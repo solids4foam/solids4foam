@@ -32,6 +32,8 @@ Description
             finiteStrain    yes;    // which update the law implements
             isotropic       yes;    // optional, default no
             linear          yes;    // optional, default no; small strain
+            referenceChecks no;     // optional, default yes: checks 1-3
+            yieldBounds     (243e6 600e6);  // optional: check 6
             fields          { T T [0 0 0 1 0 0 0] 0; }  // optional
             law             { type ...; ... }
         }
@@ -58,6 +60,17 @@ Description
          strain large enough to take the plastic laws past yield.
       5. For a linear small-strain law, doubling the strain doubles the
          stress.
+      6. For a plastic law given yieldBounds, the equivalent stress past yield
+         - at 1% strain for a small-strain law, and at the 10% of check 4 for
+         a finite-strain one, as a Kirchhoff stress - lies between the initial
+         yield stress and the last of its hardening table. This is what runs
+         the return mapping.
+
+    Every law is checked for a stiffness that is positive and finite and a
+    stress that is not zero under load, so that a law that is never reached
+    cannot pass the checks above by returning nothing. And every law the
+    runtime selection table holds must appear in constant/lawChecks, so a
+    law added without an entry fails rather than going unchecked.
 
 Author
     Philip Cardiff, UCD.
@@ -273,6 +286,8 @@ int main(int argc, char *argv[])
 
     const wordList names(lawChecks.toc());
 
+    HashSet<word> testedTypes;
+
     forAll(names, nameI)
     {
         const word& name = names[nameI];
@@ -288,6 +303,10 @@ int main(int argc, char *argv[])
         const bool isotropic =
             spec.lookupOrDefault<Switch>("isotropic", false);
         const bool linear = spec.lookupOrDefault<Switch>("linear", false);
+        const bool referenceChecks =
+            spec.lookupOrDefault<Switch>("referenceChecks", true);
+
+        testedTypes.insert(word(spec.subDict("law").lookup("type")));
 
         Info<< nl << "Law checks: " << name << endl;
 
@@ -351,7 +370,36 @@ int main(int argc, char *argv[])
             }
         }
 
+        // The law is reached and responds: a finite, positive stiffness, and
+        // a stress under load that is not zero
+        const tensor loadGradD
+        (
+            finiteStrain
+          ? tensor(0.08, 0.03, -0.02, 0.01, -0.05, 0.04, 0.02, -0.01, 0.06)
+          : tensor
+            (
+                1e-4, 0.3e-4, 0.0, 0.3e-4, -0.5e-4, 0.2e-4, 0.0, 0.2e-4, 0.7e-4
+            )
+        );
+
+        {
+            const scalar C11 = C(symmTensor::XX, symmTensor::XX);
+            const scalar sigmaLoad = mag(probe.stress(loadGradD));
+
+            const bool ok =
+                Cmax > 0 && Cmax < GREAT && C11 > 0 && sigmaLoad > 0
+             && sigmaLoad < GREAT;
+
+            check
+            (
+                ok,
+                name, "responds: positive, finite stiffness and nonzero stress",
+                ok ? 0 : 1, 0
+            );
+        }
+
         // 1. The reference state is stress free
+        if (referenceChecks)
         {
             const symmTensor sigma0(probe.stress(tensor::zero));
 
@@ -364,6 +412,7 @@ int main(int argc, char *argv[])
         }
 
         // 2. Major symmetry of the reference tangent
+        if (referenceChecks)
         {
             scalar asym = 0;
             for (label i = 0; i < 6; ++i)
@@ -383,7 +432,7 @@ int main(int argc, char *argv[])
         }
 
         // 3. The scalar tangent is lambda + 2 mu for an isotropic law
-        if (isotropic)
+        if (isotropic && referenceChecks)
         {
             scalar K = -GREAT;
             probe.stress(tensor::zero, &K);
@@ -413,12 +462,7 @@ int main(int argc, char *argv[])
         // 4. Objectivity at finite strain
         if (finiteStrain)
         {
-            const tensor A
-            (
-                0.08,  0.03, -0.02,
-                0.01, -0.05,  0.04,
-                0.02, -0.01,  0.06
-            );
+            const tensor& A = loadGradD;
 
             // 40 degrees, written without the fork-specific pi constant
             const tensor Q
@@ -460,6 +504,64 @@ int main(int argc, char *argv[])
                 err <= 1e-10,
                 name, "doubling the strain doubles the stress", err, 1e-10
             );
+        }
+
+        // 6. Past yield, the equivalent stress is on the hardening curve
+        if (spec.found("yieldBounds"))
+        {
+            const scalarList bounds(spec.lookup("yieldBounds"));
+
+            // 1% at small strain, well past yield; at finite strain the 10%
+            // of the objectivity check, measured as a Kirchhoff stress, which
+            // is what the finite-strain plastic laws' yield function bounds
+            const tensor g
+            (
+                finiteStrain
+              ? loadGradD
+              : tensor(1e-2, 0.3e-2, 0.0, 0.3e-2, -0.5e-2, 0.2e-2, 0.0, 0.2e-2,
+                    -0.5e-2)
+            );
+
+            const scalar J = finiteStrain ? det(I + g) : 1.0;
+            const symmTensor sigma(probe.stress(g));
+            const scalar sigmaEq = J*Foam::sqrt(1.5)*mag(dev(sigma));
+
+            const bool ok =
+                sigmaEq >= (1 - 1e-6)*bounds[0]
+             && sigmaEq <= (1 + 1e-6)*bounds[1];
+
+            check
+            (
+                ok,
+                name,
+                "past yield, the equivalent stress lies within yieldBounds",
+                sigmaEq, bounds[1]
+            );
+        }
+    }
+
+    // Every law that can be selected is checked
+    {
+        const wordList registered
+        (
+            mechanicalConstitutiveLaw::
+            mechanicalConstitutiveLawConstructorTablePtr_->sortedToc()
+        );
+
+        forAll(registered, i)
+        {
+            if (!testedTypes.found(registered[i]))
+            {
+                ++nFail;
+                Info<< "FAIL: " << registered[i] << ": no entry in "
+                    << "constant/lawChecks, so it is not checked" << endl;
+            }
+        }
+
+        if (testedTypes.empty())
+        {
+            ++nFail;
+            Info<< "FAIL: constant/lawChecks lists no laws" << endl;
         }
     }
 

@@ -18,9 +18,17 @@ The laws, with the constants of the tutorials that use them, are listed in
    superposed rotation, at a strain large enough to take the plastic laws
    past yield.
 5. For a linear small-strain law, doubling the strain doubles the stress.
+6. For a plastic law given `yieldBounds`, the equivalent stress past yield
+   lies between the initial yield stress and the last value of the hardening
+   table. The plasticity laws read `constant/plasticStrainVsYieldStress`,
+   which has more than two rows, so that their nonlinear hardening branch is
+   the one run.
 
-The plasticity laws read `constant/plasticStrainVsYieldStress`, which has more
-than two rows, so that their nonlinear hardening branch is the one run.
+Every law is also checked for a positive, finite stiffness and a nonzero
+stress under load, so a law that is never reached cannot pass by returning
+nothing. `electroMechanicalLaw` is listed twice, with its active tension off
+at the reference state and on from the start, so that the objectivity check
+sees the active term.
 
 Run it with:
 
@@ -29,5 +37,6 @@ Run it with:
 ```
 
 `tutorials/Alltest-regression` runs it with the tutorial regression tests.
-To add a law, give it an entry in `constant/lawChecks`; the script fails if
-any listed law is not checked.
+Every law in the runtime selection table must have an entry in
+`constant/lawChecks`: a law added without one fails the test rather than going
+unchecked.

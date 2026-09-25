@@ -24,9 +24,12 @@ FoamFile
 //
 // The plasticity laws read constant/plasticStrainVsYieldStress, which has
 // more than two rows, so that the nonlinear hardening branch is the one run.
-// electroMechanicalLaw's tension is ramped over a long time from zero, so
-// that at time 0 the reference state is stress free and the active term is
-// carried through the checks without dominating them
+// electroMechanicalLaw appears twice: with its tension ramped over a long time
+// from zero, so that at time 0 the reference state is stress free and the
+// reference checks apply, and with the tension on from the start, so that the
+// objectivity check sees the active term; the reference checks, which assume
+// a stress-free reference, are off for that one. The two plasticity laws give
+// yieldBounds, the initial yield stress and the last of the hardening table
 
 linearElastic
 {
@@ -47,6 +50,7 @@ linearElasticMisesPlastic
     finiteStrain    no;
     isotropic       yes;
     linear          no;
+    yieldBounds     (243e6 600e6);
     law
     {
         type            linearElasticMisesPlastic;
@@ -195,6 +199,7 @@ neoHookeanElasticMisesPlastic
     finiteStrain    yes;
     isotropic       yes;
     linear          no;
+    yieldBounds     (243e6 600e6);
     law
     {
         type            neoHookeanElasticMisesPlastic;
@@ -291,6 +296,34 @@ electroMechanicalLaw
         rho             rho [1 -3 0 0 0 0 0] 1000;
         activeTension   activeTension [1 -1 -2 0 0 0 0] 60e3;
         rampTime        1e6;
+        uniformFibreField yes;
+        f0              (0 0 1);
+        passiveMechanicalLaw
+        {
+            type            GuccioneElastic;
+            k               k [1 -1 -2 0 0 0 0] 2e3;
+            cf              8.0;
+            ct              2.0;
+            cfs             4.0;
+            uniformFibreField yes;
+            f0              (0 0 1);
+            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 16e6;
+        }
+    }
+}
+
+electroMechanicalLawActive
+{
+    finiteStrain    yes;
+    isotropic       no;
+    linear          no;
+    referenceChecks no;
+    law
+    {
+        type            electroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        activeTension   activeTension [1 -1 -2 0 0 0 0] 60e3;
+        rampTime        0;
         uniformFibreField yes;
         f0              (0 0 1);
         passiveMechanicalLaw
