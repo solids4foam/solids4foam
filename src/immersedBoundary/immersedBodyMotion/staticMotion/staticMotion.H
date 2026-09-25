@@ -49,7 +49,8 @@ namespace Foam
 namespace immersedBodyMotions
 {
 
-/*---------------------------------------------------------------------------*                        Class staticMotion Declaration
+/*---------------------------------------------------------------------------*\
+                        Class staticMotion Declaration
 \*---------------------------------------------------------------------------*/
 
 class staticMotion
