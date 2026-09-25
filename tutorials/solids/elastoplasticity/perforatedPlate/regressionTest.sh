@@ -129,11 +129,12 @@ extract_max_sigma() {
 extract_yielding_points() {
     # Integration points rather than cells, which is the honest description for
     # a law that may be evaluated on faces or points
+    # sed reads all its input: "head -n 1" would close the pipe early, and
+    # the resulting SIGPIPE in tail fails the script under pipefail
     grep "Number of yielding integration points" \
         "${CASE_DIR}/${SOLVER_LOGFILE}" \
         | tail -n 101 \
-        | head -n 1 \
-        | sed 's|.*= *||; s|/.*||'
+        | sed -n '1{s|.*= *||; s|/.*||; p;}'
 }
 
 # Exercise the mechanicalConstitutiveLawManager on this case. It is the only

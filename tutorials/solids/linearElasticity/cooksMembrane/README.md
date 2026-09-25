@@ -105,6 +105,14 @@ selected approach; the following files are updated:
 Subsequently, the mesh is created with `blockMesh`, followed by running the
 solver `solids4Foam`.
 
+## Verification study
+
+The opt-in [`verification/`](verification/) directory contains the structured
+mesh-convergence study formerly maintained in the `solid-benchmarks`
+repository. It checks the top-right vertical displacement against the
+very-fine finite-element range in Table 1 and is not run by normal regression
+testing. See its README for commands, acceptance criteria, and runtime details.
+
 ---
 
 ## References

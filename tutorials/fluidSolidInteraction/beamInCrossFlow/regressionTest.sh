@@ -9,6 +9,9 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 
+# Source solids4Foam scripts
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
@@ -156,6 +159,13 @@ prepare_case() {
     local coupling="$1"
     local case_name="${2:-${coupling}}"
     local case_dir="${REGRESSION_ROOT}/${case_name}"
+    local solution_setup="${coupling}"
+    local interface_condition="dirichletNeumann"
+
+    if [[ "${coupling}" == "robin" ]]; then
+        solution_setup="iqnils"
+        interface_condition="robin"
+    fi
 
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
@@ -175,17 +185,19 @@ prepare_case() {
         cd "${case_dir}"
 
         ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-        ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
-        ln -vnsf "controlDict.${coupling}" system/controlDict
-        ln -vnsf "fvSolution.${coupling}" system/fluid/fvSolution
+        ln -vnsf "solidProperties.${solution_setup}" constant/solid/solidProperties
+        ln -vnsf "controlDict.${solution_setup}" system/controlDict
+        ln -vnsf "fvSolution.${solution_setup}" system/fluid/fvSolution
+        ln -vnsf "U.${interface_condition}" 0/fluid/U
+        ln -vnsf "p.${interface_condition}" 0/fluid/p
 
 if [[ "${variant}" == "foamextend" ]]; then
-            ln -vnsf "fvSolution.${coupling}.foamextend" system/fluid/fvSolution
+            ln -vnsf "fvSolution.${solution_setup}.foamextend" system/fluid/fvSolution
         elif [[ "${variant}" == "openfoamorg" ]]; then
-            ln -vnsf "fvSolution.${coupling}.openfoamorg" system/fluid/fvSolution
+            ln -vnsf "fvSolution.${solution_setup}.openfoamorg" system/fluid/fvSolution
         fi
 
-        patch_end_time "system/controlDict.${coupling}"
+        patch_end_time "system/controlDict.${solution_setup}"
     ) > /dev/null
 
     echo "${case_dir}"
@@ -255,19 +267,33 @@ check_case() {
         force_time=""
     fi
 
-    if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
-        echo "Skipping ${coupling} regression checks because the case did not complete in this environment"
+    # A skip is only valid if the tutorial declared one in the Allrun log.
+    # Anything else that leaves the expected output missing or incomplete is a
+    # failure.
+    if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping ${coupling} regression checks because the tutorial skipped in this environment"
         return 0
+    fi
+
+    if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
+        echo "FAIL [${coupling}]: the case did not run or did not complete in this"
+        echo "      environment: expected output is missing and the tutorial did"
+        echo "      not declare a skip (see ${case_dir}/${ALLRUN_LOGFILE})"
+        return 1
     fi
 
     if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REGRESSION_END_TIME})}"; then
-        echo "Skipping ${coupling} regression checks because the displacement history did not reach the requested end time"
-        return 0
+        echo "FAIL [${coupling}]: the displacement history stops at t = ${disp_time},"
+        echo "      short of the requested end time ${REGRESSION_END_TIME}: the case"
+        echo "      did not complete"
+        return 1
     fi
 
     if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REGRESSION_END_TIME})}"; then
-        echo "Skipping ${coupling} regression checks because the force history did not reach the requested end time"
-        return 0
+        echo "FAIL [${coupling}]: the force history stops at t = ${force_time},"
+        echo "      short of the requested end time ${REGRESSION_END_TIME}: the case"
+        echo "      did not complete"
+        return 1
     fi
 
     max_disp=$(extract_max_displacement "${case_dir}")
@@ -333,6 +359,9 @@ run_case "${aitken_case}" aitken
 iqnils_case=$(prepare_case iqnils)
 run_case "${iqnils_case}" iqnils
 
+robin_case=$(prepare_case robin)
+run_case "${robin_case}" robin
+
 if [[ "${variant}" != "foamextend" ]]; then
     high_order_case=$(prepare_case iqnils highOrder)
     run_high_order_case "${high_order_case}"
@@ -347,6 +376,10 @@ check_case aitken "${aitken_case}" \
     || failures=$((failures + $?))
 
 check_case iqnils "${iqnils_case}" \
+    "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+    || failures=$((failures + $?))
+
+check_case robin "${robin_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
     || failures=$((failures + $?))
 

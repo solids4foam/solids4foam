@@ -1914,6 +1914,18 @@ void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
             << exit(FatalError);
     }
 
+    if (caseInputsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "The mesh topology changed while one or more mechanical "
+            << "constitutive law inputs are read from another case "
+            << "directory." << nl
+            << "    The input is copied by cell and face index from a static "
+            << "source mesh, so case-directory inputs cannot be combined "
+            << "with a topology-changing mesh."
+            << exit(FatalError);
+    }
+
     forAll(laws_, lawI)
     {
         if (declaresPersistentState(laws_[lawI]))
@@ -2425,6 +2437,13 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
                     continue;
                 }
 
+                // A field already supplied by another model shadows every
+                // case-directory source of the same name at evaluation time
+                if (mesh_.foundObject<volScalarField>(names[i]))
+                {
+                    continue;
+                }
+
                 forAll(laws_, otherI)
                 {
                     if (caseInputsPtr_->found(otherI, names[i]))
@@ -2476,7 +2495,7 @@ const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::rho() const
             (
                 IOobject
                 (
-                    "rho",
+                    "rhoFromLaws",
                     mesh_.time().timeName(),
                     mesh_,
                     IOobject::NO_READ,

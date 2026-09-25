@@ -1,0 +1,6 @@
+manufacturedSolution.C
+manufacturedSolutionSource.C
+manufacturedSolutionFunctionObject.C
+manufacturedSolutionFvPatchVectorField.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libmanufacturedSolution

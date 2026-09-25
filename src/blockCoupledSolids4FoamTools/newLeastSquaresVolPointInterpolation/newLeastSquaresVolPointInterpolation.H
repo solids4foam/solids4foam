@@ -205,6 +205,22 @@ class newLeastSquaresVolPointInterpolation
             const polyMesh& mesh,
             List<Type>& pointValues
         );
+
+        //- Gradient-corrected interpolation of internal fields
+        //  Private because writing a GeometricField through its
+        //  DimensionedField base class bypasses
+        //  GeometricField::storeOldTimes(), leaving a stale oldTime();
+        //  use the GeometricField overload instead
+        template<class Type>
+        void interpolate
+        (
+            const DimensionedField<Type, volMesh>& vf,
+            const DimensionedField
+            <
+                typename outerProduct<vector, Type>::type, volMesh
+            >& gradVf,
+            DimensionedField<Type, pointMesh>& pf
+        ) const;
 #endif
 
         //- Disallow default bitwise copy construct
@@ -354,12 +370,14 @@ public:
         template<class Type>
         void interpolate
         (
-            const DimensionedField<Type, volMesh>& vf,
-            const DimensionedField
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const GeometricField
             <
-                typename outerProduct<vector, Type>::type, volMesh
+                typename outerProduct<vector, Type>::type,
+                fvPatchField,
+                volMesh
             >& gradVf,
-            DimensionedField<Type, pointMesh>& pf
+            GeometricField<Type, pointPatchField, pointMesh>& pf
         ) const;
 
         //- Interpolate from volField to pointField

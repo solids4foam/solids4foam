@@ -12,7 +12,7 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ============================================================
 
 REG_END_TIME=2
-MODE="iqnils"
+MODE="robin"
 
 # Regression tolerances
 #
@@ -40,7 +40,14 @@ FSI_RES_MAX=1e-5
 # The tolerance is widened from 1e-3 to 3e-3 because the spread between
 # OpenFOAM.com versions grew to about 2.6e-3 after the change, which the old
 # tolerance could not accommodate with a single reference value.
-REF_APEX_DY=-0.479
+# Reference updated from -0.479 when the Robin interface convergence criteria
+# were added (interface pressure change and leakage): the displacement-only
+# criterion accepted most steps after about one FSI iteration, while the
+# converged coupling needs about six to nine and gives -0.4822 (-0.4817 to
+# -0.4826 across coupling methods and Robin coefficient models on
+# OpenFOAM-v2412). The regression uses the default robin mode (fixed
+# relaxation 1, automatic Robin coefficient).
+REF_APEX_DY=-0.4822
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_disp.dat"
@@ -115,6 +122,8 @@ extract_final_fsi_residual() {
 prepare_case
 run_case
 
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing or incomplete is a failure.
 if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     echo "Skipping regression checks because the tutorial skipped in this environment"
     exit 0
@@ -124,18 +133,22 @@ apex_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
 fsi_time=$(latest_numeric_time "${CASE_DIR}/${FSI_RES_FILE}" || true)
 
 if [[ -z "${apex_time}" || -z "${fsi_time}" ]]; then
-    echo "Skipping regression checks because the case did not complete in this environment"
-    exit 0
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      expected output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${apex_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the apex history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the apex history stops at t = ${apex_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 if ! awk "BEGIN {exit !(${fsi_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "Skipping regression checks because the FSI residual history did not reach the requested end time"
-    exit 0
+    echo "FAIL: the FSI residual history stops at t = ${fsi_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
 fi
 
 apex_dy=$(extract_final_apex_dy)

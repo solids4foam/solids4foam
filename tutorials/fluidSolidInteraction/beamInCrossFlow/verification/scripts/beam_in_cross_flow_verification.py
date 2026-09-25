@@ -40,18 +40,26 @@ def replace_entry(path: Path, key: str, value: str) -> None:
 
 def set_case_form(case: Path, form: str, delta_t: float | None = None,
                   end_time: float | None = None) -> None:
-    u_file = case / "0/fluid/U"
+    u_files = [
+        case / "0/fluid/U.dirichletNeumann",
+        case / "0/fluid/U.robin",
+    ]
+    u_files = [path for path in u_files if path.is_file()]
+    if not u_files:
+        u_files = [case / "0/fluid/U"]
     mechanical = case / "constant/solid/mechanicalProperties"
     control = case / "system/controlDict.iqnils"
     if form == "original":
-        replace_entry(u_file, "maxVelocity", "0.2")
-        replace_entry(u_file, "timeVaryingEndTime", "4.0")
-        replace_entry(u_file, "timeAtMaxVelocity", "4.0")
+        for u_file in u_files:
+            replace_entry(u_file, "maxVelocity", "0.2")
+            replace_entry(u_file, "timeVaryingEndTime", "4.0")
+            replace_entry(u_file, "timeAtMaxVelocity", "4.0")
         replace_entry(mechanical, "E", "E [1 -1 -2 0 0 0 0] 1.4e6")
     elif form == "modified":
-        replace_entry(u_file, "maxVelocity", "0.3")
-        replace_entry(u_file, "timeVaryingEndTime", "1.0")
-        replace_entry(u_file, "timeAtMaxVelocity", "1.0")
+        for u_file in u_files:
+            replace_entry(u_file, "maxVelocity", "0.3")
+            replace_entry(u_file, "timeVaryingEndTime", "1.0")
+            replace_entry(u_file, "timeAtMaxVelocity", "1.0")
         replace_entry(mechanical, "E", "E [1 -1 -2 0 0 0 0] 1e4")
     else:
         fail(f"Unknown case form: {form}")
@@ -125,12 +133,13 @@ def copy_case(name: str) -> Path:
     return destination
 
 
-def run_case(case: Path, label: str, cores: int) -> None:
+def run_case(case: Path, label: str, cores: int,
+             coupling: str = "iqnils") -> None:
     allrun = case / "Allrun"
     if not allrun.is_file():
         fail(f"Missing {allrun}")
     log = case / "log.Allverify"
-    command = [str(allrun), "iqnils"]
+    command = [str(allrun), coupling]
     if cores > 1:
         for dictionary in (
             case / "system/decomposeParDict",
@@ -148,8 +157,14 @@ def run_case(case: Path, label: str, cores: int) -> None:
     if not solver_log.is_file():
         fail(f"{label} did not create {solver_log}")
     solver_text = solver_log.read_text(errors="replace")
-    if re.search(r"FOAM FATAL|FOAM aborting|^ERROR$", solver_text, re.MULTILINE):
+    if re.search(
+        r"FOAM FATAL|FOAM aborting|PRTE ERROR|No sockets were able|^ERROR$",
+        solver_text,
+        re.MULTILINE,
+    ):
         fail(f"{label} failed inside Allrun; see {solver_log}")
+    if not re.search(r"^End\s*$", solver_text, re.MULTILINE):
+        fail(f"{label} did not run to completion; see {solver_log}")
 
 
 def numeric_rows(path: Path):
@@ -248,14 +263,108 @@ def relative_error(value: float, reference: float) -> float:
     return abs(value - reference) / abs(reference) if reference else abs(value - reference)
 
 
-def extract(case: Path, evaluation_time: float | None) -> dict[str, float]:
-    time, displacement = vector_at_or_before(find_displacement(case), evaluation_time)
-    force_time, force = force_at_or_before(find_force(case), evaluation_time)
+def require_end_time(path: Path, time: float, end_time: float | None) -> None:
+    """Fail unless the history in path reaches the requested end time."""
+    if end_time is not None and not math.isclose(
+        time, end_time, rel_tol=1e-6, abs_tol=1e-12
+    ):
+        fail(f"{path} ends at t={time:g}, not at the end time t={end_time:g}")
+
+
+def extract(case: Path, evaluation_time: float | None,
+            end_time: float | None = None) -> dict[str, float]:
+    displacement_path = find_displacement(case)
+    force_path = find_force(case)
+    time, displacement = vector_at_or_before(displacement_path, evaluation_time)
+    force_time, force = force_at_or_before(force_path, evaluation_time)
+    require_end_time(displacement_path, time, end_time)
+    require_end_time(force_path, force_time, end_time)
     return {"evaluation_time": time, "force_time": force_time, "ux": displacement[0],
             "uy": displacement[1], "uz": displacement[2], "fx": force[0],
             "fy": force[1], "fz": force[2],
             "uz_symmetry_difference": 2.0 * displacement[2],
             "cell_count": cell_count(case)}
+
+
+def robin_residual_summary(case: Path,
+                           end_time: float | None = None) -> dict[str, float]:
+    path = case / "postProcessing/fsiResiduals.dat"
+    if not path.is_file():
+        fail(f"Robin residual data not found in {case}")
+    rows = [fields for _, fields in numeric_rows(path)]
+    if not rows or any(len(fields) < 5 for fields in rows):
+        fail(f"Robin residual columns are missing from {path}")
+
+    # Columns: time, iteration, displacement, pressure and leakage-flux
+    # residuals and (when written) the Robin convergence state (0 not
+    # converged, 1 converged, 2 stalled within the stall tolerance). The
+    # state column is located by header name so that older files with
+    # additional columns are read correctly.
+    header = path.read_text(errors="replace").splitlines()[0].split()
+    state_index = (
+        header.index("robinConvergenceState")
+        if "robinConvergenceState" in header else None
+    )
+    final_by_time: dict[float, list[float]] = {}
+    states: dict[float, float] = {}
+    for fields in rows:
+        values = [float(value) for value in fields[:5]]
+        final_by_time[values[0]] = values
+        if state_index is not None and len(fields) > state_index:
+            states[values[0]] = float(fields[state_index])
+    require_end_time(path, max(final_by_time), end_time)
+
+    pressure_tolerance = dictionary_scalar(
+        case / "constant/fsiProperties.robin", "robinPressureTolerance"
+    )
+    flux_tolerance = dictionary_scalar(
+        case / "constant/fsiProperties.robin", "robinFluxTolerance"
+    )
+    displacement_tolerance = dictionary_scalar(
+        case / "constant/fsiProperties.robin", "outerCorrTolerance"
+    )
+    n_outer_corr = int(dictionary_scalar(
+        case / "constant/fsiProperties.robin", "nOuterCorr"
+    ))
+    def converged(values: list[float]) -> bool:
+        # The solver may accept a step whose latest residuals exceed the
+        # tolerances (stalled residuals); use its convergence state if written
+        if values[0] in states:
+            return states[values[0]] > 0
+        return (
+            values[2] <= displacement_tolerance
+            and values[3] <= pressure_tolerance
+            and values[4] <= flux_tolerance
+        )
+
+    unconverged = [
+        values for values in final_by_time.values() if not converged(values)
+    ]
+    if unconverged:
+        fail(
+            f"{len(unconverged)} Robin time step(s) reached nOuterCorr "
+            "without satisfying all convergence criteria"
+        )
+
+    return {
+        "total_outer_iterations": sum(values[1] for values in final_by_time.values()),
+        "maximum_outer_iterations": max(values[1] for values in final_by_time.values()),
+        "n_outer_corr": n_outer_corr,
+        "maximum_final_displacement_residual": max(values[2] for values in final_by_time.values()),
+        "maximum_final_pressure_residual": max(values[3] for values in final_by_time.values()),
+        "maximum_final_flux_residual": max(values[4] for values in final_by_time.values()),
+    }
+
+
+def dictionary_scalar(path: Path, key: str) -> float:
+    match = re.search(
+        rf"^\s*{re.escape(key)}\s+([-+0-9.eE]+)\s*;",
+        path.read_text(),
+        flags=re.MULTILINE,
+    )
+    if not match:
+        fail(f"Could not read '{key}' from {path}")
+    return float(match.group(1))
 
 
 def observed_order(coarse: float, medium: float, fine: float) -> float | None:
@@ -355,18 +464,108 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
         writer.writerows(rows)
     summary = OUTPUT_ROOT / "verification_summary.md"
     with summary.open("a") as handle:
-        handle.write(f"## {name}\\n\\n")
-        handle.write(f"- Result: {'PASS' if passed else 'FAIL'}\\n")
+        handle.write(f"## {name}\n\n")
+        handle.write(f"- Result: {'PASS' if passed else 'FAIL'}\n")
         if order is not None:
-            handle.write(f"- Solution-change order for u_x(A): {order:.3f}\\n")
+            handle.write(f"- Solution-change order for u_x(A): {order:.3f}\n")
         for quantity, reference_order in (reference_orders or {}).items():
             displayed_order = (
                 "infinite" if reference_order == math.inf
                 else f"{reference_order:.3f}" if reference_order is not None
                 else "undefined"
             )
-            handle.write(f"- Reference-error order for {quantity}: {displayed_order}\\n")
-        handle.write(f"- Data: `{csv_path.name}`\\n\\n")
+            handle.write(f"- Reference-error order for {quantity}: {displayed_order}\n")
+        handle.write(f"- Data: `{csv_path.name}`\n\n")
+    print(f"{name}: {'PASS' if passed else 'FAIL'}; results: {csv_path}")
+    return passed
+
+
+def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
+    mesh_spec = references[args.case].get("mesh", references["mesh"])
+    delta_t = mesh_spec["deltaTs"][0]
+    end_time = mesh_spec["endTime"]
+    cores = study_cores(args.cores, args.case, 1)
+    results: dict[str, dict[str, float]] = {}
+
+    for coupling in ("iqnils", "robin"):
+        case = copy_case(f"{args.case}_coupling_{coupling}")
+        set_case_form(case, args.case, delta_t, end_time)
+        configure_time_scheme(case, args.time_scheme)
+        configure_output(case, delta_t, end_time, args.write_interval)
+        run_case(case, f"{coupling} coupling", cores, coupling)
+        results[coupling] = extract(case, None, end_time)
+        if coupling == "robin":
+            results[coupling].update(robin_residual_summary(case, end_time))
+
+    primary_quantities = [
+        quantity
+        for quantity, spec in references[args.case]["references"].items()
+        if spec.get("primary", True)
+    ]
+    comparison_errors = {
+        quantity: relative_error(
+            results["robin"][quantity], results["iqnils"][quantity]
+        )
+        for quantity in primary_quantities
+    }
+    comparison_tolerance = references["coupling"]["relativeTolerance"]
+    passed = all(
+        error <= comparison_tolerance for error in comparison_errors.values()
+    )
+    name = f"{args.case}_coupling_comparison"
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
+    csv_path = OUTPUT_ROOT / f"{name}.csv"
+    columns = [
+        "case", "study", "coupling", "time_scheme", "cell_count", "delta_t",
+        "cores", "evaluation_time", "ux", "uy", "uz", "fx", "fy", "fz",
+        "uz_symmetry_difference", "comparison_tolerance",
+    ]
+    columns += [f"{quantity}_vs_iqnils_relative_error" for quantity in primary_quantities]
+    columns += [
+        "total_outer_iterations", "maximum_outer_iterations", "n_outer_corr",
+        "maximum_final_displacement_residual",
+        "maximum_final_pressure_residual", "maximum_final_flux_residual", "pass",
+    ]
+    rows = []
+    for coupling in ("iqnils", "robin"):
+        row = dict(results[coupling])
+        row.update({
+            "case": args.case,
+            "study": "coupling",
+            "coupling": coupling,
+            "time_scheme": args.time_scheme,
+            "delta_t": delta_t,
+            "cores": cores,
+            "comparison_tolerance": comparison_tolerance,
+            "pass": passed,
+        })
+        if coupling == "robin":
+            for quantity, error in comparison_errors.items():
+                row[f"{quantity}_vs_iqnils_relative_error"] = error
+        rows.append(row)
+    with csv_path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+    summary = OUTPUT_ROOT / "verification_summary.md"
+    with summary.open("a") as handle:
+        handle.write(f"## {name}\n\n")
+        handle.write(f"- Result: {'PASS' if passed else 'FAIL'}\n")
+        for quantity, error in comparison_errors.items():
+            handle.write(
+                f"- Robin vs IQN-ILS relative difference for {quantity}: "
+                f"{error:.6g}\n"
+            )
+        handle.write(
+            "- Worst converged Robin pressure residual: "
+            f"{results['robin']['maximum_final_pressure_residual']:.6g}\n"
+        )
+        handle.write(
+            "- Worst converged Robin leakage-flux residual: "
+            f"{results['robin']['maximum_final_flux_residual']:.6g}\n"
+        )
+        handle.write(f"- Data: `{csv_path.name}`\n\n")
     print(f"{name}: {'PASS' if passed else 'FAIL'}; results: {csv_path}")
     return passed
 
@@ -374,7 +573,7 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", choices=("original", "modified"), required=True)
-    parser.add_argument("--study", choices=("mesh",), required=True)
+    parser.add_argument("--study", choices=("mesh", "coupling"), required=True)
     parser.add_argument("--cores", default="auto", help="MPI ranks per case: positive integer or auto (default)")
     parser.add_argument("--write-interval", type=int, help="write every N time steps (default: final time only)")
     parser.add_argument(
@@ -398,8 +597,10 @@ def main() -> int:
         fail(f"Tutorial not found at {TUTORIAL}")
     references = json.loads(REFERENCE_FILE.read_text())
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    (OUTPUT_ROOT / "verification_summary.md").write_text("# beamInCrossFlow verification summary\\n\\n")
+    (OUTPUT_ROOT / "verification_summary.md").write_text("# beamInCrossFlow verification summary\n\n")
     rows: list[dict] = []
+    if args.study == "coupling":
+        return 0 if run_coupling_study(args, references) else 1
     if args.study == "mesh":
         mesh_spec = references[args.case].get("mesh", references["mesh"])
         mesh_end_time = mesh_spec["endTime"]
@@ -417,7 +618,7 @@ def main() -> int:
             refine_mesh(case / "system/solid/blockMeshDict", factor)
             cores = study_cores(args.cores, args.case, factor)
             run_case(case, f"mesh level {factor}x", cores)
-            row = extract(case, None)
+            row = extract(case, None, mesh_end_time)
             row.update({"case": args.case, "study": "mesh", "time_scheme": args.time_scheme, "mesh_level": level, "delta_t": mesh_delta_t, "cores": cores})
             rows.append(row)
         name = f"{args.case}_mesh_sweep{scheme_suffix}"

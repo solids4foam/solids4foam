@@ -54,6 +54,13 @@ void pimpleFluid::updateRobinFsiInterface
     surfaceScalarField& phiHbyA
 )
 {
+    // Mesh flux subtracted from the absolute flux by fvc::makeRelative
+    tmp<surfaceScalarField> tmeshPhi;
+    if (robinKinematicConsistency_ && mesh().moving())
+    {
+        tmeshPhi = fvc::meshPhi(U());
+    }
+
     forAll(p().boundaryField(), patchI)
     {
         if
@@ -85,62 +92,90 @@ void pimpleFluid::updateRobinFsiInterface
                 mesh().ddtScheme("ddt(" + U().name() +')')
             );
 
+            // The interface flux is the old interface velocity plus the
+            // Robin (pressure gradient) acceleration term added by the
+            // pressure equation. The old velocity is the old wall velocity
+            // (set by elasticWallVelocity from the mesh motion) or the old
+            // fluid face velocity
+            const vectorField& Sf = mesh().Sf().boundaryField()[patchI];
+            const vectorField U0
+            (
+                robinFluxFromWallVelocity_
+              ? vectorField(U().oldTime().boundaryField()[patchI])
+              : vectorField(Uf_().oldTime().boundaryField()[patchI])
+            );
+
+            const bool backward =
+                ddtScheme == fv::backwardDdtScheme<vector>::typeName;
+
             if
             (
-                ddtScheme
-             == fv::EulerDdtScheme<vector>::typeName
+                ddtScheme == fv::EulerDdtScheme<vector>::typeName
+             || (backward && runTime().timeIndex() == 1)
             )
             {
-                phiHbyA.boundaryFieldRef()[patchI] =
-                (
-                    Uf_().oldTime().boundaryField()[patchI] &
-                    mesh().Sf().boundaryField()[patchI]
-                );
+                phiHbyA.boundaryFieldRef()[patchI] = (U0 & Sf);
 
                 rAU_.boundaryFieldRef()[patchI] =
                     runTime().deltaT().value();
             }
-            else if
-            (
-                ddtScheme
-             == fv::backwardDdtScheme<vector>::typeName
-            )
+            else if (backward)
             {
-                if(runTime().timeIndex() == 1)
-                {
-                    phiHbyA.boundaryFieldRef()[patchI] =
+                const vectorField U00
+                (
+                    robinFluxFromWallVelocity_
+                  ? vectorField
                     (
-                        Uf_().oldTime().boundaryField()[patchI] &
-                        mesh().Sf().boundaryField()[patchI]
-                    );
+                        U().oldTime().oldTime().boundaryField()[patchI]
+                    )
+                  : vectorField
+                    (
+                        Uf_().oldTime().oldTime().boundaryField()[patchI]
+                    )
+                );
 
-                    rAU_.boundaryFieldRef()[patchI] =
-                        runTime().deltaT().value();
-                }
-                else
-                {
-                    scalar deltaT = runTime().deltaT().value();
-                    scalar deltaT0 = runTime().deltaT0().value();
+                scalar deltaT = runTime().deltaT().value();
+                scalar deltaT0 = runTime().deltaT0().value();
 
-                    scalar Cn = 1 + deltaT/(deltaT + deltaT0);
-                    scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-                    scalar Co = Cn + Coo;
+                scalar Cn = 1 + deltaT/(deltaT + deltaT0);
+                scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+                scalar Co = Cn + Coo;
 
-                    phiHbyA.boundaryFieldRef()[patchI] =
-                        (Co/Cn)*
-                        (
-                            Uf_().oldTime().boundaryField()[patchI] &
-                            mesh().Sf().boundaryField()[patchI]
-                        )
-                      - (Coo/Cn)*
-                        (
-                            Uf_().oldTime().oldTime().boundaryField()[patchI] &
-                            mesh().Sf().boundaryField()[patchI]
-                        );
+                phiHbyA.boundaryFieldRef()[patchI] =
+                    (Co/Cn)*(U0 & Sf) - (Coo/Cn)*(U00 & Sf);
 
-                    rAU_.boundaryFieldRef()[patchI] = deltaT/Cn;
-                }
+                rAU_.boundaryFieldRef()[patchI] = deltaT/Cn;
             }
+
+            // Kinematic consistency: the pressure equation gives the
+            // interface flux phiHbyA + rAU*a_n*|Sf|, where a_n is the normal
+            // acceleration imposed by the Robin condition, which equals the
+            // solid acceleration a_s at convergence. Replacing the old-
+            // velocity flux by meshPhi - rAU*a_s*|Sf| makes the converged
+            // flux equal to the mesh flux (no leakage through the moving
+            // wall), without changing the Robin condition itself
+            elasticWallPressureFvPatchScalarField& pRobin =
+                refCast<elasticWallPressureFvPatchScalarField>
+                (
+                    p().boundaryFieldRef()[patchI]
+                );
+
+            // Only if the mesh follows the solid: with under-relaxation or
+            // interface acceleration the mesh lags the solid during the
+            // iterations and must not enter the flux
+            const bool consistent =
+                tmeshPhi.valid() && pRobin.fluidMeshFollowsSolid();
+
+            if (consistent)
+            {
+                phiHbyA.boundaryFieldRef()[patchI] =
+                    tmeshPhi().boundaryField()[patchI]
+                  - rAU_.boundaryField()[patchI]
+                   *pRobin.prevNormalAcceleration()
+                   *mesh().magSf().boundaryField()[patchI];
+            }
+
+            pRobin.setKinematicConsistency(consistent);
         }
         else if
         (
@@ -202,6 +237,14 @@ pimpleFluid::pimpleFluid
     moveMeshOuterCorrectors_
     (
         pimple().dict().lookupOrDefault("moveMeshOuterCorrectors", false)
+    ),
+    robinFluxFromWallVelocity_
+    (
+        pimple().dict().lookupOrDefault("robinFluxFromWallVelocity", true)
+    ),
+    robinKinematicConsistency_
+    (
+        pimple().dict().lookupOrDefault("robinKinematicConsistency", true)
     ),
     cumulativeContErr_(0),
     solveEnergyEq_

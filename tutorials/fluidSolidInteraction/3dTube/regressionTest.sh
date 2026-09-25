@@ -5,6 +5,7 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+UNMASKED_CASE_DIR="${REGRESSION_ROOT}/unmaskedPointD"
 BACKWARD_CASE_DIR="${REGRESSION_ROOT}/backwardRestart"
 
 # Source solids4Foam scripts
@@ -28,6 +29,15 @@ BACKWARD_WRITE_INTERVAL=2.5e-5
 
 # Number of samples from end of force.dat to average
 FORCE_AVG_SAMPLES=50
+
+# Interface motion check: the inlet/outlet pointD patches are changed from
+# fixedValue to calculated, which removes the fixedValue pointD patches that
+# otherwise store pointD.oldTime() correctly regardless of the interpolation.
+# Each step, the fluid wall motion must then equal the solid interface pointD
+# increment. Step 1 is not checked as it is 1 even when pointD.oldTime() is
+# stale.
+UNMASKED_END_TIME=0.00025   # 10 time steps
+MOTION_RATIO_TOL=1e-3       # per-step |1 - ratio| tolerance
 
 # Reference values at REG_END_TIME
 REF_MAX_DISP=2.23646e-07
@@ -60,6 +70,7 @@ echo "3dTube FSI regression test"
 echo "Regression end time         = ${REG_END_TIME}"
 echo "Max displacement difference < ${DISP_MAX_TOL}"
 echo "Mean force difference       < ${FORCE_MEAN_TOL}"
+echo "Interface motion ratio      |1 - r| < ${MOTION_RATIO_TOL}"
 echo "============================================================"
 echo
 
@@ -79,9 +90,22 @@ copy_case() {
 }
 
 prepare_case() {
-    copy_case "${CASE_DIR}"
+    local case_dir="$1"
+    local end_time="$2"
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+    copy_case "${case_dir}"
+
+    sed -i "s/^\(endTime[[:space:]]*\).*/\1${end_time};/" "${case_dir}/system/controlDict"
+}
+
+prepare_unmasked_case() {
+    prepare_case "${UNMASKED_CASE_DIR}" "${UNMASKED_END_TIME}"
+
+    # The inlet and outlet are the only fixedValue pointD patches
+    sed -i "s/fixedValue/calculated/" "${UNMASKED_CASE_DIR}/0/solid/pointD"
+
+    sed -i '/^functions/,/^{/ s/^{/{\n    #include "interfaceMotionRatio"/' \
+        "${UNMASKED_CASE_DIR}/system/controlDict"
 }
 
 # Against the legacy answer.
@@ -214,11 +238,18 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    prepare_case
+    prepare_case "${CASE_DIR}" "${REG_END_TIME}"
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
+fi
+
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing or incomplete is a failure.
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
 fi
 
 disp_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
@@ -229,27 +260,22 @@ else
     force_time=""
 fi
 
-# The one supported reason not to run is the environment the case declares it
-# needs (PETSc); Allrun then says so, and that is a skip. A run that starts
-# and stops short is a failure, not a skip: it used to exit 0 here, which kept
-# a crash on OpenFOAM.org and foam-extend green for as long as it lasted (#455)
-if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-    echo "Skipping regression checks because the case does not run in this environment"
-    exit 0
-fi
-
 if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
-    echo "FAIL: the case produced no displacement or force history"
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      expected output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
     exit 1
 fi
 
 if ! awk "BEGIN {exit !(${disp_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "FAIL: the case stopped at ${disp_time}, before the requested end time ${REG_END_TIME}"
+    echo "FAIL: the displacement history stops at t = ${disp_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
     exit 1
 fi
 
 if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
-    echo "FAIL: the force history stopped at ${force_time}, before the requested end time ${REG_END_TIME}"
+    echo "FAIL: the force history stops at t = ${force_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
     exit 1
 fi
 
@@ -349,6 +375,53 @@ else
     printf "FAIL: mean force = %.6g (Δ = %.3g)\n" \
         "${mean_force}" "${force_diff_abs}"
     failures=$((failures + 1))
+fi
+
+# Coded function objects are not available in foam-extend
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    echo "SKIP: interface motion check (requires a coded function object)"
+else
+    if [ "$CHECK_ONLY" = false ]; then
+        prepare_unmasked_case
+        ( cd "${UNMASKED_CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+        ( cd "${UNMASKED_CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) \
+            || true
+    fi
+
+    # OpenFOAM-9 also executes the function object at the start time, so it
+    # reports step 1 too; step 1 is dropped here on every version
+    ratio_file="${UNMASKED_CASE_DIR}/interfaceMotionRatio.dat"
+    grep -h "^interfaceMotionRatio " \
+        "${UNMASKED_CASE_DIR}/log.solids4Foam" 2>/dev/null \
+        | awk -v dt=2.5e-5 '$2 > 1.5*dt {print $2, $3}' > "${ratio_file}" \
+        || true
+
+    n_expected=$(awk -v t="${UNMASKED_END_TIME}" -v dt=2.5e-5 \
+        'BEGIN {printf "%d", t/dt - 1 + 0.5}')
+    n_ratio=$(wc -l < "${ratio_file}")
+
+    worst=$(awk '
+        {
+            d = $2 - 1
+            if (d < 0) d = -d
+            if (d > worst) { worst = d; time = $1; ratio = $2 }
+        }
+        END { printf "%.3g %s %s", worst, time, ratio }
+    ' "${ratio_file}")
+    IFS=" " read -r worst_diff worst_time worst_ratio <<< "${worst}"
+
+    if (( n_ratio != n_expected )); then
+        printf "FAIL: interface motion ratio: %d of %d steps reported\n" \
+            "${n_ratio}" "${n_expected}"
+        failures=$((failures + 1))
+    elif awk "BEGIN {exit !(${worst_diff} < ${MOTION_RATIO_TOL})}"; then
+        printf "PASS: interface motion ratio, worst |1 - r| = %s over %d steps\n" \
+            "${worst_diff}" "${n_ratio}"
+    else
+        printf "FAIL: interface motion ratio = %s at t = %s (|1 - r| = %s)\n" \
+            "${worst_ratio}" "${worst_time}" "${worst_diff}"
+        failures=$((failures + 1))
+    fi
 fi
 
 echo

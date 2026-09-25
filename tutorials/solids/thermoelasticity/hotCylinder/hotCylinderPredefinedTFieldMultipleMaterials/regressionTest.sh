@@ -243,10 +243,12 @@ check_arm() {
     fi
 
     # The input must have come from the temperature case, and at the last time
-    # too, not merely once at the start
+    # too, not merely once at the start. OpenFOAM.com quotes the path it logs
+    # and the other forks do not, so the quote is optional; the end of the
+    # line is not, or time 4 would match 40
     if ! grep "${FRAMEWORK_T_READ}" "${dir}/${SOLVER_LOGFILE}" \
         | tail -n 1 \
-        | grep -q "hotCylinderTemperatureField/${COMPARISON_END_TIME}\""
+        | grep -Eq "hotCylinderTemperatureField/${COMPARISON_END_TIME}\"?$"
     then
         echo "FAIL: ${dir##*/} did not read T from" \
             "hotCylinderTemperatureField/${COMPARISON_END_TIME}"

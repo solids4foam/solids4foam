@@ -1001,6 +1001,8 @@ bool IQNILSCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
+    bool converged = false;
+
     // Check if coupling switch needs to be updated
     if (!coupled())
     {
@@ -1050,17 +1052,14 @@ bool IQNILSCouplingInterface::evolve()
         }
 
         // Optional: write residuals to file
-        if (writeResidualsToFile() && Pstream::master())
-        {
-            residualFile()
-                << runTime().value() << " "
-                << outerCorr() << " "
-                << residualNorm << endl;
-        }
-    }
-    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
+        writeResidualLine(residualNorm);
 
-    if (!(residualNorm <= outerCorrTolerance()))
+        // Displacement residual and, on Robin interfaces, the Robin criteria
+        converged = couplingConverged(residualNorm);
+    }
+    while (!converged && outerCorr() < nOuterCorr());
+
+    if (!converged)
     {
         if (allowUnconvergedCoupling())
         {

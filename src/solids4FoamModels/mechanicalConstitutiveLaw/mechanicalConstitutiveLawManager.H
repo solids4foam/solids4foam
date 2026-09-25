@@ -154,12 +154,12 @@ class mechanicalConstitutiveLawManager
         //  on demand, which in practice means once per topology size
         mutable List<symmTensor> scratchStress_;
 
-        //- Density field
         //- Mechanical constitutive law index of each cell.
         //  Needed by the flat-list boundary update for patches that carry no
         //  fvPatch faces, where lawBoundaryFaces_ cannot supply the law
         labelList cellToLaw_;
 
+        //- Unregistered material density used to initialise solver fields
         mutable autoPtr<volScalarField> rhoPtr_;
 
         //- Bulk modulus field
@@ -1041,7 +1041,7 @@ public:
             const word& topologyTypeName
         ) const;
 
-        //- Const-access to the density field
+        //- Const-access to the unregistered material-density fallback field
         const volScalarField& rho() const;
 
         //- Const-access to the bulk modulus field

@@ -1,0 +1,31 @@
+{
+  "default_levels": [5, 10, 20, 40],
+  "domain_length_m": 0.2,
+  "default_variants": [
+    "hex-segregated",
+    "hex-petscSnes",
+    "poly-segregated",
+    "poly-petscSnes",
+    "distHex-segregated",
+    "distHex-petscSnes"
+  ],
+  "variants": {
+    "hex-segregated": {"mesh": "hex", "approach": "segregated"},
+    "hex-petscSnes": {"mesh": "hex", "approach": "petscSnes"},
+    "tet-segregated": {"mesh": "tet", "approach": "segregated"},
+    "tet-petscSnes": {"mesh": "tet", "approach": "petscSnes"},
+    "poly-segregated": {"mesh": "poly", "approach": "segregated"},
+    "poly-petscSnes": {"mesh": "poly", "approach": "petscSnes"},
+    "distHex-segregated": {"mesh": "distHex", "approach": "segregated"},
+    "distHex-petscSnes": {"mesh": "distHex", "approach": "petscSnes"}
+  },
+  "acceptance": {
+    "required_metrics": [
+      "displacement_l2_m",
+      "displacement_linf_m",
+      "stress_l2_pa",
+      "stress_linf_pa"
+    ],
+    "minimum_net_order": 0.0
+  }
+}

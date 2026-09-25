@@ -1,0 +1,70 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+
+// Used by regressionTest.sh, which includes it in the controlDict functions.
+//
+// Prints, for every time step after the first, the ratio of the fluid wall
+// point motion to the solid interface pointD increment over that step. With a
+// conformal interface and a converged coupling the ratio is 1. The previous
+// values are stored here rather than taken from pointD.oldTime() and
+// mesh.oldPoints(), so that the check does not depend on the code it tests.
+
+interfaceMotionRatio
+{
+    type            coded;
+    libs            ("libutilityFunctionObjects.so");
+    name            interfaceMotionRatio;
+    region          fluid;
+
+    codeInclude
+    #{
+        #include "pointFields.H"
+    #};
+
+    codeData
+    #{
+        vectorField prevSolidPointD_;
+        vectorField prevFluidPoints_;
+    #};
+
+    codeExecute
+    #{
+        const fvMesh& solidMesh =
+            mesh().time().lookupObject<fvMesh>("solid");
+        const pointVectorField& pointD =
+            solidMesh.lookupObject<pointVectorField>("pointD");
+
+        const labelList& solidMeshPoints =
+            solidMesh.boundaryMesh()
+            [
+                solidMesh.boundaryMesh().findPatchID("inner-wall")
+            ].meshPoints();
+        const labelList& fluidMeshPoints =
+            mesh().boundaryMesh()
+            [
+                mesh().boundaryMesh().findPatchID("wall")
+            ].meshPoints();
+
+        const vectorField solidPointD(pointD.primitiveField(), solidMeshPoints);
+        const vectorField fluidPoints(mesh().points(), fluidMeshPoints);
+
+        if (prevSolidPointD_.size())
+        {
+            const scalar solidIncr = gSum(mag(solidPointD - prevSolidPointD_));
+            const scalar fluidIncr = gSum(mag(fluidPoints - prevFluidPoints_));
+
+            Info<< "interfaceMotionRatio " << mesh().time().timeName() << " "
+                << fluidIncr/max(solidIncr, VSMALL) << endl;
+        }
+
+        prevSolidPointD_ = solidPointD;
+        prevFluidPoints_ = fluidPoints;
+    #};
+}
+
+// ************************************************************************* //

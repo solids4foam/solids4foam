@@ -2406,7 +2406,7 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
                 "rho",
                 mesh().time().timeName(),
                 mesh(),
-                IOobject::NO_READ,
+                IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
             mechanicalManager().rho()

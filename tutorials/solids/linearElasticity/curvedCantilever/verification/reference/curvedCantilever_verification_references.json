@@ -1,0 +1,20 @@
+{
+  "default_levels": [1, 2, 3, 4],
+  "default_variants": ["petscSnes"],
+  "tutorial_level": 2,
+  "variants": {
+    "petscSnes": {"approach": ""}
+  },
+  "sample": {
+    "file": "postProcessing/sample/*/line_analyticalStress_sigma.xy",
+    "components": {
+      "sigma_xx": {"analytical_column": 3, "computed_column": 9},
+      "sigma_xy": {"analytical_column": 4, "computed_column": 10},
+      "sigma_yy": {"analytical_column": 6, "computed_column": 12}
+    }
+  },
+  "acceptance": {
+    "relative_l2_tolerance": 0.05,
+    "minimum_net_order": 0.5
+  }
+}

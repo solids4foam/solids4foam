@@ -1,0 +1,88 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+usage() {
+cat <<'USAGE'
+Usage:
+  ./Allrun [approach]
+
+Where [approach] is one of:
+  petscSnes         (default) Jacobian-free Newton-Krylov via PETSc SNES
+  segregated        segregated (outer-iteration) approach; approx. 3 times
+                    slower than petscSnes for this case
+
+Examples:
+  ./Allrun
+  ./Allrun petscSnes
+  ./Allrun segregated
+USAGE
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]
+then
+    usage
+    exit 0
+fi
+
+APPROACH="${1:-petscSnes}"
+
+case "$APPROACH" in
+    petscSnes|segregated) ;;
+    *)
+        echo "Error: Unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+link_files_for_suffix() {
+    local suffix="$1"
+    local found=0
+
+    while IFS= read -r -d '' f
+    do
+        found=1
+        rm -f "${f%.*}"
+        ln -vnsf "$(basename "$f")" "${f%.*}"
+    done < <(find ./0 ./constant ./system -type f -name "*.${suffix}" -print0 2>/dev/null || true)
+
+    if (( !found ))
+    then
+        echo "Warning: No *.${suffix} files found under ./0 ./constant ./system."
+    fi
+}
+
+case "$APPROACH" in
+    petscSnes)
+        echo "Using the petscSnes approach"
+        solids4Foam::requirePetscOrExitSilently
+        link_files_for_suffix petscSnes
+        ;;
+    segregated)
+        echo "Using the segregated approach"
+        link_files_for_suffix segregated
+        ;;
+esac
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create mesh
+solids4Foam::runApplication blockMesh
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Plot the tip displacement against the Abaqus reference
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating tipDisplacement.png using gnuplot"
+    gnuplot plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

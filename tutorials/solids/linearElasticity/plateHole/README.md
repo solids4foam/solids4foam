@@ -216,6 +216,34 @@ linear-elastic plate-hole benchmark.
 
 ---
 
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory migrates the mesh study
+from `solid-benchmarks/linearElasticity/plateHole` into this tutorial. It
+provides both the benchmark's structured `blockMesh` family, from 250 to
+64 000 cells, and its unstructured triangular-prism Gmsh family. The available
+formulations include the cell-centred approaches above and the legacy
+`vertexCentredLinearGeometry` approach. The driver reads the error norms that
+the `plateHoleAnalyticalSolution` function object prints against the analytical
+solution:
+
+```bash
+cd verification
+./Allverify                              # structured, segregated (default)
+./Allverify --mesh triangular            # unstructured triangular prisms
+./Allverify --variants vertexCentred      # vertex-centred formulation
+```
+
+Because the reference is an exact analytical solution, the study checks the
+observed order of accuracy directly. On the default `segregated` sweep the
+displacement L2 error falls from 2.97e-08 m to 3.20e-10 m, a net order of 1.63
+that approaches the expected second order, 1.92, between the two finest meshes;
+the stress L2 error gives a net order of 1.38. The study is separate from
+`regressionTest.sh` and is not run by the normal tutorial test suites. See the
+verification README for the mesh levels, options, and acceptance criteria.
+
+---
+
 ### References
 
 [1]

@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Weak (explicit) coupling: the interface is advanced once per time-step with
+// no outer iterations. This variant uses the same Robin-Neumann fluid setup as
+// the default approach, i.e. an elasticWallPressure condition on the fluid
+// wall patch, so it exercises the Robin pressure boundary under weak coupling.
+//
+// Weak coupling is not expected to match the strongly coupled result: it is
+// here to cover the weakCoupling code path, which is otherwise untested.
+
+fluidSolidInterface    weakCoupling;
+
+weakCouplingCoeffs
+{
+    solidPatch          inner-wall;
+    fluidPatch          wall;
+
+    // Weak coupling performs a single interface update per time-step
+    nOuterCorr          1;
+
+    interpolatorUpdateFrequency 0;
+    interfaceDeformationLimit   0;
+
+    coupled yes;
+
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+}
+
+// ************************************************************************* //

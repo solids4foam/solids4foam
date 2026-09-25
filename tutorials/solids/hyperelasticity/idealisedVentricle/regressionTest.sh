@@ -307,14 +307,15 @@ fi
 # not apply, because the active tension is not derived from a potential - so
 # this is where it does apply
 run_split_check() {
-    # The check runs on the petsc arm, or on foam-extend, where the petsc arm
-    # skips before meshing, the pressureDisplacement arm (#466)
+    # Run on any meshed arm that selected a mechanical constitutive law, so a
+    # renamed or added arm remains covered, while an arm that stopped before
+    # constructing its law is not selected merely because it appears first
+    # (#466)
     local d
-    for d in \
-        "${REGRESSION_ROOT}/petsc" \
-        "${REGRESSION_ROOT}/pressureDisplacement"
-    do
+    for d in "${REGRESSION_ROOT}"/*; do
         [[ -d "${d}/constant/polyMesh" ]] || continue
+        grep -q "Selecting mechanical constitutive law" \
+            "${d}/${SOLVER_LOGFILE}" 2>/dev/null || continue
 
         if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
             echo "SKIP: mechanicalConstitutiveLaw checks (not in PATH)"
