@@ -66,6 +66,10 @@ Description
          face value, for a face-centred and a compact face topology alike,
          including on a processor face, and a point in a cell as the cell
          value.
+     12. With one material, each surfaceField overload gives the stress, and
+         for small strain the scalar tangent, that the flat-list overload
+         gives on the face-centred topology, on the internal faces and on
+         every patch that holds values.
 
 Author
     Philip Cardiff, UCD.
@@ -176,6 +180,283 @@ tensor testGradD(const vector& p)
             0.40 - 0.20*x,   -0.50 + 0.25*y*y,  0.30 - 0.10*z,
             0.15 + 0.10*x*y,  0.25 - 0.05*y*z,  0.60 + 0.20*z*z
         );
+}
+
+
+//- 12. The surfaceField overloads agree with the flat-list overload.
+//  Both evaluate the same law on the same face-centred topology, so with one
+//  material, where nothing is collapsed, they must give the same answer: the
+//  same stress, the same tangent and the same convergence scale. Evaluated
+//  twice within one time step, so from the same history. Called before every
+//  exit, since the finite-strain-only laws leave early
+void checkSurfaceOverloads
+(
+    const fvMesh& mesh,
+    const Time& runTime,
+    mechanicalConstitutiveLawManager& manager,
+    const volTensorField& gradD,
+    const volTensorField& gradD0,
+    const scalar dt,
+    const label nLaws,
+    const bool smallStrainCapable
+)
+{
+    if (nLaws != 1)
+    {
+        return;
+    }
+
+    Info<< nl << "12. surfaceField overloads against the flat list"
+        << endl;
+
+    const integrationPointTopology& faceTopo =
+        manager.topologyFor(faceCentredIntegrationPointTopology::typeName);
+
+    const label nFaces = mesh.nFaces();
+    const polyBoundaryMesh& bm = mesh.boundaryMesh();
+
+    // A surface field as a flat list over every face, which is how the
+    // face-centred topology numbers its points. A face of an empty patch
+    // holds no value in the surface field but is still a point of the flat
+    // list, so it takes its cell's value, as the gather does
+    const auto flatten = [&]
+    (
+        const surfaceTensorField& sf,
+        const volTensorField& vf
+    ) -> tensorField
+    {
+        tensorField flat(nFaces, tensor::zero);
+
+        for (label faceI = mesh.nInternalFaces(); faceI < nFaces; ++faceI)
+        {
+            flat[faceI] = vf[mesh.faceOwner()[faceI]];
+        }
+
+        forAll(sf.internalField(), faceI)
+        {
+            flat[faceI] = sf.internalField()[faceI];
+        }
+
+        forAll(sf.boundaryField(), patchI)
+        {
+            const fvsPatchField<tensor>& pf = sf.boundaryField()[patchI];
+
+            forAll(pf, i)
+            {
+                flat[bm[patchI].start() + i] = pf[i];
+            }
+        }
+
+        return flat;
+    };
+
+    // The largest difference relative to the largest value, over the
+    // internal faces and every patch that holds values
+    const auto maxRelDiff = [&]
+    (
+        const surfaceSymmTensorField& sf,
+        const symmTensorField& flat
+    ) -> scalar
+    {
+        scalar maxDiff = 0;
+        scalar maxVal = 0;
+
+        forAll(sf.internalField(), faceI)
+        {
+            maxDiff =
+                max(maxDiff, mag(sf.internalField()[faceI] - flat[faceI]));
+            maxVal = max(maxVal, mag(flat[faceI]));
+        }
+
+        forAll(sf.boundaryField(), patchI)
+        {
+            const fvsPatchField<symmTensor>& pf =
+                sf.boundaryField()[patchI];
+
+            forAll(pf, i)
+            {
+                const label faceI = bm[patchI].start() + i;
+                maxDiff = max(maxDiff, mag(pf[i] - flat[faceI]));
+                maxVal = max(maxVal, mag(flat[faceI]));
+            }
+        }
+
+        reduce(maxDiff, maxOp<scalar>());
+        reduce(maxVal, maxOp<scalar>());
+
+        return maxDiff/max(maxVal, VSMALL);
+    };
+
+    const surfaceTensorField faceGradD(linearInterpolate(gradD));
+    const surfaceTensorField faceGradD0(linearInterpolate(gradD0));
+
+    const tensorField flatGradD(flatten(faceGradD, gradD));
+    const tensorField flatGradD0(flatten(faceGradD0, gradD0));
+
+    surfaceSymmTensorField faceSigma
+    (
+        IOobject
+        (
+            "faceSigma12",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+    );
+
+    if (smallStrainCapable)
+    {
+        symmTensorField flatSigma(nFaces, symmTensor::zero);
+        scalarField flatK(nFaces, 0.0);
+
+        surfaceScalarField faceK
+        (
+            IOobject
+            (
+                "faceK12",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        manager.updateStressSmallStrain
+        (
+            faceGradD,
+            faceGradD0,
+            dt,
+            faceSigma,
+            stressCollapseRule::none,
+            &faceK,
+            nullptr,
+            tangentRequest::scalar
+        );
+
+        manager.updateStressSmallStrain
+        (
+            faceTopo,
+            flatGradD,
+            flatGradD0,
+            dt,
+            flatSigma,
+            &flatK,
+            nullptr,
+            tangentRequest::scalar
+        );
+
+        const scalar stressDiff = maxRelDiff(faceSigma, flatSigma);
+
+        scalar kDiff = 0;
+        scalar kMax = 0;
+        forAll(faceK.internalField(), faceI)
+        {
+            kDiff = max
+            (
+                kDiff, mag(faceK.internalField()[faceI] - flatK[faceI])
+            );
+            kMax = max(kMax, mag(flatK[faceI]));
+        }
+        reduce(kDiff, maxOp<scalar>());
+        reduce(kMax, maxOp<scalar>());
+        kDiff /= max(kMax, VSMALL);
+
+        report
+        (
+            "small strain: the surfaceField stress is the flat-list one",
+            stressDiff < 1e-12,
+            "max relative difference " + Foam::name(stressDiff)
+        );
+
+        report
+        (
+            "small strain: the surfaceField tangent is the flat-list one",
+            kDiff < 1e-12,
+            "max relative difference " + Foam::name(kDiff)
+        );
+    }
+
+    // Finite strain, at F = I + gradD
+    {
+        surfaceTensorField faceF(faceGradD + I);
+        surfaceTensorField faceF0(faceGradD0 + I);
+        surfaceScalarField faceJ(det(faceF));
+        surfaceScalarField faceJ0(det(faceF0));
+        surfaceTensorField faceFinv(inv(faceF));
+        surfaceTensorField faceFinv0(inv(faceF0));
+
+        const tensorField flatF(flatGradD + I);
+        const tensorField flatF0(flatGradD0 + I);
+        const tensorField flatFinv(inv(flatF));
+        const tensorField flatFinv0(inv(flatF0));
+        const scalarField flatJ(det(flatF));
+        const scalarField flatJ0(det(flatF0));
+
+        symmTensorField flatSigma(nFaces, symmTensor::zero);
+
+        // The surfaceField overload first: it must find its own convergence
+        // scale rather than one a flat-list call left behind
+        bool finiteCapable = true;
+
+        FatalError.throwExceptions();
+
+        try
+        {
+            manager.updateStressFiniteStrain
+            (
+                faceF,
+                faceF0,
+                faceJ,
+                faceJ0,
+                faceFinv,
+                faceFinv0,
+                dt,
+                faceSigma
+            );
+        }
+        catch (const Foam::error&)
+        {
+            finiteCapable = false;
+        }
+
+        FatalError.dontThrowExceptions();
+
+        if (finiteCapable)
+        {
+            manager.updateStressFiniteStrain
+            (
+                faceTopo,
+                flatF,
+                flatF0,
+                flatFinv,
+                flatFinv0,
+                flatJ,
+                flatJ0,
+                dt,
+                flatSigma
+            );
+
+            const scalar stressDiff = maxRelDiff(faceSigma, flatSigma);
+
+            report
+            (
+                "finite strain: the surfaceField stress is the flat-list "
+                "one",
+                stressDiff < 1e-12,
+                "max relative difference " + Foam::name(stressDiff)
+            );
+        }
+        else
+        {
+            Info<< "    (finite strain skipped: this law has none)"
+                << endl;
+        }
+    }
 }
 
 
@@ -1211,6 +1492,12 @@ int main(int argc, char *argv[])
             );
         }
 
+        checkSurfaceOverloads
+        (
+            mesh, runTime, manager, gradD, gradD0, dt, lawEntries.size(),
+            smallStrainCapable
+        );
+
         Info<< nl
             << "========================================================="
             << nl;
@@ -1340,6 +1627,12 @@ int main(int argc, char *argv[])
 
     if (!smallStrainCapable)
     {
+        checkSurfaceOverloads
+        (
+            mesh, runTime, manager, gradD, gradD0, dt, lawEntries.size(),
+            smallStrainCapable
+        );
+
         Info<< nl << "The remaining checks are small strain, and no law here "
             << "evaluates a small-strain" << nl << "kinematics, so they are "
             << "skipped." << nl;
@@ -2471,10 +2764,12 @@ int main(int argc, char *argv[])
     // ---------------------------------------------------------------------
     {
         // More than two points in the hardening table is what makes the law
-        // non-linearly plastic, and so ask for a scale at all
+        // non-linearly plastic, and so ask for a scale at all. Under the
+        // processor directory in parallel, so that the ranks do not write
+        // and read one file at once
         const fileName tableName
         (
-            runTime.constant()/"Test-convergenceScaleHardening"
+            runTime.path()/runTime.constant()/"Test-convergenceScaleHardening"
         );
         {
             OFstream os(tableName);
@@ -2921,6 +3216,12 @@ int main(int argc, char *argv[])
             );
         }
     }
+
+    checkSurfaceOverloads
+    (
+        mesh, runTime, manager, gradD, gradD0, dt, lawEntries.size(),
+        smallStrainCapable
+    );
 
     // ---------------------------------------------------------------------
 
