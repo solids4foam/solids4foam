@@ -191,8 +191,29 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
     {
         const immersedBody& body = bodies_[bodyi];
 
-        force_[bodyi] = body.force(f_, rho);
-        torque_[bodyi] = body.torque(f_, rho);
+        if (method_ == "markers")
+        {
+            // Force and torque of the marker forcing
+            const immersedMarkers& markers = markers_[bodyi];
+            const vectorField& F = markerForces_[bodyi];
+            const point CofR(body.CofR());
+
+            vector Fb(Zero);
+            vector Tb(Zero);
+            forAll(F, m)
+            {
+                Fb -= F[m]*markers.volumes()[m];
+                Tb -= ((markers.points()[m] - CofR) ^ F[m])
+                   *markers.volumes()[m];
+            }
+            force_[bodyi] = rho*Fb;
+            torque_[bodyi] = rho*Tb;
+        }
+        else
+        {
+            force_[bodyi] = body.force(f_, rho);
+            torque_[bodyi] = body.torque(f_, rho);
+        }
 
         momentum_[bodyi] = body.momentum(U, lambda_);
 
@@ -305,6 +326,103 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
 }
 
 
+void Foam::fv::immersedBoundaryForce::markerForcing
+(
+    volVectorField& U,
+    const label nIter
+)
+{
+    const bool matrixValid =
+        UEqnPtr_
+     && UEqnTimeIndex_ == mesh_.time().timeIndex()
+     && UEqnCorr_ == pimple().corr()
+     && &UEqnPtr_->psi() == &U;
+
+    if (!matrixValid)
+    {
+        if (!warnedMatrix_)
+        {
+            warnedMatrix_ = true;
+            WarningInFunction
+                << "The momentum matrix of " << U.name() << " was not "
+                << "constrained by the " << typeName << " option " << name_
+                << ": the marker forcing is not updated" << endl;
+        }
+        return;
+    }
+
+    // Velocity response of the cells to the forcing
+    const scalarField rAU(1/UEqnPtr_->A()().primitiveField());
+
+    volVectorField::Internal df
+    (
+        IOobject
+        (
+            IOobject::scopedName(name_, "df"),
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        mesh_,
+        dimensionedVector(f_.dimensions(), Zero)
+    );
+
+    for (label iter = 0; iter < nIter; ++iter)
+    {
+        df.field() = Zero;
+
+        forAll(markers_, bodyi)
+        {
+            const immersedMarkers& markers = markers_[bodyi];
+
+            const vectorField Um(markers.interpolate(U.primitiveField()));
+            const scalarField a(markers.interpolate(rAU));
+            const vectorField& Ub = markers.velocities();
+
+            vectorField dF(markers.size(), Zero);
+            forAll(dF, m)
+            {
+                if (a[m] > VSMALL)
+                {
+                    dF[m] = (Ub[m] - Um[m])/a[m];
+                }
+            }
+
+            markerForces_[bodyi] += dF;
+            markers.spread(dF, df.field());
+        }
+
+        U.primitiveFieldRef() += rAU*df.field();
+        f_.primitiveFieldRef() += df.field();
+
+        // The forcing is on the right-hand side: eqn == f
+        *UEqnPtr_ -= df;
+    }
+
+    U.correctBoundaryConditions();
+    f_.correctBoundaryConditions();
+
+    if (debug)
+    {
+        forAll(markers_, bodyi)
+        {
+            const immersedMarkers& markers = markers_[bodyi];
+            const vectorField slip
+            (
+                markers.velocities()
+              - markers.interpolate(U.primitiveField())
+            );
+
+            Info<< "    Immersed body " << bodies_[bodyi].name()
+                << ": marker slip rms " << Foam::sqrt(average(magSqr(slip)))
+                << ", max " << max(mag(slip)) << endl;
+        }
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::fv::immersedBoundaryForce::immersedBoundaryForce
@@ -325,6 +443,14 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     nuSet_(false),
     kappa_(mesh.nCells(), Zero),
     couplingCoeff_(0.8),
+    markerSpacing_(1),
+    markerRetraction_(0),
+    nMarkerIterations_(3),
+    markers_(),
+    markerForces_(),
+    markerForces0_(),
+    markerTimeIndex_(-1),
+    markerCorr_(-1),
     surfaceThreshold_(1e-4),
     rho_(1),
     rhoSet_(false),
@@ -443,6 +569,29 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
 
     read(dict);
 
+    if (method_ == "markers")
+    {
+        markers_.setSize(nBodies);
+        markerForces_.setSize(nBodies);
+        markerForces0_.setSize(nBodies);
+        forAll(bodies_, bodyi)
+        {
+            markers_.set
+            (
+                bodyi,
+                new immersedMarkers
+                (
+                    bodies_[bodyi],
+                    mesh,
+                    markerSpacing_,
+                    markerRetraction_
+                )
+            );
+            markerForces_[bodyi].setSize(markers_[bodyi].size(), Zero);
+            markerForces0_[bodyi].setSize(markers_[bodyi].size(), Zero);
+        }
+    }
+
     // Force files
     if (Pstream::master())
     {
@@ -549,6 +698,46 @@ void Foam::fv::immersedBoundaryForce::addSup
         updated = true;
     }
 
+    if (method_ == "markers")
+    {
+        // Collective: updated is the same on every processor
+        if (updated)
+        {
+            for (immersedMarkers& markers : markers_)
+            {
+                markers.update();
+            }
+        }
+
+        if (markerTimeIndex_ != timeIndex)
+        {
+            markerForces0_ = markerForces_;
+        }
+
+        if (pimple().firstIter())
+        {
+            // Start the time step, or a repeated solution of the time step,
+            // from the marker forcing of the previous time step
+            markerForces_ = markerForces0_;
+        }
+
+        // Spread the current marker forcing
+        f_.primitiveFieldRef() = Zero;
+        forAll(markers_, bodyi)
+        {
+            markers_[bodyi].spread
+            (
+                markerForces_[bodyi],
+                f_.primitiveFieldRef()
+            );
+        }
+        f_.correctBoundaryConditions();
+
+        eqn += f_;
+
+        return;
+    }
+
     if (method_ == "penalty")
     {
         // Implicit volume penalisation: kappa*(Ui - U)
@@ -634,6 +823,36 @@ void Foam::fv::immersedBoundaryForce::constrain
 void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
 {
     const pimpleControl& pimple = this->pimple();
+
+    if (method_ == "markers")
+    {
+        const label timeIndex = mesh_.time().timeIndex();
+
+        if (pimple.corrPISO() < pimple.nCorrPISO())
+        {
+            // Several iterations the first time in an outer corrector (after
+            // the momentum predictor), then one after each pressure
+            // corrector but the last
+            const bool first =
+                markerTimeIndex_ != timeIndex || markerCorr_ != pimple.corr();
+
+            markerForcing(U, first ? nMarkerIterations_ : 1);
+
+            markerTimeIndex_ = timeIndex;
+            markerCorr_ = pimple.corr();
+        }
+        else
+        {
+            UEqnPtr_ = nullptr;
+
+            if (pimple.finalIter())
+            {
+                calcForces(U);
+            }
+        }
+
+        return;
+    }
 
     // Nothing to do after the momentum predictor
     if (pimple.corrPISO() < 1)
@@ -747,12 +966,21 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
     {
         coeffs_.readIfPresent("method", method_);
 
-        if (method_ != "incremental" && method_ != "penalty")
+        if
+        (
+            method_ != "incremental"
+         && method_ != "penalty"
+         && method_ != "markers"
+        )
         {
             FatalIOErrorInFunction(coeffs_)
                 << "Unknown method " << method_ << ": valid methods are "
-                << "incremental and penalty" << exit(FatalIOError);
+                << "penalty, markers and incremental" << exit(FatalIOError);
         }
+
+        coeffs_.readIfPresent("markerSpacing", markerSpacing_);
+        coeffs_.readIfPresent("markerRetraction", markerRetraction_);
+        coeffs_.readIfPresent("nMarkerIterations", nMarkerIterations_);
 
         coeffs_.readCheckIfPresent
         (

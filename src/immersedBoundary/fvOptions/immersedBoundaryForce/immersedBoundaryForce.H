@@ -177,6 +177,7 @@ SourceFiles
 #include "OFstream.H"
 #include "IOdictionary.H"
 #include "immersedBody.H"
+#include "immersedMarkers.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -235,6 +236,30 @@ class immersedBoundaryForce
 
         //- Coupling coefficient of the incremental method
         scalar couplingCoeff_;
+
+        // Marker method
+
+            //- Marker spacing, relative to the local cell width
+            scalar markerSpacing_;
+
+            //- Retraction of the forcing points into the bodies, relative
+            //  to the local cell width
+            scalar markerRetraction_;
+
+            //- Number of forcing iterations after the momentum predictor
+            label nMarkerIterations_;
+
+            //- Markers of each body
+            PtrList<immersedMarkers> markers_;
+
+            //- Forcing (acceleration) at the markers of each body, and at
+            //  the start of the time step
+            List<vectorField> markerForces_;
+            List<vectorField> markerForces0_;
+
+            //- Time index and outer corrector of the last forcing iteration
+            label markerTimeIndex_;
+            label markerCorr_;
 
         //- Occupancy threshold for a covered cell
         scalar surfaceThreshold_;
@@ -329,6 +354,10 @@ class immersedBoundaryForce
 
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
+
+        //- Multi-direct forcing iterations of the marker method, updating
+        //  U, the forcing and the stored momentum matrix
+        void markerForcing(volVectorField& U, const label nIter);
 
 
 public:

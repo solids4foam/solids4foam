@@ -207,6 +207,12 @@ public:
             //  configuration
             point CofR() const;
 
+            //- Velocity of the body at the points x
+            tmp<vectorField> velocity(const pointField& x) const
+            {
+                return motionPtr_->velocity(x, time_);
+            }
+
 
         // Edit
 

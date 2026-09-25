@@ -4,6 +4,7 @@ immersedBodyMotion/staticMotion/staticMotion.C
 immersedBodyMotion/sinusoidalTranslation/sinusoidalTranslation.C
 
 immersedBody/immersedBody.C
+immersedMarkers/immersedMarkers.C
 
 fvOptions/immersedBoundaryForce/immersedBoundaryForce.C
 
