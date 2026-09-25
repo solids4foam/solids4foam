@@ -374,8 +374,7 @@ bool pimpleFluid::evolve()
     {
         if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
         {
-            // fvModels not added yet
-            // fvModels.preUpdateMesh();
+            models().preUpdateMesh();
 
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
@@ -406,8 +405,7 @@ bool pimpleFluid::evolve()
             }
         }
 
-        // fvModels not implemented yet
-        //fvModels.correct();
+        models().correct();
 
         // UEqn.H
 
@@ -423,22 +421,20 @@ bool pimpleFluid::evolve()
             // + MRF.DDt(U)
           + turbulence_->divDevSigma(U)
           - boussinesqMomentumSource()
-         // ==
-         //    fvModels.source(U)
+         ==
+            models().source(U)
         );
         fvVectorMatrix& UEqn = tUEqn.ref();
 
         UEqn.relax();
 
-        // fvConstraints not implemented yet
-        //fvConstraints.constrain(UEqn);
+        constraints().constrain(UEqn);
 
         if (pimple.momentumPredictor())
         {
             solve(UEqn == -fvc::grad(p));
 
-            // fvConstraints not implemented yet
-            //fvConstraints.constrain(U);
+            constraints().constrain(U);
         }
 
         // --- Pressure corrector loop
@@ -515,7 +511,7 @@ bool pimpleFluid::evolve()
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-            // fvConstraints.constrain(U);
+            constraints().constrain(U);
 
             gradU() = fvc::grad(U);
             ddtU_ = fvc::ddt(U);

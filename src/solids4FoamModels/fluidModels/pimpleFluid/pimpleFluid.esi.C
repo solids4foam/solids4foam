@@ -451,19 +451,20 @@ bool pimpleFluid::evolve()
           + fvm::div(phi, U)
           + turbulence_->divDevReff(U)
           - boussinesqMomentumSource()
+         ==
+            options()(U)
         );
         fvVectorMatrix& UEqn = tUEqn.ref();
 
         UEqn.relax();
 
-        // fvOptions not implemented yet
-        // fvOptions.constrain(UEqn);
+        options().constrain(UEqn);
 
         if (pimple.momentumPredictor())
         {
             solve(UEqn == -fvc::grad(p));
-            // fvOptions not implemented yet
-            // fvOptions.correct(U);
+
+            options().correct(U);
         }
 
         // --- Pressure corrector loop
@@ -552,7 +553,7 @@ bool pimpleFluid::evolve()
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-         // fvOptions.correct(U);
+            options().correct(U);
 
             gradU() = fvc::grad(U);
         }
