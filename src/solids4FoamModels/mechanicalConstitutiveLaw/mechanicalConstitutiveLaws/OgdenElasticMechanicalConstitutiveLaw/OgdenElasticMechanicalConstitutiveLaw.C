@@ -53,12 +53,16 @@ OgdenElasticMechanicalConstitutiveLaw
     alpha2_(dict.lookup("alpha2")),
     alpha3_(dict.lookup("alpha3")),
     K_(dict.lookup("K")),
-    mu_(mu1_ + mu2_ + mu3_)
+    // The small-strain shear modulus. With principal stresses
+    // sum_k mu_k lambda^alpha_k it is half of sum_k mu_k alpha_k, not the sum
+    // of the mu_k, which is what a simple shear of the law measures
+    mu_(0.5*(mu1_*alpha1_ + mu2_*alpha2_ + mu3_*alpha3_))
 {
     Info<< "    Ogden: mu = (" << mu1_.value() << " " << mu2_.value()
         << " " << mu3_.value() << "), alpha = (" << alpha1_.value()
         << " " << alpha2_.value() << " " << alpha3_.value()
-        << "), K = " << K_.value() << endl;
+        << "), K = " << K_.value() << ", small-strain shear modulus "
+        << mu_.value() << endl;
 }
 
 

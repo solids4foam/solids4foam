@@ -20,22 +20,23 @@ The dictionary layout common to all laws is described in the
 
 ### What it computes
 
-At each integration point, from `F` and `J = det(F)`, the right Cauchy-Green
-tensor is decomposed into its eigenvalues `c_i` and eigenvectors `N_i`:
+At each integration point, from `F` and `J = det(F)`, the left Cauchy-Green
+tensor is decomposed into its eigenvalues `b_i` and eigenvectors `n_i`:
 
 ```text
-C        = F.T() & F
-lambda_i = max(sqrt(c_i), VSMALL)
+b        = F & F.T()
+lambda_i = max(sqrt(b_i), VSMALL)
 p_i      = mu1*lambda_i^alpha1 + mu2*lambda_i^alpha2 + mu3*lambda_i^alpha3
-s        = sum_i p_i*N_i*N_i
+s        = sum_i p_i*n_i*n_i
 sigmaHyd = 0.5*K*(J^2 - 1)
 sigma    = (dev(s) + sigmaHyd*I + symm(F & sigma0 & F.T()))/J
 ```
 
 The stretches are the full principal stretches, not isochoric ones, and `s`
-is formed in the eigenvectors of `C`, the principal directions of the
-reference configuration. `sigma0` is an optional initial stress (see State
-variables), pushed forward with `F`.
+is formed in the eigenvectors of `b`, the principal directions of the current
+configuration, so the stress rotates with a superposed rotation. `sigma0`
+is an optional initial stress (see State variables), pushed forward with
+`F`.
 
 The law is finite-strain only; a linear geometry solid model stops with an
 error. It holds no history.
@@ -60,8 +61,9 @@ there is no plane-stress reduction.
 
 ### Tangents and volumetric split
 
-- Scalar tangent: `(4/3)*(mu1 + mu2 + mu3) + K`, returned for both the
-  `scalar` and the `scalarDeviatoric` requests.
+- Scalar tangent: `(4/3)*mu + K`, and `(4/3)*mu` for the `scalarDeviatoric`
+  request, where `mu = 0.5*(mu1*alpha1 + mu2*alpha2 + mu3*alpha3)` is the
+  small-strain shear modulus.
 - Fourth-order tangent: `fourthOrderFiniteDifference` only. Asking for the
   analytical `fourthOrder` tangent is a fatal error.
 - Volumetric split: no. The energy is not written on an isochoric measure, so
@@ -119,6 +121,13 @@ which this law does not accept.
 - The legacy fallback to a Hookean stress when the solid model enforced
   linearity is gone.
 - A fourth-order tangent is available by finite differences.
+- The stress is assembled along the eigenvectors of `b`. The legacy law used
+  those of `C`, the reference directions, so under a stretch with a finite
+  rotation its stress was rotated back by the rotation.
+- The scalar tangent uses the small-strain shear modulus
+  `0.5*(mu1*alpha1 + mu2*alpha2 + mu3*alpha3)`; the legacy law used
+  `mu1 + mu2 + mu3`. The tangent only steers the iterations, so converged
+  answers do not change.
 - `sigma0` is still optional and still pushed forward with `F`; it is now
   read as a prescribed state field rather than by the base class.
 

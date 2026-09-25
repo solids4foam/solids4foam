@@ -59,7 +59,10 @@ release. For complete commit-level details and contributor information, see the
   of the left Cauchy-Green tensor, the spatial ones. It used the right
   tensor's, the material ones, so under a stretch with a finite rotation the
   stress was rotated back by the rotation and the law was not objective. No
-  tutorial selects it; results of a case with large rotations change.
+  tutorial selects it; results of a case with large rotations change. Its
+  scalar tangent now uses the small-strain shear modulus,
+  `0.5*(mu1*alpha1 + mu2*alpha2 + mu3*alpha3)`, where it used
+  `mu1 + mu2 + mu3`; that changes the iterations, not the answer.
 - `linearElasticMohrCoulombPlastic` refuses a friction angle below 1e-3
   degrees in magnitude again, as the legacy law did: the apex of the
   Mohr-Coulomb surface moves to infinity in that limit and the law's derived
