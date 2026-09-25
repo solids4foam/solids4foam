@@ -3222,6 +3222,35 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
     // finite-strain path
     const scalarList lawScales(smallStrainConvergenceScales(tp, gradD, gradD0));
 
+    // A caller that wants a tangent independent of history gets a state
+    // prepared exactly as a fresh run prepares one: declared defaults, the
+    // law's own initialisation, and any prescribed field. That is what the
+    // material looked like before it was loaded, so the tangent is the same
+    // whether the run started here or was continued.
+    //
+    // Prepared for every law on every rank, before the loop below skips the
+    // laws this rank holds no points of: a prescribed field is read from a
+    // file, and reading one can be collective
+    PtrList<mechanicalConstitutiveLawState> coldStates;
+    if (coldState)
+    {
+        coldStates.setSize(laws_.size());
+
+        forAll(laws_, lawI)
+        {
+            coldStates.set
+            (
+                lawI,
+                new mechanicalConstitutiveLawState(tp.states_[lawI].size())
+            );
+
+            applyStateSpec
+            (
+                lawI, topo, tp.lawIntegrationPointIDs_[lawI], coldStates[lawI]
+            );
+        }
+    }
+
     // Loop over mechanical constitutive laws
     forAll(laws_, lawI)
     {
@@ -3260,25 +3289,9 @@ void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
             );
         }
 
-        // A caller that wants a tangent independent of history gets a state
-        // prepared exactly as a fresh run prepares one: declared defaults, the
-        // law's own initialisation, and any prescribed field. That is what the
-        // material looked like before it was loaded, so the tangent is the
-        // same whether the run started here or was continued
-        autoPtr<mechanicalConstitutiveLawState> coldPtr;
-        if (coldState)
-        {
-            coldPtr.set
-            (
-                new mechanicalConstitutiveLawState(tp.states_[lawI].size())
-            );
-
-            applyStateSpec(lawI, topo, ipIDs, coldPtr());
-        }
-
         mechanicalConstitutiveLawState& lawState =
             coldState
-          ? coldPtr()
+          ? coldStates[lawI]
           : (preserveState ? shadowPtr() : tp.states_[lawI]);
 
         // Views into integration-point data (no copies)
