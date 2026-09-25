@@ -53,9 +53,6 @@ Description
     - This class is specific to small-strain formulations; finite-strain
       formulations are handled by a separate kinematics container.
 
-SourceFiles
-    smallStrainMechanicalConstitutiveLawKinematics.C
-
 Author
     Philip Cardiff, UCD.
 

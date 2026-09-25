@@ -57,9 +57,6 @@ Description
     - This class is specific to finite-strain formulations; small-strain
       formulations are handled by a separate kinematics container.
 
-SourceFiles
-    finiteStrainMechanicalConstitutiveLawKinematics.C
-
 Author
     Philip Cardiff, UCD.
 
@@ -193,12 +190,6 @@ public:
 
 
     // Edit
-
-        //- Relative deformation gradient: F*inv(F0)
-        inline tensor relativeF(const label i) const
-        {
-            return F_[i] & inv(F0_[i]);
-        }
 
         //- Return F at integration point ipI with Voigt component j of the
         //  displacement gradient perturbed by h.

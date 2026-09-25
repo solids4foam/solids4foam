@@ -420,10 +420,8 @@ public:
             return 0;
         }
 
-        //- Optional hook called once at the end of each time step.
-        //  Default implementation does nothing.
-        //  Can be used for diagnostics, logging, or state bookkeeping.
         //- Report what this law did over the time step, for one state.
+        //  Called once at the end of each time step; does nothing by default.
         //
         //  Append to the list; do not reduce. The manager calls this for the
         //  internal state and for every boundary state the law owns, and does

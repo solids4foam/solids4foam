@@ -262,9 +262,6 @@ public:
         //- Whether a child of this name exists, without creating one
         bool foundChild(const word& name) const;
 
-        //- Names of the children, in no particular order
-        wordList childNames() const;
-
         void setSize(const label newSize);
 
         // Commit current state to old-time storage

@@ -197,13 +197,9 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
     const scalar lambdaVal = lambda_.value();
 
     // The initial stress is zero in all but the cases that supply one, and
-    // adding a zero costs less than branching on it inside the loop.
-    //
-    // It is read at old time. A prescribed field is never written, so its two
-    // times always hold the same value, and the old-time one is what a shadow
-    // state aliases; a shadow owns current-time fields that start empty, so
-    // reading the current field would hand a tangent query a silent field of
-    // zeros
+    // adding a zero costs less than branching on it inside the loop. It is
+    // read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
 
     // Whether the caller wants the deviatoric stress and the volumetric

@@ -133,10 +133,8 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
-    // Read at old time: a prescribed field is never written, so its two times
-    // always hold the same value, and the old-time one is what a shadow state
-    // aliases. A tangent query evaluated into a shadow would find the
-    // current-time field empty
+    // Read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<vector>& Ec = state.getVectorField0("Ec");
     const Field<vector>& Ea = state.getVectorField0("Ea");
 

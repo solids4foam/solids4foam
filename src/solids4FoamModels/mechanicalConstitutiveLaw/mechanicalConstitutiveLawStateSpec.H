@@ -75,7 +75,13 @@ public:
         persistent,
 
         //- Supplied by the user as a field of the same name, read only,
-        //  never written back
+        //  never written back.
+        //
+        //  A law reads a prescribed field at old time. Being never written,
+        //  its two times always hold the same value, and the old-time one is
+        //  what a shadow state aliases; a shadow owns current-time fields
+        //  that start empty, so reading the current field would hand a
+        //  tangent query a silent field of zeros
         prescribed,
 
         //- Constant at its declared value. No field is consulted, which is
@@ -83,19 +89,6 @@ public:
         //  in its own dictionary - has already settled the value
         fixed
     };
-
-    //- Name of a role, for messages
-    static word stateRoleName(const stateRole r)
-    {
-        switch (r)
-        {
-            case stateRole::persistent: return "persistent";
-            case stateRole::prescribed: return "prescribed";
-            case stateRole::fixed: return "fixed";
-        }
-
-        return "unknown";
-    }
 
     //- One declared field. The default is held as each possible type rather
     //  than a variant, because a state field is one of exactly four types and

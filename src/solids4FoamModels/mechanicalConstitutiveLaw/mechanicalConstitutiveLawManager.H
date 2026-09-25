@@ -1215,9 +1215,6 @@ public:
         //- Refuse if any law cannot separate the two, naming it
         void checkVolumetricSplitSupported(const word& context) const;
 
-        //- True if every law can separate its isochoric stress from its
-        //  volumetric response. Asked rather than assumed by anything that
-        //  wants to exercise the split without demanding it
         //- How many materials this manager holds
         label nLaws() const
         {

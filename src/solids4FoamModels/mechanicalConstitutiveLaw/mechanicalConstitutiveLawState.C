@@ -269,12 +269,6 @@ bool mechanicalConstitutiveLawState::foundChild(const word& name) const
 }
 
 
-wordList mechanicalConstitutiveLawState::childNames() const
-{
-    return children_.toc();
-}
-
-
 void mechanicalConstitutiveLawState::setSize(const label newSize)
 {
     checkNotShadow("setSize");

@@ -45,6 +45,8 @@ namespace Foam
 
 namespace Foam
 {
+namespace
+{
 
 // A 64-bit FNV-1a digest of a list of row sizes, used to key a compact
 // integration-point topology on the shape of the layout that produced it.
@@ -116,7 +118,7 @@ void combineDiagnostic
 
 //- Warn about the entries of a law's dictionary, or of one below it, that only
 //  the removed legacy laws read
-static void reportRemovedLegacyEntries
+void reportRemovedLegacyEntries
 (
     const dictionary& dict,
     const word& lawName
@@ -175,6 +177,7 @@ static void reportRemovedLegacyEntries
     }
 }
 
+} // End anonymous namespace
 } // End namespace Foam
 
 

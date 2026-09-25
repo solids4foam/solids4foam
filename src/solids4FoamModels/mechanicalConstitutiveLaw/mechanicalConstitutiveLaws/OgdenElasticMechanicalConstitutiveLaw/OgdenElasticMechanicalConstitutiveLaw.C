@@ -95,9 +95,8 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
-    // Read at old time, so that a tangent query evaluated into a shadow state
-    // sees the value rather than a silently zero field. See linearElastic for
-    // the same reasoning
+    // Read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
 
     const scalar mu1 = mu1_.value();

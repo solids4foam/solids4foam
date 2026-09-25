@@ -599,10 +599,7 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
         }
     }
 
-    // Reported, not reduced. The manager gathers these from the internal
-    // state and from every boundary state this law owns, and reduces once per
-    // quantity - which is what makes the boundary points countable at all,
-    // and what stops a per-patch collective from hanging on a decomposed mesh
+    // Reported, not reduced: see mechanicalConstitutiveLaw::endTimeStep
     typedef mechanicalConstitutiveLawDiagnostic diagnostic;
 
     diagnostics.append

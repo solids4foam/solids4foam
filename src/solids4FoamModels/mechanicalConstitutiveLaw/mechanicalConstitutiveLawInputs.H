@@ -101,9 +101,6 @@ class mechanicalConstitutiveLawInputs
         //  evaluated. Not owned: the supplier outlives the evaluation
         HashTable<const scalarField*> scalarFields_;
 
-        //- Vector fields, likewise
-        HashTable<const vectorField*> vectorFields_;
-
         //- The stress already standing at these integration points, for the
         //  few laws that legitimately need it.
         //
@@ -139,7 +136,6 @@ public:
             dt_(dt),
             time_(time),
             scalarFields_(),
-            vectorFields_(),
             incomingStressPtr_(nullptr),
             convergenceScale_(0)
         {}
@@ -210,10 +206,6 @@ public:
                 return *incomingStressPtr_;
             }
 
-            //- Supply the standing stress
-            //  Attached by the manager just before the law runs, which is
-            //  why it is settable through a const handle: the inputs object is
-            //  otherwise immutable and is passed to the law as const
             //- Detach the standing stress. The pointer refers to storage the
             //  caller owns for the duration of one evaluation, so it is
             //  dropped as soon as that evaluation is over; a later law then
@@ -224,6 +216,10 @@ public:
                 incomingStressPtr_ = nullptr;
             }
 
+            //- Supply the standing stress.
+            //  Attached by the manager just before the law runs, which is
+            //  why it is settable through a const handle: the inputs object is
+            //  otherwise immutable and is passed to the law as const
             void setIncomingStress(const UList<symmTensor>& incoming) const
             {
                 incomingStressPtr_ = &incoming;
@@ -235,37 +231,20 @@ public:
                 return scalarFields_.found(name);
             }
 
-            //- Is a vector input available under this name?
-            bool foundVector(const word& name) const
-            {
-                return vectorFields_.found(name);
-            }
-
             //- Scalar input, or nullptr where it was not supplied.
             //  For a law that can work without it
             const scalarField* findScalar(const word& name) const;
-
-            //- Vector input, or nullptr where it was not supplied
-            const vectorField* findVector(const word& name) const;
 
             //- Scalar input, failing where it was not supplied.
             //  For a law that requires it: a missing input must not read as
             //  zero, which would be a plausible wrong answer
             const scalarField& getScalar(const word& name) const;
 
-            //- Vector input, failing where it was not supplied
-            const vectorField& getVector(const word& name) const;
-
-
         // Edit
 
             //- Supply a scalar input. The field must outlive this object and
             //  must have one value per integration point of the law
-            void setScalar(const word& name, const scalarField& fld);
-
-            //- Supply a vector input
-            void setVector(const word& name, const vectorField& fld);
-};
+            void setScalar(const word& name, const scalarField& fld);};
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
