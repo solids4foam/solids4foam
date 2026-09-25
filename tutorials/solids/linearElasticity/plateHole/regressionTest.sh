@@ -61,7 +61,16 @@ PRESSURE_DISPLACEMENT_CASES=(
     "pressureDisplacementCompressible medium"
     "pressureDisplacementIncompressible coarse"
     "pressureDisplacementIncompressible medium"
+    "pressureDisplacementCompressibleManager coarse"
+    "pressureDisplacementIncompressibleManager coarse"
 )
+
+# Each *Manager arm is its twin run with coupledPressureDisplacementSolid
+# taking its constitutive response from the mechanicalConstitutiveLaw
+# framework. These cases run the model in linear mode, where the law is not
+# evaluated and the stiffness is the same shear modulus on both paths, so the
+# error measures must agree with the twin's to round-off
+PD_FRAMEWORK_REL_TOL=1e-6
 
 echo "============================================================"
 echo "Plate-with-hole regression tests"
@@ -133,6 +142,13 @@ run_case() {
                 "${case_dir}/constant/solidProperties.highOrder"
             rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
             set -- highOrder parallel
+            ;;
+        pressureDisplacement*Manager)
+            local switch="    useMechanicalConstitutiveLawManager yes;"
+            sed -i \
+                "/coupledPressureDisplacementSolidCoeffs/,/{/ s|{|{\n${switch}|" \
+                "${case_dir}/caseOptions/pressureDisplacement/hex/common/constant/solidProperties"
+            set -- "${requested%Manager}" "${@:2}"
             ;;
     esac
 
@@ -255,6 +271,8 @@ FRAMEWORK_APPROACHES=(
     segregatedManager
     petscSnesPressureManager
     highOrderFourthOrder
+    pressureDisplacementCompressibleManager
+    pressureDisplacementIncompressibleManager
 )
 
 is_framework_approach() {
@@ -379,6 +397,28 @@ for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do
     if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
         echo "SKIP: ${case_name}"
         continue
+    fi
+
+    check_took_its_path "${approach}" "${case_dir}"
+
+    if [[ "${approach}" == *Manager ]]; then
+        twin_dir="${REGRESSION_ROOT}/${approach%Manager}-${mesh}"
+        for label in "DError, max" "pErr, max"; do
+            twin_value="$(extract_log_value "${twin_dir}" "${label}")"
+            value="$(extract_log_value "${case_dir}" "${label}")"
+            if [[ -z "${twin_value}" || -z "${value}" ]]; then
+                echo "FAIL: ${case_name}: could not compare ${label} with its twin"
+                failures=$((failures + 1))
+            elif awk "BEGIN {d = ${value} - ${twin_value}; \
+                exit !(${twin_value} > 0 \
+                    && d*d <= (${PD_FRAMEWORK_REL_TOL}*${twin_value})^2)}"
+            then
+                echo "PASS: ${case_name}: ${label} matches the legacy twin"
+            else
+                echo "FAIL: ${case_name}: ${label} = ${value}, legacy twin ${twin_value}"
+                failures=$((failures + 1))
+            fi
+        done
     fi
 
     check_less_than \

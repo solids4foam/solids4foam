@@ -313,7 +313,7 @@ void Foam::solidModel::makeMechanicalModel() const
     // constructs every legacy law, registers a second dictionary under the
     // name this class now reads for itself, and silently keeps the legacy
     // hierarchy alive, so it is a defect rather than a fallback
-    if (useMechanicalConstitutiveLawManager() && !needsLegacyMechanicalModel())
+    if (useMechanicalConstitutiveLawManager())
     {
         FatalErrorInFunction
             << "A mechanicalConstitutiveLaw framework run reached the legacy "
@@ -368,31 +368,10 @@ void Foam::solidModel::makeRho() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    if (useMechanicalConstitutiveLawManager())
-    {
-        rhoPtr_.set
-        (
-            new volScalarField
-            (
-                IOobject
-                (
-                    "rho",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::NO_WRITE
-                ),
-                mechanicalManager().rho()
-            )
-        );
-    }
-    else
-    {
-        rhoPtr_.set
-        (
-            new volScalarField(mechanical().rho())
-        );
-    }
+    // Both implementations read the same density entries, but only one of
+    // them may be constructed on a given run; initialRho() picks it. Built
+    // from a tmp, so the field takes over the tmp's registration as "rho"
+    rhoPtr_.set(new volScalarField(initialRho()));
 }
 
 
@@ -1679,15 +1658,6 @@ const Foam::mechanicalModel& Foam::solidModel::mechanical() const
 
 const Foam::IOdictionary& Foam::solidModel::mechanicalProperties() const
 {
-    // A model that runs both implementations at once - vertexCentredLinGeom,
-    // which takes only its tangent from the framework - already has this
-    // dictionary, because the legacy model is one. Reading a second copy would
-    // register a second object under the same name, so use the one that exists
-    if (needsLegacyMechanicalModel())
-    {
-        return mechanical();
-    }
-
     if (mechanicalPropertiesPtr_.empty())
     {
         makeMechanicalProperties();
@@ -2092,18 +2062,20 @@ void Foam::solidModel::frameworkInterpolate
 #else
     if (mechanicalManager().nLaws() > 1)
     {
-        FatalErrorInFunction
-            << "The constitutive-law framework does not support more than one "
-            << "material on foam-extend in this solid model." << nl << nl
-            << "    The point interpolation would fall back to the legacy "
-            << "per-material sub-mesh path, which the framework replaces, and "
-            << "this fork's interpolator has no gradient-corrected form."
-            << exit(FatalError);
+        // The least squares fit below would straddle a material interface,
+        // where the displacement is continuous but its gradient jumps, and
+        // smear it. The legacy model avoided that with per-material
+        // sub-meshes; the framework instead extrapolates each cell's value
+        // with its own gradient, which the material-aware leastSquaresS4f
+        // scheme keeps to one material, as the other forks do for any
+        // number of materials
+        volToPoint().interpolate(D, gradD, pointD);
     }
-
-    // What the legacy single-material branch does on this fork: there is no
-    // gradient-corrected form here, so gradD is unused
-    volToPoint().interpolate(D, pointD);
+    else
+    {
+        // What the legacy single-material branch does on this fork
+        volToPoint().interpolate(D, pointD);
+    }
 #endif
 
     correctPointDisplacement(pointD);
@@ -2114,9 +2086,25 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
 {
     if (useMechanicalConstitutiveLawManager())
     {
+        // A registered copy, as the legacy mechanicalLaw::rho() returns, so
+        // that a field built from it takes over the registration. The
+        // manager's own cache is not registered, and a plain copy of it would
+        // not be either; an unregistered field is not mapped when the mesh
+        // topology changes
         return tmp<volScalarField>
         (
-            new volScalarField(mechanicalManager().rho())
+            new volScalarField
+            (
+                IOobject
+                (
+                    "rho",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::NO_WRITE
+                ),
+                mechanicalManager().rho()
+            )
         );
     }
 

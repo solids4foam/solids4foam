@@ -307,6 +307,20 @@ public:
             return false;
         }
 
+        //- True if this law is fully incompressible: its bulk modulus is
+        //  infinite, so it has no volumetric response of its own and its total
+        //  stress is undefined.
+        //
+        //  Only a mixed displacement-pressure formulation can use such a law,
+        //  because it replaces the volumetric response with a solved pressure.
+        //  The manager therefore refuses, naming the law, any evaluation that
+        //  asks for the total stress or for a tangent that includes the bulk
+        //  stiffness. False by default
+        virtual bool incompressible() const
+        {
+            return false;
+        }
+
         //- True if the stress this law returns from a split evaluation is a
         //  function of the isochoric deformation alone.
         //
