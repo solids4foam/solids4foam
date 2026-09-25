@@ -1428,7 +1428,7 @@ label linGeomTotalDispSolid::formJacobian
 
         const tangentRequest req = jacobianTangent(tangentRequest::scalar);
 
-        if (mechanicalConstitutiveLawManager::needsFourthOrderTangent(req))
+        if (needsFourthOrderTangent(req))
         {
             // Assemble from the full material tangent
             hofvm::divSigmaIntoPETScMatrix

@@ -647,7 +647,7 @@ Foam::mechanicalConstitutiveLawManager::topology
 
         // Apply whatever the law declared and let it initialise its own
         // state, in that order. See applyStateSpec
-        applyStateSpec
+        stateSetup_.applyStateSpec
         (
             lawI,
             topo,
@@ -684,7 +684,7 @@ Foam::mechanicalConstitutiveLawManager::topology
                     new mechanicalConstitutiveLawState(nFaces)
                 );
 
-                applyStateSpecPatch
+                stateSetup_.applyStateSpecPatch
                 (
                     lawI, patchI, entry.boundaryStates_[lawI][patchI]
                 );
@@ -840,7 +840,7 @@ void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
 
     forAll(laws_, lawI)
     {
-        if (declaresPersistentState(laws_[lawI]))
+        if (stateSetup_.declaresPersistentState(laws_[lawI]))
         {
             FatalErrorInFunction
                 << "The mesh topology changed, and the mechanical "
@@ -906,7 +906,7 @@ void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
                     )
                 );
 
-                applyStateSpecPatch(lawI, patchI, bStates[patchI]);
+                stateSetup_.applyStateSpecPatch(lawI, patchI, bStates[patchI]);
             }
         }
     }
@@ -1285,7 +1285,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
                 (
                     lawEntries[lawI].dict(),
                     lawName,
-                    requiredScalarInputsRecursive(laws_[lawI])
+                    inputGatherer_.requiredScalarInputsRecursive(laws_[lawI])
                 )
             );
 
@@ -1373,7 +1373,10 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     {
         forAll(laws_, lawI)
         {
-            const wordList names(requiredScalarInputsRecursive(laws_[lawI]));
+            const wordList names
+            (
+                inputGatherer_.requiredScalarInputsRecursive(laws_[lawI])
+            );
 
             forAll(names, i)
             {
@@ -1685,7 +1688,7 @@ bool Foam::mechanicalConstitutiveLawManager::resolveBoundaryEvaluation
         // fvPatch has none, so there is no patch field to read
         // them from; they take no part in the discretisation, so
         // nothing downstream depends on the difference
-        applyStateSpecScratch(lawI, bScratchPtr());
+        stateSetup_.applyStateSpecScratch(lawI, bScratchPtr());
     }
     else if (preserveState)
     {
@@ -1728,7 +1731,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFlat
     // Every processor refreshes every coupling input source here, before any
     // material is skipped for having no points on it, since reading is
     // collective
-    refreshScalarInputs();
+    inputGatherer_.refreshScalarInputs();
 
     const word context = Fields::flatContext();
     const label nIP = topo.nIntegrationPoints();
@@ -1826,7 +1829,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFlat
                 new mechanicalConstitutiveLawState(tp.states_[lawI].size())
             );
 
-            applyStateSpec
+            stateSetup_.applyStateSpec
             (
                 lawI, topo, tp.lawIntegrationPointIDs_[lawI], coldStates[lawI]
             );
@@ -1978,73 +1981,6 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFlat
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::evaluateSmallStrain
-(
-    const integrationPointTopology& topo,
-    const UList<tensor>& gradD,
-    const UList<tensor>& gradD0,
-    const scalar dt,
-    UList<symmTensor>& stress,
-    UList<scalar>* scalarTangentPtr,
-    UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq,
-    const bool preserveState,
-    const bool coldState,
-    UList<scalar>* volumetricPtr
-)
-{
-    evaluateFlat
-    (
-        topo,
-        smallStrainKinematicsFields(gradD, gradD0),
-        dt,
-        stress,
-        scalarTangentPtr,
-        fourthOrderTangentPtr,
-        tangentReq,
-        preserveState,
-        coldState,
-        volumetricPtr
-    );
-}
-
-
-void Foam::mechanicalConstitutiveLawManager::evaluateFiniteStrain
-(
-    const integrationPointTopology& topo,
-    const UList<tensor>& F,
-    const UList<tensor>& F0,
-    const UList<tensor>& Finv,
-    const UList<tensor>& Finv0,
-    const UList<scalar>& J,
-    const UList<scalar>& J0,
-    const scalar dt,
-    UList<symmTensor>& stress,
-    UList<scalar>* scalarTangentPtr,
-    UList<mat66>* fourthOrderTangentPtr,
-    const tangentRequest tangentReq,
-    const bool preserveState,
-    UList<scalar>* volumetricPtr
-)
-{
-    // No cold state on the finite-strain path: its only caller, the
-    // small-strain implicit stiffness, does not come this way
-    evaluateFlat
-    (
-        topo,
-        finiteStrainKinematicsFields(F, F0, Finv, Finv0, J, J0),
-        dt,
-        stress,
-        scalarTangentPtr,
-        fourthOrderTangentPtr,
-        tangentReq,
-        preserveState,
-        false,
-        volumetricPtr
-    );
-}
-
-
 void Foam::mechanicalConstitutiveLawManager::checkKinematicsListSizes
 (
     const label nIP,
@@ -2085,17 +2021,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     const tangentRequest tangentReq
 )
 {
-    evaluateSmallStrain
+    evaluateFlat
     (
         topo,
-        gradD,
-        gradD0,
+        smallStrainKinematicsFields(gradD, gradD0),
         dt,
         stress,
         scalarTangentPtr,
         fourthOrderTangentPtr,
         tangentReq,
-        false           // commit the constitutive state
+        false,          // commit the constitutive state
+        false,          // not a cold-state query
+        nullptr
     );
 }
 
@@ -2116,21 +2053,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
-    evaluateFiniteStrain
+    evaluateFlat
     (
         topo,
-        F,
-        F0,
-        Finv,
-        Finv0,
-        J,
-        J0,
+        finiteStrainKinematicsFields(F, F0, Finv, Finv0, J, J0),
         dt,
         stress,
         scalarTangentPtr,
         fourthOrderTangentPtr,
         tangentReq,
-        false           // commit the constitutive state
+        false,          // commit the constitutive state
+        false,          // no cold state on the finite-strain path
+        nullptr
     );
 }
 
@@ -2157,18 +2091,18 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentSmallStrain
 
     // A constitutive law produces a stress alongside its tangent, so give it
     // somewhere to put one that is not the caller's storage
-    evaluateSmallStrain
+    evaluateFlat
     (
         topo,
-        gradD,
-        gradD0,
+        smallStrainKinematicsFields(gradD, gradD0),
         dt,
         scratchStress(topo.nIntegrationPoints()),
         scalarTangentPtr,
         fourthOrderTangentPtr,
         tangentReq,
         true,           // preserve the constitutive state
-        coldState
+        coldState,
+        nullptr
     );
 }
 
@@ -2198,21 +2132,18 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
 
     // A constitutive law produces a stress alongside its tangent, so give it
     // somewhere to put one that is not the caller's storage
-    evaluateFiniteStrain
+    evaluateFlat
     (
         topo,
-        F,
-        F0,
-        Finv,
-        Finv0,
-        J,
-        J0,
+        finiteStrainKinematicsFields(F, F0, Finv, Finv0, J, J0),
         dt,
         scratchStress(topo.nIntegrationPoints()),
         scalarTangentPtr,
         fourthOrderTangentPtr,
         tangentReq,
-        true            // preserve the constitutive state
+        true,           // preserve the constitutive state
+        false,          // no cold state on the finite-strain path
+        nullptr
     );
 }
 
@@ -2483,11 +2414,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Update the internal field via the flat-list primitive: a cell-centred
     // topology has one integration point per cell, so the internal fields are
     // already in the flat form it expects
-    evaluateSmallStrain
+    evaluateFlat
     (
         topo,
-        Foam::primitiveField(gradD),
-        Foam::primitiveField(gradD0),
+        smallStrainKinematicsFields
+        (
+            Foam::primitiveField(gradD),
+            Foam::primitiveField(gradD0)
+        ),
         dt,
         Foam::primitiveFieldRef(stress),
         scalarTangentPtr
@@ -2567,7 +2501,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSurface
     // Every processor refreshes every coupling input source here, before any
     // material is skipped for having no points on it, since reading is
     // collective
-    refreshScalarInputs();
+    inputGatherer_.refreshScalarInputs();
 
     // The scale each law's convergence test is normalised by, taken over its
     // internal faces on every rank, and used on its boundary faces too, as
@@ -2934,7 +2868,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     // Every processor refreshes every coupling input source here, before any
     // material is skipped for having no points on it, since reading is
     // collective
-    refreshScalarInputs();
+    inputGatherer_.refreshScalarInputs();
 
     // Accumulation fields
 
@@ -3197,15 +3131,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     // Update the internal field via the flat-list primitive: a cell-centred
     // topology has one integration point per cell, so the internal fields are
     // already in the flat form it expects
-    evaluateFiniteStrain
+    evaluateFlat
     (
         topo,
-        Foam::primitiveField(F),
-        Foam::primitiveField(F0),
-        Foam::primitiveField(Finv),
-        Foam::primitiveField(Finv0),
-        Foam::primitiveField(J),
-        Foam::primitiveField(J0),
+        finiteStrainKinematicsFields
+        (
+            Foam::primitiveField(F),
+            Foam::primitiveField(F0),
+            Foam::primitiveField(Finv),
+            Foam::primitiveField(Finv0),
+            Foam::primitiveField(J),
+            Foam::primitiveField(J0)
+        ),
         dt,
         Foam::primitiveFieldRef(stress),
         scalarTangentPtr
@@ -3214,6 +3151,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         nullptr,
         tangentReq,
         false,          // commit the constitutive state
+        false,          // no cold state on the finite-strain path
         volumetricResponsePtr
       ? &Foam::primitiveFieldRef(*volumetricResponsePtr)
       : nullptr

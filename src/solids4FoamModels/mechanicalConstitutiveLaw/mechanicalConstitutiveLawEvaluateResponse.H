@@ -29,7 +29,6 @@ Author
 #ifndef mechanicalConstitutiveLawEvaluateResponse_H
 #define mechanicalConstitutiveLawEvaluateResponse_H
 
-#include "mechanicalConstitutiveLawManager.H"
 #include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawInputs.H"
 #include "mechanicalConstitutiveLawState.H"
@@ -150,7 +149,7 @@ void evaluateResponse
 
         const bool bulkTangent =
             tangentReq == tangentRequest::scalar
-         || mechanicalConstitutiveLawManager::needsFourthOrderTangent
+         || needsFourthOrderTangent
             (
                 tangentReq
             );
@@ -205,7 +204,7 @@ void evaluateResponse
     if
     (
         scalarTangentStore
-     && mechanicalConstitutiveLawManager::needsScalarTangent(tangentReq)
+     && needsScalarTangent(tangentReq)
     )
     {
         UIndirectList<scalar> tangentView(*scalarTangentStore, tangentIDs);
@@ -232,7 +231,7 @@ void evaluateResponse
     else if
     (
         fourthOrderTangentStore
-     && mechanicalConstitutiveLawManager::needsFourthOrderTangent(tangentReq)
+     && needsFourthOrderTangent(tangentReq)
     )
     {
         UIndirectList<mat66> tangentView(*fourthOrderTangentStore, tangentIDs);

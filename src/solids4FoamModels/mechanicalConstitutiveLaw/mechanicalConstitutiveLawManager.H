@@ -351,8 +351,7 @@ class mechanicalConstitutiveLawManager
 
         //- The flat-list evaluation, written once for both strain measures.
         //  Fields is smallStrainKinematicsFields or
-        //  finiteStrainKinematicsFields; evaluateSmallStrain and
-        //  evaluateFiniteStrain forward to it
+        //  finiteStrainKinematicsFields
         template<class Fields>
         void evaluateFlat
         (
@@ -541,8 +540,10 @@ class mechanicalConstitutiveLawManager
             mechanicalConstitutiveLawState*& bState
         ) const;
 
-        //- The coupling-input gathering below is done by inputGatherer_; see
-        //  mechanicalConstitutiveLawInputGatherer for what each one does
+        //- A law's coupling inputs, gathered by inputGatherer_ into the
+        //  topology entry's storage; see
+        //  mechanicalConstitutiveLawInputGatherer. Everything else the
+        //  gatherer does is called on it directly
 
         mechanicalConstitutiveLawInputs lawInputs
         (
@@ -574,21 +575,6 @@ class mechanicalConstitutiveLawManager
             );
         }
 
-        void refreshScalarInputs() const
-        {
-            inputGatherer_.refreshScalarInputs();
-        }
-
-        static wordList requiredScalarInputsRecursive
-        (
-            const mechanicalConstitutiveLaw& law
-        )
-        {
-            return
-                mechanicalConstitutiveLawInputGatherer::
-                requiredScalarInputsRecursive(law);
-        }
-
         //- Tell a law and every law below it that the step has ended
         void endTimeStepLaw
         (
@@ -602,17 +588,9 @@ class mechanicalConstitutiveLawManager
             DynamicList<label>* counts = nullptr
         ) const;
 
-        //- Setting up a law's state - declared defaults, prescribed fields
-        //  and restart - is done by stateSetup_; see
-        //  mechanicalConstitutiveLawStateSetup for what each one does
-
-        bool declaresPersistentState
-        (
-            const mechanicalConstitutiveLaw& law
-        ) const
-        {
-            return stateSetup_.declaresPersistentState(law);
-        }
+        //- Register a topology entry's persistent state for restart, through
+        //  stateSetup_; see mechanicalConstitutiveLawStateSetup. Everything
+        //  else the state setup does is called on it directly
 
         void setupStateRestart
         (
@@ -630,36 +608,6 @@ class mechanicalConstitutiveLawManager
                 topo,
                 topologyKey
             );
-        }
-
-        void applyStateSpec
-        (
-            const label lawI,
-            const integrationPointTopology& topo,
-            const labelList& ipIDs,
-            mechanicalConstitutiveLawState& state
-        ) const
-        {
-            stateSetup_.applyStateSpec(lawI, topo, ipIDs, state);
-        }
-
-        void applyStateSpecScratch
-        (
-            const label lawI,
-            mechanicalConstitutiveLawState& state
-        ) const
-        {
-            stateSetup_.applyStateSpecScratch(lawI, state);
-        }
-
-        void applyStateSpecPatch
-        (
-            const label lawI,
-            const label patchI,
-            mechanicalConstitutiveLawState& state
-        ) const
-        {
-            stateSetup_.applyStateSpecPatch(lawI, patchI, state);
         }
 
         //- Roll every law's state to old time, once, on the first
@@ -683,7 +631,6 @@ class mechanicalConstitutiveLawManager
         //  need mapping onto the new boundary faces
         void updateAddressingIfTopologyChanged();
 
-
         //- No copy construct
         mechanicalConstitutiveLawManager
         (
@@ -692,66 +639,6 @@ class mechanicalConstitutiveLawManager
 
         //- No copy assignment
         void operator=(const mechanicalConstitutiveLawManager&) = delete;
-
-
-public:
-
-    // Public static predicates on a tangent request
-
-        //- Check if the provided tangent request is scalar or scalarDeviatoric
-        inline static bool needsScalarTangent(const tangentRequest req)
-        {
-            return
-                req == tangentRequest::scalar
-             || req == tangentRequest::scalarDeviatoric;
-        }
-
-        //- Check if the provided tangent request is fourthOrder or
-        //  fourthOrderFiniteDifference
-        inline static bool needsFourthOrderTangent(const tangentRequest req)
-        {
-            return
-                req == tangentRequest::fourthOrder
-             || req == tangentRequest::fourthOrderFiniteDifference;
-        }
-
-        //- Flat-list small-strain evaluation.
-        //  Shared implementation of the public stress and tangent-only
-        //  updates. With preserveState, each law is evaluated against a
-        //  shadow of its state, so history is read but never written
-        void evaluateSmallStrain
-        (
-            const integrationPointTopology& topo,
-            const UList<tensor>& gradD,
-            const UList<tensor>& gradD0,
-            const scalar dt,
-            UList<symmTensor>& stress,
-            UList<scalar>* scalarTangentPtr,
-            UList<mat66>* fourthOrderTangentPtr,
-            const tangentRequest tangentReq,
-            const bool preserveState,
-            const bool coldState = false,
-            UList<scalar>* volumetricPtr = nullptr
-        );
-
-        //- Finite-strain counterpart of evaluateSmallStrain
-        void evaluateFiniteStrain
-        (
-            const integrationPointTopology& topo,
-            const UList<tensor>& F,
-            const UList<tensor>& F0,
-            const UList<tensor>& Finv,
-            const UList<tensor>& Finv0,
-            const UList<scalar>& J,
-            const UList<scalar>& J0,
-            const scalar dt,
-            UList<symmTensor>& stress,
-            UList<scalar>* scalarTangentPtr,
-            UList<mat66>* fourthOrderTangentPtr,
-            const tangentRequest tangentReq,
-            const bool preserveState,
-            UList<scalar>* volumetricPtr = nullptr
-        );
 
         //- Check that the requested tangent can be provided at the integration
         //  points of the given topology for the current set of laws
@@ -776,19 +663,14 @@ public:
         //- As above, for point-centred topologies
         pointScalarField& pointTangentWeight() const;
 
-        //- Clear surface scratch fields
-        inline void clearScratchFields() const
-        {
-            surfaceStressSumPtr_.clear();
-            surfaceStressWeightPtr_.clear();
-            surfaceTangentWeightPtr_.clear();
+        //- Reset cached material property fields (e.g. rho, bulk modulus).
+        //  This does not modify constitutive laws or their state; it only
+        //  clears cached volScalarField representations so they will be
+        //  rebuilt on next access.
+        void resetMaterialPropertyFields();
 
-            pointStressSumPtr_.clear();
-            pointStressWeightPtr_.clear();
-            pointTangentWeightPtr_.clear();
 
-            scratchStress_.clear();
-        }
+public:
 
     //- Runtime type information
     TypeName("mechanicalConstitutiveLawManager");
@@ -857,12 +739,6 @@ public:
             const word& key,
             autoPtr<integrationPointTopology> topoPtr
         ) const;
-
-        //- Reset cached material property fields (e.g. rho, bulk modulus).
-        //  This does not modify constitutive laws or their state; it only
-        //  clears cached volScalarField representations so they will be
-        //  rebuilt on next access.
-        void resetMaterialPropertyFields();
 
         //- Update the engineering (small-strain) stress at the integration
         //  points of the supplied topology.
