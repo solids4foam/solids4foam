@@ -142,10 +142,10 @@ extract_yielding_points() {
 # tutorial in the regression set whose material is history dependent, so it is
 # the only one where a tangent query has any history to disturb
 run_constitutive_test() {
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"

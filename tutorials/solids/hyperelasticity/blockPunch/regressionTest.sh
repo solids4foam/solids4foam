@@ -156,10 +156,10 @@ check_displacement() {
 run_constitutive_test() {
     local case_dir="$1"
 
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${case_dir}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"

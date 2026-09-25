@@ -142,7 +142,15 @@ run_case() {
 
     # The law's own checks, which are what pins the constitutive port: an
     # honest isochoric split, and a fibre term that matches its closed form
-    if command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+    local testApp=0
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw || testApp=$?
+
+    # A failure in CI, where the application is always built
+    if (( testApp == 2 )); then
+        return 1
+    fi
+
+    if (( testApp == 0 )); then
         local u="${REGRESSION_ROOT}/lawChecks"
         rm -rf "${u}"; mkdir -p "${u}"
         cp -a "${d}/constant" "${d}/system" "${u}/"

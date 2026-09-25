@@ -130,7 +130,15 @@ check_displacement_formulation() {
     # this case: a law declaring it can separate its isochoric stress from its
     # volumetric response is taken at its word by any mixed formulation, and
     # this is what tests the word. GuccioneElastic declares it
-    if command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+    local testApp=0
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw || testApp=$?
+
+    # A failure in CI, where the application is always built
+    if (( testApp == 2 )); then
+        return 1
+    fi
+
+    if (( testApp == 0 )); then
         if ( cd "${CASE_DIR}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
         then
             # This law's split is honest but not dilation invariant: the

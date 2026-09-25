@@ -316,10 +316,10 @@ run_split_check() {
         grep -q "Selecting mechanical constitutive law" \
             "${d}/${SOLVER_LOGFILE}" 2>/dev/null || continue
 
-        if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-            echo "SKIP: mechanicalConstitutiveLaw checks (not in PATH)"
-            return 0
-        fi
+        # A skip where the application is not built, and a failure in CI,
+        # where it always is
+        solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+            || return $(( $? - 1 ))
 
         if ! ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
         then

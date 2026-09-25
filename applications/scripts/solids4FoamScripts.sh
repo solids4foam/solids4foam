@@ -860,6 +860,37 @@ function solids4Foam::regressionCaseSkipped()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requireTestApp
+#     Check that a test application a regression script runs is in PATH.
+#     Returns 0 if it is. If it is not, a local build may simply not have
+#     built it, so it prints SKIP and returns 1. In CI, where Allwmake always
+#     builds the test applications, a missing one means the check it serves
+#     would pass without running, so it prints FAIL and returns 2
+# Arguments:
+#     1: APPLICATION
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requireTestApp()
+{
+    local APPLICATION=$1
+
+    if command -v "${APPLICATION}" > /dev/null 2>&1
+    then
+        return 0
+    fi
+
+    if [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]
+    then
+        echo "FAIL: ${APPLICATION} not found in PATH, which a CI run must"
+        echo "      not skip: it is built by Allwmake"
+        return 2
+    fi
+
+    echo "SKIP: ${APPLICATION} not found in PATH"
+    return 1
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # latestTime
 #     Print the latest time directory of a case other than 0, or nothing if the
 #     case has none, as foamListTimes -latestTime does. foam-extend has no

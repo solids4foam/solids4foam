@@ -67,10 +67,10 @@ echo
 # viscousHookeanElastic, the first law whose response depends on the time
 # increment, so this is the runtime coverage of the inputs object carrying dt
 run_constitutive_test() {
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
