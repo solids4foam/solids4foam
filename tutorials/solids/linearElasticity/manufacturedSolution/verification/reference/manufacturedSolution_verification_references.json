@@ -132,7 +132,7 @@
       "approach": "highOrder-movingLeastSquares",
       "p": 2,
       "minimum_net_order": {
-        "displacement": 2.5,
+        "displacement": 1.5,
         "stress": 1.5
       }
     },
@@ -141,7 +141,7 @@
       "approach": "highOrder-kExactLeastSquares",
       "p": 2,
       "minimum_net_order": {
-        "displacement": 2.5,
+        "displacement": 1.5,
         "stress": 1.5
       }
     },
@@ -150,7 +150,7 @@
       "approach": "highOrder-movingLeastSquares",
       "p": 2,
       "minimum_net_order": {
-        "displacement": 2.5,
+        "displacement": 1.5,
         "stress": 1.5
       }
     },
@@ -159,7 +159,7 @@
       "approach": "highOrder-kExactLeastSquares",
       "p": 2,
       "minimum_net_order": {
-        "displacement": 2.5,
+        "displacement": 1.5,
         "stress": 1.5
       }
     },
