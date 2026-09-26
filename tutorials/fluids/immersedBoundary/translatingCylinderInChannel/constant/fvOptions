@@ -23,22 +23,25 @@ immersedBoundary
     type            immersedBoundaryForce;
 
     // Sharp interface penalisation with the fluid cells next to the
-    // surface penalised along the cell links cut by the surface; the other
-    // methods are available for comparison with
-    //     method          ghostCell;
-    //     method          penalty;
-    //     method          incremental;
-    //     couplingCoeff   0.8;
-    // and "occupancy vertexFraction;" for the body with incremental
+    // surface penalised along the cell links cut by the surface, suited to
+    // moving bodies (see src/immersedBoundary/README.md)
     method          cutLink;
 
     bodies
     {
         cylinder
         {
-            // Diameter 0.1 m, centred at (0.2, 0.2) m, extending beyond the
-            // mesh in the z direction
+            // Diameter 0.1 m, centred at (0.2, 0.2) m at t = 0, extending
+            // beyond the mesh in the z direction
             surface     "cylinder.stl";
+
+            // Translation downstream at 0.05 m/s: x = 0.2 + 0.05 t m
+
+            motion
+            {
+                type        uniformTranslation;
+                velocity    (0.05 0 0);
+            }
         }
     }
 }

@@ -51,13 +51,25 @@ release. For complete commit-level details and contributor information, see the
   the time step. For static bodies, `method ghostCell` penalises the cells
   whose centre is inside a body, with the velocity of the cells next to the
   fluid extrapolated linearly from an image point in the fluid, so that the
-  velocity equals the body velocity on the surface. The explicit direct
+  velocity equals the body velocity on the surface. `method cutLink`, for
+  static and moving bodies, penalises the cells whose centre is inside a
+  body and, along each cell link cut by the surface, the fluid cell next to
+  them (Shortley-Weller), with rates that do not depend on the time step
+  and vary continuously as the body moves; with the solids4foam
+  `pimpleFluid` fluid model, the pressure equation uses the fluid fraction
+  of the area of the cut faces (from `cutFaceIso`) and the body flux through
+  their solid part. Its force is the momentum exchange or the traction on
+  the surface (new `immersedSurfaceTraction` class). Added the
+  `uniformTranslation` body motion and the `cut` (exact volume fraction)
+  occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
   cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and
   openHFDIB; see `src/immersedBoundary/README.md` for the provenance. Added the
   `fluids/immersedBoundary/staticCylinderInChannel` and
-  `fluids/immersedBoundary/oscillatingCylinderInChannel` tutorials, with
+  `fluids/immersedBoundary/oscillatingCylinderInChannel`,
+  `fluids/immersedBoundary/translatingCylinderInChannel` and
+  `fluids/immersedBoundary/oscillatingWallStokesLayer` tutorials, with
   regression tests.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane

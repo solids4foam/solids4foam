@@ -12,35 +12,45 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    location    "constant";
-    object      fvOptions;
+    location    "system";
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Immersed cylinder, see src/immersedBoundary/README.md
-immersedBoundary
-{
-    type            immersedBoundaryForce;
+libs            (immersedBoundary);
 
-    // Sharp interface penalisation with the fluid cells next to the
-    // surface penalised along the cell links cut by the surface; the other
-    // methods are available for comparison with
-    //     method          ghostCell;
-    //     method          penalty;
-    //     method          incremental;
-    //     couplingCoeff   0.8;
-    // and "occupancy vertexFraction;" for the body with incremental
-    method          cutLink;
+application     solids4Foam;
 
-    bodies
-    {
-        cylinder
-        {
-            // Diameter 0.1 m, centred at (0.2, 0.2) m, extending beyond the
-            // mesh in the z direction
-            surface     "cylinder.stl";
-        }
-    }
-}
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         10;
+
+deltaT          0.001;
+
+writeControl    adjustableRunTime;
+
+writeInterval   1;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+adjustTimeStep  yes;
+
+maxCo           0.5;
 
 // ************************************************************************* //

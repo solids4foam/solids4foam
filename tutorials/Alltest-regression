@@ -145,6 +145,8 @@ REGRESSION_TESTS=(
     "fluids/poiseuilleChannel"
     "fluids/immersedBoundary/staticCylinderInChannel"
     "fluids/immersedBoundary/oscillatingCylinderInChannel"
+    "fluids/immersedBoundary/translatingCylinderInChannel"
+    "fluids/immersedBoundary/oscillatingWallStokesLayer"
     "thermoFluidSolidInteraction/thermalCavity"
     "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"

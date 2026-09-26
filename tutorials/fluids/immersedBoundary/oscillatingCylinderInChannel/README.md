@@ -129,6 +129,13 @@ the cylinder, the difference from the body-fitted mesh solution is about 0.46
 on all the meshes. As the occupancy varies continuously with the position of
 the cylinder, the force is smooth as the cylinder crosses the cells.
 
+With `method cutLink;`, the differences from the body-fitted mesh solution
+are 0.19, 0.07 and 0.06 for levels 1-3 with the force from the momentum
+exchange (columns 2-4 of the force file, which include the inertia of the
+fluid inside), and 0.11, 0.04 and 0.02 with the force from the surface
+traction (columns 11-13), which is the more accurate for this accelerating
+body.
+
 With the `incremental` forcing method of `pimpleHFDIBFoam` (`method
 incremental;` and `occupancy vertexFraction;` in `constant/fvOptions`), the
 differences from the Wan and Turek (2006) coefficients, including the

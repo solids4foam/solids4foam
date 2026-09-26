@@ -13,34 +13,13 @@ FoamFile
     format      ascii;
     class       dictionary;
     location    "constant";
-    object      fvOptions;
+    object      fluidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Immersed cylinder, see src/immersedBoundary/README.md
-immersedBoundary
-{
-    type            immersedBoundaryForce;
+fluidModel pimpleFluid;
 
-    // Sharp interface penalisation with the fluid cells next to the
-    // surface penalised along the cell links cut by the surface; the other
-    // methods are available for comparison with
-    //     method          ghostCell;
-    //     method          penalty;
-    //     method          incremental;
-    //     couplingCoeff   0.8;
-    // and "occupancy vertexFraction;" for the body with incremental
-    method          cutLink;
-
-    bodies
-    {
-        cylinder
-        {
-            // Diameter 0.1 m, centred at (0.2, 0.2) m, extending beyond the
-            // mesh in the z direction
-            surface     "cylinder.stl";
-        }
-    }
-}
+pimpleFluidCoeffs
+{}
 
 // ************************************************************************* //

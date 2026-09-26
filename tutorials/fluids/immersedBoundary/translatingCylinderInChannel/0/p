@@ -11,35 +11,34 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    location    "constant";
-    object      fvOptions;
+    class       volScalarField;
+    location    "0";
+    object      p;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Immersed cylinder, see src/immersedBoundary/README.md
-immersedBoundary
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
 {
-    type            immersedBoundaryForce;
-
-    // Sharp interface penalisation with the fluid cells next to the
-    // surface penalised along the cell links cut by the surface; the other
-    // methods are available for comparison with
-    //     method          ghostCell;
-    //     method          penalty;
-    //     method          incremental;
-    //     couplingCoeff   0.8;
-    // and "occupancy vertexFraction;" for the body with incremental
-    method          cutLink;
-
-    bodies
+    inlet
     {
-        cylinder
-        {
-            // Diameter 0.1 m, centred at (0.2, 0.2) m, extending beyond the
-            // mesh in the z direction
-            surface     "cylinder.stl";
-        }
+        type            zeroGradient;
+    }
+    outlet
+    {
+        type            fixedValue;
+        value           uniform 0;
+    }
+    walls
+    {
+        type            zeroGradient;
+    }
+    frontAndBack
+    {
+        type            empty;
     }
 }
 

@@ -12,9 +12,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
 fi
 
 # ============================================================
-# staticCylinderInChannel regression test
-# Runs the coarsest mesh (MESH_LEVEL=1) to steady state and
-# checks the drag and lift coefficients of the immersed
+# translatingCylinderInChannel regression test
+# Runs the coarsest mesh (MESH_LEVEL=1) to t = 5 s and checks
+# the drag and lift coefficients of the translating immersed
 # cylinder against the values of this method on this mesh.
 # ============================================================
 
@@ -23,16 +23,16 @@ fi
 # ------------------------------------------------------------
 
 REG_END_TIME=5
-CD_MIN=5.56
-CD_MAX=5.66
-CL_MIN=0.004
-CL_MAX=0.012
+CD_MIN=5.14
+CD_MAX=5.44
+CL_MIN=-0.04
+CL_MAX=0.06
 
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/immersedBoundary/0/cylinder.dat"
 
 echo "============================================================"
-echo "staticCylinderInChannel regression test"
+echo "translatingCylinderInChannel regression test"
 echo "Regression end time = ${REG_END_TIME}"
 echo "Final Cd in [${CD_MIN}, ${CD_MAX}]"
 echo "Final Cl in [${CL_MIN}, ${CL_MAX}]"

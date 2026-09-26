@@ -12,30 +12,28 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
 fi
 
 # ============================================================
-# staticCylinderInChannel regression test
-# Runs the coarsest mesh (MESH_LEVEL=1) to steady state and
-# checks the drag and lift coefficients of the immersed
-# cylinder against the values of this method on this mesh.
+# oscillatingWallStokesLayer regression test
+# Runs the coarsest mesh (MESH_LEVEL=1) for four periods and
+# checks the root mean square wall shear stress over the last
+# period against the value of this method on this mesh (the
+# periodic solution gives 0.01571 Pa).
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances
 # ------------------------------------------------------------
 
-REG_END_TIME=5
-CD_MIN=5.56
-CD_MAX=5.66
-CL_MIN=0.004
-CL_MAX=0.012
+REG_END_TIME=4
+TAU_MIN=0.0146
+TAU_MAX=0.0156
 
 ALLRUN_LOGFILE="log.Allrun"
-FORCE_FILE="postProcessing/immersedBoundary/0/cylinder.dat"
+FORCE_FILE="postProcessing/immersedBoundary/0/slab.dat"
 
 echo "============================================================"
-echo "staticCylinderInChannel regression test"
+echo "oscillatingWallStokesLayer regression test"
 echo "Regression end time = ${REG_END_TIME}"
-echo "Final Cd in [${CD_MIN}, ${CD_MAX}]"
-echo "Final Cl in [${CL_MIN}, ${CL_MAX}]"
+echo "RMS wall shear stress in [${TAU_MIN}, ${TAU_MAX}]"
 echo "============================================================"
 echo
 
@@ -95,12 +93,12 @@ if [[ ! -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
     exit 1
 fi
 
-# Cd = 2 Fx/(rho Umean^2 D Lz) = 5000 Fx, and likewise for Cl
-final_cd=$(awk '!/^#/ { cd = 5000*$2 } END { print cd }' "${CASE_DIR}/${FORCE_FILE}")
-final_cl=$(awk '!/^#/ { cl = 5000*$3 } END { print cl }' "${CASE_DIR}/${FORCE_FILE}")
+# Wall shear stress = Fx/A, with the wall area in the mesh A = 0.005 m^2,
+# root mean square over the last period (3 < t <= 4 s)
+rms_tau=$(awk '!/^#/ && $1 > 3 { s += ($2/0.005)^2; n++ } END { if (n > 0) print sqrt(s/n) }' "${CASE_DIR}/${FORCE_FILE}")
 
-if [[ -z "${final_cd}" || -z "${final_cl}" ]]; then
-    echo "FAIL: Could not extract the final drag and lift coefficients"
+if [[ -z "${rms_tau}" ]]; then
+    echo "FAIL: Could not extract the wall shear stress"
     exit 1
 fi
 
@@ -120,8 +118,7 @@ check_range() {
     fi
 }
 
-check_range "Final Cd" "${final_cd}" "${CD_MIN}" "${CD_MAX}"
-check_range "Final Cl" "${final_cl}" "${CL_MIN}" "${CL_MAX}"
+check_range "RMS wall shear stress" "${rms_tau}" "${TAU_MIN}" "${TAU_MAX}"
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then

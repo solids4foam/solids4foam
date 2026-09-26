@@ -11,35 +11,46 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    location    "constant";
-    object      fvOptions;
+    class       volVectorField;
+    location    "0";
+    object      U;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Immersed cylinder, see src/immersedBoundary/README.md
-immersedBoundary
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
 {
-    type            immersedBoundaryForce;
-
-    // Sharp interface penalisation with the fluid cells next to the
-    // surface penalised along the cell links cut by the surface; the other
-    // methods are available for comparison with
-    //     method          ghostCell;
-    //     method          penalty;
-    //     method          incremental;
-    //     couplingCoeff   0.8;
-    // and "occupancy vertexFraction;" for the body with incremental
-    method          cutLink;
-
-    bodies
+    inlet
     {
-        cylinder
-        {
-            // Diameter 0.1 m, centred at (0.2, 0.2) m, extending beyond the
-            // mesh in the z direction
-            surface     "cylinder.stl";
-        }
+        // Parabolic profile with a maximum velocity Um = 0.3 m/s, plus the
+        // velocity of the cylinder, 0.05 m/s:
+        // Ux = 0.05 + 4*Um*y*(H - y)/H^2, with H = 0.41 m
+        type            fixedProfile;
+        profile         polynomial
+        (
+            ((0.05 0 0) (0 0 0))
+            ((2.926829268 0 0) (1 0 0))
+            ((-7.138608 0 0) (2 0 0))
+        );
+        direction       (0 1 0);
+        origin          0;
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    walls
+    {
+        // Moving with the frame velocity of the translating cylinder
+        type            fixedValue;
+        value           uniform (0.05 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
     }
 }
 
