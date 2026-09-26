@@ -24,6 +24,7 @@ License
 #include "fvm.H"
 #include "constrainHbyA.H"
 #include "constrainPressure.H"
+#include "localMin.H"
 #include "findRefCell.H"
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
@@ -522,6 +523,41 @@ bool pimpleFluid::evolve()
                 tUEqn.clear();
             }
 
+            // Pressure diffusivity on the faces, with immersed boundaries
+            tmp<surfaceScalarField> rAtUf;
+
+            // Immersed boundaries (immersedBoundaryForce with
+            // apertureCoupling): on the faces cut by a body, the flux is the
+            // fluid fraction of the face area (aperture) times the flux, plus
+            // the flux of the body velocity through the solid part of the
+            // face, and the diffusivity is blended with that of the
+            // penalised cells, so that the pressure equation changes
+            // continuously as the body moves
+            if
+            (
+                mesh.foundObject<surfaceScalarField>
+                (
+                    "immersedBoundaryAperture"
+                )
+            )
+            {
+                const surfaceScalarField& alpha =
+                    mesh.lookupObject<surfaceScalarField>
+                    (
+                        "immersedBoundaryAperture"
+                    );
+                const surfaceScalarField& wallFlux =
+                    mesh.lookupObject<surfaceScalarField>
+                    (
+                        "immersedBoundaryWallFlux"
+                    );
+
+                phiHbyA = alpha*phiHbyA + wallFlux;
+                rAtUf =
+                    alpha*fvc::interpolate(rAtU())
+                  + (1 - alpha)*localMin<scalar>(mesh).interpolate(rAtU());
+            }
+
             // Update the pressure BCs to ensure flux consistency
             // constrainPressure(p, U, phiHbyA, rAtU(), MRF);
             constrainPressure(p, U, phiHbyA, rAtU());
@@ -531,7 +567,9 @@ bool pimpleFluid::evolve()
             {
                 fvScalarMatrix pEqn
                 (
-                    fvm::laplacian(rAtU(), p) == fvc::div(phiHbyA)
+                    rAtUf.valid()
+                  ? fvm::laplacian(rAtUf(), p) == fvc::div(phiHbyA)
+                  : fvm::laplacian(rAtU(), p) == fvc::div(phiHbyA)
                 );
 
                 pEqn.setReference(pRefCell_, pRefValue_);

@@ -44,20 +44,34 @@ release. For complete commit-level details and contributor information, see the
 - Added the `immersedBoundary` library (OpenFOAM.com only) with the
   `immersedBoundaryForce` finite volume option for bodies with a prescribed
   motion, given as closed surfaces, in incompressible flow. It works with the
-  `pimpleFluid` fluid model and the `pimpleFoam` solver. The default forcing
-  is an implicit volume penalisation weighted by the solid volume fraction,
+  `pimpleFluid` fluid model and the `pimpleFoam` solver. `method penalty` is
+  an implicit volume penalisation weighted by the solid volume fraction,
   which is found from the signed distance to the surface, with a
   penalisation rate in the partially covered cells that does not depend on
   the time step. For static bodies, `method ghostCell` penalises the cells
   whose centre is inside a body, with the velocity of the cells next to the
   fluid extrapolated linearly from an image point in the fluid, so that the
-  velocity equals the body velocity on the surface. The explicit direct
+  velocity equals the body velocity on the surface. `method cutLink` (the
+  default), for static and moving bodies, penalises the cells whose centre
+  is inside a body and, along each cell link cut by the surface, the fluid
+  cell next to them (Shortley-Weller), with rates that do not depend on the
+  time step
+  and vary continuously as the body moves; with the solids4foam
+  `pimpleFluid` fluid model, the pressure equation uses the fluid fraction
+  of the area of the cut faces (from `cutFaceIso`) and the body flux through
+  their solid part. Its force is the momentum exchange or the traction on
+  the surface (new `immersedSurfaceTraction` class). Added the
+  `uniformTranslation` and `solidBodyRotation` body motions and the `cut`
+  (exact volume fraction) occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
   cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and
   openHFDIB; see `src/immersedBoundary/README.md` for the provenance. Added the
   `fluids/immersedBoundary/staticCylinderInChannel` and
-  `fluids/immersedBoundary/oscillatingCylinderInChannel` tutorials, with
+  `fluids/immersedBoundary/oscillatingCylinderInChannel`,
+  `fluids/immersedBoundary/translatingCylinderInChannel` and
+  `fluids/immersedBoundary/oscillatingWallStokesLayer` and
+  `fluids/immersedBoundary/immersedTaylorCouette` tutorials, with
   regression tests.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane

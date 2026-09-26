@@ -25,9 +25,9 @@ Description
 
     Each body is a closed surface (see immersedBody) that covers some cells of
     the fluid mesh with an occupancy lambda, and moves with the velocity Ui.
-    Three forcing methods are available.
+    Four forcing methods are available.
 
-    penalty (the default): the implicit volume penalisation
+    penalty: the implicit volume penalisation
 
     \f[
         f = \kappa (U_i - U)
@@ -72,6 +72,77 @@ Description
     weighting, surfaceRateCoeff and nu entries are not used. For moving
     bodies the cells that the body leaves (fresh cells) disturb the force,
     and the penalty method is recommended.
+
+    cutLink (the default): a sharp interface penalisation for static and
+    moving bodies.
+    The cells whose centre is inside a body (penalised cells) are penalised
+    towards the body velocity with the rate
+    \f$ \kappa_s = \min(K/\Delta t, C_s(\nu/w^2 + |U_b|/w)) \f$, where w is
+    the cell width and C_s the pinnedRateCoeff (default 100), which does not
+    depend on the time step unless the time step is very large. Each fluid
+    cell P next to them is penalised
+    towards the body velocity at the surface with the rate
+
+    \f[
+        \kappa_P = \frac{1}{V_P} \sum_f \nu |S_f| \Delta_f
+            \left( \frac{|d_f|}{\phi_f} - 1 \right)
+    \f]
+
+    (at most \f$ \kappa_s \f$) summed over its faces f with a penalised
+    neighbour N, where \f$ |d_f| \f$ is the distance between the cell
+    centres, \f$ \Delta_f \f$ the diffusion coefficient of the face and
+    \f$ \phi_f \f$ the distance from the centre of P to the surface along
+    the line between the centres, from the intersection with the surface.
+    With the explicit correction \f$ \nu |S_f| \Delta_f (U_b - U_N)/V_P \f$
+    (linkCorrection, default yes), the viscous flux through the face is that
+    of a linear profile through the body velocity on the surface
+    (Shortley-Weller), whatever the velocity of the penalised cell, so that
+    the wall is on the surface to second order, except that the rate of P is
+    bounded by \f$ \kappa_s \f$ when its centre is within about 1% of the
+    cell width of the surface (with the default coefficient). The rates vary
+    continuously as the body moves: that of P tends to \f$ \kappa_s \f$ as
+    its centre reaches the surface, where P becomes penalised.
+
+    The momentum exchange force assumes a laminar flow of constant viscosity
+    on a static mesh. The bodies must not overlap, and a body that crosses a
+    cyclic patch must be periodic across it. A single immersedBoundaryForce
+    option with apertureCoupling may be used on a mesh (it may hold several
+    bodies). With cutLink, the inertia of the fluid inside the body
+    is included in the force, and the inertia columns of the force file are
+    zero.
+
+    With apertureCoupling (default yes), the option registers the fluid
+    fraction of the area of each face cut by the bodies (aperture), from the
+    geometric cutting of the faces by the zero isosurface of the signed
+    distance to the bodies (cutFaceIso), and the flux of the body velocity
+    through the solid part of the faces, as immersedBoundaryAperture and
+    immersedBoundaryWallFlux. The solids4foam pimpleFluid fluid model then
+    uses the aperture times the flux plus the body flux on these faces, and
+    blends the diffusivity of the pressure equation with that of the
+    penalised cells, so that the pressure equation changes continuously as
+    the body moves; other solvers ignore these fields.
+
+    The force is the momentum exchange (forceEstimator momentumExchange, the
+    default): the residual of the momentum equation of the final velocity
+    and pressure, without the forcing, summed over the penalised cells and
+    the fluid cells next to them, minus the rate of change of the momentum
+    of the penalised cells, with the time scheme of the momentum equation,
+    so that it includes the inertia of the fluid inside. The surface
+    traction (see immersedSurfaceTraction) is the alternative estimate
+    (forceEstimator surfaceTraction), which is also written in the columns
+    after the inertia with writeSurfaceTraction; with forceEstimator
+    surfaceTraction, the momentum exchange is written there. A third
+    estimate (forceEstimator forcing) is the forcing applied to the fluid in
+    the penalised cells and the fluid cells next to them, plus the inertia
+    of the fluid inside the body taken as rigid, \f$ \rho V_s a_c \f$, with
+    the volume \f$ V_s \f$ of the body in the mesh from the occupancy and
+    the acceleration \f$ a_c \f$ of its centroid (the rotational inertia is
+    not included); the momentum exchange is then written after the inertia.
+    The momentum exchange and forcing estimates are exact on average for
+    static and steadily moving bodies, the forcing estimate also gives the
+    wall shear of a tangentially accelerating wall accurately, and the
+    surface traction is the most accurate for bodies accelerating normal to
+    their surface.
 
     incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
     solver. The explicit forcing f is added to the right-hand side of the
@@ -126,9 +197,9 @@ Description
     {
         type            immersedBoundaryForce;
 
-        // Forcing method, optional, default penalty; ghostCell for static
-        // bodies, or incremental
-        method          penalty;
+        // Forcing method, optional, default cutLink; penalty, ghostCell
+        // (static bodies) or incremental
+        method          cutLink;
 
         // Penalty coefficient K, optional, default 1e3
         penaltyCoeff    1e3;
@@ -154,6 +225,26 @@ Description
         // (interpolated) or cell (donor cell centre), optional, default
         // cellPoint
         imageInterpolation cellPoint;
+
+        // cutLink: coefficient of the rate of the penalised cells, optional,
+        // default 100; 0 for K/deltaT
+        pinnedRateCoeff 100;
+
+        // cutLink: explicit correction of the flux to the penalised cells
+        // with the body velocity at the surface, optional, default yes
+        linkCorrection  yes;
+
+        // cutLink: register the face apertures and body fluxes for the
+        // pressure equation of pimpleFluid, optional, default yes
+        apertureCoupling yes;
+
+        // cutLink: force estimate, momentumExchange, surfaceTraction or
+        // forcing, optional, default momentumExchange
+        forceEstimator  momentumExchange;
+
+        // cutLink: with the momentum exchange, also write the force from
+        // the surface traction, optional, default no
+        writeSurfaceTraction no;
 
         // Coupling coefficient c of the incremental method, optional,
         // default 0.8
@@ -212,6 +303,7 @@ SourceFiles
 #include "OFstream.H"
 #include "IOdictionary.H"
 #include "immersedBody.H"
+#include "immersedSurfaceTraction.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -236,8 +328,8 @@ class immersedBoundaryForce
         //- Immersed bodies
         PtrList<immersedBody> bodies_;
 
-        //- Forcing method: penalty (implicit volume penalisation, the
-        //  default), ghostCell (sharp penalisation with a linear
+        //- Forcing method: cutLink (the default), penalty (implicit volume
+        //  penalisation), ghostCell (sharp penalisation with a linear
         //  reconstruction of the target velocity next to the surface) or
         //  incremental (the explicit direct forcing of openHFDIB-DEM,
         //  increased after each pressure corrector)
@@ -269,6 +361,76 @@ class immersedBoundaryForce
 
         //- Penalisation rate (1/s) in each cell
         scalarField kappa_;
+
+        // Cut link method
+
+            //- Fluid cells next to the penalised cells of each body
+            List<labelList> linkCells_;
+
+            //- Penalisation rate of each of these cells
+            List<scalarField> linkRates_;
+
+            //- Mean surface point of the links of each of these cells,
+            //  weighted by their rates
+            List<pointField> linkWallPoints_;
+
+            //- Links of each body: the fluid cell, the penalised cell (or -1
+            //  if on another processor, with the coupled patch and face),
+            //  the diffusion coefficient over the volume of the fluid cell,
+            //  and the surface point, for the explicit correction of the
+            //  flux to the penalised cell
+            List<labelList> linkFluidCells_;
+            List<labelList> linkPenalisedCells_;
+            List<labelList> linkPatches_;
+            List<labelList> linkPatchFaces_;
+            List<scalarField> linkCoeffs_;
+            List<pointField> linkPoints_;
+
+            //- Correct the flux from each fluid cell to its penalised
+            //  neighbours explicitly with the body velocity at the surface,
+            //  so that it does not depend on the stiffness of the penalised
+            //  cells
+            bool linkCorrection_;
+
+            //- Sum of the link rates of each fluid cell next to the
+            //  penalised cells, for sharing its force between bodies
+            scalarField linkRateSum_;
+
+            //- Explicit link correction of the last assembly, for the
+            //  forcing force estimate
+            vectorField linkCorrectionField_;
+
+            //- Surface traction of each body, for the forces
+            PtrList<immersedSurfaceTraction> tractions_;
+
+            //- If positive, the coefficient C of the rate of the penalised
+            //  cells of the cutLink method, C*(nu/w^2 + |Ub|/w), which does
+            //  not depend on the time step (at most K/deltaT), and bounds
+            //  the rates of the fluid cells next to them
+            scalar pinnedRateCoeff_;
+
+            //- Couple the pressure equation to the bodies through the face
+            //  apertures: the fluid model blends the face fluxes and
+            //  diffusivity of the pressure equation with those of the
+            //  bodies on the faces they cut
+            bool apertureCoupling_;
+
+            //- Fluid fraction of the area of each face (aperture), and the
+            //  flux of the body velocity through each face, registered for
+            //  the fluid model as immersedBoundaryAperture and
+            //  immersedBoundaryWallFlux
+            autoPtr<surfaceScalarField> aperturePtr_;
+            autoPtr<surfaceScalarField> wallFluxPtr_;
+
+            //- Force estimate of the cutLink method: momentumExchange (the
+            //  residual of the momentum equation in the penalised cells and
+            //  the fluid cells next to them) or surfaceTraction (the
+            //  pressure and viscous traction on the surface)
+            word forceEstimator_;
+
+            //- With the momentum exchange force, also evaluate the force from
+            //  the surface traction and write it after the inertia
+            bool writeSurfaceTraction_;
 
         // Ghost cell method
 
@@ -390,6 +552,10 @@ class immersedBoundaryForce
         List<vector> force_;
         List<vector> torque_;
         List<vector> inertia_;
+
+        //- With the cutLink method, the force from the estimator that is
+        //  not selected
+        List<vector> secondaryForce_;
         word forceTimeName_;
         bool forcesPending_;
 
@@ -418,6 +584,14 @@ class immersedBoundaryForce
         //- Move the bodies to the current time and calculate the occupancy
         void updateBodies(const bool move);
 
+        //- Residual of the momentum equation of the final velocity and
+        //  pressure without the forcing: the forcing received by the fluid
+        tmp<vectorField> residual(const volVectorField& U);
+
+        //- Time derivative of the velocity with the time scheme of the
+        //  momentum equation
+        tmp<vectorField> ddtU(const volVectorField& U) const;
+
         //- Calculate the force on each body
         void calcForces(const volVectorField& U);
 
@@ -426,6 +600,19 @@ class immersedBoundaryForce
 
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
+
+        //- Is the surface traction evaluated?
+        bool surfaceTractionRequired() const;
+
+        //- Rate of a penalised cell of the cutLink method
+        scalar pinnedRate(const label celli, const vector& Ub);
+
+        //- Find the fluid cells next to the penalised cells of the cut link
+        //  method and their rates, after the bodies are updated
+        void findLinks();
+
+        //- Update the face apertures and the flux of the body velocity
+        void updateApertures();
 
         //- Find the ghost cells and their donors, after the bodies are
         //  updated

@@ -1,0 +1,43 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+
+// Immersed Stokes second problem: N cells across the height 0.5 m, with
+// the wall of the immersed slab at y = 0.1234 m
+MESH_LEVEL ${MESH_LEVEL:-1};
+ny #eval "round(20*pow(2, $MESH_LEVEL - 1))";
+nx #eval "round($ny/10)";
+lx #eval "0.5*$nx/$ny";
+
+vertices
+(
+    (0 0 0) ($lx 0 0) ($lx 0.5 0) (0 0.5 0)
+    (0 0 0.1) ($lx 0 0.1) ($lx 0.5 0.1) (0 0.5 0.1)
+);
+
+blocks (hex (0 1 2 3 4 5 6 7) ($nx $ny 1) simpleGrading (1 1 1));
+
+boundary
+(
+    left { type cyclic; neighbourPatch right; faces ((0 4 7 3)); }
+    right { type cyclic; neighbourPatch left; faces ((1 2 6 5)); }
+    bottom { type patch; faces ((0 1 5 4)); }
+    top { type patch; faces ((3 7 6 2)); }
+    frontAndBack { type empty; faces ((0 3 2 1) (4 5 6 7)); }
+);
+
+// ************************************************************************* //

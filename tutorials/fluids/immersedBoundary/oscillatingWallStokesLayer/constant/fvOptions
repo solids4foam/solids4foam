@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+
+immersedBoundary
+{
+    type            immersedBoundaryForce;
+
+    // Sharp interface penalisation with the fluid cells next to the
+    // surface penalised along the cell links cut by the surface (see
+    // src/immersedBoundary/README.md)
+    method          cutLink;
+
+    // Also write the force from the surface traction (columns 11-13 of the
+    // force file)
+    writeSurfaceTraction yes;
+
+    bodies
+    {
+        slab
+        {
+            surface     "slab.stl";
+
+            // Slab below y = 0.1234 m, extending beyond the mesh in the x and
+            // z directions, oscillating in its plane with the velocity
+            // Ux = U0 sin(2 pi t), U0 = 0.1 m/s
+            motion
+            {
+                type        sinusoidalTranslation;
+                amplitude   0.0159154943;
+                period      1;
+                phase       -1.5707963268;
+                direction   (1 0 0);
+            }
+        }
+    }
+}
+
+// ************************************************************************* //
