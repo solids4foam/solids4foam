@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "immersedBoundaryForce.H"
+#include "fsiDriven.H"
 #include "fvMatrices.H"
 #include "fvmSup.H"
 #include "cutFaceIso.H"
@@ -185,6 +186,43 @@ void Foam::fv::immersedBoundaryForce::updateBodies(const bool move)
 
     // Record the mesh points for which lambda was calculated
     mesh_.setUpToDatePoints(pointsStamp_);
+
+    // Record the configurations of the bodies
+    bodyConfigurations_.setSize(bodies_.size());
+    forAll(bodies_, bodyi)
+    {
+        bodyConfigurations_[bodyi] = bodies_[bodyi].configuration();
+    }
+}
+
+
+bool Foam::fv::immersedBoundaryForce::bodiesRepositioned() const
+{
+    if (bodyConfigurations_.size() != bodies_.size())
+    {
+        return true;
+    }
+
+    forAll(bodies_, bodyi)
+    {
+        if (bodies_[bodyi].motion().configuration() != bodyConfigurations_[bodyi])
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+void Foam::fv::immersedBoundaryForce::checkBody(const label bodyi) const
+{
+    if (bodyi < 0 || bodyi >= bodies_.size())
+    {
+        FatalErrorInFunction
+            << "Body index " << bodyi << " out of range 0 to "
+            << bodies_.size() - 1 << abort(FatalError);
+    }
 }
 
 
@@ -1713,6 +1751,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
 :
     fv::option(name, modelType, dict, mesh),
     bodies_(),
+    bodyConfigurations_(),
     method_("cutLink"),
     penaltyCoeff_(1e3),
     weighting_("volumeFraction"),
@@ -1992,10 +2031,13 @@ void Foam::fv::immersedBoundaryForce::addSup
             }
         }
     }
-    else if (!mesh_.upToDatePoints(pointsStamp_))
+    else if (!mesh_.upToDatePoints(pointsStamp_) || bodiesRepositioned())
     {
-        // The mesh has moved since lambda was calculated
-        updateBodies(false);
+        // The mesh has moved since lambda was calculated, or a body has been
+        // re-positioned by a fluid-solid interface within the time step: the
+        // bodies are located again, keeping the forcing, momentum and
+        // apertures of the previous time step
+        updateBodies(true);
         updated = true;
     }
 
@@ -2293,6 +2335,141 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
             calcForces(U);
         }
     }
+}
+
+
+Foam::label Foam::fv::immersedBoundaryForce::findBody
+(
+    const word& bodyName
+) const
+{
+    forAll(bodies_, bodyi)
+    {
+        if (bodies_[bodyi].name() == bodyName)
+        {
+            return bodyi;
+        }
+    }
+
+    return -1;
+}
+
+
+bool Foam::fv::immersedBoundaryForce::fsiDriven(const label bodyi) const
+{
+    checkBody(bodyi);
+
+    return isA<immersedBodyMotions::fsiDriven>(bodies_[bodyi].motion());
+}
+
+
+void Foam::fv::immersedBoundaryForce::setReferenceSurface
+(
+    const label bodyi,
+    const pointField& points,
+    const faceList& triangles
+)
+{
+    checkBody(bodyi);
+
+    bodies_[bodyi].setReferenceSurface(points, triangles);
+}
+
+
+void Foam::fv::immersedBoundaryForce::moveSurface
+(
+    const label bodyi,
+    const pointField& points,
+    const vectorField& velocities
+)
+{
+    checkBody(bodyi);
+
+    immersedBody& body = bodies_[bodyi];
+
+    if (!isA<immersedBodyMotions::fsiDriven>(body.motion()))
+    {
+        FatalErrorInFunction
+            << "The motion of immersed body " << body.name() << " is "
+            << body.motion().type() << ": only a body with the fsiDriven "
+            << "motion can be moved by a fluid-solid interface"
+            << abort(FatalError);
+    }
+
+    refCast<immersedBodyMotions::fsiDriven>(body.motion())
+        .setPointsAndVelocities(points, velocities);
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::fv::immersedBoundaryForce::surfaceTraction
+(
+    const label bodyi,
+    scalarField& areas
+)
+{
+    checkBody(bodyi);
+
+    if (method_ != "cutLink")
+    {
+        FatalErrorInFunction
+            << "The surface traction of immersed body "
+            << bodies_[bodyi].name() << " requires method cutLink"
+            << abort(FatalError);
+    }
+
+    immersedBody& body = bodies_[bodyi];
+
+    // The surface is that of the current configuration (it is already
+    // current once the fluid has been solved with it)
+    body.move(mesh_.time().value());
+
+    if (tractions_.size() != bodies_.size())
+    {
+        tractions_.setSize(bodies_.size());
+    }
+    if (!tractions_.set(bodyi))
+    {
+        tractions_.set(bodyi, new immersedSurfaceTraction(body, mesh_));
+    }
+
+    const volVectorField& U =
+        mesh_.lookupObject<volVectorField>(fieldNames_[0]);
+    const volScalarField& p = mesh_.lookupObject<volScalarField>("p");
+
+    const vectorField t(tractions_[bodyi].traction(U, p, nu()));
+
+    tmp<vectorField> tfaceTraction(new vectorField());
+    tractions_[bodyi].faceValues(t, tfaceTraction.ref(), areas);
+
+    tfaceTraction.ref() *= rho();
+
+    return tfaceTraction;
+}
+
+
+Foam::vector Foam::fv::immersedBoundaryForce::momentumExchangeForce
+(
+    const label bodyi
+) const
+{
+    checkBody(bodyi);
+
+    if (method_ != "cutLink")
+    {
+        FatalErrorInFunction
+            << "The momentum exchange force of immersed body "
+            << bodies_[bodyi].name() << " requires method cutLink"
+            << abort(FatalError);
+    }
+
+    // The momentum exchange is the force, or the secondary force with the
+    // other estimators
+    if (forceEstimator_ == "momentumExchange")
+    {
+        return force_[bodyi];
+    }
+
+    return secondaryForce_[bodyi];
 }
 
 

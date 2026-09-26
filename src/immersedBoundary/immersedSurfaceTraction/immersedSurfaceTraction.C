@@ -820,6 +820,52 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
 }
 
 
+void Foam::immersedSurfaceTraction::faceValues
+(
+    const vectorField& pointValues,
+    vectorField& faceValues,
+    scalarField& faceAreas
+) const
+{
+    if (pointValues.size() != faces_.size())
+    {
+        FatalErrorInFunction
+            << "The field has " << pointValues.size() << " values, but "
+            << "there are " << faces_.size() << " quadrature points"
+            << abort(FatalError);
+    }
+
+    const label nFaces = body_.surface().size();
+
+    faceValues.setSize(nFaces);
+    faceValues = Zero;
+    faceAreas.setSize(nFaces);
+    faceAreas = 0;
+
+    forAll(faces_, i)
+    {
+        if (h_[i] > 0)
+        {
+            faceValues[faces_[i]] += areas_[i]*pointValues[i];
+            faceAreas[faces_[i]] += areas_[i];
+        }
+    }
+
+    forAll(faceValues, facei)
+    {
+        if (faceAreas[facei] > VSMALL)
+        {
+            faceValues[facei] /= faceAreas[facei];
+        }
+        else
+        {
+            faceValues[facei] = Zero;
+            faceAreas[facei] = 0;
+        }
+    }
+}
+
+
 void Foam::immersedSurfaceTraction::force
 (
     const volVectorField& U,

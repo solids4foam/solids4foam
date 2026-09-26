@@ -56,6 +56,48 @@ Foam::triSurface Foam::immersedBody::readSurface
 }
 
 
+void Foam::immersedBody::setSurface()
+{
+    // The inside test requires a closed surface with outward normals
+    if (surface_.nInternalEdges() != surface_.nEdges())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_ << " is not closed: "
+            << surface_.nEdges() - surface_.nInternalEdges()
+            << " edges are not shared by two faces" << exit(FatalError);
+    }
+
+    scalar volume = 0;
+    forAll(surface_, facei)
+    {
+        const triPointRef tri(surface_[facei].tri(surface_.points()));
+        volume += (tri.centre() & tri.areaNormal())/3;
+    }
+
+    if (volume < 0)
+    {
+        FatalErrorInFunction
+            << "The normals of the surface of immersed body " << name_
+            << " point into the body: they must point out of it"
+            << exit(FatalError);
+    }
+
+    points0_ = surface_.points();
+
+    if (!CofRGiven_)
+    {
+        CofR0_ = average(points0_);
+    }
+
+    Info<< "    Immersed body " << name_ << ": " << surface_.size()
+        << " faces, bounding box " << boundBox(points0_, false) << endl;
+
+    searchPtr_.clear();
+    time_ = -GREAT;
+    configuration_ = -1;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::immersedBody::immersedBody
@@ -67,11 +109,12 @@ Foam::immersedBody::immersedBody
 :
     name_(name),
     mesh_(mesh),
-    surface_(readSurface(mesh, dict.get<fileName>("surface"))),
-    points0_(surface_.points()),
+    surface_(),
+    points0_(),
     searchPtr_(),
     motionPtr_(),
-    CofR0_(dict.getOrDefault<point>("CofR", average(points0_))),
+    CofR0_(dict.getOrDefault<point>("CofR", Zero)),
+    CofRGiven_(dict.found("CofR")),
     signedDistance_
     (
         dict.getOrDefault<word>("occupancy", "signedDistance")
@@ -79,6 +122,7 @@ Foam::immersedBody::immersedBody
     ),
     cut_(dict.getOrDefault<word>("occupancy", "signedDistance") == "cut"),
     time_(-GREAT),
+    configuration_(-1),
     internalCells_(),
     surfaceCells_()
 {
@@ -116,34 +160,19 @@ Foam::immersedBody::immersedBody
         }
     }
 
-    // The inside test requires a closed surface with outward normals
-    if (surface_.nInternalEdges() != surface_.nEdges())
+    // A body without a surface file is given its surface by a fluid-solid
+    // interface (setReferenceSurface)
+    if (dict.found("surface"))
     {
-        FatalErrorInFunction
-            << "The surface of immersed body " << name_ << " is not closed: "
-            << surface_.nEdges() - surface_.nInternalEdges()
-            << " edges are not shared by two faces" << exit(FatalError);
+        surface_ = readSurface(mesh, dict.get<fileName>("surface"));
+        setSurface();
+        move(mesh.time().value());
     }
-
-    scalar volume = 0;
-    forAll(surface_, facei)
+    else
     {
-        const triPointRef tri(surface_[facei].tri(surface_.points()));
-        volume += (tri.centre() & tri.areaNormal())/3;
+        Info<< "    Immersed body " << name_ << ": no surface given, it "
+            << "is expected from a fluid-solid interface" << endl;
     }
-
-    if (volume < 0)
-    {
-        FatalErrorInFunction
-            << "The normals of the surface of immersed body " << name_
-            << " point into the body: they must point out of it"
-            << exit(FatalError);
-    }
-
-    Info<< "    Immersed body " << name_ << ": " << surface_.size()
-        << " faces, bounding box " << boundBox(points0_, false) << endl;
-
-    move(mesh.time().value());
 }
 
 
@@ -248,9 +277,58 @@ Foam::vector Foam::immersedBody::acceleration
 }
 
 
+void Foam::immersedBody::setReferenceSurface
+(
+    const pointField& points,
+    const faceList& triangles
+)
+{
+    if (hasSurface())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_
+            << " has already been set" << abort(FatalError);
+    }
+
+    List<labelledTri> tris(triangles.size());
+    forAll(triangles, i)
+    {
+        const face& f = triangles[i];
+
+        if (f.size() != 3)
+        {
+            FatalErrorInFunction
+                << "Face " << i << " of the surface of immersed body "
+                << name_ << " has " << f.size() << " points: the faces "
+                << "must be triangles" << abort(FatalError);
+        }
+
+        tris[i] = labelledTri(f[0], f[1], f[2], 0);
+    }
+
+    surface_ = triSurface(tris, points);
+    setSurface();
+    move(mesh_.time().value());
+}
+
+
 void Foam::immersedBody::move(const scalar t)
 {
-    if (searchPtr_ && (!moving() || t == time_))
+    if (!hasSurface())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_ << " has not been "
+            << "set: give a surface file, or drive the body by a fluid-solid "
+            << "interface" << abort(FatalError);
+    }
+
+    const label configuration = motionPtr_->configuration();
+
+    if
+    (
+        searchPtr_
+     && (!moving() || (t == time_ && configuration == configuration_))
+    )
     {
         return;
     }
@@ -258,6 +336,7 @@ void Foam::immersedBody::move(const scalar t)
     surface_.movePoints(motionPtr_->points(points0_, t));
     searchPtr_.reset(new triSurfaceSearch(surface_));
     time_ = t;
+    configuration_ = configuration;
 
     if (!motionPtr_->rigid())
     {

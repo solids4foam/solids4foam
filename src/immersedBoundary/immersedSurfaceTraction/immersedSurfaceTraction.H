@@ -186,6 +186,16 @@ public:
             const scalar nu
         );
 
+        //- Area-weighted mean of the values at the quadrature points over
+        //  each surface face, and the area of the quadrature points of each
+        //  face in the mesh: zero for a face without quadrature points
+        void faceValues
+        (
+            const vectorField& pointValues,
+            vectorField& faceValues,
+            scalarField& faceAreas
+        ) const;
+
         //- Force and torque (about CofR) exerted by the fluid on the body
         void force
         (

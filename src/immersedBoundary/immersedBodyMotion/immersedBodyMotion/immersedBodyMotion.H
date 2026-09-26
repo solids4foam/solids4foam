@@ -120,6 +120,15 @@ public:
             return true;
         }
 
+        //- Configuration index of the motion: incremented each time the
+        //  positions given by the motion change other than through the
+        //  time, e.g. when a fluid-solid interface sets them, so that the
+        //  body is re-positioned within a time step
+        virtual label configuration() const
+        {
+            return 0;
+        }
+
         //- Positions at time t of the surface points whose reference
         //  positions are points0
         virtual tmp<pointField> points
