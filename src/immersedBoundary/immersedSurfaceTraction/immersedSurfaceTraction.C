@@ -265,12 +265,19 @@ void Foam::immersedSurfaceTraction::createPoints()
             return (i*73856093) ^ (j*19349663) ^ (k*83492791);
         };
 
+        // The points inside and outside the mesh are thinned separately, so
+        // that the area of the surface in the mesh is kept
+        const scalarField candidateWidths(cellWidths(pointField(positions)));
+        auto inMesh = [&](const label i) { return candidateWidths[i] > 0; };
+
         std::unordered_map<std::int64_t, std::vector<label>> grid;
         DynamicList<label> kept(positions.size());
 
-        // Nearest kept point within the spacing, -1 if none
-        auto nearestKept = [&](const point& x, const scalar maxDist)
+        // Nearest kept point within the spacing, on the same side of the
+        // mesh boundary as the point i, -1 if none
+        auto nearestKept = [&](const label pi, const scalar maxDist)
         {
+            const point& x = positions[pi];
             label best = -1;
             scalar bestDistSqr = sqr(maxDist);
             for (label di = -1; di <= 1; ++di)
@@ -286,6 +293,10 @@ void Foam::immersedSurfaceTraction::createPoints()
                         }
                         for (const label k : iter->second)
                         {
+                            if (inMesh(kept[k]) != inMesh(pi))
+                            {
+                                continue;
+                            }
                             const scalar dSqr = magSqr(positions[kept[k]] - x);
                             if (dSqr < bestDistSqr)
                             {
@@ -301,7 +312,7 @@ void Foam::immersedSurfaceTraction::createPoints()
 
         forAll(positions, i)
         {
-            if (nearestKept(positions[i], spacing) < 0)
+            if (nearestKept(i, spacing) < 0)
             {
                 grid[key(positions[i], 0, 0, 0)].push_back(kept.size());
                 kept.append(i);
@@ -311,18 +322,26 @@ void Foam::immersedSurfaceTraction::createPoints()
         scalarField keptAreas(kept.size(), Zero);
         forAll(positions, i)
         {
-            const label k = nearestKept(positions[i], 2*spacing);
+            const label k = nearestKept(i, 2*spacing);
             keptAreas[k >= 0 ? k : 0] += areas[i];
         }
 
         faces_.setSize(kept.size());
         barycentric_.setSize(kept.size());
+        scalar meshArea = 0;
         forAll(kept, k)
         {
             faces_[k] = faces[kept[k]];
             barycentric_[k] = barycentric[kept[k]];
+            if (inMesh(kept[k]))
+            {
+                meshArea += keptAreas[k];
+            }
         }
         areas_.transfer(keptAreas);
+
+        Info<< "    Immersed body " << body_.name() << ": area in the mesh "
+            << meshArea << endl;
     }
 
     Info<< "    Immersed body " << body_.name() << ": " << faces_.size()
