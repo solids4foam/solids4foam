@@ -31,6 +31,11 @@ License
 #include "DynamicField.H"
 #include "pimpleControl.H"
 #include "addToRunTimeSelectionTable.H"
+#include "wallFvPatch.H"
+#include "emptyFvPatch.H"
+#include "symmetryFvPatch.H"
+#include "symmetryPlaneFvPatch.H"
+#include "wedgeFvPatch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -1012,17 +1017,33 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
         forAll(alpha.boundaryField(), patchi)
         {
             const fvPatch& patch = mesh_.boundary()[patchi];
+            const labelUList& faceCells = patch.faceCells();
             if (patch.coupled())
             {
                 const fvsPatchScalarField& palpha =
                     alpha.boundaryField()[patchi];
-                const labelUList& faceCells = patch.faceCells();
                 forAll(palpha, i)
                 {
                     if (palpha[i] > 0)
                     {
                         solid[faceCells[i]] = 0;
                     }
+                }
+            }
+            else if
+            (
+                !isA<wallFvPatch>(patch)
+             && !isA<emptyFvPatch>(patch)
+             && !isA<symmetryFvPatch>(patch)
+             && !isA<symmetryPlaneFvPatch>(patch)
+             && !isA<wedgeFvPatch>(patch)
+            )
+            {
+                // A boundary face that can carry a flux, such as an inlet
+                // or outlet: continuity is imposed in its cell
+                forAll(faceCells, i)
+                {
+                    solid[faceCells[i]] = 0;
                 }
             }
         }

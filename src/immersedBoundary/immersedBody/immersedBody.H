@@ -207,6 +207,18 @@ public:
                 return motionPtr_->moving();
             }
 
+            //- Is the motion of the body rigid?
+            bool rigid() const
+            {
+                return motionPtr_->rigid();
+            }
+
+            //- Velocities of the surface points of a deforming body
+            const vectorField& pointVelocities() const
+            {
+                return pointVelocities_;
+            }
+
             //- Surface in the current configuration
             const triSurface& surface() const
             {

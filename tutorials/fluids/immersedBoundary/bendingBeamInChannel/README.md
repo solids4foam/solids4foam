@@ -103,9 +103,9 @@ coefficient (53.9):
 
 | `MESH_LEVEL` | Cells across the beam | Surface traction | Momentum exchange |
 | ------------ | --------------------- | ---------------- | ----------------- |
-| 1 | 3 | 8.9% | 7.4% |
-| 2 | 6 | 5.8% | 4.6% |
-| 3 | 11 | 4.7% | 3.5% |
+| 1 | 3 | 8.6% | 7.4% |
+| 2 | 6 | 4.9% | 4.6% |
+| 3 | 11 | 3.5% | 3.5% |
 
 The difference is largest when the beam is bent furthest upstream, where the
 immersed drag is less negative than the body-fitted drag. The sections of the
@@ -113,7 +113,7 @@ beam stretch on one side and shorten on the other, so the flux of the body
 velocity out of the cells inside the beam is not zero; the `pimpleFluid`
 fluid model does not impose continuity in these cells, otherwise this flux
 leaks into the flow, and the difference no longer decreases with the mesh
-size (10.2%, 8.0% and 7.4% for the surface traction). Without the rotation of
+size (8.8%, 7.1% and 7.0% for the momentum exchange). Without the rotation of
 the sections (`amplitudeY 0`), the body velocity is solenoidal, and the
-differences from the corresponding body-fitted solution are 8.5%, 4.8% and
-4.3%.
+differences of the momentum exchange from the corresponding body-fitted
+solution are 7.0%, 3.8% and 3.2%.

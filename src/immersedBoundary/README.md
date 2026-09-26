@@ -199,7 +199,7 @@ torque by 0.8%, 0.3% and 0.2%, and the `penalty` torque by -25%, -16% and
 -10%. For a beam bending about its base (the `bendingBeamInChannel`
 tutorial), the root mean square difference of the `cutLink` drag from a
 body-fitted solution with a deforming mesh is 7.4%, 4.6% and 3.5% of the
-root mean square drag (momentum exchange), or 8.9%, 5.8% and 4.7% (surface
+root mean square drag (momentum exchange), or 8.6%, 4.9% and 3.5% (surface
 traction), with 3, 6 and 11 cells across the beam. The momentum exchange is the force that the fluid receives,
 and is the more accurate for static and steadily moving bodies; the surface
 traction is the more accurate for bodies accelerating normal to their surface

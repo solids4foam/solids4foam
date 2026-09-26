@@ -24,10 +24,10 @@ fi
 # ------------------------------------------------------------
 
 REG_END_TIME=2
-CD_MEAN_MIN=17.6
-CD_MEAN_MAX=18.5
-CD_RMS_MIN=53.0
-CD_RMS_MAX=55.1
+CD_MEAN_MIN=17.7
+CD_MEAN_MAX=18.7
+CD_RMS_MIN=53.8
+CD_RMS_MAX=56.0
 
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/immersedBoundary/0/beam.dat"

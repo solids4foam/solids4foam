@@ -527,6 +527,7 @@ bool pimpleFluid::evolve()
             // continuity is not imposed, with immersed boundaries
             tmp<surfaceScalarField> rAtUf;
             tmp<volScalarField> fluidCells;
+            tmp<volScalarField> divPhiHbyA;
 
             // Immersed boundaries (immersedBoundaryForce with
             // apertureCoupling): on the faces cut by a body, the flux is the
@@ -570,12 +571,37 @@ bool pimpleFluid::evolve()
                     )
                 )
                 {
-                    fluidCells =
-                        1
-                      - mesh.lookupObject<volScalarField>
+                    const volScalarField& solid =
+                        mesh.lookupObject<volScalarField>
                         (
                             "immersedBoundarySolidCells"
                         );
+                    fluidCells = 1 - solid;
+
+                    // Without a fixed pressure boundary, the divergence in
+                    // these cells is replaced by its mean over them, so that
+                    // the sum over the domain, and the compatibility of the
+                    // pressure equation, are unchanged
+                    divPhiHbyA = fvc::div(phiHbyA);
+                    const scalarField& V = mesh.V();
+                    const scalar solidVolume = gSum(solid.primitiveField()*V);
+                    const scalar solidSource =
+                        gSum
+                        (
+                            solid.primitiveField()
+                           *divPhiHbyA().primitiveField()*V
+                        );
+                    divPhiHbyA.ref() *= fluidCells();
+                    if (p.needReference() && solidVolume > VSMALL)
+                    {
+                        divPhiHbyA.ref() +=
+                            solid
+                           *dimensionedScalar
+                            (
+                                divPhiHbyA().dimensions(),
+                                solidSource/solidVolume
+                            );
+                    }
                 }
             }
 
@@ -588,9 +614,8 @@ bool pimpleFluid::evolve()
             {
                 fvScalarMatrix pEqn
                 (
-                    fluidCells.valid()
-                  ? fvm::laplacian(rAtUf(), p)
-                 == fluidCells()*fvc::div(phiHbyA)
+                    divPhiHbyA.valid()
+                  ? fvm::laplacian(rAtUf(), p) == divPhiHbyA()
                   : rAtUf.valid()
                   ? fvm::laplacian(rAtUf(), p) == fvc::div(phiHbyA)
                   : fvm::laplacian(rAtU(), p) == fvc::div(phiHbyA)
