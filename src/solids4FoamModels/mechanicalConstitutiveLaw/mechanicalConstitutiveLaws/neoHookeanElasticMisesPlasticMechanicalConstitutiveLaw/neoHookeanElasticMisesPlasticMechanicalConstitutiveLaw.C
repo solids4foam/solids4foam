@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw.H"
+#include "misesPlasticDiagnostics.H"
 #include "addToRunTimeSelectionTable.H"
 #include "Switch.H"
 
@@ -568,57 +569,7 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
     DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
-    const Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
-    const Field<scalar>& epsilonPEq0 =
-        state.getScalarField0("epsilonPEq");
-
-    label nYielding = 0;
-    scalar curDEpsilonPEq = 0.0;
-    scalar maxDEpsilonPEq = 0.0;
-    forAll(epsilonPEq, i)
-    {
-        curDEpsilonPEq = epsilonPEq[i] - epsilonPEq0[i];
-
-        if (curDEpsilonPEq > SMALL)
-        {
-            ++nYielding;
-
-            maxDEpsilonPEq = max(maxDEpsilonPEq, curDEpsilonPEq);
-        }
-    }
-
-    // Reported, not reduced: see mechanicalConstitutiveLaw::endTimeStep
-    typedef mechanicalConstitutiveLawDiagnostic diagnostic;
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "yielding integration points",
-            scalar(nYielding),
-            diagnostic::combineOperation::sum
-        )
-    );
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "integration points",
-            scalar(epsilonPEq.size()),
-            diagnostic::combineOperation::sum
-        )
-    );
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "max DEpsilonPEq",
-            maxDEpsilonPEq,
-            diagnostic::combineOperation::maximum
-        )
-    );
+    appendMisesPlasticDiagnostics(state, diagnostics);
 }
 
 
@@ -628,20 +579,7 @@ reportDiagnostics
     const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
-    if (!debug || diagnostics.size() != 3)
-    {
-        return;
-    }
-
-    // Same wording as before, and the same debug switch decides it. The
-    // numbers are larger than they used to be, because the boundary
-    // integration points are counted now: they were skipped entirely while
-    // the reducing happened in here
-    Info<< nl << "Max DEpsilonPEq is " << diagnostics[2].value() << nl
-        << "Number of yielding integration points = "
-        << label(diagnostics[0].value())
-        << "/" << label(diagnostics[1].value())
-        << nl << endl;
+    reportMisesPlasticDiagnostics(debug, diagnostics);
 }
 
 
