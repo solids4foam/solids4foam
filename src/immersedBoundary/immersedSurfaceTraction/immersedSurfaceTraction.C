@@ -265,12 +265,19 @@ void Foam::immersedSurfaceTraction::createPoints()
             return (i*73856093) ^ (j*19349663) ^ (k*83492791);
         };
 
+        // The points inside and outside the mesh are thinned separately, so
+        // that the area of the surface in the mesh is kept
+        const scalarField candidateWidths(cellWidths(pointField(positions)));
+        auto inMesh = [&](const label i) { return candidateWidths[i] > 0; };
+
         std::unordered_map<std::int64_t, std::vector<label>> grid;
         DynamicList<label> kept(positions.size());
 
-        // Nearest kept point within the spacing, -1 if none
-        auto nearestKept = [&](const point& x, const scalar maxDist)
+        // Nearest kept point within the spacing, on the same side of the
+        // mesh boundary as the point i, -1 if none
+        auto nearestKept = [&](const label pi, const scalar maxDist)
         {
+            const point& x = positions[pi];
             label best = -1;
             scalar bestDistSqr = sqr(maxDist);
             for (label di = -1; di <= 1; ++di)
@@ -286,6 +293,10 @@ void Foam::immersedSurfaceTraction::createPoints()
                         }
                         for (const label k : iter->second)
                         {
+                            if (inMesh(kept[k]) != inMesh(pi))
+                            {
+                                continue;
+                            }
                             const scalar dSqr = magSqr(positions[kept[k]] - x);
                             if (dSqr < bestDistSqr)
                             {
@@ -301,7 +312,7 @@ void Foam::immersedSurfaceTraction::createPoints()
 
         forAll(positions, i)
         {
-            if (nearestKept(positions[i], spacing) < 0)
+            if (nearestKept(i, spacing) < 0)
             {
                 grid[key(positions[i], 0, 0, 0)].push_back(kept.size());
                 kept.append(i);
@@ -311,22 +322,37 @@ void Foam::immersedSurfaceTraction::createPoints()
         scalarField keptAreas(kept.size(), Zero);
         forAll(positions, i)
         {
-            const label k = nearestKept(positions[i], 2*spacing);
+            const label k = nearestKept(i, 2*spacing);
             keptAreas[k >= 0 ? k : 0] += areas[i];
         }
 
         faces_.setSize(kept.size());
         barycentric_.setSize(kept.size());
+        scalar meshArea = 0;
         forAll(kept, k)
         {
             faces_[k] = faces[kept[k]];
             barycentric_[k] = barycentric[kept[k]];
+            if (inMesh(kept[k]))
+            {
+                meshArea += keptAreas[k];
+            }
         }
         areas_.transfer(keptAreas);
+
+        Info<< "    Immersed body " << body_.name() << ": area in the mesh "
+            << meshArea << endl;
     }
 
     Info<< "    Immersed body " << body_.name() << ": " << faces_.size()
         << " traction points, area " << sum(areas_) << endl;
+
+    areas0_ = areas_;
+    faceAreas0_.setSize(faces_.size());
+    forAll(faces_, i)
+    {
+        faceAreas0_[i] = mag(surf[faces_[i]].areaNormal(surf.points()));
+    }
 }
 
 
@@ -346,6 +372,18 @@ void Foam::immersedSurfaceTraction::updatePoints()
 
         points_[i] = b[0]*pts[f[0]] + b[1]*pts[f[1]] + b[2]*pts[f[2]];
         normals_[i] = faceNormals[faces_[i]];
+    }
+
+    // The area of each point of a deforming body changes with that of its
+    // parent face
+    if (!body_.rigid())
+    {
+        forAll(faces_, i)
+        {
+            areas_[i] =
+                areas0_[i]*mag(surf[faces_[i]].areaNormal(pts))
+               /max(faceAreas0_[i], VSMALL);
+        }
     }
 
     // The widths are found again only if the body moves
@@ -370,6 +408,8 @@ Foam::immersedSurfaceTraction::immersedSurfaceTraction
     faces_(),
     barycentric_(),
     areas_(),
+    areas0_(),
+    faceAreas0_(),
     h_(),
     points_(),
     normals_(),
@@ -389,6 +429,12 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
 )
 {
     updatePoints();
+
+    // Surface and vertex velocities of a deforming body
+    const triSurface& surf = body_.surface();
+    const pointField& pts = surf.points();
+    const vectorField& Ubp = body_.pointVelocities();
+    const bool deforming = !body_.rigid() && Ubp.size() == pts.size();
 
     const label n = faces_.size();
     const vectorField& C = mesh_.C();
@@ -711,13 +757,54 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
             }
         }
 
-        // Tangential viscous traction nu*(I - nn).(grad(U - Ub) & n): on a
-        // no-slip wall the tangential derivatives of U - Ub vanish, and the
-        // rigid body velocity Ub has no strain
         const vector& nw = normals_[i];
-        const vector tau(nu*((I - sqr(nw)) & (gradU & nw)));
 
-        t[i] = -pw*nw + tau;
+        if (deforming)
+        {
+            // On the surface of a deforming body, U equals the body
+            // velocity Ub, whose surface gradient Gs is that of the linear
+            // interpolation of the vertex velocities in the parent face, and
+            // the fit gives the normal derivative a of U - Ub (Ub extended
+            // along the normals). Then grad(U) = Gs + a n, continuity gives
+            // a.n = -tr(Gs), and the viscous traction
+            // nu*(grad(U) + grad(U)^T) & n is
+            // nu*((I - nn) & a - 2 tr(Gs) n + Gs^T & n)
+            const vector a(gradU & nw);
+            vector tau((I - sqr(nw)) & a);
+
+            const labelledTri& f = surf[faces_[i]];
+            const vector e1(pts[f[1]] - pts[f[0]]);
+            const vector e2(pts[f[2]] - pts[f[0]]);
+            const vector A(e1 ^ e2);
+            const scalar magSqrA = magSqr(A);
+
+            if (magSqrA > VSMALL)
+            {
+                // Gradients of the barycentric coordinates in the face
+                const vector g1((e2 ^ A)/magSqrA);
+                const vector g2((A ^ e1)/magSqrA);
+                const vector g0(-g1 - g2);
+
+                // d(Ub_i)/dx_j, with the convention of gradU
+                const tensor Gs
+                (
+                    (Ubp[f[0]]*g0) + (Ubp[f[1]]*g1) + (Ubp[f[2]]*g2)
+                );
+
+                tau += -2*tr(Gs)*nw + (Gs.T() & nw);
+            }
+
+            t[i] = -pw*nw + nu*tau;
+        }
+        else
+        {
+            // Tangential viscous traction nu*(I - nn).(grad(U - Ub) & n): on
+            // a no-slip wall the tangential derivatives of U - Ub vanish, and
+            // the rigid body velocity Ub has no strain
+            const vector tau(nu*((I - sqr(nw)) & (gradU & nw)));
+
+            t[i] = -pw*nw + tau;
+        }
     }
 
     reduce

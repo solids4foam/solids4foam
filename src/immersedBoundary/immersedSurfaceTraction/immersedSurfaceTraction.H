@@ -108,6 +108,11 @@ class immersedSurfaceTraction
         //  thickness in two dimensions)
         scalarField areas_;
 
+        //- Initial areas of the points, and of their parent faces, from
+        //  which the areas of the points of a deforming body are scaled
+        scalarField areas0_;
+        scalarField faceAreas0_;
+
         //- Local cell width at each point
         scalarField h_;
 

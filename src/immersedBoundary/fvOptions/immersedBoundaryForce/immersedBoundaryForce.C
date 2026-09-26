@@ -31,6 +31,11 @@ License
 #include "DynamicField.H"
 #include "pimpleControl.H"
 #include "addToRunTimeSelectionTable.H"
+#include "wallFvPatch.H"
+#include "emptyFvPatch.H"
+#include "symmetryFvPatch.H"
+#include "symmetryPlaneFvPatch.H"
+#include "wedgeFvPatch.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -918,6 +923,24 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
 
         // The flux is oriented with the face area vectors
         wallFluxPtr_->setOriented();
+
+        solidCellsPtr_.reset
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "immersedBoundarySolidCells",
+                    mesh_.time().timeName(),
+                    mesh_,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    true
+                ),
+                mesh_,
+                dimensionedScalar(dimless, Zero)
+            )
+        );
     }
 
     surfaceScalarField& alpha = *aperturePtr_;
@@ -974,6 +997,57 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
         {
             palpha = 1;
         }
+    }
+
+    // Cells whose internal and coupled faces are all solid
+    {
+        scalarField& solid = solidCellsPtr_->primitiveFieldRef();
+        solid = 1;
+
+        const labelUList& own = mesh_.owner();
+        const labelUList& nei = mesh_.neighbour();
+        forAll(alphaI, facei)
+        {
+            if (alphaI[facei] > 0)
+            {
+                solid[own[facei]] = 0;
+                solid[nei[facei]] = 0;
+            }
+        }
+        forAll(alpha.boundaryField(), patchi)
+        {
+            const fvPatch& patch = mesh_.boundary()[patchi];
+            const labelUList& faceCells = patch.faceCells();
+            if (patch.coupled())
+            {
+                const fvsPatchScalarField& palpha =
+                    alpha.boundaryField()[patchi];
+                forAll(palpha, i)
+                {
+                    if (palpha[i] > 0)
+                    {
+                        solid[faceCells[i]] = 0;
+                    }
+                }
+            }
+            else if
+            (
+                !isA<wallFvPatch>(patch)
+             && !isA<emptyFvPatch>(patch)
+             && !isA<symmetryFvPatch>(patch)
+             && !isA<symmetryPlaneFvPatch>(patch)
+             && !isA<wedgeFvPatch>(patch)
+            )
+            {
+                // A boundary face that can carry a flux, such as an inlet
+                // or outlet: continuity is imposed in its cell
+                forAll(faceCells, i)
+                {
+                    solid[faceCells[i]] = 0;
+                }
+            }
+        }
+        solidCellsPtr_->correctBoundaryConditions();
     }
 
     // Faces with a solid part, and their centres
@@ -1663,6 +1737,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     apertureCoupling_(true),
     aperturePtr_(),
     wallFluxPtr_(),
+    solidCellsPtr_(),
     forceEstimator_("momentumExchange"),
     writeSurfaceTraction_(false),
     imageDistance_(1.5),

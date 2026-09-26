@@ -52,7 +52,10 @@ The complete list of entries is in the header of
 `fvOptions/immersedBoundaryForce/immersedBoundaryForce.H`. The body motions
 are `static` (the default), `sinusoidalTranslation`, `uniformTranslation`
 (constant velocity) and `solidBodyRotation` (constant angular velocity about
-an axis), in `immersedBodyMotion`.
+an axis), and the deforming `quadraticBend` and `customProfileBend` (bending
+of a beam about its base), in `immersedBodyMotion`. A deforming motion gives
+the position and velocity of each vertex of the surface, and the velocity of
+the body at a point is interpolated from the vertices of the nearest triangle.
 
 ## Method
 
@@ -117,7 +120,12 @@ Four forcing methods are available:
   fraction of the area of the faces cut by the bodies, from the geometric
   cutting of the faces (`cutFaceIso`), and the flux of the body velocity
   through their solid part; the `pimpleFluid` fluid model uses them in its
-  pressure equation, so that it changes continuously as the body moves. The
+  pressure equation, so that it changes continuously as the body moves, and
+  does not impose continuity in the cells entirely inside a body, where the
+  flux of the velocity of a deforming body (for example a bending beam,
+  whose sections stretch on one side and shorten on the other) need not be
+  zero, and would otherwise be a source of fluid that leaks into the flow
+  (this has no effect for rigid bodies). The
   force is the momentum exchange (`forceEstimator momentumExchange`, the
   default), which includes the inertia of the fluid inside the body; the
   surface traction (`forceEstimator surfaceTraction`), from quadratic least
@@ -188,10 +196,15 @@ the `penalty` drag is low by 5%, 3% and 1.5%. For the immersed Stokes layer
 at second order. For a cylinder rotating inside an immersed annulus (the
 `immersedTaylorCouette` tutorial), the `cutLink` torque differs from the exact
 torque by 0.8%, 0.3% and 0.2%, and the `penalty` torque by -25%, -16% and
--10%. The momentum exchange is the force that the fluid receives,
-and is the more accurate for static and steadily moving bodies; the surface
-traction is the more accurate for bodies accelerating normal to their surface
-(oscillating cylinder: 0.11, 0.04 and 0.02); the `forcing` estimate is as
+-10%. For a beam bending about its base (the `bendingBeamInChannel`
+tutorial), the root mean square difference of the `cutLink` drag from a
+body-fitted solution with a deforming mesh is 7.4%, 4.6% and 3.5% of the
+root mean square drag (momentum exchange), or 8.6%, 4.9% and 3.5% (surface
+traction), with 3, 6 and 11 cells across the beam. The momentum exchange is
+the force that the fluid receives, and is the more accurate for static and
+steadily moving bodies; the surface traction is the more accurate for bodies
+accelerating normal to their surface (oscillating cylinder: 0.11, 0.04 and
+0.02); the `forcing` estimate is as
 accurate as the momentum exchange for static and steadily moving bodies, and
 gives the wall shear stress of the Stokes layer to 0.1% with 8 cells across
 the layer, but over-predicts the oscillating cylinder drag amplitude by 3%.
@@ -246,7 +259,8 @@ The occupancy (`immersedBody::addOccupancy`) follows the openHFDIB-DEM
 `nonConvexBody`, and the forcing and force calculation
 (`immersedBoundaryForce`, `immersedBody::force`) follow the openHFDIB-DEM
 `pimpleHFDIBFoam` solver and `immersedBody`. The sinusoidal translation
-follows the version of Sairam Pamulaparthi Venkata. The openHFDIB-DEM
+and the `quadraticBend` and `customProfileBend` deformations follow the
+versions of Sairam Pamulaparthi Venkata. The openHFDIB-DEM
 interpolation of the velocity at the immersed boundary (`lineInt`,
 `leastSquares`), which the benchmark cases do not use, is not included.
 

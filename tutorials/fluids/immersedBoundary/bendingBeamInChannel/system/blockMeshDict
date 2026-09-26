@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+
+// Channel of 24 x 4.1 m with the beam at x = 12 m on the bottom wall: the
+// mesh is uniform in 8.5 < x < 15.5 m (0.07 x 0.053 m cells for level 1)
+MESH_LEVEL ${MESH_LEVEL:-1};
+nRefine #eval "pow(2, $MESH_LEVEL - 1)";
+nxEnd #eval "round(80*$nRefine)";
+nxBand #eval "round(100*$nRefine)";
+ny #eval "round(77*$nRefine)";
+
+vertices
+(
+    (0    0   -0.05) (8.5  0   -0.05) (15.5 0   -0.05) (24   0   -0.05)
+    (0    4.1 -0.05) (8.5  4.1 -0.05) (15.5 4.1 -0.05) (24   4.1 -0.05)
+    (0    0    0.05) (8.5  0    0.05) (15.5 0    0.05) (24   0    0.05)
+    (0    4.1  0.05) (8.5  4.1  0.05) (15.5 4.1  0.05) (24   4.1  0.05)
+);
+
+blocks
+(
+    hex (0 1 5 4 8 9 13 12) ($nxEnd $ny 1) simpleGrading (1 1 1)
+    hex (1 2 6 5 9 10 14 13) ($nxBand $ny 1) simpleGrading (1 1 1)
+    hex (2 3 7 6 10 11 15 14) ($nxEnd $ny 1) simpleGrading (1 1 1)
+);
+
+boundary
+(
+    inlet { type patch; faces ((0 8 12 4)); }
+    outlet { type patch; faces ((3 7 15 11)); }
+    walls
+    {
+        type wall;
+        faces ((0 1 9 8) (1 2 10 9) (2 3 11 10) (4 12 13 5) (5 13 14 6) (6 14 15 7));
+    }
+    frontAndBack
+    {
+        type empty;
+        faces ((0 4 5 1) (1 5 6 2) (2 6 7 3) (8 9 13 12) (9 10 14 13) (10 11 15 14));
+    }
+);
+
+// ************************************************************************* //

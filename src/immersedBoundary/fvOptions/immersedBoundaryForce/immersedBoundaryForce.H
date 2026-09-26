@@ -422,6 +422,13 @@ class immersedBoundaryForce
             autoPtr<surfaceScalarField> aperturePtr_;
             autoPtr<surfaceScalarField> wallFluxPtr_;
 
+            //- Cells whose internal and coupled faces are all solid (1, else
+            //  0), registered for the fluid model as
+            //  immersedBoundarySolidCells: the fluid model does not impose
+            //  continuity in these cells, where the flux of the velocity of
+            //  a deforming body need not be zero
+            autoPtr<volScalarField> solidCellsPtr_;
+
             //- Force estimate of the cutLink method: momentumExchange (the
             //  residual of the momentum equation in the penalised cells and
             //  the fluid cells next to them) or surfaceTraction (the

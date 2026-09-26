@@ -19,6 +19,8 @@ License
 
 #include "immersedBody.H"
 #include "cutCellIso.H"
+#include "triPointRef.H"
+#include "barycentric2D.H"
 #include "treeBoundBox.H"
 #include "indexedOctree.H"
 #include "treeDataCell.H"
@@ -149,7 +151,100 @@ Foam::immersedBody::immersedBody
 
 Foam::point Foam::immersedBody::CofR() const
 {
+    // A deforming body keeps its reference centre of rotation
+    if (!motionPtr_->rigid())
+    {
+        return CofR0_;
+    }
+
     return motionPtr_->points(pointField(1, CofR0_), time_)()[0];
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::immersedBody::interpolateToNearest
+(
+    const pointField& x,
+    const vectorField& pf
+) const
+{
+    tmp<vectorField> tresult(new vectorField(x.size(), Zero));
+    vectorField& result = tresult.ref();
+
+    if (x.empty())
+    {
+        return tresult;
+    }
+
+    const boundBox bb(surface_.points(), false);
+    List<pointIndexHit> hits;
+    searchPtr_->findNearest
+    (
+        x,
+        scalarField(x.size(), magSqr(bb.span()) + GREAT*SMALL),
+        hits
+    );
+
+    const pointField& pts = surface_.points();
+    forAll(x, i)
+    {
+        if (!hits[i].hit())
+        {
+            continue;
+        }
+
+        const labelledTri& f = surface_[hits[i].index()];
+        const triPointRef tri(pts[f[0]], pts[f[1]], pts[f[2]]);
+        const barycentric2D b(tri.pointToBarycentric(hits[i].hitPoint()));
+
+        result[i] = b[0]*pf[f[0]] + b[1]*pf[f[1]] + b[2]*pf[f[2]];
+    }
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::immersedBody::velocity
+(
+    const pointField& x
+) const
+{
+    if (motionPtr_->rigid())
+    {
+        return motionPtr_->velocity(x, time_);
+    }
+
+    return interpolateToNearest(x, pointVelocities_);
+}
+
+
+Foam::vector Foam::immersedBody::acceleration
+(
+    const point& x,
+    const scalar dt
+) const
+{
+    const pointField pts(1, x);
+
+    if (motionPtr_->rigid())
+    {
+        const vector U0(motionPtr_->velocity(pts, time_)()[0]);
+        return
+        (
+            motionPtr_->velocity(pts + 0.5*dt*U0, time_ + 0.5*dt)()[0]
+          - motionPtr_->velocity(pts - 0.5*dt*U0, time_ - 0.5*dt)()[0]
+        )/dt;
+    }
+
+    // Deforming: central difference of the surface point velocities,
+    // interpolated with the current nearest point
+    const vectorField dUdt
+    (
+        (
+            motionPtr_->pointVelocities(points0_, time_ + 0.5*dt)
+          - motionPtr_->pointVelocities(points0_, time_ - 0.5*dt)
+        )/dt
+    );
+    return interpolateToNearest(pts, dUdt)()[0];
 }
 
 
@@ -163,6 +258,11 @@ void Foam::immersedBody::move(const scalar t)
     surface_.movePoints(motionPtr_->points(points0_, t));
     searchPtr_.reset(new triSurfaceSearch(surface_));
     time_ = t;
+
+    if (!motionPtr_->rigid())
+    {
+        pointVelocities_ = motionPtr_->pointVelocities(points0_, t);
+    }
 }
 
 
@@ -482,7 +582,7 @@ void Foam::immersedBody::setVelocity(volVectorField& Ui) const
 
         const vectorField velocity
         (
-            motionPtr_->velocity(pointField(mesh_.C(), cells), time_)
+            this->velocity(pointField(mesh_.C(), cells))
         );
 
         forAll(cells, i)

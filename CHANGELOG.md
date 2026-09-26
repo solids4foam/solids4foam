@@ -59,19 +59,22 @@ release. For complete commit-level details and contributor information, see the
   and vary continuously as the body moves; with the solids4foam
   `pimpleFluid` fluid model, the pressure equation uses the fluid fraction
   of the area of the cut faces (from `cutFaceIso`) and the body flux through
-  their solid part. Its force is the momentum exchange or the traction on
+  their solid part, and does not impose continuity in the cells entirely
+  inside a body. Its force is the momentum exchange or the traction on
   the surface (new `immersedSurfaceTraction` class). Added the
-  `uniformTranslation` and `solidBodyRotation` body motions and the `cut`
+  `uniformTranslation` and `solidBodyRotation` body motions, deforming bodies
+  (the `quadraticBend` and `customProfileBend` motions), and the `cut`
   (exact volume fraction) occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
   cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and
   openHFDIB; see `src/immersedBoundary/README.md` for the provenance. Added the
-  `fluids/immersedBoundary/staticCylinderInChannel` and
+  `fluids/immersedBoundary/staticCylinderInChannel`,
   `fluids/immersedBoundary/oscillatingCylinderInChannel`,
-  `fluids/immersedBoundary/translatingCylinderInChannel` and
-  `fluids/immersedBoundary/oscillatingWallStokesLayer` and
-  `fluids/immersedBoundary/immersedTaylorCouette` tutorials, with
+  `fluids/immersedBoundary/translatingCylinderInChannel`,
+  `fluids/immersedBoundary/oscillatingWallStokesLayer`,
+  `fluids/immersedBoundary/immersedTaylorCouette` and
+  `fluids/immersedBoundary/bendingBeamInChannel` tutorials, with
   regression tests.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
