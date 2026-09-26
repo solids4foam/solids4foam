@@ -194,8 +194,9 @@ public:
         );
 
         //- Area-weighted mean of the values at the quadrature points over
-        //  each surface face, and the area of the quadrature points of each
-        //  face in the mesh: zero for a face without quadrature points
+        //  each surface face, where the points outside the mesh have no
+        //  value but keep their area, and the area of the quadrature points
+        //  of each face: zero for a face without quadrature points
         void faceValues
         (
             const vectorField& pointValues,

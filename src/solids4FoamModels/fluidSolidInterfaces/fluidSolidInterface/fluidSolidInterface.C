@@ -1131,8 +1131,9 @@ void Foam::fluidSolidInterface::makeImmersedInterfaces()
                 << "fluid-solid interface" << abort(FatalError);
         }
 
-        // Global patches of the closure patches, with their points at the
-        // start of the time step
+        // Global patches of the closure patches, with their current points
+        // (those of the restart time on a restart; the surface is at rest
+        // until it is first moved)
         immersedClosurePatches_.set
         (
             interfaceI,
@@ -1159,7 +1160,7 @@ void Foam::fluidSolidInterface::makeImmersedInterfaces()
                 new globalPolyPatch(closureNames[i], solidMesh())
             );
             closureZones[i] = &closurePatches[i].globalPatch();
-            closurePoints[i] = solidZonePointsOld(closurePatches[i]);
+            closurePoints[i] = solidZonePointsOld(closurePatches[i], true);
         }
 
         immersedInterfaceList_.set
@@ -1171,7 +1172,11 @@ void Foam::fluidSolidInterface::makeImmersedInterfaces()
                 bodyi,
                 bodyName,
                 solidZone(interfaceI),
-                solidZonePointsOld(solid().globalPatches()[interfaceI]),
+                solidZonePointsOld
+                (
+                    solid().globalPatches()[interfaceI],
+                    true
+                ),
                 closureZones,
                 closurePoints,
                 fluidMesh().solutionD(),
@@ -1190,7 +1195,8 @@ void Foam::fluidSolidInterface::makeImmersedInterfaces()
 
 Foam::tmp<Foam::pointField> Foam::fluidSolidInterface::solidZonePointsOld
 (
-    const globalPolyPatch& gp
+    const globalPolyPatch& gp,
+    const bool current
 ) const
 {
     const polyPatch& pp = gp.patch();
@@ -1199,15 +1205,15 @@ Foam::tmp<Foam::pointField> Foam::fluidSolidInterface::solidZonePointsOld
 
     // For a solid that does not move its mesh, the mesh points are in the
     // reference configuration: add the total displacement of the previous
-    // time step
+    // time step, or the current one
     if (!solid().movingMesh())
     {
-        patchPoints +=
-            vectorField
-            (
-                solid().pointD().oldTime().internalField(),
-                pp.meshPoints()
-            );
+        const pointVectorField& pointD =
+        (
+            current ? solid().pointD() : solid().pointD().oldTime()
+        );
+
+        patchPoints += vectorField(pointD.internalField(), pp.meshPoints());
     }
 
     return gp.patchPointToGlobal(patchPoints);

@@ -44,15 +44,61 @@ void Foam::fsiImmersedInterface::buildSurface
 
     // Merge the points of the zones by their coordinates: the zones are
     // patches of the same mesh, so the points they share have the same
-    // coordinates. The interface zone is first, so that a shared point
-    // follows the interface
-    HashTable<label, point, Hash<point>> pointTable
-    (
-        2*(zonePoints.size() + 1)
-    );
+    // coordinates up to round-off (in parallel, a shared point is the
+    // average of its copies on the processors, whose number may differ
+    // between the zones), and are merged within a tolerance that is small
+    // relative to the extent of the interface. The interface zone is first,
+    // so that a shared point follows the interface
+    const scalar mergeTol = 1e-8*mag(boundBox(zonePoints, false).span());
+
+    // Bins of the merged points, of the width of the tolerance, keyed by a
+    // hash of the bin indices (a collision only costs a distance check)
+    const scalar binWidth = max(mergeTol, VSMALL);
+    HashTable<DynamicList<label>, label, Hash<label>>
+        pointBins(2*(zonePoints.size() + 1));
+
+    auto binKey = [&](const point& p, const label di, const label dj,
+        const label dk)
+    {
+        const long i = long(std::floor(p.x()/binWidth)) + di;
+        const long j = long(std::floor(p.y()/binWidth)) + dj;
+        const long k = long(std::floor(p.z()/binWidth)) + dk;
+        return label((i*73856093L) ^ (j*19349663L) ^ (k*83492791L));
+    };
+
     DynamicList<point> points(zonePoints.size());
     DynamicList<label> pointZones(zonePoints.size());
     DynamicList<label> pointIndices(zonePoints.size());
+
+    // Merged point within the tolerance of p, or -1
+    auto findPoint = [&](const point& p)
+    {
+        for (label di = -1; di <= 1; ++di)
+        {
+            for (label dj = -1; dj <= 1; ++dj)
+            {
+                for (label dk = -1; dk <= 1; ++dk)
+                {
+                    const auto iter = pointBins.find(binKey(p, di, dj, dk));
+
+                    if (iter == pointBins.end())
+                    {
+                        continue;
+                    }
+
+                    for (const label pointi : iter())
+                    {
+                        if (mag(points[pointi] - p) <= mergeTol)
+                        {
+                            return pointi;
+                        }
+                    }
+                }
+            }
+        }
+
+        return label(-1);
+    };
 
     // Map from the points of each zone to the surface points
     labelList zoneMap(zonePoints.size(), -1);
@@ -68,17 +114,16 @@ void Foam::fsiImmersedInterface::buildSurface
         map.setSize(pts.size(), -1);
         forAll(pts, i)
         {
-            HashTable<label, point, Hash<point>>::const_iterator iter =
-                pointTable.find(pts[i]);
+            const label found = findPoint(pts[i]);
 
-            if (iter != pointTable.end())
+            if (found >= 0)
             {
-                map[i] = iter();
+                map[i] = found;
             }
             else
             {
                 map[i] = points.size();
-                pointTable.insert(pts[i], points.size());
+                pointBins(binKey(pts[i], 0, 0, 0)).append(points.size());
                 points.append(pts[i]);
                 pointZones.append(zonei);
                 pointIndices.append(i);
@@ -226,12 +271,14 @@ void Foam::fsiImmersedInterface::buildSurface
 
         forAll(pointEdges, pointi)
         {
-            if (pointEdges[pointi].size() != 0 && pointEdges[pointi].size() != 2)
+            const label nEdges = pointEdges[pointi].size();
+
+            if (nEdges != 0 && nEdges != 2)
             {
                 FatalErrorInFunction
                     << "The boundary of the surface of immersed body "
                     << bodyName_ << " is not a set of simple loops: point "
-                    << points[pointi] << " has " << pointEdges[pointi].size()
+                    << points[pointi] << " has " << nEdges
                     << " boundary edges" << abort(FatalError);
             }
         }

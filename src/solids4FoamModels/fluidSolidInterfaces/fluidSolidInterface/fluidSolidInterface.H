@@ -308,8 +308,13 @@ class fluidSolidInterface
 
         //- Points of a solid global patch at the start of the time step:
         //  the mesh patch points, plus the old total displacement for a
-        //  solid that does not move its mesh
-        tmp<pointField> solidZonePointsOld(const globalPolyPatch& gp) const;
+        //  solid that does not move its mesh; or the current points, with
+        //  the current total displacement
+        tmp<pointField> solidZonePointsOld
+        (
+            const globalPolyPatch& gp,
+            const bool current = false
+        ) const;
 
         //- Set the points at the start of the time step of the immersed
         //  interfaces

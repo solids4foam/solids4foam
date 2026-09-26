@@ -26,7 +26,8 @@ Description
     The surface of the body is built from the solid interface zone (the
     global patch of the solid interface patch) and, optionally, closure
     zones (other patches of the solid, e.g. a clamped root), whose union
-    must be a closed surface with the normals pointing out of the solid.
+    must be a closed surface with the normals pointing out of the solid;
+    the points that the zones share are merged within a small tolerance.
     The faces are triangulated, and each triangle keeps its parent interface
     face. In a two-dimensional fluid mesh (one empty direction), the
     patches of the empty direction are not needed: the points on either
@@ -43,9 +44,9 @@ Description
 
     The traction on each interface face is the area-weighted mean of the
     tractions on its triangles from the immersed boundary, where the areas
-    are those represented by the quadrature points of the triangles in the
-    mesh; a face without quadrature points, e.g. outside the mesh, has zero
-    traction.
+    are those represented by the quadrature points of the triangles, so
+    that the force on a face partly outside the mesh is that of its part in
+    the mesh; a face without quadrature points has zero traction.
 
 Author
     Philip Cardiff, UCD.

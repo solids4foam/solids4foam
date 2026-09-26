@@ -851,13 +851,16 @@ void Foam::immersedSurfaceTraction::faceValues
     faceAreas.setSize(nFaces);
     faceAreas = 0;
 
+    // The points outside the mesh have no value but keep their area, so
+    // that the mean over a face partly outside the mesh gives the force of
+    // its part in the mesh when it is applied to the whole face
     forAll(faces_, i)
     {
         if (h_[i] > 0)
         {
             faceValues[faces_[i]] += areas_[i]*pointValues[i];
-            faceAreas[faces_[i]] += areas_[i];
         }
+        faceAreas[faces_[i]] += areas_[i];
     }
 
     forAll(faceValues, facei)
