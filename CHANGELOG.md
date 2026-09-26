@@ -8,6 +8,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `solidRobin`, a spring-dashpot (Robin) displacement boundary condition: the
+  traction is proportional to the displacement and the velocity, with separate
+  normal and tangential coefficients that act per unit reference area. The
+  spring and dashpot are implicit, through `solidDirectionMixed`, and the
+  coefficients can be scaled by a weight field. It supports linear-geometry
+  and total Lagrangian solid models; its README gives the formulation,
+  literature values and verification.
 - A documentation page for each `mechanicalConstitutiveLaw`, next to its
   class, giving its entries and defaults, its state, its tangents, whether it
   supports the mixed displacement-pressure formulation, how it differs from
