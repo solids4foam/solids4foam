@@ -869,31 +869,17 @@ void Foam::mechanicalConstitutiveLawStateSetup::setupStateRestartLaw
 }
 
 
-void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpec
-(
-    const label lawI,
-    const integrationPointTopology& topo,
-    const labelList& ipIDs,
-    mechanicalConstitutiveLawState& state
-) const
-{
-    applyStateSpec(laws_[lawI], lawI, topo, ipIDs, state);
-}
-
-
-void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpec
+void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpecTree
 (
     const mechanicalConstitutiveLaw& law,
     const label lawI,
-    const integrationPointTopology& topo,
-    const labelList& ipIDs,
+    const prescribedSource source,
+    const integrationPointTopology* topoPtr,
+    const labelList* ipIDsPtr,
+    const label patchI,
     mechanicalConstitutiveLawState& state
 ) const
 {
-    // Order matters. The declared default goes down first, then the law is
-    // given the chance to initialise state of its own over it, and only then
-    // is a prescribed field read. A law that both declares a field and fills
-    // it in initialiseState would otherwise have its work overwritten
     mechanicalConstitutiveLawStateSpec spec;
     law.declareState(spec);
 
@@ -901,32 +887,49 @@ void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpec
 
     law.initialiseState(state);
 
-    // A composite's sub-laws each get a child state of their own, prepared
-    // exactly as this one was. Without this a sub-law's declared defaults and
-    // prescribed fields would be missing and it would silently read zeros
     const wordList childNames(law.childStateNames());
 
     forAll(childNames, i)
     {
-        applyStateSpec
+        applyStateSpecTree
         (
             law.childLaw(childNames[i]),
             lawI,
-            topo,
-            ipIDs,
+            source,
+            topoPtr,
+            ipIDsPtr,
+            patchI,
             state.child(childNames[i])
         );
     }
 
-    readPrescribedFields
+    if (source != prescribedSource::none)
+    {
+        readPrescribedFields
+        (
+            spec, state, source, lawI, topoPtr, ipIDsPtr, patchI
+        );
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpec
+(
+    const label lawI,
+    const integrationPointTopology& topo,
+    const labelList& ipIDs,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    applyStateSpecTree
     (
-        spec,
-        state,
-        prescribedSource::internalPoints,
+        laws_[lawI],
         lawI,
+        prescribedSource::internalPoints,
         &topo,
         &ipIDs,
-        -1
+        -1,
+        state
     );
 }
 
@@ -937,90 +940,29 @@ void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpecScratch
     mechanicalConstitutiveLawState& state
 ) const
 {
-    applyStateSpecScratch(laws_[lawI], state);
-}
-
-
-void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpecScratch
-(
-    const mechanicalConstitutiveLaw& law,
-    mechanicalConstitutiveLawState& state
-) const
-{
-    mechanicalConstitutiveLawStateSpec spec;
-    law.declareState(spec);
-
-    applyStateDefaults(spec, state);
-
-    law.initialiseState(state);
-
-    // A composite's sub-laws each get a child state of their own, prepared
-    // exactly as this one was. Without this a sub-law's declared defaults and
-    // prescribed fields would be missing and it would silently read zeros
-    const wordList childNames(law.childStateNames());
-
-    forAll(childNames, i)
-    {
-        applyStateSpecScratch
-        (
-            law.childLaw(childNames[i]),
-            state.child(childNames[i])
-        );
-    }
-}
-
-
-void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpecPatch
-(
-    const label lawI,
-    const label patchI,
-    mechanicalConstitutiveLawState& state
-) const
-{
-    applyStateSpecPatch(laws_[lawI], lawI, patchI, state);
-}
-
-
-void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpecPatch
-(
-    const mechanicalConstitutiveLaw& law,
-    const label lawI,
-    const label patchI,
-    mechanicalConstitutiveLawState& state
-) const
-{
-    mechanicalConstitutiveLawStateSpec spec;
-    law.declareState(spec);
-
-    applyStateDefaults(spec, state);
-
-    law.initialiseState(state);
-
-    // A composite's sub-laws each get a child state of their own, prepared
-    // exactly as this one was. Without this a sub-law's declared defaults and
-    // prescribed fields would be missing and it would silently read zeros
-    const wordList childNames(law.childStateNames());
-
-    forAll(childNames, i)
-    {
-        applyStateSpecPatch
-        (
-            law.childLaw(childNames[i]),
-            lawI,
-            patchI,
-            state.child(childNames[i])
-        );
-    }
-
-    readPrescribedFields
+    applyStateSpecTree
     (
-        spec,
-        state,
-        prescribedSource::patchFaces,
+        laws_[lawI], lawI, prescribedSource::none, nullptr, nullptr, -1, state
+    );
+}
+
+
+void Foam::mechanicalConstitutiveLawStateSetup::applyStateSpecPatch
+(
+    const label lawI,
+    const label patchI,
+    mechanicalConstitutiveLawState& state
+) const
+{
+    applyStateSpecTree
+    (
+        laws_[lawI],
         lawI,
+        prescribedSource::patchFaces,
         nullptr,
         nullptr,
-        patchI
+        patchI,
+        state
     );
 }
 

@@ -105,6 +105,9 @@ class mechanicalConstitutiveLawStateSetup
         //  field, which is the other direction and a different shape
         enum class prescribedSource
         {
+            //- None: a scratch state that no field addresses
+            none,
+
             //- The law's own integration points, from a volField
             internalPoints,
 
@@ -148,30 +151,23 @@ class mechanicalConstitutiveLawStateSetup
             mechanicalConstitutiveLawState& state
         ) const;
 
-        //- As applyStateSpec, for a named law, which is how a composite's
-        //  sub-laws are reached
-        void applyStateSpec
+        //- Apply what a law, and every law below it, declared: allocate each
+        //  field, set its declared default, let the law initialise its own
+        //  state over that, and only then read any prescribed field from the
+        //  given source. The order matters: a law that both declares a field
+        //  and fills it in initialiseState would otherwise have its work
+        //  overwritten. A composite's sub-laws each get a child state of
+        //  their own, prepared the same way; without that a sub-law's
+        //  defaults and prescribed fields would be missing and it would
+        //  silently read zeros
+        void applyStateSpecTree
         (
             const mechanicalConstitutiveLaw& law,
             const label lawI,
-            const integrationPointTopology& topo,
-            const labelList& ipIDs,
-            mechanicalConstitutiveLawState& state
-        ) const;
-
-        //- As applyStateSpecPatch, for a named law
-        void applyStateSpecPatch
-        (
-            const mechanicalConstitutiveLaw& law,
-            const label lawI,
+            const prescribedSource source,
+            const integrationPointTopology* topoPtr,
+            const labelList* ipIDsPtr,
             const label patchI,
-            mechanicalConstitutiveLawState& state
-        ) const;
-
-        //- As applyStateSpecScratch, for a named law
-        void applyStateSpecScratch
-        (
-            const mechanicalConstitutiveLaw& law,
             mechanicalConstitutiveLawState& state
         ) const;
 
