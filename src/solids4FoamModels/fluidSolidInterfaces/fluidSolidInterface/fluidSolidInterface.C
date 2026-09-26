@@ -938,6 +938,47 @@ Foam::fluidSolidInterface::interfaceToInterfaceList() const
 }
 
 
+const Foam::standAlonePatch& Foam::fluidSolidInterface::fluidZone
+(
+    const label interfaceI
+) const
+{
+    return fluid().globalPatches()[interfaceI].globalPatch();
+}
+
+
+const Foam::standAlonePatch& Foam::fluidSolidInterface::solidZone
+(
+    const label interfaceI
+) const
+{
+    return solid().globalPatches()[interfaceI].globalPatch();
+}
+
+
+Foam::word Foam::fluidSolidInterface::fluidInterfaceName
+(
+    const label interfaceI
+) const
+{
+    return fluidMesh().boundary()[fluidPatchIndices()[interfaceI]].name();
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::fluidSolidInterface::fluidZoneTraction
+(
+    const label interfaceI
+) const
+{
+    // Total traction of the fluid zone: viscous force minus the pressure
+    // force along the zone normals
+    return
+        fluid().faceZoneViscousForce(interfaceI)
+      - fluid().faceZonePressureForce(interfaceI)
+       *fluidZone(interfaceI).faceNormals();
+}
+
+
 Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
 (
     const standAlonePatch& zone, const vectorField& zoneTraction
@@ -1544,17 +1585,11 @@ void Foam::fluidSolidInterface::updateForce()
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
         // Calculate total traction of fluid zone
-        vectorField fluidZoneTotalTraction
-        (
-            fluid().faceZoneViscousForce(interfaceI)
-          - fluid().faceZonePressureForce(interfaceI)*fluidZone.faceNormals()
-        );
+        vectorField fluidZoneTotalTraction(fluidZoneTraction(interfaceI));
 
         fluidZonesTractions()[interfaceI] = fluidZoneTotalTraction;
 
@@ -1640,10 +1675,8 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
         // Calculate total traction of fluid zone
         vectorField fluidZoneTraction
@@ -1719,10 +1752,8 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
         // Calculate the point displacements of the solid interface
         const vectorField solidZonePointsDisplsAtSolid
@@ -2363,10 +2394,8 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                 << endl;
 
             // Take references to zones
-            const standAlonePatch& fluidZone =
-               fluid().globalPatches()[interfaceI].globalPatch();
-            const standAlonePatch& solidZone =
-               solid().globalPatches()[interfaceI].globalPatch();
+            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+            const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
             const vectorField solidZoneAcceleration
             (
@@ -2445,10 +2474,8 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 << endl;
 
             // Take references to zones
-            const standAlonePatch& fluidZone =
-               fluid().globalPatches()[interfaceI].globalPatch();
-            const standAlonePatch& solidZone =
-               solid().globalPatches()[interfaceI].globalPatch();
+            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+            const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
             const vectorField solidZoneAcceleration
             (

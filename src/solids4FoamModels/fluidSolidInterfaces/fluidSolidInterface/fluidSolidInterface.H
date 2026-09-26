@@ -475,6 +475,29 @@ public:
                 return nGlobalPatches_;
             }
 
+            //- Return the number of fluid-solid interfaces
+            label nInterfaces() const
+            {
+                return nGlobalPatches_;
+            }
+
+            //- Return the fluid zone (global patch) of an interface
+            const standAlonePatch& fluidZone(const label interfaceI) const;
+
+            //- Return the solid zone (global patch) of an interface
+            const standAlonePatch& solidZone(const label interfaceI) const;
+
+            //- Return the name of the fluid side of an interface, for
+            //  reports: the fluid patch name
+            word fluidInterfaceName(const label interfaceI) const;
+
+            //- Return the total traction (viscous and pressure) exerted by
+            //  the fluid on the faces of the fluid zone of an interface
+            virtual tmp<vectorField> fluidZoneTraction
+            (
+                const label interfaceI
+            ) const;
+
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const
             {

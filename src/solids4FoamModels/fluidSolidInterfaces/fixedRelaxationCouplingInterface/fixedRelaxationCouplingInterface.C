@@ -153,7 +153,7 @@ bool fixedRelaxationCouplingInterface::evolve()
         // Transfer the displacement from the solid to the fluid, where we will
         // use no relaxation; in that way, we can force the solid and fluid
         // interfaces to stay aligned
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
@@ -177,7 +177,7 @@ void fixedRelaxationCouplingInterface::updateDisplacement()
     Info<< "Current fsi under-relaxation factor: "
         << relaxationFactor_ << endl;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         fluidZonesPointsDisplsPrev()[interfaceI] =
             fluidZonesPointsDispls()[interfaceI];

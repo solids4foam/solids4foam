@@ -82,7 +82,7 @@ void weakCouplingInterface::initializeFields()
     //     predictedSolidZonesTractionPtrList_[interfaceI] =
     //         vectorField
     //         (
-    //             solid().globalPatches()[interfaceI].globalPatch().size(),
+    //             solidZone(interfaceI).size(),
     //             vector::zero
     //         );
     // }
@@ -96,7 +96,7 @@ void weakCouplingInterface::updateWeakDisplacement()
     // Update the residual
     updateResidual();
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         fluidZonesPointsDisplsPrev()[interfaceI] =
             fluidZonesPointsDispls()[interfaceI];
