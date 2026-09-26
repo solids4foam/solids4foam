@@ -87,8 +87,21 @@ contributed to cardiacFoam by Sairam Pamulaparthi Venkata (see
 ```
 
 or `VALVE_MOTION=morph ./Allrun`, with `MESH_LEVEL=2 ./Allrun` etc. for the
-finer meshes (0.5 mm cells for `MESH_LEVEL=1`, about 230 000 cells). The
-flow rate through the outlet is written every time step to
+finer meshes (0.5 mm cells for `MESH_LEVEL=1`, about 230 000 cells).
+
+The immersed boundary method needs about three cells or more across the
+thickness of the leaflets (1.5 mm here). Instead of a uniformly fine mesh,
+the mesh can be refined around the region the valve sweeps over the cycle:
+
+```bash
+MESH_LEVEL=0 REFINE_LEVELS=1 ./Allrun
+```
+
+refines the 1 mm cells of `MESH_LEVEL=0` to 0.5 mm within 2 mm of the valve,
+with the `immersedBodyRefinementCells` utility and `refineMesh`; each further
+level halves the cells and the width of the band.
+
+The flow rate through the outlet is written every time step to
 `postProcessing/flowRate/0/surfaceFieldValue.dat`, and plotted in
 `flowRate.pdf` if gnuplot is installed.
 
@@ -102,6 +115,14 @@ closed valve, for `MESH_LEVEL=1`:
 | `sliceAxis`, first cycle | 61 | 17 |
 | `sliceAxis`, second cycle | 76 | 17 |
 | `morph` | 56 | 3 |
+
+With `MESH_LEVEL=0 REFINE_LEVELS=1` (99 815 cells for `sliceAxis` and 73 768
+for `morph`), the flow rates are within 0.6 ml/s of those of the uniform
+`MESH_LEVEL=1` mesh (61.7, 76.2 and 17.7 ml/s for `sliceAxis`, 56.6 and
+3.6 ml/s for `morph`). Without refinement, `MESH_LEVEL=0` has 1.5 cells
+across the leaflets, and at $$t = 0.4$$ s, just after the valve has closed,
+22 ml/s leaks through the closed valve, instead of 6 ml/s with refinement or
+on the uniform `MESH_LEVEL=1` mesh.
 
 The flow through the open valve is still developing when the valve closes in
 the first cycle. While the valve closes, the flow rate through the outlet is

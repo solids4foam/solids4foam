@@ -8,6 +8,14 @@ OpenFOAM.com, where `libimmersedBoundary` is built with solids4foam.
 The option works with the solids4foam `pimpleFluid` fluid model and with the
 standard `pimpleFoam` solver. See `tutorials/fluids/immersedBoundary`.
 
+The bodies are closed surfaces with a thickness, represented by the cells of
+the fluid mesh whose centre is inside them: **the mesh needs about three cells
+or more across the thickness of a body**, everywhere and at all times. Thinner
+bodies, or thinner parts of a body, are not blocked reliably and let the flow
+through. Zero-thickness (open) surfaces are not supported. For thin moving
+bodies, such as the leaflets of a heart valve, refine the mesh around the
+region they sweep (see Mesh refinement below).
+
 ## Usage
 
 In `system/controlDict`:
@@ -221,6 +229,35 @@ Turek (2006) stop decreasing at about 0.08, the difference between the
 body-fitted mesh solution and Wan and Turek (2006), whose coefficients lag the
 converged solutions by about 0.015 s (see the `oscillatingCylinderInChannel`
 tutorial).
+
+### Mesh refinement
+
+The `immersedBodyRefinementCells` utility writes the cell set of the cells
+within a given distance of the immersed bodies of the `immersedBoundaryForce`
+options, over their motion between two times, for `refineMesh`. The surfaces
+are sampled wherever a vertex has moved by half the distance since the
+previous sample, so that the bands around the samples overlap. Two levels of
+refinement, halving the band at each level:
+
+```bash
+immersedBodyRefinementCells -distance 0.002 -startTime 0 -endTime 0.8
+refineMesh -overwrite
+immersedBodyRefinementCells -distance 0.001 -startTime 0 -endTime 0.8
+refineMesh -overwrite
+```
+
+with `system/refineMeshDict` refining the cell set `refineCells` in the three
+directions (see the `heartValveInDuct` tutorial, `REFINE_LEVELS=1 ./Allrun`).
+The option `-bodies "(name ...)"` restricts the refinement to some bodies.
+
+For the valves of solids4foam/cardiacFoam#20 (leaflets about 0.9 mm thick) in
+a mesh of 1.3 mm cells, no cell centre is inside the open leaflets for most of
+the cycle, and the leaflets are not seen; after two levels of refinement
+around the swept region (0.34 mm cells, from 213 000 to 779 000 cells), 4 000
+to 19 000 cells are inside the mitral leaflets and 1 700 to 12 000 inside the
+aortic leaflets at all times. The `valveSliceAxis` motion shrinks the
+thickness of the leaflets with their radius, so the free edge of a closed
+valve with `Fmax` close to 1 can remain thinner than the refined cells.
 
 ## Provenance
 

@@ -64,7 +64,10 @@ release. For complete commit-level details and contributor information, see the
   the surface (new `immersedSurfaceTraction` class). Added the
   `uniformTranslation` and `solidBodyRotation` body motions, deforming bodies
   (the `quadraticBend` and `customProfileBend` motions, and the heart valve
-  motions `valveSliceAxis` and `valveMorph`), and the `cut`
+  motions `valveSliceAxis` and `valveMorph`, with the
+  `immersedBodyRefinementCells` utility to refine the mesh around the region
+  swept by thin bodies, which need about three cells across their
+  thickness), and the `cut`
   (exact volume fraction) occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
