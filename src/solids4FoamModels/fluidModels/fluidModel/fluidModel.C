@@ -1143,6 +1143,13 @@ void Foam::fluidModel::makeGlobalPatches(const wordList& patchNames) const
                 << abort(FatalError);
         }
 
+        // An interface without a fluid patch (an immersed interface) has no
+        // global patch
+        if (patchNames[i] == "none")
+        {
+            continue;
+        }
+
         globalPatchesPtrList_.set
         (
             i,
@@ -1177,7 +1184,10 @@ void Foam::fluidModel::syncGlobalPatches() const
 {
     forAll(globalPatchesPtrList_, i)
     {
-        globalPatchesPtrList_[i].syncPoints();
+        if (globalPatchesPtrList_.set(i))
+        {
+            globalPatchesPtrList_[i].syncPoints();
+        }
     }
 }
 

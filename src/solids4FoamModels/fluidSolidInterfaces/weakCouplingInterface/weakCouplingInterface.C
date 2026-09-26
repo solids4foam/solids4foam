@@ -49,7 +49,14 @@ weakCouplingInterface::weakCouplingInterface
 )
 :
     fluidSolidInterface(typeName, runTime, region)
-{}
+{
+    if (anyImmersedInterface())
+    {
+        FatalErrorInFunction
+            << "The " << typeName << " coupling is not available with an "
+            << "immersed interface" << abort(FatalError);
+    }
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -82,7 +89,7 @@ void weakCouplingInterface::initializeFields()
     //     predictedSolidZonesTractionPtrList_[interfaceI] =
     //         vectorField
     //         (
-    //             solidZone(interfaceI).size(),
+    //             solid().globalPatches()[interfaceI].globalPatch().size(),
     //             vector::zero
     //         );
     // }

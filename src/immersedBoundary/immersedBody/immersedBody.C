@@ -38,11 +38,18 @@ Foam::triSurface Foam::immersedBody::readSurface
     fileName file(f);
     file.expand();
 
-    // The surface is read by every processor from the case directory
+    // The surface is read by every processor from the constant directory of
+    // the case, or of the mesh region of a multi-region case
     if (!file.isAbsolute())
     {
-        file =
-            mesh.time().globalPath()/mesh.time().constant()/"triSurface"/file;
+        fileName dir(mesh.time().globalPath()/mesh.time().constant());
+
+        if (mesh.name() != polyMesh::defaultRegion)
+        {
+            dir = dir/mesh.name();
+        }
+
+        file = dir/"triSurface"/file;
     }
 
     if (!isFile(file))

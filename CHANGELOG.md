@@ -81,6 +81,24 @@ release. For complete commit-level details and contributor information, see the
   `fluids/immersedBoundary/bendingBeamInChannel` and
   `fluids/immersedBoundary/heartValveInDuct` tutorials, with
   regression tests.
+- Added immersed fluid-solid interfaces: in `constant/fsiProperties`, a solid
+  interface patch paired with `fluidPatch none;` drives an immersed body of
+  the `immersedBoundaryForce` option of the fluid (motion `fsiDriven`), named
+  in an `immersedInterfaces` entry with optional `closurePatches` of the
+  solid that close its surface. The surface is built from the solid patches
+  (extended and capped in the empty direction of a two-dimensional fluid
+  mesh), moved in every coupling iteration, and the surface traction of the
+  immersed boundary is returned to the solid patch; the momentum exchange
+  with the body is logged for comparison. The interface works with the
+  Dirichlet-Neumann coupling schemes (`fixedRelaxation`, `Aitken`, `IQNILS`)
+  and needs no interface mapping. The bodies of `immersedBoundaryForce` are
+  now re-positioned within a time step when their configuration changes, and
+  the `surface` entry of a body is optional. The coupling schemes use the new
+  `fluidSolidInterface` accessors `nInterfaces()`, `fluidZone(i)`,
+  `solidZone(i)`, `fluidInterfaceName(i)` and `fluidZoneTraction(i)`. Added
+  the `fluids/immersedBoundary/immersedHronTurekFsi2` tutorial (the
+  Turek-Hron FSI2 benchmark with the cylinder and flag immersed in a fixed
+  background mesh), with a regression test.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.

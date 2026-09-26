@@ -1,9 +1,10 @@
 # immersedBoundary
 
 Hybrid fictitious domain-immersed boundary (HFDIB) method for bodies with a
-prescribed motion immersed in an incompressible flow, as the finite volume
-option `immersedBoundaryForce`. It is currently only available for
-OpenFOAM.com, where `libimmersedBoundary` is built with solids4foam.
+prescribed motion, or driven by a solids4foam fluid-solid interaction,
+immersed in an incompressible flow, as the finite volume option
+`immersedBoundaryForce`. It is currently only available for OpenFOAM.com,
+where `libimmersedBoundary` is built with solids4foam.
 
 The option works with the solids4foam `pimpleFluid` fluid model and with the
 standard `pimpleFoam` solver. See `tutorials/fluids/immersedBoundary`.
@@ -68,6 +69,31 @@ an open valve surface with the same vertices), with the periodic time laws of
 `valveTimeLaw`, in `immersedBodyMotion`. A deforming motion gives
 the position and velocity of each vertex of the surface, and the velocity of
 the body at a point is interpolated from the vertices of the nearest triangle.
+The `fsiDriven` motion is set by a fluid-solid interface (see below).
+
+## Fluid-solid interaction
+
+A body whose motion is `fsiDriven` is driven by a solids4foam fluid-solid
+interface: in `constant/fsiProperties`, the solid interface patch is paired
+with `fluidPatch none;` and an `immersedInterfaces` entry names the body
+(see `src/solids4FoamModels/fluidSolidInterfaces/README.md`). The body needs
+no `surface` entry: its surface is built by the interface from the solid
+interface patch and, optionally, the closure patches of the solid (e.g. a
+clamped root), whose union must be a closed surface; in a two-dimensional
+fluid mesh the surface is extended through the mesh and capped in the empty
+direction. In each coupling iteration the interface sets the vertex
+positions and velocities of the body, and the bodies are re-positioned in
+the mesh (occupancy, links, apertures) when the momentum equation is next
+assembled, keeping the forcing, momentum and apertures of the previous time
+step. The traction returned to the solid is the surface traction (`cutLink`
+only) averaged over the quadrature points of each interface face; the log
+compares its total with the momentum exchange between the fluid and the
+whole body, which also includes the inertia of the fluid inside the body and
+the closure patches, so the two agree only for a slowly accelerating body.
+The option is found by the interface through the header-only
+`fsiImmersedBoundary` interface of solids4FoamModels, so that
+`libimmersedBoundary` does not depend on solids4FoamModels. See the
+`immersedHronTurekFsi2` tutorial.
 
 ## Method
 

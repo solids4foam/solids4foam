@@ -239,6 +239,7 @@ void Foam::immersedSurfaceTraction::createPoints()
     // for surfaces whose triangles are smaller than the cells: the points are
     // kept in order if no kept point is closer, and the area of each point
     // is given to the nearest kept point
+    if (thin_)
     {
         scalar thickness = 1;
         for (direction d = 0; d < vector::nComponents; ++d)
@@ -343,6 +344,12 @@ void Foam::immersedSurfaceTraction::createPoints()
         Info<< "    Immersed body " << body_.name() << ": area in the mesh "
             << meshArea << endl;
     }
+    else
+    {
+        faces_.transfer(faces);
+        barycentric_.transfer(barycentric);
+        areas_.transfer(areas);
+    }
 
     Info<< "    Immersed body " << body_.name() << ": " << faces_.size()
         << " traction points, area " << sum(areas_) << endl;
@@ -399,12 +406,14 @@ void Foam::immersedSurfaceTraction::updatePoints()
 Foam::immersedSurfaceTraction::immersedSurfaceTraction
 (
     const immersedBody& body,
-    const fvMesh& mesh
+    const fvMesh& mesh,
+    const bool thin
 )
 :
     mesh_(mesh),
     body_(body),
     solD_(mesh.solutionD()),
+    thin_(thin),
     faces_(),
     barycentric_(),
     areas_(),

@@ -120,6 +120,52 @@ Implementation:
 
 ---
 
+## Immersed interfaces
+
+A solid interface patch may drive an immersed body of the fluid (the
+`immersedBoundaryForce` finite volume option of `src/immersedBoundary`,
+OpenFOAM.com only) instead of a fluid patch: the fluid mesh is then fixed and
+needs no motion solver or interface mapping. The fluid patch of the interface
+is `none`, and the `immersedInterfaces` dictionary, keyed by the solid patch
+name, gives the body, whose motion must be `fsiDriven`, and optionally the
+`closurePatches`: other patches of the solid (e.g. a clamped root) such that
+the union of the interface and closure patches is a closed surface with
+outward normals. In a two-dimensional fluid mesh the patches of the empty
+direction are not needed: the surface is extended through the mesh and
+capped in that direction.
+
+```c++
+solidPatch      plate;
+fluidPatch      none;
+
+immersedInterfaces
+{
+    plate
+    {
+        body            flag;          // body of the fluid fvOptions
+        closurePatches  (plateFix);    // optional
+    }
+}
+```
+
+The lists `solidPatches`/`fluidPatches` may mix immersed (`none`) and
+body-fitted interfaces. In each coupling iteration the immersed surface is
+moved to the solid interface displacement of the coupling scheme (relaxed or
+accelerated as for a fluid patch), with the velocity of the displacement
+increment over the time step, and the traction on the solid patch is the
+surface traction of the immersed boundary averaged over the quadrature
+points of each face. The log compares its total with the momentum exchange
+between the fluid and the body. The immersed interfaces work with
+`fixedRelaxation`, `Aitken` and `IQNILS`, and not with `weakCoupling`,
+`oneWayCoupling`, `thermal` or the Robin (`elasticWallPressure`) interface
+conditions. See the `fluids/immersedBoundary/immersedHronTurekFsi2` tutorial.
+
+Implementation: `fluidSolidInterface/fsiImmersedInterface.{H,C}` builds the
+surface and maps the tractions, and `fluidSolidInterface/fsiImmersedBoundary.H`
+is the header-only interface implemented by `immersedBoundaryForce`.
+
+---
+
 ## Notes
 
 - The partitioned schemes share the common `fluidSolidInterface` machinery for

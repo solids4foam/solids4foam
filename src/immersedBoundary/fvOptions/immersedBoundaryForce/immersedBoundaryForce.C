@@ -205,7 +205,11 @@ bool Foam::fv::immersedBoundaryForce::bodiesRepositioned() const
 
     forAll(bodies_, bodyi)
     {
-        if (bodies_[bodyi].motion().configuration() != bodyConfigurations_[bodyi])
+        if
+        (
+            bodies_[bodyi].motion().configuration()
+         != bodyConfigurations_[bodyi]
+        )
         {
             return true;
         }
@@ -337,10 +341,16 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
                 }
                 if (!tractions_.set(bodyi))
                 {
+                    // The points of a body driven by a fluid-solid
+                    // interface are not thinned: each face of the
+                    // interface needs its own points
+                    const bool thin =
+                        !isA<immersedBodyMotions::fsiDriven>(body.motion());
+
                     tractions_.set
                     (
                         bodyi,
-                        new immersedSurfaceTraction(body, mesh_)
+                        new immersedSurfaceTraction(body, mesh_, thin)
                     );
                 }
 
@@ -2429,7 +2439,13 @@ Foam::tmp<Foam::vectorField> Foam::fv::immersedBoundaryForce::surfaceTraction
     }
     if (!tractions_.set(bodyi))
     {
-        tractions_.set(bodyi, new immersedSurfaceTraction(body, mesh_));
+        // The points are not thinned: each face of the interface needs its
+        // own points
+        tractions_.set
+        (
+            bodyi,
+            new immersedSurfaceTraction(body, mesh_, false)
+        );
     }
 
     const volVectorField& U =

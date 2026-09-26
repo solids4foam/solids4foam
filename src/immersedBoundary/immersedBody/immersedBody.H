@@ -53,7 +53,8 @@ Description
     \verbatim
     cylinder
     {
-        // Surface file, relative to constant/triSurface; optional for a
+        // Surface file, relative to constant/triSurface (or
+        // constant/<region>/triSurface for a mesh region); optional for a
         // body whose surface is given by a fluid-solid interface
         surface     "cylinder.stl";
 

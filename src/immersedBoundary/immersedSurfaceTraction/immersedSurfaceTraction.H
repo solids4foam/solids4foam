@@ -31,7 +31,9 @@ Description
     barycentric coordinates, so that it follows the motion or deformation of
     the surface. Where the triangles are smaller than the cells, the points
     are thinned to a spacing of about 0.7 cell widths, with the area of each
-    removed point given to the nearest kept point.
+    removed point given to the nearest kept point; the thinning is optional
+    (thin), and is not used for a body driven by a fluid-solid interface,
+    whose faces each need their own points.
 
     At each point \f$ x_w \f$, with the outward unit normal n, the pressure
     and the velocity relative to the rigid body velocity \f$ U_b \f$ are
@@ -98,6 +100,9 @@ class immersedSurfaceTraction
         //- Solved directions
         const Vector<label> solD_;
 
+        //- Thin the points where the triangles are smaller than the cells
+        const bool thin_;
+
         //- Parent surface face of each point
         labelList faces_;
 
@@ -145,11 +150,13 @@ public:
 
     // Constructors
 
-        //- Construct from the body and the mesh
+        //- Construct from the body and the mesh, thinning the points where
+        //  the triangles are smaller than the cells if thin is true
         immersedSurfaceTraction
         (
             const immersedBody& body,
-            const fvMesh& mesh
+            const fvMesh& mesh,
+            const bool thin = true
         );
 
         //- No copy construct

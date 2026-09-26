@@ -52,6 +52,13 @@ oneWayCouplingInterface::oneWayCouplingInterface
     fluidSolidInterface(typeName, runTime, region),
     solidZonesTraction_(nGlobalPatches())
 {
+    if (anyImmersedInterface())
+    {
+        FatalErrorInFunction
+            << "The " << typeName << " coupling is not available with an "
+            << "immersed interface" << abort(FatalError);
+    }
+
     // Initialize zone traction fields
     for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
