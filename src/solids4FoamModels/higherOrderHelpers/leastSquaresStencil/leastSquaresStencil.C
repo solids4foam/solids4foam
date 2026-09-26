@@ -27,6 +27,7 @@ License
 #include "processorPolyPatch.H"
 #include "volFields.H"
 #include "Tuple2.H"
+#include <cmath>
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -158,14 +159,12 @@ List<scalar> leastSquaresStencil::calcFirstHaloDepth() const
 
 labelList leastSquaresStencil::checkProcessorOverlap
 (
-    const List<treeBoundBox>& allOwnedCellsBox,
-    const List<treeBoundBox>& allOwnedFacesBox
+    const List<OBB>& allOwnedCellsBox,
+    const List<OBB>& allOwnedFacesBox
 ) const
 {
     DynamicList<label> overlappingProcessor;
     const label myProcNo = Pstream::myProcNo();
-    const treeBoundBox& ownedCellsBox = allOwnedCellsBox[myProcNo];
-    const treeBoundBox& ownedFacesBox = allOwnedFacesBox[myProcNo];
 
     for (label proc = 0; proc < Pstream::nProcs(); ++proc)
     {
@@ -174,10 +173,15 @@ labelList leastSquaresStencil::checkProcessorOverlap
             continue;
         }
 
+        // Both ranks must evaluate the same ordered SAT operations so that
+        // round-off cannot produce different communication partner lists.
+        const label first = min(myProcNo, proc);
+        const label second = max(myProcNo, proc);
+
         if
         (
-            allOwnedCellsBox[proc].overlaps(ownedFacesBox)
-         || allOwnedFacesBox[proc].overlaps(ownedCellsBox)
+            allOwnedCellsBox[first].overlaps(allOwnedFacesBox[second])
+         || allOwnedFacesBox[first].overlaps(allOwnedCellsBox[second])
         )
         {
             overlappingProcessor.append(proc);
@@ -187,54 +191,24 @@ labelList leastSquaresStencil::checkProcessorOverlap
     return overlappingProcessor.shrink();
 }
 
-treeBoundBox leastSquaresStencil::calcOwnedCellsBox() const
+OBB leastSquaresStencil::calcOwnedCellsBox() const
 {
-    vector minPt(GREAT, GREAT, GREAT);
-    vector maxPt(-GREAT, -GREAT, -GREAT);
-
-#ifdef FOAMEXTEND
-    const pointField& C = mesh_.C().internalField();
-#else
-    const pointField& C = mesh_.C().primitiveField();
-#endif
-
-    forAll(C, cellI)
-    {
-        minPt = min(minPt, C[cellI]);
-        maxPt = max(maxPt, C[cellI]);
-    }
-
-    return treeBoundBox(minPt, maxPt);
+    return OBB(primitiveField(mesh_.C()));
 }
 
 
-treeBoundBox leastSquaresStencil::calcOwnedFacesBox() const
+OBB leastSquaresStencil::calcOwnedFacesBox() const
 {
-    vector minPt(GREAT, GREAT, GREAT);
-    vector maxPt(-GREAT, -GREAT, -GREAT);
-
-    const pointField& faceCentres = mesh_.faceCentres();
-
-    forAll(faceCentres, faceI)
-    {
-        minPt = min(minPt, faceCentres[faceI]);
-        maxPt = max(maxPt, faceCentres[faceI]);
-    }
-
-    return treeBoundBox(minPt, maxPt);
+    return OBB(mesh_.faceCentres());
 }
 
 List<labelList> leastSquaresStencil::remoteCandidates
 (
-    const treeBoundBox& ownedFacesBox,
+    const OBB& ownedFacesBox,
     const labelList& procToQuery
 ) const
 {
-#ifdef FOAMEXTEND
-    const vectorField& C = mesh_.C().internalField();
-#else
-    const vectorField& C = mesh_.C().primitiveField();
-#endif
+    const vectorField& C = primitiveField(mesh_.C());
 
     List<labelList> remoteCandidatesPerProc;
 
@@ -251,15 +225,18 @@ List<labelList> leastSquaresStencil::remoteCandidates
     }
 
 #ifdef FOAMEXTEND
-    // Exchange bounding-box endpoints because Pstream::exchange supports
-    // contiguous element types only.
+    // Pack the centre, half-lengths and axes because Pstream::exchange
+    // supports contiguous element types only.
     List<vectorField> sendBoxes(Pstream::nProcs());
     forAll(procToQuery, i)
     {
         const label toProc = procToQuery[i];
-        sendBoxes[toProc].setSize(2);
-        sendBoxes[toProc][0] = ownedFacesBox.min();
-        sendBoxes[toProc][1] = ownedFacesBox.max();
+        sendBoxes[toProc].setSize(5);
+        sendBoxes[toProc][0] = ownedFacesBox.midpoint();
+        sendBoxes[toProc][1] = ownedFacesBox.ext();
+        sendBoxes[toProc][2] = ownedFacesBox.R().x();
+        sendBoxes[toProc][3] = ownedFacesBox.R().y();
+        sendBoxes[toProc][4] = ownedFacesBox.R().z();
     }
 
     List<vectorField> receivedBoxes;
@@ -275,22 +252,27 @@ List<labelList> leastSquaresStencil::remoteCandidates
 
     forAll(receivedBoxes, sender)
     {
-        const vectorField& endpoints = receivedBoxes[sender];
+        const vectorField& boxData = receivedBoxes[sender];
 
-        if (endpoints.empty())
+        if (boxData.empty())
         {
             continue;
         }
 
-        if (endpoints.size() != 2)
+        if (boxData.size() != 5)
         {
             FatalErrorInFunction
-                << "Expected two bounding-box endpoints from processor "
-                << sender << " but received " << endpoints.size()
+                << "Expected five bounding-box vectors from processor "
+                << sender << " but received " << boxData.size()
                 << abort(FatalError);
         }
 
-        const treeBoundBox queryBox(endpoints[0], endpoints[1]);
+        const OBB queryBox
+        (
+            boxData[0],
+            boxData[1],
+            tensor(boxData[2], boxData[3], boxData[4])
+        );
         DynamicList<label> markedCells;
 
         forAll(C, cellI)
@@ -313,7 +295,7 @@ List<labelList> leastSquaresStencil::remoteCandidates
     );
 #else
     // Phase 1: Exchange ownedFacesBox between processors
-    Map<treeBoundBox> incomingBoxesFromProc;
+    Map<OBB> incomingBoxesFromProc;
     {
         PstreamBuffers sBufs(Pstream::commsTypes::nonBlocking);
 
@@ -342,7 +324,7 @@ List<labelList> leastSquaresStencil::remoteCandidates
             }
 #endif
             UIPstream is(from, sBufs);
-            treeBoundBox qb;
+            OBB qb;
             is >> qb;
 
             incomingBoxesFromProc.insert(from, qb);
@@ -353,10 +335,10 @@ List<labelList> leastSquaresStencil::remoteCandidates
     {
         PstreamBuffers rBufs(Pstream::commsTypes::nonBlocking);
 
-        forAllConstIter(Map<treeBoundBox>, incomingBoxesFromProc, it)
+        forAllConstIter(Map<OBB>, incomingBoxesFromProc, it)
         {
             const label sender = it.key();
-            const treeBoundBox& qb = it();
+            const OBB& qb = it();
 
             labelHashSet usedBySender;
             forAll(C, cellI)
@@ -412,11 +394,7 @@ List<vectorField> leastSquaresStencil::remoteCandidatesCellCentres
     const labelList& procToQuery
 ) const
 {
-#ifdef FOAMEXTEND
-    const vectorField& C = mesh_.C().internalField();
-#else
-    const vectorField& C = mesh_.C().primitiveField();
-#endif
+    const vectorField& C = primitiveField(mesh_.C());
 
     List<vectorField> remoteCellCentres(Pstream::nProcs());
 
@@ -704,11 +682,7 @@ labelList leastSquaresStencil::buildFacesStencil
     //          Using squared distance for efficiency
 
     const vector faceCentre = mesh_.faceCentres()[faceI];
-#ifdef FOAMEXTEND
-    const vectorField& C = mesh_.C().internalField();
-#else
-    const vectorField& C = mesh_.C().primitiveField();
-#endif
+    const vectorField& C = primitiveField(mesh_.C());
 
     labelList localList(localCandidates.size());
     {
@@ -1013,22 +987,16 @@ void leastSquaresStencil::calcFacesStencil() const
     // We will take max halo depth and scale it to get multi halo depth
     const scalar scaledHaloDepth = max(neighbourHaloDepth) * haloDepthScale_;
 
-    // Box for faces, augmented with expected multi-halo depth
-    treeBoundBox ownedFacesBox = calcOwnedFacesBox();
-#ifdef OPENFOAM_COM
+    // Absolute halo distance, independent of the partition box diagonal.
+    // This replaces the former fractional inflate() call on OpenFOAM.org.
+    OBB ownedFacesBox = calcOwnedFacesBox();
     ownedFacesBox.grow(scaledHaloDepth);
-#elif defined(OPENFOAM_ORG)
-    ownedFacesBox.inflate(scaledHaloDepth);
-#else
-    ownedFacesBox.min() -= vector::one*scaledHaloDepth;
-    ownedFacesBox.max() += vector::one*scaledHaloDepth;
-#endif
 
     // Box for remote processors cells
-    List<treeBoundBox> allOwnedCellsBox(Pstream::nProcs());
+    List<OBB> allOwnedCellsBox(Pstream::nProcs());
     allOwnedCellsBox[Pstream::myProcNo()] = calcOwnedCellsBox();
 
-    List<treeBoundBox> allOwnedFacesBox(Pstream::nProcs());
+    List<OBB> allOwnedFacesBox(Pstream::nProcs());
     allOwnedFacesBox[Pstream::myProcNo()] = ownedFacesBox;
 
 #ifdef OPENFOAM_COM
@@ -1313,6 +1281,12 @@ leastSquaresStencil::leastSquaresStencil
     remoteCentresMapPtr_(),
     remoteCellLocationPtr_()
 {
+    if (!(haloDepthScale_ > 0) || !std::isfinite(haloDepthScale_))
+    {
+        FatalErrorInFunction
+            << "haloDepthScale must be finite and greater than zero, found "
+            << haloDepthScale_ << abort(FatalError);
+    }
 }
 
 

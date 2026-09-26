@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "OBB.H"
+#include <cmath>
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -39,13 +40,6 @@ void Foam::OBB::calcCovariance
     symmTensor& covariance
 )
 {
-    if (points.empty())
-    {
-        FatalErrorInFunction
-            << "Cannot fit an OBB to an empty point field"
-            << abort(FatalError);
-    }
-
     mean = point::zero;
 
     forAll(points, pointI)
@@ -57,9 +51,20 @@ void Foam::OBB::calcCovariance
 
     covariance = symmTensor::zero;
 
+    // Normalisation preserves the axes and avoids tiny covariance entries.
+    scalar lengthScale = 0;
     forAll(points, pointI)
     {
-        const vector d(points[pointI] - mean);
+        lengthScale = max(lengthScale, cmptMax(cmptMag(points[pointI] - mean)));
+    }
+    if (lengthScale == 0)
+    {
+        return;
+    }
+
+    forAll(points, pointI)
+    {
+        const vector d((points[pointI] - mean)/lengthScale);
 
         covariance.xx() += d.x()*d.x();
         covariance.xy() += d.x()*d.y();
@@ -94,6 +99,16 @@ void Foam::OBB::addToLocalBounds
 
 void Foam::OBB::orthonormaliseAxes()
 {
+    // A failed eigensystem must still produce a conservative fitted box.
+    for (direction cmpt = 0; cmpt < tensor::nComponents; ++cmpt)
+    {
+        if (!std::isfinite(axes_[cmpt]))
+        {
+            axes_ = tensor::I;
+            return;
+        }
+    }
+
     vector axis0(axes_.x());
     vector axis1(axes_.y());
 
@@ -138,11 +153,48 @@ void Foam::OBB::orthonormaliseAxes()
 
 void Foam::OBB::makeOBB(const pointField& points)
 {
+    if (points.empty())
+    {
+        centre_ = point::zero;
+        halfLength_ = vector(-1, -1, -1);
+        axes_ = tensor::I;
+        return;
+    }
+
     point mean(point::zero);
     symmTensor covariance(symmTensor::zero);
     calcCovariance(points, mean, covariance);
 
-    axes_ = eigenVectors(covariance);
+    const scalar trace = tr(covariance);
+    const scalar secondInvariant =
+        covariance.xx()*covariance.yy()
+      + covariance.yy()*covariance.zz()
+      + covariance.zz()*covariance.xx()
+      - sqr(covariance.xy()) - sqr(covariance.xz()) - sqr(covariance.yz());
+
+    if (trace == 0)
+    {
+        axes_ = tensor::I;
+    }
+    else if (mag(secondInvariant) <= SMALL*sqr(trace))
+    {
+        // Collinear points have one determined axis. Avoid the repeated-zero
+        // eigenvalues and complete the frame in orthonormaliseAxes().
+        vector axis(covariance.xx(), covariance.xy(), covariance.xz());
+        if (covariance.yy() > covariance.xx())
+        {
+            axis = vector(covariance.xy(), covariance.yy(), covariance.yz());
+        }
+        if (covariance.zz() > max(covariance.xx(), covariance.yy()))
+        {
+            axis = vector(covariance.xz(), covariance.yz(), covariance.zz());
+        }
+        axes_ = tensor(axis, vector::zero, vector::zero);
+    }
+    else
+    {
+        axes_ = eigenVectors(covariance);
+    }
     orthonormaliseAxes();
 
     vector minLocal(VGREAT, VGREAT, VGREAT);
@@ -291,7 +343,7 @@ void Foam::OBB::makeOBB
 Foam::OBB::OBB()
 :
     centre_(point::zero),
-    halfLength_(vector::zero),
+    halfLength_(vector(-1, -1, -1)),
     axes_(tensor::I)
 {}
 
@@ -384,8 +436,50 @@ Foam::OBB::OBB(Istream& is)
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void Foam::OBB::grow(const scalar distance)
+{
+    if (!(distance >= 0) || !std::isfinite(distance))
+    {
+        FatalErrorInFunction
+            << "OBB growth distance must be finite and non-negative: " << distance
+            << abort(FatalError);
+    }
+
+    if (!empty())
+    {
+        halfLength_ += vector::one*distance;
+    }
+}
+
+
+bool Foam::OBB::contains(const point& p) const
+{
+    if (empty())
+    {
+        return false;
+    }
+
+    const vector local(axes_ & (p - centre_));
+
+    for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
+    {
+        if (mag(local[cmpt]) > halfLength_[cmpt])
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 bool Foam::OBB::overlaps(const OBB& box) const
 {
+    if (empty() || box.empty())
+    {
+        return false;
+    }
+
     const vector& a = halfLength_;
     const vector& b = box.halfLength_;
 
@@ -494,20 +588,9 @@ bool Foam::OBB::operator==(const OBB& box) const
 
 Foam::Ostream& Foam::operator<<(Ostream& os, const OBB& box)
 {
-    if (os.format() == IOstream::ASCII)
-    {
-        os  << box.centre_ << token::SPACE
-            << box.halfLength_ << token::SPACE
-            << box.axes_;
-    }
-    else
-    {
-        os.write
-        (
-            reinterpret_cast<const char*>(&box.centre_),
-            sizeof(OBB)
-        );
-    }
+    os  << box.centre_ << token::SPACE
+        << box.halfLength_ << token::SPACE
+        << box.axes_;
 
     os.check("Ostream& operator<<(Ostream&, const OBB&)");
     return os;
@@ -516,18 +599,7 @@ Foam::Ostream& Foam::operator<<(Ostream& os, const OBB& box)
 
 Foam::Istream& Foam::operator>>(Istream& is, OBB& box)
 {
-    if (is.format() == IOstream::ASCII)
-    {
-        is >> box.centre_ >> box.halfLength_ >> box.axes_;
-    }
-    else
-    {
-        is.read
-        (
-            reinterpret_cast<char*>(&box.centre_),
-            sizeof(OBB)
-        );
-    }
+    is >> box.centre_ >> box.halfLength_ >> box.axes_;
 
     is.check("Istream& operator>>(Istream&, OBB&)");
     return is;

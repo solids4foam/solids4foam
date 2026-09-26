@@ -19,7 +19,7 @@ Application
     Test-OBB
 
 Description
-    Tests oriented bounding box fitting and overlap queries.
+    Tests oriented bounding box fitting, growth, containment and overlap.
 
 Author
     Ivan Batistic, UCD.
@@ -29,6 +29,10 @@ Author
 
 #include "OBB.H"
 #include "IOstreams.H"
+#include "OStringStream.H"
+#include "IStringStream.H"
+#include <cmath>
+#include <limits>
 
 using namespace Foam;
 
@@ -36,22 +40,6 @@ using namespace Foam;
 
 namespace
 {
-
-bool contains(const OBB& box, const point& p, const scalar tolerance)
-{
-    const vector local(box.R() & (p - box.midpoint()));
-
-    for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
-    {
-        if (mag(local[cmpt]) > box.ext()[cmpt] + tolerance)
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 
 bool check(const bool condition, const char* message)
 {
@@ -103,13 +91,14 @@ int main()
         }
     }
 
-    const OBB fittedBox(points);
+    OBB fittedBox(points);
+    fittedBox.grow(tolerance);
 
     forAll(points, i)
     {
         passed = check
         (
-            contains(fittedBox, points[i], tolerance),
+            fittedBox.contains(points[i]),
             "PCA-fitted box does not contain every input point"
         ) && passed;
     }
@@ -163,6 +152,151 @@ int main()
         mag(faceBox.midpoint().z() - 0.1) < tolerance,
         "Asymmetric face extrusion centre is incorrect"
     ) && passed;
+
+    OBB grownBox(centre, halfLength, rotatedAxes);
+    grownBox.grow(0);
+    passed = check
+    (
+        grownBox == OBB(centre, halfLength, rotatedAxes),
+        "Zero growth changed the box"
+    ) && passed;
+    grownBox.grow(0.2);
+    passed = check
+    (
+        mag(grownBox.ext() - vector(2.2, 1.0, 0.5)) < tolerance
+     && grownBox.midpoint() == centre
+     && grownBox.R() == OBB(centre, halfLength, rotatedAxes).R(),
+        "Absolute growth changed the centre, axes or expected half-lengths"
+    ) && passed;
+    passed = check
+    (
+        grownBox.contains(centre + (vector(2.1, 0, 0) & rotatedAxes))
+     && !grownBox.contains(centre + (vector(2.3, 0, 0) & rotatedAxes))
+     && boxA.contains(point(1, 1, 1)),
+        "Containment failed for rotated points or an axis-aligned boundary"
+    ) && passed;
+
+    // Absolute growth must also create thickness in degenerate boxes.
+    OBB planarBox(facePoints);
+    planarBox.grow(0.2);
+    const point faceCentre(0.5*(facePoints[0] + facePoints[2]));
+    passed = check
+    (
+        planarBox.contains(faceCentre + vector(0, 0, 0.19))
+     && !planarBox.contains(faceCentre + vector(0, 0, 0.21)),
+        "Growth of a planar box did not create the expected thickness"
+    ) && passed;
+    OBB pointBox(pointField(1, centre));
+    pointBox.grow(0.2);
+    passed = check
+    (
+        pointBox.contains(centre)
+     && mag(pointBox.ext() - vector(0.2, 0.2, 0.2)) < tolerance,
+        "Growth of a single-point box failed"
+    ) && passed;
+
+    // Uniform coordinate scaling must preserve candidate membership.
+    const scalar scale = 1000;
+    OBB scaledBox(scale*centre, scale*halfLength, rotatedAxes);
+    scaledBox.grow(scale*0.2);
+    forAll(points, i)
+    {
+        passed = check
+        (
+            grownBox.contains(points[i])
+         == scaledBox.contains(scale*points[i]),
+            "Coordinate scaling changed containment"
+        ) && passed;
+    }
+
+#ifdef OPENFOAM_COM
+    boundBox axisAligned(centre - halfLength, centre + halfLength);
+    OBB sameGrowth(axisAligned);
+    axisAligned.grow(0.2);
+    sameGrowth.grow(0.2);
+    passed = check
+    (
+        mag(sameGrowth.midpoint() - axisAligned.midpoint()) < tolerance
+     && mag(sameGrowth.ext() - 0.5*axisAligned.span()) < tolerance,
+        "OBB growth differs from OpenFOAM.com absolute growth"
+    ) && passed;
+#endif
+
+    OBB emptyBox((pointField()));
+    OBB defaultBox;
+    defaultBox.grow(100);
+    passed = check
+    (
+        defaultBox == emptyBox && defaultBox.empty()
+     && !defaultBox.contains(point::zero)
+     && !defaultBox.overlaps(boxA) && !boxA.overlaps(defaultBox),
+        "A default box must remain empty after growth and overlap nothing"
+    ) && passed;
+    emptyBox.grow(100);
+    passed = check
+    (
+        emptyBox.empty() && !emptyBox.contains(point::zero)
+     && !emptyBox.overlaps(boxA) && !boxA.overlaps(emptyBox),
+        "An empty box must remain empty after growth and overlap nothing"
+    ) && passed;
+
+    for (label small = 0; small < 2; ++small)
+    {
+        const scalar lengthScale = small ? 1e-20 : 1;
+        pointField line(3);
+        forAll(line, i)
+        {
+            line[i] = lengthScale*scalar(i)*vector(1, 2, 3);
+        }
+        OBB lineBox(line);
+        lineBox.grow(lengthScale*1e-10);
+        forAll(line, i)
+        {
+            passed = check
+            (
+                lineBox.contains(line[i]),
+                "A collinear or very small point set was not enclosed"
+            ) && passed;
+        }
+        for (direction cmpt = 0; cmpt < tensor::nComponents; ++cmpt)
+        {
+            passed = check
+            (
+                std::isfinite(lineBox.R()[cmpt]),
+                "Degenerate point set produced non-finite axes"
+            ) && passed;
+        }
+    }
+
+    tensor invalidAxes(tensor::I);
+    invalidAxes.xx() = std::numeric_limits<scalar>::quiet_NaN();
+    const OBB repairedBox(centre, halfLength, invalidAxes);
+    passed = check
+    (
+        repairedBox.R() == tensor::I && repairedBox.contains(centre),
+        "Non-finite axes were not repaired"
+    ) && passed;
+
+    // Exercise both stream formats, including an empty box in the same stream.
+    for (label binary = 0; binary < 2; ++binary)
+    {
+        const IOstream::streamFormat format =
+            binary ? IOstream::BINARY : IOstream::ASCII;
+        OStringStream os(format);
+        os.precision(16);
+        os << grownBox << token::SPACE << emptyBox;
+        IStringStream is(os.str(), format);
+        OBB restored(is);
+        OBB restoredEmpty(is);
+        passed = check
+        (
+            mag(restored.midpoint() - grownBox.midpoint()) < tolerance
+         && mag(restored.ext() - grownBox.ext()) < tolerance
+         && mag(restored.R() - grownBox.R()) < tolerance
+         && restoredEmpty.empty(),
+            "OBB stream round-trip failed"
+        ) && passed;
+    }
 
     if (!passed)
     {
