@@ -127,24 +127,6 @@ public:
             const pointField& x,
             const scalar t
         ) const = 0;
-
-        //- Acceleration of the body at time t at the points x, given in the
-        //  current configuration. The default is a central difference of
-        //  the velocity over the time interval dt, following the points
-        virtual tmp<vectorField> acceleration
-        (
-            const pointField& x,
-            const scalar t,
-            const scalar dt
-        ) const
-        {
-            const vectorField U(velocity(x, t));
-            return
-            (
-                velocity(x + 0.5*dt*U, t + 0.5*dt)
-              - velocity(x - 0.5*dt*U, t - 0.5*dt)
-            )/dt;
-        }
 };
 
 

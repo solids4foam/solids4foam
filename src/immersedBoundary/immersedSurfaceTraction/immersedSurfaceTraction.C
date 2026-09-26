@@ -21,6 +21,7 @@ License
 #include "indexedOctree.H"
 #include "treeDataCell.H"
 #include "scalarMatrices.H"
+#include "SVD.H"
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -336,8 +337,6 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
 
     const scalar radius = 3;
 
-    const vectorField Ub(body_.velocity(points_));
-
     forAll(faces_, i)
     {
         const scalar h = h_[i];
@@ -393,7 +392,13 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
             }
 
             const FixedList<scalar, 10> b(basis(dx, h));
-            const vector dU(U[celli] - Ub[i]);
+
+            // Velocity relative to the rigid body velocity at the cell
+            // centre, so that a rigid rotation gives no traction
+            const vector dU
+            (
+                U[celli] - body_.velocity(pointField(1, C[celli]))()[0]
+            );
             const scalar pc = p[celli];
 
             for (label j = 0; j < nP; ++j)
@@ -423,12 +428,14 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
     tmp<vectorField> ttraction(new vectorField(n, Zero));
     vectorField& t = ttraction.ref();
 
-    // Solve a small weighted least squares system, with a small
-    // regularisation of the quadratic terms for thin stencils
+    // Solve a small weighted least squares system with the pseudo-inverse
+    // of its matrix, which is robust to a rank-deficient stencil (e.g.
+    // collinear cell centres), with a small regularisation of the quadratic
+    // terms
     auto solve = [](const scalar* M, const label m, const label nLin,
         List<List<scalar>>& rhs)
     {
-        scalarSquareMatrix A(m);
+        scalarRectangularMatrix A(m, m);
         scalar trace = 0;
         for (label j = 0; j < m; ++j)
         {
@@ -443,11 +450,18 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
             A(j, j) += 1e-6*trace/m;
         }
 
-        labelList pivot(m);
-        LUDecompose(A, pivot);
+        const scalarRectangularMatrix Ainv(SVD(A, 1e-10).VSinvUt());
         for (List<scalar>& b : rhs)
         {
-            LUBacksubstitute(A, pivot, b);
+            List<scalar> x(m, Zero);
+            for (label j = 0; j < m; ++j)
+            {
+                for (label k = 0; k < m; ++k)
+                {
+                    x[j] += Ainv(j, k)*b[k];
+                }
+            }
+            b = x;
         }
     };
 
@@ -495,8 +509,9 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
             }
         }
 
-        // Tangential viscous traction nu*(I - nn).(grad(U) & n): the
-        // tangential derivatives of U - Ub vanish on a rigid no-slip wall
+        // Tangential viscous traction nu*(I - nn).(grad(U - Ub) & n): on a
+        // no-slip wall the tangential derivatives of U - Ub vanish, and the
+        // rigid body velocity Ub has no strain
         const vector& nw = normals_[i];
         const vector tau(nu*((I - sqr(nw)) & (gradU & nw)));
 
@@ -523,23 +538,15 @@ void Foam::immersedSurfaceTraction::force
     // The traction is the same on every processor
     F = Zero;
     T = Zero;
-    scalar area = 0;
-    vector Fp(Zero);
     forAll(t, i)
     {
         if (h_[i] > 0)
         {
-            Fp += rho*((t[i] & normals_[i])*normals_[i])*areas_[i];
             const vector dF(rho*t[i]*areas_[i]);
             F += dF;
             T += (points_[i] - CofR) ^ dF;
-            area += areas_[i];
         }
     }
-
-    Info<< "    Immersed body " << body_.name() << ": traction area " << area
-        << ", normal part of the force " << Fp << ", tangential part "
-        << F - Fp << endl;
 }
 
 

@@ -494,38 +494,8 @@ bool pimpleFluid::evolve()
 
             if (pimple.ddtCorr())
             {
-                surfaceScalarField phiCorr
-                (
-                    fvc::interpolate(rAU_)*fvc::ddtCorr(U, phi, Uf)
-                );
-
-                // Experimental: no correction on the faces cut by immersed
-                // bodies, whose old flux includes the body flux
-                if
-                (
-                    std::getenv("IB_NO_DDTCORR")
-                 && mesh.foundObject<surfaceScalarField>
-                    (
-                        "immersedBoundaryAperture"
-                    )
-                )
-                {
-                    const surfaceScalarField& alpha =
-                        mesh.lookupObject<surfaceScalarField>
-                        (
-                            "immersedBoundaryAperture"
-                        );
-                    scalarField& pcI = phiCorr.primitiveFieldRef();
-                    forAll(pcI, facei)
-                    {
-                        if (alpha[facei] < 1 - SMALL)
-                        {
-                            pcI[facei] = 0;
-                        }
-                    }
-                }
-
-                phiHbyA += phiCorr;
+                phiHbyA +=
+                    fvc::interpolate(rAU_)*fvc::ddtCorr(U, phi, Uf);
             }
 
             updateRobinFsiInterface(phiHbyA);
@@ -553,8 +523,8 @@ bool pimpleFluid::evolve()
                 tUEqn.clear();
             }
 
-            // Pressure diffusivity on the faces
-            tmp<surfaceScalarField> rAtUf(fvc::interpolate(rAtU()));
+            // Pressure diffusivity on the faces, with immersed boundaries
+            tmp<surfaceScalarField> rAtUf;
 
             // Immersed boundaries (immersedBoundaryForce with
             // apertureCoupling): on the faces cut by a body, the flux is the
@@ -584,27 +554,8 @@ bool pimpleFluid::evolve()
 
                 phiHbyA = alpha*phiHbyA + wallFlux;
                 rAtUf =
-                    alpha*rAtUf()
+                    alpha*fvc::interpolate(rAtU())
                   + (1 - alpha)*localMin<scalar>(mesh).interpolate(rAtU());
-
-                // Faces inside the bodies: a diffusivity of the order of
-                // that of the fluid, so that the pressure inside is a smooth
-                // continuation of the pressure outside, which the cells that
-                // the bodies leave take over
-                if (std::getenv("IB_INNER_RAUF"))
-                {
-                    const scalar dt = mesh.time().deltaTValue();
-                    surfaceScalarField& rAUfRef = rAtUf.ref();
-                    scalarField& rAUfI = rAUfRef.primitiveFieldRef();
-                    const scalarField& alphaI = alpha.primitiveField();
-                    forAll(rAUfI, facei)
-                    {
-                        if (alphaI[facei] < SMALL)
-                        {
-                            rAUfI[facei] = dt;
-                        }
-                    }
-                }
             }
 
             // Update the pressure BCs to ensure flux consistency
@@ -616,27 +567,10 @@ bool pimpleFluid::evolve()
             {
                 fvScalarMatrix pEqn
                 (
-                    fvm::laplacian(rAtUf(), p) == fvc::div(phiHbyA)
+                    rAtUf.valid()
+                  ? fvm::laplacian(rAtUf(), p) == fvc::div(phiHbyA)
+                  : fvm::laplacian(rAtU(), p) == fvc::div(phiHbyA)
                 );
-
-                // Immersed boundaries: the volume source of the cells cut by
-                // moving bodies, so that the fluid volume of each cell
-                // changes with the solid volume it gains or loses
-                if
-                (
-                    mesh.foundObject<volScalarField::Internal>
-                    (
-                        "immersedBoundaryVolumeSource"
-                    )
-                )
-                {
-                    // div(phi) = source
-                    pEqn +=
-                        mesh.lookupObject<volScalarField::Internal>
-                        (
-                            "immersedBoundaryVolumeSource"
-                        );
-                }
 
                 pEqn.setReference(pRefCell_, pRefValue_);
 

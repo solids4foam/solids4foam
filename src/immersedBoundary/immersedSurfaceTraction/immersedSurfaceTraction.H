@@ -31,32 +31,29 @@ Description
     barycentric coordinates, so that it follows the motion or deformation of
     the surface.
 
-    At each point \f$ x_w \f$, with the outward unit normal n, the velocity
-    and pressure and their gradients are fitted by weighted linear least
-    squares at the image point \f$ x_I = x_w + d n \f$ (d = 1.5 h), over the
-    cells within 2 h of it. The weights are a smooth function of the distance
-    to the image point, times a smooth function of the distance \f$ \psi \f$
-    of the cell centre from the tangent plane of the surface, which is zero
-    for the cells within h/4 of the surface or inside the body, so that the
-    fit uses fluid cells only and varies continuously as the body moves.
-
-    The wall pressure is extrapolated with the fitted pressure gradient, and
-    the tangential viscous traction is
-
-    \f[
-        p_w = p_I - d \, \nabla p_I \cdot n
-    \f]
+    At each point \f$ x_w \f$, with the outward unit normal n, the pressure
+    and the velocity relative to the rigid body velocity \f$ U_b \f$ are
+    fitted by weighted quadratic least squares, centred on the point,
+    over the cells within 3 h of it. The weights decrease with the distance
+    to the point, and are zero for the cells behind the tangent plane of the
+    surface, rising smoothly to their full value at h/2 in front of it, so
+    that the fits use fluid cells only and vary continuously as the body
+    moves.
+    The velocity fit has no constant term, so that the velocity equals the
+    body velocity at the point. The traction exerted by the fluid on the
+    surface is
 
     \f[
-        \tau_w = \nu \left[ \frac{(I - n n)(U_I - U_b)}{d}
-      - \frac{d}{2} \frac{(I - n n)(a_b + \nabla p_I)}{\nu} \right]
+        t = \rho \left[ -p_w n + \nu (I - n n)
+            \cdot \left( \nabla (U - U_b) \cdot n \right) \right]
     \f]
 
-    from the tangential momentum balance at the wall, where \f$ U_b \f$
-    and \f$ a_b \f$ are the velocity and acceleration of the body and p is
-    the kinematic pressure. The second term makes the tangential traction
-    second order accurate. The traction on the body is
-    \f$ \rho (-p_w n + \tau_w) \f$.
+    with the wall pressure \f$ p_w \f$ and the velocity gradient from the
+    fits, where p is the kinematic pressure: on a no-slip wall the tangential
+    derivatives of \f$ U - U_b \f$ vanish, and the rigid body velocity has
+    no strain. The fits are solved with the
+    pseudo-inverse of their matrices, which is robust to rank-deficient
+    stencils.
 
     The sums of the fits over the processors are reduced, so that the cells
     of a fit may be on any processor.

@@ -229,18 +229,6 @@ public:
                 return motionPtr_->velocity(x, time_);
             }
 
-            //- Acceleration of the body at the points x, from a central
-            //  difference over dt for the motions without an exact
-            //  acceleration
-            tmp<vectorField> acceleration
-            (
-                const pointField& x,
-                const scalar dt
-            ) const
-            {
-                return motionPtr_->acceleration(x, time_, dt);
-            }
-
             //- First intersection of the surface with each segment from
             //  start to end
             void findLine
