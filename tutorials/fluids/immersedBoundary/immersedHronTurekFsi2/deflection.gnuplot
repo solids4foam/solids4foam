@@ -8,6 +8,6 @@ set grid
 
 set y2tics
 
-plot [2:] \
+plot \
     "./postProcessing/0/solidPointDisplacement_pointDisp.dat" using 1:2 axis x1y1 title "Ux" with lines, \
     "./postProcessing/0/solidPointDisplacement_pointDisp.dat" using 1:3 axis x1y2 title "Uy" with lines

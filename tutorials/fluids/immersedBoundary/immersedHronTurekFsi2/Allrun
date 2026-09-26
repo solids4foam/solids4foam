@@ -30,7 +30,7 @@ fi
 if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
-    gnuplot deflection.gnuplot &> /dev/null
+    gnuplot deflection.gnuplot &> /dev/null || true
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
