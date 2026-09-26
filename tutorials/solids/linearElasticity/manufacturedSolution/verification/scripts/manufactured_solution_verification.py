@@ -99,6 +99,47 @@ def set_resolution(run_dir: Path, divisions: int, domain_length: float) -> None:
     )
 
 
+def set_reconstruction(run_dir: Path, variant: dict) -> None:
+    if not variant["approach"].startswith("highOrder-"):
+        return
+    path = run_dir / "constant" / f"solidProperties.{variant['approach']}"
+    text = path.read_text()
+    settings = {
+        "polynomialOrder": variant["p"],
+        "faceStencilExtraCells": variant["stencil_extra_cells"],
+    }
+    # Both methods inherit the face setting when the cell setting is absent.
+    if re.search(r"(?m)^\s*cellStencilExtraCells\s+", text):
+        settings["cellStencilExtraCells"] = variant["stencil_extra_cells"]
+    for key, value in settings.items():
+        text, count = re.subn(
+            rf"(?m)^(\s*{key}\s+)\d+(\s*;)",
+            rf"\g<1>{value}\g<2>",
+            text,
+        )
+        if count != 1:
+            raise RuntimeError(f"could not set {key} in {path}")
+    path.write_text(text)
+
+
+def validate_variant(name: str, variant: dict) -> None:
+    if variant["approach"].startswith("highOrder-"):
+        if type(variant.get("p")) is not int or variant["p"] not in (1, 2, 3):
+            raise RuntimeError(f"{name}: p must be 1, 2 or 3")
+        extra_cells = variant.get("stencil_extra_cells")
+        if type(extra_cells) is not int or extra_cells < 0:
+            raise RuntimeError(f"{name}: stencil_extra_cells must be a non-negative integer")
+    for field in ("displacement", "stress"):
+        value = variant.get("minimum_net_order", {}).get(field)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+            or value < 0
+        ):
+            raise RuntimeError(f"{name}: invalid minimum net order for {field}")
+
+
 def extract_norms(log_text: str, marker: str) -> tuple[float, float]:
     sections = log_text.split(marker)
     if len(sections) < 2:
@@ -138,8 +179,15 @@ def run_level(
 ) -> dict[str, float | int | str]:
     run_dir = WORK_DIR / variant_name / f"n{divisions}"
     solver_log = run_dir / "log.solids4Foam"
+    degree_file = run_dir / "verification_degree.json"
+    reconstruction = (
+        {"p": variant["p"], "extra_cells": variant["stencil_extra_cells"]}
+        if "p" in variant else None
+    )
     completed_case = (
         reuse
+        and degree_file.exists()
+        and json.loads(degree_file.read_text()) == reconstruction
         and solver_log.exists()
         and re.search(r"^End\s*$", solver_log.read_text(), re.MULTILINE)
     )
@@ -151,7 +199,11 @@ def run_level(
             shutil.rmtree(run_dir)
         shutil.copytree(CASE_DIR, run_dir, ignore=ignored, symlinks=True)
         set_resolution(run_dir, divisions, domain_length)
-        command = ["./Allrun", variant["approach"], variant["mesh"]]
+        set_reconstruction(run_dir, variant)
+        degree_file.write_text(json.dumps(reconstruction) + "\n")
+        # Allrun calls the structured tetrahedral mesh "tet".
+        mesh = "tet" if variant["mesh"] == "tet-structural" else variant["mesh"]
+        command = ["./Allrun", variant["approach"], mesh]
         print(f"Running {variant_name} n={divisions} in {run_dir}", flush=True)
         with (run_dir / "log.Allverify").open("w") as log:
             completed = subprocess.run(
@@ -170,6 +222,19 @@ def run_level(
             raise RuntimeError(f"solver log was not created in {run_dir}")
 
     log_text = solver_log.read_text()
+    if not re.search(r"^End\s*$", log_text, re.MULTILINE):
+        raise RuntimeError(f"incomplete solver log: {solver_log}")
+    if "DIVERGED_" in log_text:
+        raise RuntimeError(f"PETSc failed to converge: {solver_log}")
+    if variant["approach"].startswith("highOrder-"):
+        markers = ["Using volume-averaged manufactured body force"]
+        if variant["approach"] == "highOrder-kExactLeastSquares":
+            markers.append("Using cell-average analytical displacement")
+        else:
+            markers.append("Using point-valued analytical displacement")
+        for marker in markers:
+            if marker not in log_text:
+                raise RuntimeError(f"missing '{marker}' in {solver_log}")
     displacement_l2, displacement_linf = extract_norms(
         log_text, "Writing DDifference field"
     )
@@ -182,6 +247,7 @@ def run_level(
         "variant": variant_name,
         "approach": variant["approach"],
         "mesh": variant["mesh"],
+        "p": variant.get("p", ""),
         "divisions": divisions,
         "cells": cell_count,
         "effective_spacing_m": (domain_length**3 / cell_count) ** (1.0 / 3.0),
@@ -194,7 +260,7 @@ def run_level(
     numeric_values = (
         value
         for key, value in result.items()
-        if key not in {"variant", "approach", "mesh"}
+        if key not in {"variant", "approach", "mesh", "p"}
     )
     if not all(math.isfinite(float(value)) for value in numeric_values):
         raise RuntimeError(f"non-finite result extracted from {solver_log}")
@@ -243,10 +309,12 @@ def write_results(
     )
     passed = finite_positive
     if not quick:
-        minimum_order = float(reference["acceptance"]["minimum_net_order"])
         passed = passed and all(
             float(grouped[name][-1][metric]) < float(grouped[name][0][metric])
-            and orders[name][metric] > minimum_order
+            and math.isfinite(orders[name][metric])
+            and orders[name][metric] >= reference["variants"][name][
+                "minimum_net_order"
+            ][metric.split("_")[0]]
             for name in variant_names
             for metric in metrics
         )
@@ -269,10 +337,31 @@ def write_results(
                 f"- Finest mesh: {int(variant_results[-1]['cells'])} cells",
             ]
         )
+        variant = reference["variants"][name]
+        if "p" in variant:
+            lines.append(f"- Polynomial degree: p={variant['p']}")
+            lines.append(f"- Extra stencil cells: {variant['stencil_extra_cells']}")
         for metric in metrics:
+            minimum = variant["minimum_net_order"][metric.split("_")[0]]
+            metric_passed = all(
+                math.isfinite(float(row[metric])) and float(row[metric]) > 0
+                for row in variant_results
+            )
+            if not quick:
+                metric_passed = (
+                    metric_passed
+                    and float(variant_results[-1][metric])
+                    < float(variant_results[0][metric])
+                    and math.isfinite(orders[name][metric])
+                    and orders[name][metric] >= minimum
+                )
+            status = "PASS" if metric_passed else "FAIL"
+            if quick:
+                status += " (order not checked)"
             lines.append(
                 f"- {metric}: finest {float(variant_results[-1][metric]):.8g}, "
-                f"net order {orders[name][metric]:.3f}"
+                f"net order {orders[name][metric]:.3f}, "
+                f"minimum {minimum:g}: {status}"
             )
     lines.extend(["", f"- Result: {'PASS' if passed else 'FAIL'}"])
     summary = "\n".join(lines) + "\n"
@@ -306,9 +395,15 @@ def main() -> int:
     if any(right <= left for left, right in zip(levels, levels[1:])):
         raise SystemExit("levels must be strictly increasing")
 
+    try:
+        for name in variant_names:
+            validate_variant(name, all_variants[name])
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
+
     selected = [all_variants[name] for name in variant_names]
     required = ["checkMesh", "solids4Foam"]
-    if any(item["mesh"] in {"tet", "poly"} for item in selected):
+    if any(item["mesh"] in {"tet-structural", "poly"} for item in selected):
         required.extend(["gmsh", "gmshToFoam", "createPatch"])
     if any(item["mesh"] == "poly" for item in selected):
         required.append("polyDualMesh")

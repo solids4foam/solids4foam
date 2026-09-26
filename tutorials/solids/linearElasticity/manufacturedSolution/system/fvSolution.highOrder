@@ -12,27 +12,37 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      createPatchDict;
+    location    "system";
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-pointSync   false;
-
-// Patches to create
-"patches|patchInfo"
-(
+solvers
+{
+    D
     {
-        //- Master side patch
-        name            patch0;
-        "patchInfo|dictionary"
+        solver          petsc;
+
+        options
         {
-            type            patch;
+            snes_type newtonls;
+            snes_rtol "1e-10";
+            snes_atol "1e-12";
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+
+            pc_type bjacobi;
+            sub_pc_type lu;
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
         }
-        constructFrom patches;
-        patches (patch0 defaultFaces);
     }
-
-);
-
+}
 
 // ************************************************************************* //

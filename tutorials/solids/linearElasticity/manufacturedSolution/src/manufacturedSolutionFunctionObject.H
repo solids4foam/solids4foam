@@ -82,6 +82,13 @@ class manufacturedSolutionFunctionObject
 
     // Private Member Functions
 
+        //- Match analytical displacement to the reconstruction unknowns
+        void calculateAnalyticalCellDisplacement
+        (
+            const fvMesh& mesh,
+            vectorField& analyticalD
+        );
+
         //- Write data
         bool writeData();
 

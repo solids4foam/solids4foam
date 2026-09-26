@@ -389,7 +389,8 @@ private:
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
-        //- Return root high-order coefficients dictionary
+        //- Return root high-order coefficients dictionary, or an empty
+        //  dictionary when highOrderCoeffs is absent
         const dictionary& highOrderCoeffsDict() const;
 
         //- Return high-order coefficients for displacement

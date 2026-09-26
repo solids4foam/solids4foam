@@ -7,7 +7,10 @@ usage()
     cat <<'EOF'
 Usage: ./Allrun [approach] [mesh]
 
-approach: segregated (default), petscSnes
+approach: segregated (default),
+          petscSnes,
+          highOrder-movingLeastSquares,
+          highOrder-kExactLeastSquares
 mesh:     hex (default), tet, poly, distHex
 EOF
 }
@@ -21,7 +24,7 @@ APPROACH="${1:-segregated}"
 MESH="${2:-hex}"
 
 case "$APPROACH" in
-    segregated|petscSnes) ;;
+    segregated|petscSnes|highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
     *)
         echo "Error: unknown approach '$APPROACH'"
         usage
@@ -44,18 +47,28 @@ export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
 . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
 source solids4FoamScripts.sh
 
-solids4Foam::caseDoesNotRunWithFoamExtend
-solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-if [[ "$APPROACH" == "petscSnes" ]]; then
+if [[ "$APPROACH" != "segregated" ]]; then
     solids4Foam::requirePetscOrExitSilently
 fi
 
+FV_SOLUTION="$APPROACH"
+if [[ "$APPROACH" == highOrder-* ]]; then
+    FV_SOLUTION=highOrder
+fi
+
 for file in constant/solidProperties."${APPROACH}" \
-            system/fvSolution."${APPROACH}"
+            system/fvSolution."${FV_SOLUTION}"
 do
     ln -vnsf "${file##*/}" "${file%.*}"
 done
+
+if [[ "$WM_PROJECT" == "foam" || "$WM_PROJECT_VERSION" != v* ]]; then
+    # Use the tutorial source model where fvOptions is unavailable.
+    rm -f constant/solidProperties
+    sed 's/^solidModel .*/solidModel manufacturedSolutionSolid;/' \
+        "constant/solidProperties.$APPROACH" > constant/solidProperties
+fi
 
 solids4Foam::convertCaseFormat .
 
@@ -76,8 +89,11 @@ case "$MESH" in
             exit 1
         fi
         mv 0 0.tmp
-        solids4Foam::runApplication gmsh -3 -format msh2 gmsh/cube.geo
-        solids4Foam::runApplication gmshToFoam gmsh/cube.msh
+        # Select tet-unstructured for the alternative unstructured tet mesh.
+        # Both Gmsh scripts are available in gmsh/ and use meshSpacing.geo.
+        GMSH_MESH=tet-structured
+        solids4Foam::runApplication gmsh -3 -format msh2 "gmsh/$GMSH_MESH.geo"
+        solids4Foam::runApplication gmshToFoam "gmsh/$GMSH_MESH.msh"
         solids4Foam::runApplication createPatch -overwrite
         if [[ "$MESH" == "poly" ]]; then
             solids4Foam::runApplication polyDualMesh 30 -overwrite

@@ -149,6 +149,9 @@ public:
 
         //- Body forces
         const volVectorField& bodyForces() const;
+
+        //- Return manufactured body force density at a point
+        vector calculateBodyForce(const vector& point) const;
 };
 
 
