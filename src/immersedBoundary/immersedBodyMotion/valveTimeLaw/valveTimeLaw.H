@@ -50,7 +50,9 @@ Description
     The edges and laws follow the valve time gains of the immersed boundary
     library contributed to cardiacFoam by Sairam Pamulaparthi Venkata; windows
     that wrap around the end of the cycle (\f$ \phi_0 > \phi_1 \f$) are not
-    supported.
+    supported. The \c smoothstep law, and the \c threeWindow law when the
+    gain is 1 at the end of the cycle, jump back to their initial value at the
+    end of each cycle, and a warning is given.
 
 Author
     Based on the valve time laws of Sairam Pamulaparthi Venkata, UCD.

@@ -119,6 +119,19 @@ Foam::valveTimeLaw::valveTimeLaw(const dictionary& dict)
             << "Valid laws are: cos2 sin2 smoothstep twoWindow threeWindow"
             << exit(FatalIOError);
     }
+
+    // The gain jumps at the end of each cycle if it does not return to its
+    // value at the start
+    const scalar G0 = value(0);
+    const scalar G1 = value((1 - SMALL)*period_);
+    if (mag(G1 - G0) > 1e-6)
+    {
+        WarningInFunction
+            << "The valve time law " << law_ << " goes from " << G0
+            << " at the start of the cycle to " << G1 << " at its end: the "
+            << "valve jumps between these states at the end of each cycle"
+            << endl;
+    }
 }
 
 
