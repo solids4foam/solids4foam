@@ -229,6 +229,19 @@ public:
                 return motionPtr_->velocity(x, time_);
             }
 
+            //- Acceleration of the body at the point x, from a central
+            //  difference of the velocity over dt, following the point
+            vector acceleration(const point& x, const scalar dt) const
+            {
+                const pointField pts(1, x);
+                const vector U0(motionPtr_->velocity(pts, time_)()[0]);
+                return
+                (
+                    motionPtr_->velocity(pts + 0.5*dt*U0, time_ + 0.5*dt)()[0]
+                  - motionPtr_->velocity(pts - 0.5*dt*U0, time_ - 0.5*dt)()[0]
+                )/dt;
+            }
+
             //- First intersection of the surface with each segment from
             //  start to end
             void findLine

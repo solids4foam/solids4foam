@@ -80,6 +80,9 @@ the momentum exchange, which is the force that the fluid receives, is that of
 a one-sided difference between the wall and the first fluid cell, and
 converges at first order; that of the surface traction, which is fitted to
 the fluid velocity over several cells, is more accurate on the finer meshes.
+With `forceEstimator forcing;` in `constant/fvOptions`, which adds the
+inertia of the slab fluid as a rigid body to the forcing applied next to the
+wall, the wall shear stress differs by 0.09% for level 3.
 With the `penalty` method, the wall shear stress differs by 28%, 14%, 6% and
 4% for levels 1-4, and the velocity by 5.4e-2, 2.7e-2, 1.2e-2 and 7.6e-3:
 the effective wall is displaced into the slab.

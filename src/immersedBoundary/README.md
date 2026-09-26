@@ -122,7 +122,9 @@ Four forcing methods are available:
   surface traction (`forceEstimator surfaceTraction`), from quadratic least
   squares fits of the pressure and velocity at quadrature points moving
   with the surface, is written in the columns after the inertia (or is the
-  force, with the momentum exchange after the inertia). The momentum
+  force, with the momentum exchange after the inertia). A third estimate
+  (`forceEstimator forcing`) is the forcing applied in these cells plus the
+  inertia of the fluid inside the body taken as rigid. The momentum
   exchange assumes a laminar flow of constant viscosity on a static mesh.
 - `incremental`: the direct forcing of the openHFDIB-DEM `pimpleHFDIBFoam`
   solver. An explicit forcing `f` is added to the momentum equation. After
@@ -186,8 +188,11 @@ at second order. For a cylinder rotating inside an immersed annulus (the
 torque by 0.8%, 0.3% and 0.2%, and the `penalty` torque by -25%, -16% and
 -10%. The momentum exchange is the force that the fluid receives,
 and is the more accurate for static and steadily moving bodies; the surface
-traction is the more accurate for accelerating bodies and for the wall shear
-stress on fine meshes.
+traction is the more accurate for bodies accelerating normal to their surface
+(oscillating cylinder: 0.11, 0.04 and 0.02); the `forcing` estimate is as
+accurate as the momentum exchange for static and steadily moving bodies, and
+gives the wall shear stress of the Stokes layer to 0.1% with 8 cells across
+the layer, but over-predicts the oscillating cylinder drag amplitude by 3%.
 
 The cylinder forces converge at about first order in the cell size for all the
 methods, except the static `cutLink` drag, which is within 0.6% of the

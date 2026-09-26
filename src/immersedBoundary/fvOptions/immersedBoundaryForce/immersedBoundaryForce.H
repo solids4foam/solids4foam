@@ -130,7 +130,18 @@ Description
     traction (see immersedSurfaceTraction) is the alternative estimate
     (forceEstimator surfaceTraction), which is also written in the columns
     after the inertia with writeSurfaceTraction; with forceEstimator
-    surfaceTraction, the momentum exchange is written there.
+    surfaceTraction, the momentum exchange is written there. A third
+    estimate (forceEstimator forcing) is the forcing applied to the fluid in
+    the penalised cells and the fluid cells next to them, plus the inertia
+    of the fluid inside the body taken as rigid, \f$ \rho V_s a_c \f$, with
+    the volume \f$ V_s \f$ of the body in the mesh from the occupancy and
+    the acceleration \f$ a_c \f$ of its centroid (the rotational inertia is
+    not included); the momentum exchange is then written after the inertia.
+    The momentum exchange and forcing estimates are exact on average for
+    static and steadily moving bodies, the forcing estimate also gives the
+    wall shear of a tangentially accelerating wall accurately, and the
+    surface traction is the most accurate for bodies accelerating normal to
+    their surface.
 
     incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
     solver. The explicit forcing f is added to the right-hand side of the
@@ -226,8 +237,8 @@ Description
         // pressure equation of pimpleFluid, optional, default yes
         apertureCoupling yes;
 
-        // cutLink: force estimate, momentumExchange or surfaceTraction,
-        // optional, default momentumExchange
+        // cutLink: force estimate, momentumExchange, surfaceTraction or
+        // forcing, optional, default momentumExchange
         forceEstimator  momentumExchange;
 
         // cutLink: with the momentum exchange, also write the force from
@@ -383,6 +394,10 @@ class immersedBoundaryForce
             //- Sum of the link rates of each fluid cell next to the
             //  penalised cells, for sharing its force between bodies
             scalarField linkRateSum_;
+
+            //- Explicit link correction of the last assembly, for the
+            //  forcing force estimate
+            vectorField linkCorrectionField_;
 
             //- Surface traction of each body, for the forces
             PtrList<immersedSurfaceTraction> tractions_;

@@ -313,6 +313,64 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
                 );
             }
 
+            // Force from the forcing applied to the fluid in the penalised
+            // cells and the fluid cells next to them, plus the inertia of
+            // the fluid inside the body as a rigid body: rho*V_s*a_c
+            if (forceEstimator_ == "forcing")
+            {
+                vector Ff(Zero);
+                vector Tf(Zero);
+                for (const label celli : body.insideCells())
+                {
+                    const vector fc(f_[celli]*V[celli]);
+                    Ff -= fc;
+                    Tf -= (C[celli] - CofR) ^ fc;
+                }
+                forAll(lCells, i)
+                {
+                    const label celli = lCells[i];
+                    const scalar share =
+                    (
+                        linkRateSum_[celli] > VSMALL
+                      ? lRates[i]/linkRateSum_[celli]
+                      : 1
+                    );
+                    const vector fc(share*f_[celli]*V[celli]);
+                    Ff -= fc;
+                    Tf -= (C[celli] - CofR) ^ fc;
+                }
+
+                // Volume and centroid of the body in the mesh, from the
+                // occupancy
+                scalar Vs = 0;
+                vector Xs(Zero);
+                for
+                (
+                    const labelList* cellsPtr :
+                    {&body.internalCells(), &body.surfaceCells()}
+                )
+                {
+                    for (const label celli : *cellsPtr)
+                    {
+                        Vs += lambda_[celli]*V[celli];
+                        Xs += lambda_[celli]*V[celli]*C[celli];
+                    }
+                }
+                reduce(Ff, sumOp<vector>());
+                reduce(Tf, sumOp<vector>());
+                reduce(Vs, sumOp<scalar>());
+                reduce(Xs, sumOp<vector>());
+                Xs /= max(Vs, VSMALL);
+
+                const vector ac(body.acceleration(Xs, deltaT));
+                Ff += Vs*ac;
+                Tf += (Xs - CofR) ^ (Vs*ac);
+
+                secondaryForce_[bodyi] = rho*F;
+                F = Ff;
+                T = Tf;
+            }
+
             // The selected estimate is written as the force, and the other
             // after the inertia (which is included in both)
             if (forceEstimator_ == "surfaceTraction")
@@ -320,6 +378,11 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
                 force_[bodyi] = Fs;
                 torque_[bodyi] = Ts;
                 secondaryForce_[bodyi] = rho*F;
+            }
+            else if (forceEstimator_ == "forcing")
+            {
+                force_[bodyi] = rho*F;
+                torque_[bodyi] = rho*T;
             }
             else
             {
@@ -1594,6 +1657,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     linkPoints_(),
     linkCorrection_(true),
     linkRateSum_(),
+    linkCorrectionField_(),
     tractions_(),
     pinnedRateCoeff_(100),
     apertureCoupling_(true),
@@ -1972,6 +2036,9 @@ void Foam::fv::immersedBoundaryForce::addSup
             }
 
             eqn += correction;
+
+            // Kept for the forcing force estimate
+            linkCorrectionField_ = cI;
         }
 
         return;
@@ -2050,6 +2117,15 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
         // The forcing exerted by the penalisation, for the forces
         f_.primitiveFieldRef() =
             kappa_*(Ui_.primitiveField() - U.primitiveField());
+        if
+        (
+            method_ == "cutLink"
+         && linkCorrection_
+         && linkCorrectionField_.size() == f_.primitiveField().size()
+        )
+        {
+            f_.primitiveFieldRef() += linkCorrectionField_;
+        }
         f_.correctBoundaryConditions();
 
         if (pimple.corrPISO() == pimple.nCorrPISO() && pimple.finalIter())
@@ -2201,12 +2277,13 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
         (
             forceEstimator_ != "momentumExchange"
          && forceEstimator_ != "surfaceTraction"
+         && forceEstimator_ != "forcing"
         )
         {
             FatalIOErrorInFunction(coeffs_)
                 << "Unknown forceEstimator " << forceEstimator_
-                << ": valid estimators are momentumExchange and "
-                << "surfaceTraction" << exit(FatalIOError);
+                << ": valid estimators are momentumExchange, "
+                << "surfaceTraction and forcing" << exit(FatalIOError);
         }
 
         if (imageInterpolation_ != "cellPoint" && imageInterpolation_ != "cell")
