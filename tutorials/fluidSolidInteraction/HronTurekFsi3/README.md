@@ -127,6 +127,40 @@ executes `blockMesh` for both `solid` and `fluid` domains
 displacement history of point A and a file `force.pdf` will be created with the
 history of the force on the cylinder and plate.
 
+By default, the case uses Dirichlet-Neumann coupling accelerated with the
+IQN-ILS algorithm. The Robin-Neumann coupling of Tuković et al. [3], where the
+fluid interface pressure uses the `elasticWallPressure` Robin condition with an
+automatically selected coefficient and the interface iterations are unrelaxed
+fixed-point iterations, can be selected with `> ./Allrun robin`. Either variant
+can be run in parallel by appending `parallel`. The Robin-Neumann variant is
+included for comparison rather than for routine use: on this case, with a thin
+plate wetted on both sides, every coupled time step needs of the order of 200
+fixed-point iterations against about 12 IQN-ILS iterations (see the
+verification README for the reasons).
+
+---
+
+## Verification Study
+
+The opt-in [`verification/`](verification/) directory runs the benchmark
+through a mesh and time-step sweep and compares the periodic response with
+the published values of Turek and Hron [1]: the mean, amplitude and frequency
+of the point-A displacement and of the drag and lift on the cylinder and plate,
+evaluated over the closing second of each run and overlaid on the published
+time history. The verification copies use the St. Venant-Kirchhoff law of the
+benchmark and integrate the force over both the cylinder and the plate.
+
+```bash
+cd verification
+./Allverify                    # IQN-ILS sweep over the 1x and 2x meshes
+./Allverify --coupling robin   # the same sweep with Robin-Neumann coupling
+./Allverify --study coupling   # Robin-Neumann vs IQN-ILS on the 1x mesh
+```
+
+The study is separate from `regressionTest.sh` and is not run by the normal
+tutorial test suites. See the verification README for the mesh levels, options,
+acceptance criteria and recorded results.
+
 ---
 
 ## References
@@ -136,3 +170,6 @@ history of the force on the cylinder and plate.
 
 [2]
 [Tuković, Ž., Jasak, H., Karač, A., Cardiff, P., Ivanković, A. (2018). OpenFOAM finite volume solver for fluid-solid interaction. Transactions of Famena. 2018, 42(3), pp. 1–31.](https://hrcak.srce.hr/206941)
+
+[3]
+[Tuković, Ž., Bukač, M., Cardiff, P., Jasak, H., Ivanković, A. (2019). Added mass partitioned fluid-structure interaction solver based on a Robin boundary condition for pressure. In: OpenFOAM: Selected Papers of the 11th Workshop. Springer, pp. 1–22.](https://doi.org/10.1007/978-3-319-60846-4_1)

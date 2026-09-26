@@ -41,6 +41,14 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
+- Added an opt-in verification study to the `HronTurekFsi3` tutorial, which
+  runs the Turek-Hron FSI3 benchmark through a mesh and time-step sweep with
+  the partitioned IQN-ILS or Robin-Neumann coupling and compares the periodic
+  point-A displacement, drag and lift (mean, amplitude and frequency) with the
+  published values and time history of Turek and Hron (2006). A `coupling`
+  study compares the Robin-Neumann and IQN-ILS results and checks the Robin
+  convergence criteria. The tutorial's `Allrun` gained a `robin` option that
+  runs the Robin-Neumann variant of the case.
 
 ### Changed
 

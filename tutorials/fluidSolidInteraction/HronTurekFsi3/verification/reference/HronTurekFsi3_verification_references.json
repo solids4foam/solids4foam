@@ -1,0 +1,54 @@
+{
+  "point_A": [0.6, 0.2, 0.0075],
+  "thickness_m": 0.015,
+  "fluid_density": 1000,
+  "mechanical_law": "StVenantKirchhoffElastic",
+  "history_reference": "TurekHron_fsi3_reference_history.csv",
+  "mesh": {
+    "refinementFactors": [1, 2, 4],
+    "deltaTs": [0.001, 0.0005, 0.00025],
+    "defaultLevels": [1, 2],
+    "endTime": 7.0,
+    "analysisWindow": 1.0,
+    "maximumErrorGrowth": 0.01
+  },
+  "quick": {
+    "endTime": 2.3
+  },
+  "cores": {
+    "1": 4,
+    "2": 8,
+    "4": 16,
+    "default": 8
+  },
+  "coupling": {
+    "refinement": 1,
+    "endTime": 2.3,
+    "relativeTolerance": 0.01
+  },
+  "periodicity": {
+    "amplitudeTolerance": 0.02
+  },
+  "references": {
+    "ux_mean": {"value": -2.69e-3, "tolerance": 0.10, "primary": true},
+    "ux_amplitude": {"value": 2.53e-3, "tolerance": 0.10, "primary": true},
+    "ux_frequency": {"value": 10.9, "tolerance": 0.05, "primary": true},
+    "uy_mean": {"value": 1.48e-3, "tolerance": 0.25, "primary": false},
+    "uy_amplitude": {"value": 34.38e-3, "tolerance": 0.05, "primary": true},
+    "uy_frequency": {"value": 5.3, "tolerance": 0.05, "primary": true},
+    "drag_mean": {"value": 457.3, "tolerance": 0.03, "primary": true},
+    "drag_amplitude": {"value": 22.66, "tolerance": 0.30, "primary": false},
+    "drag_frequency": {"value": 10.9, "tolerance": 0.05, "primary": false},
+    "lift_mean": {"value": 2.22, "tolerance": 1.0, "primary": false},
+    "lift_amplitude": {"value": 149.78, "tolerance": 0.05, "primary": true},
+    "lift_frequency": {"value": 5.3, "tolerance": 0.05, "primary": false}
+  },
+  "publishedReferences": {
+    "Tukovic 2018": {
+      "ux_mean": -2.72e-3, "ux_amplitude": 2.58e-3, "ux_frequency": 11.07,
+      "uy_mean": 1.67e-3, "uy_amplitude": 33.84e-3, "uy_frequency": 5.53,
+      "drag_mean": 459.18, "drag_amplitude": 24.86, "drag_frequency": 11.07,
+      "lift_mean": 1.59, "lift_amplitude": 155.9, "lift_frequency": 5.53
+    }
+  }
+}
