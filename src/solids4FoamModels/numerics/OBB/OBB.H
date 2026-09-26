@@ -203,7 +203,7 @@ public:
                 return cmptMin(halfLength_) < 0;
             }
 
-            //- Return true if the box contains the point, including its boundary
+            //- Test containment with a relative round-off tolerance
             bool contains(const point& p) const;
 
             //- Return true if this box overlaps the supplied box

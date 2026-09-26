@@ -19,6 +19,7 @@ License
 
 #include "OBB.H"
 #include <cmath>
+#include <limits>
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -55,7 +56,10 @@ void Foam::OBB::calcCovariance
     scalar lengthScale = 0;
     forAll(points, pointI)
     {
-        lengthScale = max(lengthScale, cmptMax(cmptMag(points[pointI] - mean)));
+        lengthScale = max
+        (
+            lengthScale, cmptMax(cmptMag(points[pointI] - mean))
+        );
     }
     if (lengthScale == 0)
     {
@@ -126,7 +130,11 @@ void Foam::OBB::orthonormaliseAxes()
     if (mag(axis1) < SMALL)
     {
         // Choose the Cartesian direction least aligned with axis0.
-        if (mag(axis0.x()) <= mag(axis0.y()) && mag(axis0.x()) <= mag(axis0.z()))
+        if
+        (
+            mag(axis0.x()) <= mag(axis0.y())
+         && mag(axis0.x()) <= mag(axis0.z())
+        )
         {
             axis1 = vector(1, 0, 0);
         }
@@ -441,7 +449,8 @@ void Foam::OBB::grow(const scalar distance)
     if (!(distance >= 0) || !std::isfinite(distance))
     {
         FatalErrorInFunction
-            << "OBB growth distance must be finite and non-negative: " << distance
+            << "OBB growth distance must be finite and non-negative: "
+            << distance
             << abort(FatalError);
     }
 
@@ -460,10 +469,18 @@ bool Foam::OBB::contains(const point& p) const
     }
 
     const vector local(axes_ & (p - centre_));
+    // Account for subtraction and projection round-off without a fixed
+    // length tolerance, so uniformly scaled geometry behaves consistently.
+    const scalar tolerance = 32*std::numeric_limits<scalar>::epsilon()
+       *max
+        (
+            cmptMax(halfLength_),
+            max(cmptMax(cmptMag(p)), cmptMax(cmptMag(centre_)))
+        );
 
     for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
     {
-        if (mag(local[cmpt]) > halfLength_[cmpt])
+        if (mag(local[cmpt]) > halfLength_[cmpt] + tolerance)
         {
             return false;
         }

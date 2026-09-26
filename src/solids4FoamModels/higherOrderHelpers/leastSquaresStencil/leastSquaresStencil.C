@@ -204,7 +204,7 @@ OBB leastSquaresStencil::calcOwnedFacesBox() const
 
 List<labelList> leastSquaresStencil::remoteCandidates
 (
-    const OBB& ownedFacesBox,
+    const List<OBB>& allOwnedFacesBox,
     const labelList& procToQuery
 ) const
 {
@@ -225,54 +225,13 @@ List<labelList> leastSquaresStencil::remoteCandidates
     }
 
 #ifdef FOAMEXTEND
-    // Pack the centre, half-lengths and axes because Pstream::exchange
-    // supports contiguous element types only.
-    List<vectorField> sendBoxes(Pstream::nProcs());
+    // Reuse the streamed boxes from overlap detection without reconstructing
+    // their axes. Partner lists are symmetric by construction.
+    List<labelList> sendCandidates(Pstream::nProcs());
     forAll(procToQuery, i)
     {
-        const label toProc = procToQuery[i];
-        sendBoxes[toProc].setSize(5);
-        sendBoxes[toProc][0] = ownedFacesBox.midpoint();
-        sendBoxes[toProc][1] = ownedFacesBox.ext();
-        sendBoxes[toProc][2] = ownedFacesBox.R().x();
-        sendBoxes[toProc][3] = ownedFacesBox.R().y();
-        sendBoxes[toProc][4] = ownedFacesBox.R().z();
-    }
-
-    List<vectorField> receivedBoxes;
-    labelListList boxSizes;
-    Pstream::exchange<vectorField, vector>
-    (
-        sendBoxes,
-        receivedBoxes,
-        boxSizes
-    );
-
-    List<labelList> sendCandidates(Pstream::nProcs());
-
-    forAll(receivedBoxes, sender)
-    {
-        const vectorField& boxData = receivedBoxes[sender];
-
-        if (boxData.empty())
-        {
-            continue;
-        }
-
-        if (boxData.size() != 5)
-        {
-            FatalErrorInFunction
-                << "Expected five bounding-box vectors from processor "
-                << sender << " but received " << boxData.size()
-                << abort(FatalError);
-        }
-
-        const OBB queryBox
-        (
-            boxData[0],
-            boxData[1],
-            tensor(boxData[2], boxData[3], boxData[4])
-        );
+        const label sender = procToQuery[i];
+        const OBB& queryBox = allOwnedFacesBox[sender];
         DynamicList<label> markedCells;
 
         forAll(C, cellI)
@@ -294,6 +253,8 @@ List<labelList> leastSquaresStencil::remoteCandidates
         candidateSizes
     );
 #else
+    const OBB& ownedFacesBox = allOwnedFacesBox[Pstream::myProcNo()];
+
     // Phase 1: Exchange ownedFacesBox between processors
     Map<OBB> incomingBoxesFromProc;
     {
@@ -1015,7 +976,7 @@ void leastSquaresStencil::calcFacesStencil() const
 
     // List of remote cells (per processor) written using global indexing
     List<labelList> remoteCells =
-        remoteCandidates(ownedFacesBox, procToQuery);
+        remoteCandidates(allOwnedFacesBox, procToQuery);
 
     // Get cell centre for remote candidates
     List<vectorField> remoteCellsCentres =

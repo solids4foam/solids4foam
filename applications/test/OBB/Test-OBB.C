@@ -91,8 +91,7 @@ int main()
         }
     }
 
-    OBB fittedBox(points);
-    fittedBox.grow(tolerance);
+    const OBB fittedBox(points);
 
     forAll(points, i)
     {
@@ -264,6 +263,26 @@ int main()
             (
                 std::isfinite(lineBox.R()[cmpt]),
                 "Degenerate point set produced non-finite axes"
+            ) && passed;
+        }
+    }
+
+    // Check fitted extreme points without growth at different scales.
+    for (label small = 0; small < 2; ++small)
+    {
+        const scalar factor = small ? 1e-12 : 1e12;
+        pointField scaledPoints(points.size());
+        forAll(points, i)
+        {
+            scaledPoints[i] = factor*points[i];
+        }
+        const OBB scaledFit(scaledPoints);
+        forAll(points, i)
+        {
+            passed = check
+            (
+                scaledFit.contains(scaledPoints[i]),
+                "Coordinate scaling excluded a fitted extreme point"
             ) && passed;
         }
     }

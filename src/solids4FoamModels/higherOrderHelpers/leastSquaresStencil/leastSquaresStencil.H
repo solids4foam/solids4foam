@@ -149,7 +149,7 @@ class leastSquaresStencil
         //- Get remote cells candidates for stencil construction
         List<labelList> remoteCandidates
         (
-            const OBB& ownedFacesBox,
+            const List<OBB>& allOwnedFacesBox,
             const labelList& procToQuery
         ) const;
 
