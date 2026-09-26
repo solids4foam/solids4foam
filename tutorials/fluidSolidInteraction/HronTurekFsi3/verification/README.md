@@ -74,15 +74,17 @@ is unchanged:
 
 | Level | Refinement | Fluid cells | Solid cells | Δt (s) | Default cores |
 |---:|---:|---:|---:|---:|---:|
-| 1 | 1x | 5 336 | 630 | 0.001 | 4 |
+| 1 | 1x | 5 336 | 630 | 0.001 | 1 |
 | 2 | 2x | 21 344 | 2 520 | 0.0005 | 8 |
 | 3 | 4x | 85 376 | 10 080 | 0.00025 | 16 |
 
 Levels 1 and 2 form the default sweep; level 3 is reachable with
 `--levels 1,2,4` and is expensive. Use `--cores N` to run every level on the
-same number of MPI ranks (`--cores 1` runs in serial). Fields are written only
-at the end time; the point displacement and force histories are written every
-time step regardless.
+same number of MPI ranks (`--cores 1` runs in serial). Level 1 is serial by
+default because the small meshes and the many short solid solves make a
+four-rank run slower than a serial one. Fields are written only at the end
+time; the point displacement and force histories are written every time step
+regardless.
 
 ## Acceptance criteria
 
@@ -115,14 +117,37 @@ coupled Robin time step terminates with the displacement, pressure-change and
 leakage-flux residuals below their configured tolerances, and it reports the
 number of FSI iterations of each coupling.
 
-The study stops well short of the periodic regime because the Robin-Neumann
-coupling is expensive on this case. The plate is thin, wetted on both sides and
-as dense as the fluid, and its response involves several bending modes with
-different interface impedances, which a single Robin coefficient cannot match:
-the automatic `secant` coefficient settles at about twice its
-`thicknessLimited` seed with a predicted contraction factor of `0.92` per
-iteration, so every coupled step needs `150` to `225` unrelaxed fixed-point
-iterations to reach the `1e-6` displacement tolerance, against about `12`
+### Recorded coupling result: FAIL
+
+The first complete coupling study (OpenFOAM v2412, 1x mesh, four ranks each)
+did not pass, and the failure is recorded here because it is a finding about
+the Robin-Neumann implementation on this case rather than about the
+benchmark. Both couplings converged every coupled step (IQN-ILS: 12.1
+iterations per step on average, at most 14; Robin-Neumann: 160 on average, at
+most 225, with the worst converged pressure-change and leakage-flux residuals
+at `1e-5`), yet the transients differ from the first coupled step. At
+`t = 2.001 s` the converged force on the plate is `+0.64 N` in the x direction
+with IQN-ILS but `-9.38 N` with Robin-Neumann, and the Robin-Neumann plate
+then oscillates with a `u_y` amplitude of about `18 mm` within `0.1 s`, whereas
+the IQN-ILS oscillation grows gradually from below `1 mm`, as in the tutorial.
+Over the window to `t = 2.3 s` the maximum differences are `18` times the
+IQN-ILS maximum for `u_x`, `12` times for `u_y`, `40%` for the drag and
+`4.3` times for the lift. Two converged partitioned couplings of the same
+discrete problem should agree to the interface tolerance, so this points at
+the Robin condition's treatment of the coupling start (the flow is developed
+and the plate at rest when the coupling is switched on at `t = 2 s`) or of a
+thin plate wetted on both sides; the `beamInCrossFlow` coupling study, where
+the coupling is active from a ramped start, agrees to `1%`. The discrepancy is
+left open here and the IQN-ILS results above are the verification of record.
+
+The study also stops well short of the periodic regime because the
+Robin-Neumann coupling is expensive on this case. The plate is thin, wetted on
+both sides and as dense as the fluid, and its response involves several
+bending modes with different interface impedances, which a single Robin
+coefficient cannot match: the automatic `secant` coefficient settles at about
+twice its `thicknessLimited` seed with a predicted contraction factor of `0.92`
+per iteration, so every coupled step needs `150` to `225` unrelaxed
+fixed-point iterations to reach the displacement tolerance, against about `12`
 IQN-ILS iterations. Larger coefficients (`hsModel pWaveSpeed`, or a constant
 `hs` of `0.03 m` or more) diverge at the impulsive coupling start, and smaller
 ones converge even more slowly. The `robin` mesh study is therefore possible

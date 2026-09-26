@@ -129,6 +129,18 @@ def configure_case(case: Path, spec: dict, factor: int, delta_t: float,
         spec["mechanical_law"],
     )
 
+    # The tutorial's interface tolerance of 1e-6 sits at the floor below
+    # which the IQN-ILS secant stalls on this case (about one step in five
+    # thousand), so a long run would abort. Both couplings use the same,
+    # still stringent, tolerance so that the coupling study compares like with
+    # like.
+    for coupling in ("iqnils", "robin"):
+        replace_entry(
+            case / f"constant/fsiProperties.{coupling}",
+            "outerCorrTolerance",
+            f"{spec['outer_corr_tolerance']:.8g}",
+        )
+
     if cores > 1:
         # The tutorial decomposes with the simple method on a fixed 2x2
         # arrangement; scotch accepts any rank count.

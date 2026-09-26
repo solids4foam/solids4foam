@@ -3,6 +3,7 @@
   "thickness_m": 0.015,
   "fluid_density": 1000,
   "mechanical_law": "StVenantKirchhoffElastic",
+  "outer_corr_tolerance": 1e-5,
   "history_reference": "TurekHron_fsi3_reference_history.csv",
   "mesh": {
     "refinementFactors": [1, 2, 4],
@@ -16,7 +17,7 @@
     "endTime": 2.3
   },
   "cores": {
-    "1": 4,
+    "1": 1,
     "2": 8,
     "4": 16,
     "default": 8
