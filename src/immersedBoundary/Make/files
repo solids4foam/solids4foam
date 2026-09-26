@@ -6,6 +6,9 @@ immersedBodyMotion/uniformTranslation/uniformTranslation.C
 immersedBodyMotion/solidBodyRotation/solidBodyRotation.C
 immersedBodyMotion/quadraticBend/quadraticBend.C
 immersedBodyMotion/customProfileBend/customProfileBend.C
+immersedBodyMotion/valveTimeLaw/valveTimeLaw.C
+immersedBodyMotion/valveSliceAxis/valveSliceAxis.C
+immersedBodyMotion/valveMorph/valveMorph.C
 
 immersedBody/immersedBody.C
 immersedSurfaceTraction/immersedSurfaceTraction.C

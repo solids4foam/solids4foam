@@ -52,8 +52,12 @@ The complete list of entries is in the header of
 `fvOptions/immersedBoundaryForce/immersedBoundaryForce.H`. The body motions
 are `static` (the default), `sinusoidalTranslation`, `uniformTranslation`
 (constant velocity) and `solidBodyRotation` (constant angular velocity about
-an axis), and the deforming `quadraticBend` and `customProfileBend` (bending
-of a beam about its base), in `immersedBodyMotion`. A deforming motion gives
+an axis), the deforming `quadraticBend` and `customProfileBend` (bending
+of a beam about its base), and the heart valve motions `valveSliceAxis` (the
+collapse of the leaflets towards the valve axis, with the vertices on the
+annulus held fixed) and `valveMorph` (the interpolation between a closed and
+an open valve surface with the same vertices), with the periodic time laws of
+`valveTimeLaw`, in `immersedBodyMotion`. A deforming motion gives
 the position and velocity of each vertex of the surface, and the velocity of
 the body at a point is interpolated from the vertices of the nearest triangle.
 
@@ -258,9 +262,13 @@ The lineage of the code is:
 The occupancy (`immersedBody::addOccupancy`) follows the openHFDIB-DEM
 `nonConvexBody`, and the forcing and force calculation
 (`immersedBoundaryForce`, `immersedBody::force`) follow the openHFDIB-DEM
-`pimpleHFDIBFoam` solver and `immersedBody`. The sinusoidal translation
-and the `quadraticBend` and `customProfileBend` deformations follow the
-versions of Sairam Pamulaparthi Venkata. The openHFDIB-DEM
+`pimpleHFDIBFoam` solver and `immersedBody`. The sinusoidal translation,
+the `quadraticBend` and `customProfileBend` deformations, and the
+`valveSliceAxis` and `valveMorph` valve motions and their time laws follow
+the versions of Sairam Pamulaparthi Venkata in solids4foam/cardiacFoam#20,
+except the closed-to-open valve morph, which is from his later working copy
+of xenosim-erc/immersedBoundaryRigidMotion
+(`src/HFDIBDEM/geomModels/stlBased/stlBased.C`, June 2026, not committed). The openHFDIB-DEM
 interpolation of the velocity at the immersed boundary (`lineInt`,
 `leastSquares`), which the benchmark cases do not use, is not included.
 
