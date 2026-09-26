@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+
+// Square of side 0.32 m centred on the axis, with a uniform mesh of
+// 32*2^(MESH_LEVEL-1) cells across it (10 across the rotor for level 1)
+MESH_LEVEL ${MESH_LEVEL:-1};
+n #eval "round(32*pow(2, $MESH_LEVEL - 1))";
+
+vertices
+(
+    (-0.16 -0.16 0) (0.16 -0.16 0) (0.16 0.16 0) (-0.16 0.16 0)
+    (-0.16 -0.16 0.1) (0.16 -0.16 0.1) (0.16 0.16 0.1) (-0.16 0.16 0.1)
+);
+
+blocks (hex (0 1 2 3 4 5 6 7) ($n $n 1) simpleGrading (1 1 1));
+
+boundary
+(
+    walls { type wall; faces ((0 4 7 3) (1 2 6 5) (0 1 5 4) (3 7 6 2)); }
+    frontAndBack { type empty; faces ((0 3 2 1) (4 5 6 7)); }
+);
+
+// ************************************************************************* //

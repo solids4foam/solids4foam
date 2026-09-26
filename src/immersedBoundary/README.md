@@ -49,7 +49,10 @@ immersedBoundary
 ```
 
 The complete list of entries is in the header of
-`fvOptions/immersedBoundaryForce/immersedBoundaryForce.H`.
+`fvOptions/immersedBoundaryForce/immersedBoundaryForce.H`. The body motions
+are `static` (the default), `sinusoidalTranslation`, `uniformTranslation`
+(constant velocity) and `solidBodyRotation` (constant angular velocity about
+an axis), in `immersedBodyMotion`.
 
 ## Method
 
@@ -178,7 +181,10 @@ static cylinder at the same position to within 0.2% on all the meshes, with
 fluctuations of 1%, 0.4% and 0.3% as the cylinder crosses the cells, whereas
 the `penalty` drag is low by 5%, 3% and 1.5%. For the immersed Stokes layer
 (the `oscillatingWallStokesLayer` tutorial), the `cutLink` velocity converges
-at second order. The momentum exchange is the force that the fluid receives,
+at second order. For a cylinder rotating inside an immersed annulus (the
+`immersedTaylorCouette` tutorial), the `cutLink` torque differs from the exact
+torque by 0.8%, 0.3% and 0.2%, and the `penalty` torque by -25%, -16% and
+-10%. The momentum exchange is the force that the fluid receives,
 and is the more accurate for static and steadily moving bodies; the surface
 traction is the more accurate for accelerating bodies and for the wall shear
 stress on fine meshes.

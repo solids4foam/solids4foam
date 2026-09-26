@@ -60,7 +60,8 @@ release. For complete commit-level details and contributor information, see the
   of the area of the cut faces (from `cutFaceIso`) and the body flux through
   their solid part. Its force is the momentum exchange or the traction on
   the surface (new `immersedSurfaceTraction` class). Added the
-  `uniformTranslation` body motion and the `cut` (exact volume fraction)
+  `uniformTranslation` and `solidBodyRotation` body motions and the `cut`
+  (exact volume fraction)
   occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
@@ -69,7 +70,8 @@ release. For complete commit-level details and contributor information, see the
   `fluids/immersedBoundary/staticCylinderInChannel` and
   `fluids/immersedBoundary/oscillatingCylinderInChannel`,
   `fluids/immersedBoundary/translatingCylinderInChannel` and
-  `fluids/immersedBoundary/oscillatingWallStokesLayer` tutorials, with
+  `fluids/immersedBoundary/oscillatingWallStokesLayer` and
+  `fluids/immersedBoundary/immersedTaylorCouette` tutorials, with
   regression tests.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane

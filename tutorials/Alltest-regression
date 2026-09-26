@@ -147,6 +147,7 @@ REGRESSION_TESTS=(
     "fluids/immersedBoundary/oscillatingCylinderInChannel"
     "fluids/immersedBoundary/translatingCylinderInChannel"
     "fluids/immersedBoundary/oscillatingWallStokesLayer"
+    "fluids/immersedBoundary/immersedTaylorCouette"
     "thermoFluidSolidInteraction/thermalCavity"
     "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"
