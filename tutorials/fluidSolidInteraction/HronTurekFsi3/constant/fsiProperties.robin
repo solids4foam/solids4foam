@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Robin-Neumann coupling: the fluid interface pressure uses the
+// elasticWallPressure Robin condition (0/fluid/p.robin) and the velocity uses
+// elasticWallVelocity (0/fluid/U.robin). The Robin coefficient is chosen
+// automatically (hsModel secant, the default) and the coupling uses unrelaxed
+// fixed-point iterations, for which the Robin-Neumann approach is designed.
+fluidSolidInterface    fixedRelaxation;
+
+fixedRelaxationCoeffs
+{
+    // Solid interface patch list
+    solidPatch           plate;
+
+    // Fluid interface patch list
+    fluidPatch           plate;
+
+    // Unrelaxed fixed-point iterations
+    relaxationFactor     1.0;
+
+    // Tolerance for the interface displacement residual within each time-step
+    outerCorrTolerance   1e-6;
+
+    // Additional Robin convergence criteria: the relative change in the
+    // interface pressure between FSI iterations and the relative leakage flux
+    // through the interface
+    robinPressureTolerance 1e-5;
+    robinFluxTolerance     5e-3;
+
+    // Maximum number of outer FSI loop correctors within each time-step
+    nOuterCorr           300;
+
+    // Enable coupling once the flow has developed, as in the IQN-ILS setup
+    coupled              no;
+    couplingStartTime    2.0;
+
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+}
+
+// ************************************************************************* //

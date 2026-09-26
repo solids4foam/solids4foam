@@ -6,6 +6,44 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# Example usage
+# ./Allrun                 # default behaviour is Dirichlet-Neumann IQN-ILS
+# ./Allrun robin           # Robin-Neumann coupling
+# ./Allrun parallel
+# ./Allrun robin parallel
+
+coupling=iqnils
+interfaceCondition=dirichletNeumann
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        iqnils|IQNILS)
+            coupling=iqnils
+            interfaceCondition=dirichletNeumann
+            ;;
+        robin|Robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [iqnils|robin] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling setup"
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
@@ -14,7 +52,7 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if [[ "$1" == "parallel" ]]; then
+if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
