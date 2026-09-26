@@ -39,6 +39,9 @@ namespace fv
 }
 
 
+const Foam::label Foam::fv::immersedBoundaryForce::nImageLevels_ = 4;
+
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 const Foam::pimpleControl& Foam::fv::immersedBoundaryForce::pimple() const

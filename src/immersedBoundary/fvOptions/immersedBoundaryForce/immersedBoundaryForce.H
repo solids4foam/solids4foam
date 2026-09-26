@@ -283,7 +283,7 @@ class immersedBoundaryForce
 
             //- Number of image point levels: the image points are at
             //  (imageDistance + 0.5*level) cell widths from the surface
-            static constexpr label nImageLevels_ = 4;
+            static const label nImageLevels_;
 
             //- Penalised cells: those whose centre is inside a body
             labelList insideCells_;
