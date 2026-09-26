@@ -117,7 +117,12 @@ Four forcing methods are available:
   fraction of the area of the faces cut by the bodies, from the geometric
   cutting of the faces (`cutFaceIso`), and the flux of the body velocity
   through their solid part; the `pimpleFluid` fluid model uses them in its
-  pressure equation, so that it changes continuously as the body moves. The
+  pressure equation, so that it changes continuously as the body moves, and
+  does not impose continuity in the cells entirely inside a body, where the
+  flux of the velocity of a deforming body (for example a bending beam,
+  whose sections stretch on one side and shorten on the other) need not be
+  zero, and would otherwise be a source of fluid that leaks into the flow
+  (this has no effect for rigid bodies). The
   force is the momentum exchange (`forceEstimator momentumExchange`, the
   default), which includes the inertia of the fluid inside the body; the
   surface traction (`forceEstimator surfaceTraction`), from quadratic least

@@ -59,7 +59,8 @@ release. For complete commit-level details and contributor information, see the
   and vary continuously as the body moves; with the solids4foam
   `pimpleFluid` fluid model, the pressure equation uses the fluid fraction
   of the area of the cut faces (from `cutFaceIso`) and the body flux through
-  their solid part. Its force is the momentum exchange or the traction on
+  their solid part, and does not impose continuity in the cells entirely
+  inside a body. Its force is the momentum exchange or the traction on
   the surface (new `immersedSurfaceTraction` class). Added the
   `uniformTranslation` and `solidBodyRotation` body motions and the `cut`
   (exact volume fraction) occupancy. The explicit direct
