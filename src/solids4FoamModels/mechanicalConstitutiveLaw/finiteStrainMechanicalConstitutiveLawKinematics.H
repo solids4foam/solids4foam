@@ -68,6 +68,7 @@ Author
 #include "UIndirectList.H"
 #include "tensor.H"
 #include "symmTensor.H"
+#include "smallStrainMechanicalConstitutiveLawKinematics.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -191,58 +192,14 @@ public:
 
     // Edit
 
-        //- Return F at integration point ipI with Voigt component j of the
-        //  displacement gradient perturbed by h.
-        //  F = I + gradD, so perturbing F is perturbing the displacement
-        //  gradient. The perturbation is defined on the Voigt strain vector,
-        //  which uses engineering shear, so a shear component moves each
-        //  off-diagonal by h/2 and the corresponding Voigt component by
-        //  exactly h. This matches gradDPerturbed in the small-strain
-        //  kinematics, so a finite-difference tangent taken here is directly
-        //  comparable with a small-strain one
+        //- F at integration point ipI with Voigt component j of the
+        //  displacement gradient perturbed by h; see perturbVoigt
         inline tensor FPerturbed
         (
             const label ipI, const label j, const scalar h
         ) const
         {
-            tensor F = F_[ipI];
-
-            switch (j)
-            {
-                case symmTensor::XX:
-                    F.xx() += h;
-                    break;
-
-                case symmTensor::YY:
-                    F.yy() += h;
-                    break;
-
-                case symmTensor::ZZ:
-                    F.zz() += h;
-                    break;
-
-                case symmTensor::YZ:
-                    F.yz() += 0.5*h;
-                    F.zy() += 0.5*h;
-                    break;
-
-                case symmTensor::XZ:
-                    F.xz() += 0.5*h;
-                    F.zx() += 0.5*h;
-                    break;
-
-                case symmTensor::XY:
-                    F.xy() += 0.5*h;
-                    F.yx() += 0.5*h;
-                    break;
-
-                default:
-                    FatalErrorInFunction
-                        << "Invalid Voigt component index j = " << j
-                        << exit(FatalError);
-            }
-
-            return F;
+            return perturbVoigt(F_[ipI], j, h);
         }
 };
 
