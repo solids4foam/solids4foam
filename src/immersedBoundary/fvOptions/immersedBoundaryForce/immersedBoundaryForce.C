@@ -280,32 +280,35 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
             reduce(F, sumOp<vector>());
             reduce(T, sumOp<vector>());
 
-            // Force from the surface traction
-            if (tractions_.size() != bodies_.size())
-            {
-                tractions_.setSize(bodies_.size());
-            }
-            if (!tractions_.set(bodyi))
-            {
-                tractions_.set
-                (
-                    bodyi,
-                    new immersedSurfaceTraction(body, mesh_)
-                );
-            }
-
+            // Force from the surface traction, if required
             vector Fs(Zero);
             vector Ts(Zero);
-            tractions_[bodyi].force
-            (
-                U,
-                mesh_.lookupObject<volScalarField>("p"),
-                nu(),
-                rho,
-                CofR,
-                Fs,
-                Ts
-            );
+            if (surfaceTractionRequired())
+            {
+                if (tractions_.size() != bodies_.size())
+                {
+                    tractions_.setSize(bodies_.size());
+                }
+                if (!tractions_.set(bodyi))
+                {
+                    tractions_.set
+                    (
+                        bodyi,
+                        new immersedSurfaceTraction(body, mesh_)
+                    );
+                }
+
+                tractions_[bodyi].force
+                (
+                    U,
+                    mesh_.lookupObject<volScalarField>("p"),
+                    nu(),
+                    rho,
+                    CofR,
+                    Fs,
+                    Ts
+                );
+            }
 
             // The selected estimate is written as the force, and the other
             // after the inertia (which is included in both)
@@ -375,7 +378,7 @@ void Foam::fv::immersedBoundaryForce::writeForces()
                 << token::TAB
                 << Fi.x() << token::SPACE << Fi.y() << token::SPACE << Fi.z();
 
-            if (method_ == "cutLink")
+            if (method_ == "cutLink" && surfaceTractionRequired())
             {
                 const vector& Ft = secondaryForce_[bodyi];
                 os  << token::TAB << Ft.x() << token::SPACE << Ft.y()
@@ -385,6 +388,14 @@ void Foam::fv::immersedBoundaryForce::writeForces()
             os  << endl;
         }
     }
+}
+
+
+bool Foam::fv::immersedBoundaryForce::surfaceTractionRequired() const
+{
+    return
+        method_ == "cutLink"
+     && (forceEstimator_ == "surfaceTraction" || writeSurfaceTraction_);
 }
 
 
@@ -1578,6 +1589,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     aperturePtr_(),
     wallFluxPtr_(),
     forceEstimator_("momentumExchange"),
+    writeSurfaceTraction_(false),
     imageDistance_(1.5),
     imageInterpolation_("cellPoint"),
     insideCells_(),
@@ -1749,7 +1761,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
                 << "torque (x y z)" << token::TAB
                 << "inertia of the fluid inside (x y z)";
 
-            if (method_ == "cutLink")
+            if (method_ == "cutLink" && surfaceTractionRequired())
             {
                 forceFiles_[bodyi]
                     << token::TAB
@@ -2173,6 +2185,7 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
         coeffs_.readIfPresent("pinnedRateCoeff", pinnedRateCoeff_);
         coeffs_.readIfPresent("linkCorrection", linkCorrection_);
         coeffs_.readIfPresent("forceEstimator", forceEstimator_);
+        coeffs_.readIfPresent("writeSurfaceTraction", writeSurfaceTraction_);
         if
         (
             forceEstimator_ != "momentumExchange"

@@ -124,8 +124,9 @@ Description
     of the penalised cells, with the time scheme of the momentum equation,
     so that it includes the inertia of the fluid inside. The surface
     traction (see immersedSurfaceTraction) is the alternative estimate
-    (forceEstimator surfaceTraction); the estimate not selected is written
-    in the columns after the inertia.
+    (forceEstimator surfaceTraction), which is also written in the columns
+    after the inertia with writeSurfaceTraction; with forceEstimator
+    surfaceTraction, the momentum exchange is written there.
 
     incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
     solver. The explicit forcing f is added to the right-hand side of the
@@ -224,6 +225,10 @@ Description
         // cutLink: force estimate, momentumExchange or surfaceTraction,
         // optional, default momentumExchange
         forceEstimator  momentumExchange;
+
+        // cutLink: with the momentum exchange, also write the force from
+        // the surface traction, optional, default no
+        writeSurfaceTraction no;
 
         // Coupling coefficient c of the incremental method, optional,
         // default 0.8
@@ -403,6 +408,10 @@ class immersedBoundaryForce
             //  pressure and viscous traction on the surface)
             word forceEstimator_;
 
+            //- With the momentum exchange force, also evaluate the force from
+            //  the surface traction and write it after the inertia
+            bool writeSurfaceTraction_;
+
         // Ghost cell method
 
             //- Distance of the image points from the surface, relative to
@@ -571,6 +580,9 @@ class immersedBoundaryForce
 
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
+
+        //- Is the surface traction evaluated?
+        bool surfaceTractionRequired() const;
 
         //- Rate of a penalised cell of the cutLink method
         scalar pinnedRate(const label celli, const vector& Ub);

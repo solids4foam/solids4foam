@@ -22,6 +22,9 @@ License
 #include "treeDataCell.H"
 #include "scalarMatrices.H"
 #include "SVD.H"
+#include <unordered_map>
+#include <vector>
+#include <cstdint>
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -66,7 +69,15 @@ Foam::scalarField Foam::immersedSurfaceTraction::cellWidths
         }
     }
 
-    Pstream::listCombineReduce(widths, maxEqOp<scalar>());
+    // Native all-reduce of the contiguous values
+    reduce
+    (
+        widths.data(),
+        widths.size(),
+        maxOp<scalar>(),
+        UPstream::msgType(),
+        UPstream::worldComm
+    );
 
     return widths;
 }
@@ -224,11 +235,95 @@ void Foam::immersedSurfaceTraction::createPoints()
         }
     }
 
-    // The points outside the mesh are not used (h = 0), and may enter it as
-    // the body moves
-    faces_.transfer(faces);
-    barycentric_.transfer(barycentric);
-    areas_.transfer(areas);
+    // Thin the points to a spacing of about 0.7 times the mean cell width,
+    // for surfaces whose triangles are smaller than the cells: the points are
+    // kept in order if no kept point is closer, and the area of each point
+    // is given to the nearest kept point
+    {
+        scalar thickness = 1;
+        for (direction d = 0; d < vector::nComponents; ++d)
+        {
+            if (solD_[d] != 1)
+            {
+                thickness = meshBb.span()[d];
+            }
+        }
+        const scalar hMean =
+        (
+            nD == 2
+          ? Foam::sqrt(gAverage(mesh_.V())/thickness)
+          : Foam::cbrt(gAverage(mesh_.V()))
+        );
+        const scalar spacing = 0.7*hMean;
+
+        auto key = [&](const point& x, const label di, const label dj,
+            const label dk)
+        {
+            const std::int64_t i = std::int64_t(std::floor(x.x()/spacing)) + di;
+            const std::int64_t j = std::int64_t(std::floor(x.y()/spacing)) + dj;
+            const std::int64_t k = std::int64_t(std::floor(x.z()/spacing)) + dk;
+            return (i*73856093) ^ (j*19349663) ^ (k*83492791);
+        };
+
+        std::unordered_map<std::int64_t, std::vector<label>> grid;
+        DynamicList<label> kept(positions.size());
+
+        // Nearest kept point within the spacing, -1 if none
+        auto nearestKept = [&](const point& x, const scalar maxDist)
+        {
+            label best = -1;
+            scalar bestDistSqr = sqr(maxDist);
+            for (label di = -1; di <= 1; ++di)
+            {
+                for (label dj = -1; dj <= 1; ++dj)
+                {
+                    for (label dk = -1; dk <= 1; ++dk)
+                    {
+                        const auto iter = grid.find(key(x, di, dj, dk));
+                        if (iter == grid.end())
+                        {
+                            continue;
+                        }
+                        for (const label k : iter->second)
+                        {
+                            const scalar dSqr = magSqr(positions[kept[k]] - x);
+                            if (dSqr < bestDistSqr)
+                            {
+                                bestDistSqr = dSqr;
+                                best = k;
+                            }
+                        }
+                    }
+                }
+            }
+            return best;
+        };
+
+        forAll(positions, i)
+        {
+            if (nearestKept(positions[i], spacing) < 0)
+            {
+                grid[key(positions[i], 0, 0, 0)].push_back(kept.size());
+                kept.append(i);
+            }
+        }
+
+        scalarField keptAreas(kept.size(), Zero);
+        forAll(positions, i)
+        {
+            const label k = nearestKept(positions[i], 2*spacing);
+            keptAreas[k >= 0 ? k : 0] += areas[i];
+        }
+
+        faces_.setSize(kept.size());
+        barycentric_.setSize(kept.size());
+        forAll(kept, k)
+        {
+            faces_[k] = faces[kept[k]];
+            barycentric_[k] = barycentric[kept[k]];
+        }
+        areas_.transfer(keptAreas);
+    }
 
     Info<< "    Immersed body " << body_.name() << ": " << faces_.size()
         << " traction points, area " << sum(areas_) << endl;
@@ -253,7 +348,11 @@ void Foam::immersedSurfaceTraction::updatePoints()
         normals_[i] = faceNormals[faces_[i]];
     }
 
-    h_ = cellWidths(points_);
+    // The widths are found again only if the body moves
+    if (body_.moving() || h_.size() != points_.size())
+    {
+        h_ = cellWidths(points_);
+    }
 }
 
 
@@ -273,7 +372,8 @@ Foam::immersedSurfaceTraction::immersedSurfaceTraction
     areas_(),
     h_(),
     points_(),
-    normals_()
+    normals_(),
+    stencils_()
 {
     createPoints();
 }
@@ -337,6 +437,49 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
 
     const scalar radius = 3;
 
+    // Local cells of the stencil of each point, found again only if the
+    // body moves, and the rigid body velocity at their centres, from a single
+    // evaluation
+    if (body_.moving() || stencils_.size() != n)
+    {
+        stencils_.setSize(n);
+        forAll(faces_, i)
+        {
+            const scalar h = h_[i];
+
+            if (h <= 0)
+            {
+                stencils_[i].clear();
+                continue;
+            }
+
+            const point& xw = points_[i];
+            const scalar r = radius*h;
+
+            stencils_[i] =
+                mesh_.cellTree().findBox
+                (
+                    treeBoundBox(xw - vector::one*r, xw + vector::one*r)
+                );
+        }
+    }
+    const List<labelList>& stencils = stencils_;
+
+    labelList cellIndex(mesh_.nCells(), -1);
+    DynamicList<label> stencilCells;
+    forAll(stencils, i)
+    {
+        for (const label celli : stencils[i])
+        {
+            if (cellIndex[celli] < 0)
+            {
+                cellIndex[celli] = stencilCells.size();
+                stencilCells.append(celli);
+            }
+        }
+    }
+    const vectorField stencilUb(body_.velocity(pointField(C, stencilCells)));
+
     forAll(faces_, i)
     {
         const scalar h = h_[i];
@@ -350,13 +493,7 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
         const vector& nw = normals_[i];
         const scalar r = radius*h;
 
-        const labelList cells
-        (
-            mesh_.cellTree().findBox
-            (
-                treeBoundBox(xw - vector::one*r, xw + vector::one*r)
-            )
-        );
+        const labelList& cells = stencils[i];
 
         scalar* Mp = &sums[i*nSum];
         scalar* Rp = Mp + nP*nP;
@@ -395,10 +532,7 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
 
             // Velocity relative to the rigid body velocity at the cell
             // centre, so that a rigid rotation gives no traction
-            const vector dU
-            (
-                U[celli] - body_.velocity(pointField(1, C[celli]))()[0]
-            );
+            const vector dU(U[celli] - stencilUb[cellIndex[celli]]);
             const scalar pc = p[celli];
 
             for (label j = 0; j < nP; ++j)
@@ -423,15 +557,24 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
         }
     }
 
-    Pstream::listCombineReduce(sums, plusEqOp<scalar>());
+    // Native all-reduce of the contiguous sums
+    reduce
+    (
+        sums.data(),
+        sums.size(),
+        sumOp<scalar>(),
+        UPstream::msgType(),
+        UPstream::worldComm
+    );
 
     tmp<vectorField> ttraction(new vectorField(n, Zero));
     vectorField& t = ttraction.ref();
 
-    // Solve a small weighted least squares system with the pseudo-inverse
-    // of its matrix, which is robust to a rank-deficient stencil (e.g.
-    // collinear cell centres), with a small regularisation of the quadratic
-    // terms
+    // Solve a small weighted least squares system, whose matrix is
+    // symmetric positive semi-definite, with a small regularisation of the
+    // quadratic terms: by Cholesky decomposition, or with the pseudo-inverse
+    // of the matrix if it is (nearly) singular, e.g. for collinear cell
+    // centres
     auto solve = [](const scalar* M, const label m, const label nLin,
         List<List<scalar>>& rhs)
     {
@@ -450,6 +593,58 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
             A(j, j) += 1e-6*trace/m;
         }
 
+        // Cholesky decomposition A = L L^T, in the lower triangle of L
+        scalarRectangularMatrix L(A);
+        bool positive = true;
+        for (label j = 0; j < m && positive; ++j)
+        {
+            scalar d = L(j, j);
+            for (label k = 0; k < j; ++k)
+            {
+                d -= sqr(L(j, k));
+            }
+            if (d <= 1e-12*trace)
+            {
+                positive = false;
+                break;
+            }
+            L(j, j) = Foam::sqrt(d);
+            for (label i = j + 1; i < m; ++i)
+            {
+                scalar v = L(i, j);
+                for (label k = 0; k < j; ++k)
+                {
+                    v -= L(i, k)*L(j, k);
+                }
+                L(i, j) = v/L(j, j);
+            }
+        }
+
+        if (positive)
+        {
+            for (List<scalar>& b : rhs)
+            {
+                // L y = b, then L^T x = y
+                for (label j = 0; j < m; ++j)
+                {
+                    for (label k = 0; k < j; ++k)
+                    {
+                        b[j] -= L(j, k)*b[k];
+                    }
+                    b[j] /= L(j, j);
+                }
+                for (label j = m - 1; j >= 0; --j)
+                {
+                    for (label k = j + 1; k < m; ++k)
+                    {
+                        b[j] -= L(k, j)*b[k];
+                    }
+                    b[j] /= L(j, j);
+                }
+            }
+            return;
+        }
+
         const scalarRectangularMatrix Ainv(SVD(A, 1e-10).VSinvUt());
         for (List<scalar>& b : rhs)
         {
@@ -465,6 +660,8 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
         }
     };
 
+    // The fits are solved for a share of the points on each processor, and
+    // the tractions are then summed over the processors
     forAll(faces_, i)
     {
         const scalar h = h_[i];
@@ -474,7 +671,12 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
         const scalar* Ru = Mu + nU*nU;
 
         // Too few fluid cells for a fit
-        if (h <= 0 || Mp[0] < SMALL)
+        if
+        (
+            h <= 0
+         || Mp[0] < SMALL
+         || (i % Pstream::nProcs()) != Pstream::myProcNo()
+        )
         {
             continue;
         }
@@ -517,6 +719,15 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
 
         t[i] = -pw*nw + tau;
     }
+
+    reduce
+    (
+        reinterpret_cast<scalar*>(t.data()),
+        vector::nComponents*t.size(),
+        sumOp<scalar>(),
+        UPstream::msgType(),
+        UPstream::worldComm
+    );
 
     return ttraction;
 }

@@ -27,6 +27,10 @@ immersedBoundary
     // moving bodies (see src/immersedBoundary/README.md)
     method          cutLink;
 
+    // Also write the force from the surface traction (columns 11-13 of the
+    // force file)
+    writeSurfaceTraction yes;
+
     bodies
     {
         cylinder

@@ -32,6 +32,10 @@ immersedBoundary
     // and "occupancy vertexFraction;" for the body with incremental
     method          cutLink;
 
+    // Also write the force from the surface traction (columns 11-13 of the
+    // force file)
+    writeSurfaceTraction yes;
+
     bodies
     {
         cylinder

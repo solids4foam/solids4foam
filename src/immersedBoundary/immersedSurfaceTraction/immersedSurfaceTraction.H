@@ -29,7 +29,9 @@ Description
     the mesh, where each point represents the thickness of the mesh. Points
     outside the mesh are not used. Each point is defined by its triangle and
     barycentric coordinates, so that it follows the motion or deformation of
-    the surface.
+    the surface. Where the triangles are smaller than the cells, the points
+    are thinned to a spacing of about 0.7 cell widths, with the area of each
+    removed point given to the nearest kept point.
 
     At each point \f$ x_w \f$, with the outward unit normal n, the pressure
     and the velocity relative to the rigid body velocity \f$ U_b \f$ are
@@ -111,6 +113,9 @@ class immersedSurfaceTraction
         //- Current positions and outward unit normals
         pointField points_;
         vectorField normals_;
+
+        //- Local cells of the least squares stencil of each point
+        List<labelList> stencils_;
 
 
     // Private Member Functions
