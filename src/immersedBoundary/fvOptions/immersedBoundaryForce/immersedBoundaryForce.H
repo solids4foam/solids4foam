@@ -25,7 +25,7 @@ Description
 
     Each body is a closed surface (see immersedBody) that covers some cells of
     the fluid mesh with an occupancy lambda, and moves with the velocity Ui.
-    Two forcing methods are available.
+    Three forcing methods are available.
 
     penalty (the default): the implicit volume penalisation
 
@@ -47,6 +47,31 @@ Description
     width and C the surface rate coefficient (default 3), so that it does
     not depend on the time step. The results do not depend on K for K of 1e3
     or more, the number of pressure correctors or the time step.
+
+    ghostCell: a sharp interface variant of the penalty method for static
+    bodies. The cells whose centre is inside a body are penalised with the
+    rate \f$ K/\Delta t \f$, and the target velocity of those next to the
+    fluid (the ghost cells) is extrapolated linearly along the surface
+    normal, through the body velocity at the nearest surface point and the
+    velocity at an image point in the fluid:
+
+    \f[
+        U_i = U_b + (U_d - U_b) \frac{s}{s_d}
+    \f]
+
+    where s is the signed distance of the ghost cell centre from the surface
+    (negative inside the body), and \f$ U_d \f$ the velocity at the image
+    point, at the distance \f$ s_d \f$, interpolated in the donor cell that
+    contains it (imageInterpolation cellPoint, the default), or the velocity
+    of the donor cell, with \f$ s_d \f$ the distance of its centre
+    (cell). The image point is imageDistance cell widths (the width of the
+    ghost cell along the normal) beyond the surface, or 0.5, 1 or 1.5 widths
+    further if that point is not in a fluid cell; a ghost cell without a
+    donor, which may be on another processor, has the body velocity. The
+    fluid velocity then equals the body velocity on the surface. The
+    weighting, surfaceRateCoeff and nu entries are not used. For moving
+    bodies the cells that the body leaves (fresh cells) disturb the force,
+    and the penalty method is recommended.
 
     incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
     solver. The explicit forcing f is added to the right-hand side of the
@@ -101,7 +126,8 @@ Description
     {
         type            immersedBoundaryForce;
 
-        // Forcing method, optional, default penalty
+        // Forcing method, optional, default penalty; ghostCell for static
+        // bodies, or incremental
         method          penalty;
 
         // Penalty coefficient K, optional, default 1e3
@@ -119,6 +145,15 @@ Description
         // Kinematic viscosity for the surface rate, optional, default the
         // nu entry of transportProperties
         nu              1e-3;
+
+        // Distance of the image points of the ghost cell method from the
+        // surface, relative to the cell width, optional, default 1.5
+        imageDistance   1.5;
+
+        // Velocity at the image points of the ghost cell method: cellPoint
+        // (interpolated) or cell (donor cell centre), optional, default
+        // cellPoint
+        imageInterpolation cellPoint;
 
         // Coupling coefficient c of the incremental method, optional,
         // default 0.8
@@ -202,8 +237,10 @@ class immersedBoundaryForce
         PtrList<immersedBody> bodies_;
 
         //- Forcing method: penalty (implicit volume penalisation, the
-        //  default) or incremental (the explicit direct forcing of
-        //  openHFDIB-DEM, increased after each pressure corrector)
+        //  default), ghostCell (sharp penalisation with a linear
+        //  reconstruction of the target velocity next to the surface) or
+        //  incremental (the explicit direct forcing of openHFDIB-DEM,
+        //  increased after each pressure corrector)
         word method_;
 
         //- Penalty coefficient K: the penalisation rate in a fully covered
@@ -232,6 +269,66 @@ class immersedBoundaryForce
 
         //- Penalisation rate (1/s) in each cell
         scalarField kappa_;
+
+        // Ghost cell method
+
+            //- Distance of the image points from the surface, relative to
+            //  the cell width
+            scalar imageDistance_;
+
+            //- Velocity at the image points: cellPoint (interpolated, so
+            //  that the target varies continuously as the body moves) or
+            //  cell (the donor cell centre value)
+            word imageInterpolation_;
+
+            //- Number of image point levels: the image points are at
+            //  (imageDistance + 0.5*level) cell widths from the surface
+            static const label nImageLevels_;
+
+            //- Penalised cells: those whose centre is inside a body
+            labelList insideCells_;
+
+            //- Cells penalised in the previous configuration, which hold the
+            //  body velocity rather than a fluid velocity, and so are not
+            //  donors
+            boolList penalisedOld_;
+
+            //- Ghost cells: penalised cells with a fluid neighbour
+            labelList ghostCells_;
+
+            //- Donor fluid cell of each ghost cell: -1 if none, -2 if on
+            //  another processor
+            labelList ghostDonors_;
+
+            //- Nearest surface point, outward unit normal, body velocity at
+            //  the surface point and signed distance to it, for each ghost
+            //  cell
+            pointField ghostWallPoints_;
+            vectorField ghostNormals_;
+            vectorField ghostWallVelocities_;
+            scalarField ghostDistances_;
+
+            //- Ghost cells whose donor is on another processor: the ghost
+            //  index, and the donor processor, for each
+            labelList remoteGhosts_;
+            labelList remoteDonorProcs_;
+
+            //- Image point of each ghost cell with a local donor
+            pointField ghostImagePoints_;
+
+            //- Local donor cells sent to each processor, and their image
+            //  points
+            List<labelList> sendDonors_;
+            List<pointField> sendImagePoints_;
+
+            //- Remote ghost indices received from each processor, in the
+            //  order they are sent
+            List<labelList> recvGhosts_;
+
+            //- Velocity and position of the image point of each ghost cell,
+            //  gathered from the donor processor
+            vectorField ghostDonorU_;
+            pointField ghostDonorC_;
 
         //- Coupling coefficient of the incremental method
         scalar couplingCoeff_;
@@ -329,6 +426,30 @@ class immersedBoundaryForce
 
         //- Set the penalisation rate and the velocity of the bodies
         void setPenalty(const volVectorField& U);
+
+        //- Find the ghost cells and their donors, after the bodies are
+        //  updated
+        void findGhostCells(const bool newTimeStep);
+
+        //- Find a donor fluid cell for the image points of a ghost cell,
+        //  given its surface point, normal and width, and the level of its
+        //  image point; -1 and nImageLevels_ if none
+        label findDonor
+        (
+            const point& wallPoint,
+            const vector& normal,
+            const scalar width,
+            const volScalarField& inside,
+            point& imagePoint,
+            label& level
+        ) const;
+
+        //- Gather the velocity and position of the image points of the
+        //  ghost cells
+        void gatherDonors(const volVectorField& U);
+
+        //- Reconstruct the target velocity of the ghost cells
+        void reconstructTargets(const volVectorField& U);
 
 
 public:

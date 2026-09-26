@@ -61,7 +61,7 @@ body moves (`occupancy signedDistance`). Alternatively, as in openHFDIB-DEM,
 it is half the fraction of the cell vertices inside the surface, plus a half
 if the cell centre is inside the surface (`occupancy vertexFraction`).
 
-Two forcing methods are available:
+Three forcing methods are available:
 
 - `penalty` (the default): the implicit volume penalisation
   `kappa*(Ui - U)`, where `Ui` is the velocity of the body, is added to the
@@ -80,6 +80,20 @@ Two forcing methods are available:
   and 0.0025 s. With `surfaceRateCoeff 0`, the partially covered cells are
   relaxed towards `Ui` once per time step, and `Cd` is 5.37 and 5.49 for the
   same time steps.
+- `ghostCell`: a sharp interface variant of `penalty`, for static bodies.
+  The cells whose centre is inside a body are penalised with the rate
+  `K/deltaT`. In the cells next to the fluid (the ghost cells), the target
+  velocity is extrapolated linearly along the surface normal, through the
+  body velocity at the nearest surface point and the velocity at an image
+  point in the fluid, `imageDistance` (default 1.5) cell widths beyond the
+  surface. The image point velocity is interpolated in its donor cell
+  (`imageInterpolation cellPoint`, the default) or is the donor cell value
+  (`imageInterpolation cell`). The donor may be on another processor. The
+  fluid velocity then equals the body velocity on the surface, so the
+  effective wall is not displaced into the body as it is with `penalty`.
+  The results do not depend on `K`, the time step, the number of pressure
+  correctors or the number of processors. For moving bodies, the cells that
+  the body leaves (fresh cells) disturb the force: `penalty` is recommended.
 - `incremental`: the direct forcing of the openHFDIB-DEM `pimpleHFDIBFoam`
   solver. An explicit forcing `f` is added to the momentum equation. After
   each pressure corrector, `f` is increased by `couplingCoeff*(Ui - U)/deltaT`
@@ -113,18 +127,26 @@ mean square of the drag coefficient is 2.05), are:
 | A | 5.24, 5.38, 5.48 | 0.11, 0.05, 0.02 | 0.13, 0.09, 0.08 |
 | B | 5.45, 5.61, 5.61 | 2.00, 0.44, 0.29 | 1.42, 0.33, 0.20 |
 | C | 6.04, 6.42, 6.60 | 1.73, 0.60, 0.53 | 1.32, 0.52, 0.48 |
+| D | 5.42, 5.51, 5.55 | 0.80, 0.30, - | 0.59, 0.27, - |
 
 where the settings are:
 
 - A: the defaults (`penalty`, `volumeFraction`, `signedDistance`);
 - B: `penalty` with `weighting occupancy` and `occupancy vertexFraction`;
-- C: `incremental` with `occupancy vertexFraction`.
+- C: `incremental` with `occupancy vertexFraction`;
+- D: `ghostCell` (the setting of the static tutorial).
 
-The accuracy is first order in the cell size for all the methods. The
-differences from Wan and Turek (2006) stop decreasing at about 0.08, the
-difference between the body-fitted mesh solution and Wan and Turek (2006),
-whose coefficients lag the converged solutions by about 0.015 s (see the
-`oscillatingCylinderInChannel` tutorial).
+For an immersed plane Poiseuille flow between walls that are not aligned with
+the cell faces, with 20, 40 and 80 cells across the channel, the flow rate
+differs from the exact solution by 20%, 11% and 7% with setting A, and by
+0.9%, 0.03% and 0.02% with setting D.
+
+The cylinder forces converge at about first order in the cell size for all the
+methods (the ghost cell method was not run with 40 cells across the moving
+cylinder). The differences from Wan and Turek (2006) stop decreasing at
+about 0.08, the difference between the body-fitted mesh solution and Wan and
+Turek (2006), whose coefficients lag the converged solutions by about 0.015 s
+(see the `oscillatingCylinderInChannel` tutorial).
 
 ## Provenance
 
