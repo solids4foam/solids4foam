@@ -12,6 +12,8 @@ correspond to nominal displacement orders 2, 3, and 4, respectively; stress
 involves a derivative, with nominal orders 1, 2, and 3. High-order variants
 exclude `distHex` and require a PETSc-enabled build. Variant names include the
 polynomial degree, for example `hex-highOrder-movingLeastSquares-p3`.
+The `tet-structural` mesh label identifies the structured tetrahedral mesh from
+`gmsh/tet-structured.geo`; the driver maps it to the `Allrun` mesh argument `tet`.
 
 Source an OpenFOAM.com, OpenFOAM.org, or foam-extend environment, ensure the
 tutorial library can be built, and run:
@@ -29,8 +31,8 @@ for custom cell counts, and `--reuse` when resuming a sweep. For example:
 ```bash
 ./Allverify --quick
 ./Allverify --variants hex-segregated,poly-petscSnes
-./Allverify --variants tet-segregated,tet-petscSnes --quick
-./Allverify --variants hex-highOrder-movingLeastSquares-p3,tet-highOrder-kExactLeastSquares-p2
+./Allverify --variants tet-structural-segregated,tet-structural-petscSnes --quick
+./Allverify --variants hex-highOrder-movingLeastSquares-p3,tet-structural-highOrder-kExactLeastSquares-p2
 ```
 
 Results are written under the ignored `verification/postProcessing/`

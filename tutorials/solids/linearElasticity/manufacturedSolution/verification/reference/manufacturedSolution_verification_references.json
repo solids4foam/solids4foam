@@ -15,16 +15,16 @@
     "distHex-petscSnes",
     "hex-highOrder-movingLeastSquares-p1",
     "hex-highOrder-kExactLeastSquares-p1",
-    "tet-highOrder-movingLeastSquares-p1",
-    "tet-highOrder-kExactLeastSquares-p1",
+    "tet-structural-highOrder-movingLeastSquares-p1",
+    "tet-structural-highOrder-kExactLeastSquares-p1",
     "hex-highOrder-movingLeastSquares-p2",
     "hex-highOrder-kExactLeastSquares-p2",
-    "tet-highOrder-movingLeastSquares-p2",
-    "tet-highOrder-kExactLeastSquares-p2",
+    "tet-structural-highOrder-movingLeastSquares-p2",
+    "tet-structural-highOrder-kExactLeastSquares-p2",
     "hex-highOrder-movingLeastSquares-p3",
     "hex-highOrder-kExactLeastSquares-p3",
-    "tet-highOrder-movingLeastSquares-p3",
-    "tet-highOrder-kExactLeastSquares-p3"
+    "tet-structural-highOrder-movingLeastSquares-p3",
+    "tet-structural-highOrder-kExactLeastSquares-p3"
   ],
   "variants": {
     "hex-segregated": {
@@ -43,16 +43,16 @@
         "stress": 0.5
       }
     },
-    "tet-segregated": {
-      "mesh": "tet",
+    "tet-structural-segregated": {
+      "mesh": "tet-structural",
       "approach": "segregated",
       "minimum_net_order": {
         "displacement": 1.5,
         "stress": 0.5
       }
     },
-    "tet-petscSnes": {
-      "mesh": "tet",
+    "tet-structural-petscSnes": {
+      "mesh": "tet-structural",
       "approach": "petscSnes",
       "minimum_net_order": {
         "displacement": 1.5,
@@ -109,8 +109,8 @@
         "stress": 0.5
       }
     },
-    "tet-highOrder-movingLeastSquares-p1": {
-      "mesh": "tet",
+    "tet-structural-highOrder-movingLeastSquares-p1": {
+      "mesh": "tet-structural",
       "approach": "highOrder-movingLeastSquares",
       "p": 1,
       "minimum_net_order": {
@@ -118,8 +118,8 @@
         "stress": 0.5
       }
     },
-    "tet-highOrder-kExactLeastSquares-p1": {
-      "mesh": "tet",
+    "tet-structural-highOrder-kExactLeastSquares-p1": {
+      "mesh": "tet-structural",
       "approach": "highOrder-kExactLeastSquares",
       "p": 1,
       "minimum_net_order": {
@@ -145,8 +145,8 @@
         "stress": 1.5
       }
     },
-    "tet-highOrder-movingLeastSquares-p2": {
-      "mesh": "tet",
+    "tet-structural-highOrder-movingLeastSquares-p2": {
+      "mesh": "tet-structural",
       "approach": "highOrder-movingLeastSquares",
       "p": 2,
       "minimum_net_order": {
@@ -154,8 +154,8 @@
         "stress": 1.5
       }
     },
-    "tet-highOrder-kExactLeastSquares-p2": {
-      "mesh": "tet",
+    "tet-structural-highOrder-kExactLeastSquares-p2": {
+      "mesh": "tet-structural",
       "approach": "highOrder-kExactLeastSquares",
       "p": 2,
       "minimum_net_order": {
@@ -181,8 +181,8 @@
         "stress": 2.5
       }
     },
-    "tet-highOrder-movingLeastSquares-p3": {
-      "mesh": "tet",
+    "tet-structural-highOrder-movingLeastSquares-p3": {
+      "mesh": "tet-structural",
       "approach": "highOrder-movingLeastSquares",
       "p": 3,
       "minimum_net_order": {
@@ -190,8 +190,8 @@
         "stress": 2.5
       }
     },
-    "tet-highOrder-kExactLeastSquares-p3": {
-      "mesh": "tet",
+    "tet-structural-highOrder-kExactLeastSquares-p3": {
+      "mesh": "tet-structural",
       "approach": "highOrder-kExactLeastSquares",
       "p": 3,
       "minimum_net_order": {

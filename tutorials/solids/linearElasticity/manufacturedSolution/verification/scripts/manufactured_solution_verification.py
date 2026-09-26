@@ -185,7 +185,9 @@ def run_level(
         set_resolution(run_dir, divisions, domain_length)
         set_polynomial_order(run_dir, variant)
         degree_file.write_text(json.dumps(variant.get("p")) + "\n")
-        command = ["./Allrun", variant["approach"], variant["mesh"]]
+        # Allrun calls the structured tetrahedral mesh "tet".
+        mesh = "tet" if variant["mesh"] == "tet-structural" else variant["mesh"]
+        command = ["./Allrun", variant["approach"], mesh]
         print(f"Running {variant_name} n={divisions} in {run_dir}", flush=True)
         with (run_dir / "log.Allverify").open("w") as log:
             completed = subprocess.run(
@@ -384,7 +386,7 @@ def main() -> int:
 
     selected = [all_variants[name] for name in variant_names]
     required = ["checkMesh", "solids4Foam"]
-    if any(item["mesh"] in {"tet", "poly"} for item in selected):
+    if any(item["mesh"] in {"tet-structural", "poly"} for item in selected):
         required.extend(["gmsh", "gmshToFoam", "createPatch"])
     if any(item["mesh"] == "poly" for item in selected):
         required.append("polyDualMesh")
