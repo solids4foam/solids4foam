@@ -124,7 +124,7 @@ editing `constant/fvOptions` (see `src/immersedBoundary/README.md`):
 
 - `method ghostCell;`: $$C_d$$ = 5.42, 5.51 and 5.55 for `MESH_LEVEL` 1, 2
   and 3;
-- `method penalty;` (the default): $$C_d$$ = 5.24, 5.38 and 5.48;
+- `method penalty;`: $$C_d$$ = 5.24, 5.38 and 5.48;
 - `method penalty;`, `weighting occupancy;` and `occupancy vertexFraction;`:
   $$C_d$$ = 5.45, 5.61 and 5.61;
 - `method incremental;`, `couplingCoeff 0.8;` and

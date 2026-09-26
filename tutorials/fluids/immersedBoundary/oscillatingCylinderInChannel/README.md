@@ -44,7 +44,8 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    method          penalty;
+    method          cutLink;
+    forceEstimator  surfaceTraction;
 
     bodies
     {
@@ -69,10 +70,14 @@ and the immersed boundary library is loaded in `system/controlDict` with
 `src/immersedBoundary/README.md`.
 
 The force on the cylinder is written every time step to
-`postProcessing/immersedBoundary/0/cylinder.dat`: columns 2-4 are the force
-exerted by the immersed boundary forcing, and columns 8-10 the inertia of the
-fluid inside the cylinder, whose sum is the hydrodynamic force on the
-cylinder. The drag and lift coefficients are
+`postProcessing/immersedBoundary/0/cylinder.dat`. With the `cutLink` method
+and `forceEstimator surfaceTraction`, columns 2-4 are the force from the
+pressure and viscous traction on the surface of the cylinder, and columns
+11-13 the force from the momentum exchange, which includes the inertia of the
+fluid inside the cylinder. With the `penalty` and `incremental` methods,
+columns 2-4 are the force exerted by the immersed boundary forcing, and
+columns 8-10 the inertia of the fluid inside the cylinder, whose sum is the
+hydrodynamic force on the cylinder. The drag and lift coefficients are
 
 $$
 C_d = \frac{2 F_x}{\rho U_{ref}^2 D L_z}, \qquad
@@ -109,32 +114,29 @@ coefficients in `forceCoeffs.pdf`.
 
 ## Expected Results
 
-The root mean square difference between the drag coefficient, including the
-inertia of the fluid inside the cylinder, and the reference drag coefficients,
-over $$0.25 < t < 7.5$$ s, where the root mean square of the drag coefficient
-is 2.05:
+The root mean square difference between the drag coefficient and the reference
+drag coefficients, over $$0.25 < t < 7.5$$ s, where the root mean square of the
+drag coefficient is 2.05, with the `cutLink` method (surface traction) and the
+`penalty` method (forcing plus the inertia of the fluid inside):
 
-| `MESH_LEVEL` | Cells | Cells across $$D$$ | Body-fitted | Wan and Turek |
-| ------------ | ----- | ------------------ | ----------- | ------------- |
-| 1 | 5 084 | 10 | 0.11 | 0.13 |
-| 2 | 20 336 | 20 | 0.05 | 0.09 |
-| 3 | 81 344 | 40 | 0.02 | 0.08 |
+| Level | Cells across $$D$$ | `cutLink` | `penalty` | `cutLink`, Wan-Turek |
+| ----- | ------------------ | --------- | --------- | -------------------- |
+| 1 | 10 | 0.11 | 0.11 | 0.12 |
+| 2 | 20 | 0.04 | 0.05 | 0.08 |
+| 3 | 40 | 0.02 | 0.02 | 0.08 |
 
-The difference from the body-fitted mesh solution decreases by about a factor
-of two with each refinement. That from the Wan and Turek (2006) coefficients
-stops decreasing at about 0.08, which is the difference between the body-fitted
-mesh solution and the Wan and Turek (2006) coefficients: these lag the
-converged solutions by about 0.015 s. Without the inertia of the fluid inside
-the cylinder, the difference from the body-fitted mesh solution is about 0.46
-on all the meshes. As the occupancy varies continuously with the position of
-the cylinder, the force is smooth as the cylinder crosses the cells.
-
-With `method cutLink;`, the differences from the body-fitted mesh solution
-are 0.19, 0.07 and 0.06 for levels 1-3 with the force from the momentum
-exchange (columns 2-4 of the force file, which include the inertia of the
-fluid inside), and 0.11, 0.04 and 0.02 with the force from the surface
-traction (columns 11-13), which is the more accurate for this accelerating
-body.
+The first two columns are the differences from the body-fitted mesh
+solution, which decrease by about a factor of two with each refinement; the
+last is the difference from the Wan and Turek (2006) coefficients, which stops
+decreasing at about 0.08, the difference between the body-fitted mesh
+solution and the Wan and Turek (2006) coefficients: these lag the converged
+solutions by about 0.015 s. The `cutLink` force from the momentum exchange
+(columns 11-13) differs from the body-fitted mesh solution by 0.19, 0.07 and
+0.06: it over-predicts the inertia of the fluid inside the accelerating
+cylinder. With the `penalty` method, the force without the inertia of the
+fluid inside differs by about 0.46 on all the meshes, and the force is smooth
+as the cylinder crosses the cells as the occupancy varies continuously with
+its position.
 
 With the `incremental` forcing method of `pimpleHFDIBFoam` (`method
 incremental;` and `occupancy vertexFraction;` in `constant/fvOptions`), the

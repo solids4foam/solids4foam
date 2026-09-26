@@ -25,8 +25,8 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    // Forcing method, optional, default penalty
-    method          penalty;
+    // Forcing method, optional, default cutLink
+    method          cutLink;
 
     bodies
     {
@@ -66,7 +66,7 @@ if the cell centre is inside the surface (`occupancy vertexFraction`).
 
 Four forcing methods are available:
 
-- `penalty` (the default): the implicit volume penalisation
+- `penalty`: the implicit volume penalisation
   `kappa*(Ui - U)`, where `Ui` is the velocity of the body, is added to the
   momentum equation, with `-kappa*U` in the matrix. The penalisation rate is
   `K/deltaT` in the fully covered cells, where `K` is `penaltyCoeff` (default
@@ -98,7 +98,8 @@ Four forcing methods are available:
   correctors or the number of processors. For moving bodies, the cells that
   the body leaves (fresh cells) disturb the force: `cutLink` or `penalty`
   is recommended.
-- `cutLink`: a sharp interface penalisation for static and moving bodies.
+- `cutLink` (the default): a sharp interface penalisation for static and
+  moving bodies.
   The cells whose centre is inside a body are penalised towards the body
   velocity, with the rate `min(K/deltaT, C*(nu/w^2 + |Ub|/w))`, where `C` is
   `pinnedRateCoeff` (default 100). Each fluid cell next to them is penalised
@@ -165,7 +166,8 @@ mean square of the drag coefficient is 2.05), are:
 
 where the settings are:
 
-- A: the defaults (`penalty`, `volumeFraction`, `signedDistance`);
+- A: `penalty`, with its defaults `weighting volumeFraction` and
+  `occupancy signedDistance`;
 - B: `penalty` with `weighting occupancy` and `occupancy vertexFraction`;
 - C: `incremental` with `occupancy vertexFraction`;
 - D: `ghostCell`;

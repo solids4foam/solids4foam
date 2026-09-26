@@ -1639,7 +1639,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
 :
     fv::option(name, modelType, dict, mesh),
     bodies_(),
-    method_("penalty"),
+    method_("cutLink"),
     penaltyCoeff_(1e3),
     weighting_("volumeFraction"),
     surfaceRateCoeff_(3),

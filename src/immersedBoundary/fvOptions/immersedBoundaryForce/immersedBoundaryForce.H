@@ -27,7 +27,7 @@ Description
     the fluid mesh with an occupancy lambda, and moves with the velocity Ui.
     Four forcing methods are available.
 
-    penalty (the default): the implicit volume penalisation
+    penalty: the implicit volume penalisation
 
     \f[
         f = \kappa (U_i - U)
@@ -73,7 +73,8 @@ Description
     bodies the cells that the body leaves (fresh cells) disturb the force,
     and the penalty method is recommended.
 
-    cutLink: a sharp interface penalisation for static and moving bodies.
+    cutLink (the default): a sharp interface penalisation for static and
+    moving bodies.
     The cells whose centre is inside a body (penalised cells) are penalised
     towards the body velocity with the rate
     \f$ \kappa_s = \min(K/\Delta t, C_s(\nu/w^2 + |U_b|/w)) \f$, where w is
@@ -196,9 +197,9 @@ Description
     {
         type            immersedBoundaryForce;
 
-        // Forcing method, optional, default penalty; cutLink, ghostCell
+        // Forcing method, optional, default cutLink; penalty, ghostCell
         // (static bodies) or incremental
-        method          penalty;
+        method          cutLink;
 
         // Penalty coefficient K, optional, default 1e3
         penaltyCoeff    1e3;
@@ -327,8 +328,8 @@ class immersedBoundaryForce
         //- Immersed bodies
         PtrList<immersedBody> bodies_;
 
-        //- Forcing method: penalty (implicit volume penalisation, the
-        //  default), ghostCell (sharp penalisation with a linear
+        //- Forcing method: cutLink (the default), penalty (implicit volume
+        //  penalisation), ghostCell (sharp penalisation with a linear
         //  reconstruction of the target velocity next to the surface) or
         //  incremental (the explicit direct forcing of openHFDIB-DEM,
         //  increased after each pressure corrector)
