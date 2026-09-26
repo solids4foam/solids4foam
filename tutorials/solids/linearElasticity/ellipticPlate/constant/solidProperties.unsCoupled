@@ -21,7 +21,6 @@ FoamFile
 solidModel       coupledUnsLinearGeometryLinearElastic;
 //solidModel       coupledUnsLinGeometry;
 //solidModel     linearGeometryTotalDisplacement;
-//solidModel     unsLinearGeometry;
 
 coupledUnsLinearGeometryLinearElasticCoeffs
 {}

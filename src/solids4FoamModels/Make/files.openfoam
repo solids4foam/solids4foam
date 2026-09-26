@@ -15,40 +15,7 @@ solidModels/nonLinGeomTotalLagTotalDispSolid/nonLinGeomTotalLagTotalDispSolid.C
 solidModels/poroLinGeomSolid/poroLinGeomSolid.C
 solidModels/thermalLinGeomSolid/thermalLinGeomSolid.C
 solidModels/thermalSolid/thermalSolid.C
-/* Not compiled: unsLinearGeometry is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it was never ported to the
-   mechanicalConstitutiveLaw framework. Reintroducing it needs a
-   tutorial; see issue #461.
-solidModels/unsLinGeomSolid/unsLinGeomSolid.C
-*/
-/* Not compiled: unsNonLinearGeometryUpdatedLagrangian is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it was never ported to the
-   mechanicalConstitutiveLaw framework. Reintroducing it needs a
-   tutorial; see issue #461.
-solidModels/unsNonLinGeomUpdatedLagSolid/unsNonLinGeomUpdatedLagSolid.C
-*/
-/* Not compiled: unsNonLinearGeometryTotalLagrangian is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it was never ported to the
-   mechanicalConstitutiveLaw framework. Reintroducing it needs a
-   tutorial; see issue #461.
-solidModels/unsNonLinGeomTotalLagSolid/unsNonLinGeomTotalLagSolid.C
-*/
 solidModels/vertexCentredLinGeomSolid/vertexCentredLinGeomSolid.C
-/* Not compiled: vertexCentredNonLinTotalLagGeometry does not currently run.
-   No tutorial selects it, so nothing exercised it; an attempt to give it one
-   failed inside the PETSc solve. Its dictionary entries useGeometricStiffness,
-   compactImplicitStencil and the material's tangentEps also have no defaults
-   and are set by no case. Fixing it is separate from the mechanical
-   constitutive law work; see the solver's README.md.
-solidModels/vertexCentredNonLinGeomTotalLagSolid/vertexCentredNonLinGeomTotalLagSolid.C
-*/
-/* Not compiled: weakThermalLinearGeometry is withdrawn. No tutorial selects it,
-   so nothing exercises it, and it inherits the framework path from
-   linearGeometryTotalDisplacement without anything having tested that it works
-   there. thermalLinearGeometry may also cover every case it was written for.
-   Reintroducing it needs a tutorial; see issue #459.
-solidModels/weakThermalLinGeomSolid/weakThermalLinGeomSolid.C
-*/
 
 fluidModels/fluidModel/fluidModel.C
 fluidModels/interFluid/interFluid.C
@@ -74,31 +41,6 @@ $(interfaceToInterface)/ggiInterfaceToInterfaceMapping/ggiInterfaceToInterfaceMa
 $(interfaceToInterface)/directMapInterfaceToInterfaceMapping/directMapInterfaceToInterfaceMapping.C
 $(interfaceToInterface)/rbfInterfaceToInterfaceMapping/rbfInterfaceToInterfaceMapping.C
 
-materialModels/mechanicalModel/mechanicalModel.C
-materialModels/mechanicalModel/dualMechanicalModel.C
-materialModels/mechanicalModel/solidSubMeshes/solidSubMeshes.C
-mechanicalLaws = materialModels/mechanicalModel/mechanicalLaws
-$(mechanicalLaws)/mechanicalLaw/mechanicalLaw.C
-$(mechanicalLaws)/mechanicalLaw/newMechanicalLaw.C
-
-linGeomLaws = $(mechanicalLaws)/linearGeometryLaws
-$(linGeomLaws)/anisotropicBiotElastic/anisotropicBiotElastic.C
-$(linGeomLaws)/linearElastic/linearElastic.C
-$(linGeomLaws)/linearElasticMisesPlastic/linearElasticMisesPlastic.C
-$(linGeomLaws)/linearElasticMohrCoulombPlastic/linearElasticMohrCoulombPlastic.C
-$(linGeomLaws)/poroMechanicalLaw/poroMechanicalLaw.C
-$(linGeomLaws)/thermoMechanicalLaw/thermoMechanicalLaw.C
-$(linGeomLaws)/viscousHookeanElastic/viscousHookeanElastic.C
-
-nonLinGeomLaws = $(mechanicalLaws)/nonLinearGeometryLaws
-$(nonLinGeomLaws)/electroMechanicalLaw/electroMechanicalLaw.C
-$(nonLinGeomLaws)/GuccioneElastic/GuccioneElastic.C
-$(nonLinGeomLaws)/HolzapfelGasserOgdenElastic/HolzapfelGasserOgdenElastic.C
-$(nonLinGeomLaws)/OgdenElastic/OgdenElastic.C
-$(nonLinGeomLaws)/MooneyRivlinElastic/MooneyRivlinElastic.C
-$(nonLinGeomLaws)/neoHookeanElastic/neoHookeanElastic.C
-$(nonLinGeomLaws)/neoHookeanElasticMisesPlastic/neoHookeanElasticMisesPlastic.C
-$(nonLinGeomLaws)/StVenantKirchhoffElastic/StVenantKirchhoffElastic.C
 materialModels/thermalModel/thermalModel.C
 thermalLaws = materialModels/thermalModel/thermalLaws
 $(thermalLaws)/thermalLaw/thermalLaw.C
@@ -109,6 +51,8 @@ mechanicalConstitutiveLaw/mechanicalConstitutiveLawState.C
 mechanicalConstitutiveLaw/mechanicalConstitutiveLawStateIO.C
 mechanicalConstitutiveLaw/mechanicalConstitutiveLawInputs.C
 mechanicalConstitutiveLaw/mechanicalConstitutiveLawCaseInputs.C
+mechanicalConstitutiveLaw/mechanicalConstitutiveLawInputGatherer.C
+mechanicalConstitutiveLaw/mechanicalConstitutiveLawStateSetup.C
 mechanicalConstitutiveLaw/integrationPointTopology/integrationPointTopology.C
 mechanicalConstitutiveLaw/integrationPointTopology/cellCentredIntegrationPointTopology.C
 mechanicalConstitutiveLaw/integrationPointTopology/compactCellIntegrationPointTopology.C

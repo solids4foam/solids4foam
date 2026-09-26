@@ -44,14 +44,13 @@ fi
 
 # The case is run to a small fraction of the full ramp time, so the resulting
 # peak von Mises stress is well below the case maximum but still well above
-# zero. Both arms land near 155 Pa - legacy 154.986, framework 154.725 at the
-# time of writing - so the band below is wide enough to absorb the difference
-# between forks and solvers while still being an oracle: [1, 1e7] admitted
-# almost any number a run could produce, and so tested nothing on its own.
+# zero. It lands near 155 Pa - 154.725 at the time of writing - so the band
+# below is wide enough to absorb the difference between forks and solvers
+# while still being an oracle: [1, 1e7] admitted almost any number a run could
+# produce, and so tested nothing on its own.
 #
-# The arms are also required to agree with each other within 1% further down,
-# which is the sharper of the two checks. This one catches the case where both
-# arms move together.
+# The petsc arm is also required to stay within 1% of the removed legacy
+# model's answer further down, which is the sharper of the two checks.
 SIGMA_MIN=1.0e2
 SIGMA_MAX=2.5e2
 
@@ -67,12 +66,23 @@ SIGMA_MAX=2.5e2
 SIGMA_PD_MIN=6.8e2
 SIGMA_PD_MAX=7.6e2
 
+# The petsc arm's Max sigmaEq on the removed legacy mechanicalModel, from the
+# last commit that had it (mcl-stage8-coverage, c3a92b3d), on OpenFOAM.com
+# v2512, the one fork the petsc arm runs on. The framework is not expected to
+# match it exactly: its GuccioneElastic builds Q from the isochoric strain,
+# where the legacy law built it from the full Green-Lagrange strain, so shape
+# and volume are separated in one and coupled in the other. Both reduce to the
+# published model in the incompressible limit it was written for. The 1% bound
+# says the reformulation is the only thing between them; the framework reads
+# 154.725 here, 0.17% below
+LEGACY_PETSC_SIGMA=154.986
+LEGACY_PETSC_REL_TOL=0.01
+
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     "petsc"
-    "petscManager"
     "pressureDisplacement"
 )
 
@@ -108,31 +118,18 @@ loosen_pressureDisplacement_tolerances() {
             -e 's/^\(\s*nCorrectors\s*\)[0-9]\+\s*;/\1            200;/' \
             -e 's/^\(\s*solutionTolerance\s*\)[0-9eE.+-]\+\s*;/\1      1e-04;/' \
             -e 's/^\(\s*alternativeTolerance\s*\)[0-9eE.+-]\+\s*;/\1   1e-03;/' \
-            -e 's/^\(\s*materialTolerance\s*\)[0-9eE.+-]\+\s*;/\1      1e-03;/' \
             "${file}"
         rm -f "${file}.bak"
     fi
 }
 
-# The pressureDisplacement arm runs on the mechanicalConstitutiveLaw
-# framework. The legacy GuccioneElastic pressureDisplacement mode does not get
-# past the second step at any time step or tolerance tried, and did not before
-# the framework existed either; the framework path converges in a few hundred
-# iterations a step (#466). The framework law takes its penalty from
-# bulkModulus, which the legacy dictionary has no entry for; 1e15 makes it
-# fully incompressible, as nu = 0.5 is on the legacy path, since
-# coupledPressureDisplacementSolid then drops the penalty to zero
-use_framework_for_pressureDisplacement() {
-    local dir="$1"
-    local switch="    useMechanicalConstitutiveLawManager yes;"
-
-    sed -i \
-        "/coupledPressureDisplacementSolidCoeffs/,/{/ s|{|{\n${switch}|" \
-        "${dir}/solidProperties"
-    sed -i \
-        's|^\( *\)k k \[|\1bulkModulus bulkModulus [ 1 -1 -2 0 0 0 0 ] 1e15;\n\1k k [|' \
-        "${dir}/mechanicalProperties"
-}
+# There is no legacy answer for the pressureDisplacement arm to be compared
+# with. The legacy GuccioneElastic pressureDisplacement mode did not get past
+# the second step at any time step or tolerance tried, and did not before the
+# framework existed either; the framework converges in a few hundred iterations
+# a step (#466). The framework law takes its penalty from bulkModulus, which
+# the tutorial sets to 1e15 so that the material is fully incompressible, as
+# nu = 0.5 made it on the legacy path
 
 prepare_case() {
     local case_dir="$1"
@@ -158,8 +155,6 @@ prepare_case() {
     if [[ "${approach}" == "pressureDisplacement" ]]; then
         loosen_pressureDisplacement_tolerances \
             "${case_dir}/caseOptions/${approach}/constant/solidProperties"
-        use_framework_for_pressureDisplacement \
-            "${case_dir}/caseOptions/${approach}/constant"
     fi
 }
 
@@ -249,25 +244,12 @@ for approach in "${APPROACHES[@]}"; do
         continue
     fi
 
-    # And each arm has to have taken the path it was set up for, or the
-    # comparison below is a run against itself
-    if [[ "${approach}" == "petscManager" \
-       || "${approach}" == "pressureDisplacement" ]]; then
-        if ! grep -q "Selecting mechanical constitutive law" \
-            "${case_dir}/${SOLVER_LOGFILE}"
-        then
-            echo "FAIL: ${approach}: did not use the framework"
-            failures=$((failures + 1))
-            continue
-        fi
-    elif [[ "${approach}" == "petsc" ]]; then
-        if grep -q "Selecting mechanical constitutive law" \
-            "${case_dir}/${SOLVER_LOGFILE}"
-        then
-            echo "FAIL: ${approach}: used the framework"
-            failures=$((failures + 1))
-            continue
-        fi
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${case_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: ${approach}: constructed no mechanical constitutive law"
+        failures=$((failures + 1))
+        continue
     fi
 
     sigma=$(extract_max_sigma "${case_dir}")
@@ -295,28 +277,20 @@ for approach in "${APPROACHES[@]}"; do
     fi
 
     if [[ "${approach}" == "petsc" ]]; then
-        legacy_sigma="${sigma}"
-    elif [[ "${approach}" == "petscManager" ]]; then
-        framework_sigma="${sigma}"
+        petsc_sigma="${sigma}"
     fi
 done
 
-# The two petsc arms are the same case and the same solver, differing only in
-# where the stress comes from. They are not expected to agree exactly: the
-# framework's GuccioneElastic builds Q from the isochoric strain where the
-# legacy law builds it from the full Green-Lagrange strain, so shape and
-# volume are separated in one and coupled in the other. Both reduce to the
-# published model in the incompressible limit it was written for. What the
-# bound says is that the reformulation is the only thing between them
-if [[ -n "${legacy_sigma:-}" && -n "${framework_sigma:-}" ]]; then
-    if awk "BEGIN {exit !((${framework_sigma} - ${legacy_sigma})^2 \
-        <= (0.01*${legacy_sigma})^2)}"
+# The petsc arm against the removed legacy model, within the reformulation
+if [[ -n "${petsc_sigma:-}" ]]; then
+    if awk "BEGIN {exit !((${petsc_sigma} - ${LEGACY_PETSC_SIGMA})^2 \
+        <= (${LEGACY_PETSC_REL_TOL}*${LEGACY_PETSC_SIGMA})^2)}"
     then
-        printf "PASS: framework near legacy, differing by the reformulation (%.6g vs %.6g)\n" \
-            "${legacy_sigma}" "${framework_sigma}"
+        printf "PASS: near the legacy model, differing by the reformulation (%.6g vs %.6g)\n" \
+            "${petsc_sigma}" "${LEGACY_PETSC_SIGMA}"
     else
-        printf "FAIL: framework and legacy differ by more than the reformulation explains (%.6g vs %.6g)\n" \
-            "${legacy_sigma}" "${framework_sigma}"
+        printf "FAIL: differs from the legacy model by more than the reformulation explains (%.6g vs %.6g)\n" \
+            "${petsc_sigma}" "${LEGACY_PETSC_SIGMA}"
         failures=$((failures + 1))
     fi
 fi
@@ -332,19 +306,20 @@ fi
 # not apply, because the active tension is not derived from a potential - so
 # this is where it does apply
 run_split_check() {
-    # Run on any arm that actually selected the framework, so a renamed or
-    # added framework arm remains covered while a meshed legacy arm is not
-    # selected merely because it appears first (#466)
+    # Run on any meshed arm that selected a mechanical constitutive law, so a
+    # renamed or added arm remains covered, while an arm that stopped before
+    # constructing its law is not selected merely because it appears first
+    # (#466)
     local d
     for d in "${REGRESSION_ROOT}"/*; do
         [[ -d "${d}/constant/polyMesh" ]] || continue
         grep -q "Selecting mechanical constitutive law" \
             "${d}/${SOLVER_LOGFILE}" 2>/dev/null || continue
 
-        if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-            echo "SKIP: mechanicalConstitutiveLaw checks (not in PATH)"
-            return 0
-        fi
+        # A skip where the application is not built, and a failure in CI,
+        # where it always is
+        solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+            || return $(( $? - 1 ))
 
         if ! ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
         then
@@ -364,7 +339,7 @@ run_split_check() {
         return 0
     done
 
-    echo "SKIP: mechanicalConstitutiveLaw checks (the framework arm did not run)"
+    echo "SKIP: mechanicalConstitutiveLaw checks (neither arm ran here)"
     return 0
 }
 

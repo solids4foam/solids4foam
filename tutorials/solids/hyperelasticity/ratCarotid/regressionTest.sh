@@ -36,24 +36,26 @@ fi
 #
 # An artery wall, two symmetric fibre families, inflated to 25 kPa.
 #
-# Two formulations, and only one of them currently completes.
+# Two formulations, both on the mechanicalConstitutiveLaw framework, and only
+# one of them currently completes.
 #
-# The legacy one - coupledPressureDisplacementSolid with the legacy
-# HolzapfelGasserOgdenElastic - is foam-extend only and does not reach the end
-# time: it stalls at a relative residual of about 0.99 and dies at t = 0.68.
-# That is longstanding rather than a regression; the same failure happens on
-# the development branch this work started from. It is not run here.
+# coupledPressureDisplacementSolid (./Allrun pressureDisplacement) is
+# foam-extend only and does not reach the end time: it stalls at a relative
+# residual near 1 and stops at t = 0.3, when the deformation gradient inverts.
+# That is longstanding rather than a regression - with the former legacy
+# HolzapfelGasserOgdenElastic it stalled the same way and stopped at t = 0.68.
+# It is not run here.
 #
-# The framework one - nonLinearGeometryTotalLagrangianTotalDisplacement with
-# solvePressure, taking its stress from the mechanicalConstitutiveLaw
-# framework - runs to completion on any fork, which is what this checks.
+# nonLinearGeometryTotalLagrangianTotalDisplacement with solvePressure, the
+# default, runs to completion on any fork, which is what this checks.
 #
-# The framework arm requires pressure stabilisation. With momentum
-# stabilisation disabled it reaches t = 0.12 before the nonlinear solve stalls.
-# A representative momentum scale of 1 completes the case; the previous value
-# of 100 was unnecessarily large. These terms affect the discrete equations,
-# so this test makes no quantitative legacy-versus-framework equivalence claim.
-# It instead pins the framework result and verifies the constitutive-law checks.
+# It requires pressure stabilisation. With momentum stabilisation disabled it
+# reaches t = 0.12 before the nonlinear solve stalls. A representative
+# momentum scale of 1 completes the case; the previous value of 100 was
+# unnecessarily large. These terms affect the discrete equations, and the
+# legacy law never completed the case, so there is no legacy answer to compare
+# with: this test pins the framework result and verifies the constitutive-law
+# checks.
 # ============================================================
 
 echo "============================================================"
@@ -62,14 +64,14 @@ echo "============================================================"
 
 failures=0
 
-# Reference: the framework arm's own converged answer at the end time. The
+# Reference: the case's own converged answer at the end time. The
 # bounds are wide enough to survive a compiler or PETSc version change and
 # narrow enough to catch the material or the formulation moving
 MAG_D_MIN=3.2e-4
 MAG_D_MAX=3.5e-4
 
-run_framework() {
-    local d="${REGRESSION_ROOT}/framework"
+run_case() {
+    local d="${REGRESSION_ROOT}/main"
 
     rm -rf "${d}"; mkdir -p "${d}"
     for item in "${SCRIPT_DIR}"/*; do
@@ -80,19 +82,19 @@ run_framework() {
     ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
     if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"; then
-        echo "SKIP: framework arm (the tutorial skipped here)"
+        echo "SKIP: the tutorial skipped here"
         return 0
     fi
 
     if ! grep -q "Selecting mechanical constitutive law" \
         "${d}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the framework arm did not use the framework"
+        echo "FAIL: the case constructed no mechanical constitutive law"
         return 1
     fi
 
     if ! grep -q "^End" "${d}/${SOLVER_LOGFILE}"; then
-        echo "FAIL: the framework arm did not run to completion"
+        echo "FAIL: the case did not run to completion"
         tail -n 5 "${d}/${SOLVER_LOGFILE}" || true
         return 1
     fi
@@ -100,7 +102,7 @@ run_framework() {
     if grep -qE "Nonlinear solve did not converge|SNES convergence error" \
         "${d}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the framework arm did not converge"
+        echo "FAIL: the case did not converge"
         return 1
     fi
 
@@ -118,17 +120,17 @@ run_framework() {
     m=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
 
     if [[ -z "${m}" ]]; then
-        echo "FAIL: the framework arm produced no displacement history"
+        echo "FAIL: the case produced no displacement history"
         return 1
     fi
 
     if ! awk "BEGIN {exit !((${t} - 1.0)^2 <= 1e-12)}"; then
-        printf "FAIL: the framework arm stopped at t = %s, not the end time\n" \
+        printf "FAIL: the case stopped at t = %s, not the end time\n" \
             "${t}"
         return 1
     fi
 
-    echo "PASS: the framework arm ran to completion and converged"
+    echo "PASS: the case ran to completion and converged"
 
     if awk "BEGIN {exit !(${m} >= ${MAG_D_MIN} && ${m} <= ${MAG_D_MAX})}"; then
         printf "PASS: final inner-wall |D| = %.6g\n" "${m}"
@@ -140,12 +142,20 @@ run_framework() {
 
     # The law's own checks, which are what pins the constitutive port: an
     # honest isochoric split, and a fibre term that matches its closed form
-    if command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
+    local testApp=0
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw || testApp=$?
+
+    # A failure in CI, where the application is always built
+    if (( testApp == 2 )); then
+        return 1
+    fi
+
+    if (( testApp == 0 )); then
         local u="${REGRESSION_ROOT}/lawChecks"
         rm -rf "${u}"; mkdir -p "${u}"
         cp -a "${d}/constant" "${d}/system" "${u}/"
         rm -f "${u}/constant/solidProperties"
-        cp -a "${d}/constant/solidProperties.framework" \
+        cp -a "${d}/constant/solidProperties.totalLagrangian" \
               "${u}/constant/solidProperties"
 
         # The closed-form fibre check needs the fibres along the stretch, so
@@ -180,14 +190,9 @@ run_framework() {
     return 0
 }
 
-if ! run_framework; then
+if ! run_case; then
     failures=$((failures + 1))
 fi
-
-echo
-echo "NOTE: the legacy arm is not run. On foam-extend 4.1 it stalls and dies"
-echo "      at t = 0.68, identically on the development branch, so there is"
-echo "      no working reference to compare the ported law against."
 
 echo
 if (( failures == 0 )); then

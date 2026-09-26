@@ -68,6 +68,78 @@ Foam::dictionary Foam::mechanicalConstitutiveLaw::subLawDict
 }
 
 
+void Foam::mechanicalConstitutiveLaw::fillScalarTangent
+(
+    mechanicalConstitutiveLawResponse& response,
+    const scalar Kfull,
+    const scalar Kdev
+)
+{
+    if (!response.wantsScalarTangent())
+    {
+        return;
+    }
+
+    const scalar Keff =
+        response.tangentReq() == tangentRequest::scalarDeviatoric
+      ? Kdev
+      : Kfull;
+
+    UIndirectList<scalar>& K = response.scalarTangent();
+
+    forAll(K, i)
+    {
+        K[i] = Keff;
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLaw::fourthOrderByFiniteDifferenceOnly
+(
+    const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    mechanicalConstitutiveLawResponse& response
+) const
+{
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLaw::fourthOrderByFiniteDifferenceOnly
+(
+    const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    mechanicalConstitutiveLawResponse& response
+) const
+{
+    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
+    {
+        finiteDifferenceFourthOrder(kin, inputs, state, response);
+    }
+    else if (response.tangentReq() == tangentRequest::fourthOrder)
+    {
+        FatalErrorInFunction
+            << "An analytical fourth-order tangent is not implemented for "
+            << type() << "." << nl
+            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
+            << "differences." << exit(FatalError);
+    }
+}
+
+
 void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,

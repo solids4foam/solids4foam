@@ -68,7 +68,6 @@ The following `solidModel` options are particularly relevant here:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `writeResidualField` | `false` | Writes a residual field during output |
@@ -114,7 +113,6 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     nCorrectors          10000;
     solutionTolerance    1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance    1e-05;
     infoFrequency        100;
 
     restart              false;
@@ -227,7 +225,7 @@ are:
 - geometry is evaluated in the reference configuration;
 - `D` is the primary variable;
 - `F`, `Finv`, and `J` are updated from `grad(D)`;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver supports segregated implicit and PETSc SNES paths only.
 
 The class inherits from `solidModel` and `foamPetscSnesHelper`.

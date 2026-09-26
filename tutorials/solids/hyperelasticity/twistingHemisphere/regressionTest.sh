@@ -36,18 +36,22 @@ REGRESSION_END_TIME=6
 REGRESSION_ANGLE=40
 INDENTATION_CHECK_TIME=3.5
 
-# Calibrated with foam-extend-4.1 on the shipped coarse mesh:
-#   vertical force = 1.01883 at t = 3.5
-#   vertical force = 1.23495 and twisting torque = 0.218597 at t = 6
-INDENTATION_FORCE_MIN=1.008
-INDENTATION_FORCE_MAX=1.029
-FORCE_MIN=1.225
-FORCE_MAX=1.245
-TORQUE_MIN=0.212
-TORQUE_MAX=0.225
+# Calibrated with foam-extend-4.1 on the shipped coarse mesh, with the
+# material-aware gradient that two materials need on the constitutive law
+# framework (leastSquaresS4f; the removed legacy model ran extendedLeastSquares
+# and gave 1.01883, 1.23495 and 0.218597):
+#   vertical force = 1.02623 at t = 3.5
+#   vertical force = 1.27665 and twisting torque = 0.214728 at t = 6
+# The bands keep the widths they had: +/- 1%, 0.8% and 3%
+INDENTATION_FORCE_MIN=1.016
+INDENTATION_FORCE_MAX=1.036
+FORCE_MIN=1.266
+FORCE_MAX=1.287
+TORQUE_MIN=0.208
+TORQUE_MAX=0.221
 
 # Allowed relative deviations from Sauer and De Lorenzis at 40 degrees
-# (calibration run: force -0.8%, torque -18.0%)
+# (calibration run: force +2.6%, torque -19.5%)
 REFERENCE_FORCE_TOLERANCE=0.03
 REFERENCE_TORQUE_TOLERANCE=0.25
 

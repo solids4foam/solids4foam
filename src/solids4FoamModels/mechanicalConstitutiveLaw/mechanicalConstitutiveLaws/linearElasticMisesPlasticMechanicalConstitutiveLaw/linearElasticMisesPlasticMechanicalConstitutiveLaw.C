@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "linearElasticMisesPlasticMechanicalConstitutiveLaw.H"
+#include "misesPlasticDiagnostics.H"
 #include "addToRunTimeSelectionTable.H"
 #include "Switch.H"
 
@@ -116,10 +117,9 @@ inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::newtonLoop
 
     // At the same equivalent plastic strain the yield function was solved
     // with, and that the strain update below uses. This law's DLambda is the
-    // equivalent plastic strain increment itself, where the legacy law's is
-    // the plastic multiplier and increments it by sqrt(2/3)*DLambda; this line
-    // kept the legacy form and so applied that factor a second time, storing a
-    // yield stress from a plastic strain the solve never visited
+    // equivalent plastic strain increment itself, not a plastic multiplier,
+    // so no sqrt(2/3) factor is applied here: applying it would store a yield
+    // stress from a plastic strain the solve never visited
     curSigmaY = yieldStress(epsilonPEq0 + DLambda);
 }
 
@@ -145,9 +145,8 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
     maxNewtonIter_(dict.lookupOrDefault<label>("NewtonMaxIter", 200)),
     finiteDiff_(dict.lookupOrDefault<scalar>("NewtonFiniteDiffEps", 0.25e-6))
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy law, so that an existing case dictionary needs no change.
-    // The legacy law tries E and nu first, so this does too
+    // The material may be given either as E and nu or as mu and K. E and nu
+    // are tried first
     if (dict.found("E") && dict.found("nu"))
     {
         E_ = dimensionedScalar(dict.lookup("E"));
@@ -207,12 +206,11 @@ linearElasticMisesPlasticMechanicalConstitutiveLaw
     {
         FatalIOErrorInFunction(dict)
             << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected -1 <= nu for linear elasticity."
+            << ". Expected -1 < nu for linear elasticity."
             << exit(FatalIOError);
     }
 
-    // Plane stress is not supported, matching the legacy
-    // linearElasticMisesPlastic
+    // Plane stress is not supported
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary
@@ -281,6 +279,27 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::declareState
 }
 
 
+Foam::scalar
+Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::
+smallStrainConvergenceScale
+(
+    const smallStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawState&
+) const
+{
+    const UIndirectList<tensor>& gradD = kin.gradD();
+
+    scalar maxMagEpsilon = 0;
+
+    forAll(gradD, i)
+    {
+        maxMagEpsilon = max(maxMagEpsilon, mag(symm(gradD[i])));
+    }
+
+    return maxMagEpsilon;
+}
+
+
 void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 (
     const smallStrainMechanicalConstitutiveLawKinematics& kin,
@@ -328,14 +347,17 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         scalarTanPtr = &response.scalarTangent();
     }
 
-    // Normalisation for Newton residual
-    // Use max equivalent strain (small strain) as a scale
-    scalar maxMagDEpsilon = SMALL;
-    forAll(sigma, i)
+    // Normalisation for the Newton residual: the largest strain magnitude,
+    // over every rank, as the manager reduces it. Over these points alone
+    // where no scale was supplied, as on the point path
+    scalar maxMagDEpsilon = inputs.convergenceScale();
+
+    if (maxMagDEpsilon <= 0)
     {
-        const symmTensor eps = symm(gradD[i]);
-        maxMagDEpsilon = max(maxMagDEpsilon, mag(eps));
+        maxMagDEpsilon = smallStrainConvergenceScale(kin, state);
     }
+
+    maxMagDEpsilon = max(maxMagDEpsilon, SMALL);
 
     // Loop over integration points
     forAll(sigma, i)
@@ -520,23 +542,8 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Fourth-order tangent.
-    // There is no analytical consistent tangent for this law yet, but the
-    // finite-difference tangent of the base class is well defined for any law
-    // and is evaluated against a shadow state, so it neither disturbs the
-    // return mapping just performed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 
@@ -548,60 +555,7 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
     DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
-    const Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
-    const Field<scalar>& epsilonPEq0 =
-        state.getScalarField0("epsilonPEq");
-
-    label nYielding = 0;
-    scalar curDEpsilonPEq = 0.0;
-    scalar maxDEpsilonPEq = 0.0;
-    forAll(epsilonPEq, i)
-    {
-        curDEpsilonPEq = epsilonPEq[i] - epsilonPEq0[i];
-
-        if (curDEpsilonPEq > SMALL)
-        {
-            ++nYielding;
-
-            maxDEpsilonPEq = max(maxDEpsilonPEq, curDEpsilonPEq);
-        }
-    }
-
-    // Reported, not reduced. The manager gathers these from the internal
-    // state and from every boundary state this law owns, and reduces once per
-    // quantity - which is what makes the boundary points countable at all,
-    // and what stops a per-patch collective from hanging on a decomposed mesh
-    typedef mechanicalConstitutiveLawDiagnostic diagnostic;
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "yielding integration points",
-            scalar(nYielding),
-            diagnostic::combineOperation::sum
-        )
-    );
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "integration points",
-            scalar(epsilonPEq.size()),
-            diagnostic::combineOperation::sum
-        )
-    );
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "max DEpsilonPEq",
-            maxDEpsilonPEq,
-            diagnostic::combineOperation::maximum
-        )
-    );
+    appendMisesPlasticDiagnostics(state, diagnostics);
 }
 
 
@@ -610,20 +564,7 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::reportDiagnostics
     const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
-    if (!debug || diagnostics.size() != 3)
-    {
-        return;
-    }
-
-    // Same wording as before, and the same debug switch decides it. The
-    // numbers are larger than they used to be, because the boundary
-    // integration points are counted now: they were skipped entirely while
-    // the reducing happened in here
-    Info<< nl << "Max DEpsilonPEq is " << diagnostics[2].value() << nl
-        << "Number of yielding integration points = "
-        << label(diagnostics[0].value())
-        << "/" << label(diagnostics[1].value())
-        << nl << endl;
+    reportMisesPlasticDiagnostics(debug, diagnostics);
 }
 
 

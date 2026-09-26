@@ -102,7 +102,7 @@ awk -v srcOut="$tmpDir/sources" -v trailOut="$tmpDir/trailer" '
     # they contain must be left for wmake to expand
     /^(LIB|EXE)[ \t]*=/ { print > trailOut; next }
 
-    # Path variables, e.g. "linGeomLaws = $(mechanicalLaws)/linearGeometryLaws"
+    # Path variables, e.g. "thermalLaws = materialModels/thermalModel/thermalLaws"
     /^[A-Za-z_][A-Za-z0-9_]*[ \t]*=/ {
         name = $0; sub(/[ \t]*=.*$/, "", name)
         value = $0; sub(/^[^=]*=[ \t]*/, "", value)

@@ -20,18 +20,36 @@ fi
 RADIUS_STRESS_ERR_MAX=0.03
 THETA_POINT_ERR_MAX=0.01
 
-# Largest relative difference allowed between the point displacements of the
-# legacy and framework arms. The two are different discretisations - the legacy
-# arm takes its gradient per material on sub-meshes, the framework arm from the
-# material-aware leastSquaresS4f scheme on the whole mesh - so their cell
-# displacements differ by about 1.5e-3 of the largest displacement, and the
-# point displacements by 1.5e-3 on both foam-extend 4.1 and OpenFOAM.com
-# v2512. Interpolating the framework displacement to the points with
-# foam-extend's least squares fit, which straddles the interface, instead
-# puts the difference at 4.9e-3, so the threshold separates the two
-POINT_D_ARM_REL_MAX=3e-3
+# The point displacement of the removed legacy mechanicalModel, as the max and
+# mean component magnitude of its final pointD, from the last commit that had
+# it (mcl-stage8-coverage, c3a92b3d), per fork. The two are different
+# discretisations - the legacy model took its gradient per material on
+# sub-meshes, the framework takes it from the material-aware leastSquaresS4f
+# scheme on the whole mesh - so their cell displacements differ by about 1.5e-3
+# of the largest displacement, and the point displacements by 1.5e-3 on both
+# foam-extend 4.1 and OpenFOAM.com v2512. Interpolating the framework
+# displacement to the points with foam-extend's least squares fit, which
+# straddles the interface, instead puts the difference at 4.9e-3, so the 3e-3
+# threshold the two were compared with separates the two
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        LEGACY_POINT_D_MAX=1.62294e-07
+        LEGACY_POINT_D_MEAN=3.77074821948899e-08
+        ;;
+    foamextend)
+        LEGACY_POINT_D_MAX=1.62284e-07
+        LEGACY_POINT_D_MEAN=3.77106432123373e-08
+        ;;
+    *)
+        # The legacy model never ran this case here, so there is no answer
+        # of its to compare with
+        LEGACY_POINT_D_MAX=""
+        LEGACY_POINT_D_MEAN=""
+        ;;
+esac
+POINT_D_LEGACY_REL_MAX=3e-3
 
-# The parallel framework arms against the serial framework arm. The solver is
+# The parallel arms against the serial arm. The solver is
 # not decomposition invariant to round-off with any gradient scheme: a single
 # material on this mesh differs from serial by 3.5e-5 in D (interface
 # decomposition) and 4.9e-5 with leastSquares, 8.2e-5 with leastSquaresS4f
@@ -95,10 +113,10 @@ sample_file() {
 # models can now take their stress from the framework, so this is no longer its
 # only runtime coverage, but it remains the only multi-material coverage
 run_constitutive_test() {
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
@@ -130,6 +148,74 @@ run_constitutive_test() {
 # Relative difference between the internal fields of two vector fields on the
 # same mesh, followed by the largest magnitude component of each, separated by
 # tabs as IFS does not split on spaces here
+# The largest magnitude of any component of a field's internal values, and the
+# mean magnitude, as "max<TAB>mean"
+internal_field_norms() {
+    python3 - "$1" << 'PYEOF'
+import re
+import sys
+
+number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+text = open(sys.argv[1]).read()
+
+uniform = re.search(
+    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
+)
+if uniform:
+    body = uniform.group(1)
+else:
+    field = re.search(
+        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
+        text,
+        re.DOTALL,
+    )
+    if not field:
+        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
+    body = field.group(1)
+
+values = [abs(float(x)) for x in re.findall(number, body)]
+if not values:
+    sys.exit(f"empty internalField in {sys.argv[1]}")
+print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
+PYEOF
+}
+
+# A field against the removed legacy model's, through the norms above. Both
+# differences are bounded by the largest pointwise difference, so a field that
+# agrees with the legacy one to tol times its largest value passes, and one
+# that does not is caught by at least one of the two in all but contrived cases
+check_field_against_legacy() {
+    local label="$1"
+    local file="$2"
+    local legacy_max="$3"
+    local legacy_mean="$4"
+    local tol="$5"
+    local norms field_max field_mean
+
+    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
+        echo "FAIL: ${label}: no field to compare with the legacy model"
+        return 1
+    fi
+
+    read -r field_max field_mean <<< "${norms}"
+
+    if awk "BEGIN {
+            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
+            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
+            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
+                && b <= ${tol}*${legacy_max})
+        }"
+    then
+        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
+            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
+        return 0
+    fi
+
+    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
+        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
+    return 1
+}
+
 compare_internal_vector_fields() {
     python3 - "$1" "$2" << 'PYEOF'
 import re
@@ -184,7 +270,7 @@ done
 if [ "$CHECK_ONLY" = false ]; then
     prepare_case
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun "${ARM:-}" > "${ALLRUN_LOGFILE}" 2>&1 )
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
@@ -286,105 +372,34 @@ if ! run_constitutive_test; then
 fi
 
 # ------------------------------------------------------------
-# The same case on the constitutive-law framework
+# Against the legacy answer
 # ------------------------------------------------------------
 # Two materials sharing an interface, which is the combination the framework
-# exists to handle without the legacy per-material subMeshes. The framework
-# arm pairs the switch with the material-aware leastSquaresS4f gradient; that
+# exists to handle without the legacy per-material subMeshes. The tutorial
+# pairs the framework with the material-aware leastSquaresS4f gradient; that
 # pairing is the replacement for the subMesh machinery, and routing the
-# framework through the subMeshes instead puts the radial stress error at
-# 0.0305 against a tolerance of 0.03
+# framework through the subMeshes instead put the radial stress error at
+# 0.0305 against the tolerance of 0.03.
+#
+# The point displacement is where the two part company: the legacy model
+# interpolated per material on its sub-meshes, and the framework on the whole
+# mesh, extrapolating each cell with its own material's gradient. The stress
+# above does not see it, as this solid model does not feed the point
+# displacement back into the solution, so it is compared directly
 if [ "$CHECK_ONLY" = false ]; then
-    FRAMEWORK_DIR="${REGRESSION_ROOT}/framework"
-    rm -rf "${FRAMEWORK_DIR}"; mkdir -p "${FRAMEWORK_DIR}"
-    for item in "${SCRIPT_DIR}"/*; do
-        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
-        cp -a "${item}" "${FRAMEWORK_DIR}/"
-    done
-
-    # Cleaned first: the copy takes whatever the tutorial directory holds,
-    # and a log or result left there by a manual run would stand in for this
-    # arm's (runParallel, for one, skips a solver whose log already exists)
-    ( cd "${FRAMEWORK_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${FRAMEWORK_DIR}" && ./Allrun framework > "${ALLRUN_LOGFILE}" 2>&1 ) \
-        || true
-
-    if solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
     then
-        echo "SKIP: the framework arm does not run in this environment"
-    elif ! grep -q "Selecting mechanical constitutive law" \
-        "${FRAMEWORK_DIR}/log.solids4Foam" 2>/dev/null
-    then
-        echo "FAIL: the framework arm did not use the framework"
+        echo "FAIL: the case constructed no mechanical constitutive law"
         failures=$((failures + 1))
-    else
-        fw_file="$(find "${FRAMEWORK_DIR}" -name 'line_sigma:Transformed.xy' \
-            | sort | tail -n 1)"
-
-        if [[ -z "${fw_file}" ]]; then
-            echo "FAIL: the framework arm produced no sampled stress"
-            failures=$((failures + 1))
-        else
-            fw_radial="$(compute_radial_err "${fw_file}")"
-
-            if awk "BEGIN {exit !(${fw_radial} < ${RADIUS_STRESS_ERR_MAX})}"
-            then
-                printf "PASS: framework: Max radial stress error = %.6g\n" \
-                    "${fw_radial}"
-            else
-                printf "FAIL: framework: Max radial stress error = %.6g\n" \
-                    "${fw_radial}"
-                failures=$((failures + 1))
-            fi
-        fi
-
-        # The point displacement is where the two arms part company: the
-        # legacy arm interpolates per material on its sub-meshes, and the
-        # framework arm on the whole mesh, extrapolating each cell with its
-        # own material's gradient. The stress above does not see it, as this
-        # solid model does not feed the point displacement back into the
-        # solution, so compare it directly against the legacy arm
-        lg_time="$(solids4Foam::latestTime "${CASE_DIR}")"
-        fw_time="$(solids4Foam::latestTime "${FRAMEWORK_DIR}")"
-        lg_pointD="${CASE_DIR}/${lg_time}/pointD"
-        fw_pointD="${FRAMEWORK_DIR}/${fw_time}/pointD"
-
-        if grep -q "Selecting mechanical constitutive law" \
-            "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
-        then
-            # Only when ARM selects the framework for the main case too
-            echo "SKIP: point displacement comparison (main arm is not legacy)"
-        elif [[ -z "${lg_time}" || "${lg_time}" != "${fw_time}" ]]; then
-            echo "FAIL: the arms reached different times" \
-                "('${lg_time}' vs '${fw_time}')"
-            failures=$((failures + 1))
-        elif [[ ! -f "${lg_pointD}" || ! -f "${fw_pointD}" ]]; then
-            echo "FAIL: an arm wrote no pointD"
-            failures=$((failures + 1))
-        elif ! pointD_cmp=$(compare_internal_vector_fields \
-            "${lg_pointD}" "${fw_pointD}")
-        then
-            echo "FAIL: could not compare the pointD fields"
-            failures=$((failures + 1))
-        else
-            read -r pointD_rel lg_max fw_max <<< "${pointD_cmp}"
-
-            # A zero legacy field would make any comparison pass
-            if ! awk "BEGIN {exit !(${lg_max} > 1e-9 && ${fw_max} > 1e-9)}"
-            then
-                printf "FAIL: pointD is trivially small (%.4g, %.4g)\n" \
-                    "${lg_max}" "${fw_max}"
-                failures=$((failures + 1))
-            elif awk "BEGIN {exit !(${pointD_rel} < ${POINT_D_ARM_REL_MAX})}"
-            then
-                printf "PASS: framework: pointD relative diff to legacy = %.4g\n" \
-                    "${pointD_rel}"
-            else
-                printf "FAIL: framework: pointD relative diff to legacy = %.4g\n" \
-                    "${pointD_rel}"
-                failures=$((failures + 1))
-            fi
-        fi
+    elif [[ -z "${LEGACY_POINT_D_MAX}" ]]; then
+        echo "SKIP: pointD against the legacy model: no legacy answer on this fork"
+    elif ! check_field_against_legacy "pointD" \
+        "${CASE_DIR}/$(solids4Foam::latestTime "${CASE_DIR}")/pointD" \
+        "${LEGACY_POINT_D_MAX}" "${LEGACY_POINT_D_MEAN}" \
+        "${POINT_D_LEGACY_REL_MAX}"
+    then
+        failures=$((failures + 1))
     fi
 fi
 
@@ -395,7 +410,7 @@ fi
 # so an interface face is a processor face on both sides, and a simple one
 # whose processor boundaries cut across the interface, so the material
 # filter meets processor faces of both materials. Each is held to the
-# analytical bound and to the serial framework arm
+# analytical bound and to the serial arm
 run_parallel_arm() {
     local decomposition="$1"
     local arm="parallel-${decomposition}"
@@ -409,7 +424,7 @@ run_parallel_arm() {
     done
 
     ( cd "${dir}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${dir}" && ./Allrun framework parallel "${decomposition}" \
+    ( cd "${dir}" && ./Allrun parallel "${decomposition}" \
         > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
     if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
@@ -473,7 +488,7 @@ run_parallel_arm() {
     fi
 
     local sr_time par_time fld cmp rel sr_max par_max
-    sr_time="$(solids4Foam::latestTime "${FRAMEWORK_DIR}")"
+    sr_time="$(solids4Foam::latestTime "${CASE_DIR}")"
     par_time="$(solids4Foam::latestTime "${dir}")"
 
     if [[ -z "${sr_time}" || "${sr_time}" != "${par_time}" ]]
@@ -485,7 +500,7 @@ run_parallel_arm() {
 
     for fld in D pointD; do
         if ! cmp=$(compare_internal_vector_fields \
-            "${FRAMEWORK_DIR}/${sr_time}/${fld}" "${dir}/${par_time}/${fld}")
+            "${CASE_DIR}/${sr_time}/${fld}" "${dir}/${par_time}/${fld}")
         then
             echo "FAIL: ${arm}: could not compare ${fld} with the serial arm"
             failures=$((failures + 1))
@@ -543,7 +558,7 @@ cellSet outer delete cellToCell inner
 SETEOF
 
     ( cd "${dir}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${dir}" && ./Allrun framework > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+    ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
     if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
     then
@@ -570,9 +585,7 @@ SETEOF
     fi
 }
 
-if [ "$CHECK_ONLY" = false ] && [[ -n "${FRAMEWORK_DIR:-}" ]] \
-    && ! solids4Foam::regressionCaseSkipped "${FRAMEWORK_DIR}/${ALLRUN_LOGFILE}"
-then
+if [ "$CHECK_ONLY" = false ]; then
     run_parallel_arm interface
     run_parallel_arm simple
     run_one_cell_thick_arm

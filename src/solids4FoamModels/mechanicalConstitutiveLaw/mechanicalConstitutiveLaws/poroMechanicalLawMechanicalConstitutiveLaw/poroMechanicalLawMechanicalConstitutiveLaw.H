@@ -35,10 +35,9 @@ Description
     sigmaEff = sigma + b*(p + p0)*I, and the sub-law is given that field to
     work in. For a sub-law that computes its stress purely from the kinematics
     and its own history this makes no difference to the answer. For one whose
-    strength depends on the stress state - Mohr-Coulomb is the case the legacy
-    law calls out - it is the difference between the sub-law seeing effective
-    stress and seeing total stress, so it is reproduced rather than simplified
-    away.
+    strength depends on the stress state - Mohr-Coulomb, say - it is the
+    difference between the sub-law seeing effective stress and seeing total
+    stress, so it is kept rather than simplified away.
 
     The pore pressure is a live coupling input, gathered by the manager on
     every evaluation. It is not state: it is solved for elsewhere.
@@ -151,6 +150,20 @@ public:
         virtual wordList requiredScalarInputs() const override
         {
             return wordList(1, pName_);
+        }
+
+        //- The sub-law's convergence scale, over its own state, so that a
+        //  plastic sub-law is judged by the scale the manager reduces
+        virtual scalar smallStrainConvergenceScale
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const override
+        {
+            return subLawPtr_->smallStrainConvergenceScale
+            (
+                kin, state.child(subStateName_)
+            );
         }
 
         //- The sub-law's history lives in a child state

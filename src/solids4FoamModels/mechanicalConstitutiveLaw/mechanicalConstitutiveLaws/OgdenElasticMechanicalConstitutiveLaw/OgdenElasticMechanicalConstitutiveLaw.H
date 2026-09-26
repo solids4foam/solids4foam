@@ -25,8 +25,8 @@ Description
 
         p_i = sum_k mu_k * lambda_i^alpha_k
 
-    and are rotated back with the eigenvectors of the right Cauchy-Green
-    tensor. The deviatoric part of that, less the linearised shear modulus,
+    and are assembled along the eigenvectors of the left Cauchy-Green
+    tensor, the current principal directions. The deviatoric part of that,
     plus a volumetric term, gives the Cauchy stress.
 
 SourceFiles
@@ -74,7 +74,8 @@ class OgdenElasticMechanicalConstitutiveLaw
         //- Bulk modulus
         dimensionedScalar K_;
 
-        //- Linearised shear modulus, mu1 + mu2 + mu3
+        //- Small-strain shear modulus, 0.5*(mu1*alpha1 + mu2*alpha2
+        //  + mu3*alpha3), which the scalar tangent is built from
         dimensionedScalar mu_;
 
 

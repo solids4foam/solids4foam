@@ -4,8 +4,7 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-LEGACY_DIR="${REGRESSION_ROOT}/legacy"
-FRAMEWORK_DIR="${REGRESSION_ROOT}/framework"
+CASE_DIR="${REGRESSION_ROOT}/main"
 SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
 if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
@@ -48,19 +47,36 @@ PEAK_FORCE_MAX=82.4
 FINAL_FORCE_MIN=60.8
 FINAL_FORCE_MAX=62.0
 
-# The framework arm against the legacy arm: the largest difference in force_y
-# over the whole history, relative to the legacy peak.
+# The answer of the removed legacy mechanicalModel, from the last commit that
+# had it (mcl-stage8-coverage, c3a92b3d), on foam-extend 4.1: the crack patch
+# size, and the force_y history as time and force, written to twelve figures.
+# The case is held to the history row by row, the largest difference relative
+# to the legacy peak.
 #
-# Measured at zero: the two force histories are identical to the 12
-# significant figures written, with the same iteration counts and the same
-# faces broken at the same iterations. The two paths are the same linear
-# elastic law, so any difference is round-off. The bound matters more
+# The framework reproduced it exactly: the two force histories were identical
+# to the 12 significant figures written, with the same iteration counts and
+# the same faces broken at the same iterations. The two paths are the same
+# linear elastic law, so any difference is round-off. The bound matters more
 # than it would on a smooth problem: breaking a face is a threshold, and a
-# difference in the implicit stiffness the cohesive law takes its penalty from,
-# or in the stress on the new crack faces, changes which face breaks when,
-# which moves the force by per cent. 1e-6 leaves room for round-off across
-# compilers and is far below that
-FRAMEWORK_FORCE_REL_TOL=1e-6
+# difference in the implicit stiffness the cohesive law takes its penalty
+# from, or in the stress on the new crack faces, changes which face breaks
+# when, which moves the force by per cent. 1e-6 leaves room for round-off
+# across compilers and is far below that
+LEGACY_CRACK_FACES=44
+LEGACY_FORCE_HISTORY="
+0 0
+1 26.1319882895
+2 44.4955884866
+3 58.1396766671
+4 69.2483734867
+5 78.671274439
+6 81.6216548573
+7 73.9834926861
+8 71.0552239168
+9 64.2618226861
+10 61.4154571245
+"
+LEGACY_FORCE_REL_TOL=1e-6
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -72,7 +88,7 @@ echo "crackingBeams regression test"
 echo "Crack patch faces at t = ${END_TIME} in [${CRACK_FACES_MIN}, ${CRACK_FACES_MAX}]"
 echo "Peak force_y at t = ${PEAK_TIME} in [${PEAK_FORCE_MIN}, ${PEAK_FORCE_MAX}] N"
 echo "Final force_y in [${FINAL_FORCE_MIN}, ${FINAL_FORCE_MAX}] N"
-echo "Framework vs legacy force_y rel. diff <= ${FRAMEWORK_FORCE_REL_TOL}"
+echo "force_y history against the legacy model, rel. diff <= ${LEGACY_FORCE_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -168,42 +184,23 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    prepare_arm "${LEGACY_DIR}"
-    prepare_arm "${FRAMEWORK_DIR}"
-
-    # The two arms differ in this one entry and nothing else. It goes inside
-    # the solid model's coeffs sub-dictionary, which is where the model reads
-    # it
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${FRAMEWORK_DIR}/constant/solidProperties"
-
-    if ! grep -q "useMechanicalConstitutiveLawManager" \
-        "${FRAMEWORK_DIR}/constant/solidProperties"
-    then
-        echo "FAIL: could not set the framework switch on the framework arm"
-        exit 1
-    fi
+    prepare_arm "${CASE_DIR}"
 
     # A failed run is reported by the checks below rather than by set -e, so
-    # that both arms are run and cleaned up
-    ( cd "${LEGACY_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
-    ( cd "${FRAMEWORK_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+    # that the case is still cleaned up
+    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
 fi
 
 clean_arms() {
     if [ "$CHECK_ONLY" = false ]; then
-        local d
-        for d in "${LEGACY_DIR}" "${FRAMEWORK_DIR}"; do
-            ( cd "${d}" && ./Allclean > /dev/null 2>&1 ) || true
-        done
+        ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     fi
 }
 
 # The case only runs on foam-extend, where crackerFvMesh is built
-if solids4Foam::regressionCaseSkipped "${LEGACY_DIR}/${ALLRUN_LOGFILE}"; then
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     echo "Skipping regression checks because the tutorial skipped in this environment"
     clean_arms
     exit 0
@@ -217,142 +214,119 @@ fail() {
 }
 
 # ------------------------------------------------------------
-# The legacy arm against the measured answer
+# Against the measured answer
 # ------------------------------------------------------------
 
-legacy_time=""
-legacy_faces=""
-legacy_peak_force=""
+case_time=""
+case_faces=""
+case_peak_force=""
 
-if ! arm_completed "${LEGACY_DIR}"; then
-    fail "the legacy arm did not complete and converge"
+if ! arm_completed "${CASE_DIR}"; then
+    fail "the case did not complete and converge"
 else
-    legacy_time=$(solids4Foam::latestTime "${LEGACY_DIR}")
+    case_time=$(solids4Foam::latestTime "${CASE_DIR}")
 
-    if [[ -z "${legacy_time}" ]] \
-        || ! awk "BEGIN {exit !((${legacy_time} - ${END_TIME})^2 <= 1e-20)}"
+    if [[ -z "${case_time}" ]] \
+        || ! awk "BEGIN {exit !((${case_time} - ${END_TIME})^2 <= 1e-20)}"
     then
-        fail "the legacy arm stopped at '${legacy_time}'; expected ${END_TIME}"
+        fail "the case stopped at '${case_time}'; expected ${END_TIME}"
     fi
 
-    legacy_faces=$(crack_patch_faces "${LEGACY_DIR}")
-    breaks=$(logged_breaks "${LEGACY_DIR}")
+    case_faces=$(crack_patch_faces "${CASE_DIR}")
+    breaks=$(logged_breaks "${CASE_DIR}")
 
-    if [[ -z "${legacy_faces}" ]]; then
+    if [[ -z "${case_faces}" ]]; then
         fail "could not read the ${CRACK_PATCH} patch size"
-    elif (( legacy_faces != 2*breaks )); then
-        fail "${CRACK_PATCH} patch has ${legacy_faces} faces but ${breaks} breaks were logged"
-    elif in_range "${legacy_faces}" "${CRACK_FACES_MIN}" "${CRACK_FACES_MAX}"
+    elif (( case_faces != 2*breaks )); then
+        fail "${CRACK_PATCH} patch has ${case_faces} faces but ${breaks} breaks were logged"
+    elif in_range "${case_faces}" "${CRACK_FACES_MIN}" "${CRACK_FACES_MAX}"
     then
-        echo "PASS: ${CRACK_PATCH} patch faces = ${legacy_faces} (${breaks} breaks)"
+        echo "PASS: ${CRACK_PATCH} patch faces = ${case_faces} (${breaks} breaks)"
     else
-        fail "${CRACK_PATCH} patch faces = ${legacy_faces} (${breaks} breaks)"
+        fail "${CRACK_PATCH} patch faces = ${case_faces} (${breaks} breaks)"
     fi
 
-    if [[ ! -f "${LEGACY_DIR}/${FORCE_FILE}" ]]; then
-        fail "the legacy arm wrote no ${FORCE_FILE}"
+    if [[ ! -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
+        fail "the case wrote no ${FORCE_FILE}"
     else
-        read -r peak_time legacy_peak_force <<< "$(peak_force "${LEGACY_DIR}")"
-        legacy_final_force=$(final_force "${LEGACY_DIR}")
+        read -r peak_time case_peak_force <<< "$(peak_force "${CASE_DIR}")"
+        case_final_force=$(final_force "${CASE_DIR}")
 
-        if [[ -z "${legacy_peak_force}" || -z "${legacy_final_force}" ]]; then
+        if [[ -z "${case_peak_force}" || -z "${case_final_force}" ]]; then
             fail "could not extract the force history"
         else
-            if in_range "${legacy_peak_force}" \
+            if in_range "${case_peak_force}" \
                 "${PEAK_FORCE_MIN}" "${PEAK_FORCE_MAX}" \
              && awk "BEGIN {exit !((${peak_time} - ${PEAK_TIME})^2 <= 1e-20)}"
             then
                 printf "PASS: peak force_y = %.6g N at t = %s\n" \
-                    "${legacy_peak_force}" "${peak_time}"
+                    "${case_peak_force}" "${peak_time}"
             else
-                fail "peak force_y = ${legacy_peak_force} N at t = ${peak_time}"
+                fail "peak force_y = ${case_peak_force} N at t = ${peak_time}"
             fi
 
-            if in_range "${legacy_final_force}" \
+            if in_range "${case_final_force}" \
                 "${FINAL_FORCE_MIN}" "${FINAL_FORCE_MAX}"
             then
-                printf "PASS: final force_y = %.6g N\n" "${legacy_final_force}"
+                printf "PASS: final force_y = %.6g N\n" "${case_final_force}"
             else
-                fail "final force_y = ${legacy_final_force} N"
+                fail "final force_y = ${case_final_force} N"
             fi
         fi
     fi
 fi
 
 # ------------------------------------------------------------
-# The framework arm against the legacy arm
+# Against the legacy answer
 #
 # The cohesive zone laws take their penalty stiffness from the field the solid
-# model registers as impK, looked up by name. On the framework arm that is
-# frameworkImpK(), so this is the test of it for fracture, as curvedBeams is
-# for contact and 3dTube is for fluid-solid interaction. It is also the
-# framework's first run on a mesh whose topology changes: the crack patch
-# gains faces as it cracks, and the framework's boundary addressing and the
-# solid model's density have to follow
+# model registers as impK, looked up by name, which is lawImpK(), so this
+# is the test of it for fracture, as curvedBeams is for contact and 3dTube is
+# for fluid-solid interaction. It is also the framework's run on a mesh whose
+# topology changes: the crack patch gains faces as it cracks, and the
+# framework's boundary addressing and the solid model's density have to follow
 # ------------------------------------------------------------
 
-# Each arm must have taken the path it was set up for, or the comparison is a
-# run against itself
 if grep -q "Selecting mechanical constitutive law" \
-    "${FRAMEWORK_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
+    "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
 then
-    echo "PASS: framework arm took the framework path"
+    echo "PASS: the material came from the framework"
 else
-    fail "the framework arm did not use the framework"
+    fail "the case constructed no mechanical constitutive law"
 fi
 
-if grep -q "Selecting mechanical constitutive law" \
-    "${LEGACY_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
-then
-    fail "the legacy arm used the framework"
-else
-    echo "PASS: legacy arm took the legacy path"
-fi
-
-if ! arm_completed "${FRAMEWORK_DIR}"; then
-    fail "the framework arm did not complete and converge"
-elif [[ -n "${legacy_time}" && -n "${legacy_faces}" \
-     && -n "${legacy_peak_force}" ]]
-then
-    framework_time=$(solids4Foam::latestTime "${FRAMEWORK_DIR}")
-    framework_faces=$(crack_patch_faces "${FRAMEWORK_DIR}")
-
-    if [[ "${framework_time}" != "${legacy_time}" ]]; then
-        fail "the arms reached different times ('${legacy_time}' vs '${framework_time}')"
-    fi
-
+if [[ -n "${case_faces}" && -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
     # Breaking is a threshold, so the same answer breaks exactly the same
     # faces
-    if [[ "${framework_faces}" == "${legacy_faces}" ]]; then
-        echo "PASS: framework arm ${CRACK_PATCH} patch faces = ${framework_faces}"
+    if [[ "${case_faces}" == "${LEGACY_CRACK_FACES}" ]]; then
+        echo "PASS: ${CRACK_PATCH} patch faces = ${case_faces}, as the legacy model"
     else
-        fail "framework arm ${CRACK_PATCH} patch faces = '${framework_faces}', legacy ${legacy_faces}"
+        fail "${CRACK_PATCH} patch faces = '${case_faces}', legacy model ${LEGACY_CRACK_FACES}"
     fi
 
-    if [[ ! -f "${FRAMEWORK_DIR}/${FORCE_FILE}" ]]; then
-        fail "the framework arm wrote no ${FORCE_FILE}"
-    else
-        # Row by row, over the whole history, both arms having written the
-        # same times
-        if rel=$(awk -v peak="${legacy_peak_force}" '
-                !/^#/ && NF >= 3 {
-                    if (FNR == NR) {f[$1] = $3; n++; next}
-                    if (!($1 in f)) {bad = 1; exit}
-                    d = $3 - f[$1]; if (d < 0) d = -d
-                    if (d > m) m = d
-                    k++
-                }
-                END {if (bad || k != n || n == 0) exit 1; printf "%.6g", m/peak}
-            ' "${LEGACY_DIR}/${FORCE_FILE}" "${FRAMEWORK_DIR}/${FORCE_FILE}")
-        then
-            if awk "BEGIN {exit !(${rel} <= ${FRAMEWORK_FORCE_REL_TOL})}"; then
-                echo "PASS: framework and legacy force_y agree, max rel. diff = ${rel}"
-            else
-                fail "framework and legacy force_y differ, max rel. diff = ${rel}"
-            fi
+    # Row by row, over the whole history, the case having written the times
+    # the legacy model did
+    if rel=$(awk '
+            FNR == NR {
+                if (NF == 2) {f[$1] = $2; n++; if ($2 > peak) peak = $2}
+                next
+            }
+            !/^#/ && NF >= 3 {
+                if (!($1 in f)) {bad = 1; exit}
+                d = $3 - f[$1]; if (d < 0) d = -d
+                if (d > m) m = d
+                k++
+            }
+            END {if (bad || k != n || n == 0) exit 1; printf "%.6g", m/peak}
+        ' <(echo "${LEGACY_FORCE_HISTORY}") "${CASE_DIR}/${FORCE_FILE}")
+    then
+        if awk "BEGIN {exit !(${rel} <= ${LEGACY_FORCE_REL_TOL})}"; then
+            echo "PASS: force_y history matches the legacy model, max rel. diff = ${rel}"
         else
-            fail "the two arms' force histories have different times"
+            fail "force_y history differs from the legacy model, max rel. diff = ${rel}"
         fi
+    else
+        fail "the force history has different times from the legacy model's"
     fi
 fi
 

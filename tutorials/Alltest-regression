@@ -100,6 +100,15 @@ rm -rf "${REG_ROOT}"
 mkdir -p "${REG_ROOT}"
 
 # List of regression test directories (relative to tutorials/)
+#
+# Every tutorial with a regressionTest.sh is listed, except two whose scripts
+# are run by hand:
+#   fluidSolidInteraction/cerebralAneurysm, which meshes with cfMesh's
+#     cartesianMesh and fails, rather than skipping, where that cannot run
+#   solids/poroelasticity/suctionCaission, which takes about eleven minutes,
+#     and whose stress band holds on OpenFOAM.com and OpenFOAM.org but not on
+#     foam-extend, where the case reads 7.2e5 against [1.5e6, 2.2e6], as the
+#     removed legacy model also did
 REGRESSION_TESTS=(
     "solids/elastoplasticity/perforatedPlate"
     "solids/elastoplasticity/cooksMembrane"
@@ -116,6 +125,8 @@ REGRESSION_TESTS=(
     "solids/hyperelasticity/cylinderCrush"
     "solids/hyperelasticity/blockPunch"
     "solids/hyperelasticity/longWall"
+    "solids/hyperelasticity/LandEtAl2015/problem3"
+    "solids/hyperelasticity/ratCarotid"
     "solids/hyperelasticity/cantileverVibration"
     "solids/hyperelasticity/cooksMembrane"
     "solids/hyperelasticity/compressedSpheres"
@@ -139,6 +150,7 @@ REGRESSION_TESTS=(
     "solids/linearElasticity/wobblyNewton"
     "solids/multiMaterial/layeredPipe"
     "solids/poroelasticity/rodAndSeabed"
+    "solids/poroelasticity/stripFooting"
     "solids/thermoelasticity/hotSphere"
     "solids/thermoelasticity/slabCooling"
     "solids/thermoelasticity/hotCylinder/hotCylinder"
@@ -155,6 +167,8 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
     "fluidSolidInteraction/fillingElasticContainer"
+    # Not tutorials: tests kept under tests/, run the same way
+    "../tests/mechanicalConstitutiveLaw/lawChecks"
 )
 
 failures=0
@@ -174,9 +188,12 @@ run_regression_test()
 {
     local testCase="$1"
     local srcCase="${ROOT_DIR}/${testCase}"
-    local dstCase="${REG_ROOT}/${testCase}"
-    local logFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
-    local statusFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    # A test outside tutorials is named from here, as ../tests/..., and is
+    # copied into the regression tree without the leading ../, which would
+    # otherwise put the copy on top of the source and delete it
+    local dstCase="${REG_ROOT}/${testCase#../}"
+    local logFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').log"
+    local statusFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').status"
     local status=0
 
     echo
@@ -243,8 +260,8 @@ done
 wait
 
 for testCase in "${REGRESSION_TESTS[@]}"; do
-    LOG_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
-    STATUS_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    LOG_FILE="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').log"
+    STATUS_FILE="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').status"
 
     echo
     echo "------------------------------------------------------------"

@@ -41,20 +41,21 @@ Description
     treated as linear hardening with a closed-form return; three or more points
     are treated as nonlinear and solved with a local Newton iteration.
 
-    Note on the hydrostatic stress. The legacy neoHookeanElasticMisesPlastic
-    law passes its hydrostatic stress through updateSigmaHyd, which optionally
-    solves a Laplacian smoothing equation over the whole field. As for
-    MooneyRivlinElastic, that is deliberately not done here: a
-    mechanicalConstitutiveLaw is a pure function of integration-point
-    kinematics and old-time state, and pressure smoothing stabilises the
-    discretisation rather than describing the material, so it belongs to the
-    solid model. Cases setting smoothPressure will therefore not reproduce
-    their legacy results through this law until the solid model provides the
-    smoothing.
+    Note on the hydrostatic stress. The optional Laplacian smoothing of the
+    hydrostatic stress over the whole field (solvePressureEqn) is deliberately
+    not done here, as for MooneyRivlinElastic: a mechanicalConstitutiveLaw is
+    a pure function of
+    integration-point kinematics and old-time state, and pressure smoothing
+    stabilises the discretisation rather than describing the material, so it
+    belongs to the solid model, which does it when the law entry sets
+    solvePressureEqn (see solidModel::smoothHydrostaticStress()). Both that
+    and the mixed displacement-pressure formulation (solvePressure) ask this
+    law for its isochoric stress s/J and its volumetric response p/J
+    separately: J2 plasticity is isochoric, so the return mapping touches s
+    alone and p is purely elastic.
 
-    The legacy law also under-relaxes the plastic strain increment between
-    outer iterations, which is solver-loop behaviour with no equivalent here,
-    and is likewise absent.
+    The plastic strain increment is not under-relaxed between outer
+    iterations: that is solver-loop behaviour, with no place in a law.
 
     This class implements only the constitutive response at a collection
     of integration points. Storage and management of history variables
@@ -112,7 +113,7 @@ class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
         //  mu and K instead
         dimensionedScalar E_;
 
-        //- Poisson's ration
+        //- Poisson's ratio
         dimensionedScalar nu_;
 
         //- Second Lamé parameter (shear modulus)
@@ -227,6 +228,28 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return kappa_;
+        }
+
+        //- This law separates its isochoric and volumetric responses. The
+        //  stress is (p I + s)/J with p = K (J^2 - 1)/2, and J2 plasticity is
+        //  isochoric: the return mapping acts on the deviatoric Kirchhoff
+        //  stress s alone and leaves p purely elastic. So s/J is the
+        //  isochoric stress and p/J is dU/dJ for
+        //  U(J) = 0.25*K*(J^2 - 1 - 2*log(J)), exactly as the total is built
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
+        }
+
+        //- But the isochoric stress is not a function of the isochoric
+        //  deformation alone once the material yields: the yield surface is
+        //  the Cauchy yield stress scaled by J, so the radius the return
+        //  mapping brings the Kirchhoff stress s back to changes with a
+        //  superposed dilation. It is invariant only while every point is
+        //  elastic, which is not a property worth claiming
+        virtual bool isochoricStressIsDilationInvariant() const override
+        {
+            return false;
         }
 
     // Edit

@@ -39,25 +39,19 @@ Description
         U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)),   dU/dJ = 0.5*K*(J^2 - 1)/J
 
     which is what lets this law answer a mixed displacement-pressure
-    formulation. The legacy HolzapfelGasserOgdenElastic has no volumetric term
-    at all: it is written for exact incompressibility and reads the solid
-    model's pressure out of the object registry to supply the whole spherical
-    part of its stress. A law that reaches for a field the solid model happens
-    to have registered cannot be evaluated for a tangent, restarted, or asked
-    what it would do at a perturbed deformation, so that is not reproduced
-    here. Instead the pressure enters the way it does for every other law in
-    this framework: the solid model asks for the isochoric stress and the
-    volumetric response separately and replaces the second with what it
-    solved. A large bulk modulus approaches the incompressible limit the
-    legacy law assumes outright.
+    formulation. The law does not read the solid model's pressure out of the
+    object registry to supply the spherical part of its stress: a law that
+    reaches for a field the solid model happens to have registered cannot be
+    evaluated for a tangent, restarted, or asked what it would do at a
+    perturbed deformation. Instead the pressure enters the way it does for
+    every other law in this framework: the solid model asks for the isochoric
+    stress and the volumetric response separately and replaces the second
+    with what it solved. A large bulk modulus approaches the incompressible
+    limit.
 
-    Nothing selects this law yet. coupledPressureDisplacementSolid is the only
-    consumer of the legacy one, and it calls mechanical().correct() with no
-    framework switch, so it cannot reach this. It does already carry a penalty
-    term in its pressure equation - fvm::Sp(rKappa_, Dp_) with rKappa_ = 1/K -
-    which is a reason to expect the shapes to match when that solid model is
-    ported rather than evidence that they do. How that term is linearised is
-    an open question that comes with the port.
+    coupledPressureDisplacementSolid, the solid model this law is used with,
+    carries the matching penalty term in its pressure equation -
+    fvm::Sp(rKappa_, Dp_) with rKappa_ = 1/K.
 
     The local basis is prescribed state. A case supplies Ec and Ea fields -
     calcLocCoordinates writes them - and a case whose fibres are the same
@@ -65,9 +59,9 @@ Description
     normalised here, so they need not be given normalised, and a zero-length
     basis vector is refused rather than divided by.
 
-    The fibre term is not gated on I4 > 1. The legacy law is not gated either,
-    and gating it is a change of material rather than of implementation, so it
-    is left as it is rather than quietly improved.
+    The fibre term is not gated on I4 > 1: gating it is a change of material
+    rather than of implementation, so it is left as it is rather than quietly
+    improved.
 
     Dictionary entries:
 
@@ -128,7 +122,7 @@ class HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw
         const scalar k2_;
 
         //- Angle of the fibre families from the circumferential direction,
-        //  in radians. Read in degrees, as the legacy law reads it
+        //  in radians. Read in degrees
         const scalar fibreAngle_;
 
         //- Bulk modulus, a penalty enforcing near incompressibility

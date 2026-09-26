@@ -9,38 +9,41 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-# Two formulations:
+# Two formulations, both taking the stress from the mechanicalConstitutiveLaw
+# framework:
 #
-#   framework (default) - nonLinearGeometryTotalLagrangianTotalDisplacement
-#       with solvePressure, taking its stress from the
-#       mechanicalConstitutiveLaw framework. Runs on any fork, and runs to
-#       completion.
+#   totalLagrangian (default) -
+#       nonLinearGeometryTotalLagrangianTotalDisplacement with solvePressure.
+#       Runs on any fork, and runs to completion.
 #
-#   legacy - coupledPressureDisplacementSolid with the legacy
-#       HolzapfelGasserOgdenElastic. foam-extend only, and it does not reach
-#       the end time: it stalls at a relative residual of about 0.99 and dies
-#       at t = 0.68. That is longstanding, not a regression - the same failure
-#       happens on the development branch.
-APPROACH="framework"
+#   pressureDisplacement - coupledPressureDisplacementSolid. foam-extend only,
+#       and it does not reach the end time: the nonlinear iteration stalls at a
+#       relative residual near 1 and the run stops at t = 0.3, when the
+#       deformation gradient inverts. That is longstanding rather than a
+#       regression - with the former legacy material model it stalled the
+#       same way and stopped at t = 0.68.
+APPROACH="totalLagrangian"
 for arg in "$@"; do
-    if [[ "$arg" == "legacy" ]]; then APPROACH="legacy"; fi
+    if [[ "$arg" == "pressureDisplacement" ]]; then
+        APPROACH="pressureDisplacement"
+    fi
 done
 echo "Using the $APPROACH formulation"
 
-if [[ "${APPROACH}" == "legacy" ]]
+if [[ "${APPROACH}" == "pressureDisplacement" ]]
 then
     solids4Foam::caseOnlyRunsWithFoamExtend
 else
-    # The framework formulation solves with PETSc SNES
+    # The total Lagrangian formulation solves with PETSc SNES
     solids4Foam::requirePetscOrExitSilently
 fi
 
-# A previous framework run may have left the active dictionaries as symlinks.
-# Restore the preprocessing/legacy dictionaries before running utilities.
+# A previous run may have left the active dictionaries as symlinks. Restore the
+# preprocessing dictionaries before running utilities.
 rm -f constant/solidProperties system/fvSchemes system/fvSolution
-cp constant/solidProperties.legacy constant/solidProperties
+cp constant/solidProperties.pressureDisplacement constant/solidProperties
 cp system/fvSchemes.preprocess system/fvSchemes
-cp system/fvSolution.legacy system/fvSolution
+cp system/fvSolution.pressureDisplacement system/fvSolution
 
 # Compile case-local utilities
 (cd src && bash ./Allwmake -s) || exit 1
@@ -63,7 +66,7 @@ mkdir 0
 cp -r 0.orig/psi0 ./0
 cp -r 0.orig/psi1 ./0
 
-if [[ "${APPROACH}" == "legacy" ]]
+if [[ "${APPROACH}" == "pressureDisplacement" ]]
 then
     cp -r 0.orig/Dp ./0
     cp -r 0.orig/DD ./0
@@ -74,14 +77,14 @@ else
 fi
 
 # Calculate local coordinate systems. This runs against the case's own
-# schemes, before the framework ones are put in place: it needs a gradient
-# scheme that the solver's fvSchemes does not carry
+# schemes, before the total Lagrangian ones are put in place: it needs a
+# gradient scheme that the solver's fvSchemes does not carry
 runApplication calcLocCoordinates
 
-if [[ "${APPROACH}" == "framework" ]]; then
-    cp constant/solidProperties.framework constant/solidProperties
-    cp system/fvSolution.framework system/fvSolution
-    cp system/fvSchemes.framework system/fvSchemes
+if [[ "${APPROACH}" == "totalLagrangian" ]]; then
+    cp constant/solidProperties.totalLagrangian constant/solidProperties
+    cp system/fvSolution.totalLagrangian system/fvSolution
+    cp system/fvSchemes.totalLagrangian system/fvSchemes
 fi
 
 # Run solver

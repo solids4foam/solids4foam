@@ -29,7 +29,9 @@ ddtSchemes
 
 gradSchemes
 {
-     default                extendedLeastSquares 0;
+    // With more than one material, the gradient has to keep each cell's
+    // stencil within its own material
+    default                 leastSquaresS4f;
 }
 
 divSchemes

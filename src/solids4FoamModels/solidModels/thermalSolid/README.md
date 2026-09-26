@@ -37,10 +37,7 @@ rigid solid.
 ```warning
 No mechanical equation is solved. If you need the deformation as well as the
 temperature, use
-[thermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/thermalLinGeomSolid.html)
-for a strongly coupled solve, or
-[weakThermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/weakThermalLinGeomSolid.html)
-for a one-way coupled one.
+[thermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/thermalLinGeomSolid.html).
 ```
 
 ### Supported solution algorithms
@@ -156,7 +153,7 @@ heat equation only.
 
 The constructor calls the base `solidModel` constructor, constructs the
 `thermalModel` from the mesh, builds `rhoC_` as
-`thermal.C()*mechanical().rho()` and `k_` from `thermal.k()`, reads `T`
+`thermal.C()` times the initial density and `k_` from `thermal.k()`, reads `T`
 (`MUST_READ`), creates `grad(T)`, reads `absoluteTemperatureTolerance`, and
 forces creation of `T.oldTime()`.
 

@@ -123,6 +123,41 @@ protected:
             mechanicalConstitutiveLawResponse& response
         ) const;
 
+        //- Fill the scalar tangent the response asks for, if it asks for
+        //  one: Kfull for a scalar request and Kdev for a scalarDeviatoric
+        //  one, the same at every point. Kdev is the Laplacian surrogate for
+        //  div(dev(sigma)), which a mixed formulation uses because it carries
+        //  the volumetric response in an equation of its own
+        static void fillScalarTangent
+        (
+            mechanicalConstitutiveLawResponse& response,
+            const scalar Kfull,
+            const scalar Kdev
+        );
+
+        //- The fourth-order tangent of a law with no analytical one: by
+        //  finite differences when that is asked for, and refused, naming
+        //  the law, when an analytical one is. The finite-difference tangent
+        //  is well defined for any law and is evaluated against a shadow
+        //  state, so it disturbs neither the stress just computed nor the
+        //  history it started from
+        void fourthOrderByFiniteDifferenceOnly
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            mechanicalConstitutiveLawResponse& response
+        ) const;
+
+        //- Finite-strain counterpart of the above
+        void fourthOrderByFiniteDifferenceOnly
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            mechanicalConstitutiveLawResponse& response
+        ) const;
+
 
 public:
 
@@ -229,14 +264,22 @@ public:
             return wordList();
         }
 
+        //- Names of fields this law could read as coupling inputs but has not
+        //  been asked to, using a substitute of its own instead, such as a
+        //  prescribed constant. The manager warns if one of them is
+        //  registered, since the case would then run without the field it has
+        virtual wordList optionalScalarInputs() const
+        {
+            return wordList();
+        }
+
         //- A sub-law's dictionary, carrying the entries it needs from the
         //  composite's own.
         //
         //  Two kinds of entry live on the parent and have to reach the child.
         //  A case gives rho once, on the composite, because it describes one
-        //  material; the legacy laws get away with not passing it down because
-        //  they read it only when asked and nothing asks a sub-law, where a
-        //  framework law reads its material properties when it is constructed.
+        //  material, and a law reads its material properties when it is
+        //  constructed.
         //  And the manager injects planeStress and solutionD into each
         //  top-level law's dictionary, which is not where a sub-law looks.
         //
@@ -400,10 +443,20 @@ public:
             return 0;
         }
 
-        //- Optional hook called once at the end of each time step.
-        //  Default implementation does nothing.
-        //  Can be used for diagnostics, logging, or state bookkeeping.
+        //- The small-strain counterpart of localConvergenceScale, reduced and
+        //  supplied by the manager in the same way. Named apart rather than
+        //  overloaded, so that a law overriding one does not hide the other
+        virtual scalar smallStrainConvergenceScale
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics&,
+            const mechanicalConstitutiveLawState&
+        ) const
+        {
+            return 0;
+        }
+
         //- Report what this law did over the time step, for one state.
+        //  Called once at the end of each time step; does nothing by default.
         //
         //  Append to the list; do not reduce. The manager calls this for the
         //  internal state and for every boundary state the law owns, and does

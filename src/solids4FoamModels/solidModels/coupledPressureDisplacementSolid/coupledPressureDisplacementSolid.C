@@ -25,6 +25,7 @@ License
 
 #include "wedgeFvPatchFields.H"
 #include "symmetryFvPatchFields.H"
+#include "emptyFvPatchFields.H"
 #include "blockSymmPlaneFvPatchVectorField.H"
 // #include "blockRadialSlipFvPatchVectorField.H"
 #include "tractionPressureDisplacementFvPatchVectorField.H"
@@ -87,19 +88,13 @@ addToRunTimeSelectionTable
 
 tmp<volScalarField> coupledPressureDisplacementSolid::momentumImpK() const
 {
-    if (!useMechanicalConstitutiveLawManager())
+    if (lawImpKPtr_.empty())
     {
-        return mechanical().impK();
-    }
-
-    if (frameworkImpKPtr_.empty())
-    {
-        // Announce it, so that a case which sets the switch can be shown to
-        // have taken this path
+        // Announce where the stiffness is taken from
         Info<< type() << ": taking the stiffness from the "
             << "mechanicalConstitutiveLaw framework" << endl;
 
-        frameworkImpKPtr_.set
+        lawImpKPtr_.set
         (
             new volScalarField
             (
@@ -121,7 +116,7 @@ tmp<volScalarField> coupledPressureDisplacementSolid::momentumImpK() const
         // runs with have no small-strain evaluation. It neither writes a
         // stress nor disturbs history, and is taken at the current
         // deformation gradient: the identity on a cold start and the restart
-        // value otherwise, the same state dependence the legacy impK() has
+        // value otherwise
         const volTensorField F(I + gradD().T());
         const volTensorField F0(I + gradD().oldTime().T());
         const volScalarField J(det(F));
@@ -133,50 +128,33 @@ tmp<volScalarField> coupledPressureDisplacementSolid::momentumImpK() const
         (
             F, F0, Finv, Finv0, J, J0,
             mesh().time().deltaTValue(),
-            frameworkImpKPtr_(),
+            lawImpKPtr_(),
             tangentRequest::scalarDeviatoric
         );
 
-        frameworkImpKPtr_() *= 0.75;
+        lawImpKPtr_() *= 0.75;
     }
 
-    return tmp<volScalarField>(new volScalarField(frameworkImpKPtr_()));
+    return tmp<volScalarField>(new volScalarField(lawImpKPtr_()));
 }
 
 
 tmp<surfaceScalarField> coupledPressureDisplacementSolid::momentumImpKf() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().impKf();
-    }
-
     // The framework has no separate face tangent: the face value is the
-    // interpolate of the cell one, which is what the legacy impKf() amounts
-    // to for a law whose stiffness does not vary within a material
+    // interpolate of the cell one
     return fvc::interpolate(momentumImpK());
 }
 
 
 tmp<volScalarField> coupledPressureDisplacementSolid::makeRKappa() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return 1.0/mechanical().bulkModulus()();
-    }
-
     return 1.0/mechanicalManager().kappa();
 }
 
 
 void coupledPressureDisplacementSolid::updateStress(volSymmTensorField& sigma)
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        mechanical().correct(sigma);
-        return;
-    }
-
     // Total Lagrangian: the gradient is with respect to the reference
     // configuration, as calcTraction.H takes it
     const volTensorField F(I + gradD().T());
@@ -219,12 +197,6 @@ void coupledPressureDisplacementSolid::updateStress
     surfaceSymmTensorField& sigmaf
 )
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        mechanical().correct(sigmaf);
-        return;
-    }
-
     const surfaceTensorField F(I + gradDf_.T());
     const surfaceTensorField F0(I + gradDf_.oldTime().T());
     const surfaceScalarField J(det(F));
@@ -637,7 +609,7 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
         mesh(),
         dimensionedVector("0", dimless, vector::zero)
     ),
-    frameworkImpKPtr_(),
+    lawImpKPtr_(),
     impKf_
     (
         IOobject
@@ -763,8 +735,8 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
     // DisRequired();
 
     // The point-based displacement gradient option (stdDispGrad false) has
-    // been removed: no case used it, and it tied this model to the legacy
-    // mechanicalModel. Refuse it rather than silently change the scheme.
+    // been removed: no case used it. Refuse it rather than silently change
+    // the scheme.
     if (!solidModelDict().lookupOrDefault<Switch>("stdDispGrad", true))
     {
         FatalErrorIn
@@ -777,22 +749,15 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
             << abort(FatalError);
     }
 
-    // One material on the framework path. The legacy path handles more
-    // through per-material sub-meshes, which the framework replaces, and on
-    // foam-extend - the only fork this model is built on - the framework has
-    // no per-material point interpolation to replace them with
-    if
-    (
-        useMechanicalConstitutiveLawManager()
-     && mechanicalManager().nLaws() > 1
-    )
+    // One material only: on foam-extend - the only fork this model is built
+    // on - there is no per-material point interpolation
+    if (mechanicalManager().nLaws() > 1)
     {
         FatalErrorIn
         (
             "coupledPressureDisplacementSolid::"
             "coupledPressureDisplacementSolid(...)"
-        )   << "More than one material is not supported on the "
-            << "mechanicalConstitutiveLaw framework in this solid model"
+        )   << "More than one material is not supported in this solid model"
             << abort(FatalError);
     }
 
@@ -1353,16 +1318,8 @@ bool coupledPressureDisplacementSolid::evolve()
             maxIterReached()++;
         }
 
-        // Interpolate D to pointD. For one material the legacy call is this
-        // same interpolation, and the framework path allows only one
-        if (useMechanicalConstitutiveLawManager())
-        {
-            volToPoint().interpolate(DD(), pointDD());
-        }
-        else
-        {
-            mechanical().interpolate(DD(), pointDD(), false);
-        }
+        // Interpolate D to pointD. Only one material is allowed
+        volToPoint().interpolate(DD(), pointDD());
 
         // Total point displacement
         pointD() = pointD().oldTime() + pointDD();

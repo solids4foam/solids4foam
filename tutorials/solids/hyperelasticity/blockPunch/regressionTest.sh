@@ -21,6 +21,24 @@ EXPECTED_TIME_STEPS=4
 DISP_Z_MIN=-0.159
 DISP_Z_MAX=-0.163
 
+# The segregated approach's final point-A disp_z on the removed legacy
+# mechanicalModel, from the last commit that had it (mcl-stage8-coverage,
+# c3a92b3d), per fork. This is the end-to-end comparison of the framework's
+# neoHookeanElastic against the legacy law: the framework matched it to the
+# eight digits printed, and is held to the 1e-6 relative that comparison used
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        LEGACY_SEGREGATED_DISP_Z=-0.162328
+        ;;
+    org)
+        LEGACY_SEGREGATED_DISP_Z=-0.162328
+        ;;
+    foamextend)
+        LEGACY_SEGREGATED_DISP_Z=-0.160351
+        ;;
+esac
+LEGACY_REL_TOL=1e-6
+
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
 CONSTITUTIVE_LOGFILE="log.Test-mechanicalConstitutiveLaw"
@@ -28,7 +46,6 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 
 APPROACHES=(
     segregated
-    segregatedManager
     petscSnes
     highOrder
 )
@@ -139,10 +156,10 @@ check_displacement() {
 run_constitutive_test() {
     local case_dir="$1"
 
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${case_dir}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
@@ -232,18 +249,10 @@ for approach in "${APPROACHES[@]}"; do
 
     RESULT_DISP["${approach}"]=$(extract_final_disp_z "${CASE_DIR}")
 
-    if [[ "${approach}" == "segregatedManager" ]]; then
-        if ! grep -q "Selecting mechanical constitutive law" \
-            "${CASE_DIR}/${SOLVER_LOGFILE}"
-        then
-            echo "FAIL: segregatedManager did not use the framework"
-            failures=$((failures + 1))
-        fi
-    elif [[ "${approach}" == "segregated" ]] \
-      && grep -q "Selecting mechanical constitutive law" \
-          "${CASE_DIR}/${SOLVER_LOGFILE}"
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: segregated used the framework"
+        echo "FAIL: ${approach} constructed no mechanical constitutive law"
         failures=$((failures + 1))
     fi
 
@@ -261,30 +270,23 @@ for approach in "${APPROACHES[@]}"; do
     fi
 done
 
-# segregatedManager is solidProperties.segregated plus the framework switch and
-# nothing else, so the two must agree. This is the only end-to-end comparison
-# of the framework's neoHookeanElastic against the legacy law
-#
-# The comparison is only worth anything if each arm took the path it is named
-# for. If segregatedManager quietly lost its switch it would run the legacy law
-# twice and agree perfectly, which is the most convincing possible way for this
-# test to be worthless
-if [[ -n "${RESULT_DISP[segregated]:-}" \
-   && -n "${RESULT_DISP[segregatedManager]:-}" ]]
+# The segregated approach against the legacy law
+if [[ -n "${RESULT_DISP[segregated]:-}" ]]
 then
-    a="${RESULT_DISP[segregated]}"
-    b="${RESULT_DISP[segregatedManager]}"
+    a="${LEGACY_SEGREGATED_DISP_Z}"
+    b="${RESULT_DISP[segregated]}"
 
-    if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
-        printf "PASS: legacy and framework disp_z agree (%.8g vs %.8g)\n" \
-            "$a" "$b"
+    if awk "BEGIN {exit !(($a - $b)^2 <= (${LEGACY_REL_TOL}*$a)^2)}"; then
+        printf "PASS: segregated disp_z matches the legacy model (%.8g vs %.8g)\n" \
+            "$b" "$a"
     else
-        printf "FAIL: legacy and framework disp_z differ (%.8g vs %.8g)\n" \
-            "$a" "$b"
+        printf "FAIL: segregated disp_z differs from the legacy model (%.8g vs %.8g)\n" \
+            "$b" "$a"
         failures=$((failures + 1))
     fi
-else
-    echo "SKIP: cross-check needs both segregated approaches to have run"
+elif [ "$CHECK_ONLY" = false ]; then
+    echo "FAIL: the segregated approach produced no disp_z to compare"
+    failures=$((failures + 1))
 fi
 
 echo

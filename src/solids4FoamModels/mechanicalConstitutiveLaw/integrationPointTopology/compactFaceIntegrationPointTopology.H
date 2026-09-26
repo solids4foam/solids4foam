@@ -72,6 +72,9 @@ class compactFaceIntegrationPointTopology
     //- Start of each cell's block in cellIntegrationPointIDs_
     labelList cellStartOffsets_;
 
+    //- The face each integration point lies on
+    labelList integrationPointFaces_;
+
 public:
 
     //- Runtime type information
@@ -88,7 +91,8 @@ public:
         integrationPointIDs_(),
         faceStartOffsets_(),
         cellIntegrationPointIDs_(),
-        cellStartOffsets_()
+        cellStartOffsets_(),
+        integrationPointFaces_()
     {
         if (faceToIntegrationPointIDs.size() != mesh_.nFaces())
         {
@@ -114,6 +118,21 @@ public:
         }
 
         integrationPointIDs_ = faceToIntegrationPointIDs.m();
+
+        // Each point's face, which is the row it appears in
+        integrationPointFaces_.setSize(integrationPointIDs_.size(), -1);
+        forAll(rowSizes, faceI)
+        {
+            for
+            (
+                label k = faceStartOffsets_[faceI];
+                k < faceStartOffsets_[faceI + 1];
+                ++k
+            )
+            {
+                integrationPointFaces_[integrationPointIDs_[k]] = faceI;
+            }
+        }
 
         // Gather each cell's points from its faces. A cell's faces are its
         // own, so this is the natural association; an internal face
@@ -182,6 +201,12 @@ public:
           + cellStartOffsets_[cellI],
             cellStartOffsets_[cellI + 1] - cellStartOffsets_[cellI]
         );
+    }
+
+    //- Every point lies on a face, the one whose row holds it
+    virtual label integrationPointFace(const label ipI) const override
+    {
+        return integrationPointFaces_[ipI];
     }
 
     //- Does this topology store boundary integration points per patch

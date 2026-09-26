@@ -25,8 +25,9 @@ Description
     relation in the small-strain regime, computing the Cauchy stress
     as a linear function of the symmetric displacement gradient.
 
-    The law is stateless and does not require any constitutive history
-    variables. All material parameters (e.g. Young's modulus and
+    The law keeps no constitutive history. It reads an optional residual
+    stress, sigma0, from the dictionary or, failing that, from a field of the
+    same name in the case. All material parameters (e.g. Young's modulus and
     Poisson's ratio) are read from the supplied dictionary at
     construction time.
 
@@ -41,9 +42,9 @@ Description
 
     Notes:
     - This law assumes infinitesimal strains and rotations.
-    - No constitutive state variables are required.
-    - Tangent-related quantities are not computed at this stage, but
-      may be added later if required.
+    - It provides the scalar tangent 2*mu + lambda, and (4/3)*mu for the
+      deviatoric surrogate of the mixed formulation, and the fourth-order
+      tangent both analytically and by finite differences.
 
 
 SourceFiles
@@ -84,7 +85,7 @@ class linearElasticMechanicalConstitutiveLaw
         //  mu and K instead
         dimensionedScalar E_;
 
-        //- Poisson's ration
+        //- Poisson's ratio
         dimensionedScalar nu_;
 
         //- First Lamé parameter

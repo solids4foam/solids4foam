@@ -31,16 +31,19 @@ fi
 REGRESSION_END_TIME=0.5
 EARLY_CHECK_TIME=0.25
 
-# Calibrated with foam-extend-4.1:
-#   force_y = -10.7944 N at t = 0.25 s
-#   force_x = 15.6342 N and force_y = -90.238 N at t = 0.5 s
-# The bands are approximately +/- 1% (force_y) and +/- 2% (force_x).
-EARLY_FORCE_Y_MIN=-10.91
-EARLY_FORCE_Y_MAX=-10.68
-FORCE_X_MIN=15.32
-FORCE_X_MAX=15.95
-FORCE_Y_MIN=-91.14
-FORCE_Y_MAX=-89.34
+# Calibrated with foam-extend-4.1, with the material-aware gradient that two
+# materials need on the constitutive law framework (leastSquaresS4f; the
+# removed legacy model ran extendedLeastSquares and gave -10.7944, 15.6342 and
+# -90.238):
+#   force_y = -10.8592 N at t = 0.25 s
+#   force_x = 14.8288 N and force_y = -90.0582 N at t = 0.5 s
+# The bands are +/- 1% (force_y) and +/- 2% (force_x).
+EARLY_FORCE_Y_MIN=-10.97
+EARLY_FORCE_Y_MAX=-10.75
+FORCE_X_MIN=14.53
+FORCE_X_MAX=15.13
+FORCE_Y_MIN=-90.96
+FORCE_Y_MAX=-89.16
 
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"

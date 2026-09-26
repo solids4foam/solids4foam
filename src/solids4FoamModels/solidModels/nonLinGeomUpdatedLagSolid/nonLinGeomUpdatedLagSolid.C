@@ -62,14 +62,7 @@ void nonLinGeomUpdatedLagSolid::predict()
     DD() = U()*runTime().deltaT() + 0.5*sqr(runTime().deltaT())*A_;
 
     // Update gradient of displacement increment
-    if (useMechanicalConstitutiveLawManager())
-    {
-        gradDD() = fvc::grad(DD());
-    }
-    else
-    {
-        mechanical().grad(DD(), gradDD());
-    }
+    gradDD() = fvc::grad(DD());
 
     // Relative deformation gradient
     relF_ = I + gradDD().T();
@@ -396,14 +389,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         D() = D().oldTime() + DD();
 
         // Update gradient of displacement increment
-        if (useMechanicalConstitutiveLawManager())
-        {
-            gradDD() = fvc::grad(DD());
-        }
-        else
-        {
-            mechanical().grad(DD(), gradDD());
-        }
+        gradDD() = fvc::grad(DD());
 
         // Relative deformation gradient
         relF_ = I + gradDD().T();
@@ -452,14 +438,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
     gradD() = fvc::grad(D());
 
     // Interpolate cell displacement increments to vertices
-    if (useMechanicalConstitutiveLawManager())
-    {
-        frameworkInterpolate(DD(), gradDD(), pointDD());
-    }
-    else
-    {
-        mechanical().interpolate(DD(), gradDD(), pointDD());
-    }
+    interpolatePointDisplacement(DD(), gradDD(), pointDD());
 
     // Total displacement at points
     pointD() = pointD().oldTime() + pointDD();
@@ -550,14 +529,7 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     }
 
     // Interpolate cell displacements to vertices
-    if (useMechanicalConstitutiveLawManager())
-    {
-        frameworkInterpolate(DD(), gradDD(), pointDD());
-    }
-    else
-    {
-        mechanical().interpolate(DD(), gradDD(), pointDD());
-    }
+    interpolatePointDisplacement(DD(), gradDD(), pointDD());
     // Total point displacement
     pointD() = pointD().oldTime() + pointDD();;
 
@@ -580,34 +552,9 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 }
 
 
-Foam::scalar Foam::solidModels::nonLinGeomUpdatedLagSolid::materialResidual()
-{
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().residual();
-    }
-
-    // A framework law is a pure function of the kinematics and the old-time
-    // state, and the framework deliberately does not under-relax the plastic
-    // strain increment as the legacy law does, so the constitutive update does
-    // not lag the displacement solution between outer iterations.
-    //
-    // Querying the legacy law here instead would be worse than useless: its
-    // correct() is never called on this path, so its previous-iteration fields
-    // are never stored and asking for its residual aborts
-    return 0.0;
-}
-
-
 // The high-order face quadrature does not exist on foam-extend
 void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        mechanical().correct(gradDTotalQuadPtr_(), sigmaQuad());
-        return;
-    }
-
     // The caller has just accumulated the total displacement gradient at the
     // quadrature points, so the current kinematics follow from it.
     //
@@ -638,12 +585,6 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
 
 void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        mechanical().correct(sigma());
-        return;
-    }
-
     // Derive the previous inverse from F_.oldTime() so that it corresponds to
     // the converged previous configuration. A separately stored old time of
     // inv(F_) can capture a mid-iteration value because F_ is updated again at
@@ -672,6 +613,29 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
 
     const volTensorField Finv0(inv(F_.oldTime()));
 
+    // The hydrostatic stress smoothing (solvePressureEqn): the law gives its
+    // stress in two parts, and the volumetric part is smoothed before it is
+    // added back
+    if (smoothHydrostaticStress())
+    {
+        mechanicalManager().updateStressFiniteStrainSplit
+        (
+            F_,
+            F_.oldTime(),
+            Finv,
+            Finv0,
+            J_,
+            J_.oldTime(),
+            mesh().time().deltaTValue(),
+            sigma(),
+            smoothingVolumetricResponse()
+        );
+
+        addSmoothedHydrostaticStress(sigma(), impK_, &J_);
+
+        return;
+    }
+
     mechanicalManager().updateStressFiniteStrain
     (
         F_,
@@ -689,14 +653,9 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpK() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().impK();
-    }
-
-    // Match the legacy field exactly in name, dimensions and boundary types:
-    // it is registered under "impK" and looked up by that name by the contact
-    // and cohesive zone models
+    // The name, dimensions and boundary types are not free: the field is
+    // registered under "impK" and looked up by that name by the contact and
+    // cohesive zone models
     tmp<volScalarField> tImpK
     (
         new volScalarField
@@ -723,8 +682,8 @@ Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpK() const
 
     // A tangent query, so it neither writes a stress nor disturbs history.
     // Evaluated at the total deformation gradient, which is the identity on a
-    // cold start and the restart value otherwise, the same state dependence
-    // the legacy impK() has since it is likewise frozen at construction.
+    // cold start and the restart value otherwise; impK is frozen at
+    // construction.
     //
     // The total F is used rather than the relative one even though this is an
     // updated Lagrangian solver. impK is a material stiffness scale, not an
@@ -762,14 +721,8 @@ Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpK() const
 Foam::tmp<Foam::surfaceScalarField>
 Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpKf() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().impKf();
-    }
-
-    // Interpolate the framework impK rather than asking the legacy
-    // mechanicalModel for a second, independently built field: the two must
-    // describe the same material for the Laplacian term to telescope
+    // Interpolate impK rather than building a second, independent field: the
+    // two must describe the same material for the Laplacian term to telescope
     return fvc::interpolate(impK_);
 }
 
@@ -898,7 +851,33 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 {
     DDisRequired();
 
-    // A multi-material framework run needs a material-aware gradient
+    // Refused here, at construction, rather than at the first residual
+    // evaluation, so that a case asking for it stops before it runs.
+    // The mixed formulation has not been ported to this model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
+    // stress and its volumetric response apart, and replaces the second with
+    // the solved pressure; this one asks for a total stress and takes dev()
+    // of it, which is the same thing only where what remains is trace free.
+    // Refused rather than solved approximately: the difference is a different
+    // material rather than a visible error
+    if (solvePressure())
+    {
+        FatalErrorInFunction
+            << "solvePressure is not supported by this solid model." << nl
+            << nl
+            << "    The mixed formulation replaces the law's volumetric "
+            << "response with a solved pressure. This model still recovers "
+            << "that part by taking dev() of the total stress, which is "
+            << "correct only where everything the pressure must not replace "
+            << "is trace free - true of an isotropic hyperelastic law and "
+            << "false of, for instance, an active tension along a fibre "
+            << "direction." << nl << nl
+            << "    Use nonLinearGeometryTotalLagrangianTotalDisplacement, "
+            << "which asks the law for the two apart, or disable "
+            << "solvePressure."
+            << abort(FatalError);
+    }
+
+    // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(DD().name());
 
     // Force all required old-time fields to be created
@@ -953,14 +932,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     DD().correctBoundaryConditions();
     if (restart())
     {
-        if (useMechanicalConstitutiveLawManager())
-        {
-            gradDD() = fvc::grad(DD());
-        }
-        else
-        {
-            mechanical().grad(DD(), gradDD());
-        }
+        gradDD() = fvc::grad(DD());
         relF_ = I + gradDD().T();
         relFinv_ = inv(relF_);
         relJ_ = det(relF_);
@@ -968,13 +940,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         F_.storeOldTime();
         J_.storeOldTime();
 
-        // Let the mechanical law know. The framework restores its own
-        // constitutive state through the registered state fields, so there is
-        // nothing to tell it here
-        if (!useMechanicalConstitutiveLawManager())
-        {
-            mechanical().setRestart();
-        }
+        // The framework restores its own constitutive state through the
+        // registered state fields, so there is nothing to tell it here
     }
 
     // Check the gradScheme
@@ -1037,19 +1004,8 @@ void nonLinGeomUpdatedLagSolid::makeRKappa() const
             << "Pointer already set!" << abort(FatalError);
     }
 
-    // From whichever model describes the material, as in
-    // nonLinGeomTotalLagTotalDispSolid. The two are not interchangeable: a
-    // law written for exact incompressibility in the legacy hierarchy reports
-    // GREAT and carries a finite penalty in the framework, and the pressure
-    // equation has to use the one whose stress it is replacing
-    if (useMechanicalConstitutiveLawManager())
-    {
-        rKappaPtr_.set(new volScalarField(1.0/mechanicalManager().kappa()));
-    }
-    else
-    {
-        rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
-    }
+    // From the framework, as in nonLinGeomTotalLagTotalDispSolid
+    rKappaPtr_.set(new volScalarField(1.0/mechanicalManager().kappa()));
 }
 
 
@@ -1181,31 +1137,6 @@ label nonLinGeomUpdatedLagSolid::formResidual
             << abort(FatalError);
     }
 
-    // The mixed formulation on the framework has not been ported to this
-    // model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
-    // stress and its volumetric response apart, and replaces the second with
-    // the solved pressure; this one asks for a total stress and takes dev()
-    // of it, which is the same thing only where what remains is trace free.
-    // Refused rather than solved approximately: the difference is a different
-    // material rather than a visible error
-    if (solvePressure() && useMechanicalConstitutiveLawManager())
-    {
-        FatalErrorInFunction
-            << "solvePressure is not supported by this solid model when the "
-            << "mechanicalConstitutiveLaw framework is enabled." << nl << nl
-            << "    The mixed formulation replaces the law's volumetric "
-            << "response with a solved pressure. This model still recovers "
-            << "that part by taking dev() of the total stress, which is "
-            << "correct only where everything the pressure must not replace "
-            << "is trace free - true of an isotropic hyperelastic law and "
-            << "false of, for instance, an active tension along a fibre "
-            << "direction." << nl << nl
-            << "    Use nonLinearGeometryTotalLagrangianTotalDisplacement, "
-            << "which asks the law for the two apart, or disable one of "
-            << "solvePressure and useMechanicalConstitutiveLawManager."
-            << abort(FatalError);
-    }
-
     if (highOrderResidual())
     {
         // Update cell-centre displacement increment gradient
@@ -1217,14 +1148,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     else
     {
         // Update displacement increment gradient
-        if (useMechanicalConstitutiveLawManager())
-        {
-            gradDD() = fvc::grad(DD);
-        }
-        else
-        {
-            mechanical().grad(DD, gradDD());
-        }
+        gradDD() = fvc::grad(DD);
     }
 
     // Relative deformation gradient
@@ -1524,19 +1448,11 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         // not currently apply matrix under-relaxation to the high-order
         // Jacobian assembled directly into PETSc. If this becomes important
         // for robustness, an equivalent relaxation step may need to be added.
-        // From whichever model describes the material. This K is combined
-        // with impK_ to recover a shear modulus, so mixing the framework's
-        // stiffness with the legacy model's bulk modulus gives a shear
-        // modulus for neither: a law written for exact incompressibility in
-        // the legacy hierarchy reports GREAT
+        // This K is combined with impK_ to recover a shear modulus, so it
+        // must come from the framework too
         tmp<volScalarField> tK
         (
-            useMechanicalConstitutiveLawManager()
-          ? tmp<volScalarField>
-            (
-                new volScalarField(mechanicalManager().kappa())
-            )
-          : mechanical().bulkModulus()
+            new volScalarField(mechanicalManager().kappa())
         );
         const volScalarField& K = tK();
 
@@ -1690,7 +1606,7 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
 
     // // Calculate the deformed points
     // const pointField deformedPoints =
-    //     mechanical().volToPoint().interpolate
+    //     volToPoint().interpolate
     //     (
     //         mesh().boundaryMesh()[patchID],
     //         DD_
@@ -1768,24 +1684,8 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
         clearLeastSquaresData();
     }
 
-    // One or the other, not both. The base call runs the legacy laws'
-    // end-of-step work, which is not the no-op it looks like -
-    // linearElasticMohrCoulombPlastic updates strain, plastic fields and
-    // diagnostics there, and others recompute an effective stiffness. On a
-    // framework run those laws are never evaluated, so that work is done on
-    // stale inputs and read by nothing
-    if (useMechanicalConstitutiveLawManager())
-    {
-        mechanicalManager().endTimeStep();
-
-        // The base call is skipped on this branch, so the quadrature history
-        // it would have rolled over is rolled over here
-        rollOverQuadratureHistory();
-    }
-    else
-    {
-        solidModel::updateTotalFields();
-    }
+    // Roll over the constitutive state and the quadrature history
+    solidModel::updateTotalFields();
 }
 
 

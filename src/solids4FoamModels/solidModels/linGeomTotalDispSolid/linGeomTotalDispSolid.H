@@ -39,6 +39,7 @@ SourceFiles
 #include "solidModel.H"
 #include "mechanicalConstitutiveLawManager.H"
 #include "integrationPointTopologies.H"
+#include "mat66.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
@@ -116,15 +117,15 @@ class linGeomTotalDispSolid
     // Private Member Functions
 
         //- Return the implicit stiffness, from the constitutive law framework
-        //  when the framework is in use and from the
-        //  legacy mechanicalModel otherwise
         tmp<volScalarField> makeImpK() const;
 
-        //- Return the reciprocal of the bulk modulus, from the same source
+        //- Return the reciprocal of the bulk modulus, from the constitutive
+        //  law framework
         tmp<volScalarField> makeRKappa() const;
 
         //- Update the stress at the face quadrature points of the high-order
-        //  discretisation, from the same source as correctStress()
+        //  discretisation.
+        //  The high-order discretisation does not exist on foam-extend
         void correctStressQuad();
 
         //- Somewhere for the laws to put their volumetric response
@@ -137,9 +138,15 @@ class linGeomTotalDispSolid
         //- Replace the volumetric part of the stress with the solved pressure
         void replaceVolumetricStress(const volScalarField& p);
 
-        //- Update the cell-centred stress, from the framework when the
-        //  framework is in use and from the legacy mechanicalModel otherwise
+        //- Update the cell-centred stress
         void correctStress();
+
+        //- This model smooths the hydrostatic stress on request, in
+        //  correctStress(), in its implicit segregated algorithm
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return true;
+        }
 
         //- Return the material tangent at mesh faces, indexed by face, for
         //  the high-order Jacobian
@@ -226,10 +233,6 @@ public:
 
             //- Update the size of the time-step
             virtual void setDeltaT(Time& runTime);
-
-            //- Material residual, zero on the framework path: see the
-            //  base class declaration
-            virtual scalar materialResidual() override;
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();

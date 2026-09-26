@@ -36,8 +36,8 @@ Description
     same name stand in for it would all be wrong.
 
     Where nothing in the run solves for it, the temperature can be read at
-    each time step from another case directory, given as TcaseDirectory as on
-    the legacy law, or in an inputCaseDirectories sub-dictionary. That is the
+    each time step from another case directory, given as TcaseDirectory or in
+    an inputCaseDirectories sub-dictionary. That is the
     manager's business, not this law's, and works for any law's inputs: see
     mechanicalConstitutiveLawCaseInputs.
 
@@ -153,6 +153,20 @@ public:
         virtual wordList requiredScalarInputs() const override
         {
             return wordList(1, TName_);
+        }
+
+        //- The sub-law's convergence scale, over its own state, so that a
+        //  plastic sub-law is judged by the scale the manager reduces
+        virtual scalar smallStrainConvergenceScale
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const override
+        {
+            return subLawPtr_->smallStrainConvergenceScale
+            (
+                kin, state.child(subStateName_)
+            );
         }
 
         //- The sub-law's history lives in a child state

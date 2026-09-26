@@ -62,6 +62,14 @@ Description
          registerTopology key, and - where the case has more than one
          material - a face shared by two materials with no collapse rule to
          combine them, which must be refused where a rule is accepted.
+     11. A field given per cell reaches a point on a face as the interpolated
+         face value, for a face-centred and a compact face topology alike,
+         including on a processor face, and a point in a cell as the cell
+         value.
+     12. With one material, each surfaceField overload gives the stress, and
+         for small strain the scalar tangent, that the flat-list overload
+         gives on the face-centred topology, on the internal faces and on
+         every patch that holds values.
 
 Author
     Philip Cardiff, UCD.
@@ -80,6 +88,7 @@ Author
 #include "mechanicalConstitutiveLaw.H"
 #include "finiteStrainMechanicalConstitutiveLawKinematics.H"
 #include "OFstream.H"
+#include "mechanicalConstitutiveLawGather.H"
 
 using namespace Foam;
 
@@ -171,6 +180,298 @@ tensor testGradD(const vector& p)
             0.40 - 0.20*x,   -0.50 + 0.25*y*y,  0.30 - 0.10*z,
             0.15 + 0.10*x*y,  0.25 - 0.05*y*z,  0.60 + 0.20*z*z
         );
+}
+
+
+//- 12. The surfaceField overloads agree with the flat-list overload.
+//  Both evaluate the same law on the same face-centred topology, so with one
+//  material, where nothing is collapsed, they must give the same answer: the
+//  same stress, the same tangent and the same convergence scale. Evaluated
+//  twice within one time step, so from the same history. Called before every
+//  exit, since the finite-strain-only laws leave early
+void checkSurfaceOverloads
+(
+    const fvMesh& mesh,
+    const Time& runTime,
+    mechanicalConstitutiveLawManager& manager,
+    const volTensorField& gradD,
+    const volTensorField& gradD0,
+    const scalar dt,
+    const label nLaws,
+    const bool smallStrainCapable
+)
+{
+    if (nLaws != 1)
+    {
+        return;
+    }
+
+    Info<< nl << "12. surfaceField overloads against the flat list"
+        << endl;
+
+    const integrationPointTopology& faceTopo =
+        manager.topologyFor(faceCentredIntegrationPointTopology::typeName);
+
+    const label nFaces = mesh.nFaces();
+    const polyBoundaryMesh& bm = mesh.boundaryMesh();
+
+    // A surface field as a flat list over every face, which is how the
+    // face-centred topology numbers its points. A face of an empty patch
+    // holds no value in the surface field but is still a point of the flat
+    // list, so it takes its cell's value, as the gather does
+    const auto flatten = [&]
+    (
+        const surfaceTensorField& sf,
+        const volTensorField& vf
+    ) -> tensorField
+    {
+        tensorField flat(nFaces, tensor::zero);
+
+        for (label faceI = mesh.nInternalFaces(); faceI < nFaces; ++faceI)
+        {
+            flat[faceI] = vf[mesh.faceOwner()[faceI]];
+        }
+
+        forAll(sf.internalField(), faceI)
+        {
+            flat[faceI] = sf.internalField()[faceI];
+        }
+
+        forAll(sf.boundaryField(), patchI)
+        {
+            const fvsPatchField<tensor>& pf = sf.boundaryField()[patchI];
+
+            forAll(pf, i)
+            {
+                flat[bm[patchI].start() + i] = pf[i];
+            }
+        }
+
+        return flat;
+    };
+
+    // The largest difference relative to the largest value, over the
+    // internal faces and every patch that holds values
+    const auto maxRelDiff = [&]
+    (
+        const surfaceSymmTensorField& sf,
+        const symmTensorField& flat
+    ) -> scalar
+    {
+        scalar maxDiff = 0;
+        scalar maxVal = 0;
+
+        forAll(sf.internalField(), faceI)
+        {
+            maxDiff =
+                max(maxDiff, mag(sf.internalField()[faceI] - flat[faceI]));
+            maxVal = max(maxVal, mag(flat[faceI]));
+        }
+
+        forAll(sf.boundaryField(), patchI)
+        {
+            const fvsPatchField<symmTensor>& pf =
+                sf.boundaryField()[patchI];
+
+            forAll(pf, i)
+            {
+                const label faceI = bm[patchI].start() + i;
+                maxDiff = max(maxDiff, mag(pf[i] - flat[faceI]));
+                maxVal = max(maxVal, mag(flat[faceI]));
+            }
+        }
+
+        reduce(maxDiff, maxOp<scalar>());
+        reduce(maxVal, maxOp<scalar>());
+
+        return maxDiff/max(maxVal, VSMALL);
+    };
+
+    const surfaceTensorField faceGradD(linearInterpolate(gradD));
+    const surfaceTensorField faceGradD0(linearInterpolate(gradD0));
+
+    const tensorField flatGradD(flatten(faceGradD, gradD));
+    const tensorField flatGradD0(flatten(faceGradD0, gradD0));
+
+    surfaceSymmTensorField faceSigma
+    (
+        IOobject
+        (
+            "faceSigma12",
+            runTime.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh,
+        dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+    );
+
+    if (smallStrainCapable)
+    {
+        symmTensorField flatSigma(nFaces, symmTensor::zero);
+        scalarField flatK(nFaces, 0.0);
+
+        surfaceScalarField faceK
+        (
+            IOobject
+            (
+                "faceK12",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        manager.updateStressSmallStrain
+        (
+            faceGradD,
+            faceGradD0,
+            dt,
+            faceSigma,
+            stressCollapseRule::none,
+            &faceK,
+            nullptr,
+            tangentRequest::scalar
+        );
+
+        manager.updateStressSmallStrain
+        (
+            faceTopo,
+            flatGradD,
+            flatGradD0,
+            dt,
+            flatSigma,
+            &flatK,
+            nullptr,
+            tangentRequest::scalar
+        );
+
+        const scalar stressDiff = maxRelDiff(faceSigma, flatSigma);
+
+        scalar kDiff = 0;
+        scalar kMax = 0;
+        forAll(faceK.internalField(), faceI)
+        {
+            kDiff = max
+            (
+                kDiff, mag(faceK.internalField()[faceI] - flatK[faceI])
+            );
+            kMax = max(kMax, mag(flatK[faceI]));
+        }
+        forAll(faceK.boundaryField(), patchI)
+        {
+            const fvsPatchField<scalar>& pk = faceK.boundaryField()[patchI];
+
+            forAll(pk, i)
+            {
+                const label faceI = bm[patchI].start() + i;
+                kDiff = max(kDiff, mag(pk[i] - flatK[faceI]));
+                kMax = max(kMax, mag(flatK[faceI]));
+            }
+        }
+
+        reduce(kDiff, maxOp<scalar>());
+        reduce(kMax, maxOp<scalar>());
+        kDiff /= max(kMax, VSMALL);
+
+        report
+        (
+            "small strain: the surfaceField stress is the flat-list one",
+            stressDiff < 1e-12,
+            "max relative difference " + Foam::name(stressDiff)
+        );
+
+        report
+        (
+            "small strain: the surfaceField tangent is the flat-list one, "
+            "patches included",
+            kDiff < 1e-12,
+            "max relative difference " + Foam::name(kDiff)
+        );
+    }
+
+    // Finite strain, at F = I + gradD
+    {
+        surfaceTensorField faceF(faceGradD + I);
+        surfaceTensorField faceF0(faceGradD0 + I);
+        surfaceScalarField faceJ(det(faceF));
+        surfaceScalarField faceJ0(det(faceF0));
+        surfaceTensorField faceFinv(inv(faceF));
+        surfaceTensorField faceFinv0(inv(faceF0));
+
+        const tensorField flatF(flatGradD + I);
+        const tensorField flatF0(flatGradD0 + I);
+        const tensorField flatFinv(inv(flatF));
+        const tensorField flatFinv0(inv(flatF0));
+        const scalarField flatJ(det(flatF));
+        const scalarField flatJ0(det(flatF0));
+
+        symmTensorField flatSigma(nFaces, symmTensor::zero);
+
+        // The flat-list call goes first, and only it may fail: a law with no
+        // finite-strain evaluation says so there. Once it has one, a failure
+        // of the surfaceField overload is a failure of the check. Neither can
+        // borrow the other's convergence scale, since each takes its own
+        bool finiteCapable = true;
+
+        FatalError.throwExceptions();
+
+        try
+        {
+            manager.updateStressFiniteStrain
+            (
+                faceTopo,
+                flatF,
+                flatF0,
+                flatFinv,
+                flatFinv0,
+                flatJ,
+                flatJ0,
+                dt,
+                flatSigma
+            );
+        }
+        catch (const Foam::error&)
+        {
+            finiteCapable = false;
+        }
+
+        FatalError.dontThrowExceptions();
+
+        if (finiteCapable)
+        {
+            manager.updateStressFiniteStrain
+            (
+                faceF,
+                faceF0,
+                faceJ,
+                faceJ0,
+                faceFinv,
+                faceFinv0,
+                dt,
+                faceSigma
+            );
+
+            const scalar stressDiff = maxRelDiff(faceSigma, flatSigma);
+
+            report
+            (
+                "finite strain: the surfaceField stress is the flat-list "
+                "one",
+                stressDiff < 1e-12,
+                "max relative difference " + Foam::name(stressDiff)
+            );
+        }
+        else
+        {
+            Info<< "    (finite strain skipped: this law has none)"
+                << endl;
+        }
+    }
 }
 
 
@@ -623,10 +924,9 @@ int main(int argc, char *argv[])
         // Asserted, not merely reported. This is the condition under which
         // a deviatoric projection of the total stress and the law's own
         // isochoric stress are the same thing - which is what the solid
-        // models did before they could ask, and what they still do on the
-        // legacy path. A law that declares a dilation invariant split and
-        // then returns a stress with a trace has quietly made that
-        // substitution wrong wherever it is still used
+        // models did before they could ask. A law that declares a dilation
+        // invariant split and then returns a stress with a trace has quietly
+        // made that substitution wrong wherever it is still used
         scalar maxStress = 0.0;
 
         forAll(isoStress, cellI)
@@ -654,8 +954,162 @@ int main(int argc, char *argv[])
                  ? "these are small-strain laws, and this check superposes a "
                    "dilation on the deformation gradient"
                  : manager.allLawsProvideVolumetricSplit()
-                 ? "a law adds a stress that is not derived from a potential, "
-                   "so its split is not dilation invariant"
+                 ? "a law's split is not dilation invariant - it adds a "
+                   "stress that is not derived from a potential, or its "
+                   "yield surface scales with J"
+                 : "no law here separates its isochoric and volumetric "
+                   "responses"
+               )
+            << endl;
+    }
+
+    // ------------------------------------------------------------------
+    Info<< nl << "A declared split recomposes the total stress" << endl;
+
+    // The check above needs a law whose isochoric stress ignores a superposed
+    // dilation, and skips the rest. This one needs nothing but the
+    // declaration: whatever a law hands back as its isochoric stress and its
+    // volumetric response, the two together must be the total it returns when
+    // asked for the total, or a mixed formulation that replaces the second
+    // with a solved pressure is solving for a different material. It is the
+    // only check a law with history gets - neoHookeanElasticMisesPlastic,
+    // whose yield surface scales with J - so the deformation is large enough
+    // to take such a law well past yield
+    if (!smallStrainCapable && manager.allLawsProvideVolumetricSplit())
+    {
+        volTensorField Fr
+        (
+            IOobject
+            (
+                "Fr",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedTensor("I", dimless, I)
+        );
+        volTensorField Fr0(Fr), Finvr(Fr), Finvr0(Fr);
+        volScalarField Jr
+        (
+            IOobject
+            (
+                "Jr",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("one", dimless, 1.0)
+        );
+        volScalarField Jr0(Jr);
+
+        // Shear, stretch and a volume change, so that no part of the split is
+        // trivially zero
+        const tensor Fi
+        (
+            1.12, 0.07, 0.0,
+            0.03, 0.93, 0.02,
+            0.0, 0.01, 1.04
+        );
+
+        forAll(Fr, cellI)
+        {
+            Foam::primitiveFieldRef(Fr)[cellI] = Fi;
+            Foam::primitiveFieldRef(Finvr)[cellI] = inv(Fi);
+            Foam::primitiveFieldRef(Jr)[cellI] = det(Fi);
+        }
+
+        volSymmTensorField total
+        (
+            IOobject
+            (
+                "totalStress",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedSymmTensor("0", dimPressure, symmTensor::zero)
+        );
+        volSymmTensorField iso(total);
+        volScalarField vol
+        (
+            IOobject
+            (
+                "volResponseR",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
+
+        // A fully incompressible law has no total stress to compare with, and
+        // the manager refuses to form one. Asked before evaluating, so that
+        // any other failure of the evaluation fails this check rather than
+        // being taken for that one
+        const bool haveTotal = !manager.anyLawIncompressible();
+        const string whyNoTotal
+        (
+            "a law is fully incompressible, so it has no total stress"
+        );
+
+        if (haveTotal)
+        {
+            manager.updateStressFiniteStrain
+            (
+                Fr, Fr0, Jr, Jr0, Finvr, Finvr0, dt, total
+            );
+
+            manager.updateStressFiniteStrainSplit
+            (
+                Fr, Fr0, Finvr, Finvr0, Jr, Jr0, dt, iso, vol
+            );
+
+            scalar maxErr = 0.0;
+            scalar scale = SMALL;
+
+            forAll(total, cellI)
+            {
+                const symmTensor& t = Foam::primitiveField(total)[cellI];
+                const symmTensor recomposed
+                (
+                    Foam::primitiveField(iso)[cellI]
+                  + Foam::primitiveField(vol)[cellI]*symmTensor(I)
+                );
+
+                maxErr = max(maxErr, mag(t - recomposed));
+                scale = max(scale, mag(t));
+            }
+
+            reportError
+            (
+                "the isochoric stress plus the volumetric response is the "
+                "total",
+                maxErr/scale,
+                1e-10
+            );
+        }
+        else
+        {
+            Info<< "    SKIP: the total stress could not be formed here, so "
+                << "there is nothing to compare with: " << whyNoTotal.c_str()
+                << endl;
+        }
+    }
+    else
+    {
+        Info<< "    SKIP: this check does not apply here - "
+            << (
+                   smallStrainCapable
+                 ? "these are small-strain laws, and this check evaluates a "
+                   "finite-strain split"
                  : "no law here separates its isochoric and volumetric "
                    "responses"
                )
@@ -691,8 +1145,8 @@ int main(int argc, char *argv[])
             dimensionedScalar(hgoDict.lookup("mu")).value();
         const scalar k1Val =
             dimensionedScalar(hgoDict.lookup("k1")).value();
-        // Dimensioned, as the law reads them and as the legacy dictionary
-        // writes them
+        // Dimensioned, as the law reads them and as case dictionaries write
+        // them
         const scalar k2Val =
             dimensionedScalar(hgoDict.lookup("k2")).value();
         const scalar angle =
@@ -1053,6 +1507,12 @@ int main(int argc, char *argv[])
             );
         }
 
+        checkSurfaceOverloads
+        (
+            mesh, runTime, manager, gradD, gradD0, dt, lawEntries.size(),
+            smallStrainCapable
+        );
+
         Info<< nl
             << "========================================================="
             << nl;
@@ -1182,6 +1642,12 @@ int main(int argc, char *argv[])
 
     if (!smallStrainCapable)
     {
+        checkSurfaceOverloads
+        (
+            mesh, runTime, manager, gradD, gradD0, dt, lawEntries.size(),
+            smallStrainCapable
+        );
+
         Info<< nl << "The remaining checks are small strain, and no law here "
             << "evaluates a small-strain" << nl << "kinematics, so they are "
             << "skipped." << nl;
@@ -1987,12 +2453,28 @@ int main(int argc, char *argv[])
             gradD, gradD0, dt, queriedImpK, tangentRequest::scalar
         );
 
+        // Against a stress update from the same state, not the one in check
+        // 1: check 8 has committed a time step since, and a law with history
+        // gives a different tangent at the same strain once it has moved on -
+        // a plastic law that yielded in the first step is elastic in the
+        // second, which starts on the yield surface. The stress update here
+        // is within the time step the query was made in, so it evaluates
+        // from the same history and commits what check 8 already did
+        volSymmTensorField sigmaNow(sigma);
+        volScalarField impKNow(impK);
+
+        manager.updateStressSmallStrain
+        (
+            gradD, gradD0, dt, sigmaNow, &impKNow, tangentRequest::scalar
+        );
+
         reportError
         (
             "agrees with the tangent from the stress update",
             relativeDifference
             (
-                Foam::primitiveField(impK), Foam::primitiveField(queriedImpK)
+                Foam::primitiveField(impKNow),
+                Foam::primitiveField(queriedImpK)
             ),
             1e-15
         );
@@ -2223,11 +2705,123 @@ int main(int argc, char *argv[])
                 threwWithRule = true;
             }
 
-            report
-            (
-                "a shared face with a collapse rule is accepted",
-                !threwWithRule
-            );
+            // In parallel a face overload refuses more than one material,
+            // since nothing reconciles the two sides of an interface on a
+            // processor boundary; in serial a rule must be accepted
+            if (Pstream::parRun())
+            {
+                report
+                (
+                    "a shared face in parallel is refused, rule or not",
+                    threwWithRule
+                );
+            }
+            else
+            {
+                report
+                (
+                    "a shared face with a collapse rule is accepted",
+                    !threwWithRule
+                );
+            }
+
+            // The collapsed values, in closed form: a face inside one
+            // material has that material's stress and tangent, and a face on
+            // the interface the arithmetic mean of the two stresses and the
+            // chosen mean of the two tangents
+            if (allLinearElastic && !Pstream::parRun())
+            {
+                surfaceScalarField faceK
+                (
+                    IOobject
+                    (
+                        "faceK",
+                        runTime.timeName(),
+                        mesh,
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    mesh,
+                    dimensionedScalar("0", dimPressure, 0.0)
+                );
+
+                const labelList& own = mesh.faceOwner();
+                const labelList& nei = mesh.faceNeighbour();
+
+                const stressCollapseRule rules[2] =
+                {
+                    stressCollapseRule::average,
+                    stressCollapseRule::harmonic
+                };
+
+                for (label ruleI = 0; ruleI < 2; ++ruleI)
+                {
+                    const bool harmonic =
+                        rules[ruleI] == stressCollapseRule::harmonic;
+
+                    manager.updateStressSmallStrain
+                    (
+                        faceGradD,
+                        faceGradD,
+                        dt,
+                        faceSigma,
+                        rules[ruleI],
+                        &faceK,
+                        nullptr,
+                        tangentRequest::scalar
+                    );
+
+                    symmTensorField refSigma(mesh.nInternalFaces());
+                    scalarField refK(mesh.nInternalFaces());
+
+                    forAll(refSigma, faceI)
+                    {
+                        const tensor& g = faceGradD[faceI];
+                        const label a = own[faceI];
+                        const label b = nei[faceI];
+
+                        const symmTensor sa =
+                            refMu[a]*twoSymm(g) + refLambda[a]*tr(g)*I;
+                        const symmTensor sb =
+                            refMu[b]*twoSymm(g) + refLambda[b]*tr(g)*I;
+
+                        const scalar ka = 2.0*refMu[a] + refLambda[a];
+                        const scalar kb = 2.0*refMu[b] + refLambda[b];
+
+                        const bool interface =
+                            refMu[a] != refMu[b]
+                         || refLambda[a] != refLambda[b];
+
+                        refSigma[faceI] = interface ? 0.5*(sa + sb) : sa;
+
+                        refK[faceI] =
+                            !interface ? ka
+                          : harmonic ? 2.0/(1.0/ka + 1.0/kb)
+                          : 0.5*(ka + kb);
+                    }
+
+                    const word rule(harmonic ? "harmonic" : "average");
+
+                    reportError
+                    (
+                        "the " + rule + " collapse gives the closed-form "
+                        "stress",
+                        relativeDifference
+                        (
+                            Foam::primitiveField(faceSigma), refSigma
+                        ),
+                        1e-12
+                    );
+
+                    reportError
+                    (
+                        "the " + rule + " collapse gives the closed-form "
+                        "tangent",
+                        relativeDifference(Foam::primitiveField(faceK), refK),
+                        1e-12
+                    );
+                }
+            }
         }
 
         // A key already in use by a topology of a different type
@@ -2313,10 +2907,12 @@ int main(int argc, char *argv[])
     // ---------------------------------------------------------------------
     {
         // More than two points in the hardening table is what makes the law
-        // non-linearly plastic, and so ask for a scale at all
+        // non-linearly plastic, and so ask for a scale at all. Under the
+        // processor directory in parallel, so that the ranks do not write
+        // and read one file at once
         const fileName tableName
         (
-            runTime.constant()/"Test-convergenceScaleHardening"
+            runTime.path()/runTime.constant()/"Test-convergenceScaleHardening"
         );
         {
             OFstream os(tableName);
@@ -2599,6 +3195,176 @@ int main(int argc, char *argv[])
             );
         }
     }
+
+    // ---------------------------------------------------------------------
+    // 11. Gathering a cell field onto integration points
+    //
+    // A prescribed field or coupling input is given per cell. A point on a
+    // face must see the interpolated face value whichever topology holds it:
+    // a compact face topology reaches an internal face's points from both
+    // cells, and a processor face's from one, so anything built from the
+    // cells around a point would differ between serial and parallel runs
+    // ---------------------------------------------------------------------
+    {
+        Info<< nl << "11. Gathering a cell field onto integration points"
+            << endl;
+
+        // A field that differs from cell to cell, so that a face value and
+        // either cell's value are told apart
+        volScalarField src
+        (
+            IOobject
+            (
+                "gatherTestField",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimless, 0.0),
+            "zeroGradient"
+        );
+
+        forAll(src, cellI)
+        {
+            src[cellI] = 1.0 + mesh.C()[cellI].x() + 2*mesh.C()[cellI].y();
+        }
+
+        src.correctBoundaryConditions();
+
+        const surfaceScalarField srcf(linearInterpolate(src));
+
+        const labelList allCells(identity(mesh.nCells()));
+
+        // The value a point on face faceI must take: the interpolated face
+        // value, or the owner cell's on an empty patch, which holds none
+        const label nInternal = mesh.nInternalFaces();
+        const polyBoundaryMesh& bm = mesh.boundaryMesh();
+
+        const labelList& own = mesh.faceOwner();
+
+        const auto faceValue = [&](const label faceI) -> scalar
+        {
+            if (faceI < nInternal)
+            {
+                return srcf[faceI];
+            }
+
+            const label patchI = bm.whichPatch(faceI);
+
+            if (srcf.boundaryField()[patchI].empty())
+            {
+                return src[own[faceI]];
+            }
+
+            return srcf.boundaryField()[patchI][faceI - bm[patchI].start()];
+        };
+
+        // A compact face topology with two points on every face
+        {
+            const labelList sizes(mesh.nFaces(), 2);
+            CompactListList<label> rows(sizes);
+
+            for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
+            {
+                rows(faceI, 0) = 2*faceI;
+                rows(faceI, 1) = 2*faceI + 1;
+            }
+
+            const compactFaceIntegrationPointTopology topo
+            (
+                mesh, std::move(rows)
+            );
+
+            const labelList ipIDs(identity(topo.nIntegrationPoints()));
+            scalarField fld(ipIDs.size(), -GREAT);
+
+            Foam::gatherToIntegrationPoints
+            (
+                mesh, allCells, src, topo, ipIDs, fld
+            );
+
+            scalar maxErr = 0;
+            for (label faceI = 0; faceI < mesh.nFaces(); ++faceI)
+            {
+                const scalar expected = faceValue(faceI);
+                maxErr = max(maxErr, mag(fld[2*faceI] - expected));
+                maxErr = max(maxErr, mag(fld[2*faceI + 1] - expected));
+            }
+
+            reduce(maxErr, maxOp<scalar>());
+
+            report
+            (
+                "compact face points take the interpolated face value",
+                maxErr < SMALL,
+                "max error " + Foam::name(maxErr)
+            );
+        }
+
+        // A face-centred topology, whose points are the faces themselves
+        {
+            const faceCentredIntegrationPointTopology topo(mesh);
+
+            const labelList ipIDs(identity(topo.nIntegrationPoints()));
+            scalarField fld(ipIDs.size(), -GREAT);
+
+            Foam::gatherToIntegrationPoints
+            (
+                mesh, allCells, src, topo, ipIDs, fld
+            );
+
+            scalar maxErr = 0;
+            forAll(ipIDs, faceI)
+            {
+                maxErr = max(maxErr, mag(fld[faceI] - faceValue(faceI)));
+            }
+
+            reduce(maxErr, maxOp<scalar>());
+
+            report
+            (
+                "face-centred points take the interpolated face value",
+                maxErr < SMALL,
+                "max error " + Foam::name(maxErr)
+            );
+        }
+
+        // A cell-centred topology, whose points are the cells
+        {
+            const cellCentredIntegrationPointTopology topo(mesh);
+
+            const labelList ipIDs(identity(topo.nIntegrationPoints()));
+            scalarField fld(ipIDs.size(), -GREAT);
+
+            Foam::gatherToIntegrationPoints
+            (
+                mesh, allCells, src, topo, ipIDs, fld
+            );
+
+            scalar maxErr = 0;
+            forAll(ipIDs, cellI)
+            {
+                maxErr = max(maxErr, mag(fld[cellI] - src[cellI]));
+            }
+
+            reduce(maxErr, maxOp<scalar>());
+
+            report
+            (
+                "cell-centred points take the cell value",
+                maxErr < SMALL,
+                "max error " + Foam::name(maxErr)
+            );
+        }
+    }
+
+    checkSurfaceOverloads
+    (
+        mesh, runTime, manager, gradD, gradD0, dt, lawEntries.size(),
+        smallStrainCapable
+    );
 
     // ---------------------------------------------------------------------
 
