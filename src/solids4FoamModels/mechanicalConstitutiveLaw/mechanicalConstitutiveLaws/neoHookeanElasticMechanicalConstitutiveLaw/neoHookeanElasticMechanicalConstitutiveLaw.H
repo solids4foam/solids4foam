@@ -87,6 +87,9 @@ class neoHookeanElasticMechanicalConstitutiveLaw
         //- Bulk modulus
         dimensionedScalar kappa_;
 
+        //- Fully incompressible: nu = 0.5, so kappa is infinite
+        bool incompressible_;
+
 
     // Private Member Functions
 
@@ -135,6 +138,21 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return kappa_;
+        }
+
+        //- This law separates its isochoric and volumetric responses: its
+        //  energy is written on the isochoric left Cauchy-Green tensor, so
+        //  the deviatoric stress depends on shape alone and the volumetric
+        //  response is the hydrostatic term and nothing else
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
+        }
+
+        //- True if nu = 0.5
+        virtual bool incompressible() const override
+        {
+            return incompressible_;
         }
 
     // Edit

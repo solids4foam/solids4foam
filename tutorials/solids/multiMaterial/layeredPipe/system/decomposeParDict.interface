@@ -1,0 +1,32 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The processor boundary lies exactly on the material interface: every cell of
+// the inner material on one processor, every cell of the outer on the other.
+// constant/cellDecomposition is written by Allrun from the inner cellSet
+numberOfSubdomains 2;
+
+method          manual;
+
+manualCoeffs
+{
+    dataFile    "cellDecomposition";
+}
+
+
+// ************************************************************************* //

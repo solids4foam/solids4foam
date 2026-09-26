@@ -35,6 +35,12 @@ Description
     every iteration, so storing it, rolling it over, or letting a file of the
     same name stand in for it would all be wrong.
 
+    Where nothing in the run solves for it, the temperature can be read at
+    each time step from another case directory, given as TcaseDirectory as on
+    the legacy law, or in an inputCaseDirectories sub-dictionary. That is the
+    manager's business, not this law's, and works for any law's inputs: see
+    mechanicalConstitutiveLawCaseInputs.
+
     The sub-law's history lives in a child state, so the sub-law looks it up by
     its own unqualified names and nothing collides with this law's.
 

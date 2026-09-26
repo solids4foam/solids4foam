@@ -99,6 +99,38 @@ differ from the one used in the residual. Setting both to zero, as the
 there notes that momentum stabilisation contributes to `sigmaHyd`
 oscillations.
 
+### The mechanicalConstitutiveLaw framework
+
+Setting `useMechanicalConstitutiveLawManager yes;` in
+`coupledPressureDisplacementSolidCoeffs` takes the constitutive response from
+the mechanicalConstitutiveLaw framework instead of the legacy
+`mechanicalModel`. The same `mechanicalProperties` is read; the legacy-only
+`pressureDisplacement` entry is ignored.
+
+The stress is the law's isochoric stress minus the solved pressure. The law's
+own volumetric response, `dU/dJ`, is discarded rather than added: the pressure
+is a solution variable, and compressibility enters only through the penalty
+`1/kappa` in the pressure equation, where `kappa` is the law's bulk modulus.
+So the pressure does not follow the law's `dU/dJ`. The law must be able to
+separate the two (`providesVolumetricSplit`) and evaluate at finite strain,
+as `neoHookeanElastic`, `GuccioneElastic` and `HolzapfelGasserOgdenElastic`
+do.
+
+This differs from the legacy path, where each law's `pressureDisplacement`
+mode supplies its own stress form, and they do not agree with each other:
+`neoHookeanElastic` uses `-c*p*I + mu*(b - I)/J` with `c = 3*nu/(1 + nu)`,
+which is not deviatoric, while `GuccioneElastic` uses the deviatoric form the
+framework uses. The linearised operator is unchanged on both paths, so in
+linear mode (`nonLinear false`) the two paths agree to round-off, and in
+nonlinear mode they differ by terms of the order of the compressibility. At
+`nu = 0.5` in `cylindricalPressureVessel` that is about 1e-4 in the probe
+displacement.
+
+`nu = 0.5` is supported: `neoHookeanElastic` then reports itself as
+incompressible, and the framework refuses any evaluation that would need its
+(infinite) bulk stiffness, so only a mixed formulation such as this one can
+use it. One material only on this path.
+
 ### Required input files
 
 Because the model is incremental and mixed, the fields differ from the other

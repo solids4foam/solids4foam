@@ -49,7 +49,8 @@ neoHookeanElasticMechanicalConstitutiveLaw
     nu_("nu", dimless, 0.0),
     lambda_("lambda", dimPressure, 0.0),
     mu_("mu", dimPressure, 0.0),
-    kappa_("kappa", dimPressure, 0.0)
+    kappa_("kappa", dimPressure, 0.0),
+    incompressible_(false)
 {
     // The material may be given either as E and nu or as mu and K, matching
     // the legacy neoHookeanElastic law, so that an existing case dictionary
@@ -105,23 +106,6 @@ neoHookeanElasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    if (nu_.value() >= 0.5 - SMALL)
-    {
-        FatalIOErrorInFunction(dict)
-            << "Poisson's ratio nu = " << nu_.value()
-            << " is too close to 0.5 for linear elasticity. "
-            << "This leads to an ill-conditioned bulk modulus."
-            << exit(FatalIOError);
-    }
-    else if (nu_.value() <= -1.0)
-    {
-        FatalIOErrorInFunction(dict)
-            << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected -1 <= nu for linear elasticity."
-            << exit(FatalIOError);
-    }
-
-    // Set lambda, mu and kappa
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary
@@ -130,7 +114,49 @@ neoHookeanElasticMechanicalConstitutiveLaw
         dict.lookupOrDefault<Switch>("planeStress", false)
     );
 
+    if (nu_.value() > 0.5 || nu_.value() <= -1.0)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Invalid Poisson's ratio nu = " << nu_.value()
+            << ". Expected -1 < nu <= 0.5."
+            << exit(FatalIOError);
+    }
+    else if (planeStress)
+    {
+        // The plane-stress reduction keeps the bulk stiffness finite up to
+        // and including nu = 0.5, as the legacy law's does, so nothing here
+        // is incompressible or ill-conditioned
+    }
+    else if (mag(nu_.value() - 0.5) < SMALL)
+    {
+        // Fully incompressible. Allowed, because a mixed displacement-pressure
+        // formulation replaces the volumetric response with a solved pressure
+        // and needs only the isochoric stress, which is finite. Anything that
+        // would need the bulk stiffness is refused by the manager, which asks
+        // incompressible() rather than meeting an infinite kappa
+        incompressible_ = true;
+    }
+    else if (nu_.value() >= 0.5 - SMALL)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Poisson's ratio nu = " << nu_.value()
+            << " is too close to 0.5 for linear elasticity. "
+            << "This leads to an ill-conditioned bulk modulus."
+            << exit(FatalIOError);
+    }
+
+    // Set lambda, mu and kappa
     mu_ = E_/(2.0*(1.0 + nu_));
+
+    if (incompressible_)
+    {
+        // Held at GREAT rather than infinity, so that 1/kappa is zero to
+        // round-off, as the legacy law's pressureDisplacement mode has it,
+        // without an infinity reaching any arithmetic
+        lambda_ = dimensionedScalar("lambda", dimPressure, GREAT);
+        kappa_ = dimensionedScalar("kappa", dimPressure, GREAT);
+        return;
+    }
 
     if (planeStress)
     {
@@ -166,6 +192,12 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
 
     const scalar Jmin = sqrt(SMALL);
 
+    // Whether the caller wants the isochoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
     // Fast element-by-element approach
     forAll(sigma, i)
     {
@@ -191,6 +223,15 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
         const scalar sigmaHyd = 0.5*kappaVal*(sqr(Ji) - 1.0);
 
         sigma[i] = (muVal/Ji)*dev(bEbar) + (sigmaHyd/Ji)*I;
+
+        // The energy is written on the isochoric measure bEbar, so the first
+        // term is the isochoric stress and the second is dU/dJ for
+        // U(J) = 0.25*K*(J^2 - 1 - 2*log(J)), and the split is a subtraction
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = sigmaHyd/Ji;
+            sigma[i] = (muVal/Ji)*dev(bEbar);
+        }
     }
 
     // Scalar tangent: only if explicitly requested

@@ -8,6 +8,7 @@ source solids4FoamScripts.sh
 
 cleanCase
 rm -rf postProcessing *.png constant/polyMesh/boundary
+rm -rf processor* constant/cellDecomposition system/decomposeParDict
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
