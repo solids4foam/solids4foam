@@ -78,7 +78,8 @@ Description
     towards the body velocity with the rate
     \f$ \kappa_s = \min(K/\Delta t, C_s(\nu/w^2 + |U_b|/w)) \f$, where w is
     the cell width and C_s the pinnedRateCoeff (default 100), which does not
-    depend on the time step. Each fluid cell P next to them is penalised
+    depend on the time step unless the time step is very large. Each fluid
+    cell P next to them is penalised
     towards the body velocity at the surface with the rate
 
     \f[
@@ -102,7 +103,10 @@ Description
     its centre reaches the surface, where P becomes penalised.
 
     The momentum exchange force assumes a laminar flow of constant viscosity
-    on a static mesh. With cutLink, the inertia of the fluid inside the body
+    on a static mesh. The bodies must not overlap, and a body that crosses a
+    cyclic patch must be periodic across it. A single immersedBoundaryForce
+    option with apertureCoupling may be used on a mesh (it may hold several
+    bodies). With cutLink, the inertia of the fluid inside the body
     is included in the force, and the inertia columns of the force file are
     zero.
 

@@ -349,7 +349,7 @@ void Foam::immersedSurfaceTraction::updatePoints()
     }
 
     // The widths are found again only if the body moves
-    if (body_.moving() || h_.size() != points_.size())
+    if (body_.moving() || mesh_.moving() || h_.size() != points_.size())
     {
         h_ = cellWidths(points_);
     }
@@ -440,7 +440,7 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
     // Local cells of the stencil of each point, found again only if the
     // body moves, and the rigid body velocity at their centres, from a single
     // evaluation
-    if (body_.moving() || stencils_.size() != n)
+    if (body_.moving() || mesh_.moving() || stencils_.size() != n)
     {
         stencils_.setSize(n);
         forAll(faces_, i)

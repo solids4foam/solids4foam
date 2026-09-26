@@ -807,6 +807,14 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
 {
     if (!aperturePtr_)
     {
+        if (mesh_.foundObject<surfaceScalarField>("immersedBoundaryAperture"))
+        {
+            FatalErrorInFunction
+                << "The face apertures are already registered, by another "
+                << "immersedBoundaryForce option with apertureCoupling: use a "
+                << "single option with several bodies" << exit(FatalError);
+        }
+
         aperturePtr_.reset
         (
             new surfaceScalarField

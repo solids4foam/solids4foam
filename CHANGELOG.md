@@ -61,8 +61,7 @@ release. For complete commit-level details and contributor information, see the
   their solid part. Its force is the momentum exchange or the traction on
   the surface (new `immersedSurfaceTraction` class). Added the
   `uniformTranslation` and `solidBodyRotation` body motions and the `cut`
-  (exact volume fraction)
-  occupancy. The explicit direct
+  (exact volume fraction) occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
   cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and

@@ -53,12 +53,13 @@ Description
     with the wall pressure \f$ p_w \f$ and the velocity gradient from the
     fits, where p is the kinematic pressure: on a no-slip wall the tangential
     derivatives of \f$ U - U_b \f$ vanish, and the rigid body velocity has
-    no strain. The fits are solved with the
-    pseudo-inverse of their matrices, which is robust to rank-deficient
-    stencils.
+    no strain. The fits are solved by Cholesky decomposition, or with the
+    pseudo-inverse of their matrices for rank-deficient stencils.
 
     The sums of the fits over the processors are reduced, so that the cells
-    of a fit may be on any processor.
+    of a fit may be on any processor, and each fit is then solved on one
+    processor. Points outside the mesh at a given time are not used. The
+    stencils and widths are found again when the body or the mesh moves.
 
 Author
     Philip Cardiff, UCD.
