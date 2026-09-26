@@ -99,17 +99,26 @@ def set_resolution(run_dir: Path, divisions: int, domain_length: float) -> None:
     )
 
 
-def set_polynomial_order(run_dir: Path, variant: dict) -> None:
+def set_reconstruction(run_dir: Path, variant: dict) -> None:
     if not variant["approach"].startswith("highOrder-"):
         return
     path = run_dir / "constant" / f"solidProperties.{variant['approach']}"
-    text, count = re.subn(
-        r"(?m)^(\s*polynomialOrder\s+)\d+(\s*;)",
-        rf"\g<1>{variant['p']}\g<2>",
-        path.read_text(),
-    )
-    if count != 1:
-        raise RuntimeError(f"could not set polynomialOrder in {path}")
+    text = path.read_text()
+    settings = {
+        "polynomialOrder": variant["p"],
+        "faceStencilExtraCells": variant["stencil_extra_cells"],
+    }
+    # Both methods inherit the face setting when the cell setting is absent.
+    if re.search(r"(?m)^\s*cellStencilExtraCells\s+", text):
+        settings["cellStencilExtraCells"] = variant["stencil_extra_cells"]
+    for key, value in settings.items():
+        text, count = re.subn(
+            rf"(?m)^(\s*{key}\s+)\d+(\s*;)",
+            rf"\g<1>{value}\g<2>",
+            text,
+        )
+        if count != 1:
+            raise RuntimeError(f"could not set {key} in {path}")
     path.write_text(text)
 
 
@@ -117,6 +126,9 @@ def validate_variant(name: str, variant: dict) -> None:
     if variant["approach"].startswith("highOrder-"):
         if type(variant.get("p")) is not int or variant["p"] not in (1, 2, 3):
             raise RuntimeError(f"{name}: p must be 1, 2 or 3")
+        extra_cells = variant.get("stencil_extra_cells")
+        if type(extra_cells) is not int or extra_cells < 0:
+            raise RuntimeError(f"{name}: stencil_extra_cells must be a non-negative integer")
     for field in ("displacement", "stress"):
         value = variant.get("minimum_net_order", {}).get(field)
         if (
@@ -168,10 +180,14 @@ def run_level(
     run_dir = WORK_DIR / variant_name / f"n{divisions}"
     solver_log = run_dir / "log.solids4Foam"
     degree_file = run_dir / "verification_degree.json"
+    reconstruction = (
+        {"p": variant["p"], "extra_cells": variant["stencil_extra_cells"]}
+        if "p" in variant else None
+    )
     completed_case = (
         reuse
         and degree_file.exists()
-        and json.loads(degree_file.read_text()) == variant.get("p")
+        and json.loads(degree_file.read_text()) == reconstruction
         and solver_log.exists()
         and re.search(r"^End\s*$", solver_log.read_text(), re.MULTILINE)
     )
@@ -183,8 +199,8 @@ def run_level(
             shutil.rmtree(run_dir)
         shutil.copytree(CASE_DIR, run_dir, ignore=ignored, symlinks=True)
         set_resolution(run_dir, divisions, domain_length)
-        set_polynomial_order(run_dir, variant)
-        degree_file.write_text(json.dumps(variant.get("p")) + "\n")
+        set_reconstruction(run_dir, variant)
+        degree_file.write_text(json.dumps(reconstruction) + "\n")
         # Allrun calls the structured tetrahedral mesh "tet".
         mesh = "tet" if variant["mesh"] == "tet-structural" else variant["mesh"]
         command = ["./Allrun", variant["approach"], mesh]
@@ -324,6 +340,7 @@ def write_results(
         variant = reference["variants"][name]
         if "p" in variant:
             lines.append(f"- Polynomial degree: p={variant['p']}")
+            lines.append(f"- Extra stencil cells: {variant['stencil_extra_cells']}")
         for metric in metrics:
             minimum = variant["minimum_net_order"][metric.split("_")[0]]
             metric_passed = all(

@@ -7,13 +7,16 @@ hexahedral, dual-polyhedral, and distorted-hexahedral meshes. Their tetrahedral
 variants remain available explicitly. Both high-order approaches,
 `highOrder-movingLeastSquares` and `highOrder-kExactLeastSquares`, are included
 on regular hexahedral and tetrahedral meshes with polynomial degrees p=1, p=2,
-and p=3. The JSON `p` entry sets `polynomialOrder` in each copied case. These
-correspond to nominal displacement orders 2, 3, and 4, respectively; stress
-involves a derivative, with nominal orders 1, 2, and 3. High-order variants
-exclude `distHex` and require a PETSc-enabled build. Variant names include the
-polynomial degree, for example `hex-highOrder-movingLeastSquares-p3`.
-The `tet-structural` mesh label identifies the structured tetrahedral mesh from
-`gmsh/tet-structured.geo`; the driver maps it to the `Allrun` mesh argument `tet`.
+and p=3. The JSON `p` entry sets `polynomialOrder` in each copied case. The per-variant
+JSON `stencil_extra_cells` input sets the extra cells for face and cell stencils.
+It defaults to 45 for p=1, 55 for p=2, and 65 for p=3 in the supplied JSON, for
+both reconstruction methods. These correspond to nominal displacement orders 2,
+2 (instead of 3), and 4, respectively; stress involves a derivative,
+with nominal orders 1, 2, and 3. High-order variants require a PETSc-enabled build.
+Variant names include the polynomial degree, for example
+`hex-highOrder-movingLeastSquares-p3`. The `tet-structural` mesh label identifies
+the structured tetrahedral mesh from `gmsh/tet-structured.geo`; the driver maps
+it to the `Allrun` mesh argument `tet`.
 
 Source an OpenFOAM.com, OpenFOAM.org, or foam-extend environment, ensure the
 tutorial library can be built, and run:
@@ -50,7 +53,8 @@ margin below the nominal orders. These are editable expectations, not thresholds
 calibrated against a completed full sweep.
 Quick runs check finite positive errors and successful solver completion,
 without enforcing the order thresholds. The CSV records p for high-order runs.
-`--reuse` requires matching degree metadata; older runs without it are rerun.
+`--reuse` requires matching degree and stencil metadata; older runs without
+it are rerun.
 The kExact displacement errors compare cell averages; MLS errors compare
 point values at cell centres. Stress errors use cell-centre values in both.
 The study is not run by
