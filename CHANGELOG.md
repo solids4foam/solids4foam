@@ -74,8 +74,9 @@ release. For complete commit-level details and contributor information, see the
   `fluids/immersedBoundary/oscillatingCylinderInChannel`,
   `fluids/immersedBoundary/translatingCylinderInChannel`,
   `fluids/immersedBoundary/oscillatingWallStokesLayer`,
-  `fluids/immersedBoundary/immersedTaylorCouette` and
-  `fluids/immersedBoundary/bendingBeamInChannel` tutorials, with
+  `fluids/immersedBoundary/immersedTaylorCouette`,
+  `fluids/immersedBoundary/bendingBeamInChannel` and
+  `fluids/immersedBoundary/heartValveInDuct` tutorials, with
   regression tests.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
