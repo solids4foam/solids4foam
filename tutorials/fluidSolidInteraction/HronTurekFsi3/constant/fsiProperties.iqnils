@@ -37,6 +37,13 @@ fluidSolidInterface    IQNILS;
     // time-step, then the IQNILS procedure is used
     relaxationFactor     0.05;
 
+    // Apply the full predicted solid interface displacement in the first
+    // IQN-ILS iteration of each time-step, rather than relaxationFactor times
+    // it; otherwise the fluid sees the plate stop within one step, and the
+    // resulting added-mass spike in the first-iterate force eventually makes
+    // the solid solve fail (see issue #489)
+    predictor            yes;
+
     // Tolerance for the FSI loop within each time-step
     outerCorrTolerance   1e-6;
 
