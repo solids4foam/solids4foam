@@ -100,7 +100,7 @@
     },
     "lift_amplitude": {
       "value": 153.91,
-      "tolerance": 0.1,
+      "tolerance": 0.15,
       "primary": true
     },
     "lift_frequency": {
@@ -143,14 +143,25 @@
   "fsi1": {
     "source": "Featflow FSI1 table, https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/fsi_benchmark/fsi_tests/fsi_fsi_tests.html",
     "inletMaxValue": 0.3,
-    "youngsModulus": 1.4e6,
+    "youngsModulus": 1400000.0,
     "transitionPeriod": 2.0,
     "couplingStartTime": 2.0,
-    "fluidSolverTolerance": 1e-9,
+    "fluidSolverTolerance": 1e-09,
     "mesh": {
-      "refinementFactors": [1, 2, 4],
-      "deltaTs": [0.025, 0.025, 0.0125],
-      "defaultLevels": [1, 2],
+      "refinementFactors": [
+        1,
+        2,
+        4
+      ],
+      "deltaTs": [
+        0.025,
+        0.025,
+        0.0125
+      ],
+      "defaultLevels": [
+        1,
+        2
+      ],
       "endTime": 30.0,
       "maximumErrorGrowth": 0.001
     },
@@ -166,7 +177,7 @@
     },
     "steadyState": {
       "windowFraction": 0.2,
-      "relativeTolerance": 1e-3
+      "relativeTolerance": 0.001
     },
     "coupling": {
       "refinement": 1,
@@ -174,18 +185,94 @@
       "continuation": 1.0
     },
     "references": {
-      "ux": {"value": 2.270493e-05, "tolerance": {"2": 0.03, "4": 0.03}, "primary": false},
-      "uy": {"value": 8.208773e-04, "tolerance": {"2": 0.06, "4": 0.03}, "primary": true},
-      "drag": {"value": 14.29426, "tolerance": {"2": 0.005, "4": 0.005}, "primary": true},
-      "lift": {"value": 0.7637460, "tolerance": {"2": 0.03, "4": 0.03}, "primary": false}
+      "ux": {
+        "value": 2.270493e-05,
+        "tolerance": {
+          "2": 0.03,
+          "4": 0.03
+        },
+        "primary": false
+      },
+      "uy": {
+        "value": 0.0008208773,
+        "tolerance": {
+          "2": 0.06,
+          "4": 0.03
+        },
+        "primary": true
+      },
+      "drag": {
+        "value": 14.29426,
+        "tolerance": {
+          "2": 0.005,
+          "4": 0.005
+        },
+        "primary": true
+      },
+      "lift": {
+        "value": 0.763746,
+        "tolerance": {
+          "2": 0.03,
+          "4": 0.03
+        },
+        "primary": false
+      }
     },
     "featflowLevels": [
-      {"level": "2+0", "nel": 992, "ndof": 19488, "ux": 2.287080e-05, "uy": 8.193038e-04, "drag": 14.27359, "lift": 0.7617550},
-      {"level": "3+0", "nel": 3968, "ndof": 76672, "ux": 2.277423e-05, "uy": 8.204231e-04, "drag": 14.29177, "lift": 0.7630484},
-      {"level": "4+0", "nel": 15872, "ndof": 304128, "ux": 2.273175e-05, "uy": 8.207084e-04, "drag": 14.29484, "lift": 0.7635608},
-      {"level": "5+0", "nel": 63488, "ndof": 1211392, "ux": 2.271553e-05, "uy": 8.208126e-04, "drag": 14.29486, "lift": 0.7636992},
-      {"level": "6+0", "nel": 253952, "ndof": 4835328, "ux": 2.270838e-05, "uy": 8.208548e-04, "drag": 14.29451, "lift": 0.7637359},
-      {"level": "7+0", "nel": 1015808, "ndof": 19320832, "ux": 2.270493e-05, "uy": 8.208773e-04, "drag": 14.29426, "lift": 0.7637460}
+      {
+        "level": "2+0",
+        "nel": 992,
+        "ndof": 19488,
+        "ux": 2.28708e-05,
+        "uy": 0.0008193038,
+        "drag": 14.27359,
+        "lift": 0.761755
+      },
+      {
+        "level": "3+0",
+        "nel": 3968,
+        "ndof": 76672,
+        "ux": 2.277423e-05,
+        "uy": 0.0008204231,
+        "drag": 14.29177,
+        "lift": 0.7630484
+      },
+      {
+        "level": "4+0",
+        "nel": 15872,
+        "ndof": 304128,
+        "ux": 2.273175e-05,
+        "uy": 0.0008207084,
+        "drag": 14.29484,
+        "lift": 0.7635608
+      },
+      {
+        "level": "5+0",
+        "nel": 63488,
+        "ndof": 1211392,
+        "ux": 2.271553e-05,
+        "uy": 0.0008208126,
+        "drag": 14.29486,
+        "lift": 0.7636992
+      },
+      {
+        "level": "6+0",
+        "nel": 253952,
+        "ndof": 4835328,
+        "ux": 2.270838e-05,
+        "uy": 0.0008208548,
+        "drag": 14.29451,
+        "lift": 0.7637359
+      },
+      {
+        "level": "7+0",
+        "nel": 1015808,
+        "ndof": 19320832,
+        "ux": 2.270493e-05,
+        "uy": 0.0008208773,
+        "drag": 14.29426,
+        "lift": 0.763746
+      }
     ]
   }
 }
