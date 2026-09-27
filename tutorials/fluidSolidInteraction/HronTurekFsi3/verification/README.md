@@ -158,7 +158,8 @@ iterations; on the 2x mesh about `52`. Larger coefficients (`hsModel
 pWaveSpeed`, or a constant `hs` of `0.03 m` or more) diverge at the coupling
 start, and smaller ones converge even more slowly. The `robin` mesh study is
 therefore possible (`--coupling robin`) but is not expected to be run
-routinely.
+routinely. The cost and the uncoupled-phase behaviour are the subject of
+[issue #493](https://github.com/solids4foam/solids4foam/issues/493).
 
 ## Reference results
 
