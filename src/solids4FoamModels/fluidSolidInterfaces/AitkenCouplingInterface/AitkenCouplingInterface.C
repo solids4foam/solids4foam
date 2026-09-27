@@ -193,8 +193,15 @@ void AitkenCouplingInterface::updateDisplacement()
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
 
-            fluidZonesPointsDispls()[interfaceI] +=
-                relaxationFactor_*residuals()[interfaceI];
+            if ((outerCorr() == 1) && predictor())
+            {
+                fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
+            }
+            else
+            {
+                fluidZonesPointsDispls()[interfaceI] +=
+                    relaxationFactor_*residuals()[interfaceI];
+            }
         }
     }
     else

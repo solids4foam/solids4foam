@@ -30,24 +30,18 @@ fluidSolidInterface    IQNILS;
 
     // Under-relaxation factor for passing the solid interface
     // displacement/velocity to the fluid interface
-    // For fixedRelaxation, this value is used for all iterations
-    // For Aitken, this value is used for the first iteration each time-step,
-    // then it adaptively changes
-    // For IQNILS, this value is used for the first two iterations each
+    // The first iteration of each time-step is not relaxed with predictor yes
+    // (see below)
+    // For fixedRelaxation, this value is used for all other iterations
+    // For Aitken, this value is used for the second iteration each
+    // time-step, then it adaptively changes
+    // For IQNILS, this value is used for the second iteration each
     // time-step, then the IQNILS procedure is used
     relaxationFactor     0.05;
 
-    // Optional (only for IQNILS): move the fluid interface with the full
-    // predicted solid displacement in the first iteration of each time-step,
-    // instead of the relaxed one; the second iteration is still relaxed. The
-    // interface displacement is an increment within the time-step, so a
-    // relaxed first iteration moves the fluid interface by only
-    // relaxationFactor times the plate's step: as seen by the fluid, the plate
-    // stops, or with backward time differencing reverses, within one
-    // time-step. The resulting added-mass force, hundreds of times the
-    // converged force here, loads the solid in the first iteration, and once
-    // the plate deformation is large the solid fails to converge under it
-    // (#489)
+    // Move the fluid interface with the full solid predictor displacement in
+    // the first iteration of each time-step (the default). With predictor no,
+    // this case diverges once the plate deformation is large (#489)
     predictor            yes;
 
     // Tolerance for the FSI loop within each time-step

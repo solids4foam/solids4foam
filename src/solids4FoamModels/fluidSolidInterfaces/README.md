@@ -96,15 +96,6 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
 - `reorthogonalizeCouplingColumns`: optionally apply a second
   Gram-Schmidt-style correction while assembling the QR system.
 - `predictSolid`: optionally solve the solid once before the outer FSI loop.
-- `predictor`: in the first iteration of each time step, move the fluid
-  interface with the full solid displacement from `predictSolid` instead of
-  `relaxationFactor` times it (default `no`). The interface displacement is an
-  increment within the time step, so a relaxed first iteration makes the
-  interface nearly stop, or reverse with backward time differencing, as seen
-  by the fluid. On cases with a strong added-mass effect and a small
-  `relaxationFactor`, the resulting first-iteration fluid force can be
-  hundreds of times the converged one and can make the solid fail to converge
-  (see `HronTurekFsi3`).
 
 Implementation:
 `IQNILSCouplingInterface/IQNILSCouplingInterface.{H,C}`
@@ -137,6 +128,18 @@ Implementation:
   `weakCoupling` is the cheapest, `fixedRelaxation` and `Aitken` are simple
   strong-coupling options, and `IQNILS` is the most sophisticated partitioned
   acceleration scheme in this directory.
+- `fixedRelaxation`, `Aitken` and `IQNILS` start each time step from the
+  solid predictor (`predictSolid`, default `yes`): the solid is solved once
+  with the fluid force of the previous time step. With `predictor` (default
+  `yes`), the first iteration moves the fluid interface with the full
+  predicted solid displacement; later iterations are relaxed or accelerated as
+  usual. The interface displacement is an increment within the time step, so
+  with `predictor no` the first iteration moves the fluid interface by only
+  `relaxationFactor` times the solid's step, and the interface stops, or with
+  backward time differencing reverses, as seen by the fluid. On cases with a
+  strong added-mass effect and a small `relaxationFactor`, the resulting
+  first-iteration fluid force can be hundreds of times the converged one and
+  make the solid diverge (#489).
 - For `IQNILS`, increasing `couplingReuse` can improve convergence, but it is
   not guaranteed to make a case monotonically more robust. The best reuse level
   is case dependent and interacts with time-step size and the quality of the

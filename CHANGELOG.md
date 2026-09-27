@@ -108,6 +108,26 @@ release. For complete commit-level details and contributor information, see the
   iteration count and the path taken to get there move for every case that
   selects this option.
 
+- The FSI `predictor` switch now defaults to `yes`, and `Aitken` and
+  `fixedRelaxation` honour it as `IQNILS` did. The first coupling iteration of
+  each time step then moves the fluid interface with the full solid predictor
+  displacement (`predictSolid`) instead of `relaxationFactor` times it; later
+  iterations are unchanged. A relaxed first iteration made the interface stop,
+  or reverse, as seen by the fluid, which caused #489. Cases that set
+  `relaxationFactor 1`, and `IQNILS` cases with `couplingReuse`, whose first
+  update reuses previous time steps' modes (such as `3dTube`), are unaffected.
+  On the other tutorials that change, the
+  results match the previous ones at tight tolerances, with fewer iterations:
+  `perpendicularFlap` needs 1.0 instead of 3.3 coupling iterations per time
+  step and runs 2.8 times faster, and at its tolerance of `1e-3` it is also
+  closer to a tightly converged solution (0.8% instead of 14% in the peak tip
+  displacement). `cavityFlexibleBottom` drops from 3.5 to 1.3 iterations per
+  time step, and `beamInCrossFlow` with Aitken from 13.3 to 11.0.
+  `flexibleDamBreak` sets `predictor no`, as it stalls just above its
+  tolerance with the predictor, because its single PIMPLE outer corrector
+  sets a floor on the FSI residual. Set `predictor no` to recover the previous
+  behaviour.
+
 ### Removed
 
 - **Breaking:** ten mechanical laws are removed: `diffusionElastic`,
@@ -170,12 +190,11 @@ release. For complete commit-level details and contributor information, see the
   FSI3 parameters shortly after its end time (#383). With a relaxed first
   coupling iteration, the fluid saw the plate stop or reverse within each time
   step, and the solid had to converge under a first-iteration fluid force of
-  about 250 times the converged one. The tutorial now sets `predictor yes`, so
-  the first iteration moves the fluid interface with the full solid
-  prediction, and the first-iteration force is close to the converged one.
-  The FSI2 variant now runs to t = 15 s and FSI3 to t = 10 s. Between t = 2
-  and 6 s the mean number of coupling iterations per time step drops from 8.6
-  to 4.4 for FSI2 and from 13.0 to 9.0 for FSI3.
+  about 250 times the converged one. With the new `predictor` default (see
+  Changed), the first-iteration force is close to the converged one. The FSI2
+  variant now runs to t = 15 s and FSI3 to t = 10 s. Between t = 2 and 6 s the
+  mean number of coupling iterations per time step drops from 8.6 to 4.4 for
+  FSI2 and from 13.0 to 9.0 for FSI3.
 
 ## [v2.4] - 2026-08-24
 

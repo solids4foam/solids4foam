@@ -25,6 +25,16 @@ AitkenCoeffs
     solidPatch interface;
     fluidPatch interface;
     relaxationFactor 0.4;
+
+    // Relax the first iteration of each time-step too. With the default
+    // (predictor yes), the case converges in fewer iterations but stalls just
+    // above outerCorrTolerance at t = 0.156 s: with nOuterCorrectors 1 in
+    // system/fluid/fvSolution, the fluid response depends on the FSI
+    // iteration history, which sets a floor on the FSI residual. With
+    // nOuterCorrectors 2, predictor yes runs to the end time in 40% less
+    // time, but moves the peak displacement outside the regression tolerance
+    predictor no;
+
     interfaceDeformationLimit 0;
     outerCorrTolerance 1e-6;
     nOuterCorr 50;
