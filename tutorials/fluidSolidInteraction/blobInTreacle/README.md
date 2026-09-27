@@ -93,6 +93,10 @@ displacement of [2] is $$(0.1297, -0.0117)\,\mathrm{m}$$, about 10% more than
 on the tutorial mesh. The difference shrinks with mesh refinement, and the
 remaining offset is discussed in the verification README.
 
+The published data for this case are limited to self-convergence norms and
+the coarse-mesh figures of the preprint, so an independent reference solution,
+e.g. from COMSOL, LS-DYNA or ANSYS, would be valuable; one is being arranged.
+
 ![Figure 2: Deformed interface compared with Liu (arXiv:1401.0082).](images/blobInTreacle-interfaces.png)
 
 **Figure 2: Deformed interface at $$t = 1\,\mathrm{s}$$ and in the steady
@@ -131,7 +135,9 @@ differs from this tutorial in two ways.
   quasi-monolithic ones, depending on the mesh and the solids4foam build.
   With `newMovingWallVelocity`, the partitioned solution with the campaign's
   solid model gives $$0.0736\,\mathrm{m}$$, against $$0.0737\,\mathrm{m}$$ from
-  the quasi-monolithic solver on the same mesh.
+  the quasi-monolithic solver on the same mesh. The partitioned couplings now
+  stop with a fatal error when the fluid velocity on the interface is
+  `fixedValue` or `noSlip`.
 - It uses a Saint Venant-Kirchhoff solid rather than the linear elastic solid
   of [1, 2]. With $$\lambda_s/\mu_s = 10$$ and the ambient pressure of about
   $$25\,\mathrm{Pa}$$, this law softens: the displacement at

@@ -145,6 +145,30 @@ relative_difference() {
 }
 
 # ------------------------------------------------------------
+# Check that the solver completed
+# ------------------------------------------------------------
+
+# Allrun does not return the solver status, so check the solver log and the
+# time of the last displacement sample
+SOLVER_LOG="${CASE_DIR}/log.solids4Foam"
+if [[ ! -f "${SOLVER_LOG}" ]] || ! grep -q "^End" "${SOLVER_LOG}" \
+    || grep -q "FOAM FATAL" "${SOLVER_LOG}"; then
+    echo "FAIL: solids4Foam did not run to completion; see ${SOLVER_LOG}"
+    exit 1
+fi
+
+END_TIME=$(awk '/^endTime/ { gsub(";", "", $2); print $2 }' \
+    "${CASE_DIR}/system/controlDict")
+last_time=$(awk '$1 !~ /^#/ { value = $1 } END { print value }' \
+    "${CASE_DIR}/${DISP_FILE}")
+if ! awk -v a="${last_time}" -v b="${END_TIME}" \
+    'BEGIN { d = a - b; exit !(d < 1e-8 && d > -1e-8) }'; then
+    echo "FAIL: last displacement sample at t = ${last_time}," \
+        "not at the end time ${END_TIME}"
+    exit 1
+fi
+
+# ------------------------------------------------------------
 # Extract values
 # ------------------------------------------------------------
 

@@ -416,8 +416,10 @@ def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
         factors = [float(value) for value in spec["quick_factors"]]
     else:
         factors = [float(value) for value in spec["factors"]]
-    if any(right <= left for left, right in zip(factors, factors[1:])):
-        raise SystemExit("mesh refinement factors must be strictly increasing")
+    # The observed order and the extrapolation assume a refinement ratio of 2
+    if any(abs(right / left - 2.0) > 1e-9 for left, right in zip(factors, factors[1:])):
+        raise SystemExit("successive mesh refinement factors must double, "
+                         "e.g. 0.5,1,2,4")
     end_time = float(spec["end_time"])
     window = float(spec["steady_window"])
     liu = reference["liu"]
@@ -425,6 +427,7 @@ def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
     curve_steady = read_curve(REFERENCE_DIR / liu["interface_steady"])
 
     rows = []
+    failed = False
     for factor in factors:
         delta_t = float(spec["delta_t"].get(f"{factor:g}", spec["delta_t"]["default"]))
         cores = args.cores if factor > 1 else 1
@@ -435,6 +438,9 @@ def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
             print(f"ERROR: {error}", file=sys.stderr)
             if not args.keep_going:
                 return False
+            # A failed level fails the study, and leaves a gap in the
+            # refinement sequence, so the remaining levels are reported only
+            failed = True
             continue
         history = displacement_history(run_dir)
         _, dx_t1, dy_t1 = value_at(history, 1.0)
@@ -474,7 +480,7 @@ def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
     write_interfaces(rows, end_time)
 
     acceptance = spec["acceptance"]
-    passed = all(
+    passed = not failed and all(
         row["steady_spread"] <= float(spec["steady_tolerance"]) for row in rows
     )
     finest = rows[-1]

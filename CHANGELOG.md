@@ -57,7 +57,8 @@ release. For complete commit-level details and contributor information, see the
   `fixedValue` or `noSlip`. These conditions ignore the interface motion and
   silently remove the added-mass effect; the message names the patch and
   suggests `newMovingWallVelocity`, or `elasticWallVelocity` for a Robin
-  interface. `oneWayCoupling`, where the fluid wall is rigid, is not checked.
+  interface. `oneWayCoupling`, where the fluid wall is rigid, and runs that
+  are never coupled are not checked.
 - The `mechanicalConstitutiveLaw` framework no longer requires the legacy
   `mechanicalModel` it replaces. `solidModel` reads
   `constant/mechanicalProperties` itself and hands it to whichever

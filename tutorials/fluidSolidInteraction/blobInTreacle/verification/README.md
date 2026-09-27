@@ -31,7 +31,7 @@ Useful options:
 ./Allverify --quick              # two time steps and two coarse meshes only
 ./Allverify --study time         # the time-step study only
 ./Allverify --study mesh         # the mesh study only
-./Allverify --levels 0.5,1,2     # a subset of the mesh levels
+./Allverify --levels 0.5,1,2     # a subset of the levels, each double the last
 ./Allverify --cores 4            # MPI ranks for the levels finer than the tutorial
 ./Allverify --reuse              # resume a sweep without re-running cases
 ```
@@ -184,6 +184,10 @@ whereas the `t = 1 s` curve, which solids4foam reproduces, was computed with
 P5/P4/P5 elements on a refinement of it; the offset is therefore attributed
 mainly to the reference, although this cannot be confirmed from the published
 data.
+
+Because the published data are limited to self-convergence norms and the
+coarse-mesh figures of the preprint, an independent reference solution, e.g.
+from COMSOL, LS-DYNA or ANSYS, would be valuable; one is being arranged.
 
 ## References
 
