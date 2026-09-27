@@ -17,7 +17,7 @@ cd tutorials/fluidSolidInteraction/mokLidDrivenCavity/verification
 ./Allverify                  # all three studies
 ./Allverify --study mesh     # one study: mesh, timestep or solid
 ./Allverify --quick          # smoke test: two members per study, to t = 10 s
-./Allverify --reuse          # resume without re-running completed members
+./Allverify --reuse          # reuse members completed with the same settings
 ./Allverify --cores 4        # run every member on 4 MPI ranks
 ```
 
@@ -27,7 +27,10 @@ never modified. Results go to the ignored `verification/postProcessing/`
 directory: one `<study>_study.csv` table and one `<study>_histories.csv` file
 per study, `verification_summary.md`, and, when `gnuplot` is available, a
 `<study>_histories.png` plot against the published curves. `Allverify` returns
-zero only when every check passes.
+zero only when every check passes. Each completed member records its settings,
+rank count and a fingerprint of the tutorial inputs in
+`verification_member.json`; `--reuse` reuses a member only when these match
+and its solver log ends normally, and reruns it otherwise.
 
 ## Benchmark definition and reference quality
 

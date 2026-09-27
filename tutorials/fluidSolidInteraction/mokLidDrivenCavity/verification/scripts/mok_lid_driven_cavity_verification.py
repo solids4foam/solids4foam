@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import re
@@ -201,7 +202,38 @@ def read_history(run_dir: Path) -> list[tuple[float, float]]:
     )
     if not candidates:
         raise RuntimeError(f"no midpoint displacement data in {run_dir}")
-    return [(row[0], row[2]) for row in numeric_rows(candidates[-1]) if len(row) >= 3]
+    history = [
+        (row[0], row[2]) for row in numeric_rows(candidates[-1]) if len(row) >= 3
+    ]
+    if not all(math.isfinite(time) and math.isfinite(value)
+               for time, value in history):
+        raise RuntimeError(f"non-finite midpoint displacement in {candidates[-1]}")
+    return history
+
+
+def check_history(
+    history: list[tuple[float, float]], end: float, delta_t: float, label: str
+) -> None:
+    """The history must be increasing in time, without gaps, and reach the end
+    of the comparison window."""
+    if not history:
+        raise RuntimeError(f"{label}: empty midpoint displacement history")
+    times = [time for time, _ in history]
+    if any(right <= left for left, right in zip(times, times[1:])):
+        raise RuntimeError(f"{label}: midpoint history times are not increasing")
+    gap = max(
+        [right - left for left, right in zip(times, times[1:])] + [times[0]]
+    )
+    if gap > 1.5 * delta_t:
+        raise RuntimeError(
+            f"{label}: midpoint history has a gap of {gap:g} s "
+            f"(time step {delta_t:g} s)"
+        )
+    if times[-1] < end - 0.5 * delta_t:
+        raise RuntimeError(
+            f"{label}: midpoint history stops at t = {times[-1]:g} s, before "
+            f"the end of the comparison window at {end:g} s"
+        )
 
 
 def read_iterations(run_dir: Path) -> list[int]:
@@ -221,6 +253,10 @@ def check_solver_log(solver_log: Path, end_time: float, label: str) -> None:
     if re.search(r"FOAM FATAL|FOAM aborting|^ERROR$|\[stack trace\]", text,
                  re.MULTILINE):
         raise RuntimeError(f"{label} diverged or aborted; see {solver_log}")
+    if not re.search(r"^End\s*$", text, re.MULTILINE):
+        raise RuntimeError(
+            f"{label} did not terminate normally (no End); see {solver_log}"
+        )
     times = [float(value) for value in
              re.findall(r"^Time = ([0-9.eE+-]+)\s*$", text, re.MULTILINE)]
     if not times or times[-1] < end_time - 1.0e-8:
@@ -231,18 +267,49 @@ def check_solver_log(solver_log: Path, end_time: float, label: str) -> None:
         )
 
 
+def tutorial_fingerprint() -> str:
+    """Hash of the tutorial inputs that a member copies, so that a member run
+    from different inputs is not reused."""
+    digest = hashlib.sha256()
+    for path in sorted(CASE_DIR.rglob("*")):
+        relative = path.relative_to(CASE_DIR)
+        if (
+            relative.parts[0] not in {"0", "constant", "system", "Allrun"}
+            or "polyMesh" in relative.parts
+            or not path.is_file()
+        ):
+            continue
+        digest.update(str(relative).encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def member_metadata(member: dict, end_time: float) -> dict:
+    return {
+        "member": {key: member[key] for key in sorted(member)},
+        "end_time_s": end_time,
+        "tutorial": tutorial_fingerprint(),
+    }
+
+
 def run_member(
     study: str, member: dict, end_time: float, cores: int, reuse: bool
 ) -> dict:
     run_dir = WORK_DIR / study / member["name"]
     solver_log = run_dir / "log.solids4Foam"
+    metadata_file = run_dir / "verification_member.json"
     label = f"{study}/{member['name']}"
-    completed_case = (
-        reuse
-        and solver_log.exists()
-        and re.search(r"^End\s*$", solver_log.read_text(errors="replace"),
-                      re.MULTILINE)
-    )
+    metadata = member_metadata(member, end_time)
+    completed_case = False
+    if reuse and solver_log.exists() and metadata_file.is_file():
+        stored = json.loads(metadata_file.read_text())
+        completed_case = (
+            all(stored.get(key) == value for key, value in metadata.items())
+            and re.search(r"^End\s*$", solver_log.read_text(errors="replace"),
+                          re.MULTILINE) is not None
+        )
+        if completed_case:
+            cores = int(stored.get("cores", cores))
     if completed_case:
         print(f"Reusing {label} in {run_dir}", flush=True)
     else:
@@ -269,6 +336,10 @@ def run_member(
             ).read_text(errors="replace"):
                 raise RuntimeError("this case requires solids4foam built with PETSc")
             raise RuntimeError(f"solver log was not created in {run_dir}")
+        check_solver_log(solver_log, end_time, label)
+        metadata_file.write_text(
+            json.dumps(dict(metadata, cores=cores), indent=2) + "\n"
+        )
     check_solver_log(solver_log, end_time, label)
     log_text = solver_log.read_text(errors="replace")
     clock = re.findall(r"ClockTime\s*=\s*([0-9.eE+-]+)", log_text)
@@ -333,7 +404,7 @@ def periodic_stats(
             point for point in curve
             if cycle_start <= point[0] < cycle_start + period
         ]
-        if len(window) > 2:
+        if len(window) >= 10:
             peak = max(window, key=lambda point: point[1])
             peaks.append(peak[1])
             peak_phases.append((peak[0] - cycle_start) % period)
@@ -416,8 +487,9 @@ def envelope_deviation(value: float, low: float, high: float) -> float:
 def evaluate(row: dict, references: dict, config: dict) -> None:
     window = config["comparison_window_s"]
     period = float(config["lid_period_s"])
-    end = min(float(window[1]), row["history"][-1][0])
-    start = float(window[0])
+    start, end = float(window[0]), float(window[1])
+    label = f"{row['study']}/{row['name']}"
+    check_history(row["history"], end, row["delta_t_s"], label)
     stats = periodic_stats(row["history"], start, end, period)
     row.update({f"{key}_m" if key in QUANTITIES else key: value
                 for key, value in stats.items()})
@@ -453,6 +525,12 @@ def evaluate(row: dict, references: dict, config: dict) -> None:
             row["history"], reference["curve"], start, end
         ) / ref_scale
 
+    checked = [f"{quantity}_m" for quantity in QUANTITIES] + [
+        f"{quantity}_envelope_deviation" for quantity in QUANTITIES
+    ] + ["band_distance"]
+    if not all(math.isfinite(row[key]) for key in checked):
+        raise RuntimeError(f"{label}: non-finite verification metric")
+
 
 # --------------------------------------------------------------------------- #
 # Studies
@@ -473,6 +551,16 @@ def check_study(study: str, rows: list[dict], config: dict,
     if quick:
         checks.append((f"{study}: all members completed", True, ""))
         return checks
+
+    expected = len(study_members(config, study, quick=False))
+    if len(rows) < expected:
+        checks.append((
+            f"{study}: all {expected} members completed",
+            False,
+            f"{len(rows)} completed",
+        ))
+        if len(rows) < 2:
+            return checks
 
     if study in {"mesh", "timestep"}:
         # The change in the periodic response (the larger of the peak and the
@@ -747,16 +835,18 @@ def main() -> int:
         for member in study_members(config, study, args.quick):
             try:
                 row = run_member(study, member, end_time, args.cores, args.reuse)
+                row["compare"] = bool(member.get("compare", True))
+                evaluate(row, references, config)
             except RuntimeError as error:
                 print(f"ERROR: {error}", file=sys.stderr)
                 failures += 1
                 if not args.keep_going:
                     return 1
                 continue
-            row["compare"] = bool(member.get("compare", True))
-            evaluate(row, references, config)
             rows.append(row)
         if not rows:
+            all_checks.append((f"{study}: no member completed", False, ""))
+            lines += ["", f"## {study} study", "", f"- FAIL: {study}: no member completed"]
             continue
         write_study_csv(study, rows, curve_names)
         create_plot(study, rows)
