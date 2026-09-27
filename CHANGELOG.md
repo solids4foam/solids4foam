@@ -123,10 +123,11 @@ release. For complete commit-level details and contributor information, see the
   closer to a tightly converged solution (0.8% instead of 14% in the peak tip
   displacement). `cavityFlexibleBottom` drops from 3.5 to 1.3 iterations per
   time step, and `beamInCrossFlow` with Aitken from 13.3 to 11.0.
-  `flexibleDamBreak` sets `predictor no`, as it stalls just above its
-  tolerance with the predictor, because its single PIMPLE outer corrector
-  sets a floor on the FSI residual. Set `predictor no` to recover the previous
-  behaviour.
+  `flexibleDamBreak` stalled just above its tolerance with the predictor,
+  because its single PIMPLE outer corrector made the fluid response depend on
+  the FSI iteration history; it now uses two, and runs to its end time in
+  475 s instead of 761 s, with a new regression reference. Set `predictor no`
+  to recover the previous behaviour.
 
 ### Removed
 
@@ -195,6 +196,10 @@ release. For complete commit-level details and contributor information, see the
   variant now runs to t = 15 s and FSI3 to t = 10 s. Between t = 2 and 6 s the
   mean number of coupling iterations per time step drops from 8.6 to 4.4 for
   FSI2 and from 13.0 to 9.0 for FSI3.
+- `fillingElasticContainer`: `./Allrun aitken` failed, as it selected a
+  `constant/fsiProperties.aitken` that did not exist. The Aitken setup is now
+  in that file, and `constant/fsiProperties` is a link to the selected
+  `constant/fsiProperties.<mode>` (`robin` by default).
 
 ## [v2.4] - 2026-08-24
 

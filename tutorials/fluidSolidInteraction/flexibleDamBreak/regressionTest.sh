@@ -24,8 +24,9 @@ REG_END_TIME=0.3
 
 # Reference values
 # Peak horizontal displacement Dx of the tracked dam corner over t <= 0.3
-# Rounded reference covering OpenFOAM.com, OpenFOAM.org and foam-extend
-REF_MAX_DISP=0.049
+# Midpoint of OpenFOAM-v2512 (0.05167), OpenFOAM-9 (0.04996) and
+# foam-extend-4.1 (0.04803), each within 1.9e-3 of it
+REF_MAX_DISP=0.0499
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
