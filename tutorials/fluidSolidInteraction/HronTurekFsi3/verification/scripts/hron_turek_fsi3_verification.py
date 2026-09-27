@@ -693,16 +693,9 @@ def enable_restart(case: Path) -> None:
     path.write_text(text)
 
 
-def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
-    """Compare the transient after the coupling start between the couplings.
-
-    Both couplings converge the same interface problem at every time step, so
-    the histories must agree closely from the first coupled step; there is no
-    need to reach the periodic regime, which is far too expensive for the
-    Robin-Neumann variant on this case.
-    """
-    end_time = args.end_time or spec["coupling"]["endTime"]
-    factor = int(args.levels) if args.levels else spec["coupling"]["refinement"]
+def coupling_level(args: argparse.Namespace, spec: dict, factor: int,
+                   end_time: float) -> dict:
+    """Run both couplings on one mesh level from a common start state."""
     index = spec["mesh"]["refinementFactors"].index(factor)
     delta_t = spec["mesh"]["deltaTs"][index]
     # The restarts below are run in serial so that the common start state
@@ -760,20 +753,11 @@ def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
         else:
             row.update(iqnils_iteration_summary(case))
         rows.append(row)
-    csv_name = f"coupling_comparison_{factor}x.csv"
-    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    if args.quick:
-        write_csv(OUTPUT_ROOT / csv_name, rows)
-        print(f"Quick coupling run completed; results: {OUTPUT_ROOT / csv_name}")
-        return True
-
     histories = {
         row["coupling"]: coupled_histories(WORK_ROOT / row["case"], spec, coupling_start)
         for row in rows
     }
     iqnils, robin = rows
-    failures = []
-    tolerance = spec["coupling"]["relativeTolerance"]
     for quantity in QUANTITIES:
         time_i, values_i = histories["iqnils"][quantity]
         time_r, values_r = histories["robin"][quantity]
@@ -782,19 +766,12 @@ def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
         ):
             fail(f"The {quantity} histories of the two couplings are sampled at different times")
         scale = max(abs(v) for v in values_i)
-        difference = max(abs(a - b) for a, b in zip(values_i, values_r)) / scale
-        robin[f"{quantity}_vs_iqnils"] = difference
+        robin[f"{quantity}_vs_iqnils"] = max(
+            abs(a - b) for a, b in zip(values_i, values_r)
+        ) / scale
         robin[f"{quantity}_scale"] = scale
-        if difference > tolerance:
-            failures.append(
-                f"{quantity}: the Robin history differs from IQN-ILS by up to "
-                f"{100 * difference:.3f}% of its maximum (tolerance {100 * tolerance:g}%)"
-            )
-    passed = not failures
-    for row in rows:
-        row["pass"] = passed
-    write_csv(OUTPUT_ROOT / csv_name, rows)
 
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     history_name = f"coupling_comparison_{factor}x_history.csv"
     with (OUTPUT_ROOT / history_name).open("w", newline="") as handle:
         writer = csv.writer(handle)
@@ -804,30 +781,6 @@ def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
             writer.writerow([f"{t:.6f}"] + [
                 f"{histories[c][q][1][i]:.6e}" for c in ("iqnils", "robin") for q in QUANTITIES
             ])
-
-    notes = list(failures)
-    for quantity in QUANTITIES:
-        notes.append(
-            f"Maximum Robin vs IQN-ILS difference in {quantity}: "
-            f"{100 * robin[f'{quantity}_vs_iqnils']:.4f}% of its maximum"
-        )
-    for row in rows:
-        notes.append(
-            f"{row['case']}: {row['total_outer_iterations']:.0f} FSI iterations over "
-            f"{row['coupled_time_steps']:.0f} coupled time steps "
-            f"(mean {row['total_outer_iterations'] / row['coupled_time_steps']:.1f}, "
-            f"maximum {row['maximum_outer_iterations']:.0f} per step)"
-        )
-    notes.append(
-        "Worst converged Robin pressure residual: "
-        f"{robin['maximum_final_pressure_residual']:.3g}; leakage-flux residual: "
-        f"{robin['maximum_final_flux_residual']:.3g}"
-    )
-    table = "| Quantity | Maximum difference (% of maximum) |\n|---|---:|\n" + "\n".join(
-        f"| {quantity} | {100 * robin[f'{quantity}_vs_iqnils']:.4f} |" for quantity in QUANTITIES
-    )
-    write_summary(f"coupling comparison on the {factor}x mesh to t = {end_time:g} s",
-                  passed, notes, table, csv_name)
     if command_exists("gnuplot"):
         output = OUTPUT_ROOT / f"coupling_comparison_{factor}x_history.png"
         result = subprocess.run(
@@ -843,6 +796,101 @@ def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
         if result.returncode:
             fail(f"Could not create the coupling history plot {output}")
         print(f"History plot: {output}")
+    return {"rows": rows, "histories": histories}
+
+
+def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
+    """Compare the Robin-Neumann and IQN-ILS transients after the coupling start.
+
+    Both couplings are converged at every time step, but the two interface
+    formulations are different spatial discretisations of the interface
+    conditions: the converged Robin condition prescribes the pressure gradient
+    from the interpolated solid acceleration, whereas the Dirichlet-Neumann
+    wall is kinematically exact in the discrete sense. Their difference is
+    therefore a discretisation error, not a coupling error. The study checks
+    that it decreases under mesh refinement and that on the finest level it
+    is smaller than the discretisation error of either solution, estimated
+    from the change in the IQN-ILS history between the two finest levels.
+    """
+    end_time = args.end_time or spec["coupling"]["endTime"]
+    factors = (
+        [int(level) for level in args.levels.split(",")]
+        if args.levels else spec["coupling"]["levels"]
+    )
+    if len(factors) < 2:
+        fail("The coupling study needs at least two mesh levels")
+    results = {factor: coupling_level(args, spec, factor, end_time) for factor in factors}
+    rows = [row for factor in factors for row in results[factor]["rows"]]
+    csv_name = "coupling_comparison.csv"
+    if args.quick:
+        write_csv(OUTPUT_ROOT / csv_name, rows)
+        print(f"Quick coupling run completed; results: {OUTPUT_ROOT / csv_name}")
+        return True
+
+    coarse, fine = factors[-2], factors[-1]
+    fine_robin = results[fine]["rows"][1]
+    coarse_robin = results[coarse]["rows"][1]
+    failures = []
+    for quantity in QUANTITIES:
+        # Discretisation error estimate: the change in the IQN-ILS history
+        # between the two finest levels, at the times both levels share
+        time_c, values_c = results[coarse]["histories"]["iqnils"][quantity]
+        time_f, values_f = results[fine]["histories"]["iqnils"][quantity]
+        fine_values = {round(t, 9): v for t, v in zip(time_f, values_f)}
+        pairs = [(v, fine_values[round(t, 9)]) for t, v in zip(time_c, values_c)
+                 if round(t, 9) in fine_values]
+        if not pairs:
+            fail(f"The {quantity} histories of the two mesh levels share no sample times")
+        scale = max(abs(b) for _, b in pairs)
+        mesh_change = max(abs(a - b) for a, b in pairs) / scale
+        fine_robin[f"{quantity}_iqnils_mesh_change"] = mesh_change
+        gap_coarse = coarse_robin[f"{quantity}_vs_iqnils"]
+        gap_fine = fine_robin[f"{quantity}_vs_iqnils"]
+        if gap_fine >= gap_coarse:
+            failures.append(
+                f"{quantity}: the Robin vs IQN-ILS difference does not decrease with "
+                f"refinement ({100 * gap_coarse:.3f}% on {coarse}x, {100 * gap_fine:.3f}% on {fine}x)"
+            )
+        if gap_fine >= mesh_change:
+            failures.append(
+                f"{quantity}: the Robin vs IQN-ILS difference on the {fine}x mesh "
+                f"({100 * gap_fine:.3f}%) is not below the IQN-ILS change between the "
+                f"{coarse}x and {fine}x meshes ({100 * mesh_change:.3f}%)"
+            )
+    passed = not failures
+    for row in rows:
+        row["pass"] = passed
+    write_csv(OUTPUT_ROOT / csv_name, rows)
+
+    notes = list(failures)
+    for row in rows:
+        notes.append(
+            f"{row['case']}: {row['total_outer_iterations']:.0f} FSI iterations over "
+            f"{row['coupled_time_steps']:.0f} coupled time steps "
+            f"(mean {row['total_outer_iterations'] / row['coupled_time_steps']:.1f}, "
+            f"maximum {row['maximum_outer_iterations']:.0f} per step)"
+        )
+    for factor in factors:
+        robin = results[factor]["rows"][1]
+        notes.append(
+            f"Worst converged Robin residuals on the {factor}x mesh: pressure "
+            f"{robin['maximum_final_pressure_residual']:.3g}, leakage flux "
+            f"{robin['maximum_final_flux_residual']:.3g}"
+        )
+    header = "| Quantity | " + " | ".join(
+        f"Robin vs IQN-ILS, {factor}x (%)" for factor in factors
+    ) + f" | IQN-ILS change {coarse}x to {fine}x (%) |"
+    table = header + "\n|---|" + "---:|" * (len(factors) + 1) + "\n" + "\n".join(
+        f"| {quantity} | " + " | ".join(
+            f"{100 * results[factor]['rows'][1][f'{quantity}_vs_iqnils']:.3f}" for factor in factors
+        ) + f" | {100 * fine_robin[f'{quantity}_iqnils_mesh_change']:.3f} |"
+        for quantity in QUANTITIES
+    )
+    write_summary(
+        f"coupling comparison to t = {end_time:g} s on the "
+        + ", ".join(f"{factor}x" for factor in factors) + " meshes",
+        passed, notes, table, csv_name,
+    )
     print(f"coupling comparison: {'PASS' if passed else 'FAIL'}; results: {OUTPUT_ROOT / csv_name}")
     for message in failures:
         print(f"  - {message}")
