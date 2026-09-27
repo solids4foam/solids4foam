@@ -1,0 +1,24 @@
+functions
+{
+    // Displacement of the bottom midpoint, on the wetted face of the membrane
+    midpoint
+    {
+        type                solidPointDisplacement;
+        point               (0.5 0 0.05);
+    }
+    forces
+    {
+        type                forces;
+        region              fluid;
+        libs                ( "libforces.so" );
+        writeControl        timeStep;
+        writeInterval       1;
+        patches             (interface);
+        "pName|p"           p;
+        "UName|U"           U;
+        "rhoName|rho"       rhoInf;
+        log                 false;
+        rhoInf              1;
+        CofR                (0.5 0 0.05);
+    }
+}

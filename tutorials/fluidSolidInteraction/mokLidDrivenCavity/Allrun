@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun                      # default: IQNILS coupling, high-order solid
+# ./Allrun standard             # standard second-order solid
+# ./Allrun aitken               # Aitken coupling
+# ./Allrun parallel             # run in parallel
+# ./Allrun aitken standard parallel
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
+# The lid and inlet velocities use codedFixedValue, which foam-extend does not
+# provide
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+coupling=iqnils
+solid=highOrder
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            ;;
+        highOrder)
+            solid=highOrder
+            ;;
+        standard)
+            solid=standard
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [iqnils|aitken] [highOrder|standard] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling and the ${solid} solid discretisation"
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "solidProperties.${solid}" constant/solid/solidProperties
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+if [[ "$runMode" == "parallel" ]]; then
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
