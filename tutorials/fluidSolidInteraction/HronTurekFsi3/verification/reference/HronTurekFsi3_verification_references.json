@@ -274,5 +274,287 @@
         "lift": 0.763746
       }
     ]
+  },
+  "fsi2": {
+    "source": "Featflow FSI2 tables, https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/fsi_benchmark/fsi_tests/fsi_fsi_tests.html",
+    "references_source": "Featflow FSI2 table, level 4+0 (15872 elements), dt = 0.0005 s: the discretisation of the published reference history",
+    "history_reference": "TurekHron_fsi2_reference_history.csv",
+    "inletMaxValue": 1.5,
+    "solidDensity": 10000.0,
+    "youngsModulus": 1400000.0,
+    "transitionPeriod": 2.0,
+    "couplingStartTime": 2.0,
+    "outer_corr_tolerance": 1e-06,
+    "mesh": {
+      "refinementFactors": [
+        1,
+        2,
+        4
+      ],
+      "deltaTs": [
+        0.001,
+        0.0005,
+        0.00025
+      ],
+      "defaultLevels": [
+        1,
+        2
+      ],
+      "endTime": 12.0,
+      "analysisWindow": 3.0,
+      "maximumErrorGrowth": 0.01
+    },
+    "quick": {
+      "endTime": 2.3
+    },
+    "cores": {
+      "1": 1,
+      "2": 8,
+      "4": 16,
+      "default": 8
+    },
+    "periodicity": {
+      "amplitudeTolerance": 0.02,
+      "reportOnly": []
+    },
+    "references": {
+      "ux_mean": {
+        "value": -0.01485,
+        "tolerance": 0.1,
+        "primary": true
+      },
+      "ux_amplitude": {
+        "value": 0.0127,
+        "tolerance": 0.1,
+        "primary": true
+      },
+      "ux_frequency": {
+        "value": 3.86,
+        "tolerance": 0.03,
+        "primary": true
+      },
+      "uy_mean": {
+        "value": 0.0013,
+        "tolerance": 1.0,
+        "primary": false
+      },
+      "uy_amplitude": {
+        "value": 0.0816,
+        "tolerance": 0.05,
+        "primary": true
+      },
+      "uy_frequency": {
+        "value": 1.93,
+        "tolerance": 0.03,
+        "primary": true
+      },
+      "drag_mean": {
+        "value": 215.06,
+        "tolerance": 0.02,
+        "primary": true
+      },
+      "drag_amplitude": {
+        "value": 77.65,
+        "tolerance": 0.15,
+        "primary": true
+      },
+      "drag_frequency": {
+        "value": 3.86,
+        "tolerance": 0.03,
+        "primary": false
+      },
+      "lift_mean": {
+        "value": 0.61,
+        "tolerance": 1.0,
+        "primary": false
+      },
+      "lift_amplitude": {
+        "value": 237.8,
+        "tolerance": 0.15,
+        "primary": true
+      },
+      "lift_frequency": {
+        "value": 1.93,
+        "tolerance": 0.03,
+        "primary": false
+      }
+    },
+    "publishedReferences": {
+      "Turek-Hron 2006": {
+        "ux_mean": -0.01458,
+        "ux_amplitude": 0.01244,
+        "ux_frequency": 3.8,
+        "uy_mean": 0.00123,
+        "uy_amplitude": 0.0806,
+        "uy_frequency": 2.0,
+        "drag_mean": 208.83,
+        "drag_amplitude": 73.75,
+        "drag_frequency": 3.8,
+        "lift_mean": 0.88,
+        "lift_amplitude": 234.2,
+        "lift_frequency": 2.0
+      }
+    },
+    "featflowTables": {
+      "0.02": [
+        {
+          "level": "2+0",
+          "nel": 992,
+          "ndof": 19488,
+          "ux_mean": -0.01402,
+          "ux_amplitude": 0.01203,
+          "ux_frequency": 3.85,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0793,
+          "uy_frequency": 1.93,
+          "drag_mean": 210.1,
+          "drag_amplitude": 72.62,
+          "drag_frequency": 3.85,
+          "lift_mean": 0.25,
+          "lift_amplitude": 227.9,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "3+0",
+          "nel": 3968,
+          "ndof": 76672,
+          "ux_mean": -0.01454,
+          "ux_amplitude": 0.0125,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0807,
+          "uy_frequency": 1.93,
+          "drag_mean": 213.06,
+          "drag_amplitude": 75.76,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.85,
+          "lift_amplitude": 234.4,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "4+0",
+          "nel": 15872,
+          "ndof": 304128,
+          "ux_mean": -0.01487,
+          "ux_amplitude": 0.01273,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00124,
+          "uy_amplitude": 0.0817,
+          "uy_frequency": 1.93,
+          "drag_mean": 212.83,
+          "drag_amplitude": 75.89,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.92,
+          "lift_amplitude": 234.3,
+          "lift_frequency": 1.93
+        }
+      ],
+      "0.01": [
+        {
+          "level": "2+0",
+          "nel": 992,
+          "ndof": 19488,
+          "ux_mean": -0.01401,
+          "ux_amplitude": 0.01204,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0793,
+          "uy_frequency": 1.93,
+          "drag_mean": 210.09,
+          "drag_amplitude": 72.82,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.52,
+          "lift_amplitude": 228.6,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "3+0",
+          "nel": 3968,
+          "ndof": 76672,
+          "ux_mean": -0.01454,
+          "ux_amplitude": 0.01248,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0807,
+          "uy_frequency": 1.93,
+          "drag_mean": 213.06,
+          "drag_amplitude": 75.76,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.85,
+          "lift_amplitude": 234.4,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "4+0",
+          "nel": 15872,
+          "ndof": 304128,
+          "ux_mean": -0.01487,
+          "ux_amplitude": 0.01273,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00124,
+          "uy_amplitude": 0.0817,
+          "uy_frequency": 1.93,
+          "drag_mean": 215.18,
+          "drag_amplitude": 77.78,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.87,
+          "lift_amplitude": 238.0,
+          "lift_frequency": 1.93
+        }
+      ],
+      "0.0005": [
+        {
+          "level": "2+0",
+          "nel": 992,
+          "ndof": 19488,
+          "ux_mean": -0.01401,
+          "ux_amplitude": 0.01204,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00128,
+          "uy_amplitude": 0.0792,
+          "uy_frequency": 1.93,
+          "drag_mean": 210.14,
+          "drag_amplitude": 72.86,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.49,
+          "lift_amplitude": 228.7,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "3+0",
+          "nel": 3968,
+          "ndof": 76672,
+          "ux_mean": -0.01448,
+          "ux_amplitude": 0.01245,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00124,
+          "uy_amplitude": 0.0807,
+          "uy_frequency": 1.93,
+          "drag_mean": 213.05,
+          "drag_amplitude": 75.74,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.84,
+          "lift_amplitude": 234.8,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "4+0",
+          "nel": 15872,
+          "ndof": 304128,
+          "ux_mean": -0.01485,
+          "ux_amplitude": 0.0127,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.0013,
+          "uy_amplitude": 0.0816,
+          "uy_frequency": 1.93,
+          "drag_mean": 215.06,
+          "drag_amplitude": 77.65,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.61,
+          "lift_amplitude": 237.8,
+          "lift_frequency": 1.93
+        }
+      ]
+    }
   }
 }

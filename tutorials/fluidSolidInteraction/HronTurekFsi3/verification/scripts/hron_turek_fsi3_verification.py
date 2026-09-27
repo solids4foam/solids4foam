@@ -417,15 +417,16 @@ def relative_error(value: float, reference: float) -> float:
     return abs(value - reference) / abs(reference) if reference else abs(value - reference)
 
 
-def periodicity_failures(row: dict[str, float], tolerance: float) -> list[str]:
+def periodicity_failures(row: dict[str, float], tolerance: float,
+                         report_only: tuple[str, ...] = ("drag",)) -> list[str]:
     failures = []
     for quantity in QUANTITIES:
         change = relative_error(row[f"{quantity}_late_amplitude"],
                                 row[f"{quantity}_early_amplitude"])
         row[f"{quantity}_amplitude_change"] = change
-        # The drag amplitude scatters by about 2% from cycle to cycle with no
-        # trend, so its change is reported but not tested
-        if quantity != "drag" and change > tolerance:
+        # The FSI3 drag amplitude scatters by about 2% from cycle to cycle with
+        # no trend, so its change is reported but not tested
+        if quantity not in report_only and change > tolerance:
             failures.append(
                 f"{quantity} mean amplitude over the last two periods differs by "
                 f"{100 * change:.2f}% from the two before (tolerance {100 * tolerance:g}%)"
@@ -433,7 +434,7 @@ def periodicity_failures(row: dict[str, float], tolerance: float) -> list[str]:
     return failures
 
 
-def create_plot(script_name: str, run_name: str) -> None:
+def create_plot(script_name: str, run_name: str, options: str = "") -> None:
     plot_script = VERIFICATION / "scripts" / script_name
     output = OUTPUT_ROOT / f"{run_name}_history.png"
     result = subprocess.run(
@@ -442,7 +443,7 @@ def create_plot(script_name: str, run_name: str) -> None:
             "-e",
             f"run='{OUTPUT_ROOT / (run_name + '_history.csv')}'; "
             f"reference='{OUTPUT_ROOT / 'reference_history.csv'}'; "
-            f"output='{output}'; label='{run_name}'",
+            f"output='{output}'; label='{run_name}'" + options,
             str(plot_script),
         ],
         cwd=VERIFICATION,
@@ -539,10 +540,20 @@ def run_level(args: argparse.Namespace, spec: dict, factor: int, coupling: str,
         case = copy_case(name)
         configure_case(case, spec, factor, delta_t, end_time,
                        args.write_interval, cores)
+        if spec.get("benchmark") == "fsi2":
+            configure_fsi2(case, spec["fsi2"])
     run_case(case, name, cores, coupling, args.reuse)
     row: dict = {"case": name, "coupling": coupling, "mesh_level": index + 1,
                  "refinement": factor, "delta_t": delta_t, "cores": cores,
                  "end_time": end_time, "window": window}
+    if spec.get("benchmark") == "fsi2":
+        # A reused run keeps the rank count it was run with
+        row["cores"] = len(list(case.glob("processor*"))) or 1
+        row["execution_time"] = execution_time(case)
+        row.update(iqnils_iteration_summary(case))
+        if "coupled_time_steps" in row:
+            row["mean_outer_iterations"] = (row["total_outer_iterations"]
+                                            / row["coupled_time_steps"])
     if args.quick:
         return row
     row.update(extract(case, spec, window, end_time))
@@ -559,21 +570,25 @@ def mesh_study(args: argparse.Namespace, spec: dict) -> bool:
             fail(f"Unsupported refinement factor {factor}; choose from {spec['mesh']['refinementFactors']}")
     if args.quick:
         end_time = spec["quick"]["endTime"]
+    # FSI2 runs, results and plots carry a prefix so that they do not
+    # overwrite the FSI3 ones
+    prefix = "fsi2_" if spec.get("benchmark") == "fsi2" else ""
     rows = []
     notes = []
     failures = []
     for factor in factors:
-        name = f"{args.coupling}_mesh_{factor}x"
+        name = f"{prefix}{args.coupling}_mesh_{factor}x"
         row = run_level(args, spec, factor, args.coupling, end_time, window, name)
         rows.append(row)
         if args.quick:
             continue
         failures += [f"{name}: {message}" for message in
-                     periodicity_failures(row, spec["periodicity"]["amplitudeTolerance"])]
+                     periodicity_failures(row, spec["periodicity"]["amplitudeTolerance"],
+                                          tuple(spec["periodicity"].get("reportOnly", ("drag",))))]
         level_failures = check_references(row, spec["references"])
         if factor == factors[-1]:
             failures += [f"{name}: {message}" for message in level_failures]
-    csv_name = f"{args.coupling}_mesh_sweep.csv"
+    csv_name = f"{prefix}{args.coupling}_mesh_sweep.csv"
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     if args.quick:
         write_csv(OUTPUT_ROOT / csv_name, rows)
@@ -608,11 +623,20 @@ def mesh_study(args: argparse.Namespace, spec: dict) -> bool:
             f"{row['case']}: {row['cell_count']} cells, dt = {row['delta_t']:g} s, "
             f"{row['uy_periods']} uy periods in the analysis window"
         )
-    write_summary(f"{args.coupling} mesh study", passed, notes, table, csv_name)
+        if "mean_outer_iterations" in row:
+            notes[-1] += (
+                f", {row['cores']} core(s), {row['execution_time']:.0f} s, mean "
+                f"{row['mean_outer_iterations']:.2f} (maximum "
+                f"{row['maximum_outer_iterations']:.0f}) FSI iterations per step"
+            )
+    title = f"{prefix.upper().replace('_', ' ')}{args.coupling} mesh study"
+    write_summary(title, passed, notes, table, csv_name)
     write_reference_history(spec, window)
     if command_exists("gnuplot"):
-        create_plot("plotPeriodicHistory.gnuplot", rows[-1]["case"])
-    print(f"{args.coupling} mesh study: {'PASS' if passed else 'FAIL'}; results: {OUTPUT_ROOT / csv_name}")
+        # FSI2 periods are about 0.52 s long; two are shown
+        options = "; benchmark='FSI2'; xmin=-1.1" if prefix else ""
+        create_plot("plotPeriodicHistory.gnuplot", rows[-1]["case"], options)
+    print(f"{title}: {'PASS' if passed else 'FAIL'}; results: {OUTPUT_ROOT / csv_name}")
     for message in failures:
         print(f"  - {message}")
     return passed
@@ -1267,10 +1291,48 @@ def fsi1_coupling_study(args: argparse.Namespace, spec: dict) -> bool:
     return passed
 
 
+# ---------------------------------------------------------------------------
+# FSI2: periodic benchmark with large deformation
+# ---------------------------------------------------------------------------
+
+def fsi2_spec(spec: dict) -> dict:
+    """The FSI3 specification with the FSI2 entries in place of the FSI3 ones."""
+    fsi2 = spec["fsi2"]
+    merged = dict(spec)
+    for key in ("history_reference", "outer_corr_tolerance", "mesh", "quick",
+                "cores", "periodicity", "references", "publishedReferences",
+                "references_source"):
+        merged[key] = fsi2[key]
+    merged["benchmark"] = "fsi2"
+    return merged
+
+
+def configure_fsi2(case: Path, fsi2: dict) -> None:
+    """Turn a configured FSI3 copy into the periodic FSI2 benchmark.
+
+    FSI2 has the same geometry and fluid as FSI3, half its mean inflow
+    (1 m/s) and a heavier, softer plate. The inflow is ramped smoothly over
+    the benchmark's 2 s ramp and the coupling starts at the end of the ramp.
+    """
+    for condition in ("dirichletNeumann", "robin"):
+        path = case / f"0/fluid/U.{condition}"
+        replace_entry(path, "maxValue", f"{fsi2['inletMaxValue']:.8g}")
+        replace_entry(path, "transitionPeriod", f"{fsi2['transitionPeriod']:.8g}")
+    properties = case / "constant/solid/mechanicalProperties"
+    replace_entry(properties, "rho", f"rho [1 -3 0 0 0 0 0] {fsi2['solidDensity']:.8g}")
+    replace_entry(properties, "E", f"E [1 -1 -2 0 0 0 0] {fsi2['youngsModulus']:.8g}")
+    for coupling in ("iqnils", "robin"):
+        replace_entry(
+            case / f"constant/fsiProperties.{coupling}",
+            "couplingStartTime",
+            f"{fsi2['couplingStartTime']:.8g}",
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--benchmark", choices=("fsi3", "fsi1"), default="fsi3",
-                        help="periodic FSI3 (default) or steady FSI1 benchmark")
+    parser.add_argument("--benchmark", choices=("fsi3", "fsi1", "fsi2"), default="fsi3",
+                        help="periodic FSI3 (default), steady FSI1 or periodic FSI2 benchmark")
     parser.add_argument("--study", choices=("mesh", "coupling"), default="mesh")
     parser.add_argument("--coupling", choices=("iqnils", "robin"), default="iqnils",
                         help="coupling variant for the mesh study (default: iqnils)")
@@ -1307,6 +1369,10 @@ def main() -> int:
     if args.benchmark == "fsi1":
         study = fsi1_coupling_study if args.study == "coupling" else fsi1_mesh_study
         return 0 if study(args, spec) else 1
+    if args.benchmark == "fsi2":
+        if args.study == "coupling":
+            fail("The coupling study is not available for FSI2")
+        return 0 if mesh_study(args, fsi2_spec(spec)) else 1
     if args.study == "coupling":
         return 0 if coupling_study(args, spec) else 1
     return 0 if mesh_study(args, spec) else 1
