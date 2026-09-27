@@ -184,6 +184,14 @@ def run_case(
     ):
         print(f"Reusing {name} in {run_dir}")
     else:
+        # foam-extend moves the blockMeshDicts into constant/*/polyMesh,
+        # which is not copied; Allclean moves them back
+        for region in ("fluid", "solid"):
+            if not (CASE_DIR / "system" / region / "blockMeshDict").is_file():
+                raise RuntimeError(
+                    f"system/{region}/blockMeshDict is missing from the "
+                    "tutorial; run ./Allclean in the tutorial first"
+                )
         if run_dir.exists():
             shutil.rmtree(run_dir)
         shutil.copytree(CASE_DIR, run_dir, ignore=ignored, symlinks=True)
