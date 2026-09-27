@@ -62,7 +62,7 @@ about 25% in the mean membrane position, because the openings have been
 defined in two ways. The original definition of Wall [1] and Mok [2] leaves the
 velocity unconstrained at the top two nodes of each side wall, which makes the
 opening size depend on the mesh. Valdés [3], the Kratos Multiphysics example
-[4] and later studies instead prescribe the linear inflow profile above over a
+[4] and Tiba et al. [5] instead prescribe the linear inflow profile above over a
 fixed 0.125 m opening and fix the outlet pressure. This tutorial uses the
 second, fully specified definition. The
 [verification README](verification/README.md) documents both groups and the
@@ -140,14 +140,28 @@ published solutions**
 
 **Table 2: Periodic response of the midpoint for $$t = 20$$-$$70$$ s.**
 
-The trough and the mean agree with the solutions of Valdés and Kratos
-Multiphysics to within 3% and 5% of their peak values, and the phase of the
-oscillation agrees closely. The peak is 6.2% above the solution of Valdés and
-9.2% above the Kratos solution: the solids4foam oscillation has a somewhat
-larger amplitude than both. The published solutions themselves differ by
-about 6% in their peaks and 20% in their amplitudes. The solution of Mok [2]
-lies about 25% lower, because his openings are defined by unconstrained mesh
-nodes rather than a prescribed inflow; see the verification README.
+The trough and the mean lie within, or within 0.6% of, the range of the
+published group B solutions (Valdés [3], Kratos Multiphysics [4] and Tiba et
+al. [5]), and the phase of the oscillation agrees closely. The peak is 6.2%
+above the solution of Valdés and 9.2% above the Kratos solution, and 3.3%
+above the highest group B value: the solids4foam oscillation has a somewhat
+larger amplitude. The published solutions themselves differ by about 6% in
+their peaks and 20% in their amplitudes.
+
+None of the published solutions demonstrates mesh or time-step insensitivity:
+each is a single computation on one mesh with one time step. The solids4foam
+solution is mesh- and time-step-converged: the response changes by 0.8% of the
+peak between the 64 x 64 and 96 x 96 meshes (the peak by 0.3%), and by 0.04%
+between time steps of 0.05 s and 0.025 s. The 6-9% difference in the peak
+therefore cannot be attributed to the solids4foam discretisation, and the
+solids4foam result may be the more accurate one, but this cannot be decided
+from the published data. An independent solution from a commercial finite
+element code (COMSOL, LS-DYNA or ANSYS) has been requested and will be added as
+a reference when it is available.
+
+The solution of Mok [2] lies about 25% lower, because his openings are defined
+by unconstrained mesh nodes rather than a prescribed inflow; see the
+verification README.
 
 With IQN-ILS coupling a time step needs about four coupling iterations; Aitken
 relaxation (`./Allrun aitken`) gives the same result with about ten. The
@@ -159,8 +173,10 @@ minutes with the standard solid.
 ## Verification Study
 
 The opt-in [`verification/`](verification/) directory holds a mesh study, a
-time-step study and a comparison of the standard and the high-order solids,
-all evaluated against the curves of Valdés [3] and Kratos Multiphysics [4]:
+time-step study and a comparison of the standard and the high-order solids.
+Each checks that the peak, trough and mean lie within 5% of the range spanned
+by the group B solutions [3-5], and that the history stays within 10% of the
+peak of the band between the Valdés and Kratos curves:
 
 ```bash
 cd verification
@@ -172,7 +188,9 @@ by 0.8% of the peak between the two finest meshes, and the standard and the
 high-order solids agree to 0.04%. For this tension-dominated membrane the
 high-order solid gives no accuracy benefit: the standard solid reaches the same
 answer with two cells through the thickness, whereas the high-order solid needs
-eight and costs 1.5 to 2.2 times as much. The study is separate from
+eight and costs 1.5 times as much. A 128 x 128 mesh level could not be
+completed: the partitioned coupling diverges at that resolution, with either
+solid, and the cause has not been found. The study is separate from
 `regressionTest.sh` and is not run by the normal tutorial test suites. See the
 verification README for the benchmark definition, the reference quality, the
 acceptance criteria and the recorded results.
@@ -194,5 +212,11 @@ Universität Stuttgart.](https://elib.uni-stuttgart.de/handle/11682/164)
 shell structures including fluid-structure interaction. PhD thesis,
 Universitat Politècnica de Catalunya.](https://www.tdx.cat/handle/10803/6866)
 
-[4] [Kratos Multiphysics Examples: FSI lid driven
+[4]
+[Kratos Multiphysics Examples: FSI lid driven
 cavity.](https://github.com/KratosMultiphysics/Examples/tree/master/fluid_structure_interaction/validation/fsi_lid_driven_cavity)
+
+[5]
+[Tiba, A. et al. (2026). Online adaptive non-intrusive model reduction via
+manifold interpolation and subspace updates: application to FSI convergence
+acceleration. arXiv:2609.16876.](https://arxiv.org/abs/2609.16876)
