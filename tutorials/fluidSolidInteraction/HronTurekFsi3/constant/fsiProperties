@@ -37,6 +37,19 @@ fluidSolidInterface    IQNILS;
     // time-step, then the IQNILS procedure is used
     relaxationFactor     0.05;
 
+    // Optional (only for IQNILS): move the fluid interface with the full
+    // predicted solid displacement in the first iteration of each time-step,
+    // instead of the relaxed one; the second iteration is still relaxed. The
+    // interface displacement is an increment within the time-step, so a
+    // relaxed first iteration moves the fluid interface by only
+    // relaxationFactor times the plate's step: as seen by the fluid, the plate
+    // stops, or with backward time differencing reverses, within one
+    // time-step. The resulting added-mass force, hundreds of times the
+    // converged force here, loads the solid in the first iteration, and once
+    // the plate deformation is large the solid fails to converge under it
+    // (#489)
+    predictor            yes;
+
     // Tolerance for the FSI loop within each time-step
     outerCorrTolerance   1e-6;
 

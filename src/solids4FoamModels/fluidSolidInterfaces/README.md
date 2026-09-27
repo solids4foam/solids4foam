@@ -96,6 +96,15 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
 - `reorthogonalizeCouplingColumns`: optionally apply a second
   Gram-Schmidt-style correction while assembling the QR system.
 - `predictSolid`: optionally solve the solid once before the outer FSI loop.
+- `predictor`: in the first iteration of each time step, move the fluid
+  interface with the full solid displacement from `predictSolid` instead of
+  `relaxationFactor` times it (default `no`). The interface displacement is an
+  increment within the time step, so a relaxed first iteration makes the
+  interface nearly stop, or reverse with backward time differencing, as seen
+  by the fluid. On cases with a strong added-mass effect and a small
+  `relaxationFactor`, the resulting first-iteration fluid force can be
+  hundreds of times the converged one and can make the solid fail to converge
+  (see `HronTurekFsi3`).
 
 Implementation:
 `IQNILSCouplingInterface/IQNILSCouplingInterface.{H,C}`

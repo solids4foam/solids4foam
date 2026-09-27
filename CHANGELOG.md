@@ -163,6 +163,20 @@ release. For complete commit-level details and contributor information, see the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
 
+### Fixed
+
+- `HronTurekFsi3` no longer diverges once the plate deformation is large. With
+  the FSI2 parameters it failed at t = 6.4-6.9 s (#489), and with its own
+  FSI3 parameters shortly after its end time (#383). With a relaxed first
+  coupling iteration, the fluid saw the plate stop or reverse within each time
+  step, and the solid had to converge under a first-iteration fluid force of
+  about 250 times the converged one. The tutorial now sets `predictor yes`, so
+  the first iteration moves the fluid interface with the full solid
+  prediction, and the first-iteration force is close to the converged one.
+  The FSI2 variant now runs to t = 15 s and FSI3 to t = 10 s. Between t = 2
+  and 6 s the mean number of coupling iterations per time step drops from 8.6
+  to 4.4 for FSI2 and from 13.0 to 9.0 for FSI3.
+
 ## [v2.4] - 2026-08-24
 
 ### Added in v2.4
