@@ -188,6 +188,170 @@ The worst converged Robin pressure-change and leakage-flux residuals were
 
 To be recorded from the first complete sweep.
 
+## FSI1 steady benchmark
+
+`--benchmark fsi1` runs the steady FSI1 test of Turek and Hron instead of
+FSI3. It has the same geometry and fluid, a mean inflow of `0.2 m/s`
+(`Re = 20`) and a plate with `E = 1.4 MPa`, `ν = 0.4` and
+`ρ = 1000 kg/m^3`, and the flow and plate settle to a steady state. The
+steady point-A displacement, drag and lift are compared with the Featflow FSI1
+table:
+
+```bash
+./Allverify --benchmark fsi1                   # IQN-ILS mesh study, 1x and 2x
+./Allverify --benchmark fsi1 --levels 1,2,4    # add the 4x mesh (expensive)
+./Allverify --benchmark fsi1 --study coupling  # Robin vs IQN-ILS, 1x mesh
+./Allverify --benchmark fsi1 --quick           # smoke run, no checks
+```
+
+The default `--benchmark fsi3` behaviour is unchanged. The FSI1 settings are
+in the `fsi1` entry of the reference JSON file. In addition to the FSI3 changes
+listed above, the verification copies set:
+
+- the inlet `maxValue` to `0.3 m/s`, ramped over `transitionPeriod 2 s`, in
+  both `U.dirichletNeumann` and `U.robin`;
+- `E = 1.4e6 Pa`;
+- the coupling start at `t = 2 s`, the end of the ramp;
+- fluid solver tolerances of `1e-9` instead of `1e-6`, which is needed because
+  the FSI1 loads and displacements are 30 to 40 times smaller than those of
+  FSI3. With the tutorial tolerances, the inner-solver residuals put a floor
+  of about `1e-4` on the relative interface residual, and IQN-ILS stops
+  converging on the 4x mesh. On the 1x and 2x meshes, which converge with
+  either tolerance, the steady values agree to `2e-4`;
+- `restart yes` and `writePrecision 12`, so that the coupling study can
+  restart from the steady state.
+
+The run is a pseudo-transient route to the steady state with
+`Δt = 0.025 s` (`0.0125 s` on the 4x mesh) to `t = 30 s`. The time step is
+25 times that of FSI3 and is limited by the IQN-ILS coupling rather than
+by accuracy. These limits were found with the tutorial solver tolerances. At
+`Δt = 0.05 s` and `0.1 s` on the 1x mesh, with coupling from `t = 0`, IQN-ILS
+stalls near the interface tolerance at `t = 2.3 s` and `0.8 s`. On the 4x
+mesh, `Δt = 0.025 s` (maximum Courant number 6) stalls in the first coupled
+steps. Coupling from `t = 0` or `t = 0.5 s`, while the inflow is still small,
+stalls on the 2x mesh, so the coupling starts at the end of the ramp. The
+steady values depend slightly on the time step through the PIMPLE flux
+interpolation: going from `Δt = 0.025 s` to `0.01 s` on the 1x mesh changes
+`u_y` by `0.04%`, drag by `0.04%` and `u_x` by `0.26%`, all far below the
+discretisation error.
+
+### FSI1 reference and acceptance
+
+The reference values are the finest level (7+0, about one million elements) of
+the Featflow FSI1 table: `u_x(A) = 2.270493e-5 m`, `u_y(A) = 8.208773e-4 m`,
+drag `14.29426 N/m` and lift `0.7637460 N/m`. All six tabulated levels are
+recorded in the JSON file (`featflowLevels`). Between the coarsest level 2+0
+and level 7+0, the reference changes by `0.73%` in `u_x`, `0.19%` in `u_y`,
+`0.14%` in drag and `0.26%` in lift. Its own discretisation error is therefore
+negligible against the tolerances below.
+
+- Every level must reach a steady state: the relative spread of each quantity
+  over the closing `20%` of the run must be below `1e-3`. A level that has not
+  settled fails instead of being compared.
+- `u_y(A)` and drag are the primary quantities. On the finest level of the
+  sweep, drag must be within `0.5%` of the reference, and `u_y` within `6%`
+  on the 2x mesh or `3%` on the 4x mesh. The tolerances follow from the
+  recorded errors below. `u_y` converges at an observed order of about 1.6,
+  so its error falls by a factor of about three per level. The 4x tolerance
+  is an extrapolation, because the 4x level has not yet been run.
+- `u_x(A)` (`23 μm`, the axial stretch of the plate) and the lift (`0.76 N/m`,
+  set by the small asymmetry of the cylinder position) are reported with a
+  `3%` indicative tolerance but do not fail the study. They are small
+  resultants and are the most sensitive to the time step and to the remaining
+  steady-state drift. `u_x`, for example, changes by `0.26%` between
+  `Δt = 0.025 s` and `0.01 s`, and the lift settles last.
+- The reference error of a primary quantity may not grow by more than `0.1`
+  percentage points between the coarsest and the finest level.
+
+### FSI1 coupling study
+
+The coupling study compares the steady states of the two couplings on the 1x
+mesh. Both couplings restart from the steady IQN-ILS state of the mesh-study
+run at `t = 30 s` and continue for `1 s`, IQN-ILS with its Dirichlet
+conditions and Robin-Neumann with the plate switched to `elasticWallPressure`
+and `elasticWallVelocity`. The steady solution does not depend on the path
+taken to it, and both couplings converge the same discrete interface problem
+at every time step. If the Robin-Neumann coupling converges to the same
+discrete solution, it must therefore stay at the IQN-ILS state. The means of
+each quantity over the closing half of the continuation must agree to `0.1%`
+of the steady value. The driver also checks that every Robin step satisfied
+all three Robin convergence criteria.
+
+A restart replaces separate runs from rest for two reasons. First, the
+Robin-Neumann fixed-point iterations are very expensive near rest: with
+coupling from `t = 0`, the first two steps need 283 and 585 iterations. With
+coupling from `t = 2 s`, the first coupled step needs 675 iterations. Second,
+before the coupling starts, the Robin plate conditions do not act as a
+zero-gradient wall, so the two couplings would enter the coupled phase from
+different flow states.
+
+The continuation uses `Δt = 0.001 s` (the FSI3 time step) for both couplings.
+At `Δt = 0.025 s`, the Robin iterations contract by only about `0.99` per
+iteration and do not reach the interface tolerance within 300 iterations, and
+a constant `hs` of `0.1 m` diverges within a few iterations. The change of
+time step moves the state by up to `0.2%` in drag and `1%` in `u_x`,
+identically for both couplings, so the comparison is between two converged
+couplings on the same transient.
+
+### FSI1 recorded results
+
+Recorded with OpenFOAM v2412 on an Apple M1 Ultra. The 1x mesh ran in serial
+in `781 s`. The 2x mesh ran on two ranks in `3062 s`. IQN-ILS needed a mean of
+`3.7` FSI iterations per coupled step on the 1x mesh (at most 8) and `4.1` on
+the 2x mesh (at most 9). The largest steady spread over the closing `20%` was
+`2.0e-4` on the 1x mesh and `3.1e-4` on the 2x mesh, both in the lift. The
+errors are relative to Featflow level 7+0:
+
+| Quantity | 1x | Error | 2x | Error | Observed order | Featflow 7+0 |
+|---|---:|---:|---:|---:|---:|---:|
+| `u_x(A)` (m) | 2.20672e-5 | 2.81% | 2.24843e-5 | 0.97% | 1.5 | 2.270493e-5 |
+| `u_y(A)` (m) | 7.04258e-4 | 14.21% | 7.82820e-4 | 4.64% | 1.6 | 8.208773e-4 |
+| drag (N/m) | 14.18027 | 0.80% | 14.26063 | 0.24% | 1.7 | 14.29426 |
+| lift (N/m) | 0.803445 | 5.20% | 0.775620 | 1.55% | 1.7 | 0.7637460 |
+
+The 1x mesh has 5 336 fluid and 630 solid cells, and the 2x mesh has 21 344
+and 2 520. They are comparable in resolution to Featflow levels 2+0 and 3+0
+(992 and 3 968 biquadratic elements), which are within `0.2%` of level 7+0
+in `u_y` and drag. The second-order finite-volume discretisation needs
+considerably finer meshes for the same plate deflection. All four errors fall
+monotonically. The observed orders use the finest Featflow value as the exact
+solution.
+
+The 4x level (`Δt = 0.0125 s`) is reachable with `--levels 1,2,4`. On three
+ranks it took about `46 s` per coupled step, which is more than 14 hours to
+`t = 30 s`, so it was not run for this record.
+
+The steady coupling study passed. Both couplings restarted from the
+`t = 30 s` IQN-ILS state on the 1x mesh and ran to `t = 31 s` at
+`Δt = 0.001 s`. The table gives the means over `t = 30.5` to `31 s`. The
+differences and the step-to-step noise (the range over the same window) are
+relative to the steady value:
+
+| Quantity | IQN-ILS | Robin-Neumann | Difference | IQN-ILS noise | Robin noise |
+|---|---:|---:|---:|---:|---:|
+| `u_x(A)` (m) | 2.233184e-5 | 2.233136e-5 | 0.0022% | 0.54% | 0.074% |
+| `u_y(A)` (m) | 7.045302e-4 | 7.045790e-4 | 0.0069% | 0.042% | 0.034% |
+| drag (N/m) | 14.20647 | 14.20644 | 0.0002% | 0.088% | 0.006% |
+| lift (N/m) | 0.8035243 | 0.8034405 | 0.0104% | 16.5% | 0.34% |
+
+The Robin-Neumann coupling therefore converges to the same steady discrete
+solution as IQN-ILS, to within `0.01%` in all four quantities. This contrasts
+with the FSI3 coupling study, where the two couplings differ from the first
+coupled step. The first continued step differs by `0.12%` in `u_x`, `0.22%` in
+drag and `2.8%` in lift, which is the size of the IQN-ILS step-to-step noise.
+The lift noise of IQN-ILS alternates from step to step at `Δt = 0.001 s` and
+is the reason the comparison uses window means.
+
+IQN-ILS needed a mean of `5.9` iterations per step (at most 8). Robin-Neumann
+needed `17.6` (at most 56), with the automatic `secant` coefficient. The two
+continuations took `1053 s` (IQN-ILS) and `1276 s` (Robin-Neumann) in serial.
+Of the 1000 Robin steps, 976 met all three Robin criteria. The other 24 ended
+on a stalled pressure residual, which the coupling accepts
+(`robinConvergenceState 2`). Over all steps, the interface-displacement
+residual was at most `4.2e-7` and the leakage-flux residual at most
+`4.4e-7`, but in those 24 steps the pressure-change residual was up to
+`9.8e-5`, against a `robinPressureTolerance` of `1e-5`.
+
 ## References
 
 S. Turek and J. Hron, Proposal for numerical benchmarking of fluid-structure

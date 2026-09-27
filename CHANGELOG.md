@@ -48,7 +48,9 @@ release. For complete commit-level details and contributor information, see the
   published values and time history of Turek and Hron (2006). A `coupling`
   study compares the Robin-Neumann and IQN-ILS results and checks the Robin
   convergence criteria. The tutorial's `Allrun` gained a `robin` option that
-  runs the Robin-Neumann variant of the case.
+  runs the Robin-Neumann variant of the case. A `--benchmark fsi1` option runs
+  the steady FSI1 benchmark instead, with a mesh study against the Featflow
+  values and a steady Robin-Neumann versus IQN-ILS comparison.
 
 ### Changed
 
