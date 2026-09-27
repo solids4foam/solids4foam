@@ -15,8 +15,9 @@ You can find the files for this tutorial under
   drives an immersed body of the `immersedBoundaryForce` finite volume
   option, on a fixed fluid mesh, rather than a fluid patch on a moving mesh;
 - Compare the immersed solution of the Turek and Hron [1] FSI2 benchmark with
-  the body-fitted solution of the `HronTurekFsi3` tutorial set up with the
-  FSI2 parameters, and with the benchmark values.
+  the benchmark values, and with the body-fitted solution of the
+  `HronTurekFsi3` tutorial set up with the FSI2 parameters while the
+  oscillation grows.
 
 ## Case Overview
 
@@ -99,7 +100,50 @@ the bodies to `postProcessing/fluid/immersedBoundary/0/<body>.dat` (columns
 
 ## Expected Results
 
-RESULTS_PLACEHOLDER
+The oscillation of the flag grows from the start of the coupling at
+$$t = 2$$ s and saturates at about $$t = 8$$ s. The tables give the mean and
+amplitude (half the difference between the extrema) over 2 s of the
+saturated oscillation, $$13 < t < 15$$ s for `MESH_LEVEL=1` and
+$$8 < t < 10$$ s for `MESH_LEVEL=2`, with the forces smoothed over 10 ms to
+remove their fluctuations as the surface crosses the cells, and the
+frequency from the crossings of the mean.
+
+Tip displacement of the flag and frequency of $$u_y$$:
+
+| | Tip $$u_y$$ (mm) | Tip $$u_x$$ (mm) | Frequency (Hz) |
+| --- | --- | --- | --- |
+| `MESH_LEVEL=1` | 1.17 ± 75.3 | -12.8 ± 11.7 | 2.07 |
+| `MESH_LEVEL=2` | 1.23 ± 76.8 | -13.3 ± 12.0 | 2.05 |
+| Turek and Hron [1] | 1.23 ± 80.6 | -14.58 ± 12.44 | 2.0 |
+
+Drag and lift (N/m):
+
+| | Drag | Lift |
+| --- | --- | --- |
+| `MESH_LEVEL=1` | 204.8 ± 73.6 | -2.5 ± 236.7 |
+| `MESH_LEVEL=2` | 209.2 ± 77.9 | -0.9 ± 255.0 |
+| Turek and Hron [1] | 208.83 ± 73.75 | 0.88 ± 234.2 |
+
+The drag and lift are those of the cylinder and the flag, from the surface
+traction, per unit depth. The amplitude of the tip displacement is 7% and 5%
+low with `MESH_LEVEL=1` and 2, and the frequency 3% and 2% high. The mean
+drag is within 2% of the benchmark on both meshes; the amplitudes of the drag
+and lift are within 1% of it with `MESH_LEVEL=1` but 6% and 9% high with
+`MESH_LEVEL=2`, and so do not yet converge with the mesh (the smoothed extrema
+are sensitive to the fluctuations of the traction as the surface crosses the
+cells).
+
+While the oscillation grows, the tip displacement follows that of the
+body-fitted solution closely (for $$3.5 < t < 4$$ s, $$u_y$$ from -0.7 to
+4.5 mm immersed and from -0.9 to 4.6 mm body-fitted). The body-fitted
+solution with the FSI2 parameters and the mesh of the `HronTurekFsi3`
+tutorial diverges at about $$t = 6.5$$ s, before the oscillation saturates
+(solids4foam issue #489), whereas the immersed solution, with the same solid
+mesh and solid model, runs to $$t = 15$$ s.
+
+The regression test runs `MESH_LEVEL=1` with the coupling started at
+$$t = 0.5$$ s to $$t = 0.6$$ s, and checks the tip displacement and the
+force on the flag.
 
 ## Running the Case
 
