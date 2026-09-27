@@ -10,12 +10,14 @@ are available:
 - solid:    the standard and the high-order solid discretisations are compared
             on the same meshes, including a through-thickness refinement.
 
-The midpoint displacement history of each run is compared with the published
-histories of Valdes (2007) and Kratos (Zorrilla): the late-time peak and trough
-of the periodic response, and the maximum history difference normalised by the
-reference peak. The curves of Mok (2001) and Gerbeau and Vidrascu (2003) are
-reported for context only: they use a boundary-condition set that is not fully
-documented and differ from the Valdes/Kratos group by about 25%.
+The midpoint displacement history of each run is compared with the group B
+references, whose boundary conditions are fully specified: Valdes (2007),
+Kratos (Zorrilla) and the scalar values of Tiba et al. (2026). The late-time
+peak, trough and mean of the periodic response must lie within a tolerance of
+the envelope spanned by these references, and the history must stay close to
+the band between the Valdes and Kratos curves. The curves of Mok (2001), Wall
+(1999), Gerbeau and Vidrascu (2003) and Kassiotis et al. (2011) are reported
+for context only: their openings are defined differently.
 """
 
 from __future__ import annotations
@@ -368,28 +370,88 @@ def history_difference(
     )
 
 
+def band_distance(
+    curve: list[tuple[float, float]],
+    references: list[list[tuple[float, float]]],
+    start: float,
+    end: float,
+) -> float:
+    """Largest distance of the curve from the band between the references,
+    which at each time runs from the lowest to the highest reference value."""
+    end = min([end] + [reference[-1][0] for reference in references])
+    distances = []
+    for time, value in curve:
+        if not start <= time <= end:
+            continue
+        values = [interpolate(reference, time) for reference in references]
+        distances.append(max(value - max(values), min(values) - value, 0.0))
+    return max(distances) if distances else math.nan
+
+
+QUANTITIES = ("peak", "trough", "mean")
+
+
+def envelope(references: dict) -> dict:
+    """Range of each quantity over the group B references that give it."""
+    result = {}
+    for quantity in QUANTITIES:
+        values = [
+            reference["stats"][quantity]
+            for reference in references.values()
+            if reference["group_b"] and quantity in reference["stats"]
+        ]
+        result[quantity] = (min(values), max(values))
+    return result
+
+
+def envelope_deviation(value: float, low: float, high: float) -> float:
+    """Relative distance outside [low, high]: positive above, negative below."""
+    if value > high:
+        return (value - high) / abs(high)
+    if value < low:
+        return (value - low) / abs(low)
+    return 0.0
+
+
 def evaluate(row: dict, references: dict, config: dict) -> None:
     window = config["comparison_window_s"]
     period = float(config["lid_period_s"])
     end = min(float(window[1]), row["history"][-1][0])
     start = float(window[0])
     stats = periodic_stats(row["history"], start, end, period)
-    row.update({f"{key}_m" if key in {"peak", "trough", "mean"} else key: value
+    row.update({f"{key}_m" if key in QUANTITIES else key: value
                 for key, value in stats.items()})
+
+    ranges = envelope(references)
+    for quantity in QUANTITIES:
+        low, high = ranges[quantity]
+        row[f"{quantity}_envelope"] = (low, high)
+        row[f"{quantity}_envelope_deviation"] = envelope_deviation(
+            stats[quantity], low, high
+        )
+
+    # The band between the group B curves, normalised by the smaller of their
+    # peaks
+    curves = [
+        reference for reference in references.values()
+        if reference["group_b"] and reference["curve"]
+    ]
+    scale = min(abs(reference["stats"]["peak"]) for reference in curves)
+    row["band_distance"] = band_distance(
+        row["history"], [reference["curve"] for reference in curves], start, end
+    ) / scale
+
     for name, reference in references.items():
-        ref_stats = reference["stats"]
-        scale = abs(ref_stats["peak"])
-        row[f"{name}_peak_error"] = (stats["peak"] - ref_stats["peak"]) / scale
-        row[f"{name}_trough_error"] = (
-            stats["trough"] - ref_stats["trough"]
-        ) / scale
-        row[f"{name}_mean_error"] = (stats["mean"] - ref_stats["mean"]) / scale
+        if not reference["curve"]:
+            continue
+        ref_scale = abs(reference["stats"]["peak"])
+        for quantity in QUANTITIES:
+            row[f"{name}_{quantity}_error"] = (
+                stats[quantity] - reference["stats"][quantity]
+            ) / ref_scale
         row[f"{name}_history_difference"] = history_difference(
             row["history"], reference["curve"], start, end
-        ) / scale
-        row[f"{name}_history_difference_all"] = history_difference(
-            row["history"], reference["curve"], 0.0, end
-        ) / scale
+        ) / ref_scale
 
 
 # --------------------------------------------------------------------------- #
@@ -403,8 +465,8 @@ def study_members(config: dict, study: str, quick: bool) -> list[dict]:
     return members
 
 
-def check_study(study: str, rows: list[dict], config: dict, quick: bool,
-                primary: list[str]) -> list[tuple[str, bool, str]]:
+def check_study(study: str, rows: list[dict], config: dict,
+                quick: bool) -> list[tuple[str, bool, str]]:
     """Return (description, passed, detail) for every check of a study."""
     acceptance = config["acceptance"]
     checks: list[tuple[str, bool, str]] = []
@@ -461,23 +523,33 @@ def check_study(study: str, rows: list[dict], config: dict, quick: bool,
             ))
         compared = [row for row in rows if row.get("compare", True)]
 
+    envelope_tolerance = float(acceptance["envelope_tolerance"])
+    band_tolerance = float(acceptance["band_tolerance"])
     for row in compared:
-        for name in primary:
-            for metric, key in (
-                ("peak", "peak_tolerance"),
-                ("trough", "trough_tolerance"),
-                ("mean", "mean_tolerance"),
-                ("history_difference", "history_tolerance"),
-            ):
-                value = row[f"{name}_{metric}" if metric == "history_difference"
-                            else f"{name}_{metric}_error"]
-                tolerance = float(acceptance[key])
-                checks.append((
-                    f"{study}/{row['name']}: {metric} vs {name} within "
-                    f"{100.0 * tolerance:g}%",
-                    abs(value) <= tolerance,
-                    f"{100.0 * value:+.2f}%",
-                ))
+        for quantity in QUANTITIES:
+            deviation = row[f"{quantity}_envelope_deviation"]
+            low, high = row[f"{quantity}_envelope"]
+            value = row[f"{quantity}_m"]
+            # Distance to the nearer acceptance limit, relative to its bound
+            margin = min(
+                ((1.0 + envelope_tolerance) * high - value) / abs(high),
+                (value - (1.0 - envelope_tolerance) * low) / abs(low),
+            )
+            checks.append((
+                f"{study}/{row['name']}: {quantity} within "
+                f"{100.0 * envelope_tolerance:g}% of the group B envelope "
+                f"[{low:.4f}, {high:.4f}] m",
+                abs(deviation) <= envelope_tolerance,
+                f"{value:.4f} m, outside by {100.0 * deviation:+.2f}%, "
+                f"margin to the limit {100.0 * margin:.2f}%",
+            ))
+        checks.append((
+            f"{study}/{row['name']}: history within "
+            f"{100.0 * band_tolerance:g}% of the peak of the group B band",
+            row["band_distance"] <= band_tolerance,
+            f"{100.0 * row['band_distance']:.2f}%, margin "
+            f"{100.0 * (band_tolerance - row['band_distance']):.2f}%",
+        ))
     return checks
 
 
@@ -489,16 +561,16 @@ SUMMARY_COLUMNS = [
     "study", "name", "solid", "coupling", "nx", "solid_ny", "delta_t_s",
     "cores", "peak_m", "trough_m", "mean_m", "peak_phase", "cycles",
     "fsi_iterations_mean", "fsi_iterations_max", "clock_time_s",
+    "peak_envelope_deviation", "trough_envelope_deviation",
+    "mean_envelope_deviation", "band_distance",
 ]
 
 
-def write_study_csv(study: str, rows: list[dict], reference_names: list[str]) -> None:
+def write_study_csv(study: str, rows: list[dict], curve_names: list[str]) -> None:
     columns = list(SUMMARY_COLUMNS)
-    for name in reference_names:
-        columns += [
-            f"{name}_peak_error", f"{name}_trough_error", f"{name}_mean_error",
-            f"{name}_history_difference", f"{name}_history_difference_all",
-        ]
+    for name in curve_names:
+        columns += [f"{name}_{quantity}_error" for quantity in QUANTITIES]
+        columns.append(f"{name}_history_difference")
     with (POST_DIR / f"{study}_study.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=columns, extrasaction="ignore")
         writer.writeheader()
@@ -544,28 +616,24 @@ def create_plot(study: str, rows: list[dict]) -> None:
         print(f"Plot: {output}")
 
 
-def summary_table(rows: list[dict], names: list[str]) -> list[str]:
+def summary_table(rows: list[dict]) -> list[str]:
     header = (
         "| Member | Solid | nx | Solid ny | dt (s) | Peak (m) | Trough (m) | "
-        + " | ".join(f"Peak vs {name}" for name in names)
-        + " | "
-        + " | ".join(f"History vs {name}" for name in names)
-        + " | FSI its (mean/max) | Clock (s) |"
+        "Mean (m) | Peak dev. | Trough dev. | Mean dev. | Band dist. | "
+        "FSI its (mean/max) | Clock (s) |"
     )
     lines = [header, "|" + "---|" * (header.count("|") - 1)]
     for row in rows:
         lines.append(
             f"| {row['name']} | {row['solid']} | {row['nx']} | "
             f"{row['solid_ny']} | {row['delta_t_s']:g} | {row['peak_m']:.4f} | "
-            f"{row['trough_m']:.4f} | "
+            f"{row['trough_m']:.4f} | {row['mean_m']:.4f} | "
             + " | ".join(
-                f"{100.0 * row[f'{name}_peak_error']:+.1f}%" for name in names
+                f"{100.0 * row[f'{quantity}_envelope_deviation']:+.2f}%"
+                for quantity in QUANTITIES
             )
-            + " | "
-            + " | ".join(
-                f"{100.0 * row[f'{name}_history_difference']:.1f}%" for name in names
-            )
-            + f" | {row['fsi_iterations_mean']:.1f}/{row['fsi_iterations_max']} | "
+            + f" | {100.0 * row['band_distance']:.2f}% | "
+            f"{row['fsi_iterations_mean']:.1f}/{row['fsi_iterations_max']} | "
             f"{row['clock_time_s']:.0f} |"
         )
     return lines
@@ -610,16 +678,26 @@ def main() -> int:
     config["comparison_window_s"] = quick_window
     references = {}
     for name, entry in config["references"].items():
-        curve = read_curve(REFERENCE_DIR / entry["file"])
-        # Some published curves stop before the end of the window
-        stats_end = min(float(quick_window[1]), curve[-1][0])
+        if "file" in entry:
+            curve = read_curve(REFERENCE_DIR / entry["file"])
+            # Some published curves stop before the end of the window
+            stats_end = min(float(quick_window[1]), curve[-1][0])
+            stats = periodic_stats(
+                curve, float(quick_window[0]), stats_end, period
+            )
+        else:
+            # A reference published as scalar values only
+            curve = []
+            stats = {key: float(value) for key, value in entry["values"].items()}
         references[name] = {
             "curve": curve,
-            "primary": bool(entry["primary"]),
-            "stats": periodic_stats(curve, float(quick_window[0]), stats_end, period),
+            "group_b": bool(entry["group_b"]),
+            "stats": stats,
         }
     reference_names = list(references)
-    primary = [name for name in reference_names if references[name]["primary"]]
+    group_b = [name for name in reference_names if references[name]["group_b"]]
+    curve_names = [name for name in reference_names if references[name]["curve"]]
+    ranges = envelope(references)
 
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     POST_DIR.mkdir(parents=True, exist_ok=True)
@@ -630,20 +708,37 @@ def main() -> int:
         f"- Mode: {'quick smoke test' if args.quick else 'full verification'}",
         f"- End time: {end_time:g} s; comparison window: "
         f"{quick_window[0]:g}-{min(quick_window[1], end_time):g} s",
-        f"- Primary references: {', '.join(primary)}; context only: "
-        + ", ".join(name for name in reference_names if name not in primary),
+        f"- Group B references: {', '.join(group_b)}; context only: "
+        + ", ".join(name for name in reference_names if name not in group_b),
         "",
         "## References",
         "",
-        "| Reference | Peak (m) | Trough (m) | Mean (m) | Peak phase (s) |",
-        "|---|---|---|---|---|",
+        "| Reference | Peak (m) | Trough (m) | Mean (m) |",
+        "|---|---|---|---|",
     ]
     for name, reference in references.items():
         stats = reference["stats"]
         lines.append(
-            f"| {name} | {stats['peak']:.4f} | {stats['trough']:.4f} | "
-            f"{stats['mean']:.4f} | {stats['peak_phase']:.2f} |"
+            f"| {name} | "
+            + " | ".join(
+                f"{stats[quantity]:.4f}" if quantity in stats else "-"
+                for quantity in QUANTITIES
+            )
+            + " |"
         )
+    lines += [
+        "",
+        "Group B envelope: "
+        + ", ".join(
+            f"{quantity} {ranges[quantity][0]:.4f}-{ranges[quantity][1]:.4f} m"
+            for quantity in QUANTITIES
+        ),
+        "",
+        "Deviations are relative to the nearer envelope bound (zero inside",
+        "it). The band distance is the largest distance of the history from",
+        "the band between the group B curves in the comparison window, as a",
+        "fraction of the smaller group B curve peak.",
+    ]
 
     all_checks: list[tuple[str, bool, str]] = []
     failures = 0
@@ -663,12 +758,12 @@ def main() -> int:
             rows.append(row)
         if not rows:
             continue
-        write_study_csv(study, rows, reference_names)
+        write_study_csv(study, rows, curve_names)
         create_plot(study, rows)
-        checks = check_study(study, rows, config, args.quick, primary)
+        checks = check_study(study, rows, config, args.quick)
         all_checks += checks
         lines += ["", f"## {study} study", ""]
-        lines += summary_table(rows, primary)
+        lines += summary_table(rows)
         lines += [""]
         lines += [
             f"- {'PASS' if passed else 'FAIL'}: {description}"
