@@ -247,6 +247,13 @@ bool Foam::fluidSolidInterface::newTimeStep() const
 
 void Foam::fluidSolidInterface::checkFluidInterfaceVelocity()
 {
+    // A run that is never coupled solves the fluid with a rigid interface,
+    // for which a static condition is correct
+    if (!coupled_ && couplingStartTime_ < SMALL)
+    {
+        return;
+    }
+
     const volVectorField& U = fluid().U();
 
     forAll(fluidPatchIndices_, interfaceI)
