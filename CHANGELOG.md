@@ -50,7 +50,7 @@ release. For complete commit-level details and contributor information, see the
   convergence criteria. The tutorial's `Allrun` gained a `robin` option that
   runs the Robin-Neumann variant of the case. A `--benchmark fsi1` option runs
   the steady FSI1 benchmark instead, with a mesh study against the Featflow
-  values and a steady Robin-Neumann versus IQN-ILS comparison.
+  values and an informative steady Robin-Neumann versus IQN-ILS comparison.
 
 ### Changed
 

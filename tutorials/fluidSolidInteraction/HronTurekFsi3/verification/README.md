@@ -265,17 +265,18 @@ negligible against the tolerances below.
 
 ### FSI1 coupling study
 
-The coupling study compares the steady states of the two couplings on the 1x
-mesh. Both couplings restart from the steady IQN-ILS state of the mesh-study
-run at `t = 30 s` and continue for `1 s`, IQN-ILS with its Dirichlet
-conditions and Robin-Neumann with the plate switched to `elasticWallPressure`
-and `elasticWallVelocity`. The steady solution does not depend on the path
-taken to it, and both couplings converge the same discrete interface problem
-at every time step. If the Robin-Neumann coupling converges to the same
-discrete solution, it must therefore stay at the IQN-ILS state. The means of
-each quantity over the closing half of the continuation must agree to `0.1%`
-of the steady value. The driver also checks that every Robin step satisfied
-all three Robin convergence criteria.
+The opt-in coupling study compares the steady states of the two couplings on
+the 1x mesh. It is informative only: the Robin-Neumann coupling on the
+Turek-Hron cases is studied separately in
+[issue #493](https://github.com/solids4foam/solids4foam/issues/493),
+and the FSI1 acceptance rests on the IQN-ILS mesh study. Both couplings
+restart from the steady IQN-ILS state of the mesh-study run at `t = 30 s`
+and continue for `1 s`. IQN-ILS keeps its
+Dirichlet conditions, and Robin-Neumann has the plate switched to
+`elasticWallPressure` and `elasticWallVelocity`. The driver reports the
+difference between the means of each quantity over the closing half of the
+continuation. It fails only if the start state has not settled or a Robin step
+does not meet its convergence criteria.
 
 A restart replaces separate runs from rest for two reasons. First, the
 Robin-Neumann fixed-point iterations are very expensive near rest: with
@@ -321,7 +322,7 @@ The 4x level (`Δt = 0.0125 s`) is reachable with `--levels 1,2,4`. On three
 ranks it took about `46 s` per coupled step, which is more than 14 hours to
 `t = 30 s`, so it was not run for this record.
 
-The steady coupling study passed. Both couplings restarted from the
+In the steady coupling study, both couplings restarted from the
 `t = 30 s` IQN-ILS state on the 1x mesh and ran to `t = 31 s` at
 `Δt = 0.001 s`. The table gives the means over `t = 30.5` to `31 s`. The
 differences and the step-to-step noise (the range over the same window) are
@@ -335,10 +336,12 @@ relative to the steady value:
 | lift (N/m) | 0.8035243 | 0.8034405 | 0.0104% | 16.5% | 0.34% |
 
 The Robin-Neumann coupling therefore converges to the same steady discrete
-solution as IQN-ILS, to within `0.01%` in all four quantities. This contrasts
-with the FSI3 coupling study, where the two couplings differ from the first
-coupled step. The first continued step differs by `0.12%` in `u_x`, `0.22%` in
-drag and `2.8%` in lift, which is the size of the IQN-ILS step-to-step noise.
+solution as IQN-ILS, to within `0.01%` in all four quantities. This is
+consistent with the FSI3 coupling study, which attributes the transient
+difference to the Robin pressure gradient built from the solid acceleration:
+that term vanishes at a steady state. The first continued step differs by
+`0.12%` in `u_x`, `0.22%` in drag and `2.8%` in lift, which is the size of
+the IQN-ILS step-to-step noise.
 The lift noise of IQN-ILS alternates from step to step at `Δt = 0.001 s` and
 is the reason the comparison uses window means.
 

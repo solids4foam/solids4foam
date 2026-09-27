@@ -171,8 +171,7 @@
     "coupling": {
       "refinement": 1,
       "deltaT": 0.001,
-      "continuation": 1.0,
-      "relativeTolerance": 0.001
+      "continuation": 1.0
     },
     "references": {
       "ux": {"value": 2.270493e-05, "tolerance": {"2": 0.03, "4": 0.03}, "primary": false},
