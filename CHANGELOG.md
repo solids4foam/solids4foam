@@ -108,6 +108,17 @@ release. For complete commit-level details and contributor information, see the
   iteration count and the path taken to get there move for every case that
   selects this option.
 
+- `elasticWallPressure` documents and reports why Robin-Neumann coupling is
+  slow on walls wetted on both sides, such as the `HronTurekFsi3` flap. There,
+  each face has two interface impedances: one for loads that push both faces
+  the same way (translation and bending), which the automatic coefficient
+  matches, and one about `coth^2(h/l)` times larger for loads that squeeze
+  the wall through its thickness. A single coefficient cannot match both, so
+  the squeeze modes contract at best at about `1 - 2*tanh^2(h/l)` per FSI
+  iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
+  The estimate is printed at the start of the run, with a warning when it
+  exceeds 0.95.
+
 ### Removed
 
 - **Breaking:** ten mechanical laws are removed: `diffusionElastic`,
@@ -162,6 +173,13 @@ release. For complete commit-level details and contributor information, see the
   any test. solids4foam's preCICE cases are now maintained upstream in the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
+
+### Fixed
+
+- On a restart, the warning that an `elasticWallPressure` (Robin) interface is
+  used with relaxed or accelerated coupling was issued for `fixedRelaxation`
+  with `relaxationFactor 1` too, as the check ran during the construction of
+  the base coupling class.
 
 ## [v2.4] - 2026-08-24
 
