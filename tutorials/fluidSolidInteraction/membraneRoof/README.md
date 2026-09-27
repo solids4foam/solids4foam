@@ -137,6 +137,15 @@ The results in Figure 2 were produced with the tutorial settings (mesh as
 above, $$\Delta t = 0.02$$ s) using OpenFOAM-v2412 on 6 processes of an Apple M1
 Ultra, in 18 min. The coupling took 9.6 iterations per time step on average.
 
+```note
+The default mesh does not resolve the vortex shedding behind the reference
+oscillations. The finer mesh 2 of Figure 3 (58 min on 32 processes) brings the
+mean roof-centre displacement between 1 and 4 s to $$-0.35$$ m, against
+$$-0.36$$ m for the reference and $$-0.25$$ m for the default mesh, but it does
+not resolve the shedding either. A finer, shedding-resolving mesh is future
+work.
+```
+
 ### Sensitivity
 
 Figure 3 repeats the comparison with half the time step and with the
