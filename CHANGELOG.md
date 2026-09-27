@@ -41,6 +41,13 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
+- Added the `blobInTreacle` fluid-solid interaction tutorial, the
+  temporal-accuracy case of Liu, Jaiman and Gurugubelli (2014): a linear
+  elastic half cylinder in a ramped, highly viscous channel flow, with equal
+  fluid and solid densities, solved with partitioned IQN-ILS coupling. It has a
+  `regressionTest.sh` and an opt-in `verification/` study: a mesh study against
+  the steady solution and interface shape of the authors' preprint, and a
+  time-step study that checks second-order temporal accuracy.
 
 ### Changed
 
