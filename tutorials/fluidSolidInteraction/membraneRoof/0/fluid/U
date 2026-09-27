@@ -1,0 +1,76 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        // Power-law profile in the vertical (y) direction, ramped
+        // sinusoidally over the first 5 s (von Scheven and Ramm, Eq. 28-29)
+        type            uniformFixedValue;
+        uniformValue
+        {
+            type            expression;
+            expression
+            #{
+                100*0.5*(sin(pi()*(min(arg(), 5)/5 - 0.5)) + 1)
+               *pow(max(pos().y(), 0)/350, 0.22)*vector(1, 0, 0)
+            #};
+        }
+        value           uniform (0 0 0);
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    membrane-fluid
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+
+    bottom
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+
+    frontAndBack
+    {
+        type            slip;
+    }
+
+    building
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+
+    top
+    {
+        type            slip;
+    }
+}
+
+// ************************************************************************* //
