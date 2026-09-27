@@ -76,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--end-time",
         type=float,
-        help="override the end time (s); the checks need at least 30 s",
+        help="override the end time (s); a full study needs at least 70 s",
     )
     parser.add_argument(
         "--keep-going",
@@ -302,14 +302,24 @@ def run_member(
     metadata = member_metadata(member, end_time)
     completed_case = False
     if reuse and solver_log.exists() and metadata_file.is_file():
-        stored = json.loads(metadata_file.read_text())
+        try:
+            stored = json.loads(metadata_file.read_text())
+        except (OSError, ValueError):
+            stored = None
+        if not isinstance(stored, dict):
+            stored = {}
+        # The rank count is not compared: it does not change the requested
+        # computation, and the count the member actually ran with is reported
         completed_case = (
             all(stored.get(key) == value for key, value in metadata.items())
             and re.search(r"^End\s*$", solver_log.read_text(errors="replace"),
                           re.MULTILINE) is not None
         )
         if completed_case:
-            cores = int(stored.get("cores", cores))
+            try:
+                cores = int(stored.get("cores", cores))
+            except (TypeError, ValueError):
+                pass
     if completed_case:
         print(f"Reusing {label} in {run_dir}", flush=True)
     else:
@@ -337,9 +347,10 @@ def run_member(
                 raise RuntimeError("this case requires solids4foam built with PETSc")
             raise RuntimeError(f"solver log was not created in {run_dir}")
         check_solver_log(solver_log, end_time, label)
-        metadata_file.write_text(
-            json.dumps(dict(metadata, cores=cores), indent=2) + "\n"
-        )
+        # Write atomically, so that an interrupted write is a cache miss
+        partial = metadata_file.with_suffix(".json.tmp")
+        partial.write_text(json.dumps(dict(metadata, cores=cores), indent=2) + "\n")
+        partial.replace(metadata_file)
     check_solver_log(solver_log, end_time, label)
     log_text = solver_log.read_text(errors="replace")
     clock = re.findall(r"ClockTime\s*=\s*([0-9.eE+-]+)", log_text)
@@ -549,7 +560,12 @@ def check_study(study: str, rows: list[dict], config: dict,
     acceptance = config["acceptance"]
     checks: list[tuple[str, bool, str]] = []
     if quick:
-        checks.append((f"{study}: all members completed", True, ""))
+        expected = len(study_members(config, study, quick=True))
+        checks.append((
+            f"{study}: all {expected} members completed",
+            len(rows) == expected,
+            f"{len(rows)} completed",
+        ))
         return checks
 
     expected = len(study_members(config, study, quick=False))
@@ -576,6 +592,9 @@ def check_study(study: str, rows: list[dict], config: dict,
             for left, right in zip(rows, rows[1:])
         ]
         scale = abs(rows[-1]["peak_m"])
+        if scale <= 0.0:
+            checks.append((f"{study}: finest peak is positive", False, "zero peak"))
+            return checks
         floor = float(acceptance["noise_floor_fraction"]) * scale
         detail = ", ".join(f"{100.0 * change / scale:.2f}%" for change in changes)
         checks.append((
@@ -597,6 +616,10 @@ def check_study(study: str, rows: list[dict], config: dict,
         # converged-change tolerance
         last = rows[-1]
         scale = abs(last["peak_m"])
+        if scale <= 0.0:
+            checks.append((f"{study}: {last['name']} peak is positive", False,
+                           "zero peak"))
+            return checks
         tolerance = float(acceptance["converged_change_fraction"])
         for row in rows[:-1]:
             change = max(
@@ -750,9 +773,11 @@ def main() -> int:
         else float(config["quick_end_time_s"] if args.quick else config["end_time_s"])
     )
     window = config["comparison_window_s"]
-    if end_time < float(window[0]) + float(config["lid_period_s"]) and not args.quick:
-        raise SystemExit("--end-time must cover at least one lid period after "
-                         f"t = {window[0]} s")
+    if end_time < float(window[1]) and not args.quick:
+        raise SystemExit(
+            f"--end-time must reach the end of the comparison window, "
+            f"t = {window[1]:g} s"
+        )
 
     required = ["blockMesh", "solids4Foam"]
     if args.cores > 1:

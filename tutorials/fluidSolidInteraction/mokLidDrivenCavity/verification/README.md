@@ -259,8 +259,10 @@ Recorded with OpenFOAM v2412 on an Apple Silicon Mac Studio shared with other
 jobs. The three studies were run concurrently with
 `./Allverify --study mesh --cores 2`, `./Allverify --study timestep --cores 2`
 and `./Allverify --study solid`, and the combined summary was then written by
-`./Allverify --reuse`, which passes every check. The margins of the finest
-members to the acceptance limits are:
+`./Allverify --reuse`, which passes every check. (These runs predate the
+`verification_member.json` records, which were written for them afterwards
+from the same settings.) The margins of the finest members to the acceptance
+limits are:
 
 | Member | Check | Value | Outside envelope | Margin to limit |
 |---|---|---|---|---|
