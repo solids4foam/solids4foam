@@ -19,6 +19,7 @@ License
 
 #include "fluidSolidInterface.H"
 #include "volFields.H"
+#include "fixedValueFvPatchFields.H"
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
 #include "twoDPointCorrector.H"
@@ -241,6 +242,41 @@ bool Foam::fluidSolidInterface::newTimeStep() const
     }
 
     return false;
+}
+
+
+void Foam::fluidSolidInterface::checkFluidInterfaceVelocity()
+{
+    const volVectorField& U = fluid().U();
+
+    forAll(fluidPatchIndices_, interfaceI)
+    {
+        const fvPatchVectorField& Up =
+            U.boundaryField()[fluidPatchIndices_[interfaceI]];
+
+        // Test the exact type, so that conditions derived from fixedValue
+        // which follow the interface motion, e.g. newMovingWallVelocity,
+        // are accepted
+        if
+        (
+            isType<fixedValueFvPatchVectorField>(Up)
+         || Up.type() == "noSlip"
+        )
+        {
+            FatalErrorIn("void fluidSolidInterface::checkFluidInterfaceVelocity()")
+                << "The fluid velocity " << U.name() << " on the coupled "
+                << "interface patch " << Up.patch().name() << " is of type "
+                << Up.type() << ", which ignores the motion of the interface: "
+                << "the fluid does not see the solid velocity and the "
+                << "added-mass effect is lost, so the coupled solution is "
+                << "wrong." << nl
+                << "Use newMovingWallVelocity on this patch, or "
+                << "elasticWallVelocity with a Robin interface condition "
+                << "(elasticWallPressure)." << nl
+                << "For a rigid fluid wall, use the oneWayCoupling "
+                << "fluidSolidInterface instead." << abort(FatalError);
+        }
+    }
 }
 
 

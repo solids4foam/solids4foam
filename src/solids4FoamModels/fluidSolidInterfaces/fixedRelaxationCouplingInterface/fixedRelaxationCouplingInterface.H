@@ -79,11 +79,14 @@ public:
 
     // Constructors
 
-        //- Construct from components
+        //- Construct from components. A derived coupling that does not
+        //  always move the fluid interface can skip the check of the fluid
+        //  interface velocity condition and make it itself
         fixedRelaxationCouplingInterface
         (
             Time& runTime,
-            const word& region = dynamicFvMesh::defaultRegion
+            const word& region = dynamicFvMesh::defaultRegion,
+            const bool checkInterfaceVelocity = true
         );
 
 

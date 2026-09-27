@@ -305,6 +305,12 @@ protected:
         //  it is called in a time step
         bool newTimeStep() const;
 
+        //- Stop if the fluid velocity on a coupled interface patch is a
+        //  static condition (fixedValue or noSlip), which ignores the
+        //  interface motion. Called by the couplings that move the fluid
+        //  interface with the solid
+        void checkFluidInterfaceVelocity();
+
         //- Return sub-dictionary
         dictionary& fsiProperties()
         {

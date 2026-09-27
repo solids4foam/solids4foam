@@ -48,7 +48,7 @@ thermalCouplingInterface::thermalCouplingInterface
     const word& region
 )
 :
-    fixedRelaxationCouplingInterface(runTime, region),
+    fixedRelaxationCouplingInterface(runTime, region, false),
     relaxationFactor_
     (
         fsiProperties().found("thermoRelaxationFactor")
@@ -79,6 +79,12 @@ thermalCouplingInterface::thermalCouplingInterface
     oldOldSolidFaceZoneHeatFlux_(),
     timeIndex_(-1)
 {
+    // Without mechanical coupling the fluid interface is a rigid wall
+    if (mechanicalCoupling_)
+    {
+        checkFluidInterfaceVelocity();
+    }
+
     maxThermalResidualsNorm_.setSize(nGlobalPatches());
 
     // Set equivalent interface heat transfer coefficient

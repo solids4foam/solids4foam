@@ -49,7 +49,9 @@ weakCouplingInterface::weakCouplingInterface
 )
 :
     fluidSolidInterface(typeName, runTime, region)
-{}
+{
+    checkFluidInterfaceVelocity();
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
