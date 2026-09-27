@@ -95,7 +95,8 @@ Run the case with
 ```
 
 which uses 6 processes, or `./Allrun` for a serial run. The case needs
-OpenFOAM.com, for the expression inlet, and a solids4foam build with PETSc,
+OpenFOAM.com v2012 or newer, for the expression inlet, and a solids4foam build
+with PETSc,
 for the solid solver; with other OpenFOAM variants, `Allrun` exits without
 running. `Allrun` also writes `deflection.pdf` with gnuplot, comparing the
 roof-centre displacement with the reference.
@@ -150,16 +151,16 @@ work.
 
 Figure 3 repeats the comparison with half the time step and with the
 self-weight applied from $$t = 0$$ (both with 6 cells through the roof
-thickness), and on a finer mesh with twice as many cells in each
-direction in both the fluid ($$220\,804$$ cells) and the roof
+thickness), and on a finer mesh with twice as many cells in each direction in
+the fluid ($$220\,804$$ cells) and in the two in-plane directions of the roof
 ($$32 \times 2 \times 32$$ cells). Halving the time step changes the result
 very little. The finer mesh lowers the roof by about $$0.1$$ m during the ramp,
 bringing the mean displacement between $$1$$ and $$4$$ s to $$-0.35$$ m,
 against $$-0.36$$ m for the reference and $$-0.25$$ m for the tutorial mesh,
 and it shows the first of the reference oscillations, near $$t = 0.4$$ s. It
 still settles to a nearly steady shape after the ramp, so neither mesh resolves
-the vortex shedding that drives the reference response. The finer mesh took
-58 min on 32 processes of an AMD EPYC 9684X.
+the vortex shedding that drives the reference response. The finer mesh took 58
+min on 32 processes of an AMD EPYC 9684X.
 
 ![Sensitivity of the roof centre displacement to the time step, self-weight and mesh](./images/membraneRoof-sensitivity.png)
 

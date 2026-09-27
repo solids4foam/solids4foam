@@ -51,9 +51,14 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    # GNU sed is needed for in-place editing; on macOS this is gsed
-    solids4Foam::requireGnuSed
-    "${SOLIDS4FOAM_SED}" -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+    # Set the end time with awk rather than sed -i, which differs between GNU
+    # and BSD sed
+    local controlDict="${CASE_DIR}/system/controlDict"
+    awk -v endTime="${REG_END_TIME}" '
+        /^endTime[[:space:]]/ { $0 = "endTime         " endTime ";" }
+        { print }
+    ' "${controlDict}" > "${controlDict}.tmp"
+    mv "${controlDict}.tmp" "${controlDict}"
 }
 
 run_case() {
