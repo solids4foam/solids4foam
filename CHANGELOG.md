@@ -33,6 +33,13 @@ release. For complete commit-level details and contributor information, see the
   a `regressionTest.sh`: `cantileverVibration`, `cooksMembrane`,
   `compressedSpheres`, `twistingHemisphere`, `rubberSealing` and
   `shallowIroning` (all under `tutorials/solids/hyperelasticity`).
+- Added the `membraneRoof` fluid-solid interaction tutorial, ported from the
+  `solid-benchmarks` repository: wind flow over a building with a 10 x 10 m,
+  0.01 m thick membrane roof, after von Scheven and Ramm (2011). It uses
+  IQN-ILS coupling and the built-in expression inlet in place of the compiled
+  inlet library, and its README compares the roof-centre deflection
+  qualitatively with von Scheven's thesis. It runs with OpenFOAM.com and
+  PETSc only, and has a `regressionTest.sh`.
 - Added opt-in mesh-convergence verification studies, migrated from
   `solid-benchmarks`, to the linear-elastic and elastoplastic Cook's membrane,
   `sphericalCavity`, `ellipticPlate`, `narrowTmember`, `plateHole`,
