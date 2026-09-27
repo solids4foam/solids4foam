@@ -897,8 +897,369 @@ def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
     return passed
 
 
+# ---------------------------------------------------------------------------
+# FSI1: steady benchmark
+# ---------------------------------------------------------------------------
+
+def configure_fsi1(case: Path, fsi1: dict) -> None:
+    """Turn a configured FSI3 copy into the steady FSI1 benchmark.
+
+    FSI1 has the same geometry and fluid as FSI3 but a mean inflow of
+    0.2 m/s and a softer plate. The inflow is ramped smoothly, the coupling
+    starts early in the ramp, and the run is a pseudo-transient route to the
+    steady state. The full solid state is written at the end time so that the
+    steady coupling comparison can restart from it.
+    """
+    for condition in ("dirichletNeumann", "robin"):
+        path = case / f"0/fluid/U.{condition}"
+        replace_entry(path, "maxValue", f"{fsi1['inletMaxValue']:.8g}")
+        replace_entry(path, "transitionPeriod", f"{fsi1['transitionPeriod']:.8g}")
+    replace_entry(
+        case / "constant/solid/mechanicalProperties",
+        "E",
+        f"E [1 -1 -2 0 0 0 0] {fsi1['youngsModulus']:.8g}",
+    )
+    for coupling in ("iqnils", "robin"):
+        replace_entry(
+            case / f"constant/fsiProperties.{coupling}",
+            "couplingStartTime",
+            f"{fsi1['couplingStartTime']:.8g}",
+        )
+    # The FSI1 loads and displacements are one to two orders of magnitude
+    # smaller than those of FSI3, so the absolute fluid solver tolerances are
+    # tightened accordingly; otherwise the solver residuals set a floor on
+    # the interface residual above outerCorrTolerance on the finer meshes
+    path = case / "system/fluid/fvSolution"
+    text, count = re.subn(r"^(\s*tolerance\s+)[^;]+;",
+                          rf"\g<1>{fsi1['fluidSolverTolerance']:.8g};",
+                          path.read_text(), flags=re.MULTILINE)
+    if count == 0:
+        fail(f"No solver tolerances found in {path}")
+    path.write_text(text)
+    replace_entry(case / "system/controlDict", "writePrecision", "12")
+    enable_restart(case)
+
+
+def set_robin_conditions(directory: Path) -> None:
+    """Switch the fluid plate conditions of a time directory to Robin."""
+    for field, condition in (("p", "elasticWallPressure"),
+                             ("U", "elasticWallVelocity")):
+        path = directory / "fluid" / field
+        text, count = re.subn(
+            r"(\bplate\s*\{\s*type\s+)\w+;",
+            rf"\g<1>{condition};",
+            path.read_text(),
+        )
+        if count != 1:
+            fail(f"Could not set the Robin condition on plate in {path}")
+        path.write_text(text)
+
+
+def steady_value(time: list[float], values: list[float],
+                 window_fraction: float) -> tuple[float, float]:
+    """Final value and its relative spread over the closing part of the run."""
+    start = time[-1] * (1.0 - window_fraction)
+    window = [v for t, v in zip(time, values) if t >= start]
+    if len(window) < 2:
+        fail("The steady-state window contains too few samples")
+    final = values[-1]
+    return final, (max(window) - min(window)) / max(abs(final), 1e-30)
+
+
+def execution_time(case: Path) -> float:
+    matches = re.findall(r"ExecutionTime\s*=\s*([0-9.eE+-]+)\s*s",
+                         (case / "log.solids4Foam").read_text(errors="replace"))
+    return float(matches[-1]) if matches else float("nan")
+
+
+def fsi1_run(args: argparse.Namespace, spec: dict, factor: int,
+             coupling: str) -> dict:
+    """Run, or reuse, one FSI1 level and extract its steady values."""
+    fsi1 = spec["fsi1"]
+    mesh = fsi1["mesh"]
+    if factor not in mesh["refinementFactors"]:
+        fail(f"Unsupported refinement factor {factor}; choose from {mesh['refinementFactors']}")
+    index = mesh["refinementFactors"].index(factor)
+    delta_t = mesh["deltaTs"][index]
+    end_time = args.end_time or (fsi1["quick"]["endTime"] if args.quick else mesh["endTime"])
+    if args.cores == "auto":
+        cores = int(fsi1["cores"].get(str(factor), fsi1["cores"]["default"]))
+    else:
+        cores = int(args.cores)
+    name = f"fsi1_{coupling}_mesh_{factor}x"
+    case = WORK_ROOT / name
+    if not (args.reuse and case.is_dir()):
+        case = copy_case(name)
+        configure_case(case, spec, factor, delta_t, end_time,
+                       args.write_interval, cores)
+        configure_fsi1(case, fsi1)
+    run_case(case, name, cores, coupling, args.reuse)
+    # A reused run keeps the rank count it was run with
+    cores = len(list(case.glob("processor*"))) or 1
+    row: dict = {"case": name, "coupling": coupling, "mesh_level": index + 1,
+                 "refinement": factor, "delta_t": delta_t, "cores": cores,
+                 "end_time": end_time, "cell_count": cell_count(case),
+                 "execution_time": execution_time(case)}
+    if coupling == "robin":
+        row.update(robin_residual_summary(case, end_time))
+    else:
+        row.update(iqnils_iteration_summary(case))
+    row["mean_outer_iterations"] = row["total_outer_iterations"] / row["coupled_time_steps"]
+    if args.quick:
+        return row
+    fraction = fsi1["steadyState"]["windowFraction"]
+    for quantity, (time, values) in fsi1_histories(case, spec).items():
+        if not math.isclose(time[-1], end_time, rel_tol=1e-6, abs_tol=1e-9):
+            fail(f"The {quantity} history of {name} ends at t={time[-1]:g}, not at t={end_time:g}")
+        row[quantity], row[f"{quantity}_spread"] = steady_value(time, values, fraction)
+    return row
+
+
+def fsi1_histories(case: Path, spec: dict) -> dict[str, tuple[list[float], list[float]]]:
+    time_d, ux, uy = displacement_history(case)
+    time_f, drag, lift = force_history(case, spec["thickness_m"])
+    return {"ux": (time_d, ux), "uy": (time_d, uy),
+            "drag": (time_f, drag), "lift": (time_f, lift)}
+
+
+def steady_failures(row: dict, tolerance: float) -> list[str]:
+    return [
+        f"{row['case']}: {quantity} has not settled: relative spread "
+        f"{row[f'{quantity}_spread']:.2e} over the closing part of the run "
+        f"(tolerance {tolerance:g})"
+        for quantity in QUANTITIES if row[f"{quantity}_spread"] > tolerance
+    ]
+
+
+def fsi1_format(quantity: str, value: float) -> str:
+    return f"{1000 * value:.6f}" if quantity in ("ux", "uy") else f"{value:.4f}"
+
+
+def fsi1_mesh_study(args: argparse.Namespace, spec: dict) -> bool:
+    fsi1 = spec["fsi1"]
+    factors = ([int(level) for level in args.levels.split(",")] if args.levels
+               else fsi1["mesh"]["defaultLevels"])
+    rows = [fsi1_run(args, spec, factor, args.coupling) for factor in factors]
+    csv_name = f"fsi1_{args.coupling}_mesh_sweep.csv"
+    if args.quick:
+        write_csv(OUTPUT_ROOT / csv_name, rows)
+        print(f"Quick FSI1 run completed for levels {factors}; results: {OUTPUT_ROOT / csv_name}")
+        return True
+
+    failures = []
+    tolerance = fsi1["steadyState"]["relativeTolerance"]
+    for row in rows:
+        failures += steady_failures(row, tolerance)
+        for quantity, reference in fsi1["references"].items():
+            error = relative_error(row[quantity], reference["value"])
+            row[f"{quantity}_error"] = error
+            # Tolerances are given for the finest level of the sweep
+            limit = reference["tolerance"].get(str(row["refinement"]))
+            if (row is rows[-1] and reference["primary"] and limit is not None
+                    and error > limit):
+                failures.append(
+                    f"{row['case']}: {quantity} = {row[quantity]:.6g} differs from the "
+                    f"Featflow value {reference['value']:.6g} by {100 * error:.3f}% "
+                    f"(tolerance {100 * limit:g}%)"
+                )
+        if row is rows[-1] and str(row["refinement"]) not in fsi1["references"]["uy"]["tolerance"]:
+            failures.append(f"{row['case']}: no reference tolerances for the finest level; "
+                            "include level 2 or 4 in the sweep")
+    if len(rows) > 1:
+        for quantity, reference in fsi1["references"].items():
+            growth = rows[-1][f"{quantity}_error"] - rows[0][f"{quantity}_error"]
+            if reference["primary"] and growth > fsi1["mesh"]["maximumErrorGrowth"]:
+                failures.append(
+                    f"{quantity} reference error grew from {100 * rows[0][f'{quantity}_error']:.3f}% "
+                    f"to {100 * rows[-1][f'{quantity}_error']:.3f}% between the coarsest and finest levels"
+                )
+    passed = not failures
+    for row in rows:
+        row["pass"] = passed
+    write_csv(OUTPUT_ROOT / csv_name, rows)
+
+    finest = fsi1["featflowLevels"][-1]
+    lines = [
+        "| Quantity | " + " | ".join(f"{row['refinement']}x" for row in rows)
+        + f" | Featflow {finest['level']} |",
+        "|---|" + "---:|" * (len(rows) + 1),
+    ]
+    units = {"ux": "mm", "uy": "mm", "drag": "N/m", "lift": "N/m"}
+    for quantity in QUANTITIES:
+        cells = [f"{fsi1_format(quantity, row[quantity])} "
+                 f"({100 * row[f'{quantity}_error']:.2f}%)" for row in rows]
+        cells.append(fsi1_format(quantity, finest[quantity]))
+        lines.append(f"| {quantity} ({units[quantity]}) | " + " | ".join(cells) + " |")
+    notes = list(failures)
+    for row in rows:
+        notes.append(
+            f"{row['case']}: {row['cell_count']} cells, dt = {row['delta_t']:g} s, "
+            f"{row['cores']} core(s), {row['execution_time']:.0f} s, mean "
+            f"{row['mean_outer_iterations']:.2f} FSI iterations per step, largest "
+            f"steady spread {max(row[f'{q}_spread'] for q in QUANTITIES):.2e}"
+        )
+    write_summary(f"FSI1 {args.coupling} mesh study", passed, notes,
+                  "\n".join(lines), csv_name)
+    print(f"FSI1 {args.coupling} mesh study: {'PASS' if passed else 'FAIL'}; "
+          f"results: {OUTPUT_ROOT / csv_name}")
+    for message in failures:
+        print(f"  - {message}")
+    return passed
+
+
+def fsi1_continuation(args: argparse.Namespace, spec: dict, base: dict,
+                      coupling: str) -> dict:
+    """Continue the steady IQN-ILS state with one coupling at a small dt."""
+    fsi1 = spec["fsi1"]
+    factor = base["refinement"]
+    start = base["end_time"]
+    start_directory = WORK_ROOT / base["case"] / f"{start:g}"
+    if not start_directory.is_dir():
+        fail(f"The IQN-ILS run did not write its end state {start_directory}")
+    delta_t = fsi1["coupling"]["deltaT"]
+    end_time = start + (fsi1["quick"]["continuation"] if args.quick
+                        else fsi1["coupling"]["continuation"])
+    name = f"fsi1_{coupling}_continuation_{factor}x"
+    case = WORK_ROOT / name
+    if not (args.reuse and case.is_dir()):
+        case = copy_case(name)
+        configure_case(case, spec, factor, delta_t, end_time, None, 1)
+        configure_fsi1(case, fsi1)
+        shutil.copytree(start_directory, case / start_directory.name)
+        if coupling == "robin":
+            set_robin_conditions(case / start_directory.name)
+    run_case(case, name, 1, coupling, args.reuse)
+    row: dict = {"case": name, "coupling": coupling, "refinement": factor,
+                 "delta_t": delta_t, "cores": 1, "start_time": start,
+                 "end_time": end_time, "cell_count": cell_count(case),
+                 "execution_time": execution_time(case)}
+    if coupling == "robin":
+        row.update(robin_residual_summary(case, end_time))
+    else:
+        row.update(iqnils_iteration_summary(case))
+    row["mean_outer_iterations"] = row["total_outer_iterations"] / row["coupled_time_steps"]
+    return row
+
+
+def fsi1_coupling_study(args: argparse.Namespace, spec: dict) -> bool:
+    """Compare the couplings from one converged FSI1 steady state.
+
+    The steady solution does not depend on the path taken to it, so both
+    couplings restart from the steady state of the IQN-ILS mesh-study run.
+    The Robin-Neumann fixed-point iterations converge far too slowly at the
+    pseudo-transient time step, so both continuations use a smaller time
+    step; the change of time step perturbs the state slightly, identically
+    for both couplings. Both converge the same interface problem at every
+    step, so their continued histories must agree.
+    """
+    fsi1 = spec["fsi1"]
+    factor = int(args.levels) if args.levels else fsi1["coupling"]["refinement"]
+    # The restarts are run in serial so that the start state does not have to
+    # be decomposed
+    if args.cores != "auto" and int(args.cores) != 1:
+        fail("The FSI1 coupling study runs in serial")
+    args.cores = "1"
+    base = fsi1_run(args, spec, factor, "iqnils")
+    rows = [base] + [fsi1_continuation(args, spec, base, coupling)
+                     for coupling in ("iqnils", "robin")]
+    csv_name = f"fsi1_coupling_comparison_{factor}x.csv"
+    if args.quick:
+        write_csv(OUTPUT_ROOT / csv_name, rows)
+        print(f"Quick FSI1 coupling run completed; results: {OUTPUT_ROOT / csv_name}")
+        return True
+
+    _, iqnils, robin = rows
+    failures = steady_failures(base, fsi1["steadyState"]["relativeTolerance"])
+    tolerance = fsi1["coupling"]["relativeTolerance"]
+    histories = {row["coupling"]: fsi1_histories(WORK_ROOT / row["case"], spec)
+                 for row in (iqnils, robin)}
+    for quantity in QUANTITIES:
+        selected = {}
+        for coupling, history in histories.items():
+            time, values = history[quantity]
+            selected[coupling] = [(t, v) for t, v in zip(time, values)
+                                  if t > base["end_time"] + 1e-9]
+        time_i = [t for t, _ in selected["iqnils"]]
+        time_r = [t for t, _ in selected["robin"]]
+        if not time_i or len(time_i) != len(time_r) or any(
+            not math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-12) for a, b in zip(time_i, time_r)
+        ):
+            fail(f"The {quantity} continuations are sampled at different times")
+        values_i = [v for _, v in selected["iqnils"]]
+        values_r = [v for _, v in selected["robin"]]
+        # Each coupling converges the interface to outerCorrTolerance at
+        # every step, which leaves step-to-step noise in the small resultants
+        # (lift, ux), so the continued states are compared through their
+        # means over the closing half of the continuation. Differences are
+        # relative to the steady value of the quantity.
+        scale = abs(base[quantity])
+        closing = time_i[0] + 0.5 * (time_i[-1] - time_i[0])
+        means = {}
+        for coupling, values in (("iqnils", values_i), ("robin", values_r)):
+            window = [v for t, v in zip(time_i, values) if t >= closing]
+            means[coupling] = sum(window) / len(window)
+            row = iqnils if coupling == "iqnils" else robin
+            row[quantity] = means[coupling]
+            row[f"{quantity}_noise"] = (max(window) - min(window)) / scale
+        difference = abs(means["robin"] - means["iqnils"]) / scale
+        robin[f"{quantity}_vs_iqnils"] = difference
+        robin[f"{quantity}_max_vs_iqnils"] = max(
+            abs(a - b) for a, b in zip(values_i, values_r)) / scale
+        robin[f"{quantity}_first_vs_iqnils"] = abs(values_r[0] - values_i[0]) / scale
+        if difference > tolerance:
+            failures.append(
+                f"{quantity}: the mean Robin value {means['robin']:.7g} differs from "
+                f"IQN-ILS {means['iqnils']:.7g} by {100 * difference:.4f}% of the "
+                f"steady value (tolerance {100 * tolerance:g}%)"
+            )
+    passed = not failures
+    for row in rows:
+        row["pass"] = passed
+    write_csv(OUTPUT_ROOT / csv_name, rows)
+
+    table = [f"| Quantity | Steady (dt = {base['delta_t']:g} s) | IQN-ILS mean | "
+             "Robin mean | Mean difference | First-step difference | "
+             "IQN-ILS noise | Robin noise |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|"]
+    for quantity in QUANTITIES:
+        table.append(
+            f"| {quantity} | {base[quantity]:.7g} | {iqnils[quantity]:.7g} | "
+            f"{robin[quantity]:.7g} | {100 * robin[f'{quantity}_vs_iqnils']:.4f}% | "
+            f"{100 * robin[f'{quantity}_first_vs_iqnils']:.4f}% | "
+            f"{100 * iqnils[f'{quantity}_noise']:.3f}% | "
+            f"{100 * robin[f'{quantity}_noise']:.3f}% |"
+        )
+    notes = list(failures)
+    notes.append(
+        f"Both couplings restarted from the IQN-ILS steady state at t = {base['end_time']:g} s "
+        f"and run to t = {robin['end_time']:g} s with dt = {robin['delta_t']:g} s; "
+        "differences are relative to the steady value"
+    )
+    for row in rows:
+        notes.append(
+            f"{row['case']}: {row['total_outer_iterations']:.0f} FSI iterations over "
+            f"{row['coupled_time_steps']:.0f} coupled time steps (mean "
+            f"{row['mean_outer_iterations']:.2f}, maximum "
+            f"{row['maximum_outer_iterations']:.0f} per step), {row['execution_time']:.0f} s"
+        )
+    notes.append(
+        "Worst converged Robin pressure residual: "
+        f"{robin['maximum_final_pressure_residual']:.3g}; leakage-flux residual: "
+        f"{robin['maximum_final_flux_residual']:.3g}"
+    )
+    write_summary(f"FSI1 steady coupling comparison on the {factor}x mesh",
+                  passed, notes, "\n".join(table), csv_name)
+    print(f"FSI1 coupling comparison: {'PASS' if passed else 'FAIL'}; "
+          f"results: {OUTPUT_ROOT / csv_name}")
+    for message in failures:
+        print(f"  - {message}")
+    return passed
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--benchmark", choices=("fsi3", "fsi1"), default="fsi3",
+                        help="periodic FSI3 (default) or steady FSI1 benchmark")
     parser.add_argument("--study", choices=("mesh", "coupling"), default="mesh")
     parser.add_argument("--coupling", choices=("iqnils", "robin"), default="iqnils",
                         help="coupling variant for the mesh study (default: iqnils)")
@@ -932,6 +1293,9 @@ def main() -> int:
     (OUTPUT_ROOT / "verification_summary.md").write_text(
         "# HronTurekFsi3 verification summary\n\n"
     )
+    if args.benchmark == "fsi1":
+        study = fsi1_coupling_study if args.study == "coupling" else fsi1_mesh_study
+        return 0 if study(args, spec) else 1
     if args.study == "coupling":
         return 0 if coupling_study(args, spec) else 1
     return 0 if mesh_study(args, spec) else 1
