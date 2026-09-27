@@ -675,6 +675,15 @@ def coupled_histories(case: Path, spec: dict,
     return histories
 
 
+def enable_restart(case: Path) -> None:
+    """Ask the solid model to write, or read, the full restart state."""
+    path = case / "constant/solid/solidProperties"
+    text, count = re.subn(r"(Coeffs\"?\s*\{)", r"\g<1>\n    restart yes;", path.read_text(), count=1)
+    if count != 1:
+        fail(f"Could not find the solid model coefficients in {path}")
+    path.write_text(text)
+
+
 def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
     """Compare the transient after the coupling start between the couplings.
 
@@ -685,17 +694,54 @@ def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
     """
     end_time = args.end_time or spec["coupling"]["endTime"]
     factor = int(args.levels) if args.levels else spec["coupling"]["refinement"]
+    index = spec["mesh"]["refinementFactors"].index(factor)
+    delta_t = spec["mesh"]["deltaTs"][index]
+    # The restarts below are run in serial so that the common start state
+    # does not have to be decomposed
+    cores = 1
+    coupling_start = dictionary_scalar(
+        TUTORIAL / "constant/fsiProperties.iqnils", "couplingStartTime"
+    )
+
+    # The fluid boundary conditions of the two variants differ even before
+    # the coupling starts (elasticWallPressure is not a zero-gradient wall
+    # while the plate is at rest), so separate runs from t = 0 would enter
+    # the coupling from different flow states. Both variants therefore
+    # restart from the state of one uncoupled Dirichlet-Neumann run.
+    base_name = f"precoupling_{factor}x"
+    base = WORK_ROOT / base_name
+    if not (args.reuse and base.is_dir()):
+        base = copy_case(base_name)
+        configure_case(base, spec, factor, delta_t, coupling_start, None, cores)
+        replace_entry(base / "system/controlDict", "writePrecision", "12")
+        enable_restart(base)
+    run_case(base, base_name, cores, "iqnils", args.reuse)
+    start_directory = base / f"{coupling_start:g}"
+    if not start_directory.is_dir():
+        fail(f"The uncoupled run did not write the start state {start_directory}")
+
     rows = []
     for coupling in ("iqnils", "robin"):
         name = f"{coupling}_coupling_{factor}x"
-        index = spec["mesh"]["refinementFactors"].index(factor)
-        delta_t = spec["mesh"]["deltaTs"][index]
-        cores = study_cores(args.cores, factor, spec)
         case = WORK_ROOT / name
         if not (args.reuse and case.is_dir()):
             case = copy_case(name)
             configure_case(case, spec, factor, delta_t, end_time,
                            args.write_interval, cores)
+            enable_restart(case)
+            shutil.copytree(start_directory, case / start_directory.name)
+            if coupling == "robin":
+                for field, condition in (("p", "elasticWallPressure"),
+                                         ("U", "elasticWallVelocity")):
+                    path = case / start_directory.name / "fluid" / field
+                    text, count = re.subn(
+                        r"(\bplate\s*\{\s*type\s+)\w+;",
+                        rf"\g<1>{condition};",
+                        path.read_text(),
+                    )
+                    if count != 1:
+                        fail(f"Could not set the Robin condition on plate in {path}")
+                    path.write_text(text)
         run_case(case, name, cores, coupling, args.reuse)
         row: dict = {"case": name, "coupling": coupling, "refinement": factor,
                      "delta_t": delta_t, "cores": cores, "end_time": end_time,
@@ -712,9 +758,6 @@ def coupling_study(args: argparse.Namespace, spec: dict) -> bool:
         print(f"Quick coupling run completed; results: {OUTPUT_ROOT / csv_name}")
         return True
 
-    coupling_start = dictionary_scalar(
-        WORK_ROOT / rows[0]["case"] / "constant/fsiProperties.iqnils", "couplingStartTime"
-    )
     histories = {
         row["coupling"]: coupled_histories(WORK_ROOT / row["case"], spec, coupling_start)
         for row in rows
