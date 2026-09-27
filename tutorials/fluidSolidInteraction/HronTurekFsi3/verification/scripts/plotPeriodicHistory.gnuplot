@@ -16,22 +16,22 @@ set key top left
 set xrange [-0.6:0.02]
 set xlabel "Time from the last u_y maximum, t [s]"
 
-set multiplot layout 2,2 title "Turek-Hron FSI3: ".label." vs the reference history"
+set multiplot layout 2,2 title "Turek-Hron FSI3: ".label." vs the reference history" noenhanced
 
 set ylabel "u_x(A) [mm]"
 plot reference using 1:($4*1000) with lines lw 2 lc rgb "black" title "Turek-Hron reference", \
-     run using 1:($4*1000) with lines lw 2 lc rgb "red" title label
+     run using 1:($4*1000) with lines lw 2 lc rgb "red" title label noenhanced
 
 set ylabel "u_y(A) [mm]"
 plot reference using 1:($5*1000) with lines lw 2 lc rgb "black" title "Turek-Hron reference", \
-     run using 1:($5*1000) with lines lw 2 lc rgb "red" title label
+     run using 1:($5*1000) with lines lw 2 lc rgb "red" title label noenhanced
 
 set ylabel "Drag [N/m]"
 plot reference using 1:2 with lines lw 2 lc rgb "black" title "Turek-Hron reference", \
-     run using 1:2 with lines lw 2 lc rgb "red" title label
+     run using 1:2 with lines lw 2 lc rgb "red" title label noenhanced
 
 set ylabel "Lift [N/m]"
 plot reference using 1:3 with lines lw 2 lc rgb "black" title "Turek-Hron reference", \
-     run using 1:3 with lines lw 2 lc rgb "red" title label
+     run using 1:3 with lines lw 2 lc rgb "red" title label noenhanced
 
 unset multiplot
