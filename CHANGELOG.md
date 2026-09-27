@@ -41,6 +41,13 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
+- Added an opt-in verification study to the `3dTube` tutorial, which runs the
+  pressure-pulse benchmark through a mesh and time-step sweep with the
+  partitioned Robin-Neumann or IQN-ILS coupling, compares the point-A wall
+  displacement with Tuković et al. (2018) and, using the published first-order
+  time discretisation, with Lozovskiy et al. (2019) and Eken (2016), checks
+  the pulse-wave speed against a thick-wall estimate, and compares the
+  Robin-Neumann and IQN-ILS solutions.
 
 ### Changed
 
