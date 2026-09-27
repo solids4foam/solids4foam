@@ -268,7 +268,8 @@ def reference_history(path: Path) -> dict[str, list[float]]:
 # ---------------------------------------------------------------------------
 
 def periodic_statistics(time: list[float], values: list[float],
-                        window: float) -> dict[str, float]:
+                        window: float,
+                        fundamental: list[float] | None = None) -> dict[str, float]:
     """Mean, amplitude and frequency of a periodic signal.
 
     The benchmark reports the mean as (max + min)/2 and the amplitude as
@@ -304,9 +305,15 @@ def periodic_statistics(time: list[float], values: list[float],
         segment = [v for tv, v in zip(t, y) if t_start <= tv <= t_end]
         return max(segment), min(segment)
 
-    last_max, last_min = extrema(crossings[-2], crossings[-1])
-    previous_max, previous_min = extrema(crossings[-3], crossings[-2])
+    # The extrema are taken over the fundamental period (that of u_y) when it
+    # is given: u_x and the drag oscillate at twice that frequency with
+    # alternating troughs, and the benchmark reports their mean and amplitude
+    # over the full period of the plate motion
+    bounds = fundamental if fundamental is not None else crossings
+    last_max, last_min = extrema(bounds[-2], bounds[-1])
+    previous_max, previous_min = extrema(bounds[-3], bounds[-2])
     return {
+        "crossings": crossings,
         "mean": 0.5 * (last_max + last_min),
         "amplitude": 0.5 * (last_max - last_min),
         "frequency": (len(crossings) - 1) / (crossings[-1] - crossings[0]),
@@ -329,8 +336,9 @@ def extract(case: Path, spec: dict, window: float,
     row: dict[str, float] = {"cell_count": cell_count(case)}
     histories = {"ux": (time_d, ux), "uy": (time_d, uy),
                  "drag": (time_f, drag), "lift": (time_f, lift)}
+    fundamental = periodic_statistics(time_d, uy, window)["crossings"]
     for quantity, (time, values) in histories.items():
-        statistics = periodic_statistics(time, values, window)
+        statistics = periodic_statistics(time, values, window, fundamental)
         for name in STATISTICS:
             row[f"{quantity}_{name}"] = statistics[name]
         row[f"{quantity}_previous_amplitude"] = statistics["previous_amplitude"]
@@ -372,15 +380,16 @@ def write_reference_history(spec: dict, window: float) -> None:
             if t < reference["time"][-1] - window:
                 continue
             writer.writerow([f"{t - shift:.6f}"] + [
-                f"{reference[name][i]:.6e}" for name in QUANTITIES
+                f"{reference[name][i]:.6e}" for name in ("drag", "lift", "ux", "uy")
             ])
 
 
 def reference_history_statistics(spec: dict, window: float) -> dict[str, float]:
     reference = reference_history(VERIFICATION / "reference" / spec["history_reference"])
     values: dict[str, float] = {}
+    fundamental = periodic_statistics(reference["time"], reference["uy"], window)["crossings"]
     for quantity in QUANTITIES:
-        statistics = periodic_statistics(reference["time"], reference[quantity], window)
+        statistics = periodic_statistics(reference["time"], reference[quantity], window, fundamental)
         for name in STATISTICS:
             values[f"{quantity}_{name}"] = statistics[name]
     return values
@@ -446,7 +455,7 @@ def summary_table(rows: list[dict], references: dict, published: dict,
                   key: str) -> str:
     lines = [
         "| Quantity | " + " | ".join(str(row[key]) for row in rows)
-        + " | Turek-Hron | " + " | ".join(published) + " |",
+        + " | Featflow L4 | " + " | ".join(published) + " |",
         "|---|" + "---:|" * (len(rows) + 1 + len(published)),
     ]
     units = {"ux": "mm", "uy": "mm", "drag": "N/m", "lift": "N/m"}
