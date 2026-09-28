@@ -64,6 +64,7 @@
       "deltaT": [0.025, 0.0125, 0.00625],
       "quickDeltaT": [0.025],
       "reference": "converged",
+      "fsiProperties": {"relMinSignificant": "1e-2"},
       "solidMesh": [640, 8],
       "solidType": "linear",
       "acceptance": {

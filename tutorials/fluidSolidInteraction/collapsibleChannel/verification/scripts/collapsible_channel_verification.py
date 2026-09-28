@@ -153,6 +153,15 @@ def study_cases(study: str, refs: dict, quick: bool) -> list[dict]:
                 )
     else:
         raise RuntimeError(f"unknown study {study}")
+
+    # Optional fsiProperties entries that differ from the tutorial; they are
+    # part of the case name, so such cases are never shared with other studies
+    overrides = spec.get("fsiProperties", {})
+    if overrides:
+        suffix = "_".join(f"{key}{value}" for key, value in overrides.items())
+        for case in cases:
+            case["fsi"] = overrides
+            case["name"] += f"_{suffix}"
     return cases
 
 
@@ -235,6 +244,9 @@ def configure_case(run_dir: Path, case: dict, end_time: float) -> None:
         r"^(\s*relaxationFactor\s+)[^;]+;",
         rf"\g<1>{omega*(case['dt']/base_dt)**2:.6g};",
     )
+
+    for key, value in case.get("fsi", {}).items():
+        replace_once(fsi, rf"^(\s*{key}\s+)[^;]+;", rf"\g<1>{value};")
 
     # Matching interface faces can be mapped directly; otherwise use AMI
     if case["solid"][0] != FLUID_BASE[1]*f:
