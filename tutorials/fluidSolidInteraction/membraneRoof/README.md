@@ -158,8 +158,8 @@ The finer mesh 2 of Figure 3 (58 min on 32 processes) brings the mean
 roof-centre displacement between 1 and 4 s to $$-0.35$$ m, against $$-0.36$$ m
 for the reference and $$-0.25$$ m for the default mesh. Neither mesh
 reproduces the reference oscillation, and the study below indicates that
-refinement would not: its period is not consistent with the published roof
-properties.
+refinement is unlikely to: its period is not the natural period of a roof with
+the published properties.
 ```
 
 ### Roof oscillation
@@ -203,9 +203,13 @@ pressure $$p$$ (0.25, 0.17 and 0.11 s for 500, 1500 and 4500 Pa), and a period
 of about $$0.48$$ s with the fluid added mass would need about five times the
 mass or a fifth of the tension. Applying the self-weight, or fixing only the
 lower half of the roof edges to approximate the pinned edges of the reference,
-changes the period by about $$2\%$$ or less. The reference oscillation is
-therefore either a numerical artefact or the result of a model difference that
-the references do not document, and it cannot be recovered by refining this
+changes the period by about $$2\%$$ or less. A forced response at a fixed
+frequency from the flow is also unlikely, since the reference period stays at
+about $$0.48$$ s while the inflow speed at roof height rises about ninefold
+during the ramp. The reference oscillation is therefore most likely either a
+numerical artefact or the result of a model difference that the references do
+not document; it was not recovered on any of the meshes tested here, up to
+$$369\,000$$ fluid cells, and is unlikely to be recovered by refining this
 model.
 
 ### Sensitivity
