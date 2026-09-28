@@ -1921,7 +1921,7 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
     const label interfaceI
 ) const
 {
-    const volVectorField a(fvc::d2dt2(D()));
+    const volVectorField a(fvcD2dt2Compat(D()));
 
     return globalPatches()[interfaceI].patchFaceToGlobal
     (

@@ -40,6 +40,17 @@ APPROACHES=(
     petscSnes
 )
 
+# The ddtSchemes (backward) and d2dt2Schemes (steadyState) defaults of this
+# case differ. OpenFOAM's fvc::d2dt2 takes its scheme from ddtSchemes, so the
+# solid models use fvcD2dt2Compat, which takes it from d2dt2Schemes as
+# fvm::d2dt2 does (#502). Test-fvcD2dt2 checks the two agree on this mesh for
+# each of these d2dt2Schemes defaults
+FVC_D2DT2_DIR="${REGRESSION_ROOT}/fvcD2dt2"
+FVC_D2DT2_SCHEMES=(
+    steadyState
+    Euler
+)
+
 echo "============================================================"
 echo "cooksMembrane (hyperelastic) regression test"
 echo "Reference point displacement in [${REF_DISP_MIN}, ${REF_DISP_MAX}] m"
@@ -124,9 +135,66 @@ check_ref_disp() {
     return 1
 }
 
+check_fvc_d2dt2() {
+    local scheme
+
+    # errexit does not apply inside this function, as it is called from an
+    # if statement, so each step checks for failure
+    if ! rm -rf "${FVC_D2DT2_DIR}" \
+        || ! mkdir -p "${FVC_D2DT2_DIR}" \
+        || ! cp -a "${SCRIPT_DIR}/0" "${SCRIPT_DIR}/constant" \
+            "${SCRIPT_DIR}/system" "${FVC_D2DT2_DIR}/"
+    then
+        echo "FAIL: Could not prepare the Test-fvcD2dt2 case"
+        return 1
+    fi
+
+    if ! ( cd "${FVC_D2DT2_DIR}" \
+        && solids4Foam::convertCaseFormat . > log.convertCaseFormat 2>&1 \
+        && blockMesh > log.blockMesh 2>&1 )
+    then
+        echo "FAIL: Could not create the mesh for Test-fvcD2dt2"
+        return 1
+    fi
+
+    for scheme in "${FVC_D2DT2_SCHEMES[@]}"; do
+        sed -i \
+            "/^d2dt2Schemes/,/^}/s/\(default[[:space:]]*\).*;/\1${scheme};/" \
+            "${FVC_D2DT2_DIR}/system/fvSchemes"
+
+        if ! sed -n '/^d2dt2Schemes/,/^}/p' \
+            "${FVC_D2DT2_DIR}/system/fvSchemes" \
+            | grep -qE "^[[:space:]]*default[[:space:]]+${scheme};"
+        then
+            echo "FAIL: Could not set the d2dt2Schemes default to ${scheme}"
+            return 1
+        fi
+
+        if ( cd "${FVC_D2DT2_DIR}" \
+            && Test-fvcD2dt2 > "log.Test-fvcD2dt2.${scheme}" 2>&1 )
+        then
+            echo "PASS: Test-fvcD2dt2 (d2dt2Schemes default ${scheme})"
+        else
+            echo "FAIL: Test-fvcD2dt2 (d2dt2Schemes default ${scheme}); see" \
+                "${FVC_D2DT2_DIR}/log.Test-fvcD2dt2.${scheme}"
+            return 1
+        fi
+    done
+
+    rm -rf "${FVC_D2DT2_DIR}"
+    return 0
+}
+
 failures=0
 
 if [ "$CHECK_ONLY" = false ]; then
+    echo "------------------------------------------------------------"
+    echo "Testing fvcD2dt2Compat against fvm::d2dt2"
+    echo "------------------------------------------------------------"
+    if ! check_fvc_d2dt2; then
+        failures=$((failures + 1))
+    fi
+
     prepare_case
     for approach in "${APPROACHES[@]}"; do
         echo

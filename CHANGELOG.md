@@ -163,6 +163,23 @@ release. For complete commit-level details and contributor information, see the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
 
+### Fixed
+
+- The explicit inertia term of the solid models now takes its scheme from
+  `d2dt2Schemes`, as the implicit term does (#502). OpenFOAM's `fvc::d2dt2`
+  looks up `ddtSchemes`, so when the two defaults differed, the PETSc SNES
+  residuals, standard and high-order, of `linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` and
+  `nonLinearGeometryUpdatedLagrangian`, the old-time inertia term of the
+  segregated updated Lagrangian solver, and the solid interface acceleration
+  passed to the fluid, used the `ddtSchemes` scheme. Cases in
+  which both dictionaries select the same scheme for these terms, e.g. through
+  equal defaults, are unaffected; the one tutorial whose defaults differ, the
+  hyperelastic `cooksMembrane`, changes by about 1e-9 relative in its
+  `petscSnes` variant. The lookup names are unchanged, so a case that sets
+  these terms through named entries, or sets `ddtSchemes` but not
+  `d2dt2Schemes`, must now give them in `d2dt2Schemes`.
+
 ## [v2.4] - 2026-08-24
 
 ### Added in v2.4

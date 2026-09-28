@@ -376,7 +376,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
-          + fvc::d2dt2(rho_, D().oldTime())
+          + fvcD2dt2Compat(rho_, D().oldTime())
          == tRhsEqn
         );
 
@@ -903,7 +903,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 
     // Force all required old-time fields to be created
     fvm::d2dt2(rho_, DD());
-    fvc::d2dt2(rho_, D().oldTime());
+    fvcD2dt2Compat(rho_, D().oldTime());
 
     if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
     {
@@ -1404,7 +1404,7 @@ label nonLinGeomUpdatedLagSolid::formResidual
     }
     else
     {
-        residual -= rho()*fvc::d2dt2(D());
+        residual -= rho()*fvcD2dt2Compat(D());
     }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)

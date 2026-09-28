@@ -1574,7 +1574,7 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     }
     else
     {
-        residual -= rho()*fvc::d2dt2(D);
+        residual -= rho()*fvcD2dt2Compat(D);
     }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
