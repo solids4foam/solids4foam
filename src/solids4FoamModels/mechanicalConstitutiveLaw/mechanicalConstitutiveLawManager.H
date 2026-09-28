@@ -828,7 +828,9 @@ public:
         //  history variable is disturbed.
         //  Intended for solid models that need an implicit stiffness
         //  coefficient at construction time, before any stress update has been
-        //  performed, or at a chosen refresh cadence between updates
+        //  performed, or at a chosen refresh cadence between updates.
+        //  The body is in updateScalarTangentVol, shared with
+        //  updateScalarTangentFiniteStrain
         void updateScalarTangent
         (
             const volTensorField& gradD,
@@ -845,7 +847,9 @@ public:
         //  finite-strain solid model that needs an implicit stiffness
         //  coefficient. Like its small-strain counterpart it evaluates each
         //  law against a shadow of its state, so it neither writes a stress
-        //  nor disturbs history
+        //  nor disturbs history.
+        //  The body is in updateScalarTangentVol, shared with
+        //  updateScalarTangent
         void updateScalarTangentFiniteStrain
         (
             const volTensorField& F,
@@ -912,6 +916,8 @@ public:
         //  Optionally computes an approximate scalar material tangent when
         //  requested, e.g. for segregated or mixed displacement–pressure
         //  formulations.
+        //  The body is in updateStressVol, shared with the finite-strain
+        //  volField overload
         void updateStressSmallStrain
         (
             const volTensorField& gradD,
@@ -995,7 +1001,9 @@ public:
         //  mechanicalConstitutiveLawState objects.
         //  Optionally computes an approximate scalar material tangent when
         //  requested, e.g. for segregated or mixed displacement–pressure
-        //  formulations
+        //  formulations.
+        //  The body is in updateStressVol, shared with the small-strain
+        //  volField overload
         void updateStressFiniteStrain
         (
             const volTensorField& F,

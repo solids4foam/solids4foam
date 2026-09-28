@@ -2190,13 +2190,7 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentVol
     const bool coldState
 )
 {
-    fields.checkMeshes
-    (
-        [&](const polyMesh& fieldMesh, const word& fieldName)
-        {
-            checkMeshConsistency(mesh_, fieldMesh, fieldName);
-        }
-    );
+    fields.checkMeshes(mesh_);
     checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
 
     if (!needsScalarTangent(tangentReq))
@@ -2381,13 +2375,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressVol
 )
 {
     // Check the kinematic fields are defined on the correct mesh
-    fields.checkMeshes
-    (
-        [&](const polyMesh& fieldMesh, const word& fieldName)
-        {
-            checkMeshConsistency(mesh_, fieldMesh, fieldName);
-        }
-    );
+    fields.checkMeshes(mesh_);
     checkMeshConsistency(mesh_, stress.mesh(), stress.name());
     if (scalarTangentPtr)
     {

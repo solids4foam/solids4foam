@@ -263,6 +263,22 @@ struct kinematicsViewsOf<finiteStrainKinematicsFields>
 };
 
 
+//- Check a field is defined on the expected mesh
+template<class GeoField>
+inline void checkFieldMesh(const polyMesh& mesh, const GeoField& field)
+{
+    if (&field.mesh() != &mesh)
+    {
+        FatalError
+            << "Field '" << field.name() << "' is associated with a "
+            << "different mesh." << nl
+            << "Expected mesh: " << mesh.name() << nl
+            << "Field mesh:    " << field.mesh().name()
+            << exit(FatalError);
+    }
+}
+
+
 /*---------------------------------------------------------------------------*\
                    Struct smallStrainGeometricFields Declaration
 \*---------------------------------------------------------------------------*/
@@ -301,12 +317,11 @@ struct smallStrainGeometricFields
         return "updateScalarTangent";
     }
 
-    //- Call check(mesh, name) for each field
-    template<class Check>
-    void checkMeshes(const Check& check) const
+    //- Check each field is defined on mesh
+    void checkMeshes(const polyMesh& mesh) const
     {
-        check(gradD.mesh(), gradD.name());
-        check(gradD0.mesh(), gradD0.name());
+        checkFieldMesh(mesh, gradD);
+        checkFieldMesh(mesh, gradD0);
     }
 
     //- The field whose patches say which are coupled
@@ -388,16 +403,15 @@ struct finiteStrainGeometricFields
         return "updateScalarTangentFiniteStrain";
     }
 
-    //- Call check(mesh, name) for each field
-    template<class Check>
-    void checkMeshes(const Check& check) const
+    //- Check each field is defined on mesh
+    void checkMeshes(const polyMesh& mesh) const
     {
-        check(F.mesh(), F.name());
-        check(F0.mesh(), F0.name());
-        check(Finv.mesh(), Finv.name());
-        check(Finv0.mesh(), Finv0.name());
-        check(J.mesh(), J.name());
-        check(J0.mesh(), J0.name());
+        checkFieldMesh(mesh, F);
+        checkFieldMesh(mesh, F0);
+        checkFieldMesh(mesh, Finv);
+        checkFieldMesh(mesh, Finv0);
+        checkFieldMesh(mesh, J);
+        checkFieldMesh(mesh, J0);
     }
 
     //- The field whose patches say which are coupled
