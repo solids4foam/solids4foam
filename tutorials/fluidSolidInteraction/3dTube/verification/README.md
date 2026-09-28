@@ -311,7 +311,7 @@ number of FSI iterations over the 800 time steps):
 | Coupling | u_r,max | u_z,min | t_arr | c_p | Iter. | Mean | Max | Clock (s) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Robin | 0.15984 | -0.08823 | 5.874 | 4.771 | 3 791 | 4.74 | 9 | 758 |
-| IQN-ILS | 0.15971 | -0.08818 | 5.870 | 4.771 | 12 369 | 15.46 | 20 | 3 077 |
+| IQN-ILS | 0.15971 | -0.08818 | 5.869 | 4.771 | 12 420 | 15.53 | 20 | 3 075 |
 
 The two radial histories at A differ by at most 0.27% of the peak, and the
 monitored quantities by at most 0.08%. Every Robin-Neumann step met its
@@ -319,6 +319,11 @@ displacement, pressure and leakage-flux criteria without stalling (worst
 final residuals 6.1e-7, 9.9e-6 and 9.2e-6). The Robin-Neumann coupling needs
 3.3 times fewer FSI iterations than IQN-ILS and runs 4.1 times faster on this
 case, for which it was designed.
+
+The IQN-ILS arm uses the interface `predictor`. An earlier run without it
+gave the same solution (to 0.001% in every monitored quantity) with 15.46
+mean and 20 maximum iterations per step, so the predictor does not change the
+comparison here.
 
 ## References
 
