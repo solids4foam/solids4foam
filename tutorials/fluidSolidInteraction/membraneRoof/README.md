@@ -106,10 +106,12 @@ Run the case with
 
 which uses 6 processes, or `./Allrun` for a serial run. The case needs
 OpenFOAM.com v2012 or newer, for the expression inlet, and a solids4foam build
-with PETSc,
-for the solid solver; with other OpenFOAM variants, `Allrun` exits without
-running. `Allrun` also writes `deflection.pdf` with gnuplot, comparing the
-roof-centre displacement with the reference.
+with PETSc, for the solid solver; with other OpenFOAM variants, or without
+PETSc, `Allrun` exits without running. The hypre BoomerAMG preconditioner
+needs PETSc built with hypre; without it, use the LU preconditioner commented
+in `system/solid/fvSolution`, which is fine in serial or on a few processes.
+`Allrun` also writes `deflection.pdf` with gnuplot, comparing the roof-centre
+displacement with the reference.
 
 ## Results
 
@@ -168,8 +170,8 @@ around the leading edge and the roof ($$49\,668$$ fluid cells, cells of
 $$0.31$$ m at the roof, $$32 \times 2 \times 32$$ roof cells). The
 oscillation is the displacement minus its $$0.6$$ s moving mean, between $$1$$
 and $$4.5$$ s. The first column gives the time schemes of the solid and the
-fluid; the row with $$\Delta t = 0.005$$ s and `LUST` uses the tutorial
-settings.
+fluid; the row with $$\Delta t = 0.005$$ s and `LUST` uses the schemes and
+time step of the tutorial.
 
 #### Table 2: Roof-centre oscillation during the ramp
 
@@ -185,12 +187,14 @@ settings.
 
 Numerical damping, from the first-order `Euler` scheme and the limited
 convection scheme in the fluid, is why the previous settings of this tutorial
-damped the roof oscillation out. With the tutorial settings the oscillation is
-sustained and converged in the time step, at the natural period of the roof in
-air, about $$0.20$$ s. Its amplitude is still about four times smaller than
-that of the reference, and its period is less than half.
+damped the roof oscillation out. On this mesh, with the schemes and time step
+of the tutorial, the oscillation is sustained and converged in the time step,
+at the natural period of the roof in air, about $$0.20$$ s. Its amplitude is
+still about four times smaller than that of the reference, and its period is
+less than half; on the default mesh the amplitude is smaller still, about
+$$0.02$$ m peak to peak.
 
-The reference oscillates at about $$0.48$$ s ($$2.2$$ Hz) in both the
+The reference oscillates at about $$0.48$$ s (about $$2.1$$ Hz) in both the
 roof-centre displacement and the pressure [2, Figs. 6.6 and 6.7]. Membrane
 theory and dry tests of the roof alone, in which a pressure is applied
 suddenly, show that the published roof properties cannot give that period at
@@ -217,10 +221,12 @@ the fluid ($$220\,804$$ cells) and in the two in-plane directions of the roof
 very little. The finer mesh lowers the roof by about $$0.1$$ m during the ramp,
 bringing the mean displacement between $$1$$ and $$4$$ s to $$-0.35$$ m,
 against $$-0.36$$ m for the reference and $$-0.25$$ m for the tutorial mesh,
-and it shows the first of the reference oscillations, near $$t = 0.4$$ s. It
-still settles to a nearly steady shape after the ramp, so neither mesh resolves
-the vortex shedding that drives the reference response. The finer mesh took 58
-min on 32 processes of an AMD EPYC 9684X.
+and it shows a first dip near $$t = 0.4$$ s. It still settles to a nearly
+steady shape after the ramp. With these dissipative settings neither mesh
+reproduces the reference oscillation; with the current settings the roof
+oscillates at its natural period instead, and the reason the reference period
+differs is discussed in [Roof oscillation](#roof-oscillation). The finer mesh
+took 58 min on 32 processes of an AMD EPYC 9684X.
 
 ![Sensitivity of the roof centre displacement to the time step, self-weight and mesh](./images/membraneRoof-sensitivity.png)
 
