@@ -16,9 +16,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// Second-order, low-dissipation schemes in time and for convection: the
+// first-order Euler scheme and a limited linearUpwind scheme damp out the
+// oscillation of the roof
 ddtSchemes
 {
-    default            Euler;
+    default            backward;
 }
 
 gradSchemes
@@ -29,7 +32,7 @@ gradSchemes
 divSchemes
 {
     default            none;
-    div(phi,U)         Gauss linearUpwind cellLimited leastSquares 1;
+    div(phi,U)         Gauss LUST grad(U);
     div((nuEff*dev2(T(grad(U))))) Gauss linear;
     div((nuEff*dev(T(grad(U))))) Gauss linear;
 }

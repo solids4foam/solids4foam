@@ -11,9 +11,8 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # membraneRoof FSI regression test
 # ============================================================
 
-# Shortened regression horizon: the first 10 time-steps of the inlet ramp,
-# during which the roof response is smooth. A full run takes about 18 min on
-# 6 processes.
+# Shortened regression horizon: the first 40 time-steps of the inlet ramp.
+# A full run takes about 31 min on 6 processes.
 REG_END_TIME=0.2
 
 # Regression tolerances
@@ -23,9 +22,9 @@ FY_TOL=20
 # Reference values at REG_END_TIME: vertical displacement of the roof centre
 # and the total vertical force on the fluid side of the roof, from a serial
 # OpenFOAM-v2412 run on Linux. A 6-process OpenFOAM-v2412 run on macOS differs
-# by 3.8e-6 m and 1.4 N.
-REF_UY=-0.0610105
-REF_FY=-28041.0
+# by 9.3e-6 m and 8.4 N.
+REF_UY=-0.0685211
+REF_FY=-30483.9
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"

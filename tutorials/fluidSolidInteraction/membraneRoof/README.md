@@ -61,24 +61,34 @@ sides are slip walls, and the outlet has a zero pressure. The flow is laminar.
 | Solid Young's modulus, $$E_S$$ | $$10^9$$ | Pa |
 | Solid Poisson's ratio, $$\nu_S$$ | 0 | |
 | Roof thickness, $$t$$ | 0.01 | m |
-| Time step, $$\Delta t$$ | 0.02 | s |
+| Time step, $$\Delta t$$ | 0.005 | s |
 | End time | 12 | s |
 
 The roof is a St. Venant-Kirchhoff solid, solved with the standard
-total-Lagrangian finite volume solid model and PETSc; the references use a
-7-parameter shell. The partitioned coupling uses IQN-ILS with a predictor, and
-the fluid mesh motion uses a uniform diffusivity. The coupling tolerance
-(`outerCorrTolerance`) is $$10^{-5}$$, relative to the interface displacement:
-after the ramp, a tolerance of $$10^{-6}$$ stagnates at the level of the inner
-fluid and solid solver tolerances.
+total-Lagrangian finite volume solid model and PETSc, with a hypre BoomerAMG
+preconditioner; the references use a 7-parameter shell. The partitioned
+coupling uses IQN-ILS with a predictor, and the fluid mesh motion uses a
+uniform diffusivity. The coupling tolerance (`outerCorrTolerance`) is
+$$10^{-5}$$, relative to the interface displacement: after the ramp, a
+tolerance of $$10^{-6}$$ stagnates at the level of the inner fluid and solid
+solver tolerances.
+
+The time schemes are chosen to add little numerical damping to the roof
+oscillation, whose period is about $$0.2$$ s: the second-order `backward`
+scheme in the fluid and the solid, the low-dissipation `LUST` convection
+scheme in the fluid, and $$\Delta t = 0.005$$ s, i.e. about 40 steps per
+period. The first-order `Euler` scheme in the fluid, or in the solid, and a
+limited `linearUpwind` convection scheme damp the oscillation out (see
+[Roof oscillation](#roof-oscillation)).
 
 ### Gravity
 
 Gravity is switched off. The thesis [2] states that the self-weight of the
 roof is included, but not how it is applied. Applying the self-weight
 ($$\rho_S g t \approx 98$$ Pa) from $$t = 0$$ lowers the roof centre by about
-$$0.01$$-$$0.02$$ m throughout the run (Figure 3), which is small compared with
-the differences from the reference.
+$$0.01$$-$$0.02$$ m throughout the run (Figure 3) and changes the roof
+oscillation period by about $$2\%$$, which is small compared with the
+differences from the reference.
 
 ## Mesh and Running
 
@@ -125,31 +135,81 @@ Only the first $$5$$ s, the inlet ramp, is a meaningful comparison. There, both
 solutions show the same behaviour: the positive pressure on the roof while the
 flow accelerates pushes it down into a concave shape, and as the inlet speed
 approaches its maximum the roof is lifted by suction into a convex shape,
-crossing zero at $$t = 4.6$$ s, against $$5.0$$ s in the reference. The
-reference oscillates between about $$-0.18$$ and $$-0.55$$ m in this phase,
-which von Scheven attributes to vortices shed at the upstream edge of the
-roof, whereas this coarse mesh gives a smooth response with a minimum of
-$$-0.30$$ m. After the ramp the reference roof oscillates irregularly, with
-repeated snap-through, while the computed roof settles to a nearly steady
-convex shape; a comparison of individual peaks after $$5$$ s would not be
-meaningful for the reasons given above.
+crossing zero at $$t = 4.5$$ s, against $$5.0$$ s in the reference. The mean
+displacement between $$1$$ and $$4$$ s is $$-0.25$$ m, against $$-0.36$$ m for
+the reference. The computed roof oscillates about this mean at its natural
+period of about $$0.19$$ s, with a peak-to-peak amplitude of only about
+$$0.02$$ m on this coarse mesh, whereas the reference oscillates between about
+$$-0.18$$ and $$-0.55$$ m with a period of about $$0.48$$ s. After the ramp the
+reference roof oscillates irregularly, with repeated snap-through, while the
+computed roof settles to a convex shape with a small oscillation; a comparison
+of individual peaks after $$5$$ s would not be meaningful for the reasons given
+above.
 
 The results in Figure 2 were produced with the tutorial settings (mesh as
-above, $$\Delta t = 0.02$$ s) using OpenFOAM-v2412 on 6 processes of an Apple M1
-Ultra, in 18 min. The coupling took 9.6 iterations per time step on average.
+above, $$\Delta t = 0.005$$ s) using OpenFOAM-v2412 on 6 processes of an Apple
+M1 Ultra, in 31 min. The coupling took 6.2 iterations per time step on
+average.
 
 ```note
-The default mesh does not resolve the vortex shedding behind the reference
-oscillations. The finer mesh 2 of Figure 3 (58 min on 32 processes) brings the
-mean roof-centre displacement between 1 and 4 s to $$-0.35$$ m, against
-$$-0.36$$ m for the reference and $$-0.25$$ m for the default mesh, but it does
-not resolve the shedding either. A finer, shedding-resolving mesh is future
-work.
+The finer mesh 2 of Figure 3 (58 min on 32 processes) brings the mean
+roof-centre displacement between 1 and 4 s to $$-0.35$$ m, against $$-0.36$$ m
+for the reference and $$-0.25$$ m for the default mesh. Neither mesh
+reproduces the reference oscillation, and the study below indicates that
+refinement would not: its period is not consistent with the published roof
+properties.
 ```
+
+### Roof oscillation
+
+Table 2 summarises a study of the roof oscillation during the ramp, run to
+$$t = 5$$ s on the default mesh with one extra level of local refinement
+around the leading edge and the roof ($$49\,668$$ fluid cells, cells of
+$$0.31$$ m at the roof, $$32 \times 2 \times 32$$ roof cells). The
+oscillation is the displacement minus its $$0.6$$ s moving mean, between $$1$$
+and $$4.5$$ s. The first column gives the time schemes of the solid and the
+fluid; the row with $$\Delta t = 0.005$$ s and `LUST` uses the tutorial
+settings.
+
+#### Table 2: Roof-centre oscillation during the ramp
+
+| Solid, fluid | Convection | $$\Delta t$$ [s] | Peak to peak [m] | Period [s] |
+| :-- | :-- | --: | --: | --: |
+| Reference [2] | | 0.02 | 0.37 | 0.48 |
+| `backward`, `Euler` | limited `linearUpwind` | 0.02 | 0.026 | 0.2, decaying |
+| `backward`, `Euler` | limited `linearUpwind` | 0.005 | 0.057 | 0.20, decaying |
+| `backward`, `backward` | `LUST` | 0.02 | 0.050 | 0.20 |
+| `backward`, `backward` | `LUST` | 0.01 | 0.077 | 0.22 |
+| `backward`, `backward` | `LUST` | 0.005 | 0.091 | 0.20 |
+| `backward`, `backward` | `LUST` | 0.0025 | 0.089 | 0.20 |
+
+Numerical damping, from the first-order `Euler` scheme and the limited
+convection scheme in the fluid, is why the previous settings of this tutorial
+damped the roof oscillation out. With the tutorial settings the oscillation is
+sustained and converged in the time step, at the natural period of the roof in
+air, about $$0.20$$ s. Its amplitude is still about four times smaller than
+that of the reference, and its period is less than half.
+
+The reference oscillates at about $$0.48$$ s ($$2.2$$ Hz) in both the
+roof-centre displacement and the pressure [2, Figs. 6.6 and 6.7]. Membrane
+theory and dry tests of the roof alone, in which a pressure is applied
+suddenly, show that the published roof properties cannot give that period at
+the reported sag: the dry period scales as $$p^{-1/3}$$ with the applied
+pressure $$p$$ (0.25, 0.17 and 0.11 s for 500, 1500 and 4500 Pa), and a period
+of about $$0.48$$ s with the fluid added mass would need about five times the
+mass or a fifth of the tension. Applying the self-weight, or fixing only the
+lower half of the roof edges to approximate the pinned edges of the reference,
+changes the period by about $$2\%$$ or less. The reference oscillation is
+therefore either a numerical artefact or the result of a model difference that
+the references do not document, and it cannot be recovered by refining this
+model.
 
 ### Sensitivity
 
-Figure 3 repeats the comparison with half the time step and with the
+Figure 3, computed with the previous, more dissipative settings of this
+tutorial (`Euler` in the fluid, limited `linearUpwind` convection and
+$$\Delta t = 0.02$$ s), shows the sensitivity of the mean response. It repeats
+the comparison with half the time step and with the
 self-weight applied from $$t = 0$$ (both with 6 cells through the roof
 thickness), and on a finer mesh with twice as many cells in each direction in
 the fluid ($$220\,804$$ cells) and in the two in-plane directions of the roof
@@ -167,8 +227,9 @@ min on 32 processes of an AMD EPYC 9684X.
 **Figure 3:** Sensitivity of the roof-centre displacement to the time step,
 the self-weight and the mesh.
 
-The regression test (`regressionTest.sh`) runs the first $$0.2$$ s and checks
-the roof-centre displacement and the vertical force on the roof.
+The regression test (`regressionTest.sh`) runs the first $$0.2$$ s (40 time
+steps) and checks the roof-centre displacement and the vertical force on the
+roof.
 
 ## References
 

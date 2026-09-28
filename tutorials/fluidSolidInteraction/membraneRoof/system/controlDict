@@ -27,7 +27,9 @@ stopAt          endTime;
 
 endTime         12;
 
-deltaT          0.02;
+// Resolves the roof oscillation period (about 0.2 s) with about 40 steps, so
+// that the numerical damping of the backward scheme is small
+deltaT          0.005;
 
 writeControl    runTime;
 

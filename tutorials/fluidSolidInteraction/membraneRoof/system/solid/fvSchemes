@@ -17,6 +17,8 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+// The second-order backward scheme; the first-order Euler d2dt2 scheme strongly
+// damps the oscillation of the roof
 d2dt2Schemes
 {
     default                 backward;

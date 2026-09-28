@@ -46,30 +46,27 @@ solvers
             snes_lag_preconditioner_persists true;
             snes_lag_preconditioner "-2";
 
-            // Preconditioner - LU
-            pc_type redundant;
-            redundant_pc_type lu;
-
-            // Preconditioner - ILU
-            // pc_type asm;
-            // sub_pc_type ilu;
-            // sub_pc_factor_levels "1";
-
             // Preconditioner - multigrid
-            // pc_type hypre;
-            // pc_hypre_type boomeramg;
-            // pc_hypre_boomeramg_max_iter "1";
-            // //pc_hypre_boomeramg_strong_threshold "0.25";
-            // pc_hypre_boomeramg_strong_threshold "0.7";
-            // pc_hypre_boomeramg_grid_sweeps_up "1";
-            // pc_hypre_boomeramg_grid_sweeps_down "1";
-            // pc_hypre_boomeramg_agg_nl "1";
-            // pc_hypre_boomeramg_agg_num_paths "1";
-            // pc_hypre_boomeramg_max_levels "25";
-            // pc_hypre_boomeramg_coarsen_type HMIS;
-            // pc_hypre_boomeramg_interp_type ext+i;
-            // pc_hypre_boomeramg_P_max "1";
-            // pc_hypre_boomeramg_truncfactor "0.3";
+            // Scales in parallel, unlike LU; bjacobi with LU blocks
+            // (sub_pc_type lu) does not converge for this thin roof
+            pc_type hypre;
+            pc_hypre_type boomeramg;
+            pc_hypre_boomeramg_max_iter "1";
+            pc_hypre_boomeramg_strong_threshold "0.7";
+            pc_hypre_boomeramg_grid_sweeps_up "1";
+            pc_hypre_boomeramg_grid_sweeps_down "1";
+            pc_hypre_boomeramg_agg_nl "1";
+            pc_hypre_boomeramg_agg_num_paths "1";
+            pc_hypre_boomeramg_max_levels "25";
+            pc_hypre_boomeramg_coarsen_type HMIS;
+            pc_hypre_boomeramg_interp_type ext+i;
+            pc_hypre_boomeramg_P_max "1";
+            pc_hypre_boomeramg_truncfactor "0.3";
+
+            // Preconditioner - LU on the whole solid system: fine in serial,
+            // but does not scale
+            // pc_type redundant;
+            // redundant_pc_type lu;
         }
     }
 }
