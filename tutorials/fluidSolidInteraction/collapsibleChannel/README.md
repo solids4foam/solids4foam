@@ -161,6 +161,10 @@ it can be:
 - `relMinSignificant 1e-2` drops secant modes that are small relative to the
   newest one, which otherwise let round-off in the sub-solvers blow up the
   least-squares update;
+- `qrSolveTolerance 1e-3` and `reorthogonalizeCouplingColumns yes`
+  regularise the least-squares update; without them an occasional
+  near-singular update moved the interface far enough to tangle the fluid
+  mesh on a refined fluid mesh;
 - `couplingReuse 0`: re-using the secant modes of previous time steps halves
   the iteration count, but with the massless wall the old modes are nearly
   parallel to the new ones, and the coupling then diverged or stalled on some
@@ -171,8 +175,8 @@ it can be:
   the round-off floor of the high-order solid residual.
 
 On the tutorial mesh the coupling converges in about 16 iterations per time
-step (at most 54) with the cubic solid and 11 (at most 19) with the linear
-one.
+step (at most 92, during the collapse) with the cubic solid and 11 (at most
+20) with the linear one; at most 200 are allowed (`nOuterCorr`).
 
 The added-mass coupling of the massless wall grows as $$1/\Delta t^2$$, so the
 coupling becomes harder as the time step is refined; see the time-step study

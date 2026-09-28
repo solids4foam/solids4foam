@@ -61,6 +61,13 @@ IQNILSCoeffs
     // least-squares update
     relMinSignificant 1e-2;
 
+    // Regularise the least-squares update: drop the directions whose QR
+    // diagonal is below 1e-3 of the largest column sum, and re-orthogonalise
+    // the QR factorisation. Without this an occasional near-singular update
+    // moves the interface far enough to tangle the fluid mesh
+    qrSolveTolerance 1e-3;
+    reorthogonalizeCouplingColumns yes;
+
     // Do not re-use the secant modes of previous time steps: with the
     // massless wall they are nearly parallel to the new ones, and re-using
     // them made the coupling diverge or stall on some meshes and platforms

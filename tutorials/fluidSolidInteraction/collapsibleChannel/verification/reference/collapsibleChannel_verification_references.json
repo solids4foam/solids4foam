@@ -49,7 +49,7 @@
       }
     },
     "mesh": {
-      "levels": [1, 2, 3, 4],
+      "levels": [1, 2, 3],
       "quickLevels": [1],
       "deltaT": 0.025,
       "reference": "sameDeltaT",
