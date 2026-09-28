@@ -8,6 +8,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Added the `NewmarkBeta` d2dt2 scheme for the cell-centred solid models:
+  `NewmarkBeta [beta gamma [alphaM]]`, with the default beta = 1/4 and
+  gamma = 1/2, which is the non-dissipative average acceleration method.
+  The optional alphaM, with the Bossak relations for beta and gamma, gives
+  the Bossak-alpha method, which damps high frequencies and stays
+  second-order. The velocity and acceleration are stored as `NewmarkV(D)` and
+  `NewmarkA(D)`, which are written, read on restart, and can set the initial
+  conditions; otherwise the body starts at rest or in equilibrium. The
+  time-step may vary. Add `"d2dt2\(.*\)" NewmarkBeta;` to `ddtSchemes` too,
+  because `fvc::d2dt2` reads its scheme there (#502); a fatal error says so
+  if it is missing. The updated Lagrangian solid models are not supported.
 - Framework regression arms for `squarePlate`, `cantilever2d`, `thermalCavity`,
   `curvedBeams` and `3dTube`. Each runs its tutorial on both implementations
   and asserts that each arm took the path it was set up for before comparing
