@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    // Jacobian-free Newton-Krylov solution with PETSc SNES (options in
+    // system/solid/fvSolution)
+    solutionAlgorithm PETScSNES;
+
+    // The massless (steady-state) wall cannot use the solid predictor; the
+    // FSI predictor in fsiProperties extrapolates the interface instead
+    predictor no;
+
+    // High-order (cubic) least-squares reconstruction of the residual
+    highOrderCoeffs
+    {
+        highOrderResidual true;
+
+        // Precondition with the assembled high-order Jacobian: the compact
+        // approximation is too poor a preconditioner for the thin wall
+        highOrderJacobian true;
+        displacement
+        {
+            polynomialOrder 3;
+            faceStencilExtraCells 15;
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+    }
+}
+
+// ************************************************************************* //

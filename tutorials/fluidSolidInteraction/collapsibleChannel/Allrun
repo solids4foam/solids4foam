@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun            # high-order solid: cubic reconstruction
+# ./Allrun linear     # second-order solid: linear reconstruction
+# The case runs in serial: see the README
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
+solidVariant=highOrder
+
+for arg in "$@"
+do
+    case "$arg" in
+        linear)
+            solidVariant="$arg"
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [linear]"
+            exit 1
+            ;;
+    esac
+done
+
+ln -vnsf "solidProperties.${solidVariant}" constant/solid/solidProperties
+ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
