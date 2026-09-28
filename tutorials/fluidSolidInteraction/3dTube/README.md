@@ -426,8 +426,8 @@ sizes**
 
 The opt-in [`verification/`](verification/) directory runs the case through a
 mesh and time-step sweep with the second-order `backward` scheme and compares
-the radial and axial displacement at point A with the finite volume results of
-Tuković et al. (2018, Trans. FAMENA 42(3)). A second study repeats the
+the radial displacement at point A with the finite volume results of Tuković
+et al. (2018, Trans. FAMENA 42(3)). A second study repeats the
 published first-order `Euler`, `Δt = 1e-4 s` discretisation and compares the
 point-A histories with the finite element results of Lozovskiy et al. (2019,
 Computers & Fluids 179) and Eken (2016). The pulse-wave speed is checked

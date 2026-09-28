@@ -40,15 +40,26 @@ cd tutorials/fluidSolidInteraction/3dTube/verification
 ./Allverify --cores 6              # MPI ranks per run (default: auto)
 ```
 
-The driver requires `python3`, `blockMesh` and `solids4Foam`; `gnuplot` is
-optional and is used for the history plots. Each run is a complete copy of the
-tutorial under `verification/work/`, prepared by editing the copy and then
-running the tutorial's own `Allrun` (with `dirichletNeumann` for IQN-ILS and
-Aitken), so the tutorial itself and its regression test are not modified.
-Results are written to `verification/postProcessing/` as CSV files,
-`verification_summary.md`, and PNG and PDF history plots. Both directories are
-ignored by Git and are retained to make a failed run diagnosable. `Allverify`
-returns zero only when every acceptance check of the selected study passes.
+The driver requires Python 3.8 or newer, `blockMesh` and `solids4Foam`;
+`gnuplot` (5.0 or newer) is optional and is used for the history plots. Each run
+is a complete copy of the tutorial under `verification/work/`, prepared by
+editing the copy and then running the tutorial's own `Allrun` (with
+`dirichletNeumann` for IQN-ILS and Aitken), so the tutorial itself and its
+regression test are not modified. Results are written to
+`verification/postProcessing/` as CSV files, `verification_summary.md`, and PNG
+and PDF history plots. Both directories are ignored by Git and are retained to
+make a failed run diagnosable. `Allverify` returns zero only when every
+acceptance check of the selected study passes.
+
+A completed run is reused by `--reuse` only when the settings recorded in its
+`verification_settings.json` match the requested ones: coupling, refinement,
+time step, end time, time scheme, solid preconditioner, monitors, MPI ranks,
+OpenFOAM version and a hash of the tutorial's `0`, `constant`, `system` and
+`Allrun`. Otherwise it is run again. Every monitored history must also have
+one complete, finite row per time step up to the end time, the residual
+evaluated for each step must be that of its last FSI iteration, and the solver
+log must contain `End`; a run that fails these checks is reported as a failure
+rather than evaluated.
 
 ## Case and verification copies
 
@@ -71,6 +82,10 @@ The verification copies differ from the tutorial as follows:
   block-Jacobi LU of the tutorial, whose factorisation does not scale to the
   finer meshes (`--solid-preconditioner lu` restores it); the converged
   solution does not depend on it;
+- for IQN-ILS, the fluid-solid interface `predictor` is switched on, which
+  avoids a first-iterate added-mass spike (issue #489); Aitken predicts the
+  solid itself (`predictSolid`, on by default), and the Robin-Neumann setup is
+  used as the tutorial has it;
 - wall-displacement monitors at `z = 0.5, 1.0, ..., 4.5 cm` on the inner wall
   and pressure probes near the axis at the same positions are added, and the
   fields are written only at the end time;

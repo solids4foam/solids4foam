@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -38,10 +40,10 @@ COUPLINGS = {
               "interface": None},
     "iqnils": {"allrun": ["dirichletNeumann"],
                "fsiProperties": "constant/fsiProperties.pimpleFluid",
-               "interface": "IQNILS"},
+               "interface": "IQNILS", "predictor": True},
     "aitken": {"allrun": ["dirichletNeumann"],
                "fsiProperties": "constant/fsiProperties.pimpleFluid",
-               "interface": "Aitken"},
+               "interface": "Aitken", "predictor": False},
 }
 
 
@@ -66,7 +68,9 @@ def ignored(directory: str, names: list[str]) -> set[str]:
             name for name in names
             if name != "0" and re.fullmatch(r"[0-9.eE+-]+", name)
         )
-    if directory_path.parent.name == "constant":
+    # Skip a generated mesh, but keep a foam-extend blockMeshDict
+    if (directory_path.parent.name == "constant" and "polyMesh" in names
+            and not (directory_path / "polyMesh" / "blockMeshDict").is_file()):
         skip.add("polyMesh")
     return skip.intersection(names)
 
@@ -89,6 +93,15 @@ def replace_entry(path: Path, key: str, value: str,
     if count != 1:
         fail(f"Expected one '{key}' entry in {path}, found {count}")
     path.write_text(text)
+
+
+def block_mesh_dict(case: Path, region: str) -> Path:
+    """Locate a region's blockMeshDict in the OpenFOAM or foam-extend layout."""
+    for path in (case / "system" / region / "blockMeshDict",
+                 case / "constant" / region / "polyMesh" / "blockMeshDict"):
+        if path.is_file():
+            return path
+    fail(f"No blockMeshDict for region {region} in {case}")
 
 
 def refine_mesh(path: Path, factor: int) -> None:
@@ -216,10 +229,21 @@ def configure_coupling(case: Path, coupling: str) -> None:
                       flags=re.MULTILINE | re.DOTALL)
     if not match:
         fail(f"No {block} dictionary in {path}")
-    if "writeResidualsToFile" not in match.group(1):
-        text = (text[:match.end(1)] + "    writeResidualsToFile yes;\n"
-                + text[match.end(1):])
-        path.write_text(text)
+    # The fluid-solid interface predictor avoids the first-iterate added-mass
+    # spike of IQN-ILS (issue #489). Aitken predicts the solid itself
+    # (predictSolid), and the Robin-Neumann tutorial setup is used as it is.
+    added = ""
+    keys = ["writeResidualsToFile"]
+    if spec["predictor"]:
+        keys.append("predictor")
+    for key in keys:
+        if not re.search(rf"^\s*{key}\s", match.group(1), re.MULTILINE):
+            added += f"    {key} yes;\n"
+        elif not re.search(rf"^\s*{key}\s+(yes|on|true)\s*;",
+                           match.group(1), re.MULTILINE):
+            fail(f"{block}/{key} in {path} is not enabled")
+    text = text[:match.end(1)] + added + text[match.end(1):]
+    path.write_text(text)
 
 
 def configure_parallel(case: Path, cores: int) -> None:
@@ -246,7 +270,7 @@ def configure_parallel(case: Path, cores: int) -> None:
         serial,
         "solids4Foam::runApplication -s fluid decomposePar -region fluid\n"
         "solids4Foam::runApplication -s solid decomposePar -region solid\n"
-        "solids4Foam::runParallel solids4Foam\n",
+        "solids4Foam::runParallel solids4Foam || exit 1\n",
     ))
 
 
@@ -254,8 +278,8 @@ def prepare_case(name: str, coupling: str, factor: int, delta_t: float,
                  end_time: float, args: argparse.Namespace,
                  reference: dict, cores: int) -> Path:
     case = copy_case(name)
-    refine_mesh(case / "system/fluid/blockMeshDict", factor)
-    refine_mesh(case / "system/solid/blockMeshDict", factor)
+    refine_mesh(block_mesh_dict(case, "fluid"), factor)
+    refine_mesh(block_mesh_dict(case, "solid"), factor)
     control = case / "system/controlDict"
     replace_entry(control, "deltaT", f"{delta_t:.10g}", True)
     replace_entry(control, "endTime", f"{end_time:.10g}", True)
@@ -333,15 +357,31 @@ def clock_time(case: Path) -> float:
 # ---------------------------------------------------------------------------
 
 def numeric_rows(path: Path) -> list[list[float]]:
+    """Return every data row, rejecting malformed or non-finite ones.
+
+    Comment lines and a single leading header line (as in fsiResiduals.dat)
+    are skipped; any other row that is not entirely finite numbers, such as a
+    row cut short by an aborted run, is an error rather than being dropped.
+    """
     rows = []
-    for line in path.read_text(errors="replace").splitlines():
+    header_allowed = True
+    for number, line in enumerate(
+        path.read_text(errors="replace").splitlines(), 1
+    ):
         fields = line.replace("(", " ").replace(")", " ").split()
         if not fields or fields[0].startswith("#"):
             continue
         try:
-            rows.append([float(field) for field in fields])
+            values = [float(field) for field in fields]
         except ValueError:
-            continue
+            if header_allowed:
+                header_allowed = False
+                continue
+            fail(f"{path}:{number} is not a numeric data row: {line.strip()}")
+        header_allowed = False
+        if not all(math.isfinite(value) for value in values):
+            fail(f"{path}:{number} contains non-finite values")
+        rows.append(values)
     return rows
 
 
@@ -353,9 +393,48 @@ def last_per_time(rows: list[list[float]]) -> list[list[float]]:
     return [by_time[time] for time in sorted(by_time)]
 
 
-def require_end_time(path: Path, time: float, end_time: float) -> None:
-    if not math.isclose(time, end_time, rel_tol=1e-6, abs_tol=1e-12):
-        fail(f"{path} ends at t={time:g}, not at the end time t={end_time:g}")
+def dictionary_scalar(path: Path, key: str) -> float | None:
+    """Read a top-level scalar entry of an OpenFOAM dictionary."""
+    match = re.search(
+        rf"^{re.escape(key)}\s+([-+0-9.eE]+)\s*;",
+        path.read_text(), flags=re.MULTILINE,
+    )
+    return float(match.group(1)) if match else None
+
+
+def require_complete(path: Path, rows: list[list[float]], end_time: float,
+                     columns: int) -> None:
+    """Require one complete, finite row per time step up to the end time.
+
+    The time step is read from the copy's controlDict, so a history with a
+    gap or a missing tail is rejected rather than evaluated.
+    """
+    short = [row for row in rows if len(row) < columns]
+    if short:
+        fail(f"{path} has {len(short)} row(s) with fewer than {columns} "
+             f"columns, starting at t={short[0][0]:g}")
+    control = path
+    while control.name != "postProcessing":
+        control = control.parent
+    delta_t = dictionary_scalar(control.parent / "system/controlDict", "deltaT")
+    if delta_t is None or delta_t <= 0.0:
+        fail(f"Could not read deltaT for {path}")
+    expected = round(end_time / delta_t)
+    times = [row[0] for row in rows]
+    if not times or not math.isclose(
+        times[-1], end_time, rel_tol=1e-6, abs_tol=1e-12
+    ):
+        reached = times[-1] if times else 0.0
+        fail(f"{path} ends at t={reached:g}, not at the end time "
+             f"t={end_time:g}")
+    if len(times) != expected or any(
+        not math.isclose(later - earlier, delta_t, rel_tol=1e-3)
+        for earlier, later in zip(times, times[1:])
+    ):
+        fail(f"{path} has {len(times)} time levels, expected {expected} "
+             f"at dt = {delta_t:g}")
+    if any(not math.isfinite(value) for row in rows for value in row):
+        fail(f"{path} contains non-finite values")
 
 
 def displacement_history(case: Path, name: str, end_time: float
@@ -373,8 +452,9 @@ def displacement_history(case: Path, name: str, end_time: float
     rows = last_per_time(numeric_rows(candidates[0]))
     if not rows:
         fail(f"No numeric rows in {candidates[0]}")
-    require_end_time(candidates[0], rows[-1][0], end_time)
-    return [(row[0], row[2], row[3]) for row in rows if len(row) >= 4]
+    # Columns: time, then the x, y and z displacement and its magnitude
+    require_complete(candidates[0], rows, end_time, 5)
+    return [(row[0], row[2], row[3]) for row in rows]
 
 
 def pressure_histories(case: Path, n_stations: int, end_time: float,
@@ -386,7 +466,7 @@ def pressure_histories(case: Path, n_stations: int, end_time: float,
     rows = last_per_time(numeric_rows(candidates[0]))
     if not rows or any(len(row) != n_stations + 1 for row in rows):
         fail(f"Unexpected pressure probe columns in {candidates[0]}")
-    require_end_time(candidates[0], rows[-1][0], end_time)
+    require_complete(candidates[0], rows, end_time, n_stations + 1)
     # The fluid pressure is kinematic.
     return [
         [(row[0], density * row[index + 1]) for row in rows]
@@ -451,9 +531,10 @@ def front_arrival(history: list[tuple[float, float]], reference: dict
 
 def fit_speed(positions: list[float], times: list[float]) -> float:
     """Least-squares slope dz/dt of the arrival times."""
-    pairs = [(z, t) for z, t in zip(positions, times) if math.isfinite(t)]
-    if len(pairs) < 2:
+    # Every station must have a front arrival; a partial fit is rejected.
+    if len(times) < 2 or not all(math.isfinite(t) for t in times):
         return math.nan
+    pairs = list(zip(positions, times))
     mean_z = sum(z for z, _ in pairs) / len(pairs)
     mean_t = sum(t for _, t in pairs) / len(pairs)
     s_tt = sum((t - mean_t) ** 2 for _, t in pairs)
@@ -534,7 +615,7 @@ def iteration_summary(case: Path, end_time: float) -> dict[str, float]:
     rows = last_per_time(numeric_rows(candidates[0]))
     if not rows:
         fail(f"No numeric rows in {candidates[0]}")
-    require_end_time(candidates[0], rows[-1][0], end_time)
+    require_complete(candidates[0], rows, end_time, 2)
     counts = [row[1] for row in rows]
     return {
         "time_steps": len(counts),
@@ -570,7 +651,7 @@ def residual_rows(case: Path, end_time: float) -> tuple[list[str], list[list[flo
     rows = last_per_time(numeric_rows(path))
     if not rows or any(len(row) < 3 for row in rows):
         fail(f"FSI residual columns are missing from {path}")
-    require_end_time(path, rows[-1][0], end_time)
+    require_complete(path, rows, end_time, 3)
     return header, rows
 
 
@@ -629,11 +710,30 @@ def dirichlet_neumann_summary(case: Path, coupling: str, end_time: float
 def coupling_summary(case: Path, coupling: str, end_time: float
                      ) -> dict[str, float]:
     summary = iteration_summary(case, end_time)
+    # The residual evaluated for each step must be that of its last
+    # FSI iteration, as recorded independently in fsiConvergenceData.dat.
+    _, residuals = residual_rows(case, end_time)
+    iterations = {
+        row[0]: row[1] for row in last_per_time(numeric_rows(next(
+            case.glob("postProcessing/**/fsiConvergenceData.dat")
+        )))
+    }
+    mismatched = [row[0] for row in residuals
+                  if iterations.get(row[0]) != row[1]]
+    if mismatched:
+        fail(f"{len(mismatched)} step(s) in {case} have a final residual row "
+             "that is not their last FSI iteration, starting at "
+             f"t={mismatched[0]:g}")
     if coupling == "robin":
         summary.update(robin_residual_summary(case, end_time))
     else:
         summary.update(dirichlet_neumann_summary(case, coupling, end_time))
     return summary
+
+
+def within(value: float, tolerance: float) -> bool:
+    """A check passes only for a finite value within the tolerance."""
+    return math.isfinite(value) and value <= tolerance
 
 
 def relative_difference(value: float, reference: float) -> float:
@@ -712,10 +812,14 @@ def run_gnuplot(script: str, variables: dict[str, str]) -> None:
         return
     assignments = "; ".join(f"{key}='{value}'" for key, value in variables.items())
     for terminal, extension in (("png", "png"), ("pdf", "pdf")):
+        # Paths are passed relative to the verification directory, so the
+        # checkout path, which may contain spaces or quotes, never reaches
+        # the gnuplot expressions.
         output = OUTPUT_ROOT / f"{variables['stem']}.{extension}"
+        relative_output = output.relative_to(VERIFICATION)
         result = subprocess.run(
             ["gnuplot", "-e",
-             f"{assignments}; term='{terminal}'; output='{output}'",
+             f"{assignments}; term='{terminal}'; output='{relative_output}'",
              str(SCRIPT_DIR / script)],
             cwd=VERIFICATION, text=True, check=False,
         )
@@ -739,17 +843,65 @@ def study_cores(requested: str, study: str, level: int, reference: dict) -> int:
     return int(reference[study]["auto_cores"][str(level)])
 
 
+SETTINGS_FILE = "verification_settings.json"
+
+
+def tutorial_fingerprint() -> str:
+    """Hash of the tutorial inputs that a run copies."""
+    digest = hashlib.sha256()
+    for directory in ("0", "constant", "system"):
+        for path in sorted((TUTORIAL / directory).rglob("*")):
+            if path.is_symlink():
+                digest.update(f"{path.relative_to(TUTORIAL)}->"
+                              f"{os.readlink(path)}".encode())
+            elif path.is_file() and (
+                "polyMesh" not in path.parts or path.name == "blockMeshDict"
+            ):
+                digest.update(str(path.relative_to(TUTORIAL)).encode())
+                digest.update(path.read_bytes())
+    digest.update((TUTORIAL / "Allrun").read_bytes())
+    return digest.hexdigest()
+
+
+def run_settings(coupling: str, factor: int, delta_t: float, end_time: float,
+                 args: argparse.Namespace, reference: dict, cores: int
+                 ) -> dict:
+    """Everything that defines a run, so a stale copy is never reused."""
+    return {
+        "coupling": coupling, "refinement": factor,
+        "delta_t_s": f"{delta_t:.10g}", "end_time_s": f"{end_time:.10g}",
+        "time_scheme": args.time_scheme,
+        "solid_preconditioner": args.solid_preconditioner,
+        "stations_z_m": reference["stations_z_m"],
+        "pressure_probe_offset_m": reference["pressure_probe_offset_m"],
+        "interface_predictor": COUPLINGS[coupling].get("predictor", False),
+        "inner_radius_m": reference["geometry"]["inner_radius_m"],
+        "cores": cores,
+        "openfoam": os.environ.get("WM_PROJECT", "") + "-"
+        + os.environ.get("WM_PROJECT_VERSION", ""),
+        "tutorial_inputs": tutorial_fingerprint(),
+    }
+
+
 def run_or_reuse(name: str, coupling: str, factor: int, delta_t: float,
                  end_time: float, args: argparse.Namespace, reference: dict,
                  cores: int, label: str) -> Path:
     case = WORK_ROOT / name
+    settings = run_settings(coupling, factor, delta_t, end_time, args,
+                            reference, cores)
+    settings_file = case / SETTINGS_FILE
     if args.reuse and solver_completed(case):
-        print(f"Reusing {label} in {case}")
-        check_solver_log(case, label)
-        return case
+        stored = (json.loads(settings_file.read_text())
+                  if settings_file.is_file() else None)
+        if stored == settings:
+            print(f"Reusing {label} in {case}")
+            check_solver_log(case, label)
+            return case
+        print(f"Not reusing {case}: it was run with other settings")
     case = prepare_case(name, coupling, factor, delta_t, end_time, args,
                         reference, cores)
     run_case(case, label, coupling)
+    settings_file.write_text(json.dumps(settings, indent=2) + "\n")
     return case
 
 
@@ -798,7 +950,7 @@ def published_checks(rows: list[dict], reference: dict, study: str
                 f"{quantity} {format_value(finest[quantity], 4)} vs {citation} "
                 f"{value:.4g} ({spec['quality']}): {100 * difference:.1f}% <= "
                 f"{100 * tolerance:g}%",
-                math.isfinite(difference) and difference <= tolerance,
+                within(difference, tolerance),
             ))
     return checks
 
@@ -862,8 +1014,8 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
             "study": study, "coupling": args.coupling,
             "time_scheme": args.time_scheme, "level": level,
             "refinement": factor,
-            "fluid_cells": cell_count(case / "system/fluid/blockMeshDict"),
-            "solid_cells": cell_count(case / "system/solid/blockMeshDict"),
+            "fluid_cells": cell_count(block_mesh_dict(case, "fluid")),
+            "solid_cells": cell_count(block_mesh_dict(case, "solid")),
             "delta_t_s": delta_t, "end_time_s": end_time,
             "cores": solver_ranks(case),
             "clock_time_s": clock_time(case),
@@ -912,7 +1064,7 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
             checks.append((
                 f"{quantity}: change between the two finest levels "
                 f"{100 * change:.2f}% <= {100 * tolerance:g}%",
-                change <= tolerance,
+                within(change, tolerance),
             ))
             if len(rows) >= 3:
                 # A change below the resolution floor counts as converged:
@@ -924,7 +1076,7 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
                     f"{100 * floor:g}% "
                     f"({', '.join(f'{100 * c:.3g}%' for c in changes)}; "
                     f"observed order {format_value(orders[quantity], 3)})",
-                    all(b < a or b <= floor
+                    all(math.isfinite(b) and (b < a or b <= floor)
                         for a, b in zip(changes, changes[1:])),
                 ))
         tolerance = acceptance["wave_speed_vs_estimate"].get(study)
@@ -936,7 +1088,7 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
                 f"the {reference['wave_speed_reference']} estimate "
                 f"{wave_reference:.4g} m/s (approximate): "
                 f"{100 * difference:.1f}% <= {100 * tolerance:g}%",
-                difference <= tolerance,
+                within(difference, tolerance),
             ))
         checks += published_checks(rows, reference, study)
     passed = all(ok for _, ok in checks)
@@ -1001,17 +1153,21 @@ def create_history_plot(stem: str, history_files: list[Path],
     ]
     run_gnuplot("plotPointAHistory.gnuplot", {
         "stem": stem,
-        "files": " ".join(str(path) for path in history_files),
+        "files": " ".join(
+            str(path.relative_to(VERIFICATION)) for path in history_files
+        ),
         "titles": " ".join(titles),
         "references": " ".join(
-            str(REFERENCE_DIR / reference["published"][source]["history"])
+            str((REFERENCE_DIR / reference["published"][source]["history"])
+                .relative_to(VERIFICATION))
             for source in sources
         ),
         "referenceTitles": " ".join(
             reference["published"][source]["label"] for source in sources
         ),
         "axialReferences": " ".join(
-            str(REFERENCE_DIR / reference["published"][source]["history"])
+            str((REFERENCE_DIR / reference["published"][source]["history"])
+                .relative_to(VERIFICATION))
             for source in axial_sources
         ),
         "axialReferenceTitles": " ".join(
@@ -1070,7 +1226,7 @@ def run_coupling_study(args: argparse.Namespace, reference: dict) -> bool:
         checks.append((
             f"{coupling} vs iqnils: max |u_r(A) difference| / max |u_r(A)| "
             f"{100 * difference:.3f}% <= {100 * tolerance:g}%",
-            difference <= tolerance,
+            within(difference, tolerance),
         ))
         for quantity in spec["compared_quantities"]:
             difference = relative_difference(
@@ -1080,7 +1236,7 @@ def run_coupling_study(args: argparse.Namespace, reference: dict) -> bool:
             checks.append((
                 f"{coupling} vs iqnils: {quantity} {100 * difference:.3f}% "
                 f"<= {100 * tolerance:g}%",
-                difference <= tolerance,
+                within(difference, tolerance),
             ))
     passed = all(ok for _, ok in checks)
 
