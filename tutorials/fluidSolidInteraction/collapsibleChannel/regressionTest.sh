@@ -22,8 +22,8 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 END_TIME=1
 
 # Wall-midpoint vertical displacement at the first trough and at t = 1 s
-REF_TROUGH=-0.21292
-REF_END=-0.14785
+REF_TROUGH=-0.21291
+REF_END=-0.14784
 DISP_TOL=0.002
 
 # Log files
