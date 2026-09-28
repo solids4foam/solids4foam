@@ -1,0 +1,71 @@
+{
+  "description": "collapsibleChannel verification against converged oomph-lib solutions; see ../README.md",
+  "endTime": 1.5,
+  "quickEndTime": 0.5,
+  "troughWindow": [0.3, 0.75],
+  "reference": {
+    "file": "collapsibleChannel_oomph_reference.csv",
+    "source": "oomph-lib collapsible-channel driver (reference/oomph-lib), clamped Kirchhoff-Love beam",
+    "parameters": {
+      "Re": 50.0,
+      "ReSt": 50.0,
+      "Q": 4e-11,
+      "H": 0.05,
+      "Sigma0": 0.0,
+      "P_ext": 4e-7,
+      "T_ramp": 0.25,
+      "P_up": 300.0,
+      "Lup": 5.0,
+      "Lcollapsible": 10.0,
+      "Ldown": 10.0
+    }
+  },
+  "studies": {
+    "static": {
+      "loadSteps": 20,
+      "solidTypes": ["linear", "highOrder"],
+      "solidMeshes": [[80, 8], [160, 8], [320, 8], [640, 8], [160, 4]],
+      "quickSolidMeshes": [[80, 8]],
+      "reference": {
+        "wallQuarter": -0.09645925,
+        "wallMid": -0.14362832,
+        "wallThreeQuarter": -0.09645925
+      },
+      "acceptance": {
+        "maxRelError": {"highOrder": 0.005},
+        "linearFinestMesh": "640x8",
+        "linearFinestRelError": 0.01
+      }
+    },
+    "mesh": {
+      "levels": [1, 2, 4],
+      "quickLevels": [1],
+      "deltaT": 0.00625,
+      "solidMesh": [640, 8],
+      "solidType": "linear",
+      "acceptance": {
+        "finestMaxError": 0.02
+      }
+    },
+    "time": {
+      "level": 1,
+      "deltaT": [0.025, 0.0125, 0.00625, 0.003125],
+      "quickDeltaT": [0.025],
+      "solidMesh": [640, 8],
+      "solidType": "linear",
+      "acceptance": {
+        "finestMaxError": 0.02
+      }
+    },
+    "solid": {
+      "fluidLevel": 1,
+      "deltaT": 0.025,
+      "solidTypes": ["linear", "highOrder"],
+      "solidMeshes": [[80, 8], [160, 8], [320, 8], [640, 8]],
+      "quickSolidMeshes": [[80, 8]],
+      "acceptance": {
+        "maxError": {"highOrder": 0.08}
+      }
+    }
+  }
+}
