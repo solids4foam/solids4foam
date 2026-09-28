@@ -90,17 +90,17 @@ class finiteStrainMechanicalConstitutiveLawKinematics
         //- Deformation gradient at previous time
         const UIndirectList<tensor>& F0_;
 
-        //- Determinant of deformation gradient
-        const UIndirectList<scalar>& J_;
-
-        //- Determinant of deformation gradient at previous time
-        const UIndirectList<scalar>& J0_;
-
         //- Inverse deformation gradient
         const UIndirectList<tensor>& Finv_;
 
         //- Inverse deformation gradient at previous time
         const UIndirectList<tensor>& Finv0_;
+
+        //- Determinant of deformation gradient
+        const UIndirectList<scalar>& J_;
+
+        //- Determinant of deformation gradient at previous time
+        const UIndirectList<scalar>& J0_;
 
 
 
@@ -129,18 +129,18 @@ public:
         (
             const UIndirectList<tensor>& F,
             const UIndirectList<tensor>& F0,
-            const UIndirectList<scalar>& J,
-            const UIndirectList<scalar>& J0,
             const UIndirectList<tensor>& Finv,
-            const UIndirectList<tensor>& Finv0
+            const UIndirectList<tensor>& Finv0,
+            const UIndirectList<scalar>& J,
+            const UIndirectList<scalar>& J0
         )
         :
             F_(F),
             F0_(F0),
-            J_(J),
-            J0_(J0),
             Finv_(Finv),
-            Finv0_(Finv0)
+            Finv0_(Finv0),
+            J_(J),
+            J0_(J0)
         {}
 
 

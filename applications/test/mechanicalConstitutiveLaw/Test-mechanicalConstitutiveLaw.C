@@ -448,10 +448,10 @@ void checkSurfaceOverloads
             (
                 faceF,
                 faceF0,
-                faceJ,
-                faceJ0,
                 faceFinv,
                 faceFinv0,
+                faceJ,
+                faceJ0,
                 dt,
                 faceSigma
             );
@@ -1064,7 +1064,7 @@ int main(int argc, char *argv[])
         {
             manager.updateStressFiniteStrain
             (
-                Fr, Fr0, Jr, Jr0, Finvr, Finvr0, dt, total
+                Fr, Fr0, Finvr, Finvr0, Jr, Jr0, dt, total
             );
 
             manager.updateStressFiniteStrainSplit
@@ -2989,7 +2989,7 @@ int main(int argc, char *argv[])
 
             const finiteStrainMechanicalConstitutiveLawKinematics kin
             (
-                FView, F0View, JView, J0View, FinvView, Finv0View
+                FView, F0View, FinvView, Finv0View, JView, J0View
             );
 
             scales[s] = plasticPtr->localConvergenceScale(kin, plasticState);
@@ -3078,7 +3078,7 @@ int main(int argc, char *argv[])
 
             const finiteStrainMechanicalConstitutiveLawKinematics kin
             (
-                FView, F0View, JView, J0View, FinvView, Finv0View
+                FView, F0View, FinvView, Finv0View, JView, J0View
             );
 
             mechanicalConstitutiveLawState elasticState(nPts);

@@ -345,10 +345,10 @@ void Foam::mechanicalConstitutiveLaw::finiteDifferenceFourthOrder
         (
             FPertView,
             kin.F0(),
-            JPertView,
-            kin.J0(),
             FinvPertView,
-            kin.Finv0()
+            kin.Finv0(),
+            JPertView,
+            kin.J0()
         );
 
         mechanicalConstitutiveLawResponse respPert

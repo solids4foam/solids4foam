@@ -214,8 +214,7 @@ class finiteStrainKinematicsViews
 
 public:
 
-    //- The kinematics on the views above, which it refers to. Note the
-    //  order its constructor takes them in, which is not the order above
+    //- The kinematics on the views above, which it refers to
     const finiteStrainMechanicalConstitutiveLawKinematics kin;
 
     finiteStrainKinematicsViews
@@ -230,7 +229,7 @@ public:
         Finv0_(fields.Finv0, ids),
         J_(fields.J, ids),
         J0_(fields.J0, ids),
-        kin(F_, F0_, J_, J0_, Finv_, Finv0_)
+        kin(F_, F0_, Finv_, Finv0_, J_, J0_)
     {}
 };
 

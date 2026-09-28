@@ -790,10 +790,10 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
     (
         F_,
         F_.oldTime(),
-        J_,
-        J_.oldTime(),
         Finv_,
         Finv_.oldTime(),
+        J_,
+        J_.oldTime(),
         mesh().time().deltaTValue(),
         sigma()
     );
