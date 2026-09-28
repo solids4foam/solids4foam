@@ -374,17 +374,19 @@ bool pimpleFluid::evolve()
     {
         if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
         {
-            models().preUpdateMesh();
-
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
             if (fluidModel::fsiMeshUpdate())
             {
                 // The FSI interface is in charge of calling mesh.update()
+                // Note: fvModels preUpdateMesh() is not called here, as the
+                // mesh has already been updated
                 fluidModel::fsiMeshUpdateChanged();
             }
             else
             {
+                models().preUpdateMesh();
+
                 mesh.update();
             }
 
