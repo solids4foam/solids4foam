@@ -2180,6 +2180,59 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
 }
 
 
+template<class VolFields>
+void Foam::mechanicalConstitutiveLawManager::updateScalarTangentVol
+(
+    const VolFields& fields,
+    const scalar dt,
+    volScalarField& scalarTangent,
+    const tangentRequest tangentReq,
+    const bool coldState
+)
+{
+    fields.checkMeshes
+    (
+        [&](const polyMesh& fieldMesh, const word& fieldName)
+        {
+            checkMeshConsistency(mesh_, fieldMesh, fieldName);
+        }
+    );
+    checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
+
+    if (!needsScalarTangent(tangentReq))
+    {
+        FatalErrorInFunction
+            << VolFields::scalarTangentContext() << " was asked for a "
+            << tangentRequestName(tangentReq) << " tangent." << nl
+            << "This interface returns a scalar tangent at cell centres, so "
+            << "the request must be scalar or scalarDeviatoric."
+            << exit(FatalError);
+    }
+
+    const integrationPointTopology& topo =
+        topologyFor(cellCentredIntegrationPointTopology::typeName);
+
+    // A constitutive law produces a stress alongside its tangent, so give it
+    // somewhere to put one that is not the caller's storage
+    evaluateFlat
+    (
+        topo,
+        fields.internal(),
+        dt,
+        scratchStress(topo.nIntegrationPoints()),
+        &Foam::primitiveFieldRef(scalarTangent),
+        nullptr,
+        tangentReq,
+        true,           // preserve the constitutive state
+        coldState,
+        nullptr
+    );
+
+    // The flat-list primitive fills internal integration points only
+    fillScalarTangentBoundary(scalarTangent);
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
 (
     const volTensorField& gradD,
@@ -2190,39 +2243,14 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangent
     const bool coldState
 )
 {
-    checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
-    checkMeshConsistency(mesh_, gradD0.mesh(), gradD0.name());
-    checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
-
-    if (!needsScalarTangent(tangentReq))
-    {
-        FatalErrorInFunction
-            << "updateScalarTangent was asked for a "
-            << tangentRequestName(tangentReq) << " tangent." << nl
-            << "This interface returns a scalar tangent at cell centres, so "
-            << "the request must be scalar or scalarDeviatoric."
-            << exit(FatalError);
-    }
-
-    const integrationPointTopology& topo =
-        topologyFor(cellCentredIntegrationPointTopology::typeName);
-
-    scalarField& tangent = Foam::primitiveFieldRef(scalarTangent);
-
-    updateTangentSmallStrain
+    updateScalarTangentVol
     (
-        topo,
-        Foam::primitiveField(gradD),
-        Foam::primitiveField(gradD0),
+        smallStrainVolFields(gradD, gradD0),
         dt,
-        &tangent,
-        nullptr,
+        scalarTangent,
         tangentReq,
         coldState
     );
-
-    // The flat-list primitive fills internal integration points only
-    fillScalarTangentBoundary(scalarTangent);
 }
 
 
@@ -2239,55 +2267,22 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
     const tangentRequest tangentReq
 )
 {
-    checkMeshConsistency(mesh_, F.mesh(), F.name());
-    checkMeshConsistency(mesh_, F0.mesh(), F0.name());
-    checkMeshConsistency(mesh_, Finv.mesh(), Finv.name());
-    checkMeshConsistency(mesh_, Finv0.mesh(), Finv0.name());
-    checkMeshConsistency(mesh_, J.mesh(), J.name());
-    checkMeshConsistency(mesh_, J0.mesh(), J0.name());
-    checkMeshConsistency(mesh_, scalarTangent.mesh(), scalarTangent.name());
-
-    if (!needsScalarTangent(tangentReq))
-    {
-        FatalErrorInFunction
-            << "updateScalarTangentFiniteStrain was asked for a "
-            << tangentRequestName(tangentReq) << " tangent." << nl
-            << "This interface returns a scalar tangent at cell centres, so "
-            << "the request must be scalar or scalarDeviatoric."
-            << exit(FatalError);
-    }
-
-    const integrationPointTopology& topo =
-        topologyFor(cellCentredIntegrationPointTopology::typeName);
-
-    scalarField& tangent = Foam::primitiveFieldRef(scalarTangent);
-
-    updateTangentFiniteStrain
+    updateScalarTangentVol
     (
-        topo,
-        Foam::primitiveField(F),
-        Foam::primitiveField(F0),
-        Foam::primitiveField(Finv),
-        Foam::primitiveField(Finv0),
-        Foam::primitiveField(J),
-        Foam::primitiveField(J0),
+        finiteStrainVolFields(F, F0, Finv, Finv0, J, J0),
         dt,
-        &tangent,
-        nullptr,
-        tangentReq
+        scalarTangent,
+        tangentReq,
+        false           // no cold state on the finite-strain path
     );
-
-    // The flat-list primitive fills internal integration points only
-    fillScalarTangentBoundary(scalarTangent);
 }
 
 
-template<class Fields, class PatchFieldsFn>
+template<class VolFields>
 void Foam::mechanicalConstitutiveLawManager::updateStressVolBoundary
 (
     topologyEntry& tp,
-    const volTensorField& lead,
-    const PatchFieldsFn& patchFields,
+    const VolFields& fields,
     const scalar dt,
     volSymmTensorField& stress,
     volScalarField* scalarTangentPtr,
@@ -2301,6 +2296,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressVolBoundary
     {
         return;
     }
+
+    typedef typename VolFields::listFields Fields;
+
+    const volTensorField& lead = fields.lead();
 
     forAll(laws_, lawI)
     {
@@ -2340,7 +2339,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressVolBoundary
             // which do not copy data, and the kinematics built on them
             const typename kinematicsViewsOf<Fields>::type views
             (
-                patchFields(patchI), faces
+                fields.patch(patchI), faces
             );
             UIndirectList<symmTensor> stressView
             (
@@ -2370,10 +2369,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressVolBoundary
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+template<class VolFields>
+void Foam::mechanicalConstitutiveLawManager::updateStressVol
 (
-    const volTensorField& gradD,
-    const volTensorField& gradD0,
+    const VolFields& fields,
     const scalar dt,
     volSymmTensorField& stress,
     volScalarField* scalarTangentPtr,
@@ -2381,9 +2380,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     volScalarField* volumetricResponsePtr
 )
 {
-    // Check gradD is defined on the correct mesh
-    checkMeshConsistency(mesh_, gradD.mesh(), gradD.name());
-    checkMeshConsistency(mesh_, gradD0.mesh(), gradD0.name());
+    // Check the kinematic fields are defined on the correct mesh
+    fields.checkMeshes
+    (
+        [&](const polyMesh& fieldMesh, const word& fieldName)
+        {
+            checkMeshConsistency(mesh_, fieldMesh, fieldName);
+        }
+    );
     checkMeshConsistency(mesh_, stress.mesh(), stress.name());
     if (scalarTangentPtr)
     {
@@ -2402,8 +2406,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
             volumetricResponsePtr->name()
         );
 
-        // Checked where the request is made, as on the finite-strain path
-        checkVolumetricSplitSupported("updateStressSmallStrain");
+        // The split is reachable through this overload as well as through
+        // the Split overloads, so the capability is checked where it is
+        // asked for rather than at one of the ways of asking. A law that
+        // cannot separate the two would otherwise ignore the request and hand
+        // back a total stress the caller would treat as deviatoric or
+        // isochoric
+        checkVolumetricSplitSupported(VolFields::stressContext());
     }
 
     // Update old time fields at the start of a new time step
@@ -2419,11 +2428,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     evaluateFlat
     (
         topo,
-        smallStrainKinematicsFields
-        (
-            Foam::primitiveField(gradD),
-            Foam::primitiveField(gradD0)
-        ),
+        fields.internal(),
         dt,
         Foam::primitiveFieldRef(stress),
         scalarTangentPtr
@@ -2441,18 +2446,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     topologyEntry& tp = topology(topo);
 
     // The boundary faces, each with its own state
-    updateStressVolBoundary<smallStrainKinematicsFields>
+    updateStressVolBoundary
     (
         tp,
-        gradD,
-        [&](const label patchI)
-        {
-            return smallStrainKinematicsFields
-            (
-                gradD.boundaryField()[patchI],
-                gradD0.boundaryField()[patchI]
-            );
-        },
+        fields,
         dt,
         stress,
         scalarTangentPtr,
@@ -2467,13 +2464,35 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
 }
 
 
-template<class Fields, class PatchFieldsFn>
+void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
+(
+    const volTensorField& gradD,
+    const volTensorField& gradD0,
+    const scalar dt,
+    volSymmTensorField& stress,
+    volScalarField* scalarTangentPtr,
+    const tangentRequest tangentReq,
+    volScalarField* volumetricResponsePtr
+)
+{
+    updateStressVol
+    (
+        smallStrainVolFields(gradD, gradD0),
+        dt,
+        stress,
+        scalarTangentPtr,
+        tangentReq,
+        volumetricResponsePtr
+    );
+}
+
+
+template<class SurfaceFields>
 void Foam::mechanicalConstitutiveLawManager::updateStressSurface
 (
     const integrationPointTopology& topo,
     topologyEntry& tp,
-    const Fields& fields,
-    const PatchFieldsFn& patchFields,
+    const SurfaceFields& surfaceFields,
     const scalar dt,
     surfaceSymmTensorField& stress,
     const stressCollapseRule collapseRule,
@@ -2483,6 +2502,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSurface
     surfaceScalarField* volumetricResponsePtr
 )
 {
+    typedef typename SurfaceFields::listFields Fields;
+
+    const Fields fields(surfaceFields.internal());
+
     // Update old time fields at the start of a new time step
     updateOldTimeIfNeeded();
 
@@ -2630,7 +2653,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSurface
 
             // "View" into the kinematic and stress fields for this material
             // => does not copy data
-            const Fields pf(patchFields(patchI));
+            const Fields pf(surfaceFields.patch(patchI));
 
             const typename kinematicsViewsOf<Fields>::type
                 patchViews(pf, faces);
@@ -2796,18 +2819,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressSmallStrain
     (
         topo,
         tp,
-        smallStrainKinematicsFields
-        (
-            gradD.internalField(), gradD0.internalField()
-        ),
-        [&](const label patchI)
-        {
-            return smallStrainKinematicsFields
-            (
-                gradD.boundaryField()[patchI],
-                gradD0.boundaryField()[patchI]
-            );
-        },
+        smallStrainSurfaceFields(gradD, gradD0),
         dt,
         stress,
         collapseRule,
@@ -3076,104 +3088,14 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     volScalarField* volumetricResponsePtr
 )
 {
-    // Check F is defined on the correct mesh
-    checkMeshConsistency(mesh_, F.mesh(), F.name());
-    checkMeshConsistency(mesh_, F0.mesh(), F0.name());
-    checkMeshConsistency(mesh_, Finv.mesh(), Finv.name());
-    checkMeshConsistency(mesh_, Finv0.mesh(), Finv0.name());
-    checkMeshConsistency(mesh_, J.mesh(), J.name());
-    checkMeshConsistency(mesh_, J0.mesh(), J0.name());
-    checkMeshConsistency(mesh_, stress.mesh(), stress.name());
-    if (scalarTangentPtr)
-    {
-        checkMeshConsistency
-        (
-            mesh_, scalarTangentPtr->mesh(), scalarTangentPtr->name()
-        );
-    }
-
-    if (volumetricResponsePtr)
-    {
-        checkMeshConsistency
-        (
-            mesh_,
-            volumetricResponsePtr->mesh(),
-            volumetricResponsePtr->name()
-        );
-
-        // The split is reachable through this overload as well as through
-        // updateStressFiniteStrainSplit, so the capability is checked where
-        // it is asked for rather than at one of the ways of asking. A law
-        // that cannot separate the two would otherwise ignore the request and
-        // hand back a total stress the caller would treat as isochoric
-        checkVolumetricSplitSupported("updateStressFiniteStrain");
-    }
-
-    // Update old time fields at the start of a new time step
-    updateOldTimeIfNeeded();
-
-    // Look up the map and state for cell-based topologies
-    const integrationPointTopology& topo =
-        topologyFor(cellCentredIntegrationPointTopology::typeName);
-
-    // Update the internal field via the flat-list primitive: a cell-centred
-    // topology has one integration point per cell, so the internal fields are
-    // already in the flat form it expects
-    evaluateFlat
+    updateStressVol
     (
-        topo,
-        finiteStrainKinematicsFields
-        (
-            Foam::primitiveField(F),
-            Foam::primitiveField(F0),
-            Foam::primitiveField(Finv),
-            Foam::primitiveField(Finv0),
-            Foam::primitiveField(J),
-            Foam::primitiveField(J0)
-        ),
-        dt,
-        Foam::primitiveFieldRef(stress),
-        scalarTangentPtr
-      ? &Foam::primitiveFieldRef(*scalarTangentPtr)
-      : nullptr,
-        nullptr,
-        tangentReq,
-        false,          // commit the constitutive state
-        false,          // no cold state on the finite-strain path
-        volumetricResponsePtr
-      ? &Foam::primitiveFieldRef(*volumetricResponsePtr)
-      : nullptr
-    );
-
-    topologyEntry& tp = topology(topo);
-
-    // The boundary faces, each with its own state
-    updateStressVolBoundary<finiteStrainKinematicsFields>
-    (
-        tp,
-        F,
-        [&](const label patchI)
-        {
-            return finiteStrainKinematicsFields
-            (
-                F.boundaryField()[patchI],
-                F0.boundaryField()[patchI],
-                Finv.boundaryField()[patchI],
-                Finv0.boundaryField()[patchI],
-                J.boundaryField()[patchI],
-                J0.boundaryField()[patchI]
-            );
-        },
+        finiteStrainVolFields(F, F0, Finv, Finv0, J, J0),
         dt,
         stress,
         scalarTangentPtr,
         tangentReq,
         volumetricResponsePtr
-    );
-
-    correctStressBoundaries
-    (
-        stress, scalarTangentPtr, tangentReq, volumetricResponsePtr
     );
 }
 
@@ -3372,27 +3294,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     (
         topo,
         tp,
-        finiteStrainKinematicsFields
-        (
-            F.internalField(),
-            F0.internalField(),
-            Finv.internalField(),
-            Finv0.internalField(),
-            J.internalField(),
-            J0.internalField()
-        ),
-        [&](const label patchI)
-        {
-            return finiteStrainKinematicsFields
-            (
-                F.boundaryField()[patchI],
-                F0.boundaryField()[patchI],
-                Finv.boundaryField()[patchI],
-                Finv0.boundaryField()[patchI],
-                J.boundaryField()[patchI],
-                J0.boundaryField()[patchI]
-            );
-        },
+        finiteStrainSurfaceFields(F, F0, Finv, Finv0, J, J0),
         dt,
         stress,
         collapseRule,

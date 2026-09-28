@@ -17,7 +17,8 @@ License
 
 Class
     Foam::smallStrainKinematicsFields, Foam::smallStrainKinematicsViews,
-    Foam::finiteStrainKinematicsFields, Foam::finiteStrainKinematicsViews
+    Foam::finiteStrainKinematicsFields, Foam::finiteStrainKinematicsViews,
+    Foam::smallStrainGeometricFields, Foam::finiteStrainGeometricFields
 
 Description
     The kinematic inputs of an evaluation, as lists over integration points,
@@ -35,6 +36,11 @@ Description
     kinematicsViewsOf<Fields>::type names the Views class of a Fields, for
     code written once for both.
 
+    The GeometricFields structs hold the same inputs as volFields or
+    surfaceFields, so the manager's field overloads can be written once for
+    both strain measures. Each gives its internal and patch values as a
+    Fields, checks its fields' meshes, and names the overloads it serves.
+
 SourceFiles
     (header only)
 
@@ -51,6 +57,9 @@ Author
 #include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawState.H"
 #include "UIndirectList.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -252,6 +261,189 @@ struct kinematicsViewsOf<finiteStrainKinematicsFields>
 {
     typedef finiteStrainKinematicsViews type;
 };
+
+
+/*---------------------------------------------------------------------------*\
+                   Struct smallStrainGeometricFields Declaration
+\*---------------------------------------------------------------------------*/
+
+template<template<class> class PatchField, class GeoMesh>
+struct smallStrainGeometricFields
+{
+    // The fields are held by reference, as are the lists taken from them, so
+    // each must outlive both
+
+    typedef smallStrainKinematicsFields listFields;
+    typedef GeometricField<tensor, PatchField, GeoMesh> tensorFieldType;
+
+    const tensorFieldType& gradD;
+    const tensorFieldType& gradD0;
+
+    smallStrainGeometricFields
+    (
+        const tensorFieldType& gradDIn,
+        const tensorFieldType& gradD0In
+    )
+    :
+        gradD(gradDIn),
+        gradD0(gradD0In)
+    {}
+
+    //- The name the stress update reports itself by
+    static const char* stressContext()
+    {
+        return "updateStressSmallStrain";
+    }
+
+    //- The name the scalar tangent update reports itself by
+    static const char* scalarTangentContext()
+    {
+        return "updateScalarTangent";
+    }
+
+    //- Call check(mesh, name) for each field
+    template<class Check>
+    void checkMeshes(const Check& check) const
+    {
+        check(gradD.mesh(), gradD.name());
+        check(gradD0.mesh(), gradD0.name());
+    }
+
+    //- The field whose patches say which are coupled
+    const tensorFieldType& lead() const
+    {
+        return gradD;
+    }
+
+    //- The internal values
+    listFields internal() const
+    {
+        return listFields
+        (
+            Foam::primitiveField(gradD),
+            Foam::primitiveField(gradD0)
+        );
+    }
+
+    //- The values on patch patchI
+    listFields patch(const label patchI) const
+    {
+        return listFields
+        (
+            gradD.boundaryField()[patchI],
+            gradD0.boundaryField()[patchI]
+        );
+    }
+};
+
+
+/*---------------------------------------------------------------------------*\
+                  Struct finiteStrainGeometricFields Declaration
+\*---------------------------------------------------------------------------*/
+
+template<template<class> class PatchField, class GeoMesh>
+struct finiteStrainGeometricFields
+{
+    // The fields are held by reference, as are the lists taken from them, so
+    // each must outlive both
+
+    typedef finiteStrainKinematicsFields listFields;
+    typedef GeometricField<tensor, PatchField, GeoMesh> tensorFieldType;
+    typedef GeometricField<scalar, PatchField, GeoMesh> scalarFieldType;
+
+    const tensorFieldType& F;
+    const tensorFieldType& F0;
+    const tensorFieldType& Finv;
+    const tensorFieldType& Finv0;
+    const scalarFieldType& J;
+    const scalarFieldType& J0;
+
+    finiteStrainGeometricFields
+    (
+        const tensorFieldType& FIn,
+        const tensorFieldType& F0In,
+        const tensorFieldType& FinvIn,
+        const tensorFieldType& Finv0In,
+        const scalarFieldType& JIn,
+        const scalarFieldType& J0In
+    )
+    :
+        F(FIn),
+        F0(F0In),
+        Finv(FinvIn),
+        Finv0(Finv0In),
+        J(JIn),
+        J0(J0In)
+    {}
+
+    //- The name the stress update reports itself by
+    static const char* stressContext()
+    {
+        return "updateStressFiniteStrain";
+    }
+
+    //- The name the scalar tangent update reports itself by
+    static const char* scalarTangentContext()
+    {
+        return "updateScalarTangentFiniteStrain";
+    }
+
+    //- Call check(mesh, name) for each field
+    template<class Check>
+    void checkMeshes(const Check& check) const
+    {
+        check(F.mesh(), F.name());
+        check(F0.mesh(), F0.name());
+        check(Finv.mesh(), Finv.name());
+        check(Finv0.mesh(), Finv0.name());
+        check(J.mesh(), J.name());
+        check(J0.mesh(), J0.name());
+    }
+
+    //- The field whose patches say which are coupled
+    const tensorFieldType& lead() const
+    {
+        return F;
+    }
+
+    //- The internal values
+    listFields internal() const
+    {
+        return listFields
+        (
+            Foam::primitiveField(F),
+            Foam::primitiveField(F0),
+            Foam::primitiveField(Finv),
+            Foam::primitiveField(Finv0),
+            Foam::primitiveField(J),
+            Foam::primitiveField(J0)
+        );
+    }
+
+    //- The values on patch patchI
+    listFields patch(const label patchI) const
+    {
+        return listFields
+        (
+            F.boundaryField()[patchI],
+            F0.boundaryField()[patchI],
+            Finv.boundaryField()[patchI],
+            Finv0.boundaryField()[patchI],
+            J.boundaryField()[patchI],
+            J0.boundaryField()[patchI]
+        );
+    }
+};
+
+
+typedef smallStrainGeometricFields<fvPatchField, volMesh>
+    smallStrainVolFields;
+typedef smallStrainGeometricFields<fvsPatchField, surfaceMesh>
+    smallStrainSurfaceFields;
+typedef finiteStrainGeometricFields<fvPatchField, volMesh>
+    finiteStrainVolFields;
+typedef finiteStrainGeometricFields<fvsPatchField, surfaceMesh>
+    finiteStrainSurfaceFields;
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

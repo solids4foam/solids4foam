@@ -367,16 +367,13 @@ class mechanicalConstitutiveLawManager
             UList<scalar>* volumetricPtr
         );
 
-        //- The boundary faces of the volField stress updates, written once
-        //  for both strain measures. patchFields(patchI) gives the patch's
-        //  kinematic lists as Fields; lead is the field whose patches say
-        //  which are coupled
-        template<class Fields, class PatchFieldsFn>
-        void updateStressVolBoundary
+        //- The volField stress updates, written once for both strain
+        //  measures. VolFields is smallStrainVolFields or
+        //  finiteStrainVolFields
+        template<class VolFields>
+        void updateStressVol
         (
-            topologyEntry& tp,
-            const volTensorField& lead,
-            const PatchFieldsFn& patchFields,
+            const VolFields& fields,
             const scalar dt,
             volSymmTensorField& stress,
             volScalarField* scalarTangentPtr,
@@ -384,19 +381,43 @@ class mechanicalConstitutiveLawManager
             volScalarField* volumetricResponsePtr
         );
 
+        //- The boundary faces of the volField stress updates
+        template<class VolFields>
+        void updateStressVolBoundary
+        (
+            topologyEntry& tp,
+            const VolFields& fields,
+            const scalar dt,
+            volSymmTensorField& stress,
+            volScalarField* scalarTangentPtr,
+            const tangentRequest tangentReq,
+            volScalarField* volumetricResponsePtr
+        );
+
+        //- The volField scalar tangent updates, written once for both strain
+        //  measures
+        template<class VolFields>
+        void updateScalarTangentVol
+        (
+            const VolFields& fields,
+            const scalar dt,
+            volScalarField& scalarTangent,
+            const tangentRequest tangentReq,
+            const bool coldState
+        );
+
         //- The surfaceField stress updates, written once for both strain
         //  measures: each law's internal faces and its boundary faces are
         //  evaluated, and a face reached by more than one law collapsed by
-        //  collapseRule. patchFields(patchI) gives the patch's kinematic
-        //  lists as Fields. A null tangent or volumetric pointer is not
-        //  computed
-        template<class Fields, class PatchFieldsFn>
+        //  collapseRule. SurfaceFields is smallStrainSurfaceFields or
+        //  finiteStrainSurfaceFields. A null tangent or volumetric pointer is
+        //  not computed
+        template<class SurfaceFields>
         void updateStressSurface
         (
             const integrationPointTopology& topo,
             topologyEntry& tp,
-            const Fields& fields,
-            const PatchFieldsFn& patchFields,
+            const SurfaceFields& surfaceFields,
             const scalar dt,
             surfaceSymmTensorField& stress,
             const stressCollapseRule collapseRule,
