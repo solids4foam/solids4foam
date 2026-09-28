@@ -32,6 +32,14 @@ REFERENCE_DIR = VERIFY_DIR / "reference"
 REFERENCE_JSON = REFERENCE_DIR / "collapsibleChannel_verification_references.json"
 REFERENCE_CSV = REFERENCE_DIR / "collapsibleChannel_oomph_reference.csv"
 
+
+def reference_csv(study_spec: dict, delta_t: float) -> Path:
+    """The converged reference, or the oomph-lib solution at the same time
+    step, which isolates the spatial error of a case"""
+    if study_spec.get("reference", "converged") == "converged":
+        return REFERENCE_CSV
+    return REFERENCE_DIR / f"collapsibleChannel_oomph_dt{1.0/delta_t:g}.csv"
+
 MONITORS = ("wallQuarter", "wallMid", "wallThreeQuarter")
 
 # Tutorial block divisions: fluid (upstream, elastic, downstream) x height and
@@ -400,8 +408,8 @@ def read_history(run_dir: Path, monitor: str) -> list[tuple[float, float]]:
     return sorted(values.items())
 
 
-def read_reference() -> dict[str, list[tuple[float, float]]]:
-    with REFERENCE_CSV.open() as handle:
+def read_reference(path: Path) -> dict[str, list[tuple[float, float]]]:
+    with path.open() as handle:
         rows = [
             row for row in csv.DictReader(
                 line for line in handle if not line.startswith("#")
@@ -598,7 +606,7 @@ def check_study(study: str, rows: list[dict], refs: dict, quick: bool) -> list[s
     return failures
 
 
-def write_plot(study: str, cases: list[tuple[dict, Path]]) -> None:
+def write_plot(study: str, cases: list[tuple[dict, Path]], reference: Path) -> None:
     if not shutil.which("gnuplot"):
         return
     lines = [
@@ -609,7 +617,7 @@ def write_plot(study: str, cases: list[tuple[dict, Path]]) -> None:
         'set grid',
         'set key bottom right',
         'set datafile separator ","',
-        f'plot "{REFERENCE_CSV}" every ::1 using 1:3 with lines lw 3 '
+        f'plot "{reference}" every ::1 using 1:3 with lines lw 3 '
         'lc rgb "black" title "oomph-lib reference"',
     ]
     for case, run_dir in cases:
@@ -627,8 +635,8 @@ def write_plot(study: str, cases: list[tuple[dict, Path]]) -> None:
         'set datafile separator ","\n', ""
     )
     script = script.replace(
-        f'plot "{REFERENCE_CSV}"',
-        f'plot "< grep -v ^# {REFERENCE_CSV} | tr , \' \'"',
+        f'plot "{reference}"',
+        f'plot "< grep -v ^# {reference} | tr , \' \'"',
     )
     path = POST_DIR / f"{study}_wallMid.gnuplot"
     path.write_text(script + "\n")
@@ -639,7 +647,7 @@ def main() -> int:
     args = parse_args()
     refs = load_references()
     studies = (
-        ["static", "mesh", "time", "solid"] if args.study == "all"
+        ["static", "solid", "mesh", "time"] if args.study == "all"
         else [s.strip() for s in args.study.split(",")]
     )
     end_time = args.end_time or (
@@ -659,10 +667,9 @@ def main() -> int:
                   file=sys.stderr)
             return 2
 
-    reference = read_reference()
     all_failures = []
     # Cases shared between studies are run once per invocation
-    finished: dict[str, tuple] = {}
+    finished: dict[str, Path] = {}
     summary = ["# collapsibleChannel verification summary", ""]
     for study in studies:
         print(f"Study: {study}", flush=True)
@@ -671,14 +678,17 @@ def main() -> int:
             if not selected or case["name"] in selected
         ]
 
+        spec = refs["studies"][study]
+
         def run_one(case: dict):
-            if case["name"] in finished:
-                return finished[case["name"]]
             try:
                 if case.get("static"):
                     run_dir = run_static_case(case, refs, args.reuse)
                     return case, run_dir, evaluate_static(case, run_dir, refs)
-                run_dir = run_case(case, end_time, args.reuse)
+                run_dir = finished.get(case["name"])
+                if run_dir is None:
+                    run_dir = run_case(case, end_time, args.reuse)
+                reference = read_reference(reference_csv(spec, case["dt"]))
                 return case, run_dir, evaluate(case, run_dir, reference, refs)
             except RuntimeError as error:
                 return case, None, str(error)
@@ -688,11 +698,11 @@ def main() -> int:
 
         results = []
         for case, run_dir, row in outcomes:
-            finished[case["name"]] = (case, run_dir, row)
             if run_dir is None:
                 print(f"  FAILED: {row}", flush=True)
                 all_failures.append(row)
                 continue
+            finished[case["name"]] = run_dir
             results.append((case, run_dir, row))
             print(f"  {describe(row)}", flush=True)
         if all_failures and not args.keep_going:
@@ -702,7 +712,11 @@ def main() -> int:
         rows = [row for _, _, row in results]
         path = write_rows(study, rows)
         if study != "static":
-            write_plot(study, [(case, run_dir) for case, run_dir, _ in results])
+            write_plot(
+                study,
+                [(case, run_dir) for case, run_dir, _ in results],
+                reference_csv(spec, results[-1][0]["dt"]),
+            )
         failures = check_study(study, rows, refs, args.quick)
         all_failures.extend(failures)
         summary += [f"## {study}", "", f"Results: `{path.name}`", ""]
