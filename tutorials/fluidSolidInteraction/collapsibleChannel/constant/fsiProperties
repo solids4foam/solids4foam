@@ -48,7 +48,7 @@ IQNILSCoeffs
     outerCorrTolerance 1e-4;
 
     // Maximum number of outer FSI loop correctors within each time-step
-    nOuterCorr 100;
+    nOuterCorr 200;
 
     // Enable coupling from the start
     coupled yes;
@@ -56,15 +56,15 @@ IQNILSCoeffs
     // The fluid and solid interface faces match
     interfaceTransferMethod directMap;
 
-    // Drop secant modes that are small relative to the newest one: with the
-    // strong added-mass effect, and the reused modes below, the older modes
-    // are nearly parallel, and keeping them lets round-off in the fluid and
-    // solid solutions blow up the least-squares update. With 1e-2 or 1e-3 the
-    // high-order case diverges at t = 0.35 s on some platforms
-    relMinSignificant 1e-1;
+    // Drop secant modes that are small relative to the newest one, which
+    // otherwise let round-off in the fluid and solid solutions blow up the
+    // least-squares update
+    relMinSignificant 1e-2;
 
-    // Re-use the secant modes of the previous three time steps
-    couplingReuse 3;
+    // Do not re-use the secant modes of previous time steps: with the
+    // massless wall they are nearly parallel to the new ones, and re-using
+    // them made the coupling diverge or stall on some meshes and platforms
+    couplingReuse 0;
 
     // Write fsi residuals to file
     writeResidualsToFile yes;

@@ -521,6 +521,36 @@ def evaluate(case: dict, run_dir: Path, reference: dict, refs: dict) -> dict:
     return row
 
 
+def self_convergence(results: list[tuple[dict, Path, dict]]) -> list[str]:
+    """Differences between successive time steps, and the observed order.
+
+    The comparison with the converged reference also carries the spatial
+    error of the fixed mesh, so the temporal convergence itself is measured
+    between the solids4foam solutions: the difference of the wall-midpoint
+    histories at the times of the coarser run, relative to the peak of the
+    reference.
+    """
+    ordered = sorted(results, key=lambda item: -item[0]["dt"])
+    scale = max(abs(v) for _, v in read_reference(REFERENCE_CSV)["wallMid"])
+    lines, diffs = [], []
+    for (case_a, dir_a, _), (case_b, dir_b, _) in zip(ordered, ordered[1:]):
+        coarse = dict(read_history(dir_a, "wallMid"))
+        fine = dict(read_history(dir_b, "wallMid"))
+        common = [t for t in coarse if t in fine and t > 0]
+        diff = max(abs(coarse[t] - fine[t]) for t in common)/scale
+        diffs.append((case_a["dt"]/case_b["dt"], diff))
+        lines.append(
+            f"- dt {case_a['dt']:g} vs {case_b['dt']:g}: max difference"
+            f" {diff:.3%}"
+        )
+    for (ratio, d1), (_, d2) in zip(diffs, diffs[1:]):
+        if d2 > 0:
+            lines.append(
+                f"- observed temporal order {math.log(d1/d2)/math.log(ratio):.2f}"
+            )
+    return lines
+
+
 def observed_order(errors: list[float], ratio: float) -> float | None:
     if len(errors) < 2 or errors[-1] <= 0 or errors[-2] <= 0:
         return None
@@ -733,6 +763,11 @@ def main() -> int:
         all_failures.extend(failures)
         summary += [f"## {study}", "", f"Results: `{path.name}`", ""]
         summary += summary_table(study, rows)
+        if study == "time" and len(results) > 1:
+            lines = self_convergence(results)
+            summary += [""] + lines
+            for line in lines:
+                print(f"  {line[2:]}", flush=True)
         summary += [""] + [f"- FAIL: {f}" for f in failures] + [""]
 
     POST_DIR.mkdir(parents=True, exist_ok=True)

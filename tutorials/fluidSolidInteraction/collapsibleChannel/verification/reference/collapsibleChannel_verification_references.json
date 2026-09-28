@@ -49,7 +49,7 @@
       }
     },
     "mesh": {
-      "levels": [1, 2, 4],
+      "levels": [1, 2, 3, 4],
       "quickLevels": [1],
       "deltaT": 0.025,
       "reference": "sameDeltaT",
@@ -64,9 +64,8 @@
       "deltaT": [0.025, 0.0125, 0.00625],
       "quickDeltaT": [0.025],
       "reference": "converged",
-      "fsiProperties": {"relMinSignificant": "1e-2"},
-      "solidMesh": [640, 8],
-      "solidType": "linear",
+      "solidMesh": [160, 8],
+      "solidType": "highOrder",
       "acceptance": {
         "finestMaxError": 0.05
       }

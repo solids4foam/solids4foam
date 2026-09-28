@@ -158,33 +158,31 @@ it can be:
 - `relaxationFactor 0.005` for the first two iterations of each time step,
   roughly the wall stiffness over the added mass divided by $$\Delta t^2$$;
   it must shrink with $$\Delta t^2$$ when the time step is refined;
-- `couplingReuse 3` re-uses the secant modes of the previous three time
-  steps, without which the high-order solid needs up to 50 iterations per
-  time step during the collapse;
-- `relMinSignificant 1e-1` drops secant modes that are small relative to the
-  newest one. With the reused modes the older modes are nearly parallel, and
-  keeping them lets round-off in the sub-solvers blow up the least-squares
-  update: with `1e-2` or `1e-3` the high-order case diverges at
-  $$t = 0.35\,\mathrm{s}$$ on one of the two platforms tested.
+- `relMinSignificant 1e-2` drops secant modes that are small relative to the
+  newest one, which otherwise let round-off in the sub-solvers blow up the
+  least-squares update;
+- `couplingReuse 0`: re-using the secant modes of previous time steps halves
+  the iteration count, but with the massless wall the old modes are nearly
+  parallel to the new ones, and the coupling then diverged or stalled on some
+  meshes and on one of the two platforms tested, whatever the
+  `relMinSignificant` filter;
 - `outerCorrTolerance 1e-4`, relative to the largest interface displacement,
   i.e. about $$2\times10^{-5}\,\mathrm{m}$$; much tighter tolerances reach
   the round-off floor of the high-order solid residual.
 
-On the tutorial mesh the coupling converges in about 10 iterations per time
-step (at most 28) with the cubic solid and 8 (at most 14) with the linear
+On the tutorial mesh the coupling converges in about 16 iterations per time
+step (at most 54) with the cubic solid and 11 (at most 19) with the linear
 one.
 
-These settings are tuned to the tutorial time step. With a four times smaller
-time step the added-mass coupling, which grows as $$1/\Delta t^2$$, is much
-stiffer: `relMinSignificant 1e-1` then fails in the first time step, and with
-`1e-2` the cubic solid stalls during the collapse while the linear solid
-converges (see the time-step study in `verification/`).
+The added-mass coupling of the massless wall grows as $$1/\Delta t^2$$, so the
+coupling becomes harder as the time step is refined; see the time-step study
+in `verification/`.
 
 ## Running the case
 
 ```bash
-./Allrun         # high-order (cubic) solid, about 7 minutes
-./Allrun linear  # second-order (linear) solid, about 3 minutes
+./Allrun         # high-order (cubic) solid, about 11 minutes
+./Allrun linear  # second-order (linear) solid, about 4 minutes
 ```
 
 The case runs in serial: in parallel, the Krylov solves of the solid fail to
