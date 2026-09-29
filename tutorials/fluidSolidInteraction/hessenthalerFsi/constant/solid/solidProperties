@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    // Solution algorithm
+    solutionAlgorithm PETScSNES;
+
+    // Predictor D at the start of a new time step using U and A
+    predictor yes;
+
+    // High-order (cubic) reconstruction of the residual
+    highOrderCoeffs
+    {
+        highOrderResidual true;
+
+        // The compact Jacobian stalls the Krylov solver for this thin flap,
+        // so the linear high-order Jacobian is used as the preconditioner
+        highOrderJacobian true;
+
+        displacement
+        {
+            polynomialOrder 3;
+            faceStencilExtraCells 65;
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,26 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Aqueous glycerol solution, Phase I (23.6 C): rho = 1163.3 kg/m^3,
+// mu = 12.50 mPa s (Hessenthaler et al. 2017, Table 3)
+transportModel  Newtonian;
+nu              nu [0 2 -1 0 0 0 0] 1.074529e-05;
+rho             rho [1 -3 0 0 0 0 0] 1163.3;
+
+// ************************************************************************* //

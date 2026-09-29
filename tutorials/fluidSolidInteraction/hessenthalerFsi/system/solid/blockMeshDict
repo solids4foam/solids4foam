@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Hexahedral mesh of the flap: 11 x 2 x 65 mm, clamped at z = 0
+convertToMeters 0.001;
+
+nx 11;
+ny 4;
+nz 65;
+
+vertices
+(
+    (-5.5 -1  0) (5.5 -1  0) (5.5 1  0) (-5.5 1  0)
+    (-5.5 -1 65) (5.5 -1 65) (5.5 1 65) (-5.5 1 65)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) ($nx $ny $nz) simpleGrading (1 1 1)
+);
+
+boundary
+(
+    fixed
+    {
+        type patch;
+        faces ( (0 3 2 1) );
+    }
+    interface
+    {
+        type patch;
+        faces
+        (
+            (4 5 6 7)
+            (0 1 5 4)
+            (1 2 6 5)
+            (2 3 7 6)
+            (3 0 4 7)
+        );
+    }
+);
+
+// ************************************************************************* //

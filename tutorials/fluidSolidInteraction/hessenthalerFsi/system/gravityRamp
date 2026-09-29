@@ -1,0 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      gravityRamp;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Ramp the net buoyancy of the flap (constant/solid/g) in smoothly from zero
+// over rampTime, starting from the straight flap:
+//     g(t) = g_final*(3*s^2 - 2*s^3), s = min(t/rampTime, 1)
+// The value is set before each time step is solved.
+gravityRamp
+{
+    type            coded;
+    libs            (utilityFunctionObjects);
+    name            gravityRamp;
+    region          solid;
+
+    codeInclude
+    #{
+        #include "uniformDimensionedFields.H"
+    #};
+
+    codeData
+    #{
+        vector gFinal_{Zero};
+        bool gFinalSet_{false};
+        scalar rampTime_{0.5};
+    #};
+
+    localCode
+    #{
+        static void setGravity
+        (
+            const fvMesh& mesh,
+            const vector& gFinal,
+            const scalar rampTime
+        )
+        {
+            // Time of the step about to be solved
+            const scalar t = mesh.time().value() + mesh.time().deltaTValue();
+            scalar s = 1.0;
+            if (rampTime > SMALL)
+            {
+                s = min(max(t/rampTime, 0.0), 1.0);
+            }
+
+            uniformDimensionedVectorField& g =
+                const_cast<uniformDimensionedVectorField&>
+                (
+                    mesh.lookupObject<uniformDimensionedVectorField>("g")
+                );
+            g.value() = s*s*(3.0 - 2.0*s)*gFinal;
+        }
+    #};
+
+    codeRead
+    #{
+        // The final value is the one read from constant/solid/g; store it
+        // before the first ramped value overwrites it
+        if (!gFinalSet_)
+        {
+            gFinal_ =
+                mesh().lookupObject<uniformDimensionedVectorField>("g").value();
+            gFinalSet_ = true;
+        }
+        setGravity(mesh(), gFinal_, rampTime_);
+    #};
+
+    codeExecute
+    #{
+        setGravity(mesh(), gFinal_, rampTime_);
+    #};
+}
+
+// ************************************************************************* //

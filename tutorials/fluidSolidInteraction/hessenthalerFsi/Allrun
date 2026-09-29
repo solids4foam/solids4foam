@@ -1,0 +1,132 @@
+#!/bin/bash
+
+set -Eeo pipefail
+set +u
+IFS=$'\n\t'
+
+caseDir="$(cd "$(dirname "$0")" && pwd)"
+cd "$caseDir"
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment is not sourced}"
+
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+print_usage()
+{
+    cat <<'EOF'
+Usage:
+  ./Allrun [coarse|medium] [hex|tet] [parallel]
+
+  coarse    coarse fluid mesh, about 0.23 million cells (default)
+  medium    medium fluid mesh, about 0.8 million cells
+  hex       hexahedral solid mesh from blockMesh (default)
+  tet       tetrahedral solid mesh from Gmsh (flap.geo)
+  parallel  decompose both regions with system/fluid/decomposeParDict and
+            system/solid/decomposeParDict and run in parallel
+EOF
+}
+
+fluidMesh=coarse
+solidMesh=hex
+runParallel=no
+
+for arg in "$@"
+do
+    case "$arg" in
+        coarse|medium)
+            fluidMesh="$arg"
+            ;;
+        hex|tet)
+            solidMesh="$arg"
+            ;;
+        parallel)
+            runParallel=yes
+            ;;
+        help|-h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            print_usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+# PETSc is required for the solid
+solids4Foam::requirePetscOrExitSilently
+
+# The mesh-generation workflow is not supported on foam-extend
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
+if ! command -v python3 &> /dev/null
+then
+    echo
+    echo "python3 command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
+if [[ "$solidMesh" == "tet" ]] && ! command -v gmsh &> /dev/null
+then
+    echo
+    echo "gmsh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
+for generatedMesh in \
+    constant/polyMesh \
+    constant/fluid/polyMesh \
+    constant/solid/polyMesh
+do
+    if [ -e "$generatedMesh" ]
+    then
+        echo "Generated mesh already exists: $generatedMesh" >&2
+        echo "Run ./Allclean before ./Allrun." >&2
+        exit 1
+    fi
+done
+
+# Split the published fluid-domain surface into patches and add the 250 mm
+# outlet extension
+runApplication -o python3 makeFluidSurface.py
+
+# Fluid mesh: cartesianMesh writes an unregioned mesh, so move it into the
+# fluid region
+ln -vnsf "meshDict.${fluidMesh}" system/meshDict
+runApplication -o cartesianMesh
+mkdir -p constant/fluid
+mv constant/polyMesh constant/fluid/polyMesh
+
+# Solid mesh
+if [[ "$solidMesh" == "tet" ]]
+then
+    runApplication -o gmsh -3 -format msh2 flap.geo -o flap.msh
+    runApplication -o gmshToFoam flap.msh -region solid
+else
+    runApplication -o blockMesh -region solid
+fi
+
+runApplication -o -s fluid checkMesh -region fluid
+runApplication -o -s solid checkMesh -region solid
+
+# Run the coupled fluid-solid case
+if [[ "$runParallel" == "yes" ]]
+then
+    solids4Foam::runApplication -o -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -o -s solid decomposePar -region solid
+    solids4Foam::runParallel -o solids4Foam
+else
+    solids4Foam::runApplication -o solids4Foam
+fi

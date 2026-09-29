@@ -1,0 +1,103 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      meshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// cfMesh cartesianMesh settings for the medium (about 0.8 million cells) fluid mesh.
+// cartesianMesh uses an octree whose cell sizes are the root size divided by
+// powers of two; each requested size is set just above the intended level so
+// that rounding does not select the next finer level.
+
+surfaceFile     "constant/triSurface/fluidDomain.stl";
+
+// Bulk cell size, used in the outlet extension away from the wall
+maxCellSize     0.004;
+
+// Cell size at the walls
+boundaryCellSize 0.00101;
+
+localRefinement
+{
+    // Flap surface: four cells across its 2 mm thickness
+    interface
+    {
+        cellSize    0.000505;
+    }
+}
+
+objectRefinements
+{
+    // Region swept by the flap between its straight state and the zero-flow
+    // buoyancy deflection (tip about 30 mm above the axis)
+    flapSweep
+    {
+        type        box;
+        cellSize    0.00101;
+        centre      (0 0.015 0.035);
+        lengthX     0.026;
+        lengthY     0.042;
+        lengthZ     0.08;
+    }
+
+    // The merging region and the downstream jets
+    merging
+    {
+        type        box;
+        cellSize    0.00101;
+        centre      (0 0 0.05);
+        lengthX     0.078;
+        lengthY     0.078;
+        lengthZ     0.16;
+    }
+}
+
+renameBoundary
+{
+    defaultName     wall;
+    defaultType     wall;
+
+    newPatchNames
+    {
+        upperInlet
+        {
+            newName     upperInlet;
+            type        patch;
+        }
+        lowerInlet
+        {
+            newName     lowerInlet;
+            type        patch;
+        }
+        outlet
+        {
+            newName     outlet;
+            type        patch;
+        }
+        wall
+        {
+            newName     wall;
+            type        wall;
+        }
+        interface
+        {
+            newName     interface;
+            type        wall;
+        }
+    }
+}
+
+// ************************************************************************* //
