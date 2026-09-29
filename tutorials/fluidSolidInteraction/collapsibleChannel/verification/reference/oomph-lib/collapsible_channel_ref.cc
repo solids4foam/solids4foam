@@ -38,10 +38,13 @@
 //  - field output is off unless --docfields 1 is given;
 //  - --steady N computes the steady solution instead, raising the external
 //    pressure to its final value in N equal increments;
+//  - --lambdasq L gives the wall the inertia of the timescale ratio
+//    Lambda^2 = rho_s U^2/E_eff, with a Newmark timestepper for the wall;
+//    the default, 0, is the massless wall of the original driver;
 //  - --tramp T ramps the external pressure up as (1 - cos(pi t/T))/2 over
 //    0 < t < T instead of applying it impulsively.
 // Physics, discretisation (algebraic node update, Crouzeix-Raviart elements
-// by default, BDF2) and the massless wall are unchanged.
+// by default, BDF2) are unchanged.
 //
 #include <cmath>
 #include <iostream>
@@ -258,6 +261,10 @@ namespace Global_Physical_Variables
  /// non-dimensionalisation of fluid to solid stresses. 
  double Q=1.0e-5;
 
+ /// Timescale ratio of the wall, Lambda^2 = rho_s U^2/E_eff: zero for the
+ /// massless wall of the original driver
+ double Lambda_sq=0.0;
+
  /// Clamp the beam ends (pin the slope as well as the position)?
  bool Clamped=false;
 
@@ -448,6 +455,15 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
  // previous timsteps. 
  add_time_stepper_pt(new BDF<2>);
 
+ // A wall with inertia needs a timestepper for its positions (Newmark);
+ // the massless wall of the original driver uses the steady default
+ TimeStepper* wall_time_stepper_pt=&Mesh::Default_TimeStepper;
+ if (Global_Physical_Variables::Lambda_sq>0.0)
+  {
+   wall_time_stepper_pt=new Newmark<2>;
+   add_time_stepper_pt(wall_time_stepper_pt);
+  }
+
  // Geometric object that represents the undeformed wall: 
  // A straight line at height y=ly; starting at x=lup.
  UndeformedWall* undeformed_wall_pt=new UndeformedWall(lup,ly);
@@ -455,7 +471,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
  //Create the "wall" mesh with FSI Hermite elements
  Wall_mesh_pt = new OneDLagrangianMesh<FSIHermiteBeamElement>
   //(2*Ncollapsible+5,Lcollapsible,undeformed_wall_pt);
-  (Ncollapsible,Lcollapsible,undeformed_wall_pt);
+  (Ncollapsible,Lcollapsible,undeformed_wall_pt,wall_time_stepper_pt);
 
  
 
@@ -614,6 +630,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
    // Set physical parameters for each element:
    elem_pt->sigma0_pt() = &Global_Physical_Variables::Sigma0;
    elem_pt->h_pt() = &Global_Physical_Variables::H;
+   elem_pt->lambda_sq_pt() = &Global_Physical_Variables::Lambda_sq;
     
    // Set the load vector for each element
    elem_pt->load_vector_fct_pt() = &Global_Physical_Variables::load;
@@ -827,6 +844,9 @@ void FSICollapsibleChannelProblem<ELEMENT>::set_initial_condition()
  // Assign initial values for an impulsive start
  bulk_mesh_pt()->assign_initial_values_impulsive();
 
+ // The wall starts at rest in its undeformed shape
+ wall_mesh_pt()->assign_initial_values_impulsive();
+
 } // end of set_initial_condition
 
 
@@ -859,6 +879,8 @@ int main(int argc, char* argv[])
  CommandLineArgs::specify_command_line_flag("--steady",&steady);
  CommandLineArgs::specify_command_line_flag("--clamped",&clamped);
  CommandLineArgs::specify_command_line_flag("--docfields",&doc_fields);
+ CommandLineArgs::specify_command_line_flag("--lambdasq",
+  &Global_Physical_Variables::Lambda_sq);
  CommandLineArgs::specify_command_line_flag("--tramp",
   &Global_Physical_Variables::T_ramp);
  CommandLineArgs::specify_command_line_flag("--out",&outdir);
@@ -872,7 +894,8 @@ int main(int argc, char* argv[])
      || !std::isfinite(Global_Physical_Variables::Sigma0)
      || !std::isfinite(Global_Physical_Variables::Q)
      || !std::isfinite(Global_Physical_Variables::P_ext)
-     || !std::isfinite(Global_Physical_Variables::T_ramp))
+     || !std::isfinite(Global_Physical_Variables::T_ramp)
+     || !std::isfinite(Global_Physical_Variables::Lambda_sq))
   {
    std::cerr << "Invalid parameters: all values must be finite" << std::endl;
    return 1;
@@ -880,7 +903,8 @@ int main(int argc, char* argv[])
  if (refine<1 || !(dt>0.0) || !(t_max>0.0) || !(Global_Physical_Variables::H>0.0)
      || !(Global_Physical_Variables::Sigma0>=0.0)
      || !(Global_Physical_Variables::Q>=0.0)
-     || !(Global_Physical_Variables::T_ramp>=0.0) || steady<0)
+     || !(Global_Physical_Variables::T_ramp>=0.0)
+     || !(Global_Physical_Variables::Lambda_sq>=0.0) || steady<0)
   {
    std::cerr << "Invalid parameters: --refine must be at least 1, --dt,"
              << " --tmax and --h positive, and --sigma0, --q, --tramp and"
