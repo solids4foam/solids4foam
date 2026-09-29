@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run opt-in HronTurekFsi3 verification studies in isolated case copies.
+"""Run opt-in HronTurek verification studies in isolated case copies.
 
 The studies compare the periodic response of the Turek-Hron FSI3 benchmark
 (mean, amplitude and frequency of the point-A displacement and of the drag and
@@ -21,7 +21,7 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve()
 VERIFICATION = SCRIPT.parents[1]
 TUTORIAL = VERIFICATION.parent
-REFERENCE_FILE = VERIFICATION / "reference" / "HronTurekFsi3_verification_references.json"
+REFERENCE_FILE = VERIFICATION / "reference" / "HronTurek_verification_references.json"
 WORK_ROOT = VERIFICATION / "work"
 OUTPUT_ROOT = VERIFICATION / "postProcessing"
 
@@ -1369,7 +1369,7 @@ def main() -> int:
     spec = json.loads(REFERENCE_FILE.read_text())
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     (OUTPUT_ROOT / "verification_summary.md").write_text(
-        "# HronTurekFsi3 verification summary\n\n"
+        "# HronTurek verification summary\n\n"
     )
     if args.benchmark == "fsi1":
         study = fsi1_coupling_study if args.study == "coupling" else fsi1_mesh_study

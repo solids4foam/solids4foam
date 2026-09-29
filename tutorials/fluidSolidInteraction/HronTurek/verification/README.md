@@ -1,10 +1,11 @@
-# HronTurekFsi3 verification studies
+# HronTurek verification studies
 
-This directory contains opt-in verification studies for the `HronTurekFsi3`
-tutorial. They compare the periodic response of the Turek-Hron FSI3
+This directory contains opt-in verification studies for the `HronTurek`
+tutorial. By default they compare the periodic response of the Turek-Hron FSI3
 benchmark, computed with the partitioned Dirichlet-Neumann IQN-ILS and
 Robin-Neumann couplings, with the published reference values of Turek and
-Hron (2006). The studies are deliberately separate from `regressionTest.sh`:
+Hron (2006). The steady FSI1 and the periodic FSI2 benchmarks are described
+in their own sections below. The studies are deliberately separate from `regressionTest.sh`:
 the regression test checks that the tutorial remains numerically stable,
 whereas these studies check convergence towards the benchmark. Nothing here is
 run by `tutorials/Alltest` or `tutorials/Alltest-regression`.
@@ -13,7 +14,7 @@ Source a supported OpenFOAM environment, build solids4foam with PETSc, and run
 from this directory:
 
 ```bash
-cd tutorials/fluidSolidInteraction/HronTurekFsi3/verification
+cd tutorials/fluidSolidInteraction/HronTurek/verification
 ./Allverify                            # IQN-ILS mesh study, levels 1x and 2x
 ./Allverify --coupling robin           # the same sweep with Robin-Neumann coupling
 ./Allverify --levels 1,2,4             # add the 4x mesh (expensive)
@@ -60,7 +61,7 @@ The verification copies differ from the tutorial in four respects:
   closing window is well inside the periodic regime. The coupling is
   activated at `t = 2 s`, as in the tutorial.
 
-The reference values are in `reference/HronTurekFsi3_verification_references.json`.
+The reference values are in `reference/HronTurek_verification_references.json`.
 The primary values are the Featflow FSI3 results on level 4 with
 `Δt = 0.00025 s`: `u_x = -2.88 ± 2.72 mm [10.93 Hz]`,
 `u_y = 1.47 ± 34.99 mm [5.46 Hz]`, `F_D = 460.5 ± 27.74 N/m [10.93 Hz]` and

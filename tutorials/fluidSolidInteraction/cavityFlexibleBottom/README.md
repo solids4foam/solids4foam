@@ -42,9 +42,9 @@ the channel flow over a cavity with a flexible bottom [1]**
 ## Running the case
 
 The tutorial case is located at
-`solids4foam/tutorials/fluidSolidInteraction/HronTurekFsi3`. The case can be run
-using the included `Allrun` script, i.e. `> ./Allrun`. The `Allrun` script first
-executes `blockMesh` for both `solid` and `fluid` domains
+`solids4foam/tutorials/fluidSolidInteraction/cavityFlexibleBottom`. The case
+can be run using the included `Allrun` script, i.e. `> ./Allrun`. The `Allrun`
+script first executes `blockMesh` for both `solid` and `fluid` domains
 (`> blockMesh -region fluid` and `> blockMesh -region solid` ), and the
 `solids4foam` solver is used to run the case (`> solids4Foam`). Optionally, if
 `gnuplot` is installed, a file `deflection.pdf` will be created with the

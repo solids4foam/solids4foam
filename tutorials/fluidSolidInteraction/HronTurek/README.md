@@ -2,7 +2,7 @@
 sort: 3
 ---
 
-# Hron_Turek fluid-solid interaction benchmark: `HronTurekFsi3`
+# Hron_Turek fluid-solid interaction benchmark: `HronTurek`
 
 ---
 
@@ -118,7 +118,7 @@ amplitude [frequency]).**
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/fluidSolidInteraction/HronTurekFsi3`. The case can be run
+`solids4foam/tutorials/fluidSolidInteraction/HronTurek`. The case can be run
 using the included `Allrun` script, i.e. `> ./Allrun`. The `Allrun` script first
 executes `blockMesh` for both `solid` and `fluid` domains
 (`> blockMesh -region fluid` and `> blockMesh -region solid` ), and the

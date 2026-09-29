@@ -41,7 +41,8 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
-- Added an opt-in verification study to the `HronTurekFsi3` tutorial, which
+- Added an opt-in verification study to the `HronTurek` tutorial (formerly
+  `HronTurekFsi3`), which
   runs the Turek-Hron FSI3 benchmark through a mesh and time-step sweep with
   the partitioned IQN-ILS or Robin-Neumann coupling and compares the periodic
   point-A displacement, drag and lift (mean, amplitude and frequency) with the
