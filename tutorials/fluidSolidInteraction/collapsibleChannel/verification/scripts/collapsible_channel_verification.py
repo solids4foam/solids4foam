@@ -57,8 +57,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--study",
         default="all",
-        help="comma-separated studies: static, solid, mesh, time, or all"
-        " (default: static, solid and mesh; time is not part of all)",
+        help="comma-separated studies: static, solid, mesh, time or all"
+        " (default)",
     )
     parser.add_argument(
         "--quick",
@@ -654,7 +654,9 @@ def add_solid_differences(
         row["solidDiffFrom"] = finest[0]["name"]
 
 
-def self_convergence(results: list[tuple[dict, Path, dict]]) -> list[str]:
+def self_convergence(
+    results: list[tuple[dict, Path, dict]]
+) -> tuple[list[str], list[float], list[float]]:
     """Differences between successive time steps, and the observed order.
 
     The comparison with the converged reference also carries the spatial
@@ -665,7 +667,7 @@ def self_convergence(results: list[tuple[dict, Path, dict]]) -> list[str]:
     """
     ordered = sorted(results, key=lambda item: -item[0]["dt"])
     scale = max(abs(v) for _, v in read_reference(REFERENCE_CSV)["wallMid"])
-    lines, diffs = [], []
+    lines, diffs, orders = [], [], []
     for (case_a, dir_a, _), (case_b, dir_b, _) in zip(ordered, ordered[1:]):
         coarse = dict(read_history(dir_a, "wallMid"))
         fine = dict(read_history(dir_b, "wallMid"))
@@ -678,10 +680,9 @@ def self_convergence(results: list[tuple[dict, Path, dict]]) -> list[str]:
         )
     for (ratio, d1), (_, d2) in zip(diffs, diffs[1:]):
         if d2 > 0:
-            lines.append(
-                f"- observed temporal order {math.log(d1/d2)/math.log(ratio):.2f}"
-            )
-    return lines
+            orders.append(math.log(d1/d2)/math.log(ratio))
+            lines.append(f"- observed temporal order {orders[-1]:.2f}")
+    return lines, [d for _, d in diffs], orders
 
 
 def observed_order(errors: list[float], ratio: float) -> float | None:
@@ -751,7 +752,7 @@ def check_study(study: str, rows: list[dict], refs: dict, quick: bool) -> list[s
     criteria = refs["studies"][study]["acceptance"]
     if quick:
         return failures
-    if study in ("mesh", "time"):
+    if study == "mesh":
         errors = [row["wallMid_maxError"] for row in rows]
         if any(b >= a for a, b in zip(errors, errors[1:])):
             failures.append(f"{study}: wall-midpoint error does not decrease")
@@ -846,7 +847,7 @@ def main() -> int:
     args = parse_args()
     refs = load_references()
     studies = (
-        ["static", "solid", "mesh"] if args.study == "all"
+        ["static", "solid", "mesh", "time"] if args.study == "all"
         else [s.strip() for s in args.study.split(",")]
     )
     end_time = args.end_time or (
@@ -950,14 +951,28 @@ def main() -> int:
                 end_time,
             )
         failures = check_study(study, rows, refs, args.quick)
-        all_failures.extend(failures)
         summary += [f"## {study}", "", f"Results: `{path.name}`", ""]
         summary += summary_table(study, rows)
         if study == "time" and len(results) > 1:
-            lines = self_convergence(results)
+            lines, diffs, orders = self_convergence(results)
             summary += [""] + lines
             for line in lines:
                 print(f"  {line[2:]}", flush=True)
+            criteria = spec["acceptance"]
+            if not args.quick:
+                if len(results) != len(spec["deltaT"]):
+                    failures.append("time: not every time step completed")
+                elif diffs[-1] > criteria["finestSelfDifference"]:
+                    failures.append(
+                        f"time: finest time-step difference {diffs[-1]:.3g}"
+                        f" > {criteria['finestSelfDifference']}"
+                    )
+                if orders and min(orders) < criteria["minOrder"]:
+                    failures.append(
+                        f"time: observed order {min(orders):.2f}"
+                        f" < {criteria['minOrder']}"
+                    )
+        all_failures.extend(failures)
         summary += [""] + [f"- FAIL: {f}" for f in failures] + [""]
 
     POST_DIR.mkdir(parents=True, exist_ok=True)

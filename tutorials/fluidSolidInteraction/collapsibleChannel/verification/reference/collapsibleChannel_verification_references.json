@@ -5,7 +5,7 @@
   "troughWindow": [0.3, 0.75],
   "reference": {
     "file": "collapsibleChannel_oomph_reference.csv",
-    "source": "oomph-lib collapsible-channel driver (reference/oomph-lib), clamped Kirchhoff-Love beam",
+    "source": "oomph-lib collapsible-channel driver (reference/oomph-lib), clamped Kirchhoff-Love beam with the regularising wall density",
     "parameters": {
       "Re": 50.0,
       "ReSt": 50.0,
@@ -14,6 +14,7 @@
       "Sigma0": 0.0,
       "P_ext": 4e-7,
       "T_ramp": 0.25,
+      "Lambda_sq": 2e-9,
       "P_up": 300.0,
       "Lup": 5.0,
       "Lcollapsible": 10.0,
@@ -52,10 +53,11 @@
       }
     },
     "mesh": {
-      "levels": [1, 2, 3],
+      "levels": [1, 2, 3, 4],
       "quickLevels": [1],
-      "deltaT": 0.025,
+      "deltaT": 0.00625,
       "reference": "sameDeltaT",
+      "coupling": "robin",
       "solidMesh": [160, 8],
       "solidType": "highOrder",
       "acceptance": {
@@ -64,13 +66,15 @@
     },
     "time": {
       "level": 1,
-      "deltaT": [0.025, 0.0125, 0.00625],
+      "deltaT": [0.025, 0.0125, 0.00625, 0.003125],
       "quickDeltaT": [0.025],
       "reference": "converged",
+      "coupling": "robin",
       "solidMesh": [160, 8],
       "solidType": "highOrder",
       "acceptance": {
-        "finestMaxError": 0.05
+        "finestSelfDifference": 0.005,
+        "minOrder": 1.5
       }
     }
   }
