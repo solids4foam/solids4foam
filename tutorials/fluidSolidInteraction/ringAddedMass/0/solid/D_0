@@ -18,68 +18,8 @@ FoamFile
 
 dimensions      [0 1 0 0 0 0 0];
 
-// Old-time displacement, D_0 = -V dt, which starts the ring from its
-// undeformed shape with the initial velocity V of the n = 2 (ovalling) mode of
-// a thin inextensional ring of mean radius a:
-//     V_r     = V0 cos(2 theta)
-//     V_theta = V0 sin(2 theta) (-1/2 + 3 (r - a)/(2 a))
-// where the second term of V_theta is the rotation of the ring cross-section
-// (plane sections remain normal). Starting from the undeformed shape keeps the
-// solid and fluid interfaces aligned at the start.
-internalField   #codeStream
-{
-    codeInclude
-    #{
-        #include "fvCFD.H"
-    #};
-
-    codeOptions
-    #{
-        -I$(LIB_SRC)/finiteVolume/lnInclude \
-        -I$(LIB_SRC)/meshTools/lnInclude
-    #};
-
-    codeLibs
-    #{
-        -lmeshTools \
-        -lfiniteVolume
-    #};
-
-    code
-    #{
-        const IOdictionary& d = static_cast<const IOdictionary&>(dict);
-        const fvMesh& mesh = refCast<const fvMesh>(d.db());
-
-        // Mean radius and mode velocity amplitude
-        const scalar a = 1.0;
-        const scalar V0 = 1.5e-3;
-
-        // Time-step from system/controlDict
-        const scalar deltaT = mesh.time().deltaTValue();
-
-        const vectorField& C = mesh.C();
-        vectorField D0(C.size(), vector::zero);
-
-        forAll(C, cellI)
-        {
-            const scalar r = Foam::sqrt(sqr(C[cellI].x()) + sqr(C[cellI].y()));
-            const scalar theta = Foam::atan2(C[cellI].y(), C[cellI].x());
-
-            const scalar vr = V0*Foam::cos(2*theta);
-            const scalar vt =
-                V0*Foam::sin(2*theta)*(-0.5 + 1.5*(r - a)/a);
-
-            D0[cellI] = -deltaT*vector
-            (
-                vr*Foam::cos(theta) - vt*Foam::sin(theta),
-                vr*Foam::sin(theta) + vt*Foam::cos(theta),
-                0
-            );
-        }
-
-        os  << word("nonuniform") << token::SPACE << D0;
-    #};
-};
+// Replaced by setInitialVelocity.py during Allrun.
+internalField   uniform (0 0 0);
 
 boundaryField
 {

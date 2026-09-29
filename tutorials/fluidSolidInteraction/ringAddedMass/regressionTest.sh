@@ -23,18 +23,33 @@ HALF_PERIOD_EXACT_TOL=0.01    # relative difference from the exact half period
 HALF_PERIOD_TOL=2e-4          # relative difference from the reference
 DISP_TOL=2e-6                 # final displacement absolute difference (m)
 
-# Reference values at REG_END_TIME (OpenFOAM-v2412)
+# Reference values at REG_END_TIME (OpenFOAM-v2512, with foam-extend values
+# selected below)
 ref_half_period() {
+    if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+        case "$1" in
+            iqnils) echo 1.7411818 ;;
+            robin) echo 1.7436173 ;;
+        esac
+        return
+    fi
     case "$1" in
-        iqnils) echo 1.7420635 ;;
-        robin) echo 1.7424661 ;;
+        iqnils) echo 1.7420511 ;;
+        robin) echo 1.7432661 ;;
     esac
 }
 
 ref_final_ux() {
+    if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+        case "$1" in
+            iqnils) echo 0.000155080 ;;
+            robin) echo 0.000112373 ;;
+        esac
+        return
+    fi
     case "$1" in
-        iqnils) echo 0.00015324 ;;
-        robin) echo 0.000149775 ;;
+        iqnils) echo 0.000121865 ;;
+        robin) echo 0.000120717 ;;
     esac
 }
 

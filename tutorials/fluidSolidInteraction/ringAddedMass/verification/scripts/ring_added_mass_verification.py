@@ -121,6 +121,8 @@ source solids4FoamScripts.sh
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
 
+python3 setInitialVelocity.py system/blockMeshDict system/controlDict 0 || exit 1
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
@@ -146,6 +148,7 @@ def prepare_dry(case: Path, solid: str) -> None:
     for name in ("fvSchemes", "fvSolution", "blockMeshDict", "decomposeParDict"):
         shutil.copy(source / "system/solid" / name, case / "system" / name)
     shutil.copy(source / "system/controlDict", case / "system/controlDict")
+    shutil.copy(source / "setInitialVelocity.py", case / "setInitialVelocity.py")
     physics = (source / "constant/physicsProperties").read_text()
     physics, count = re.subn(r"^type\s+fluidSolidInteraction;", "type    solid;",
                              physics, flags=re.MULTILINE)
@@ -211,7 +214,8 @@ def tutorial_signature() -> dict:
             relative = path.relative_to(TUTORIAL)
             top = relative.parts[0]
             # Only the files that define the runs
-            if top not in ("0", "constant", "system", "Allrun") \
+            if top not in ("0", "constant", "system", "Allrun",
+                           "setInitialVelocity.py") \
                     or "polyMesh" in relative.parts or path.is_dir():
                 continue
             if path.is_symlink():

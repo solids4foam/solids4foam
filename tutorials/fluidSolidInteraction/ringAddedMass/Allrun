@@ -50,10 +50,20 @@ done
 
 echo "Using ${coupling} coupling setup"
 
+solverArgs=()
+if [[ "$WM_PROJECT" == "foam" ]]; then
+    # Permit foam-extend's round-off-level closed-domain flux imbalance
+    solverArgs=(-Tolerances closedDomainTol=1e-5)
+fi
+
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "solidProperties.${solidModel}" constant/solid/solidProperties
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
 ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
+# Set D_0 and D_0_0 from the current mesh description and time-step
+python3 setInitialVelocity.py \
+    system/solid/blockMeshDict system/controlDict 0/solid || exit 1
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
@@ -67,12 +77,12 @@ if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
-    solids4Foam::runParallel solids4Foam
+    solids4Foam::runParallel solids4Foam "${solverArgs[@]}"
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
     # Run serial
-    solids4Foam::runApplication solids4Foam
+    solids4Foam::runApplication solids4Foam "${solverArgs[@]}"
 fi
 
 # Create plots
