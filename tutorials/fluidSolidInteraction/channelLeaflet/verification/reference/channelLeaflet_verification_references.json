@@ -1,0 +1,95 @@
+{
+  "description": "channelLeaflet verification against oomph-lib solutions; see ../README.md",
+  "endTime": 8.0,
+  "quickEndTime": 0.5,
+  "period": 2.0,
+  "reference": {
+    "file": "channelLeaflet_oomph_reference.csv",
+    "sameDeltaT": "channelLeaflet_oomph_dt{steps}.csv",
+    "thickness": {
+      "0.05": "channelLeaflet_oomph_h0.05.csv",
+      "0.025": "channelLeaflet_oomph_h0.025.csv",
+      "0.0125": "channelLeaflet_oomph_h0.0125.csv"
+    },
+    "source": "oomph-lib channel-with-leaflet driver (reference/oomph-lib), Kirchhoff-Love beam with the regularising leaflet density, started from rest",
+    "parameters": {
+      "Re": 200.0,
+      "ReSt": 200.0,
+      "Q": 1e-6,
+      "H": 0.05,
+      "Lambda_sq": 2e-4,
+      "Period": 2.0,
+      "Min_flux": 1.0,
+      "Max_flux": 2.0,
+      "T_ramp": 1.0,
+      "Lleft": 1.0,
+      "Lright": 7.0
+    }
+  },
+  "studies": {
+    "static": {
+      "loadSteps": 10,
+      "traction": 0.01,
+      "thickness": [0.05, 0.025, 0.0125],
+      "solidTypes": ["linear", "highOrder"],
+      "solidMeshes": {
+        "0.05": [[4, 40], [8, 80], [16, 160]],
+        "0.025": [[4, 40]],
+        "0.0125": [[4, 40]]
+      },
+      "quickSolidMeshes": {
+        "0.05": [[4, 40]]
+      },
+      "acceptance": {
+        "maxRelError": {"highOrder": 0.015}
+      }
+    },
+    "mesh": {
+      "levels": [1, 1.5, 2],
+      "quickLevels": [1],
+      "deltaT": 0.01,
+      "reference": "sameDeltaT",
+      "solidMesh": [4, 40],
+      "solidType": "highOrder",
+      "acceptance": {
+        "finestMaxError": 0.03,
+        "finestSelfDifference": 0.01
+      }
+    },
+    "time": {
+      "fluidLevel": 1,
+      "deltaT": [0.01, 0.005, 0.0025],
+      "quickDeltaT": [0.01],
+      "reference": "converged",
+      "solidMesh": [4, 40],
+      "solidType": "highOrder",
+      "acceptance": {
+        "finestSelfDifference": 0.005,
+        "minOrder": 1.5
+      }
+    },
+    "solid": {
+      "fluidLevel": 1,
+      "deltaT": 0.01,
+      "reference": "sameDeltaT",
+      "solidTypes": ["linear", "highOrder"],
+      "solidMeshes": [[4, 40]],
+      "quickSolidMeshes": [[4, 40]],
+      "acceptance": {
+        "maxSolidDiff": {}
+      }
+    },
+    "thickness": {
+      "fluidLevel": 1,
+      "deltaT": 0.01,
+      "thickness": [0.05, 0.025, 0.0125],
+      "quickThickness": [0.05],
+      "reference": "thickness",
+      "solidMesh": [4, 40],
+      "solidType": "highOrder",
+      "acceptance": {
+        "extrapolatedMaxError": 0.01
+      }
+    }
+  }
+}
