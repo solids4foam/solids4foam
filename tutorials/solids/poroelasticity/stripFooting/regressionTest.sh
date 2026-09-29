@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # stripFooting regression test
 #
@@ -41,19 +44,19 @@ P_MAX=9.0e4
 # 0.001% change in a material constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        LEGACY_D_MAX=0.045900554625415
-        LEGACY_D_MEAN=0.00582265661842307
+        REF_D_MAX=0.045900554625415
+        REF_D_MEAN=0.00582265661842307
         ;;
     org)
-        LEGACY_D_MAX=0.045900554625415
-        LEGACY_D_MEAN=0.00582265661842306
+        REF_D_MAX=0.045900554625415
+        REF_D_MEAN=0.00582265661842306
         ;;
     foamextend)
-        LEGACY_D_MAX=0.047361024905273
-        LEGACY_D_MEAN=0.00607079996386413
+        REF_D_MAX=0.047361024905273
+        REF_D_MEAN=0.00607079996386413
         ;;
 esac
-LEGACY_D_REL_TOL=1e-6
+REF_D_REL_TOL=1e-6
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -62,7 +65,7 @@ echo "============================================================"
 echo "stripFooting regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max |p|       in [${P_MIN}, ${P_MAX}]"
-echo "Plus the comparison with the legacy model"
+echo "Plus the comparison with the reference"
 echo "============================================================"
 echo
 
@@ -84,7 +87,7 @@ prepare_case() {
     # Enough digits that a comparison is about the solution rather than about
     # the last figure written
     if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-        sed -i 's|^writePrecision.*|writePrecision  14;|' \
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
             "${dir}/system/controlDict"
     else
         echo "writePrecision  14;" >> "${dir}/system/controlDict"
@@ -133,76 +136,8 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-# A field against the removed legacy model's, through the norms above. Both
-# differences are bounded by the largest pointwise difference, so a field that
-# agrees with the legacy one to tol times its largest value passes, and one
-# that does not is caught by at least one of the two in all but contrived cases
-check_field_against_legacy() {
-    local label="$1"
-    local file="$2"
-    local legacy_max="$3"
-    local legacy_mean="$4"
-    local tol="$5"
-    local norms field_max field_mean
-
-    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
-        echo "FAIL: ${label}: no field to compare with the legacy model"
-        return 1
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
-                && b <= ${tol}*${legacy_max})
-        }"
-    then
-        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
-            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
-        return 0
-    fi
-
-    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
-        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
-    return 1
-}
-
 # The case against the removed legacy model
-check_against_legacy() {
+check_against_reference() {
     if ! grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
@@ -222,8 +157,8 @@ check_against_legacy() {
         return 1
     fi
 
-    check_field_against_legacy "D at t = ${t}" "${CASE_DIR}/${t}/D" \
-        "${LEGACY_D_MAX}" "${LEGACY_D_MEAN}" "${LEGACY_D_REL_TOL}"
+    solids4Foam::checkFieldNorms "D at t = ${t}" "${CASE_DIR}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 epsilon=$(grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
@@ -256,7 +191,7 @@ else
     failures=$((failures + 1))
 fi
 
-if ! check_against_legacy; then
+if ! check_against_reference; then
     failures=$((failures + 1))
 fi
 
@@ -277,11 +212,11 @@ run_restart_test() {
     local g="${REGRESSION_ROOT}/restartMissingChild"
 
     prepare_case "${d}"
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         's|^\( *\)nCorrectors|\1restart yes;\n\1nCorrectors|' \
         "${d}/constant/solidProperties"
-    sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
-    sed -i 's/^endTime         0.38;/endTime         0.2;/' "${d}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i 's/^endTime         0.38;/endTime         0.2;/' "${d}/system/controlDict"
 
     ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
         echo "FAIL: restart: the first leg did not run"
@@ -300,7 +235,7 @@ run_restart_test() {
     # Negative control, on the child specifically
     rm -rf "${g}"; cp -a "${d}" "${g}"
     rm -f "${g}"/0.2/*IntegrationPointTopology_effectiveStressMechanicalLaw_*
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         0.2;/endTime         0.38;/' \
         "${g}/system/controlDict"
 
@@ -319,7 +254,7 @@ run_restart_test() {
     fi
 
     # The restart itself
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         0.2;/endTime         0.38;/' \
         "${d}/system/controlDict"
     mv "${d}/${SOLVER_LOGFILE}" "${d}/log.solids4Foam.firstLeg"

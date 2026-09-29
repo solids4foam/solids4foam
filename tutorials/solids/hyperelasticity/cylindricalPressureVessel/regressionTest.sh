@@ -37,7 +37,7 @@ CASES=(
 # where coupledPressureDisplacementSolid runs. Each is a case above, as
 # name : legacy value : relative tolerance, the tolerance being the one the
 # framework was held to against it
-LEGACY_REFERENCES=(
+REFERENCES=(
     # Nonlinear: the framework takes the law's isochoric stress minus the
     # solved pressure, where the legacy law's pressureDisplacement mode used
     # mu*(b - I)/J, which is not deviatoric. At nu = 0.5 the two differ by
@@ -185,13 +185,13 @@ then
 fi
 
 # The pressure-displacement arms against the legacy answers
-for reference in "${LEGACY_REFERENCES[@]}"; do
-    IFS=':' read -r case_name legacy_value rel_tol <<< "${reference}"
+for reference in "${REFERENCES[@]}"; do
+    IFS=':' read -r case_name ref_value rel_tol <<< "${reference}"
     case_dir="${REGRESSION_ROOT}/${case_name}"
 
     if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"
     then
-        echo "SKIP: ${case_name} against the legacy model"
+        echo "SKIP: ${case_name} against the reference"
         continue
     fi
 
@@ -208,14 +208,14 @@ for reference in "${LEGACY_REFERENCES[@]}"; do
     if [[ -z "${value}" ]]; then
         echo "FAIL: ${case_name}: could not extract the probe value"
         failures=$((failures + 1))
-    elif awk "BEGIN {d = ${value} - ${legacy_value}; \
-        exit !(${value} > 0 && d*d <= (${rel_tol}*${legacy_value})^2)}"
+    elif awk "BEGIN {d = ${value} - ${ref_value}; \
+        exit !(${value} > 0 && d*d <= (${rel_tol}*${ref_value})^2)}"
     then
-        printf "PASS: %s against the legacy model: %.12g vs %.12g\n" \
-            "${case_name}" "${value}" "${legacy_value}"
+        printf "PASS: %s against the reference: %.12g vs %.12g\n" \
+            "${case_name}" "${value}" "${ref_value}"
     else
-        printf "FAIL: %s against the legacy model: %.12g vs %.12g (tolerance %s)\n" \
-            "${case_name}" "${value}" "${legacy_value}" "${rel_tol}"
+        printf "FAIL: %s against the reference: %.12g vs %.12g (tolerance %s)\n" \
+            "${case_name}" "${value}" "${ref_value}" "${rel_tol}"
         failures=$((failures + 1))
     fi
 done

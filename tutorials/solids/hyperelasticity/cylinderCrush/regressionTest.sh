@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # cylinderCrush regression test
 # Uses the short displacement and force histories as a contact benchmark.
@@ -45,7 +48,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i.bak 's/^endTime[[:space:]]\+30;/endTime         1;/' "${CASE_DIR}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+30;/endTime         1;/' "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 }
 
@@ -111,9 +114,9 @@ COMPARISON_END_TIME=2
 # 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
 # largest value, allows for that, and is ten times below the 1e-5 that a
 # 0.001% change in a material constant makes
-LEGACY_D_MAX=0.0066666666744038
-LEGACY_D_MEAN=0.00116545530838457
-LEGACY_D_REL_TOL=1e-6
+REF_D_MAX=0.0066666666744038
+REF_D_MEAN=0.00116545530838457
+REF_D_REL_TOL=1e-6
 
 # The latest written time directory.
 #
@@ -147,75 +150,7 @@ check_completed() {
     fi
 }
 
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-# A field against the removed legacy model's, through the norms above. Both
-# differences are bounded by the largest pointwise difference, so a field that
-# agrees with the legacy one to tol times its largest value passes, and one
-# that does not is caught by at least one of the two in all but contrived cases
-check_field_against_legacy() {
-    local label="$1"
-    local file="$2"
-    local legacy_max="$3"
-    local legacy_mean="$4"
-    local tol="$5"
-    local norms field_max field_mean
-
-    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
-        echo "FAIL: ${label}: no field to compare with the legacy model"
-        return 1
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
-                && b <= ${tol}*${legacy_max})
-        }"
-    then
-        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
-            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
-        return 0
-    fi
-
-    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
-        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
-    return 1
-}
-
-run_legacy_comparison() {
+run_reference_comparison() {
     local dir="${REGRESSION_ROOT}/comparison"
 
     if [ "$CHECK_ONLY" = false ]; then
@@ -231,14 +166,14 @@ run_legacy_comparison() {
             cp -a "${item}" "${dir}/"
         done
 
-        sed -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
+        "${SOLIDS4FOAM_SED}" -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
             "${dir}/system/controlDict"
 
-        sed -i 's|solvePressureEqn[[:space:]]*yes;|solvePressureEqn no;|' \
+        "${SOLIDS4FOAM_SED}" -i 's|solvePressureEqn[[:space:]]*yes;|solvePressureEqn no;|' \
             "${dir}/constant/mechanicalProperties"
 
         if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-            sed -i 's|^writePrecision.*|writePrecision  14;|' \
+            "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
                 "${dir}/system/controlDict"
         else
             echo "writePrecision  14;" >> "${dir}/system/controlDict"
@@ -253,7 +188,7 @@ run_legacy_comparison() {
     fi
 
     if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"; then
-        echo "Skipping the legacy comparison: the case skipped here"
+        echo "Skipping the reference comparison: the case skipped here"
         return 0
     fi
 
@@ -274,9 +209,9 @@ run_legacy_comparison() {
 
     check_completed "${dir}" "${COMPARISON_END_TIME}" || return 1
 
-    check_field_against_legacy "D at t = ${COMPARISON_END_TIME}" \
+    solids4Foam::checkFieldNorms "D at t = ${COMPARISON_END_TIME}" \
         "${dir}/$(latest_time_dir "${dir}")/D" \
-        "${LEGACY_D_MAX}" "${LEGACY_D_MEAN}" "${LEGACY_D_REL_TOL}"
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 failures=0
@@ -312,7 +247,7 @@ fi
 
 echo
 
-if ! run_legacy_comparison; then
+if ! run_reference_comparison; then
     failures=$((failures + 1))
 fi
 

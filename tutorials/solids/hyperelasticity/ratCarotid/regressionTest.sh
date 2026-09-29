@@ -16,6 +16,9 @@ elif command -v solids4FoamScripts.sh > /dev/null 2>&1; then
     source solids4FoamScripts.sh
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 if ! declare -F solids4Foam::regressionCaseSkipped > /dev/null 2>&1; then
     solids4Foam::regressionCaseSkipped() {
         local LOG_FILE="$1"
@@ -161,12 +164,12 @@ run_case() {
         # The closed-form fibre check needs the fibres along the stretch, so
         # the angle is zeroed here. It selects which directions the fibres
         # point in, not which code paths run
-        sed -i.bak 's/\(fibreAngle.*\]\) *39.76;/\1 0.0;/' \
+        "${SOLIDS4FOAM_SED}" -i.bak 's/\(fibreAngle.*\]\) *39.76;/\1 0.0;/' \
             "${u}/constant/mechanicalProperties"
         rm -f "${u}/constant/mechanicalProperties.bak"
 
         # Uniform directions, so the check needs no calcLocCoordinates run
-        sed -i.bak 's|^        bulkModulus|        uniformLocalBasis yes;\n        Ec              (1 0 0);\n        Ea              (0 1 0);\n\n        bulkModulus|' \
+        "${SOLIDS4FOAM_SED}" -i.bak 's|^        bulkModulus|        uniformLocalBasis yes;\n        Ec              (1 0 0);\n        Ea              (0 1 0);\n\n        bulkModulus|' \
             "${u}/constant/mechanicalProperties"
         rm -f "${u}/constant/mechanicalProperties.bak"
 

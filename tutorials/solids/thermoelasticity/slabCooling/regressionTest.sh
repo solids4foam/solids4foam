@@ -45,23 +45,16 @@ if [[ "${variant}" != "openfoamcom" ]]; then
     SIGMA_MAX=1.05e3
 fi
 
-# The final D of the removed legacy mechanicalModel, as a digest of its
-# internal values as written, from the last commit that had it
-# (mcl-stage8-coverage, c3a92b3d), per fork. thermoMechanicalLaw is a
-# composite: it owns a sub-law, delegates to it, and subtracts the thermal
-# term, and the framework reproduced the legacy D field exactly, in every
-# figure written
-case "$(solids4Foam::foamFlavour)" in
-    com)
-        LEGACY_D_DIGEST=b7609301dbc9037471029473cdc64be52c014832
-        ;;
-    org)
-        LEGACY_D_DIGEST=b7609301dbc9037471029473cdc64be52c014832
-        ;;
-    foamextend)
-        LEGACY_D_DIGEST=4760637f46f33deb124c59b8219f9e0a0d4e014e
-        ;;
-esac
+# The final D, as the max and mean component magnitude of its internal values
+# as written. thermoMechanicalLaw is a composite: it owns a sub-law, delegates
+# to it, and subtracts the thermal term, and the framework reproduced the
+# removed legacy mechanicalModel's D field exactly, in every figure written, on
+# every fork (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's,
+# the same as OpenFOAM.org 9's; foam-extend 4.1 gives a max 1.8e-3 smaller,
+# and the tolerance, 3e-3 of the largest value, covers that
+REF_D_MAX=0.0484734
+REF_D_MEAN=0.0120319022347934
+REF_D_REL_TOL=3e-3
 
 echo "============================================================"
 echo "slabCooling regression test"
@@ -91,23 +84,7 @@ prepare_case
 ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
-# A digest of a field's internal values as written, independent of the file
-# header, which names the OpenFOAM version that wrote it
-internal_field_digest() {
-    python3 - "$1" << 'PYEOF'
-import hashlib
-import re
-import sys
-
-text = open(sys.argv[1]).read()
-field = re.search(r"\binternalField\s+(.*?);\s*\n\s*boundaryField", text, re.DOTALL)
-if not field:
-    sys.exit(f"cannot find the internalField in {sys.argv[1]}")
-print(hashlib.sha1(" ".join(field.group(1).split()).encode()).hexdigest())
-PYEOF
-}
-
-check_against_legacy() {
+check_against_reference() {
     if ! grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
@@ -127,17 +104,8 @@ check_against_legacy() {
         return 1
     fi
 
-    local digest
-    digest=$(internal_field_digest "${CASE_DIR}/${t}/D" || true)
-
-    if [[ -n "${digest}" && "${digest}" == "${LEGACY_D_DIGEST}" ]]; then
-        echo "PASS: D matches the legacy model's exactly"
-        return 0
-    fi
-
-    echo "FAIL: D differs from the legacy model's" \
-        "(digest ${digest:-none}, legacy ${LEGACY_D_DIGEST})"
-    return 1
+    solids4Foam::checkFieldNorms "D" "${CASE_DIR}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 # ------------------------------------------------------------
@@ -197,7 +165,7 @@ else
     failures=$((failures + 1))
 fi
 
-if ! check_against_legacy; then
+if ! check_against_reference; then
     failures=$((failures + 1))
 fi
 

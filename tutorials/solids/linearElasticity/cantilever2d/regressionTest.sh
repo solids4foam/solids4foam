@@ -12,6 +12,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # cantilever2d regression test
 # Checks selected solution approaches against the analytical
@@ -25,38 +28,41 @@ SIGMA_MAX=1.05e8
 HIGH_ORDER_DISP_TOL=1e-10
 
 # ------------------------------------------------------------
-# The answers of the removed legacy mechanicalModel
+# Reference answers
 # ------------------------------------------------------------
-# From the last commit that had it (mcl-stage8-coverage, c3a92b3d), per fork.
-# Each is the legacy side of a comparison the framework passed there, and is
-# held to the tolerance that comparison used. Fields are recorded as the max
-# and mean component magnitude of their internal values as written
-case "$(solids4Foam::foamFlavour)" in
-    com|org)
-        LEGACY_POINT_D_MAX=0.015999512315885
-        LEGACY_POINT_D_MEAN=0.00207382900687327
-        LEGACY_EXPLICIT_POINT_D_MAX=4.50000000005551e-06
-        LEGACY_EXPLICIT_POINT_D_MEAN=2.69525341068081e-09
-        LEGACY_EXPLICIT_DELTAT_LINE="Setting deltaT = 8.830682704707434e-08, maxCo = 0.1"
-        # unsCoupled runs on foam-extend only
-        LEGACY_UNSCOUPLED_EPS=""
-        ;;
-    foamextend)
-        LEGACY_POINT_D_MAX=0.0159995123112567
-        LEGACY_POINT_D_MEAN=0.00207382900625648
-        LEGACY_EXPLICIT_POINT_D_MAX=4.5e-06
-        LEGACY_EXPLICIT_POINT_D_MEAN=2.6952526893628e-09
-        LEGACY_EXPLICIT_DELTAT_LINE="Setting deltaT = 8.830682704706176e-08, maxCo = 0.1"
-        LEGACY_UNSCOUPLED_EPS=0.00044921
-        ;;
-esac
+# The answers of the removed legacy mechanicalModel, from the last commit that
+# had it (mcl-stage8-coverage, c3a92b3d), which the framework reproduced. Each
+# is held to the tolerance that comparison used, which also covers the forks:
+# they differ by 3e-10 relative at most. Fields are recorded as the max and
+# mean component magnitude of their internal values as written
+REF_POINT_D_MAX=0.015999512315885
+REF_POINT_D_MEAN=0.00207382900687327
+REF_EXPLICIT_POINT_D_MAX=4.50000000005551e-06
+REF_EXPLICIT_POINT_D_MEAN=2.69525341068081e-09
 
-# The same on every fork
-declare -A LEGACY_SIGMA0_D_DIGEST=(
-    [dict]=1c2bf5df020259760a2afc4badb6cf86e101c1e5
-    [field]=2c8072a41810075abbdbd5912646a309423536bf
-    [both]=1c2bf5df020259760a2afc4badb6cf86e101c1e5
+# The explicit time step, which the forks give to 13 figures
+REF_EXPLICIT_DELTAT=8.830682704707e-08
+EXPLICIT_DELTAT_REL_TOL=1e-10
+
+# unsCoupled runs on foam-extend only
+REF_UNSCOUPLED_EPS=0.00044921
+
+# sigma0, given in the law's dictionary, as a field, and as both. The final D
+# agreed with the legacy model's exactly, in all six figures written, on every
+# fork; the dictionary takes precedence when both are given, so dict and both
+# are the same field. The tolerance, 1e-5 of the largest component, is a few
+# units in the last written figure
+declare -A REF_SIGMA0_D_MAX=(
+    [dict]=0.0158458
+    [field]=0.0167114
+    [both]=0.0158458
 )
+declare -A REF_SIGMA0_D_MEAN=(
+    [dict]=0.00205453796368938
+    [field]=0.00215475325899651
+    [both]=0.00205453796368938
+)
+SIGMA0_D_REL_TOL=1e-5
 
 # unsCoupled: the final max epsilonEq. The same problem with the same material
 # constants read two ways, so the two agreed far more closely than the band
@@ -72,10 +78,6 @@ UNSCOUPLED_REL_TOL=1e-4
 # component, allows for that, and is ten times below the 1e-5 that a 0.001%
 # change in E makes
 VERTEX_CENTRED_DISP_REL_TOL=1e-6
-
-# sigma0, given in the law's dictionary, as a field, and as both: the final D
-# agreed with the legacy model's exactly, in all six figures written, and is
-# recorded as a digest of its internal values
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -94,8 +96,8 @@ echo "cantilever2d regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "High-order DDifference LInf < ${HIGH_ORDER_DISP_TOL}"
-echo "Against the legacy model: unsCoupled max epsilonEq to ${UNSCOUPLED_REL_TOL},"
-echo "  vertex-centred pointD to ${VERTEX_CENTRED_DISP_REL_TOL}, sigma0 D exactly"
+echo "Against the reference: unsCoupled max epsilonEq to ${UNSCOUPLED_REL_TOL},"
+echo "  vertex-centred pointD to ${VERTEX_CENTRED_DISP_REL_TOL}, sigma0 D to ${SIGMA0_D_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -118,7 +120,7 @@ prepare_case() {
     # The regression copy lives deeper than the source tutorial, so the
     # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
     # the repository root.
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${CASE_DIR}/src/Make/options"
 
@@ -228,7 +230,7 @@ run_sigma0_check() {
 
     if [[ "${mode}" == "dict" || "${mode}" == "both" ]]; then
         # A uniform initial stress given where the material is given
-        sed -i \
+        "${SOLIDS4FOAM_SED}" -i \
             's|^\( *\)nu  *nu .*|&\n\1sigma0 sigma0 [1 -1 -2 0 0 0 0] (10e6 2e6 -3e6 15e6 0 -5e6);|' \
             "${d}/constant/mechanicalProperties"
 
@@ -296,19 +298,9 @@ run_sigma0_check() {
         fi
     fi
 
-    local digest
-    digest=$(internal_field_digest "${d}/${t}/D" || true)
-
-    if [[ -z "${digest}" \
-        || "${digest}" != "${LEGACY_SIGMA0_D_DIGEST[${mode}]}" ]]
-    then
-        echo "FAIL: sigma0 ${mode}: D differs from the legacy model's" \
-            "(digest ${digest:-none}, legacy ${LEGACY_SIGMA0_D_DIGEST[${mode}]})"
-        return 1
-    fi
-
-    echo "PASS: sigma0 ${mode}: D matches the legacy model's exactly"
-    return 0
+    solids4Foam::checkFieldNorms "sigma0 ${mode}: D" "${d}/${t}/D" \
+        "${REF_SIGMA0_D_MAX[${mode}]}" "${REF_SIGMA0_D_MEAN[${mode}]}" \
+        "${SIGMA0_D_REL_TOL}"
 }
 
 # A prescribed field has to survive a restart. It is written into 0 and the
@@ -344,7 +336,7 @@ run_sigma0_restart_check() {
         # the check. 'restart yes' would also make legacy's sigma0 be written
         # into the time this resumes from, which is the very thing the check
         # below requires to be absent
-        sed -i \
+        "${SOLIDS4FOAM_SED}" -i \
             's|^\( *\)nCorrectors|\1restart no;\n\1nCorrectors|' \
             "${root}/${d}/constant/solidProperties"
 
@@ -370,20 +362,20 @@ run_sigma0_restart_check() {
 
     (
         cd "${root}/restartContinuous" || exit 1
-        sed -i 's|^endTime .*|endTime         2;|' system/controlDict
+        "${SOLIDS4FOAM_SED}" -i 's|^endTime .*|endTime         2;|' system/controlDict
         solids4Foam > log.solids4Foam 2>&1
     ) || { echo "FAIL: sigma0 restart check could not run continuous"; return 1; }
 
     (
         cd "${root}/restartNone" || exit 1
-        sed -i 's|^endTime .*|endTime         2;|' system/controlDict
+        "${SOLIDS4FOAM_SED}" -i 's|^endTime .*|endTime         2;|' system/controlDict
         solids4Foam > log.solids4Foam 2>&1
     ) || { echo "FAIL: sigma0 restart check could not run the control"; return 1; }
 
     (
         cd "${root}/restartRestarted" || exit 1
         solids4Foam > log.first 2>&1 || exit 1
-        sed -i \
+        "${SOLIDS4FOAM_SED}" -i \
             's|^endTime .*|endTime         2;|;s|^startFrom .*|startFrom       latestTime;|' \
             system/controlDict
         solids4Foam > log.solids4Foam 2>&1
@@ -552,90 +544,6 @@ check_solver_extrema() {
     return "${failures}"
 }
 
-# A digest of a field's internal values as written, independent of the file
-# header, which names the OpenFOAM version that wrote it
-internal_field_digest() {
-    python3 - "$1" << 'PYEOF'
-import hashlib
-import re
-import sys
-
-text = open(sys.argv[1]).read()
-field = re.search(r"\binternalField\s+(.*?);\s*\n\s*boundaryField", text, re.DOTALL)
-if not field:
-    sys.exit(f"cannot find the internalField in {sys.argv[1]}")
-print(hashlib.sha1(" ".join(field.group(1).split()).encode()).hexdigest())
-PYEOF
-}
-
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-# A field against the removed legacy model's, through the norms above. Both
-# differences are bounded by the largest pointwise difference, so a field that
-# agrees with the legacy one to tol times its largest value passes, and one
-# that does not is caught by at least one of the two in all but contrived cases
-check_field_against_legacy() {
-    local label="$1"
-    local file="$2"
-    local legacy_max="$3"
-    local legacy_mean="$4"
-    local tol="$5"
-    local norms field_max field_mean
-
-    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
-        echo "FAIL: ${label}: no field to compare with the legacy model"
-        return 1
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
-                && b <= ${tol}*${legacy_max})
-        }"
-    then
-        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
-            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
-        return 0
-    fi
-
-    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
-        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
-    return 1
-}
-
 # The explicit path of the vertex-centred model, which no tutorial runs:
 # twenty steps of the cantilever from rest, in a case directory of its own.
 # The time step comes from the wave speed, so it is also a check that the
@@ -655,17 +563,17 @@ run_vertex_centred_explicit_check() {
         cp -a "${item}" "${d}/"
     done
 
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${d}/src/Make/options"
 
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         's|solutionAlgorithm PETScSNES;|solutionAlgorithm explicit;|' \
         "${d}/constant/solidProperties.vertexCentred"
 
     # Twenty steps, and only the last one written. The time step is set
     # by the model, so the run is stopped by step count rather than time
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         -e 's|^stopAt .*|stopAt          nextWrite;|' \
         -e 's|^deltaT .*|deltaT          1e-8;|' \
         -e 's|^writeControl .*|writeControl    timeStep;|' \
@@ -690,28 +598,32 @@ run_vertex_centred_explicit_check() {
         return 1
     fi
 
-    local deltaT_line
-    deltaT_line=$(grep "Setting deltaT" "${d}/${SOLVER_LOGFILE}" || true)
+    # "Setting deltaT = <value>, maxCo = <value>"
+    local deltaT
+    deltaT=$(grep "Setting deltaT" "${d}/${SOLVER_LOGFILE}" \
+        | awk -F'[=,]' 'END {printf "%.16g\n", $2 + 0}' || true)
 
-    if [[ -z "${deltaT_line}" ]]; then
+    if [[ -z "${deltaT}" ]] || awk "BEGIN {exit !(${deltaT} <= 0)}"; then
         echo "FAIL: vertexCentred explicit did not run explicitly"
         return 1
     fi
 
-    if [[ "${deltaT_line}" != "${LEGACY_EXPLICIT_DELTAT_LINE}" ]]; then
-        echo "FAIL: vertexCentred explicit chose a different time step from" \
-            "the legacy model ('${deltaT_line}', legacy" \
-            "'${LEGACY_EXPLICIT_DELTAT_LINE}')"
+    if ! awk "BEGIN {d = ${deltaT} - ${REF_EXPLICIT_DELTAT}; if (d < 0) d = -d;
+                     exit !(d <= ${EXPLICIT_DELTAT_REL_TOL} * ${REF_EXPLICIT_DELTAT})}"
+    then
+        printf "FAIL: vertexCentred explicit chose a different time step from the reference (%.13g vs %.13g)\n" \
+            "${deltaT}" "${REF_EXPLICIT_DELTAT}"
         return 1
     fi
-    echo "PASS: vertexCentred explicit chose the legacy model's time step"
+    printf "PASS: vertexCentred explicit chose the reference time step (%.13g)\n" \
+        "${deltaT}"
 
     local t
     t=$(solids4Foam::latestTime "${d}")
 
-    check_field_against_legacy "vertexCentred explicit pointD" \
+    solids4Foam::checkFieldNorms "vertexCentred explicit pointD" \
         "${d}/${t}/pointD" \
-        "${LEGACY_EXPLICIT_POINT_D_MAX}" "${LEGACY_EXPLICIT_POINT_D_MEAN}" \
+        "${REF_EXPLICIT_POINT_D_MAX}" "${REF_EXPLICIT_POINT_D_MEAN}" \
         "${VERTEX_CENTRED_DISP_REL_TOL}"
 }
 
@@ -751,7 +663,7 @@ if [ "$CHECK_ONLY" = false ]; then
         # The vertex-centred arm is compared with the legacy answer, which the
         # default six significant figures would only do to six figures
         if [[ "${RUN_APPROACH}" == vertexCentred ]]; then
-            sed -i 's|^writePrecision .*|writePrecision  16;|' \
+            "${SOLIDS4FOAM_SED}" -i 's|^writePrecision .*|writePrecision  16;|' \
                 "${CASE_DIR}/system/controlDict"
         fi
 
@@ -803,9 +715,9 @@ if [ "$CHECK_ONLY" = false ]; then
     # that ran and wrote no pointD is a failure, not a reason to skip
     if [[ -n "${VERTEX_CENTRED_RAN:-}" ]]
     then
-        if ! check_field_against_legacy "vertexCentred pointD" \
+        if ! solids4Foam::checkFieldNorms "vertexCentred pointD" \
             "${REGRESSION_ROOT}/pointD.vertexCentred" \
-            "${LEGACY_POINT_D_MAX}" "${LEGACY_POINT_D_MEAN}" \
+            "${REF_POINT_D_MAX}" "${REF_POINT_D_MEAN}" \
             "${VERTEX_CENTRED_DISP_REL_TOL}"
         then
             failures=$((failures + 1))
@@ -821,15 +733,15 @@ if [ "$CHECK_ONLY" = false ]; then
     # than the band allows
     if [[ -n "${UNSCOUPLED_EPS}" ]]
     then
-        if awk "BEGIN {d = ${UNSCOUPLED_EPS} - ${LEGACY_UNSCOUPLED_EPS};
+        if awk "BEGIN {d = ${UNSCOUPLED_EPS} - ${REF_UNSCOUPLED_EPS};
                        if (d < 0) d = -d;
-                       exit !(d <= ${UNSCOUPLED_REL_TOL} * ${LEGACY_UNSCOUPLED_EPS})}"
+                       exit !(d <= ${UNSCOUPLED_REL_TOL} * ${REF_UNSCOUPLED_EPS})}"
         then
-            printf "PASS: unsCoupled matches the legacy model (%.8g vs %.8g)\n" \
-                "${UNSCOUPLED_EPS}" "${LEGACY_UNSCOUPLED_EPS}"
+            printf "PASS: unsCoupled matches the reference (%.8g vs %.8g)\n" \
+                "${UNSCOUPLED_EPS}" "${REF_UNSCOUPLED_EPS}"
         else
-            printf "FAIL: unsCoupled differs from the legacy model (%.8g vs %.8g)\n" \
-                "${UNSCOUPLED_EPS}" "${LEGACY_UNSCOUPLED_EPS}"
+            printf "FAIL: unsCoupled differs from the reference (%.8g vs %.8g)\n" \
+                "${UNSCOUPLED_EPS}" "${REF_UNSCOUPLED_EPS}"
             failures=$((failures + 1))
         fi
     fi

@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # suctionCaission regression test
 #
@@ -46,25 +49,25 @@ COMPARISON_END_TIME=1
 # 0.001% change in a material constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        LEGACY_D_MAX=0.039970270753559
-        LEGACY_D_MEAN=0.00324034872160463
-        LEGACY_P_MAX=94941.676957032
-        LEGACY_P_MEAN=19655.7130753187
+        REF_D_MAX=0.039970270753559
+        REF_D_MEAN=0.00324034872160463
+        REF_P_MAX=94941.676957032
+        REF_P_MEAN=19655.7130753187
         ;;
     org)
-        LEGACY_D_MAX=0.039970258883115
-        LEGACY_D_MEAN=0.00324070141058448
-        LEGACY_P_MAX=94957.392747739
-        LEGACY_P_MEAN=19661.8147230215
+        REF_D_MAX=0.039970258883115
+        REF_D_MEAN=0.00324070141058448
+        REF_P_MAX=94957.392747739
+        REF_P_MEAN=19661.8147230215
         ;;
     foamextend)
-        LEGACY_D_MAX=0.039984257331651
-        LEGACY_D_MEAN=0.00342262334429839
-        LEGACY_P_MAX=66272.071942348
-        LEGACY_P_MEAN=17304.5184317787
+        REF_D_MAX=0.039984257331651
+        REF_D_MEAN=0.00342262334429839
+        REF_P_MAX=66272.071942348
+        REF_P_MEAN=17304.5184317787
         ;;
 esac
-LEGACY_REL_TOL=1e-6
+REF_REL_TOL=1e-6
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -73,7 +76,7 @@ echo "============================================================"
 echo "suctionCaission regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
-echo "Plus the comparison with the legacy model, to t=${COMPARISON_END_TIME}"
+echo "Plus the comparison with the reference, to t=${COMPARISON_END_TIME}"
 echo "============================================================"
 echo
 
@@ -117,87 +120,19 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-# A field against the removed legacy model's, through the norms above. Both
-# differences are bounded by the largest pointwise difference, so a field that
-# agrees with the legacy one to tol times its largest value passes, and one
-# that does not is caught by at least one of the two in all but contrived cases
-check_field_against_legacy() {
-    local label="$1"
-    local file="$2"
-    local legacy_max="$3"
-    local legacy_mean="$4"
-    local tol="$5"
-    local norms field_max field_mean
-
-    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
-        echo "FAIL: ${label}: no field to compare with the legacy model"
-        return 1
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
-                && b <= ${tol}*${legacy_max})
-        }"
-    then
-        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
-            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
-        return 0
-    fi
-
-    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
-        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
-    return 1
-}
-
 # Run the case to the comparison time and hold it to the legacy answer there
-run_legacy_comparison() {
+run_reference_comparison() {
     local dir="${REGRESSION_ROOT}/comparison"
 
     prepare_case "${dir}"
 
-    sed -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
+    "${SOLIDS4FOAM_SED}" -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
         "${dir}/system/controlDict"
 
     # Enough digits that the comparison is about the solution and not about
     # the last figure written
     if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-        sed -i 's|^writePrecision.*|writePrecision  14;|' \
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
             "${dir}/system/controlDict"
     else
         echo "writePrecision  14;" >> "${dir}/system/controlDict"
@@ -227,13 +162,13 @@ run_legacy_comparison() {
 
     local failed=0
 
-    check_field_against_legacy "D at t = ${t}" "${dir}/${t}/D" \
-        "${LEGACY_D_MAX}" "${LEGACY_D_MEAN}" "${LEGACY_REL_TOL}" \
+    solids4Foam::checkFieldNorms "D at t = ${t}" "${dir}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_REL_TOL}" \
         || failed=1
 
-    check_field_against_legacy "porePressure at t = ${t}" \
+    solids4Foam::checkFieldNorms "porePressure at t = ${t}" \
         "${dir}/${t}/porePressure" \
-        "${LEGACY_P_MAX}" "${LEGACY_P_MEAN}" "${LEGACY_REL_TOL}" \
+        "${REF_P_MAX}" "${REF_P_MEAN}" "${REF_REL_TOL}" \
         || failed=1
 
     return "${failed}"
@@ -267,7 +202,7 @@ else
     failures=$((failures + 1))
 fi
 
-if [ "$CHECK_ONLY" = false ] && ! run_legacy_comparison; then
+if [ "$CHECK_ONLY" = false ] && ! run_reference_comparison; then
     failures=$((failures + 1))
 fi
 

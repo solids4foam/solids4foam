@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # hotSphere regression test
 # Uses the tutorial's reported temperature and stress extrema.
@@ -54,7 +57,7 @@ prepare_case() {
 
 shorten_case() {
     local controlDict="${CASE_DIR}/system/controlDict"
-    sed -i.bak 's/^endTime[[:space:]]\+5;/endTime         1;/' "${controlDict}"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+5;/endTime         1;/' "${controlDict}"
     rm -f "${controlDict}.bak"
 }
 
@@ -122,94 +125,14 @@ extract_max_sigma() {
 FRAMEWORK_D_REL_TOL=1e-6
 COMPARISON_END_TIME=5
 
-# The legacy model's final D, as the max and mean component magnitude of the
-# field written to fourteen figures, from the last commit that had it
-# (mcl-stage8-coverage, c3a92b3d), per fork
-case "$(solids4Foam::foamFlavour)" in
-    com)
-        LEGACY_D_MAX=0.00015702498751748
-        LEGACY_D_MEAN=7.86486280639836e-05
-        ;;
-    org)
-        LEGACY_D_MAX=0.00015702498782177
-        LEGACY_D_MEAN=7.86486272668098e-05
-        ;;
-    *)
-        # The case does not run here
-        LEGACY_D_MAX=""
-        LEGACY_D_MEAN=""
-        ;;
-esac
+# The final D, as the max and mean component magnitude of the field written
+# to fourteen figures, from the removed legacy mechanicalModel on the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d). OpenFOAM.com v2512's;
+# OpenFOAM.org 9 agrees to 2e-9. foam-extend is not compared, as below
+REF_D_MAX=0.00015702498751748
+REF_D_MEAN=7.86486280639836e-05
 
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-# A field against the removed legacy model's, through the norms above. Both
-# differences are bounded by the largest pointwise difference, so a field that
-# agrees with the legacy one to tol times its largest value passes, and one
-# that does not is caught by at least one of the two in all but contrived cases
-check_field_against_legacy() {
-    local label="$1"
-    local file="$2"
-    local legacy_max="$3"
-    local legacy_mean="$4"
-    local tol="$5"
-    local norms field_max field_mean
-
-    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
-        echo "FAIL: ${label}: no field to compare with the legacy model"
-        return 1
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
-                && b <= ${tol}*${legacy_max})
-        }"
-    then
-        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
-            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
-        return 0
-    fi
-
-    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
-        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
-    return 1
-}
-
-run_legacy_comparison() {
+run_reference_comparison() {
     # Not on foam-extend, where the framework and the legacy model differed by
     # 0.6 % in D, and the framework's answer is the one kept. They matched to
     # 1e-13 for two correctors and part of the third, and differed only in the
@@ -228,7 +151,7 @@ run_legacy_comparison() {
     # and foam-extend 4.1 and 5.0. So the legacy answer there is the one known
     # to be wrong, and there is nothing to hold the framework to
     if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-        echo "SKIP: legacy comparison (known foam-extend symmetryPlane difference)"
+        echo "SKIP: reference comparison (known foam-extend symmetryPlane difference)"
         return 0
     fi
 
@@ -251,14 +174,14 @@ run_legacy_comparison() {
     # two differ by around 3e-6 simply because that is the last digit written,
     # which would tell us nothing
     if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-        sed -i 's|^writePrecision.*|writePrecision  14;|' \
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
             "${dir}/system/controlDict"
     else
         echo "writePrecision  14;" >> "${dir}/system/controlDict"
     fi
 
     ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-        echo "FAIL: the legacy comparison could not run ${dir}"
+        echo "FAIL: the reference comparison could not run ${dir}"
         return 1
     }
 
@@ -287,8 +210,8 @@ run_legacy_comparison() {
         return 1
     fi
 
-    check_field_against_legacy "D at t = ${t}" "${dir}/${t}/D" \
-        "${LEGACY_D_MAX}" "${LEGACY_D_MEAN}" "${FRAMEWORK_D_REL_TOL}"
+    solids4Foam::checkFieldNorms "D at t = ${t}" "${dir}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${FRAMEWORK_D_REL_TOL}"
 }
 
 # ------------------------------------------------------------
@@ -333,7 +256,7 @@ fi
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then
-    if ! run_legacy_comparison; then
+    if ! run_reference_comparison; then
         failures=$((failures + 1))
     fi
 

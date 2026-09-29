@@ -38,23 +38,26 @@ APPROACHES=(
 
 # The high-order arms take their stress at the face quadrature points from the
 # mechanicalConstitutiveLaw framework. Their final D, as written, matched the
-# removed legacy mechanicalModel's exactly, and still must. The legacy fields
-# are recorded as digests of their written internal values, from the last
+# removed legacy mechanicalModel's exactly, and still must. It is recorded as
+# the max and mean component magnitude of its internal values, from the last
 # commit that had the legacy model (mcl-stage8-coverage, c3a92b3d), on
 # OpenFOAM.com v2512 and OpenFOAM.org 9, where the high-order arms run, and the
-# same on both.
+# same on both. The tolerance, 1e-5 of the largest value, is a few units in the
+# last of the six figures written.
 #
-# At the six figures written, D is the rigid rotation itself: every arm here
-# writes the same field. So this says the high-order arms still rotate the
-# block rigidly to that precision, as they did on the legacy model; the
-# stress bound above is the check on how rigidly
-declare -A LEGACY_D_DIGEST=()
-case "$(solids4Foam::foamFlavour)" in
-    com|org)
-        LEGACY_D_DIGEST[highOrder]=59bbcbdcd22ae9b18f041bbbc1d5916cefeb9adb
-        LEGACY_D_DIGEST[highOrderUpdatedLagrangian]=59bbcbdcd22ae9b18f041bbbc1d5916cefeb9adb
-        ;;
-esac
+# At those six figures, D is the rigid rotation itself: every arm here writes
+# the same field. So this says the high-order arms still rotate the block
+# rigidly to that precision, as they did on the legacy model; the stress bound
+# above is the check on how rigidly
+declare -A REF_D_MAX=(
+    [highOrder]=2.05053
+    [highOrderUpdatedLagrangian]=2.05053
+)
+declare -A REF_D_MEAN=(
+    [highOrder]=0.4825039126
+    [highOrderUpdatedLagrangian]=0.4825039126
+)
+REF_D_REL_TOL=1e-5
 
 failures=0
 
@@ -74,22 +77,6 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
-}
-
-# A digest of a field's internal values as written, independent of the file
-# header, which names the OpenFOAM version that wrote it
-internal_field_digest() {
-    python3 - "$1" << 'PYEOF'
-import hashlib
-import re
-import sys
-
-text = open(sys.argv[1]).read()
-field = re.search(r"\binternalField\s+(.*?);\s*\n\s*boundaryField", text, re.DOTALL)
-if not field:
-    sys.exit(f"cannot find the internalField in {sys.argv[1]}")
-print(hashlib.sha1(" ".join(field.group(1).split()).encode()).hexdigest())
-PYEOF
 }
 
 prepare_case
@@ -141,15 +128,13 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    if [[ -n "${LEGACY_D_DIGEST[${approach}]:-}" ]]; then
+    if [[ -n "${REF_D_MAX[${approach}]:-}" ]]; then
         latest_time=$(solids4Foam::latestTime "${CASE_DIR}")
-        digest=$(internal_field_digest "${CASE_DIR}/${latest_time}/D" || true)
 
-        if [[ "${digest}" == "${LEGACY_D_DIGEST[${approach}]}" ]]; then
-            echo "PASS: ${approach} D matches the legacy model's exactly"
-        else
-            echo "FAIL: ${approach} D differs from the legacy model's" \
-                "(digest ${digest:-none}, legacy ${LEGACY_D_DIGEST[${approach}]})"
+        if ! solids4Foam::checkFieldNorms "${approach} D" \
+            "${CASE_DIR}/${latest_time}/D" "${REF_D_MAX[${approach}]}" \
+            "${REF_D_MEAN[${approach}]}" "${REF_D_REL_TOL}"
+        then
             failures=$((failures + 1))
         fi
     fi

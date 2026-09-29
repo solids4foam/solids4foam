@@ -11,6 +11,9 @@ BACKWARD_CASE_DIR="${REGRESSION_ROOT}/backwardRestart"
 # Source solids4Foam scripts
 source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # Beam-in-cross-flow FSI regression test
 # ============================================================
@@ -43,22 +46,16 @@ MOTION_RATIO_TOL=1e-3       # per-step |1 - ratio| tolerance
 REF_MAX_DISP=2.23646e-07
 REF_MEAN_FORCE=0.0320942
 
-# The final probe displacement magnitude of the removed legacy
-# mechanicalModel, per fork, as CI logged it on the last commit that had it
-# (mcl-stage8-coverage, 9b46ef47, which carries development's fluid-solid
-# coupling changes; the answer before them was 7.18043e-07 on OpenFOAM.com):
-# the coupled answer moves between forks by more than the framework moved from
-# legacy on any one of them. The material is linear elastic, so the framework
-# solves the same problem, and it reproduced these in every figure printed.
-# The log gives six, so a round-off difference on another machine can move
-# the last one; the tolerance, 1e-5 relative, is a few units in that figure.
-# These are v2512's; v2412 differs by about 2%
-case "$(solids4Foam::foamFlavour)" in
-    com)        LEGACY_FINAL_MAGD=7.15479e-07 ;;
-    org)        LEGACY_FINAL_MAGD=7.06217e-07 ;;
-    foamextend) LEGACY_FINAL_MAGD=7.0864e-07 ;;
-esac
-LEGACY_MAGD_REL_TOL=1e-5
+# The final probe displacement magnitude. One value for every fork and
+# version: the coupled answer moves between them, 7.15479e-07 on OpenFOAM.com
+# v2512, 7.06217e-07 on OpenFOAM.org 9 and 7.0864e-07 on foam-extend 4.1, and
+# about 2% from v2512 on v2412, so the value is the middle of that spread and
+# the tolerance, 3% relative, covers it. The material is linear elastic, and
+# on each fork the framework reproduced the removed legacy mechanicalModel's
+# answer in every figure printed (mcl-stage8-coverage, 9b46ef47), so this
+# holds the answer to within the fork spread, not to round-off
+REF_FINAL_MAGD=7.11e-07
+REF_MAGD_REL_TOL=3e-2
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -97,16 +94,16 @@ prepare_case() {
 
     copy_case "${case_dir}"
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${end_time};/" "${case_dir}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i "s/^\(endTime[[:space:]]*\).*/\1${end_time};/" "${case_dir}/system/controlDict"
 }
 
 prepare_unmasked_case() {
     prepare_case "${UNMASKED_CASE_DIR}" "${UNMASKED_END_TIME}"
 
     # The inlet and outlet are the only fixedValue pointD patches
-    sed -i "s/fixedValue/calculated/" "${UNMASKED_CASE_DIR}/0/solid/pointD"
+    "${SOLIDS4FOAM_SED}" -i "s/fixedValue/calculated/" "${UNMASKED_CASE_DIR}/0/solid/pointD"
 
-    sed -i '/^functions/,/^{/ s/^{/{\n    #include "interfaceMotionRatio"/' \
+    "${SOLIDS4FOAM_SED}" -i '/^functions/,/^{/ s/^{/{\n    #include "interfaceMotionRatio"/' \
         "${UNMASKED_CASE_DIR}/system/controlDict"
 }
 
@@ -117,7 +114,7 @@ prepare_unmasked_case() {
 # by name, to build the p-wave speed it uses for its added-mass term, so
 # lawImpK() has to register a field the fluid side can find. The same
 # lookup is used by the contact penalty models and the cohesive zone models
-check_against_legacy() {
+check_against_reference() {
     local failures=0
 
     local solver_log
@@ -146,14 +143,14 @@ check_against_legacy() {
         return $((failures + 1))
     fi
 
-    if awk "BEGIN {d = ${disp} - ${LEGACY_FINAL_MAGD}; if (d < 0) d = -d;
-                   exit !(d <= ${LEGACY_MAGD_REL_TOL} * ${LEGACY_FINAL_MAGD})}"
+    if awk "BEGIN {d = ${disp} - ${REF_FINAL_MAGD}; if (d < 0) d = -d;
+                   exit !(d <= ${REF_MAGD_REL_TOL} * ${REF_FINAL_MAGD})}"
     then
-        printf "PASS: final displacement matches the legacy model (%.8g vs %.8g)\n" \
-            "${disp}" "${LEGACY_FINAL_MAGD}"
+        printf "PASS: final displacement matches the reference (%.8g vs %.8g)\n" \
+            "${disp}" "${REF_FINAL_MAGD}"
     else
-        printf "FAIL: final displacement differs from the legacy model (%.8g vs %.8g)\n" \
-            "${disp}" "${LEGACY_FINAL_MAGD}"
+        printf "FAIL: final displacement differs from the reference (%.8g vs %.8g)\n" \
+            "${disp}" "${REF_FINAL_MAGD}"
         failures=$((failures + 1))
     fi
 
@@ -165,16 +162,16 @@ prepare_backward_case() {
 
     # This total-strain material does not need constitutive kinematic history,
     # but a restart must say so explicitly.
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         's/^    nCorrectors/    restart                 no;\n\n    nCorrectors/' \
         "${BACKWARD_CASE_DIR}/constant/solid/solidProperties"
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${BACKWARD_END_TIME};/" \
+    "${SOLIDS4FOAM_SED}" -i "s/^\(endTime[[:space:]]*\).*/\1${BACKWARD_END_TIME};/" \
         "${BACKWARD_CASE_DIR}/system/controlDict"
-    sed -i "s/^\(writeInterval[[:space:]]*\).*/\1${BACKWARD_WRITE_INTERVAL};/" \
+    "${SOLIDS4FOAM_SED}" -i "s/^\(writeInterval[[:space:]]*\).*/\1${BACKWARD_WRITE_INTERVAL};/" \
         "${BACKWARD_CASE_DIR}/system/controlDict"
-    sed -i "s/^\(startFrom[[:space:]]*\).*/\1latestTime;/" \
+    "${SOLIDS4FOAM_SED}" -i "s/^\(startFrom[[:space:]]*\).*/\1latestTime;/" \
         "${BACKWARD_CASE_DIR}/system/controlDict"
-    sed -i "s/default[[:space:]]*Euler;/default            backward;/" \
+    "${SOLIDS4FOAM_SED}" -i "s/default[[:space:]]*Euler;/default            backward;/" \
         "${BACKWARD_CASE_DIR}/system/fluid/fvSchemes"
 }
 
@@ -359,7 +356,7 @@ force_diff_abs=$(abs "${force_diff}")
 
 failures=0
 
-check_against_legacy || failures=$((failures + $?))
+check_against_reference || failures=$((failures + $?))
 
 if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
     printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \

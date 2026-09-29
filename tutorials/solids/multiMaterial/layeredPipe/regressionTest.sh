@@ -22,32 +22,20 @@ THETA_POINT_ERR_MAX=0.01
 
 # The point displacement of the removed legacy mechanicalModel, as the max and
 # mean component magnitude of its final pointD, from the last commit that had
-# it (mcl-stage8-coverage, c3a92b3d), per fork. The two are different
-# discretisations - the legacy model took its gradient per material on
-# sub-meshes, the framework takes it from the material-aware leastSquaresS4f
-# scheme on the whole mesh - so their cell displacements differ by about 1.5e-3
-# of the largest displacement, and the point displacements by 1.5e-3 on both
-# foam-extend 4.1 and OpenFOAM.com v2512. Interpolating the framework
-# displacement to the points with foam-extend's least squares fit, which
-# straddles the interface, instead puts the difference at 4.9e-3, so the 3e-3
-# threshold the two were compared with separates the two
-case "$(solids4Foam::foamFlavour)" in
-    com)
-        LEGACY_POINT_D_MAX=1.62294e-07
-        LEGACY_POINT_D_MEAN=3.77074821948899e-08
-        ;;
-    foamextend)
-        LEGACY_POINT_D_MAX=1.62284e-07
-        LEGACY_POINT_D_MEAN=3.77106432123373e-08
-        ;;
-    *)
-        # The legacy model never ran this case here, so there is no answer
-        # of its to compare with
-        LEGACY_POINT_D_MAX=""
-        LEGACY_POINT_D_MEAN=""
-        ;;
-esac
-POINT_D_LEGACY_REL_MAX=3e-3
+# it (mcl-stage8-coverage, c3a92b3d). The two are different discretisations -
+# the legacy model took its gradient per material on sub-meshes, the framework
+# takes it from the material-aware leastSquaresS4f scheme on the whole mesh -
+# so their cell displacements differ by about 1.5e-3 of the largest
+# displacement, and the point displacements by 1.5e-3 on both foam-extend 4.1
+# and OpenFOAM.com v2512. Interpolating the framework displacement to the
+# points with foam-extend's least squares fit, which straddles the interface,
+# instead puts the difference at 4.9e-3, so the 3e-3 threshold the two were
+# compared with separates the two. These are OpenFOAM.com v2512's; foam-extend
+# 4.1's differ by 6e-5, well inside it. The legacy model never ran this case
+# on OpenFOAM.org, so there it is not compared
+REF_POINT_D_MAX=1.62294e-07
+REF_POINT_D_MEAN=3.77074821948899e-08
+POINT_D_REF_REL_MAX=3e-3
 
 # The parallel arms against the serial arm. The solver is
 # not decomposition invariant to round-off with any gradient scheme: a single
@@ -145,114 +133,29 @@ run_constitutive_test() {
     return 1
 }
 
-# Relative difference between the internal fields of two vector fields on the
-# same mesh, followed by the largest magnitude component of each, separated by
-# tabs as IFS does not split on spaces here
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-# A field against the removed legacy model's, through the norms above. Both
-# differences are bounded by the largest pointwise difference, so a field that
-# agrees with the legacy one to tol times its largest value passes, and one
-# that does not is caught by at least one of the two in all but contrived cases
-check_field_against_legacy() {
-    local label="$1"
-    local file="$2"
-    local legacy_max="$3"
-    local legacy_mean="$4"
-    local tol="$5"
-    local norms field_max field_mean
-
-    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
-        echo "FAIL: ${label}: no field to compare with the legacy model"
-        return 1
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
-                && b <= ${tol}*${legacy_max})
-        }"
-    then
-        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
-            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
-        return 0
-    fi
-
-    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
-        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
-    return 1
-}
-
+# The largest pointwise difference between two fields' internal values,
+# relative to the first's largest magnitude, and both largest magnitudes, as
+# "rel<TAB>max1<TAB>max2"
 compare_internal_vector_fields() {
-    python3 - "$1" "$2" << 'PYEOF'
-import re
-import sys
+    local a b
+    a=$(solids4Foam::internalFieldValues "$1") || return 1
+    b=$(solids4Foam::internalFieldValues "$2") || return 1
 
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-
-def read_internal(path):
-    text = open(path).read()
-    nonuniform = re.search(
-        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not nonuniform:
-        raise ValueError(f"cannot parse internalField in {path}")
-
-    values = re.findall(
-        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
-    )
-    if not values:
-        raise ValueError(f"empty internalField in {path}")
-    return [tuple(map(float, value)) for value in values]
-
-try:
-    a = read_internal(sys.argv[1])
-    b = read_internal(sys.argv[2])
-    if len(a) != len(b):
-        raise ValueError("different internalField sizes")
-    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
-    max_a = max(abs(x) for av in a for x in av)
-    max_b = max(abs(x) for av in b for x in av)
-    print(f"{max_diff/max_a if max_a else max_diff:.10g}\t{max_a:.10g}\t{max_b:.10g}")
-except (OSError, ValueError) as error:
-    print(error, file=sys.stderr)
-    sys.exit(1)
-PYEOF
+    paste <(echo "${a}") <(echo "${b}") | awk '
+        NF != 2 {
+            print "different internalField sizes" > "/dev/stderr"
+            bad = 1
+            exit 1
+        }
+        {
+            d = $1 - $2; if (d < 0) d = -d; if (d > maxDiff) maxDiff = d
+            x = ($1 < 0 ? -$1 : $1); if (x > maxA) maxA = x
+            y = ($2 < 0 ? -$2 : $2); if (y > maxB) maxB = y
+        }
+        END {
+            if (bad) exit 1
+            printf "%.10g\t%.10g\t%.10g\n", (maxA ? maxDiff/maxA : maxDiff), maxA, maxB
+        }'
 }
 
 CHECK_ONLY=false
@@ -392,12 +295,12 @@ if [ "$CHECK_ONLY" = false ]; then
     then
         echo "FAIL: the case constructed no mechanical constitutive law"
         failures=$((failures + 1))
-    elif [[ -z "${LEGACY_POINT_D_MAX}" ]]; then
-        echo "SKIP: pointD against the legacy model: no legacy answer on this fork"
-    elif ! check_field_against_legacy "pointD" \
+    elif [[ "$(solids4Foam::foamFlavour)" == org ]]; then
+        echo "SKIP: pointD against the reference: none on OpenFOAM.org"
+    elif ! solids4Foam::checkFieldNorms "pointD" \
         "${CASE_DIR}/$(solids4Foam::latestTime "${CASE_DIR}")/pointD" \
-        "${LEGACY_POINT_D_MAX}" "${LEGACY_POINT_D_MEAN}" \
-        "${POINT_D_LEGACY_REL_MAX}"
+        "${REF_POINT_D_MAX}" "${REF_POINT_D_MEAN}" \
+        "${POINT_D_REF_REL_MAX}"
     then
         failures=$((failures + 1))
     fi

@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # Land et al. (2015) problem 3 regression test
 #
@@ -34,7 +37,7 @@ MAG_D_MAX=9.0e-4
 # commit that had it (mcl-stage8-coverage, c3a92b3d), on OpenFOAM.com v2512,
 # the one fork this case runs on. See below for why the framework is near it
 # rather than on it
-LEGACY_MAG_D=8.515121585e-4
+REF_MAG_D=8.515121585e-4
 
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
@@ -60,7 +63,7 @@ prepare_case() {
 }
 
 prepare_case
-sed -i 's/^writePrecision.*/writePrecision  14;/' "${CASE_DIR}/system/controlDict"
+"${SOLIDS4FOAM_SED}" -i 's/^writePrecision.*/writePrecision  14;/' "${CASE_DIR}/system/controlDict"
 ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
 if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
@@ -88,13 +91,9 @@ failures=0
 if [[ ! -f "${CASE_DIR}/0/f0" ]]; then
     echo "FAIL: setFibreField produced no fibre field"
     failures=$((failures + 1))
-elif python3 - "${CASE_DIR}/0/f0" << 'PYEOF'
-import re, sys
-body = open(sys.argv[1]).read().split('* * * * *')[-1]
-nums = [float(x) for x in re.findall(r'-?\d+\.?\d*(?:[eE][-+]?\d+)?', body)]
-# any component away from zero means a direction was actually set
-sys.exit(0 if any(abs(v) > 1e-8 for v in nums) else 1)
-PYEOF
+# Any component away from zero means a direction was actually set
+elif solids4Foam::internalFieldValues "${CASE_DIR}/0/f0" \
+    | awk '{v = ($1 < 0 ? -$1 : $1); if (v > 1e-8) set = 1} END {exit !set}'
 then
     echo "PASS: the fibre field is set"
 else
@@ -113,7 +112,6 @@ else
     printf "FAIL: final probe |D| = %.6g\n" "${magD}"
     failures=$((failures + 1))
 fi
-
 
 # ------------------------------------------------------------
 # The displacement formulation against its reference and the legacy model
@@ -189,15 +187,15 @@ check_displacement_formulation() {
     fi
     printf "PASS: matches the reference (%.10g)\n" "${b}"
 
-    if awk "BEGIN {exit !((${LEGACY_MAG_D} - ${b})^2 <= (1e-3*${LEGACY_MAG_D})^2)}"
+    if awk "BEGIN {exit !((${REF_MAG_D} - ${b})^2 <= (1e-3*${REF_MAG_D})^2)}"
     then
-        printf "PASS: near the legacy model, differing by the reformulation (%.10g vs %.10g)\n" \
-            "${b}" "${LEGACY_MAG_D}"
+        printf "PASS: near the reference, differing by the reformulation (%.10g vs %.10g)\n" \
+            "${b}" "${REF_MAG_D}"
         return 0
     fi
 
-    printf "FAIL: differs from the legacy model by more than the reformulation explains (%.10g vs %.10g)\n" \
-        "${b}" "${LEGACY_MAG_D}"
+    printf "FAIL: differs from the reference by more than the reformulation explains (%.10g vs %.10g)\n" \
+        "${b}" "${REF_MAG_D}"
     return 1
 }
 
@@ -221,7 +219,7 @@ run_mixed_framework() {
         [[ "$(basename "${item}")" == "regressionTests" ]] && continue
         cp -a "${item}" "${d}/"
     done
-    sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
 
     ( cd "${d}" && ./Allrun pressure > "${ALLRUN_LOGFILE}" 2>&1 ) || true
 
@@ -295,7 +293,6 @@ run_mixed_framework() {
 if ! run_mixed_framework; then
     failures=$((failures + 1))
 fi
-
 
 echo
 if (( failures == 0 )); then

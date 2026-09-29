@@ -39,25 +39,22 @@ SIGMA_TOL=1e4
 # near zero, so it is compared on the absolute scale of the threshold - 1% of
 # it - rather than relative to a value that is itself almost zero, as the two
 # models were
-LEGACY_SIGMA=3700.73
-LEGACY_SIGMA_TOL=$(awk "BEGIN {print 0.01*${SIGMA_TOL}}")
-
-APPROACHES=(
-    main
-)
+REF_SIGMA=3700.73
+REF_SIGMA_TOL=$(awk "BEGIN {print 0.01*${SIGMA_TOL}}")
 
 failures=0
-declare -A RESULT_SIGMA
+result_sigma=""
 
 echo "============================================================"
 echo "Rigid rotation cylinder regression test"
 echo "Stress threshold: sigmaEq < ${SIGMA_TOL}"
-echo "sigmaEq within ${LEGACY_SIGMA_TOL} of the legacy model"
+echo "sigmaEq within ${REF_SIGMA_TOL} of the reference"
 echo "============================================================"
 
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 prepare_case() {
-    local approach="$1"
-    local case_dir="${REGRESSION_ROOT}/${approach}"
+    local case_dir="${CASE_DIR}"
 
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
@@ -107,31 +104,22 @@ run_constitutive_test() {
     return 1
 }
 
-constitutive_tested=false
-
-for approach in "${APPROACHES[@]}"; do
-    CASE_DIR="${REGRESSION_ROOT}/${approach}"
-
-    echo
-    echo "------------------------------------------------------------"
-    echo "Testing approach: ${approach}"
-    echo "------------------------------------------------------------"
-
-    prepare_case "${approach}"
+run_case() {
+    prepare_case
 
     ( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
     ( cd "${CASE_DIR}" && ./Allrun ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
 
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-        echo "Skipping ${approach} because it is unavailable in this environment"
-        continue
+        echo "Skipping because the case is unavailable in this environment"
+        return 0
     fi
 
     marker='Implicit stiffness from the mechanicalConstitutiveLaw framework'
     if grep -q "${marker}" "${CASE_DIR}/${SOLVER_LOGFILE}"; then
-        echo "PASS: ${approach} took impK from the framework"
+        echo "PASS: took impK from the framework"
     else
-        echo "FAIL: ${approach} did not take impK from the framework"
+        echo "FAIL: did not take impK from the framework"
         failures=$((failures + 1))
     fi
 
@@ -140,50 +128,48 @@ for approach in "${APPROACHES[@]}"; do
         | tail -n 1 || true)
 
     if [[ -z "${sigma}" ]]; then
-        echo "FAIL: ${approach} could not extract sigmaEq from log"
+        echo "FAIL: could not extract sigmaEq from log"
         failures=$((failures + 1))
-        continue
+        return 0
     fi
 
-    RESULT_SIGMA["${approach}"]="${sigma}"
+    result_sigma="${sigma}"
 
     if awk "BEGIN {exit !(${sigma} < ${SIGMA_TOL})}"; then
-        printf "PASS: %s final sigmaEq = %.6g\n" "${approach}" "${sigma}"
+        printf "PASS: final sigmaEq = %.6g\n" "${sigma}"
     else
-        printf "FAIL: %s final sigmaEq = %.6g exceeds threshold %.6g\n" \
-            "${approach}" "${sigma}" "${SIGMA_TOL}"
+        printf "FAIL: final sigmaEq = %.6g exceeds threshold %.6g\n" \
+            "${sigma}" "${SIGMA_TOL}"
         failures=$((failures + 1))
     fi
 
     # Before the Allclean below, which removes the mesh
-    if [[ "${constitutive_tested}" == false ]]; then
-        constitutive_tested=true
-
-        if ! run_constitutive_test "${CASE_DIR}"; then
-            failures=$((failures + 1))
-        fi
+    if ! run_constitutive_test "${CASE_DIR}"; then
+        failures=$((failures + 1))
     fi
 
     ( cd "${CASE_DIR}" && ./Allclean ) >/dev/null 2>&1 || true
-done
+}
+
+run_case
 
 # impK changes the path, not the answer
-if [[ -n "${RESULT_SIGMA[main]:-}" ]]
+if [[ -n "${result_sigma}" ]]
 then
-    a="${LEGACY_SIGMA}"
-    b="${RESULT_SIGMA[main]}"
+    a="${REF_SIGMA}"
+    b="${result_sigma}"
 
-    if awk "BEGIN {exit !(($a - $b)^2 < (${LEGACY_SIGMA_TOL})^2)}"; then
-        printf "PASS: sigmaEq matches the legacy model (%.6g vs %.6g)\n" \
+    if awk "BEGIN {exit !(($a - $b)^2 < (${REF_SIGMA_TOL})^2)}"; then
+        printf "PASS: sigmaEq matches the reference (%.6g vs %.6g)\n" \
             "$b" "$a"
     else
-        printf "FAIL: sigmaEq differs from the legacy model (%.6g vs %.6g)\n" \
+        printf "FAIL: sigmaEq differs from the reference (%.6g vs %.6g)\n" \
             "$b" "$a"
         failures=$((failures + 1))
     fi
 elif ! solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"
 then
-    echo "FAIL: the main arm produced no sigmaEq to compare with the legacy model"
+    echo "FAIL: the main arm produced no sigmaEq to compare with the reference"
     failures=$((failures + 1))
 fi
 

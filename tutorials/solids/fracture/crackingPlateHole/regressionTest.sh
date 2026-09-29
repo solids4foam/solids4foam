@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # crackingPlateHole regression test
 #
@@ -59,8 +62,8 @@ FINAL_FORCE_MAX=8.86e5
 # difference in the stress on the cohesive patch changes which face is
 # released when, which moves the force by per cent. 1e-6 leaves room for
 # round-off across compilers and is far below that
-LEGACY_RELEASED_BY_STEP="3:3 4:3 5:3 6:2 7:2 8:4 9:2 10:3 11:1 12:2 13:1 14:1 15:1 16:1 17:1"
-LEGACY_FORCE_HISTORY="
+REF_RELEASED_BY_STEP="3:3 4:3 5:3 6:2 7:2 8:4 9:2 10:3 11:1 12:2 13:1 14:1 15:1 16:1 17:1"
+REF_FORCE_HISTORY="
 0 0
 1 86934.8180971
 2 173869.638267
@@ -83,7 +86,7 @@ LEGACY_FORCE_HISTORY="
 19 834712.529485
 20 877672.389608
 "
-LEGACY_FORCE_REL_TOL=1e-6
+REF_FORCE_REL_TOL=1e-6
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -94,7 +97,7 @@ echo "crackingPlateHole regression test"
 echo "Faces released in [${RELEASED_FACES_MIN}, ${RELEASED_FACES_MAX}]"
 echo "Force_y first falls at t = ${FIRST_DROP_TIME}, from a peak in [${PEAK_FORCE_MIN}, ${PEAK_FORCE_MAX}]"
 echo "Final force_y in [${FINAL_FORCE_MIN}, ${FINAL_FORCE_MAX}]"
-echo "force_y history against the legacy model, rel. diff <= ${LEGACY_FORCE_REL_TOL}"
+echo "force_y history against the reference, rel. diff <= ${REF_FORCE_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -117,7 +120,7 @@ prepare_arm() {
 
     # Enough digits for the arm comparison to be about the solution rather
     # than about the last digit written
-    sed -i 's/^writePrecision[[:space:]].*/writePrecision  12;/' "${controlDict}"
+    "${SOLIDS4FOAM_SED}" -i 's/^writePrecision[[:space:]].*/writePrecision  12;/' "${controlDict}"
 
     # The reaction force on the loaded edge. The tutorial has no function
     # objects, so the copy gets one
@@ -309,11 +312,11 @@ if [[ -n "${case_time}" && -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
     # Releasing is a threshold, so the same answer releases the same faces at
     # the same time steps
     released="$(released_by_step "${CASE_DIR}")"
-    if [[ "${released% }" == "${LEGACY_RELEASED_BY_STEP}" ]]
+    if [[ "${released% }" == "${REF_RELEASED_BY_STEP}" ]]
     then
-        echo "PASS: the same faces released at the same times as the legacy model"
+        echo "PASS: the same faces released at the same times as the reference"
     else
-        fail "faces released at different times from the legacy model ('${released% }')"
+        fail "faces released at different times from the reference ('${released% }')"
     fi
 
     # Row by row, over the whole history, the case having written the times
@@ -330,15 +333,15 @@ if [[ -n "${case_time}" && -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
                 k++
             }
             END {if (bad || k != n || n == 0) exit 1; printf "%.6g", m/ref}
-        ' <(echo "${LEGACY_FORCE_HISTORY}") "${CASE_DIR}/${FORCE_FILE}")
+        ' <(echo "${REF_FORCE_HISTORY}") "${CASE_DIR}/${FORCE_FILE}")
     then
-        if awk "BEGIN {exit !(${rel} <= ${LEGACY_FORCE_REL_TOL})}"; then
-            echo "PASS: force_y history matches the legacy model, max rel. diff = ${rel}"
+        if awk "BEGIN {exit !(${rel} <= ${REF_FORCE_REL_TOL})}"; then
+            echo "PASS: force_y history matches the reference, max rel. diff = ${rel}"
         else
-            fail "force_y history differs from the legacy model, max rel. diff = ${rel}"
+            fail "force_y history differs from the reference, max rel. diff = ${rel}"
         fi
     else
-        fail "the force history has different times from the legacy model's"
+        fail "the force history has different times from the reference"
     fi
 fi
 

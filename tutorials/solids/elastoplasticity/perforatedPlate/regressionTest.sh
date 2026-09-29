@@ -6,17 +6,16 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
-# For solids4Foam::foamFlavour, which picks the legacy reference for this fork
+# For solids4Foam::foamFlavour, which picks the reference for this fork
 source "${SOLIDS4FOAM_SCRIPTS}"
+
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
 
 # This is the regression case whose material is history dependent AND which
 # runs the mechanicalConstitutiveLaw framework end to end in a solver, so it is
 # where a plastic history error would show up in a real solve rather than in a
 # unit check
-APPROACHES=(
-    main
-)
-
 # ============================================================
 # Elastoplastic perforated plate regression test
 # Checks strain, stress, and plastic yielding
@@ -47,19 +46,19 @@ YIELD_MAX=44
 # as a difference the unit checks cannot see
 case "$(solids4Foam::foamFlavour)" in
     com)
-        LEGACY_EPS=0.00507147
-        LEGACY_SIG=1.79161e+08
+        REF_EPS=0.00507147
+        REF_SIG=1.79161e+08
         ;;
     org)
-        LEGACY_EPS=0.00507147
-        LEGACY_SIG=1.79161e+08
+        REF_EPS=0.00507147
+        REF_SIG=1.79161e+08
         ;;
     foamextend)
-        LEGACY_EPS=0.00547244
-        LEGACY_SIG=1.87143e+08
+        REF_EPS=0.00547244
+        REF_SIG=1.87143e+08
         ;;
 esac
-LEGACY_REL_TOL=1e-5
+REF_REL_TOL=1e-5
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -75,13 +74,13 @@ echo "Elastoplastic perforated plate regression test"
 echo "Max epsilonEq           in [${EPSILON_MIN}, ${EPSILON_MAX}]"
 echo "Max sigmaEq (von Mises) in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "Yielding points         in [${YIELD_MIN}, ${YIELD_MAX}]"
-echo "epsilonEq and sigmaEq match the legacy model to ${LEGACY_REL_TOL}"
+echo "epsilonEq and sigmaEq match the reference to ${REF_REL_TOL}"
 echo "============================================================"
 echo
 
+# A copy of the case in regressionTests/<name>, main unless named
 prepare_case() {
-    local approach="$1"
-    CASE_DIR="${REGRESSION_ROOT}/${approach}"
+    CASE_DIR="${REGRESSION_ROOT}/${1:-main}"
 
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
@@ -100,7 +99,7 @@ prepare_case() {
     # written in total strain, but an incremental one does, and a restart arm
     # that does not ask for it is testing a half restart. The main arm asks
     # too, so that the restarts below are compared with a run set up the same
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         's/^    predictor yes;/    restart yes;\n    predictor yes;/' \
         "${CASE_DIR}/constant/solidProperties"
     rm -f "${CASE_DIR}/constant/solidProperties.bak"
@@ -174,20 +173,15 @@ run_constitutive_test() {
 }
 
 # ------------------------------------------------------------
-# Run and check each approach
+# Run and check the case
 # ------------------------------------------------------------
 
 failures=0
-declare -A RESULT_EPS
-declare -A RESULT_SIG
+result_eps=""
+result_sig=""
 
-for approach in "${APPROACHES[@]}"; do
-    echo
-    echo "------------------------------------------------------------"
-    echo "Testing approach: ${approach}"
-    echo "------------------------------------------------------------"
-
-    prepare_case "${approach}"
+run_case() {
+    prepare_case
 
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
@@ -195,9 +189,9 @@ for approach in "${APPROACHES[@]}"; do
     if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        echo "PASS: ${approach} took its material from the framework"
+        echo "PASS: took its material from the framework"
     else
-        echo "FAIL: ${approach} constructed no mechanical constitutive law"
+        echo "FAIL: constructed no mechanical constitutive law"
         failures=$((failures + 1))
     fi
 
@@ -206,34 +200,34 @@ for approach in "${APPROACHES[@]}"; do
     yielding_points=$(extract_yielding_points)
 
     if [[ -z "${epsilon}" || -z "${sigma}" || -z "${yielding_points}" ]]; then
-        echo "FAIL: ${approach} could not extract one or more quantities"
+        echo "FAIL: could not extract one or more quantities"
         failures=$((failures + 1))
-        continue
+        return 0
     fi
 
-    RESULT_EPS["${approach}"]="${epsilon}"
-    RESULT_SIG["${approach}"]="${sigma}"
+    result_eps="${epsilon}"
+    result_sig="${sigma}"
 
     if awk "BEGIN {exit !(${epsilon} >= ${EPSILON_MIN} && ${epsilon} <= ${EPSILON_MAX})}"
     then
-        printf "PASS: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+        printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
     else
-        printf "FAIL: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+        printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
         failures=$((failures + 1))
     fi
 
     if awk "BEGIN {exit !(${sigma} >= ${SIGMA_MIN} && ${sigma} <= ${SIGMA_MAX})}"
     then
-        printf "PASS: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+        printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
     else
-        printf "FAIL: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+        printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
         failures=$((failures + 1))
     fi
 
     if (( yielding_points >= YIELD_MIN && yielding_points <= YIELD_MAX )); then
-        printf "PASS: %s yielding = %d\n" "${approach}" "${yielding_points}"
+        printf "PASS: yielding = %d\n" "${yielding_points}"
     else
-        printf "FAIL: %s yielding = %d\n" "${approach}" "${yielding_points}"
+        printf "FAIL: yielding = %d\n" "${yielding_points}"
         failures=$((failures + 1))
     fi
 
@@ -242,28 +236,30 @@ for approach in "${APPROACHES[@]}"; do
     fi
 
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-done
+}
+
+run_case
 
 # The framework must reproduce the legacy result
-if [[ -n "${RESULT_EPS[main]:-}" ]]; then
+if [[ -n "${result_eps}" ]]; then
     for q in eps sig; do
         if [[ "${q}" == "eps" ]]; then
-            a="${LEGACY_EPS}"; b="${RESULT_EPS[main]}"; n="epsilonEq"
+            a="${REF_EPS}"; b="${result_eps}"; n="epsilonEq"
         else
-            a="${LEGACY_SIG}"; b="${RESULT_SIG[main]}"; n="sigmaEq"
+            a="${REF_SIG}"; b="${result_sig}"; n="sigmaEq"
         fi
 
-        if awk "BEGIN {exit !(($a - $b)^2 <= (${LEGACY_REL_TOL}*$a)^2)}"; then
-            printf "PASS: %s matches the legacy model (%.8g vs %.8g)\n" \
+        if awk "BEGIN {exit !(($a - $b)^2 <= (${REF_REL_TOL}*$a)^2)}"; then
+            printf "PASS: %s matches the reference (%.8g vs %.8g)\n" \
                 "$n" "$b" "$a"
         else
-            printf "FAIL: %s differs from the legacy model (%.8g vs %.8g)\n" \
+            printf "FAIL: %s differs from the reference (%.8g vs %.8g)\n" \
                 "$n" "$b" "$a"
             failures=$((failures + 1))
         fi
     done
 else
-    echo "FAIL: the main arm produced no result to compare with the legacy model"
+    echo "FAIL: the main arm produced no result to compare with the reference"
     failures=$((failures + 1))
 fi
 
@@ -301,7 +297,7 @@ prepare_written_traction_series_for_restart() {
         for field_file in "${time_dir}"/D*; do
             [[ -f "${field_file}" ]] || continue
             if grep -q 'fileName' "${field_file}"; then
-                sed -i.bak 's/fileName/file/' "${field_file}"
+                "${SOLIDS4FOAM_SED}" -i.bak 's/fileName/file/' "${field_file}"
                 rm -f "${field_file}.bak"
             fi
         done
@@ -314,9 +310,9 @@ run_restart_test() {
     prepare_case "restart"
     CASE_DIR="${base}"
 
-    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/' \
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^writePrecision  6;/writePrecision  14;/' \
         "${CASE_DIR}/system/controlDict"
-    sed -i.bak 's/^endTime         20;/endTime         10;/' \
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime         20;/endTime         10;/' \
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 
@@ -348,7 +344,7 @@ run_restart_test() {
     rm -rf "${guard_dir}"
     cp -a "${CASE_DIR}" "${guard_dir}"
     rm -f "${guard_dir}"/10/*IntegrationPointTopology_epsilonP
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
         "${guard_dir}/system/controlDict"
     rm -f "${guard_dir}/system/controlDict.bak"
@@ -366,7 +362,7 @@ run_restart_test() {
     fi
 
     # 1. the restart itself
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
@@ -382,7 +378,7 @@ run_restart_test() {
     eps=$(extract_max_epsilon)
     sig=$(extract_max_sigma)
 
-    if [[ -z "${eps}" || -z "${sig}" || -z "${RESULT_EPS[main]:-}" ]]; then
+    if [[ -z "${eps}" || -z "${sig}" || -z "${result_eps}" ]]; then
         echo "SKIP: restart: needs the main arm to have run"
         return 0
     fi
@@ -394,7 +390,7 @@ run_restart_test() {
     # because the solver stops on a residual measured relative to its first
     # one and a restarted step does not start from the same guess
     local a b
-    a="${RESULT_EPS[main]}"; b="${eps}"
+    a="${result_eps}"; b="${eps}"
 
     if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart reproduces the uninterrupted run (%.8g vs %.8g)\n" \
@@ -435,7 +431,7 @@ run_parallel_restart_test() {
     prepare_case "parallel"
     CASE_DIR="${d}"
 
-    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
 
@@ -448,7 +444,7 @@ numberOfSubdomains ${PARALLEL_N_PROCS};
 method scotch;
 EOD
 
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
@@ -495,12 +491,12 @@ EOD
     local eps
     eps=$(grep "Max epsilonEq" "${d}/log.par" | awk '{print $NF}' | tail -n 1)
 
-    if [[ -z "${eps}" || -z "${RESULT_EPS[main]:-}" ]]; then
+    if [[ -z "${eps}" || -z "${result_eps}" ]]; then
         echo "SKIP: parallel restart needs the main arm to have run"
         return 0
     fi
 
-    local a="${RESULT_EPS[main]}"
+    local a="${result_eps}"
 
     if awk "BEGIN {exit !(($a - $eps)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart on %s processors matches the serial run (%.8g vs %.8g)\n" \
@@ -547,7 +543,7 @@ run_reconstructed_restart_test() {
     prepare_case "reconstructed"
     CASE_DIR="${d}"
 
-    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^writePrecision  6;/writePrecision  14;/; s/^endTime         20;/endTime         10;/' \
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
 
@@ -591,7 +587,7 @@ EOD
     fi
     echo "PASS: reconstructed restart: state stays in the processor directories"
 
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         10;/endTime         20;/' \
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
@@ -612,12 +608,12 @@ EOD
     local eps
     eps=$(extract_max_epsilon)
 
-    if [[ -z "${eps}" || -z "${RESULT_EPS[main]:-}" ]]; then
+    if [[ -z "${eps}" || -z "${result_eps}" ]]; then
         echo "SKIP: reconstructed restart needs the main arm"
         return 0
     fi
 
-    local a="${RESULT_EPS[main]}"
+    local a="${result_eps}"
 
     if awk "BEGIN {exit !(($a - $eps)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart after reconstructPar matches the serial run (%.8g vs %.8g)\n" \

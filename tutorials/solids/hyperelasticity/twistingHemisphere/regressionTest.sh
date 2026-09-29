@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # twistingHemisphere regression test
 # To keep the run short, only the start of the load history is simulated:
@@ -85,7 +88,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i.bak "s/^endTime[[:space:]]\+13;/endTime         ${REGRESSION_END_TIME};/" \
+    "${SOLIDS4FOAM_SED}" -i.bak "s/^endTime[[:space:]]\+13;/endTime         ${REGRESSION_END_TIME};/" \
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 }

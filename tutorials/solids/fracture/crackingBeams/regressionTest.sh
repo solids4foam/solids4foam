@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # crackingBeams regression test
 #
@@ -62,8 +65,8 @@ FINAL_FORCE_MAX=62.0
 # from, or in the stress on the new crack faces, changes which face breaks
 # when, which moves the force by per cent. 1e-6 leaves room for round-off
 # across compilers and is far below that
-LEGACY_CRACK_FACES=44
-LEGACY_FORCE_HISTORY="
+REF_CRACK_FACES=44
+REF_FORCE_HISTORY="
 0 0
 1 26.1319882895
 2 44.4955884866
@@ -76,7 +79,7 @@ LEGACY_FORCE_HISTORY="
 9 64.2618226861
 10 61.4154571245
 "
-LEGACY_FORCE_REL_TOL=1e-6
+REF_FORCE_REL_TOL=1e-6
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -88,7 +91,7 @@ echo "crackingBeams regression test"
 echo "Crack patch faces at t = ${END_TIME} in [${CRACK_FACES_MIN}, ${CRACK_FACES_MAX}]"
 echo "Peak force_y at t = ${PEAK_TIME} in [${PEAK_FORCE_MIN}, ${PEAK_FORCE_MAX}] N"
 echo "Final force_y in [${FINAL_FORCE_MIN}, ${FINAL_FORCE_MAX}] N"
-echo "force_y history against the legacy model, rel. diff <= ${LEGACY_FORCE_REL_TOL}"
+echo "force_y history against the reference, rel. diff <= ${REF_FORCE_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -109,12 +112,12 @@ prepare_arm() {
 
     local controlDict="${d}/system/controlDict"
 
-    sed -i 's/^endTime[[:space:]]\+20;/endTime         '"${END_TIME}"';/' \
+    "${SOLIDS4FOAM_SED}" -i 's/^endTime[[:space:]]\+20;/endTime         '"${END_TIME}"';/' \
         "${controlDict}"
 
     # Enough digits for the arm comparison to be about the solution rather
     # than about the last digit written
-    sed -i 's/^writePrecision[[:space:]].*/writePrecision  12;/' "${controlDict}"
+    "${SOLIDS4FOAM_SED}" -i 's/^writePrecision[[:space:]].*/writePrecision  12;/' "${controlDict}"
 
     # The reaction force on the loaded patch. The tutorial has no function
     # objects, so the copy gets one
@@ -298,10 +301,10 @@ fi
 if [[ -n "${case_faces}" && -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
     # Breaking is a threshold, so the same answer breaks exactly the same
     # faces
-    if [[ "${case_faces}" == "${LEGACY_CRACK_FACES}" ]]; then
-        echo "PASS: ${CRACK_PATCH} patch faces = ${case_faces}, as the legacy model"
+    if [[ "${case_faces}" == "${REF_CRACK_FACES}" ]]; then
+        echo "PASS: ${CRACK_PATCH} patch faces = ${case_faces}, as the reference"
     else
-        fail "${CRACK_PATCH} patch faces = '${case_faces}', legacy model ${LEGACY_CRACK_FACES}"
+        fail "${CRACK_PATCH} patch faces = '${case_faces}', reference ${REF_CRACK_FACES}"
     fi
 
     # Row by row, over the whole history, the case having written the times
@@ -318,15 +321,15 @@ if [[ -n "${case_faces}" && -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
                 k++
             }
             END {if (bad || k != n || n == 0) exit 1; printf "%.6g", m/peak}
-        ' <(echo "${LEGACY_FORCE_HISTORY}") "${CASE_DIR}/${FORCE_FILE}")
+        ' <(echo "${REF_FORCE_HISTORY}") "${CASE_DIR}/${FORCE_FILE}")
     then
-        if awk "BEGIN {exit !(${rel} <= ${LEGACY_FORCE_REL_TOL})}"; then
-            echo "PASS: force_y history matches the legacy model, max rel. diff = ${rel}"
+        if awk "BEGIN {exit !(${rel} <= ${REF_FORCE_REL_TOL})}"; then
+            echo "PASS: force_y history matches the reference, max rel. diff = ${rel}"
         else
-            fail "force_y history differs from the legacy model, max rel. diff = ${rel}"
+            fail "force_y history differs from the reference, max rel. diff = ${rel}"
         fi
     else
-        fail "the force history has different times from the legacy model's"
+        fail "the force history has different times from the reference"
     fi
 fi
 

@@ -10,6 +10,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # blockPunch regression test
 # Checks four load steps with the segregated, PETSc SNES, and high-order
@@ -28,16 +31,16 @@ DISP_Z_MAX=-0.163
 # eight digits printed, and is held to the 1e-6 relative that comparison used
 case "$(solids4Foam::foamFlavour)" in
     com)
-        LEGACY_SEGREGATED_DISP_Z=-0.162328
+        REF_SEGREGATED_DISP_Z=-0.162328
         ;;
     org)
-        LEGACY_SEGREGATED_DISP_Z=-0.162328
+        REF_SEGREGATED_DISP_Z=-0.162328
         ;;
     foamextend)
-        LEGACY_SEGREGATED_DISP_Z=-0.160351
+        REF_SEGREGATED_DISP_Z=-0.160351
         ;;
 esac
-LEGACY_REL_TOL=1e-6
+REF_REL_TOL=1e-6
 
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
@@ -74,7 +77,7 @@ prepare_case() {
         cp -a "${item}" "${case_dir}/"
     done
 
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         "s/^endTime[[:space:]][[:space:]]*[^;][^;]*;/endTime         ${REGRESSION_END_TIME};/" \
         "${case_dir}/system/controlDict"
     rm -f "${case_dir}/system/controlDict.bak"
@@ -273,14 +276,14 @@ done
 # The segregated approach against the legacy law
 if [[ -n "${RESULT_DISP[segregated]:-}" ]]
 then
-    a="${LEGACY_SEGREGATED_DISP_Z}"
+    a="${REF_SEGREGATED_DISP_Z}"
     b="${RESULT_DISP[segregated]}"
 
-    if awk "BEGIN {exit !(($a - $b)^2 <= (${LEGACY_REL_TOL}*$a)^2)}"; then
-        printf "PASS: segregated disp_z matches the legacy model (%.8g vs %.8g)\n" \
+    if awk "BEGIN {exit !(($a - $b)^2 <= (${REF_REL_TOL}*$a)^2)}"; then
+        printf "PASS: segregated disp_z matches the reference (%.8g vs %.8g)\n" \
             "$b" "$a"
     else
-        printf "FAIL: segregated disp_z differs from the legacy model (%.8g vs %.8g)\n" \
+        printf "FAIL: segregated disp_z differs from the reference (%.8g vs %.8g)\n" \
             "$b" "$a"
         failures=$((failures + 1))
     fi

@@ -27,8 +27,8 @@ WF_MAX=7.0e-4
 # digit. The value is written to six figures, so a round-off difference on
 # another machine can move its last digit; the tolerance, 1e-5 relative, is
 # a few units in that digit, and a 0.001% change in E or nu still reaches it
-LEGACY_MAX_WVF=0.000691225
-LEGACY_REL_TOL=1e-5
+REF_MAX_WVF=0.000691225
+REF_REL_TOL=1e-5
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -129,14 +129,14 @@ else
     failures=$((failures + 1))
 fi
 
-if awk "BEGIN {d = ${max_wvf} - ${LEGACY_MAX_WVF}; if (d < 0) d = -d;
-               exit !(d <= ${LEGACY_REL_TOL} * ${LEGACY_MAX_WVF})}"
+if awk "BEGIN {d = ${max_wvf} - ${REF_MAX_WVF}; if (d < 0) d = -d;
+               exit !(d <= ${REF_REL_TOL} * ${REF_MAX_WVF})}"
 then
-    printf "PASS: Max wVf matches the legacy model (%.8g vs %.8g)\n" \
-        "${max_wvf}" "${LEGACY_MAX_WVF}"
+    printf "PASS: Max wVf matches the reference (%.8g vs %.8g)\n" \
+        "${max_wvf}" "${REF_MAX_WVF}"
 else
-    printf "FAIL: Max wVf differs from the legacy model (%.8g vs %.8g)\n" \
-        "${max_wvf}" "${LEGACY_MAX_WVF}"
+    printf "FAIL: Max wVf differs from the reference (%.8g vs %.8g)\n" \
+        "${max_wvf}" "${REF_MAX_WVF}"
     failures=$((failures + 1))
 fi
 

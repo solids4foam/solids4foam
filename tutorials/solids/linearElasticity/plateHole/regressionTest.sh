@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # Plate-with-hole regression tests
 # Checks numerical vs analytical solution for the displacement
@@ -66,28 +69,22 @@ PRESSURE_DISPLACEMENT_CASES=(
 # From the last commit that had it (mcl-stage8-coverage, c3a92b3d).
 #
 # segregated and petscSnesPressure: the final D, as the max and mean component
-# magnitude of the field as written, per fork. For isotropic linear elasticity
-# a deviatoric projection and the declared volumetric split are the same
+# magnitude of the field as written. For isotropic linear elasticity a
+# deviatoric projection and the declared volumetric split are the same
 # operation, so the framework reproduced the legacy D fields to the precision
-# written, 2e-12 at most. D is written to six figures, though, so a round-off
-# difference on another compiler, CPU or MPI build can move the last one; the
-# tolerance, 2e-5 of the largest value, is two units in that figure. Both norms
-# are within the largest pointwise difference, so the bound carries over
-declare -A LEGACY_D_MAX=()
-declare -A LEGACY_D_MEAN=()
-case "$(solids4Foam::foamFlavour)" in
-    com|org)
-        LEGACY_D_MAX[segregated]=1.05063e-05
-        LEGACY_D_MEAN[segregated]=2.56367713626666e-06
-        LEGACY_D_MAX[petscSnesPressure]=1.05169e-05
-        LEGACY_D_MEAN[petscSnesPressure]=2.56525614836667e-06
-        ;;
-    foamextend)
-        LEGACY_D_MAX[segregated]=1.05101e-05
-        LEGACY_D_MEAN[segregated]=2.56399595763334e-06
-        ;;
-esac
-LEGACY_D_REL_TOL=2e-5
+# written, 2e-12 at most. These are OpenFOAM.com v2512's, the same as
+# OpenFOAM.org 9's; foam-extend 4.1 gives a segregated D 3.6e-4 larger at most,
+# and the tolerance, 5e-4 of the largest value, covers that. Both norms are
+# within the largest pointwise difference, so the bound carries over
+declare -A REF_D_MAX=(
+    [segregated]=1.05063e-05
+    [petscSnesPressure]=1.05169e-05
+)
+declare -A REF_D_MEAN=(
+    [segregated]=2.56367713626666e-06
+    [petscSnesPressure]=2.56525614836667e-06
+)
+REF_D_REL_TOL=5e-4
 
 # The pressure-displacement cases, on foam-extend 4.1, where
 # coupledPressureDisplacementSolid runs: DError and pErr maxima, as logged. The
@@ -99,12 +96,12 @@ LEGACY_D_REL_TOL=2e-5
 # up to 40% apart, so this solver's answer here depends on the build, not only
 # on round-off, and the values hold for the CI build. The log gives six
 # figures; the tolerance, 1e-5 relative, is a few units in the last one
-declare -A LEGACY_PD=(
+declare -A REF_PD=(
     # case : DError max, pErr max
     [pressureDisplacementCompressible-coarse]="7.748e-05 22215.6"
     [pressureDisplacementIncompressible-coarse]="8.66026e-05 31612.4"
 )
-LEGACY_PD_REL_TOL=1e-5
+REF_PD_REL_TOL=1e-5
 
 echo "============================================================"
 echo "Plate-with-hole regression tests"
@@ -137,7 +134,7 @@ prepare_case() {
     # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
     # the repository root.
     if [[ -f "${case_dir}/src/Make/options" ]]; then
-        sed -i.bak \
+        "${SOLIDS4FOAM_SED}" -i.bak \
             "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
             "${case_dir}/src/Make/options"
     fi
@@ -263,39 +260,6 @@ check_less_than() {
     fi
 }
 
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-
 # Every arm takes its material from the mechanicalConstitutiveLaw framework
 check_used_framework() {
     local approach="$1"
@@ -347,43 +311,16 @@ for approach in segregated petscSnesPressure; do
     case_dir="${REGRESSION_ROOT}/${approach}"
 
     if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
-        echo "SKIP: ${approach} against the legacy model"
+        echo "SKIP: ${approach} against the reference"
         continue
     fi
 
     t=$(solids4Foam::latestTime "${case_dir}")
-    legacy_max="${LEGACY_D_MAX[${approach}]:-}"
-    legacy_mean="${LEGACY_D_MEAN[${approach}]:-}"
 
-    if [[ -z "${legacy_max}" ]]; then
-        echo "FAIL: ${approach}: no legacy answer recorded for this fork"
-        failures=$((failures + 1))
-        continue
-    fi
-
-    if [[ -z "${t}" || ! -f "${case_dir}/${t}/D" ]] \
-        || ! norms=$(internal_field_norms "${case_dir}/${t}/D")
+    if ! solids4Foam::checkFieldNorms "${approach} D" "${case_dir}/${t}/D" \
+        "${REF_D_MAX[${approach}]}" "${REF_D_MEAN[${approach}]}" \
+        "${REF_D_REL_TOL}"
     then
-        echo "FAIL: ${approach}: no D field to compare with the legacy model"
-        failures=$((failures + 1))
-        continue
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            tol = ${LEGACY_D_REL_TOL}*${legacy_max}
-            exit !(${field_max} > 0 && a <= tol && b <= tol)
-        }"
-    then
-        printf "PASS: %s D matches the legacy model (max %.10g, mean %.10g)\n" \
-            "${approach}" "${field_max}" "${field_mean}"
-    else
-        printf "FAIL: %s D differs from the legacy model: max %.10g (%.10g), mean %.10g (%.10g)\n" \
-            "${approach}" "${field_max}" "${legacy_max}" "${field_mean}" \
-            "${legacy_mean}"
         failures=$((failures + 1))
     fi
 done
@@ -405,24 +342,24 @@ for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    if [[ -n "${LEGACY_PD[${case_name}]:-}" ]]; then
-        IFS=' ' read -r legacy_derror legacy_perr \
-            <<< "${LEGACY_PD[${case_name}]}"
-        for pair in "DError, max:${legacy_derror}" "pErr, max:${legacy_perr}"
+    if [[ -n "${REF_PD[${case_name}]:-}" ]]; then
+        IFS=' ' read -r ref_derror ref_perr \
+            <<< "${REF_PD[${case_name}]}"
+        for pair in "DError, max:${ref_derror}" "pErr, max:${ref_perr}"
         do
             label="${pair%%:*}"
-            legacy_value="${pair##*:}"
+            ref_value="${pair##*:}"
             value="$(extract_log_value "${case_dir}" "${label}")"
             if [[ -z "${value}" ]]; then
-                echo "FAIL: ${case_name}: could not compare ${label} with the legacy model"
+                echo "FAIL: ${case_name}: could not compare ${label} with the reference"
                 failures=$((failures + 1))
-            elif awk "BEGIN {d = ${value} - ${legacy_value}; \
-                exit !(${legacy_value} > 0 \
-                    && d*d <= (${LEGACY_PD_REL_TOL}*${legacy_value})^2)}"
+            elif awk "BEGIN {d = ${value} - ${ref_value}; \
+                exit !(${ref_value} > 0 \
+                    && d*d <= (${REF_PD_REL_TOL}*${ref_value})^2)}"
             then
-                echo "PASS: ${case_name}: ${label} matches the legacy model"
+                echo "PASS: ${case_name}: ${label} matches the reference"
             else
-                echo "FAIL: ${case_name}: ${label} = ${value}, legacy model ${legacy_value}"
+                echo "FAIL: ${case_name}: ${label} = ${value}, reference ${ref_value}"
                 failures=$((failures + 1))
             fi
         done

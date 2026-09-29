@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # Rod and seabed regression test
 # Checks strain and stress
@@ -31,31 +34,16 @@ EPSILON_MAX=2.2e-3
 SIGMA_MIN=40e3
 SIGMA_MAX=58e3
 
-# The final D of the removed legacy mechanicalModel, as the max and mean
-# component magnitude of the field written to fourteen figures, from the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d), per fork. The case as it
-# ships is poroMechanicalLaw over anisotropicBiotElastic, and the framework
-# reproduced the legacy D field exactly, in every one of those figures. These are
-# recorded numbers, though, and another compiler, CPU or MPI build moves an
-# iterative solution by round-off at the solver tolerance: CI measures up to
-# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
-# largest value, allows for that, and is ten times below the 1e-5 that a
-# 0.001% change in a material constant makes
-case "$(solids4Foam::foamFlavour)" in
-    com)
-        LEGACY_D_MAX=0.024504218766989
-        LEGACY_D_MEAN=0.00528889093233214
-        ;;
-    org)
-        LEGACY_D_MAX=0.024504219027988
-        LEGACY_D_MEAN=0.00528889109572662
-        ;;
-    foamextend)
-        LEGACY_D_MAX=0.024496819721199
-        LEGACY_D_MEAN=0.00528997493008025
-        ;;
-esac
-LEGACY_D_REL_TOL=1e-6
+# The final D, as the max and mean component magnitude of the field written
+# to fourteen figures. The case as it ships is poroMechanicalLaw over
+# anisotropicBiotElastic, and the framework reproduced the removed legacy
+# mechanicalModel's D field exactly, in every one of those figures, on every
+# fork (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's;
+# OpenFOAM.org 9 agrees to 1e-8, and foam-extend 4.1 gives a max 3e-4 smaller.
+# The tolerance, 5e-4 of the largest value, covers that
+REF_D_MAX=0.024504218766989
+REF_D_MEAN=0.00528889093233214
+REF_D_REL_TOL=5e-4
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -83,7 +71,7 @@ prepare_case() {
     # Enough digits that the comparison with the legacy answer is about the
     # solution and not about the last figure written
     if grep -q "^writePrecision" "${CASE_DIR}/system/controlDict"; then
-        sed -i 's|^writePrecision.*|writePrecision  14;|' \
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
             "${CASE_DIR}/system/controlDict"
     else
         echo "writePrecision  14;" >> "${CASE_DIR}/system/controlDict"
@@ -147,74 +135,6 @@ fi
 # Checks
 # ------------------------------------------------------------
 
-# The largest magnitude of any component of a field's internal values, and the
-# mean magnitude, as "max<TAB>mean"
-internal_field_norms() {
-    python3 - "$1" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-text = open(sys.argv[1]).read()
-
-uniform = re.search(
-    r"\binternalField\s+uniform\s+(\([^)]*\)|" + number + r")\s*;", text
-)
-if uniform:
-    body = uniform.group(1)
-else:
-    field = re.search(
-        r"\binternalField\s+nonuniform\s+List<\w+>\s+\d+\s*\((.*?)\n\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not field:
-        sys.exit(f"cannot parse internalField in {sys.argv[1]}")
-    body = field.group(1)
-
-values = [abs(float(x)) for x in re.findall(number, body)]
-if not values:
-    sys.exit(f"empty internalField in {sys.argv[1]}")
-print(f"{max(values):.15g}\t{sum(values)/len(values):.15g}")
-PYEOF
-}
-
-# A field against the removed legacy model's, through the norms above. Both
-# differences are bounded by the largest pointwise difference, so a field that
-# agrees with the legacy one to tol times its largest value passes, and one
-# that does not is caught by at least one of the two in all but contrived cases
-check_field_against_legacy() {
-    local label="$1"
-    local file="$2"
-    local legacy_max="$3"
-    local legacy_mean="$4"
-    local tol="$5"
-    local norms field_max field_mean
-
-    if [[ ! -f "${file}" ]] || ! norms=$(internal_field_norms "${file}"); then
-        echo "FAIL: ${label}: no field to compare with the legacy model"
-        return 1
-    fi
-
-    read -r field_max field_mean <<< "${norms}"
-
-    if awk "BEGIN {
-            a = ${field_max} - ${legacy_max}; if (a < 0) a = -a
-            b = ${field_mean} - ${legacy_mean}; if (b < 0) b = -b
-            exit !(${field_max} > 0 && a <= ${tol}*${legacy_max} \
-                && b <= ${tol}*${legacy_max})
-        }"
-    then
-        printf "PASS: %s matches the legacy model: max %.15g (%.15g), mean %.15g (%.15g)\n" \
-            "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}"
-        return 0
-    fi
-
-    printf "FAIL: %s differs from the legacy model: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
-        "${label}" "${field_max}" "${legacy_max}" "${field_mean}" "${legacy_mean}" "${tol}"
-    return 1
-}
-
 # Check the poroMechanicalLaw composite against the legacy law, on the case as
 # it ships: poroMechanicalLaw over anisotropicBiotElastic.
 #
@@ -223,7 +143,7 @@ check_field_against_legacy() {
 # unwritten in the branch this case takes, so they come from whatever the
 # sub-law was given to work in - which is the whole reason the composite hands
 # it the effective stress rather than the caller's total stress
-check_poro_against_legacy() {
+check_poro_against_reference() {
     if ! grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
@@ -243,8 +163,8 @@ check_poro_against_legacy() {
         return 1
     fi
 
-    check_field_against_legacy "poro D at t = ${t}" "${CASE_DIR}/${t}/D" \
-        "${LEGACY_D_MAX}" "${LEGACY_D_MEAN}" "${LEGACY_D_REL_TOL}"
+    solids4Foam::checkFieldNorms "poro D at t = ${t}" "${CASE_DIR}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 failures=0
@@ -268,7 +188,7 @@ else
 fi
 
 echo
-if ! check_poro_against_legacy; then
+if ! check_poro_against_reference; then
     failures=$((failures + 1))
 fi
 

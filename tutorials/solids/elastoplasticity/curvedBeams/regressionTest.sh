@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # curvedBeams regression test
 # Uses the reaction force history as a cheap contact benchmark check.
@@ -25,8 +28,8 @@ FORCE_Y_MAX=-17.6
 # much tighter one, because the framework solves the same problem. It
 # reproduced this value to the eight digits printed; the tolerance is the
 # 0.02 N the two arms were held to when both ran
-LEGACY_FINAL_FORCE_Y=-17.724965
-LEGACY_FORCE_TOL=0.02
+REF_FINAL_FORCE_Y=-17.724965
+REF_FORCE_TOL=0.02
 
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/0/solidForcesdisplacement.dat"
@@ -50,7 +53,7 @@ prepare_case() {
         cp -a "${item}" "${d}/"
     done
 
-    sed -i.bak 's/^endTime[[:space:]]\+31.5;/endTime         9;/' "${d}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+31.5;/endTime         9;/' "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
 }
 
@@ -127,15 +130,15 @@ fi
 
 # The band is wide enough to hold answers that disagree materially, so the
 # legacy answer is checked too
-if awk "BEGIN {d = ${final_force_y} - ${LEGACY_FINAL_FORCE_Y};
+if awk "BEGIN {d = ${final_force_y} - ${REF_FINAL_FORCE_Y};
                if (d < 0) d = -d;
-               exit !(d <= ${LEGACY_FORCE_TOL})}"
+               exit !(d <= ${REF_FORCE_TOL})}"
 then
-    printf "PASS: force_y matches the legacy model (%.8g vs %.8g)\n" \
-        "${final_force_y}" "${LEGACY_FINAL_FORCE_Y}"
+    printf "PASS: force_y matches the reference (%.8g vs %.8g)\n" \
+        "${final_force_y}" "${REF_FINAL_FORCE_Y}"
 else
-    printf "FAIL: force_y differs from the legacy model (%.8g vs %.8g)\n" \
-        "${final_force_y}" "${LEGACY_FINAL_FORCE_Y}"
+    printf "FAIL: force_y differs from the reference (%.8g vs %.8g)\n" \
+        "${final_force_y}" "${REF_FINAL_FORCE_Y}"
     failures=$((failures + 1))
 fi
 

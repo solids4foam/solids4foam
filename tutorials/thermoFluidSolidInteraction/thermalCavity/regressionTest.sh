@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # thermalCavity regression test
 # Uses the fsiConvergenceData output as a cheap convergence check.
@@ -27,7 +30,7 @@ N_FSI_CORRECTORS_MAX=50
 # thermalSolid asks the constitutive implementation only for the density, so
 # the same rho drives the same conjugate heat transfer and the same coupling
 # iteration count: the framework reproduced it exactly, and must
-LEGACY_N_FSI_CORRECTORS=3
+REF_N_FSI_CORRECTORS=3
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -55,7 +58,7 @@ prepare_case() {
 
 shorten_case() {
     local controlDict="${1:-${CASE_DIR}}/system/controlDict"
-    sed -i.bak 's/^endTime[[:space:]]\+10;/endTime         0.1;/' "${controlDict}"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+10;/endTime         0.1;/' "${controlDict}"
     rm -f "${controlDict}.bak"
 }
 
@@ -151,12 +154,12 @@ else
     failures=$((failures + 1))
 fi
 
-if [[ "${n_fsi_correctors}" == "${LEGACY_N_FSI_CORRECTORS}" ]]; then
-    printf "PASS: nFsiCorrectors = %s, as the legacy model\n" \
+if [[ "${n_fsi_correctors}" == "${REF_N_FSI_CORRECTORS}" ]]; then
+    printf "PASS: nFsiCorrectors = %s, as the reference\n" \
         "${n_fsi_correctors}"
 else
-    printf "FAIL: nFsiCorrectors differ (%s, legacy model %s)\n" \
-        "${n_fsi_correctors}" "${LEGACY_N_FSI_CORRECTORS}"
+    printf "FAIL: nFsiCorrectors differ (%s, reference %s)\n" \
+        "${n_fsi_correctors}" "${REF_N_FSI_CORRECTORS}"
     failures=$((failures + 1))
 fi
 

@@ -12,6 +12,9 @@ elif command -v solids4FoamScripts.sh > /dev/null 2>&1; then
     source solids4FoamScripts.sh
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # Provide a fallback definition for older solids4FoamScripts.sh installs
 # that pre-date the regressionCaseSkipped helper.
 if ! declare -F solids4Foam::regressionCaseSkipped > /dev/null 2>&1; then
@@ -75,8 +78,8 @@ SIGMA_PD_MAX=7.6e2
 # published model in the incompressible limit it was written for. The 1% bound
 # says the reformulation is the only thing between them; the framework reads
 # 154.725 here, 0.17% below
-LEGACY_PETSC_SIGMA=154.986
-LEGACY_PETSC_REL_TOL=0.01
+REF_PETSC_SIGMA=154.986
+REF_PETSC_REL_TOL=0.01
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -101,7 +104,7 @@ echo
 shorten_controlDict() {
     local file="$1"
     if [[ -f "${file}" ]]; then
-        sed -i.bak \
+        "${SOLIDS4FOAM_SED}" -i.bak \
             -e 's/^\(\s*endTime\s*\).*/\1     0.02;/' \
             -e 's/^\(\s*deltaT\s*\).*/\1      0.01;/' \
             -e 's/^\(\s*writeControl\s*\).*/\1 timeStep;/' \
@@ -114,7 +117,7 @@ shorten_controlDict() {
 loosen_pressureDisplacement_tolerances() {
     local file="$1"
     if [[ -f "${file}" ]]; then
-        sed -i.bak \
+        "${SOLIDS4FOAM_SED}" -i.bak \
             -e 's/^\(\s*nCorrectors\s*\)[0-9]\+\s*;/\1            200;/' \
             -e 's/^\(\s*solutionTolerance\s*\)[0-9eE.+-]\+\s*;/\1      1e-04;/' \
             -e 's/^\(\s*alternativeTolerance\s*\)[0-9eE.+-]\+\s*;/\1   1e-03;/' \
@@ -283,14 +286,14 @@ done
 
 # The petsc arm against the removed legacy model, within the reformulation
 if [[ -n "${petsc_sigma:-}" ]]; then
-    if awk "BEGIN {exit !((${petsc_sigma} - ${LEGACY_PETSC_SIGMA})^2 \
-        <= (${LEGACY_PETSC_REL_TOL}*${LEGACY_PETSC_SIGMA})^2)}"
+    if awk "BEGIN {exit !((${petsc_sigma} - ${REF_PETSC_SIGMA})^2 \
+        <= (${REF_PETSC_REL_TOL}*${REF_PETSC_SIGMA})^2)}"
     then
-        printf "PASS: near the legacy model, differing by the reformulation (%.6g vs %.6g)\n" \
-            "${petsc_sigma}" "${LEGACY_PETSC_SIGMA}"
+        printf "PASS: near the reference, differing by the reformulation (%.6g vs %.6g)\n" \
+            "${petsc_sigma}" "${REF_PETSC_SIGMA}"
     else
-        printf "FAIL: differs from the legacy model by more than the reformulation explains (%.6g vs %.6g)\n" \
-            "${petsc_sigma}" "${LEGACY_PETSC_SIGMA}"
+        printf "FAIL: differs from the reference by more than the reformulation explains (%.6g vs %.6g)\n" \
+            "${petsc_sigma}" "${REF_PETSC_SIGMA}"
         failures=$((failures + 1))
     fi
 fi

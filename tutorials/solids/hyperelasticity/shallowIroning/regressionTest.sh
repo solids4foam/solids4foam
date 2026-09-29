@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # shallowIroning regression test
 # The full ironing stroke (endTime 6) takes too long for a regression test,
@@ -77,7 +80,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i.bak "s/^endTime[[:space:]]\+6;/endTime         ${REGRESSION_END_TIME};/" \
+    "${SOLIDS4FOAM_SED}" -i.bak "s/^endTime[[:space:]]\+6;/endTime         ${REGRESSION_END_TIME};/" \
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 

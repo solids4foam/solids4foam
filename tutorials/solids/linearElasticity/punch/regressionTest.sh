@@ -20,25 +20,16 @@ PUNCH_DISP_Z_MIN=-0.00025
 PUNCH_DISP_Z_MAX=-0.0002
 
 # The final punch dispZ of the removed legacy mechanicalModel, from the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d), per fork. The two
-# materials are handled differently - per-material sub-meshes on the legacy
-# path, the material-aware leastSquaresS4f gradient on one mesh on the
-# framework - so the two are different discretisations of the same problem,
-# and the contact makes the punch displacement the most sensitive quantity in
-# the case to that difference. Measured: 3.9e-4 on foam-extend 4.1, 6.7e-3 on
-# OpenFOAM.com v2512; the tolerance is the 1e-2 relative that allowed for it
-case "$(solids4Foam::foamFlavour)" in
-    com)
-        LEGACY_PUNCH_DISP_Z=-0.000226704
-        ;;
-    foamextend)
-        LEGACY_PUNCH_DISP_Z=-0.000226333
-        ;;
-    *)
-        # The case does not run here
-        LEGACY_PUNCH_DISP_Z=""
-        ;;
-esac
+# commit that had it (mcl-stage8-coverage, c3a92b3d). The two materials are
+# handled differently - per-material sub-meshes on the legacy path, the
+# material-aware leastSquaresS4f gradient on one mesh on the framework - so the
+# two are different discretisations of the same problem, and the contact makes
+# the punch displacement the most sensitive quantity in the case to that
+# difference. Measured: 3.9e-4 on foam-extend 4.1, 6.7e-3 on OpenFOAM.com
+# v2512; the tolerance is the 1e-2 relative that allowed for it. This is
+# OpenFOAM.com v2512's; foam-extend 4.1's is 1.6e-3 smaller, inside it. The
+# case does not run on OpenFOAM.org
+REF_PUNCH_DISP_Z=-0.000226704
 PUNCH_DISP_Z_REL_TOL=1e-2
 
 ALLRUN_LOGFILE="log.Allrun"
@@ -130,15 +121,15 @@ elif [[ -z "${end_time}" ]] \
 then
     echo "FAIL: the case stopped at '${final_time}', not at the end time '${end_time}'"
     failures=$((failures + 1))
-elif awk "BEGIN {d = ${punch_disp_z} - ${LEGACY_PUNCH_DISP_Z}; \
+elif awk "BEGIN {d = ${punch_disp_z} - ${REF_PUNCH_DISP_Z}; \
     exit !(${punch_disp_z} < 0 \
-        && d*d <= (${PUNCH_DISP_Z_REL_TOL}*${LEGACY_PUNCH_DISP_Z})^2)}"
+        && d*d <= (${PUNCH_DISP_Z_REL_TOL}*${REF_PUNCH_DISP_Z})^2)}"
 then
-    printf "PASS: punchLoading dispZ matches the legacy model (%.6g vs %.6g)\n" \
-        "${punch_disp_z}" "${LEGACY_PUNCH_DISP_Z}"
+    printf "PASS: punchLoading dispZ matches the reference (%.6g vs %.6g)\n" \
+        "${punch_disp_z}" "${REF_PUNCH_DISP_Z}"
 else
-    printf "FAIL: punchLoading dispZ differs from the legacy model (%.6g vs %.6g)\n" \
-        "${punch_disp_z}" "${LEGACY_PUNCH_DISP_Z}"
+    printf "FAIL: punchLoading dispZ differs from the reference (%.6g vs %.6g)\n" \
+        "${punch_disp_z}" "${REF_PUNCH_DISP_Z}"
     failures=$((failures + 1))
 fi
 
