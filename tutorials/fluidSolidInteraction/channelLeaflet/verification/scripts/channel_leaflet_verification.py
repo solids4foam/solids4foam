@@ -360,17 +360,22 @@ def is_result_time(name: str) -> bool:
 
 
 def solver_fingerprint() -> str:
-    """The solver on the path and the solids4foam library it loads"""
+    """The solver on the path and the solids4foam libraries it loads: the
+    models and the radial-basis-function mesh motion, wherever the build put
+    them"""
     parts = []
     solver = shutil.which("solids4Foam")
-    for path in (
-        solver,
-        *(
-            str(Path(d) / name)
-            for d in (os.environ.get("FOAM_USER_LIBBIN", ""),)
-            for name in ("libsolids4FoamModels.so", "libsolids4FoamModels.dylib")
-        ),
-    ):
+    directories = [
+        os.environ.get(name, "")
+        for name in ("FOAM_MODULE_LIBBIN", "FOAM_USER_LIBBIN", "FOAM_SITE_LIBBIN")
+    ]
+    libraries = [
+        str(Path(d) / f"lib{name}{suffix}")
+        for d in directories if d
+        for name in ("solids4FoamModels", "RBFMeshMotionSolver")
+        for suffix in (".so", ".dylib")
+    ]
+    for path in [solver] + libraries:
         if path and Path(path).is_file():
             stat = Path(path).stat()
             parts.append(f"{path}:{stat.st_size}:{stat.st_mtime_ns}")
@@ -555,7 +560,9 @@ def run_static_case(case: dict, refs: dict, reuse: bool) -> Path:
     spec = refs["studies"]["static"]
     steps = spec["loadSteps"]
     run_dir = WORK_DIR / case["name"]
-    stamp = fingerprint(case, steps)
+    # The applied traction is part of the fingerprint: the reference
+    # deflection is computed from it
+    stamp = fingerprint({**case, "traction": spec["traction"]}, steps)
     if reuse and completed(run_dir, case["name"], steps, 1.0, stamp):
         print(f"  reusing {case['name']}")
         return run_dir
@@ -841,7 +848,8 @@ def observed_order(spacings: list[float], d12: float, d23: float) -> float:
 
     lo, hi = 0.05, 8.0
     if not ratio(lo) <= target <= ratio(hi):
-        return math.log(target)/math.log(h1/h2) if target > 0 else math.nan
+        # Outside the supported range of orders
+        return math.nan
     for _ in range(100):
         mid = 0.5*(lo + hi)
         if ratio(mid) < target:
@@ -869,11 +877,13 @@ def self_convergence(results, spacing, scale: float, start: float = 0.0):
     orders = []
     for i in range(len(diffs) - 1):
         if diffs[i] > 0 and diffs[i + 1] > 0:
-            orders.append(observed_order(
+            order = observed_order(
                 [spacing(item[0]) for item in ordered[i:i + 3]],
                 diffs[i], diffs[i + 1],
-            ))
-            lines.append(f"- observed order {orders[-1]:.2f}")
+            )
+            # An order outside the supported range counts as a failure
+            orders.append(order if math.isfinite(order) else -math.inf)
+            lines.append(f"- observed order {order:.2f}")
     return lines, diffs, orders
 
 

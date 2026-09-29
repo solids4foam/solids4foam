@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Write a reference CSV from runs of the oomph-lib reference driver.
 
-usage: oomph_trace_to_csv.py <coarse/trace.dat> [<fine/trace.dat>] <output.csv>
+usage: oomph_trace_to_csv.py --tmax T <coarse/trace.dat> [<fine/trace.dat>]
+                             <output.csv>
+
+Every run must start at t = 0 and end at t = T (the --tmax it was run
+with), so that a run that stopped early is not taken as a reference.
 
 With two runs, the fine run must use half the time step of the coarse one.
 Both use BDF2, so the tip displacements are Richardson-extrapolated in time,
@@ -45,6 +49,15 @@ def read(path):
     return rows
 
 
+def check_interval(rows, path, t_max):
+    """A run must cover 0 <= t <= t_max"""
+    if abs(min(rows)) > 1e-9 or abs(max(rows) - t_max) > 1e-6*max(1.0, t_max):
+        sys.exit(
+            f"ERROR: {path} covers t = {min(rows):g} to {max(rows):g}, not"
+            f" 0 to {t_max:g}: the run did not complete"
+        )
+
+
 def step(rows, path):
     """The uniform time step of a run"""
     times = sorted(rows)
@@ -66,8 +79,19 @@ def write(target, header, rows):
 
 
 def main() -> int:
+    args = sys.argv[1:]
+    if len(args) < 2 or args[0] != "--tmax":
+        sys.exit(__doc__)
+    try:
+        t_max = float(args[1])
+    except ValueError:
+        sys.exit("ERROR: --tmax needs a number")
+    if not (math.isfinite(t_max) and t_max > 0):
+        sys.exit("ERROR: --tmax must be positive and finite")
+    sys.argv = [sys.argv[0]] + args[2:]
     if len(sys.argv) == 3:
         run = read(sys.argv[1])
+        check_interval(run, sys.argv[1], t_max)
         step(run, sys.argv[1])
         write(
             sys.argv[2],
@@ -79,6 +103,8 @@ def main() -> int:
     if len(sys.argv) != 4:
         sys.exit(__doc__)
     coarse, fine = read(sys.argv[1]), read(sys.argv[2])
+    check_interval(coarse, sys.argv[1], t_max)
+    check_interval(fine, sys.argv[2], t_max)
     dt_coarse, dt_fine = step(coarse, sys.argv[1]), step(fine, sys.argv[2])
     if abs(dt_coarse/dt_fine - 2.0) > 1e-6:
         sys.exit(
