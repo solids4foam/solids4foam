@@ -72,8 +72,8 @@ def copy_case(name: str) -> Path:
         fail(f"{TUTORIAL} holds *.stored files from an Allrun benchmark run; "
              "run its Allclean first")
     patterns = shutil.ignore_patterns(
-        "verification", "regressionTests", "postProcessing", "processor*",
-        "log.*", "*.pdf", "case.foam",
+        "verification", "regressionTests", "postProcessing", "forces",
+        "processor*", "log.*", "*.pdf", "case.foam",
     )
 
     def ignore(directory: str, names: list[str]) -> set[str]:
@@ -86,6 +86,11 @@ def copy_case(name: str) -> Path:
         return ignored
 
     shutil.copytree(TUTORIAL, destination, symlinks=True, ignore=ignore)
+    # The copies are configured in the stored OpenFOAM.com format, which a
+    # foam-extend tutorial run leaves converted until its Allclean
+    if not (destination / "system/fluid/blockMeshDict").is_file():
+        fail(f"{TUTORIAL} is not in the stored case format (was it run with "
+             "foam-extend?); run its Allclean first")
     return destination
 
 

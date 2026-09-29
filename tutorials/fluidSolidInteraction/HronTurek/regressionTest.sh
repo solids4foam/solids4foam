@@ -59,7 +59,7 @@ prepare_case() {
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
-        if [[ "${base_item}" == "regressionTests" ]]; then
+        if [[ "${base_item}" == "regressionTests" || "${base_item}" == "verification" ]]; then
             continue
         fi
         cp -a "${item}" "${CASE_DIR}/"

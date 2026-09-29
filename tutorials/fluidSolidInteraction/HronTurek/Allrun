@@ -63,6 +63,18 @@ restore_benchmark()
     done
 }
 
+# A backup left by an interrupted benchmark run holds the stored
+# dictionaries, and the case files still hold that benchmark's settings
+for file in $benchmarkFiles
+do
+    if [[ -e "${file}.stored" ]]
+    then
+        echo "${file}.stored exists from an interrupted run:"
+        echo "run ./Allclean to restore the stored case first"
+        exit 1
+    fi
+done
+
 if [[ -n "$benchmark" ]]
 then
     case "$benchmark" in
@@ -94,17 +106,6 @@ then
     echo "Setting up the ${benchmark} benchmark"
 
     solids4Foam::requireGnuSed
-    # A backup left by an interrupted run holds the stored dictionaries, and
-    # overwriting it would lose them
-    for file in $benchmarkFiles
-    do
-        if [[ -e "${file}.stored" ]]
-        then
-            echo "${file}.stored exists from an interrupted run:"
-            echo "run ./Allclean to restore the stored case first"
-            exit 1
-        fi
-    done
     for file in $benchmarkFiles
     do
         cp "${file}" "${file}.stored" || exit 1
