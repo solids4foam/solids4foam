@@ -168,12 +168,12 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
-- `pimpleFluid` now applies finite volume options: `fvOptions` in
-  OpenFOAM.com, and `fvModels` and `fvConstraints` in OpenFOAM.org, called
-  where the standard `pimpleFoam` solver calls them. Previously they were
-  read and reported but silently ignored. In FSI runs, `fvModels`
-  `preUpdateMesh()` is not yet called, as the fluid-solid interface updates
-  the mesh before the fluid model is evolved.
+- `pimpleFluid` now applies finite volume options to its momentum and optional
+  temperature equations: `fvOptions` in OpenFOAM.com, and `fvModels` and
+  `fvConstraints` in OpenFOAM.org, called where the corresponding standard
+  solvers call them. Previously they were read and reported but silently
+  ignored. In OpenFOAM.org FSI runs, the fluid-solid interface also calls
+  `fvModels::preUpdateMesh()` before moving the fluid mesh.
 - With OpenFOAM.org, `libsolids4FoamModels` now links `libfvModels` and
   `libfvConstraints`, without which a fluid case with an `fvConstraints` file
   crashed with a segmentation fault.

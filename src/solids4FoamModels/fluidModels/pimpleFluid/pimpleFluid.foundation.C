@@ -321,6 +321,12 @@ pimpleFluid::pimpleFluid
 }
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void pimpleFluid::preUpdateMesh()
+{
+    models().preUpdateMesh();
+}
+
+
 tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
 {
     tmp<vectorField> tvF
@@ -379,13 +385,11 @@ bool pimpleFluid::evolve()
             if (fluidModel::fsiMeshUpdate())
             {
                 // The FSI interface is in charge of calling mesh.update()
-                // Note: fvModels preUpdateMesh() is not called here, as the
-                // mesh has already been updated
                 fluidModel::fsiMeshUpdateChanged();
             }
             else
             {
-                models().preUpdateMesh();
+                preUpdateMesh();
 
                 mesh.update();
             }
@@ -564,6 +568,21 @@ void pimpleFluid::solveEnergyEq()
         // Store fields for under-relaxation and residual calculation
         TPtr_().storePrevIter();
 
+        volScalarField rhoCp
+        (
+            IOobject
+            (
+                "rhoCp",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            rho_*Cp
+        );
+
         fvScalarMatrix TEqn
         (
             rho_*Cp*
@@ -572,16 +591,22 @@ void pimpleFluid::solveEnergyEq()
               + fvm::div(phi(), TPtr_())
             )
           - fvm::laplacian(lambdaEffPtr_(), TPtr_())
+         ==
+            models().source(rhoCp, TPtr_())
         );
 
         // Under-relaxation the linear system
         TEqn.relax();
+
+        constraints().constrain(TEqn);
 
         // Solve the linear system
         TEqn.solve();
 
         // Under-relax the field
         TPtr_().relax();
+
+        constraints().constrain(TPtr_());
     }
 }
 
