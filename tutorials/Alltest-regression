@@ -167,8 +167,8 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
     "fluidSolidInteraction/fillingElasticContainer"
-    # Not tutorials: tests kept under tests/, run the same way
-    "../tests/mechanicalConstitutiveLaw/lawChecks"
+    # Not tutorials: a test application's case, run the same way
+    "../applications/test/mechanicalConstitutiveLawChecks/case"
 )
 
 failures=0
@@ -188,9 +188,9 @@ run_regression_test()
 {
     local testCase="$1"
     local srcCase="${ROOT_DIR}/${testCase}"
-    # A test outside tutorials is named from here, as ../tests/..., and is
-    # copied into the regression tree without the leading ../, which would
-    # otherwise put the copy on top of the source and delete it
+    # A test outside tutorials is named from here, as ../applications/...,
+    # and is copied into the regression tree without the leading ../, which
+    # would otherwise put the copy on top of the source and delete it
     local dstCase="${REG_ROOT}/${testCase#../}"
     local logFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').log"
     local statusFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').status"

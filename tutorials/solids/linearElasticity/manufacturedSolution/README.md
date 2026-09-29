@@ -57,8 +57,7 @@ The default case has a regression test:
 ./regressionTest.sh
 ```
 
-The opt-in [`verification/`](verification/) directory migrates the mesh and
-solver variants from `solid-benchmarks/linearElasticity/manufacturedSolution`.
-It is separate from the normal tutorial regression suite because it runs many
-cases. See the verification README for variants, commands, and acceptance
-criteria.
+The opt-in [`verification/`](verification/) directory holds mesh and solver
+variants of this case. It is separate from the normal tutorial regression suite
+because it runs many cases. See the verification README for variants, commands,
+and acceptance criteria.

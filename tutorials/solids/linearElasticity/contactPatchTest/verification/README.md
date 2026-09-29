@@ -1,12 +1,8 @@
 # Contact patch test verification
 
-This opt-in study migrates the solver-formulation cases previously kept in
-`solid-benchmarks/linearElasticity/contactPatchTest`. It runs the
-non-conformal contact patch test with `linearGeometryTotalDisplacement`, then
-checks the transmitted stress against the analytical solution. The original
-study also ran `unsLinearGeometry`, which has been removed together with the
-legacy mechanical model. The parent tutorial and its normal regression test
-are not modified.
+This opt-in study runs the non-conformal contact patch test with
+`linearGeometryTotalDisplacement`, then checks the transmitted stress against
+the analytical solution.
 
 With OpenFOAM and solids4foam loaded, run:
 
