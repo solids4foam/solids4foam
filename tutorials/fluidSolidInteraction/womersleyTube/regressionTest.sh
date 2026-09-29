@@ -28,8 +28,8 @@ DISP_TOL=1e-6           # final displacement difference from the reference (m)
 # Reference values at REG_END_TIME (OpenFOAM-v2412)
 ref_final_ur() {
     case "$1" in
-        iqnils) echo -0.00022376304 ;;
-        robin) echo -0.00022178305 ;;
+        iqnils) echo -0.0002237665584 ;;
+        robin) echo -0.0002217864674 ;;
     esac
 }
 

@@ -43,10 +43,17 @@ RESIDUALS = "postProcessing/fsiResiduals.dat"
 # frequency is exact for a sinusoid, and the harmonics that could alias onto
 # it (9 and 11 times the frequency) are negligible
 SAMPLES_PER_PERIOD = 10
+# Points of the axial pressure set in system/controlDict
+AXIAL_POINTS = 61
 
 
 def fail(message: str) -> None:
     raise RuntimeError(message)
+
+
+# Errors from analysing damaged or degenerate results, reported as a failure
+# of that case rather than aborting the study
+ANALYSIS_ERRORS = (RuntimeError, ValueError, ZeroDivisionError)
 
 
 def replace_entry(path: Path, key: str, value: str) -> None:
@@ -182,11 +189,19 @@ def configure(case: Path, spec: dict, reference: dict) -> None:
     control.write_text(text)
 
 
-def solver_completed(case: Path) -> bool:
+def solver_log_problem(case: Path) -> str | None:
+    """Why the solver log does not show a completed run, or None. A
+    completed log has an End line and no fatal error; PETSc and MPI can
+    print warnings after End on shut-down."""
     log = case / "log.solids4Foam"
-    return log.is_file() and bool(
-        re.search(r"^End\s*$", log.read_text(errors="replace"), re.MULTILINE)
-    )
+    if not log.is_file():
+        return f"did not run the solver; see {case / 'log.Allverify'}"
+    text = log.read_text(errors="replace")
+    if re.search(r"FOAM FATAL|FOAM aborting", text):
+        return f"failed; see {log}"
+    if not re.search(r"^End\s*$", text, re.MULTILINE):
+        return f"did not run to completion; see {log}"
+    return None
 
 
 def run_case(spec: dict, reference: dict, reuse: bool) -> str:
@@ -200,11 +215,11 @@ def run_case(spec: dict, reference: dict, reuse: bool) -> str:
                 previous = json.loads(stored.read_text())
             except json.JSONDecodeError:
                 previous = None
-        if previous == wanted and solver_completed(case):
+        if previous == wanted and solver_log_problem(case) is None:
             try:
                 analyse(spec, reference)
                 return f"{spec['name']}: reusing the completed run"
-            except RuntimeError as error:
+            except ANALYSIS_ERRORS as error:
                 print(f"{spec['name']}: not reused ({error})")
         else:
             print(f"{spec['name']}: cached run does not match the requested "
@@ -219,14 +234,9 @@ def run_case(spec: dict, reference: dict, reuse: bool) -> str:
     with log.open("w") as handle:
         result = subprocess.run(command, cwd=case, stdout=handle,
                                 stderr=subprocess.STDOUT, text=True)
-    solver_log = case / "log.solids4Foam"
-    if not solver_log.is_file():
-        fail(f"{spec['name']} did not run the solver; see {log}")
-    text = solver_log.read_text(errors="replace")
-    if re.search(r"FOAM FATAL|FOAM aborting", text):
-        fail(f"{spec['name']} failed; see {solver_log}")
-    if not re.search(r"^End\s*$", text, re.MULTILINE):
-        fail(f"{spec['name']} did not run to completion; see {solver_log}")
+    problem = solver_log_problem(case)
+    if problem:
+        fail(f"{spec['name']} {problem}")
     if result.returncode:
         # The tutorial Allrun only fails after the solver when plotting
         print(f"{spec['name']}: Allrun returned {result.returncode} after the "
@@ -352,12 +362,18 @@ def last_period(times, values, period, steps, before=0, count=1):
     if len(selected) != steps * count:
         fail(f"Found {len(selected)} samples in the last {count} periods, "
              f"expected {steps * count}")
+    # The Fourier sum assumes uniform samples
+    n = len(selected)
+    for i, (t, _) in enumerate(selected):
+        if abs(t - (end - (n - 1 - i) * period / steps)) > 1e-4 * period / steps:
+            fail(f"Samples are not uniformly spaced in time near t = {t}")
     return [t for t, _ in selected], [v for _, v in selected]
 
 
-def read_samples(case: Path, exact: Exact, periods: int, window: int) -> dict:
+def read_samples(case: Path, exact: Exact, periods: int, window: int,
+                 expected: dict) -> dict:
     """Fourier coefficients of the profile and axial samples over the last
-    `window` periods."""
+    `window` periods; `expected` holds the number of points of each set."""
     start = (periods - window) * exact.period
     wanted = period_times(start, window * exact.period,
                           window * SAMPLES_PER_PERIOD)
@@ -381,9 +397,22 @@ def read_samples(case: Path, exact: Exact, periods: int, window: int) -> dict:
             rows = read_rows(match[0] / f"{set_name}_p_U.xy", 5)
             series.append(rows)
         n_points = len(series[0])
-        if n_points < 2 or any(len(s) != n_points for s in series):
-            fail(f"Inconsistent {set_name} samples in {root}")
+        if n_points != expected[set_name] \
+                or any(len(s) != n_points for s in series):
+            fail(f"Expected {expected[set_name]} {set_name} samples at every "
+                 f"time in {root}, found {[len(s) for s in series]}")
         coord = [row[0] for row in series[0]]
+        if any(b <= a for a, b in zip(coord, coord[1:])):
+            fail(f"The {set_name} sample coordinates are not increasing in "
+                 f"{root}")
+        # The samples must be at the same places at every time, apart from
+        # the motion of the mesh (the wall moves by 1% of the tutorial radial
+        # cell size)
+        spacing = min(b - a for a, b in zip(coord, coord[1:]))
+        for s in series[1:]:
+            if any(abs(row[0] - c) > 0.05 * spacing for row, c in zip(s, coord)):
+                fail(f"The {set_name} sample coordinates change between "
+                     f"times in {root}")
         p = [fourier(wanted, [s[i][1] for s in series], exact.omega)
              for i in range(n_points)]
         ux = [fourier(wanted, [s[i][2] for s in series], exact.omega)
@@ -413,6 +442,8 @@ def fit_wave_number(x: list[float], p: list[complex]) -> complex:
     """Least-squares fit of log p = log C - i k x, with the phase unwrapped."""
     logs, previous = [], None
     for value in p:
+        if value == 0:
+            fail("Zero pressure harmonic in the axial samples")
         z = cmath.log(value)
         if previous is not None:
             while z.imag - previous.imag > math.pi:
@@ -429,6 +460,8 @@ def fit_wave_number(x: list[float], p: list[complex]) -> complex:
 
 
 def phase_error(value: complex, exact: complex) -> float:
+    if value == 0 or exact == 0:
+        fail("Zero harmonic amplitude")
     return cmath.phase(value / exact)
 
 
@@ -480,20 +513,38 @@ def analyse(spec: dict, reference: dict) -> dict:
             # last, left by the start-up transient
             t0, v0 = last_period(times, radial, exact.period, steps, before=1)
             t1, v1 = last_period(times, radial, exact.period, steps)
-            row["periodicity"] = abs(fourier(t0, v0, exact.omega)
-                                     / fourier(t1, v1, exact.omega) - 1)
+            last = fourier(t1, v1, exact.omega)
+            if last == 0:
+                fail("Zero wall displacement harmonic")
+            row["periodicity"] = abs(fourier(t0, v0, exact.omega) / last - 1)
 
-    samples = read_samples(case, exact, periods, window)
+    mesh = mesh_divisions(spec["factor"], reference)
+    samples = read_samples(case, exact, periods, window,
+                           {"profile": mesh["fluidRadial"],
+                            "axial": AXIAL_POINTS})
     # Velocity profile and flow rate at x = L/2
     prof = samples["profile"]
     x_mid = 0.5 * exact.L
     # The profile holds the values of the cells just downstream of x = L/2,
-    # centred half a cell further on
-    x_cells = x_mid + 0.5 * exact.L \
-        / mesh_divisions(spec["factor"], reference)["axial"]
-    u_exact = [exact.velocity(r, x_cells) for r in prof["coord"]]
+    # centred half a cell further on, and at the centroid radius of each
+    # wedge cell, (2/3)(r2^3 - r1^3)/(r2^2 - r1^2), rather than at the
+    # midpoint between its faces, (r1 + r2)/2, that the set reports; both are
+    # on the wedge mid-plane, where the faces are at r cos(0.5 degrees)
+    x_cells = x_mid + 0.5 * exact.L / mesh["axial"]
+    dr = exact.R / mesh["fluidRadial"]
+    chord = math.cos(math.radians(0.5))
+    radii = []
+    for j, r in enumerate(prof["coord"]):
+        if abs(r - (j + 0.5) * dr) > 0.1 * dr:
+            fail(f"Unexpected profile sample radius {r} for cell {j}")
+        r1, r2 = j * dr, (j + 1) * dr
+        radii.append(chord * 2 / 3 * (r2**3 - r1**3) / (r2**2 - r1**2))
+    u_exact = [exact.velocity(r, x_cells) for r in radii]
     scale = max(abs(u) for u in u_exact)
     row["profile"] = max(abs(u - ue) for u, ue in zip(prof["ux"], u_exact)) / scale
+    # The profile itself, normalised by the exact peak, to compare runs;
+    # entries starting with an underscore are not written to the CSV file
+    row["_profile"] = [u / scale for u in prof["ux"]]
     for label, phi in (("0", 0.0), ("90", 0.5 * math.pi), ("180", math.pi),
                        ("270", 1.5 * math.pi)):
         row[f"profile{label}"] = max(
@@ -698,7 +749,14 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
         check_errors(iq, tol["coupling"], f"IQN-ILS ({iq['name']})")
         check_errors(rb, tol["coupling"], f"Robin ({rb['name']})")
         for key, description in METRICS:
-            difference = abs(rb[key] - iq[key])
+            if key == "profile":
+                # The profiles themselves, not their error norms
+                description = "velocity profile at L/2, max |difference| / " \
+                    "max |u|"
+                difference = max(abs(a - b) for a, b in
+                                 zip(rb["_profile"], iq["_profile"]))
+            else:
+                difference = abs(rb[key] - iq[key])
             check(difference <= tol["couplingAgreement"],
                   f"Robin and IQN-ILS agree on the {description} to "
                   f"{fmt(difference)} (within {tol['couplingAgreement']:g})")
@@ -729,8 +787,8 @@ def table(rows: list[dict]) -> list[str]:
 
 def write_csv(path: Path, rows: list[dict]) -> None:
     fields = ["name", "coupling", "factor", "steps"] + sorted(
-        {k for r in rows for k in r} - {"name", "coupling", "factor", "steps",
-                                         "groups"})
+        {k for r in rows for k in r if not k.startswith("_")}
+        - {"name", "coupling", "factor", "steps", "groups"})
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
@@ -779,7 +837,7 @@ def main() -> int:
     for spec in specs:
         try:
             rows.append(analyse(spec, reference))
-        except RuntimeError as error:
+        except ANALYSIS_ERRORS as error:
             if not any(spec["name"] in e for e in errors):
                 errors.append(f"{spec['name']}: {error}")
     rows.sort(key=lambda r: (r["coupling"], r["factor"], r["steps"]))

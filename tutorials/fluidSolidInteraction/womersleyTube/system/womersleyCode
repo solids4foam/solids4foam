@@ -279,8 +279,9 @@ womersleyDisplacement
 #};
 
 // Initial fields, set with #codeStream at the cell centres or the points.
-// The old-time solid displacements, D_0 and D_0_0, are the exact solution
-// one and two time-steps earlier, as the second-order time scheme reads them
+// The old-time solid displacements, D_0, D_0_0 and D_0_0_0, are the exact
+// solution one, two and three time-steps earlier: the backward d2dt2 scheme
+// applies the backward ddt twice, so it reads three old-time levels
 
 womersleyCodeOptions
 #{
@@ -322,7 +323,7 @@ womersleyInitialVelocity
     os  << word("nonuniform") << token::SPACE << value;
 #};
 
-// The time level (0, 1 or 2 steps before the start time) is read from the
+// The time level (0 to 3 steps before the start time) is read from the
 // womersleyTimeLevel entry of the field file
 womersleyInitialDisplacement
 #{

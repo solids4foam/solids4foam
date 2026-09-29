@@ -82,9 +82,10 @@ tolerances of the solvers.
   coefficients from `constant/womersleyProperties`, which is written by
   `verification/scripts/womersley_exact.py --write-case .`.
 - **Initial fields.** The fluid velocity and pressure and the wall
-  displacement, including the old-time displacements `D_0` and `D_0_0` read
-  by the second-order time scheme, are set to the exact solution with
-  `#codeStream`, so there is no start-up ramp. Both the boundary conditions
+  displacement, including the old-time displacements `D_0`, `D_0_0` and
+  `D_0_0_0` read by the second-order time scheme, are set to the exact
+  solution with `#codeStream`, so there is no start-up ramp. Both the
+  boundary conditions
   and the initial fields compile a small library on the first run.
 - **Wall.** `linearGeometryTotalDisplacement` with the PETSc SNES solver. The
   outer surface is traction free; the wall is not longitudinally tethered, as
@@ -124,7 +125,7 @@ a solver whose log exists.
 Figure 2 compares the velocity profile at $$x = L/2$$ over the second period,
 at four phases, and the radial wall displacement at $$x = L/4$$, $$L/2$$ and
 $$3L/4$$, with the exact solution. Over the second period, the velocity
-profile is within 0.44% of the largest exact velocity at every phase, the
+profile is within 0.5% of the largest exact velocity at every phase, the
 flow rate at $$x = L/2$$ within 0.02% in amplitude and 0.001 rad in phase, the
 wall displacement amplitude within 0.25% at the three stations, and the wave
 speed fitted to the pressure along the tube within 0.15%. The attenuation,

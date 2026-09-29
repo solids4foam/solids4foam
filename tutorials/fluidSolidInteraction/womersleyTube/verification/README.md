@@ -74,9 +74,11 @@ continuum problem, computed by `scripts/womersley_exact.py`:
 
 The frequency equation is solved for $$k$$ by the secant method from
 Womersley's value. The collocation solution is checked in two limits: as
-$$h / R \to 0$$ at fixed $$E h$$ and $$\rho_s h$$, the exact $$k$$ tends to
-Womersley's with an error proportional to $$h / R$$, for both the free and
-the tethered wall; and for the tethered wall at long wavelength it agrees
+$$h / R \to 0$$ at fixed $$E h$$ and $$\rho_s h$$, the difference between the
+exact $$k$$ and Womersley's falls in proportion to $$h / R$$, for both the
+free and the tethered wall, to the long-wave correction of order
+$$(k R)^2$$ that remains in the limit; and for the tethered wall at long
+wavelength (a stiffer wall, $$k R \approx 0.015$$) it agrees
 with Womersley's equation with the plane-strain (Lamé) stiffness of the thick
 cylinder to $$2 \times 10^{-5}$$. Womersley's quadratic was also checked
 against an independent derivation from the membrane equations, which agrees
@@ -128,16 +130,17 @@ generated:
   fluid-solid interface.
 
 The fields are set to the exact solution at $$t = 0$$ (and the solid's old-time
-displacements at $$-\Delta t$$ and $$-2 \Delta t$$), so there is no start-up
-ramp. A small start-up transient remains, of about 0.5% in the wall
-displacement over the first period. Its likely source is that the initial
-point displacement is the exact value at the points, which differs slightly
-from the solid model's interpolation of the cell values that moves the fluid
-mesh from the first time-step on; the transient grows as the time-step is
-reduced, as such a mismatch would. It decays slowly, as it excites the lightly
-damped axial wave of the wall, so the driver runs six periods and analyses
-the last two; `periodicity` is the change in the wall displacement coefficient
-from the fifth to the sixth period.
+displacements at $$-\Delta t$$, $$-2 \Delta t$$ and $$-3 \Delta t$$, as the
+`backward` d2dt2 scheme applies the backward ddt twice), so there is no
+start-up ramp. A small start-up transient remains, of about 0.5% in the wall
+displacement over the first period, and it grows as the time-step is reduced.
+Its source has not been pinned down. One candidate is that the initial point
+displacement is the exact value at the points, which differs slightly from
+the solid model's interpolation of the cell values that moves the fluid mesh
+from the first time-step on; a mismatch of this kind would grow as the
+time-step is reduced. The transient decays slowly, so the driver runs six
+periods and analyses the last two; `periodicity` is the change in the wall
+displacement coefficient from the fifth to the sixth period.
 
 ### Why the wall is not tethered
 
@@ -235,12 +238,12 @@ OpenFOAM-v2412 on macOS (arm64). Errors are relative, and phases in radians.
 
 | Case | profile | flow_amp | flow_phase | wallMid_amp |
 |---|---:|---:|---:|---:|
-| m1, n200 | 1.58e-2 | 5.62e-3 | 6.24e-3 | -9.73e-3 |
-| m2, n200 | 4.40e-3 | 4.40e-4 | 1.31e-3 | -1.09e-3 |
-| m4, n200 | 1.07e-3 | -7.15e-4 | 1.53e-5 | 8.57e-4 |
-| m2, n50 | 6.97e-3 | -2.06e-3 | 1.23e-4 | 7.14e-3 |
-| m2, n100 | 4.39e-3 | -1.69e-4 | 1.05e-3 | 8.40e-4 |
-| m2, n100, IQN-ILS | 4.40e-3 | -1.41e-4 | 1.06e-3 | 1.12e-3 |
+| m1, n200 | 1.78e-2 | 5.62e-3 | 6.24e-3 | -9.73e-3 |
+| m2, n200 | 4.91e-3 | 4.40e-4 | 1.31e-3 | -1.09e-3 |
+| m4, n200 | 1.18e-3 | -7.15e-4 | 1.53e-5 | 8.57e-4 |
+| m2, n50 | 7.05e-3 | -2.06e-3 | 1.23e-4 | 7.14e-3 |
+| m2, n100 | 4.90e-3 | -1.69e-4 | 1.05e-3 | 8.40e-4 |
+| m2, n100, IQN-ILS | 4.91e-3 | -1.41e-4 | 1.06e-3 | 1.12e-3 |
 
 | Case | wallMid_phase | speed | attenuation | Iter./step |
 |---|---:|---:|---:|---:|
@@ -260,7 +263,7 @@ $$10^{-4}$$ in every run.
 
 | Quantity | Mesh | Time step |
 |---|---:|---:|
-| profile | 2.04 | – |
+| profile | 2.06 | – |
 | flow_amp | 2.16 | 1.64 |
 | flow_phase | 1.92 | 1.84 |
 | wallMid_amp | 2.15 | 1.71 |
@@ -308,8 +311,14 @@ over the radius ($$5 \times 10^{-4}$$) and of the velocity over the wave speed
 ($$1.5 \times 10^{-3}$$), so agreement much better than $$10^{-3}$$ cannot be
 expected; the finest-mesh tolerances allow this and the measured error, with a
 margin, and the looser attenuation tolerance reflects its larger sensitivity.
-The order thresholds sit below the observed orders; the wall phase and the
-attenuation are reported but not order-checked.
+The order thresholds sit below the observed orders. The wall phase and the
+attenuation are not checked for their mesh order, which is about one; every
+signed quantity is checked for its time order.
+
+The driver also rejects histories that are truncated, non-finite, not
+increasing or not uniformly spaced in time, and fluid samples with an
+unexpected number of points, and a run whose solver log lacks `End` or
+reports a fatal error, whether freshly run or reused.
 
 ## Solid model
 
