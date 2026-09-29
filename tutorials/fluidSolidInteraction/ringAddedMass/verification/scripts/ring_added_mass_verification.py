@@ -187,10 +187,11 @@ def build_signature() -> dict:
     signature = {key: os.environ.get(key, "")
                  for key in ("WM_PROJECT", "WM_PROJECT_VERSION", "WM_OPTIONS")}
     candidates = [shutil.which("solids4Foam")]
-    libbin = os.environ.get("FOAM_USER_LIBBIN", "")
-    if libbin:
-        candidates += sorted(str(p) for p in Path(libbin).glob(
-            "libsolids4FoamModels.*"))
+    for variable in ("FOAM_USER_LIBBIN", "FOAM_MODULE_LIBBIN", "FOAM_SITE_LIBBIN"):
+        libbin = os.environ.get(variable, "")
+        if libbin:
+            candidates += sorted(str(p) for p in Path(libbin).glob(
+                "libsolids4FoamModels.*"))
     for candidate in candidates:
         if candidate:
             status = Path(candidate).stat()
@@ -598,7 +599,10 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
         check(change <= tol["meshChange"],
               f"{label}: largest mesh change in the frequency "
               f"{100 * change:.3f}% within {100 * tol['meshChange']:.2f}%")
-        if label != "dry":
+        if label != "dry" and any("ratio_error" not in s for s in series):
+            check(False, f"{label}: wet/dry ratio unavailable, as a dry run "
+                  "is missing")
+        elif label != "dry":
             ratios = [s["ratio_error"] for s in series]
             order = record(f"{label}: wet/dry ratio error, mesh", ratios)
             check(abs(finest["ratio_error"]) <= tol["ratio"],
@@ -650,6 +654,10 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
               f"{num(order, '.2f')} at least {tol['minMeshOrder']}")
         if label != "dry":
             finest = series[-1]
+            if "ratio_error" not in finest:
+                check(False, f"{label}: standard-solid wet/dry ratio "
+                      "unavailable, as a dry run is missing")
+                continue
             check(abs(finest["ratio_error"]) <= tol["ratio"],
                   f"{label}: standard-solid finest-mesh wet/dry ratio error "
                   f"{pct(finest['ratio_error'])} within "

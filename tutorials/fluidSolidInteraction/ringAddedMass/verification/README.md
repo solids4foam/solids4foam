@@ -206,9 +206,11 @@ assumptions, and are stored in the reference JSON.
 - **Observed time order at least 1.5** (formally 2).
 - **Standard solid: observed mesh order at least 1.5** and a finest-mesh ratio
   error within 0.1%.
-- **Amplitude loss per period between -0.2% and 2%** at 100 steps per
-  period. A free vibration must not grow, so no run may gain more than 0.2%
-  per period, which allows for the measurement noise of an undamped run.
+- **Amplitude loss per period below 2%** at 100 steps per period on the
+  time-study mesh (refinement factor 2), where it is at most 1.14%; the loss
+  is larger on the coarsest mesh and halves with each refinement. A free
+  vibration must not grow, so no run may gain more than 0.2% per period,
+  which allows for the measurement noise of an undamped run.
 - **Robin-Neumann and IQN-ILS frequencies agree to 0.1%.**
 
 A `--quick` run only checks that the coarse dry and moderate wet frequencies
