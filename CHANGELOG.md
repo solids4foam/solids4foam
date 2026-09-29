@@ -98,7 +98,11 @@ release. For complete commit-level details and contributor information, see the
 - The restart files of the `mechanicalConstitutiveLaw` history are named
   `<material>_<topology>_<variable>`, where the development branch had
   colons, which Windows file systems, archive tools and CI artifact uploads
-  refuse.
+  refuse. A history-dependent case written by a development build from before
+  this change, such as `perforatedPlate`, cannot be restarted from those
+  times: the run stops because the renamed field is missing. Rename the files
+  in the restart time directory, replacing each `:` with `_`, or rerun from
+  the start. No release wrote the old names.
 
 - `vertexCentredLinearGeometry` takes its whole constitutive response from the
   `mechanicalConstitutiveLaw` framework: the residual stress at the dual mesh

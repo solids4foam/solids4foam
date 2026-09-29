@@ -443,6 +443,15 @@ public:
             return 0;
         }
 
+        //- Whether this law overrides localConvergenceScale or
+        //  smallStrainConvergenceScale. The manager skips the reduction when
+        //  no law does, which is safe because the answer depends on the law
+        //  alone and so is the same on every rank
+        virtual bool usesConvergenceScale() const
+        {
+            return false;
+        }
+
         //- The small-strain counterpart of localConvergenceScale, reduced and
         //  supplied by the manager in the same way. Named apart rather than
         //  overloaded, so that a law overriding one does not hide the other

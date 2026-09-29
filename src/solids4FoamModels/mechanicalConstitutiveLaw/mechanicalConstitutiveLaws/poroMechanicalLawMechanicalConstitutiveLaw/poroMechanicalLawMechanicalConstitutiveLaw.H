@@ -166,6 +166,12 @@ public:
             );
         }
 
+        //- Whether the sub-law uses a convergence scale
+        virtual bool usesConvergenceScale() const override
+        {
+            return subLawPtr_->usesConvergenceScale();
+        }
+
         //- The sub-law's history lives in a child state
         virtual wordList childStateNames() const override
         {

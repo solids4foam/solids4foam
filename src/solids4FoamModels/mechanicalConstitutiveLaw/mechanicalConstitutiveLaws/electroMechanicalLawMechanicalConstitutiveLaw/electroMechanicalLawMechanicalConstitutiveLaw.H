@@ -229,6 +229,12 @@ public:
             );
         }
 
+        //- Whether the passive law uses a convergence scale
+        virtual bool usesConvergenceScale() const override
+        {
+            return subLawPtr_->usesConvergenceScale();
+        }
+
         //- The child state the passive law owns
         virtual wordList childStateNames() const override
         {

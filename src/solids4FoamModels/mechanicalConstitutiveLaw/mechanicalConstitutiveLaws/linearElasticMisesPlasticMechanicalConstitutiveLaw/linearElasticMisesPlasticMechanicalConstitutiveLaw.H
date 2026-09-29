@@ -213,6 +213,12 @@ public:
             const mechanicalConstitutiveLawState& state
         ) const override;
 
+        //- The convergence scale above is used
+        virtual bool usesConvergenceScale() const override
+        {
+            return true;
+        }
+
         virtual void evaluate
         (
             const smallStrainMechanicalConstitutiveLawKinematics& kin,

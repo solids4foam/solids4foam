@@ -530,7 +530,28 @@ Foam::scalarList Foam::mechanicalConstitutiveLawManager::convergenceScales
     const Fields& fields
 ) const
 {
-    scalarList scales(laws_.size(), 0.0);
+    scalarField scales(laws_.size(), 0.0);
+
+    // None of the laws normalises its convergence test by a scale, which is
+    // the common case, so there is nothing to compute or reduce. Every rank
+    // takes this branch or none does, as it depends on the laws alone
+    bool anyUsesScale = false;
+
+    forAll(laws_, lawI)
+    {
+        if (laws_[lawI].usesConvergenceScale())
+        {
+            anyUsesScale = true;
+            break;
+        }
+    }
+
+    if (!anyUsesScale)
+    {
+        tp.lawConvergenceScales_ = scales;
+
+        return scales;
+    }
 
     // Every law, on every rank, whether or not this rank holds any of its
     // points. That is the point of doing it here: the evaluation loops skip a
@@ -547,11 +568,8 @@ Foam::scalarList Foam::mechanicalConstitutiveLawManager::convergenceScales
             Fields::convergenceScale(laws_[lawI], views.kin, tp.states_[lawI]);
     }
 
-    // One reduction per law, in law order, which every rank shares
-    forAll(scales, lawI)
-    {
-        reduce(scales[lawI], maxOp<scalar>());
-    }
+    // One reduction for all the laws together
+    reduce(scales, maxOp<scalarField>());
 
     // Kept so that the boundary evaluations use the same scale as the
     // internal ones

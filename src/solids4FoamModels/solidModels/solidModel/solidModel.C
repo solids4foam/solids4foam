@@ -2682,39 +2682,46 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 
     // Asked here, once the model is fully constructed and its override can be
     // seen, so that a solid model which cannot smooth the hydrostatic stress
-    // refuses a case that asks for it rather than silently ignoring it.
+    // refuses a case that asks for it rather than silently ignoring it. A
+    // model that can has the request validated here too, rather than at the
+    // first stress update: a model running the mixed formulation returns from
+    // its stress update before reaching the smoothing, so solvePressure with
+    // solvePressureEqn would otherwise be accepted and the smoothing silently
+    // ignored.
     //
-    // Only of a model that has built the framework manager, and so has read
-    // mechanicalProperties already
-    if
+    // Of every case that has a mechanicalProperties, whether or not the model
+    // has read it or built the framework manager yet: both are made on first
+    // use, so gating on either would let a model that makes them lazily skip
+    // the check
+    IOobject mechPropsIO
     (
-        modelPtr->mechanicalManagerPtr_.valid()
-     && !modelPtr->supportsHydrostaticSmoothing()
-     && modelPtr->hydrostaticSmoothingRequested()
-    )
-    {
-        FatalErrorIn("solidModel::New(Time&, const word&)")
-            << "solvePressureEqn is set in mechanicalProperties, and solid "
-            << "model " << modelType << " cannot smooth the hydrostatic "
-            << "stress." << nl
-            << "    It is supported by the updated Lagrangian, total "
-            << "Lagrangian and linear geometry total displacement models. "
-            << "Remove solvePressureEqn, or use one of those."
-            << exit(FatalError);
-    }
+        "mechanicalProperties",
+        runTime.constant(),
+        modelPtr->mesh(),
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    );
 
-    // And of a model that can, the request is validated here too, rather than
-    // at the first stress update: a model running the mixed formulation
-    // returns from its stress update before reaching the smoothing, so
-    // solvePressure with solvePressureEqn would otherwise be accepted and the
-    // smoothing silently ignored
-    if
-    (
-        modelPtr->mechanicalManagerPtr_.valid()
-     && modelPtr->supportsHydrostaticSmoothing()
-     && modelPtr->hydrostaticSmoothingRequested()
-    )
+#ifdef OPENFOAM_NOT_EXTEND
+    const bool hasMechProps = mechPropsIO.typeHeaderOk<IOdictionary>(true);
+#else
+    const bool hasMechProps = mechPropsIO.headerOk();
+#endif
+
+    if (hasMechProps && modelPtr->hydrostaticSmoothingRequested())
     {
+        if (!modelPtr->supportsHydrostaticSmoothing())
+        {
+            FatalErrorIn("solidModel::New(Time&, const word&)")
+                << "solvePressureEqn is set in mechanicalProperties, and "
+                << "solid model " << modelType << " cannot smooth the "
+                << "hydrostatic stress." << nl
+                << "    It is supported by the updated Lagrangian, total "
+                << "Lagrangian and linear geometry total displacement "
+                << "models. Remove solvePressureEqn, or use one of those."
+                << exit(FatalError);
+        }
+
         modelPtr->smoothHydrostaticStress();
     }
 
