@@ -4,11 +4,6 @@ sort: 2
 
 # Immersed oscillating cylinder in a channel: `oscillatingCylinderInChannel`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/oscillatingCylinderInChannel`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/oscillatingCylinderInChannel).
-
----
-
 ## Tutorial Aims
 
 - Demonstrate how to prescribe the motion of an immersed body with the
@@ -82,7 +77,7 @@ $$
 where the reference velocity is the maximum velocity of the cylinder,
 $$U_{ref} = 2 \pi A/T = 0.3927$$ m/s, and $$L_z = 0.1$$ m is the thickness of
 the mesh, i.e. $$C_d = 1296.9 F_x$$. The coefficients of Wan and Turek (2006)
-are in `verificationData`.
+are in `verification/reference`.
 
 ## Running the Case
 

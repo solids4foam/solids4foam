@@ -25,7 +25,7 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    // Coupling coefficient, optional, default 0.8
+    // Relaxation of each direct-forcing update, optional, default 0.8
     couplingCoeff   0.2;
 
     bodies
@@ -62,6 +62,13 @@ corrector, the forcing in the covered cells is increased by
 the updated forcing is used by the next pressure corrector. At the start of
 each time step, the bodies are moved to the new time and the forcing is
 multiplied by the new occupancy.
+
+`couplingCoeff` controls how much of the velocity error is corrected after
+each pressure corrector. The default `0.8` gives strong enforcement without
+the oscillation that full correction can produce. Reduce it when the forcing
+or pressure corrections oscillate or diverge; a smaller value is more stable,
+but enforces the body velocity more slowly and can require more pressure
+correctors or a smaller time step for the same accuracy.
 
 The force `-rho*sum(f*V)` and torque on each body are written every time step
 to `postProcessing/<option name>/<start time>/<body>.dat`, together with the

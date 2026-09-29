@@ -212,10 +212,10 @@ public:
 
         // Evaluation
 
-            //- Force on the fluid by the body, given by the immersed boundary
-            //  forcing f (an acceleration): -rho*sum(f*V) over the covered
-            //  cells. This is also the force on the body by the fluid,
-            //  excluding the inertia of the fluid inside the body
+            //- Force on the body by the fluid, opposite to the immersed
+            //  boundary forcing f (an acceleration): -rho*sum(f*V) over the
+            //  covered cells, excluding the inertia of the fluid inside the
+            //  body
             vector force(const volVectorField& f, const scalar rho) const;
 
             //- Torque about CofR corresponding to force

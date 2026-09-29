@@ -39,6 +39,16 @@ Description
     mesh moves again within the time step (moveMeshOuterCorrectors), f is set
     to zero in the cells no longer covered.
 
+    The force reported after the last pressure corrector includes that
+    corrector's forcing increment. Since there is no following pressure
+    corrector in the same solve, this increment first acts in the next
+    momentum solve, consistently with the original pimpleHFDIBFoam method.
+
+    To pass forcing increments between pressure correctors, constrain() keeps
+    a non-owning pointer to the current momentum matrix. The solver must keep
+    that matrix alive through all non-final pressure correctors of the current
+    outer corrector; the pointer is never accessed after the last corrector.
+
     The force on each body is written every time step to
     postProcessing/<name>/<startTime>/<body>.dat, as the force -rho*sum(f*V)
     and torque exerted by the forcing, which exclude the inertia of the fluid
@@ -76,7 +86,9 @@ Description
     {
         type            immersedBoundaryForce;
 
-        // Coupling coefficient c, optional, default 0.8
+        // Relaxation c of each direct-forcing update, optional, default 0.8.
+        // Reduce it to damp oscillatory forcing or pressure corrections, at
+        // the cost of slower enforcement of the body velocity
         couplingCoeff   0.2;
 
         // Occupancy threshold for a covered cell, optional, default 1e-4
@@ -215,7 +227,10 @@ class immersedBoundaryForce
         List<vector> force_;
         List<vector> torque_;
         List<vector> inertia_;
+        //- Time name associated with the force values awaiting output
         word forceTimeName_;
+
+        //- Are calculated force values waiting to be written?
         bool forcesPending_;
 
         //- Has the missing momentum matrix been reported?
@@ -226,6 +241,9 @@ class immersedBoundaryForce
 
         //- The solution control of the momentum equation
         const pimpleControl& pimple() const;
+
+        //- Base post-processing directory for this option
+        fileName outputDir() const;
 
         //- Fluid density for the forces: the rho entry, else the rho entry
         //  of transportProperties, else 1. The fluid model may construct

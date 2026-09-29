@@ -30,9 +30,7 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::immersedBodyMotion::immersedBodyMotion(const dictionary& dict)
-:
-    dict_(dict)
+Foam::immersedBodyMotion::immersedBodyMotion(const dictionary&)
 {}
 
 

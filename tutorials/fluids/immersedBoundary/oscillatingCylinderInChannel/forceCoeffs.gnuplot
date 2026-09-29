@@ -20,7 +20,7 @@ set grid
 plot \
     forceFile u 1:(scale*($2 + $8)) w l lw 2 lc rgb "black" \
         t "immersedBoundaryForce", \
-    "verificationData/Cd.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
+    "verification/reference/Cd.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
         t "Wan and Turek (2006)"
 
 set ylabel "C_l"
@@ -28,7 +28,7 @@ set yrange [-0.1:0.1]
 plot \
     forceFile u 1:(scale*($3 + $9)) w l lw 2 lc rgb "black" \
         t "immersedBoundaryForce", \
-    "verificationData/Cl.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
+    "verification/reference/Cl.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
         t "Wan and Turek (2006)"
 
 unset multiplot

@@ -4,11 +4,6 @@ sort: 1
 
 # Immersed cylinder in a channel: `staticCylinderInChannel`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/staticCylinderInChannel`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/staticCylinderInChannel).
-
----
-
 ## Tutorial Aims
 
 - Demonstrate how to represent a body with the immersed boundary finite volume
