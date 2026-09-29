@@ -55,7 +55,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--study",
         default="all",
-        help="comma-separated studies: mesh, time, solid or all (default)",
+        help="comma-separated studies: static, solid, mesh, time, or all"
+        " (default: static, solid and mesh; time is not part of all)",
     )
     parser.add_argument(
         "--quick",
@@ -521,6 +522,30 @@ def evaluate(case: dict, run_dir: Path, reference: dict, refs: dict) -> dict:
     return row
 
 
+def add_solid_differences(results: list[tuple[dict, Path, dict]]) -> None:
+    """Difference of each case from the finest high-order solid mesh.
+
+    On the tutorial fluid mesh the comparison with oomph-lib is dominated by
+    the fluid discretisation error, which is common to all the cases of the
+    solid study; the difference from the finest high-order solid isolates the
+    solid discretisation error. It is relative to the peak of the reference.
+    """
+    finest = max(
+        (item for item in results if item[0]["solidType"] == "highOrder"),
+        key=lambda item: item[0]["solid"][0]*item[0]["solid"][1],
+        default=None,
+    )
+    if finest is None:
+        return
+    scale = max(abs(v) for _, v in read_reference(REFERENCE_CSV)["wallMid"])
+    target = dict(read_history(finest[1], "wallMid"))
+    for case, run_dir, row in results:
+        history = dict(read_history(run_dir, "wallMid"))
+        common = [t for t in history if t in target and t > 0]
+        row["solidDiff"] = max(abs(history[t] - target[t]) for t in common)/scale
+        row["solidDiffFrom"] = finest[0]["name"]
+
+
 def self_convergence(results: list[tuple[dict, Path, dict]]) -> list[str]:
     """Differences between successive time steps, and the observed order.
 
@@ -594,14 +619,19 @@ def summary_table(study: str, rows: list[dict]) -> list[str]:
                 f" {row['wallMid_relError']:+.3%} | {row['clockTime']:.0f} |"
             )
         return lines
+    solid = study == "solid"
     lines = [
-        "| Case | Max error (mid) | RMS error (mid) | Trough | FSI it./step | Clock (s) |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| Case | Max error (mid) | RMS error (mid) |"
+        + (" Diff. from finest solid |" if solid else "")
+        + " Trough | FSI it./step | Clock (s) |",
+        "|---|---:|---:|" + ("---:|" if solid else "") + "---:|---:|---:|",
     ]
     for row in rows:
         lines.append(
             f"| {row['case']} | {row['wallMid_maxError']:.3%} |"
-            f" {row['wallMid_rmsError']:.3%} | {row['troughValue']:.5f} |"
+            f" {row['wallMid_rmsError']:.3%} |"
+            + (f" {row.get('solidDiff', math.nan):.3%} |" if solid else "")
+            + f" {row['troughValue']:.5f} |"
             f" {row['meanFsiIterations']:.1f} | {row['clockTime']:.0f} |"
         )
     return lines
@@ -639,6 +669,18 @@ def check_study(study: str, rows: list[dict], refs: dict, quick: bool) -> list[s
                 )
     if study == "solid":
         for row in rows:
+            tolerance = criteria["maxSolidDiff"].get(row["solidType"])
+            if (
+                tolerance is None
+                and row["solidCells"] == criteria["linearFinestMesh"]
+            ):
+                tolerance = criteria["linearFinestSolidDiff"]
+            if tolerance is not None and row.get("solidDiff", 0) > tolerance:
+                failures.append(
+                    f"solid: {row['case']} differs from {row['solidDiffFrom']}"
+                    f" by {row['solidDiff']:.3g} > {tolerance}"
+                )
+        for row in rows:
             tolerance = criteria["maxError"].get(row["solidType"])
             if tolerance is not None and row["wallMid_maxError"] > tolerance:
                 failures.append(
@@ -648,7 +690,9 @@ def check_study(study: str, rows: list[dict], refs: dict, quick: bool) -> list[s
     return failures
 
 
-def write_plot(study: str, cases: list[tuple[dict, Path]], reference: Path) -> None:
+def write_plot(
+    study: str, cases: list[tuple[dict, Path]], reference: Path, end_time: float
+) -> None:
     if not shutil.which("gnuplot"):
         return
     lines = [
@@ -658,6 +702,7 @@ def write_plot(study: str, cases: list[tuple[dict, Path]], reference: Path) -> N
         'set ylabel "vertical displacement at x = 10 m (m)"',
         'set grid',
         'set key bottom right',
+        f'set xrange [0:{end_time:g}]',
         'set datafile separator ","',
         f'plot "{reference}" every ::1 using 1:3 with lines lw 3 '
         'lc rgb "black" title "oomph-lib reference"',
@@ -689,7 +734,7 @@ def main() -> int:
     args = parse_args()
     refs = load_references()
     studies = (
-        ["static", "solid", "mesh", "time"] if args.study == "all"
+        ["static", "solid", "mesh"] if args.study == "all"
         else [s.strip() for s in args.study.split(",")]
     )
     end_time = args.end_time or (
@@ -751,6 +796,8 @@ def main() -> int:
             return 1
         if not results:
             continue
+        if study == "solid":
+            add_solid_differences(results)
         rows = [row for _, _, row in results]
         path = write_rows(study, rows)
         if study != "static":
@@ -758,6 +805,7 @@ def main() -> int:
                 study,
                 [(case, run_dir) for case, run_dir, _ in results],
                 reference_csv(spec, results[-1][0]["dt"]),
+                end_time,
             )
         failures = check_study(study, rows, refs, args.quick)
         all_failures.extend(failures)

@@ -45,7 +45,10 @@
       "solidMeshes": [[80, 8], [160, 8], [320, 8], [640, 8]],
       "quickSolidMeshes": [[80, 8]],
       "acceptance": {
-        "maxError": {"highOrder": 0.05}
+        "maxError": {"highOrder": 0.05},
+        "maxSolidDiff": {"highOrder": 0.01},
+        "linearFinestMesh": "640x8",
+        "linearFinestSolidDiff": 0.01
       }
     },
     "mesh": {
@@ -56,7 +59,7 @@
       "solidMesh": [160, 8],
       "solidType": "highOrder",
       "acceptance": {
-        "finestMaxError": 0.05
+        "finestMaxError": 0.01
       }
     },
     "time": {
