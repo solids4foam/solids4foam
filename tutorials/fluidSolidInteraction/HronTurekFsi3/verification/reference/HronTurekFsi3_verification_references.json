@@ -300,8 +300,8 @@
         1,
         2
       ],
-      "endTime": 12.0,
-      "analysisWindow": 3.0,
+      "endTime": 10.5,
+      "analysisWindow": 2.6,
       "maximumErrorGrowth": 0.01
     },
     "quick": {
@@ -320,12 +320,12 @@
     "references": {
       "ux_mean": {
         "value": -0.01485,
-        "tolerance": 0.1,
+        "tolerance": 0.05,
         "primary": true
       },
       "ux_amplitude": {
         "value": 0.0127,
-        "tolerance": 0.1,
+        "tolerance": 0.05,
         "primary": true
       },
       "ux_frequency": {
@@ -340,7 +340,7 @@
       },
       "uy_amplitude": {
         "value": 0.0816,
-        "tolerance": 0.05,
+        "tolerance": 0.03,
         "primary": true
       },
       "uy_frequency": {
@@ -350,12 +350,12 @@
       },
       "drag_mean": {
         "value": 215.06,
-        "tolerance": 0.02,
+        "tolerance": 0.015,
         "primary": true
       },
       "drag_amplitude": {
         "value": 77.65,
-        "tolerance": 0.15,
+        "tolerance": 0.05,
         "primary": true
       },
       "drag_frequency": {
@@ -370,8 +370,9 @@
       },
       "lift_amplitude": {
         "value": 237.8,
-        "tolerance": 0.15,
-        "primary": true
+        "tolerance": 0.12,
+        "primary": true,
+        "errorGrowthChecked": false
       },
       "lift_frequency": {
         "value": 1.93,

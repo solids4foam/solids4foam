@@ -603,6 +603,11 @@ def mesh_study(args: argparse.Namespace, spec: dict) -> bool:
             if not reference.get("primary", True):
                 continue
             growth = rows[-1][f"{column}_error"] - rows[0][f"{column}_error"]
+            # The FSI2 lift amplitude does not converge monotonically, so its
+            # error growth is reported but not tested
+            if not reference.get("errorGrowthChecked", True):
+                rows[-1][f"{column}_error_growth"] = growth
+                continue
             rows[-1][f"{column}_error_growth"] = growth
             if growth > growth_limit:
                 failures.append(

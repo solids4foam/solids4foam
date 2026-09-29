@@ -51,6 +51,9 @@ release. For complete commit-level details and contributor information, see the
   runs the Robin-Neumann variant of the case. A `--benchmark fsi1` option runs
   the steady FSI1 benchmark instead, with a mesh study against the Featflow
   values and an informative steady Robin-Neumann versus IQN-ILS comparison.
+  A `--benchmark fsi2` option runs the periodic, large-deformation FSI2
+  benchmark through the same mesh study against the Featflow FSI2 values and
+  history.
 
 ### Changed
 

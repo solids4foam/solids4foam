@@ -375,6 +375,161 @@ residual was at most `4.2e-7` and the leakage-flux residual at most
 `4.4e-7`, but in those 24 steps the pressure-change residual was up to
 `9.8e-5`, against a `robinPressureTolerance` of `1e-5`.
 
+## FSI2 periodic benchmark
+
+`--benchmark fsi2` runs the periodic FSI2 test of Turek and Hron. It has the
+same geometry and fluid as FSI3, a mean inflow of `1 m/s` (`Re = 100`) and a
+heavy, soft plate with `ρ = 10000 kg/m^3`, `E = 1.4 MPa` and `ν = 0.4`. The
+plate flaps with a large amplitude: `u_y(A)` is about `±80 mm` at `1.93 Hz`.
+The FSI3 machinery is reused unchanged: the same periodic statistics,
+periodicity test, history overlay and force integration.
+
+```bash
+./Allverify --benchmark fsi2                   # IQN-ILS mesh study, 1x and 2x
+./Allverify --benchmark fsi2 --levels 1,2,4    # add the 4x mesh (expensive)
+./Allverify --benchmark fsi2 --quick           # smoke run to t = 2.3 s, no checks
+```
+
+The FSI2 settings are in the `fsi2` entry of the reference JSON file. Runs,
+CSV files and plots carry an `fsi2_` prefix. In addition to the FSI3 changes
+listed above, the verification copies set:
+
+- the inlet `maxValue` to `1.5 m/s`, ramped over the benchmark's
+  `transitionPeriod 2 s`, in both `U.dirichletNeumann` and `U.robin`;
+- `ρ = 10000 kg/m^3` and `E = 1.4e6 Pa`;
+- the coupling start at `t = 2 s`, the end of the ramp;
+- `outerCorrTolerance 1e-6`, the tutorial value, instead of the `1e-5` of the
+  FSI3 copies. At `1e-5`, the partly converged interface leaves step-to-step
+  noise in the forces: on the 1x mesh the lift noise was `14 N/m` rms, with
+  peaks of `40 N/m`, and on the 2x mesh `30 N/m` rms, with peaks of
+  `140 N/m`. Because the amplitude is taken from the extrema, this noise
+  inflated the lift amplitude by `13%` on the 1x mesh and `30%` on the 2x
+  mesh. At `1e-6` the noise falls by a factor of about six. IQN-ILS needs one
+  more iteration per step, and the lift amplitude is within `3%` of that of
+  the smoothed signal. At `1e-7` there was no further change. The stall that
+  motivates `1e-5` for FSI3 is discussed below; it is not avoided by `1e-5`.
+
+The time steps are those of FSI3, `Δt = 0.001 s` on the 1x mesh, `0.0005 s`
+on the 2x mesh and `0.00025 s` on the 4x mesh. The maximum Courant number is
+`0.40` on 1x and `0.41` on 2x, half that of FSI3 because the inflow is halved;
+the moving plate adds little. A period of about `0.52 s` is resolved by
+about 500 steps on the 1x mesh. The Featflow tables change by at most `1%`
+between `Δt = 0.01 s` and `0.0005 s` on level 4, so the time-step error is
+small against the mesh error.
+
+### FSI2 end time and window
+
+The run ends at `t = 10.5 s` and is evaluated over the closing `2.6 s`, from
+`t = 7.9 s` on the 2x mesh. That is four full `u_y` periods, which is the
+minimum for the two-against-two periodicity test. Both limits come from the
+runs:
+
+- The flow before the coupling starts is steady. After the coupling starts,
+  the flapping grows from rest by about a factor of 1.6 every `0.5 s`, and
+  the `u_y` amplitude saturates at `t ≈ 7.4 s` (2x) and `7.7 s` (1x).
+- After saturation the amplitude drifts slowly downwards, by about `0.1%` per
+  period on the 2x mesh and `0.2%` on the 1x mesh, while the fluid mesh
+  distorts. The largest non-orthogonality rises steadily during the flapping,
+  on the 2x mesh from `26°` at rest to `42°` at `t = 9 s`, `58°` at
+  `10.5 s` and `61°` at `11 s`. On the 1x mesh it reaches `79°` at
+  `13.3 s`. The `velocityLaplacian` motion solver is not reversible over a
+  period, so the interior points drift. Eventually IQN-ILS stops converging
+  within 30 iterations. With `outerCorrTolerance 1e-6`, this happened at
+  `t = 11.36 s` on the 2x mesh and at `18.67 s` on the 1x mesh. With `1e-5`,
+  it happened at `11.35 s` (2x) and `19.65 s` (1x), and on the 2x mesh the
+  solid SNES then failed. The loosened tolerance therefore does not avoid it.
+  The run is stopped at `10.5 s`, before the mesh degrades further.
+
+The mesh drift is a limitation of the tutorial's mesh motion on this case. It
+is not addressed here.
+
+### FSI2 reference and acceptance
+
+The reference values are the Featflow FSI2 results on level 4 with
+`Δt = 0.0005 s`: `u_x = -14.85 ± 12.70 mm [3.86 Hz]`,
+`u_y = 1.30 ± 81.6 mm [1.93 Hz]`, `F_D = 215.06 ± 77.65 N/m [3.86 Hz]` and
+`F_L = 0.61 ± 237.8 N/m [1.93 Hz]`. All three published FSI2 tables (levels
+2 to 4 at `Δt = 0.02`, `0.01` and `0.0005 s`) are recorded in the JSON file
+(`featflowTables`).
+
+This table is the discretisation of the published reference history,
+`reference/TurekHron_fsi2_reference_history.csv`. It is subsampled to `1 ms`
+from the Featflow `ref_fsi2.point` file. Applied to that history, the
+driver's extraction reproduces all the amplitudes and the `u_x` and drag
+means to within `0.3%`, and the frequencies to the tabulated digits. The
+exceptions are the two near-zero means. The `u_y` mean comes out as `1.25`
+rather than `1.30 mm`, and the lift mean as `0.27` rather than `0.61 N/m`.
+Both differences are below `0.15%` of the corresponding amplitude. The lift
+mean is `0.75 N/m` at the full `0.5 ms` sampling. The summary values of Turek
+and Hron (2006), `u_x = -14.58 ± 12.44 mm [3.8 Hz]`,
+`u_y = 1.23 ± 80.6 mm [2.0 Hz]`, `F_D = 208.83 ± 73.75 N/m` and
+`F_L = 0.88 ± 234.2 N/m`, are reported alongside for information.
+
+From level 3 to level 4 the Featflow reference changes by `2.5%` in the `u_x`
+mean, `2.0%` in the `u_x` amplitude, `1.1%` in the `u_y` amplitude, `0.9%` in
+the drag mean, `2.5%` in the drag amplitude and `1.3%` in the lift
+amplitude. The frequencies do not change. The level-4 values are therefore
+themselves uncertain by about `1%`, which sets the floor of the tolerances
+below.
+
+- Every run must complete to the end time.
+- Every run must be periodic: for all four quantities, including the drag,
+  the mean amplitude over the last two full `u_y` periods must agree with that
+  over the two before to within `2%`. The largest change was `1.1%` (`u_x` on
+  the 1x mesh).
+- On the finest level of the sweep, each primary quantity must be within its
+  tolerance of the Featflow level-4 value: `1.5%` for the drag mean; `3%` for
+  the `u_y` amplitude and the `u_x` and `u_y` frequencies; `5%` for the `u_x`
+  mean and amplitude and the drag amplitude; and `12%` for the lift
+  amplitude. These are the recorded 2x errors, rounded up by about 1.5 times
+  and by at least the reference's own spread. The `u_y` and lift means, and
+  the drag and lift frequencies (which equal the `u_x` and `u_y`
+  frequencies), are reported only.
+- The reference error of a primary quantity may not grow by more than one
+  percentage point between the coarsest and the finest level of the sweep.
+  The lift amplitude is exempt (`errorGrowthChecked false`), as it does not
+  converge monotonically: it is `8%` high on both meshes.
+
+The lift amplitude converges slowest, as it does in FSI3. Its extrema-based
+value is `256.7 N/m` on the 1x mesh and `256.3 N/m` on the 2x mesh, against
+`237.8 N/m`. On the 2x mesh, the last period, smoothed over 21 steps, gives
+`250.7 N/m` (`5.4%` high). The remaining `2.4%` is residual coupling noise.
+The history overlay shows the lift peaks sharper than the reference and the
+plateaus between them slightly lower. The frequencies converge next slowest:
+`7%` high on the 1x mesh and `1.8%` high on the 2x mesh.
+
+### FSI2 recorded results
+
+Recorded with OpenFOAM v2412 on an Apple M1 Ultra shared with other jobs.
+The 1x mesh ran in serial in `4173 s` (`1.2 h`). The 2x mesh ran on seven
+ranks in `14346 s` (`4.0 h`), because one core was in use by the 1x run.
+IQN-ILS needed a mean of `4.6` FSI iterations per coupled step on both meshes
+(at most 10 on 1x and 12 on 2x). The errors are relative to Featflow level 4,
+`Δt = 0.0005 s`:
+
+| Quantity | 1x | Error | 2x | Error | Featflow level 4 |
+|---|---:|---:|---:|---:|---:|
+| `u_x` mean (mm) | -11.643 | 21.6% | -14.396 | 3.1% | -14.85 |
+| `u_x` amplitude (mm) | 10.618 | 16.4% | 12.458 | 1.9% | 12.70 |
+| `u_x` frequency (Hz) | 4.130 | 7.0% | 3.929 | 1.8% | 3.86 |
+| `u_y` mean (mm) | 1.138 | 12.5% | 1.253 | 3.6% | 1.30 |
+| `u_y` amplitude (mm) | 71.51 | 12.4% | 80.55 | 1.3% | 81.6 |
+| `u_y` frequency (Hz) | 2.063 | 6.9% | 1.965 | 1.8% | 1.93 |
+| drag mean (N/m) | 205.19 | 4.6% | 216.04 | 0.5% | 215.06 |
+| drag amplitude (N/m) | 67.45 | 13.1% | 79.24 | 2.0% | 77.65 |
+| lift mean (N/m) | 0.90 | - | -0.88 | - | 0.61 |
+| lift amplitude (N/m) | 256.70 | 7.9% | 256.32 | 7.8% | 237.8 |
+
+Every primary error except that of the lift amplitude falls by a factor of
+four to ten from the 1x to the 2x mesh. The largest periodicity change on the
+2x mesh was `0.9%` (drag). `reference/fsi2_iqnils_mesh_2x_history.png`
+overlays the 2x history on the published one.
+
+The 4x level (`Δt = 0.00025 s`, 16 ranks by default) is reachable with
+`--levels 1,2,4`, but it has not been run. Its end time would first have to
+be checked against the mesh drift described above: the finer mesh
+distorted sooner.
+
 ## References
 
 S. Turek and J. Hron, Proposal for numerical benchmarking of fluid-structure
