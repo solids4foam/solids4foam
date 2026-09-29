@@ -156,6 +156,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
     "fluidSolidInteraction/fillingElasticContainer"
+    "fluidSolidInteraction/womersleyTube"
 )
 
 failures=0
