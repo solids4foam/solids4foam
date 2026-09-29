@@ -13,5 +13,18 @@ cleanCase solid
 (cd constant/fluid/polyMesh && find . ! -name 'blockMeshDict' -type f -exec rm -f {} +)
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
 
+# Restore the stored FSI3 dictionaries if an Allrun benchmark run was
+# interrupted before it could restore them
+for file in 0/fluid/U.dirichletNeumann 0/fluid/U.robin \
+    constant/solid/mechanicalProperties system/controlDict \
+    constant/fsiProperties.iqnils constant/fsiProperties.robin \
+    system/fluid/fvSolution
+do
+    if [[ -f "${file}.stored" ]]
+    then
+        mv -f "${file}.stored" "${file}"
+    fi
+done
+
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .

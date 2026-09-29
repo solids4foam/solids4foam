@@ -7,18 +7,24 @@
 source solids4FoamScripts.sh
 
 # Example usage
-# ./Allrun                 # default behaviour is Dirichlet-Neumann IQN-ILS
+# ./Allrun                 # default behaviour is FSI3 with Dirichlet-Neumann IQN-ILS
+# ./Allrun fsi1            # steady FSI1 benchmark
+# ./Allrun fsi2            # periodic FSI2 benchmark
 # ./Allrun robin           # Robin-Neumann coupling
 # ./Allrun parallel
-# ./Allrun robin parallel
+# ./Allrun fsi2 robin parallel
 
 coupling=iqnils
 interfaceCondition=dirichletNeumann
 runMode=serial
+benchmark=
 
 for arg in "$@"
 do
     case "$arg" in
+        fsi1|FSI1|fsi2|FSI2|fsi3|FSI3)
+            benchmark=$(printf '%s' "$arg" | tr '[:upper:]' '[:lower:]')
+            ;;
         iqnils|IQNILS)
             coupling=iqnils
             interfaceCondition=dirichletNeumann
@@ -32,13 +38,91 @@ do
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [iqnils|robin] [parallel]"
+            echo "Usage: ./Allrun [fsi1|fsi2|fsi3] [iqnils|robin] [parallel]"
             exit 1
             ;;
     esac
 done
 
 echo "Using ${coupling} coupling setup"
+
+# Set the inflow, plate material and run control of the requested benchmark.
+# The stored case is FSI3; the edited dictionaries are restored on exit.
+benchmarkFiles="0/fluid/U.dirichletNeumann 0/fluid/U.robin \
+constant/solid/mechanicalProperties system/controlDict \
+constant/fsiProperties.iqnils constant/fsiProperties.robin system/fluid/fvSolution"
+
+restore_benchmark()
+{
+    for file in $benchmarkFiles
+    do
+        if [[ -f "${file}.stored" ]]
+        then
+            mv -f "${file}.stored" "${file}"
+        fi
+    done
+}
+
+if [[ -n "$benchmark" ]]
+then
+    case "$benchmark" in
+        fsi1)
+            # Steady: mean inflow 0.2 m/s ramped over 2 s, run as a
+            # pseudo-transient route to the steady state. The loads are
+            # 30 to 40 times smaller than in FSI3, so the fluid solver
+            # tolerances are tightened and the interface tolerance is that of
+            # the verification study; otherwise the solver residuals stall
+            # IQN-ILS just above 1e-6
+            maxValue=0.3; transitionPeriod=2; rho=1000; E=1.4e6
+            deltaT=0.025; endTime=30; writeInterval=40
+            outerCorrTolerance=1e-5; fluidTolerance=1e-9
+            ;;
+        fsi2)
+            # Periodic with large deformation: mean inflow 1 m/s ramped over
+            # 2 s and a heavy, soft plate
+            maxValue=1.5; transitionPeriod=2; rho=10000; E=1.4e6
+            deltaT=1e-3; endTime=10.5; writeInterval=100
+            outerCorrTolerance=1e-6; fluidTolerance=1e-6
+            ;;
+        fsi3)
+            # Periodic: mean inflow 2 m/s applied without a ramp
+            maxValue=3; transitionPeriod=0; rho=1000; E=5.6e6
+            deltaT=1e-3; endTime=6; writeInterval=20
+            outerCorrTolerance=1e-6; fluidTolerance=1e-6
+            ;;
+    esac
+    echo "Setting up the ${benchmark} benchmark"
+
+    solids4Foam::requireGnuSed
+    for file in $benchmarkFiles
+    do
+        cp -f "${file}" "${file}.stored"
+    done
+    trap restore_benchmark EXIT
+
+    for file in 0/fluid/U.dirichletNeumann 0/fluid/U.robin
+    do
+        "${SOLIDS4FOAM_SED}" -i \
+            -e "s/^\(\s*maxValue\s\+\)[^;]*;/\1${maxValue};/" \
+            -e "s/^\(\s*transitionPeriod\s\+\)[^;]*;/\1${transitionPeriod};/" \
+            "${file}"
+    done
+    "${SOLIDS4FOAM_SED}" -i \
+        -e "s/^\(\s*rho\s\+rho \[[^]]*\] \)[^;]*;/\1${rho};/" \
+        -e "s/^\(\s*E\s\+E \[[^]]*\] \)[^;]*;/\1${E};/" \
+        constant/solid/mechanicalProperties
+    "${SOLIDS4FOAM_SED}" -i \
+        -e "s/^\(deltaT\s\+\)[^;]*;/\1${deltaT};/" \
+        -e "s/^\(endTime\s\+\)[^;]*;/\1${endTime};/" \
+        -e "s/^\(writeInterval\s\+\)[^;]*;/\1${writeInterval};/" \
+        system/controlDict
+    "${SOLIDS4FOAM_SED}" -i \
+        -e "s/^\(\s*outerCorrTolerance\s\+\)[^;]*;/\1${outerCorrTolerance};/" \
+        constant/fsiProperties.iqnils constant/fsiProperties.robin
+    "${SOLIDS4FOAM_SED}" -i \
+        -e "s/^\(\s*tolerance\s\+\)[^;]*;/\1${fluidTolerance};/" \
+        system/fluid/fvSolution
+fi
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U

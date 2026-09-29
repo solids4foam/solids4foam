@@ -58,6 +58,12 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- Renamed the `fluidSolidInteraction/HronTurekFsi3` tutorial to
+  `fluidSolidInteraction/HronTurek`, which now covers all three Turek-Hron
+  benchmarks: `./Allrun fsi1`, `./Allrun fsi2` or `./Allrun fsi3` (the
+  default) selects the inflow, plate material and run control of each, and
+  combines with the existing `robin` and `parallel` options. The stored case
+  and its regression test remain FSI3.
 - The `mechanicalConstitutiveLaw` framework no longer requires the legacy
   `mechanicalModel` it replaces. `solidModel` reads
   `constant/mechanicalProperties` itself and hands it to whichever
