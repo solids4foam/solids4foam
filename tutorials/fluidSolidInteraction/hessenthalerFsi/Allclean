@@ -10,7 +10,7 @@ cleanCase
 foamCleanPolyMesh -region fluid
 foamCleanPolyMesh -region solid
 
-rm -rf constant/polyMesh constant/triSurface system/meshDict flap.msh \
+rm -rf constant/polyMesh constant/triSurface system/meshDict \
     case.foam postProcessing dynamicCode
 
 # Restore the stored case format

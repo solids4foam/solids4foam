@@ -174,7 +174,7 @@ def tutorial_fingerprint() -> str:
             elif path.is_file():
                 digest.update(str(relative).encode())
                 digest.update(path.read_bytes())
-    for name in ("Allrun", "makeFluidSurface.py", "flap.geo"):
+    for name in ("Allrun", "makeFluidSurface.py"):
         digest.update((TUTORIAL / name).read_bytes())
     return digest.hexdigest()
 
@@ -721,7 +721,7 @@ def read_csv_plain(path: Path) -> list[dict[str, str]]:
 def ignored(directory: str, names: list[str]) -> set[str]:
     """Copy only the inputs a fresh run needs, never a previous result."""
     skip = {"validation", "regressionTests", "postProcessing", "dynamicCode",
-            "case.foam", "flap.msh"}
+            "case.foam"}
     skip.update(name for name in names if name.startswith("processor"))
     skip.update(name for name in names if name.startswith("log."))
     directory_path = Path(directory)

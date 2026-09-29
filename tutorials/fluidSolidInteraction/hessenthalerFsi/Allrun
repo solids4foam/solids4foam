@@ -16,19 +16,16 @@ print_usage()
 {
     cat <<'EOF'
 Usage:
-  ./Allrun [coarse|medium] [hex|tet] [parallel]
+  ./Allrun [coarse|medium] [parallel]
 
   coarse    coarse fluid mesh, about 0.23 million cells (default)
   medium    medium fluid mesh, about 0.8 million cells
-  hex       hexahedral solid mesh from blockMesh (default)
-  tet       tetrahedral solid mesh from Gmsh (flap.geo)
   parallel  decompose both regions with system/fluid/decomposeParDict and
             system/solid/decomposeParDict and run in parallel
 EOF
 }
 
 fluidMesh=coarse
-solidMesh=hex
 runParallel=no
 
 for arg in "$@"
@@ -36,9 +33,6 @@ do
     case "$arg" in
         coarse|medium)
             fluidMesh="$arg"
-            ;;
-        hex|tet)
-            solidMesh="$arg"
             ;;
         parallel)
             runParallel=yes
@@ -77,14 +71,6 @@ then
     exit 0
 fi
 
-if [[ "$solidMesh" == "tet" ]] && ! command -v gmsh &> /dev/null
-then
-    echo
-    echo "gmsh command not found, which is required for this case"
-    echo
-    exit 0
-fi
-
 for generatedMesh in \
     constant/polyMesh \
     constant/fluid/polyMesh \
@@ -110,13 +96,7 @@ mkdir -p constant/fluid
 mv constant/polyMesh constant/fluid/polyMesh
 
 # Solid mesh
-if [[ "$solidMesh" == "tet" ]]
-then
-    runApplication -o gmsh -3 -format msh2 flap.geo -o flap.msh
-    runApplication -o gmshToFoam flap.msh -region solid
-else
-    runApplication -o blockMesh -region solid
-fi
+runApplication -o blockMesh -region solid
 
 runApplication -o -s fluid checkMesh -region fluid
 runApplication -o -s solid checkMesh -region solid
