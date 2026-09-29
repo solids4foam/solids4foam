@@ -20,8 +20,9 @@ FoamFile
 // Hexahedral mesh of the flap: 11 x 2 x 65 mm, clamped at z = 0
 convertToMeters 0.001;
 
-nx 11;
-ny 4;
+// Even nx and ny place mesh points on the centreline x = y = 0
+nx 12;
+ny 8;
 nz 65;
 
 vertices

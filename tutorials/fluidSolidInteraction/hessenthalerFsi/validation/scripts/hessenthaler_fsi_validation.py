@@ -2,14 +2,14 @@
 """Run the opt-in Hessenthaler et al. (2017) FSI validation studies.
 
 calibration
-    The flap alone under its net buoyancy (no fluid). The buoyancy is ramped
-    in slowly to 1.4 times its Phase I value while the tip deflection is
-    recorded. The static deflection of a neo-Hookean solid with a fixed
-    Poisson's ratio depends only on rho*g/mu, so the load factor at which the
-    tip reaches the measured zero-flow deflection of 29.50 mm gives the
-    calibrated shear modulus. The study covers several solid meshes, two
-    Poisson's ratios, the standard (second-order) solid for comparison, and
-    one parallel run.
+    The flap alone under its net buoyancy (no fluid), relaxed with damping to
+    its static deflection at three buoyancy load factors. The static
+    deflection of a neo-Hookean solid with a fixed Poisson's ratio depends
+    only on rho*g/mu, so the load factors map to shear moduli, and
+    interpolation to the measured zero-flow tip deflection of 29.50 mm gives
+    the calibrated shear modulus. The study covers three solid meshes, two
+    Poisson's ratios, the stabilisation, the high-order solid, and one
+    parallel run.
 
 phaseI
     The coupled steady-inflow Phase I case on the coarse and medium fluid
@@ -33,6 +33,7 @@ import re
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve()
@@ -46,19 +47,10 @@ SETTINGS_FILE = "validation_settings.json"
 
 # Hexahedral solid meshes (cells in x, y, z) of the calibration study
 SOLID_MESHES = {
-    "coarse": (6, 3, 33),
-    "medium": (11, 4, 65),
-    "fine": (16, 6, 98),
+    "coarse": (6, 4, 33),
+    "medium": (12, 8, 65),
+    "fine": (18, 12, 98),
 }
-
-# Quasi-static buoyancy ramp of the calibration study: the buoyancy grows
-# linearly to LOAD_MAX times its Phase I value over RAMP_TIME, with light
-# damping so that the flap follows the static solution closely
-LOAD_MAX = 1.4
-RAMP_TIME = 40.0
-CAL_DELTA_T = 0.05
-CAL_DAMPING = 5.0
-MU_REFERENCE = 61000.0
 
 # Voxel sub-sampling of the MRI comparison (points per voxel in x, y, z)
 VOXEL_SAMPLES = (4, 4, 12)
@@ -241,11 +233,25 @@ def reusable(case: Path, settings: dict, args: argparse.Namespace,
     return True
 
 
+def run_environment() -> dict[str, str]:
+    """The environment of the OpenFOAM commands.
+
+    macOS drops DYLD_LIBRARY_PATH when a protected interpreter such as
+    /usr/bin/env starts this script; restore it as OpenFOAM does.
+    """
+    env = dict(os.environ)
+    if sys.platform == "darwin" and not env.get("DYLD_LIBRARY_PATH") \
+            and env.get("FOAM_LD_LIBRARY_PATH"):
+        env["DYLD_LIBRARY_PATH"] = env["FOAM_LD_LIBRARY_PATH"]
+    return env
+
+
 def run(command: list[str], case: Path, log_name: str) -> None:
     log = case / log_name
     with log.open("w") as handle:
         result = subprocess.run(command, cwd=case, stdout=handle,
-                                stderr=subprocess.STDOUT, text=True)
+                                stderr=subprocess.STDOUT, text=True,
+                                env=run_environment())
     if result.returncode:
         fail(f"'{' '.join(command)}' failed in {case}; see {log}")
 
@@ -283,12 +289,24 @@ def use_parallel_lu(fv_solution: Path) -> None:
 # Calibration study: the flap alone under buoyancy
 # ---------------------------------------------------------------------------
 
-LOAD_RAMP = """
-loadRamp
+# Buoyancy load factors, relative to the Phase I value, of the plateaus of a
+# calibration run. The static deflection of a neo-Hookean solid with a fixed
+# Poisson's ratio depends only on rho*g/mu, so load factor f at shear modulus
+# MU_REFERENCE is equivalent to shear modulus MU_REFERENCE/f at load 1.
+LOAD_LEVELS = (0.9, 1.05, 1.2)
+# Each plateau: a smooth 0.25 s transition, then damped settling
+PLATEAU_TIME = 2.0
+TRANSITION_TIME = 0.25
+CAL_DELTA_T = 0.005
+CAL_DAMPING = 15.0
+MU_REFERENCE = 61000.0
+
+LOAD_STEPS = """
+loadSteps
 {
     type            coded;
     libs            (utilityFunctionObjects);
-    name            loadRamp;
+    name            loadSteps;
 
     codeInclude
     #{
@@ -303,17 +321,23 @@ loadRamp
 
     localCode
     #{
-        // Linear ramp of the buoyancy to LOAD_MAX times its final value
+        // Piecewise-constant buoyancy load factor with smooth transitions
         static void setLoad(const fvMesh& mesh, const vector& gFinal)
         {
+            const scalarList levels({LEVELS});
+            const scalar plateau = PLATEAU;
+            const scalar transition = TRANSITION;
             const scalar t = mesh.time().value() + mesh.time().deltaTValue();
-            const scalar s = min(max(t/RAMP_TIME, 0.0), 1.0);
+            const label k = min(label(t/plateau), levels.size() - 1);
+            const scalar previous = k > 0 ? levels[k - 1] : 0.0;
+            const scalar s = min(max((t - k*plateau)/transition, 0.0), 1.0);
+            const scalar f = previous + (levels[k] - previous)*s*s*(3 - 2*s);
             uniformDimensionedVectorField& g =
                 const_cast<uniformDimensionedVectorField&>
                 (
                     mesh.lookupObject<uniformDimensionedVectorField>("g")
                 );
-            g.value() = LOAD_MAX*s*gFinal;
+            g.value() = f*gFinal;
         }
     #};
 
@@ -335,10 +359,48 @@ loadRamp
 }
 """
 
+# High-order total Lagrangian solid of the comparison: cubic residual, with
+# the linear high-order Jacobian as preconditioner (the compact Jacobian
+# stalls the Krylov solver for this thin flap)
+HIGH_ORDER_PROPERTIES = """
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-def solid_case(name: str, mesh: tuple[int, int, int], nu: float,
-               standard: bool, cores: int, end_time: float,
-               ramp_time: float) -> Path:
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    solutionAlgorithm PETScSNES;
+
+    predictor yes;
+
+    highOrderCoeffs
+    {
+        highOrderResidual true;
+        highOrderJacobian true;
+        displacement
+        {
+            polynomialOrder 3;
+            faceStencilExtraCells 65;
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+    }
+}
+"""
+
+
+def solid_case(name: str, spec: dict, end_time: float) -> Path:
     """Build a solid-only copy of the tutorial's solid region."""
     case = WORK_ROOT / name
     if case.exists():
@@ -348,13 +410,13 @@ def solid_case(name: str, mesh: tuple[int, int, int], nu: float,
     shutil.copytree(TUTORIAL / "constant" / "solid", case / "constant")
     for path in (TUTORIAL / "system" / "solid").iterdir():
         shutil.copy(path, case / "system" / path.name)
-    physics = case / "constant" / "physicsProperties"
-    physics.write_text(
+    (case / "constant" / "physicsProperties").write_text(
         (TUTORIAL / "constant" / "physicsProperties").read_text()
         .replace("fluidSolidInteraction;", "solid;"))
 
     # Material: the reference shear modulus with the requested nu
     mechanical = case / "constant" / "mechanicalProperties"
+    nu = spec["nu"]
     bulk = 2.0 * MU_REFERENCE * (1.0 + nu) / (3.0 * (1.0 - 2.0 * nu))
     text = mechanical.read_text()
     text, found = re.subn(r"(mu\s+mu\s+\[[^]]*\]\s+)[^;]+;",
@@ -365,23 +427,28 @@ def solid_case(name: str, mesh: tuple[int, int, int], nu: float,
         fail(f"Could not set mu and K in {mechanical}")
     mechanical.write_text(text)
 
-    # Damping of the quasi-static ramp
     solid_properties = case / "constant" / "solidProperties"
-    if standard:
+    if spec["solid"] == "highOrder":
         text = solid_properties.read_text()
-        start = text.index("    highOrderCoeffs")
-        end = text.index("    stabilisation")
-        text = text[:start] + text[end:]
-        text = re.sub(r"type\s+alpha;\s*scaleFactor\s+0\.1;",
-                      "type        diffStencilLaplacian;\n"
-                      "            scaleFactor 0.5;", text)
-        solid_properties.write_text(text)
+        header = text[:text.index("solidModel")]
+        solid_properties.write_text(header + HIGH_ORDER_PROPERTIES.lstrip())
+        displacement = case / "0" / "DD"
+        displacement.rename(case / "0" / "D")
+        replace_text(case / "0" / "D", "object      DD;", "object      D;")
+        solution = case / "system" / "fvSolution"
+        # Accept an inexact linear solve rather than stopping: the linear
+        # high-order Jacobian loses accuracy as the flap rotates
+        replace_entry(solution, "ksp_max_it", '"200"')
+        replace_text(solution, '            snes_monitor;\n',
+                     '            snes_monitor;\n'
+                     '            snes_max_linear_solve_fail "1000";\n')
+    else:
+        replace_entry(solid_properties, "scaleFactor", f"{spec['sf']:g}")
     replace_text(solid_properties, "    solutionAlgorithm PETScSNES;\n",
                  "    solutionAlgorithm PETScSNES;\n\n"
                  f"    dampingCoeff    [0 0 -1 0 0 0 0] {CAL_DAMPING:g};\n")
 
-    # First-order implicit time scheme with a large step: only the static
-    # limit of the ramp matters
+    # First-order implicit time scheme: only the static limit matters
     schemes = case / "system" / "fvSchemes"
     text = schemes.read_text()
     text, found = re.subn(r"(d2dt2Schemes|ddtSchemes)(\s*\{\s*default\s+)"
@@ -390,26 +457,23 @@ def solid_case(name: str, mesh: tuple[int, int, int], nu: float,
         fail(f"Could not set the time schemes in {schemes}")
     schemes.write_text(text)
 
-    solution = case / "system" / "fvSolution"
-    replace_entry(solution, "ksp_rtol", '"1e-3"')
-    replace_text(solution, '            snes_monitor;\n',
-                 '            snes_monitor;\n'
-                 '            snes_max_linear_solve_fail "1000";\n')
-    if cores > 1:
-        use_parallel_lu(solution)
+    if spec["cores"] > 1:
+        use_parallel_lu(case / "system" / "fvSolution")
     replace_entry(case / "system" / "decomposeParDict", "numberOfSubdomains",
-                  str(cores), True)
+                  str(spec["cores"]), True)
 
     block = case / "system" / "blockMeshDict"
-    for key, value in zip(("nx", "ny", "nz"), mesh):
+    for key, value in zip(("nx", "ny", "nz"), spec["mesh"]):
         replace_entry(block, key, str(value), True)
 
-    ramp = (LOAD_RAMP.replace("LOAD_MAX", f"{LOAD_MAX:.10g}")
-            .replace("RAMP_TIME", f"{ramp_time:.10g}"))
+    steps = (LOAD_STEPS
+             .replace("LEVELS", ", ".join(f"{v:g}" for v in LOAD_LEVELS))
+             .replace("PLATEAU", f"{PLATEAU_TIME:g}")
+             .replace("TRANSITION", f"{TRANSITION_TIME:g}"))
     control = (TUTORIAL / "system" / "controlDict").read_text()
     control = re.sub(r"^functions\s*\{.*\Z", "", control,
                      flags=re.MULTILINE | re.DOTALL)
-    control += ("functions\n{\n" + ramp + """
+    control += ("functions\n{\n" + steps + """
     flapTip
     {
         type            solidPointDisplacement;
@@ -417,8 +481,8 @@ def solid_case(name: str, mesh: tuple[int, int, int], nu: float,
     }
 }
 """)
-    (case / "system" / "controlDict").write_text(control)
     control_path = case / "system" / "controlDict"
+    control_path.write_text(control)
     replace_entry(control_path, "startFrom", "startTime", True)
     replace_entry(control_path, "endTime", f"{end_time:.10g}", True)
     replace_entry(control_path, "deltaT", f"{CAL_DELTA_T:.10g}", True)
@@ -450,23 +514,50 @@ def tip_history(case: Path, end_time: float, delta_t: float
 
 
 def calibration_runs(args: argparse.Namespace) -> list[dict]:
-    """(label, mesh, nu, standard, cores) of every calibration run."""
-    levels = args.levels or ["coarse", "medium"]
-    runs = []
-    for level in levels:
-        for nu in (0.49, 0.45):
-            runs.append({"level": level, "nu": nu, "solid": "highOrder",
-                         "cores": 1})
-    if not args.quick:
-        # Standard solid on a mesh with twice the cells through the thickness
-        runs.append({"level": "standard", "nu": 0.49, "solid": "standard",
-                     "cores": 1})
-        # Parallel run of the medium high-order case
-        cores = int(args.cores) if args.cores != "auto" else 8
-        if cores > 1 and "medium" in levels:
-            runs.append({"level": "medium", "nu": 0.49, "solid": "highOrder",
-                         "cores": cores})
+    """Every run of the calibration study."""
+    meshes = [SOLID_MESHES[level] for level in
+              (args.levels or ["coarse", "medium", "fine"])]
+    if args.quick:
+        meshes = meshes[:1]
+    runs = [{"solid": "standard", "mesh": m, "nu": 0.45, "sf": 0.05,
+             "cores": 1} for m in meshes]
+    if args.quick:
+        return runs
+    medium = SOLID_MESHES["medium"]
+    runs += [{"solid": "standard", "mesh": medium, "nu": 0.49, "sf": 0.05,
+              "cores": 1},
+             {"solid": "standard", "mesh": medium, "nu": 0.49, "sf": 0.01,
+              "cores": 1},
+             {"solid": "standard", "mesh": medium, "nu": 0.45, "sf": 0.01,
+              "cores": 1},
+             {"solid": "highOrder", "mesh": (6, 4, 33), "nu": 0.45, "sf": 0.1,
+              "cores": 1}]
+    cores = int(args.cores) if args.cores != "auto" else 8
+    if cores > 1:
+        runs.append({"solid": "standard", "mesh": medium, "nu": 0.45,
+                     "sf": 0.05, "cores": cores})
     return runs
+
+
+def run_name(spec: dict) -> str:
+    return (f"calibration_{spec['solid']}_{'x'.join(map(str, spec['mesh']))}"
+            f"_nu{spec['nu']:g}_sf{spec['sf']:g}_np{spec['cores']}")
+
+
+def plateau_tips(history: list[list[float]]) -> list[tuple[float, float]]:
+    """(load factor, settled tip y in mm) at the end of every plateau."""
+    points = []
+    for k, level in enumerate(LOAD_LEVELS):
+        end = (k + 1) * PLATEAU_TIME
+        rows = [r for r in history if end - 0.1 <= r[0] <= end + 1e-9]
+        if not rows:
+            fail(f"No tip history at the end of plateau {k + 1}")
+        drift = 1.0e3 * (max(r[2] for r in rows) - min(r[2] for r in rows))
+        if drift > 0.05:
+            fail(f"The tip has not settled on plateau {k + 1}: it moves by "
+                 f"{drift:.3f} mm over the last 0.1 s")
+        points.append((level, 1.0e3 * rows[-1][2]))
+    return points
 
 
 def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
@@ -474,82 +565,95 @@ def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
     uniaxial = float(reference["materials_phase_I"]
                      ["uniaxial_neo_hookean_c1_Pa"])
     cheart = float(reference["materials_phase_I"]["cheart_neo_hookean_mu_Pa"])
-    ramp_time = 4.0 if args.quick else RAMP_TIME
-    end_time = ramp_time
+    end_time = len(LOAD_LEVELS) * PLATEAU_TIME
     rows = []
     passed = True
-    for spec in calibration_runs(args):
-        mesh = (11, 8, 65) if spec["solid"] == "standard" \
-            else SOLID_MESHES[spec["level"]]
-        name = (f"calibration_{spec['solid']}_{'x'.join(map(str, mesh))}_"
-                f"nu{spec['nu']:g}_np{spec['cores']}")
-        label = f"calibration {name}"
-        case = WORK_ROOT / name
+    specs = calibration_runs(args)
+
+    def settings_of(spec: dict) -> dict:
         settings = {
-            "study": "calibration", "mesh": mesh, "nu": spec["nu"],
-            "solid": spec["solid"], "cores": spec["cores"],
-            "load_max": LOAD_MAX, "ramp_time": ramp_time,
+            "study": "calibration", **spec,
+            "load_levels": list(LOAD_LEVELS), "plateau_time": PLATEAU_TIME,
             "delta_t": CAL_DELTA_T, "damping": CAL_DAMPING,
             "mu_reference": MU_REFERENCE,
             "tutorial_inputs": tutorial_fingerprint(),
             "build": build_fingerprint(),
         }
-        if not reusable(case, settings, args, label):
-            case = solid_case(name, mesh, spec["nu"],
-                              spec["solid"] == "standard", spec["cores"],
-                              end_time, ramp_time)
-            print(f"Running {label}", flush=True)
-            run_solid_case(case, spec["cores"])
-            check_solver_log(case, label)
-            (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
-                                              + "\n")
+        settings["mesh"] = list(spec["mesh"])
+        return settings
+
+    def execute(spec: dict) -> None:
+        name = run_name(spec)
+        label = f"calibration {name}"
+        settings = settings_of(spec)
+        if reusable(WORK_ROOT / name, settings, args, label):
+            return
+        case = solid_case(name, spec, end_time)
+        print(f"Running {label}", flush=True)
+        run_solid_case(case, spec["cores"])
+        check_solver_log(case, label)
+        (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
+                                          + "\n")
+
+    # The runs are independent: run up to --jobs of them at once
+    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+        for future in [pool.submit(execute, spec) for spec in specs]:
+            future.result()
+
+    for spec in specs:
+        name = run_name(spec)
+        case = WORK_ROOT / name
         history = tip_history(case, end_time, CAL_DELTA_T)
-        # Load factor and tip position y in mm
-        curve = [(LOAD_MAX * min(row[0] / ramp_time, 1.0), 1.0e3 * row[2])
-                 for row in history]
-        write_csv(OUTPUT_ROOT / f"{name}_tip.csv",
-                  [{"load_factor": f"{load:.6g}", "tip_y_mm": f"{y:.6g}",
-                    "equivalent_mu_Pa": f"{MU_REFERENCE / load:.6g}"
-                    if load > 0 else "inf"} for load, y in curve])
-        mu_cal = calibrated_mu(curve, target)
-
-        def tip_at(mu: float) -> float:
-            return interpolate([(l, y) for l, y in curve],
-                               MU_REFERENCE / mu)
-
-        rows.append({
-            "solid": spec["solid"], "mesh": "x".join(map(str, mesh)),
-            "cells": math.prod(mesh), "nu": spec["nu"],
-            "ranks": spec["cores"],
-            "mu_calibrated_Pa": f"{mu_cal:.5g}" if math.isfinite(mu_cal)
-            else "n/a",
-            "tip_mm_mu_cheart": f"{tip_at(cheart):.4g}",
-            "tip_mm_mu_uniaxial": f"{tip_at(uniaxial):.4g}",
-            "clock_time_s": f"{clock_time(case):.0f}",
-        })
-        print(f"  {name}: mu = {rows[-1]['mu_calibrated_Pa']} Pa, tip at "
-              f"61 kPa = {rows[-1]['tip_mm_mu_cheart']} mm", flush=True)
-    write_csv(OUTPUT_ROOT / "calibration.csv", rows)
-    plot_calibration(rows, target)
+        write_csv(OUTPUT_ROOT / f"{name}_tip_history.csv",
+                  [{"time_s": f"{r[0]:.6g}", "tip_dy_mm": f"{1e3 * r[2]:.6g}",
+                    "tip_dz_mm": f"{1e3 * r[3]:.6g}"} for r in history])
+        points = plateau_tips(history)
+        # Equivalent (mu, tip) pairs, in increasing tip order
+        curve = sorted((MU_REFERENCE / load, tip) for load, tip in points)
+        curve.sort(key=lambda item: item[1])
+        mu_cal = interpolate([(tip, mu) for mu, tip in curve], target)
+        row = {
+            "solid": spec["solid"], "mesh": "x".join(map(str, spec["mesh"])),
+            "cells": math.prod(spec["mesh"]), "nu": spec["nu"],
+            "stabilisation": spec["sf"], "ranks": spec["cores"],
+            "mu_calibrated_Pa": mu_cal,
+            "tip_mm_at_61kPa": interpolate(
+                [(mu, tip) for mu, tip in sorted(curve)], MU_REFERENCE),
+            "tip_mm_at_uniaxial": extrapolate_tip(curve, uniaxial),
+            "clock_time_s": clock_time(case),
+        }
+        for load, tip in points:
+            row[f"tip_mm_load{load:g}"] = tip
+        rows.append(row)
+        print(f"  {name}: mu = {mu_cal:.5g} Pa", flush=True)
+        if not math.isfinite(mu_cal):
+            passed = False
+    write_csv(OUTPUT_ROOT / "calibration.csv",
+              [{k: (f"{v:.5g}" if isinstance(v, float) else v)
+                for k, v in r.items()} for r in rows])
+    plot_calibration(rows, target, cheart)
     lines = ["# Calibration (flap alone under buoyancy)", "",
-             f"Target zero-flow tip deflection: {target:.2f} mm", "",
-             "| solid | mesh | cells | nu | ranks | calibrated mu (Pa) | "
-             "tip at 61 kPa (mm) | tip at 96.9 kPa (mm) | time (s) |",
+             f"Target zero-flow tip deflection: {target:.2f} mm; CHeart "
+             f"used {cheart / 1e3:.0f} kPa, the uniaxial neo-Hookean fit "
+             f"gives {uniaxial / 1e3:.1f} kPa.", "",
+             "| solid | mesh | cells | nu | stab. | ranks | calibrated mu "
+             "(kPa) | tip at 61 kPa (mm) | time (s) |",
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for row in rows:
-        lines.append("| " + " | ".join(str(row[key]) for key in (
-            "solid", "mesh", "cells", "nu", "ranks", "mu_calibrated_Pa",
-            "tip_mm_mu_cheart", "tip_mm_mu_uniaxial", "clock_time_s"))
-            + " |")
-    parallel = [r for r in rows if r["ranks"] > 1]
-    for row in parallel:
+        lines.append(
+            f"| {row['solid']} | {row['mesh']} | {row['cells']} | "
+            f"{row['nu']:g} | {row['stabilisation']:g} | {row['ranks']} | "
+            f"{row['mu_calibrated_Pa'] / 1e3:.2f} | "
+            f"{row['tip_mm_at_61kPa']:.2f} | {row['clock_time_s']:.0f} |")
+    for row in [r for r in rows if r["ranks"] > 1]:
         serial = [r for r in rows if r["ranks"] == 1 and r["mesh"] ==
                   row["mesh"] and r["nu"] == row["nu"]
-                  and r["solid"] == row["solid"]]
-        if serial and not args.quick:
-            a = float(serial[0]["mu_calibrated_Pa"])
-            b = float(row["mu_calibrated_Pa"])
-            same = abs(a - b) <= 1e-3 * a
+                  and r["solid"] == row["solid"]
+                  and r["stabilisation"] == row["stabilisation"]]
+        if serial:
+            a = serial[0]["mu_calibrated_Pa"]
+            b = row["mu_calibrated_Pa"]
+            same = math.isfinite(a) and abs(a - b) <= 1e-3 * a
             passed &= same
             lines += ["", f"Parallel check ({row['ranks']} ranks): mu = "
                       f"{b:.5g} Pa against {a:.5g} Pa in serial: "
@@ -559,23 +663,22 @@ def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
 
 
 def interpolate(curve: list[tuple[float, float]], x: float) -> float:
-    """Linear interpolation of a monotonic (x, y) curve."""
+    """Linear interpolation of an increasing (x, y) curve."""
     for (x0, y0), (x1, y1) in zip(curve, curve[1:]):
         if x0 <= x <= x1 and x1 > x0:
             return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
     return math.nan
 
 
-def calibrated_mu(curve: list[tuple[float, float]], target: float) -> float:
-    """Shear modulus at which the static tip reaches the target."""
-    for (l0, y0), (l1, y1) in zip(curve, curve[1:]):
-        if y0 <= target <= y1 and y1 > y0:
-            load = l0 + (l1 - l0) * (target - y0) / (y1 - y0)
-            return MU_REFERENCE / load
-    return math.nan
+def extrapolate_tip(curve: list[tuple[float, float]], mu: float) -> float:
+    """Tip at a shear modulus outside the plateaus, from the last two."""
+    ordered = sorted(curve)
+    (m0, t0), (m1, t1) = ordered[-2], ordered[-1]
+    # The tip is close to linear in 1/mu over this range
+    return t1 + (t0 - t1) * (1 / mu - 1 / m1) / (1 / m0 - 1 / m1)
 
 
-def plot_calibration(rows: list[dict], target: float) -> None:
+def plot_calibration(rows: list[dict], target: float, cheart: float) -> None:
     try:
         import matplotlib
         matplotlib.use("Agg")
@@ -585,22 +688,21 @@ def plot_calibration(rows: list[dict], target: float) -> None:
         return
     fig, ax = plt.subplots(figsize=(6.4, 4.2))
     for row in rows:
-        name = (f"calibration_{row['solid']}_{row['mesh']}_nu{row['nu']:g}_"
-                f"np{row['ranks']}")
-        data = read_csv_plain(OUTPUT_ROOT / f"{name}_tip.csv")
-        mu = [MU_REFERENCE / float(d["load_factor"]) / 1e3 for d in data
-              if float(d["load_factor"]) > 0.3]
-        tip = [float(d["tip_y_mm"]) for d in data
-               if float(d["load_factor"]) > 0.3]
-        style = "--" if row["ranks"] > 1 else "-"
-        ax.plot(mu, tip, style, label=f"{row['solid']} {row['mesh']}, "
-                f"nu = {row['nu']:g}" + (f", {row['ranks']} ranks"
-                                         if row["ranks"] > 1 else ""))
+        mus = [MU_REFERENCE / load / 1e3 for load in LOAD_LEVELS]
+        tips = [row[f"tip_mm_load{load:g}"] for load in LOAD_LEVELS]
+        style = "--" if row["ranks"] > 1 else "-o"
+        ax.plot(mus, tips, style, ms=3,
+                label=f"{row['solid']} {row['mesh']}, nu = {row['nu']:g}, "
+                f"stab. {row['stabilisation']:g}"
+                + (f", {row['ranks']} ranks" if row["ranks"] > 1 else ""))
     ax.axhline(target, color="k", lw=0.8)
-    ax.text(ax.get_xlim()[1], target, " 29.50 mm", va="bottom", ha="right")
+    ax.axvline(cheart / 1e3, color="0.5", lw=0.8, ls=":")
+    ax.text(cheart / 1e3, ax.get_ylim()[0], " CHeart", fontsize=7,
+            va="bottom")
     ax.set_xlabel("shear modulus mu (kPa)")
     ax.set_ylabel("static tip position y (mm)")
-    ax.legend(fontsize=7)
+    ax.set_title("zero-flow tip deflection; measured 29.50 mm", fontsize=9)
+    ax.legend(fontsize=6)
     ax.grid(alpha=0.3)
     fig.tight_layout()
     fig.savefig(OUTPUT_ROOT / "calibration_tip_vs_mu.png", dpi=150)
@@ -685,7 +787,6 @@ functions
     {{
         type            sets;
         libs            (sampling);
-        region          fluid;
         interpolationScheme cellPoint;
         setFormat       raw;
         fields          (U);
@@ -721,12 +822,14 @@ def sample_voxels(case: Path, cores: int, velocity: list[dict]) -> list[dict]:
     """Average the computed velocity over every MRI voxel."""
     points = voxel_points(velocity)
     write_sampling_dict(case, points)
-    command = ["postProcess", "-dict", "system/sampleVoxels", "-latestTime"]
+    command = ["postProcess", "-region", "fluid", "-dict",
+               "system/sampleVoxels", "-latestTime"]
     if cores > 1:
         command = ["mpirun", "-np", str(cores)] + command + ["-parallel"]
     run(command, case, "log.sampleVoxels")
     time = latest_time(case, cores)
-    files = sorted(case.glob(f"postProcessing/sampleVoxels/{time}/voxels*U*"))
+    files = sorted(case.glob(
+        f"postProcessing/**/sampleVoxels/{time}/voxels*U*"))
     if not files:
         fail(f"No voxel samples written in {case}")
     samples = numeric_rows(files[0])
@@ -753,15 +856,27 @@ def sample_voxels(case: Path, cores: int, velocity: list[dict]) -> list[dict]:
     return averaged
 
 
-def centreline(case: Path, cores: int) -> list[tuple[float, float]]:
-    """Deformed centreline (z, y) in mm of the flap at the final time."""
-    files = sorted(case.glob("postProcessing/flapCentreline/*/centreline*D*"),
-                   key=lambda p: float(p.parent.name))
-    if not files:
-        fail(f"No centreline samples in {case}")
-    rows = numeric_rows(files[-1])
-    points = sorted((1e3 * (row[2] + row[5]), 1e3 * row[4]) for row in rows)
-    return points
+def centreline(case: Path, end_time: float, delta_t: float
+               ) -> list[tuple[float, float]]:
+    """Deformed centreline (z, y) in mm of the flap at the final time.
+
+    Built from the displacement monitors on the undeformed centreline
+    (system/flapCentreline) and the tip monitor.
+    """
+    points = [(0.0, 0.0)]
+    files = sorted(case.glob(
+        "postProcessing/**/solidPointDisplacement_flapCentrelineZ*.dat"))
+    files += sorted(case.glob(
+        "postProcessing/**/solidPointDisplacement_flapTip.dat"))
+    if len(files) < 10:
+        fail(f"Centreline monitors missing in {case}")
+    for path in files:
+        match = re.search(r"Z(\d+)\.dat$", path.name)
+        z0 = 0.1 * int(match.group(1)) if match else 65.0
+        rows = last_per_time(numeric_rows(path))
+        require_history(path, rows, end_time, delta_t, 5)
+        points.append((z0 + 1e3 * rows[-1][3], 1e3 * rows[-1][2]))
+    return sorted(points)
 
 
 def centreline_errors(sim: list[tuple[float, float]],
@@ -829,24 +944,32 @@ def run_phase_i(args: argparse.Namespace, reference: dict) -> bool:
     tip_target = float(reference["targets"]["phase_I_tip_y_mm"])
     rows = []
     passed = True
-    for level in levels:
+    def execute(level: str) -> None:
         name = f"phaseI_{level}"
         label = f"Phase I {level}"
-        case = WORK_ROOT / name
         settings = {
             "study": "phaseI", "level": level, "cores": cores,
             "end_time": end_time, "delta_t": delta_t,
             "tutorial_inputs": tutorial_fingerprint(),
             "build": build_fingerprint(),
         }
-        if not reusable(case, settings, args, label):
-            case = prepare_phase_i(name, cores, end_time, delta_t)
-            print(f"Running {label} on {cores} ranks", flush=True)
-            run(["./Allrun", level] + (["parallel"] if cores > 1 else []),
-                case, "log.Allrun")
-            check_solver_log(case, label)
-            (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
-                                              + "\n")
+        if reusable(WORK_ROOT / name, settings, args, label):
+            return
+        case = prepare_phase_i(name, cores, end_time, delta_t)
+        print(f"Running {label} on {cores} ranks", flush=True)
+        run(["./Allrun", level] + (["parallel"] if cores > 1 else []),
+            case, "log.Allrun")
+        check_solver_log(case, label)
+        (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
+                                          + "\n")
+
+    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+        for future in [pool.submit(execute, level) for level in levels]:
+            future.result()
+
+    for level in levels:
+        name = f"phaseI_{level}"
+        case = WORK_ROOT / name
         history = tip_history(case, end_time, delta_t)
         write_csv(OUTPUT_ROOT / f"{name}_tip_history.csv",
                   [{"time_s": f"{r[0]:.6g}", "tip_dx_mm": f"{1e3 * r[1]:.6g}",
@@ -862,7 +985,7 @@ def run_phase_i(args: argparse.Namespace, reference: dict) -> bool:
         tail = [r[2] for r in history if r[0] >= 0.9 * end_time]
         row["tip_drift_last_tenth_mm"] = 1e3 * (max(tail) - min(tail))
         if not args.quick:
-            line = centreline(case, cores)
+            line = centreline(case, end_time, delta_t)
             write_csv(OUTPUT_ROOT / f"{name}_centreline.csv",
                       [{"z_mm": f"{z:.5g}", "y_mm": f"{y:.5g}"}
                        for z, y in line])
@@ -989,6 +1112,8 @@ def main() -> int:
                         help="Phase I end time in s (default 10)")
     parser.add_argument("--delta-t", type=float, default=0.002,
                         help="Phase I time step in s (default 0.002)")
+    parser.add_argument("--jobs", type=int, default=1,
+                        help="runs executed at once (default 1)")
     parser.add_argument("--quick", action="store_true",
                         help="smoke test: first level only, short runs, "
                              "no accuracy checks")

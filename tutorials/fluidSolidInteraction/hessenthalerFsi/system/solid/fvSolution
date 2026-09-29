@@ -19,7 +19,7 @@ FoamFile
 
 solvers
 {
-    D
+    "D|DD"
     {
         solver petsc;
 

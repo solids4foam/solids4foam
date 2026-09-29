@@ -17,44 +17,29 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+// Updated Lagrangian form: the flap rotates by up to about 35 degrees, and
+// the compact Jacobian assembled on the current configuration remains a good
+// preconditioner for such rotations, unlike the total Lagrangian forms
+// (see README.md)
+solidModel     nonLinearGeometryUpdatedLagrangian;
 
-nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+nonLinearGeometryUpdatedLagrangianCoeffs
 {
     // Solution algorithm
     solutionAlgorithm PETScSNES;
 
-    // Predictor D at the start of a new time step using U and A
+    // Predictor DD at the start of a new time step using U and A
     predictor yes;
 
-    // High-order (cubic) reconstruction of the residual
-    highOrderCoeffs
-    {
-        highOrderResidual true;
-
-        // The compact Jacobian stalls the Krylov solver for this thin flap,
-        // so the linear high-order Jacobian is used as the preconditioner
-        highOrderJacobian true;
-
-        displacement
-        {
-            polynomialOrder 3;
-            faceStencilExtraCells 65;
-            weightFunctionCoeffs
-            {
-                type radiallySymmetricExponential;
-                k 6;
-            }
-            calcConditionNumber false;
-        }
-    }
-
+    // A small stabilisation: the default scaleFactor 0.5 stiffens the
+    // bending of the thin flap, as the stabilisation scales with the
+    // (nearly incompressible) bulk modulus
     stabilisation
     {
         momentum
         {
-            type        alpha;
-            scaleFactor 0.1;
+            type        diffStencilLaplacian;
+            scaleFactor 0.05;
         }
     }
 }
