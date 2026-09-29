@@ -891,15 +891,18 @@ def main() -> int:
         return 2
 
     all_failures = []
+    partial = False
     # Cases shared between studies are run once per invocation
     finished: dict[str, Path] = {}
     summary = ["# collapsibleChannel verification summary", ""]
     for study in studies:
         print(f"Study: {study}", flush=True)
+        all_cases = study_cases(study, refs, args.quick)
         cases = [
-            case for case in study_cases(study, refs, args.quick)
+            case for case in all_cases
             if not selected or case["name"] in selected
         ]
+        partial = partial or len(cases) < len(all_cases)
 
         spec = refs["studies"][study]
 
@@ -953,16 +956,16 @@ def main() -> int:
         failures = check_study(study, rows, refs, args.quick)
         summary += [f"## {study}", "", f"Results: `{path.name}`", ""]
         summary += summary_table(study, rows)
-        if study == "time" and len(results) > 1:
+        if study == "time" and not args.quick and len(results) < len(spec["deltaT"]):
+            failures.append("time: not every time step completed")
+        elif study == "time" and len(results) > 1:
             lines, diffs, orders = self_convergence(results)
             summary += [""] + lines
             for line in lines:
                 print(f"  {line[2:]}", flush=True)
             criteria = spec["acceptance"]
             if not args.quick:
-                if len(results) != len(spec["deltaT"]):
-                    failures.append("time: not every time step completed")
-                elif diffs[-1] > criteria["finestSelfDifference"]:
+                if diffs[-1] > criteria["finestSelfDifference"]:
                     failures.append(
                         f"time: finest time-step difference {diffs[-1]:.3g}"
                         f" > {criteria['finestSelfDifference']}"
@@ -982,6 +985,12 @@ def main() -> int:
         for failure in all_failures:
             print(f"  {failure}")
         return 1
+    if partial:
+        # A --cases selection runs only part of a study, so its acceptance
+        # checks (monotonic errors, orders, finest-case references) are not
+        # meaningful
+        print("Verification INCOMPLETE: --cases ran only part of the studies")
+        return 3
     print("Verification PASSED")
     return 0
 

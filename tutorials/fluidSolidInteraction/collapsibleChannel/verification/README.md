@@ -282,10 +282,13 @@ study removes.
 
 ![Time-step study](reference/time_study_wallMid.png)
 
-Together, the mesh and time-step studies give time- and mesh-independent
-results: on the finest mesh at $$\Delta t = 0.00625\,\mathrm{s}$$ the wall
-history is within 0.5% of oomph-lib, and the time-step error at that step is
-0.34%.
+The two studies are separate refinements: the mesh study at
+$$\Delta t = 0.00625\,\mathrm{s}$$, and the time-step study on the tutorial
+fluid mesh. Together they show that the spatial error falls to the reference
+precision on the finest mesh (0.5% against oomph-lib at the same time step),
+and that the temporal error at $$\Delta t = 0.00625\,\mathrm{s}$$ is about
+0.3% on the tutorial mesh; the temporal error on the finest mesh was not
+measured separately.
 
 ## Solid solver
 
