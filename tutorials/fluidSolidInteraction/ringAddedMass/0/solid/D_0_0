@@ -1,0 +1,113 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      D_0_0;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+// Old-old-time displacement, D_0_0 = -2 V dt. Together with D_0 = -V dt, it
+// gives the second-order backward scheme a history of constant velocity V, the
+// initial velocity of the n = 2 (ovalling) mode given in D_0.
+internalField   #codeStream
+{
+    codeInclude
+    #{
+        #include "fvCFD.H"
+    #};
+
+    codeOptions
+    #{
+        -I$(LIB_SRC)/finiteVolume/lnInclude \
+        -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+
+    codeLibs
+    #{
+        -lmeshTools \
+        -lfiniteVolume
+    #};
+
+    code
+    #{
+        const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+        const fvMesh& mesh = refCast<const fvMesh>(d.db());
+
+        // Mean radius and mode velocity amplitude
+        const scalar a = 1.0;
+        const scalar V0 = 1.5e-3;
+
+        // Time-step from system/controlDict
+        const scalar deltaT = mesh.time().deltaTValue();
+
+        const vectorField& C = mesh.C();
+        vectorField D0(C.size(), vector::zero);
+
+        forAll(C, cellI)
+        {
+            const scalar r = Foam::sqrt(sqr(C[cellI].x()) + sqr(C[cellI].y()));
+            const scalar theta = Foam::atan2(C[cellI].y(), C[cellI].x());
+
+            const scalar vr = V0*Foam::cos(2*theta);
+            const scalar vt =
+                V0*Foam::sin(2*theta)*(-0.5 + 1.5*(r - a)/a);
+
+            D0[cellI] = -2*deltaT*vector
+            (
+                vr*Foam::cos(theta) - vt*Foam::sin(theta),
+                vr*Foam::sin(theta) + vt*Foam::cos(theta),
+                0
+            );
+        }
+
+        os  << word("nonuniform") << token::SPACE << D0;
+    #};
+};
+
+boundaryField
+{
+    interface
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    inside
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }
+    bottom
+    {
+        type            solidSymmetry;
+        patchType       symmetry;
+        value           uniform (0 0 0);
+    }
+    left
+    {
+        type            solidSymmetry;
+        patchType       symmetry;
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //
