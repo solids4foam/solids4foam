@@ -209,10 +209,20 @@ collapses 14% too little and oscillates too fast.
 
 ## Verification
 
-The `verification/` directory holds an opt-in study that compares the wall
-displacement history with a converged oomph-lib solution under mesh and
-time-step refinement, and compares the two solid discretisations; see
-[`verification/README.md`](verification/README.md).
+The `verification/` directory holds an opt-in study against oomph-lib
+solutions of the same problem; see
+[`verification/README.md`](verification/README.md). In summary, at the
+tutorial time step:
+
+- the static wall deflection of the cubic solid is within 0.25% of the beam
+  on every solid mesh, and converges to 0.05%;
+- in the coupled problem the solid discretisation error of the cubic solid
+  is 0.6% on the tutorial mesh, against 17% for the linear solid;
+- refining the fluid mesh three times brings the wall-midpoint history to
+  within 0.5% of oomph-lib at the same time step (4.3% on the tutorial mesh).
+
+The fluid mesh refined four times, and time steps smaller than the
+tutorial's, do not run: the IQN-ILS coupling of the massless wall stalls.
 
 ## Regression test
 
