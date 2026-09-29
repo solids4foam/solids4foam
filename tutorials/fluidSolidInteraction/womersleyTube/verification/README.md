@@ -151,7 +151,9 @@ such solids4foam condition, `displacementOrTraction` (with
 `specifyNormalDirection -1`), is not enforced by the residual of the PETSc
 SNES solid solver, which only enforces `solidTraction` boundaries directly: in
 a test its SNES iterations diverged from the first time-step. The segregated
-solid solver diverged with it too. The wall is therefore free, and the free
+solid solver diverged with it too; see
+[#511](https://github.com/solids4foam/solids4foam/issues/511). The wall is
+therefore free, and the free
 wall of the same parameters is solved exactly instead; the tethered exact and
 thin-wall values are kept in the reference file for comparison (the tethered
 wave is 0.9% faster and 13% more strongly attenuated).
@@ -325,7 +327,8 @@ reports a fatal error, whether freshly run or reused.
 The standard (second-order) solid residual is used. The cubic high-order
 residual was also tried: its moving-least-squares reconstruction stops with
 "Empty direction should be vector::Z", as it requires an empty third
-direction and OpenFOAM treats the wedge direction as a solution direction.
+direction and OpenFOAM treats the wedge direction as a solution direction
+([#512](https://github.com/solids4foam/solids4foam/issues/512)).
 The standard solid is accurate here: the wall is loaded in hoop tension, not
 bending, and eight cells through the thickness on the tutorial mesh give a
 wall displacement within 0.1% of the exact value. With two cells through the

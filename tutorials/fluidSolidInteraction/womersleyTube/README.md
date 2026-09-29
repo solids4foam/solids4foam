@@ -90,10 +90,11 @@ tolerances of the solvers.
 - **Wall.** `linearGeometryTotalDisplacement` with the PETSc SNES solver. The
   outer surface is traction free; the wall is not longitudinally tethered, as
   in Womersley's constrained tube, because the SNES solver does not enforce a
-  mixed displacement-traction condition (see `verification/README.md`). The
-  cubic high-order residual is not used:
-  its moving-least-squares reconstruction requires an empty (not wedge)
-  direction.
+  mixed displacement-traction condition (see `verification/README.md` and
+  [#511](https://github.com/solids4foam/solids4foam/issues/511)). The cubic
+  high-order residual is not used: its moving-least-squares reconstruction
+  requires an empty (not wedge) direction
+  ([#512](https://github.com/solids4foam/solids4foam/issues/512)).
 - **Fluid.** `pimpleFluid`, with `newMovingWallVelocity` on the interface.
 - **Coupling.** IQN-ILS with the predictor (`constant/fsiProperties.iqnils`),
   or Robin-Neumann with `elasticWallPressure`, `elasticWallVelocity` and a
