@@ -9,10 +9,11 @@ sort: 10
 ## Tutorial Aims
 
 - Demonstrates a strongly coupled internal-flow fluid-solid interaction case
-  with a massless, thin elastic wall.
-- Verifies the partitioned IQN-ILS coupling against a converged monolithic
-  solution computed with the open-source finite-element library
-  [oomph-lib](https://oomph-lib.github.io/oomph-lib/).
+  with a very light, thin elastic wall.
+- Verifies partitioned IQN-ILS and Robin-Neumann coupling against converged
+  monolithic solutions computed with the open-source finite-element library
+  [oomph-lib](https://oomph-lib.github.io/oomph-lib/), under mesh and
+  time-step refinement.
 - Compares the second-order and the high-order (cubic) solid discretisations
   on a thin wall that deforms in combined bending and stretching.
 
@@ -40,7 +41,7 @@ new equilibrium, pumping fluid in and out of the channel as it does so.
 | Wall thickness $$h$$, length $$L$$ | 0.05 m, 10 m |
 | Wall Young's modulus $$E$$, Poisson's ratio $$\nu_s$$ | 455 MPa, 0.3 |
 | Plane-strain wall modulus $$E/(1-\nu_s^2)$$ | 500 MPa |
-| Wall density | massless (quasi-static wall) |
+| Wall density | 1 kg/m^3, as the fluid (regularising, see below) |
 | External pressure $$p_{ext}$$ | 200 Pa, ramped over 0.25 s |
 | Time step, end time | 0.025 s, 3.5 s |
 
@@ -55,9 +56,10 @@ The configuration is that of the oomph-lib tutorial
 [Flow in a 2D collapsible channel](https://oomph-lib.github.io/oomph-lib/doc/interaction/fsi_collapsible_channel/html/index.html),
 itself a version of the problem studied by Jensen & Heil (2003), Heil (2004)
 and Heil, Hazel & Boyle (2008): the same geometry, Reynolds number, flow
-driving, boundary conditions, massless wall, initial condition and monitored
-wall displacement. Three things are changed, each so that a finite-volume
-continuum can represent the wall:
+driving, boundary conditions, initial condition and monitored wall
+displacement. Four things are changed, the first three so that a
+finite-volume continuum can represent the wall, the fourth so that the
+partitioned coupling works at every time step and mesh:
 
 1. **No pre-stress.** In the published cases the wall is a Kirchhoff-Love
    beam with an axial pre-stress $$\sigma_0 = 10^3$$ on the scale of its own
@@ -75,11 +77,21 @@ continuum can represent the wall:
 3. **Clamped ends and a ramped external pressure.** A continuum wall fixed on
    its end faces is clamped, not pinned; the ramp replaces the impulsive
    start, which limits the time-step convergence of the second-order schemes.
+4. **A small regularising wall density.** The published wall is massless.
+   Then the fluid's added mass, which grows as $$1/\Delta t^2$$, is the only
+   inertia, and the partitioned coupling fails at time steps below
+   $$0.025\,\mathrm{s}$$ and on fine fluid meshes. The wall is given the density
+   of the fluid, $$\rho_s/\rho_f = 1$$, like a penalty bulk modulus for an
+   incompressible solid: it moves the converged oomph-lib solution by 0.28% of
+   the peak deflection, below the precision of the reference, and the
+   reference is computed with the same density. The density sweep in
+   `verification/README.md` gives the rationale.
 
 The non-dimensional parameters, on the oomph-lib scales (lengths on $$a$$,
 velocities on $$U$$, stresses on $$E/(1-\nu_s^2)$$), are $$Re = Re\,St = 50$$,
 $$Q = \mu U/(a E_{eff}) = 4\times10^{-11}$$, $$H = h/a = 0.05$$,
-$$\sigma_0 = 0$$, $$P_{ext} = 4\times10^{-7}$$ and
+$$\sigma_0 = 0$$, $$\Lambda^2 = \rho_s U^2/E_{eff} = 2\times10^{-9}$$,
+$$P_{ext} = 4\times10^{-7}$$ and
 $$P_{up} = 12(L_{up} + L + L_{down}) = 300$$.
 
 ### From the beam to a continuum
@@ -139,69 +151,77 @@ solve on the tutorial mesh. With PETSc SNES, preconditioned by its
 compact-stencil Jacobian, it needs thousands of Krylov iterations per Newton
 step, fails on refined meshes, and is 9% too stiff on the tutorial mesh.
 
-The cubic solid does not converge through sixteen or more cells across the
-wall thickness, where its linear solves diverge; the verification therefore
-keeps eight cells across the thickness.
+The solid solve needs the assembled high-order Jacobian as the
+preconditioner: with the compact Jacobian, even factorised exactly, GMRES
+stalls. hypre BoomerAMG works on the high-order Jacobian but is several
+times slower than LU. The cubic solid does not converge through sixteen or
+more cells across the wall thickness, where its linear solves diverge; the
+verification therefore keeps eight cells across the thickness.
 
 ## Fluid-solid coupling
 
-The coupling is partitioned (Dirichlet-Neumann) IQN-ILS
-(`constant/fsiProperties`), with the fluid interface velocity from the mesh
-motion (`newMovingWallVelocity`). Because the wall is massless, the fluid's
-added mass is the only inertia in the system and the coupling is as strong as
-it can be:
+Two partitioned couplings are provided, both with the fluid interface
+velocity from the solid motion.
+
+**IQN-ILS** (the default, `constant/fsiProperties.iqnils`, with
+`newMovingWallVelocity`). Because the wall is so light, the fluid's added
+mass dominates its inertia and the coupling is very strong:
 
 - `predictor yes` extrapolates the interface at the start of each time step;
-- `predictSolid no`: solving the massless wall first with the old fluid load
-  would jump it to the new external pressure, and passing that jump to the
-  fluid unrelaxed gives an added-mass pressure about thirty times $$p_{ext}$$;
+- `predictSolid no`: solving the light wall first with the old fluid load
+  would jump it towards the new external pressure, and passing that jump to
+  the fluid unrelaxed gives a large added-mass pressure;
 - `relaxationFactor 0.005` for the first two iterations of each time step,
   roughly the wall stiffness over the added mass divided by $$\Delta t^2$$;
   it must shrink with $$\Delta t^2$$ when the time step is refined;
-- `relMinSignificant 1e-2` drops secant modes that are small relative to the
-  newest one, which otherwise let round-off in the sub-solvers blow up the
-  least-squares update;
-- `qrSolveTolerance 1e-3` and `reorthogonalizeCouplingColumns yes`
-  regularise the least-squares update; without them an occasional
-  near-singular update moved the interface far enough to tangle the fluid
-  mesh on a refined fluid mesh;
-- `couplingReuse 0`: re-using the secant modes of previous time steps halves
-  the iteration count, but with the massless wall the old modes are nearly
-  parallel to the new ones, and the coupling then diverged or stalled on some
-  meshes and on one of the two platforms tested, whatever the
-  `relMinSignificant` filter;
+- `relMinSignificant 1e-2`, `qrSolveTolerance 1e-3` and
+  `reorthogonalizeCouplingColumns yes` filter and regularise the
+  least-squares update; without them round-off or a near-singular update
+  could tangle the fluid mesh;
+- `couplingReuse 0`: re-using the secant modes of previous time steps made
+  the coupling diverge or stall on some meshes and platforms;
 - `outerCorrTolerance 1e-4`, relative to the largest interface displacement,
-  i.e. about $$2\times10^{-5}\,\mathrm{m}$$; much tighter tolerances reach
-  the round-off floor of the high-order solid residual.
+  i.e. about $$2\times10^{-5}\,\mathrm{m}$$.
 
-On the tutorial mesh the coupling converges in about 16 iterations per time
-step (at most 92, during the collapse) with the cubic solid and 11 (at most
-20) with the linear one; at most 200 are allowed (`nOuterCorr`).
+IQN-ILS runs the tutorial in about 15 iterations per time step, but fails at
+smaller time steps and on the finest fluid mesh even with the regularising
+density.
 
-The added-mass coupling of the massless wall grows as $$1/\Delta t^2$$, so the
-coupling becomes harder as the time step is refined; see the time-step study
-in `verification/`.
+**Robin-Neumann** (`./Allrun robin`, `constant/fsiProperties.robin`, with
+`elasticWallPressure` and `elasticWallVelocity` on the fluid interface and
+unrelaxed fixed-point iterations). The Robin coefficient is the wall density
+times a virtual thickness from the default secant model, so it needs the
+nonzero wall density. Robin needs about 18 iterations per time step on the
+tutorial and 20-24 at smaller time steps and on finer meshes, and completes
+every time step and fluid mesh of the verification study. Where both
+complete, Robin and IQN-ILS agree to 0.1-0.25% of the peak deflection.
 
 ## Running the case
 
 ```bash
-./Allrun         # high-order (cubic) solid, about 11 minutes
-./Allrun linear  # second-order (linear) solid, about 4 minutes
+./Allrun               # IQN-ILS, high-order (cubic) solid, about 10 minutes
+./Allrun linear        # IQN-ILS, second-order (linear) solid, about 4 minutes
+./Allrun robin         # Robin-Neumann, cubic solid, about 8 minutes
+./Allrun robin linear  # Robin-Neumann, linear solid, about 5 minutes
 ```
 
 The case runs in serial: in parallel, the Krylov solves of the solid fail to
-converge, even with an overlapping additive-Schwarz preconditioner.
+converge with every preconditioner tried, including an exact parallel LU,
+which suggests a parallel inconsistency in the high-order residual (see
+`verification/README.md`).
 
 ## Expected results
 
 Figure 1 compares the wall-midpoint displacement with the oomph-lib solution
 of the same problem, both at the tutorial time step and converged in space
 and time (see `verification/`). With the high-order solid the first trough,
-$$-0.2129\,\mathrm{m}$$ at $$t = 0.47\,\mathrm{s}$$, is within 1.4% of the
-converged $$-0.2159\,\mathrm{m}$$; the later oscillations are slightly
-over-damped and lag by a few hundredths of a second, as the oomph-lib solution
-at the same time step does. The linear solid, too stiff on this mesh,
-collapses 14% too little and oscillates too fast.
+$$-0.2129\,\mathrm{m}$$ at $$t = 0.47\,\mathrm{s}$$, matches oomph-lib at the
+same time step ($$-0.2130\,\mathrm{m}$$) and is within 1.4% of the converged
+$$-0.2160\,\mathrm{m}$$; the later oscillations are slightly over-damped and
+lag by a few hundredths of a second, as the oomph-lib solution at the same
+time step does. The Robin and IQN-ILS histories coincide to within 0.3%. The
+linear solid, too stiff on this mesh, collapses 14% too little and
+oscillates too fast.
 
 ![Wall-midpoint displacement](images/collapsibleChannel-wallMid.png)
 
@@ -211,23 +231,23 @@ collapses 14% too little and oscillates too fast.
 
 The `verification/` directory holds an opt-in study against oomph-lib
 solutions of the same problem; see
-[`verification/README.md`](verification/README.md). In summary, at the
-tutorial time step:
+[`verification/README.md`](verification/README.md). In summary:
 
 - the static wall deflection of the cubic solid is within 0.25% of the beam
   on every solid mesh, and converges to 0.05%;
 - in the coupled problem the solid discretisation error of the cubic solid
-  is 0.6% on the tutorial mesh, against 17% for the linear solid;
-- refining the fluid mesh three times brings the wall-midpoint history to
-  within 0.5% of oomph-lib at the same time step (4.3% on the tutorial mesh).
-
-The fluid mesh refined four times, and time steps smaller than the
-tutorial's, do not run: the IQN-ILS coupling of the massless wall stalls.
+  is 0.44% on the tutorial mesh, against 17% for the linear solid;
+- with Robin coupling at $$\Delta t = 0.00625\,\mathrm{s}$$, refining the
+  fluid mesh up to four times brings the wall-midpoint history to within 0.5%
+  of oomph-lib (4.65% on the tutorial mesh), the reference precision;
+- the time-step study converges with an observed order of 1.8 to 2.0, as
+  oomph-lib does, with a difference of 0.34% between the two finest steps.
 
 ## Regression test
 
-`regressionTest.sh` runs the tutorial to $$t = 1\,\mathrm{s}$$ and checks the
-wall-midpoint displacement at the first trough against stored values.
+`regressionTest.sh` runs the tutorial (IQN-ILS, cubic solid) to
+$$t = 1\,\mathrm{s}$$ and checks the wall-midpoint displacement at the first
+trough and at $$t = 1\,\mathrm{s}$$ against stored values.
 
 ## References
 
