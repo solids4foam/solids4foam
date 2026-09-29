@@ -1,0 +1,27 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      transportProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Re = U a / nu = 200 with a mean velocity U = 1 m/s (at the minimum flux)
+// and channel height a = 1 m
+transportModel  Newtonian;
+
+nu              nu [0 2 -1 0 0 0 0] 0.005;
+
+rho             rho [1 -3 0 0 0 0 0] 1;
+
+// ************************************************************************* //
