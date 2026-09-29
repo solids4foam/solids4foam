@@ -245,6 +245,7 @@ numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4F.C
 numerics/AMIInterpolationS4F/advancingFrontAMIS4F/advancingFrontAMIS4FParallelOps.C
 numerics/AMIInterpolationS4F/faceAreaWeightAMIS4F/faceAreaWeightAMIS4F.C
 numerics/backwardD2dt2Scheme/backwardD2dt2Schemes.C
+numerics/bdfD2dt2Scheme/bdfD2dt2Schemes.C
 numerics/boolIOList/boolIOList.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/deltaVectors/deltaVectors.C

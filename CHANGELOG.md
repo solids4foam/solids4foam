@@ -8,6 +8,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Added the `bdf` d2dt2 scheme, `default bdf 3;` in `d2dt2Schemes`, which
+  applies the backward differentiation formula of order 1 to 4 twice, as the
+  `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and
+  it reduces the order during start-up. `fvc::d2dt2` reads its scheme from
+  `ddtSchemes`, so add `"d2dt2\(.*\)" bdf 3;` there too. BDF3 and BDF4 slowly
+  amplify an undamped oscillation, by about 4.5% and 0.6% per period at 20
+  steps per period, so they are not recommended for undamped structures.
 - Framework regression arms for `squarePlate`, `cantilever2d`, `thermalCavity`,
   `curvedBeams` and `3dTube`. Each runs its tutorial on both implementations
   and asserts that each arm took the path it was set up for before comparing
