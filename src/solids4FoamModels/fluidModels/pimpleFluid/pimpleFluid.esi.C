@@ -400,9 +400,6 @@ bool pimpleFluid::evolve()
     {
         if (pimple.firstIter() || moveMeshOuterCorrectors)
         {
-            // fvModels not added yet
-            // fvModels.preUpdateMesh();
-
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
             if (fluidModel::fsiMeshUpdate())
@@ -451,19 +448,20 @@ bool pimpleFluid::evolve()
           + fvm::div(phi, U)
           + turbulence_->divDevReff(U)
           - boussinesqMomentumSource()
+         ==
+            options()(U)
         );
         fvVectorMatrix& UEqn = tUEqn.ref();
 
         UEqn.relax();
 
-        // fvOptions not implemented yet
-        // fvOptions.constrain(UEqn);
+        options().constrain(UEqn);
 
         if (pimple.momentumPredictor())
         {
             solve(UEqn == -fvc::grad(p));
-            // fvOptions not implemented yet
-            // fvOptions.correct(U);
+
+            options().correct(U);
         }
 
         // --- Pressure corrector loop
@@ -552,7 +550,7 @@ bool pimpleFluid::evolve()
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-         // fvOptions.correct(U);
+            options().correct(U);
 
             gradU() = fvc::grad(U);
         }
@@ -597,6 +595,21 @@ void pimpleFluid::solveEnergyEq()
         // Store fields for under-relaxation and residual calculation
         TPtr_().storePrevIter();
 
+        volScalarField rhoCp
+        (
+            IOobject
+            (
+                "rhoCp",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            rho_*Cp
+        );
+
         fvScalarMatrix TEqn
         (
             rho_*Cp*
@@ -605,16 +618,22 @@ void pimpleFluid::solveEnergyEq()
               + fvm::div(phi(), TPtr_())
             )
           - fvm::laplacian(lambdaEffPtr_(), TPtr_())
+         ==
+            options()(rhoCp, TPtr_())
         );
 
         // Under-relaxation the linear system
         TEqn.relax();
+
+        options().constrain(TEqn);
 
         // Solve the linear system
         TEqn.solve();
 
         // Under-relax the field
         TPtr_().relax();
+
+        options().correct(TPtr_());
     }
 }
 
