@@ -212,14 +212,16 @@ The variant is selected with `fsi1`, `fsi2` or `fsi3` (the default):
 The case is stored as `FSI3`. For `fsi1` and `fsi2`, `Allrun` edits the inlet
 velocity and ramp (`0/fluid/U.*`), the plate density and Young's modulus
 (`constant/solid/mechanicalProperties`) and the time step, end time and write
-interval (`system/controlDict`), and restores the stored files when it exits.
-`FSI1` runs as a pseudo-transient route to the steady state with
-`Δt = 0.025 s` to `t = 30 s`. Its loads are 30 to 40 times smaller than those
-of `FSI3`, so it also tightens the fluid solver tolerances to `1e-9` and uses
-an interface tolerance `outerCorrTolerance` of `1e-5`. `FSI2` runs with
+interval (`system/controlDict`). It keeps the stored files as `*.stored` and
+restores them when it exits, so edits made to these files during the run,
+for example to the `controlDict`, are discarded. `FSI1` runs as a
+pseudo-transient route to the steady state with `Δt = 0.025 s` to `t = 30 s`.
+Its loads are 30 to 40 times smaller than those of `FSI3`, so it also tightens
+the fluid solver tolerances to `1e-9` and uses an interface tolerance
+`outerCorrTolerance` of `1e-5`. `FSI2` runs with
 `Δt = 0.001 s` to `t = 10.5 s`. These settings are those of the 1x level of
-the verification study. `Allclean` restores the stored files if a run was
-interrupted.
+the verification study. If a run was interrupted, `Allrun` refuses to start
+until `Allclean` has restored the stored files.
 
 By default, the case uses Dirichlet-Neumann coupling accelerated with the
 IQN-ILS algorithm. The Robin-Neumann coupling of Tuković et al. [3], where the

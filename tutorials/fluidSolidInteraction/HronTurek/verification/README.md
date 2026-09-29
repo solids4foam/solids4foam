@@ -68,8 +68,13 @@ The primary values are the Featflow FSI3 results on level 4 with
 `F_L = 2.50 ± 153.91 N/m [5.46 Hz]`. This is the discretisation of the
 published reference time history, `reference/TurekHron_fsi3_reference_history.csv`
 (subsampled to `1 ms` from the Featflow `ref_fsi3.point` file): the driver's
-extraction applied to that history reproduces the table to within the
-tabulated digits, which checks the extraction itself. The frequently quoted
+extraction applied to that history reproduces the table, which checks the
+extraction itself. The displacement statistics, the drag mean and the lift
+amplitude agree to within `0.7%`, and the frequencies to within `0.3%`
+(`5.473` against `5.46 Hz` for `u_y`). The drag amplitude is `1.1%` low
+(`27.43` against `27.74 N/m`), and the near-zero `u_y` and lift means differ
+by `0.02 mm` and `0.04 N/m`. These differences are small against the
+tolerances below. The frequently quoted
 summary values of Turek and Hron (2006), `u_x = -2.69 ± 2.53 mm [10.9 Hz]`,
 `u_y = 1.48 ± 34.38 mm [5.3 Hz]`, `F_D = 457.3 ± 22.66 N/m` and
 `F_L = 2.22 ± 149.78 N/m`, and the solids4foam values of Tuković et al.

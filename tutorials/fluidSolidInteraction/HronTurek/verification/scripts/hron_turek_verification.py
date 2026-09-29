@@ -65,10 +65,26 @@ def copy_case(name: str) -> Path:
     destination = WORK_ROOT / name
     if destination.exists():
         shutil.rmtree(destination)
-    ignore = shutil.ignore_patterns(
+    # Allrun keeps the stored dictionaries as *.stored while it runs a
+    # benchmark variant, and the edited ones must not be copied
+    if any(path for directory in ("0", "constant", "system")
+           for path in (TUTORIAL / directory).glob("**/*.stored")):
+        fail(f"{TUTORIAL} holds *.stored files from an Allrun benchmark run; "
+             "run its Allclean first")
+    patterns = shutil.ignore_patterns(
         "verification", "regressionTests", "postProcessing", "processor*",
         "log.*", "*.pdf", "case.foam",
     )
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        ignored = set(patterns(directory, names))
+        # Result time directories of a tutorial run would be picked up by
+        # startFrom latestTime, so only the initial conditions are copied
+        if Path(directory) == TUTORIAL:
+            ignored |= {name for name in names if name != "0"
+                        and re.fullmatch(r"[-+0-9.eE]+", name)}
+        return ignored
+
     shutil.copytree(TUTORIAL, destination, symlinks=True, ignore=ignore)
     return destination
 
@@ -94,7 +110,12 @@ def refine_mesh(path: Path, factor: int) -> None:
 
 def cell_count(case: Path) -> int:
     total = 0
-    for mesh in (case / "system/fluid/blockMeshDict", case / "system/solid/blockMeshDict"):
+    for region in ("fluid", "solid"):
+        # foam-extend reads blockMeshDict from constant/<region>/polyMesh, to
+        # which the case-format conversion in Allrun moves it
+        mesh = case / "system" / region / "blockMeshDict"
+        if not mesh.is_file():
+            mesh = case / "constant" / region / "polyMesh" / "blockMeshDict"
         for match in re.finditer(r"hex\s+\([^)]*\)\s+\(([^()]+)\)", mesh.read_text()):
             total += math.prod(int(value) for value in match.group(1).split())
     return total
