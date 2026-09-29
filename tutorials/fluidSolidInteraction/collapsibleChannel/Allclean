@@ -17,6 +17,7 @@ fi
 
 rm -rf case.foam residuals deflection.pdf postProcessing
 rm -f constant/solid/solidProperties system/solid/fvSolution
+rm -f constant/fsiProperties 0/fluid/U 0/fluid/p
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .

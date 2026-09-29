@@ -24,9 +24,8 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     // system/solid/fvSolution)
     solutionAlgorithm PETScSNES;
 
-    // The massless (steady-state) wall cannot use the solid predictor; the
-    // FSI predictor in fsiProperties extrapolates the interface instead
-    predictor no;
+    // Predict the displacement at the start of each time step
+    predictor yes;
 
     // High-order (cubic) least-squares reconstruction of the residual
     highOrderCoeffs

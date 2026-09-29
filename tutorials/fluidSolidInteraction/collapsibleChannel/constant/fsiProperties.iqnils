@@ -30,9 +30,9 @@ IQNILSCoeffs
     predictor            yes;
 
     // Do not solve the solid with the old fluid load before the first fluid
-    // solve: the wall is massless, so that solid solution jumps straight to
-    // the new external pressure, and passing it to the fluid unrelaxed gives
-    // an added-mass pressure some thirty times the external pressure
+    // solve: the wall is nearly massless, so that solid solution jumps
+    // towards the new external pressure, and passing it to the fluid
+    // unrelaxed gives a large added-mass pressure
     predictSolid         no;
 
     // Under-relaxation factor for the first two iterations of each time step.

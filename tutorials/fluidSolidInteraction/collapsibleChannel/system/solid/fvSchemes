@@ -17,15 +17,16 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// The wall is massless, as in the reference beam: the solid is quasi-static
+// Second-order time integration of the wall inertia (see the regularising
+// density in constant/solid/mechanicalProperties)
 d2dt2Schemes
 {
-    default            steadyState;
+    default            backward;
 }
 
 ddtSchemes
 {
-    default            steadyState;
+    default            backward;
 }
 
 gradSchemes

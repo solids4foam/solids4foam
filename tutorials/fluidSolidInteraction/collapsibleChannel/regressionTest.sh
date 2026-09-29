@@ -23,8 +23,8 @@ END_TIME=1
 DELTA_T=0.025
 
 # Wall-midpoint vertical displacement at the first trough and at t = 1 s
-REF_TROUGH=-0.21291
-REF_END=-0.14784
+REF_TROUGH=-0.21293
+REF_END=-0.14756
 DISP_TOL=0.002
 
 # Log files

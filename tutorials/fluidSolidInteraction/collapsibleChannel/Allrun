@@ -7,14 +7,18 @@
 source solids4FoamScripts.sh
 
 # Example usage
-# ./Allrun            # high-order solid: cubic reconstruction
+# ./Allrun            # IQN-ILS coupling, high-order solid (cubic)
 # ./Allrun linear     # second-order solid: linear reconstruction
+# ./Allrun robin      # Robin-Neumann coupling
+# ./Allrun robin linear
 # The case runs in serial: see the README
 
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
 
 solidVariant=highOrder
+coupling=iqnils
+interfaceCondition=dirichletNeumann
 
 for arg in "$@"
 do
@@ -22,9 +26,13 @@ do
         linear)
             solidVariant="$arg"
             ;;
+        robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [linear]"
+            echo "Usage: ./Allrun [linear] [robin]"
             exit 1
             ;;
     esac
@@ -32,6 +40,9 @@ done
 
 ln -vnsf "solidProperties.${solidVariant}" constant/solid/solidProperties
 ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

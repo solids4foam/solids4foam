@@ -157,6 +157,13 @@ def study_cases(study: str, refs: dict, quick: bool) -> list[dict]:
     else:
         raise RuntimeError(f"unknown study {study}")
 
+    # The coupling: IQN-ILS (the tutorial default) or Robin-Neumann
+    coupling = spec.get("coupling", "iqnils")
+    for case in cases:
+        case["coupling"] = coupling
+        if coupling != "iqnils" and not case.get("static"):
+            case["name"] += f"_{coupling}"
+
     # Optional fsiProperties entries that differ from the tutorial; they are
     # part of the case name, so such cases are never shared with other studies
     overrides = spec.get("fsiProperties", {})
@@ -271,24 +278,25 @@ def configure_case(run_dir: Path, case: dict, end_time: float) -> None:
     replace_once(control, r"^(endTime\s+)[^;]+;", rf"\g<1>{end_time:.10g};")
     replace_once(control, r"^(writeInterval\s+)[^;]+;", rf"\g<1>{end_time:.10g};")
 
-    # The initial IQN-ILS relaxation must shrink with the square of the time
-    # step: the added-mass pressure of a given interface increment grows
-    # with 1/deltaT^2 while the wall stiffness does not
-    fsi = run_dir / "constant" / "fsiProperties"
-    omega = float(
-        re.search(r"^\s*relaxationFactor\s+([^;]+);", fsi.read_text(),
-                  re.MULTILINE).group(1)
-    )
-    base_dt = float(
-        re.search(r"^deltaT\s+([^;]+);",
-                  (CASE_DIR / "system" / "controlDict").read_text(),
-                  re.MULTILINE).group(1)
-    )
-    replace_once(
-        fsi,
-        r"^(\s*relaxationFactor\s+)[^;]+;",
-        rf"\g<1>{omega*(case['dt']/base_dt)**2:.6g};",
-    )
+    fsi = run_dir / "constant" / f"fsiProperties.{case['coupling']}"
+    if case["coupling"] == "iqnils":
+        # The initial IQN-ILS relaxation must shrink with the square of the
+        # time step: the added-mass pressure of a given interface increment
+        # grows with 1/deltaT^2 while the wall stiffness does not
+        omega = float(
+            re.search(r"^\s*relaxationFactor\s+([^;]+);", fsi.read_text(),
+                      re.MULTILINE).group(1)
+        )
+        base_dt = float(
+            re.search(r"^deltaT\s+([^;]+);",
+                      (CASE_DIR / "system" / "controlDict").read_text(),
+                      re.MULTILINE).group(1)
+        )
+        replace_once(
+            fsi,
+            r"^(\s*relaxationFactor\s+)[^;]+;",
+            rf"\g<1>{omega*(case['dt']/base_dt)**2:.6g};",
+        )
 
     for key, value in case.get("fsi", {}).items():
         replace_once(fsi, rf"^(\s*{key}\s+)[^;]+;", rf"\g<1>{value};")
@@ -296,7 +304,7 @@ def configure_case(run_dir: Path, case: dict, end_time: float) -> None:
     # Matching interface faces can be mapped directly; otherwise use AMI
     if case["solid"][0] != FLUID_BASE[1]*f:
         replace_once(
-            run_dir / "constant" / "fsiProperties",
+            fsi,
             r"^(\s*interfaceTransferMethod\s+)\w+;",
             r"\g<1>AMI;",
         )
@@ -357,6 +365,8 @@ def run_case(case: dict, end_time: float, reuse: bool) -> Path:
     command = ["./Allrun"]
     if case["solidType"] == "linear":
         command.append("linear")
+    if case["coupling"] == "robin":
+        command.append("robin")
     print(f"  running {case['name']}", flush=True)
     with (run_dir / "log.Allverify").open("w") as handle:
         result = subprocess.run(

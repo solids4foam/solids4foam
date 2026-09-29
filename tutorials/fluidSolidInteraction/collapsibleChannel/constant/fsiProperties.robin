@@ -12,28 +12,41 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      mechanicalProperties;
+    object      fsiProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress     no;
+fluidSolidInterface    fixedRelaxation;
 
-// St Venant-Kirchhoff wall: the second Piola-Kirchhoff stress is linear in
-// the Green strain, as in the reference Kirchhoff-Love beam. In plane strain
-// the wall's axial and bending stiffness follow from E/(1 - nu^2) = 5e8 Pa
-mechanical
-(
-    wall
-    {
-        type            StVenantKirchhoffElastic;
-        // Regularising density: the reference wall is massless, but a
-        // massless wall makes the partitioned coupling fail at small time
-        // steps. rho_s = rho_f = 1 kg/m^3 moves the oomph-lib reference by
-        // 0.2% of the peak deflection (see the README)
-        rho             rho [1 -3 0 0 0 0 0] 1;
-        E               E [1 -1 -2 0 0 0 0] 4.55e8;
-        nu              nu [0 0 0 0 0 0 0] 0.3;
-    }
-);
+fixedRelaxationCoeffs
+{
+    // Interface patches
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Robin-Neumann coupling (elasticWallPressure and elasticWallVelocity on
+    // the fluid interface): unrelaxed fixed-point iterations
+    predictor            yes;
+    predictSolid         yes;
+    relaxationFactor     1.0;
+
+    // Convergence: the interface displacement residual, the change in the
+    // interface pressure and the leakage flux through the moving interface
+    outerCorrTolerance     1e-4;
+    robinPressureTolerance 1e-4;
+    robinFluxTolerance     5e-3;
+
+    // Maximum number of outer FSI loop correctors within each time-step
+    nOuterCorr 200;
+
+    // Enable coupling from the start
+    coupled yes;
+
+    // The fluid and solid interface faces match
+    interfaceTransferMethod directMap;
+
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+}
 
 // ************************************************************************* //

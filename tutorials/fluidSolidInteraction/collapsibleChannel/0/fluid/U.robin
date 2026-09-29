@@ -1,0 +1,91 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+// Steady Poiseuille flow of unit mean velocity, u = 6 y (1 - y)
+internalField   #codeStream
+{
+    codeInclude
+    #{
+        #include "fvCFD.H"
+    #};
+
+    codeOptions
+    #{
+        -I$(LIB_SRC)/finiteVolume/lnInclude \
+        -I$(LIB_SRC)/meshTools/lnInclude
+    #};
+
+    codeLibs
+    #{
+        -lmeshTools \
+        -lfiniteVolume
+    #};
+
+    code
+    #{
+        const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+        const fvMesh& mesh = refCast<const fvMesh>(d.db());
+        vectorField U(mesh.nCells(), vector::zero);
+        forAll(U, cellI)
+        {
+            const scalar y = mesh.C()[cellI].y();
+            U[cellI] = vector(6.0*y*(1.0 - y), 0, 0);
+        }
+        U.writeEntry("", os);
+    #};
+};
+
+boundaryField
+{
+    inlet
+    {
+        // Parallel flow: zero transverse velocity, zero-gradient axial velocity
+        type            directionMixed;
+        refValue        uniform (0 0 0);
+        refGradient     uniform (0 0 0);
+        valueFraction   uniform (0 0 0 1 0 1);
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        // Parallel flow: zero transverse velocity, zero-gradient axial velocity
+        type            directionMixed;
+        refValue        uniform (0 0 0);
+        refGradient     uniform (0 0 0);
+        valueFraction   uniform (0 0 0 1 0 1);
+        value           uniform (0 0 0);
+    }
+    walls
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    interface
+    {
+        type            elasticWallVelocity;
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //
