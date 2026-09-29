@@ -43,6 +43,7 @@
 // Physics, discretisation (algebraic node update, Crouzeix-Raviart elements
 // by default, BDF2) and the massless wall are unchanged.
 //
+#include <cmath>
 #include <iostream>
 
 // Generic oomph-lib includes
@@ -866,6 +867,16 @@ int main(int argc, char* argv[])
  CommandLineArgs::parse_and_assign();
  CommandLineArgs::doc_specified_flags();
  // Check the parameters
+ if (!std::isfinite(dt) || !std::isfinite(t_max)
+     || !std::isfinite(Global_Physical_Variables::H)
+     || !std::isfinite(Global_Physical_Variables::Sigma0)
+     || !std::isfinite(Global_Physical_Variables::Q)
+     || !std::isfinite(Global_Physical_Variables::P_ext)
+     || !std::isfinite(Global_Physical_Variables::T_ramp))
+  {
+   std::cerr << "Invalid parameters: all values must be finite" << std::endl;
+   return 1;
+  }
  if (refine<1 || !(dt>0.0) || !(t_max>0.0) || !(Global_Physical_Variables::H>0.0)
      || !(Global_Physical_Variables::Sigma0>=0.0)
      || !(Global_Physical_Variables::Q>=0.0)

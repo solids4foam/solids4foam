@@ -20,13 +20,22 @@ import sys
 
 def read(path):
     rows = {}
-    for line in open(path):
+    previous = -math.inf
+    for number, line in enumerate(open(path), 1):
         fields = line.split()
-        if len(fields) < 9:
+        if not fields:
             continue
-        values = [float(field) for field in fields]
+        if len(fields) < 9:
+            sys.exit(f"ERROR: {path}:{number} has {len(fields)} fields, not 9")
+        try:
+            values = [float(field) for field in fields]
+        except ValueError:
+            sys.exit(f"ERROR: {path}:{number} is not numeric")
         if not all(math.isfinite(v) for v in values):
-            sys.exit(f"ERROR: non-finite values in {path}: {line.strip()}")
+            sys.exit(f"ERROR: non-finite values in {path}:{number}")
+        if values[0] <= previous:
+            sys.exit(f"ERROR: {path}:{number}: times are not increasing")
+        previous = values[0]
         rows[round(values[0], 9)] = (
             values[6] - 1.0, values[1] - 1.0, values[8] - 1.0
         )
@@ -47,6 +56,7 @@ def step(rows, path):
 def main() -> int:
     if len(sys.argv) == 3:
         run = read(sys.argv[1])
+        step(run, sys.argv[1])
         with open(sys.argv[2], "w") as handle:
             handle.write(
                 "# oomph-lib solution: vertical wall displacement (m) at 25%,"
@@ -66,6 +76,11 @@ def main() -> int:
         sys.exit(
             f"ERROR: the time steps {dt_coarse:g} and {dt_fine:g} are not in the"
             " ratio 2:1 that the Richardson extrapolation assumes"
+        )
+    if abs(max(coarse) - max(fine)) > 1e-9:
+        sys.exit(
+            f"ERROR: the runs end at different times, {max(coarse):g} and"
+            f" {max(fine):g}"
         )
     missing = [t for t in coarse if t not in fine]
     if missing:

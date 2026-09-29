@@ -198,7 +198,9 @@ def fingerprint(case: dict, end_time: float, extra: str = "") -> str:
     """Hash of the tutorial inputs and of the case settings.
 
     A reused case must have been run from the same inputs: the files a fresh
-    copy takes from the tutorial, the case parameters and the end time.
+    copy takes from the tutorial (not generated plots, backups or the
+    variant links Allrun creates), this script, which sets up the cases, the
+    solver found on the path, the case parameters and the end time.
     """
     digest = hashlib.sha256()
     for directory, dirs, files in os.walk(CASE_DIR):
@@ -206,8 +208,19 @@ def fingerprint(case: dict, end_time: float, extra: str = "") -> str:
         dirs[:] = sorted(d for d in dirs if d not in skipped)
         for name in sorted(f for f in files if f not in skipped):
             path = Path(directory) / name
+            if (
+                path.is_symlink() or name.endswith((".bak", ".pdf"))
+                or name.endswith(".withDefaultValues")
+            ):
+                continue
             digest.update(str(path.relative_to(CASE_DIR)).encode())
             digest.update(path.read_bytes())
+    digest.update(Path(__file__).read_bytes())
+    solver = shutil.which("solids4Foam") or ""
+    digest.update(solver.encode())
+    if solver:
+        digest.update(str(Path(solver).stat().st_mtime_ns).encode())
+    digest.update(os.environ.get("WM_PROJECT_VERSION", "").encode())
     digest.update(json.dumps(case, sort_keys=True, default=str).encode())
     digest.update(f"{end_time:.10g}{extra}".encode())
     return digest.hexdigest()
@@ -296,17 +309,26 @@ def check_run(run_dir: Path, name: str, end_time: float, step: float) -> None:
     text = log.read_text(errors="replace") if log.is_file() else ""
     if not re.search(r"^End\s*$", text, re.MULTILINE):
         raise RuntimeError(f"{name} did not finish; see {run_dir}")
+    if not (math.isfinite(step) and step > 0 and math.isfinite(end_time)):
+        raise RuntimeError(f"{name}: invalid time step or end time")
     expected = int(round(end_time/step))
+    if abs(expected*step - end_time) > 1e-6*end_time:
+        raise RuntimeError(f"{name}: the end time is not a multiple of the step")
     for monitor in MONITORS:
         history = read_history(run_dir, monitor)
-        times = [t for t, _ in history if t > 0]
-        if len(times) < expected or abs(times[-1] - end_time) > 1e-6*end_time:
-            raise RuntimeError(
-                f"{name}: {monitor} history is incomplete ({len(times)} of"
-                f" {expected} samples, last at t = {times[-1] if times else 0:g})"
-            )
         if not all(math.isfinite(t) and math.isfinite(v) for t, v in history):
             raise RuntimeError(f"{name}: {monitor} history is not finite")
+        # Every step 1..expected must have a sample
+        steps = {
+            int(round(t/step)) for t, _ in history
+            if t > 0 and abs(t/step - round(t/step)) < 1e-4
+        }
+        missing = set(range(1, expected + 1)) - steps
+        if missing:
+            raise RuntimeError(
+                f"{name}: {monitor} history is incomplete: {len(missing)} of"
+                f" {expected} steps missing, from t = {min(missing)*step:g}"
+            )
 
 
 def completed(run_dir: Path, name: str, end_time: float, step: float,
@@ -601,7 +623,9 @@ def add_solid_differences(
         default=None,
     )
     if finest is None:
-        return
+        raise RuntimeError(
+            "the solid study needs a high-order case to measure the solid error"
+        )
     prescribed = max(
         (tuple(mesh) for mesh in spec_meshes),
         key=lambda mesh: mesh[0]*mesh[1],
@@ -749,7 +773,11 @@ def check_study(study: str, rows: list[dict], refs: dict, quick: bool) -> list[s
                 and row["solidCells"] == criteria["linearFinestMesh"]
             ):
                 tolerance = criteria["linearFinestSolidDiff"]
-            if tolerance is not None and row.get("solidDiff", 0) > tolerance:
+            if tolerance is None:
+                continue
+            if "solidDiff" not in row:
+                failures.append(f"solid: {row['case']} has no solid difference")
+            elif row["solidDiff"] > tolerance:
                 failures.append(
                     f"solid: {row['case']} differs from {row['solidDiffFrom']}"
                     f" by {row['solidDiff']:.3g} > {tolerance}"

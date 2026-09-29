@@ -20,6 +20,7 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # The case is run to t = 1 s, which covers the collapse of the wall, its first
 # trough and the following rebound
 END_TIME=1
+DELTA_T=0.025
 
 # Wall-midpoint vertical displacement at the first trough and at t = 1 s
 REF_TROUGH=-0.21291
@@ -86,7 +87,7 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-if ! grep -q "^End" "${CASE_DIR}/log.solids4Foam" 2>/dev/null; then
+if ! grep -q "^End[[:space:]]*$" "${CASE_DIR}/log.solids4Foam" 2>/dev/null; then
     echo "FAIL: solids4Foam did not finish (see ${CASE_DIR}/log.solids4Foam)"
     exit 1
 fi
@@ -105,6 +106,7 @@ fi
 failures=0
 awk \
     -v endTime="${END_TIME}" \
+    -v deltaT="${DELTA_T}" \
     -v refTrough="${REF_TROUGH}" \
     -v refEnd="${REF_END}" \
     -v tol="${DISP_TOL}" '
@@ -128,7 +130,14 @@ function report(label, value, reference,    diff) {
         bad = 1
         next
     }
-    t = $1 + 0; v = $3 + 0; n++
+    t = $1 + 0; v = $3 + 0
+    # Reject values that overflowed to infinity when converted
+    if (absval(t) > 1e30 || absval(v) > 1e30) {
+        printf "FAIL: non-finite sample at line %d: %s\n", NR, $0
+        bad = 1
+        next
+    }
+    if (t > 0) n++
     if (t >= 0.3 && t <= 0.75 && (troughSet == 0 || v < trough)) {
         trough = v; troughSet = 1
     }
@@ -136,8 +145,9 @@ function report(label, value, reference,    diff) {
 }
 END {
     if (bad) exit 1
-    if (n == 0 || troughSet == 0 || last < endTime - 1e-6) {
-        printf "FAIL: incomplete history (last sample at t = %g)\n", last
+    expected = int(endTime/deltaT + 0.5)
+    if (n < expected || troughSet == 0 || absval(last - endTime) > 1e-6) {
+        printf "FAIL: incomplete history (%d of %d samples, last at t = %g)\n", n, expected, last
         exit 1
     }
     report("trough displacement", trough, refTrough)
