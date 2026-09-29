@@ -1,0 +1,359 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      womersleyCode;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The exact solution, used for the initial fields and by the coded boundary
+// conditions at the tube ends. Its coefficients are read from
+// constant/womersleyProperties, which is written by
+// verification/scripts/womersley_exact.py. Every field is the real part of a
+// complex amplitude, a function of the radius r, times exp(i (omega t - k x))
+
+womersleyCodeInclude
+#{
+    #include <complex>
+    #include "fvMesh.H"
+    #include "IOdictionary.H"
+    #include "vector2D.H"
+    #include "mathematicalConstants.H"
+
+    namespace womersley
+    {
+        typedef std::complex<Foam::scalar> cplx;
+
+        // Modified Bessel function I_n, n = 0 or 1, by its power series
+        inline cplx besselI(const int n, const cplx& z)
+        {
+            cplx term = (n == 0) ? cplx(1, 0) : 0.5*z;
+            cplx sum = term;
+            const cplx q = 0.25*z*z;
+            for (int m = 1; m < 500; ++m)
+            {
+                term *= q/Foam::scalar(m*(m + n));
+                sum += term;
+                if (std::abs(term) < 1e-17*std::abs(sum))
+                {
+                    break;
+                }
+            }
+            return sum;
+        }
+
+        class mode
+        {
+            static cplx c(const Foam::vector2D& v)
+            {
+                return cplx(v.x(), v.y());
+            }
+
+            static Foam::List<cplx> cList(const Foam::List<Foam::vector2D>& v)
+            {
+                Foam::List<cplx> result(v.size());
+                forAll(v, i)
+                {
+                    result[i] = c(v[i]);
+                }
+                return result;
+            }
+
+            // Radius and radial unit vector of a point; the x axis is the
+            // tube axis
+            static Foam::scalar radius(const Foam::vector& C, Foam::vector& er)
+            {
+                const Foam::scalar r =
+                    Foam::sqrt(Foam::sqr(C.y()) + Foam::sqr(C.z()));
+                er = (r > Foam::VSMALL)
+                   ? Foam::vector(0, C.y()/r, C.z()/r)
+                   : Foam::vector::zero;
+                return r;
+            }
+
+        public:
+
+            Foam::scalar omega, Ri, Ro;
+            cplx k, s, A, B;
+            Foam::List<cplx> Ur, Ux;
+
+            explicit mode(const Foam::dictionary& dict)
+            :
+                omega(Foam::readScalar(dict.lookup("omega"))),
+                Ri(Foam::readScalar(dict.lookup("innerRadius"))),
+                Ro(Foam::readScalar(dict.lookup("outerRadius"))),
+                k(c(Foam::vector2D(dict.lookup("k")))),
+                s(c(Foam::vector2D(dict.lookup("s")))),
+                A(c(Foam::vector2D(dict.lookup("A")))),
+                B(c(Foam::vector2D(dict.lookup("B")))),
+                Ur
+                (
+                    cList
+                    (
+                        Foam::List<Foam::vector2D>
+                        (
+                            dict.lookup("solidRadialDisplacement")
+                        )
+                    )
+                ),
+                Ux
+                (
+                    cList
+                    (
+                        Foam::List<Foam::vector2D>
+                        (
+                            dict.lookup("solidAxialDisplacement")
+                        )
+                    )
+                )
+            {}
+
+            cplx wave(const Foam::scalar t, const Foam::scalar x) const
+            {
+                return std::exp(cplx(0, 1)*(omega*t - k*x));
+            }
+
+            // Kinematic pressure and velocity amplitudes at radius r
+            void fluid(const Foam::scalar r, cplx& p, cplx& ux, cplx& ur) const
+            {
+                const cplx i(0, 1);
+                p = A*besselI(0, k*r);
+                ux = k*A/omega*besselI(0, k*r) + B*besselI(0, s*r);
+                ur = i*k*A/omega*besselI(1, k*r) + i*k/s*B*besselI(1, s*r);
+            }
+
+            // Radial and axial wall displacement amplitudes at radius r, by
+            // barycentric interpolation between the Chebyshev points
+            void solid(const Foam::scalar r, cplx& ur, cplx& ux) const
+            {
+                const Foam::label N = Ur.size() - 1;
+                const Foam::scalar xi = 2*(r - Ri)/(Ro - Ri) - 1;
+                cplx sumR(0, 0), sumX(0, 0);
+                Foam::scalar sumW = 0;
+                for (Foam::label j = 0; j <= N; ++j)
+                {
+                    const Foam::scalar xj =
+                        Foam::cos(Foam::constant::mathematical::pi*j/N);
+                    Foam::scalar w = (j % 2 == 0) ? 1 : -1;
+                    if (j == 0 || j == N)
+                    {
+                        w *= 0.5;
+                    }
+                    if (Foam::mag(xi - xj) < 1e-14)
+                    {
+                        ur = Ur[j];
+                        ux = Ux[j];
+                        return;
+                    }
+                    w /= (xi - xj);
+                    sumR += w*Ur[j];
+                    sumX += w*Ux[j];
+                    sumW += w;
+                }
+                ur = sumR/sumW;
+                ux = sumX/sumW;
+            }
+
+            Foam::scalar pressure(const Foam::vector& C, const Foam::scalar t)
+            const
+            {
+                Foam::vector er;
+                cplx p, ux, ur;
+                fluid(radius(C, er), p, ux, ur);
+                return std::real(p*wave(t, C.x()));
+            }
+
+            // Velocity, or its normal gradient on a face with normal n,
+            // d/dx = -i k
+            Foam::vector velocity
+            (
+                const Foam::vector& C,
+                const Foam::scalar t,
+                const Foam::vector* n = nullptr
+            ) const
+            {
+                Foam::vector er;
+                cplx p, ux, ur;
+                fluid(radius(C, er), p, ux, ur);
+                cplx w = wave(t, C.x());
+                if (n)
+                {
+                    w *= -cplx(0, 1)*k*n->x();
+                }
+                return std::real(w*ux)*Foam::vector(1, 0, 0)
+                  + std::real(w*ur)*er;
+            }
+
+            Foam::vector displacement
+            (
+                const Foam::vector& C,
+                const Foam::scalar t
+            ) const
+            {
+                Foam::vector er;
+                cplx ur, ux;
+                solid(radius(C, er), ur, ux);
+                const cplx w = wave(t, C.x());
+                return std::real(w*ux)*Foam::vector(1, 0, 0)
+                  + std::real(w*ur)*er;
+            }
+        };
+
+        inline const mode& lookup(const Foam::Time& runTime)
+        {
+            static Foam::autoPtr<mode> modePtr;
+            if (!modePtr.valid())
+            {
+                Foam::IOdictionary dict
+                (
+                    Foam::IOobject
+                    (
+                        "womersleyProperties",
+                        runTime.constant(),
+                        runTime,
+                        Foam::IOobject::MUST_READ,
+                        Foam::IOobject::NO_WRITE,
+                        false
+                    )
+                );
+                modePtr.reset(new mode(dict));
+            }
+            return modePtr();
+        }
+    }
+#};
+
+// Boundary conditions at the tube ends
+
+// Kinematic pressure
+womersleyPressure
+#{
+    const womersley::mode& m = womersley::lookup(this->db().time());
+    const scalar t = this->db().time().value();
+    const vectorField& Cf = this->patch().Cf();
+    scalarField value(Cf.size());
+    forAll(Cf, faceI)
+    {
+        value[faceI] = m.pressure(Cf[faceI], t);
+    }
+    operator==(value);
+#};
+
+// Normal gradient of the velocity
+womersleyVelocityGradient
+#{
+    const womersley::mode& m = womersley::lookup(this->db().time());
+    const scalar t = this->db().time().value();
+    const vectorField& Cf = this->patch().Cf();
+    const vectorField nf(this->patch().nf());
+    forAll(Cf, faceI)
+    {
+        this->refValue()[faceI] = m.velocity(Cf[faceI], t);
+        this->refGrad()[faceI] = m.velocity(Cf[faceI], t, &nf[faceI]);
+    }
+    this->valueFraction() = 0;
+#};
+
+// Wall displacement
+womersleyDisplacement
+#{
+    const womersley::mode& m = womersley::lookup(this->db().time());
+    const scalar t = this->db().time().value();
+    const vectorField& Cf = this->patch().Cf();
+    vectorField value(Cf.size());
+    forAll(Cf, faceI)
+    {
+        value[faceI] = m.displacement(Cf[faceI], t);
+    }
+    operator==(value);
+#};
+
+// Initial fields, set with #codeStream at the cell centres or the points.
+// The old-time solid displacements, D_0 and D_0_0, are the exact solution
+// one and two time-steps earlier, as the second-order time scheme reads them
+
+womersleyCodeOptions
+#{
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude
+#};
+
+womersleyCodeLibs
+#{
+    -lmeshTools \
+    -lfiniteVolume
+#};
+
+womersleyInitialPressure
+#{
+    const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+    const fvMesh& mesh = refCast<const fvMesh>(d.db());
+    const womersley::mode& m = womersley::lookup(mesh.time());
+    const vectorField& C = mesh.cellCentres();
+    scalarField value(C.size());
+    forAll(C, cellI)
+    {
+        value[cellI] = m.pressure(C[cellI], mesh.time().value());
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
+womersleyInitialVelocity
+#{
+    const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+    const fvMesh& mesh = refCast<const fvMesh>(d.db());
+    const womersley::mode& m = womersley::lookup(mesh.time());
+    const vectorField& C = mesh.cellCentres();
+    vectorField value(C.size());
+    forAll(C, cellI)
+    {
+        value[cellI] = m.velocity(C[cellI], mesh.time().value());
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
+// The time level (0, 1 or 2 steps before the start time) is read from the
+// womersleyTimeLevel entry of the field file
+womersleyInitialDisplacement
+#{
+    const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+    const fvMesh& mesh = refCast<const fvMesh>(d.db());
+    const womersley::mode& m = womersley::lookup(mesh.time());
+    const scalar t =
+        mesh.time().value()
+      - readScalar(dict.lookup("womersleyTimeLevel"))
+       *mesh.time().deltaTValue();
+    const vectorField& C = mesh.cellCentres();
+    vectorField value(C.size());
+    forAll(C, cellI)
+    {
+        value[cellI] = m.displacement(C[cellI], t);
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
+womersleyInitialPointDisplacement
+#{
+    const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+    const fvMesh& mesh = refCast<const fvMesh>(d.db());
+    const womersley::mode& m = womersley::lookup(mesh.time());
+    const pointField& points = mesh.points();
+    vectorField value(points.size());
+    forAll(points, pointI)
+    {
+        value[pointI] = m.displacement(points[pointI], mesh.time().value());
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
+// ************************************************************************* //
