@@ -44,6 +44,14 @@ release. For complete commit-level details and contributor information, see the
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.
+- Added the `womersleyTube` fluid-solid interaction tutorial: pulsatile
+  (Womersley) flow in an elastic tube, driven at both ends by the exact
+  travelling-wave solution so that nothing reflects, with a
+  `regressionTest.sh` and an opt-in verification study. The study compares the
+  velocity profile, the flow rate, the wall displacement and the complex wave
+  number with the exact linear solution for a thick elastic wall, under mesh
+  and time-step refinement, and compares the IQN-ILS and Robin-Neumann
+  couplings.
 
 ### Changed
 
