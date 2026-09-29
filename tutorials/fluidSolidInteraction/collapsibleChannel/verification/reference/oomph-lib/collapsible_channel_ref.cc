@@ -865,6 +865,17 @@ int main(int argc, char* argv[])
  Global_Physical_Variables::P_ext = 1.0e-1;
  CommandLineArgs::parse_and_assign();
  CommandLineArgs::doc_specified_flags();
+ // Check the parameters
+ if (refine<1 || !(dt>0.0) || !(t_max>0.0) || !(Global_Physical_Variables::H>0.0)
+     || !(Global_Physical_Variables::Sigma0>=0.0)
+     || !(Global_Physical_Variables::Q>=0.0)
+     || !(Global_Physical_Variables::T_ramp>=0.0) || steady<0)
+  {
+   std::cerr << "Invalid parameters: --refine must be at least 1, --dt,"
+             << " --tmax and --h positive, and --sigma0, --q, --tramp and"
+             << " --steady non-negative" << std::endl;
+   return 1;
+  }
  Global_Physical_Variables::Clamped=(clamped!=0);
  Global_Physical_Variables::Doc_fields=(doc_fields!=0);
 
@@ -903,6 +914,11 @@ int main(int argc, char* argv[])
  char filename[1000];
  snprintf(filename, sizeof(filename), "%s/trace.dat",outdir.c_str());
  trace_file.open(filename);
+ if (!trace_file)
+  {
+   std::cerr << "Cannot open " << filename << std::endl;
+   return 1;
+  }
  trace_file.precision(12);
 
  if (steady)
@@ -918,7 +934,7 @@ int main(int argc, char* argv[])
      problem.doc_solution(doc_info, trace_file);
     }
    trace_file.close();
-   return 0;
+   return trace_file ? 0 : 1;
   }
 
  problem.doc_solution(doc_info, trace_file);
@@ -936,4 +952,5 @@ int main(int argc, char* argv[])
    doc_info.number()++;
   }
  trace_file.close();
+ return trace_file ? 0 : 1;
 }

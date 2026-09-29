@@ -13,8 +13,10 @@ from __future__ import annotations
 import argparse
 import bisect
 import csv
+import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -176,13 +178,42 @@ def ignored(directory: str, names: list[str]) -> set[str]:
     ignored_names.update(n for n in names if n.startswith("log."))
     directory_path = Path(directory)
     if directory_path == CASE_DIR:
-        ignored_names.update(
-            n for n in names
-            if n != "0" and re.fullmatch(r"[0-9]+(?:\.[0-9]+)?(?:e-?[0-9]+)?", n)
-        )
+        ignored_names.update(n for n in names if is_result_time(n))
+        ignored_names.update({"README.md", "regressionTest.sh"})
     if directory_path.name in {"fluid", "solid"} and directory_path.parent.name == "constant":
         ignored_names.add("polyMesh")
     return ignored_names.intersection(names)
+
+
+def is_result_time(name: str) -> bool:
+    """A time directory other than 0, in any OpenFOAM time format"""
+    try:
+        value = float(name)
+    except ValueError:
+        return False
+    return math.isfinite(value) and name != "0"
+
+
+def fingerprint(case: dict, end_time: float, extra: str = "") -> str:
+    """Hash of the tutorial inputs and of the case settings.
+
+    A reused case must have been run from the same inputs: the files a fresh
+    copy takes from the tutorial, the case parameters and the end time.
+    """
+    digest = hashlib.sha256()
+    for directory, dirs, files in os.walk(CASE_DIR):
+        skipped = ignored(directory, dirs + files)
+        dirs[:] = sorted(d for d in dirs if d not in skipped)
+        for name in sorted(f for f in files if f not in skipped):
+            path = Path(directory) / name
+            digest.update(str(path.relative_to(CASE_DIR)).encode())
+            digest.update(path.read_bytes())
+    digest.update(json.dumps(case, sort_keys=True, default=str).encode())
+    digest.update(f"{end_time:.10g}{extra}".encode())
+    return digest.hexdigest()
+
+
+FINGERPRINT_FILE = "fingerprint.dat"
 
 
 def replace_once(path: Path, pattern: str, replacement: str) -> None:
@@ -259,22 +290,41 @@ def configure_case(run_dir: Path, case: dict, end_time: float) -> None:
 
 
 
-def completed(run_dir: Path, end_time: float) -> bool:
+def check_run(run_dir: Path, name: str, end_time: float, step: float) -> None:
+    """Raise unless the run ended cleanly with complete, finite histories."""
     log = run_dir / "log.solids4Foam"
-    if not log.is_file() or not re.search(
-        r"^End\s*$", log.read_text(errors="replace"), re.MULTILINE
-    ):
+    text = log.read_text(errors="replace") if log.is_file() else ""
+    if not re.search(r"^End\s*$", text, re.MULTILINE):
+        raise RuntimeError(f"{name} did not finish; see {run_dir}")
+    expected = int(round(end_time/step))
+    for monitor in MONITORS:
+        history = read_history(run_dir, monitor)
+        times = [t for t, _ in history if t > 0]
+        if len(times) < expected or abs(times[-1] - end_time) > 1e-6*end_time:
+            raise RuntimeError(
+                f"{name}: {monitor} history is incomplete ({len(times)} of"
+                f" {expected} samples, last at t = {times[-1] if times else 0:g})"
+            )
+        if not all(math.isfinite(t) and math.isfinite(v) for t, v in history):
+            raise RuntimeError(f"{name}: {monitor} history is not finite")
+
+
+def completed(run_dir: Path, name: str, end_time: float, step: float,
+              expected: str) -> bool:
+    stamp = run_dir / FINGERPRINT_FILE
+    if not stamp.is_file() or stamp.read_text().strip() != expected:
         return False
     try:
-        history = read_history(run_dir, "wallMid")
+        check_run(run_dir, name, end_time, step)
     except RuntimeError:
         return False
-    return bool(history) and history[-1][0] >= end_time - 1e-9
+    return True
 
 
 def run_case(case: dict, end_time: float, reuse: bool) -> Path:
     run_dir = WORK_DIR / case["name"]
-    if reuse and completed(run_dir, end_time):
+    stamp = fingerprint(case, end_time)
+    if reuse and completed(run_dir, case["name"], end_time, case["dt"], stamp):
         print(f"  reusing {case['name']}")
         return run_dir
     if run_dir.exists():
@@ -290,26 +340,23 @@ def run_case(case: dict, end_time: float, reuse: bool) -> Path:
         result = subprocess.run(
             command, cwd=run_dir, stdout=handle, stderr=subprocess.STDOUT
         )
-    log = run_dir / "log.solids4Foam"
-    text = log.read_text(errors="replace") if log.is_file() else ""
-    if result.returncode or not re.search(r"^End\s*$", text, re.MULTILINE):
+    if result.returncode:
         raise RuntimeError(f"{case['name']} failed; see {run_dir}")
+    check_run(run_dir, case["name"], end_time, case["dt"])
+    (run_dir / FINGERPRINT_FILE).write_text(stamp + "\n")
     return run_dir
 
 
 def run_static_case(case: dict, refs: dict, reuse: bool) -> Path:
     """Solve the wall alone under the external pressure, raised in steps."""
     run_dir = WORK_DIR / case["name"]
-    log = run_dir / "log.solids4Foam"
-    if (
-        reuse and log.is_file()
-        and re.search(r"^End\s*$", log.read_text(errors="replace"), re.MULTILINE)
-    ):
+    steps = refs["studies"]["static"]["loadSteps"]
+    stamp = fingerprint(case, steps, "static")
+    if reuse and completed(run_dir, case["name"], steps, 1.0, stamp):
         print(f"  reusing {case['name']}")
         return run_dir
     if run_dir.exists():
         shutil.rmtree(run_dir)
-    steps = refs["studies"]["static"]["loadSteps"]
     for sub in ("0", "constant", "system"):
         (run_dir / sub).mkdir(parents=True)
     for name in ("dynamicMeshDict", "g", "mechanicalProperties"):
@@ -369,9 +416,8 @@ def run_static_case(case: dict, refs: dict, reuse: bool) -> Path:
         subprocess.run(
             ["./Allrun"], cwd=run_dir, stdout=handle, stderr=subprocess.STDOUT
         )
-    text = log.read_text(errors="replace") if log.is_file() else ""
-    if not re.search(r"^End\s*$", text, re.MULTILINE):
-        raise RuntimeError(f"{case['name']} failed; see {run_dir}")
+    check_run(run_dir, case["name"], steps, 1.0)
+    (run_dir / FINGERPRINT_FILE).write_text(stamp + "\n")
     return run_dir
 
 
@@ -390,6 +436,7 @@ def evaluate_static(case: dict, run_dir: Path, refs: dict) -> dict:
     text = (run_dir / "log.solids4Foam").read_text(errors="replace")
     clock = re.findall(r"ClockTime = ([0-9.eE+-]+) s", text)
     row["clockTime"] = float(clock[-1]) if clock else math.nan
+    require_finite(row)
     return row
 
 
@@ -436,6 +483,10 @@ def read_reference(path: Path) -> dict[str, list[tuple[float, float]]]:
 
 def interpolate(curve: list[tuple[float, float]], time: float) -> float:
     times = [point[0] for point in curve]
+    if not times[0] - 1e-9 <= time <= times[-1] + 1e-9:
+        raise RuntimeError(
+            f"t = {time:g} is outside the reference, {times[0]:g} to {times[-1]:g}"
+        )
     index = bisect.bisect_left(times, time)
     if index <= 0:
         return curve[0][1]
@@ -461,8 +512,9 @@ def trough(curve: list[tuple[float, float]], window: tuple[float, float]) -> tup
             c = (
                 tb*tc*(tb - tc)*va + tc*ta*(tc - ta)*vb + ta*tb*(ta - tb)*vc
             )/denominator
-            if a > 0:
-                time = -b/(2*a)
+            vertex = -b/(2*a) if a > 0 else math.nan
+            if ta <= vertex <= tc and window[0] <= vertex <= window[1]:
+                time = vertex
                 value = c - b*b/(4*a)
     return time, value
 
@@ -495,7 +547,8 @@ def cell_counts(run_dir: Path) -> tuple[int, int]:
     return counts[0], counts[1]
 
 
-def evaluate(case: dict, run_dir: Path, reference: dict, refs: dict) -> dict:
+def evaluate(case: dict, run_dir: Path, reference: dict, refs: dict,
+             end_time: float) -> dict:
     row = {
         "case": case["name"],
         "fluidLevel": case["fluid"],
@@ -507,7 +560,8 @@ def evaluate(case: dict, run_dir: Path, reference: dict, refs: dict) -> dict:
     window = tuple(refs["troughWindow"])
     for monitor in MONITORS:
         history = [
-            point for point in read_history(run_dir, monitor) if point[0] > 0
+            point for point in read_history(run_dir, monitor)
+            if 0 < point[0] <= end_time + 1e-9
         ]
         ref_curve = reference[monitor]
         scale = max(abs(value) for _, value in ref_curve)
@@ -519,10 +573,21 @@ def evaluate(case: dict, run_dir: Path, reference: dict, refs: dict) -> dict:
     history = read_history(run_dir, "wallMid")
     row["troughTime"], row["troughValue"] = trough(history, window)
     row.update(solver_statistics(run_dir))
+    require_finite(row)
     return row
 
 
-def add_solid_differences(results: list[tuple[dict, Path, dict]]) -> None:
+def require_finite(row: dict) -> None:
+    for key, value in row.items():
+        if isinstance(value, float) and not math.isfinite(value):
+            if key in ("executionTime", "clockTime"):
+                continue
+            raise RuntimeError(f"{row['case']}: {key} is not finite")
+
+
+def add_solid_differences(
+    results: list[tuple[dict, Path, dict]], spec_meshes: list
+) -> None:
     """Difference of each case from the finest high-order solid mesh.
 
     On the tutorial fluid mesh the comparison with oomph-lib is dominated by
@@ -537,6 +602,15 @@ def add_solid_differences(results: list[tuple[dict, Path, dict]]) -> None:
     )
     if finest is None:
         return
+    prescribed = max(
+        (tuple(mesh) for mesh in spec_meshes),
+        key=lambda mesh: mesh[0]*mesh[1],
+    )
+    if tuple(finest[0]["solid"]) != prescribed:
+        raise RuntimeError(
+            "the solid study needs the finest high-order solid,"
+            f" {prescribed[0]}x{prescribed[1]}, to measure the solid error"
+        )
     scale = max(abs(v) for _, v in read_reference(REFERENCE_CSV)["wallMid"])
     target = dict(read_history(finest[1], "wallMid"))
     for case, run_dir, row in results:
@@ -748,11 +822,34 @@ def main() -> int:
                 print(f"{study}: {case['name']}")
         return 0
 
+    if selected:
+        known = {
+            case["name"] for study in studies
+            for case in study_cases(study, refs, args.quick)
+        }
+        unknown = selected - known
+        if unknown:
+            print(f"ERROR: unknown cases: {', '.join(sorted(unknown))}",
+                  file=sys.stderr)
+            return 2
+
     for tool in ("blockMesh", "solids4Foam"):
         if not shutil.which(tool):
             print(f"ERROR: {tool} not found; source OpenFOAM and solids4foam",
                   file=sys.stderr)
             return 2
+
+    # 7: the case needs OpenFOAM.com (v2412 tested) and PETSc
+    version = os.environ.get("WM_PROJECT_VERSION", "")
+    if not version.startswith("v"):
+        print(f"ERROR: the collapsibleChannel study needs OpenFOAM.com"
+              f" (tested with v2412); found {version or 'none'}",
+              file=sys.stderr)
+        return 2
+    if not os.environ.get("PETSC_DIR"):
+        print("ERROR: the collapsibleChannel study needs solids4foam built"
+              " with PETSc (PETSC_DIR is not set)", file=sys.stderr)
+        return 2
 
     all_failures = []
     # Cases shared between studies are run once per invocation
@@ -776,7 +873,9 @@ def main() -> int:
                 if run_dir is None:
                     run_dir = run_case(case, end_time, args.reuse)
                 reference = read_reference(reference_csv(spec, case["dt"]))
-                return case, run_dir, evaluate(case, run_dir, reference, refs)
+                return case, run_dir, evaluate(
+                    case, run_dir, reference, refs, end_time
+                )
             except RuntimeError as error:
                 return case, None, str(error)
 
@@ -797,7 +896,12 @@ def main() -> int:
         if not results:
             continue
         if study == "solid":
-            add_solid_differences(results)
+            meshes = spec["quickSolidMeshes"] if args.quick else spec["solidMeshes"]
+            try:
+                add_solid_differences(results, meshes)
+            except RuntimeError as error:
+                print(f"  FAILED: {error}", flush=True)
+                all_failures.append(str(error))
         rows = [row for _, _, row in results]
         path = write_rows(study, rows)
         if study != "static":

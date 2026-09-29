@@ -14,6 +14,7 @@ wall and x1 at its midpoint. The CSV holds the vertical displacements,
 x2 - 1, of the three wall points.
 """
 
+import math
 import sys
 
 
@@ -24,10 +25,23 @@ def read(path):
         if len(fields) < 9:
             continue
         values = [float(field) for field in fields]
+        if not all(math.isfinite(v) for v in values):
+            sys.exit(f"ERROR: non-finite values in {path}: {line.strip()}")
         rows[round(values[0], 9)] = (
             values[6] - 1.0, values[1] - 1.0, values[8] - 1.0
         )
+    if len(rows) < 3:
+        sys.exit(f"ERROR: fewer than three samples in {path}")
     return rows
+
+
+def step(rows, path):
+    """The uniform time step of a run"""
+    times = sorted(rows)
+    steps = [b - a for a, b in zip(times, times[1:])]
+    if max(steps) - min(steps) > 1e-6*max(steps):
+        sys.exit(f"ERROR: {path} does not have a uniform time step")
+    return steps[0]
 
 
 def main() -> int:
@@ -47,7 +61,19 @@ def main() -> int:
         return 0
     coarse, fine = read(sys.argv[1]), read(sys.argv[2])
     target = sys.argv[3]
-    times = sorted(t for t in coarse if t in fine)
+    dt_coarse, dt_fine = step(coarse, sys.argv[1]), step(fine, sys.argv[2])
+    if abs(dt_coarse/dt_fine - 2.0) > 1e-6:
+        sys.exit(
+            f"ERROR: the time steps {dt_coarse:g} and {dt_fine:g} are not in the"
+            " ratio 2:1 that the Richardson extrapolation assumes"
+        )
+    missing = [t for t in coarse if t not in fine]
+    if missing:
+        sys.exit(
+            f"ERROR: {len(missing)} coarse samples, from t = {min(missing):g},"
+            f" are missing in {sys.argv[2]}"
+        )
+    times = sorted(coarse)
     correction = max(
         abs(f - c)/3.0
         for t in times for f, c in zip(fine[t], coarse[t])

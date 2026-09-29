@@ -86,50 +86,64 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
+if ! grep -q "^End" "${CASE_DIR}/log.solids4Foam" 2>/dev/null; then
+    echo "FAIL: solids4Foam did not finish (see ${CASE_DIR}/log.solids4Foam)"
+    exit 1
+fi
+
 if [[ ! -f "${CASE_DIR}/${DISP_FILE}" ]]; then
     echo "FAIL: Could not find ${DISP_FILE}"
     exit 1
 fi
 
 # ------------------------------------------------------------
-# Extract values
+# Extract and check values
 # ------------------------------------------------------------
 
-trough=$(awk '!/^#/ && $1 >= 0.3 && $1 <= 0.75 {
-    if (min == "" || $3 < min) min = $3
-} END { print min }' "${CASE_DIR}/${DISP_FILE}")
-
-end_disp=$(awk '!/^#/ { t = $1; v = $3 } END {
-    if (t > '"${END_TIME}"' - 1e-6) print v
-}' "${CASE_DIR}/${DISP_FILE}")
-
-if [[ -z "${trough}" || -z "${end_disp}" ]]; then
-    echo "FAIL: Could not extract regression quantities"
-    exit 1
-fi
-
-abs() {
-    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
-}
-
+# Every sample must be a finite number, and the history must reach END_TIME.
+# All values are passed to awk as data, never as program text
 failures=0
-
-check() {
-    local label=$1 value=$2 reference=$3
-    local diff
-    diff=$(abs "$(awk "BEGIN {print ${value} - ${reference}}")")
-    if awk "BEGIN {exit !(${diff} < ${DISP_TOL})}"; then
-        printf "PASS: %s = %.6g (reference %.6g, diff %.3g)\n" \
-            "${label}" "${value}" "${reference}" "${diff}"
-    else
-        printf "FAIL: %s = %.6g (reference %.6g, diff %.3g)\n" \
-            "${label}" "${value}" "${reference}" "${diff}"
-        failures=$((failures + 1))
-    fi
+awk \
+    -v endTime="${END_TIME}" \
+    -v refTrough="${REF_TROUGH}" \
+    -v refEnd="${REF_END}" \
+    -v tol="${DISP_TOL}" '
+function finite(x) {
+    return x ~ /^[-+]?([0-9]+\.?[0-9]*|\.[0-9]+)([eE][-+]?[0-9]+)?$/
 }
-
-check "trough displacement" "${trough}" "${REF_TROUGH}"
-check "displacement at t = ${END_TIME} s" "${end_disp}" "${REF_END}"
+function absval(x) { return x < 0 ? -x : x }
+function report(label, value, reference,    diff) {
+    diff = absval(value - reference)
+    if (diff < tol) {
+        printf "PASS: %s = %.6g (reference %.6g, diff %.3g)\n", label, value, reference, diff
+    } else {
+        printf "FAIL: %s = %.6g (reference %.6g, diff %.3g)\n", label, value, reference, diff
+        failed++
+    }
+}
+/^#/ { next }
+{
+    if (!finite($1) || !finite($3)) {
+        printf "FAIL: non-finite sample at line %d: %s\n", NR, $0
+        bad = 1
+        next
+    }
+    t = $1 + 0; v = $3 + 0; n++
+    if (t >= 0.3 && t <= 0.75 && (troughSet == 0 || v < trough)) {
+        trough = v; troughSet = 1
+    }
+    last = t; lastValue = v
+}
+END {
+    if (bad) exit 1
+    if (n == 0 || troughSet == 0 || last < endTime - 1e-6) {
+        printf "FAIL: incomplete history (last sample at t = %g)\n", last
+        exit 1
+    }
+    report("trough displacement", trough, refTrough)
+    report("displacement at t = " endTime " s", lastValue, refEnd)
+    exit failed ? 1 : 0
+}' "${CASE_DIR}/${DISP_FILE}" || failures=1
 
 echo
 if (( failures == 0 )); then
@@ -139,7 +153,7 @@ if (( failures == 0 )); then
     exit 0
 else
     echo "============================================================"
-    echo "Regression test FAILED (${failures} checks)"
+    echo "Regression test FAILED"
     echo "============================================================"
     exit 1
 fi

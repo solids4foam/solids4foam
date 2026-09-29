@@ -56,8 +56,9 @@ mkdir -p run
 ```
 
 `--refine 1` is the resolution of the oomph-lib tutorial: 100 x 16 fluid
-elements and 40 beam elements, 17,356 unknowns. `--steady 20` gives the
-static beam deflection used by the `static` study.
+elements and 40 beam elements, 17,356 unknowns. The static beam deflection
+used by the `static` study is computed with `--q 0 --steady 20`: the wall
+alone, without fluid loading, under the external pressure raised in 20 steps.
 
 `scripts/oomph_trace_to_csv.py` writes the reference CSV files:
 
