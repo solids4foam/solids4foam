@@ -176,6 +176,12 @@ solid predictor, fluid residual control and shared FSI settings, gives:
 So for this like-for-like setup, IQNILS is both faster and requires fewer FSI
 iterations than Aitken.
 
+The IQNILS setup sets `relMinSignificant 1e-2` in `constant/fsiProperties.iqnils`,
+which drops a secant mode when the part of it that is orthogonal to the newer
+modes is less than 1% of its norm. Without this filter, nearly dependent modes
+are retained once the solution approaches a steady state, and the FSI residual
+can stall just above `outerCorrTolerance` until `nOuterCorr` is reached.
+
 ## Regression Test
 
 The case also includes a `regressionTest.sh` script which runs short regression
@@ -424,16 +430,13 @@ Two further points apply to any multi-material case:
 - The materials share one solid mesh, so the FSI interface patch can span
   several materials, as it does here.
 
-The case is then run as before. The Aitken coupling is suggested, i.e.
-`./Allrun aitken`, or `./Allrun aitken parallel` to run in parallel.
+The case is then run as before, i.e. `./Allrun`, or `./Allrun parallel` to run
+in parallel. The `aitken` and `robin` options also work.
 
 ```note
-With the default IQNILS setup, this two-material case stops at `t = 1.8 s`
-because the FSI residual stalls just above `outerCorrTolerance` and
-`nOuterCorr` (50) is reached. Increasing `nOuterCorr` to `100`, or loosening
-`outerCorrTolerance` to `1e-5`, in `constant/fsiProperties.iqnils` allows it to
-run to the end. The Aitken setup needs at most 14 FSI iterations per time step
-for this case.
+The `highOrder` option cannot be used with more than one material: the
+high-order face quadrature gradient is not yet implemented for multi-material
+cases, and the solver stops with a message saying so.
 ```
 
 The table below gives the $$x$$ displacement of the beam tip (the point

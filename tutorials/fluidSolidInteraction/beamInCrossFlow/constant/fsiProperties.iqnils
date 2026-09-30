@@ -56,8 +56,12 @@ fluidSolidInterface    IQNILS;
     // Defaults to 0 modes
     couplingReuse 0;
     minSignificant 1e-12;
-    // Optional: relative QR2-style filtering of older secant modes
-    // relMinSignificant 1e-2;
+    // Relative QR2-style filtering of older secant modes: a secant mode is
+    // dropped when the part of it orthogonal to the newer modes is smaller than
+    // this fraction of its norm. Without it, nearly dependent modes are kept
+    // once the solution is close to steady, and the iterations can stall just
+    // above the tolerance
+    relMinSignificant 1e-2;
     // Optional: normalize secant columns before the IQN-ILS QR solve
     // normalizeCouplingColumns yes;
     // Optional: reuse the previous time step's secants only in iteration 1
