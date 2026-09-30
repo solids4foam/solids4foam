@@ -55,12 +55,28 @@ fluid and Hermite beam elements. To regenerate the references, build oomph-lib
 cd reference/oomph-lib
 cmake -G Ninja -B build -DOOMPH_INSTALL=<oomph-lib>/install
 cmake --build build
-mkdir -p run
-./build/channel_with_leaflet_ref --out run --lright 7 --nre 0 --tramp 1 \
-    --lambdasq 2e-4 --dt 0.01 --tmax 10
+ref="./build/channel_with_leaflet_ref --lright 7 --nre 0 --tramp 1 --tmax 10"
+csv="python3 ../../scripts/oomph_trace_to_csv.py --tmax 10"
+# The tutorial leaflet at dt = 0.02 and 0.01 s
+mkdir -p dt50 dt100
+$ref --lambdasq 2e-4 --dt 0.02 --out dt50
+$ref --lambdasq 2e-4 --dt 0.01 --out dt100
+$csv dt50/trace.dat dt100/trace.dat ../channelLeaflet_oomph_reference.csv
+$csv dt100/trace.dat ../channelLeaflet_oomph_dt100.csv
+# Leaflets of thickness h at the same bending stiffness and mass per unit
+# length, at dt = 0.05 and 0.025 s
+for args in "0.05 1e-6 2e-4" "0.025 1.25e-7 5e-5" "0.0125 1.5625e-8 1.25e-5"
+do
+    set -- $args
+    mkdir -p h$1_dt20 h$1_dt40
+    $ref --h $1 --q $2 --lambdasq $3 --dt 0.05 --out h$1_dt20
+    $ref --h $1 --q $2 --lambdasq $3 --dt 0.025 --out h$1_dt40
+    $csv h$1_dt20/trace.dat h$1_dt40/trace.dat ../channelLeaflet_oomph_h$1.csv
+done
 ```
 
-`scripts/oomph_trace_to_csv.py --tmax 10` writes the reference CSV files:
+`scripts/oomph_trace_to_csv.py` converts the traces to the reference CSV
+files, with a Richardson extrapolation in time when given two runs:
 
 - `channelLeaflet_oomph_reference.csv`: the Richardson extrapolation in time
   of the runs at $$\Delta t = 0.02$$ and $$0.01\,\mathrm{s}$$;
@@ -70,6 +86,8 @@ mkdir -p run
   0.0125 m at the same bending stiffness and mass per unit length
   ($$Q \propto h^3$$, $$\Lambda^2 \propto h^2$$), Richardson-extrapolated from
   $$\Delta t = 0.05$$ and $$0.025\,\mathrm{s}$$.
+
+The runs at $$\Delta t = 0.01\,\mathrm{s}$$ take about 5 hours each in serial.
 
 Precision of the reference, against the largest tip displacement of 0.43 m:
 
