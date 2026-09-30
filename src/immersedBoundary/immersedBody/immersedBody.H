@@ -87,6 +87,7 @@ SourceFiles
 #define immersedBody_H
 
 #include "fvMesh.H"
+#include "Enum.H"
 #include "volFields.H"
 #include "triSurface.H"
 #include "triSurfaceSearch.H"
@@ -104,6 +105,11 @@ namespace Foam
 class immersedBody
 {
     // Private Data
+
+        //- Occupancy methods and dictionary names
+        enum occupancyMethod { signedDistance, vertexFraction };
+        static const Enum<occupancyMethod> occupancyNames_;
+
 
         //- Name of the body
         const word name_;
@@ -138,6 +144,9 @@ class immersedBody
 
         //- Local cells partially covered by the body
         labelList surfaceCells_;
+
+        //- Smallest cell bounding box width in the solved directions
+        scalarField cellWidths_;
 
 
     // Private Member Functions
@@ -201,6 +210,12 @@ public:
             const labelList& surfaceCells() const
             {
                 return surfaceCells_;
+            }
+
+            //- Cached cell widths, indexed by mesh cell
+            const scalarField& cellWidths() const
+            {
+                return cellWidths_;
             }
 
             //- Centre of rotation for the torque, in the current

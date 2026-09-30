@@ -145,7 +145,7 @@ Description
     }
     \endverbatim
 
-    The fields lambda, Ui and f are written with the name of the option as a
+    The fields lambda, Ui, kappa and f are written with the name of the option as a
     prefix, e.g. immersedBoundary:lambda. With the incremental method, f is
     read on restart.
 
@@ -172,6 +172,7 @@ SourceFiles
 #define immersedBoundaryForce_H
 
 #include "fvOption.H"
+#include "Enum.H"
 #include "volFields.H"
 #include "PtrList.H"
 #include "OFstream.H"
@@ -198,13 +199,22 @@ class immersedBoundaryForce
 {
     // Private Data
 
+        //- Forcing methods and dictionary names
+        enum forcingMethod { incremental, penalty };
+        static const Enum<forcingMethod> methodNames_;
+
+        //- Penalty weightings and dictionary names
+        enum penaltyWeighting { volumeFraction, occupancy };
+        static const Enum<penaltyWeighting> weightingNames_;
+
+
         //- Immersed bodies
         PtrList<immersedBody> bodies_;
 
         //- Forcing method: penalty (implicit volume penalisation, the
         //  default) or incremental (the explicit direct forcing of
         //  openHFDIB-DEM, increased after each pressure corrector)
-        word method_;
+        forcingMethod method_;
 
         //- Penalty coefficient K: the penalisation rate in a fully covered
         //  cell is K/deltaT
@@ -215,7 +225,7 @@ class immersedBoundaryForce
         //  min(K, lambda/(1 - lambda)), so that the penalised velocity is
         //  lambda*Ui + (1 - lambda)*U, or occupancy, where the rate is
         //  K*lambda/deltaT
-        word weighting_;
+        penaltyWeighting weighting_;
 
         //- Coefficient C of the penalisation rate in the partially covered
         //  cells with the volumeFraction weighting: the rate is
@@ -231,7 +241,7 @@ class immersedBoundaryForce
         bool nuSet_;
 
         //- Penalisation rate (1/s) in each cell
-        scalarField kappa_;
+        volScalarField kappa_;
 
         //- Coupling coefficient of the incremental method
         scalar couplingCoeff_;
@@ -313,10 +323,6 @@ class immersedBoundaryForce
         //- Kinematic viscosity for the surface rate: the nu entry, else the
         //  nu entry of transportProperties
         scalar nu();
-
-        //- Width of a cell: its smallest bounding box width in the solved
-        //  directions
-        scalar cellWidth(const label celli) const;
 
         //- Move the bodies to the current time and calculate the occupancy
         void updateBodies(const bool move);
