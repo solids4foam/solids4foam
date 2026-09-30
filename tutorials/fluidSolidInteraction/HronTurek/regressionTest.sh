@@ -25,20 +25,22 @@ FY_TOL=1e-3
 
 # Reference values at REG_END_TIME
 # The force references are the total force on the plate and cylinder, in N
-# before the plotting depth correction. The force values are the midpoint of
+# before the plotting depth correction. All references use the benchmark
+# St. Venant-Kirchhoff law and FSI3 interface tolerance of 1e-5.
+# The displacement and force values are the midpoint of
 # OpenFOAM-v2412 and OpenFOAM-v2512 runs with rhoInf 1000 at t = 2.1.
-# Their Fx spread is 6.02e-4, which the existing midpoint tolerance covers.
+# Their Fx spread is 6.71e-4, which the existing midpoint tolerance covers.
 # OpenFOAM-9 could not be re-run locally because its libPstream path is broken.
-REF_TIP_UY=-0.000282442
-REF_FX=6.678182
-REF_FY=-0.67516295
+REF_TIP_UY=-0.000282008
+REF_FX=6.6783815
+REF_FY=-0.6751037
 
 # foam-extend uses GGI rather than AMI for the interface interpolation and has
 # a distinct, repeatable tip displacement and force at the regression end time.
 if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-    REF_TIP_UY=-0.000244033
-    REF_FX=6.722605
-    REF_FY=-0.647795
+    REF_TIP_UY=-0.000242835
+    REF_FX=6.722682
+    REF_FY=-0.6478985
 fi
 
 ALLRUN_LOGFILE="log.Allrun"
