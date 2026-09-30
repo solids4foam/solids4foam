@@ -787,6 +787,7 @@ functions
     {{
         type            sets;
         libs            (sampling);
+        region          fluid;
         interpolationScheme cellPoint;
         setFormat       raw;
         fields          (U);
@@ -823,22 +824,30 @@ def sample_voxels(case: Path, cores: int, velocity: list[dict]) -> list[dict]:
     points = voxel_points(velocity)
     write_sampling_dict(case, points)
     command = ["postProcess", "-region", "fluid", "-dict",
-               "system/sampleVoxels", "-latestTime"]
+               "system/sampleVoxels", "-fields", "(U)", "-latestTime"]
     if cores > 1:
         command = ["mpirun", "-np", str(cores)] + command + ["-parallel"]
     run(command, case, "log.sampleVoxels")
     time = latest_time(case, cores)
-    files = sorted(case.glob(
-        f"postProcessing/**/sampleVoxels/{time}/voxels*U*"))
+    files = sorted(path for path in
+                   (case / "postProcessing").rglob("voxels*U*")
+                   if "sampleVoxels" in path.parts
+                   and path.parent.name == time)
     if not files:
         fail(f"No voxel samples written in {case}")
     samples = numeric_rows(files[0])
+    # Match the written samples to the requested points on a 10 um grid:
+    # the sample points are at least 0.3 mm apart, and the written
+    # coordinates are rounded
+    def key(point) -> tuple:
+        return tuple(round(v * 1.0e5) for v in point)
+
     lookup = {}
     for row in samples:
-        lookup[tuple(round(v, 7) for v in row[:3])] = row[3:6]
+        lookup[key(row[:3])] = row[3:6]
     sums = [[0.0, 0.0, 0.0, 0] for _ in velocity]
     for index, point in points:
-        value = lookup.get(tuple(round(v, 7) for v in point))
+        value = lookup.get(key(point))
         if value is not None:
             for d in range(3):
                 sums[index][d] += value[d]
@@ -849,6 +858,9 @@ def sample_voxels(case: Path, cores: int, velocity: list[dict]) -> list[dict]:
         found = total[3]
         entry = dict(row)
         entry["fluid_fraction"] = found / per_voxel
+        for key in ("vx", "vy", "vz"):
+            entry[f"{key}_sim_mm_s"] = None
+        # Compare only voxels that lie mostly in the computed fluid
         if found >= 0.5 * per_voxel:
             for d, key in enumerate(("vx", "vy", "vz")):
                 entry[f"{key}_sim_mm_s"] = 1.0e3 * total[d] / found
@@ -863,7 +875,7 @@ def centreline(case: Path, end_time: float, delta_t: float
     Built from the displacement monitors on the undeformed centreline
     (system/flapCentreline) and the tip monitor.
     """
-    points = [(0.0, 0.0)]
+    points = {0.0: (0.0, 0.0)}
     files = sorted(case.glob(
         "postProcessing/**/solidPointDisplacement_flapCentrelineZ*.dat"))
     files += sorted(case.glob(
@@ -875,8 +887,8 @@ def centreline(case: Path, end_time: float, delta_t: float
         z0 = 0.1 * int(match.group(1)) if match else 65.0
         rows = last_per_time(numeric_rows(path))
         require_history(path, rows, end_time, delta_t, 5)
-        points.append((z0 + 1e3 * rows[-1][3], 1e3 * rows[-1][2]))
-    return sorted(points)
+        points[round(z0, 3)] = (z0 + 1e3 * rows[-1][3], 1e3 * rows[-1][2])
+    return sorted(points.values())
 
 
 def centreline_errors(sim: list[tuple[float, float]],
@@ -897,7 +909,7 @@ def centreline_errors(sim: list[tuple[float, float]],
 
 
 def velocity_errors(voxels: list[dict], scale: float) -> dict:
-    valid = [v for v in voxels if "vx_sim_mm_s" in v]
+    valid = [v for v in voxels if v["vx_sim_mm_s"] is not None]
     if not valid:
         fail("No voxel lies in the computed fluid domain")
     distances = [math.sqrt(sum((v[f"{k}_sim_mm_s"] - v[f"{k}_mm_s"]) ** 2
@@ -963,13 +975,29 @@ def run_phase_i(args: argparse.Namespace, reference: dict) -> bool:
         (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
                                           + "\n")
 
-    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        for future in [pool.submit(execute, level) for level in levels]:
-            future.result()
+    external = {}
+    if args.case:
+        # Evaluate a completed run made elsewhere from a copy of this
+        # tutorial; its own controlDict and decomposition apply
+        case = Path(args.case).resolve()
+        check_solver_log(case, f"Phase I run in {case}")
+        control = (case / "system" / "controlDict").read_text()
+        end_time = float(re.search(r"^endTime\s+([^;]+);", control,
+                                   re.MULTILINE).group(1))
+        delta_t = float(re.search(r"^deltaT\s+([^;]+);", control,
+                                  re.MULTILINE).group(1))
+        cores = sum(1 for p in case.iterdir()
+                    if re.fullmatch(r"processor\d+", p.name)) or 1
+        levels = levels[:1]
+        external[levels[0]] = case
+    else:
+        with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+            for future in [pool.submit(execute, level) for level in levels]:
+                future.result()
 
     for level in levels:
         name = f"phaseI_{level}"
-        case = WORK_ROOT / name
+        case = external.get(level, WORK_ROOT / name)
         history = tip_history(case, end_time, delta_t)
         write_csv(OUTPUT_ROOT / f"{name}_tip_history.csv",
                   [{"time_s": f"{r[0]:.6g}", "tip_dx_mm": f"{1e3 * r[1]:.6g}",
@@ -1114,6 +1142,9 @@ def main() -> int:
                         help="Phase I time step in s (default 0.002)")
     parser.add_argument("--jobs", type=int, default=1,
                         help="runs executed at once (default 1)")
+    parser.add_argument("--case",
+                        help="phaseI: evaluate this completed run of the "
+                             "first --levels mesh instead of running it")
     parser.add_argument("--quick", action="store_true",
                         help="smoke test: first level only, short runs, "
                              "no accuracy checks")
