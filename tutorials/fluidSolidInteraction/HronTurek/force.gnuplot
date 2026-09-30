@@ -2,8 +2,8 @@ set terminal pdfcairo enhanced color solid
 
 set output "force.pdf"
 set xlabel "Time, t [s]"
-set ylabel "Fx [N]"
-set y2label "Fy [N]"
+set ylabel "Fx [N/m]"
+set y2label "Fy [N/m]"
 set grid
 
 set y2tics

@@ -12,12 +12,12 @@ functions
        libs                ( "libforces.so" );
        writeControl        timeStep;
        writeInterval       1;
-       patches             (plate);
+       patches             (plate cylinder);
        "pName|p"           p;
        "UName|U"           U;
        "rhoName|rho"       rhoInf;
        log                 true;
-       rhoInf              100;
+       rhoInf              1000;
        CofR                (0.5 0.1 0);
 
        region fluid;

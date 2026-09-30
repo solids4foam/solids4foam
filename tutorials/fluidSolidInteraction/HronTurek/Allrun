@@ -165,7 +165,8 @@ if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
     gnuplot deflection.gnuplot &> /dev/null
-    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    if [ $(find postProcessing forces -type f \
+        \( -name force.dat -o -name forces.dat \) 2>/dev/null | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
         gnuplot force.gnuplot &> /dev/null

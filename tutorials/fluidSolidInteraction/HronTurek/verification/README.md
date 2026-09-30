@@ -46,11 +46,13 @@ frequency with alternating troughs, so their own, shorter period would miss
 the deeper trough. The frequency of each quantity is the average over its own
 full periods in the window.
 
-The verification copies differ from the tutorial in four respects:
+Both the tutorial and verification copies integrate the forces over the
+`cylinder` and `plate` patches with `rhoInf 1000`. The plotted and verification
+forces are divided by the `0.015 m` mesh thickness to report force per unit
+depth, like the published values.
 
-- the forces are integrated over both the `cylinder` and `plate` patches with
-  `rhoInf 1000` and divided by the `0.015 m` mesh thickness, so that they are
-  per unit depth like the published values;
+The verification copies differ from the tutorial in three respects:
+
 - the plate uses `StVenantKirchhoffElastic`, the constitutive law specified by
   the benchmark, instead of the tutorial's `neoHookeanElastic`;
 - the interface tolerance `outerCorrTolerance` is `1e-5` rather than the
