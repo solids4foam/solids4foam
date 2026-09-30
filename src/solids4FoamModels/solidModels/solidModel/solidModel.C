@@ -840,14 +840,10 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
     // Hack to avoid expensive copy of residuals
 #ifdef OPENFOAM_COM
-    #if (OPENFOAM >= 2312)
-        const_cast<dictionary&>
-        (
-            D.mesh().data().solverPerformanceDict()
-        ).clear();
-    #else
-        const_cast<dictionary&>(D.mesh().solverPerformanceDict()).clear();
-    #endif
+    const_cast<dictionary&>
+    (
+        D.mesh().data().solverPerformanceDict()
+    ).clear();
 #endif
 
     if (relaxationMethod_ == "fixed")
@@ -2645,7 +2641,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 
     Info<< "Selecting solidModel " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)
@@ -3027,7 +3023,7 @@ void Foam::solidModel::moveMesh
 #ifdef FOAMEXTEND
     mesh().changing(false);
 #endif
-#if (OPENFOAM >= 2206)
+#ifdef OPENFOAM_COM
     {
         auto tmeshPhi(mesh().setPhi());
         if (tmeshPhi)

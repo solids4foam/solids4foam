@@ -11,7 +11,9 @@ else
         "v2606" "v2512" "v2506" "v2412" "v2406" "v2312" "4.1" "9"
     )
     if ! [[ " ${allowed_ver[*]} " == *" $WM_PROJECT_VERSION "* ]]; then
-        echo "Unsupported OpenFOAM version sourced!"
+        echo "Unsupported OpenFOAM version sourced: $WM_PROJECT_VERSION"
+        echo "The supported versions are: ${allowed_ver[*]}"
+        exit 1
     fi
 fi
 
