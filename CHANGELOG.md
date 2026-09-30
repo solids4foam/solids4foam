@@ -168,6 +168,11 @@ release. For complete commit-level details and contributor information, see the
 
 ### Removed
 
+- OpenFOAM.com versions older than v2312 (v2306, v2212, v2206, v2112, v2106
+  and v2012) are no longer supported and are removed from the versions
+  `Allwmake` and `Allwclean` accept. The source no longer compiles against
+  them, and the build workflows cover v2312 and newer only.
+
 - **Breaking:** the legacy `mechanicalModel` is removed - `mechanicalModel`,
   `dualMechanicalModel`, `solidSubMeshes`, `mechanicalLaw` and every legacy
   law - together with the `useMechanicalConstitutiveLawManager` switch that
