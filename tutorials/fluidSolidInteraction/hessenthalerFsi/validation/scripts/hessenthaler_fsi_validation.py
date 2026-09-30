@@ -152,9 +152,15 @@ def require_history(path: Path, rows: list[list[float]], end_time: float,
     if not math.isclose(times[-1], end_time, rel_tol=1e-6, abs_tol=1e-9):
         fail(f"{path} ends at t = {times[-1]:g}, not at the end time "
              f"t = {end_time:g}")
+    if times[0] > 1.5 * delta_t:
+        fail(f"{path} starts at t = {times[0]:g}, not at the first time "
+             f"step t = {delta_t:g}")
     gaps = [b - a for a, b in zip(times, times[1:])]
     if gaps and max(gaps) > 1.5 * delta_t:
         fail(f"{path} has a gap of {max(gaps):g} s in its history")
+    expected = round(end_time / delta_t)
+    if len(times) < expected:
+        fail(f"{path} has {len(times)} time levels, expected {expected}")
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +183,11 @@ def tutorial_fingerprint() -> str:
     for name in ("Allrun", "makeFluidSurface.py"):
         digest.update((TUTORIAL / name).read_bytes())
     return digest.hexdigest()
+
+
+def driver_fingerprint() -> str:
+    """Hash of this script, which generates or edits the run inputs."""
+    return hashlib.sha256(SCRIPT.read_bytes()).hexdigest()
 
 
 def build_fingerprint() -> str:
@@ -316,7 +327,6 @@ loadSteps
     codeData
     #{
         vector gFinal_{Zero};
-        bool gFinalSet_{false};
     #};
 
     localCode
@@ -343,12 +353,21 @@ loadSteps
 
     codeRead
     #{
-        if (!gFinalSet_)
-        {
-            gFinal_ =
-                mesh().lookupObject<uniformDimensionedVectorField>("g").value();
-            gFinalSet_ = true;
-        }
+        // The unscaled value is read from constant/g on disk, not from the
+        // registered field, which holds the scaled value
+        const uniformDimensionedVectorField gFile
+        (
+            IOobject
+            (
+                "g",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            )
+        );
+        gFinal_ = gFile.value();
         setLoad(mesh(), gFinal_);
     #};
 
@@ -502,15 +521,29 @@ def run_solid_case(case: Path, cores: int) -> None:
         run(["solids4Foam"], case, "log.solids4Foam")
 
 
+def monitor_history(case: Path, name: str, end_time: float,
+                    delta_t: float) -> list[list[float]]:
+    """History of one solidPointDisplacement monitor.
+
+    A restarted run writes one file per start time; the segments are merged
+    in start-time order, a later segment replacing overlapping times.
+    """
+    candidates = sorted(
+        case.glob(f"postProcessing/*/solidPointDisplacement_{name}.dat"),
+        key=lambda path: float(path.parent.name))
+    if not candidates:
+        fail(f"No '{name}' history in {case}")
+    rows = []
+    for path in candidates:
+        rows.extend(numeric_rows(path))
+    rows = last_per_time(rows)
+    require_history(candidates[-1], rows, end_time, delta_t, 5)
+    return rows
+
+
 def tip_history(case: Path, end_time: float, delta_t: float
                 ) -> list[list[float]]:
-    candidates = sorted(case.glob(
-        "postProcessing/**/solidPointDisplacement_flapTip.dat"))
-    if not candidates:
-        fail(f"No flap tip history in {case}")
-    rows = last_per_time(numeric_rows(candidates[0]))
-    require_history(candidates[0], rows, end_time, delta_t, 5)
-    return rows
+    return monitor_history(case, "flapTip", end_time, delta_t)
 
 
 def calibration_runs(args: argparse.Namespace) -> list[dict]:
@@ -561,6 +594,11 @@ def plateau_tips(history: list[list[float]]) -> list[tuple[float, float]]:
 
 
 def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
+    global LOAD_LEVELS, PLATEAU_TIME
+    if args.quick:
+        # Smoke test: one short plateau at the Phase I load, no checks
+        LOAD_LEVELS = (1.0,)
+        PLATEAU_TIME = 0.5
     target = float(reference["targets"]["zero_flow_tip_y_mm"])
     uniaxial = float(reference["materials_phase_I"]
                      ["uniaxial_neo_hookean_c1_Pa"])
@@ -574,6 +612,8 @@ def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
         settings = {
             "study": "calibration", **spec,
             "load_levels": list(LOAD_LEVELS), "plateau_time": PLATEAU_TIME,
+            "transition_time": TRANSITION_TIME,
+            "driver": driver_fingerprint(),
             "delta_t": CAL_DELTA_T, "damping": CAL_DAMPING,
             "mu_reference": MU_REFERENCE,
             "tutorial_inputs": tutorial_fingerprint(),
@@ -607,6 +647,10 @@ def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
         write_csv(OUTPUT_ROOT / f"{name}_tip_history.csv",
                   [{"time_s": f"{r[0]:.6g}", "tip_dy_mm": f"{1e3 * r[2]:.6g}",
                     "tip_dz_mm": f"{1e3 * r[3]:.6g}"} for r in history])
+        if args.quick:
+            print(f"  {name}: tip y = {1e3 * history[-1][2]:.3f} mm at "
+                  f"t = {history[-1][0]:g} s (quick run, no checks)")
+            continue
         points = plateau_tips(history)
         # Equivalent (mu, tip) pairs, in increasing tip order
         curve = sorted((MU_REFERENCE / load, tip) for load, tip in points)
@@ -628,6 +672,8 @@ def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
         print(f"  {name}: mu = {mu_cal:.5g} Pa", flush=True)
         if not math.isfinite(mu_cal):
             passed = False
+    if args.quick:
+        return True
     write_csv(OUTPUT_ROOT / "calibration.csv",
               [{k: (f"{v:.5g}" if isinstance(v, float) else v)
                 for k, v in r.items()} for r in rows])
@@ -876,17 +922,17 @@ def centreline(case: Path, end_time: float, delta_t: float
     (system/flapCentreline) and the tip monitor.
     """
     points = {0.0: (0.0, 0.0)}
-    files = sorted(case.glob(
-        "postProcessing/**/solidPointDisplacement_flapCentrelineZ*.dat"))
-    files += sorted(case.glob(
-        "postProcessing/**/solidPointDisplacement_flapTip.dat"))
-    if len(files) < 10:
+    names = sorted({
+        path.name[len("solidPointDisplacement_"):-len(".dat")]
+        for path in case.glob(
+            "postProcessing/*/solidPointDisplacement_flapCentrelineZ*.dat")
+    })
+    if len(names) < 10:
         fail(f"Centreline monitors missing in {case}")
-    for path in files:
-        match = re.search(r"Z(\d+)\.dat$", path.name)
+    for name in names + ["flapTip"]:
+        match = re.search(r"Z(\d+)$", name)
         z0 = 0.1 * int(match.group(1)) if match else 65.0
-        rows = last_per_time(numeric_rows(path))
-        require_history(path, rows, end_time, delta_t, 5)
+        rows = monitor_history(case, name, end_time, delta_t)
         points[round(z0, 3)] = (z0 + 1e3 * rows[-1][3], 1e3 * rows[-1][2])
     return sorted(points.values())
 
@@ -962,6 +1008,7 @@ def run_phase_i(args: argparse.Namespace, reference: dict) -> bool:
         settings = {
             "study": "phaseI", "level": level, "cores": cores,
             "end_time": end_time, "delta_t": delta_t,
+            "driver": driver_fingerprint(),
             "tutorial_inputs": tutorial_fingerprint(),
             "build": build_fingerprint(),
         }
@@ -1023,7 +1070,9 @@ def run_phase_i(args: argparse.Namespace, reference: dict) -> bool:
             write_csv(OUTPUT_ROOT / f"{name}_voxels.csv", voxels)
             row.update(velocity_errors(voxels, scale))
             tip_error = abs(row["tip_y_mm"] - tip_target)
-            ok = tip_error <= 1.0 and row["centreline_rms_mm"] <= 1.0
+            # Steady: the tip moves by less than 0.1 mm over the last tenth
+            ok = (tip_error <= 1.0 and row["centreline_rms_mm"] <= 1.0
+                  and row["tip_drift_last_tenth_mm"] <= 0.1)
             row["pass"] = ok
             passed &= ok
         rows.append(row)

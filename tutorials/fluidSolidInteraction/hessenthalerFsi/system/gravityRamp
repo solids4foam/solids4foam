@@ -36,7 +36,6 @@ gravityRamp
     codeData
     #{
         vector gFinal_{Zero};
-        bool gFinalSet_{false};
         scalar rampTime_{0.5};
     #};
 
@@ -68,14 +67,21 @@ gravityRamp
 
     codeRead
     #{
-        // The final value is the one read from constant/solid/g; store it
-        // before the first ramped value overwrites it
-        if (!gFinalSet_)
-        {
-            gFinal_ =
-                mesh().lookupObject<uniformDimensionedVectorField>("g").value();
-            gFinalSet_ = true;
-        }
+        // The final value is read from constant/solid/g on disk, not from
+        // the registered field, which holds the ramped value
+        const uniformDimensionedVectorField gFile
+        (
+            IOobject
+            (
+                "g",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            )
+        );
+        gFinal_ = gFile.value();
         setGravity(mesh(), gFinal_, rampTime_);
     #};
 
