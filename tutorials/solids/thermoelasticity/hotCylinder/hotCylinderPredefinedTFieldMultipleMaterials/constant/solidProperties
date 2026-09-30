@@ -17,7 +17,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel     weakThermalLinearGeometry;
 //solidModel     thermalLinearGeometry;
 solidModel     linearGeometryTotalDisplacement;
 
@@ -31,9 +30,6 @@ linearGeometryTotalDisplacementCoeffs
 
     // Alternative solution tolerance for displacement
     alternativeTolerance 1e-07;
-
-    // Material law solution tolerance
-    materialTolerance 1e-05;
 
     // Write frequency for the residuals
     infoFrequency   100;
