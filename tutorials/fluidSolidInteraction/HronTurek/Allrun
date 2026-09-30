@@ -100,7 +100,7 @@ then
             # Periodic: mean inflow 2 m/s applied without a ramp
             maxValue=3; transitionPeriod=0; rho=1000; E=5.6e6
             deltaT=1e-3; endTime=6; writeInterval=20
-            outerCorrTolerance=1e-6; fluidTolerance=1e-6
+            outerCorrTolerance=1e-5; fluidTolerance=1e-6
             ;;
     esac
     echo "Setting up the ${benchmark} benchmark"

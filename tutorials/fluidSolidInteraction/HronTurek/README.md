@@ -48,11 +48,10 @@ the periodic motion is reached quickly. For `FSI1` and `FSI2`, it is ramped
 over 2 s with the smooth ramp of the benchmark. In all three variants, the
 coupling between the fluid and the solid is activated after 2 s.
 
-The tutorial describes the plate with the `neoHookeanElastic` law. The
-benchmark specifies the St. Venant-Kirchhoff law, which the verification
-study uses (see below). The tutorial keeps `neoHookeanElastic`, which is used
-by its regression test and has recorded reference values across the supported
-OpenFOAM versions.
+The tutorial and verification study both use `StVenantKirchhoffElastic`,
+the St. Venant-Kirchhoff constitutive law specified by the benchmark.
+For FSI3, both use `outerCorrTolerance 1e-5`; at `1e-6`, the IQN-ILS
+residual occasionally stalls just above the tolerance during longer runs.
 
 ![Figure 1: Computational domain with a structural detail for the elas\
 tic plate case. All dimensions are in m.](./images/HronTurekFsi3-geometry.pdf)
@@ -219,7 +218,8 @@ pseudo-transient route to the steady state with `Δt = 0.025 s` to `t = 30 s`.
 Its loads are 30 to 40 times smaller than those of `FSI3`, so it also tightens
 the fluid solver tolerances to `1e-9` and uses an interface tolerance
 `outerCorrTolerance` of `1e-5`. `FSI2` runs with
-`Δt = 0.001 s` to `t = 10.5 s`. These settings are those of the 1x level of
+`Δt = 0.001 s` to `t = 10.5 s` with `outerCorrTolerance 1e-6`. These
+settings are those of the 1x level of
 the verification study. If a run was interrupted, `Allrun` refuses to start
 until `Allclean` has restored the stored files.
 

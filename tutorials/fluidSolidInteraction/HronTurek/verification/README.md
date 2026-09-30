@@ -51,17 +51,14 @@ Both the tutorial and verification copies integrate the forces over the
 forces are divided by the `0.015 m` mesh thickness to report force per unit
 depth, like the published values.
 
-The verification copies differ from the tutorial in three respects:
+Both also use `StVenantKirchhoffElastic`, the benchmark's constitutive law,
+and `outerCorrTolerance 1e-5` for FSI3. At `1e-6`, the IQN-ILS residual
+occasionally stalls just above the tolerance and a long run aborts (about
+once in five thousand steps).
 
-- the plate uses `StVenantKirchhoffElastic`, the constitutive law specified by
-  the benchmark, instead of the tutorial's `neoHookeanElastic`;
-- the interface tolerance `outerCorrTolerance` is `1e-5` rather than the
-  tutorial's `1e-6`, at which the IQN-ILS residual occasionally stalls just
-  above the tolerance and a long run aborts (about once in five thousand
-  steps);
-- the run continues to `t = 7 s` (the tutorial stops at `6 s`) so that the
-  closing window is well inside the periodic regime. The coupling is
-  activated at `t = 2 s`, as in the tutorial.
+The FSI3 verification run continues to `t = 7 s` (the tutorial stops at
+`6 s`) so that the closing window is well inside the periodic regime.
+The coupling is activated at `t = 2 s`, as in the tutorial.
 
 The reference values are in `reference/HronTurek_verification_references.json`.
 The primary values are the Featflow FSI3 results on level 4 with
@@ -406,7 +403,8 @@ listed above, the verification copies set:
   `transitionPeriod 2 s`, in both `U.dirichletNeumann` and `U.robin`;
 - `ρ = 10000 kg/m^3` and `E = 1.4e6 Pa`;
 - the coupling start at `t = 2 s`, the end of the ramp;
-- `outerCorrTolerance 1e-6`, the tutorial value, instead of the `1e-5` of the
+- `outerCorrTolerance 1e-6`, also used by `Allrun fsi2`, instead of the
+  `1e-5` of the
   FSI3 copies. At `1e-5`, the partly converged interface leaves step-to-step
   noise in the forces: on the 1x mesh the lift noise was `14 N/m` rms, with
   peaks of `40 N/m`, and on the 2x mesh `30 N/m` rms, with peaks of

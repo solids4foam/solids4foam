@@ -217,4 +217,3 @@ Cases that select `neoHookeanElastic`:
 - `fluidSolidInteraction/beamInCrossFlow`
 - `fluidSolidInteraction/fillingElasticContainer`
 - `fluidSolidInteraction/flexibleDamBreak`
-- `fluidSolidInteraction/HronTurek`

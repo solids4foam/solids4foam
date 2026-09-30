@@ -35,7 +35,7 @@ fixedRelaxationCoeffs
     relaxationFactor     1.0;
 
     // Tolerance for the interface displacement residual within each time-step
-    outerCorrTolerance   1e-6;
+    outerCorrTolerance   1e-5;
 
     // Additional Robin convergence criteria: the relative change in the
     // interface pressure between FSI iterations and the relative leakage flux
