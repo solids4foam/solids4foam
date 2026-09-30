@@ -91,6 +91,12 @@ Two forcing methods are available:
   occupancy. The results depend on `couplingCoeff`, the time step and the
   number of pressure correctors. This method is kept for comparison: with
   `occupancy vertexFraction` it reproduces `pimpleHFDIBFoam`.
+  `couplingCoeff` controls how much of the velocity error is corrected after
+  each pressure corrector. The default `0.8` gives strong enforcement without
+  the oscillation that full correction can produce. Reduce it when forcing
+  or pressure corrections oscillate or diverge; a smaller value enforces
+  body velocity more slowly and can require more pressure correctors or a
+  smaller timestep for the same accuracy.
 
 The force `-rho*sum(f*V)` and torque on each body, where `f` is the forcing
 (an acceleration) exerted on the fluid, are written every time step to

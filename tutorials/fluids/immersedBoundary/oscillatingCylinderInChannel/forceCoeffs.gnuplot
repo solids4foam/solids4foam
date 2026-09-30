@@ -20,9 +20,9 @@ set grid
 plot \
     forceFile u 1:(scale*($2 + $8)) w l lw 2 lc rgb "black" \
         t "immersedBoundaryForce", \
-    "verificationData/Cd.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
+    "verification/reference/Cd.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
         t "Wan and Turek (2006)", \
-    "verificationData/CdBodyFitted.dat" u 1:2 w l lw 1 dt 2 lc rgb "blue" \
+    "verification/reference/CdBodyFitted.dat" u 1:2 w l lw 1 dt 2 lc rgb "blue" \
         t "Body-fitted mesh"
 
 set ylabel "C_l"
@@ -30,9 +30,9 @@ set yrange [-0.1:0.1]
 plot \
     forceFile u 1:(scale*($3 + $9)) w l lw 2 lc rgb "black" \
         t "immersedBoundaryForce", \
-    "verificationData/Cl.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
+    "verification/reference/Cl.dat" u 1:2 w p pt 7 ps 0.3 lc rgb "red" \
         t "Wan and Turek (2006)", \
-    "verificationData/ClBodyFitted.dat" u 1:2 w l lw 1 dt 2 lc rgb "blue" \
+    "verification/reference/ClBodyFitted.dat" u 1:2 w l lw 1 dt 2 lc rgb "blue" \
         t "Body-fitted mesh"
 
 unset multiplot

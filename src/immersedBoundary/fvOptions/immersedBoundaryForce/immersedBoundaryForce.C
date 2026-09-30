@@ -70,6 +70,19 @@ const Foam::pimpleControl& Foam::fv::immersedBoundaryForce::pimple() const
 }
 
 
+Foam::fileName Foam::fv::immersedBoundaryForce::outputDir() const
+{
+    fileName dir(mesh_.time().globalPath()/"postProcessing");
+
+    if (mesh_.name() != polyMesh::defaultRegion)
+    {
+        dir /= mesh_.name();
+    }
+
+    return dir/name_;
+}
+
+
 Foam::scalar Foam::fv::immersedBoundaryForce::rho()
 {
     if (!rhoSet_)
@@ -456,14 +469,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     // Force files
     if (Pstream::master())
     {
-        fileName dir(mesh.time().globalPath()/"postProcessing");
-
-        if (mesh.name() != polyMesh::defaultRegion)
-        {
-            dir = dir/mesh.name();
-        }
-
-        dir = dir/name/mesh.time().timeName();
+        const fileName dir(outputDir()/mesh.time().timeName());
 
         mkDir(dir);
 
@@ -506,13 +512,39 @@ void Foam::fv::immersedBoundaryForce::addSup
 )
 {
     const label timeIndex = mesh_.time().timeIndex();
+    const bool newTimeStep = timeIndex != timeIndex_;
 
     bool updated = false;
 
-    if (timeIndex != timeIndex_)
+    if (newTimeStep)
     {
         // The previous time step is complete
         writeForces();
+
+        // On startup or restart, recover the previous-time fluid momentum
+        // from the loaded velocity and the body configuration at startTime.
+        // The body is moved to the new time by updateBodies() below.
+        if (momentumTimeIndex_ < 0)
+        {
+            lambda_.primitiveFieldRef() = 0;
+
+            for (immersedBody& body : bodies_)
+            {
+                body.addOccupancy(lambda_, surfaceThreshold_);
+            }
+
+            lambda_.correctBoundaryConditions();
+
+            forAll(bodies_, bodyi)
+            {
+                momentum_[bodyi] =
+                    bodies_[bodyi].momentum(eqn.psi(), lambda_);
+            }
+
+            momentum0_ = momentum_;
+            momentum0Valid_ = true;
+            momentumTimeIndex_ = timeIndex;
+        }
 
         // New time step: store the forcing of the previous time step (or the
         // forcing read on restart), and move the bodies to the new time
@@ -534,14 +566,10 @@ void Foam::fv::immersedBoundaryForce::addSup
 
         if (writeSurfaces_ && mesh_.time().writeTime())
         {
-            fileName dir(mesh_.time().globalPath()/"postProcessing");
-
-            if (mesh_.name() != polyMesh::defaultRegion)
-            {
-                dir = dir/mesh_.name();
-            }
-
-            dir = dir/name_/"surfaces"/mesh_.time().timeName();
+            const fileName dir
+            (
+                outputDir()/"surfaces"/mesh_.time().timeName()
+            );
 
             for (const immersedBody& body : bodies_)
             {
@@ -572,7 +600,7 @@ void Foam::fv::immersedBoundaryForce::addSup
         return;
     }
 
-    if (pimple().firstIter())
+    if (newTimeStep || pimple().firstIter())
     {
         // Start the time step, or a repeated solution of the time step, e.g.
         // in a partitioned fluid-solid interaction iteration, from the
@@ -642,7 +670,11 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
             kappa_.primitiveField()*(Ui_.primitiveField() - U.primitiveField());
         f_.correctBoundaryConditions();
 
-        if (pimple.corrPISO() == pimple.nCorrPISO() && pimple.finalIter())
+        if
+        (
+            pimple.corrPISO() == pimple.nCorrPISO()
+         && (pimple.finalIter() || pimple.corr() == 0)
+        )
         {
             calcForces(U);
         }
@@ -727,7 +759,9 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
         // Last pressure corrector
         UEqnPtr_ = nullptr;
 
-        if (pimple.finalIter())
+        // pisoControl does not enter an outer-corrector loop, so corr() stays
+        // zero and firstIter()/finalIter() are both false
+        if (pimple.finalIter() || pimple.corr() == 0)
         {
             calcForces(U);
         }

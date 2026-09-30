@@ -42,15 +42,20 @@ Foam::triSurface Foam::immersedBody::readSurface
     const fileName& f
 )
 {
-    fileName file(f);
-    file.expand();
+    const IOobject surfaceIO
+    (
+        "immersedBodySurface",
+        mesh.time().constant(),
+        "triSurface",
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE,
+        false
+    );
 
-    // The surface is read by every processor from the case directory
-    if (!file.isAbsolute())
-    {
-        file =
-            mesh.time().globalPath()/mesh.time().constant()/"triSurface"/file;
-    }
+    // Resolve relative paths through the file handler, including distributed
+    // roots, with constant/triSurface as the base directory
+    const fileName file(triSurface::relativeFilePath(surfaceIO, f, true));
 
     if (!isFile(file))
     {
