@@ -360,6 +360,101 @@ Remember that a tutorial case can be cleaned and reset using the included
 
 ---
 
+## Multi-Material Variant
+
+The beam can be made of more than one material, e.g. a stiff root with a
+flexible tip. Nothing changes on the fluid side or in the FSI coupling: the
+solid region is simply given a cell zone for each material. The three changes
+below convert this tutorial into a two-material case.
+
+**1. Define the materials.** In `constant/solid/mechanicalProperties`, replace
+the single `rubber` entry with one entry per material:
+
+```c++
+mechanical
+(
+    stiff
+    {
+        type        StVenantKirchhoffElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1000;
+        E           E [1 -1 -2 0 0 0 0] 1.4e6;
+        nu          nu [0 0 0 0 0 0 0] 0.4;
+    }
+
+    flexible
+    {
+        type        StVenantKirchhoffElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1000;
+        E           E [1 -1 -2 0 0 0 0] 1e4;
+        nu          nu [0 0 0 0 0 0 0] 0.4;
+    }
+);
+```
+
+**2. Define the cell sets.** Create a file called `batch.setSet` in the case
+directory, which places the lower half of the beam ($$y < 0.1$$ m) in the
+`stiff` set and the upper half in the `flexible` set:
+
+```plaintext
+cellSet stiff new boxToCell (0.45 0 -0.2) (0.55 0.1 0)
+cellSet flexible new boxToCell (0.45 0.1 -0.2) (0.55 0.2 0)
+```
+
+**3. Create the cell zones.** In the `Allrun` script, convert the sets to cell
+zones in the solid region after the meshes have been created, i.e. after the
+two `blockMesh` lines:
+
+```bash
+# Create the material cellZones in the solid region
+solids4Foam::runApplication -s solid setSet -region solid -batch batch.setSet
+solids4Foam::runApplication -s solid setsToZones -region solid
+```
+
+```note
+For multi-material cases, solids4foam expects to find a cellZone for each
+material defined in `mechanicalProperties`, where the cellZone name is the same
+as the material name.
+```
+
+Two further points apply to any multi-material case:
+
+- The gradient of the displacement must be calculated with the material-aware
+  `leastSquaresS4f` scheme, which keeps each cell's stencil within its own
+  material. This tutorial already uses it in `system/solid/fvSchemes`.
+- The materials share one solid mesh, so the FSI interface patch can span
+  several materials, as it does here.
+
+The case is then run as before. The Aitken coupling is suggested, i.e.
+`./Allrun aitken`, or `./Allrun aitken parallel` to run in parallel.
+
+```note
+With the default IQNILS setup, this two-material case stops at `t = 1.8 s`
+because the FSI residual stalls just above `outerCorrTolerance` and
+`nOuterCorr` (50) is reached. Increasing `nOuterCorr` to `100`, or loosening
+`outerCorrTolerance` to `1e-5`, in `constant/fsiProperties.iqnils` allows it to
+run to the end. The Aitken setup needs at most 14 FSI iterations per time step
+for this case.
+```
+
+The table below gives the $$x$$ displacement of the beam tip (the point
+monitored in `postProcessing/0/solidPointDisplacement_displacement.dat`) at
+`t = 4 s`, calculated with OpenFOAM-v2512. As expected, the two-material
+results lie between those of the two single-material beams, and the beam is
+much stiffer when the stiff material is at the root, where the bending moment
+is greatest.
+
+| Beam                                          | Tip $$x$$ displacement (m) |
+| --------------------------------------------- | -------------------------- |
+| Flexible throughout (the unmodified tutorial) | `9.90e-3`                  |
+| Flexible root, stiff tip                      | `7.94e-3`                  |
+| Stiff root, flexible tip (as described above) | `1.26e-3`                  |
+| Stiff throughout                              | `6.97e-5`                  |
+
+The serial and parallel (four processors) results for the stiff-root case
+agree to five significant figures.
+
+---
+
 ## Analysing the Results
 
 In the ParaView (Figure 3), both the solid and fluid regions are loaded by
