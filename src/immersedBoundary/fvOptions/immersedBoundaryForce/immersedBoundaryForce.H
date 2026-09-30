@@ -43,10 +43,11 @@ Description
     the occupancy weighting, \f$ \kappa = K \lambda/\Delta t \f$, which for
     large K blocks every covered cell. With the volumeFraction weighting, the
     rate in the partially covered cells is also limited to
-    \f$ \lambda/(1 - \lambda) C (\nu/w^2 + |U_i|/w) \f$, where w is the cell
-    width and C the surface rate coefficient (default 3), so that it does
-    not depend on the time step. The results do not depend on K for K of 1e3
-    or more, the number of pressure correctors or the time step.
+    \f$ \lambda/(1 - \lambda) C (\nu/w^2 + \max(|U_i|, |U|)/w) \f$, where
+    w is the cell width and C the surface rate coefficient (default 3).
+    This cap has no explicit time-step dependence. The numerical velocity
+    scale is relative to the fixed mesh; it is updated using the current
+    fluid velocity at each momentum assembly.
 
     incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
     solver. The explicit forcing f is added to the right-hand side of the
@@ -229,8 +230,9 @@ class immersedBoundaryForce
 
         //- Coefficient C of the penalisation rate in the partially covered
         //  cells with the volumeFraction weighting: the rate is
-        //  lambda/(1 - lambda)*C*(nu/w^2 + |Ui|/w), where w is the cell
-        //  width, so that it does not depend on the time step. The rate is
+        //  lambda/(1 - lambda)*C*(nu/w^2 + max(|Ui|, |U|)/w), where w is
+        //  the cell width. This cap has no explicit time-step dependence;
+        //  the fluid velocity is updated at each momentum assembly. The rate is
         //  lambda/((1 - lambda)*deltaT) if C is not positive
         scalar surfaceRateCoeff_;
 

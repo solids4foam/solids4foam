@@ -289,7 +289,7 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                         (
                             kappaI[celli],
                             lambda/(1 - lambda)*surfaceRateCoeff_
-                           *(nu/sqr(w) + mag(Ui_[celli])/w)
+                           *(nu/sqr(w) + max(mag(Ui_[celli]), mag(U[celli]))/w)
                         );
                     }
                 }

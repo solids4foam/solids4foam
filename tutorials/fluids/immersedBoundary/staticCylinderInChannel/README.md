@@ -101,15 +101,18 @@ coefficients in `forceCoeffs.pdf`.
 
 | `MESH_LEVEL` | Cells | Cells across $$D$$ | $$C_d$$ | $$C_l$$ |
 | ------------ | ----- | ------------------ | ------- | ------- |
-| 1 | 4 510 | 10 | 5.24 | 0.004 |
-| 2 | 18 040 | 20 | 5.38 | 0.009 |
-| 3 | 72 160 | 40 | 5.48 | 0.010 |
+| 1 | 4 510 | 10 | 5.303 | 0.005 |
+| 2 | 18 040 | 20 | 5.394 | 0.009 |
+| 3 | 72 160 | 40 | Not reverified | Not reverified |
 | Schäfer and Turek (1996) | | | 5.57–5.59 | 0.0104–0.0110 |
 
-The drag converges towards the reference at first order in the cell size.
-The results do not depend on the penalty coefficient, the number of pressure
-correctors or the time step: with `MESH_LEVEL=1`, fixed time steps of 0.01 s
-and 0.0025 s give $$C_d = 5.236$$ and $$C_d = 5.239$$.
+Levels 1 and 2 were checked on OpenFOAM v2512 with fixed timesteps of
+0.01 and 0.0025 s, respectively, at 10 s. With `MESH_LEVEL=1`, reducing the
+timestep from 0.01 to 0.0025 s gives $$C_d = 5.3027$$ and $$C_d = 5.3029$$;
+three instead of one PIMPLE outer correctors gives $$C_d = 5.3027$$.
+The finest mesh has not been reverified with the fluid-speed contribution.
+The earlier body-speed-only cap gave $$C_d = 5.24, 5.38, 5.48$$ on levels
+1-3, with first-order convergence towards the reference.
 
 The other forcing methods of `immersedBoundaryForce` can be compared by
 editing `constant/fvOptions` (see `src/immersedBoundary/README.md`):

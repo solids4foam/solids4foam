@@ -116,18 +116,23 @@ is 2.05:
 
 | `MESH_LEVEL` | Cells | Cells across $$D$$ | Body-fitted | Wan and Turek |
 | ------------ | ----- | ------------------ | ----------- | ------------- |
-| 1 | 5 084 | 10 | 0.11 | 0.13 |
-| 2 | 20 336 | 20 | 0.05 | 0.09 |
-| 3 | 81 344 | 40 | 0.02 | 0.08 |
+| 1 | 5 084 | 10 | 0.104 | 0.135 |
+| 2 | 20 336 | 20 | 0.045 | 0.091 |
+| 3 | 81 344 | 40 | Not reverified | Not reverified |
 
-The difference from the body-fitted mesh solution decreases by about a factor
-of two with each refinement. That from the Wan and Turek (2006) coefficients
-stops decreasing at about 0.08, which is the difference between the body-fitted
-mesh solution and the Wan and Turek (2006) coefficients: these lag the
-converged solutions by about 0.015 s. Without the inertia of the fluid inside
-the cylinder, the difference from the body-fitted mesh solution is about 0.46
-on all the meshes. As the occupancy varies continuously with the position of
-the cylinder, the force is smooth as the cylinder crosses the cells.
+Levels 1 and 2 were checked on OpenFOAM v2512 over full 8 s runs at a fixed
+timestep of 0.0025 s with the maximum of body and fluid speed in the
+surface-rate cap. On level 1, reducing the timestep to 0.000625 s gives an
+RMS difference from the body-fitted reference of 0.136; using three instead
+of one PIMPLE outer correctors gives 0.102. The moving case therefore has
+measurable timestep sensitivity despite the absence of explicit timestep
+dependence in the cap.
+
+The earlier body-speed-only cap gave body-fitted RMS differences of
+0.11, 0.05 and 0.02, and Wan and Turek differences of 0.13, 0.09 and 0.08,
+for levels 1-3. The finest mesh has not been reverified with the new cap.
+As the occupancy varies continuously with the cylinder position, the force
+is smooth as the cylinder crosses cells.
 
 With the `incremental` forcing method of `pimpleHFDIBFoam` (`method
 incremental;` and `occupancy vertexFraction;` in `constant/fvOptions`), the
