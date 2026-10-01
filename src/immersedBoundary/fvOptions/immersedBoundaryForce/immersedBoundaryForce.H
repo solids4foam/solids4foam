@@ -24,22 +24,74 @@ Description
     incompressible flow, as a finite volume option for the momentum equation.
 
     Each body is a closed surface (see immersedBody) that covers some cells of
-    the fluid mesh with an occupancy lambda. The option adds the forcing f
-    (an acceleration) to the right-hand side of the momentum equation, and
-    after each pressure corrector drives the velocity U of the covered cells
-    towards the velocity of the bodies Ui:
+    the fluid mesh with an occupancy lambda, and moves with the velocity Ui.
+    Three forcing methods are available.
+
+    penalty (the default): the implicit volume penalisation
+
+    \f[
+        f = \kappa (U_i - U)
+    \f]
+
+    is added to the right-hand side of the momentum equation, with the
+    \f$ -\kappa U \f$ part in the matrix, so that it also enters the pressure
+    equation through 1/A. The penalisation rate is \f$ \kappa = K/\Delta t \f$
+    in the fully covered cells, where K is the penalty coefficient. With the
+    volumeFraction weighting (the default), \f$ \kappa \Delta t =
+    \min(K, \lambda/(1 - \lambda)) \f$ in the partially covered cells, so
+    that the penalised velocity is \f$ \lambda U_i + (1 - \lambda) U \f$; with
+    the occupancy weighting, \f$ \kappa = K \lambda/\Delta t \f$, which for
+    large K blocks every covered cell. With the volumeFraction weighting, the
+    rate in the partially covered cells is also limited to
+    \f$ \lambda/(1 - \lambda) C (\nu/w^2 + \max(|U_i|, |U|)/w) \f$, where
+    w is the cell width and C the surface rate coefficient (default 3).
+    This cap has no explicit time-step dependence. The numerical velocity
+    scale is relative to the fixed mesh; it is updated using the current
+    fluid velocity at each momentum assembly.
+
+    ghostCell: a sharp interface variant of the penalty method for static
+    bodies. The cells whose centre is inside a body are penalised with the
+    rate \f$ K/\Delta t \f$, and the target velocity of those next to the
+    fluid (the ghost cells) is extrapolated linearly along the surface
+    normal, through the body velocity at the nearest surface point and the
+    velocity at an image point in the fluid:
+
+    \f[
+        U_i = U_b + (U_d - U_b) \frac{s}{s_d}
+    \f]
+
+    where s is the signed distance of the ghost cell centre from the surface
+    (negative inside the body), and \f$ U_d \f$ the velocity at the image
+    point, at the distance \f$ s_d \f$, interpolated in the donor cell that
+    contains it (imageInterpolation cellPoint, the default), or the velocity
+    of the donor cell, with \f$ s_d \f$ the distance of its centre
+    (cell). The image point is imageDistance cell widths (the width of the
+    ghost cell along the normal) beyond the surface, or 0.5, 1 or 1.5 widths
+    further if that point is not in a fluid cell; a ghost cell without a
+    donor, which may be on another processor, has the body velocity. The
+    fluid velocity then equals the body velocity on the surface. The
+    weighting, surfaceRateCoeff and nu entries are not used. For moving
+    bodies the cells that the body leaves (fresh cells) disturb the force,
+    and the penalty method is recommended.
+
+    incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
+    solver. The explicit forcing f is added to the right-hand side of the
+    momentum equation, and after each pressure corrector
 
     \f[
         f \leftarrow f + c \frac{U_i - U}{\Delta t}
     \f]
 
-    where \f$ c \f$ is the coupling coefficient. The updated forcing is used by
-    the next pressure corrector. At the start of each time step, the bodies
-    are moved to the new time and f is multiplied by the new occupancy; if the
-    mesh moves again within the time step (moveMeshOuterCorrectors), f is set
-    to zero in the cells no longer covered.
+    in the covered cells, where \f$ c \f$ is the coupling coefficient; the
+    updated forcing is used by the next pressure corrector. At the start of
+    each time step, f is multiplied by the new occupancy; if the mesh moves
+    again within the time step (moveMeshOuterCorrectors), f is set to zero in
+    the cells no longer covered. The results depend on c, the time step and
+    the number of pressure correctors. This method is kept for comparison, and
+    reproduces pimpleHFDIBFoam with the vertexFraction occupancy.
 
-    The force reported after the last pressure corrector includes that
+    With the incremental method, the force reported after the last pressure
+    corrector includes that
     corrector's forcing increment. Since there is no following pressure
     corrector in the same solve, this increment first acts in the next
     momentum solve, consistently with the original pimpleHFDIBFoam method.
@@ -86,10 +138,39 @@ Description
     {
         type            immersedBoundaryForce;
 
-        // Relaxation c of each direct-forcing update, optional, default 0.8.
-        // Reduce it to damp oscillatory forcing or pressure corrections, at
-        // the cost of slower enforcement of the body velocity
-        couplingCoeff   0.2;
+        // Forcing method, optional, default penalty; ghostCell for static
+        // bodies, or incremental
+        method          penalty;
+
+        // Penalty coefficient K, optional, default 1e3
+        penaltyCoeff    1e3;
+
+        // Weighting of the penalty in partially covered cells, optional,
+        // default volumeFraction
+        weighting       volumeFraction;
+
+        // Coefficient of the penalisation rate in partially covered cells
+        // with the volumeFraction weighting, optional, default 3; 0 for a
+        // rate of lambda/((1 - lambda)*deltaT)
+        surfaceRateCoeff 3;
+
+        // Kinematic viscosity for the surface rate, optional, default the
+        // nu entry of transportProperties
+        nu              1e-3;
+
+        // Distance of the image points of the ghost cell method from the
+        // surface, relative to the cell width, optional, default 1.5
+        imageDistance   1.5;
+
+        // Velocity at the image points of the ghost cell method: cellPoint
+        // (interpolated) or cell (donor cell centre), optional, default
+        // cellPoint
+        imageInterpolation cellPoint;
+
+        // Relaxation c of each incremental direct-forcing update, optional,
+        // default 0.8. Reduce it to damp oscillatory forcing or pressure
+        // corrections, at the cost of slower enforcement of body velocity
+        couplingCoeff   0.8;
 
         // Occupancy threshold for a covered cell, optional, default 1e-4
         surfaceThreshold 1e-4;
@@ -112,8 +193,9 @@ Description
     }
     \endverbatim
 
-    The fields lambda, Ui and f are written with the name of the option as a
-    prefix, e.g. immersedBoundary:lambda. f is read on restart.
+    The fields lambda, Ui, kappa and f are written with the name of the option as a
+    prefix, e.g. immersedBoundary:lambda. With the incremental method, f is
+    read on restart.
 
 Author
     Derived from the pimpleHFDIBFoam solver of openHFDIB-DEM
@@ -138,6 +220,7 @@ SourceFiles
 #define immersedBoundaryForce_H
 
 #include "fvOption.H"
+#include "Enum.H"
 #include "volFields.H"
 #include "PtrList.H"
 #include "OFstream.H"
@@ -164,10 +247,121 @@ class immersedBoundaryForce
 {
     // Private Data
 
+        //- Forcing methods and dictionary names
+        enum forcingMethod { incremental, penalty, ghostCell };
+        static const Enum<forcingMethod> methodNames_;
+
+        //- Penalty weightings and dictionary names
+        enum penaltyWeighting { volumeFraction, occupancy };
+        static const Enum<penaltyWeighting> weightingNames_;
+
+        //- Velocity at the image points of the ghost cell method and
+        //  dictionary names
+        enum imageInterpolationType { cellPointImage, cellImage };
+        static const Enum<imageInterpolationType> imageInterpolationNames_;
+
+
         //- Immersed bodies
         PtrList<immersedBody> bodies_;
 
-        //- Coupling coefficient
+        //- Forcing method: penalty (implicit volume penalisation, the
+        //  default), ghostCell (sharp penalisation with a linear
+        //  reconstruction of the target velocity next to the surface) or
+        //  incremental (the explicit direct forcing of openHFDIB-DEM,
+        //  increased after each pressure corrector)
+        forcingMethod method_;
+
+        //- Penalty coefficient K: the penalisation rate in a fully covered
+        //  cell is K/deltaT
+        scalar penaltyCoeff_;
+
+        //- Weighting of the penalisation in the partially covered cells:
+        //  volumeFraction (the default), where the rate times deltaT is
+        //  min(K, lambda/(1 - lambda)), so that the penalised velocity is
+        //  lambda*Ui + (1 - lambda)*U, or occupancy, where the rate is
+        //  K*lambda/deltaT
+        penaltyWeighting weighting_;
+
+        //- Coefficient C of the penalisation rate in the partially covered
+        //  cells with the volumeFraction weighting: the rate is
+        //  lambda/(1 - lambda)*C*(nu/w^2 + max(|Ui|, |U|)/w), where w is
+        //  the cell width. This cap has no explicit time-step dependence;
+        //  the fluid velocity is updated at each momentum assembly. The rate is
+        //  lambda/((1 - lambda)*deltaT) if C is not positive
+        scalar surfaceRateCoeff_;
+
+        //- Kinematic viscosity for the surface rate
+        scalar nu_;
+
+        //- Has the viscosity been set?
+        bool nuSet_;
+
+        //- Penalisation rate (1/s) in each cell
+        volScalarField kappa_;
+
+        // Ghost cell method
+
+            //- Distance of the image points from the surface, relative to
+            //  the cell width
+            scalar imageDistance_;
+
+            //- Velocity at the image points: cellPoint (interpolated, so
+            //  that the target varies continuously as the body moves) or
+            //  cell (the donor cell centre value)
+            imageInterpolationType imageInterpolation_;
+
+            //- Number of image point levels: the image points are at
+            //  (imageDistance + 0.5*level) cell widths from the surface
+            static const label nImageLevels_;
+
+            //- Penalised cells: those whose centre is inside a body
+            labelList insideCells_;
+
+            //- Cells penalised in the previous configuration, which hold the
+            //  body velocity rather than a fluid velocity, and so are not
+            //  donors
+            boolList penalisedOld_;
+
+            //- Ghost cells: penalised cells with a fluid neighbour
+            labelList ghostCells_;
+
+            //- Local donor fluid cell of each ghost cell, -1 if none
+            labelList ghostDonors_;
+
+            //- Is the donor of each ghost cell on another processor?
+            boolList ghostRemoteDonors_;
+
+            //- Nearest surface point, outward unit normal, body velocity at
+            //  the surface point and signed distance to it, for each ghost
+            //  cell
+            pointField ghostWallPoints_;
+            vectorField ghostNormals_;
+            vectorField ghostWallVelocities_;
+            scalarField ghostDistances_;
+
+            //- Ghost cells whose donor is on another processor: the ghost
+            //  index, and the donor processor, for each
+            labelList remoteGhosts_;
+            labelList remoteDonorProcs_;
+
+            //- Image point of each ghost cell with a local donor
+            pointField ghostImagePoints_;
+
+            //- Local donor cells sent to each processor, and their image
+            //  points
+            List<labelList> sendDonors_;
+            List<pointField> sendImagePoints_;
+
+            //- Remote ghost indices received from each processor, in the
+            //  order they are sent
+            List<labelList> recvGhosts_;
+
+            //- Velocity and position of the image point of each ghost cell,
+            //  gathered from the donor processor
+            vectorField ghostDonorU_;
+            pointField ghostDonorC_;
+
+        //- Coupling coefficient of the incremental method
         scalar couplingCoeff_;
 
         //- Occupancy threshold for a covered cell
@@ -250,6 +444,10 @@ class immersedBoundaryForce
         //  transportProperties after the option, so it is looked up on use
         scalar rho();
 
+        //- Kinematic viscosity for the surface rate: the nu entry, else the
+        //  nu entry of transportProperties
+        scalar nu();
+
         //- Move the bodies to the current time and calculate the occupancy
         void updateBodies(const bool move);
 
@@ -258,6 +456,41 @@ class immersedBoundaryForce
 
         //- Write the forces of the last completed time step
         void writeForces();
+
+        //- Set the penalisation rate and the velocity of the bodies
+        void setPenalty(const volVectorField& U);
+
+        //- Set the penalisation rate and the target velocity of the ghost
+        //  cell method
+        void setGhostCellPenalty(const volVectorField& U);
+
+        //- Bounding box span of a cell in the solved directions, zero in
+        //  the empty direction of a 2D mesh
+        vector solvedSpan(const label celli) const;
+
+        //- Find the ghost cells and their donors, after the bodies are
+        //  updated
+        void findGhostCells(const bool newTimeStep);
+
+        //- Find a donor fluid cell for the image points of a ghost cell,
+        //  given its surface point, normal and width, and the level of its
+        //  image point; -1 and nImageLevels_ if none
+        label findDonor
+        (
+            const point& wallPoint,
+            const vector& normal,
+            const scalar width,
+            const volScalarField& inside,
+            point& imagePoint,
+            label& level
+        ) const;
+
+        //- Gather the velocity and position of the image points of the
+        //  ghost cells
+        void gatherDonors(const volVectorField& U);
+
+        //- Reconstruct the target velocity of the ghost cells
+        void reconstructTargets(const volVectorField& U);
 
 
 public:

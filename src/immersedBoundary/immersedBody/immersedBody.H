@@ -23,11 +23,19 @@ Description
     file) and a prescribed motion.
 
     The body gives the solid volume fraction (occupancy) lambda of the cells
-    it covers, following the non-convex body of openHFDIB-DEM: the occupancy
-    of a cell is half the fraction of its vertices that are inside the surface
-    plus a half if its centre is inside the surface. Cells with an occupancy
-    greater than 1 - threshold are internal cells, and cells with an
-    occupancy greater than threshold are surface cells.
+    it covers:
+
+    - signedDistance (the default): lambda = 0.5 + d/w, clipped to [0, 1],
+      where d is the distance of the cell centre to the surface, positive
+      inside the body, and w is the width of the cell normal to the surface
+      (the width of its bounding box in the direction of the normal of the
+      nearest surface face). lambda varies continuously as the body moves.
+    - vertexFraction: half the fraction of the cell vertices inside the
+      surface, plus a half if the cell centre is inside the surface, as in
+      the non-convex body of openHFDIB-DEM.
+
+    Cells with an occupancy greater than 1 - threshold are internal cells, and
+    cells with an occupancy greater than threshold are surface cells.
 
     The surface is replicated on every processor, so every processor moves it
     identically and locates the cells of its own part of the mesh.
@@ -50,6 +58,9 @@ Description
         // Centre of rotation for the torque, optional, default the mean of
         // the reference surface points
         CofR        (0 0 0);
+
+        // Occupancy, optional, default signedDistance
+        occupancy   signedDistance;
     }
     \endverbatim
 
@@ -76,6 +87,7 @@ SourceFiles
 #define immersedBody_H
 
 #include "fvMesh.H"
+#include "Enum.H"
 #include "volFields.H"
 #include "triSurface.H"
 #include "triSurfaceSearch.H"
@@ -93,6 +105,11 @@ namespace Foam
 class immersedBody
 {
     // Private Data
+
+        //- Occupancy methods and dictionary names
+        enum occupancyMethod { signedDistance, vertexFraction };
+        static const Enum<occupancyMethod> occupancyNames_;
+
 
         //- Name of the body
         const word name_;
@@ -115,6 +132,10 @@ class immersedBody
         //- Centre of rotation for the torque, in the reference configuration
         const point CofR0_;
 
+        //- Occupancy from the signed distance of the cell centres to the
+        //  surface, rather than from the fraction of cell vertices inside
+        const bool signedDistance_;
+
         //- Time of the current configuration
         scalar time_;
 
@@ -123,6 +144,12 @@ class immersedBody
 
         //- Local cells partially covered by the body
         labelList surfaceCells_;
+
+        //- Local cells whose centre is inside the body
+        labelList insideCells_;
+
+        //- Smallest cell bounding box width in the solved directions
+        scalarField cellWidths_;
 
 
     // Private Member Functions
@@ -156,6 +183,16 @@ public:
 
     // Member Functions
 
+        // Static Functions
+
+            //- Width of a cell along a unit normal, given the span of its
+            //  bounding box
+            static scalar normalWidth(const vector& n, const vector& span)
+            {
+                return max(cmptSum(cmptMultiply(cmptMag(n), span)), VSMALL);
+            }
+
+
         // Access
 
             //- Name of the body
@@ -188,9 +225,38 @@ public:
                 return surfaceCells_;
             }
 
+            //- Local cells whose centre is inside the body
+            const labelList& insideCells() const
+            {
+                return insideCells_;
+            }
+
+            //- Cached cell widths, indexed by mesh cell
+            const scalarField& cellWidths() const
+            {
+                return cellWidths_;
+            }
+
             //- Centre of rotation for the torque, in the current
             //  configuration
             point CofR() const;
+
+            //- Velocity of the body at the points x
+            tmp<vectorField> velocity(const pointField& x) const
+            {
+                return motionPtr_->velocity(x, time_);
+            }
+
+            //- Nearest points on the surface to the points x, within the
+            //  distances sqrt(searchDistSqr), and the unit normals of the
+            //  nearest surface faces
+            void nearest
+            (
+                const pointField& x,
+                const scalarField& searchDistSqr,
+                List<pointIndexHit>& hits,
+                vectorField& normals
+            ) const;
 
 
         // Edit

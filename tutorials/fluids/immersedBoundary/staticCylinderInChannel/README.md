@@ -46,7 +46,7 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    couplingCoeff   0.8;
+    method          ghostCell;
 
     bodies
     {
@@ -58,8 +58,13 @@ immersedBoundary
 }
 ```
 
-The option forces the velocity of the cells covered by the cylinder towards
-the velocity of the cylinder, here zero. The method is described in
+With the ghost cell method, the option penalises, implicitly in the momentum
+equation, the difference between the velocity of the cells whose centre is
+inside the cylinder and a target velocity. The target is the velocity of the
+cylinder, here zero, except in the cells next to the fluid (the ghost cells),
+where it is extrapolated linearly along the surface normal from the fluid
+velocity at an image point outside the cylinder, so that the fluid velocity is
+zero on the surface. The method is described in
 `src/immersedBoundary/README.md`. The force on the cylinder is written every
 time step to `postProcessing/immersedBoundary/0/cylinder.dat`, and the solid
 volume fraction, target velocity and forcing fields are written as
@@ -95,19 +100,33 @@ coefficients in `forceCoeffs.pdf`.
 
 | `MESH_LEVEL` | Cells | Cells across $$D$$ | $$C_d$$ | $$C_l$$ |
 | ------------ | ----- | ------------------ | ------- | ------- |
-| 1 | 4 510 | 10 | 6.04 | 0.014 |
-| 2 | 18 040 | 20 | 6.42 | 0.018 |
-| 3 | 72 160 | 40 | 6.60 | 0.014 |
+| 1 | 4 510 | 10 | 5.42 | 0.012 |
+| 2 | 18 040 | 20 | 5.51 | 0.012 |
+| 3 | 72 160 | 40 | 5.55 | 0.011 |
 | Schäfer and Turek (1996) | | | 5.57–5.59 | 0.0104–0.0110 |
 
-The direct forcing of the immersed boundary method over-predicts the drag.
-The forcing in the cells partially covered by the cylinder (the surface cells)
-is multiplied by their solid volume fraction every time step, so the results
-depend on the coupling coefficient and the time step as well as on the mesh:
-for example, with `MESH_LEVEL=1`, a coupling coefficient of 0.2 gives
-$$C_d = 5.99$$, and a fixed time step of 0.00125 s gives $$C_d = 5.79$$. This
-behaviour is inherent to the method: the option reproduces the forces of the
-`pimpleHFDIBFoam` solver from which it is derived.
+The drag converges towards the reference with the cell size, with differences
+of 2.8%, 1.3% and 0.6% from 5.58. The results do not depend on the penalty
+coefficient, the number of pressure correctors, the time step or the number of
+processors: with `MESH_LEVEL=1`, fixed time steps of 0.002 s and 0.0005 s give
+$$C_d = 5.430$$ and $$C_d = 5.431$$, and with `MESH_LEVEL=2`, 1, 4 and 8
+processors give the same $$C_d$$ to the written precision.
+
+The other forcing methods of `immersedBoundaryForce` can be compared by
+editing `constant/fvOptions` (see `src/immersedBoundary/README.md`):
+
+- `method penalty;` (the default, which is more accurate for moving bodies):
+  $$C_d$$ = 5.24, 5.38 and 5.48 for `MESH_LEVEL` 1, 2 and 3;
+- `method penalty;`, `weighting occupancy;` and `occupancy vertexFraction;`:
+  $$C_d$$ = 5.45, 5.61 and 5.61;
+- `method incremental;`, `couplingCoeff 0.8;` and
+  `occupancy vertexFraction;`: $$C_d$$ = 6.04, 6.42 and 6.60.
+
+The `incremental` method is the direct forcing of the `pimpleHFDIBFoam`
+solver from which the option is derived. Its results also depend on the
+coupling coefficient, the time step and the number of pressure correctors: for
+example, with `MESH_LEVEL=1`, a coupling coefficient of 0.2 gives
+$$C_d = 5.99$$, and a fixed time step of 0.00125 s gives $$C_d = 5.79$$.
 
 ## References
 
