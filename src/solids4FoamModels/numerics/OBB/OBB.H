@@ -86,7 +86,7 @@ class OBB
 
     // Private Member Functions
 
-        //- Fit a principal-component box to the supplied points
+        //- Fit a principal-component box, or the axis-aligned box if smaller
         void makeOBB(const pointField& points);
 
         //- Fit a minimum-area in-plane box and extrude it along faceNormal
@@ -99,7 +99,7 @@ class OBB
             const scalar scaleFactor
         );
 
-        //- Calculate the point mean and symmetric covariance tensor
+        //- Calculate the point mean and scale-normalised covariance tensor
         static void calcCovariance
         (
             const pointField& points,
@@ -129,7 +129,7 @@ public:
 
     // Constructors
 
-        //- Construct a zero-sized box at the origin
+        //- Construct an empty box
         OBB();
 
         //- Construct an axis-aligned box from its centre and half-lengths
@@ -146,10 +146,11 @@ public:
         //- Construct from an axis-aligned bounding box
         OBB(const boundBox& box);
 
-        //- Fit a principal-component box to the supplied points
+        //- Fit the smaller of the principal-component and axis-aligned boxes;
+        //  an empty field gives an empty box
         OBB(const pointField& points);
 
-        //- Fit a principal-component box to a temporary point field
+        //- Fit a box as above to a temporary point field
         OBB(const tmp<pointField>& points);
 
         //- Construct a face box with positive and negative normal extrusion
@@ -189,7 +190,23 @@ public:
             }
 
 
+        // Edit
+
+            //- Expand each local half-length by the non-negative distance
+            void grow(const scalar distance);
+
+
         // Query
+
+            //- Return true if any half-length is negative (empty box)
+            //  Negative half-lengths or an inverted boundBox give an empty box
+            bool empty() const
+            {
+                return cmptMin(halfLength_) < 0;
+            }
+
+            //- Test containment with a relative round-off tolerance
+            bool contains(const point& p) const;
 
             //- Return true if this box overlaps the supplied box
             bool overlaps(const OBB& box) const;
