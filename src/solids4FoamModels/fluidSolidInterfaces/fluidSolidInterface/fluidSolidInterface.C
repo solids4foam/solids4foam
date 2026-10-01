@@ -847,7 +847,7 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 
     Info<< "Selecting fluidSolidInterface " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)
@@ -1237,6 +1237,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             maxDelta = delta;
         }
     }
+
+    fluid().preUpdateMesh();
 
     if (maxDelta < interfaceDeformationLimit())
     {
