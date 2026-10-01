@@ -27,6 +27,17 @@ License
 #include "Map.H"
 #include "OSspecific.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * //
+
+const Foam::Enum<Foam::immersedBody::occupancyMethod>
+Foam::immersedBody::occupancyNames_
+({
+    {signedDistance, "signedDistance"},
+    {vertexFraction, "vertexFraction"},
+    {cut, "cut"}
+});
+
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 Foam::triSurface Foam::immersedBody::readSurface
@@ -35,22 +46,20 @@ Foam::triSurface Foam::immersedBody::readSurface
     const fileName& f
 )
 {
-    fileName file(f);
-    file.expand();
+    const IOobject surfaceIO
+    (
+        "immersedBodySurface",
+        mesh.time().constant(),
+        "triSurface",
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE,
+        false
+    );
 
-    // The surface is read by every processor from the constant directory of
-    // the case, or of the mesh region of a multi-region case
-    if (!file.isAbsolute())
-    {
-        fileName dir(mesh.time().globalPath()/mesh.time().constant());
-
-        if (mesh.name() != polyMesh::defaultRegion)
-        {
-            dir = dir/mesh.name();
-        }
-
-        file = dir/"triSurface"/file;
-    }
+    // Resolve relative paths through the file handler, including distributed
+    // roots, with constant/triSurface as the base directory
+    const fileName file(triSurface::relativeFilePath(surfaceIO, f, true));
 
     if (!isFile(file))
     {
@@ -124,14 +133,19 @@ Foam::immersedBody::immersedBody
     CofRGiven_(dict.found("CofR")),
     signedDistance_
     (
-        dict.getOrDefault<word>("occupancy", "signedDistance")
-     == "signedDistance"
+        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
+     == signedDistance
     ),
-    cut_(dict.getOrDefault<word>("occupancy", "signedDistance") == "cut"),
+    cut_
+    (
+        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
+     == cut
+    ),
     time_(-GREAT),
     configuration_(-1),
     internalCells_(),
-    surfaceCells_()
+    surfaceCells_(),
+    cellWidths_(mesh.nCells(), Zero)
 {
     // The body is static unless a motion is given
     dictionary motionDict;
@@ -146,26 +160,6 @@ Foam::immersedBody::immersedBody
     }
 
     motionPtr_ = immersedBodyMotion::New(motionDict);
-
-    {
-        const word occupancy
-        (
-            dict.getOrDefault<word>("occupancy", "signedDistance")
-        );
-
-        if
-        (
-            occupancy != "signedDistance"
-         && occupancy != "vertexFraction"
-         && occupancy != "cut"
-        )
-        {
-            FatalIOErrorInFunction(dict)
-                << "Unknown occupancy " << occupancy << ": valid occupancies "
-                << "are signedDistance, vertexFraction and cut"
-                << exit(FatalIOError);
-        }
-    }
 
     // A body without a surface file is given its surface by a fluid-solid
     // interface (setReferenceSurface)
@@ -378,12 +372,32 @@ void Foam::immersedBody::addOccupancy
             );
         }
 
+        reduce(maxSpan, maxOp<vector>());
         surfaceBb.grow(maxSpan);
     }
 
     const labelList cells(mesh_.cellTree().findBox(surfaceBb));
 
     const labelListList& cellPoints = mesh_.cellPoints();
+
+    // Cache cell widths while calculating occupancy, also for vertexFraction
+    vectorField spans(cells.size());
+    cellWidths_.setSize(mesh_.nCells(), Zero);
+    const Vector<label>& solD = mesh_.solutionD();
+    forAll(cells, i)
+    {
+        spans[i] =
+            boundBox(mesh_.points(), cellPoints[cells[i]], false).span();
+        scalar width = GREAT;
+        for (direction d = 0; d < vector::nComponents; ++d)
+        {
+            if (solD[d] == 1)
+            {
+                width = min(width, spans[i][d]);
+            }
+        }
+        cellWidths_[cells[i]] = width;
+    }
 
     // For the vertex fraction occupancy, test each point of these cells once
     Map<label> pointToIndex;
@@ -467,15 +481,10 @@ void Foam::immersedBody::addOccupancy
     if (signedDistance_)
     {
         const pointField centres(mesh_.C(), cells);
-        const pointField& meshPoints = mesh_.points();
-
-        // Width of each cell bounding box in each direction
-        vectorField spans(cells.size());
+        // Search within each cell bounding box diagonal
         scalarField searchDistSqr(cells.size());
         forAll(cells, i)
         {
-            const boundBox cellBb(meshPoints, cellPoints[cells[i]], false);
-            spans[i] = cellBb.span();
             searchDistSqr[i] = magSqr(spans[i]);
         }
 
@@ -490,11 +499,10 @@ void Foam::immersedBody::addOccupancy
             if (nearest[i].hit())
             {
                 const vector& n = faceNormals[nearest[i].index()];
-                const scalar width = cmptSum(cmptMultiply(cmptMag(n), spans[i]));
+                const scalar width = normalWidth(n, spans[i]);
                 const scalar d = mag(nearest[i].hitPoint() - centres[i]);
 
-                distanceLambda[i] =
-                    0.5 + (centreInside[i] ? d : -d)/max(width, VSMALL);
+                distanceLambda[i] = 0.5 + (centreInside[i] ? d : -d)/width;
             }
             else
             {

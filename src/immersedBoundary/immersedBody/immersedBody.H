@@ -98,6 +98,7 @@ SourceFiles
 #define immersedBody_H
 
 #include "fvMesh.H"
+#include "Enum.H"
 #include "volFields.H"
 #include "triSurface.H"
 #include "triSurfaceSearch.H"
@@ -115,6 +116,11 @@ namespace Foam
 class immersedBody
 {
     // Private Data
+
+        //- Occupancy methods and dictionary names
+        enum occupancyMethod { signedDistance, vertexFraction, cut };
+        static const Enum<occupancyMethod> occupancyNames_;
+
 
         //- Name of the body
         const word name_;
@@ -166,6 +172,9 @@ class immersedBody
         //- Velocity of the surface points, for a deforming motion
         vectorField pointVelocities_;
 
+        //- Smallest cell bounding box width in the solved directions
+        scalarField cellWidths_;
+
 
     // Private Member Functions
 
@@ -210,6 +219,16 @@ public:
 
 
     // Member Functions
+
+        // Static Functions
+
+            //- Width of a cell along a unit normal, given the span of its
+            //  bounding box
+            static scalar normalWidth(const vector& n, const vector& span)
+            {
+                return max(cmptSum(cmptMultiply(cmptMag(n), span)), VSMALL);
+            }
+
 
         // Access
 
@@ -289,6 +308,12 @@ public:
                 return insideCells_;
             }
 
+            //- Cached cell widths, indexed by mesh cell
+            const scalarField& cellWidths() const
+            {
+                return cellWidths_;
+            }
+
             //- Centre of rotation for the torque, in the current
             //  configuration
             point CofR() const;
@@ -363,10 +388,10 @@ public:
 
         // Evaluation
 
-            //- Force on the fluid by the body, given by the immersed boundary
-            //  forcing f (an acceleration): -rho*sum(f*V) over the covered
-            //  cells. This is also the force on the body by the fluid,
-            //  excluding the inertia of the fluid inside the body
+            //- Force on the body by the fluid, opposite to the immersed
+            //  boundary forcing f (an acceleration): -rho*sum(f*V) over the
+            //  covered cells, excluding the inertia of the fluid inside the
+            //  body
             vector force(const volVectorField& f, const scalar rho) const;
 
             //- Torque about CofR corresponding to force

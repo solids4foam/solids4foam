@@ -1592,6 +1592,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         }
     }
 
+    fluid().preUpdateMesh();
+
     if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points

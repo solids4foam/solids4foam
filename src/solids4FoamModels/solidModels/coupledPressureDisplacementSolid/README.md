@@ -72,8 +72,8 @@ There is a single block-coupled path. This model does not read
 interpolated face fields when enabled.
 
 ```warning
-As in `unsNonLinGeomTotalLagSolid`, `solutionTolerance` is used as a relative
-tolerance in this model, not an absolute one.
+`solutionTolerance` is used as a relative tolerance in this model, not an
+absolute one.
 ```
 
 `K` is unusual in that it is re-read from the dictionary inside
@@ -86,7 +86,6 @@ The relevant inherited `solidModel` entries are:
 | --- | --- | --- |
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `stabilisation` | auto-created | Both sub-dictionaries are used |
@@ -101,11 +100,9 @@ oscillations.
 
 ### The mechanicalConstitutiveLaw framework
 
-Setting `useMechanicalConstitutiveLawManager yes;` in
-`coupledPressureDisplacementSolidCoeffs` takes the constitutive response from
-the mechanicalConstitutiveLaw framework instead of the legacy
-`mechanicalModel`. The same `mechanicalProperties` is read; the legacy-only
-`pressureDisplacement` entry is ignored.
+The constitutive response comes from the mechanicalConstitutiveLaw framework,
+read from `mechanicalProperties`. A law's `pressureDisplacement` entry, used
+by the former `mechanicalModel`, is ignored.
 
 The stress is the law's isochoric stress minus the solved pressure. The law's
 own volumetric response, `dU/dJ`, is discarded rather than added: the pressure
@@ -116,20 +113,20 @@ separate the two (`providesVolumetricSplit`) and evaluate at finite strain,
 as `neoHookeanElastic`, `GuccioneElastic` and `HolzapfelGasserOgdenElastic`
 do.
 
-This differs from the legacy path, where each law's `pressureDisplacement`
-mode supplies its own stress form, and they do not agree with each other:
-`neoHookeanElastic` uses `-c*p*I + mu*(b - I)/J` with `c = 3*nu/(1 + nu)`,
-which is not deviatoric, while `GuccioneElastic` uses the deviatoric form the
-framework uses. The linearised operator is unchanged on both paths, so in
-linear mode (`nonLinear false`) the two paths agree to round-off, and in
-nonlinear mode they differ by terms of the order of the compressibility. At
-`nu = 0.5` in `cylindricalPressureVessel` that is about 1e-4 in the probe
-displacement.
+This differs from the former `mechanicalModel`, now removed, where each
+law's `pressureDisplacement` mode supplied its own stress form, and they did
+not agree with each other: `neoHookeanElastic` used `-c*p*I + mu*(b - I)/J`
+with `c = 3*nu/(1 + nu)`, which is not deviatoric, while `GuccioneElastic`
+used the deviatoric form the framework uses. The linearised operator is the
+same, so in linear mode (`nonLinear false`) results agree with the former
+model's to round-off, and in nonlinear mode they differ by terms of the order
+of the compressibility. At `nu = 0.5` in `cylindricalPressureVessel` that is
+about 1e-4 in the probe displacement.
 
 `nu = 0.5` is supported: `neoHookeanElastic` then reports itself as
 incompressible, and the framework refuses any evaluation that would need its
 (infinite) bulk stiffness, so only a mixed formulation such as this one can
-use it. One material only on this path.
+use it. One material only.
 
 ### Required input files
 
@@ -156,7 +153,6 @@ coupledPressureDisplacementSolidCoeffs
     nCorrectors             2000;
     solutionTolerance       1e-7;
     alternativeTolerance    1e-06;
-    materialTolerance       1e-05;
     infoFrequency           1;
 
     stabilisation

@@ -54,14 +54,6 @@ namespace Foam
 
 class immersedBodyMotion
 {
-protected:
-
-    // Protected Data
-
-        //- Motion coefficients
-        const dictionary dict_;
-
-
 public:
 
     //- Runtime type information

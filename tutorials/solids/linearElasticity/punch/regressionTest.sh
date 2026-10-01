@@ -19,6 +19,19 @@ fi
 PUNCH_DISP_Z_MIN=-0.00025
 PUNCH_DISP_Z_MAX=-0.0002
 
+# The final punch dispZ of the removed legacy mechanicalModel, from the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d). The two materials are
+# handled differently - per-material sub-meshes on the legacy path, the
+# material-aware leastSquaresS4f gradient on one mesh on the framework - so the
+# two are different discretisations of the same problem, and the contact makes
+# the punch displacement the most sensitive quantity in the case to that
+# difference. Measured: 3.9e-4 on foam-extend 4.1, 6.7e-3 on OpenFOAM.com
+# v2512; the tolerance is the 1e-2 relative that allowed for it. This is
+# OpenFOAM.com v2512's; foam-extend 4.1's is 1.6e-3 smaller, inside it. The
+# case does not run on OpenFOAM.org
+REF_PUNCH_DISP_Z=-0.000226704
+PUNCH_DISP_Z_REL_TOL=1e-2
+
 ALLRUN_LOGFILE="log.Allrun"
 
 echo "============================================================"
@@ -85,6 +98,40 @@ if [[ -z "${punch_disp_z:-}" ]]; then
 fi
 
 failures=0
+
+# ------------------------------------------------------------
+# Against the legacy answer
+# ------------------------------------------------------------
+# Two materials in contact, so the one multi-material tutorial with contact:
+# it covers the contact penalty's registry lookup of impK on a multi-material
+# framework run, and the point displacement the contact geometry reads. More
+# than one material on the framework needs the material-aware gradient, which
+# the tutorial sets
+end_time=$(sed -n 's/^endTime[[:space:]]*\([^;]*\);.*/\1/p' \
+    "${CASE_DIR}/system/controlDict")
+final_time=$(awk 'END {print $1}' "${punch_file}")
+
+if ! grep -q "Selecting mechanical constitutive law" \
+    "${CASE_DIR}/log.solids4Foam" 2>/dev/null
+then
+    echo "FAIL: the case constructed no mechanical constitutive law"
+    failures=$((failures + 1))
+elif [[ -z "${end_time}" ]] \
+    || ! awk "BEGIN {exit !((${final_time} - ${end_time})^2 <= 1e-20)}"
+then
+    echo "FAIL: the case stopped at '${final_time}', not at the end time '${end_time}'"
+    failures=$((failures + 1))
+elif awk "BEGIN {d = ${punch_disp_z} - ${REF_PUNCH_DISP_Z}; \
+    exit !(${punch_disp_z} < 0 \
+        && d*d <= (${PUNCH_DISP_Z_REL_TOL}*${REF_PUNCH_DISP_Z})^2)}"
+then
+    printf "PASS: punchLoading dispZ matches the reference (%.6g vs %.6g)\n" \
+        "${punch_disp_z}" "${REF_PUNCH_DISP_Z}"
+else
+    printf "FAIL: punchLoading dispZ differs from the reference (%.6g vs %.6g)\n" \
+        "${punch_disp_z}" "${REF_PUNCH_DISP_Z}"
+    failures=$((failures + 1))
+fi
 
 if awk "BEGIN {exit !(${punch_disp_z} >= ${PUNCH_DISP_Z_MIN} && ${punch_disp_z} <= ${PUNCH_DISP_Z_MAX})}"; then
     printf "PASS: punchLoading dispZ = %.6g\n" "${punch_disp_z}"

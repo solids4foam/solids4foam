@@ -24,7 +24,6 @@ mechanical
     rubber
     {
         type GuccioneElastic;
-        pressureDisplacement yes;
 
         k k [ 1 -1 -2 0 0 0 0 ] 2000;
         cf 8;
@@ -33,12 +32,14 @@ mechanical
 
         // mu = 14000 Pa
 
-        impKcoeff 2;
-
-        calculateStressInLocalCoordinateSystem true; //ventricle mora s false
-
         rho  rho    [ 1 -3  0 0 0 0 0 ] 1000;
-        nu   nu     [ 0 0 0 0 0 0 0 ]   0.5;
+
+        // The penalty on volume change. coupledPressureDisplacementSolid
+        // solves the pressure itself and takes 1/bulkModulus as the
+        // compressibility of the pressure equation, so a bulk modulus this
+        // large makes the material fully incompressible, as nu = 0.5 did for
+        // the former mechanicalModel
+        bulkModulus bulkModulus [ 1 -1 -2 0 0 0 0 ] 1e15;
     }
 
     // rubber

@@ -510,6 +510,10 @@ public:
             }
 #endif
 
+            //- Prepare finite volume models for a mesh update
+            virtual void preUpdateMesh()
+            {}
+
             //- Non-const access to the fsiMeshUpdate flag
             virtual bool& fsiMeshUpdate()
             {
