@@ -15,8 +15,7 @@ sort: 3
 ## Case Overview
 
 A fluid flows through a two-dimensional channel over a plate that is heated
-from below. The set-up resembles the forced-convection conjugate heat transfer
-problem of Vynnycky et al. [1].
+from below.
 
 The fluid region is a channel of length `3.5 m` ($$-0.5 \le x \le 3$$ m) and
 height `0.5 m`. The fluid enters at the `inlet` with a uniform velocity of
@@ -74,11 +73,3 @@ the included script from this directory:
 
 The script creates the solid and fluid meshes with `blockMesh` and then runs
 the `solids4Foam` solver. The case can be cleaned with `./Allclean`.
-
-## References
-
-[1]
-[M. Vynnycky, S. Kimura, K. Kanev, and I. Pop, "Forced convection heat
-transfer from a flat plate: the conjugate problem", International Journal of
-Heat and Mass Transfer, 41(1), 45-59,
-1998.](https://doi.org/10.1016/S0017-9310(97)00113-0)

@@ -59,10 +59,11 @@ time `4`. The stress-free reference temperature is `T0 = 0 K`.
 
 ## Expected Results
 
-The temperature is uniform at each time, so a single-material cylinder would
-expand freely without stress. Here, the stresses come from the mismatch
-between the thermal expansion of the two materials: the aluminium expands more
-than the steel. At the final time (`90 K`), the maximum equivalent (von Mises)
+The temperature is uniform at each time. The stresses reflect both the
+plane-strain constraint and the mismatch in thermal expansion between the
+two materials: the aluminium expands more than the steel. Even a
+single-material cylinder can develop thermal stress under the plane-strain
+constraint. At the final time (`90 K`), the maximum equivalent (von Mises)
 stress reported by the solver is approximately `182 MPa` and the maximum
 equivalent strain is approximately `1.5e-3`.
 
