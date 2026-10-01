@@ -20,6 +20,8 @@ License
 #include "NewmarkBetaD2dt2Scheme.H"
 #include "fvMatrices.H"
 #include "calculatedFvPatchFields.H"
+#include "compatibilityFunctions.H"
+#include "fvcD2dt2.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -32,6 +34,25 @@ namespace fv
 {
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+template<class Type>
+word NewmarkBetaD2dt2Scheme<Type>::startTimeName() const
+{
+    // The name of the start time directory, rather than the start time
+    // written with the current timePrecision, which differs from it if the
+    // directory was written with more digits
+    const Time& runTime = mesh().time();
+    const scalar startTime = runTime.startTime().value();
+    const instant closest = runTime.findClosestTime(startTime);
+
+    if (mag(closest.value() - startTime) < 0.5*runTime.deltaTValue())
+    {
+        return closest.name();
+    }
+
+    return runTime.timeName(startTime);
+}
+
 
 template<class Type>
 GeometricField<Type, fvPatchField, volMesh>&
@@ -53,7 +74,7 @@ NewmarkBetaD2dt2Scheme<Type>::stateField
     IOobject io
     (
         name,
-        mesh.time().timeName(mesh.time().startTime().value()),
+        startTimeName(),
         mesh,
         IOobject::MUST_READ,
         IOobject::AUTO_WRITE
@@ -125,7 +146,13 @@ void NewmarkBetaD2dt2Scheme<Type>::updateState
     const scalar deltaT = runTime.deltaTValue();
     const bool firstStep = (runTime.timeIndex() == runTime.startTimeIndex());
     const scalar t0 = firstStep ? runTime.value() : runTime.value() - deltaT;
-    const fieldType& vf0 = firstStep ? vf : vf.oldTime();
+
+    // Request the old-time field on the first call too, as the Euler and
+    // backward schemes do, so that it is stored from then on at the start of
+    // each time-step, before the field is changed, for example by a boundary
+    // condition or a fluid-solid interface update
+    const fieldType& vfOld = vf.oldTime();
+    const fieldType& vf0 = firstStep ? vf : vfOld;
 
     // Tolerance for comparing times
     const scalar tol = 1e-6*deltaT + 1e-12*mag(runTime.value());
@@ -143,7 +170,7 @@ void NewmarkBetaD2dt2Scheme<Type>::updateState
         IOobject lagIO
         (
             lagName,
-            runTime.timeName(startTime),
+            startTimeName(),
             mesh,
             IOobject::MUST_READ,
             IOobject::NO_WRITE,
@@ -172,7 +199,7 @@ void NewmarkBetaD2dt2Scheme<Type>::updateState
             {
                 WarningInFunction
                     << lagName << " was not found at the start time "
-                    << runTime.timeName(startTime) << ": the " << type()
+                    << startTimeName() << ": the " << type()
                     << " velocity and acceleration of " << vfName
                     << " are initialised from NewmarkV(" << vfName
                     << ") and NewmarkA(" << vfName << ") if present, and "
@@ -361,25 +388,51 @@ scalar NewmarkBetaD2dt2Scheme<Type>::diagCoeff() const
 
 
 template<class Type>
+const GeometricField<Type, fvPatchField, volMesh>&
+NewmarkBetaD2dt2Scheme<Type>::state
+(
+    const word& prefix,
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+) const
+{
+    return mesh().template
+        lookupObject<GeometricField<Type, fvPatchField, volMesh> >
+        (
+            prefix + '(' + vf.name() + ')'
+        );
+}
+
+
+template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh> >
 NewmarkBetaD2dt2Scheme<Type>::explicitPart
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf
 ) const
 {
-    typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
-
     updateState(vf);
 
-    const word& vfName = vf.name();
-    const objectRegistry& db = mesh();
+    return explicitPart
+    (
+        vf.name(),
+        state("NewmarkV", vf),
+        state("NewmarkA", vf),
+        state("NewmarkD", vf)
+    );
+}
 
-    const fieldType& U =
-        db.lookupObject<fieldType>("NewmarkV(" + vfName + ')');
-    const fieldType& A =
-        db.lookupObject<fieldType>("NewmarkA(" + vfName + ')');
-    const fieldType& D =
-        db.lookupObject<fieldType>("NewmarkD(" + vfName + ')');
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh> >
+NewmarkBetaD2dt2Scheme<Type>::explicitPart
+(
+    const word& vfName,
+    const GeometricField<Type, fvPatchField, volMesh>& U,
+    const GeometricField<Type, fvPatchField, volMesh>& A,
+    const GeometricField<Type, fvPatchField, volMesh>& D
+) const
+{
+    typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
 
     const dimensionedScalar deltaT = mesh().time().deltaT();
     const dimensionedScalar c
@@ -414,22 +467,16 @@ NewmarkBetaD2dt2Scheme<Type>::acceleration
 {
     typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
 
-    const tmp<fieldType> texplicit = explicitPart(vf);
+    updateState(vf);
+
+    const fieldType& A = state("NewmarkA", vf);
 
     const Time& runTime = mesh().time();
 
     if (runTime.timeIndex() == runTime.startTimeIndex())
     {
         // Before the first time-step, return the initial acceleration
-        const objectRegistry& db = mesh();
-
-        return tmp<fieldType>
-        (
-            new fieldType
-            (
-                db.lookupObject<fieldType>("NewmarkA(" + vf.name() + ')')
-            )
-        );
+        return tmp<fieldType>(new fieldType(A));
     }
 
     const dimensionedScalar c
@@ -437,7 +484,12 @@ NewmarkBetaD2dt2Scheme<Type>::acceleration
         "c", dimless/dimTime/dimTime, diagCoeff()
     );
 
-    return c*vf - texplicit;
+    return
+        c*vf
+      - explicitPart
+        (
+            vf.name(), state("NewmarkV", vf), A, state("NewmarkD", vf)
+        );
 }
 
 
@@ -479,10 +531,100 @@ NewmarkBetaD2dt2Scheme<Type>::NewmarkBetaD2dt2Scheme
             << ", gamma = " << gamma_ << " and alphaM = " << alphaM_
             << exit(FatalIOError);
     }
+
+    // Warn, once, about coefficients outside the documented ranges, where
+    // the scheme is not unconditionally stable or adds negative damping. The
+    // scheme is constructed for every fvm::d2dt2 and fvc::d2dt2 call
+    static bool warned = false;
+
+    if (!warned)
+    {
+        warned = true;
+
+        if (gamma_ < 0.5)
+        {
+            WarningInFunction
+                << "gamma = " << gamma_ << " < 1/2: the " << type()
+                << " scheme amplifies the motion (negative numerical "
+                << "damping)" << endl;
+        }
+
+        if (beta_ < 0.5*gamma_)
+        {
+            WarningInFunction
+                << "beta = " << beta_ << " < gamma/2 = " << 0.5*gamma_
+                << ": the " << type() << " scheme is only conditionally "
+                << "stable" << endl;
+        }
+
+        if (alphaM_ < -1.0/3.0 || alphaM_ > 0)
+        {
+            WarningInFunction
+                << "alphaM = " << alphaM_ << " is outside the Bossak range "
+                << "-1/3 <= alphaM <= 0" << endl;
+        }
+    }
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh> >
+NewmarkBetaD2dt2Scheme<Type>::physicalAcceleration
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+)
+{
+    typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
+
+    tmp<fieldType> ta = fvc::d2dt2(vf);
+
+    // fvc::d2dt2 reads its scheme from ddtSchemes (issue #502)
+    const fvMesh& mesh = vf.mesh();
+    const word name("d2dt2(" + vf.name() + ')');
+
+#ifdef OPENFOAM_NOT_EXTEND
+    ITstream& is = mesh.ddtScheme(name);
+#else
+    ITstream& is = mesh.schemesDict().ddtScheme(name);
+#endif
+
+    const word schemeName(is);
+
+    scalar alphaM = 0;
+
+    if (schemeName == typeName)
+    {
+        // The optional coefficients: beta, gamma and alphaM
+        for (label coeffI = 0; coeffI < 3 && !is.eof(); ++coeffI)
+        {
+            const scalar coeff = readScalar(is);
+
+            if (coeffI == 2)
+            {
+                alphaM = coeff;
+            }
+        }
+    }
+
+    is.rewind();
+
+    if (alphaM == 0)
+    {
+        return ta;
+    }
+
+    // d2dt2 is the Bossak-weighted (1 - alphaM) a^{n+1} + alphaM a^n, and
+    // the stored NewmarkA is a^n once the state has been updated in this
+    // time-step, as fvc::d2dt2 did above; before the first time-step, both
+    // are the initial acceleration
+    const fieldType& A =
+        mesh.template lookupObject<fieldType>("NewmarkA(" + vf.name() + ')');
+
+    return (ta - alphaM*A)/(1.0 - alphaM);
+}
+
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh> >
@@ -491,21 +633,11 @@ NewmarkBetaD2dt2Scheme<Type>::fvcD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    return tmp<GeometricField<Type, fvPatchField, volMesh> >
-    (
-        new GeometricField<Type, fvPatchField, volMesh>
-        (
-            IOobject
-            (
-                "d2dt2(" + vf.name() + ')',
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            acceleration(vf)
-        )
-    );
+    tmp<GeometricField<Type, fvPatchField, volMesh> > tacc = acceleration(vf);
+
+    tmpRef(tacc).rename("d2dt2(" + vf.name() + ')');
+
+    return tacc;
 }
 
 
@@ -517,21 +649,12 @@ NewmarkBetaD2dt2Scheme<Type>::fvcD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    return tmp<GeometricField<Type, fvPatchField, volMesh> >
-    (
-        new GeometricField<Type, fvPatchField, volMesh>
-        (
-            IOobject
-            (
-                "d2dt2(" + rho.name() + ',' + vf.name() + ')',
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            rho*acceleration(vf)
-        )
-    );
+    tmp<GeometricField<Type, fvPatchField, volMesh> > tacc =
+        rho*acceleration(vf);
+
+    tmpRef(tacc).rename("d2dt2(" + rho.name() + ',' + vf.name() + ')');
+
+    return tacc;
 }
 
 
@@ -551,11 +674,7 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
         )
     );
 
-#ifdef FOAMEXTEND
-    fvMatrix<Type>& fvm = tfvm();
-#else
-    fvMatrix<Type>& fvm = tfvm.ref();
-#endif
+    fvMatrix<Type>& fvm = tmpRef(tfvm);
 
     checkFvcScheme("d2dt2(" + vf.name() + ')');
 
@@ -564,11 +683,7 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
         explicitPart(vf);
 
     fvm.diag() = diagCoeff()*V;
-#ifdef FOAMEXTEND
-    fvm.source() = V*texplicit().internalField();
-#else
-    fvm.source() = V*texplicit().primitiveField();
-#endif
+    fvm.source() = V*primitiveField(texplicit());
 
     return tfvm;
 }
@@ -591,11 +706,7 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
         )
     );
 
-#ifdef FOAMEXTEND
-    fvMatrix<Type>& fvm = tfvm();
-#else
-    fvMatrix<Type>& fvm = tfvm.ref();
-#endif
+    fvMatrix<Type>& fvm = tmpRef(tfvm);
 
     checkFvcScheme("d2dt2(" + vf.name() + ')');
 
@@ -604,11 +715,7 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
         explicitPart(vf);
 
     fvm.diag() = diagCoeff()*rho.value()*V;
-#ifdef FOAMEXTEND
-    fvm.source() = rho.value()*V*texplicit().internalField();
-#else
-    fvm.source() = rho.value()*V*texplicit().primitiveField();
-#endif
+    fvm.source() = rho.value()*V*primitiveField(texplicit());
 
     return tfvm;
 }
@@ -631,11 +738,7 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
         )
     );
 
-#ifdef FOAMEXTEND
-    fvMatrix<Type>& fvm = tfvm();
-#else
-    fvMatrix<Type>& fvm = tfvm.ref();
-#endif
+    fvMatrix<Type>& fvm = tmpRef(tfvm);
 
     checkFvcScheme("d2dt2(" + rho.name() + ',' + vf.name() + ')');
 
@@ -644,15 +747,9 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
         explicitPart(vf);
 
     // The current density multiplies the acceleration
-#ifdef FOAMEXTEND
-    const scalarField& rhoI = rho.internalField();
+    const scalarField& rhoI = primitiveField(rho);
     fvm.diag() = diagCoeff()*rhoI*V;
-    fvm.source() = rhoI*V*texplicit().internalField();
-#else
-    const scalarField& rhoI = rho.primitiveField();
-    fvm.diag() = diagCoeff()*rhoI*V;
-    fvm.source() = rhoI*V*texplicit().primitiveField();
-#endif
+    fvm.source() = rhoI*V*primitiveField(texplicit());
 
     return tfvm;
 }

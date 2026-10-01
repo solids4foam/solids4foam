@@ -94,10 +94,12 @@ Description
     acceleration: the initial acceleration, or, on restart, that of the time
     before the last completed time-step.
 
-    With alphaM != 0, fvc::d2dt2 returns the Bossak-weighted acceleration,
-    which the momentum residual needs, also where the physical acceleration is
-    meant, for example in solidModel::faceZoneAcceleration. The difference is
-    alphaM*(a^n - a^{n+1}), which is small for a resolved motion.
+    With alphaM != 0, fvc::d2dt2 returns the Bossak-weighted acceleration
+    (1 - alphaM) a^{n+1} + alphaM a^n, which the momentum residual needs.
+    Where the physical acceleration a^{n+1} is meant, such as the interface
+    acceleration passed to the fluid (solidModel::faceZoneAcceleration) and
+    the acceleration of the total Lagrangian solid model, it is recovered
+    with physicalAcceleration().
 
     The time-step may vary. The scheme is not implemented for a moving mesh,
     or for the updated Lagrangian solid models, which evaluate
@@ -206,6 +208,9 @@ class NewmarkBetaD2dt2Scheme
 
     // Private Member Functions
 
+        //- Return the name of the start time directory
+        word startTimeName() const;
+
         //- Return the named state field, creating it if needed: it is read
         //  if present, and is otherwise initialised to the given value
         GeometricField<Type, fvPatchField, volMesh>& stateField
@@ -228,11 +233,30 @@ class NewmarkBetaD2dt2Scheme
         //- Return the coefficient of u^{n+1} in d2dt2(u)
         scalar diagCoeff() const;
 
+        //- Return the state field prefix(u), e.g. NewmarkA(u), which must
+        //  exist
+        const GeometricField<Type, fvPatchField, volMesh>& state
+        (
+            const word& prefix,
+            const GeometricField<Type, fvPatchField, volMesh>& vf
+        ) const;
+
         //- Return the explicit part of d2dt2(u), so that
-        //  d2dt2(u) = diagCoeff()*u^{n+1} - explicitPart(u)
+        //  d2dt2(u) = diagCoeff()*u^{n+1} - explicitPart(u), after updating
+        //  the state
         tmp<GeometricField<Type, fvPatchField, volMesh> > explicitPart
         (
             const GeometricField<Type, fvPatchField, volMesh>& vf
+        ) const;
+
+        //- Return the explicit part of d2dt2(u) from the given state: the
+        //  velocity U, the acceleration A and the field D
+        tmp<GeometricField<Type, fvPatchField, volMesh> > explicitPart
+        (
+            const word& vfName,
+            const GeometricField<Type, fvPatchField, volMesh>& U,
+            const GeometricField<Type, fvPatchField, volMesh>& A,
+            const GeometricField<Type, fvPatchField, volMesh>& D
         ) const;
 
         //- Return d2dt2(u), or the initial acceleration before the first
@@ -268,6 +292,17 @@ public:
         {
             return fv::d2dt2Scheme<Type>::mesh();
         }
+
+        //- Return the physical acceleration of vf, a^{n+1}. With the
+        //  Bossak-alpha method (alphaM != 0), fvc::d2dt2 returns the weighted
+        //  (1 - alphaM) a^{n+1} + alphaM a^n, which the momentum residual
+        //  needs; this recovers a^{n+1} from it. For any other d2dt2 scheme,
+        //  it returns fvc::d2dt2(vf)
+        static tmp<GeometricField<Type, fvPatchField, volMesh> >
+        physicalAcceleration
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf
+        );
 
         tmp<GeometricField<Type, fvPatchField, volMesh> > fvcD2dt2
         (
