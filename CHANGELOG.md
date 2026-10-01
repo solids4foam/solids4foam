@@ -69,6 +69,10 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `Allwmake` and `Allwclean` now stop with an error when an unsupported
+  OpenFOAM version is sourced, listing the supported versions, where before
+  they printed a warning and carried on.
+
 - `OgdenElastic` assembles its Cauchy stress along the principal directions
   of the left Cauchy-Green tensor, the spatial ones. It used the right
   tensor's, the material ones, so under a stretch with a finite rotation the
@@ -167,6 +171,12 @@ release. For complete commit-level details and contributor information, see the
   selects this option.
 
 ### Removed
+
+- OpenFOAM.com versions older than v2312 (v2306, v2212, v2206, v2112, v2106
+  and v2012) are no longer supported and are removed from the versions
+  `Allwmake` and `Allwclean` accept. The source no longer compiles against
+  them, and the build workflows cover v2312 and newer only. The code paths
+  that were kept for them are removed.
 
 - **Breaking:** the legacy `mechanicalModel` is removed - `mechanicalModel`,
   `dualMechanicalModel`, `solidSubMeshes`, `mechanicalLaw` and every legacy
