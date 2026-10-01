@@ -1,6 +1,6 @@
 # Drag and lift coefficients of the bending immersed beam, compared with those
 # of the body-fitted solution with a deforming mesh
-# (verificationData/CdBodyFitted.dat)
+# (verification/reference/CdBodyFitted.dat)
 #
 # Cd = 2 Fx/(rho Umean^2 H Lz), with rho = 1 kg/m^3, the mean inlet velocity
 # Umean = 1 m/s, the beam height H = 2.0295 m and Lz = 0.1 m, i.e.
@@ -10,7 +10,7 @@ set terminal pdfcairo enhanced color font "Helvetica,12" size 6,6
 set output "forceCoeffs.pdf"
 
 forceFile = "postProcessing/immersedBoundary/0/beam.dat"
-refFile = "verificationData/CdBodyFitted.dat"
+refFile = "verification/reference/CdBodyFitted.dat"
 
 set multiplot layout 2,1
 

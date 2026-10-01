@@ -78,7 +78,7 @@ every time step to `postProcessing/immersedBoundary/0/beam.dat`: columns 2-4
 are the force from the surface traction, and columns 11-13 that from the
 momentum exchange.
 
-The reference, in `verificationData/CdBodyFitted.dat`, is the solution of
+The reference, in `verification/reference/CdBodyFitted.dat`, is the solution of
 `pimpleFoam` on a body-fitted mesh deformed with the beam by a Laplacian
 motion solver, from the embedded beam case of Sairam Pamulaparthi Venkata
 (solids4foam/cardiacFoam#20), with twice as many cells in each direction and
