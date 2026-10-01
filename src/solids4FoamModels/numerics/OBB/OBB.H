@@ -199,6 +199,7 @@ public:
         // Query
 
             //- Return true if any half-length is negative (empty box)
+            //  Negative half-lengths or an inverted boundBox give an empty box
             bool empty() const
             {
                 return cmptMin(halfLength_) < 0;

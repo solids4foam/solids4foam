@@ -61,7 +61,7 @@ void Foam::OBB::calcCovariance
             lengthScale, cmptMax(cmptMag(points[pointI] - mean))
         );
     }
-    if (lengthScale == 0)
+    if (lengthScale < VSMALL)
     {
         return;
     }
@@ -180,7 +180,7 @@ void Foam::OBB::makeOBB(const pointField& points)
       + covariance.zz()*covariance.xx()
       - sqr(covariance.xy()) - sqr(covariance.xz()) - sqr(covariance.yz());
 
-    if (trace == 0)
+    if (trace < VSMALL)
     {
         axes_ = tensor::I;
     }
