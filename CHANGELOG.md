@@ -8,19 +8,30 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
-- Framework regression arms for `squarePlate`, `cantilever2d`, `thermalCavity`,
-  `curvedBeams` and `3dTube`. Each runs its tutorial on both implementations
-  and asserts that each arm took the path it was set up for before comparing
-  them. `curvedBeams` and `3dTube` are the first coverage of the `impK`
-  registry lookup that the contact penalty models, the cohesive zone models
-  and `elasticWallPressure` all depend on; `thermalCavity` is the first
-  framework arm under `thermoFluidSolidInteraction`; and `cantilever2d`'s
-  `unsCoupled` arms are the first regression coverage of
-  `coupledUnsLinearGeometryLinearElastic` on either implementation.
-- `cantilever2d` regression arms for `vertexCentredLinearGeometry`, on both
-  implementations, which no regression case ran before. The legacy and
-  framework results are compared field by field, for the PETSc SNES path and
-  for a short run of the explicit path, which no tutorial exercises.
+- A documentation page for each `mechanicalConstitutiveLaw`, next to its
+  class, giving its entries and defaults, its state, its tangents, whether it
+  supports the mixed displacement-pressure formulation, how it differs from
+  the removed legacy law, and the tutorials that use it, with an index in the
+  material models page. The legacy laws' pages were removed with them.
+
+- The `mechanicalConstitutiveLaw` history, such as the plastic strain, is
+  written at each write time as volFields named after the variable
+  (`epsilonPEq`, `epsilonP`, `sigmaY` and so on), so that it can be viewed in
+  ParaView as the legacy laws' fields could. They cover every material that
+  declares the variable and are zero in the others' cells, carry no
+  dimensions, and are written, not read: the restart files remain the
+  authoritative copy.
+
+- Regression coverage of the `mechanicalConstitutiveLaw` framework in
+  `squarePlate`, `cantilever2d`, `thermalCavity`, `curvedBeams` and `3dTube`,
+  each held to the answer of the removed legacy model. `curvedBeams` and
+  `3dTube` are the first coverage of the `impK` registry lookup that the
+  contact penalty models, the cohesive zone models and `elasticWallPressure`
+  all depend on, and `cantilever2d`'s `unsCoupled` case is the first
+  regression coverage of `coupledUnsLinearGeometryLinearElastic`.
+- `cantilever2d` regression cases for `vertexCentredLinearGeometry`, which no
+  regression case ran before, on the PETSc SNES path and a short run of the
+  explicit path, which no tutorial exercises.
 - Added `tests/precice`, which runs solids4foam's preCICE coupling cases from
   the [preCICE tutorials](https://github.com/precice/tutorials) against the
   current source and checks them against stored reference values. The preCICE
@@ -41,39 +52,97 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
+- Added the `immersedBoundary` library (OpenFOAM.com only) with the
+  `immersedBoundaryForce` finite volume option for bodies with a prescribed
+  motion, given as closed surfaces, in incompressible flow. It works with the
+  `pimpleFluid` fluid model and the `pimpleFoam` solver. The default forcing
+  is an implicit volume penalisation weighted by the solid volume fraction,
+  which is found from the signed distance to the surface, with a
+  penalisation rate in the partially covered cells that does not depend on
+  the time step. For static bodies, `method ghostCell` penalises the cells
+  whose centre is inside a body, with the velocity of the cells next to the
+  fluid extrapolated linearly from an image point in the fluid, so that the
+  velocity equals the body velocity on the surface. The explicit direct
+  forcing of openHFDIB-DEM is available as `method incremental`, for
+  comparison. The option is based on the immersed boundary code contributed to
+  cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and
+  openHFDIB; see `src/immersedBoundary/README.md` for the provenance. Added the
+  `fluids/immersedBoundary/staticCylinderInChannel` and
+  `fluids/immersedBoundary/oscillatingCylinderInChannel` tutorials, with
+  regression tests.
+- Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
+  by the `meanVelocityForce` finite volume option, compared with the plane
+  Poiseuille solution, with a `regressionTest.sh`.
 
 ### Changed
 
-- The `mechanicalConstitutiveLaw` framework no longer requires the legacy
-  `mechanicalModel` it replaces. `solidModel` reads
-  `constant/mechanicalProperties` itself and hands it to whichever
-  implementation is in use, where previously the manager was built from the
-  legacy model, so every framework run constructed the whole legacy hierarchy
-  and every legacy law. Reaching the legacy model on a framework run is now a
-  fatal error rather than a silent fallback, for every solid model.
+- `Allwmake` and `Allwclean` now stop with an error when an unsupported
+  OpenFOAM version is sourced, listing the supported versions, where before
+  they printed a warning and carried on.
+
+- `OgdenElastic` assembles its Cauchy stress along the principal directions
+  of the left Cauchy-Green tensor, the spatial ones. It used the right
+  tensor's, the material ones, so under a stretch with a finite rotation the
+  stress was rotated back by the rotation and the law was not objective. No
+  tutorial selects it; results of a case with large rotations change. Its
+  scalar tangent now uses the small-strain shear modulus,
+  `0.5*(mu1*alpha1 + mu2*alpha2 + mu3*alpha3)`, where it used
+  `mu1 + mu2 + mu3`; that changes the iterations, not the answer.
+- `linearElasticMohrCoulombPlastic` refuses a friction angle below 1e-3
+  degrees in magnitude again, as the legacy law did: the apex of the
+  Mohr-Coulomb surface moves to infinity in that limit and the law's derived
+  parameters divide by zero. Its deviatoric scalar tangent is `(4/3)*mu`, as
+  for `linearElastic`, and so is `OgdenElastic`'s.
+- `linearElasticMisesPlastic` normalises its Newton residual for nonlinear
+  hardening by the largest strain over every rank, as
+  `neoHookeanElasticMisesPlastic` already did, so the plastic update no
+  longer depends on the decomposition. No tutorial uses the nonlinear
+  hardening branch.
+- A prescribed field or coupling input, such as a residual stress or a
+  temperature, reaches an integration point shared by several cells in a way
+  that no longer depends on the cell ordering or the decomposition. A point on
+  a mesh face - including every point of the compact face topology the
+  high-order path uses - takes the interpolated face value, as a face-centred
+  point already did, and a processor face forms it from the neighbour values
+  the rank holds. A point-centred point takes the average of the law's cells
+  around it. Both took the value of whichever cell was visited last.
+- A law dictionary that still sets an entry only the removed legacy laws read,
+  such as `pressureDisplacement`, `impKcoeff`, `tangentEps`, `regionName` or
+  `pressureFieldRegion`, gives a warning naming it; the entries were ignored
+  silently.
+
+- The coupling inputs a `mechanicalConstitutiveLaw` reads, such as the
+  active tension of `electroMechanicalLaw` or the temperature of
+  `thermoMechanicalLaw`, are gathered on every evaluation path, where before
+  only the small-strain cell paths gathered them and the others stopped. So
+  `electroMechanicalLaw` with `activeTensionFromField yes` now runs under the
+  finite-strain solid models, which are the only ones it supports. With the
+  switch off, the law uses its ramped constant and the run warns once if a
+  field of that name is registered: unlike the removed legacy law, a
+  registered `Ta` is not picked up unasked.
+- The restart files of the `mechanicalConstitutiveLaw` history are named
+  `<material>_<topology>_<variable>`, where the development branch had
+  colons, which Windows file systems, archive tools and CI artifact uploads
+  refuse. A history-dependent case written by a development build from before
+  this change, such as `perforatedPlate`, cannot be restarted from those
+  times: the run stops because the renamed field is missing. Rename the files
+  in the restart time directory, replacing each `:` with `_`, or rerun from
+  the start. No release wrote the old names.
+
 - `vertexCentredLinearGeometry` takes its whole constitutive response from the
-  `mechanicalConstitutiveLaw` framework when
-  `useMechanicalConstitutiveLawManager` is set: the residual stress at the dual
-  mesh faces, on the PETSc SNES and explicit paths alike, as well as the
-  Jacobian tangent, the cell stress and the stiffness behind the default
-  `fixedDofScale` and the explicit time step. It previously refused the
-  switch, and it no longer constructs the legacy `mechanicalModel` or
-  `dualMechanicalModel` on a framework run. More than one material is
-  supported on the framework path. The legacy path of this model does not
-  manage it: with more than one material, constructing its dual-mesh laws
-  stops with "SubMesh not found when looking for a field in the base mesh".
+  `mechanicalConstitutiveLaw` framework: the residual stress at the dual mesh
+  faces, on the PETSc SNES and explicit paths alike, as well as the Jacobian
+  tangent, the cell stress and the stiffness behind the default
+  `fixedDofScale` and the explicit time step. More than one material is now
+  supported; the removed legacy path stopped with "SubMesh not found when
+  looking for a field in the base mesh".
 - `kirchhoffPlate`, `coupledUnsLinearGeometryLinearElastic` and `thermalSolid`
-  accept `useMechanicalConstitutiveLawManager`. The first two read material
-  constants from a single isotropic linear elastic law rather than asking it
-  for a stress - a plate has one bending stiffness, and the block-coupled
-  solver assembles one set of Lame constants - so both keep that restriction
-  and only change where the constants come from.
-- `kirchhoffPlate` no longer reports or tests a material residual. It admits
-  only `linearElastic`, which does not override `mechanicalLaw::residual()`,
-  and that returns zero, so the value was always zero and its convergence test
-  always passed. The `matRes` column is gone from its residual output.
-- On foam-extend, a `mechanicalConstitutiveLaw` framework run with more than
-  one material now runs, in `linearGeometryTotalDisplacement`,
+  take their material from the `mechanicalConstitutiveLaw` framework. The
+  first two read material constants from a single isotropic linear elastic law
+  rather than asking it for a stress - a plate has one bending stiffness, and
+  the block-coupled solver assembles one set of Lame constants - so both keep
+  that restriction.
+- On foam-extend, a run with more than one material now runs, in `linearGeometryTotalDisplacement`,
   `nonLinearGeometryTotalLagrangianTotalDisplacement`,
   `nonLinearGeometryUpdatedLagrangian`, `poroLinearGeometry` and
   `thermalLinearGeometry`. The displacement is interpolated to the points the
@@ -83,10 +152,10 @@ release. For complete commit-level details and contributor information, see the
   extrapolated values are averaged with inverse-distance weights. foam-extend's
   least squares interpolation, which a stencil straddling a material interface
   smears, is not used for these runs, and nor are the legacy per-material
-  sub-meshes. On `layeredPipe` the framework's point displacement is within
-  1.5e-3 of the legacy arm's, where the least squares interpolation is 4.9e-3
-  away. Single-material framework runs on foam-extend keep the least squares
-  interpolation, as before.
+  sub-meshes. On `layeredPipe` the point displacement is within 1.5e-3 of the
+  legacy model's, where the least squares interpolation is 4.9e-3 away.
+  Single-material runs on foam-extend keep the least squares interpolation, as
+  before.
 - **Breaking:** the pore pressure field of `poroLinearGeometry` and the default
   pore pressure field name of `poroMechanicalLaw` are now `porePressure` rather
   than `p`. An existing case carrying `0/p` fails at construction with a
@@ -131,6 +200,44 @@ release. For complete commit-level details and contributor information, see the
 
 ### Removed
 
+- OpenFOAM.com versions older than v2312 (v2306, v2212, v2206, v2112, v2106
+  and v2012) are no longer supported and are removed from the versions
+  `Allwmake` and `Allwclean` accept. The source no longer compiles against
+  them, and the build workflows cover v2312 and newer only. The code paths
+  that were kept for them are removed.
+
+- **Breaking:** the legacy `mechanicalModel` is removed - `mechanicalModel`,
+  `dualMechanicalModel`, `solidSubMeshes`, `mechanicalLaw` and every legacy
+  law - together with the `useMechanicalConstitutiveLawManager` switch that
+  chose it. The `mechanicalConstitutiveLaw` framework is the only mechanical
+  model, reading the same `constant/mechanicalProperties`, and results are
+  those the switch's `yes` gave. A case that still sets
+  `useMechanicalConstitutiveLawManager no;` stops with an error saying so,
+  rather than silently changing its results; `yes` is accepted with a note
+  that the entry can be removed. Entries only the legacy model read, such as
+  a law's `pressureDisplacement` and `writeSubMeshes`, are ignored. The
+  sources of the withdrawn `unsLinearGeometry`,
+  `unsNonLinearGeometryTotalLagrangian`,
+  `unsNonLinearGeometryUpdatedLagrangian`, `weakThermalLinearGeometry` and
+  `vertexCentredNonLinTotalLagGeometry` solid models, which depended on the
+  legacy model, are deleted.
+- The material residual is removed from every solid model, with the `matRes`
+  column of the residual output and of `residual.dat`, which now hold one
+  column fewer. The legacy laws under-relaxed their plastic strain increment,
+  so the constitutive update lagged the displacement between outer iterations
+  and was tested against `materialTolerance`; a `mechanicalConstitutiveLaw` is
+  a pure function of the kinematics and the old-time state, so there was
+  nothing left to measure and the column was always zero. `materialTolerance`
+  is ignored with a note that it can be removed, and the tutorials no longer
+  set it.
+- **Breaking:** `nonLinearGeometryUpdatedLagrangian` no longer supports
+  `solvePressure`. The mixed formulation replaces a law's volumetric response
+  with the solved pressure; this model takes `dev()` of the total stress to
+  recover the rest, which is right only where everything the pressure must not
+  replace is trace free - true of an isotropic hyperelastic law, false of an
+  active tension along a fibre. It stops at construction rather than solving a
+  different material. Use `nonLinearGeometryTotalLagrangianTotalDisplacement`,
+  which asks the law for the two parts separately.
 - **Breaking:** ten mechanical laws are removed: `diffusionElastic`,
   `linearElasticCt`, `linearElasticFromFile`, `orthotropicLinearElastic`,
   `GentElastic`, `StVenantKirchhoffOrthotropicElastic`, `YeohElastic`,
@@ -186,6 +293,15 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `pimpleFluid` now applies finite volume options to its momentum and optional
+  temperature equations: `fvOptions` in OpenFOAM.com, and `fvModels` and
+  `fvConstraints` in OpenFOAM.org, called where the corresponding standard
+  solvers call them. Previously they were read and reported but silently
+  ignored. In OpenFOAM.org FSI runs, the fluid-solid interface also calls
+  `fvModels::preUpdateMesh()` before moving the fluid mesh.
+- With OpenFOAM.org, `libsolids4FoamModels` now links `libfvModels` and
+  `libfvConstraints`, without which a fluid case with an `fvConstraints` file
+  crashed with a segmentation fault.
 - `HronTurekFsi3` no longer diverges once the plate deformation is large. With
   the FSI2 parameters it failed at t = 6.4-6.9 s (#489), and with its own
   FSI3 parameters shortly after its end time (#383). With a relaxed first

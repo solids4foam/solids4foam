@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw.H"
+#include "misesPlasticDiagnostics.H"
 #include "addToRunTimeSelectionTable.H"
 #include "Switch.H"
 
@@ -25,13 +26,6 @@ License
 
 namespace Foam
 {
-    // The debug default must match the legacy law of the same TypeName.
-    // Debug switches are registered globally by name, and this law shares its
-    // name with the legacy neoHookeanElasticMisesPlastic so that a case
-    // dictionary needs no change. OpenFOAM.org makes two different defaults
-    // for one name a fatal error at start-up - "Multiple defaults set for
-    // debug switch" - which takes down every case in the run, while
-    // OpenFOAM.com tolerates it silently
     defineTypeNameAndDebug
     (
         neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw, 0
@@ -192,9 +186,8 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
         dict.lookupOrDefault<Switch>("updateBEbarConsistent", true)
     )
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy law, so that an existing case dictionary needs no change.
-    // The legacy law tries E and nu first, so this does too
+    // The material may be given either as E and nu or as mu and K. E and nu
+    // are tried first
     if (dict.found("E") && dict.found("nu"))
     {
         E_ = dimensionedScalar(dict.lookup("E"));
@@ -254,12 +247,11 @@ neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
     {
         FatalIOErrorInFunction(dict)
             << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected -1 <= nu for linear elasticity."
+            << ". Expected -1 < nu for linear elasticity."
             << exit(FatalIOError);
     }
 
-    // Plane stress is not supported, matching the legacy
-    // neoHookeanElasticMisesPlastic
+    // Plane stress is not supported
     // Note: the planeStress entry is injected into this dictionary by the
     // mechanicalConstitutiveLawManager from the top-level entry in
     // mechanicalProperties; it is not given by the user in this sub-dictionary
@@ -410,6 +402,17 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         scalarTanPtr = &response.scalarTangent();
     }
 
+    // Whether the caller wants the isochoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
+    // The deviatoric-only scalar tangent, for a mixed formulation, whose
+    // pressure equation carries the bulk stiffness instead
+    const bool deviatoricTan =
+        response.tangentReq() == tangentRequest::scalarDeviatoric;
+
     const label nIP = sigma.size();
 
     // The Newton residual is normalised by the largest trial elastic strain,
@@ -518,36 +521,43 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
         sigma[i] = (1.0/Ji)*(p*symmTensor(I) + sDev);
 
+        // J2 plasticity is isochoric, so the return mapping has touched sDev
+        // alone and p is the elastic volumetric response: the first term is
+        // the isochoric stress and the second is dU/dJ, and the split is the
+        // same two terms the total above is built from
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = p/Ji;
+            sigma[i] = sDev/Ji;
+        }
+
         // Commit the history
         epsilonPEq[i] = epsilonPEq0[i] + dEpsilonPEq;
         sigmaY[i] = curSigmaY;
 
         if (needScalarTan)
         {
-            // The legacy law scales the elastic stiffness down by how far the
-            // return mapping moved the stress, which keeps the Laplacian
+            // Scale the elastic stiffness down by how far the return mapping
+            // moved the stress, which keeps the Laplacian
             // coefficient representative once a point is yielding
             const scalar scaleFactor =
                 1.0 - 2.0*muBar*dLambda/max(magSTrial, SMALL);
 
-            (*scalarTanPtr)[i] = scaleFactor*(4.0/3.0)*mu + kappa;
+            if (deviatoricTan)
+            {
+                // Scalar Laplacian surrogate for div(dev(sigma)), which is
+                // mu*lap(D) + (1/3)*mu*grad(div(D))
+                (*scalarTanPtr)[i] = scaleFactor*(4.0/3.0)*mu;
+            }
+            else
+            {
+                (*scalarTanPtr)[i] = scaleFactor*(4.0/3.0)*mu + kappa;
+            }
         }
     }
 
-    // Fourth-order tangent by finite differences, as for the other
-    // finite-strain laws. There is no analytical spatial tangent here
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 
@@ -559,60 +569,7 @@ void Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw::endTimeStep
     DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
-    const Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
-    const Field<scalar>& epsilonPEq0 =
-        state.getScalarField0("epsilonPEq");
-
-    label nYielding = 0;
-    scalar curDEpsilonPEq = 0.0;
-    scalar maxDEpsilonPEq = 0.0;
-    forAll(epsilonPEq, i)
-    {
-        curDEpsilonPEq = epsilonPEq[i] - epsilonPEq0[i];
-
-        if (curDEpsilonPEq > SMALL)
-        {
-            ++nYielding;
-
-            maxDEpsilonPEq = max(maxDEpsilonPEq, curDEpsilonPEq);
-        }
-    }
-
-    // Reported, not reduced. The manager gathers these from the internal
-    // state and from every boundary state this law owns, and reduces once per
-    // quantity - which is what makes the boundary points countable at all,
-    // and what stops a per-patch collective from hanging on a decomposed mesh
-    typedef mechanicalConstitutiveLawDiagnostic diagnostic;
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "yielding integration points",
-            scalar(nYielding),
-            diagnostic::combineOperation::sum
-        )
-    );
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "integration points",
-            scalar(epsilonPEq.size()),
-            diagnostic::combineOperation::sum
-        )
-    );
-
-    diagnostics.append
-    (
-        diagnostic
-        (
-            "max DEpsilonPEq",
-            maxDEpsilonPEq,
-            diagnostic::combineOperation::maximum
-        )
-    );
+    appendMisesPlasticDiagnostics(state, diagnostics);
 }
 
 
@@ -622,20 +579,7 @@ reportDiagnostics
     const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
 ) const
 {
-    if (!debug || diagnostics.size() != 3)
-    {
-        return;
-    }
-
-    // Same wording as before, and the same debug switch decides it. The
-    // numbers are larger than they used to be, because the boundary
-    // integration points are counted now: they were skipped entirely while
-    // the reducing happened in here
-    Info<< nl << "Max DEpsilonPEq is " << diagnostics[2].value() << nl
-        << "Number of yielding integration points = "
-        << label(diagnostics[0].value())
-        << "/" << label(diagnostics[1].value())
-        << nl << endl;
+    reportMisesPlasticDiagnostics(debug, diagnostics);
 }
 
 
