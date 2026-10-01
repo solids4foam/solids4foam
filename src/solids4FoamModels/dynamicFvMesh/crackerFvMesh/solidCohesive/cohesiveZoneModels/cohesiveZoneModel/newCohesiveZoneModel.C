@@ -42,7 +42,7 @@ autoPtr<cohesiveZoneModel> cohesiveZoneModel::New
 
     Info<< "Selecting cohesive zone model: " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)

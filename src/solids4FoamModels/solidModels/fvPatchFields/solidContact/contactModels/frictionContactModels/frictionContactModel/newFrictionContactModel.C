@@ -42,7 +42,7 @@ autoPtr<frictionContactModel> frictionContactModel::New
 {
     Info<< "    Friction contact model: " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)

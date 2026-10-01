@@ -134,8 +134,7 @@ in parallel. For a coupled solid model that *does* run in parallel, use the
 
 ## Verification and Convergence Study
 
-The opt-in [`verification/`](verification/) directory migrates the mesh study
-from `solid-benchmarks/linearElasticity/narrowTmember` into this tutorial. It
+The opt-in [`verification/`](verification/) directory holds a mesh study. It
 refines the tutorial `blockMesh` through the same mesh family used in the table
 above, samples the equivalent (von Mises) stress along the arc $$r = 1.5R$$ in
 the $$z = 0$$ plane, and compares it with the published curve:

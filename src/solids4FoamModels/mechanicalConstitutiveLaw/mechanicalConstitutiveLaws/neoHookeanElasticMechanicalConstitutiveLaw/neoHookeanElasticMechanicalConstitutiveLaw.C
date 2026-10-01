@@ -52,9 +52,8 @@ neoHookeanElasticMechanicalConstitutiveLaw
     kappa_("kappa", dimPressure, 0.0),
     incompressible_(false)
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy neoHookeanElastic law, so that an existing case dictionary
-    // needs no change. Exactly one of the two pairs must be present
+    // The material may be given either as E and nu or as mu and K. Exactly
+    // one of the two pairs must be present
     const bool haveENu = dict.found("E") && dict.found("nu");
     const bool haveMuK = dict.found("mu") && dict.found("K");
 
@@ -124,8 +123,8 @@ neoHookeanElasticMechanicalConstitutiveLaw
     else if (planeStress)
     {
         // The plane-stress reduction keeps the bulk stiffness finite up to
-        // and including nu = 0.5, as the legacy law's does, so nothing here
-        // is incompressible or ill-conditioned
+        // and including nu = 0.5, so nothing here is incompressible or
+        // ill-conditioned
     }
     else if (mag(nu_.value() - 0.5) < SMALL)
     {
@@ -151,8 +150,7 @@ neoHookeanElasticMechanicalConstitutiveLaw
     if (incompressible_)
     {
         // Held at GREAT rather than infinity, so that 1/kappa is zero to
-        // round-off, as the legacy law's pressureDisplacement mode has it,
-        // without an infinity reaching any arithmetic
+        // round-off, without an infinity reaching any arithmetic
         lambda_ = dimensionedScalar("lambda", dimPressure, GREAT);
         kappa_ = dimensionedScalar("kappa", dimPressure, GREAT);
         return;
@@ -214,12 +212,11 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
 
         const symmTensor bEbar = pow(Ji, -2.0/3.0)*symm(F[i] & F[i].T());
 
-        // Hydrostatic stress. The legacy neoHookeanElastic uses
-        // 0.5*K*(J^2 - 1), and this must match it: the two volumetric
-        // energies, 0.5*K*(J^2 - 1) and K*log(J), agree only to first order
-        // in (J - 1), so they are indistinguishable near the identity and
-        // diverge at finite strain. Using log(J) here made this law disagree
-        // with the legacy one by about 1e-3 on neckingBar
+        // Hydrostatic stress, 0.5*K*(J^2 - 1), as in the other hyperelastic
+        // laws here. The two common volumetric energies, 0.5*K*(J^2 - 1) and
+        // K*log(J), agree only to first order in (J - 1), so they are
+        // indistinguishable near the identity and diverge at finite strain:
+        // changing to log(J) changes the neckingBar results by about 1e-3
         const scalar sigmaHyd = 0.5*kappaVal*(sqr(Ji) - 1.0);
 
         sigma[i] = (muVal/Ji)*dev(bEbar) + (sigmaHyd/Ji)*I;
@@ -234,52 +231,17 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D))
+    fillScalarTangent
+    (
+        response,
+        (4.0/3.0)*mu_.value() + kappa_.value(),
+        (4.0/3.0)*mu_.value()
+    );
 
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                Keff = (4.0/3.0)*mu_.value() + kappa_.value();
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                // Scalar Laplacian surrogate for div(dev(sigma)), which is
-                // mu*lap(D) + (1/3)*mu*grad(div(D))
-                Keff = (4.0/3.0)*mu_.value();
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // There is no analytical spatial tangent for this law yet, but the
-    // finite-difference tangent of the base class is well defined for any
-    // finite-strain law and is evaluated against a shadow state, so it leaves
-    // neither the stress just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 
