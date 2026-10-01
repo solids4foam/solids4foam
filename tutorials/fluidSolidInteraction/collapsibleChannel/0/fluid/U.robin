@@ -18,39 +18,9 @@ FoamFile
 
 dimensions      [0 1 -1 0 0 0 0];
 
-// Steady Poiseuille flow of unit mean velocity, u = 6 y (1 - y)
-internalField   #codeStream
-{
-    codeInclude
-    #{
-        #include "fvCFD.H"
-    #};
-
-    codeOptions
-    #{
-        -I$(LIB_SRC)/finiteVolume/lnInclude \
-        -I$(LIB_SRC)/meshTools/lnInclude
-    #};
-
-    codeLibs
-    #{
-        -lmeshTools \
-        -lfiniteVolume
-    #};
-
-    code
-    #{
-        const IOdictionary& d = static_cast<const IOdictionary&>(dict);
-        const fvMesh& mesh = refCast<const fvMesh>(d.db());
-        vectorField U(mesh.nCells(), vector::zero);
-        forAll(U, cellI)
-        {
-            const scalar y = mesh.C()[cellI].y();
-            U[cellI] = vector(6.0*y*(1.0 - y), 0, 0);
-        }
-        U.writeEntry("", os);
-    #};
-};
+// Allrun sets this to the steady Poiseuille flow of unit mean velocity,
+// u = 6 y (1 - y), using the setPoiseuilleFlow utility
+internalField   uniform (0 0 0);
 
 boundaryField
 {

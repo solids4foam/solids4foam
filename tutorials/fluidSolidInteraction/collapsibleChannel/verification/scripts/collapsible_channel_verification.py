@@ -189,6 +189,9 @@ def ignored(directory: str, names: list[str]) -> set[str]:
         ignored_names.update({"README.md", "regressionTest.sh"})
     if directory_path.name in {"fluid", "solid"} and directory_path.parent.name == "constant":
         ignored_names.add("polyMesh")
+    # Allrun writes the initial fluid fields from their variants
+    if directory_path.name == "fluid" and directory_path.parent.name == "0":
+        ignored_names.update({"U", "p"})
     return ignored_names.intersection(names)
 
 
@@ -218,6 +221,8 @@ def fingerprint(case: dict, end_time: float, extra: str = "") -> str:
             if (
                 path.is_symlink() or name.endswith((".bak", ".pdf"))
                 or name.endswith(".withDefaultValues")
+                # Build output of the setPoiseuilleFlow utility
+                or ("Make" in path.parts and name not in {"files", "options"})
             ):
                 continue
             digest.update(str(path.relative_to(CASE_DIR)).encode())
@@ -888,6 +893,19 @@ def main() -> int:
     if not os.environ.get("PETSC_DIR"):
         print("ERROR: the collapsibleChannel study needs solids4foam built"
               " with PETSc (PETSC_DIR is not set)", file=sys.stderr)
+        return 2
+
+    # Build setPoiseuilleFlow once, before cases run at the same time: the
+    # copies take its build output and find it up to date, rather than each
+    # relinking the shared executable while another case runs it
+    built = subprocess.run(
+        ["wmake", "setPoiseuilleFlow"], cwd=CASE_DIR,
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT
+    )
+    if built.returncode != 0:
+        print("ERROR: could not build setPoiseuilleFlow; run"
+              " 'wmake setPoiseuilleFlow' in the tutorial to see why",
+              file=sys.stderr)
         return 2
 
     all_failures = []

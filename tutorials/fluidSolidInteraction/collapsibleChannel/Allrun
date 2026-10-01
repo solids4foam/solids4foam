@@ -41,8 +41,13 @@ done
 ln -vnsf "solidProperties.${solidVariant}" constant/solid/solidProperties
 ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-ln -vnsf "U.${interfaceCondition}" 0/fluid/U
-ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+# Copied rather than linked, as setPoiseuilleFlow writes the initial fields
+rm -f 0/fluid/U 0/fluid/p
+cp "0/fluid/U.${interfaceCondition}" 0/fluid/U
+cp "0/fluid/p.${interfaceCondition}" 0/fluid/p
+
+# Build the utility that sets the initial Poiseuille flow
+wmake setPoiseuilleFlow
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
@@ -50,6 +55,9 @@ solids4Foam::convertCaseFormat .
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Start the fluid from the steady Poiseuille flow
+solids4Foam::runApplication setPoiseuilleFlow -region fluid
 
 # Run solver
 solids4Foam::runApplication solids4Foam
