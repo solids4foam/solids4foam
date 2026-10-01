@@ -1745,8 +1745,9 @@ void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
     const label nGhosts = ghostCells_.size();
     const bool cellPoint = (imageInterpolation_ == cellPointImage);
 
-    // The interpolation is only constructed on the processors with local or
-    // requested donors
+    // The interpolation is only constructed if a processor has local or
+    // requested donors. The point interpolation of U is collective, so the
+    // decision is the same on every processor
     bool hasDonors = false;
     for (const label donori : ghostDonors_)
     {
@@ -1756,6 +1757,7 @@ void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
     {
         hasDonors = hasDonors || donors.size();
     }
+    reduce(hasDonors, orOp<bool>());
 
     autoPtr<interpolationCellPoint<vector>> interpPtr;
     if (cellPoint && hasDonors)
