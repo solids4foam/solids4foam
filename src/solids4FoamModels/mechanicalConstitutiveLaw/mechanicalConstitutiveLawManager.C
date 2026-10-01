@@ -568,8 +568,11 @@ Foam::scalarList Foam::mechanicalConstitutiveLawManager::convergenceScales
             Fields::convergenceScale(laws_[lawI], views.kin, tp.states_[lawI]);
     }
 
-    // One reduction for all the laws together
-    reduce(scales, maxOp<scalarField>());
+    // One reduction for all the laws together. Not reduce with
+    // maxOp<scalarField>, whose max returns a tmp that clang cannot convert
+    // unambiguously to the scalarField the op returns
+    Pstream::listCombineGather(scales, maxEqOp<scalar>());
+    Pstream::listCombineScatter(scales);
 
     // Kept so that the boundary evaluations use the same scale as the
     // internal ones
