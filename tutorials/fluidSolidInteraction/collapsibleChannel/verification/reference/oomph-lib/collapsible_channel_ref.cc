@@ -1,27 +1,27 @@
 //LIC// ====================================================================
-//LIC// This file forms part of oomph-lib, the object-oriented, 
-//LIC// multi-physics finite-element library, available 
+//LIC// This file forms part of oomph-lib, the object-oriented,
+//LIC// multi-physics finite-element library, available
 //LIC// at http://www.oomph-lib.org.
-//LIC// 
+//LIC//
 //LIC// Copyright (C) 2006-2026 Matthias Heil and Andrew Hazel
-//LIC// 
+//LIC//
 //LIC// This library is free software; you can redistribute it and/or
 //LIC// modify it under the terms of the GNU Lesser General Public
 //LIC// License as published by the Free Software Foundation; either
 //LIC// version 2.1 of the License, or (at your option) any later version.
-//LIC// 
+//LIC//
 //LIC// This library is distributed in the hope that it will be useful,
 //LIC// but WITHOUT ANY WARRANTY; without even the implied warranty of
 //LIC// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 //LIC// Lesser General Public License for more details.
-//LIC// 
+//LIC//
 //LIC// You should have received a copy of the GNU Lesser General Public
 //LIC// License along with this library; if not, write to the Free Software
 //LIC// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 //LIC// 02110-1301  USA.
-//LIC// 
+//LIC//
 //LIC// The authors may be contacted at oomph-lib@maths.man.ac.uk.
-//LIC// 
+//LIC//
 //LIC//====================================================================
 //
 // Reference driver for the solids4foam collapsibleChannel verification.
@@ -71,7 +71,7 @@ using namespace oomph;
 //======================================================================
 namespace BL_Squash
 {
- 
+
  /// Boundary layer width
  double Delta=0.1;
 
@@ -113,7 +113,7 @@ namespace BL_Squash
 
 
 //====start_of_underformed_wall============================================
-/// Undeformed wall is a steady, straight 1D line in 2D space 
+/// Undeformed wall is a steady, straight 1D line in 2D space
 ///  \f[ x = X_0 + \zeta \f]
 ///  \f[ y = H \f]
 //=========================================================================
@@ -129,9 +129,9 @@ public:
    X0=x0;
    H=h;
   }
- 
 
- /// Position vector at Lagrangian coordinate zeta 
+
+ /// Position vector at Lagrangian coordinate zeta
  void position(const Vector<double>& zeta, Vector<double>& r) const
   {
    // Position Vector
@@ -154,8 +154,8 @@ public:
 
  /// Posn vector and its  1st & 2nd derivatives
  /// w.r.t. to coordinates:
- /// \f$ \frac{dR_i}{d \zeta_\alpha}\f$ = drdzeta(alpha,i). 
- /// \f$ \frac{d^2R_i}{d \zeta_\alpha d \zeta_\beta}\f$ = 
+ /// \f$ \frac{dR_i}{d \zeta_\alpha}\f$ = drdzeta(alpha,i).
+ /// \f$ \frac{d^2R_i}{d \zeta_\alpha d \zeta_\beta}\f$ =
  /// ddrdzeta(alpha,beta,i). Evaluated at current time.
  void d2position(const Vector<double>& zeta,
                  Vector<double>& r,
@@ -178,7 +178,7 @@ public:
 
  private :
 
- /// x position of the undeformed beam's left end. 
+ /// x position of the undeformed beam's left end.
  double X0;
 
  /// Height of the undeformed wall above y=0.
@@ -202,7 +202,7 @@ namespace Global_Physical_Variables
 
  /// Womersley = Reynolds times Strouhal
  double ReSt=50.0;
- 
+
  /// Default pressure on the left boundary
  double P_up=0.0;
 
@@ -220,7 +220,7 @@ namespace Global_Physical_Variables
 
  /// Non-dimensional wall thickness. As in Jensen & Heil (2003) paper.
  double H=1.0e-2;
- 
+
  /// 2nd Piola Kirchhoff pre-stress. As in Jensen & Heil (2003) paper.
  double Sigma0=1.0e3;
 
@@ -249,8 +249,8 @@ namespace Global_Physical_Variables
  /// Fluid load gets added on by FSIWallElement.
  void load(const Vector<double>& xi, const Vector<double>& x,
            const Vector<double>& N, Vector<double>& load)
- { 
-  for(unsigned i=0;i<2;i++) 
+ {
+  for(unsigned i=0;i<2;i++)
    {
     load[i] = -p_ext()*N[i];
    }
@@ -258,7 +258,7 @@ namespace Global_Physical_Variables
 
 
  /// Fluid structure interaction parameter: Ratio of stresses used for
- /// non-dimensionalisation of fluid to solid stresses. 
+ /// non-dimensionalisation of fluid to solid stresses.
  double Q=1.0e-5;
 
  /// Timescale ratio of the wall, Lambda^2 = rho_s U^2/E_eff: zero for the
@@ -288,15 +288,15 @@ class FSICollapsibleChannelProblem : public Problem
 
 /// Constructor: The arguments are the number of elements and
 /// the lengths of the domain.
- FSICollapsibleChannelProblem(const unsigned& nup, 
+ FSICollapsibleChannelProblem(const unsigned& nup,
                        const unsigned& ncollapsible,
                        const unsigned& ndown,
                        const unsigned& ny,
                        const double& lup,
-                       const double& lcollapsible, 
+                       const double& lcollapsible,
                        const double& ldown,
                        const double& ly);
- 
+
  /// Destructor (empty)
  ~FSICollapsibleChannelProblem(){}
 
@@ -304,9 +304,9 @@ class FSICollapsibleChannelProblem : public Problem
 #ifdef MACRO_ELEMENT_NODE_UPDATE
 
  /// Access function for the specific bulk (fluid) mesh
- MacroElementNodeUpdateCollapsibleChannelMesh<ELEMENT>* bulk_mesh_pt() 
+ MacroElementNodeUpdateCollapsibleChannelMesh<ELEMENT>* bulk_mesh_pt()
   {
-   // Upcast from pointer to the Mesh base class to the specific 
+   // Upcast from pointer to the Mesh base class to the specific
    // element type that we're using here.
    return dynamic_cast<
     MacroElementNodeUpdateCollapsibleChannelMesh<ELEMENT>*>
@@ -316,9 +316,9 @@ class FSICollapsibleChannelProblem : public Problem
 #else
 
  /// Access function for the specific bulk (fluid) mesh
- AlgebraicCollapsibleChannelMesh<ELEMENT>* bulk_mesh_pt() 
+ AlgebraicCollapsibleChannelMesh<ELEMENT>* bulk_mesh_pt()
   {
-   // Upcast from pointer to the Mesh base class to the specific 
+   // Upcast from pointer to the Mesh base class to the specific
    // element type that we're using here.
    return dynamic_cast<
     AlgebraicCollapsibleChannelMesh<ELEMENT>*>
@@ -329,21 +329,21 @@ class FSICollapsibleChannelProblem : public Problem
 
 
  /// Access function for the wall mesh
- OneDLagrangianMesh<FSIHermiteBeamElement>* wall_mesh_pt() 
+ OneDLagrangianMesh<FSIHermiteBeamElement>* wall_mesh_pt()
   {
    return Wall_mesh_pt;
 
   } // end of access to wall mesh
 
 
- /// Update the problem specs before solve (empty) 
+ /// Update the problem specs before solve (empty)
  void actions_before_newton_solve(){}
 
  /// Update the problem after solve (empty)
  void actions_after_newton_solve(){}
-  
+
  /// Update before checking Newton convergence: Update the
- /// nodal positions in the fluid mesh in response to possible 
+ /// nodal positions in the fluid mesh in response to possible
  /// changes in the wall shape
  void actions_before_newton_convergence_check()
   {
@@ -352,21 +352,21 @@ class FSICollapsibleChannelProblem : public Problem
 
  /// Doc the solution
  void doc_solution(DocInfo& doc_info,ofstream& trace_file);
- 
+
  /// Apply initial conditions
  void set_initial_condition();
 
-private : 
+private :
 
  /// Create the prescribed traction elements on boundary b
- void create_traction_elements(const unsigned &b, 
+ void create_traction_elements(const unsigned &b,
                                Mesh* const &bulk_mesh_pt,
                                Mesh* const &traction_mesh_pt);
- 
+
  /// Number of elements in the x direction in the upstream part of the channel
  unsigned Nup;
 
- /// Number of elements in the x direction in the collapsible part of 
+ /// Number of elements in the x direction in the collapsible part of
  /// the channel
  unsigned Ncollapsible;
 
@@ -403,17 +403,17 @@ private :
 
  /// Pointer to the "surface" mesh that applies the traction at the
  /// inflow
- Mesh* Applied_fluid_traction_mesh_pt; 
- 
+ Mesh* Applied_fluid_traction_mesh_pt;
+
  /// Pointer to the "wall" mesh
- OneDLagrangianMesh<FSIHermiteBeamElement>* Wall_mesh_pt; 
+ OneDLagrangianMesh<FSIHermiteBeamElement>* Wall_mesh_pt;
 
  /// Pointer to the left control node
  Node* Left_node_pt;
- 
+
  /// Pointer to right control node
  Node* Right_node_pt;
- 
+
  /// Pointer to control node on the wall
  Node* Wall_node_pt;
 
@@ -427,12 +427,12 @@ private :
 //===============================================================
 template <class ELEMENT>
 FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
- const unsigned& nup, 
+ const unsigned& nup,
  const unsigned& ncollapsible,
  const unsigned& ndown,
  const unsigned& ny,
  const double& lup,
- const double& lcollapsible, 
+ const double& lcollapsible,
  const double& ldown,
  const double& ly)
 {
@@ -450,9 +450,9 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
  // Overwrite maximum allowed residual to accomodate bad initial guesses
  Problem::Max_residuals=1000.0;
 
- // Allocate the timestepper -- this constructs the Problem's 
+ // Allocate the timestepper -- this constructs the Problem's
  // time object with a sufficient amount of storage to store the
- // previous timsteps. 
+ // previous timsteps.
  add_time_stepper_pt(new BDF<2>);
 
  // A wall with inertia needs a timestepper for its positions (Newmark);
@@ -464,7 +464,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
    add_time_stepper_pt(wall_time_stepper_pt);
   }
 
- // Geometric object that represents the undeformed wall: 
+ // Geometric object that represents the undeformed wall:
  // A straight line at height y=ly; starting at x=lup.
  UndeformedWall* undeformed_wall_pt=new UndeformedWall(lup,ly);
 
@@ -473,18 +473,18 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
   //(2*Ncollapsible+5,Lcollapsible,undeformed_wall_pt);
   (Ncollapsible,Lcollapsible,undeformed_wall_pt,wall_time_stepper_pt);
 
- 
+
 
  // Build a geometric object (one Lagrangian, two Eulerian coordinates)
  // from the wall mesh
  MeshAsGeomObject* wall_geom_object_pt=
-  new MeshAsGeomObject(Wall_mesh_pt); 
+  new MeshAsGeomObject(Wall_mesh_pt);
 
 
 #ifdef MACRO_ELEMENT_NODE_UPDATE
 
  //Build bulk (fluid) mesh
- Bulk_mesh_pt = 
+ Bulk_mesh_pt =
   new MacroElementNodeUpdateCollapsibleChannelMesh<ELEMENT>
   (nup, ncollapsible, ndown, ny,
    lup, lcollapsible, ldown, ly,
@@ -492,7 +492,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
    time_stepper_pt());
 
  // Set a non-trivial boundary-layer-squash function...
- Bulk_mesh_pt->bl_squash_fct_pt() = &BL_Squash::squash_fct; 
+ Bulk_mesh_pt->bl_squash_fct_pt() = &BL_Squash::squash_fct;
 
  // ... and update the nodal positions accordingly
  Bulk_mesh_pt->node_update();
@@ -500,7 +500,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 #else
 
  //Build bulk (fluid) mesh
- Bulk_mesh_pt = 
+ Bulk_mesh_pt =
   new AlgebraicCollapsibleChannelMesh<ELEMENT>
   (nup, ncollapsible, ndown, ny,
    lup, lcollapsible, ldown, ly,
@@ -511,15 +511,15 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 #endif
 
 
- // Create "surface mesh" that will contain only the prescribed-traction 
+ // Create "surface mesh" that will contain only the prescribed-traction
  // elements. The constructor just creates the mesh without
  // giving it any elements, nodes, etc.
  Applied_fluid_traction_mesh_pt = new Mesh;
- 
- // Create prescribed-traction elements from all elements that are 
+
+ // Create prescribed-traction elements from all elements that are
  // adjacent to boundary 5 (left boundary), but add them to a separate mesh.
  create_traction_elements(5,Bulk_mesh_pt,Applied_fluid_traction_mesh_pt);
- 
+
  // Add the sub meshes to the problem
  add_sub_mesh(Bulk_mesh_pt);
  add_sub_mesh(Applied_fluid_traction_mesh_pt);
@@ -527,25 +527,25 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 
  // Combine all submeshes into a single Mesh
  build_global_mesh();
-   
+
 
  // Complete build of fluid mesh
- //----------------------------- 
- 
- // Loop over the elements to set up element-specific 
+ //-----------------------------
+
+ // Loop over the elements to set up element-specific
  // things that cannot be handled by constructor
  unsigned n_element=Bulk_mesh_pt->nelement();
  for(unsigned e=0;e<n_element;e++)
   {
    // Upcast from GeneralisedElement to the present element
    ELEMENT* el_pt = dynamic_cast<ELEMENT*>(Bulk_mesh_pt->element_pt(e));
-   
+
    //Set the Reynolds number
    el_pt->re_pt() = &Global_Physical_Variables::Re;
 
    // Set the Womersley number
    el_pt->re_st_pt() = &Global_Physical_Variables::ReSt;
-   
+
   } // end loop over elements
 
 
@@ -555,7 +555,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 
  //Pin the velocity on the boundaries
  //x and y-velocities pinned along boundary 0 (bottom boundary) :
- unsigned ibound=0; 
+ unsigned ibound=0;
  unsigned num_nod= bulk_mesh_pt()->nboundary_node(ibound);
  for (unsigned inod=0;inod<num_nod;inod++)
   {
@@ -564,10 +564,10 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
      bulk_mesh_pt()->boundary_node_pt(ibound, inod)->pin(i);
     }
   }
-  
+
  //x and y-velocities pinned along boundaries 2, 3, 4 (top boundaries) :
  for(ibound=2;ibound<5;ibound++)
-  { 
+  {
    num_nod= bulk_mesh_pt()->nboundary_node(ibound);
    for (unsigned inod=0;inod<num_nod;inod++)
     {
@@ -579,7 +579,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
   }
 
  //y-velocity pinned along boundary 1 (right boundary):
- ibound=1; 
+ ibound=1;
  num_nod= bulk_mesh_pt()->nboundary_node(ibound);
  for (unsigned inod=0;inod<num_nod;inod++)
   {
@@ -588,7 +588,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 
 
  //y-velocity pinned along boundary 5 (left boundary):
- ibound=5; 
+ ibound=5;
  num_nod= bulk_mesh_pt()->nboundary_node(ibound);
  for (unsigned inod=0;inod<num_nod;inod++)
   {
@@ -599,16 +599,16 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
  // Complete build of applied traction elements
  //--------------------------------------------
 
- // Loop over the traction elements to pass pointer to prescribed 
+ // Loop over the traction elements to pass pointer to prescribed
  // traction function
  unsigned n_el=Applied_fluid_traction_mesh_pt->nelement();
  for(unsigned e=0;e<n_el;e++)
   {
    // Upcast from GeneralisedElement to NavierStokes traction element
-   NavierStokesTractionElement<ELEMENT> *el_pt = 
+   NavierStokesTractionElement<ELEMENT> *el_pt =
     dynamic_cast< NavierStokesTractionElement<ELEMENT>*>(
      Applied_fluid_traction_mesh_pt->element_pt(e));
-    
+
    // Set the pointer to the prescribed traction function
    el_pt->traction_fct_pt() = &Global_Physical_Variables::prescribed_traction;
   }
@@ -618,20 +618,20 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 
  // Complete build of wall elements
  //--------------------------------
-  
+
  //Loop over the elements to set physical parameters etc.
  n_element = wall_mesh_pt()->nelement();
  for(unsigned e=0;e<n_element;e++)
   {
    // Upcast to the specific element type
-   FSIHermiteBeamElement *elem_pt = 
+   FSIHermiteBeamElement *elem_pt =
     dynamic_cast<FSIHermiteBeamElement*>(wall_mesh_pt()->element_pt(e));
-    
+
    // Set physical parameters for each element:
    elem_pt->sigma0_pt() = &Global_Physical_Variables::Sigma0;
    elem_pt->h_pt() = &Global_Physical_Variables::H;
    elem_pt->lambda_sq_pt() = &Global_Physical_Variables::Lambda_sq;
-    
+
    // Set the load vector for each element
    elem_pt->load_vector_fct_pt() = &Global_Physical_Variables::load;
 
@@ -659,7 +659,7 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
  for(unsigned b=0;b<2;b++)
   {
    // Pin displacements in both x and y directions
-   wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(0); 
+   wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(0);
    wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(1);
    if (Global_Physical_Variables::Clamped)
     {
@@ -668,26 +668,26 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
      wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(1,1);
     }
   }
-  
- 
+
+
 
 
  //Choose control nodes
  //---------------------
-  
+
  // Left boundary
- ibound=5; 
+ ibound=5;
  num_nod= bulk_mesh_pt()->nboundary_node(ibound);
  unsigned control_nod=num_nod/2;
  Left_node_pt= bulk_mesh_pt()->boundary_node_pt(ibound, control_nod);
-  
+
  // Right boundary
- ibound=1; 
+ ibound=1;
  num_nod= bulk_mesh_pt()->nboundary_node(ibound);
  control_nod=num_nod/2;
  Right_node_pt= bulk_mesh_pt()->boundary_node_pt(ibound, control_nod);
-  
- 
+
+
  // Set the pointer to the control node on the wall
  Wall_node_pt=wall_mesh_pt()->node_pt(Ncollapsible/2);
 
@@ -699,10 +699,10 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 
  // The velocity of the fluid nodes on the wall (fluid mesh boundary 3)
  // is set by the wall motion -- hence the no-slip condition must be
- // re-applied whenever a node update is performed for these nodes. 
- // Such tasks may be performed automatically by the auxiliary node update 
+ // re-applied whenever a node update is performed for these nodes.
+ // Such tasks may be performed automatically by the auxiliary node update
  // function specified by a function pointer:
- ibound=3; 
+ ibound=3;
  num_nod= bulk_mesh_pt()->nboundary_node(ibound);
  for (unsigned inod=0;inod<num_nod;inod++)
   {
@@ -710,18 +710,18 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
     set_auxiliary_node_update_fct_pt(
      FSI_functions::apply_no_slip_on_moving_wall);
   }
-  
-  
+
+
  // Work out which fluid dofs affect the residuals of the wall elements:
- // We pass the boundary between the fluid and solid meshes and 
- // pointers to the meshes. The interaction boundary is boundary 3 of the 
+ // We pass the boundary between the fluid and solid meshes and
+ // pointers to the meshes. The interaction boundary is boundary 3 of the
  // 2D fluid mesh.
  FSI_functions::setup_fluid_load_info_for_solid_elements<ELEMENT,2>
   (this,3,Bulk_mesh_pt,Wall_mesh_pt);
-  
+
  // Setup equation numbering scheme
- cout <<"Number of equations: " << assign_eqn_numbers() << std::endl; 
-  
+ cout <<"Number of equations: " << assign_eqn_numbers() << std::endl;
+
 
 }//end of constructor
 
@@ -732,9 +732,9 @@ FSICollapsibleChannelProblem<ELEMENT>::FSICollapsibleChannelProblem(
 /// Doc the solution
 //============================================================================
 template <class ELEMENT>
-void FSICollapsibleChannelProblem<ELEMENT>:: doc_solution(DocInfo& doc_info, 
+void FSICollapsibleChannelProblem<ELEMENT>:: doc_solution(DocInfo& doc_info,
                                                        ofstream& trace_file)
-{ 
+{
 
 
  ofstream some_file;
@@ -749,7 +749,7 @@ void FSICollapsibleChannelProblem<ELEMENT>:: doc_solution(DocInfo& doc_info,
    some_file.close();
   }
 
- // Write trace file 
+ // Write trace file
 
  // Wall positions at 25, 50 and 75% of the collapsible length
  unsigned nnod_wall=wall_mesh_pt()->nnode();
@@ -763,7 +763,7 @@ void FSICollapsibleChannelProblem<ELEMENT>:: doc_solution(DocInfo& doc_info,
             << wall_mesh_pt()->node_pt(3*(nnod_wall-1)/4)->x(0) << " "
             << wall_mesh_pt()->node_pt(3*(nnod_wall-1)/4)->x(1) << " "
             << Wall_node_pt->x(0) << " "
-            << std::endl; 
+            << std::endl;
 
 } // end_of_doc_solution
 
@@ -787,14 +787,14 @@ void FSICollapsibleChannelProblem<ELEMENT>::create_traction_elements(
    // Get pointer to the bulk element that is adjacent to boundary b
    ELEMENT* bulk_elem_pt = dynamic_cast<ELEMENT*>
     (bulk_mesh_pt->boundary_element_pt(b,e));
-   
+
    //What is the index of the face of element e along boundary b
    int face_index = bulk_mesh_pt->face_index_at_boundary(b,e);
 
    // Build the corresponding prescribed-traction element
-   NavierStokesTractionElement<ELEMENT>* flux_element_pt = 
+   NavierStokesTractionElement<ELEMENT>* flux_element_pt =
     new  NavierStokesTractionElement<ELEMENT>(bulk_elem_pt,face_index);
-   
+
    //Add the prescribed-traction element to the surface mesh
    traction_mesh_pt->add_element_pt(flux_element_pt);
 
@@ -810,7 +810,7 @@ void FSICollapsibleChannelProblem<ELEMENT>::create_traction_elements(
 //============================================================================
 template <class ELEMENT>
 void FSICollapsibleChannelProblem<ELEMENT>::set_initial_condition()
-{ 
+{
  // Check that timestepper is from the BDF family
  if (time_stepper_pt()->type()!="BDF")
   {
@@ -818,7 +818,7 @@ void FSICollapsibleChannelProblem<ELEMENT>::set_initial_condition()
    error_stream << "Timestepper has to be from the BDF family!\n"
                 << "You have specified a timestepper from the "
                 << time_stepper_pt()->type() << " family" << std::endl;
-   
+
    throw OomphLibError(error_stream.str(),
                        OOMPH_CURRENT_FUNCTION,
                        OOMPH_EXCEPTION_LOCATION);
@@ -826,7 +826,7 @@ void FSICollapsibleChannelProblem<ELEMENT>::set_initial_condition()
 
  // Update the mesh
  bulk_mesh_pt()->node_update();
- 
+
  // Loop over the nodes to set initial guess everywhere
  unsigned num_nod = bulk_mesh_pt()->nnode();
  for (unsigned n=0;n<num_nod;n++)
@@ -835,11 +835,11 @@ void FSICollapsibleChannelProblem<ELEMENT>::set_initial_condition()
    Vector<double> x(2);
    x[0]=bulk_mesh_pt()->node_pt(n)->x(0);
    x[1]=bulk_mesh_pt()->node_pt(n)->x(1);
-   
+
    // Assign initial condition: Steady Poiseuille flow
    bulk_mesh_pt()->node_pt(n)->set_value(0,6.0*(x[1]/Ly)*(1.0-(x[1]/Ly)));
    bulk_mesh_pt()->node_pt(n)->set_value(1,0.0);
-  } 
+  }
 
  // Assign initial values for an impulsive start
  bulk_mesh_pt()->assign_initial_values_impulsive();
