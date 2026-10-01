@@ -15,14 +15,34 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # membrane is first pushed down and then lifted by the developing cavity flow
 REG_END_TIME=5
 
-# Regression tolerances
+# Reference values at REG_END_TIME and tolerances for each fork. The force
+# reference is the total vertical force on the interface.
+#
+# OpenFOAM.com: v2412 and v2512 agree to 5e-5 in Uy and 1.4e-6 in Fy; the
+# references are the v2512 values.
+REF_MID_UY=0.136377
+REF_FY=1.69653e-04
 DISP_TOL=2e-4
 FY_TOL=1e-5
 
-# Reference values at REG_END_TIME, from OpenFOAM-v2412
-# The force reference is the total vertical force on the interface
-REF_MID_UY=0.136422
-REF_FY=1.710532e-04
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    # foam-extend 4.1: the pressure next to the membrane is lower than on the
+    # other forks, so the vertical force is about a tenth and the midpoint
+    # displacement 3% smaller. The references are one local run; the wider
+    # tolerances allow for the machine dependence seen on OpenFOAM.org
+    REF_MID_UY=0.132567
+    REF_FY=1.81995e-05
+    DISP_TOL=1e-3
+    FY_TOL=1.5e-5
+elif [[ "${WM_PROJECT_VERSION:-}" != v* ]]; then
+    # OpenFOAM.org: the result depends on the machine. OpenFOAM-9 gave
+    # Uy = 0.137318 and Fy = 1.768e-4 locally but 0.136042 and 1.589e-4 in CI,
+    # so the references are the midpoints, with tolerances that cover both
+    REF_MID_UY=0.13668
+    REF_FY=1.679e-04
+    DISP_TOL=1e-3
+    FY_TOL=1.5e-5
+fi
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_midpoint.dat"

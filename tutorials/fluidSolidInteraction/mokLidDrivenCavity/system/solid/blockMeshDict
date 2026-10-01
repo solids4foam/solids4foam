@@ -20,8 +20,12 @@ FoamFile
 // face is the fluid-solid interface, and the number of cells along it must
 // match the fluid mesh, as the interface uses directMap. The high-order solid
 // needs eight cells through the thickness on this mesh: with two or four, its
-// nonlinear (PETSc SNES) solve stalls in the first time-steps. The standard
-// solid gives the same answer with two
+// nonlinear (PETSc SNES) solve diverges within the first second. The
+// least-squares systems of these thin cells are poorly conditioned: with four
+// cells the largest condition number is about 4e9, against 3e8 with eight, and
+// a larger stencil (faceStencilExtraCells 25 or 35) makes it worse, as the
+// stencil grows mostly along the strip. The standard solid gives the same
+// answer with two
 scale 1;
 
 vertices

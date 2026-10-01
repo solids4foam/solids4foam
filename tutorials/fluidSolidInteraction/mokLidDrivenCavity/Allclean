@@ -16,6 +16,11 @@ elif [[ $WM_PROJECT_VERSION == v* ]]; then
 fi
 
 rm -rf case.foam residuals deflection.pdf postProcessing dynamicCode
+(cd src && wclean libso)
+
+# Restore the default variants that Allrun relinks
+ln -nsf fsiProperties.iqnils constant/fsiProperties
+ln -nsf solidProperties.highOrder constant/solid/solidProperties
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
