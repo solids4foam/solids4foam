@@ -190,7 +190,7 @@ protected:
     // Protected member functions
 
 #ifndef OPENFOAM_COM
-        //- Return optional source per unit volume (zero by default)
+        //- Return optional source per unit volume; empty (no source) by default
         virtual tmp<volVectorField> fvOptionsSource() const;
 #endif
 

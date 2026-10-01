@@ -339,7 +339,11 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
 #ifdef OPENFOAM_COM
             tmpRef(tRhsEqn) += fvOptions()(ds_, D());
 #else
-            tmpRef(tRhsEqn) += fvOptionsSource();
+            const tmp<volVectorField> tsource(fvOptionsSource());
+            if (tsource.valid())
+            {
+                tmpRef(tRhsEqn) += tsource();
+            }
 #endif
 
             fvVectorMatrix DEqn
@@ -730,23 +734,8 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStress()
 Foam::tmp<Foam::volVectorField>
 Foam::solidModels::linGeomTotalDispSolid::fvOptionsSource() const
 {
-    return tmp<volVectorField>
-    (
-        new volVectorField
-        (
-            IOobject
-            (
-                "fvOptionsSource",
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            mesh(),
-            dimensionedVector("zero", dimForce/dimVolume, vector::zero)
-        )
-    );
+    // An empty tmp means no source, so callers can skip the field operations
+    return tmp<volVectorField>();
 }
 #endif
 
@@ -1339,7 +1328,11 @@ label linGeomTotalDispSolid::formResidual
     // Note that "source()" is already multiplied by the volumes
     residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
 #else
-    residual += mesh.V()*fvOptionsSource()().internalField();
+    const tmp<volVectorField> tsource(fvOptionsSource());
+    if (tsource.valid())
+    {
+        residual += mesh.V()*tsource().internalField();
+    }
 #endif
 
     // Copy the residual into the f field
