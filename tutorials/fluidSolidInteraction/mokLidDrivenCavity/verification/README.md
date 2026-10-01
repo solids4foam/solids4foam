@@ -289,8 +289,10 @@ $$t = 10$$ s, which took about 7 minutes on two ranks.
 
 - A 128 x 128 mesh level could not be completed (see the mesh study), so the
   finest mesh level is 96 x 96.
-- The case uses `codedFixedValue`, so it does not run on foam-extend, where
-  `Allrun` skips it. It has not been tested on OpenFOAM.org.
+- The study was run on OpenFOAM.com only. The tutorial also runs on
+  OpenFOAM.org and foam-extend, but their results differ (see the tutorial
+  README): on foam-extend the midpoint displacement at t = 5 s is 3% smaller
+  and the vertical force on the membrane about a tenth.
 - Only one group B reference (Valdés) gives the full history from vector data;
   the Kratos curve is digitised from a raster image and Tiba et al. give scalar
   values only.

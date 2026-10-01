@@ -22,38 +22,23 @@ internalField   uniform (0 0 0);
 
 // The lid velocity is vBar = 1 - cos(2 pi t/5) m/s. The inlet profile rises
 // linearly from zero at the bottom of the opening (y = 0.875) to vBar at the
-// lid (y = 1), i.e. vBar*(8 y - 7). Both are imposed with codedFixedValue,
-// which OpenFOAM.com and OpenFOAM.org provide but foam-extend does not
+// lid (y = 1), i.e. vBar*(8 y - 7). Both are imposed with the
+// mokCavityVelocity condition, built from src/ by Allrun
 boundaryField
 {
     lid
     {
-        type            codedFixedValue;
+        type            mokCavityVelocity;
+        period          5;
         value           uniform (0 0 0);
-        name            mokCavityLidVelocity;
-
-        code
-        #{
-            const scalar t = this->db().time().value();
-            const scalar vBar = 1.0 - Foam::cos(2.0*3.14159265358979*t/5.0);
-
-            operator==(vector(vBar, 0, 0));
-        #};
     }
     inlet
     {
-        type            codedFixedValue;
+        type            mokCavityVelocity;
+        period          5;
+        yBottom         0.875;
+        yTop            1;
         value           uniform (0 0 0);
-        name            mokCavityInletVelocity;
-
-        code
-        #{
-            const scalar t = this->db().time().value();
-            const scalar vBar = 1.0 - Foam::cos(2.0*3.14159265358979*t/5.0);
-            const scalarField y(this->patch().Cf().component(vector::Y));
-
-            operator==(vBar*(8.0*y - 7.0)*vector(1, 0, 0));
-        #};
     }
     outlet
     {

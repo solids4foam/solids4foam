@@ -100,14 +100,20 @@ with the `Allrun` script:
 ```
 
 The `Allrun` script links the selected `fsiProperties` and `solidProperties`,
-creates the fluid and solid meshes with `blockMesh`, and runs `solids4Foam`. If
+builds the `mokCavityVelocity` boundary condition of the lid and inlet from
+`src/`, creates the fluid and solid meshes with `blockMesh`, and runs
+`solids4Foam`. If
 `gnuplot` is installed, `deflection.pdf` shows the midpoint displacement
 history, which is written to
 `postProcessing/0/solidPointDisplacement_midpoint.dat`.
 
-The case requires solids4foam built with PETSc. It uses `codedFixedValue` for
-the lid and inlet velocities, which foam-extend does not provide, so the case
-is skipped on foam-extend.
+The case requires solids4foam built with PETSc. It runs on all three forks,
+but the results differ between them. At t = 5 s, the end of the regression
+test, OpenFOAM.com gives a midpoint displacement of 0.1364 m. OpenFOAM-9 gives
+0.1360-0.1373 m depending on the machine. foam-extend 4.1 gives 0.1326 m, with
+a lower pressure next to the membrane and about a tenth of the vertical force
+on it; the cause has not been investigated. The verification study was run
+on OpenFOAM.com.
 
 ---
 

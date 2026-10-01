@@ -107,6 +107,9 @@ def ignored(directory: str, names: list[str]) -> set[str]:
         )
     if directory_path.name in {"fluid", "solid"} and directory_path.parent.name == "constant":
         ignored_names.add("polyMesh")
+    # Build output of the boundary condition library in src/
+    if directory_path.name == "Make":
+        ignored_names.update(name for name in names if name not in {"files", "options"})
     return ignored_names.intersection(names)
 
 
@@ -274,8 +277,12 @@ def tutorial_fingerprint() -> str:
     for path in sorted(CASE_DIR.rglob("*")):
         relative = path.relative_to(CASE_DIR)
         if (
-            relative.parts[0] not in {"0", "constant", "system", "Allrun"}
+            relative.parts[0] not in {"0", "constant", "system", "src", "Allrun"}
             or "polyMesh" in relative.parts
+            or (
+                "Make" in relative.parts
+                and relative.name not in {"files", "options"}
+            )
             or not path.is_file()
         ):
             continue

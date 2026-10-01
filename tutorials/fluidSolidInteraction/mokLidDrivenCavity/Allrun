@@ -16,10 +16,6 @@ source solids4FoamScripts.sh
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
 
-# The lid and inlet velocities use codedFixedValue, which foam-extend does not
-# provide
-solids4Foam::caseDoesNotRunWithFoamExtend
-
 coupling=iqnils
 solid=highOrder
 runMode=serial
@@ -54,6 +50,9 @@ echo "Using ${coupling} coupling and the ${solid} solid discretisation"
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "solidProperties.${solid}" constant/solid/solidProperties
+
+# Build the lid and inlet velocity boundary condition
+(cd src && ./Allwmake) || exit 1
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
