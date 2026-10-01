@@ -331,6 +331,8 @@ symmetric SOR.
   for both the cubic and the linear reconstruction. With MUMPS the Krylov
   iterations fail although the preconditioner is exact, and with the linear
   reconstruction a solve that did converge on 4 ranks gave a wrong
-  displacement. This points to a parallel inconsistency of the high-order
-  residual or Jacobian rather than a weak preconditioner. It needs a C++
-  investigation and is left open.
+  displacement. The cause is the assembled high-order Jacobian
+  (`highOrderJacobian`), which is serial-only for now: its alpha scheme is not
+  yet parallelised. A fix is in preparation, after which the parallel runs,
+  including the wrong linear-reconstruction displacement, should be
+  rechecked.

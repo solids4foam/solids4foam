@@ -154,9 +154,28 @@ step, fails on refined meshes, and is 9% too stiff on the tutorial mesh.
 The solid solve needs the assembled high-order Jacobian as the
 preconditioner: with the compact Jacobian, even factorised exactly, GMRES
 stalls. hypre BoomerAMG works on the high-order Jacobian but is several
-times slower than LU. The cubic solid does not converge through sixteen or
-more cells across the wall thickness, where its linear solves diverge; the
-verification therefore keeps eight cells across the thickness.
+times slower than LU.
+
+The size of the least-squares stencil matters on this thin, structured wall,
+where the conditioning of the least-squares problem is poor, especially at
+boundary cells. With the tutorial's `faceStencilExtraCells 15`, the cubic solid
+does not converge with sixteen cells across the thickness: its linear solves
+diverge. A larger stencil improves the conditioning at some cost in accuracy.
+For the solid alone under the full external pressure (the wall-midpoint
+error against the beam, as in the table above):
+
+| `faceStencilExtraCells` | 80 x 8 (tutorial) | 80 x 16 | 160 x 16 |
+| ---: | ---: | ---: | ---: |
+| 15 (tutorial) | +0.21% | diverges | diverges |
+| 25 | +0.21% | diverges | |
+| 30 | +0.36% | diverges | |
+| 35 | +0.57% | +0.21% | |
+| 40 | -0.97% | +0.20% | +0.06% |
+| 60 | -0.95% | +0.87% | |
+
+Sixteen cells across the thickness therefore need about 35 extra stencil
+cells, which costs accuracy on the tutorial mesh. The tutorial and the
+verification keep eight cells across the thickness and 15 extra cells.
 
 ## Fluid-solid coupling
 
@@ -205,10 +224,14 @@ complete, Robin and IQN-ILS agree to 0.1-0.25% of the peak deflection.
 ./Allrun robin linear  # Robin-Neumann, linear solid, about 5 minutes
 ```
 
-The case runs in serial: in parallel, the Krylov solves of the solid fail to
-converge with every preconditioner tried, including an exact parallel LU,
-which suggests a parallel inconsistency in the high-order residual (see
+The case runs in serial: the assembled high-order Jacobian
+(`highOrderJacobian`) that preconditions the solid is serial-only for now, as
+its alpha scheme is not yet parallelised, and in parallel the solid's Krylov
+solves fail to converge with every preconditioner tried (see
 `verification/README.md`).
+
+`Allrun` builds the small `setPoiseuilleFlow` utility, which sets the initial
+Poiseuille flow in the fluid; `Allclean` removes its build files.
 
 ## Expected results
 
