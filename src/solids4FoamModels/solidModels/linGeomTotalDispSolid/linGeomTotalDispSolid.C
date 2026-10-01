@@ -338,6 +338,12 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
             tmpRef(tRhsEqn) += rho()*g();
 #ifdef OPENFOAM_COM
             tmpRef(tRhsEqn) += fvOptions()(ds_, D());
+#else
+            const tmp<volVectorField> tsource(fvOptionsSource());
+            if (tsource.valid())
+            {
+                tmpRef(tRhsEqn) += tsource();
+            }
 #endif
 
             fvVectorMatrix DEqn
@@ -722,6 +728,16 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStress()
         sigma()
     );
 }
+
+
+#ifndef OPENFOAM_COM
+Foam::tmp<Foam::volVectorField>
+Foam::solidModels::linGeomTotalDispSolid::fvOptionsSource() const
+{
+    // An empty tmp means no source, so callers can skip the field operations
+    return tmp<volVectorField>();
+}
+#endif
 
 
 Foam::tmp<Foam::volScalarField>
@@ -1311,6 +1327,12 @@ label linGeomTotalDispSolid::formResidual
     // Add optional fvOptions, e.g. MMS body force
     // Note that "source()" is already multiplied by the volumes
     residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+#else
+    const tmp<volVectorField> tsource(fvOptionsSource());
+    if (tsource.valid())
+    {
+        residual += mesh.V()*tsource().internalField();
+    }
 #endif
 
     // Copy the residual into the f field
