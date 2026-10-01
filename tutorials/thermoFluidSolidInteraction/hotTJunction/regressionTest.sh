@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # hotTJunction regression test
 # Uses the fsiConvergenceData output as a cheap coupling check.
@@ -48,7 +51,7 @@ prepare_case() {
 
 shorten_case() {
     local controlDict="${CASE_DIR}/system/controlDict"
-    sed -i.bak 's/^endTime[[:space:]]\+0.2;/endTime         0.01;/' "${controlDict}"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+0.2;/endTime         0.01;/' "${controlDict}"
     rm -f "${controlDict}.bak"
 }
 
