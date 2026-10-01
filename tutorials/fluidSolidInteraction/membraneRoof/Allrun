@@ -11,14 +11,6 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-if [[ "${WM_PROJECT_VERSION#v}" -lt 2012 ]]
-then
-    echo
-    echo "OpenFOAM-v2012 or a newer version is required for this case"
-    echo
-    exit 0
-fi
-
 # PETSc is required for the solid solver
 solids4Foam::requirePetscOrExitSilently
 

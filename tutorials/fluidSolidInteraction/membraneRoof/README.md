@@ -92,11 +92,29 @@ differences from the reference.
 
 ## Mesh and Running
 
+The vertex numbering for `system/fluid/blockMeshDict` is shown below. The
+schematic uses the case axes and the 75 m domain height; dimensions are in
+metres. The [editable SVG](./images/membraneRoof-blockMeshDict.svg) is retained
+alongside the image.
+
+![Fluid blockMesh vertex numbering](./images/membraneRoof-blockMeshDict.png)
+
 The fluid mesh is created with `blockMesh` and refined once, in all directions,
 above and around the roof, with `setSet` and `refineMesh`, giving
 $$28\,752$$ cells. The solid mesh has $$16 \times 2 \times 16$$ cells, i.e. 2
 cells through the roof thickness: with 6 cells through the thickness the
 roof-centre displacement changes by less than $$1$$ mm, at twice the cost.
+This through-thickness comparison alone does not establish in-plane mesh
+convergence or equivalence to the reference shell formulation.
+
+The solid dictionary uses `scale 1` and vertical coordinates 4.99 and 5 m,
+giving a thickness of 0.01 m, consistent with [2, Sect. 6.2.2]. Generating the
+solid mesh with OpenFOAM-v2512 confirms these bounds, 512 cells and a total
+volume of 1 m$$^3$$ (1000 kg at the specified density). The earlier
+`feature-petsc-snes-quasi-monolithic` case also uses those coordinates despite
+its stale comment stating 0.1 m. This checks the case definitions; the meshes
+and configurations behind the historical plots still need a
+[provenance audit](https://github.com/solids4foam/solids4foam/issues/524).
 
 Run the case with
 
@@ -105,8 +123,8 @@ Run the case with
 ```
 
 which uses 6 processes, or `./Allrun` for a serial run. The case needs
-OpenFOAM.com v2012 or newer, for the expression inlet, and a solids4foam build
-with PETSc, for the solid solver; with other OpenFOAM variants, or without
+a supported OpenFOAM.com version, for the expression inlet, and a solids4foam
+build with PETSc, for the solid solver; with other OpenFOAM variants, or without
 PETSc, `Allrun` exits without running. The hypre BoomerAMG preconditioner
 needs PETSc built with hypre; without it, use the LU preconditioner commented
 in `system/solid/fvSolution`, which is fine in serial or on a few processes.
@@ -139,7 +157,7 @@ flow accelerates pushes it down into a concave shape, and as the inlet speed
 approaches its maximum the roof is lifted by suction into a convex shape,
 crossing zero at $$t = 4.5$$ s, against $$5.0$$ s in the reference. The mean
 displacement between $$1$$ and $$4$$ s is $$-0.25$$ m, against $$-0.36$$ m for
-the reference. The computed roof oscillates about this mean at its natural
+the reference. The computed roof oscillates about this mean with a
 period of about $$0.19$$ s, with a peak-to-peak amplitude of only about
 $$0.02$$ m on this coarse mesh, whereas the reference oscillates between about
 $$-0.18$$ and $$-0.55$$ m with a period of about $$0.48$$ s. After the ramp the
@@ -157,9 +175,8 @@ average.
 The finer mesh 2 of Figure 3 (58 min on 32 processes) brings the mean
 roof-centre displacement between 1 and 4 s to $$-0.35$$ m, against $$-0.36$$ m
 for the reference and $$-0.25$$ m for the default mesh. Neither mesh
-reproduces the reference oscillation, and the study below indicates that
-refinement is unlikely to: its period is not the natural period of a roof with
-the published properties.
+reproduces the reference oscillation. The cause of the discrepancy remains
+unresolved; the study below describes the sensitivities examined so far.
 ```
 
 ### Roof oscillation
@@ -179,7 +196,7 @@ time step of the tutorial.
 | :-- | :-- | --: | --: | --: |
 | Reference [2] | | 0.02 | 0.37 | 0.48 |
 | `backward`, `Euler` | limited `linearUpwind` | 0.02 | 0.026 | 0.2, decaying |
-| `backward`, `Euler` | limited `linearUpwind` | 0.005 | 0.057 | 0.20, decaying |
+| `backward`, `Euler` | limited `linearUpwind` | 0.005 | 0.057 | 0.2, decaying |
 | `backward`, `backward` | `LUST` | 0.02 | 0.050 | 0.20 |
 | `backward`, `backward` | `LUST` | 0.01 | 0.077 | 0.22 |
 | `backward`, `backward` | `LUST` | 0.005 | 0.091 | 0.20 |
@@ -189,28 +206,33 @@ Numerical damping, from the first-order `Euler` scheme and the limited
 convection scheme in the fluid, is why the previous settings of this tutorial
 damped the roof oscillation out. On this mesh, with the schemes and time step
 of the tutorial, the oscillation is sustained and converged in the time step,
-at the natural period of the roof in air, about $$0.20$$ s. Its amplitude is
+with a period of about $$0.20$$ s in this simulation. Its amplitude is
 still about four times smaller than that of the reference, and its period is
 less than half; on the default mesh the amplitude is smaller still, about
 $$0.02$$ m peak to peak.
 
 The reference oscillates at about $$0.48$$ s (about $$2.1$$ Hz) in both the
-roof-centre displacement and the pressure [2, Figs. 6.6 and 6.7]. Membrane
-theory and dry tests of the roof alone, in which a pressure is applied
-suddenly, show that the published roof properties cannot give that period at
-the reported sag: the dry period scales as $$p^{-1/3}$$ with the applied
-pressure $$p$$ (0.25, 0.17 and 0.11 s for 500, 1500 and 4500 Pa), and a period
-of about $$0.48$$ s with the fluid added mass would need about five times the
-mass or a fifth of the tension. Applying the self-weight, or fixing only the
-lower half of the roof edges to approximate the pinned edges of the reference,
-changes the period by about $$2\%$$ or less. A forced response at a fixed
-frequency from the flow is also unlikely, since the reference period stays at
-about $$0.48$$ s while the inflow speed at roof height rises about ninefold
-during the ramp. The reference oscillation is therefore most likely either a
-numerical artefact or the result of a model difference that the references do
-not document; it was not recovered on any of the meshes tested here, up to
-$$369\,000$$ fluid cells, and is unlikely to be recovered by refining this
-model.
+roof-centre displacement and the pressure [2, Figs. 6.6 and 6.7]. In the dry
+tests of the present roof model, a suddenly applied pressure gives periods
+of 0.25, 0.17 and 0.11 s for 500, 1500 and 4500 Pa, approximately following
+$$p^{-1/3}$$ scaling. These observations do not establish that the coupled
+reference response is incompatible with the published properties.
+
+The reference uses seven-parameter shell elements with edge translations
+fixed and rotations permitted [2, Sects. 6.2.2-6.2.3]. The present model uses
+three-dimensional continuum cells with the entire edge faces fixed. Applying
+self-weight, or fixing only the lower half of the roof edges, changed the
+period by about $$2\%$$ or less in the reported tests; the latter condition
+is only an approximation to a pinned shell edge.
+
+The present model does not reproduce the reference oscillation, including on
+the meshes tested up to $$369\,000$$ fluid cells. The cause remains unresolved;
+structural formulation, boundary conditions, fluid loading and numerical
+discretisation require further comparison. A useful next step is a comparison
+of shell and solid structure-only models with matched static
+pressure-deflection curves, followed by small oscillations about the same
+loaded equilibrium and spatial and temporal refinement. This investigation is
+tracked in [issue #526](https://github.com/solids4foam/solids4foam/issues/526).
 
 ### Sensitivity
 
@@ -228,9 +250,9 @@ against $$-0.36$$ m for the reference and $$-0.25$$ m for the tutorial mesh,
 and it shows a first dip near $$t = 0.4$$ s. It still settles to a nearly
 steady shape after the ramp. With these dissipative settings neither mesh
 reproduces the reference oscillation; with the current settings the roof
-oscillates at its natural period instead, and the reason the reference period
-differs is discussed in [Roof oscillation](#roof-oscillation). The finer mesh
-took 58 min on 32 processes of an AMD EPYC 9684X.
+oscillates with a shorter period, and the unresolved discrepancy is discussed
+in [Roof oscillation](#roof-oscillation). The finer mesh took 58 min on 32
+processes of an AMD EPYC 9684X.
 
 ![Sensitivity of the roof centre displacement to the time step, self-weight and mesh](./images/membraneRoof-sensitivity.png)
 
