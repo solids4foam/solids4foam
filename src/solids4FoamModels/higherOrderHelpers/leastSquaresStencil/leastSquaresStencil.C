@@ -159,8 +159,8 @@ List<scalar> leastSquaresStencil::calcFirstHaloDepth() const
 
 labelList leastSquaresStencil::checkProcessorOverlap
 (
-    const List<OBB>& allOwnedCellsBox,
-    const List<OBB>& allOwnedFacesBox
+    const List<orientedBoundBox>& allOwnedCellsBox,
+    const List<orientedBoundBox>& allOwnedFacesBox
 ) const
 {
     DynamicList<label> overlappingProcessor;
@@ -191,20 +191,20 @@ labelList leastSquaresStencil::checkProcessorOverlap
     return overlappingProcessor.shrink();
 }
 
-OBB leastSquaresStencil::calcOwnedCellsBox() const
+orientedBoundBox leastSquaresStencil::calcOwnedCellsBox() const
 {
-    return OBB(primitiveField(mesh_.C()));
+    return orientedBoundBox(primitiveField(mesh_.C()));
 }
 
 
-OBB leastSquaresStencil::calcOwnedFacesBox() const
+orientedBoundBox leastSquaresStencil::calcOwnedFacesBox() const
 {
-    return OBB(mesh_.faceCentres());
+    return orientedBoundBox(mesh_.faceCentres());
 }
 
 List<labelList> leastSquaresStencil::remoteCandidates
 (
-    const List<OBB>& allOwnedFacesBox,
+    const List<orientedBoundBox>& allOwnedFacesBox,
     const labelList& procToQuery
 ) const
 {
@@ -230,7 +230,7 @@ List<labelList> leastSquaresStencil::remoteCandidates
     forAll(procToQuery, i)
     {
         const label sender = procToQuery[i];
-        const OBB& queryBox = allOwnedFacesBox[sender];
+        const orientedBoundBox& queryBox = allOwnedFacesBox[sender];
         DynamicList<label> markedCells;
 
         forAll(C, cellI)
@@ -883,14 +883,14 @@ void leastSquaresStencil::calcFacesStencil() const
 
     // Absolute halo distance, independent of the partition box diagonal.
     // This replaces the former fractional inflate() call on OpenFOAM.org.
-    OBB ownedFacesBox = calcOwnedFacesBox();
+    orientedBoundBox ownedFacesBox = calcOwnedFacesBox();
     ownedFacesBox.grow(scaledHaloDepth);
 
     // Box for remote processors cells
-    List<OBB> allOwnedCellsBox(Pstream::nProcs());
+    List<orientedBoundBox> allOwnedCellsBox(Pstream::nProcs());
     allOwnedCellsBox[Pstream::myProcNo()] = calcOwnedCellsBox();
 
-    List<OBB> allOwnedFacesBox(Pstream::nProcs());
+    List<orientedBoundBox> allOwnedFacesBox(Pstream::nProcs());
     allOwnedFacesBox[Pstream::myProcNo()] = ownedFacesBox;
 
 #ifdef OPENFOAM_COM

@@ -57,7 +57,7 @@ Author
 #include "Field.H"
 #include "tmp.H"
 #include "globalIndex.H"
-#include "OBB.H"
+#include "orientedBoundBox.H"
 #include "CompactListList.H"
 #include "boolList.H"
 #include "compatibilityFunctions.H"
@@ -127,10 +127,10 @@ class leastSquaresStencil
         void operator=(const leastSquaresStencil&) = delete;
 
         //- Calculate oriented bounding box for owned cells
-        OBB calcOwnedCellsBox() const;
+        orientedBoundBox calcOwnedCellsBox() const;
 
         //- Calculate oriented bounding box for owned faces
-        OBB calcOwnedFacesBox() const;
+        orientedBoundBox calcOwnedFacesBox() const;
 
         //- Get average depth of first-halo cells for each processors
         List<scalar> calcFirstHaloDepth() const;
@@ -142,14 +142,14 @@ class leastSquaresStencil
         /// cells and bounding box for local processor faces
         labelList checkProcessorOverlap
         (
-            const List<OBB>& allOwnedCellsBox,
-            const List<OBB>& allOwnedFacesBox
+            const List<orientedBoundBox>& allOwnedCellsBox,
+            const List<orientedBoundBox>& allOwnedFacesBox
         ) const;
 
         //- Get remote cells candidates for stencil construction
         List<labelList> remoteCandidates
         (
-            const List<OBB>& allOwnedFacesBox,
+            const List<orientedBoundBox>& allOwnedFacesBox,
             const labelList& procToQuery
         ) const;
 

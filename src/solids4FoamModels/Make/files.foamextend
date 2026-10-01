@@ -224,7 +224,7 @@ numerics/multiplyCoeff/multiplyCoeff.C
 numerics/newGGIInterpolation/newGGIInterpolationName.C
 numerics/newAMIInterpolation/newAMIInterpolationName.C
 numerics/newFvMeshSubset/newFvMeshSubset.C
-numerics/OBB/OBB.C
+numerics/orientedBoundBox/orientedBoundBox.C
 numerics/patchCorrectionVectors/patchCorrectionVectors.C
 numerics/pointFieldFunctions/pointFieldFunctions.C
 numerics/pointGaussLeastSquaresGrad/pointGaussLeastSquaresGrads.C
