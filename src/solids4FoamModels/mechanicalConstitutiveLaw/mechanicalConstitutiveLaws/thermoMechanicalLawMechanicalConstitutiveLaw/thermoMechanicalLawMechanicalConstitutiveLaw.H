@@ -35,6 +35,12 @@ Description
     every iteration, so storing it, rolling it over, or letting a file of the
     same name stand in for it would all be wrong.
 
+    Where nothing in the run solves for it, the temperature can be read at
+    each time step from another case directory, given as TcaseDirectory or in
+    an inputCaseDirectories sub-dictionary. That is the
+    manager's business, not this law's, and works for any law's inputs: see
+    mechanicalConstitutiveLawCaseInputs.
+
     The sub-law's history lives in a child state, so the sub-law looks it up by
     its own unqualified names and nothing collides with this law's.
 
@@ -147,6 +153,26 @@ public:
         virtual wordList requiredScalarInputs() const override
         {
             return wordList(1, TName_);
+        }
+
+        //- The sub-law's convergence scale, over its own state, so that a
+        //  plastic sub-law is judged by the scale the manager reduces
+        virtual scalar smallStrainConvergenceScale
+        (
+            const smallStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const override
+        {
+            return subLawPtr_->smallStrainConvergenceScale
+            (
+                kin, state.child(subStateName_)
+            );
+        }
+
+        //- Whether the sub-law uses a convergence scale
+        virtual bool usesConvergenceScale() const override
+        {
+            return subLawPtr_->usesConvergenceScale();
         }
 
         //- The sub-law's history lives in a child state

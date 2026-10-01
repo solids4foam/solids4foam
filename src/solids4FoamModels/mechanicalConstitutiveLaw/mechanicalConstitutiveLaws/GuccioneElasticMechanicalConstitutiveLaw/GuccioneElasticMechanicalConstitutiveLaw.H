@@ -42,9 +42,8 @@ Description
     displacement-pressure formulation replace the volumetric part with a solved
     pressure and still describe this material rather than a neighbouring one.
 
-    It is not the legacy law away from the incompressible limit. The legacy
-    GuccioneElastic puts the full Green-Lagrange strain into Q, which couples
-    shape to volume; the two agree as J approaches one, which is the limit the
+    Putting the full Green-Lagrange strain into Q instead would couple shape
+    to volume; the two forms agree as J approaches one, which is the limit the
     published model was written for, and differ by about 4e-4 on the
     LandEtAl2015 problem3 tutorial.
 
@@ -54,16 +53,16 @@ Description
     it need not be given normalised, and a zero-length fibre is refused rather
     than divided by.
 
-    Two things the legacy GuccioneElastic does are deliberately not here.
+    Two things are deliberately not here.
 
-    The mixed displacement-pressure formulation is not ported. In the legacy
-    law it is selected by a per-material dictionary entry, which makes a
-    material's dictionary choose which equations the solver solves, and its two
-    branches do not agree on the stress measure they return. That is being
-    settled separately, and until it is this law is displacement only.
+    A mixed displacement-pressure formulation selected by a per-material
+    dictionary entry: that would make a material's dictionary choose which
+    equations the solver solves. The law is displacement only; the solid
+    model's mixed formulation asks it for its isochoric stress and volumetric
+    response apart.
 
-    Neither is the local coordinate system variant, which doubles the
-    evaluation path for a case that no ported tutorial uses.
+    A local coordinate system variant, which would double the evaluation path
+    for a case that no tutorial uses.
 
 SourceFiles
     GuccioneElasticMechanicalConstitutiveLaw.C
