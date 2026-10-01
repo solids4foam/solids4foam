@@ -29,7 +29,9 @@ ddtSchemes
 gradSchemes
 {
     default            none;
-    grad(D)            pointCellsLeastSquares;
+    // With more than one material, the gradient has to keep each cell's
+    // stencil within its own material
+    grad(D)            leastSquaresS4f;
 }
 
 divSchemes
@@ -44,9 +46,7 @@ laplacianSchemes
 
 snGradSchemes
 {
-    default            none;
-    snGrad(D)          corrected;
-    snGrad(DD)         corrected;
+    default            corrected;
 }
 
 interpolationSchemes

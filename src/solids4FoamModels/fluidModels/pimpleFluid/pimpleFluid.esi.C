@@ -400,9 +400,6 @@ bool pimpleFluid::evolve()
     {
         if (pimple.firstIter() || moveMeshOuterCorrectors)
         {
-            // fvModels not added yet
-            // fvModels.preUpdateMesh();
-
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
             if (fluidModel::fsiMeshUpdate())
@@ -598,6 +595,21 @@ void pimpleFluid::solveEnergyEq()
         // Store fields for under-relaxation and residual calculation
         TPtr_().storePrevIter();
 
+        volScalarField rhoCp
+        (
+            IOobject
+            (
+                "rhoCp",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            rho_*Cp
+        );
+
         fvScalarMatrix TEqn
         (
             rho_*Cp*
@@ -606,16 +618,22 @@ void pimpleFluid::solveEnergyEq()
               + fvm::div(phi(), TPtr_())
             )
           - fvm::laplacian(lambdaEffPtr_(), TPtr_())
+         ==
+            options()(rhoCp, TPtr_())
         );
 
         // Under-relaxation the linear system
         TEqn.relax();
+
+        options().constrain(TEqn);
 
         // Solve the linear system
         TEqn.solve();
 
         // Under-relax the field
         TPtr_().relax();
+
+        options().correct(TPtr_());
     }
 }
 

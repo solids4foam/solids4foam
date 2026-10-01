@@ -69,33 +69,27 @@ The following `solidModel` options are particularly relevant here:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `writeResidualField` | `false` | Writes a residual field during output |
 | `residualFile` | `false` | Writes `residual.dat` in the case directory |
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
-| `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+| `solvePressure` | `false` | Not supported; refused at construction |
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with
 `scaleFactor 0.1` for both momentum and pressure.
 
-### Pressure coupling special case
+### Pressure coupling
 
-This model can also solve for pressure by enabling:
-
-```text
-solvePressure true;
-```
-
-This is a special case and is only supported when `solutionAlgorithm` is
-`PETScSNES`. When pressure solving is enabled:
-
-- the PETSc solution vector includes `p` as an extra unknown;
-- the pressure stabilisation sub-model is used;
-- the code enforces the `PETScSNES` path at construction time.
+The mixed displacement-pressure formulation (`solvePressure`) is not
+supported by this model, and a case that sets it stops at construction. This
+model obtains the volumetric part by taking `dev()` of the total stress, which
+is exact only where everything the solved pressure must not replace is trace
+free. Use `nonLinearGeometryTotalLagrangianTotalDisplacement` for a mixed
+formulation. For a segregated solve of a nearly incompressible material, the
+hydrostatic stress smoothing (`solvePressureEqn`) is available instead.
 
 ### Recommended dictionary setup
 
@@ -115,7 +109,6 @@ nonLinearGeometryUpdatedLagrangianCoeffs
     nCorrectors          10000;
     solutionTolerance    1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance    1e-05;
     infoFrequency        100;
 
     restart              false;
@@ -139,12 +132,6 @@ nonLinearGeometryUpdatedLagrangianCoeffs
         }
     }
 }
-```
-
-If `solvePressure` is enabled, add:
-
-```text
-    solvePressure         true;
 ```
 
 If `solutionAlgorithm` is `PETScSNES`, also ensure the case provides the PETSc
@@ -184,7 +171,6 @@ The main fields you will typically see in the output are:
 - `A`: acceleration field.
 - `sigma`: symmetric stress tensor field.
 - `rho`: updated-configuration density field.
-- `p`: pressure field, only when `solvePressure` is enabled.
 
 Here `oldTime()` means the value stored at the previous time step.
 
@@ -234,7 +220,7 @@ choices are:
 - `D` is reconstructed from `DD`;
 - `F`, `relF`, `relFinv`, `relJ`, and `J` are updated from `grad(DD)`;
 - the model is marked as incremental and moving-mesh;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver supports segregated implicit and PETSc SNES paths only.
 
 The class inherits from `solidModel` and `foamPetscSnesHelper`.
@@ -252,8 +238,7 @@ The constructor performs the following setup:
 4. Reads optional settings such as `predictor`, `solvePressure`,
    `dampingCoeff`, and the PETSc options file name.
 5. Forces creation of old-time fields for consistent restart behaviour.
-6. Creates `p` and validates that `solvePressure` is only used with
-   `PETScSNES`.
+6. Refuses `solvePressure`, which this model does not support.
 7. Rebuilds `relF`, `relFinv`, `relJ`, `F`, and `J` when `restart` is enabled.
 8. Enforces `leastSquaresS4f` for `grad(DD)` when PETSc SNES is used.
 9. Enables `extrapolateValue` on `solidTraction` patch fields for the PETSc
@@ -291,7 +276,6 @@ Any other algorithm value is treated as unsupported for this class.
   solution vector;
 - solves the nonlinear system through `foamPetscSnesHelper`;
 - extracts the solution back into `DD`;
-- optionally extracts `p` when `solvePressure` is enabled;
 - recomputes `D`, `gradDD`, `pointDD`, `pointD`, `U`, `A`, `F`, `relF`,
   `relFinv`, `relJ`, and `J`.
 
@@ -331,11 +315,10 @@ read back.
 
 Measured on the `neckingBar` tutorial, stopping halfway and continuing: the
 axial loading force differs by about 1e-5 relative, and a force component that
-is otherwise zero returns as a small non-zero value. The size is the same
-whether the material is evaluated through the legacy `mechanicalModel` or
-through the `mechanicalConstitutiveLaw` framework, and the framework is if
-anything the closer of the two, so this is the solid model's rather than the
-material's.
+is otherwise zero returns as a small non-zero value. The size was the same with
+the former `mechanicalModel` material implementation as with the
+`mechanicalConstitutiveLaw` framework, so this is the solid model's rather
+than the material's.
 
 The cause has not been established. The likely place to look is what the
 updated configuration needs carried across a restart beyond the fields
