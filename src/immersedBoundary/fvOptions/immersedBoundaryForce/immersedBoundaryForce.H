@@ -24,22 +24,49 @@ Description
     incompressible flow, as a finite volume option for the momentum equation.
 
     Each body is a closed surface (see immersedBody) that covers some cells of
-    the fluid mesh with an occupancy lambda. The option adds the forcing f
-    (an acceleration) to the right-hand side of the momentum equation, and
-    after each pressure corrector drives the velocity U of the covered cells
-    towards the velocity of the bodies Ui:
+    the fluid mesh with an occupancy lambda, and moves with the velocity Ui.
+    Two forcing methods are available.
+
+    penalty (the default): the implicit volume penalisation
+
+    \f[
+        f = \kappa (U_i - U)
+    \f]
+
+    is added to the right-hand side of the momentum equation, with the
+    \f$ -\kappa U \f$ part in the matrix, so that it also enters the pressure
+    equation through 1/A. The penalisation rate is \f$ \kappa = K/\Delta t \f$
+    in the fully covered cells, where K is the penalty coefficient. With the
+    volumeFraction weighting (the default), \f$ \kappa \Delta t =
+    \min(K, \lambda/(1 - \lambda)) \f$ in the partially covered cells, so
+    that the penalised velocity is \f$ \lambda U_i + (1 - \lambda) U \f$; with
+    the occupancy weighting, \f$ \kappa = K \lambda/\Delta t \f$, which for
+    large K blocks every covered cell. With the volumeFraction weighting, the
+    rate in the partially covered cells is also limited to
+    \f$ \lambda/(1 - \lambda) C (\nu/w^2 + \max(|U_i|, |U|)/w) \f$, where
+    w is the cell width and C the surface rate coefficient (default 3).
+    This cap has no explicit time-step dependence. The numerical velocity
+    scale is relative to the fixed mesh; it is updated using the current
+    fluid velocity at each momentum assembly.
+
+    incremental: the direct forcing of the openHFDIB-DEM pimpleHFDIBFoam
+    solver. The explicit forcing f is added to the right-hand side of the
+    momentum equation, and after each pressure corrector
 
     \f[
         f \leftarrow f + c \frac{U_i - U}{\Delta t}
     \f]
 
-    where \f$ c \f$ is the coupling coefficient. The updated forcing is used by
-    the next pressure corrector. At the start of each time step, the bodies
-    are moved to the new time and f is multiplied by the new occupancy; if the
-    mesh moves again within the time step (moveMeshOuterCorrectors), f is set
-    to zero in the cells no longer covered.
+    in the covered cells, where \f$ c \f$ is the coupling coefficient; the
+    updated forcing is used by the next pressure corrector. At the start of
+    each time step, f is multiplied by the new occupancy; if the mesh moves
+    again within the time step (moveMeshOuterCorrectors), f is set to zero in
+    the cells no longer covered. The results depend on c, the time step and
+    the number of pressure correctors. This method is kept for comparison, and
+    reproduces pimpleHFDIBFoam with the vertexFraction occupancy.
 
-    The force reported after the last pressure corrector includes that
+    With the incremental method, the force reported after the last pressure
+    corrector includes that
     corrector's forcing increment. Since there is no following pressure
     corrector in the same solve, this increment first acts in the next
     momentum solve, consistently with the original pimpleHFDIBFoam method.
@@ -86,10 +113,29 @@ Description
     {
         type            immersedBoundaryForce;
 
-        // Relaxation c of each direct-forcing update, optional, default 0.8.
-        // Reduce it to damp oscillatory forcing or pressure corrections, at
-        // the cost of slower enforcement of the body velocity
-        couplingCoeff   0.2;
+        // Forcing method, optional, default penalty
+        method          penalty;
+
+        // Penalty coefficient K, optional, default 1e3
+        penaltyCoeff    1e3;
+
+        // Weighting of the penalty in partially covered cells, optional,
+        // default volumeFraction
+        weighting       volumeFraction;
+
+        // Coefficient of the penalisation rate in partially covered cells
+        // with the volumeFraction weighting, optional, default 3; 0 for a
+        // rate of lambda/((1 - lambda)*deltaT)
+        surfaceRateCoeff 3;
+
+        // Kinematic viscosity for the surface rate, optional, default the
+        // nu entry of transportProperties
+        nu              1e-3;
+
+        // Relaxation c of each incremental direct-forcing update, optional,
+        // default 0.8. Reduce it to damp oscillatory forcing or pressure
+        // corrections, at the cost of slower enforcement of body velocity
+        couplingCoeff   0.8;
 
         // Occupancy threshold for a covered cell, optional, default 1e-4
         surfaceThreshold 1e-4;
@@ -112,8 +158,9 @@ Description
     }
     \endverbatim
 
-    The fields lambda, Ui and f are written with the name of the option as a
-    prefix, e.g. immersedBoundary:lambda. f is read on restart.
+    The fields lambda, Ui, kappa and f are written with the name of the option as a
+    prefix, e.g. immersedBoundary:lambda. With the incremental method, f is
+    read on restart.
 
 Author
     Derived from the pimpleHFDIBFoam solver of openHFDIB-DEM
@@ -138,6 +185,7 @@ SourceFiles
 #define immersedBoundaryForce_H
 
 #include "fvOption.H"
+#include "Enum.H"
 #include "volFields.H"
 #include "PtrList.H"
 #include "OFstream.H"
@@ -164,10 +212,52 @@ class immersedBoundaryForce
 {
     // Private Data
 
+        //- Forcing methods and dictionary names
+        enum forcingMethod { incremental, penalty };
+        static const Enum<forcingMethod> methodNames_;
+
+        //- Penalty weightings and dictionary names
+        enum penaltyWeighting { volumeFraction, occupancy };
+        static const Enum<penaltyWeighting> weightingNames_;
+
+
         //- Immersed bodies
         PtrList<immersedBody> bodies_;
 
-        //- Coupling coefficient
+        //- Forcing method: penalty (implicit volume penalisation, the
+        //  default) or incremental (the explicit direct forcing of
+        //  openHFDIB-DEM, increased after each pressure corrector)
+        forcingMethod method_;
+
+        //- Penalty coefficient K: the penalisation rate in a fully covered
+        //  cell is K/deltaT
+        scalar penaltyCoeff_;
+
+        //- Weighting of the penalisation in the partially covered cells:
+        //  volumeFraction (the default), where the rate times deltaT is
+        //  min(K, lambda/(1 - lambda)), so that the penalised velocity is
+        //  lambda*Ui + (1 - lambda)*U, or occupancy, where the rate is
+        //  K*lambda/deltaT
+        penaltyWeighting weighting_;
+
+        //- Coefficient C of the penalisation rate in the partially covered
+        //  cells with the volumeFraction weighting: the rate is
+        //  lambda/(1 - lambda)*C*(nu/w^2 + max(|Ui|, |U|)/w), where w is
+        //  the cell width. This cap has no explicit time-step dependence;
+        //  the fluid velocity is updated at each momentum assembly. The rate is
+        //  lambda/((1 - lambda)*deltaT) if C is not positive
+        scalar surfaceRateCoeff_;
+
+        //- Kinematic viscosity for the surface rate
+        scalar nu_;
+
+        //- Has the viscosity been set?
+        bool nuSet_;
+
+        //- Penalisation rate (1/s) in each cell
+        volScalarField kappa_;
+
+        //- Coupling coefficient of the incremental method
         scalar couplingCoeff_;
 
         //- Occupancy threshold for a covered cell
@@ -250,6 +340,10 @@ class immersedBoundaryForce
         //  transportProperties after the option, so it is looked up on use
         scalar rho();
 
+        //- Kinematic viscosity for the surface rate: the nu entry, else the
+        //  nu entry of transportProperties
+        scalar nu();
+
         //- Move the bodies to the current time and calculate the occupancy
         void updateBodies(const bool move);
 
@@ -258,6 +352,9 @@ class immersedBoundaryForce
 
         //- Write the forces of the last completed time step
         void writeForces();
+
+        //- Set the penalisation rate and the velocity of the bodies
+        void setPenalty(const volVectorField& U);
 
 
 public:
