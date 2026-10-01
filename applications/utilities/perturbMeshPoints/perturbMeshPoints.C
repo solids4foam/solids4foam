@@ -442,11 +442,7 @@ int main(int argc, char *argv[])
         Info<< "Applying the perturbation to the points" << endl;
         mesh.movePoints(newPoints);
 #ifdef OPENFOAM_COM
-    #if (OPENFOAM >= 2112)
         mesh.setPhi()->writeOpt() = IOobject::NO_WRITE;
-    #else
-        mesh.setPhi().writeOpt() = IOobject::NO_WRITE;
-    #endif
 #endif
 
         // Check for negative or small cell volumes

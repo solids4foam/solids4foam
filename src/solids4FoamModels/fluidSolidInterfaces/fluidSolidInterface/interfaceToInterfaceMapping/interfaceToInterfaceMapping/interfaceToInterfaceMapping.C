@@ -165,7 +165,7 @@ Foam::interfaceToInterfaceMapping::New
 {
     Info<< "Selecting interfaceToInterfaceMapping " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)

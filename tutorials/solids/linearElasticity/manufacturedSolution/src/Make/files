@@ -1,5 +1,6 @@
 manufacturedSolution.C
 manufacturedSolutionSource.C
+manufacturedSolutionSolid.C
 manufacturedSolutionFunctionObject.C
 manufacturedSolutionFvPatchVectorField.C
 

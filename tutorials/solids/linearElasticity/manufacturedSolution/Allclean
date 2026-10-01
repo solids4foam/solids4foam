@@ -5,7 +5,7 @@ source solids4FoamScripts.sh
 
 wclean lib src
 cleanCase
-rm -f gmsh/cube.msh
+rm -f gmsh/*.msh
 solids4Foam::restoreCaseFormat .
 
 for file in constant/solidProperties.segregated \

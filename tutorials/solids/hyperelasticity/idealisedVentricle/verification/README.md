@@ -1,10 +1,9 @@
 # idealisedVentricle verification study
 
-This opt-in study migrates the mesh-convergence study from
-`solid-benchmarks/hyperElasticity/idealisedVentricle` into the tutorial itself.
-It refines the tutorial `blockMesh` and its rotational `extrudeMesh` together,
-samples the deformed mid-wall line of Problem 2 of Land et al. (2015), and
-checks that the solution converges under uniform refinement.
+This opt-in study is a mesh-convergence study. It refines the tutorial
+`blockMesh` and its rotational `extrudeMesh` together, samples the deformed
+mid-wall line of Problem 2 of Land et al. (2015), and checks that the solution
+converges under uniform refinement.
 
 It is deliberately separate from `regressionTest.sh`: the regression test
 checks that the tutorial remains numerically stable, whereas this study checks
