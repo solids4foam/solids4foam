@@ -224,9 +224,8 @@ List<labelList> leastSquaresStencil::remoteCandidates
         return remoteCandidatesPerProc;
     }
 
-#ifdef FOAMEXTEND
-    // Reuse the streamed boxes from overlap detection without reconstructing
-    // their axes. Partner lists are symmetric by construction.
+    // Mark local cells inside each partner's gathered face box. Partner lists
+    // are symmetric by construction, so the boxes need not be exchanged again
     List<labelList> sendCandidates(Pstream::nProcs());
     forAll(procToQuery, i)
     {
@@ -245,6 +244,7 @@ List<labelList> leastSquaresStencil::remoteCandidates
         sendCandidates[sender].transfer(markedCells.shrink());
     }
 
+#ifdef FOAMEXTEND
     labelListList candidateSizes;
     Pstream::exchange<labelList, label>
     (
@@ -253,95 +253,28 @@ List<labelList> leastSquaresStencil::remoteCandidates
         candidateSizes
     );
 #else
-    const OBB& ownedFacesBox = allOwnedFacesBox[Pstream::myProcNo()];
+    PstreamBuffers pBufs(Pstream::commsTypes::nonBlocking);
 
-    // Phase 1: Exchange ownedFacesBox between processors
-    Map<OBB> incomingBoxesFromProc;
+    forAll(procToQuery, i)
     {
-        PstreamBuffers sBufs(Pstream::commsTypes::nonBlocking);
-
-        forAll(procToQuery, i)
-        {
-            const label toProc = procToQuery[i];
-            UOPstream os(toProc, sBufs);
-            os << ownedFacesBox;
-        }
-
-        sBufs.finishedSends();
-
-        forAll(procToQuery, i)
-        {
-            const label from = procToQuery[i];
-
-            if (from == Pstream::myProcNo())
-            {
-                continue;
-            }
-
-#ifdef OPENFOAM_COM
-            if (!sBufs.recvDataCount(from))
-            {
-                continue;
-            }
-#endif
-            UIPstream is(from, sBufs);
-            OBB qb;
-            is >> qb;
-
-            incomingBoxesFromProc.insert(from, qb);
-        }
+        const label toProc = procToQuery[i];
+        UOPstream os(toProc, pBufs);
+        os << sendCandidates[toProc];
     }
 
-    // Phase 2: Mark local cells and send back global IDs
+    pBufs.finishedSends();
+
+    forAll(procToQuery, i)
     {
-        PstreamBuffers rBufs(Pstream::commsTypes::nonBlocking);
-
-        forAllConstIter(Map<OBB>, incomingBoxesFromProc, it)
-        {
-            const label sender = it.key();
-            const OBB& qb = it();
-
-            labelHashSet usedBySender;
-            forAll(C, cellI)
-            {
-                if (qb.contains(C[cellI]))
-                {
-                    usedBySender.insert(cellI);
-                }
-            }
-
-            // Send back as a list
-            labelList markedCells(usedBySender.size());
-            label i = 0;
-            forAllConstIter(labelHashSet, usedBySender, iter)
-            {
-                const label localCell = iter.key();
-                markedCells[i++] = globalCells_.toGlobal(localCell);
-            }
-
-            UOPstream os(sender, rBufs);
-            os << markedCells;
-        }
-
-        rBufs.finishedSends();
-
-
-        // Phase 3: Recieve marked cells from  other processors
-        forAll(procToQuery, i)
-        {
-            const label fromProc = procToQuery[i];
+        const label fromProc = procToQuery[i];
 #ifdef OPENFOAM_COM
-            if (!rBufs.recvDataCount(fromProc))
-            {
-                continue;
-            }
-#endif
-            UIPstream is(fromProc, rBufs);
-            labelList lst;
-            is >> lst;
-
-            remoteCandidatesPerProc[fromProc].transfer(lst);
+        if (!pBufs.recvDataCount(fromProc))
+        {
+            continue;
         }
+#endif
+        UIPstream is(fromProc, pBufs);
+        is >> remoteCandidatesPerProc[fromProc];
     }
 #endif
 
