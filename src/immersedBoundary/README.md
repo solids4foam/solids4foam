@@ -72,14 +72,17 @@ Three forcing methods are available:
   `lambda*Ui + (1 - lambda)*U`; or `kappa = K*lambda/deltaT` (`weighting
   occupancy`), which blocks every covered cell. With the `volumeFraction`
   weighting, the rate in the partially covered cells is also limited to
-  `lambda/(1 - lambda)*C*(nu/w^2 + |Ui|/w)`, where `w` is the cell width and
-  `C` is `surfaceRateCoeff` (default 3), so that it does not depend on the
-  time step. The results do not depend on `K` for `K` of 1e3 or more, the
-  number of pressure correctors or the time step: for the static cylinder
-  with 10 cells across it, `Cd` is 5.236 and 5.239 for time steps of 0.01 s
-  and 0.0025 s. With `surfaceRateCoeff 0`, the partially covered cells are
-  relaxed towards `Ui` once per time step, and `Cd` is 5.37 and 5.49 for the
-  same time steps.
+  `lambda/(1 - lambda)*C*(nu/w^2 + max(|Ui|, |U|)/w)`, where `w` is the
+  cell width and `C` is `surfaceRateCoeff` (default 3). The maximum preserves
+  the body-motion scale and includes fluid advection for static bodies.
+  This numerical velocity scale is relative to the fixed mesh, and the cap
+  has no explicit time-step dependence. It is recomputed from the current
+  fluid velocity at each momentum assembly; timestep and iteration
+  independence must therefore be checked for each case. Local fluid speed
+  is itself damped by the penalty, so this is not an estimate of incident
+  flow speed or a guarantee of a Reynolds-independent boundary location.
+  With `surfaceRateCoeff 0`, the partially covered cells are relaxed towards
+  `Ui` once per time step.
 - `ghostCell`: a sharp interface variant of `penalty`, for static bodies.
   The cells whose centre is inside a body are penalised with the rate
   `K/deltaT`. In the cells next to the fluid (the ghost cells), the target
@@ -102,6 +105,12 @@ Three forcing methods are available:
   occupancy. The results depend on `couplingCoeff`, the time step and the
   number of pressure correctors. This method is kept for comparison: with
   `occupancy vertexFraction` it reproduces `pimpleHFDIBFoam`.
+  `couplingCoeff` controls how much of the velocity error is corrected after
+  each pressure corrector. The default `0.8` gives strong enforcement without
+  the oscillation that full correction can produce. Reduce it when forcing
+  or pressure corrections oscillate or diverge; a smaller value enforces
+  body velocity more slowly and can require more pressure correctors or a
+  smaller timestep for the same accuracy.
 
 The force `-rho*sum(f*V)` and torque on each body, where `f` is the forcing
 (an acceleration) exerted on the fluid, are written every time step to
@@ -109,13 +118,15 @@ The force `-rho*sum(f*V)` and torque on each body, where `f` is the forcing
 inertia of the fluid inside the body, `rho*d/dt(sum(lambda*U*V))`. For a
 moving body, the hydrodynamic force is the sum of the two (Uhlmann, 2005).
 
-The fields `<option name>:lambda`, `<option name>:Ui` and `<option name>:f`
+The fields `<option name>:lambda`, `<option name>:Ui`, `<option name>:kappa`
+and `<option name>:f`
 are written at write times; with the `incremental` method,
 `<option name>:f` is read on restart.
 
 ### Accuracy
 
-For the two tutorials, with 10, 20 and 40 cells across the cylinder, the
+Before adding fluid speed to the surface-rate cap, the two tutorials
+with 10, 20 and 40 cells across the cylinder gave the following results. The
 static cylinder drag coefficient (reference 5.57-5.59), and the root mean
 square difference of the oscillating cylinder drag coefficient, including the
 inertia of the fluid inside the cylinder, from a moving body-fitted mesh
@@ -131,7 +142,8 @@ mean square of the drag coefficient is 2.05), are:
 
 where the settings are:
 
-- A: the defaults (`penalty`, `volumeFraction`, `signedDistance`);
+- A: `penalty`, `volumeFraction`, `signedDistance`, with the previous
+  body-speed-only surface-rate cap;
 - B: `penalty` with `weighting occupancy` and `occupancy vertexFraction`;
 - C: `incremental` with `occupancy vertexFraction`;
 - D: `ghostCell` (the setting of the static tutorial).
@@ -141,12 +153,38 @@ the cell faces, with 20, 40 and 80 cells across the channel, the flow rate
 differs from the exact solution by 20%, 11% and 7% with setting A, and by
 0.9%, 0.03% and 0.02% with setting D.
 
-The cylinder forces converge at about first order in the cell size for all the
-methods (the ghost cell method was not run with 40 cells across the moving
-cylinder). The differences from Wan and Turek (2006) stop decreasing at
-about 0.08, the difference between the body-fitted mesh solution and Wan and
-Turek (2006), whose coefficients lag the converged solutions by about 0.015 s
-(see the `oscillatingCylinderInChannel` tutorial).
+These results showed first-order accuracy in cell size for all the methods
+(the ghost cell method was not run with 40 cells across the moving cylinder).
+The differences from Wan and Turek (2006) stop decreasing at about 0.08, the
+difference between the body-fitted mesh solution and Wan and Turek (2006),
+whose coefficients lag the converged solutions by about 0.015 s (see the
+`oscillatingCylinderInChannel` tutorial).
+
+### Fluid-speed surface-rate check
+
+With the maximum of body and fluid speed in the cap, OpenFOAM v2512 checks
+with fixed timesteps gave static `Cd = 5.3027, 5.3944` at 10 and 20 cells
+across the cylinder (at 10 s). On the coarse mesh, reducing the timestep
+from 0.01 to 0.0025 s gave `Cd = 5.3029`, and three instead of one PIMPLE
+outer correctors gave `Cd = 5.3027`.
+
+For the oscillating cylinder, full 8 s runs at a fixed timestep of 0.0025 s
+gave RMS drag differences from the body-fitted reference of `0.1039, 0.0454`
+at 10 and 20 cells across the cylinder, over `0.25 < t < 7.5 s`, including
+the inertia of the internal fluid. On the coarse mesh, a timestep of
+0.000625 s gave `0.1363`, while three outer correctors gave `0.1018`.
+These checks show measurable timestep sensitivity in the moving case;
+absence of explicit timestep dependence in the cap does not imply timestep
+independence of the solution. The finest mesh was not reverified with this
+cap; the three-level table above records the earlier body-speed-only cap.
+
+At one-tenth viscosity, the RMS fluid speed in the partially covered cells
+at 10 s fell from 0.131 to 0.065 m/s compared with the body-speed-only cap.
+This is a damping diagnostic, not a boundary-location or drag-accuracy test:
+that flow is unsteady and has a different Reynolds number from the supplied
+static reference. In a short zero-viscosity diagnostic, all 36 partially
+covered cells had positive penalty rates, compared with zero for the old
+cap. This does not establish inviscid no-slip accuracy.
 
 ## Provenance
 

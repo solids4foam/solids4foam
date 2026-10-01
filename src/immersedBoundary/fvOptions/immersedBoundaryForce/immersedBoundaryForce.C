@@ -41,6 +41,28 @@ namespace fv
 
 const Foam::label Foam::fv::immersedBoundaryForce::nImageLevels_ = 4;
 
+const Foam::Enum<Foam::fv::immersedBoundaryForce::forcingMethod>
+Foam::fv::immersedBoundaryForce::methodNames_
+({
+    {incremental, "incremental"},
+    {penalty, "penalty"},
+    {ghostCell, "ghostCell"}
+});
+
+const Foam::Enum<Foam::fv::immersedBoundaryForce::penaltyWeighting>
+Foam::fv::immersedBoundaryForce::weightingNames_
+({
+    {volumeFraction, "volumeFraction"},
+    {occupancy, "occupancy"}
+});
+
+const Foam::Enum<Foam::fv::immersedBoundaryForce::imageInterpolationType>
+Foam::fv::immersedBoundaryForce::imageInterpolationNames_
+({
+    {cellPointImage, "cellPoint"},
+    {cellImage, "cell"}
+});
+
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -59,6 +81,19 @@ const Foam::pimpleControl& Foam::fv::immersedBoundaryForce::pimple() const
     }
 
     return *pimplePtr;
+}
+
+
+Foam::fileName Foam::fv::immersedBoundaryForce::outputDir() const
+{
+    fileName dir(mesh_.time().globalPath()/"postProcessing");
+
+    if (mesh_.name() != polyMesh::defaultRegion)
+    {
+        dir /= mesh_.name();
+    }
+
+    return dir/name_;
 }
 
 
@@ -117,35 +152,16 @@ Foam::scalar Foam::fv::immersedBoundaryForce::nu()
                 dimViscosity,
                 *transportPropertiesPtr
             ).value();
+        if (nu_ < 0)
+        {
+            FatalIOErrorInFunction(*transportPropertiesPtr)
+                << "Kinematic viscosity nu must be non-negative, found "
+                << nu_ << exit(FatalIOError);
+        }
         nuSet_ = true;
     }
 
     return nu_;
-}
-
-
-Foam::scalar Foam::fv::immersedBoundaryForce::cellWidth
-(
-    const label celli
-) const
-{
-    const vector span
-    (
-        boundBox(mesh_.points(), mesh_.cellPoints()[celli], false).span()
-    );
-
-    const Vector<label>& solD = mesh_.solutionD();
-
-    scalar w = GREAT;
-    for (direction d = 0; d < vector::nComponents; ++d)
-    {
-        if (solD[d] == 1)
-        {
-            w = min(w, span[d]);
-        }
-    }
-
-    return w;
 }
 
 
@@ -255,7 +271,7 @@ void Foam::fv::immersedBoundaryForce::writeForces()
 void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
 {
     const scalar deltaT = mesh_.time().deltaTValue();
-    const bool volumeFraction = (weighting_ == "volumeFraction");
+    const bool useVolumeFraction = (weighting_ == volumeFraction);
     const scalarField& lambdaI = lambda_.primitiveField();
 
     Ui_ = U;
@@ -265,22 +281,14 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
         body.setVelocity(Ui_);
     }
 
-    const scalar nu = (surfaceRateCoeff_ > 0 ? this->nu() : 0);
+    const scalar nu =
+        (useVolumeFraction && surfaceRateCoeff_ > 0 ? this->nu() : 0);
 
-    kappa_ = 0;
+    kappa_.primitiveFieldRef() = 0;
+    scalarField& kappaI = kappa_.primitiveFieldRef();
 
     for (const immersedBody& body : bodies_)
     {
-        if (method_ == "ghostCell")
-        {
-            // Sharp penalisation of the cells whose centre is inside
-            for (const label celli : body.insideCells())
-            {
-                kappa_[celli] = penaltyCoeff_/deltaT;
-            }
-            continue;
-        }
-
         for (const labelList* cellsPtr :
             {&body.internalCells(), &body.surfaceCells()})
         {
@@ -288,10 +296,10 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
             {
                 const scalar lambda = lambdaI[celli];
 
-                if (volumeFraction)
+                if (useVolumeFraction)
                 {
                     // The penalised velocity is lambda*Ui + (1 - lambda)*U
-                    kappa_[celli] =
+                    kappaI[celli] =
                         min
                         (
                             penaltyCoeff_,
@@ -302,23 +310,75 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                     // covered cells
                     if (surfaceRateCoeff_ > 0 && lambda < 1 - surfaceThreshold_)
                     {
-                        const scalar w = cellWidth(celli);
+                        const scalar w = body.cellWidths()[celli];
 
-                        kappa_[celli] = min
+                        kappaI[celli] = min
                         (
-                            kappa_[celli],
+                            kappaI[celli],
                             lambda/(1 - lambda)*surfaceRateCoeff_
-                           *(nu/sqr(w) + mag(Ui_[celli])/w)
+                           *(nu/sqr(w) + max(mag(Ui_[celli]), mag(U[celli]))/w)
                         );
                     }
                 }
                 else
                 {
-                    kappa_[celli] = penaltyCoeff_*lambda/deltaT;
+                    kappaI[celli] = penaltyCoeff_*lambda/deltaT;
                 }
             }
         }
     }
+}
+
+
+void Foam::fv::immersedBoundaryForce::setGhostCellPenalty
+(
+    const volVectorField& U
+)
+{
+    const scalar deltaT = mesh_.time().deltaTValue();
+
+    Ui_ = U;
+
+    kappa_.primitiveFieldRef() = 0;
+    scalarField& kappaI = kappa_.primitiveFieldRef();
+
+    // Sharp penalisation of the cells whose centre is inside a body, towards
+    // the body velocity
+    for (const immersedBody& body : bodies_)
+    {
+        body.setVelocity(Ui_);
+
+        for (const label celli : body.insideCells())
+        {
+            kappaI[celli] = penaltyCoeff_/deltaT;
+        }
+    }
+
+    // Reconstructed target velocity in the ghost cells
+    reconstructTargets(U);
+}
+
+
+Foam::vector Foam::fv::immersedBoundaryForce::solvedSpan
+(
+    const label celli
+) const
+{
+    vector span
+    (
+        boundBox(mesh_.points(), mesh_.cellPoints()[celli], false).span()
+    );
+
+    const Vector<label>& solD = mesh_.solutionD();
+    for (direction d = 0; d < vector::nComponents; ++d)
+    {
+        if (solD[d] != 1)
+        {
+            span[d] = 0;
+        }
+    }
+
+    return span;
 }
 
 
@@ -331,8 +391,6 @@ void Foam::fv::immersedBoundaryForce::findGhostCells(const bool newTimeStep)
 
     const labelUList& own = mesh_.owner();
     const labelUList& nei = mesh_.neighbour();
-    const pointField& meshPoints = mesh_.points();
-    const labelListList& cellPoints = mesh_.cellPoints();
 
     // Penalised cells: those whose centre is inside a body
     volScalarField inside
@@ -370,7 +428,9 @@ void Foam::fv::immersedBoundaryForce::findGhostCells(const bool newTimeStep)
 
     // Cells penalised at the end of the previous time step, which are not
     // donors; when the bodies are updated again within a time step (e.g. the
-    // mesh moves), these are kept. The mesh topology is assumed not to change
+    // mesh moves), these are kept. On startup or restart, insideCells_ holds
+    // the cells inside the bodies at the start time (set in addSup). The mesh
+    // topology is assumed not to change
     if (newTimeStep || penalisedOld_.size() != mesh_.nCells())
     {
         penalisedOld_.setSize(mesh_.nCells());
@@ -431,6 +491,8 @@ void Foam::fv::immersedBoundaryForce::findGhostCells(const bool newTimeStep)
     const label nGhosts = ghostCells_.size();
     ghostDonors_.setSize(nGhosts);
     ghostDonors_ = -1;
+    ghostRemoteDonors_.setSize(nGhosts);
+    ghostRemoteDonors_ = false;
     ghostWallPoints_.setSize(nGhosts);
     ghostWallPoints_ = Zero;
     ghostNormals_.setSize(nGhosts);
@@ -442,61 +504,89 @@ void Foam::fv::immersedBoundaryForce::findGhostCells(const bool newTimeStep)
     ghostImagePoints_.setSize(nGhosts);
     ghostImagePoints_ = Zero;
 
-    const pointField ghostCentres(mesh_.C(), ghostCells_);
-
+    // Cell spans in the solved directions, so that the empty direction of a
+    // 2D mesh does not set the search radius or the tolerances
     vectorField spans(nGhosts);
-    scalarField searchDistSqr(nGhosts);
     forAll(ghostCells_, gi)
     {
-        spans[gi] =
-            boundBox(meshPoints, cellPoints[ghostCells_[gi]], false).span();
-        searchDistSqr[gi] = 4*magSqr(spans[gi]);
+        spans[gi] = solvedSpan(ghostCells_[gi]);
+    }
+
+    // Ghost cells of each body
+    List<DynamicList<label>> bodyGhosts(bodies_.size());
+    forAll(ghostCells_, gi)
+    {
+        bodyGhosts[cellBody[ghostCells_[gi]]].append(gi);
     }
 
     // Nearest surface point of the body that contains each ghost cell
     forAll(bodies_, bodyi)
     {
+        const labelList& ghosts = bodyGhosts[bodyi];
+
+        const pointField centres(mesh_.C(), labelList(ghostCells_, ghosts));
+        scalarField searchDistSqr(ghosts.size());
+        forAll(ghosts, i)
+        {
+            searchDistSqr[i] = 4*magSqr(spans[ghosts[i]]);
+        }
+
         List<pointIndexHit> hits;
         vectorField normals;
-        bodies_[bodyi].nearest(ghostCentres, searchDistSqr, hits, normals);
+        bodies_[bodyi].nearest(centres, searchDistSqr, hits, normals);
 
-        DynamicList<label> hitGhosts(nGhosts);
-        DynamicField<point> hitPoints(nGhosts);
+        DynamicList<label> hitGhosts(ghosts.size());
+        DynamicField<point> hitPoints(ghosts.size());
 
-        forAll(hits, gi)
+        forAll(ghosts, i)
         {
-            if (cellBody[ghostCells_[gi]] == bodyi && hits[gi].hit())
+            const label gi = ghosts[i];
+
+            if (!hits[i].hit())
             {
-                ghostWallPoints_[gi] = hits[gi].hitPoint();
-
-                // Outward normal along the line from the cell centre, which
-                // is inside the body, to the surface point, so that it varies
-                // continuously as the body moves; the normal of the nearest
-                // face if the centre is on the surface
-                const vector r(ghostCentres[gi] - hits[gi].hitPoint());
-                const scalar magR = mag(r);
-                if (magR > 1e-3*mag(spans[gi]))
-                {
-                    ghostNormals_[gi] = -r/magR;
-                }
-                else
-                {
-                    ghostNormals_[gi] = normals[gi];
-                }
-
-                // Signed distance from the surface, along the outward
-                // normal: negative inside the body
-                ghostDistances_[gi] = r & ghostNormals_[gi];
-
-                hitGhosts.append(gi);
-                hitPoints.append(hits[gi].hitPoint());
+                continue;
             }
+
+            ghostWallPoints_[gi] = hits[i].hitPoint();
+
+            // Outward normal along the line from the cell centre, which is
+            // inside the body, to the surface point, so that it varies
+            // continuously as the body moves; the normal of the nearest face
+            // if the centre is on the surface
+            const vector r(centres[i] - hits[i].hitPoint());
+            const scalar magR = mag(r);
+            if (magR > 1e-3*mag(spans[gi]))
+            {
+                ghostNormals_[gi] = -r/magR;
+            }
+            else
+            {
+                ghostNormals_[gi] = normals[i];
+            }
+
+            // Signed distance from the surface, along the outward normal:
+            // negative inside the body
+            ghostDistances_[gi] = r & ghostNormals_[gi];
+
+            hitGhosts.append(gi);
+            hitPoints.append(hits[i].hitPoint());
         }
 
         const vectorField Ub(bodies_[bodyi].velocity(hitPoints));
         forAll(hitGhosts, i)
         {
             ghostWallVelocities_[hitGhosts[i]] = Ub[i];
+        }
+
+        // A ghost cell without a surface point has the body velocity
+        const label nMissed =
+            returnReduce(ghosts.size() - hitGhosts.size(), sumOp<label>());
+        if (nMissed)
+        {
+            WarningInFunction
+                << "Immersed body " << bodies_[bodyi].name() << ": no "
+                << "surface point found within two cell sizes of " << nMissed
+                << " ghost cells, which have the body velocity" << endl;
         }
     }
 
@@ -513,7 +603,7 @@ void Foam::fv::immersedBoundaryForce::findGhostCells(const bool newTimeStep)
     forAll(ghostCells_, gi)
     {
         const vector& n = ghostNormals_[gi];
-        widths[gi] = cmptSum(cmptMultiply(cmptMag(n), spans[gi]));
+        widths[gi] = immersedBody::normalWidth(n, spans[gi]);
 
         if (magSqr(n) > SMALL)
         {
@@ -648,6 +738,7 @@ void Foam::fv::immersedBoundaryForce::findGhostCells(const bool newTimeStep)
             if (remoteDonorProcs_[k] >= 0)
             {
                 ghostDonors_[remoteGhosts_[k]] = -1;
+                ghostRemoteDonors_[remoteGhosts_[k]] = true;
             }
         }
 
@@ -769,10 +860,22 @@ void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
 {
     const vectorField& C = mesh_.C();
     const label nGhosts = ghostCells_.size();
-    const bool cellPoint = (imageInterpolation_ == "cellPoint");
+    const bool cellPoint = (imageInterpolation_ == cellPointImage);
+
+    // The interpolation is only constructed on the processors with local or
+    // requested donors
+    bool hasDonors = false;
+    for (const label donori : ghostDonors_)
+    {
+        hasDonors = hasDonors || donori >= 0;
+    }
+    for (const labelList& donors : sendDonors_)
+    {
+        hasDonors = hasDonors || donors.size();
+    }
 
     autoPtr<interpolationCellPoint<vector>> interpPtr;
-    if (cellPoint)
+    if (cellPoint && hasDonors)
     {
         interpPtr.reset(new interpolationCellPoint<vector>(U));
     }
@@ -846,8 +949,6 @@ void Foam::fv::immersedBoundaryForce::gatherDonors(const volVectorField& U)
                     const label gi = remoteGhosts_[ks[i]];
                     ghostDonorU_[gi] = donorU[i];
                     ghostDonorC_[gi] = donorC[i];
-                    // Mark the ghost as having a donor
-                    ghostDonors_[gi] = -2;
                 }
             }
         }
@@ -869,13 +970,16 @@ void Foam::fv::immersedBoundaryForce::reconstructTargets
     vectorField& UiI = Ui_.primitiveFieldRef();
     forAll(ghostCells_, gi)
     {
-        if (ghostDonors_[gi] != -1)
+        if (ghostDonors_[gi] >= 0 || ghostRemoteDonors_[gi])
         {
+            // The ghost cell centre is inside the body (s <= 0) and the
+            // donor accepted at more than a quarter cell width outside it
+            // (sd > 0), so the ratio is not positive
             const label celli = ghostCells_[gi];
             const vector& Ub = ghostWallVelocities_[gi];
             const scalar sd =
                 (ghostDonorC_[gi] - ghostWallPoints_[gi]) & ghostNormals_[gi];
-            const scalar ratio = min(ghostDistances_[gi]/sd, scalar(1));
+            const scalar ratio = ghostDistances_[gi]/sd;
 
             // Deeper inside than the donor is outside: the body velocity,
             // as set by setPenalty
@@ -900,19 +1004,32 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
 :
     fv::option(name, modelType, dict, mesh),
     bodies_(),
-    method_("penalty"),
+    method_(penalty),
     penaltyCoeff_(1e3),
-    weighting_("volumeFraction"),
+    weighting_(volumeFraction),
     surfaceRateCoeff_(3),
     nu_(0),
     nuSet_(false),
-    kappa_(mesh.nCells(), Zero),
+    kappa_
+    (
+        IOobject
+        (
+            IOobject::scopedName(name, "kappa"),
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedScalar(dimless/dimTime, Zero)
+    ),
     imageDistance_(1.5),
-    imageInterpolation_("cellPoint"),
+    imageInterpolation_(cellPointImage),
     insideCells_(),
     penalisedOld_(),
     ghostCells_(),
     ghostDonors_(),
+    ghostRemoteDonors_(),
     ghostWallPoints_(),
     ghostNormals_(),
     ghostWallVelocities_(),
@@ -1047,14 +1164,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     // Force files
     if (Pstream::master())
     {
-        fileName dir(mesh.time().globalPath()/"postProcessing");
-
-        if (mesh.name() != polyMesh::defaultRegion)
-        {
-            dir = dir/mesh.name();
-        }
-
-        dir = dir/name/mesh.time().timeName();
+        const fileName dir(outputDir()/mesh.time().timeName());
 
         mkDir(dir);
 
@@ -1097,14 +1207,52 @@ void Foam::fv::immersedBoundaryForce::addSup
 )
 {
     const label timeIndex = mesh_.time().timeIndex();
+    const bool newTimeStep = timeIndex != timeIndex_;
 
     bool updated = false;
-    const bool newTimeStep = (timeIndex != timeIndex_);
 
-    if (timeIndex != timeIndex_)
+    if (newTimeStep)
     {
         // The previous time step is complete
         writeForces();
+
+        // On startup or restart, recover the previous-time fluid momentum
+        // from the loaded velocity and the body configuration at startTime.
+        // The body is moved to the new time by updateBodies() below.
+        if (momentumTimeIndex_ < 0)
+        {
+            lambda_.primitiveFieldRef() = 0;
+
+            for (immersedBody& body : bodies_)
+            {
+                body.addOccupancy(lambda_, surfaceThreshold_);
+            }
+
+            lambda_.correctBoundaryConditions();
+
+            forAll(bodies_, bodyi)
+            {
+                momentum_[bodyi] =
+                    bodies_[bodyi].momentum(eqn.psi(), lambda_);
+            }
+
+            momentum0_ = momentum_;
+            momentum0Valid_ = true;
+            momentumTimeIndex_ = timeIndex;
+
+            // The cells inside the bodies at startTime, which an
+            // uninterrupted run penalised in the previous time step and
+            // which are therefore not ghost cell donors in this one
+            if (method_ == ghostCell)
+            {
+                DynamicList<label> insideCells;
+                for (const immersedBody& body : bodies_)
+                {
+                    insideCells.append(body.insideCells());
+                }
+                insideCells_.transfer(insideCells);
+            }
+        }
 
         // New time step: store the forcing of the previous time step (or the
         // forcing read on restart), and move the bodies to the new time
@@ -1126,14 +1274,10 @@ void Foam::fv::immersedBoundaryForce::addSup
 
         if (writeSurfaces_ && mesh_.time().writeTime())
         {
-            fileName dir(mesh_.time().globalPath()/"postProcessing");
-
-            if (mesh_.name() != polyMesh::defaultRegion)
-            {
-                dir = dir/mesh_.name();
-            }
-
-            dir = dir/name_/"surfaces"/mesh_.time().timeName();
+            const fileName dir
+            (
+                outputDir()/"surfaces"/mesh_.time().timeName()
+            );
 
             for (const immersedBody& body : bodies_)
             {
@@ -1151,46 +1295,32 @@ void Foam::fv::immersedBoundaryForce::addSup
         updated = true;
     }
 
-    if (method_ == "penalty" || method_ == "ghostCell")
+    if (method_ == penalty || method_ == ghostCell)
     {
         // Implicit volume penalisation: kappa*(Ui - U)
         const volVectorField& U = eqn.psi();
 
-        setPenalty(U);
-
-        if (method_ == "ghostCell")
+        if (method_ == ghostCell)
         {
             // Collective: updated is the same on every processor
             if (updated)
             {
                 findGhostCells(newTimeStep);
             }
-            reconstructTargets(U);
+            setGhostCellPenalty(U);
+        }
+        else
+        {
+            setPenalty(U);
         }
 
-        volScalarField::Internal kappa
-        (
-            IOobject
-            (
-                IOobject::scopedName(name_, "kappa"),
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            mesh_,
-            dimensionedScalar(dimless/dimTime, Zero)
-        );
-        kappa.field() = kappa_;
-
-        eqn += kappa*Ui_();
-        eqn -= fvm::Sp(kappa, U);
+        eqn += kappa_()*Ui_();
+        eqn -= fvm::Sp(kappa_(), U);
 
         return;
     }
 
-    if (pimple().firstIter())
+    if (newTimeStep || pimple().firstIter())
     {
         // Start the time step, or a repeated solution of the time step, e.g.
         // in a partitioned fluid-solid interaction iteration, from the
@@ -1253,14 +1383,18 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
         return;
     }
 
-    if (method_ == "penalty" || method_ == "ghostCell")
+    if (method_ == penalty || method_ == ghostCell)
     {
         // The forcing exerted by the penalisation, for the forces
         f_.primitiveFieldRef() =
-            kappa_*(Ui_.primitiveField() - U.primitiveField());
+            kappa_.primitiveField()*(Ui_.primitiveField() - U.primitiveField());
         f_.correctBoundaryConditions();
 
-        if (pimple.corrPISO() == pimple.nCorrPISO() && pimple.finalIter())
+        if
+        (
+            pimple.corrPISO() == pimple.nCorrPISO()
+         && (pimple.finalIter() || pimple.corr() == 0)
+        )
         {
             calcForces(U);
         }
@@ -1345,7 +1479,9 @@ void Foam::fv::immersedBoundaryForce::correct(volVectorField& U)
         // Last pressure corrector
         UEqnPtr_ = nullptr;
 
-        if (pimple.finalIter())
+        // pisoControl does not enter an outer-corrector loop, so corr() stays
+        // zero and firstIter()/finalIter() are both false
+        if (pimple.finalIter() || pimple.corr() == 0)
         {
             calcForces(U);
         }
@@ -1357,19 +1493,7 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
 {
     if (fv::option::read(dict))
     {
-        coeffs_.readIfPresent("method", method_);
-
-        if
-        (
-            method_ != "incremental"
-         && method_ != "penalty"
-         && method_ != "ghostCell"
-        )
-        {
-            FatalIOErrorInFunction(coeffs_)
-                << "Unknown method " << method_ << ": valid methods are "
-                << "penalty, ghostCell and incremental" << exit(FatalIOError);
-        }
+        methodNames_.readIfPresent("method", coeffs_, method_);
 
         coeffs_.readCheckIfPresent
         (
@@ -1377,18 +1501,16 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             penaltyCoeff_,
             scalarMinMax::ge(1)
         );
-        coeffs_.readIfPresent("weighting", weighting_);
-        coeffs_.readIfPresent("surfaceRateCoeff", surfaceRateCoeff_);
-        if (coeffs_.readIfPresent("nu", nu_))
+        weightingNames_.readIfPresent("weighting", coeffs_, weighting_);
+        coeffs_.readCheckIfPresent
+        (
+            "surfaceRateCoeff",
+            surfaceRateCoeff_,
+            scalarMinMax::ge(0)
+        );
+        if (coeffs_.readCheckIfPresent("nu", nu_, scalarMinMax::ge(0)))
         {
             nuSet_ = true;
-        }
-
-        if (weighting_ != "volumeFraction" && weighting_ != "occupancy")
-        {
-            FatalIOErrorInFunction(coeffs_)
-                << "Unknown weighting " << weighting_ << ": valid weightings "
-                << "are volumeFraction and occupancy" << exit(FatalIOError);
         }
 
         coeffs_.readCheckIfPresent
@@ -1397,15 +1519,12 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             imageDistance_,
             scalarMinMax::ge(0.5)
         );
-        coeffs_.readIfPresent("imageInterpolation", imageInterpolation_);
-
-        if (imageInterpolation_ != "cellPoint" && imageInterpolation_ != "cell")
-        {
-            FatalIOErrorInFunction(coeffs_)
-                << "Unknown imageInterpolation " << imageInterpolation_
-                << ": valid options are cellPoint and cell"
-                << exit(FatalIOError);
-        }
+        imageInterpolationNames_.readIfPresent
+        (
+            "imageInterpolation",
+            coeffs_,
+            imageInterpolation_
+        );
 
         coeffs_.readCheckIfPresent
         (
@@ -1429,16 +1548,18 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             rhoSet_ = true;
         }
 
-        if (method_ == "ghostCell")
+        if (method_ == ghostCell)
         {
             Info<< "    Ghost cell method: penalty coefficient "
                 << penaltyCoeff_ << ", image distance " << imageDistance_
-                << ", " << imageInterpolation_ << " image interpolation";
+                << ", " << imageInterpolationNames_[imageInterpolation_]
+                << " image interpolation";
         }
-        else if (method_ == "penalty")
+        else if (method_ == penalty)
         {
             Info<< "    Penalty method: coefficient " << penaltyCoeff_
-                << ", " << weighting_ << " weighting, surface rate "
+                << ", " << weightingNames_[weighting_]
+                << " weighting, surface rate "
                 << "coefficient " << surfaceRateCoeff_;
         }
         else
