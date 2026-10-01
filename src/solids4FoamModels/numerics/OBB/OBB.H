@@ -86,7 +86,7 @@ class OBB
 
     // Private Member Functions
 
-        //- Fit a principal-component box to the supplied points
+        //- Fit a principal-component box, or the axis-aligned box if smaller
         void makeOBB(const pointField& points);
 
         //- Fit a minimum-area in-plane box and extrude it along faceNormal
@@ -146,10 +146,11 @@ public:
         //- Construct from an axis-aligned bounding box
         OBB(const boundBox& box);
 
-        //- Fit a principal-component box; an empty field gives an empty box
+        //- Fit the smaller of the principal-component and axis-aligned boxes;
+        //  an empty field gives an empty box
         OBB(const pointField& points);
 
-        //- Fit a principal-component box to a temporary point field
+        //- Fit a box as above to a temporary point field
         OBB(const tmp<pointField>& points);
 
         //- Construct a face box with positive and negative normal extrusion

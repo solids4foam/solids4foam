@@ -207,6 +207,8 @@ void Foam::OBB::makeOBB(const pointField& points)
 
     vector minLocal(VGREAT, VGREAT, VGREAT);
     vector maxLocal(-VGREAT, -VGREAT, -VGREAT);
+    point minGlobal(VGREAT, VGREAT, VGREAT);
+    point maxGlobal(-VGREAT, -VGREAT, -VGREAT);
 
     forAll(points, pointI)
     {
@@ -216,11 +218,27 @@ void Foam::OBB::makeOBB(const pointField& points)
             minLocal,
             maxLocal
         );
+        addToLocalBounds(points[pointI], minGlobal, maxGlobal);
     }
 
     const vector localCentre(0.5*(minLocal + maxLocal));
     centre_ = mean + (localCentre & axes_);
     halfLength_ = 0.5*(maxLocal - minLocal);
+
+    // Principal axes are arbitrary for near-isotropic point sets and can give
+    // a larger box than the axis-aligned one, so keep the smaller of the two.
+    // Ties, e.g. coplanar points, keep the axis-aligned box
+    const vector alignedHalfLength(0.5*(maxGlobal - minGlobal));
+    if
+    (
+        alignedHalfLength.x()*alignedHalfLength.y()*alignedHalfLength.z()
+     <= halfLength_.x()*halfLength_.y()*halfLength_.z()
+    )
+    {
+        centre_ = 0.5*(minGlobal + maxGlobal);
+        halfLength_ = alignedHalfLength;
+        axes_ = tensor::I;
+    }
 }
 
 

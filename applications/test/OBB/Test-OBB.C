@@ -108,6 +108,56 @@ int main()
         "PCA-fitted box centre is incorrect"
     ) && passed;
 
+    // The rotated box is tighter than its axis-aligned box, so it is kept.
+    passed = check
+    (
+        mag
+        (
+            fittedBox.ext().x()*fittedBox.ext().y()*fittedBox.ext().z()
+          - halfLength.x()*halfLength.y()*halfLength.z()
+        ) < tolerance,
+        "PCA-fitted box was replaced by a larger axis-aligned box"
+    ) && passed;
+
+    // A jittered lattice has arbitrary principal axes, so the fitted box must
+    // fall back to the axis-aligned box when that is smaller.
+    pointField lattice(1000);
+    point minLattice(VGREAT, VGREAT, VGREAT);
+    point maxLattice(-VGREAT, -VGREAT, -VGREAT);
+    forAll(lattice, latticeI)
+    {
+        const scalar n = latticeI + 1;
+        lattice[latticeI] =
+            0.1*vector(latticeI % 10, (latticeI/10) % 10, latticeI/100)
+          + 0.01*vector
+            (
+                Foam::sin(12.9898*n),
+                Foam::sin(78.233*n),
+                Foam::sin(37.719*n)
+            );
+        minLattice = min(minLattice, lattice[latticeI]);
+        maxLattice = max(maxLattice, lattice[latticeI]);
+    }
+
+    const OBB latticeBox(lattice);
+    const vector latticeHalfLength(0.5*(maxLattice - minLattice));
+
+    passed = check
+    (
+        latticeBox.ext().x()*latticeBox.ext().y()*latticeBox.ext().z()
+     <= latticeHalfLength.x()*latticeHalfLength.y()*latticeHalfLength.z(),
+        "Fitted box is larger than the axis-aligned box"
+    ) && passed;
+
+    forAll(lattice, latticeI)
+    {
+        passed = check
+        (
+            latticeBox.contains(lattice[latticeI]),
+            "Fitted lattice box does not contain every input point"
+        ) && passed;
+    }
+
     const OBB boxA(point::zero, vector(1, 1, 1));
     const OBB touchingBox(point(2, 0, 0), vector(1, 1, 1));
     const OBB separatedBox(point(2.01, 0, 0), vector(1, 1, 1));
