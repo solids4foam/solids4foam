@@ -108,7 +108,8 @@ def set_reconstruction(run_dir: Path, variant: dict) -> None:
         "polynomialOrder": variant["p"],
         "faceStencilExtraCells": variant["stencil_extra_cells"],
     }
-    # Both methods inherit the face setting when the cell setting is absent.
+    # Both methods use faceStencilExtraCells for the cell stencil when
+    # cellStencilExtraCells is absent, as in the supplied dictionaries.
     if re.search(r"(?m)^\s*cellStencilExtraCells\s+", text):
         settings["cellStencilExtraCells"] = variant["stencil_extra_cells"]
     for key, value in settings.items():
@@ -202,7 +203,7 @@ def run_level(
         set_reconstruction(run_dir, variant)
         degree_file.write_text(json.dumps(reconstruction) + "\n")
         # Allrun calls the structured tetrahedral mesh "tet".
-        mesh = "tet" if variant["mesh"] == "tet-structural" else variant["mesh"]
+        mesh = "tet" if variant["mesh"] == "tet-structured" else variant["mesh"]
         command = ["./Allrun", variant["approach"], mesh]
         print(f"Running {variant_name} n={divisions} in {run_dir}", flush=True)
         with (run_dir / "log.Allverify").open("w") as log:
@@ -403,7 +404,7 @@ def main() -> int:
 
     selected = [all_variants[name] for name in variant_names]
     required = ["checkMesh", "solids4Foam"]
-    if any(item["mesh"] in {"tet-structural", "poly"} for item in selected):
+    if any(item["mesh"] in {"tet-structured", "poly"} for item in selected):
         required.extend(["gmsh", "gmshToFoam", "createPatch"])
     if any(item["mesh"] == "poly" for item in selected):
         required.append("polyDualMesh")

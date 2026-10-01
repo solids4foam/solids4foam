@@ -53,9 +53,12 @@ build. The `tet` and `poly` meshes require Gmsh. The tutorial supports OpenFOAM.
 OpenFOAM.org, and foam-extend.
 
 The `tet` and `poly` runs use `gmsh/tet-structured.geo` by default. Set
-`GMSH_MESH=tet-unstructured` in `Allrun` to use the unstructured tetrahedral
-alternative. A standalone `gmsh/hex-structured.geo` is also provided; the
-standard `hex` run uses `blockMesh`. All Gmsh scripts read `gmsh/meshSpacing.geo`.
+`GMSH_MESH` when running `Allrun` to use another Gmsh script, for example
+`GMSH_MESH=tet-unstructured ./Allrun petscSnes tet` for the unstructured
+tetrahedral alternative. `gmsh/hex-structured.geo` is provided for manual use
+in the same way (`GMSH_MESH=hex-structured`); no script selects it, and the
+standard `hex` run uses `blockMesh`. All Gmsh scripts read
+`gmsh/meshSpacing.geo`.
 
 The high-order approaches use cubic displacement reconstruction, face
 quadrature, and volume integration of the manufactured body force. The
@@ -66,9 +69,6 @@ adds the same source through the linear solid model's `fvOptionsSource()` functi
 The source coefficients remain in `constant/fvOptions` on all versions. The
 boundary condition evaluates the analytical displacement at face quadrature
 points.
-
-Rebuild solids4foam after updating the core source interface. `Allrun`
-builds the tutorial library, but does not rebuild the core libraries or solver.
 
 `movingLeastSquares` stores point values, so displacement errors use the
 analytical solution at cell centres. `kExactLeastSquares` stores cell averages,

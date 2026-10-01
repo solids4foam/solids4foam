@@ -7,13 +7,14 @@ variants remain available explicitly. Both high-order approaches,
 `highOrder-movingLeastSquares` and `highOrder-kExactLeastSquares`, are included
 on regular hexahedral and tetrahedral meshes with polynomial degrees p=1, p=2,
 and p=3. The JSON `p` entry sets `polynomialOrder` in each copied case. The per-variant
-JSON `stencil_extra_cells` input sets the extra cells for face and cell stencils.
+JSON `stencil_extra_cells` input sets `faceStencilExtraCells`, which both
+methods also use for the cell stencil when `cellStencilExtraCells` is absent.
 It defaults to 45 for p=1, 55 for p=2, and 65 for p=3 in the supplied JSON, for
 both reconstruction methods. These correspond to nominal displacement orders 2,
 2 (instead of 3), and 4, respectively; stress involves a derivative,
 with nominal orders 1, 2, and 3. High-order variants require a PETSc-enabled build.
 Variant names include the polynomial degree, for example
-`hex-highOrder-movingLeastSquares-p3`. The `tet-structural` mesh label identifies
+`hex-highOrder-movingLeastSquares-p3`. The `tet-structured` mesh label identifies
 the structured tetrahedral mesh from `gmsh/tet-structured.geo`; the driver maps
 it to the `Allrun` mesh argument `tet`.
 
@@ -33,8 +34,8 @@ for custom cell counts, and `--reuse` when resuming a sweep. For example:
 ```bash
 ./Allverify --quick
 ./Allverify --variants hex-segregated,poly-petscSnes
-./Allverify --variants tet-structural-segregated,tet-structural-petscSnes --quick
-./Allverify --variants hex-highOrder-movingLeastSquares-p3,tet-structural-highOrder-kExactLeastSquares-p2
+./Allverify --variants tet-structured-segregated,tet-structured-petscSnes --quick
+./Allverify --variants hex-highOrder-movingLeastSquares-p3,tet-structured-highOrder-kExactLeastSquares-p2
 ```
 
 Results are written under the ignored `verification/postProcessing/`
@@ -47,8 +48,9 @@ finest errors and effective mesh spacings; intermediate errors need not decrease
 monotonically. The summary reports each measured order, threshold, and result.
 
 Initial thresholds are 1.5 for displacement and 0.5 for stress for standard
-methods. High-order thresholds are p+0.5 and p-0.5, respectively, allowing a 0.5
-margin below the nominal orders. These are editable expectations, not thresholds
+methods. High-order thresholds allow a 0.5 margin below the nominal orders:
+1.5, 1.5, and 3.5 for displacement and 0.5, 1.5, and 2.5 for stress for p=1,
+p=2, and p=3. These are editable expectations, not thresholds
 calibrated against a completed full sweep.
 Quick runs check finite positive errors and successful solver completion,
 without enforcing the order thresholds. The CSV records p for high-order runs.

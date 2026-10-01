@@ -23,6 +23,7 @@ License
 #include "pointFields.H"
 #include "coordinateSystem.H"
 #include "lookupSolidModel.H"
+#include "kExactLeastSquares.H"
 #include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -54,20 +55,8 @@ calculateAnalyticalCellDisplacement
 
     if (solMod.highOrderResidual())
     {
-        const dictionary& highOrderDict =
-            solMod.solidModelDict().subDict("highOrderCoeffs");
-        const dictionary& displacementDict =
-            highOrderDict.subDict("displacement");
-        const word reconstructionType
-        (
-            displacementDict.lookupOrDefault<word>
-            (
-                "type",
-                "movingLeastSquares"
-            )
-        );
-
-        useCellAverage = reconstructionType == "kExactLeastSquares";
+        useCellAverage =
+            isA<kExactLeastSquares>(solMod.displacementLeastSquares());
     }
 
     if (useCellAverage)

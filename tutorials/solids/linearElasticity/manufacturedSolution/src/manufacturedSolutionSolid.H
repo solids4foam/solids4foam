@@ -74,6 +74,9 @@ public:
     // Constructors
 
         //- Construct from time and region
+        //  linGeomTotalDispSolid passes its own typeName to solidModel, so the
+        //  coefficients are still read from
+        //  linearGeometryTotalDisplacementCoeffs
         manufacturedSolutionSolid(Time& runTime, const word& region);
 };
 
