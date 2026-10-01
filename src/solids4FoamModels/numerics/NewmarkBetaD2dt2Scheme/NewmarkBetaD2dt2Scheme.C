@@ -532,37 +532,41 @@ NewmarkBetaD2dt2Scheme<Type>::NewmarkBetaD2dt2Scheme
             << exit(FatalIOError);
     }
 
-    // Warn, once, about coefficients outside the documented ranges, where
-    // the scheme is not unconditionally stable or adds negative damping. The
-    // scheme is constructed for every fvm::d2dt2 and fvc::d2dt2 call
-    static bool warned = false;
+    // Warn about coefficients outside the documented ranges, where the
+    // scheme is not unconditionally stable or adds negative damping. The
+    // scheme is constructed for every fvm::d2dt2 and fvc::d2dt2 call, so each
+    // warning is given once
+    static bool warnedGamma = false;
+    static bool warnedBeta = false;
+    static bool warnedAlphaM = false;
 
-    if (!warned)
+    if (gamma_ < 0.5 && !warnedGamma)
     {
-        warned = true;
+        warnedGamma = true;
 
-        if (gamma_ < 0.5)
-        {
-            WarningInFunction
-                << "gamma = " << gamma_ << " < 1/2: the " << type()
-                << " scheme amplifies the motion (negative numerical "
-                << "damping)" << endl;
-        }
+        WarningInFunction
+            << "gamma = " << gamma_ << " < 1/2: the " << type()
+            << " scheme amplifies the motion (negative numerical damping)"
+            << endl;
+    }
 
-        if (beta_ < 0.5*gamma_)
-        {
-            WarningInFunction
-                << "beta = " << beta_ << " < gamma/2 = " << 0.5*gamma_
-                << ": the " << type() << " scheme is only conditionally "
-                << "stable" << endl;
-        }
+    if (beta_ < 0.5*gamma_ && !warnedBeta)
+    {
+        warnedBeta = true;
 
-        if (alphaM_ < -1.0/3.0 || alphaM_ > 0)
-        {
-            WarningInFunction
-                << "alphaM = " << alphaM_ << " is outside the Bossak range "
-                << "-1/3 <= alphaM <= 0" << endl;
-        }
+        WarningInFunction
+            << "beta = " << beta_ << " < gamma/2 = " << 0.5*gamma_
+            << ": the " << type() << " scheme is only conditionally stable"
+            << endl;
+    }
+
+    if ((alphaM_ < -1.0/3.0 || alphaM_ > 0) && !warnedAlphaM)
+    {
+        warnedAlphaM = true;
+
+        WarningInFunction
+            << "alphaM = " << alphaM_ << " is outside the Bossak range "
+            << "-1/3 <= alphaM <= 0" << endl;
     }
 }
 
