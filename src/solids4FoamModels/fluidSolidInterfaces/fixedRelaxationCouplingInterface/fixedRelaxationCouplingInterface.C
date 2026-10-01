@@ -174,23 +174,24 @@ void fixedRelaxationCouplingInterface::updateDisplacement()
     Info<< nl << "Time = " << fluid().runTime().timeName()
         << ", iteration: " << outerCorr() << endl;
 
-    Info<< "Current fsi under-relaxation factor: "
-        << relaxationFactor_ << endl;
+    // With the predictor, the first iteration takes the full solid predictor
+    // displacement
+    const scalar factor =
+        ((outerCorr() == 1) && predictor()) ? 1.0 : relaxationFactor_;
+
+    Info<< "Current fsi under-relaxation factor: " << factor;
+    if ((outerCorr() == 1) && predictor())
+    {
+        Info<< " (predictor)";
+    }
+    Info<< endl;
 
     forAll(fluid().globalPatches(), interfaceI)
     {
         fluidZonesPointsDisplsPrev()[interfaceI] =
             fluidZonesPointsDispls()[interfaceI];
 
-        if ((outerCorr() == 1) && predictor())
-        {
-            fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
-        }
-        else
-        {
-            fluidZonesPointsDispls()[interfaceI] +=
-                relaxationFactor_*residuals()[interfaceI];
-        }
+        fluidZonesPointsDispls()[interfaceI] += factor*residuals()[interfaceI];
     }
 
     // Update movingWallPressure boundary conditions, if found

@@ -185,23 +185,30 @@ void AitkenCouplingInterface::updateDisplacement()
 
     if (outerCorr() < 3)
     {
-        Info<< "Current fsi under-relaxation factor (fixed): "
-            << relaxationFactor_ << endl;
+        // With the predictor, the first iteration takes the full solid
+        // predictor displacement
+        const scalar factor =
+            ((outerCorr() == 1) && predictor()) ? 1.0 : relaxationFactor_;
+
+        Info<< "Current fsi under-relaxation factor (fixed): " << factor;
+        if ((outerCorr() == 1) && predictor())
+        {
+            Info<< " (predictor)";
+        }
+        Info<< endl;
 
         forAll(fluid().globalPatches(), interfaceI)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
 
-            if ((outerCorr() == 1) && predictor())
-            {
-                fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
-            }
-            else
-            {
-                fluidZonesPointsDispls()[interfaceI] +=
-                    relaxationFactor_*residuals()[interfaceI];
-            }
+            fluidZonesPointsDispls()[interfaceI] +=
+                factor*residuals()[interfaceI];
+
+            // The Aitken update of iteration 3 starts from the factor applied
+            // here, in iteration 2, rather than the one the previous time
+            // step ended with
+            aitkenRelaxationFactors_[interfaceI] = factor;
         }
     }
     else

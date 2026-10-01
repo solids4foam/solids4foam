@@ -26,10 +26,18 @@ DISP_MAX_TOL=2.5e-3      # max displacement absolute tolerance (~5% of reference
 REG_END_TIME=0.3
 
 # Reference values
-# Peak horizontal displacement Dx of the tracked dam corner over t <= 0.3
-# Midpoint of OpenFOAM-v2512 (0.05167), OpenFOAM-9 (0.04996) and
-# foam-extend-4.1 (0.04803), each within 1.9e-3 of it
-REF_MAX_DISP=0.0499
+# Peak horizontal displacement Dx of the tracked dam corner over t <= 0.3.
+# The forks differ by up to 3.6e-3, more than the tolerance, so each has its
+# own reference: OpenFOAM-v2512 gives 0.05158-0.05167 (CI and local, with
+# and without the Aitken correction), OpenFOAM-9 0.04999 and foam-extend-4.1
+# 0.04803 (CI)
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    REF_MAX_DISP=0.04803
+elif [[ "${WM_PROJECT_VERSION:-}" == v* ]]; then
+    REF_MAX_DISP=0.05162
+else
+    REF_MAX_DISP=0.04999
+fi
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
