@@ -283,17 +283,13 @@ public:
         //- Does this response want a scalar tangent calculated
         bool wantsScalarTangent() const
         {
-            return
-                tangentRequest_ == tangentRequest::scalar
-             || tangentRequest_ == tangentRequest::scalarDeviatoric;
+            return needsScalarTangent(tangentRequest_);
         }
 
         //- Does this response want a fourth order tangent calculated
         bool wantsFourthOrderTangent() const
         {
-            return
-                tangentRequest_ == tangentRequest::fourthOrder
-             || tangentRequest_ == tangentRequest::fourthOrderFiniteDifference;
+            return needsFourthOrderTangent(tangentRequest_);
         }
 
     // Edit

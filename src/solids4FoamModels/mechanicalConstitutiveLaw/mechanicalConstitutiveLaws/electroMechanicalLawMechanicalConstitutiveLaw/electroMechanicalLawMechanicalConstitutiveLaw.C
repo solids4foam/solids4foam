@@ -72,8 +72,14 @@ electroMechanicalLawMechanicalConstitutiveLaw
     }
 
     Info<< "    Active tension law over " << subLawPtr_->type()
-        << ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_
-        << (TaFromField_ ? ", from field " + TaName_ : word("")) << endl;
+        << ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_;
+
+    if (TaFromField_)
+    {
+        Info<< ", from field " << TaName_;
+    }
+
+    Info<< endl;
 }
 
 
@@ -130,10 +136,8 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
-    // Read at old time: a prescribed field is never written, so its two times
-    // always hold the same value, and the old-time one is what a shadow state
-    // aliases. A tangent query evaluated into a shadow would find the
-    // current-time field empty
+    // Read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<vector>& f0 = state.getVectorField0("f0");
 
     // A field of active tension if the case asked for one, otherwise the
@@ -191,8 +195,8 @@ void Foam::electroMechanicalLawMechanicalConstitutiveLaw::evaluate
     // caller is handed.
     //
     // The scalar tangent is not recomputed and so does not see the active
-    // tension. That matches the legacy electroMechanicalLaw, whose impK()
-    // returns the passive law's, and it costs iterations rather than accuracy:
+    // tension: it is the passive law's, and that costs iterations rather than
+    // accuracy:
     // the scalar tangent is the segregated solver's stiffness estimate, not a
     // quantity the answer depends on. Worth revisiting once the active tension
     // modelling settles - a single isotropic number for a stress that acts

@@ -18,6 +18,8 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "manufacturedSolutionSource.H"
+#ifdef OPENFOAM_COM
+
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 
@@ -78,5 +80,7 @@ bool Foam::fv::manufacturedSolutionSource::read(const dictionary& dict)
     return false;
 }
 
+
+#endif
 
 // ************************************************************************* //

@@ -1,15 +1,13 @@
 # curvedBeams verification study
 
-This opt-in study turns the curved-beams contact benchmark from
-`solid-benchmarks/elastoPlasticity/curvedBeams` into a mesh-convergence study
-inside the tutorial itself. It refines the tutorial `blockMesh`, extracts the
+This opt-in study is a mesh-convergence study of the curved-beams contact
+benchmark. It refines the tutorial `blockMesh`, extracts the
 total reaction force history on the `fixed` patch of the lower beam from the
 `solidForces` function object that the tutorial already runs, and compares the
 history with the published curves of Neto et al. (2016).
 
-The `solid-benchmarks` case varies the Coulomb friction coefficient over
-`0.0`, `0.3` and `0.6` on a single mesh. Those three friction coefficients are
-retained here as the study variants, and the mesh sweep is added on top: each
+The Coulomb friction coefficients `0.0`, `0.3` and `0.6` are the study
+variants: each
 variant is run through the mesh family below and compared with the published
 curve for its own friction coefficient.
 
