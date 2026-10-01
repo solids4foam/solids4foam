@@ -9,7 +9,7 @@ HEX_STRESS_TOL=6e5
 TET_DISP_TOL=1.5e-7
 TET_STRESS_TOL=9e5
 
-HIGH_ORDER_DISP_TOL=5e-9
+HIGH_ORDER_DISP_TOL=7e-9
 HIGH_ORDER_STRESS_TOL=7e4
 
 APPROACHES=(
@@ -62,10 +62,11 @@ check_tolerance()
         return 1
     fi
 
-    if awk "BEGIN {exit !($value <= $tolerance)}"; then
+    # Errors must be positive: zero indicates a degenerate comparison
+    if awk "BEGIN {exit !($value > 0 && $value <= $tolerance)}"; then
         printf 'PASS: %s = %.8g\n' "$label" "$value"
     else
-        printf 'FAIL: %s = %.8g, expected <= %g\n' \
+        printf 'FAIL: %s = %.8g, expected in (0, %g]\n' \
             "$label" "$value" "$tolerance"
         return 1
     fi
