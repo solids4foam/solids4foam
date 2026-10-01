@@ -85,12 +85,7 @@ the same displacement and stress L2 tolerances:
 ./regressionTest.sh
 ```
 
-PETSc regression runs are skipped when `PETSC_DIR` is unset; tet runs are
-skipped when Gmsh is unavailable. Logs are retained under `regressionTests/`;
-use `./regressionTest.sh --check-only` to check existing results.
-
-The opt-in [`verification/`](verification/) directory migrates the mesh and
-solver variants from `solid-benchmarks/linearElasticity/manufacturedSolution`.
-It is separate from the normal tutorial regression suite because it runs many
-cases. See the verification README for variants, commands, and acceptance
-criteria.
+The opt-in [`verification/`](verification/) directory holds mesh and solver
+variants of this case. It is separate from the normal tutorial regression suite
+because it runs many cases. See the verification README for variants, commands,
+and acceptance criteria.

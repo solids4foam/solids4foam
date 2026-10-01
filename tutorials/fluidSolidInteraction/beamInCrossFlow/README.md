@@ -476,9 +476,9 @@ Total force (fluid) = (-0.147015 0.378642 -0.38067)
 Total force (solid) = (0.146715 -0.378943 0.380941)
 Evolving solid solver
 Solving the updated Lagrangian form of the momentum equation for DD
-    Corr, res, relRes, matRes, iters
+    Corr, res, relRes, iters
     Both residuals have converged
-    2, 5.23068e-07, 7.10068e-07, 0, 2
+    2, 5.23068e-07, 7.10068e-07, 2
 
 Current fsi relative residual norm: 5.70921e-07
 Alternative fsi residual: 5.70555e-07

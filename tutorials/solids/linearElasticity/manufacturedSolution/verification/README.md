@@ -1,7 +1,6 @@
 # Manufactured-solution verification study
 
-This opt-in study migrates the active convergence variants from
-`solid-benchmarks/linearElasticity/manufacturedSolution`. The default sweep
+This opt-in study is a convergence study. The default sweep
 combines the segregated and PETSc SNES solution procedures with regular
 hexahedral, dual-polyhedral, and distorted-hexahedral meshes. Their tetrahedral
 variants remain available explicitly. Both high-order approaches,
