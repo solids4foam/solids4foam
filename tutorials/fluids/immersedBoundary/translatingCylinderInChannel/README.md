@@ -32,10 +32,10 @@ with $$U_m = 0.3$$ m/s and $$H = 0.41$$ m. The flow relative to the cylinder
 is then that of the benchmark with the cylinder at the position
 $$x = 0.2 + 0.05 t$$ m, so that, once the flow has developed, the forces on
 the translating cylinder equal those on a static cylinder at the same
-position. These are in `verificationData/CdStatic.dat`, from static cylinders
-at 0.05 m intervals on the finest mesh: the drag coefficient is 5.58 with the
-cylinder at $$x = 0.2$$ m, as in the benchmark, and falls to 5.29 as the
-cylinder moves away from the inlet, beyond $$x = 0.4$$ m ($$t = 4$$ s).
+position. These are in `verification/reference/CdStatic.dat`, from static
+cylinders at 0.05 m intervals on the finest mesh: the drag coefficient is 5.58
+with the cylinder at $$x = 0.2$$ m, as in the benchmark, and falls to 5.29 as
+the cylinder moves away from the inlet, beyond $$x = 0.4$$ m ($$t = 4$$ s).
 
 The cylinder moves through a mesh that is uniform upstream of $$x = 1.2$$ m,
 with 10 cells across the cylinder for `MESH_LEVEL=1`, so the cells that it

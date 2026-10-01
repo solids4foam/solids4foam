@@ -108,13 +108,21 @@ final_umax=""
 if [[ -n "${latest_time}" && -f "${CASE_DIR}/${latest_time}/U" ]]; then
     final_umax=$(awk '
         /^internalField/ { inField = 1; next }
-        inField && /^\)/ { exit }
-        inField && /^\(/ {
-            gsub(/[()]/, "", $0)
-            if (n == 0 || $1 > umax) { umax = $1 }
-            n++
+        inField && /^[[:space:]]*\)[[:space:]]*;?[[:space:]]*$/ { exit }
+        inField {
+            line = $0
+            while (match(line, /\([^()]*\)/)) {
+                vector = substr(line, RSTART + 1, RLENGTH - 2)
+                nComp = split(vector, component, /[[:space:]]+/)
+                if (nComp == 3) {
+                    value = component[1] + 0
+                    if (!found || value > umax) { umax = value }
+                    found = 1
+                }
+                line = substr(line, RSTART + RLENGTH)
+            }
         }
-        END { if (n > 0) { print umax } }
+        END { if (found) { print umax } }
     ' "${CASE_DIR}/${latest_time}/U")
 fi
 

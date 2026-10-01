@@ -75,7 +75,7 @@ class neoHookeanElasticMechanicalConstitutiveLaw
         //- Young's modulus
         dimensionedScalar E_;
 
-        //- Poisson's ration
+        //- Poisson's ratio
         dimensionedScalar nu_;
 
         //- First Lamé parameter
@@ -157,7 +157,7 @@ public:
 
     // Edit
 
-        //- Small-strain constitutive evaluation
+        //- Finite-strain constitutive evaluation
         virtual void evaluate
         (
             const finiteStrainMechanicalConstitutiveLawKinematics& kin,
