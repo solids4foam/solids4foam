@@ -130,7 +130,8 @@ added mass applies; the exact viscous correction to the frequency is 0.03%.
 ```
 
 The tutorial runs four wet periods in about 75 s in serial and requires
-solids4foam to be built with PETSc. Run `./Allclean` before switching to
+solids4foam to be built with PETSc, and `python3` to generate the initial
+velocity. Run `./Allclean` before switching to
 another variant, as `Allrun` does not rerun a solver whose log exists.
 
 ---
