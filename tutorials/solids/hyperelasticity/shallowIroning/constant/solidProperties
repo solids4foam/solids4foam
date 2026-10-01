@@ -20,7 +20,7 @@ FoamFile
 solidModel     nonLinearGeometryUpdatedLagrangian;
 
 // Note: nonLinearGeometryUpdatedLagrangian checks convergence using
-// solutionTolerance, alternativeTolerance and materialTolerance
+// solutionTolerance and alternativeTolerance
 nonLinearGeometryUpdatedLagrangianCoeffs
 {
     // Maximum number of momentum correctors
@@ -31,9 +31,6 @@ nonLinearGeometryUpdatedLagrangianCoeffs
 
     // Alternative solution tolerance for displacement
     alternativeTolerance    1e-6;
-
-    // Material law solution tolerance
-    materialTolerance       1e-06;
 
     // Write frequency for the residuals
     infoFrequency           100;

@@ -1,6 +1,6 @@
 # Drag and lift coefficients of the translating immersed cylinder, compared
 # with those of the static cylinder at the same positions
-# (verificationData/CdStatic.dat)
+# (verification/reference/CdStatic.dat)
 #
 # Cd = 2 Fx/(rho Umean^2 D Lz), with rho = 1 kg/m^3, the mean velocity of the
 # flow relative to the cylinder Umean = 0.2 m/s, D = 0.1 m and Lz = 0.1 m,
@@ -10,7 +10,7 @@ set terminal pdfcairo enhanced color font "Helvetica,12" size 6,6
 set output "forceCoeffs.pdf"
 
 forceFile = "postProcessing/immersedBoundary/0/cylinder.dat"
-refFile = "verificationData/CdStatic.dat"
+refFile = "verification/reference/CdStatic.dat"
 
 set multiplot layout 2,1
 
