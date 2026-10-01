@@ -17,15 +17,15 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "OBB.H"
+#include "orientedBoundBox.H"
 #include <cmath>
 #include <limits>
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-const Foam::scalar Foam::OBB::parallelTolerance_ = 1e-6;
+const Foam::scalar Foam::orientedBoundBox::parallelTolerance_ = 1e-6;
 
-const Foam::OBB Foam::OBB::greatBox
+const Foam::orientedBoundBox Foam::orientedBoundBox::greatBox
 (
     Foam::point::zero,
     Foam::vector(Foam::VGREAT, Foam::VGREAT, Foam::VGREAT)
@@ -34,7 +34,7 @@ const Foam::OBB Foam::OBB::greatBox
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-void Foam::OBB::calcCovariance
+void Foam::orientedBoundBox::calcCovariance
 (
     const pointField& points,
     point& mean,
@@ -86,7 +86,7 @@ void Foam::OBB::calcCovariance
 }
 
 
-void Foam::OBB::addToLocalBounds
+void Foam::orientedBoundBox::addToLocalBounds
 (
     const vector& localPoint,
     vector& minLocal,
@@ -101,7 +101,7 @@ void Foam::OBB::addToLocalBounds
 }
 
 
-void Foam::OBB::orthonormaliseAxes()
+void Foam::orientedBoundBox::orthonormaliseAxes()
 {
     // A failed eigensystem must still produce a conservative fitted box.
     for (direction cmpt = 0; cmpt < tensor::nComponents; ++cmpt)
@@ -159,7 +159,7 @@ void Foam::OBB::orthonormaliseAxes()
 }
 
 
-void Foam::OBB::makeOBB(const pointField& points)
+void Foam::orientedBoundBox::makeBox(const pointField& points)
 {
     if (points.empty())
     {
@@ -242,7 +242,7 @@ void Foam::OBB::makeOBB(const pointField& points)
 }
 
 
-void Foam::OBB::makeOBB
+void Foam::orientedBoundBox::makeBox
 (
     const pointField& facePoints,
     const vector& faceNormal,
@@ -366,7 +366,7 @@ void Foam::OBB::makeOBB
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::OBB::OBB()
+Foam::orientedBoundBox::orientedBoundBox()
 :
     centre_(point::zero),
     halfLength_(vector(-1, -1, -1)),
@@ -374,7 +374,11 @@ Foam::OBB::OBB()
 {}
 
 
-Foam::OBB::OBB(const point& centre, const vector& halfLength)
+Foam::orientedBoundBox::orientedBoundBox
+(
+    const point& centre,
+    const vector& halfLength
+)
 :
     centre_(centre),
     halfLength_(halfLength),
@@ -382,7 +386,7 @@ Foam::OBB::OBB(const point& centre, const vector& halfLength)
 {}
 
 
-Foam::OBB::OBB
+Foam::orientedBoundBox::orientedBoundBox
 (
     const point& centre,
     const vector& halfLength,
@@ -397,7 +401,7 @@ Foam::OBB::OBB
 }
 
 
-Foam::OBB::OBB(const boundBox& box)
+Foam::orientedBoundBox::orientedBoundBox(const boundBox& box)
 :
     centre_(box.midpoint()),
     halfLength_(0.5*(box.max() - box.min())),
@@ -405,28 +409,28 @@ Foam::OBB::OBB(const boundBox& box)
 {}
 
 
-Foam::OBB::OBB(const pointField& points)
+Foam::orientedBoundBox::orientedBoundBox(const pointField& points)
 :
     centre_(point::zero),
     halfLength_(vector::zero),
     axes_(tensor::I)
 {
-    makeOBB(points);
+    makeBox(points);
 }
 
 
-Foam::OBB::OBB(const tmp<pointField>& points)
+Foam::orientedBoundBox::orientedBoundBox(const tmp<pointField>& points)
 :
     centre_(point::zero),
     halfLength_(vector::zero),
     axes_(tensor::I)
 {
-    makeOBB(points());
+    makeBox(points());
     points.clear();
 }
 
 
-Foam::OBB::OBB
+Foam::orientedBoundBox::orientedBoundBox
 (
     const pointField& facePoints,
     const vector& faceNormal,
@@ -439,7 +443,7 @@ Foam::OBB::OBB
     halfLength_(vector::zero),
     axes_(tensor::I)
 {
-    makeOBB
+    makeBox
     (
         facePoints,
         faceNormal,
@@ -450,7 +454,7 @@ Foam::OBB::OBB
 }
 
 
-Foam::OBB::OBB(Istream& is)
+Foam::orientedBoundBox::orientedBoundBox(Istream& is)
 :
     centre_(point::zero),
     halfLength_(vector::zero),
@@ -462,12 +466,12 @@ Foam::OBB::OBB(Istream& is)
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::OBB::grow(const scalar distance)
+void Foam::orientedBoundBox::grow(const scalar distance)
 {
     if (!(distance >= 0) || !std::isfinite(distance))
     {
         FatalErrorInFunction
-            << "OBB growth distance must be finite and non-negative: "
+            << "Box growth distance must be finite and non-negative: "
             << distance
             << abort(FatalError);
     }
@@ -479,7 +483,7 @@ void Foam::OBB::grow(const scalar distance)
 }
 
 
-bool Foam::OBB::contains(const point& p) const
+bool Foam::orientedBoundBox::contains(const point& p) const
 {
     if (empty())
     {
@@ -508,7 +512,7 @@ bool Foam::OBB::contains(const point& p) const
 }
 
 
-bool Foam::OBB::overlaps(const OBB& box) const
+bool Foam::orientedBoundBox::overlaps(const orientedBoundBox& box) const
 {
     if (empty() || box.empty())
     {
@@ -610,7 +614,7 @@ bool Foam::OBB::overlaps(const OBB& box) const
 }
 
 
-bool Foam::OBB::operator==(const OBB& box) const
+bool Foam::orientedBoundBox::operator==(const orientedBoundBox& box) const
 {
     return
         centre_ == box.centre_
@@ -621,22 +625,22 @@ bool Foam::OBB::operator==(const OBB& box) const
 
 // * * * * * * * * * * * * * * IOstream Operators * * * * * * * * * * * * * //
 
-Foam::Ostream& Foam::operator<<(Ostream& os, const OBB& box)
+Foam::Ostream& Foam::operator<<(Ostream& os, const orientedBoundBox& box)
 {
     os  << box.centre_ << token::SPACE
         << box.halfLength_ << token::SPACE
         << box.axes_;
 
-    os.check("Ostream& operator<<(Ostream&, const OBB&)");
+    os.check("Ostream& operator<<(Ostream&, const orientedBoundBox&)");
     return os;
 }
 
 
-Foam::Istream& Foam::operator>>(Istream& is, OBB& box)
+Foam::Istream& Foam::operator>>(Istream& is, orientedBoundBox& box)
 {
     is >> box.centre_ >> box.halfLength_ >> box.axes_;
 
-    is.check("Istream& operator>>(Istream&, OBB&)");
+    is.check("Istream& operator>>(Istream&, orientedBoundBox&)");
     return is;
 }
 

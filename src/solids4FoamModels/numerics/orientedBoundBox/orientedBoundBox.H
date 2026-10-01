@@ -16,15 +16,17 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::OBB
+    Foam::orientedBoundBox
 
 Description
-    Oriented bounding box represented by a centre, three orthonormal axes and
-    the corresponding half-lengths.
+    Oriented bounding box (OBB) represented by a centre, three orthonormal
+    axes and the corresponding half-lengths.
 
     The box fitted to an arbitrary point field uses principal component
-    analysis.  This generally gives a tighter box than an axis-aligned bound
-    box, but is not guaranteed to be the minimum-volume oriented box.
+    analysis, and the axis-aligned bound box is kept instead when it has the
+    smaller volume.  The fitted box is therefore never larger than the
+    axis-aligned bound box, but is not guaranteed to be the minimum-volume
+    oriented box.
 
     Box overlap is evaluated with the separating axis theorem.
 
@@ -41,12 +43,12 @@ Author
     Philip Cardiff, UCD.
 
 SourceFiles
-    OBB.C
+    orientedBoundBox.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef OBB_H
-#define OBB_H
+#ifndef orientedBoundBox_H
+#define orientedBoundBox_H
 
 #include "boundBox.H"
 #include "pointField.H"
@@ -57,17 +59,17 @@ SourceFiles
 namespace Foam
 {
 
-class OBB;
+class orientedBoundBox;
 
-Ostream& operator<<(Ostream& os, const OBB& box);
-Istream& operator>>(Istream& is, OBB& box);
+Ostream& operator<<(Ostream& os, const orientedBoundBox& box);
+Istream& operator>>(Istream& is, orientedBoundBox& box);
 
 
 /*---------------------------------------------------------------------------*\
-                           Class OBB Declaration
+                      Class orientedBoundBox Declaration
 \*---------------------------------------------------------------------------*/
 
-class OBB
+class orientedBoundBox
 {
     // Private Data
 
@@ -87,10 +89,10 @@ class OBB
     // Private Member Functions
 
         //- Fit a principal-component box, or the axis-aligned box if smaller
-        void makeOBB(const pointField& points);
+        void makeBox(const pointField& points);
 
         //- Fit a minimum-area in-plane box and extrude it along faceNormal
-        void makeOBB
+        void makeBox
         (
             const pointField& facePoints,
             const vector& faceNormal,
@@ -124,19 +126,19 @@ public:
     // Static Data Members
 
         //- A box centred at the origin with VGREAT half-lengths
-        static const OBB greatBox;
+        static const orientedBoundBox greatBox;
 
 
     // Constructors
 
         //- Construct an empty box
-        OBB();
+        orientedBoundBox();
 
         //- Construct an axis-aligned box from its centre and half-lengths
-        OBB(const point& centre, const vector& halfLength);
+        orientedBoundBox(const point& centre, const vector& halfLength);
 
         //- Construct from centre, half-lengths and local axes stored as rows
-        OBB
+        orientedBoundBox
         (
             const point& centre,
             const vector& halfLength,
@@ -144,17 +146,17 @@ public:
         );
 
         //- Construct from an axis-aligned bounding box
-        OBB(const boundBox& box);
+        orientedBoundBox(const boundBox& box);
 
         //- Fit the smaller of the principal-component and axis-aligned boxes;
         //  an empty field gives an empty box
-        OBB(const pointField& points);
+        orientedBoundBox(const pointField& points);
 
         //- Fit a box as above to a temporary point field
-        OBB(const tmp<pointField>& points);
+        orientedBoundBox(const tmp<pointField>& points);
 
         //- Construct a face box with positive and negative normal extrusion
-        OBB
+        orientedBoundBox
         (
             const pointField& facePoints,
             const vector& faceNormal,
@@ -164,7 +166,7 @@ public:
         );
 
         //- Construct from Istream
-        OBB(Istream& is);
+        orientedBoundBox(Istream& is);
 
 
     // Member Functions
@@ -209,14 +211,14 @@ public:
             bool contains(const point& p) const;
 
             //- Return true if this box overlaps the supplied box
-            bool overlaps(const OBB& box) const;
+            bool overlaps(const orientedBoundBox& box) const;
 
 
     // Member Operators
 
-        bool operator==(const OBB& box) const;
+        bool operator==(const orientedBoundBox& box) const;
 
-        bool operator!=(const OBB& box) const
+        bool operator!=(const orientedBoundBox& box) const
         {
             return !operator==(box);
         }
@@ -224,8 +226,8 @@ public:
 
     // IOstream Operators
 
-        friend Istream& operator>>(Istream& is, OBB& box);
-        friend Ostream& operator<<(Ostream& os, const OBB& box);
+        friend Istream& operator>>(Istream& is, orientedBoundBox& box);
+        friend Ostream& operator<<(Ostream& os, const orientedBoundBox& box);
 };
 
 
