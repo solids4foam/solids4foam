@@ -528,7 +528,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrAddDefault<scalar>("couplingStartTime", -1.0)
     ),
-    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
+    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", true)),
     curTimeIndex_(-1),
     interfaceDeformationLimit_
     (

@@ -28,8 +28,9 @@ IQNILSCoeffs
     predictor            yes;
     predictSolid         yes;
 
-    // Under-relaxation factor for the first two iterations of each time-step,
-    // after which the IQNILS procedure is used
+    // Under-relaxation factor for the second iteration of each time-step (the
+    // first is not relaxed with predictor yes), after which the IQNILS
+    // procedure is used
     relaxationFactor     0.05;
 
     // Tolerance for the FSI loop within each time-step

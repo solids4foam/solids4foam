@@ -108,7 +108,15 @@ class fluidSolidInterface
         //- Optional: enable coupling after specified time
         const scalar couplingStartTime_;
 
-        //- Predictor on/off
+        //- Predictor on/off: move the fluid interface with the full solid
+        //  predictor displacement, rather than the relaxed one, in the first
+        //  FSI iteration of each time-step. The interface displacement is an
+        //  increment within the time-step, so a relaxed first iteration makes
+        //  the interface stop, or with backward time differencing reverse, as
+        //  seen by the fluid, and on cases with a strong added-mass effect the
+        //  resulting fluid force can make the solid diverge (#489). It
+        //  requires the solid predictor (predictSolid), without which the
+        //  first residual is zero. Defaults to on
         const Switch predictor_;
 
         //- Current time step index

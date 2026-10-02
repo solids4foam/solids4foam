@@ -190,7 +190,9 @@ mass dominates its inertia and the coupling is very strong:
 - `predictSolid no`: solving the light wall first with the old fluid load
   would jump it towards the new external pressure, and passing that jump to
   the fluid unrelaxed gives a large added-mass pressure;
-- `relaxationFactor 0.005` for the first two iterations of each time step,
+- `relaxationFactor 0.005` for the second iteration of each time step (the
+  first is not relaxed with `predictor yes`, and without the solid predictor
+  it only passes the previous time step's converged residual),
   roughly the wall stiffness over the added mass divided by $$\Delta t^2$$;
   it must shrink with $$\Delta t^2$$ when the time step is refined;
 - `relMinSignificant 1e-2`, `qrSolveTolerance 1e-3` and
