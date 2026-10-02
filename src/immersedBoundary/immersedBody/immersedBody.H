@@ -38,6 +38,11 @@ Description
       geometric cutting of the cells of the geometricVoF library
       (cutCellIso). lambda varies continuously as the body moves.
 
+    A body driven by a fluid-solid interface (motion fsiDriven) may be given
+    its surface by the interface rather than by a surface file
+    (setReferenceSurface); it is then re-positioned in each coupling
+    iteration, when the configuration index of its motion changes.
+
     Cells with an occupancy greater than 1 - threshold are internal cells, and
     cells with an occupancy greater than threshold are surface cells.
 
@@ -48,7 +53,9 @@ Description
     \verbatim
     cylinder
     {
-        // Surface file, relative to constant/triSurface
+        // Surface file, relative to constant/triSurface (or
+        // constant/<region>/triSurface for a mesh region); optional for a
+        // body whose surface is given by a fluid-solid interface
         surface     "cylinder.stl";
 
         // Prescribed motion, optional, default static
@@ -125,7 +132,7 @@ class immersedBody
         triSurface surface_;
 
         //- Surface points in the reference configuration
-        const pointField points0_;
+        pointField points0_;
 
         //- Search engine for the current surface
         autoPtr<triSurfaceSearch> searchPtr_;
@@ -134,7 +141,11 @@ class immersedBody
         autoPtr<immersedBodyMotion> motionPtr_;
 
         //- Centre of rotation for the torque, in the reference configuration
-        const point CofR0_;
+        point CofR0_;
+
+        //- Was the centre of rotation given, rather than taken as the mean
+        //  of the reference surface points?
+        const bool CofRGiven_;
 
         //- Occupancy from the signed distance of the cell centres to the
         //  surface, rather than from the fraction of cell vertices inside
@@ -145,6 +156,9 @@ class immersedBody
 
         //- Time of the current configuration
         scalar time_;
+
+        //- Configuration index of the motion in the current configuration
+        label configuration_;
 
         //- Local cells fully covered by the body
         labelList internalCells_;
@@ -175,6 +189,10 @@ class immersedBody
 
         //- Read the surface
         static triSurface readSurface(const fvMesh& mesh, const fileName& f);
+
+        //- Check that the surface is closed with outward normals, and set
+        //  the reference points and centre of rotation from it
+        void setSurface();
 
 
 public:
@@ -233,10 +251,38 @@ public:
                 return name_;
             }
 
+            //- Has the surface been set? A body without a surface file is
+            //  given its surface by a fluid-solid interface
+            bool hasSurface() const
+            {
+                return surface_.size() > 0;
+            }
+
+            //- Motion of the body
+            const immersedBodyMotion& motion() const
+            {
+                return motionPtr_();
+            }
+
+            //- Non-const access to the motion, for a fluid-solid interface
+            //  that drives it
+            immersedBodyMotion& motion()
+            {
+                return motionPtr_();
+            }
+
             //- Does the body move?
             bool moving() const
             {
                 return motionPtr_->moving();
+            }
+
+            //- Configuration index of the motion in the current
+            //  configuration: the body has been re-positioned since it was
+            //  last used if this differs from motion().configuration()
+            label configuration() const
+            {
+                return configuration_;
             }
 
             //- Is the motion of the body rigid?
@@ -327,7 +373,18 @@ public:
 
         // Edit
 
-            //- Move the surface to its configuration at time t
+            //- Set the reference surface of a body without a surface file:
+            //  the points and the triangles as faces of three points, with
+            //  the normals pointing out of the body. The surface is then
+            //  moved to the current time
+            void setReferenceSurface
+            (
+                const pointField& points,
+                const faceList& triangles
+            );
+
+            //- Move the surface to its configuration at time t, if the time
+            //  or the configuration index of the motion has changed
             void move(const scalar t);
 
             //- Locate the covered cells and add the occupancy of the body to

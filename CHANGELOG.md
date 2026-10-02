@@ -99,6 +99,24 @@ release. For complete commit-level details and contributor information, see the
   `fluids/immersedBoundary/bendingBeamInChannel` and
   `fluids/immersedBoundary/heartValveInDuct` tutorials, with
   regression tests.
+- Added immersed fluid-solid interfaces: in `constant/fsiProperties`, a solid
+  interface patch paired with `fluidPatch none;` drives an immersed body of
+  the `immersedBoundaryForce` option of the fluid (motion `fsiDriven`), named
+  in an `immersedInterfaces` entry with optional `closurePatches` of the
+  solid that close its surface. The surface is built from the solid patches
+  (extended and capped in the empty direction of a two-dimensional fluid
+  mesh), moved in every coupling iteration, and the surface traction of the
+  immersed boundary is returned to the solid patch; the momentum exchange
+  with the body is logged for comparison. The interface works with the
+  Dirichlet-Neumann coupling schemes (`fixedRelaxation`, `Aitken`, `IQNILS`)
+  and needs no interface mapping. The bodies of `immersedBoundaryForce` are
+  now re-positioned within a time step when their configuration changes, and
+  the `surface` entry of a body is optional. The coupling schemes use the new
+  `fluidSolidInterface` accessors `nInterfaces()`, `fluidZone(i)`,
+  `solidZone(i)`, `fluidInterfaceName(i)` and `fluidZoneTraction(i)`. Added
+  the `fluids/immersedBoundary/immersedHronTurekFsi2` tutorial (the
+  Turek-Hron FSI2 benchmark with the cylinder and flag immersed in a fixed
+  background mesh), with a regression test.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.
@@ -110,9 +128,17 @@ release. For complete commit-level details and contributor information, see the
   second-order. The velocity and acceleration are stored as `NewmarkV(D)` and
   `NewmarkA(D)`, which are written, read on restart, and can set the initial
   conditions; otherwise the body starts at rest or in equilibrium. The
-  time-step may vary. Add `"d2dt2\(.*\)" NewmarkBeta;` to `ddtSchemes` too,
-  because `fvc::d2dt2` reads its scheme there (#502); a fatal error says so
-  if it is missing. The updated Lagrangian solid models are not supported.
+  time-step may vary. Only `d2dt2Schemes` needs the entry (#502). An
+  optional `"d2dt2\(.*\)" NewmarkBeta;` in `ddtSchemes`, with the same
+  coefficients, makes the linear predictor use the Newmark acceleration;
+  differing coefficients are a fatal error. The updated Lagrangian solid
+  models are not supported.
+- The `cantileverVibration` tutorial takes the time scheme as a second
+  `Allrun` argument: `bdf2` (default), `newmark`, `bossak`, or `all` to
+  compare the three with Abaqus. Its regression test runs all three, checks
+  the physical and Bossak-weighted accelerations with `Test-fvcD2dt2`, and
+  checks both `ddtSchemes` forms for `NewmarkBeta` and the fatal error for
+  mismatched coefficients.
 - Added the `collapsibleChannel` fluid-solid interaction tutorial: flow in a
   2D channel with a very light, thin elastic wall that bends and stretches,
   after the oomph-lib collapsible-channel problem of Heil and co-workers,
@@ -292,6 +318,17 @@ release. For complete commit-level details and contributor information, see the
   end time in 475 s instead of 761 s, with new regression references for each
   fork. Set `predictor no` to recover the previous behaviour.
 
+- `elasticWallPressure` documents and reports why Robin-Neumann coupling is
+  slow on walls wetted on both sides, such as the `HronTurekFsi3` flap. There,
+  each face has two interface impedances: one for loads that push both faces
+  the same way (translation and bending), which the automatic coefficient
+  matches, and one about `coth^2(h/l)` times larger for loads that squeeze
+  the wall through its thickness. A single coefficient cannot match both, so
+  the squeeze modes contract at best at about `1 - 2*tanh^2(h/l)` per FSI
+  iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
+  The estimate is printed at the start of the run, with a warning when it
+  exceeds 0.95.
+
 ### Removed
 
 - OpenFOAM.com versions older than v2312 (v2306, v2212, v2206, v2112, v2106
@@ -387,6 +424,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The explicit inertia term of the solid models now takes its scheme from
+  `d2dt2Schemes`, as the implicit term does (#502). OpenFOAM's `fvc::d2dt2`
+  looks up `ddtSchemes`, so when the two defaults differed, the PETSc SNES
+  residuals, standard and high-order, of `linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` and
+  `nonLinearGeometryUpdatedLagrangian`, the old-time inertia term of the
+  segregated updated Lagrangian solver, and the solid interface acceleration
+  passed to the fluid, used the `ddtSchemes` scheme. Cases in
+  which both dictionaries select the same scheme for these terms, e.g. through
+  equal defaults, are unaffected; the one tutorial whose defaults differ, the
+  hyperelastic `cooksMembrane`, changes by about 1e-9 relative in its
+  `petscSnes` variant. The lookup names are unchanged, so a case that sets
+  these terms through named entries, or sets `ddtSchemes` but not
+  `d2dt2Schemes`, must now give them in `d2dt2Schemes`.
 - `pimpleFluid` now applies finite volume options to its momentum and optional
   temperature equations: `fvOptions` in OpenFOAM.com, and `fvModels` and
   `fvConstraints` in OpenFOAM.org, called where the corresponding standard
@@ -419,6 +470,10 @@ release. For complete commit-level details and contributor information, see the
   `constant/fsiProperties.aitken` that did not exist. The Aitken setup is now
   in that file, and `constant/fsiProperties` is a link to the selected
   `constant/fsiProperties.<mode>` (`robin` by default).
+- On a restart, the warning that an `elasticWallPressure` (Robin) interface is
+  used with relaxed or accelerated coupling was issued for `fixedRelaxation`
+  with `relaxationFactor 1` too, as the check ran during the construction of
+  the base coupling class.
 
 ## [v2.4] - 2026-08-24
 

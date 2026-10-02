@@ -107,51 +107,8 @@ Foam::triSurface Foam::immersedBody::readSurface
 }
 
 
-// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
-
-Foam::immersedBody::immersedBody
-(
-    const word& name,
-    const dictionary& dict,
-    const fvMesh& mesh
-)
-:
-    name_(name),
-    mesh_(mesh),
-    surface_(readSurface(mesh, dict.get<fileName>("surface"))),
-    points0_(surface_.points()),
-    searchPtr_(),
-    motionPtr_(),
-    CofR0_(dict.getOrDefault<point>("CofR", average(points0_))),
-    signedDistance_
-    (
-        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
-     == signedDistance
-    ),
-    cut_
-    (
-        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
-     == cut
-    ),
-    time_(-GREAT),
-    internalCells_(),
-    surfaceCells_(),
-    cellWidths_(mesh.nCells(), Zero)
+void Foam::immersedBody::setSurface()
 {
-    // The body is static unless a motion is given
-    dictionary motionDict;
-
-    if (dict.found("motion"))
-    {
-        motionDict = dict.subDict("motion");
-    }
-    else
-    {
-        motionDict.add("type", word("static"));
-    }
-
-    motionPtr_ = immersedBodyMotion::New(motionDict);
-
     // The inside test requires a closed surface with outward normals
     if (surface_.nInternalEdges() != surface_.nEdges())
     {
@@ -176,10 +133,82 @@ Foam::immersedBody::immersedBody
             << exit(FatalError);
     }
 
+    points0_ = surface_.points();
+
+    if (!CofRGiven_)
+    {
+        CofR0_ = average(points0_);
+    }
+
     Info<< "    Immersed body " << name_ << ": " << surface_.size()
         << " faces, bounding box " << boundBox(points0_, false) << endl;
 
-    move(mesh.time().value());
+    searchPtr_.clear();
+    time_ = -GREAT;
+    configuration_ = -1;
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::immersedBody::immersedBody
+(
+    const word& name,
+    const dictionary& dict,
+    const fvMesh& mesh
+)
+:
+    name_(name),
+    mesh_(mesh),
+    surface_(),
+    points0_(),
+    searchPtr_(),
+    motionPtr_(),
+    CofR0_(dict.getOrDefault<point>("CofR", Zero)),
+    CofRGiven_(dict.found("CofR")),
+    signedDistance_
+    (
+        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
+     == signedDistance
+    ),
+    cut_
+    (
+        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
+     == cut
+    ),
+    time_(-GREAT),
+    configuration_(-1),
+    internalCells_(),
+    surfaceCells_(),
+    cellWidths_(mesh.nCells(), Zero)
+{
+    // The body is static unless a motion is given
+    dictionary motionDict;
+
+    if (dict.found("motion"))
+    {
+        motionDict = dict.subDict("motion");
+    }
+    else
+    {
+        motionDict.add("type", word("static"));
+    }
+
+    motionPtr_ = immersedBodyMotion::New(motionDict);
+
+    // A body without a surface file is given its surface by a fluid-solid
+    // interface (setReferenceSurface)
+    if (dict.found("surface"))
+    {
+        surface_ = readSurface(mesh, dict.get<fileName>("surface"));
+        setSurface();
+        move(mesh.time().value());
+    }
+    else
+    {
+        Info<< "    Immersed body " << name_ << ": no surface given, it "
+            << "is expected from a fluid-solid interface" << endl;
+    }
 }
 
 
@@ -284,9 +313,58 @@ Foam::vector Foam::immersedBody::acceleration
 }
 
 
+void Foam::immersedBody::setReferenceSurface
+(
+    const pointField& points,
+    const faceList& triangles
+)
+{
+    if (hasSurface())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_
+            << " has already been set" << abort(FatalError);
+    }
+
+    List<labelledTri> tris(triangles.size());
+    forAll(triangles, i)
+    {
+        const face& f = triangles[i];
+
+        if (f.size() != 3)
+        {
+            FatalErrorInFunction
+                << "Face " << i << " of the surface of immersed body "
+                << name_ << " has " << f.size() << " points: the faces "
+                << "must be triangles" << abort(FatalError);
+        }
+
+        tris[i] = labelledTri(f[0], f[1], f[2], 0);
+    }
+
+    surface_ = triSurface(tris, points);
+    setSurface();
+    move(mesh_.time().value());
+}
+
+
 void Foam::immersedBody::move(const scalar t)
 {
-    if (searchPtr_ && (!moving() || t == time_))
+    if (!hasSurface())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_ << " has not been "
+            << "set: give a surface file, or drive the body by a fluid-solid "
+            << "interface" << abort(FatalError);
+    }
+
+    const label configuration = motionPtr_->configuration();
+
+    if
+    (
+        searchPtr_
+     && (!moving() || (t == time_ && configuration == configuration_))
+    )
     {
         return;
     }
@@ -294,6 +372,7 @@ void Foam::immersedBody::move(const scalar t)
     surface_.movePoints(motionPtr_->points(points0_, t));
     searchPtr_.reset(new triSurfaceSearch(surface_));
     time_ = t;
+    configuration_ = configuration;
 
     if (!motionPtr_->rigid())
     {

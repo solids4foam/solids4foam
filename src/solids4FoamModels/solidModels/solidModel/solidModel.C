@@ -2267,11 +2267,15 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
     const label interfaceI
 ) const
 {
-    // The physical acceleration: with the Bossak-alpha NewmarkBeta scheme,
-    // fvc::d2dt2 returns the weighted acceleration of the momentum residual
+    // Pass physical acceleration, not the Bossak-weighted inertia residual,
+    // using the same scheme dictionary as the momentum equation
     const volVectorField a
     (
-        fv::NewmarkBetaD2dt2Scheme<vector>::physicalAcceleration(D())
+        fv::NewmarkBetaD2dt2Scheme<vector>::physicalAcceleration
+        (
+            D(),
+            d2dt2SchemeCompat(mesh(), "d2dt2(" + D().name() + ')')
+        )
     );
 
     return globalPatches()[interfaceI].patchFaceToGlobal

@@ -41,12 +41,6 @@ Description
             default         NewmarkBeta;  // beta = 1/4, gamma = 1/2
         }
 
-        ddtSchemes
-        {
-            default         backward;
-            "d2dt2\(.*\)"   NewmarkBeta;
-        }
-
     The optional coefficients follow the name: "NewmarkBeta beta gamma" or
     "NewmarkBeta beta gamma alphaM", with the defaults beta = 0.25,
     gamma = 0.5 and alphaM = 0.
@@ -61,13 +55,25 @@ Description
       and damps high frequencies, with the spectral radius at infinity
       rho_inf = (1 + alphaM)/(1 - alphaM).
 
-    The ddtSchemes entry is needed because fvc::d2dt2, which is used for
-    example in the PETSc SNES residual, reads its scheme from ddtSchemes
-    (issue #502). Without it, the residual would silently use another scheme,
-    so fvm::d2dt2 raises a fatal error if the ddtSchemes entry for d2dt2(D)
-    is not NewmarkBeta. There is no NewmarkBeta ddt scheme, so it must not be
-    the ddtSchemes default. The velocity from fvc::ddt keeps the ddtSchemes
-    default scheme, and it is not the Newmark velocity.
+    Only the d2dt2Schemes entry is needed: fvm::d2dt2 and the inertia terms
+    of the momentum residuals, e.g. of the PETSc SNES solid models, read
+    d2dt2Schemes (issue #502). Plain fvc::d2dt2 reads ddtSchemes, and is used
+    for the acceleration of the linear predictor of the total Lagrangian
+    solid model, which is then consistent with the velocity from fvc::ddt.
+    This changes only the initial guess, not the converged solution. For the
+    predictor to use the Newmark acceleration instead, add
+
+        ddtSchemes
+        {
+            default         backward;
+            "d2dt2\(.*\)"   NewmarkBeta;
+        }
+
+    with the same coefficients as in d2dt2Schemes; differing coefficients
+    are a fatal error, because the two would share the stored state. There is
+    no NewmarkBeta ddt scheme, so it must not be the ddtSchemes default. The
+    velocity from fvc::ddt keeps the ddtSchemes default scheme, and it is not
+    the Newmark velocity.
 
     State: the velocity, the acceleration and the field at the last completed
     time-step are stored as the registered fields "NewmarkV(D)",
@@ -226,9 +232,10 @@ class NewmarkBetaD2dt2Scheme
             const GeometricField<Type, fvPatchField, volMesh>& vf
         ) const;
 
-        //- Check that fvc::d2dt2, which reads the named scheme from
-        //  ddtSchemes, uses this scheme with the same coefficients
-        void checkFvcScheme(const word& name) const;
+        //- Check that, if ddtSchemes, which plain fvc::d2dt2 reads, also
+        //  selects this scheme for the named term, it has the same
+        //  coefficients, as the two share the stored state
+        void checkDdtSchemesEntry(const word& name) const;
 
         //- Return the coefficient of u^{n+1} in d2dt2(u)
         scalar diagCoeff() const;
@@ -302,6 +309,16 @@ public:
         physicalAcceleration
         (
             const GeometricField<Type, fvPatchField, volMesh>& vf
+        );
+
+        //- Return physical acceleration using the supplied scheme entry.
+        //  Allows interface acceleration to use d2dt2Schemes while the
+        //  kinematic predictor retains its ddtSchemes lookup
+        static tmp<GeometricField<Type, fvPatchField, volMesh> >
+        physicalAcceleration
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            ITstream& schemeData
         );
 
         tmp<GeometricField<Type, fvPatchField, volMesh> > fvcD2dt2

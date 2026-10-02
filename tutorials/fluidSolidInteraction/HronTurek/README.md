@@ -231,8 +231,13 @@ fixed-point iterations, can be selected with `robin`. Any variant can be run
 in parallel by appending `parallel`. The Robin-Neumann variant is included for
 comparison rather than for routine use: on `FSI3`, with a thin plate wetted on
 both sides, every coupled time step needs of the order of 150 fixed-point
-iterations against about 9 IQN-ILS iterations (see the verification README for
-the reasons).
+iterations against about 9 IQN-ILS iterations. The plate is wetted on both
+faces, so its interface has two very different impedances: about
+10 kg/m$$^2$$ when both faces are pushed the same way (translation and
+bending), and about 540 kg/m$$^2$$ when the plate is squeezed through its
+thickness. A single Robin coefficient cannot match both, and the squeeze modes
+contract by at best about 0.96 per iteration (see the `elasticWallPressure`
+documentation and the verification README).
 
 ---
 

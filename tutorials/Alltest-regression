@@ -167,6 +167,7 @@ REGRESSION_TESTS=(
     "fluids/immersedBoundary/immersedTaylorCouette"
     "fluids/immersedBoundary/bendingBeamInChannel"
     "fluids/immersedBoundary/heartValveInDuct"
+    "fluids/immersedBoundary/immersedHronTurekFsi2"
     "thermoFluidSolidInteraction/thermalCavity"
     "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"

@@ -609,7 +609,8 @@ public:
             //- This function will check that the p field was read from disk
             virtual void pisRequired();
 
-            //- Make the global poly patches
+            //- Make the global poly patches; the name none gives no
+            //  global patch (an interface without a fluid patch)
             void makeGlobalPatches(const wordList& patchNames) const;
 
             //- Return const-access to the global poly patches

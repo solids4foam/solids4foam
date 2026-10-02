@@ -9,6 +9,7 @@ immersedBodyMotion/customProfileBend/customProfileBend.C
 immersedBodyMotion/valveTimeLaw/valveTimeLaw.C
 immersedBodyMotion/valveSliceAxis/valveSliceAxis.C
 immersedBodyMotion/valveMorph/valveMorph.C
+immersedBodyMotion/fsiDriven/fsiDriven.C
 
 immersedBody/immersedBody.C
 immersedSurfaceTraction/immersedSurfaceTraction.C
