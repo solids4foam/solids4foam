@@ -2634,14 +2634,8 @@ Foam::vector Foam::fv::immersedBoundaryForce::momentumExchangeForce
             << abort(FatalError);
     }
 
-    // The momentum exchange is the force, or the secondary force with the
-    // other estimators
-    if (forceEstimator_ == "momentumExchange")
-    {
-        return force_[bodyi];
-    }
-
-    return secondaryForce_[bodyi];
+    // Stored whichever estimator is selected
+    return momentumExchangeForce_[bodyi];
 }
 
 
