@@ -57,9 +57,6 @@ Description
     - This class is specific to finite-strain formulations; small-strain
       formulations are handled by a separate kinematics container.
 
-SourceFiles
-    finiteStrainMechanicalConstitutiveLawKinematics.C
-
 Author
     Philip Cardiff, UCD.
 
@@ -71,6 +68,7 @@ Author
 #include "UIndirectList.H"
 #include "tensor.H"
 #include "symmTensor.H"
+#include "smallStrainMechanicalConstitutiveLawKinematics.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -92,17 +90,17 @@ class finiteStrainMechanicalConstitutiveLawKinematics
         //- Deformation gradient at previous time
         const UIndirectList<tensor>& F0_;
 
-        //- Determinant of deformation gradient
-        const UIndirectList<scalar>& J_;
-
-        //- Determinant of deformation gradient at previous time
-        const UIndirectList<scalar>& J0_;
-
         //- Inverse deformation gradient
         const UIndirectList<tensor>& Finv_;
 
         //- Inverse deformation gradient at previous time
         const UIndirectList<tensor>& Finv0_;
+
+        //- Determinant of deformation gradient
+        const UIndirectList<scalar>& J_;
+
+        //- Determinant of deformation gradient at previous time
+        const UIndirectList<scalar>& J0_;
 
 
 
@@ -131,18 +129,18 @@ public:
         (
             const UIndirectList<tensor>& F,
             const UIndirectList<tensor>& F0,
-            const UIndirectList<scalar>& J,
-            const UIndirectList<scalar>& J0,
             const UIndirectList<tensor>& Finv,
-            const UIndirectList<tensor>& Finv0
+            const UIndirectList<tensor>& Finv0,
+            const UIndirectList<scalar>& J,
+            const UIndirectList<scalar>& J0
         )
         :
             F_(F),
             F0_(F0),
-            J_(J),
-            J0_(J0),
             Finv_(Finv),
-            Finv0_(Finv0)
+            Finv0_(Finv0),
+            J_(J),
+            J0_(J0)
         {}
 
 
@@ -194,64 +192,14 @@ public:
 
     // Edit
 
-        //- Relative deformation gradient: F*inv(F0)
-        inline tensor relativeF(const label i) const
-        {
-            return F_[i] & inv(F0_[i]);
-        }
-
-        //- Return F at integration point ipI with Voigt component j of the
-        //  displacement gradient perturbed by h.
-        //  F = I + gradD, so perturbing F is perturbing the displacement
-        //  gradient. The perturbation is defined on the Voigt strain vector,
-        //  which uses engineering shear, so a shear component moves each
-        //  off-diagonal by h/2 and the corresponding Voigt component by
-        //  exactly h. This matches gradDPerturbed in the small-strain
-        //  kinematics, so a finite-difference tangent taken here is directly
-        //  comparable with a small-strain one
+        //- F at integration point ipI with Voigt component j of the
+        //  displacement gradient perturbed by h; see perturbVoigt
         inline tensor FPerturbed
         (
             const label ipI, const label j, const scalar h
         ) const
         {
-            tensor F = F_[ipI];
-
-            switch (j)
-            {
-                case symmTensor::XX:
-                    F.xx() += h;
-                    break;
-
-                case symmTensor::YY:
-                    F.yy() += h;
-                    break;
-
-                case symmTensor::ZZ:
-                    F.zz() += h;
-                    break;
-
-                case symmTensor::YZ:
-                    F.yz() += 0.5*h;
-                    F.zy() += 0.5*h;
-                    break;
-
-                case symmTensor::XZ:
-                    F.xz() += 0.5*h;
-                    F.zx() += 0.5*h;
-                    break;
-
-                case symmTensor::XY:
-                    F.xy() += 0.5*h;
-                    F.yx() += 0.5*h;
-                    break;
-
-                default:
-                    FatalErrorInFunction
-                        << "Invalid Voigt component index j = " << j
-                        << exit(FatalError);
-            }
-
-            return F;
+            return perturbVoigt(F_[ipI], j, h);
         }
 };
 

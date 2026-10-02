@@ -12,6 +12,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # pressurisedCylinder regression test
 # Checks selected solution approaches against the expected solution bounds
@@ -59,7 +62,7 @@ prepare_case() {
     # The regression copy lives deeper than the source tutorial, so the
     # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
     # the repository root.
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${CASE_DIR}/src/Make/options"
 
