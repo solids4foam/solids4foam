@@ -76,7 +76,7 @@ the patch normals are then not reference normals.
 
 ## Usage
 
-```
+```text
 EPI
 {
     type            solidRobin;
@@ -99,13 +99,16 @@ EPI
 
 ## Typical values from the literature
 
-| Source | Boundary | Form | Stiffness | Damping |
-|---|---|---|---|---|
-| Pfaller 2019 | epicardium | normal | k = 0.2 kPa/mm = 2e5 Pa/m (swept 0.1–5 kPa/mm) | c = 5e-3 kPa s/mm = 5e3 Pa s/m |
-| Pfaller 2019 | great vessels | all directions | 2e3 kPa/mm | 1e-2 kPa s/mm |
-| Strocchi 2020 | epicardium | normal, varies in space | up to 50 kPa/mm at the apex (swept 1–50) | — |
-| Strocchi 2020 | cut veins | all directions | 10 kPa/mm | — |
-| Barnafi 2022 | base | normal / tangential | K⊥ = 2e5, K∥ = 2e4 Pa/m | C⊥ = 1e4, C∥ = 2e3 Pa s/m |
+- **Pfaller 2019, epicardium:** normal springs and dashpots,
+  k = 0.2 kPa/mm = 2e5 Pa/m (swept 0.1–5 kPa/mm),
+  c = 5e-3 kPa s/mm = 5e3 Pa s/m.
+- **Pfaller 2019, great vessels:** all directions, k = 2e3 kPa/mm,
+  c = 1e-2 kPa s/mm.
+- **Strocchi 2020, epicardium:** normal springs varying in space, up to
+  50 kPa/mm at the apex (swept 1–50 kPa/mm), no damping.
+- **Strocchi 2020, cut veins:** all directions, k = 10 kPa/mm.
+- **Barnafi 2022, base:** K⊥ = 2e5, K∥ = 2e4 Pa/m; C⊥ = 1e4,
+  C∥ = 2e3 Pa s/m.
 
 Unit conversion: 1 kPa/mm = 1e6 Pa/m.
 
@@ -113,15 +116,22 @@ Unit conversion: 1 kPa/mm = 1e6 Pa/m.
 
 Tested with OpenFOAM v2412, against analytical solutions:
 
-| Test | Result |
-|---|---|
-| Bar in uniaxial strain on a normal spring, loaded at the far end, k = 1e4 … 1e8 Pa/m | spring-face and loaded-face displacements exact to ≤ 2e-8 |
-| Stiff spring, k L / E ≈ 7400 | exact; 120 outer iterations vs 106 for `fixedDisplacement` |
-| Load applied through the BC's own `traction` entry, far end fixed | 2e-10; 113–139 iterations for all k |
-| Simple shear with cyclic sides (tangential spring) | 1e-9; normal leakage 4e-21 |
-| Mass-spring-dashpot (dynamic, `d2dt2 Euler`) | matches the discrete oscillator to 1.6e-4 (≈ k L / M); period 44.40 ms vs 2π√(m/k) = 44.43 ms; damped (ζ = 0.2) period 45.50 ms vs 45.35 ms |
-| Total Lagrangian, 25 % strain, spring face area changes ≈ 13 % | force balance F = k·D·A₀ exact to 7e-8 (14 % error when the area scaling is disabled) |
-| `weightField`, restart, 2-processor run | identical to 1e-11 |
+- **Bar in uniaxial strain on a normal spring**, loaded at the far end,
+  k = 1e4 … 1e8 Pa/m: spring-face and loaded-face displacements exact to
+  ≤ 2e-8.
+- **Stiff spring**, k L / E ≈ 7400: exact; 120 outer iterations against 106
+  for `fixedDisplacement`.
+- **Load through the condition's own `traction` entry**, far end fixed:
+  2e-10, with 113–139 iterations for all k.
+- **Simple shear with cyclic sides** (tangential spring): 1e-9; normal
+  leakage 4e-21.
+- **Mass-spring-dashpot** (dynamic, `d2dt2 Euler`): matches the discrete
+  oscillator to 1.6e-4 (≈ k L / M). Period 44.40 ms against
+  2π√(m/k) = 44.43 ms; damped (ζ = 0.2) period 45.50 ms against 45.35 ms.
+- **Total Lagrangian, 25 % strain**, spring-face area change ≈ 13 %: force
+  balance F = k·D·A₀ exact to 7e-8 (14 % error with the area scaling
+  disabled).
+- **`weightField`, restart and a 2-processor run:** identical to 1e-11.
 
 Note: a static body held only by soft springs and loaded with `solidTraction`
 converges slowly in the segregated solver (about 1000 outer iterations at
