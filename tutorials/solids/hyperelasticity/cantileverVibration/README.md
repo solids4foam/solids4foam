@@ -16,7 +16,8 @@ Prepared by Philip Cardiff
   and large rotations;
 - Demonstrate the Jacobian-free Newton-Krylov (PETSc SNES) solution algorithm
   for a dynamic, geometrically nonlinear problem, and compare it with the
-  segregated algorithm.
+  segregated algorithm;
+- Compare BDF2, trapezoidal Newmark and damped Bossak-Newmark time integration.
 
 ## Case Overview
 
@@ -57,18 +58,19 @@ time, $$D_x$$, $$D_y$$, $$D_z$$ and the magnitude $$|D|$$.
 
 - **Mesh**: a single structured `blockMesh` block with 6 x 6 x 60 hexahedral
   cells (2 160 cells; cell size 33.3 mm).
-- **Time scheme**: second-order implicit backward (BDF2) differencing for both
-  the `d2dt2` and `ddt` terms (`system/fvSchemes`).
+- **Time scheme**: second-order implicit backward (BDF2) by default, with
+  trapezoidal Newmark and Bossak-Newmark alternatives for the `d2dt2` term.
+  The first derivative (`ddt`) uses backward differencing in all three cases.
 - **Time step**: constant $$\Delta t = 0.005$$ s, with an end time of 0.65 s
   (130 time steps). A predictor (`predictor yes;` in
   `constant/solidProperties`) extrapolates `D` at the start of each time step
   from the previous velocity and acceleration.
 
 ```note
-The shipped mesh and time step are a demonstration resolution chosen so that
-the case runs in well under a minute; they are not converged. On this mesh,
-halving the time step from 0.01 s to 0.005 s does not change the peak tip
-displacement to four significant figures (2.7247 m), whereas the coarser
+The shipped mesh and time step are a demonstration resolution chosen for
+short run times; they are not converged. On this mesh,
+with BDF2, halving the time step from 0.01 s to 0.005 s does not change the
+peak tip displacement to four significant figures (2.7247 m), whereas the coarser
 3 x 3 x 30 mesh gives a noticeably smaller peak (approximately 2.55 m), so
 the remaining difference from the reference is dominated by the spatial
 resolution.
@@ -90,28 +92,57 @@ full reference window, set `endTime 1;` in `system/controlDict` (and widen
 
 The tutorial case is located at
 `solids4foam/tutorials/solids/hyperelasticity/cantileverVibration`. The case
-can be run using the included `Allrun` script, which optionally takes an
-argument that specifies the solution algorithm:
+can be run using the included `Allrun` script. Its first argument selects the
+solution algorithm; its optional second argument selects the time scheme:
 
 ```bash
-./Allrun             # Defaults to the petscSnes approach
-./Allrun petscSnes   # Jacobian-free Newton-Krylov (PETSc SNES) approach [1]
-./Allrun segregated  # Segregated approach
+./Allrun                       # PETSc SNES with BDF2 (defaults)
+./Allrun segregated            # Segregated algorithm with BDF2
+./Allrun petscSnes newmark      # Trapezoidal Newmark
+./Allrun petscSnes bossak       # Damped Bossak-Newmark
+./Allrun petscSnes all          # All three schemes and a comparison plot
 ```
 
-The `Allrun` script first links `constant/solidProperties` and
-`system/fvSolution` to the `*.petscSnes` or `*.segregated` versions, then
-creates the mesh with `blockMesh`, runs `solids4Foam`, and, if `gnuplot` is
-installed, plots the tip displacement against the Abaqus reference in
-`tipDisplacement.png`. The `petscSnes` approach requires solids4foam to be
-compiled with PETSc; if PETSc is not available, the case exits without
-running. `./Allclean` removes the results and restores the default
-(`petscSnes`) links.
+The time-scheme selector is available with either algorithm. The results and
+regression checks below use `petscSnes`. With the current segregated settings
+on OpenFOAM-v2512, all three schemes (including the BDF2 baseline) failed at
+the first time step with a non-positive deformation-gradient determinant;
+use `petscSnes` to reproduce this comparison.
 
-The default `petscSnes` approach takes approximately 25 s in serial on a
-recent desktop CPU; the `segregated` approach gives the same tip displacement
-history (peak 2.7247 m) but takes roughly three times longer (approximately
-70 s).
+The second-derivative scheme parameters are:
+
+| Option | Scheme | Beta | Gamma | AlphaM |
+| --- | --- | --- | --- | --- |
+| `bdf2` | `backward` | — | — | — |
+| `newmark` | `NewmarkBeta` (trapezoidal rule) | 0.25 | 0.5 | 0 |
+| `bossak` | `NewmarkBeta` (Bossak damping) | 0.3025 | 0.6 | -0.1 |
+
+The `newmark` dictionary omits the coefficients to exercise the scheme's
+defaults. The Bossak coefficients satisfy
+$$\beta = (1 - \alpha_M)^2/4$$ and $$\gamma = 0.5 - \alpha_M$$.
+The Newmark dictionaries also include a matching named `d2dt2` entry in
+`ddtSchemes` so that the linear predictor uses the Newmark acceleration too.
+This entry is optional for the momentum equation, but if present its
+coefficients must match those in `d2dt2Schemes`. It does not change the
+scheme for first derivatives.
+
+For a single run, `Allrun` links `constant/solidProperties` and
+`system/fvSolution` to the selected algorithm's dictionaries and
+`system/fvSchemes` to `fvSchemes.bdf2`, `fvSchemes.newmark` or
+`fvSchemes.bossak`. It then creates the mesh with `blockMesh`, runs
+`solids4Foam` and, if `gnuplot` is installed, plots the selected scheme
+against Abaqus in `tipDisplacement.png`. Run `./Allclean` before changing
+options for a single run to remove previous results.
+
+The `all` option creates fresh cases in `timeSchemeRuns/bdf2`,
+`timeSchemeRuns/newmark` and `timeSchemeRuns/bossak`, runs each, then generates
+`tipDisplacement.png` with all three predictions and the Abaqus reference.
+Use `./Allrun petscSnes all` to reproduce Figure 1.
+
+The `petscSnes` approach requires solids4foam to be compiled with PETSc;
+if PETSc is unavailable, the case exits without running. `./Allclean`
+removes the results, including `timeSchemeRuns`, and restores the default
+`petscSnes` and `bdf2` links.
 
 ---
 
@@ -125,30 +156,43 @@ file for its provenance).
 ![Tip displacement history](images/tipDisplacement.png)
 
 **Figure 1: Magnitude of the tip displacement at the centre of the free-end
-face over one oscillation: solids4foam (6 x 6 x 60 cells,
-$$\Delta t = 0.005$$ s, `petscSnes`, OpenFOAM-v2512) and Abaqus (C3D8).**
+face over one oscillation: BDF2, trapezoidal Newmark, Bossak-Newmark and
+Abaqus (C3D8). The solids4foam runs use 6 x 6 x 60 cells,
+$$\Delta t = 0.005$$ s, `petscSnes` and OpenFOAM-v2512.**
 
-The solids4foam and Abaqus histories agree closely during the loading phase
-($$t \lesssim 0.25$$ s). On this coarse tutorial mesh, solids4foam predicts a
-peak displacement 2.7% smaller than Abaqus and an oscillation period roughly
-2.5% shorter, i.e. the discretised beam is slightly too stiff, which is the
-expected behaviour of a coarse mesh in bending.
+All three solids4foam histories agree closely with Abaqus during the loading
+phase ($$t \lesssim 0.25$$ s). On this tutorial mesh their peak displacements
+are approximately 2.7–2.8% smaller than Abaqus. The Newmark and Bossak-Newmark
+curves nearly overlap at this resolution; the sampled peak occurs one time
+step later than with BDF2. The return to minimum occurs approximately 2.5%
+earlier than in the reference for all three schemes. These results are not
+a mesh or time-step convergence study.
 
-**Table 1: Tip displacement magnitude: solids4foam (tutorial settings) versus
-Abaqus.**
+**Table 1: Tip displacement magnitude at the tutorial settings versus Abaqus.**
 
-| Quantity | solids4foam | Abaqus (C3D8) |
-| --- | --- | --- |
-| Peak displacement (m) | 2.725 | 2.801 |
-| Time of peak (s) | 0.310 | 0.318 |
-| Time of return to minimum (s) | 0.630 | 0.646 |
-| Displacement at minimum (m) | 0.025 | 0.018 |
+| Quantity | BDF2 | Newmark | Bossak-Newmark | Abaqus (C3D8) |
+| --- | --- | --- | --- | --- |
+| Peak displacement (m) | 2.72472 | 2.72369 | 2.72200 | 2.8007 |
+| Time of peak (s) | 0.310 | 0.320 | 0.320 | 0.318 |
+| Time of return to minimum (s) | 0.630 | 0.630 | 0.630 | 0.646 |
+| Displacement at minimum (m) | 0.02495 | 0.02488 | 0.02105 | 0.018 |
 
-The `regressionTest.sh` script runs the default configuration and checks that
-the peak tip displacement over the run lies within $$[2.70, 2.78]$$ m. The
-band allows for small differences between OpenFOAM versions: the peak is
-2.7247 m with OpenFOAM-v2512, 2.7404 m with foam-extend-4.1 and 2.7556 m with
-OpenFOAM-9.
+The `regressionTest.sh` script runs all three schemes with PETSc SNES in
+separate `regressionTests` subdirectories. It checks that each run reaches
+0.65 s and that its peak tip displacement lies within $$[2.70, 2.78]$$ m.
+The band retains the allowance for differences between OpenFOAM versions:
+the BDF2 peak is 2.7247 m with OpenFOAM-v2512, 2.7404 m with foam-extend-4.1
+and 2.7556 m with OpenFOAM-9. The Newmark results in Table 1 were measured
+with OpenFOAM-v2512.
+
+For each scheme, the regression also runs `Test-fvcD2dt2` on the same mesh
+and dictionaries. This checks the selected scheme and coefficients, explicit
+versus implicit inertia (with and without density), and, for Newmark and
+Bossak-Newmark, physical and weighted accelerations against an independent
+scalar recurrence. This distinguishes the physical acceleration from the
+Bossak-weighted acceleration even when the displacement curves are close.
+The test utility must be built and available on `PATH`. Results are retained;
+`./regressionTest.sh --check-only` rechecks their logs without rerunning.
 
 ---
 

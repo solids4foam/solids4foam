@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Bossak-Newmark: alphaM = -0.1, beta = (1-alphaM)^2/4, gamma = 0.5-alphaM
+d2dt2Schemes
+{
+    default         NewmarkBeta 0.3025 0.6 -0.1;
+}
+
+// Use the same Newmark acceleration in the linear predictor.
+// The first derivative still uses backward; NewmarkBeta is a d2dt2 scheme.
+ddtSchemes
+{
+    default         backward;
+    "d2dt2\(.*\)"   NewmarkBeta 0.3025 0.6 -0.1;
+}
+
+gradSchemes
+{
+    default         leastSquaresS4f;
+}
+
+divSchemes
+{
+    default         Gauss linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default         corrected;
+}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+// ************************************************************************* //

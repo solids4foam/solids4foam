@@ -26,12 +26,15 @@ Description
 
     OpenFOAM's fvc::d2dt2 takes its scheme from ddtSchemes, whereas
     fvm::d2dt2 takes it from d2dt2Schemes; the mismatch of fvc::d2dt2 is
-    reported for information only.
+    reported for information only. For Newmark/Bossak, also checks the physical
+    and weighted accelerations against an independent scalar recurrence.
 
 \*---------------------------------------------------------------------------*/
 
 #include "fvCFD.H"
 #include "compatibilityFunctions.H"
+#include "NewmarkBetaD2dt2Scheme.H"
+#include <cmath>
 
 using namespace Foam;
 
@@ -122,6 +125,44 @@ int main(int argc, char *argv[])
         dimensionedVector("zero", dimLength, vector::zero)
     );
 
+    // Read the Newmark coefficients for an independent scalar recurrence.
+    // D(t) = t^3*C, so each cell follows the same scalar time history.
+    ITstream& schemeData = d2dt2SchemeCompat(mesh, "d2dt2(D)");
+    const word schemeName(schemeData);
+    scalar beta = 0.25;
+    scalar gamma = 0.5;
+    scalar alphaM = 0;
+    if (schemeName == "NewmarkBeta")
+    {
+        if (!schemeData.eof())
+        {
+            beta = readScalar(schemeData);
+        }
+        if (!schemeData.eof())
+        {
+            gamma = readScalar(schemeData);
+        }
+        if (!schemeData.eof())
+        {
+            alphaM = readScalar(schemeData);
+        }
+    }
+    schemeData.rewind();
+    Info<< "Selected d2dt2 scheme: " << schemeName;
+    if (schemeName == "NewmarkBeta")
+    {
+        Info<< " beta=" << beta << " gamma=" << gamma << " alphaM=" << alphaM;
+    }
+    Info<< endl;
+
+    scalar velocity = 0;
+    scalar acceleration = 0;
+    scalar physicalError = 0;
+    scalar weightedError = 0;
+
+    // Initialise the state before advancing, as the solid model does.
+    fvcD2dt2Compat(D);
+
     // Store two old-time levels
     D.oldTime().oldTime();
 
@@ -129,11 +170,60 @@ int main(int argc, char *argv[])
     // that every d2dt2 scheme gives a non-trivial result
     for (label timeI = 0; timeI < 3; timeI++)
     {
+        const scalar oldTime = runTime.value();
+        const scalar oldAcceleration = acceleration;
         runTime++;
 
         primitiveFieldRef(D) =
             pow3(runTime.value())*primitiveField(mesh.C());
         D.correctBoundaryConditions();
+
+        const volVectorField physical
+        (
+            fv::NewmarkBetaD2dt2Scheme<vector>::physicalAcceleration
+            (
+                D, d2dt2SchemeCompat(mesh, "d2dt2(D)")
+            )
+        );
+        const volVectorField weighted(fvcD2dt2Compat(D));
+
+        if (schemeName == "NewmarkBeta")
+        {
+            const scalar dt = runTime.deltaTValue();
+            acceleration =
+                (pow3(runTime.value()) - pow3(oldTime) - dt*velocity
+               - (0.5 - beta)*sqr(dt)*oldAcceleration)/(beta*sqr(dt));
+            velocity += dt*((1 - gamma)*oldAcceleration + gamma*acceleration);
+
+            const vectorField expectedPhysical
+            (
+                acceleration*primitiveField(mesh.C())
+            );
+            const vectorField expectedWeighted
+            (
+                ((1 - alphaM)*acceleration + alphaM*oldAcceleration)
+               *primitiveField(mesh.C())
+            );
+            physicalError = max
+            (
+                physicalError,
+                gMax(mag(primitiveField(physical) - expectedPhysical))
+               /max(gMax(mag(expectedPhysical)), VSMALL)
+            );
+            weightedError = max
+            (
+                weightedError,
+                gMax(mag(primitiveField(weighted) - expectedWeighted))
+               /max(gMax(mag(expectedWeighted)), VSMALL)
+            );
+        }
+        else
+        {
+            physicalError = max
+            (
+                physicalError, relativeDifference(physical, weighted)
+            );
+        }
     }
 
     const fvVectorMatrix DEqn(fvm::d2dt2(D));
@@ -153,10 +243,20 @@ int main(int argc, char *argv[])
         << "difference = " << relativeDifference(fvc::d2dt2(D)(), fvmD2dt2)
         << endl;
 
-    if (error > tolerance || rhoError > tolerance)
+    Info<< "Physical acceleration: relative difference = " << physicalError
+        << nl << "Weighted acceleration: relative difference = "
+        << weightedError << endl;
+
+    if
+    (
+        !std::isfinite(error) || !std::isfinite(rhoError)
+     || !std::isfinite(physicalError) || !std::isfinite(weightedError)
+     || error > tolerance || rhoError > tolerance
+     || physicalError > tolerance || weightedError > tolerance
+    )
     {
         FatalErrorInFunction
-            << "The explicit and implicit d2dt2 operators do not agree"
+            << "The d2dt2 operators or physical acceleration do not agree"
             << abort(FatalError);
     }
 
