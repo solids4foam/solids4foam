@@ -158,9 +158,11 @@ check_fvc_d2dt2() {
     fi
 
     for scheme in "${FVC_D2DT2_SCHEMES[@]}"; do
-        sed -i \
+        # An attached -i suffix is portable to both GNU and BSD (macOS) sed
+        sed -i.bak \
             "/^d2dt2Schemes/,/^}/s/\(default[[:space:]]*\).*;/\1${scheme};/" \
             "${FVC_D2DT2_DIR}/system/fvSchemes"
+        rm -f "${FVC_D2DT2_DIR}/system/fvSchemes.bak"
 
         if ! sed -n '/^d2dt2Schemes/,/^}/p' \
             "${FVC_D2DT2_DIR}/system/fvSchemes" \
