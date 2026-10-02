@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "nonLinGeomTotalLagTotalDispSolid.H"
+#include "NewmarkBetaD2dt2Scheme.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
@@ -597,8 +598,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     // Velocity
     U() = fvc::ddt(D());
 
-    // Acceleration
-    A_ = fvc::d2dt2(D());
+    // Acceleration: the physical one, rather than the Bossak-weighted
+    // acceleration of the NewmarkBeta momentum residual
+    A_ = fv::NewmarkBetaD2dt2Scheme<vector>::physicalAcceleration(D());
 
 #ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
@@ -709,8 +711,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     // Velocity
     U() = fvc::ddt(D());
 
-    // Acceleration
-    A_ = fvc::d2dt2(D());
+    // Acceleration: the physical one, rather than the Bossak-weighted
+    // acceleration of the NewmarkBeta momentum residual
+    A_ = fv::NewmarkBetaD2dt2Scheme<vector>::physicalAcceleration(D());
 
 #else
 

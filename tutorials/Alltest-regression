@@ -172,6 +172,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
     "fluidSolidInteraction/fillingElasticContainer"
+    "fluidSolidInteraction/membraneRoof"
     # Not tutorials: a test application's case, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
 )
