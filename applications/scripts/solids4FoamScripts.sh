@@ -640,6 +640,25 @@ function solids4Foam::applyOpenFOAMOrgTweaks()
 
     # 10. OpenFOAM.org writes forces.dat rather than force.dat
     solids4Foam::useForcesDat "${CASE_DIR}"
+
+    # 14. OpenFOAM.org reads the PIMPLE outer-corrector convergence controls
+    #     from outerCorrectorResidualControl: its residualControl is the
+    #     criterion for ending the run. Symlinked fvSolution files are edited
+    #     in place so the links are kept
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && grep -qE '^[[:space:]]*residualControl\b' "${FILE}"
+        then
+            echo "OpenFOAM.org specific: replacing 'residualControl' with"
+            echo "'outerCorrectorResidualControl' in the PIMPLE dictionary of"
+            echo "${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                '/^PIMPLE\b/,/^}/ s/^([[:space:]]*)residualControl\b/\1outerCorrectorResidualControl/' \
+                "${FILE}"
+        fi
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -668,6 +687,22 @@ function solids4Foam::undoOpenFOAMOrgTweaks()
 
     # 10. OpenFOAM.com writes force.dat rather than forces.dat
     solids4Foam::useForceDat "${CASE_DIR}"
+
+    # 14. OpenFOAM.com reads the PIMPLE outer-corrector convergence controls
+    #     from residualControl
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && grep -qE '^[[:space:]]*outerCorrectorResidualControl\b' "${FILE}"
+        then
+            echo "Replacing 'outerCorrectorResidualControl' with"
+            echo "'residualControl' in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                's/^([[:space:]]*)outerCorrectorResidualControl\b/\1residualControl/' \
+                "${FILE}"
+        fi
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#

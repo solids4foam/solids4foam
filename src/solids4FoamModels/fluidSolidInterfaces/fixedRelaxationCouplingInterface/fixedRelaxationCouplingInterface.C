@@ -43,8 +43,7 @@ addToRunTimeSelectionTable
 fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
 (
     Time& runTime,
-    const word& region,
-    const bool checkInterfaceVelocity
+    const word& region
 )
 :
     fluidSolidInterface(typeName, runTime, region),
@@ -53,12 +52,7 @@ fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
         fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
     ),
     predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true))
-{
-    if (checkInterfaceVelocity)
-    {
-        checkFluidInterfaceVelocity();
-    }
-}
+{}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 

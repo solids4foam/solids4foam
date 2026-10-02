@@ -59,9 +59,7 @@ AitkenCouplingInterface::AitkenCouplingInterface
     ),
     predictSolid_(fsiProperties().lookupOrAddDefault<Switch>("predictSolid", true)),
     aitkenRelaxationFactors_(nGlobalPatches(), relaxationFactor_)
-{
-    checkFluidInterfaceVelocity();
-}
+{}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

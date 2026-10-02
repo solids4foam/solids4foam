@@ -100,8 +100,7 @@ Acceptance criteria:
 ## Mesh study
 
 Each level scales the in-plane block divisions of both meshes, leaving the
-single spanwise cell alone. Level `x1` is the tutorial mesh and level `x0.5` is
-level 1 of the `solid-benchmarks` campaign.
+single spanwise cell alone. Level `x1` is the tutorial mesh.
 
 | Level | Fluid cells | Solid cells | `deltaT` (s) |
 | ---: | ---: | ---: | ---: |

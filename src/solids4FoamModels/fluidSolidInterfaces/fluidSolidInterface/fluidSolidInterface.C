@@ -923,7 +923,16 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<fluidSolidInterface>(ctorPtr(runTime, region));
+    autoPtr<fluidSolidInterface> fsiPtr(ctorPtr(runTime, region));
+
+    // Check once here, rather than in each coupling, that the fluid sees the
+    // interface motion
+    if (fsiPtr->movesFluidInterface())
+    {
+        fsiPtr->checkFluidInterfaceVelocity();
+    }
+
+    return fsiPtr;
 }
 
 

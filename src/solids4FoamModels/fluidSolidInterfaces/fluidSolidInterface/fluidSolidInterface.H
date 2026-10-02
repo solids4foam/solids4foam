@@ -307,8 +307,8 @@ protected:
 
         //- Stop if the fluid velocity on a coupled interface patch is a
         //  static condition (fixedValue or noSlip), which ignores the
-        //  interface motion. Called by the couplings that move the fluid
-        //  interface with the solid
+        //  interface motion. Called by the selector for the couplings that
+        //  move the fluid interface with the solid
         void checkFluidInterfaceVelocity();
 
         //- Return sub-dictionary
@@ -706,6 +706,14 @@ public:
             virtual bool fluidMeshFollowsSolid() const
             {
                 return false;
+            }
+
+            //- Does the coupling move the fluid interface with the solid? If
+            //  so, the selector checks that the fluid velocity condition on
+            //  the interface follows the motion
+            virtual bool movesFluidInterface() const
+            {
+                return true;
             }
 
             //- Sync the fluidZonePointsDispl field across processors

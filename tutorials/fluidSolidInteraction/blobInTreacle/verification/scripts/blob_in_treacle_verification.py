@@ -416,7 +416,8 @@ def count_cells(run_dir: Path, region: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
+def run_mesh_study(args, reference: dict, lines: list[str],
+                   plot_levels: list[str]) -> bool:
     spec = reference["mesh"]
     if args.levels:
         factors = [float(value) for value in args.levels.split(",")]
@@ -486,6 +487,7 @@ def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
         writer.writeheader()
         writer.writerows(rows)
     write_interfaces(rows, end_time)
+    plot_levels.extend(f"{row['factor']:g}" for row in rows)
 
     acceptance = spec["acceptance"]
     passed = not failed and all(
@@ -498,8 +500,18 @@ def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
     dy_error = abs(finest["dy_steady_m"] - dy_ref) / abs(dy_ref)
     order = math.nan
     extrapolated = math.nan
-    changes = [abs(b["dx_steady_m"] - a["dx_steady_m"]) for a, b in zip(rows, rows[1:])]
-    if len(rows) >= 3:
+    # A level that failed with --keep-going leaves a gap in the refinement
+    # sequence: the changes, order and extrapolation use only successive
+    # levels that double
+    def doubles(coarse, fine) -> bool:
+        return abs(fine["factor"] / coarse["factor"] - 2.0) < 1e-9
+
+    changes = [
+        abs(b["dx_steady_m"] - a["dx_steady_m"])
+        for a, b in zip(rows, rows[1:])
+        if doubles(a, b)
+    ]
+    if len(rows) >= 3 and doubles(rows[-3], rows[-2]) and doubles(rows[-2], rows[-1]):
         order = observed_order(*(row["dx_steady_m"] for row in rows[-3:]))
         if math.isfinite(order) and order > 0:
             extrapolated = finest["dx_steady_m"] + (
@@ -532,7 +544,12 @@ def run_mesh_study(args, reference: dict, lines: list[str]) -> bool:
         + ", ".join(f"{r['dx_steady_m']:.6g}" for r in rows),
         "- Change between successive levels (m): "
         + ", ".join(f"{change:.3g}" for change in changes),
-        f"- Observed order: {order:.3f}; extrapolated u_x: {extrapolated:.6g} m",
+        (
+            f"- Observed order: {order:.3f}; extrapolated u_x: {extrapolated:.6g} m"
+            if math.isfinite(order)
+            else "- Observed order and extrapolated u_x: not available (fewer "
+            "than three successive levels that double)"
+        ),
         f"- Finest u_x = {finest['dx_steady_m']:.6g} m vs Liu {dx_ref:g} m "
         f"({100 * dx_error:.2f}%); u_y = {finest['dy_steady_m']:.6g} m vs "
         f"Liu {dy_ref:g} m ({100 * dy_error:.1f}%)",
@@ -651,7 +668,7 @@ def run_time_study(args, reference: dict, lines: list[str]) -> bool:
     return passed
 
 
-def create_plot() -> None:
+def create_plot(levels: list[str]) -> None:
     plot_script = SCRIPT_DIR / "plotInterfaces.gnuplot"
     if shutil.which("gnuplot") is None or not plot_script.is_file():
         return
@@ -661,7 +678,8 @@ def create_plot() -> None:
             "gnuplot",
             "-e",
             f"interfaces='{POST_DIR / 'interfaces'}'; "
-            f"reference='{REFERENCE_DIR}'; output='{output}'",
+            f"reference='{REFERENCE_DIR}'; output='{output}'; "
+            f"levels='{' '.join(levels)}'",
             str(plot_script),
         ],
         cwd=VERIFY_DIR,
@@ -697,9 +715,10 @@ def main() -> int:
     if args.study in ("all", "time"):
         passed = run_time_study(args, reference, lines) and passed
     if args.study in ("all", "mesh"):
-        passed = run_mesh_study(args, reference, lines) and passed
-        if (POST_DIR / "interfaces").is_dir():
-            create_plot()
+        plot_levels: list[str] = []
+        passed = run_mesh_study(args, reference, lines, plot_levels) and passed
+        if plot_levels:
+            create_plot(plot_levels)
     lines.append(f"Overall: {'PASS' if passed else 'FAIL'}")
     summary = "\n".join(lines) + "\n"
     (POST_DIR / "verification_summary.md").write_text(summary)

@@ -161,9 +161,7 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
     previousNonEmptyStepPatchesPointsW_(nGlobalPatches()),
     previousNonEmptyStepPatchesFacesTractionW_(nGlobalPatches()),
     residualPointScale_(nGlobalPatches())
-{
-    checkFluidInterfaceVelocity();
-}
+{}
 
 
 void IQNILSCouplingInterface::removeCouplingMode
