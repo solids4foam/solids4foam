@@ -33,6 +33,10 @@ Description
     - vertexFraction: half the fraction of the cell vertices inside the
       surface, plus a half if the cell centre is inside the surface, as in
       the non-convex body of openHFDIB-DEM.
+    - cut: the exact volume fraction of the cell inside the zero isosurface
+      of the signed distance to the surface at the cell vertices, from the
+      geometric cutting of the cells of the geometricVoF library
+      (cutCellIso). lambda varies continuously as the body moves.
 
     Cells with an occupancy greater than 1 - threshold are internal cells, and
     cells with an occupancy greater than threshold are surface cells.
@@ -107,7 +111,7 @@ class immersedBody
     // Private Data
 
         //- Occupancy methods and dictionary names
-        enum occupancyMethod { signedDistance, vertexFraction };
+        enum occupancyMethod { signedDistance, vertexFraction, cut };
         static const Enum<occupancyMethod> occupancyNames_;
 
 
@@ -135,6 +139,9 @@ class immersedBody
         //- Occupancy from the signed distance of the cell centres to the
         //  surface, rather than from the fraction of cell vertices inside
         const bool signedDistance_;
+
+        //- Cut cell occupancy
+        const bool cut_;
 
         //- Time of the current configuration
         scalar time_;
@@ -192,6 +199,19 @@ public:
                 return max(cmptSum(cmptMultiply(cmptMag(n), span)), VSMALL);
             }
 
+            //- Smallest width of a bounding box span in the solved
+            //  directions
+            static scalar solvedWidth
+            (
+                const vector& span,
+                const Vector<label>& solD
+            );
+
+            //- Width of a cell: its smallest bounding box width in the
+            //  solved directions. Used for the stencil radius of the surface
+            //  traction and the pinned rate, which must agree
+            static scalar cellWidth(const polyMesh& mesh, const label celli);
+
 
         // Access
 
@@ -246,6 +266,36 @@ public:
             {
                 return motionPtr_->velocity(x, time_);
             }
+
+            //- Acceleration of the body at the point x, from a central
+            //  difference of the velocity over dt, following the point
+            vector acceleration(const point& x, const scalar dt) const
+            {
+                const pointField pts(1, x);
+                const vector U0(motionPtr_->velocity(pts, time_)()[0]);
+                return
+                (
+                    motionPtr_->velocity(pts + 0.5*dt*U0, time_ + 0.5*dt)()[0]
+                  - motionPtr_->velocity(pts - 0.5*dt*U0, time_ - 0.5*dt)()[0]
+                )/dt;
+            }
+
+            //- First intersection of the surface with each segment from
+            //  start to end
+            void findLine
+            (
+                const pointField& start,
+                const pointField& end,
+                List<pointIndexHit>& hits
+            ) const
+            {
+                searchPtr_->findLine(start, end, hits);
+            }
+
+            //- Set the signed distance to the surface, positive outside the
+            //  body, at the points of the cells near the surface, where it is
+            //  lower than the value in f
+            void addPointDistances(scalarField& f) const;
 
             //- Nearest points on the surface to the points x, within the
             //  distances sqrt(searchDistSqr), and the unit normals of the

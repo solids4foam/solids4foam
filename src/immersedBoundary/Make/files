@@ -2,8 +2,11 @@ immersedBodyMotion/immersedBodyMotion/immersedBodyMotion.C
 immersedBodyMotion/immersedBodyMotion/immersedBodyMotionNew.C
 immersedBodyMotion/staticMotion/staticMotion.C
 immersedBodyMotion/sinusoidalTranslation/sinusoidalTranslation.C
+immersedBodyMotion/uniformTranslation/uniformTranslation.C
+immersedBodyMotion/solidBodyRotation/solidBodyRotation.C
 
 immersedBody/immersedBody.C
+immersedSurfaceTraction/immersedSurfaceTraction.C
 
 fvOptions/immersedBoundaryForce/immersedBoundaryForce.C
 

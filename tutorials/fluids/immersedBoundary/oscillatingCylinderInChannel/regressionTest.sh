@@ -24,10 +24,10 @@ fi
 # ------------------------------------------------------------
 
 REG_END_TIME=1
-CD_MIN=1.78
-CD_MAX=1.87
-CL_MIN=0.005
-CL_MAX=0.015
+CD_MIN=1.25
+CD_MAX=1.35
+CL_MIN=-0.015
+CL_MAX=-0.002
 
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/immersedBoundary/0/cylinder.dat"
@@ -97,7 +97,8 @@ if [[ ! -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
 fi
 
 # Cd = 2 Fx/(rho Uref^2 D Lz) = 1296.9 Fx, and likewise for Cl, from the force
-# of the forcing, which excludes the inertia of the fluid inside the cylinder
+# from the surface traction (forceEstimator surfaceTraction), which includes
+# the inertia of the fluid inside the cylinder
 final_cd=$(awk '!/^#/ { cd = 1296.9*$2 } END { print cd }' "${CASE_DIR}/${FORCE_FILE}")
 final_cl=$(awk '!/^#/ { cl = 1296.9*$3 } END { print cl }' "${CASE_DIR}/${FORCE_FILE}")
 

@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "immersedBody.H"
+#include "cutCellIso.H"
 #include "treeBoundBox.H"
 #include "indexedOctree.H"
 #include "treeDataCell.H"
@@ -30,8 +31,44 @@ const Foam::Enum<Foam::immersedBody::occupancyMethod>
 Foam::immersedBody::occupancyNames_
 ({
     {signedDistance, "signedDistance"},
-    {vertexFraction, "vertexFraction"}
+    {vertexFraction, "vertexFraction"},
+    {cut, "cut"}
 });
+
+
+// * * * * * * * * * * * * * * * Static Functions  * * * * * * * * * * * * //
+
+Foam::scalar Foam::immersedBody::solvedWidth
+(
+    const vector& span,
+    const Vector<label>& solD
+)
+{
+    scalar width = GREAT;
+    for (direction d = 0; d < vector::nComponents; ++d)
+    {
+        if (solD[d] == 1)
+        {
+            width = min(width, span[d]);
+        }
+    }
+
+    return width;
+}
+
+
+Foam::scalar Foam::immersedBody::cellWidth
+(
+    const polyMesh& mesh,
+    const label celli
+)
+{
+    return solvedWidth
+    (
+        boundBox(mesh.points(), mesh.cellPoints()[celli], false).span(),
+        mesh.solutionD()
+    );
+}
 
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
@@ -88,6 +125,11 @@ Foam::immersedBody::immersedBody
     (
         occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
      == signedDistance
+    ),
+    cut_
+    (
+        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
+     == cut
     ),
     time_(-GREAT),
     internalCells_(),
@@ -202,22 +244,14 @@ void Foam::immersedBody::addOccupancy
     {
         spans[i] =
             boundBox(mesh_.points(), cellPoints[cells[i]], false).span();
-        scalar width = GREAT;
-        for (direction d = 0; d < vector::nComponents; ++d)
-        {
-            if (solD[d] == 1)
-            {
-                width = min(width, spans[i][d]);
-            }
-        }
-        cellWidths_[cells[i]] = width;
+        cellWidths_[cells[i]] = solvedWidth(spans[i], solD);
     }
 
     // For the vertex fraction occupancy, test each point of these cells once
     Map<label> pointToIndex;
     boolList pointInside;
 
-    if (!signedDistance_)
+    if (!signedDistance_ && !cut_)
     {
         pointToIndex.resize(4*cells.size());
         DynamicList<label> points(4*cells.size());
@@ -235,6 +269,23 @@ void Foam::immersedBody::addOccupancy
 
         pointInside =
             searchPtr_->calcInside(pointField(mesh_.points(), points));
+    }
+
+    // For the cut occupancy, the signed distance to the surface at the
+    // points of these cells, positive inside the body (the opposite sign to
+    // addPointDistances): the cut cells give the volume fraction where it is
+    // positive. The values at the other points are not used
+    scalarField pointDistance;
+    autoPtr<cutCellIso> cutCellPtr;
+
+    if (cut_)
+    {
+        pointDistance.setSize(mesh_.nPoints(), GREAT);
+        addPointDistances(pointDistance);
+        pointDistance.negate();
+
+        // calcSubCell clears the storage of the previous cell
+        cutCellPtr.reset(new cutCellIso(mesh_, pointDistance));
     }
 
     const boolList centreInside
@@ -297,6 +348,12 @@ void Foam::immersedBody::addOccupancy
         {
             cellLambda = distanceLambda[i];
         }
+        else if (cut_)
+        {
+            // Volume fraction inside the surface
+            cutCellPtr->calcSubCell(celli, 0);
+            cellLambda = cutCellPtr->VolumeOfFluid();
+        }
         else
         {
             const labelList& curPoints = cellPoints[celli];
@@ -343,6 +400,67 @@ void Foam::immersedBody::addOccupancy
         }
     }
     insideCells_.transfer(insideCells);
+}
+
+
+void Foam::immersedBody::addPointDistances(scalarField& f) const
+{
+    // Points of the cells whose bounding box overlaps the bounding box of
+    // the surface, grown by the largest size of these cells
+    treeBoundBox surfaceBb(surface_.points());
+    surfaceBb.grow(SMALL*mag(surfaceBb.span()));
+
+    const pointField& meshPoints = mesh_.points();
+    const labelListList& cellPoints = mesh_.cellPoints();
+
+    scalar maxSpanSqr = 0;
+    {
+        const labelList cells0(mesh_.cellTree().findBox(surfaceBb));
+
+        vector maxSpan(Zero);
+        for (const label celli : cells0)
+        {
+            maxSpan = max
+            (
+                maxSpan,
+                boundBox(meshPoints, cellPoints[celli], false).span()
+            );
+        }
+        surfaceBb.grow(maxSpan);
+        maxSpanSqr = magSqr(maxSpan);
+    }
+
+    const labelList cells(mesh_.cellTree().findBox(surfaceBb));
+
+    labelHashSet pointSet(8*cells.size());
+    for (const label celli : cells)
+    {
+        pointSet.insert(cellPoints[celli]);
+    }
+    const labelList points(pointSet.sortedToc());
+    const pointField pts(meshPoints, points);
+
+    const boolList inside(searchPtr_->calcInside(pts));
+
+    List<pointIndexHit> nearest;
+    searchPtr_->findNearest
+    (
+        pts,
+        scalarField(pts.size(), 4*maxSpanSqr),
+        nearest
+    );
+
+    forAll(points, i)
+    {
+        const scalar d =
+        (
+            nearest[i].hit()
+          ? mag(nearest[i].hitPoint() - pts[i])
+          : 2*Foam::sqrt(maxSpanSqr)
+        );
+
+        f[points[i]] = min(f[points[i]], (inside[i] ? -d : d));
+    }
 }
 
 

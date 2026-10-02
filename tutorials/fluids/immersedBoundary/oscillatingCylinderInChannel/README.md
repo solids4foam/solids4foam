@@ -39,7 +39,8 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    method          penalty;
+    method          cutLink;
+    forceEstimator  surfaceTraction;
 
     bodies
     {
@@ -64,10 +65,14 @@ and the immersed boundary library is loaded in `system/controlDict` with
 `src/immersedBoundary/README.md`.
 
 The force on the cylinder is written every time step to
-`postProcessing/immersedBoundary/0/cylinder.dat`: columns 2-4 are the force
-exerted by the immersed boundary forcing, and columns 8-10 the inertia of the
-fluid inside the cylinder, whose sum is the hydrodynamic force on the
-cylinder. The drag and lift coefficients are
+`postProcessing/immersedBoundary/0/cylinder.dat`. With the `cutLink` method
+and `forceEstimator surfaceTraction`, columns 2-4 are the force from the
+pressure and viscous traction on the surface of the cylinder, and columns
+11-13 the force from the momentum exchange, which includes the inertia of the
+fluid inside the cylinder. With the `penalty` and `incremental` methods,
+columns 2-4 are the force exerted by the immersed boundary forcing, and
+columns 8-10 the inertia of the fluid inside the cylinder, whose sum is the
+hydrodynamic force on the cylinder. The drag and lift coefficients are
 
 $$
 C_d = \frac{2 F_x}{\rho U_{ref}^2 D L_z}, \qquad
@@ -104,30 +109,33 @@ coefficients in `forceCoeffs.pdf`.
 
 ## Expected Results
 
-The root mean square difference between the drag coefficient, including the
-inertia of the fluid inside the cylinder, and the reference drag coefficients,
-over $$0.25 < t < 7.5$$ s, where the root mean square of the drag coefficient
-is 2.05:
+The root mean square difference between the drag coefficient and the reference
+drag coefficients, over $$0.25 < t < 7.5$$ s, where the root mean square of the
+drag coefficient is 2.05, with the `cutLink` method (surface traction) and the
+`penalty` method (forcing plus the inertia of the fluid inside):
 
-| `MESH_LEVEL` | Cells | Cells across $$D$$ | Body-fitted | Wan and Turek |
-| ------------ | ----- | ------------------ | ----------- | ------------- |
-| 1 | 5 084 | 10 | 0.104 | 0.135 |
-| 2 | 20 336 | 20 | 0.045 | 0.091 |
-| 3 | 81 344 | 40 | Not reverified | Not reverified |
+| Level | Cells across $$D$$ | `cutLink` | `penalty` | `cutLink`, Wan-Turek |
+| ----- | ------------------ | --------- | --------- | -------------------- |
+| 1 | 10 | 0.11 | 0.11 | 0.12 |
+| 2 | 20 | 0.04 | 0.05 | 0.08 |
+| 3 | 40 | 0.02 | 0.02 | 0.08 |
 
-Levels 1 and 2 were checked on OpenFOAM v2512 over full 8 s runs at a fixed
-timestep of 0.0025 s with the maximum of body and fluid speed in the
-surface-rate cap. On level 1, reducing the timestep to 0.000625 s gives an
-RMS difference from the body-fitted reference of 0.136; using three instead
-of one PIMPLE outer correctors gives 0.102. The moving case therefore has
-measurable timestep sensitivity despite the absence of explicit timestep
-dependence in the cap.
+The first two columns are the differences from the body-fitted mesh
+solution, which decrease by about a factor of two with each refinement; the
+last is the difference from the Wan and Turek (2006) coefficients, which stops
+decreasing at about 0.08, the difference between the body-fitted mesh
+solution and the Wan and Turek (2006) coefficients: these lag the converged
+solutions by about 0.015 s. The `cutLink` force from the momentum exchange
+(columns 11-13) differs from the body-fitted mesh solution by 0.19, 0.07 and
+0.06: it over-predicts the inertia of the fluid inside the accelerating
+cylinder. With the `penalty` method, the force without the inertia of the
+fluid inside differs by about 0.46 on all the meshes, and the force is smooth
+as the cylinder crosses the cells as the occupancy varies continuously with
+its position.
 
-The earlier body-speed-only cap gave body-fitted RMS differences of
-0.11, 0.05 and 0.02, and Wan and Turek differences of 0.13, 0.09 and 0.08,
-for levels 1-3. The finest mesh has not been reverified with the new cap.
-As the occupancy varies continuously with the cylinder position, the force
-is smooth as the cylinder crosses cells.
+The `penalty` column is for the earlier body-speed-only surface-rate cap.
+With the current cap, which also includes the fluid speed, levels 1 and 2
+give 0.104 and 0.045 (see `src/immersedBoundary/README.md`).
 
 With the `incremental` forcing method of `pimpleHFDIBFoam` (`method
 incremental;` and `occupancy vertexFraction;` in `constant/fvOptions`), the
