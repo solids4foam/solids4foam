@@ -23,8 +23,10 @@ d2dt2Schemes
     default         NewmarkBeta 0.3025 0.6 -0.1;
 }
 
-// Use the same Newmark acceleration in the linear predictor.
-// The first derivative still uses backward; NewmarkBeta is a d2dt2 scheme.
+// Optional: the linear predictor then uses the Newmark acceleration too. The
+// coefficients must match d2dt2Schemes, otherwise the run stops with a fatal
+// error. The first derivative still uses backward; NewmarkBeta is a d2dt2
+// scheme only.
 ddtSchemes
 {
     default         backward;

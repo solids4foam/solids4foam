@@ -485,6 +485,10 @@ NewmarkBetaD2dt2Scheme<Type>::acceleration
 {
     typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
 
+    // The PETSc SNES solid models reach this scheme through fvc::d2dt2
+    // only, without fvm::d2dt2, so the check is made here too
+    checkDdtSchemesEntry("d2dt2(" + vf.name() + ')');
+
     updateState(vf);
 
     const fieldType& A = state("NewmarkA", vf);

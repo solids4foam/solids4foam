@@ -116,7 +116,69 @@ for scheme in "${SCHEMES[@]}"; do
         echo "FAIL: Missing operator-test success or incorrect time scheme"
         failures=$((failures + 1))
     fi
+
+    # newmark selects NewmarkBeta in d2dt2Schemes only, so the linear
+    # predictor reports that it uses the ddtSchemes default; bossak also has
+    # the optional matching ddtSchemes entry, so it does not
+    predictor_note='uses the ddtSchemes scheme backward'
+    case "$scheme" in
+        newmark)
+            if grep -Fq "$predictor_note" "$solver_log"; then
+                echo "PASS: d2dt2Schemes-only NewmarkBeta accepted"
+            else
+                echo "FAIL: Missing the ddtSchemes predictor note"
+                failures=$((failures + 1))
+            fi
+            ;;
+        bossak)
+            if ! grep -Fq "$predictor_note" "$solver_log"; then
+                echo "PASS: Matching ddtSchemes NewmarkBeta entry accepted"
+            else
+                echo "FAIL: The matching ddtSchemes entry was not used"
+                failures=$((failures + 1))
+            fi
+            ;;
+    esac
 done
+
+# A NewmarkBeta ddtSchemes entry whose coefficients differ from d2dt2Schemes
+# must stop with a fatal error, as the two would advance the same stored
+# state. Test-fvcD2dt2 calls fvm::d2dt2, which makes the check, on the bossak
+# mesh with trapezoidal coefficients in ddtSchemes
+mismatch_dir="${REGRESSION_ROOT}/mismatch"
+mismatch_log="${mismatch_dir}/log.Test-fvcD2dt2"
+echo "============================================================"
+echo "cantileverVibration: mismatched NewmarkBeta coefficients"
+
+if [ "$CHECK_ONLY" = false ]; then
+    rm -rf "$mismatch_dir"
+    mkdir -p "$mismatch_dir/system"
+    cp -a "${REGRESSION_ROOT}/bossak/constant" "$mismatch_dir/"
+    cp -a "${SCRIPT_DIR}/system/controlDict" \
+        "${SCRIPT_DIR}/system/fvSolution.petscSnes" "$mismatch_dir/system/"
+    mv "$mismatch_dir/system/fvSolution.petscSnes" \
+        "$mismatch_dir/system/fvSolution"
+    awk '
+        /^ddtSchemes/ {inDdt = 1}
+        inDdt && /NewmarkBeta/ {sub(/NewmarkBeta.*;/, "NewmarkBeta 0.25 0.5;")}
+        inDdt && /^}/ {inDdt = 0}
+        {print}' "${SCRIPT_DIR}/system/fvSchemes.bossak" \
+        > "$mismatch_dir/system/fvSchemes"
+
+    if (cd "$mismatch_dir" && Test-fvcD2dt2 > log.Test-fvcD2dt2 2>&1); then
+        echo "FAIL: Test-fvcD2dt2 ran with mismatched coefficients"
+        failures=$((failures + 1))
+    fi
+fi
+
+if [[ -f "$mismatch_log" ]] \
+    && grep -q 'selects it with different coefficients' "$mismatch_log"
+then
+    echo "PASS: Mismatched coefficients stop with a fatal error"
+else
+    echo "FAIL: No mismatched-coefficient error; see ${mismatch_log}"
+    failures=$((failures + 1))
+fi
 
 if (( failures == 0 )); then
     echo "Regression test PASSED"

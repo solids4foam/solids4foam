@@ -93,6 +93,12 @@ release. For complete commit-level details and contributor information, see the
   coefficients, makes the linear predictor use the Newmark acceleration;
   differing coefficients are a fatal error. The updated Lagrangian solid
   models are not supported.
+- The `cantileverVibration` tutorial takes the time scheme as a second
+  `Allrun` argument: `bdf2` (default), `newmark`, `bossak`, or `all` to
+  compare the three with Abaqus. Its regression test runs all three, checks
+  the physical and Bossak-weighted accelerations with `Test-fvcD2dt2`, and
+  checks both `ddtSchemes` forms for `NewmarkBeta` and the fatal error for
+  mismatched coefficients.
 - Added the `collapsibleChannel` fluid-solid interaction tutorial: flow in a
   2D channel with a very light, thin elastic wall that bends and stretches,
   after the oomph-lib collapsible-channel problem of Heil and co-workers,

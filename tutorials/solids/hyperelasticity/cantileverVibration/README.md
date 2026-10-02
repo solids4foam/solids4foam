@@ -120,10 +120,15 @@ The second-derivative scheme parameters are:
 The `newmark` dictionary omits the coefficients to exercise the scheme's
 defaults. The Bossak coefficients satisfy
 $$\beta = (1 - \alpha_M)^2/4$$ and $$\gamma = 0.5 - \alpha_M$$.
-The Newmark dictionaries also include a matching named `d2dt2` entry in
-`ddtSchemes` so that the linear predictor uses the Newmark acceleration too.
-This entry is optional for the momentum equation, but if present its
-coefficients must match those in `d2dt2Schemes`. It does not change the
+The two Newmark dictionaries show both supported forms. `fvSchemes.newmark`
+selects `NewmarkBeta` in `d2dt2Schemes` only, which is all the momentum
+equation needs; the linear predictor's acceleration then uses the `ddtSchemes`
+default (`backward`), and the solver log says so once. `fvSchemes.bossak`
+also has the optional `"d2dt2\(.*\)"` entry in `ddtSchemes`, with the same
+coefficients, so that the predictor uses the Newmark acceleration too. Both
+forms give the same converged solution, since the predictor only changes the
+initial guess. If the `ddtSchemes` coefficients differ from those in
+`d2dt2Schemes`, the run stops with a fatal error. Neither form changes the
 scheme for first derivatives.
 
 For a single run, `Allrun` links `constant/solidProperties` and
@@ -191,6 +196,10 @@ versus implicit inertia (with and without density), and, for Newmark and
 Bossak-Newmark, physical and weighted accelerations against an independent
 scalar recurrence. This distinguishes the physical acceleration from the
 Bossak-weighted acceleration even when the displacement curves are close.
+The regression also checks both `ddtSchemes` forms above: the `newmark` run
+must report that its predictor uses `backward`, and the `bossak` run must
+not. A final `Test-fvcD2dt2` run on the `bossak` mesh, with mismatched
+coefficients in `ddtSchemes`, must stop with the fatal error.
 The test utility must be built and available on `PATH`. Results are retained;
 `./regressionTest.sh --check-only` rechecks their logs without rerunning.
 

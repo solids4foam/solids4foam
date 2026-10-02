@@ -23,12 +23,12 @@ d2dt2Schemes
     default         NewmarkBeta;
 }
 
-// Use the same Newmark acceleration in the linear predictor.
-// The first derivative still uses backward; NewmarkBeta is a d2dt2 scheme.
+// Only d2dt2Schemes selects NewmarkBeta: the linear predictor's acceleration
+// then uses backward, from ddtSchemes (see fvSchemes.bossak for the optional
+// matching ddtSchemes entry). NewmarkBeta is a d2dt2 scheme only.
 ddtSchemes
 {
     default         backward;
-    "d2dt2\(.*\)"   NewmarkBeta;
 }
 
 gradSchemes
