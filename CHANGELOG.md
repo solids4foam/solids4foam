@@ -44,6 +44,13 @@ release. For complete commit-level details and contributor information, see the
   a `regressionTest.sh`: `cantileverVibration`, `cooksMembrane`,
   `compressedSpheres`, `twistingHemisphere`, `rubberSealing` and
   `shallowIroning` (all under `tutorials/solids/hyperelasticity`).
+- Added the `membraneRoof` fluid-solid interaction tutorial, ported from the
+  `solid-benchmarks` repository: wind flow over a building with a 10 x 10 m,
+  0.01 m thick membrane roof, after von Scheven and Ramm (2011). It uses
+  IQN-ILS coupling and the built-in expression inlet in place of the compiled
+  inlet library, and its README compares the roof-centre deflection
+  qualitatively with von Scheven's thesis. It runs with OpenFOAM.com and
+  PETSc only, and has a `regressionTest.sh`.
 - Added opt-in mesh-convergence verification studies, migrated from
   `solid-benchmarks`, to the linear-elastic and elastoplastic Cook's membrane,
   `sphericalCavity`, `ellipticPlate`, `narrowTmember`, `plateHole`,
@@ -73,6 +80,17 @@ release. For complete commit-level details and contributor information, see the
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.
+- Added the `NewmarkBeta` d2dt2 scheme for the cell-centred solid models:
+  `NewmarkBeta [beta gamma [alphaM]]`, with the default beta = 1/4 and
+  gamma = 1/2, which is the non-dissipative average acceleration method.
+  The optional alphaM, with the Bossak relations for beta and gamma, gives
+  the Bossak-alpha method, which damps high frequencies and stays
+  second-order. The velocity and acceleration are stored as `NewmarkV(D)` and
+  `NewmarkA(D)`, which are written, read on restart, and can set the initial
+  conditions; otherwise the body starts at rest or in equilibrium. The
+  time-step may vary. Add `"d2dt2\(.*\)" NewmarkBeta;` to `ddtSchemes` too,
+  because `fvc::d2dt2` reads its scheme there (#502); a fatal error says so
+  if it is missing. The updated Lagrangian solid models are not supported.
 - Added the `mokLidDrivenCavity` tutorial (under
   `tutorials/fluidSolidInteraction`): the lid-driven cavity with a flexible
   bottom of Wall and Mok, a strongly coupled partitioned FSI benchmark with a
