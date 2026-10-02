@@ -76,7 +76,7 @@ $$(1.5, 0)\,\mathrm{m}$$, is written to
 interface to `postProcessing/fluid/forces/0/force.dat`. The half cylinder leans
 downstream as the inflow ramps up and settles once the ramp ends
 (Figure 2). The steady top-point displacement is
-$$(0.1172, -0.0137)\,\mathrm{m}$$ and the steady interface force
+$$(0.1173, -0.0137)\,\mathrm{m}$$ and the steady interface force
 $$(15.8, -25.0)\,\mathrm{N}$$ per metre of span; the vertical force is
 dominated by the pressure, which is about $$25\,\mathrm{Pa}$$ at the half
 cylinder because of the viscous pressure drop along the channel.

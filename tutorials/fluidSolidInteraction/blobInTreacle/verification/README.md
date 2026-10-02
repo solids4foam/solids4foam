@@ -119,7 +119,7 @@ Acceptance criteria and their basis:
 - The change in the steady `u_x` between successive levels must decrease, with
   an observed order of at least `1.5` from the three finest levels, and the
   finest `u_x` must be within 1% of the Richardson extrapolation. The
-  discretisation is second order; the observed order is 2.3.
+  discretisation is second order; the observed order is 2.4.
 - The finest steady `u_x` must be within 10% and `u_y` within 25% of the
   published top-point displacement. The published steady state comes from a
   coarse mesh, and its `u_y` is small, so these are comparisons
@@ -136,18 +136,18 @@ only that every run completes and reaches a steady state.
 
 ## Reference results
 
-Recorded with OpenFOAM v2412 on an Apple M1 Ultra, with `--cores 4`: levels
-x0.5 and x1 and the time-step study in serial, levels x2 and x4 on four MPI
-ranks. The whole study took about 40 minutes.
+Recorded with OpenFOAM v2512 on Linux, with `--cores 4`: levels x0.5 and x1
+and the time-step study in serial, levels x2 and x4 on four MPI ranks. The
+whole study took about 33 minutes.
 
 Time-step study, tutorial mesh, `t = 1 s`:
 
 | `deltaT` (s) | `u_x` (m) | Change (m) | Order | Interface order | FSI its |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0.25 | 0.0558539 | – | – | – | 10.8/12 |
-| 0.125 | 0.0563958 | 5.42e-4 | – | – | 9.2/11 |
-| 0.0625 | 0.0565075 | 1.12e-4 | 2.28 | 2.27 | 10.3/11 |
-| 0.03125 | 0.0565286 | 2.10e-5 | 2.41 | 2.26 | 10.8/12 |
+| 0.25 | 0.0558737 | – | – | – | 11.5/14 |
+| 0.125 | 0.0564184 | 5.45e-4 | – | – | 13.0/14 |
+| 0.0625 | 0.0565219 | 1.04e-4 | 2.39 | 2.39 | 13.0/15 |
+| 0.03125 | 0.0565398 | 1.78e-5 | 2.54 | 2.41 | 13.1/14 |
 
 Mesh study, top-point displacement in the steady state, and the largest
 distance of the interface from the published one divided by the largest
@@ -155,20 +155,20 @@ interface displacement:
 
 | Level | `u_x` (m) | `u_y` (m) | Change (m) | Shape, 1 s | Shape, steady |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| x0.5 | 0.108186 | -0.012647 | – | 5.5% | 12.6% |
-| x1 | 0.117226 | -0.013731 | 9.04e-3 | 1.6% | 7.8% |
-| x2 | 0.119711 | -0.014015 | 2.49e-3 | 1.6% | 6.5% |
-| x4 | 0.120210 | -0.014027 | 4.99e-4 | 1.6% | 6.3% |
+| x0.5 | 0.108206 | -0.012650 | – | 5.5% | 12.6% |
+| x1 | 0.117301 | -0.013745 | 9.10e-3 | 1.6% | 7.8% |
+| x2 | 0.119698 | -0.014003 | 2.40e-3 | 1.6% | 6.5% |
+| x4 | 0.120152 | -0.013996 | 4.54e-4 | 1.6% | 6.3% |
 
 | Level | Cores | Clock time (s) | FSI iterations per step (mean/max) |
 | ---: | ---: | ---: | ---: |
-| x0.5 | 1 | 45 | 7.7/11 |
-| x1 | 1 | 95 | 8.6/13 |
-| x2 | 4 | 282 | 9.8/15 |
-| x4 | 4 | 1876 | 15.7/53 |
+| x0.5 | 1 | 41 | 7.7/11 |
+| x1 | 1 | 91 | 9.0/14 |
+| x2 | 4 | 376 | 10.6/16 |
+| x4 | 4 | 1430 | 11.7/18 |
 
-The steady `u_x` converges at an observed order of 2.32 to an extrapolated
-`0.12034 m`; the finest level is 0.1% from it and 7.3% below the published
+The steady `u_x` converges at an observed order of 2.40 to an extrapolated
+`0.12026 m`; the finest level is 0.1% from it and 7.4% below the published
 `0.1297 m`, and its `u_y` is 20% larger in magnitude than the published
 `-0.0117 m`. The interface at `t = 1 s` agrees with the published one to 1.6%
 of the interface displacement on every level from x1, which is within the 4%
