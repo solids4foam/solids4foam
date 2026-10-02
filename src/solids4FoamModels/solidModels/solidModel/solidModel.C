@@ -35,6 +35,7 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
+#include "NewmarkBetaD2dt2Scheme.H"
 #include "hofvc.H"
 #include "fvm.H"
 #include "fvc.H"
@@ -2266,7 +2267,12 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
     const label interfaceI
 ) const
 {
-    const volVectorField a(fvc::d2dt2(D()));
+    // The physical acceleration: with the Bossak-alpha NewmarkBeta scheme,
+    // fvc::d2dt2 returns the weighted acceleration of the momentum residual
+    const volVectorField a
+    (
+        fv::NewmarkBetaD2dt2Scheme<vector>::physicalAcceleration(D())
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal
     (
