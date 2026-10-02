@@ -236,13 +236,12 @@ release. For complete commit-level details and contributor information, see the
   suggests `newMovingWallVelocity`, or `elasticWallVelocity` for a Robin
   interface. `oneWayCoupling`, where the fluid wall is rigid, and runs that
   are never coupled are not checked.
-- `solids4Foam::convertCaseFormat` renames `residualControl` in the `PIMPLE`
-  dictionary to `outerCorrectorResidualControl` for OpenFOAM.org, where
-  `residualControl` is the criterion for ending the run, and
-  `solids4Foam::restoreCaseFormat` reverses it. This replaces the same rename
-  in the `3dTube`, `flowOverHeatedPlate` and `thermalCavity` Allrun and
-  Allclean scripts, and also applies it to `beamInCrossFlow`, which ran with
-  the OpenFOAM.com keyword on OpenFOAM.org.
+- `solids4Foam::convertCaseFormat` renames an OpenFOAM.com `residualControl`
+  (with `tolerance` and `relTol` sub-dictionaries) in the `PIMPLE` dictionary
+  to `outerCorrectorResidualControl` for OpenFOAM.org, where `residualControl`
+  is the criterion for ending the run, and `solids4Foam::restoreCaseFormat`
+  reverses it. This replaces the same rename in the `3dTube`,
+  `flowOverHeatedPlate` and `thermalCavity` Allrun and Allclean scripts.
 
 ### Removed
 
