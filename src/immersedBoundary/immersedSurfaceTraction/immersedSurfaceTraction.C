@@ -219,6 +219,7 @@ void Foam::immersedSurfaceTraction::createPoints()
     // for surfaces whose triangles are smaller than the cells: the points are
     // kept in order if no kept point is closer, and the area of each point
     // is given to the nearest kept point
+    if (thin_)
     {
         scalar thickness = 1;
         for (direction d = 0; d < vector::nComponents; ++d)
@@ -323,6 +324,12 @@ void Foam::immersedSurfaceTraction::createPoints()
         Info<< "    Immersed body " << body_.name() << ": area in the mesh "
             << meshArea << endl;
     }
+    else
+    {
+        faces_.transfer(faces);
+        barycentric_.transfer(barycentric);
+        areas_.transfer(areas);
+    }
 
     Info<< "    Immersed body " << body_.name() << ": " << faces_.size()
         << " traction points, area " << sum(areas_) << endl;
@@ -379,12 +386,14 @@ void Foam::immersedSurfaceTraction::updatePoints()
 Foam::immersedSurfaceTraction::immersedSurfaceTraction
 (
     const immersedBody& body,
-    const fvMesh& mesh
+    const fvMesh& mesh,
+    const bool thin
 )
 :
     mesh_(mesh),
     body_(body),
     solD_(mesh.solutionD()),
+    thin_(thin),
     faces_(),
     barycentric_(),
     areas_(),
@@ -797,6 +806,55 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
     );
 
     return ttraction;
+}
+
+
+void Foam::immersedSurfaceTraction::faceValues
+(
+    const vectorField& pointValues,
+    vectorField& faceValues,
+    scalarField& faceAreas
+) const
+{
+    if (pointValues.size() != faces_.size())
+    {
+        FatalErrorInFunction
+            << "The field has " << pointValues.size() << " values, but "
+            << "there are " << faces_.size() << " quadrature points"
+            << abort(FatalError);
+    }
+
+    const label nFaces = body_.surface().size();
+
+    faceValues.setSize(nFaces);
+    faceValues = Zero;
+    faceAreas.setSize(nFaces);
+    faceAreas = 0;
+
+    // The points outside the mesh have no value but keep their area, so
+    // that the mean over a face partly outside the mesh gives the force of
+    // its part in the mesh when it is applied to the whole face
+    forAll(faces_, i)
+    {
+        if (h_[i] > 0)
+        {
+            faceValues[faces_[i]] += areas_[i]*pointValues[i];
+        }
+        faceAreas[faces_[i]] += areas_[i];
+    }
+
+    forAll(faceValues, facei)
+    {
+        if (faceAreas[facei] > VSMALL)
+        {
+            faceValues[facei] /= faceAreas[facei];
+        }
+        else
+        {
+            faceValues[facei] = Zero;
+            faceAreas[facei] = 0;
+        }
+    }
 }
 
 

@@ -1,0 +1,50 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Immersed cylinder and flag, see src/immersedBoundary/README.md; the
+// surface files are in constant/fluid/triSurface
+immersedBoundary
+{
+    type            immersedBoundaryForce;
+
+    // cutLink (the default), with the force from the momentum exchange and
+    // the force from the surface traction written in columns 11-13
+    writeSurfaceTraction yes;
+
+    bodies
+    {
+        // Rigid cylinder of radius 0.05 m centred at (0.2 0.2)
+        cylinder
+        {
+            surface     "cylinder.stl";
+        }
+
+        // Elastic flag: its surface is the solid interface patch and its
+        // motion is given by the fluid-solid interface (constant/fsiProperties)
+        flag
+        {
+            motion
+            {
+                type        fsiDriven;
+            }
+        }
+    }
+}
+
+// ************************************************************************* //
