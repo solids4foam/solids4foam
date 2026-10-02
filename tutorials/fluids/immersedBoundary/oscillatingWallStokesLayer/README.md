@@ -4,11 +4,6 @@ sort: 4
 
 # Stokes layer on an immersed oscillating wall: `oscillatingWallStokesLayer`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/oscillatingWallStokesLayer`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/oscillatingWallStokesLayer).
-
----
-
 ## Tutorial Aims
 
 - Verify the velocity and the wall shear stress next to a moving immersed

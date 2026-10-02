@@ -133,7 +133,6 @@ class immersedSurfaceTraction
 
         //- Width of a cell: its smallest bounding box width in the solved
         //  directions
-        scalar cellWidth(const label celli) const;
 
         //- Width of the cell containing each point, the largest over the
         //  processors, and 0 if no processor contains it

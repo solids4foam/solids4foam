@@ -4,11 +4,6 @@ sort: 6
 
 # Immersed beam bending in a channel: `bendingBeamInChannel`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/bendingBeamInChannel`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/bendingBeamInChannel).
-
----
-
 ## Tutorial Aims
 
 - Verify the force on a deforming immersed body against a body-fitted

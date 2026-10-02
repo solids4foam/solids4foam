@@ -15,6 +15,7 @@ FoamFile
     location    "0";
     object      U;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 dimensions      [0 1 -1 0 0 0 0];
 
@@ -22,8 +23,14 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    walls { type noSlip; }
-    frontAndBack { type empty; }
+    walls
+    {
+        type            noSlip;
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
 }
 
 // ************************************************************************* //

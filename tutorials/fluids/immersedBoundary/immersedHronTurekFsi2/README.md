@@ -4,11 +4,6 @@ sort: 8
 
 # Immersed Turek-Hron FSI2 benchmark: `immersedHronTurekFsi2`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/immersedHronTurekFsi2`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/immersedHronTurekFsi2).
-
----
-
 ## Tutorial Aims
 
 - Demonstrate a fluid-solid interaction in which the solid interface patch

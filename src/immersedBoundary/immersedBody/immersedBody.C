@@ -38,6 +38,41 @@ Foam::immersedBody::occupancyNames_
 });
 
 
+// * * * * * * * * * * * * * * * Static Functions  * * * * * * * * * * * * //
+
+Foam::scalar Foam::immersedBody::solvedWidth
+(
+    const vector& span,
+    const Vector<label>& solD
+)
+{
+    scalar width = GREAT;
+    for (direction d = 0; d < vector::nComponents; ++d)
+    {
+        if (solD[d] == 1)
+        {
+            width = min(width, span[d]);
+        }
+    }
+
+    return width;
+}
+
+
+Foam::scalar Foam::immersedBody::cellWidth
+(
+    const polyMesh& mesh,
+    const label celli
+)
+{
+    return solvedWidth
+    (
+        boundBox(mesh.points(), mesh.cellPoints()[celli], false).span(),
+        mesh.solutionD()
+    );
+}
+
+
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 Foam::triSurface Foam::immersedBody::readSurface
@@ -388,22 +423,14 @@ void Foam::immersedBody::addOccupancy
     {
         spans[i] =
             boundBox(mesh_.points(), cellPoints[cells[i]], false).span();
-        scalar width = GREAT;
-        for (direction d = 0; d < vector::nComponents; ++d)
-        {
-            if (solD[d] == 1)
-            {
-                width = min(width, spans[i][d]);
-            }
-        }
-        cellWidths_[cells[i]] = width;
+        cellWidths_[cells[i]] = solvedWidth(spans[i], solD);
     }
 
     // For the vertex fraction occupancy, test each point of these cells once
     Map<label> pointToIndex;
     boolList pointInside;
 
-    if (!signedDistance_)
+    if (!signedDistance_ && !cut_)
     {
         pointToIndex.resize(4*cells.size());
         DynamicList<label> points(4*cells.size());
@@ -424,49 +451,20 @@ void Foam::immersedBody::addOccupancy
     }
 
     // For the cut occupancy, the signed distance to the surface at the
-    // points of these cells, positive inside the body: the cut cells give
-    // the volume fraction where it is positive
+    // points of these cells, positive inside the body (the opposite sign to
+    // addPointDistances): the cut cells give the volume fraction where it is
+    // positive. The values at the other points are not used
     scalarField pointDistance;
+    autoPtr<cutCellIso> cutCellPtr;
 
     if (cut_)
     {
-        const pointField& meshPoints = mesh_.points();
+        pointDistance.setSize(mesh_.nPoints(), GREAT);
+        addPointDistances(pointDistance);
+        pointDistance.negate();
 
-        scalar maxSpanSqr = 0;
-        for (const label celli : cells)
-        {
-            maxSpanSqr = max
-            (
-                maxSpanSqr,
-                magSqr(boundBox(meshPoints, cellPoints[celli], false).span())
-            );
-        }
-
-        const labelList points(pointToIndex.sortedToc());
-        const pointField pts(meshPoints, points);
-
-        List<pointIndexHit> nearest;
-        searchPtr_->findNearest
-        (
-            pts,
-            scalarField(pts.size(), 4*maxSpanSqr),
-            nearest
-        );
-
-        // The values at the other points are not used
-        pointDistance.setSize(mesh_.nPoints(), 0);
-        forAll(points, i)
-        {
-            const scalar d =
-            (
-                nearest[i].hit()
-              ? mag(nearest[i].hitPoint() - pts[i])
-              : 2*Foam::sqrt(maxSpanSqr)
-            );
-
-            pointDistance[points[i]] =
-                (pointInside[pointToIndex[points[i]]] ? d : -d);
-        }
+        // calcSubCell clears the storage of the previous cell
+        cutCellPtr.reset(new cutCellIso(mesh_, pointDistance));
     }
 
     const boolList centreInside
@@ -532,9 +530,8 @@ void Foam::immersedBody::addOccupancy
         else if (cut_)
         {
             // Volume fraction inside the surface
-            cutCellIso cutCell(mesh_, pointDistance);
-            cutCell.calcSubCell(celli, 0);
-            cellLambda = cutCell.VolumeOfFluid();
+            cutCellPtr->calcSubCell(celli, 0);
+            cellLambda = cutCellPtr->VolumeOfFluid();
         }
         else
         {
