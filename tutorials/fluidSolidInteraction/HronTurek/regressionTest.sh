@@ -4,6 +4,9 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
@@ -67,7 +70,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
 run_case() {

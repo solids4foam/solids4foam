@@ -178,12 +178,12 @@ Table 1 lists the wall-clock times rounded to the nearest second for the
 
 ## Verification and Convergence Study
 
-The opt-in [`verification/`](verification/) directory adds the order-of-accuracy
-sweep described above, ported from the `solid-benchmarks` cantilever study. It
-scales the axial and through-thickness divisions by powers of two from
-$$40 \times 2$$ to $$320 \times 16$$ cells and reads the displacement and
-stress error norms that the `cantileverAnalyticalSolution` function object
-already writes to the solver log:
+The opt-in [`verification/`](verification/) directory adds the
+order-of-accuracy sweep described above. It scales the axial and
+through-thickness divisions by powers of two from $$40 \times 2$$ to $$320
+\times 16$$ cells and reads the displacement and stress error norms that the
+`cantileverAnalyticalSolution` function object already writes to the solver
+log:
 
 ```bash
 cd verification

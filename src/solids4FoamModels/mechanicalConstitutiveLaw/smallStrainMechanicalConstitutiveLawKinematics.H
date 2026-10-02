@@ -53,9 +53,6 @@ Description
     - This class is specific to small-strain formulations; finite-strain
       formulations are handled by a separate kinematics container.
 
-SourceFiles
-    smallStrainMechanicalConstitutiveLawKinematics.C
-
 Author
     Philip Cardiff, UCD.
 
@@ -73,6 +70,56 @@ Author
 
 namespace Foam
 {
+
+//- A displacement gradient, or a deformation gradient, with Voigt strain
+//  component j (0..5, symmTensor order) perturbed by h.
+//  The perturbation is defined on the Voigt strain vector, which uses
+//  engineering shear: gamma_xy = 2*eps_xy. A shear component therefore moves
+//  each off-diagonal by h/2, so that the corresponding Voigt component moves
+//  by exactly h. This is what makes a finite-difference tangent directly
+//  comparable with an analytical one, where for isotropic elasticity
+//  C(XY,XY) is mu rather than 2*mu; and since F = I + gradD, a finite-strain
+//  tangent taken this way is comparable with a small-strain one
+inline tensor perturbVoigt(tensor g, const label j, const scalar h)
+{
+    switch (j)
+    {
+        case symmTensor::XX:
+            g.xx() += h;
+            break;
+
+        case symmTensor::YY:
+            g.yy() += h;
+            break;
+
+        case symmTensor::ZZ:
+            g.zz() += h;
+            break;
+
+        case symmTensor::YZ:
+            g.yz() += 0.5*h;
+            g.zy() += 0.5*h;
+            break;
+
+        case symmTensor::XZ:
+            g.xz() += 0.5*h;
+            g.zx() += 0.5*h;
+            break;
+
+        case symmTensor::XY:
+            g.xy() += 0.5*h;
+            g.yx() += 0.5*h;
+            break;
+
+        default:
+            FatalErrorInFunction
+                << "Invalid Voigt component index j = " << j
+                << exit(FatalError);
+    }
+
+    return g;
+}
+
 
 /*---------------------------------------------------------------------------*\
        Class smallStrainMechanicalConstitutiveLawKinematics Declaration
@@ -147,74 +194,14 @@ public:
 
     // Edit
 
-        //- Return a perturbed copy of gradD at ipI
-        //  Voigt strain perturbation to integration point ipI
-        //  j = Voigt index [0..5]
-        //  h = perturbation magnitude
-        //  This can be used for calculating material tangents with finite
-        //  differences
-        //- Return gradD at integration point ipI with Voigt strain component
-        //  j perturbed by h.
-        //  The perturbation is defined on the Voigt strain vector, which uses
-        //  engineering shear: gamma_xy = 2*eps_xy. A shear component therefore
-        //  moves each off-diagonal of gradD by h/2, so that the corresponding
-        //  Voigt component moves by exactly h. This is what makes a
-        //  finite-difference tangent directly comparable with an analytical
-        //  one, where for isotropic elasticity C(XY,XY) is mu rather than 2*mu
+        //- gradD at integration point ipI with Voigt strain component j
+        //  perturbed by h; see perturbVoigt
         inline tensor gradDPerturbed
         (
             const label ipI, const label j, const scalar h
         ) const
         {
-            #ifdef FULLDEBUG
-            if (j < 0 || j >= 6)
-            {
-                FatalErrorInFunction
-                    << "Invalid Voigt index j = " << j
-                    << " (expected 0..5)"
-                    << exit(FatalError);
-            }
-            #endif
-
-            // Copy of gradD
-            tensor g = gradD_[ipI];
-
-            switch (j)
-            {
-                case symmTensor::XX:
-                    g.xx() += h;
-                    break;
-
-                case symmTensor::YY:
-                    g.yy() += h;
-                    break;
-
-                case symmTensor::ZZ:
-                    g.zz() += h;
-                    break;
-
-                case symmTensor::YZ:
-                    g.yz() += 0.5*h;
-                    g.zy() += 0.5*h;
-                    break;
-
-                case symmTensor::XZ:
-                    g.xz() += 0.5*h;
-                    g.zx() += 0.5*h;
-                    break;
-
-                case symmTensor::XY:
-                    g.xy() += 0.5*h;
-                    g.yx() += 0.5*h;
-                    break;
-
-                default:
-                    FatalErrorInFunction
-                        << "Invalid Voigt component index j = " << j
-                            << exit(FatalError);
-            }
-
-            return g;
+            return perturbVoigt(gradD_[ipI], j, h);
         }
 };
 

@@ -67,15 +67,15 @@ MooneyRivlinElasticMechanicalConstitutiveLaw
             << exit(FatalIOError);
     }
 
-    // Shear modulus, from the pure shear stress state, as in the legacy law
+    // Shear modulus, from the pure shear stress state
     mu_ = 2.0*(c10_ + c01_);
 
     // The bulk modulus is given directly or derived from nu.
     //
-    // The legacy law takes K when it is present and ignores nu, so an existing
-    // case dictionary carrying both must keep working and keep the same
-    // meaning. Rejecting that combination here would be tidier but would break
-    // dictionaries the legacy law accepts, so it is warned about instead
+    // K is taken when it is present and nu is ignored, so that an existing
+    // case dictionary carrying both keeps working and keeps its meaning.
+    // Rejecting that combination would be tidier but would break such
+    // dictionaries, so it is warned about instead
     const bool haveK = dict.found("K");
     const bool haveNu = dict.found("nu");
 
@@ -89,8 +89,8 @@ MooneyRivlinElasticMechanicalConstitutiveLaw
     if (haveK && haveNu)
     {
         WarningInFunction
-            << "Both 'K' and 'nu' are given: K is used and nu is ignored, "
-            << "as in the legacy MooneyRivlinElastic law." << endl;
+            << "Both 'K' and 'nu' are given: K is used and nu is ignored."
+            << endl;
     }
 
     if (haveK)
@@ -125,7 +125,7 @@ MooneyRivlinElasticMechanicalConstitutiveLaw
                 << exit(FatalIOError);
         }
 
-        // As in the legacy law: E follows from the small-strain limit
+        // E follows from the small-strain limit
         E_ = 6.0*(c10_ + c01_);
         kappa_ = E_/(3.0*(1.0 - 2.0*nu_));
     }
@@ -162,7 +162,7 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
 
     // Not merely a positivity check: the stress divides by J and forms
     // inv(isoB), so a J this close to zero is already meaningless
-    // numerically. The legacy law imposes no such floor
+    // numerically
     const scalar Jmin = sqrt(SMALL);
 
     forAll(sigma, i)
@@ -195,9 +195,9 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
           - 2.0*(c01 + c11*(I1 - 3.0))*inv(isoB)
         );
 
-        // Hydrostatic stress, unsmoothed: see the note in the header. The
-        // legacy law passes this through updateSigmaHyd, which may solve a
-        // Laplacian over the field; that belongs to the solid model, not here
+        // Hydrostatic stress, unsmoothed: see the note in the header. A
+        // Laplacian smoothing over the field belongs to the solid model, not
+        // here
         const scalar p = 0.5*kappaVal*(sqr(Ji) - 1.0);
 
         sigma[i] = (1.0/Ji)*(dev(s) + p*I);
@@ -213,54 +213,17 @@ void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D))
+    fillScalarTangent
+    (
+        response,
+        (4.0/3.0)*mu_.value() + kappa_.value(),
+        (4.0/3.0)*mu_.value()
+    );
 
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                // Matches the implicit stiffness the legacy law passes to
-                // updateSigmaHyd, which is (4/3)*mu + K
-                Keff = (4.0/3.0)*mu_.value() + kappa_.value();
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                // Scalar Laplacian surrogate for div(dev(sigma)), which is
-                // mu*lap(D) + (1/3)*mu*grad(div(D))
-                Keff = (4.0/3.0)*mu_.value();
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // There is no analytical spatial tangent for this law yet, but the
-    // finite-difference tangent of the base class is well defined for any
-    // finite-strain law and is evaluated against a shadow state, so it leaves
-    // neither the stress just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

@@ -1,0 +1,242 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::orientedBoundBox
+
+Description
+    Oriented bounding box (OBB) represented by a centre, three orthonormal
+    axes and the corresponding half-lengths.
+
+    The box fitted to an arbitrary point field uses principal component
+    analysis, and the axis-aligned bound box is kept instead when it has the
+    smaller volume.  The fitted box is therefore never larger than the
+    axis-aligned bound box, but is not guaranteed to be the minimum-volume
+    oriented box.
+
+    Box overlap is evaluated with the separating axis theorem.
+
+References
+    Eberly, D. H. (2008). 3D Game Engine Design (2nd ed.). Morgan Kaufmann.
+
+    Ericson, C. (2005). Real-Time Collision Detection. Morgan Kaufmann.
+
+    Gottschalk, S. (2000). Collision Queries Using Oriented Bounding Boxes.
+    PhD thesis, University of North Carolina at Chapel Hill.
+
+Author
+    Ivan Batistic, UCD.
+    Philip Cardiff, UCD.
+
+SourceFiles
+    orientedBoundBox.C
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef orientedBoundBox_H
+#define orientedBoundBox_H
+
+#include "boundBox.H"
+#include "pointField.H"
+#include "tmp.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+class orientedBoundBox;
+
+Ostream& operator<<(Ostream& os, const orientedBoundBox& box);
+Istream& operator>>(Istream& is, orientedBoundBox& box);
+
+
+/*---------------------------------------------------------------------------*\
+                      Class orientedBoundBox Declaration
+\*---------------------------------------------------------------------------*/
+
+class orientedBoundBox
+{
+    // Private Data
+
+        //- Centre of the box
+        point centre_;
+
+        //- Half-length along each local box axis
+        vector halfLength_;
+
+        //- Orthonormal local box axes stored as tensor rows
+        tensor axes_;
+
+        //- Angular tolerance used to identify parallel separating axes
+        static const scalar parallelTolerance_;
+
+
+    // Private Member Functions
+
+        //- Fit a principal-component box, or the axis-aligned box if smaller
+        void makeBox(const pointField& points);
+
+        //- Fit a minimum-area in-plane box and extrude it along faceNormal
+        void makeBox
+        (
+            const pointField& facePoints,
+            const vector& faceNormal,
+            const scalar normalPosExtent,
+            const scalar normalNegExtent,
+            const scalar scaleFactor
+        );
+
+        //- Calculate the point mean and scale-normalised covariance tensor
+        static void calcCovariance
+        (
+            const pointField& points,
+            point& mean,
+            symmTensor& covariance
+        );
+
+        //- Expand local component bounds to include the supplied point
+        static void addToLocalBounds
+        (
+            const vector& localPoint,
+            vector& minLocal,
+            vector& maxLocal
+        );
+
+        //- Orthonormalise the rows of axes_
+        void orthonormaliseAxes();
+
+
+public:
+
+    // Static Data Members
+
+        //- A box centred at the origin with VGREAT half-lengths
+        static const orientedBoundBox greatBox;
+
+
+    // Constructors
+
+        //- Construct an empty box
+        orientedBoundBox();
+
+        //- Construct an axis-aligned box from its centre and half-lengths
+        orientedBoundBox(const point& centre, const vector& halfLength);
+
+        //- Construct from centre, half-lengths and local axes stored as rows
+        orientedBoundBox
+        (
+            const point& centre,
+            const vector& halfLength,
+            const tensor& axes
+        );
+
+        //- Construct from an axis-aligned bounding box
+        orientedBoundBox(const boundBox& box);
+
+        //- Fit the smaller of the principal-component and axis-aligned boxes;
+        //  an empty field gives an empty box
+        orientedBoundBox(const pointField& points);
+
+        //- Fit a box as above to a temporary point field
+        orientedBoundBox(const tmp<pointField>& points);
+
+        //- Construct a face box with positive and negative normal extrusion
+        orientedBoundBox
+        (
+            const pointField& facePoints,
+            const vector& faceNormal,
+            const scalar normalPosExtent,
+            const scalar normalNegExtent,
+            const scalar scaleFactor = 1.0
+        );
+
+        //- Construct from Istream
+        orientedBoundBox(Istream& is);
+
+
+    // Member Functions
+
+        // Access
+
+            //- Return the box centre
+            const point& midpoint() const
+            {
+                return centre_;
+            }
+
+            //- Return the half-lengths along the local box axes
+            const vector& ext() const
+            {
+                return halfLength_;
+            }
+
+            //- Return the local box axes stored as tensor rows
+            const tensor& R() const
+            {
+                return axes_;
+            }
+
+
+        // Edit
+
+            //- Expand each local half-length by the non-negative distance
+            void grow(const scalar distance);
+
+
+        // Query
+
+            //- Return true if any half-length is negative (empty box)
+            //  Negative half-lengths or an inverted boundBox give an empty box
+            bool empty() const
+            {
+                return cmptMin(halfLength_) < 0;
+            }
+
+            //- Test containment with a relative round-off tolerance
+            bool contains(const point& p) const;
+
+            //- Return true if this box overlaps the supplied box
+            bool overlaps(const orientedBoundBox& box) const;
+
+
+    // Member Operators
+
+        bool operator==(const orientedBoundBox& box) const;
+
+        bool operator!=(const orientedBoundBox& box) const
+        {
+            return !operator==(box);
+        }
+
+
+    // IOstream Operators
+
+        friend Istream& operator>>(Istream& is, orientedBoundBox& box);
+        friend Ostream& operator<<(Ostream& os, const orientedBoundBox& box);
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

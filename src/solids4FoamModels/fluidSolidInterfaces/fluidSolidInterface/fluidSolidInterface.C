@@ -485,7 +485,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrAddDefault<scalar>("couplingStartTime", -1.0)
     ),
-    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
+    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", true)),
     curTimeIndex_(-1),
     interfaceDeformationLimit_
     (
@@ -847,7 +847,7 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 
     Info<< "Selecting fluidSolidInterface " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)
@@ -1237,6 +1237,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             maxDelta = delta;
         }
     }
+
+    fluid().preUpdateMesh();
 
     if (maxDelta < interfaceDeformationLimit())
     {

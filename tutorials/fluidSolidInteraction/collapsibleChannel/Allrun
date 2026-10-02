@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun            # IQN-ILS coupling, high-order solid (cubic)
+# ./Allrun linear     # second-order solid: linear reconstruction
+# ./Allrun robin      # Robin-Neumann coupling
+# ./Allrun robin linear
+# The case runs in serial: see the README
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
+solidVariant=highOrder
+coupling=iqnils
+interfaceCondition=dirichletNeumann
+
+for arg in "$@"
+do
+    case "$arg" in
+        linear)
+            solidVariant="$arg"
+            ;;
+        robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [linear] [robin]"
+            exit 1
+            ;;
+    esac
+done
+
+ln -vnsf "solidProperties.${solidVariant}" constant/solid/solidProperties
+ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+# Copied rather than linked, as setPoiseuilleFlow writes the initial fields
+rm -f 0/fluid/U 0/fluid/p
+cp "0/fluid/U.${interfaceCondition}" 0/fluid/U
+cp "0/fluid/p.${interfaceCondition}" 0/fluid/p
+
+# Build the utility that sets the initial Poiseuille flow
+wmake setPoiseuilleFlow
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Start the fluid from the steady Poiseuille flow
+solids4Foam::runApplication setPoiseuilleFlow -region fluid
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
