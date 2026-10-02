@@ -167,10 +167,14 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/3dTube"
     "fluidSolidInteraction/beamInCrossFlow"
     "fluidSolidInteraction/cavityFlexibleBottom"
+    "fluidSolidInteraction/collapsibleChannel"
     "fluidSolidInteraction/flexibleDamBreak"
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
+    "fluidSolidInteraction/mokLidDrivenCavity"
     "fluidSolidInteraction/fillingElasticContainer"
+    "fluidSolidInteraction/membraneRoof"
+    "fluidSolidInteraction/ringAddedMass"
     # Not tutorials: a test application's case, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
 )
