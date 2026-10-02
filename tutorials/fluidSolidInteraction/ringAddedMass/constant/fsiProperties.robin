@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidSolidInterface    fixedRelaxation;
+
+fixedRelaxationCoeffs
+{
+    // Interface patches
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Predictors at the start of a new time step
+    predictor            yes;
+    predictSolid         yes;
+
+    // No relaxation: the Robin pressure condition (elasticWallPressure)
+    // provides the added-mass stabilisation
+    relaxationFactor     1.0;
+
+    // Tolerance for the FSI loop within each time-step
+    outerCorrTolerance   1e-6;
+
+    // Additional convergence tolerances used automatically by Robin pressure
+    // interfaces: the interface-pressure change and the leakage (interface
+    // flux relative to the mesh motion)
+    robinPressureTolerance 1e-5;
+    robinFluxTolerance     5e-3;
+
+    // Maximum number of outer FSI loop correctors within each time-step
+    nOuterCorr           200;
+
+    // Enable/disable coupling from the start
+    coupled              yes;
+
+    // Method for transferring information between the interfaces
+    interfaceTransferMethod directMap;
+
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+}
+
+// ************************************************************************* //

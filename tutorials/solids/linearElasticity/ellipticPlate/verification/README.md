@@ -1,9 +1,8 @@
 # ellipticPlate verification study
 
-This opt-in study migrates the mesh-convergence study from
-`solid-benchmarks/linearElasticity/ellipticPlate` into the tutorial itself. It
-refines the tutorial `blockMesh` through the mesh family of Demirdžić et al.
-(1997), samples the equivalent (von Mises) stress along the line
+This opt-in study is a mesh-convergence study. It refines the tutorial
+`blockMesh` through the mesh family of Demirdžić et al. (1997), samples the
+equivalent (von Mises) stress along the line
 `r = 2.1 m`, `z = 0.3 m` at mid-thickness, and compares the result with the
 published curve.
 

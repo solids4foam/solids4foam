@@ -89,9 +89,8 @@ evolution of the horizontal and vertical reaction forces is plotted in the
 
 ## Verification and Convergence Study
 
-The opt-in [`verification/`](verification/) directory turns the curved-beams
-benchmark from `solid-benchmarks/elastoPlasticity/curvedBeams` into a mesh
-convergence study for this tutorial. It refines the tutorial `blockMesh`,
+The opt-in [`verification/`](verification/) directory holds a mesh
+convergence study. It refines the tutorial `blockMesh`,
 extracts the total reaction force history on the `fixed` patch, and compares it
 with the published curves of Neto et al. [2] for friction coefficients of
 $$\mu = 0.0$$, $$0.3$$ and $$0.6$$:
