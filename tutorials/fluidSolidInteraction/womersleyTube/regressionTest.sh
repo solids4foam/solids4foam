@@ -19,17 +19,19 @@ EXACT_AMPLITUDE=4.512494768325512e-4
 EXACT_PHASE=-1.0453187730902433
 OMEGA=0.12566370614359174
 
-# Regression tolerances. The difference from the exact solution, 2.6e-6 m
-# (IQN-ILS) and 4.6e-6 m (Robin) of an amplitude of 4.5e-4 m, is mostly the
-# start-up transient, which decays over the first periods
+# Regression tolerances. The difference from the exact solution, 2.7e-6 m
+# (IQN-ILS) and 3.4e-6 m (Robin) of an amplitude of 4.5e-4 m, is mostly the
+# start-up transient, which decays over the first periods. The final
+# displacement differs between OpenFOAM-v2412 and v2512 by 1e-7 m (IQN-ILS)
+# and 1.2e-6 m (Robin), independent of the FSI tolerances
 EXACT_TOL=1e-5          # final displacement difference from the exact (m)
-DISP_TOL=1e-6           # final displacement difference from the reference (m)
+DISP_TOL=2e-6           # final displacement difference from the reference (m)
 
-# Reference values at REG_END_TIME (OpenFOAM-v2412)
+# Reference values at REG_END_TIME (OpenFOAM-v2512)
 ref_final_ur() {
     case "$1" in
-        iqnils) echo -0.0002237665584 ;;
-        robin) echo -0.0002217864674 ;;
+        iqnils) echo -0.0002236660656 ;;
+        robin) echo -0.0002229508061 ;;
     esac
 }
 
