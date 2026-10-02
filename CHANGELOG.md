@@ -173,6 +173,13 @@ release. For complete commit-level details and contributor information, see the
   time discretisation, with Lozovskiy et al. (2019) and Eken (2016), checks
   the pulse-wave speed against a thick-wall estimate, and compares the
   Robin-Neumann and IQN-ILS solutions.
+- Added the `blobInTreacle` fluid-solid interaction tutorial, the
+  temporal-accuracy case of Liu, Jaiman and Gurugubelli (2014): a linear
+  elastic half cylinder in a ramped, highly viscous channel flow, with equal
+  fluid and solid densities, solved with partitioned IQN-ILS coupling. It has a
+  `regressionTest.sh` and an opt-in `verification/` study: a mesh study against
+  the steady solution and interface shape of the authors' preprint, and a
+  time-step study that checks second-order temporal accuracy.
 
 ### Changed
 
@@ -276,6 +283,20 @@ release. For complete commit-level details and contributor information, see the
   solved, so converged results are unchanged within tolerance, but the
   iteration count and the path taken to get there move for every case that
   selects this option.
+- Partitioned fluid-solid interaction (`fixedRelaxation`, `Aitken`, `IQNILS`,
+  `weakCoupling`, and `thermal` with `mechanicalCoupling yes`) now stops with
+  a fatal error when the fluid velocity on a coupled interface patch is
+  `fixedValue` or `noSlip`. These conditions ignore the interface motion and
+  silently remove the added-mass effect; the message names the patch and
+  suggests `newMovingWallVelocity`, or `elasticWallVelocity` for a Robin
+  interface. `oneWayCoupling`, where the fluid wall is rigid, and runs that
+  are never coupled are not checked.
+- `solids4Foam::convertCaseFormat` renames an OpenFOAM.com `residualControl`
+  (with `tolerance` and `relTol` sub-dictionaries) in the `PIMPLE` dictionary
+  to `outerCorrectorResidualControl` for OpenFOAM.org, where `residualControl`
+  is the criterion for ending the run, and `solids4Foam::restoreCaseFormat`
+  reverses it. This replaces the same rename in the `3dTube`,
+  `flowOverHeatedPlate` and `thermalCavity` Allrun and Allclean scripts.
 
 - **Breaking:** the FSI `predictor` switch now defaults to `yes`, and `Aitken`
   and `fixedRelaxation` honour it as `IQNILS` did. The first coupling iteration
