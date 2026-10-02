@@ -15,6 +15,7 @@ FoamFile
     location    "system";
     object      blockMeshDict;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // Channel of 24 x 4.1 m with the beam at x = 12 m on the bottom wall: the
 // mesh is uniform in 8.5 < x < 15.5 m (0.07 x 0.053 m cells for level 1)
@@ -41,8 +42,22 @@ blocks
 
 boundary
 (
-    inlet { type patch; faces ((0 8 12 4)); }
-    outlet { type patch; faces ((3 7 15 11)); }
+    inlet
+    {
+        type            patch;
+        faces
+        (
+            (0 8 12 4)
+        );
+    }
+    outlet
+    {
+        type            patch;
+        faces
+        (
+            (3 7 15 11)
+        );
+    }
     walls
     {
         type wall;

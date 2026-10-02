@@ -150,10 +150,16 @@ Foam::scalar Foam::fv::immersedBoundaryForce::nu()
 
         if (!transportPropertiesPtr || !transportPropertiesPtr->found("nu"))
         {
+            // Only the surface rate of the penalty method can do without it
+            const string hint
+            (
+                method_ == penalty ? ", or set surfaceRateCoeff 0" : ""
+            );
+
             FatalIOErrorInFunction(coeffs_)
                 << "The " << typeName << " option " << name_ << " requires "
-                << "the kinematic viscosity for the surface rate: give nu in "
-                << "the option, or set surfaceRateCoeff 0" << exit(FatalIOError);
+                << "the kinematic viscosity nu: give it in the option or in "
+                << "transportProperties" << hint.c_str() << exit(FatalIOError);
         }
 
         nu_ =
@@ -206,29 +212,32 @@ void Foam::fv::immersedBoundaryForce::updateBodies(const bool move)
 
 
 Foam::tmp<Foam::vectorField>
-Foam::fv::immersedBoundaryForce::ddtU(const volVectorField& U) const
+Foam::fv::immersedBoundaryForce::residual
+(
+    const volVectorField& U,
+    const volVectorField& dUdt
+)
 {
-    return tmp<vectorField>::New(fvc::ddt(U)().primitiveField());
-}
-
-
-Foam::tmp<Foam::vectorField>
-Foam::fv::immersedBoundaryForce::residual(const volVectorField& U)
-{
-    // The residual ddt(U) + div(phi, U) - laplacian(nu, U) + grad(p) of the
-    // final fields, which is the forcing that the fluid receives
+    // The residual ddt(U) + div(phi, U) + divDevReff(U) + grad(p) of the
+    // final fields, which is the forcing that the fluid receives, with the
+    // laminar viscous term of the momentum equation, including the
+    // transpose gradient part, which is not zero in the cut and penalised
+    // cells, where the velocity is not divergence free
     const volScalarField& p = mesh_.lookupObject<volScalarField>("p");
     const surfaceScalarField& phi =
         mesh_.lookupObject<surfaceScalarField>("phi");
 
-    const dimensionedScalar nu("nu", dimViscosity, this->nu());
+    // Named as the effective viscosity of the turbulence model, so that the
+    // schemes of the momentum equation are used
+    const dimensionedScalar nuEff("nuEff", dimViscosity, this->nu());
 
     return tmp<vectorField>::New
     (
         (
-            fvc::ddt(U)
+            dUdt
           + fvc::div(phi, U)
-          - fvc::laplacian(nu, U)
+          - fvc::laplacian(nuEff, U)
+          - fvc::div(nuEff*dev2(T(fvc::grad(U))))
           + fvc::grad(p)
         )().primitiveField()
     );
@@ -251,12 +260,15 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
         momentumTimeIndex_ = timeIndex;
     }
 
+    // The time derivative of the velocity, with the time scheme of the
+    // momentum equation, is used by the residual and for the momentum of
+    // the penalised cells
+    tmp<volVectorField> tdUdt;
     tmp<vectorField> residualPtr;
-    tmp<vectorField> ddtUPtr;
     if (method_ == cutLink)
     {
-        residualPtr = residual(U);
-        ddtUPtr = ddtU(U);
+        tdUdt = fvc::ddt(U);
+        residualPtr = residual(U, tdUdt());
     }
 
     forAll(bodies_, bodyi)
@@ -272,7 +284,7 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
             // scheme of the momentum equation, both over the same cells, so
             // that the force does not jump as cells change role
             const vectorField& R = residualPtr();
-            const vectorField& dUdt = ddtUPtr();
+            const vectorField& dUdt = tdUdt().primitiveField();
             const scalarField& V = mesh_.V();
             const vectorField& C = mesh_.C();
             const point CofR(body.CofR());
@@ -388,30 +400,24 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
                 Ff += Vs*ac;
                 Tf += (Xs - CofR) ^ (Vs*ac);
 
-                secondaryForce_[bodyi] = rho*F;
-                F = Ff;
-                T = Tf;
+                force_[bodyi] = rho*Ff;
+                torque_[bodyi] = rho*Tf;
             }
-
-            // The selected estimate is written as the force, and the other
-            // after the inertia (which is included in both)
-            if (forceEstimator_ == "surfaceTraction")
+            else if (forceEstimator_ == "surfaceTraction")
             {
                 force_[bodyi] = Fs;
                 torque_[bodyi] = Ts;
-                secondaryForce_[bodyi] = rho*F;
-            }
-            else if (forceEstimator_ == "forcing")
-            {
-                force_[bodyi] = rho*F;
-                torque_[bodyi] = rho*T;
             }
             else
             {
                 force_[bodyi] = rho*F;
                 torque_[bodyi] = rho*T;
-                secondaryForce_[bodyi] = Fs;
             }
+
+            // The estimates that are not selected are written after the
+            // inertia
+            momentumExchangeForce_[bodyi] = rho*F;
+            surfaceTractionForce_[bodyi] = Fs;
             momentum_[bodyi] = Zero;
         }
         else
@@ -466,11 +472,18 @@ void Foam::fv::immersedBoundaryForce::writeForces()
                 << token::TAB
                 << Fi.x() << token::SPACE << Fi.y() << token::SPACE << Fi.z();
 
-            if (method_ == cutLink && surfaceTractionRequired())
+            if (writeMomentumExchangeForce())
             {
-                const vector& Ft = secondaryForce_[bodyi];
-                os  << token::TAB << Ft.x() << token::SPACE << Ft.y()
-                    << token::SPACE << Ft.z();
+                const vector& Fm = momentumExchangeForce_[bodyi];
+                os  << token::TAB << Fm.x() << token::SPACE << Fm.y()
+                    << token::SPACE << Fm.z();
+            }
+
+            if (writeSurfaceTractionForce())
+            {
+                const vector& Fs = surfaceTractionForce_[bodyi];
+                os  << token::TAB << Fs.x() << token::SPACE << Fs.y()
+                    << token::SPACE << Fs.z();
             }
 
             os  << endl;
@@ -484,6 +497,21 @@ bool Foam::fv::immersedBoundaryForce::surfaceTractionRequired() const
     return
         method_ == cutLink
      && (forceEstimator_ == "surfaceTraction" || writeSurfaceTraction_);
+}
+
+
+bool Foam::fv::immersedBoundaryForce::writeMomentumExchangeForce() const
+{
+    return method_ == cutLink && forceEstimator_ != "momentumExchange";
+}
+
+
+bool Foam::fv::immersedBoundaryForce::writeSurfaceTractionForce() const
+{
+    return
+        method_ == cutLink
+     && writeSurfaceTraction_
+     && forceEstimator_ != "surfaceTraction";
 }
 
 
@@ -574,23 +602,18 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
         // Normalise the target of each fluid cell once, also if it is next
         // to several bodies, and keep the sum of its rates for the forces
         linkRateSum_.setSize(mesh_.nCells());
+        bitSet normalised(mesh_.nCells());
         forAll(bodies_, bodyi)
         {
             for (const label celli : linkCells_[bodyi])
             {
-                linkRateSum_[celli] = kappa_[celli];
-            }
-        }
-        forAll(bodies_, bodyi)
-        {
-            for (const label celli : linkCells_[bodyi])
-            {
-                if (kappa_[celli] <= 0)
+                if (!normalised.set(celli))
                 {
                     continue;
                 }
 
-                // Normalised once: the rate is then marked as negative
+                linkRateSum_[celli] = kappa_[celli];
+
                 if (kappa_[celli] > VSMALL)
                 {
                     UiI[celli] /= kappa_[celli];
@@ -599,14 +622,6 @@ void Foam::fv::immersedBoundaryForce::setPenalty(const volVectorField& U)
                 {
                     UiI[celli] = U[celli];
                 }
-                kappa_[celli] = -kappa_[celli];
-            }
-        }
-        forAll(bodies_, bodyi)
-        {
-            for (const label celli : linkCells_[bodyi])
-            {
-                kappa_[celli] = mag(kappa_[celli]);
             }
         }
 
@@ -1201,19 +1216,7 @@ Foam::scalar Foam::fv::immersedBoundaryForce::cellWidth
     const label celli
 ) const
 {
-    const vector span(solvedSpan(celli));
-    const Vector<label>& solD = mesh_.solutionD();
-
-    scalar w = GREAT;
-    for (direction d = 0; d < vector::nComponents; ++d)
-    {
-        if (solD[d] == 1)
-        {
-            w = min(w, span[d]);
-        }
-    }
-
-    return w;
+    return immersedBody::cellWidth(mesh_, celli);
 }
 
 
@@ -1968,7 +1971,8 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     force_(),
     torque_(),
     inertia_(),
-    secondaryForce_(),
+    momentumExchangeForce_(),
+    surfaceTractionForce_(),
     forceTimeName_(),
     forcesPending_(false),
     warnedMatrix_(false)
@@ -2016,7 +2020,8 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     force_.setSize(nBodies, Zero);
     torque_.setSize(nBodies, Zero);
     inertia_.setSize(nBodies, Zero);
-    secondaryForce_.setSize(nBodies, Zero);
+    momentumExchangeForce_.setSize(nBodies, Zero);
+    surfaceTractionForce_.setSize(nBodies, Zero);
 
     read(dict);
 
@@ -2045,15 +2050,16 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
                 << "torque (x y z)" << token::TAB
                 << "inertia of the fluid inside (x y z)";
 
-            if (method_ == cutLink && surfaceTractionRequired())
+            if (writeMomentumExchangeForce())
             {
                 forceFiles_[bodyi]
-                    << token::TAB
-                    << (
-                           forceEstimator_ == "surfaceTraction"
-                         ? "force from the momentum exchange (x y z)"
-                         : "force from the surface traction (x y z)"
-                       );
+                    << token::TAB << "force from the momentum exchange (x y z)";
+            }
+
+            if (writeSurfaceTractionForce())
+            {
+                forceFiles_[bodyi]
+                    << token::TAB << "force from the surface traction (x y z)";
             }
 
             forceFiles_[bodyi] << endl;
@@ -2487,6 +2493,20 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
         coeffs_.readIfPresent("linkCorrection", linkCorrection_);
         coeffs_.readIfPresent("forceEstimator", forceEstimator_);
         coeffs_.readIfPresent("writeSurfaceTraction", writeSurfaceTraction_);
+        if (method_ != cutLink)
+        {
+            for (const word key : {"forceEstimator", "writeSurfaceTraction"})
+            {
+                if (coeffs_.found(key))
+                {
+                    WarningInFunction
+                        << "Option " << name_ << ": " << key << " is only "
+                        << "used by the cutLink method and is ignored with "
+                        << "the " << methodNames_[method_] << " method"
+                        << endl;
+                }
+            }
+        }
         if
         (
             forceEstimator_ != "momentumExchange"
