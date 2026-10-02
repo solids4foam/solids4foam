@@ -642,6 +642,43 @@ function solids4Foam::applyOpenFOAMOrgTweaks()
 
     # 10. OpenFOAM.org writes forces.dat rather than force.dat
     solids4Foam::useForcesDat "${CASE_DIR}"
+
+    # 14. OpenFOAM.org reads the PIMPLE outer-corrector convergence controls
+    #     from outerCorrectorResidualControl: its residualControl, with a
+    #     single tolerance per field, is the criterion for ending the run.
+    #     Only a residualControl with the OpenFOAM.com sub-dictionaries
+    #     (tolerance and relTol) is renamed, so a case may still give the
+    #     OpenFOAM.org form. Symlinked fvSolution files are edited in place
+    #     so the links are kept
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && awk '
+            /^PIMPLE/ { inPimple = 1; next }
+            inPimple && /^}/ { inPimple = 0 }
+            inPimple && /^[[:space:]]*residualControl([[:space:]]|$)/ \
+            {
+                inControl = 1; depth = 0; next
+            }
+            inControl \
+            {
+                nOpen = gsub(/\{/, "{"); nClose = gsub(/\}/, "}")
+                if (depth == 1 && nOpen > 0) { found = 1 }
+                depth += nOpen - nClose
+                if (depth <= 0 && nClose > 0) { inControl = 0 }
+            }
+            END { exit !found }
+        ' "${FILE}"
+        then
+            echo "OpenFOAM.org specific: replacing 'residualControl' with"
+            echo "'outerCorrectorResidualControl' in the PIMPLE dictionary of"
+            echo "${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                '/^PIMPLE\b/,/^}/ s/^([[:space:]]*)residualControl\b/\1outerCorrectorResidualControl/' \
+                "${FILE}"
+        fi
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -670,6 +707,22 @@ function solids4Foam::undoOpenFOAMOrgTweaks()
 
     # 10. OpenFOAM.com writes force.dat rather than forces.dat
     solids4Foam::useForceDat "${CASE_DIR}"
+
+    # 14. OpenFOAM.com reads the PIMPLE outer-corrector convergence controls
+    #     from residualControl
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && grep -qE '^[[:space:]]*outerCorrectorResidualControl\b' "${FILE}"
+        then
+            echo "Replacing 'outerCorrectorResidualControl' with"
+            echo "'residualControl' in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                's/^([[:space:]]*)outerCorrectorResidualControl\b/\1residualControl/' \
+                "${FILE}"
+        fi
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#

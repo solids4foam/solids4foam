@@ -15,14 +15,7 @@ elif [[ $WM_PROJECT_VERSION == v* ]]; then
     foamCleanPolyMesh -region solid
 fi
 
-rm -rf case.foam postProcessing residuals
-rm -rf radialDisplacement.pdf fsiConvergence.pdf axialDisplacement.pdf
+rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
-
-# Link files back to default with pimpleFluid
-for file in $(find ./0 ./constant ./system -name '*.robin')
-do
-    ln -vnsf ${file##*/} ${file%.*}
-done
