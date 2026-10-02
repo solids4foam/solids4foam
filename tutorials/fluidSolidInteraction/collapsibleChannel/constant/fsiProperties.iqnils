@@ -35,7 +35,9 @@ IQNILSCoeffs
     // unrelaxed gives a large added-mass pressure
     predictSolid         no;
 
-    // Under-relaxation factor for the first two iterations of each time step.
+    // Under-relaxation factor for the second iteration of each time step (the
+    // first is not relaxed with predictor yes, and without the solid predictor
+    // it only passes the previous time step's converged residual).
     // The massless wall is only held back by the added mass of the fluid, so
     // the factor must be small: roughly the ratio of the wall stiffness to the
     // added mass over the time step squared
