@@ -1,0 +1,81 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The flexible bottom: a 1 m x 0.002 m strip clamped at both ends. Its upper
+// face is the fluid-solid interface, and the number of cells along it must
+// match the fluid mesh, as the interface uses directMap. The high-order solid
+// needs eight cells through the thickness on this mesh: with two or four, its
+// nonlinear (PETSc SNES) solve diverges within the first second. The
+// least-squares systems of these thin cells are poorly conditioned: with four
+// cells the largest condition number is about 4e9, against 3e8 with eight, and
+// a larger stencil (faceStencilExtraCells 25 or 35) makes it worse, as the
+// stencil grows mostly along the strip. The standard solid gives the same
+// answer with two
+scale 1;
+
+vertices
+(
+    (0 -0.002 0)     // 0
+    (1 -0.002 0)     // 1
+    (1  0     0)     // 2
+    (0  0     0)     // 3
+    (0 -0.002 0.1)   // 4
+    (1 -0.002 0.1)   // 5
+    (1  0     0.1)   // 6
+    (0  0     0.1)   // 7
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (32 8 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+patches
+(
+    patch interface
+    (
+        (3 7 6 2)
+    )
+    patch bottom
+    (
+        (0 1 5 4)
+    )
+    patch left
+    (
+        (0 4 7 3)
+    )
+    patch right
+    (
+        (1 2 6 5)
+    )
+    empty frontAndBack
+    (
+        (0 3 2 1)
+        (4 5 6 7)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

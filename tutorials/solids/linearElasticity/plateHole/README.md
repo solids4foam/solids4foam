@@ -218,10 +218,9 @@ linear-elastic plate-hole benchmark.
 
 ## Verification and Convergence Study
 
-The opt-in [`verification/`](verification/) directory migrates the mesh study
-from `solid-benchmarks/linearElasticity/plateHole` into this tutorial. It
-provides both the benchmark's structured `blockMesh` family, from 250 to
-64 000 cells, and its unstructured triangular-prism Gmsh family. The available
+The opt-in [`verification/`](verification/) directory holds a mesh study. It
+provides both a structured `blockMesh` family, from 250 to 64 000 cells, and an
+unstructured triangular-prism Gmsh family. The available
 formulations include the cell-centred approaches above and the legacy
 `vertexCentredLinearGeometry` approach. The driver reads the error norms that
 the `plateHoleAnalyticalSolution` function object prints against the analytical

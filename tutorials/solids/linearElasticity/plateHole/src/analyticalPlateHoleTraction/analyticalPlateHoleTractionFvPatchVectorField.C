@@ -20,7 +20,6 @@ License
 #include "analyticalPlateHoleTractionFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "volFields.H"
-#include "mechanicalModel.H"
 #include "volFields.H"
 #include "fvc.H"
 #include "fixedValueFvPatchFields.H"

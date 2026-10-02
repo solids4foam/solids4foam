@@ -16,7 +16,7 @@ else ifneq (,$(findstring -DOPENFOAM_ORG, $(VERSION_SPECIFIC_INC)))
         -lcompressibleMomentumTransportModels -ltwoPhaseMixture \
         -limmiscibleIncompressibleTwoPhaseMixture -lmeshTools \
         -lfvMotionSolvers -lradiationModels -lfluidThermophysicalModels \
-        -ltwoPhaseChangeModels
+        -ltwoPhaseChangeModels -lfvModels -lfvConstraints
 else
     VERSION_SPECIFIC_LIBS = \
         -lturbulenceModels -lincompressibleTurbulenceModels \

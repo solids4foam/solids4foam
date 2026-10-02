@@ -623,21 +623,8 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
 #endif
     {
         Info<< "Reading g from constant directory" << endl;
-#if (OPENFOAM >= 1906)
+#ifdef OPENFOAM_COM
         return meshObjects::gravity(runTime());
-#elif (OPENFOAM >= 1812)
-        return meshObjects::gravity
-        (
-            runTime(),
-            IOobject
-            (
-                "g",
-                runTime().caseConstant(),
-                mesh(),
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
 #else
         return uniformDimensionedVectorField
         (
@@ -656,21 +643,8 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     {
         Info<< "g field not found in constant directory: initialising to zero"
             << endl;
-#if (OPENFOAM >= 1906)
+#ifdef OPENFOAM_COM
         return meshObjects::gravity(runTime());
-#elif (OPENFOAM >= 1812)
-        return meshObjects::gravity
-        (
-            runTime(),
-            IOobject
-            (
-                "g",
-                runTime().caseConstant(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            )
-        );
 #else
         return uniformDimensionedVectorField
         (
@@ -1243,7 +1217,7 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
 
     Info<< nl << "Selecting fluidModel " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)
