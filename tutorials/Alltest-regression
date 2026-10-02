@@ -167,6 +167,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/3dTube"
     "fluidSolidInteraction/beamInCrossFlow"
     "fluidSolidInteraction/cavityFlexibleBottom"
+    "fluidSolidInteraction/collapsibleChannel"
     "fluidSolidInteraction/flexibleDamBreak"
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
