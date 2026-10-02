@@ -43,7 +43,9 @@ fluidSolidInterface    IQNILS;
     outerCorrTolerance 1e-6;
 
     // Maximum number of outer FSI loop correctors within each time-step
-    nOuterCorr 50;
+    // The refined meshes of the verification study need up to 45 at their
+    // hardest time step, so this leaves a margin
+    nOuterCorr 100;
 
     // Enable/disable coupling from the start
     coupled yes;
