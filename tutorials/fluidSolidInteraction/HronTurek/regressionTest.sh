@@ -25,9 +25,7 @@ REG_END_TIME=2.1
 DISP_TOL=2e-5
 # The force tolerances are relative to the reference, as the total force on
 # the plate and cylinder is dominated by the cylinder drag. OpenFOAM-v2412 and
-# v2512 are within 6e-5 of the references below. OpenFOAM-9 has not been run
-# with them: when the force was that of the plate alone, its Fx was within
-# 3.4e-4 N of OpenFOAM.com, a twentieth of the Fx tolerance here
+# v2512 are within 6e-5 of the references below, and OpenFOAM-9 within 1.5e-4
 FX_REL_TOL=1e-3
 FY_REL_TOL=5e-3
 
