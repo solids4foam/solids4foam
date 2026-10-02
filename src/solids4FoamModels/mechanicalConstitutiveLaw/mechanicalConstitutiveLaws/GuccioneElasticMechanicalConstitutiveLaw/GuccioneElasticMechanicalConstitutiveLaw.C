@@ -102,10 +102,8 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
-    // Read at old time: a prescribed field is never written, so its two times
-    // always hold the same value, and the old-time one is what a shadow state
-    // aliases. A tangent query evaluated into a shadow would find the
-    // current-time field empty
+    // Read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<vector>& f0 = state.getVectorField0("f0");
 
     // Whether the caller wants the isochoric stress and the volumetric
@@ -117,8 +115,7 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
     const scalar kVal = k_.value();
     const scalar bulkVal = bulkModulus_.value();
 
-    // Grouped as the legacy law groups them, so that the two agree term for
-    // term rather than only in exact arithmetic
+    // Coefficients of the fibre invariants
     const scalar cI4 = cf_ - 2.0*cfs_ + ct_;
     const scalar cI5 = cfs_ - ct_;
 
@@ -156,9 +153,9 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
         // the volume change, so Q depends on shape alone and the volumetric
         // response below is the only place volume enters.
         //
-        // The legacy law builds Q from the full strain, which makes its energy
-        // coupled: its deviatoric stress then varies with J, and a mixed
-        // formulation replacing the volumetric part gives a different material
+        // Building Q from the full strain would make the energy coupled: the
+        // deviatoric stress would then vary with J, and a mixed formulation
+        // replacing the volumetric part would give a different material
         // rather than the same one solved differently. Written this way the
         // two formulations describe one material, and both reduce to the
         // published model in the incompressible limit it was defined for
@@ -206,59 +203,23 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for: a small-strain estimate, which is a
+    // preconditioner rather than a tangent of this energy.
+    //
+    // A mixed displacement-pressure formulation carries the volumetric
+    // response in its own equation, so the deviatoric surrogate is the one for
+    // div(dev(sigma)) alone. The bulk modulus here is a near-incompressibility
+    // penalty, two orders above the shear modulus, so including it makes the
+    // surrogate stiff enough that the linear solve does not converge at all
+    fillScalarTangent
+    (
+        response,
+        (4.0/3.0)*mu_.value() + bulkModulus_.value(),
+        (4.0/3.0)*mu_.value()
+    );
 
-        // The small-strain estimate the legacy law uses. It is a
-        // preconditioner, not a tangent of this energy
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                Keff = (4.0/3.0)*mu_.value() + bulkModulus_.value();
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                // A mixed displacement-pressure formulation carries the
-                // volumetric response in its own equation, so the Laplacian
-                // surrogate here is the one for div(dev(sigma)) alone. The
-                // bulk modulus here is a near-incompressibility penalty, two
-                // orders above the shear modulus, so including it makes the
-                // surrogate stiff enough that the linear solve does not
-                // converge at all
-                Keff = (4.0/3.0)*mu_.value();
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // No analytical consistent tangent has been derived for this law. The
-    // finite-difference one of the base class is well defined for any law and
-    // is evaluated against a shadow state, so it disturbs neither the stress
-    // just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

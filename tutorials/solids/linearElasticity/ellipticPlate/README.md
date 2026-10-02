@@ -163,11 +163,10 @@ links the appropriate `blockMeshDict` for the loaded OpenFOAM variant.
 
 ## Verification and Convergence Study
 
-The opt-in [`verification/`](verification/) directory migrates the mesh
-convergence study from `solid-benchmarks/linearElasticity/ellipticPlate` into
-this tutorial. It refines the tutorial `blockMesh` through the mesh family of
-Demirdžić et al. [2], samples the equivalent (von Mises) stress along the line
-$$r = 2.1$$ m, $$z = 0.3$$ m, and compares it with the published curve:
+The opt-in [`verification/`](verification/) directory holds a mesh convergence
+study. It refines the tutorial `blockMesh` through the mesh family of Demirdžić
+et al. [2], samples the equivalent (von Mises) stress along the line $$r =
+2.1$$ m, $$z = 0.3$$ m, and compares it with the published curve:
 
 ```bash
 cd verification

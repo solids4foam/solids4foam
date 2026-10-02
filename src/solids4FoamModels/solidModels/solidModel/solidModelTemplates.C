@@ -102,13 +102,10 @@ bool Foam::solidModel::converged
 #endif
         )/denom;
 
-    // Calculate material residual
-    const scalar materialResidual = this->materialResidual();
-
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
-    // force at least 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol_)
+    // force at least 1 outer iteration
+    if (iCorr > 1)
     {
         if
         (
@@ -152,22 +149,20 @@ bool Foam::solidModel::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res, relRes, matRes, iters" << endl;
+        Info<< "    Corr, res, relRes, iters" << endl;
     }
     else if (iCorr % infoFrequency_ == 0 || converged)
     {
         Info<< "    " << iCorr
             << ", " << solverPerfInitRes
             << ", " << residualvf
-            << ", " << materialResidual
             << ", " << solverPerfNIters << endl;
 
         if (residualFilePtr_.valid())
         {
             residualFilePtr_()
                 << solverPerfInitRes << " "
-                << residualvf << " "
-                << materialResidual
+                << residualvf
                 << endl;
         }
 

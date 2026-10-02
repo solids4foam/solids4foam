@@ -14,3 +14,6 @@ cleanCase
 rm -rf constant/*/polyMesh
 rm -rf case.foam *.pdf 0/fluid/alpha.water
 \cp 0/fluid/org/alpha.water 0/fluid/alpha.water
+
+# Restore the default (robin) coupling mode
+ln -nsf fsiProperties.robin constant/fsiProperties

@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+
+// Square duct of 24 x 24 mm along z, from z = -10 mm to 40 mm, with the valve
+// annulus at z = 0: 0.5 mm cells for MESH_LEVEL 1
+MESH_LEVEL ${MESH_LEVEL:-1};
+nRefine #eval "pow(2, $MESH_LEVEL - 1)";
+nxy #eval "round(48*$nRefine)";
+nz #eval "round(100*$nRefine)";
+
+convertToMeters 0.001;
+
+vertices
+(
+    (-12 -12 -10) (12 -12 -10) (12 12 -10) (-12 12 -10)
+    (-12 -12  40) (12 -12  40) (12 12  40) (-12 12  40)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) ($nxy $nxy $nz) simpleGrading (1 1 1)
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces ((0 3 2 1));
+    }
+    outlet
+    {
+        type patch;
+        faces ((4 5 6 7));
+    }
+    walls
+    {
+        type wall;
+        faces ((0 1 5 4) (1 2 6 5) (2 3 7 6) (3 0 4 7));
+    }
+);
+
+// ************************************************************************* //

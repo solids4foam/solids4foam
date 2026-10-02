@@ -1,0 +1,437 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::immersedBody
+
+Description
+    A body immersed in the fluid mesh, given by a closed surface (e.g. an STL
+    file) and a prescribed motion.
+
+    The body gives the solid volume fraction (occupancy) lambda of the cells
+    it covers:
+
+    - signedDistance (the default): lambda = 0.5 + d/w, clipped to [0, 1],
+      where d is the distance of the cell centre to the surface, positive
+      inside the body, and w is the width of the cell normal to the surface
+      (the width of its bounding box in the direction of the normal of the
+      nearest surface face). lambda varies continuously as the body moves.
+    - vertexFraction: half the fraction of the cell vertices inside the
+      surface, plus a half if the cell centre is inside the surface, as in
+      the non-convex body of openHFDIB-DEM.
+    - cut: the exact volume fraction of the cell inside the zero isosurface
+      of the signed distance to the surface at the cell vertices, from the
+      geometric cutting of the cells of the geometricVoF library
+      (cutCellIso). lambda varies continuously as the body moves.
+
+    A body driven by a fluid-solid interface (motion fsiDriven) may be given
+    its surface by the interface rather than by a surface file
+    (setReferenceSurface); it is then re-positioned in each coupling
+    iteration, when the configuration index of its motion changes.
+
+    Cells with an occupancy greater than 1 - threshold are internal cells, and
+    cells with an occupancy greater than threshold are surface cells.
+
+    The surface is replicated on every processor, so every processor moves it
+    identically and locates the cells of its own part of the mesh.
+
+    Usage, as an entry of the bodies dictionary of immersedBoundaryForce:
+    \verbatim
+    cylinder
+    {
+        // Surface file, relative to constant/triSurface (or
+        // constant/<region>/triSurface for a mesh region); optional for a
+        // body whose surface is given by a fluid-solid interface
+        surface     "cylinder.stl";
+
+        // Prescribed motion, optional, default static
+        motion
+        {
+            type        sinusoidalTranslation;
+            amplitude   0.25;
+            period      4;
+        }
+
+        // Centre of rotation for the torque, optional, default the mean of
+        // the reference surface points
+        CofR        (0 0 0);
+
+        // Occupancy, optional, default signedDistance
+        occupancy   signedDistance;
+    }
+    \endverbatim
+
+Author
+    Derived from openHFDIB-DEM (https://github.com/techMathGroup/openHFDIB-DEM,
+    commit b4ea321), itself derived from openHFDIB
+    (https://github.com/fmuni/openHFDIB). openHFDIB-DEM contributors:
+    Federico Municchi (2016), Martin Isoz (2019-*), Martin Kotouč Šourek
+    (2019-*), Ondřej Studeník (2020-*). openHFDIB and openHFDIB-DEM are
+    distributed under the GNU Lesser General Public License version 3, whose
+    terms allow this derived code to be distributed under the GNU General
+    Public License version 3.
+
+    Rewritten for prescribed motion in solids4foam by Philip Cardiff, UCD,
+    from the version adapted by Sairam Pamulaparthi Venkata, UCD, in
+    cardiacFoam.
+
+SourceFiles
+    immersedBody.C
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef immersedBody_H
+#define immersedBody_H
+
+#include "fvMesh.H"
+#include "Enum.H"
+#include "volFields.H"
+#include "triSurface.H"
+#include "triSurfaceSearch.H"
+#include "immersedBodyMotion.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+                        Class immersedBody Declaration
+\*---------------------------------------------------------------------------*/
+
+class immersedBody
+{
+    // Private Data
+
+        //- Occupancy methods and dictionary names
+        enum occupancyMethod { signedDistance, vertexFraction, cut };
+        static const Enum<occupancyMethod> occupancyNames_;
+
+
+        //- Name of the body
+        const word name_;
+
+        //- Reference to the fluid mesh
+        const fvMesh& mesh_;
+
+        //- Surface in the current configuration
+        triSurface surface_;
+
+        //- Surface points in the reference configuration
+        pointField points0_;
+
+        //- Search engine for the current surface
+        autoPtr<triSurfaceSearch> searchPtr_;
+
+        //- Prescribed motion
+        autoPtr<immersedBodyMotion> motionPtr_;
+
+        //- Centre of rotation for the torque, in the reference configuration
+        point CofR0_;
+
+        //- Was the centre of rotation given, rather than taken as the mean
+        //  of the reference surface points?
+        const bool CofRGiven_;
+
+        //- Occupancy from the signed distance of the cell centres to the
+        //  surface, rather than from the fraction of cell vertices inside
+        const bool signedDistance_;
+
+        //- Cut cell occupancy
+        const bool cut_;
+
+        //- Time of the current configuration
+        scalar time_;
+
+        //- Configuration index of the motion in the current configuration
+        label configuration_;
+
+        //- Local cells fully covered by the body
+        labelList internalCells_;
+
+        //- Local cells partially covered by the body
+        labelList surfaceCells_;
+
+        //- Local cells whose centre is inside the body
+        labelList insideCells_;
+
+        //- Velocity of the surface points, for a deforming motion
+        vectorField pointVelocities_;
+
+        //- Smallest cell bounding box width in the solved directions
+        scalarField cellWidths_;
+
+
+    // Private Member Functions
+
+        //- Interpolate the point values pf to the nearest points of the
+        //  surface to the points x, with the barycentric coordinates of the
+        //  nearest points in their triangles
+        tmp<vectorField> interpolateToNearest
+        (
+            const pointField& x,
+            const vectorField& pf
+        ) const;
+
+        //- Read the surface
+        static triSurface readSurface(const fvMesh& mesh, const fileName& f);
+
+        //- Check that the surface is closed with outward normals, and set
+        //  the reference points and centre of rotation from it
+        void setSurface();
+
+
+public:
+
+    // Constructors
+
+        //- Construct from name, dictionary and mesh
+        immersedBody
+        (
+            const word& name,
+            const dictionary& dict,
+            const fvMesh& mesh
+        );
+
+        //- No copy construct
+        immersedBody(const immersedBody&) = delete;
+
+        //- No copy assignment
+        void operator=(const immersedBody&) = delete;
+
+
+    //- Destructor
+    ~immersedBody() = default;
+
+
+    // Member Functions
+
+        // Static Functions
+
+            //- Width of a cell along a unit normal, given the span of its
+            //  bounding box
+            static scalar normalWidth(const vector& n, const vector& span)
+            {
+                return max(cmptSum(cmptMultiply(cmptMag(n), span)), VSMALL);
+            }
+
+            //- Smallest width of a bounding box span in the solved
+            //  directions
+            static scalar solvedWidth
+            (
+                const vector& span,
+                const Vector<label>& solD
+            );
+
+            //- Width of a cell: its smallest bounding box width in the
+            //  solved directions. Used for the stencil radius of the surface
+            //  traction and the pinned rate, which must agree
+            static scalar cellWidth(const polyMesh& mesh, const label celli);
+
+
+        // Access
+
+            //- Name of the body
+            const word& name() const
+            {
+                return name_;
+            }
+
+            //- Has the surface been set? A body without a surface file is
+            //  given its surface by a fluid-solid interface
+            bool hasSurface() const
+            {
+                return surface_.size() > 0;
+            }
+
+            //- Motion of the body
+            const immersedBodyMotion& motion() const
+            {
+                return motionPtr_();
+            }
+
+            //- Non-const access to the motion, for a fluid-solid interface
+            //  that drives it
+            immersedBodyMotion& motion()
+            {
+                return motionPtr_();
+            }
+
+            //- Does the body move?
+            bool moving() const
+            {
+                return motionPtr_->moving();
+            }
+
+            //- Configuration index of the motion in the current
+            //  configuration: the body has been re-positioned since it was
+            //  last used if this differs from motion().configuration()
+            label configuration() const
+            {
+                return configuration_;
+            }
+
+            //- Is the motion of the body rigid?
+            bool rigid() const
+            {
+                return motionPtr_->rigid();
+            }
+
+            //- Velocities of the surface points of a deforming body
+            const vectorField& pointVelocities() const
+            {
+                return pointVelocities_;
+            }
+
+            //- Surface in the current configuration
+            const triSurface& surface() const
+            {
+                return surface_;
+            }
+
+            //- Local cells fully covered by the body
+            const labelList& internalCells() const
+            {
+                return internalCells_;
+            }
+
+            //- Local cells partially covered by the body
+            const labelList& surfaceCells() const
+            {
+                return surfaceCells_;
+            }
+
+            //- Local cells whose centre is inside the body
+            const labelList& insideCells() const
+            {
+                return insideCells_;
+            }
+
+            //- Cached cell widths, indexed by mesh cell
+            const scalarField& cellWidths() const
+            {
+                return cellWidths_;
+            }
+
+            //- Centre of rotation for the torque, in the current
+            //  configuration
+            point CofR() const;
+
+            //- Velocity of the body at the points x: that of the motion for
+            //  a rigid motion; for a deforming motion, the velocity of the
+            //  surface points interpolated at the nearest point of the
+            //  surface
+            tmp<vectorField> velocity(const pointField& x) const;
+
+            //- Acceleration of the body at the point x, from a central
+            //  difference of the velocity over dt, following the point for
+            //  a rigid motion
+            vector acceleration(const point& x, const scalar dt) const;
+
+            //- First intersection of the surface with each segment from
+            //  start to end
+            void findLine
+            (
+                const pointField& start,
+                const pointField& end,
+                List<pointIndexHit>& hits
+            ) const
+            {
+                searchPtr_->findLine(start, end, hits);
+            }
+
+            //- Set the signed distance to the surface, positive outside the
+            //  body, at the points of the cells near the surface, where it is
+            //  lower than the value in f
+            void addPointDistances(scalarField& f) const;
+
+            //- Nearest points on the surface to the points x, within the
+            //  distances sqrt(searchDistSqr), and the unit normals of the
+            //  nearest surface faces
+            void nearest
+            (
+                const pointField& x,
+                const scalarField& searchDistSqr,
+                List<pointIndexHit>& hits,
+                vectorField& normals
+            ) const;
+
+
+        // Edit
+
+            //- Set the reference surface of a body without a surface file:
+            //  the points and the triangles as faces of three points, with
+            //  the normals pointing out of the body. The surface is then
+            //  moved to the current time
+            void setReferenceSurface
+            (
+                const pointField& points,
+                const faceList& triangles
+            );
+
+            //- Move the surface to its configuration at time t, if the time
+            //  or the configuration index of the motion has changed
+            void move(const scalar t);
+
+            //- Locate the covered cells and add the occupancy of the body to
+            //  lambda, which is clipped to [0, 1]
+            void addOccupancy
+            (
+                volScalarField& lambda,
+                const scalar threshold
+            );
+
+            //- Set the velocity of the body in the covered cells of Ui
+            void setVelocity(volVectorField& Ui) const;
+
+
+        // Evaluation
+
+            //- Force on the body by the fluid, opposite to the immersed
+            //  boundary forcing f (an acceleration): -rho*sum(f*V) over the
+            //  covered cells, excluding the inertia of the fluid inside the
+            //  body
+            vector force(const volVectorField& f, const scalar rho) const;
+
+            //- Torque about CofR corresponding to force
+            vector torque(const volVectorField& f, const scalar rho) const;
+
+            //- Momentum of the fluid inside the body, per unit density:
+            //  sum(lambda*U*V) over the covered cells
+            vector momentum
+            (
+                const volVectorField& U,
+                const volScalarField& lambda
+            ) const;
+
+
+        // Write
+
+            //- Write the current surface to the given file
+            void writeSurface(const fileName& file) const;
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

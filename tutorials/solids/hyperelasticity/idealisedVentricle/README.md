@@ -67,9 +67,8 @@ The default approach can also be run in parallel using:
 
 ## Verification and Convergence Study
 
-The opt-in [`verification/`](verification/) directory migrates the mesh
-convergence study from `solid-benchmarks/hyperElasticity/idealisedVentricle`
-into this tutorial. It refines the `blockMesh` divisions and the rotational
+The opt-in [`verification/`](verification/) directory holds a mesh
+convergence study. It refines the `blockMesh` divisions and the rotational
 extrusion layers together, samples the deformed mid-wall line of Problem 2 of
 Land et al. [3], and checks self-convergence of that line:
 
