@@ -128,17 +128,19 @@ Description
     and pressure, without the forcing, summed over the penalised cells and
     the fluid cells next to them, minus the rate of change of the momentum
     of the penalised cells, with the time scheme of the momentum equation,
-    so that it includes the inertia of the fluid inside. The surface
-    traction (see immersedSurfaceTraction) is the alternative estimate
-    (forceEstimator surfaceTraction), which is also written in the columns
-    after the inertia with writeSurfaceTraction; with forceEstimator
-    surfaceTraction, the momentum exchange is written there. A third
-    estimate (forceEstimator forcing) is the forcing applied to the fluid in
-    the penalised cells and the fluid cells next to them, plus the inertia
-    of the fluid inside the body taken as rigid, \f$ \rho V_s a_c \f$, with
-    the volume \f$ V_s \f$ of the body in the mesh from the occupancy and
-    the acceleration \f$ a_c \f$ of its centroid (the rotational inertia is
-    not included); the momentum exchange is then written after the inertia.
+    so that it includes the inertia of the fluid inside. The residual uses
+    the laminar viscous term of the momentum equation, with its transpose
+    gradient part. The surface traction (see immersedSurfaceTraction) is the
+    alternative estimate (forceEstimator surfaceTraction). A third estimate
+    (forceEstimator forcing) is the forcing applied to the fluid in the
+    penalised cells and the fluid cells next to them, plus the inertia of
+    the fluid inside the body taken as rigid, \f$ \rho V_s a_c \f$, with the
+    volume \f$ V_s \f$ of the body in the mesh from the occupancy and the
+    acceleration \f$ a_c \f$ of its centroid (the rotational inertia is not
+    included). The estimates that are not selected are written after the
+    inertia: the momentum exchange, unless it is selected, then the surface
+    traction, with writeSurfaceTraction, unless it is selected.
+    forceEstimator and writeSurfaceTraction are only used by cutLink.
     The momentum exchange and forcing estimates are exact on average for
     static and steadily moving bodies, the forcing estimate also gives the
     wall shear of a tangentially accelerating wall accurately, and the
@@ -584,9 +586,11 @@ class immersedBoundaryForce
         List<vector> torque_;
         List<vector> inertia_;
 
-        //- With the cutLink method, the force from the estimator that is
-        //  not selected
-        List<vector> secondaryForce_;
+        //- With the cutLink method, the force from the momentum exchange
+        //  and from the surface traction, written after the inertia when
+        //  they are not the selected estimate
+        List<vector> momentumExchangeForce_;
+        List<vector> surfaceTractionForce_;
 
         //- Time name associated with the force values awaiting output
         word forceTimeName_;
@@ -619,12 +623,13 @@ class immersedBoundaryForce
         void updateBodies(const bool move);
 
         //- Residual of the momentum equation of the final velocity and
-        //  pressure without the forcing: the forcing received by the fluid
-        tmp<vectorField> residual(const volVectorField& U);
-
-        //- Time derivative of the velocity with the time scheme of the
-        //  momentum equation
-        tmp<vectorField> ddtU(const volVectorField& U) const;
+        //  pressure without the forcing: the forcing received by the fluid,
+        //  given the time derivative of the velocity
+        tmp<vectorField> residual
+        (
+            const volVectorField& U,
+            const volVectorField& dUdt
+        );
 
         //- Calculate the force on each body
         void calcForces(const volVectorField& U);
@@ -637,6 +642,12 @@ class immersedBoundaryForce
 
         //- Is the surface traction evaluated?
         bool surfaceTractionRequired() const;
+
+        //- Is the momentum exchange force written after the inertia?
+        bool writeMomentumExchangeForce() const;
+
+        //- Is the surface traction force written after the inertia?
+        bool writeSurfaceTractionForce() const;
 
         //- Rate of a penalised cell of the cutLink method
         scalar pinnedRate(const label celli, const vector& Ub);

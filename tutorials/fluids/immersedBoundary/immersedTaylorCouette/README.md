@@ -4,11 +4,6 @@ sort: 5
 
 # Immersed Taylor-Couette flow: `immersedTaylorCouette`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/immersedTaylorCouette`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/immersedTaylorCouette).
-
----
-
 ## Tutorial Aims
 
 - Verify the velocity and the torque for a rotating immersed body, against

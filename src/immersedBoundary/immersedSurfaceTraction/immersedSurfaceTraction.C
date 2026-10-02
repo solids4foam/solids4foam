@@ -28,26 +28,6 @@ License
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
-Foam::scalar Foam::immersedSurfaceTraction::cellWidth(const label celli) const
-{
-    const vector span
-    (
-        boundBox(mesh_.points(), mesh_.cellPoints()[celli], false).span()
-    );
-
-    scalar w = GREAT;
-    for (direction d = 0; d < vector::nComponents; ++d)
-    {
-        if (solD_[d] == 1)
-        {
-            w = min(w, span[d]);
-        }
-    }
-
-    return w;
-}
-
-
 Foam::scalarField Foam::immersedSurfaceTraction::cellWidths
 (
     const pointField& pts
@@ -65,7 +45,7 @@ Foam::scalarField Foam::immersedSurfaceTraction::cellWidths
 
         if (celli >= 0)
         {
-            widths[i] = cellWidth(celli);
+            widths[i] = immersedBody::cellWidth(mesh_, celli);
         }
     }
 
