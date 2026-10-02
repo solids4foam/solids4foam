@@ -1,0 +1,49 @@
+{
+  "end_time_s": 70.0,
+  "quick_end_time_s": 10.0,
+  "comparison_window_s": [20.0, 70.0],
+  "lid_period_s": 5.0,
+  "references": {
+    "Valdes2007": {"file": "Valdes2007_fig5.12.csv", "group_b": true},
+    "Kratos": {"file": "KratosZorrilla.csv", "group_b": true},
+    "Tiba2026": {
+      "values": {"peak": 0.2769, "mean": 0.2466},
+      "group_b": true,
+      "source": "Tiba et al. (2026), arXiv:2609.16876, Table 3: umax 27.69 cm, mean 24.66 cm"
+    },
+    "Mok2001": {"file": "Mok2001_bild6.6.csv", "group_b": false},
+    "Wall1999": {"file": "Wall1999_bild7.16.csv", "group_b": false},
+    "GerbeauVidrascu2003": {"file": "GerbeauVidrascu2003_fig4.csv", "group_b": false},
+    "Kassiotis2011": {"file": "Kassiotis2011_fig7a.csv", "group_b": false}
+  },
+  "studies": {
+    "mesh": {
+      "members": [
+        {"name": "mesh16", "nx": 16, "solid_ny": 8, "delta_t": 0.2, "solid": "highOrder"},
+        {"name": "mesh32", "nx": 32, "solid_ny": 8, "delta_t": 0.1, "solid": "highOrder"},
+        {"name": "mesh64", "nx": 64, "solid_ny": 8, "delta_t": 0.05, "solid": "highOrder"},
+        {"name": "mesh96", "nx": 96, "solid_ny": 8, "delta_t": 0.025, "solid": "highOrder"}
+      ]
+    },
+    "timestep": {
+      "members": [
+        {"name": "dt0.1", "nx": 64, "solid_ny": 8, "delta_t": 0.1, "solid": "highOrder"},
+        {"name": "dt0.05", "nx": 64, "solid_ny": 8, "delta_t": 0.05, "solid": "highOrder"},
+        {"name": "dt0.025", "nx": 64, "solid_ny": 8, "delta_t": 0.025, "solid": "highOrder"}
+      ]
+    },
+    "solid": {
+      "members": [
+        {"name": "standard_ny2", "nx": 64, "solid_ny": 2, "delta_t": 0.1, "solid": "standard"},
+        {"name": "standard_ny8", "nx": 64, "solid_ny": 8, "delta_t": 0.1, "solid": "standard"},
+        {"name": "highOrder_ny8", "nx": 64, "solid_ny": 8, "delta_t": 0.1, "solid": "highOrder"}
+      ]
+    }
+  },
+  "acceptance": {
+    "envelope_tolerance": 0.05,
+    "band_tolerance": 0.10,
+    "converged_change_fraction": 0.01,
+    "noise_floor_fraction": 0.001
+  }
+}

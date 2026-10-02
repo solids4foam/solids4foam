@@ -97,7 +97,10 @@ PISO
 PIMPLE
 {
     momentumPredictor yes;
-    nOuterCorrectors 1;
+    // Two outer correctors make the fluid response to a given interface
+    // displacement independent of the FSI iteration history; with one, the
+    // FSI residual stalls just above outerCorrTolerance at t = 0.156 s
+    nOuterCorrectors 2;
     nCorrectors     4;
     nNonOrthogonalCorrectors 0;
     nAlphaCorr      1;

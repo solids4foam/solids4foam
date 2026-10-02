@@ -127,6 +127,17 @@ executes `blockMesh` for both `solid` and `fluid` domains
 displacement history of point A and a file `force.pdf` will be created with the
 history of the force on the cylinder and plate.
 
+The case uses IQN-ILS coupling with a Dirichlet-Neumann interface, which
+converges in about 10 FSI iterations per time step. Robin-Neumann coupling (the
+`elasticWallPressure` pressure condition, as in `3dTube`) converges to the same
+solution, but needs about 160 iterations per time step here. The plate is
+wetted on both faces, so its interface has two very different impedances: about
+10 kg/m$$^2$$ when both faces are pushed the same way (translation and
+bending), and about 540 kg/m$$^2$$ when the plate is squeezed through its
+thickness. A single Robin coefficient cannot match both, and the squeeze modes
+contract by at best about 0.96 per iteration (see the `elasticWallPressure`
+documentation).
+
 ---
 
 ## References

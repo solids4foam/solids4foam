@@ -1,0 +1,78 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Quarter of the fluid annulus between the ring (radius 1.05 m) and the rigid
+// outer cylinder (radius 1.5 m)
+
+convertToMeters 1;
+
+vertices
+(
+    (1.05 0 0)
+    (1.5 0 0)
+    (0 1.5 0)
+    (0 1.05 0)
+    (1.05 0 0.1)
+    (1.5 0 0.1)
+    (0 1.5 0.1)
+    (0 1.05 0.1)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (12 48 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+    arc 0 3 (0.74246212024587 0.74246212024587 0)
+    arc 1 2 (1.0606601717798 1.0606601717798 0)
+    arc 4 7 (0.74246212024587 0.74246212024587 0.1)
+    arc 5 6 (1.0606601717798 1.0606601717798 0.1)
+);
+
+patches
+(
+    wall interface
+    (
+        (0 4 7 3)
+    )
+    wall outerWall
+    (
+        (1 2 6 5)
+    )
+    symmetry bottom
+    (
+        (0 1 5 4)
+    )
+    symmetry left
+    (
+        (3 7 6 2)
+    )
+    empty frontAndBack
+    (
+        (0 3 2 1)
+        (4 5 6 7)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

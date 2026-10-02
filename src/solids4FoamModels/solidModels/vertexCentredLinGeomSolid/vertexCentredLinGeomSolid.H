@@ -30,10 +30,8 @@ Description
 
     An implicit Newton-Raphson algorithm is employed.
 
-    The stress at the dual mesh faces comes from the legacy
-    dualMechanicalModel or, with useMechanicalConstitutiveLawManager, from the
-    mechanicalConstitutiveLaw framework, in which case the legacy
-    mechanicalModel is not constructed at all.
+    The stress at the dual mesh faces comes from the mechanicalConstitutiveLaw
+    framework.
 
 Author
     Philip Cardiff, UCD.
@@ -53,7 +51,6 @@ SourceFiles
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
 #include "GeometricField.H"
-#include "dualMechanicalModel.H"
 #include "mechanicalConstitutiveLawManager.H"
 #include "integrationPointTopologies.H"
 #include "globalPointIndices.H"
@@ -89,17 +86,6 @@ class vertexCentredLinGeomSolid
 private:
 
     // Private Data
-
-        //- Mechanical model for dual mesh
-        //  Only constructed when the legacy mechanicalModel is in use: on a
-        //  mechanicalConstitutiveLaw framework run it is left empty
-        autoPtr<dualMechanicalModel> dualMechanicalPtr_;
-
-        //- Implicit stiffness used by segregated algorithm
-        //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
-        //  The value of this term only affects convergence and not the answer
-        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
 
         //- Integration-point topology for the internal dual mesh faces,
         //  owned by the manager
@@ -234,26 +220,18 @@ private:
         const integrationPointTopology& dualBoundaryFaceTopology() const;
 
         //- Update the stress at the dual mesh faces from the displacement
-        //  gradient there, using whichever implementation is in use
+        //  gradient there
         void correctDualStress
         (
             const surfaceTensorField& dualGradDf,
             surfaceSymmTensorField& dualSigmaf
         );
 
-        //- Update the primary mesh cell stress field from gradD, using
-        //  whichever implementation is in use
+        //- Update the primary mesh cell stress field from gradD
         void correctCellStress();
 
-        //- Implicit stiffness at the primary mesh cells, using whichever
-        //  implementation is in use
+        //- Implicit stiffness at the primary mesh cells
         tmp<volScalarField> impK() const;
-
-        //- Make dualImpKf field
-        void makeDualImpKf() const;
-
-        //- Return dualImpK field
-        const surfaceScalarField& dualImpKf() const;
 
         //- Predict displacement field using the velocity field
         void predict();

@@ -9,17 +9,25 @@ source solids4FoamScripts.sh
 usage() {
 cat <<'USAGE'
 Usage:
-  ./Allrun [approach]
+  ./Allrun [approach] [timeScheme]
 
 Where [approach] is one of:
   petscSnes         (default) Jacobian-free Newton-Krylov via PETSc SNES
-  segregated        segregated (outer-iteration) approach; approx. 3 times
-                    slower than petscSnes for this case
+  segregated        segregated (outer-iteration) approach
+
+Where [timeScheme] is one of:
+  bdf2              (default) second-order backward
+  newmark           trapezoidal Newmark (beta=0.25, gamma=0.5)
+  bossak            Bossak-Newmark (beta=0.3025, gamma=0.6, alphaM=-0.1)
+  all               run all three in timeSchemeRuns/ and compare with Abaqus
 
 Examples:
   ./Allrun
   ./Allrun petscSnes
   ./Allrun segregated
+  ./Allrun petscSnes newmark
+  ./Allrun petscSnes bossak
+  ./Allrun petscSnes all
 USAGE
 }
 
@@ -30,6 +38,7 @@ then
 fi
 
 APPROACH="${1:-petscSnes}"
+TIME_SCHEME="${2:-bdf2}"
 
 case "$APPROACH" in
     petscSnes|segregated) ;;
@@ -39,6 +48,44 @@ case "$APPROACH" in
         exit 1
         ;;
 esac
+
+case "$TIME_SCHEME" in
+    bdf2|newmark|bossak|all) ;;
+    *)
+        echo "Error: Unknown time scheme '$TIME_SCHEME'"
+        usage
+        exit 1
+        ;;
+esac
+
+if [[ "$TIME_SCHEME" == all ]]; then
+    if [[ "$APPROACH" == petscSnes ]]; then
+        solids4Foam::requirePetscOrExitSilently
+    fi
+    for scheme in bdf2 newmark bossak; do
+        case_dir="timeSchemeRuns/${scheme}"
+        rm -rf "$case_dir"
+        mkdir -p "$case_dir"
+        cp -a 0 constant system reference Allrun Allclean plot.gnuplot "$case_dir/"
+        if ! (cd "$case_dir" && ./Allclean > /dev/null 2>&1 \
+            && ./Allrun "$APPROACH" "$scheme" > log.Allrun 2>&1)
+        then
+            echo "Failed to run ${scheme}; see ${case_dir}/log.Allrun"
+            exit 1
+        fi
+        if [[ ! -f "$case_dir/log.solids4Foam" ]] \
+            || ! grep -q '^End' "$case_dir/log.solids4Foam" \
+            || [[ ! -s "$case_dir/postProcessing/0/solidPointDisplacement_pointDisp.dat" ]]
+        then
+            echo "Incomplete ${scheme} run; see ${case_dir}/log.solids4Foam"
+            exit 1
+        fi
+    done
+    if command -v gnuplot &> /dev/null; then
+        gnuplot -e "comparison=1" plot.gnuplot
+    fi
+    exit 0
+fi
 
 link_files_for_suffix() {
     local suffix="$1"
@@ -69,20 +116,24 @@ case "$APPROACH" in
         ;;
 esac
 
+# Select the second-derivative time scheme independently of the solver
+ln -vnsf "fvSchemes.${TIME_SCHEME}" system/fvSchemes
+echo "Using the ${TIME_SCHEME} time scheme"
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-solids4Foam::runApplication blockMesh
+solids4Foam::runApplication blockMesh || exit $?
 
 # Run solver
-solids4Foam::runApplication solids4Foam
+solids4Foam::runApplication solids4Foam || exit $?
 
 # Plot the tip displacement against the Abaqus reference
 if command -v gnuplot &> /dev/null
 then
     echo "Generating tipDisplacement.png using gnuplot"
-    gnuplot plot.gnuplot &> /dev/null
+    gnuplot -e "scheme='${TIME_SCHEME}'" plot.gnuplot &> /dev/null
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
