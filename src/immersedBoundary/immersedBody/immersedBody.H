@@ -155,11 +155,23 @@ class immersedBody
         //- Local cells whose centre is inside the body
         labelList insideCells_;
 
+        //- Velocity of the surface points, for a deforming motion
+        vectorField pointVelocities_;
+
         //- Smallest cell bounding box width in the solved directions
         scalarField cellWidths_;
 
 
     // Private Member Functions
+
+        //- Interpolate the point values pf to the nearest points of the
+        //  surface to the points x, with the barycentric coordinates of the
+        //  nearest points in their triangles
+        tmp<vectorField> interpolateToNearest
+        (
+            const pointField& x,
+            const vectorField& pf
+        ) const;
 
         //- Read the surface
         static triSurface readSurface(const fvMesh& mesh, const fileName& f);
@@ -227,6 +239,18 @@ public:
                 return motionPtr_->moving();
             }
 
+            //- Is the motion of the body rigid?
+            bool rigid() const
+            {
+                return motionPtr_->rigid();
+            }
+
+            //- Velocities of the surface points of a deforming body
+            const vectorField& pointVelocities() const
+            {
+                return pointVelocities_;
+            }
+
             //- Surface in the current configuration
             const triSurface& surface() const
             {
@@ -261,24 +285,16 @@ public:
             //  configuration
             point CofR() const;
 
-            //- Velocity of the body at the points x
-            tmp<vectorField> velocity(const pointField& x) const
-            {
-                return motionPtr_->velocity(x, time_);
-            }
+            //- Velocity of the body at the points x: that of the motion for
+            //  a rigid motion; for a deforming motion, the velocity of the
+            //  surface points interpolated at the nearest point of the
+            //  surface
+            tmp<vectorField> velocity(const pointField& x) const;
 
             //- Acceleration of the body at the point x, from a central
-            //  difference of the velocity over dt, following the point
-            vector acceleration(const point& x, const scalar dt) const
-            {
-                const pointField pts(1, x);
-                const vector U0(motionPtr_->velocity(pts, time_)()[0]);
-                return
-                (
-                    motionPtr_->velocity(pts + 0.5*dt*U0, time_ + 0.5*dt)()[0]
-                  - motionPtr_->velocity(pts - 0.5*dt*U0, time_ - 0.5*dt)()[0]
-                )/dt;
-            }
+            //  difference of the velocity over dt, following the point for
+            //  a rigid motion
+            vector acceleration(const point& x, const scalar dt) const;
 
             //- First intersection of the surface with each segment from
             //  start to end

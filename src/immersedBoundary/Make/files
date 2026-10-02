@@ -4,6 +4,8 @@ immersedBodyMotion/staticMotion/staticMotion.C
 immersedBodyMotion/sinusoidalTranslation/sinusoidalTranslation.C
 immersedBodyMotion/uniformTranslation/uniformTranslation.C
 immersedBodyMotion/solidBodyRotation/solidBodyRotation.C
+immersedBodyMotion/quadraticBend/quadraticBend.C
+immersedBodyMotion/customProfileBend/customProfileBend.C
 
 immersedBody/immersedBody.C
 immersedSurfaceTraction/immersedSurfaceTraction.C
