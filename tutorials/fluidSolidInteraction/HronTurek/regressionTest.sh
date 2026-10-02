@@ -23,8 +23,13 @@ REG_END_TIME=2.1
 
 # Regression tolerances
 DISP_TOL=2e-5
-FX_TOL=5e-4
-FY_TOL=1e-3
+# The force tolerances are relative to the reference, as the total force on
+# the plate and cylinder is dominated by the cylinder drag. OpenFOAM-v2412 and
+# v2512 are within 6e-5 of the references below. OpenFOAM-9 has not been run
+# with them: when the force was that of the plate alone, its Fx was within
+# 3.4e-4 N of OpenFOAM.com, a twentieth of the Fx tolerance here
+FX_REL_TOL=1e-3
+FY_REL_TOL=5e-3
 
 # Reference values at REG_END_TIME
 # The force references are the total force on the plate and cylinder, in N
@@ -32,8 +37,6 @@ FY_TOL=1e-3
 # St. Venant-Kirchhoff law and FSI3 interface tolerance of 1e-5.
 # The displacement and force values are the midpoint of
 # OpenFOAM-v2412 and OpenFOAM-v2512 runs with rhoInf 1000 at t = 2.1.
-# Their Fx spread is 6.71e-4, which the existing midpoint tolerance covers.
-# OpenFOAM-9 could not be re-run locally because its libPstream path is broken.
 REF_TIP_UY=-0.000282008
 REF_FX=6.6783815
 REF_FY=-0.6751037
@@ -53,8 +56,8 @@ echo "============================================================"
 echo "Hron-Turek FSI3 regression test"
 echo "Regression end time         = ${REG_END_TIME}"
 echo "Tip Uy tolerance            < ${DISP_TOL}"
-echo "Final Fx tolerance          < ${FX_TOL}"
-echo "Final Fy tolerance          < ${FY_TOL}"
+echo "Final Fx relative tolerance < ${FX_REL_TOL}"
+echo "Final Fy relative tolerance < ${FY_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -215,8 +218,8 @@ final_fx=$(awk '{print $1}' <<< "${force_components}")
 final_fy=$(awk '{print $2}' <<< "${force_components}")
 
 tip_uy_diff_abs=$(abs "$(awk "BEGIN {print ${tip_uy} - ${REF_TIP_UY}}")")
-final_fx_diff_abs=$(abs "$(awk "BEGIN {print ${final_fx} - ${REF_FX}}")")
-final_fy_diff_abs=$(abs "$(awk "BEGIN {print ${final_fy} - ${REF_FY}}")")
+final_fx_diff_rel=$(abs "$(awk "BEGIN {print (${final_fx} - ${REF_FX})/${REF_FX}}")")
+final_fy_diff_rel=$(abs "$(awk "BEGIN {print (${final_fy} - ${REF_FY})/${REF_FY}}")")
 
 failures=0
 
@@ -227,14 +230,14 @@ else
     failures=$((failures + 1))
 fi
 
-if awk "BEGIN {exit !(${final_fx_diff_abs} < ${FX_TOL})}"; then
+if awk "BEGIN {exit !(${final_fx_diff_rel} < ${FX_REL_TOL})}"; then
     printf "PASS: final Fx = %.6g\n" "${final_fx}"
 else
     printf "FAIL: final Fx = %.6g\n" "${final_fx}"
     failures=$((failures + 1))
 fi
 
-if awk "BEGIN {exit !(${final_fy_diff_abs} < ${FY_TOL})}"; then
+if awk "BEGIN {exit !(${final_fy_diff_rel} < ${FY_REL_TOL})}"; then
     printf "PASS: final Fy = %.6g\n" "${final_fy}"
 else
     printf "FAIL: final Fy = %.6g\n" "${final_fy}"
