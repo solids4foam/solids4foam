@@ -104,6 +104,23 @@ public:
             return true;
         }
 
+        //- Is the motion rigid? The velocity of a rigid motion is defined
+        //  at any point; that of a deforming motion only at the surface
+        //  points, from pointVelocities
+        virtual bool rigid() const
+        {
+            return true;
+        }
+
+        //- Configuration index of the motion: incremented each time the
+        //  positions given by the motion change other than through the
+        //  time, e.g. when a fluid-solid interface sets them, so that the
+        //  body is re-positioned within a time step
+        virtual label configuration() const
+        {
+            return 0;
+        }
+
         //- Positions at time t of the surface points whose reference
         //  positions are points0
         virtual tmp<pointField> points
@@ -113,12 +130,24 @@ public:
         ) const = 0;
 
         //- Velocity of the body at time t at the points x, given in the
-        //  current configuration
+        //  current configuration (rigid motions)
         virtual tmp<vectorField> velocity
         (
             const pointField& x,
             const scalar t
         ) const = 0;
+
+        //- Velocity at time t of the surface points whose reference
+        //  positions are points0. The default is the velocity at their
+        //  positions at time t
+        virtual tmp<vectorField> pointVelocities
+        (
+            const pointField& points0,
+            const scalar t
+        ) const
+        {
+            return velocity(points(points0, t), t);
+        }
 };
 
 

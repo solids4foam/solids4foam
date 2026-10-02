@@ -1,12 +1,21 @@
 # immersedBoundary
 
 Hybrid fictitious domain-immersed boundary (HFDIB) method for bodies with a
-prescribed motion immersed in an incompressible flow, as the finite volume
-option `immersedBoundaryForce`. It is currently only available for
-OpenFOAM.com, where `libimmersedBoundary` is built with solids4foam.
+prescribed motion, or driven by a solids4foam fluid-solid interaction,
+immersed in an incompressible flow, as the finite volume option
+`immersedBoundaryForce`. It is currently only available for OpenFOAM.com,
+where `libimmersedBoundary` is built with solids4foam.
 
 The option works with the solids4foam `pimpleFluid` fluid model and with the
 standard `pimpleFoam` solver. See `tutorials/fluids/immersedBoundary`.
+
+The bodies are closed surfaces with a thickness, represented by the cells of
+the fluid mesh whose centre is inside them: **the mesh needs about three cells
+or more across the thickness of a body**, everywhere and at all times. Thinner
+bodies, or thinner parts of a body, are not blocked reliably and let the flow
+through. Zero-thickness (open) surfaces are not supported. For thin moving
+bodies, such as the leaflets of a heart valve, refine the mesh around the
+region they sweep (see Mesh refinement below).
 
 ## Usage
 
@@ -25,8 +34,8 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    // Forcing method, optional, default penalty
-    method          penalty;
+    // Forcing method, optional, default cutLink
+    method          cutLink;
 
     bodies
     {
@@ -49,7 +58,42 @@ immersedBoundary
 ```
 
 The complete list of entries is in the header of
-`fvOptions/immersedBoundaryForce/immersedBoundaryForce.H`.
+`fvOptions/immersedBoundaryForce/immersedBoundaryForce.H`. The body motions
+are `static` (the default), `sinusoidalTranslation`, `uniformTranslation`
+(constant velocity) and `solidBodyRotation` (constant angular velocity about
+an axis), the deforming `quadraticBend` and `customProfileBend` (bending
+of a beam about its base), and the heart valve motions `valveSliceAxis` (the
+collapse of the leaflets towards the valve axis, with the vertices on the
+annulus held fixed) and `valveMorph` (the interpolation between a closed and
+an open valve surface with the same vertices), with the periodic time laws of
+`valveTimeLaw`, in `immersedBodyMotion`. A deforming motion gives
+the position and velocity of each vertex of the surface, and the velocity of
+the body at a point is interpolated from the vertices of the nearest triangle.
+The `fsiDriven` motion is set by a fluid-solid interface (see below).
+
+## Fluid-solid interaction
+
+A body whose motion is `fsiDriven` is driven by a solids4foam fluid-solid
+interface: in `constant/fsiProperties`, the solid interface patch is paired
+with `fluidPatch none;` and an `immersedInterfaces` entry names the body
+(see `src/solids4FoamModels/fluidSolidInterfaces/README.md`). The body needs
+no `surface` entry: its surface is built by the interface from the solid
+interface patch and, optionally, the closure patches of the solid (e.g. a
+clamped root), whose union must be a closed surface; in a two-dimensional
+fluid mesh the surface is extended through the mesh and capped in the empty
+direction. In each coupling iteration the interface sets the vertex
+positions and velocities of the body, and the bodies are re-positioned in
+the mesh (occupancy, links, apertures) when the momentum equation is next
+assembled, keeping the forcing, momentum and apertures of the previous time
+step. The traction returned to the solid is the surface traction (`cutLink`
+only) averaged over the quadrature points of each interface face; the log
+compares its total with the momentum exchange between the fluid and the
+whole body, which also includes the inertia of the fluid inside the body and
+the closure patches, so the two agree only for a slowly accelerating body.
+The option is found by the interface through the header-only
+`fsiImmersedBoundary` interface of solids4FoamModels, so that
+`libimmersedBoundary` does not depend on solids4FoamModels. See the
+`immersedHronTurekFsi2` tutorial.
 
 ## Method
 
@@ -61,9 +105,9 @@ body moves (`occupancy signedDistance`). Alternatively, as in openHFDIB-DEM,
 it is half the fraction of the cell vertices inside the surface, plus a half
 if the cell centre is inside the surface (`occupancy vertexFraction`).
 
-Three forcing methods are available:
+Four forcing methods are available:
 
-- `penalty` (the default): the implicit volume penalisation
+- `penalty`: the implicit volume penalisation
   `kappa*(Ui - U)`, where `Ui` is the velocity of the body, is added to the
   momentum equation, with `-kappa*U` in the matrix. The penalisation rate is
   `K/deltaT` in the fully covered cells, where `K` is `penaltyCoeff` (default
@@ -96,7 +140,44 @@ Three forcing methods are available:
   effective wall is not displaced into the body as it is with `penalty`.
   The results do not depend on `K`, the time step, the number of pressure
   correctors or the number of processors. For moving bodies, the cells that
-  the body leaves (fresh cells) disturb the force: `penalty` is recommended.
+  the body leaves (fresh cells) disturb the force: `cutLink` or `penalty`
+  is recommended.
+- `cutLink` (the default): a sharp interface penalisation for static and
+  moving bodies.
+  The cells whose centre is inside a body are penalised towards the body
+  velocity, with the rate `min(K/deltaT, C*(nu/w^2 + |Ub|/w))`, where `C` is
+  `pinnedRateCoeff` (default 100). Each fluid cell next to them is penalised
+  towards the body velocity at the surface with the rate
+  `sum(nu*|Sf|*deltaCoeff*(|d|/phi - 1))/V` over its faces with a penalised
+  neighbour, where `|d|` is the distance between the cell centres and `phi`
+  the distance from the fluid cell centre to the surface along the line
+  between them, from the intersection with the surface; with the explicit
+  correction of the flux to the penalised cell (`linkCorrection`, default
+  yes), the viscous flux through the face is that of a linear profile
+  through the body velocity on the surface (Shortley-Weller), so that the
+  wall is on the surface to second order. The rates do not depend on the
+  time step and vary continuously as the body moves. With
+  `apertureCoupling` (default yes), the option also registers the fluid
+  fraction of the area of the faces cut by the bodies, from the geometric
+  cutting of the faces (`cutFaceIso`), and the flux of the body velocity
+  through their solid part; the `pimpleFluid` fluid model uses them in its
+  pressure equation, so that it changes continuously as the body moves, and
+  does not impose continuity in the cells entirely inside a body, where the
+  flux of the velocity of a deforming body (for example a bending beam,
+  whose sections stretch on one side and shorten on the other) need not be
+  zero, and would otherwise be a source of fluid that leaks into the flow
+  (this has no effect for rigid bodies). The
+  force is the momentum exchange (`forceEstimator momentumExchange`, the
+  default), which includes the inertia of the fluid inside the body; the
+  alternative surface traction (`forceEstimator surfaceTraction`) is from
+  quadratic least squares fits of the pressure and velocity at quadrature
+  points moving with the surface. A third estimate (`forceEstimator forcing`) is
+  the forcing applied in these cells plus the inertia of the fluid inside
+  the body taken as rigid. The estimates that are not selected are written
+  after the inertia: the momentum exchange, unless it is selected, then the
+  surface traction, with `writeSurfaceTraction yes`, unless it is selected.
+  The momentum exchange assumes a laminar flow of constant viscosity on a
+  static mesh.
 - `incremental`: the direct forcing of the openHFDIB-DEM `pimpleHFDIBFoam`
   solver. An explicit forcing `f` is added to the momentum equation. After
   each pressure corrector, `f` is increased by `couplingCoeff*(Ui - U)/deltaT`
@@ -139,6 +220,8 @@ mean square of the drag coefficient is 2.05), are:
 | B | 5.45, 5.61, 5.61 | 2.00, 0.44, 0.29 | 1.42, 0.33, 0.20 |
 | C | 6.04, 6.42, 6.60 | 1.73, 0.60, 0.53 | 1.32, 0.52, 0.48 |
 | D | 5.42, 5.51, 5.55 | 0.80, 0.30, - | 0.59, 0.27, - |
+| E | 5.61, 5.58, 5.58 | 0.19, 0.07, 0.06 | 0.17, 0.07, 0.06 |
+| F | 5.36, 5.46, 5.48 | 0.11, 0.04, 0.02 | 0.12, 0.08, 0.08 |
 
 where the settings are:
 
@@ -146,19 +229,45 @@ where the settings are:
   body-speed-only surface-rate cap;
 - B: `penalty` with `weighting occupancy` and `occupancy vertexFraction`;
 - C: `incremental` with `occupancy vertexFraction`;
-- D: `ghostCell` (the setting of the static tutorial).
+- D: `ghostCell`;
+- E: `cutLink` (the setting of the static tutorial), with the force from the
+  momentum exchange (the default);
+- F: `cutLink`, with the force from the surface traction.
 
 For an immersed plane Poiseuille flow between walls that are not aligned with
 the cell faces, with 20, 40 and 80 cells across the channel, the flow rate
-differs from the exact solution by 20%, 11% and 7% with setting A, and by
-0.9%, 0.03% and 0.02% with setting D.
+differs from the exact solution by 20%, 11% and 7% with setting A, by
+0.9%, 0.03% and 0.02% with setting D, and by 0.25%, 0.23% and 0.05% with
+setting E. For a cylinder translating at constant velocity through the mesh
+(the `translatingCylinderInChannel` tutorial), `cutLink` gives the drag of the
+static cylinder at the same position to within 0.2% on all the meshes, with
+fluctuations of 1%, 0.4% and 0.3% as the cylinder crosses the cells, whereas
+the `penalty` drag is low by 5%, 3% and 1.5%. For the immersed Stokes layer
+(the `oscillatingWallStokesLayer` tutorial), the `cutLink` velocity converges
+at second order. For a cylinder rotating inside an immersed annulus (the
+`immersedTaylorCouette` tutorial), the `cutLink` torque differs from the exact
+torque by 0.8%, 0.3% and 0.2%, and the `penalty` torque by -25%, -16% and
+-10%. For a beam bending about its base (the `bendingBeamInChannel`
+tutorial), the root mean square difference of the `cutLink` drag from a
+body-fitted solution with a deforming mesh is 7.4%, 4.6% and 3.5% of the
+root mean square drag (momentum exchange), or 8.6%, 4.9% and 3.5% (surface
+traction), with 3, 6 and 11 cells across the beam. The momentum exchange is
+the force that the fluid receives, and is the more accurate for static and
+steadily moving bodies; the surface traction is the more accurate for bodies
+accelerating normal to their surface (oscillating cylinder: 0.11, 0.04 and
+0.02); the `forcing` estimate is as
+accurate as the momentum exchange for static and steadily moving bodies, and
+gives the wall shear stress of the Stokes layer to 0.1% with 8 cells across
+the layer, but over-predicts the oscillating cylinder drag amplitude by 3%.
 
-These results showed first-order accuracy in cell size for all the methods
-(the ghost cell method was not run with 40 cells across the moving cylinder).
-The differences from Wan and Turek (2006) stop decreasing at about 0.08, the
-difference between the body-fitted mesh solution and Wan and Turek (2006),
-whose coefficients lag the converged solutions by about 0.015 s (see the
-`oscillatingCylinderInChannel` tutorial).
+The cylinder forces converge at about first order in the cell size for all the
+methods, except the static `cutLink` drag, which is within 0.6% of the
+reference from 10 cells across the cylinder (the ghost cell method was not
+run with 40 cells across the moving cylinder). The differences from Wan and
+Turek (2006) stop decreasing at about 0.08, the difference between the
+body-fitted mesh solution and Wan and Turek (2006), whose coefficients lag the
+converged solutions by about 0.015 s (see the `oscillatingCylinderInChannel`
+tutorial).
 
 ### Fluid-speed surface-rate check
 
@@ -185,6 +294,35 @@ that flow is unsteady and has a different Reynolds number from the supplied
 static reference. In a short zero-viscosity diagnostic, all 36 partially
 covered cells had positive penalty rates, compared with zero for the old
 cap. This does not establish inviscid no-slip accuracy.
+
+### Mesh refinement
+
+The `immersedBodyRefinementCells` utility writes the cell set of the cells
+within a given distance of the immersed bodies of the `immersedBoundaryForce`
+options, over their motion between two times, for `refineMesh`. The surfaces
+are sampled wherever a vertex has moved by half the distance since the
+previous sample, so that the bands around the samples overlap. Two levels of
+refinement, halving the band at each level:
+
+```bash
+immersedBodyRefinementCells -distance 0.002 -startTime 0 -endTime 0.8
+refineMesh -overwrite
+immersedBodyRefinementCells -distance 0.001 -startTime 0 -endTime 0.8
+refineMesh -overwrite
+```
+
+with `system/refineMeshDict` refining the cell set `refineCells` in the three
+directions (see the `heartValveInDuct` tutorial, `REFINE_LEVELS=1 ./Allrun`).
+The option `-bodies "(name ...)"` restricts the refinement to some bodies.
+
+For the valves of solids4foam/cardiacFoam#20 (leaflets about 0.9 mm thick) in
+a mesh of 1.3 mm cells, no cell centre is inside the open leaflets for most of
+the cycle, and the leaflets are not seen; after two levels of refinement
+around the swept region (0.34 mm cells, from 213 000 to 779 000 cells), 4 000
+to 19 000 cells are inside the mitral leaflets and 1 700 to 12 000 inside the
+aortic leaflets at all times. The `valveSliceAxis` motion shrinks the
+thickness of the leaflets with their radius, so the free edge of a closed
+valve with `Fmax` close to 1 can remain thinner than the refined cells.
 
 ## Provenance
 
@@ -226,8 +364,13 @@ The lineage of the code is:
 The occupancy (`immersedBody::addOccupancy`) follows the openHFDIB-DEM
 `nonConvexBody`, and the forcing and force calculation
 (`immersedBoundaryForce`, `immersedBody::force`) follow the openHFDIB-DEM
-`pimpleHFDIBFoam` solver and `immersedBody`. The sinusoidal translation
-follows the version of Sairam Pamulaparthi Venkata. The openHFDIB-DEM
+`pimpleHFDIBFoam` solver and `immersedBody`. The sinusoidal translation,
+the `quadraticBend` and `customProfileBend` deformations, and the
+`valveSliceAxis` and `valveMorph` valve motions and their time laws follow
+the versions of Sairam Pamulaparthi Venkata in solids4foam/cardiacFoam#20,
+except the closed-to-open valve morph, which is from his later working copy
+of xenosim-erc/immersedBoundaryRigidMotion
+(`src/HFDIBDEM/geomModels/stlBased/stlBased.C`, June 2026, not committed). The openHFDIB-DEM
 interpolation of the velocity at the immersed boundary (`lineInt`,
 `leastSquares`), which the benchmark cases do not use, is not included.
 

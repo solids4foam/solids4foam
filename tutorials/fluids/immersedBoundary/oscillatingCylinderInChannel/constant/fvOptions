@@ -22,12 +22,18 @@ immersedBoundary
 {
     type            immersedBoundaryForce;
 
-    // Implicit penalisation (the default); the direct forcing of
-    // openHFDIB-DEM is available for comparison with
+    // Sharp interface penalisation with the fluid cells next to the
+    // surface penalised along the cell links cut by the surface (the
+    // default), with the force from the surface traction, the most accurate
+    // for an accelerating body (the momentum exchange is written in columns
+    // 11-13 of the force file); the other methods are available for
+    // comparison with
+    //     method          penalty;
     //     method          incremental;
     //     couplingCoeff   0.8;
-    // and "occupancy vertexFraction;" for the body
-    method          penalty;
+    // and "occupancy vertexFraction;" for the body with incremental
+    method          cutLink;
+    forceEstimator  surfaceTraction;
 
     bodies
     {

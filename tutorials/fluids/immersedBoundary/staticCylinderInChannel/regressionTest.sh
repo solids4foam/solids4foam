@@ -23,10 +23,10 @@ fi
 # ------------------------------------------------------------
 
 REG_END_TIME=5
-CD_MIN=5.37
-CD_MAX=5.47
-CL_MIN=0.009
-CL_MAX=0.017
+CD_MIN=5.56
+CD_MAX=5.66
+CL_MIN=0.004
+CL_MAX=0.012
 
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/immersedBoundary/0/cylinder.dat"

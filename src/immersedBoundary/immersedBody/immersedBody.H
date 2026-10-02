@@ -33,6 +33,15 @@ Description
     - vertexFraction: half the fraction of the cell vertices inside the
       surface, plus a half if the cell centre is inside the surface, as in
       the non-convex body of openHFDIB-DEM.
+    - cut: the exact volume fraction of the cell inside the zero isosurface
+      of the signed distance to the surface at the cell vertices, from the
+      geometric cutting of the cells of the geometricVoF library
+      (cutCellIso). lambda varies continuously as the body moves.
+
+    A body driven by a fluid-solid interface (motion fsiDriven) may be given
+    its surface by the interface rather than by a surface file
+    (setReferenceSurface); it is then re-positioned in each coupling
+    iteration, when the configuration index of its motion changes.
 
     Cells with an occupancy greater than 1 - threshold are internal cells, and
     cells with an occupancy greater than threshold are surface cells.
@@ -44,7 +53,9 @@ Description
     \verbatim
     cylinder
     {
-        // Surface file, relative to constant/triSurface
+        // Surface file, relative to constant/triSurface (or
+        // constant/<region>/triSurface for a mesh region); optional for a
+        // body whose surface is given by a fluid-solid interface
         surface     "cylinder.stl";
 
         // Prescribed motion, optional, default static
@@ -107,7 +118,7 @@ class immersedBody
     // Private Data
 
         //- Occupancy methods and dictionary names
-        enum occupancyMethod { signedDistance, vertexFraction };
+        enum occupancyMethod { signedDistance, vertexFraction, cut };
         static const Enum<occupancyMethod> occupancyNames_;
 
 
@@ -121,7 +132,7 @@ class immersedBody
         triSurface surface_;
 
         //- Surface points in the reference configuration
-        const pointField points0_;
+        pointField points0_;
 
         //- Search engine for the current surface
         autoPtr<triSurfaceSearch> searchPtr_;
@@ -130,14 +141,24 @@ class immersedBody
         autoPtr<immersedBodyMotion> motionPtr_;
 
         //- Centre of rotation for the torque, in the reference configuration
-        const point CofR0_;
+        point CofR0_;
+
+        //- Was the centre of rotation given, rather than taken as the mean
+        //  of the reference surface points?
+        const bool CofRGiven_;
 
         //- Occupancy from the signed distance of the cell centres to the
         //  surface, rather than from the fraction of cell vertices inside
         const bool signedDistance_;
 
+        //- Cut cell occupancy
+        const bool cut_;
+
         //- Time of the current configuration
         scalar time_;
+
+        //- Configuration index of the motion in the current configuration
+        label configuration_;
 
         //- Local cells fully covered by the body
         labelList internalCells_;
@@ -148,14 +169,30 @@ class immersedBody
         //- Local cells whose centre is inside the body
         labelList insideCells_;
 
+        //- Velocity of the surface points, for a deforming motion
+        vectorField pointVelocities_;
+
         //- Smallest cell bounding box width in the solved directions
         scalarField cellWidths_;
 
 
     // Private Member Functions
 
+        //- Interpolate the point values pf to the nearest points of the
+        //  surface to the points x, with the barycentric coordinates of the
+        //  nearest points in their triangles
+        tmp<vectorField> interpolateToNearest
+        (
+            const pointField& x,
+            const vectorField& pf
+        ) const;
+
         //- Read the surface
         static triSurface readSurface(const fvMesh& mesh, const fileName& f);
+
+        //- Check that the surface is closed with outward normals, and set
+        //  the reference points and centre of rotation from it
+        void setSurface();
 
 
 public:
@@ -192,6 +229,19 @@ public:
                 return max(cmptSum(cmptMultiply(cmptMag(n), span)), VSMALL);
             }
 
+            //- Smallest width of a bounding box span in the solved
+            //  directions
+            static scalar solvedWidth
+            (
+                const vector& span,
+                const Vector<label>& solD
+            );
+
+            //- Width of a cell: its smallest bounding box width in the
+            //  solved directions. Used for the stencil radius of the surface
+            //  traction and the pinned rate, which must agree
+            static scalar cellWidth(const polyMesh& mesh, const label celli);
+
 
         // Access
 
@@ -201,10 +251,50 @@ public:
                 return name_;
             }
 
+            //- Has the surface been set? A body without a surface file is
+            //  given its surface by a fluid-solid interface
+            bool hasSurface() const
+            {
+                return surface_.size() > 0;
+            }
+
+            //- Motion of the body
+            const immersedBodyMotion& motion() const
+            {
+                return motionPtr_();
+            }
+
+            //- Non-const access to the motion, for a fluid-solid interface
+            //  that drives it
+            immersedBodyMotion& motion()
+            {
+                return motionPtr_();
+            }
+
             //- Does the body move?
             bool moving() const
             {
                 return motionPtr_->moving();
+            }
+
+            //- Configuration index of the motion in the current
+            //  configuration: the body has been re-positioned since it was
+            //  last used if this differs from motion().configuration()
+            label configuration() const
+            {
+                return configuration_;
+            }
+
+            //- Is the motion of the body rigid?
+            bool rigid() const
+            {
+                return motionPtr_->rigid();
+            }
+
+            //- Velocities of the surface points of a deforming body
+            const vectorField& pointVelocities() const
+            {
+                return pointVelocities_;
             }
 
             //- Surface in the current configuration
@@ -241,11 +331,33 @@ public:
             //  configuration
             point CofR() const;
 
-            //- Velocity of the body at the points x
-            tmp<vectorField> velocity(const pointField& x) const
+            //- Velocity of the body at the points x: that of the motion for
+            //  a rigid motion; for a deforming motion, the velocity of the
+            //  surface points interpolated at the nearest point of the
+            //  surface
+            tmp<vectorField> velocity(const pointField& x) const;
+
+            //- Acceleration of the body at the point x, from a central
+            //  difference of the velocity over dt, following the point for
+            //  a rigid motion
+            vector acceleration(const point& x, const scalar dt) const;
+
+            //- First intersection of the surface with each segment from
+            //  start to end
+            void findLine
+            (
+                const pointField& start,
+                const pointField& end,
+                List<pointIndexHit>& hits
+            ) const
             {
-                return motionPtr_->velocity(x, time_);
+                searchPtr_->findLine(start, end, hits);
             }
+
+            //- Set the signed distance to the surface, positive outside the
+            //  body, at the points of the cells near the surface, where it is
+            //  lower than the value in f
+            void addPointDistances(scalarField& f) const;
 
             //- Nearest points on the surface to the points x, within the
             //  distances sqrt(searchDistSqr), and the unit normals of the
@@ -261,7 +373,18 @@ public:
 
         // Edit
 
-            //- Move the surface to its configuration at time t
+            //- Set the reference surface of a body without a surface file:
+            //  the points and the triangles as faces of three points, with
+            //  the normals pointing out of the body. The surface is then
+            //  moved to the current time
+            void setReferenceSurface
+            (
+                const pointField& points,
+                const faceList& triangles
+            );
+
+            //- Move the surface to its configuration at time t, if the time
+            //  or the configuration index of the motion has changed
             void move(const scalar t);
 
             //- Locate the covered cells and add the occupancy of the body to

@@ -62,21 +62,61 @@ release. For complete commit-level details and contributor information, see the
 - Added the `immersedBoundary` library (OpenFOAM.com only) with the
   `immersedBoundaryForce` finite volume option for bodies with a prescribed
   motion, given as closed surfaces, in incompressible flow. It works with the
-  `pimpleFluid` fluid model and the `pimpleFoam` solver. The default forcing
-  is an implicit volume penalisation weighted by the solid volume fraction,
+  `pimpleFluid` fluid model and the `pimpleFoam` solver. `method penalty` is
+  an implicit volume penalisation weighted by the solid volume fraction,
   which is found from the signed distance to the surface, with a
   penalisation rate in the partially covered cells that does not depend on
   the time step. For static bodies, `method ghostCell` penalises the cells
   whose centre is inside a body, with the velocity of the cells next to the
   fluid extrapolated linearly from an image point in the fluid, so that the
-  velocity equals the body velocity on the surface. The explicit direct
+  velocity equals the body velocity on the surface. `method cutLink` (the
+  default), for static and moving bodies, penalises the cells whose centre
+  is inside a body and, along each cell link cut by the surface, the fluid
+  cell next to them (Shortley-Weller), with rates that do not depend on the
+  time step
+  and vary continuously as the body moves; with the solids4foam
+  `pimpleFluid` fluid model, the pressure equation uses the fluid fraction
+  of the area of the cut faces (from `cutFaceIso`) and the body flux through
+  their solid part, and does not impose continuity in the cells entirely
+  inside a body. Its force is the momentum exchange or the traction on
+  the surface (new `immersedSurfaceTraction` class). Added the
+  `uniformTranslation` and `solidBodyRotation` body motions, deforming bodies
+  (the `quadraticBend` and `customProfileBend` motions, and the heart valve
+  motions `valveSliceAxis` and `valveMorph`, with the
+  `immersedBodyRefinementCells` utility to refine the mesh around the region
+  swept by thin bodies, which need about three cells across their
+  thickness), and the `cut`
+  (exact volume fraction) occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
   cardiacFoam by Sairam Pamulaparthi Venkata, itself based on openHFDIB-DEM and
   openHFDIB; see `src/immersedBoundary/README.md` for the provenance. Added the
-  `fluids/immersedBoundary/staticCylinderInChannel` and
-  `fluids/immersedBoundary/oscillatingCylinderInChannel` tutorials, with
+  `fluids/immersedBoundary/staticCylinderInChannel`,
+  `fluids/immersedBoundary/oscillatingCylinderInChannel`,
+  `fluids/immersedBoundary/translatingCylinderInChannel`,
+  `fluids/immersedBoundary/oscillatingWallStokesLayer`,
+  `fluids/immersedBoundary/immersedTaylorCouette`,
+  `fluids/immersedBoundary/bendingBeamInChannel` and
+  `fluids/immersedBoundary/heartValveInDuct` tutorials, with
   regression tests.
+- Added immersed fluid-solid interfaces: in `constant/fsiProperties`, a solid
+  interface patch paired with `fluidPatch none;` drives an immersed body of
+  the `immersedBoundaryForce` option of the fluid (motion `fsiDriven`), named
+  in an `immersedInterfaces` entry with optional `closurePatches` of the
+  solid that close its surface. The surface is built from the solid patches
+  (extended and capped in the empty direction of a two-dimensional fluid
+  mesh), moved in every coupling iteration, and the surface traction of the
+  immersed boundary is returned to the solid patch; the momentum exchange
+  with the body is logged for comparison. The interface works with the
+  Dirichlet-Neumann coupling schemes (`fixedRelaxation`, `Aitken`, `IQNILS`)
+  and needs no interface mapping. The bodies of `immersedBoundaryForce` are
+  now re-positioned within a time step when their configuration changes, and
+  the `surface` entry of a body is optional. The coupling schemes use the new
+  `fluidSolidInterface` accessors `nInterfaces()`, `fluidZone(i)`,
+  `solidZone(i)`, `fluidInterfaceName(i)` and `fluidZoneTraction(i)`. Added
+  the `fluids/immersedBoundary/immersedHronTurekFsi2` tutorial (the
+  Turek-Hron FSI2 benchmark with the cylinder and flag immersed in a fixed
+  background mesh), with a regression test.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.
@@ -118,6 +158,13 @@ release. For complete commit-level details and contributor information, see the
   `verification/` study compares the dry and wet frequencies and their ratio
   with the exact continuum solution for added-to-structural mass ratios of
   0.1, 1 and 10, under mesh and time-step refinement.
+- Added an opt-in verification study to the `3dTube` tutorial, which runs the
+  pressure-pulse benchmark through a mesh and time-step sweep with the
+  partitioned Robin-Neumann or IQN-ILS coupling, compares the point-A wall
+  displacement with Tuković et al. (2018) and, using the published first-order
+  time discretisation, with Lozovskiy et al. (2019) and Eken (2016), checks
+  the pulse-wave speed against a thick-wall estimate, and compares the
+  Robin-Neumann and IQN-ILS solutions.
 - Added the `blobInTreacle` fluid-solid interaction tutorial, the
   temporal-accuracy case of Liu, Jaiman and Gurugubelli (2014): a linear
   elastic half cylinder in a ramped, highly viscous channel flow, with equal
@@ -263,6 +310,17 @@ release. For complete commit-level details and contributor information, see the
   end time in 475 s instead of 761 s, with new regression references for each
   fork. Set `predictor no` to recover the previous behaviour.
 
+- `elasticWallPressure` documents and reports why Robin-Neumann coupling is
+  slow on walls wetted on both sides, such as the `HronTurekFsi3` flap. There,
+  each face has two interface impedances: one for loads that push both faces
+  the same way (translation and bending), which the automatic coefficient
+  matches, and one about `coth^2(h/l)` times larger for loads that squeeze
+  the wall through its thickness. A single coefficient cannot match both, so
+  the squeeze modes contract at best at about `1 - 2*tanh^2(h/l)` per FSI
+  iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
+  The estimate is printed at the start of the run, with a warning when it
+  exceeds 0.95.
+
 ### Removed
 
 - OpenFOAM.com versions older than v2312 (v2306, v2212, v2206, v2112, v2106
@@ -390,6 +448,10 @@ release. For complete commit-level details and contributor information, see the
   `constant/fsiProperties.aitken` that did not exist. The Aitken setup is now
   in that file, and `constant/fsiProperties` is a link to the selected
   `constant/fsiProperties.<mode>` (`robin` by default).
+- On a restart, the warning that an `elasticWallPressure` (Robin) interface is
+  used with relaxed or accelerated coupling was issued for `fixedRelaxation`
+  with `relaxationFactor 1` too, as the check ran during the construction of
+  the base coupling class.
 
 ## [v2.4] - 2026-08-24
 

@@ -3,8 +3,10 @@
 #
 # C = 2 F/(rho Uref^2 D Lz), with rho = 1 kg/m^3, the maximum cylinder
 # velocity Uref = 2 pi A/T = 0.3927 m/s, D = 0.1 m and Lz = 0.1 m, i.e.
-# C = 1296.9 F. The hydrodynamic force is the force of the forcing (columns
-# 2-4) plus the inertia of the fluid inside the cylinder (columns 8-10).
+# C = 1296.9 F. With cutLink and forceEstimator surfaceTraction, the force is
+# in columns 2-4 (columns 8-10 are zero); with penalty, the hydrodynamic force
+# is the force of the forcing (columns 2-4) plus the inertia of the fluid
+# inside the cylinder (columns 8-10).
 set terminal pdfcairo enhanced color font "Helvetica,12" size 6,6
 set output "forceCoeffs.pdf"
 

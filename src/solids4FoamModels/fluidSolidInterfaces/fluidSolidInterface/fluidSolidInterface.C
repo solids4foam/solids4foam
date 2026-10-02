@@ -325,6 +325,13 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     // Note: the interpolation/mapping for each interface pair can be different
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
+        // An immersed interface has no fluid patch: the immersed surface
+        // follows the solid zone point by point, and needs no mapping
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         // Lookup the type
         const word type = fsiProperties_.lookupOrAddDefault<word>
 #ifdef OPENFOAM_NOT_EXTEND
@@ -371,15 +378,38 @@ calcAccumulatedFluidInterfacesDisplacements() const
         nGlobalPatches_
     );
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
-        const label patchID =
-            fluid().globalPatches()[interfaceI].patch().index();
-
         const word accumulatedFluidInterfaceDisplacementName
         (
             "accumulatedFluidInterfaceDisplacement" + Foam::name(interfaceI)
         );
+
+        // An immersed interface does not move the fluid mesh
+        if (immersedInterfaces_[interfaceI])
+        {
+            accumulatedFluidInterfacesDisplacementsList_.set
+            (
+                interfaceI,
+                new vectorIOField
+                (
+                    IOobject
+                    (
+                        accumulatedFluidInterfaceDisplacementName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    vectorField()
+                )
+            );
+
+            continue;
+        }
+
+        const label patchID =
+            fluid().globalPatches()[interfaceI].patch().index();
 
         // Accumulated fluid interface displacement
         IOobject accumulatedFluidInterfaceDisplacementHeader
@@ -498,6 +528,9 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fluidPatchIndices_(),
     nGlobalPatches_(-1),
     interfaceToInterfaceList_(),
+    immersedInterfaces_(),
+    immersedInterfaceList_(),
+    immersedClosurePatches_(),
     outerCorrTolerance_
     (
         fsiProperties_.lookupOrAddDefault<scalar>("outerCorrTolerance", 1e-06)
@@ -625,6 +658,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     robinConvergenceState_(0),
     robinKinematicConsistency_(true),
     robinRelaxationWarned_(false),
+    fieldsInitialized_(false),
     robinReferenceHintIssued_(false),
     residuals_(),
     residualsPrev_(),
@@ -737,6 +771,15 @@ Foam::fluidSolidInterface::fluidSolidInterface
     solidPatchIndices_.setSize(solidPatchNames_.size(), label(-1));
     fluidPatchIndices_.setSize(fluidPatchNames_.size(), label(-1));
 
+    // An interface whose fluid patch is none is immersed: the solid patch
+    // drives an immersed body of the fluid
+    immersedInterfaces_.setSize(fluidPatchNames_.size(), false);
+    forAll(fluidPatchNames_, interfaceI)
+    {
+        immersedInterfaces_[interfaceI] =
+            (fluidPatchNames_[interfaceI] == "none");
+    }
+
     // loop over all coupled patches
     forAll(solidPatchNames_, interfaceI)
     {
@@ -763,6 +806,11 @@ Foam::fluidSolidInterface::fluidSolidInterface
     // loop over all coupled patches
     forAll(fluidPatchNames_, interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         // Fluid patch index
         const polyPatchID fluidPatch
         (
@@ -785,6 +833,9 @@ Foam::fluidSolidInterface::fluidSolidInterface
 
     // Set the number of global poly patches: solid or fluid
     nGlobalPatches_ = fluid().globalPatches().size();
+
+    // Create the immersed interfaces
+    makeImmersedInterfaces();
 
     // Set interface fields list size and initialize residual
     fluidZonesPointsDispls_.setSize(nGlobalPatches_);
@@ -838,7 +889,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     {
         residuals_[interfaceI] = vectorField
         (
-            fluid().globalPatches()[interfaceI].globalPatch().nPoints(),
+            fluidZone(interfaceI).nPoints(),
             vector::zero
         );
     }
@@ -990,6 +1041,265 @@ Foam::fluidSolidInterface::interfaceToInterfaceList() const
 }
 
 
+bool Foam::fluidSolidInterface::anyImmersedInterface() const
+{
+    forAll(immersedInterfaces_, interfaceI)
+    {
+        if (immersedInterfaces_[interfaceI])
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+const Foam::standAlonePatch& Foam::fluidSolidInterface::fluidZone
+(
+    const label interfaceI
+) const
+{
+    if (immersedInterfaces_[interfaceI])
+    {
+        return solidZone(interfaceI);
+    }
+
+    return fluid().globalPatches()[interfaceI].globalPatch();
+}
+
+
+const Foam::standAlonePatch& Foam::fluidSolidInterface::solidZone
+(
+    const label interfaceI
+) const
+{
+    return solid().globalPatches()[interfaceI].globalPatch();
+}
+
+
+Foam::word Foam::fluidSolidInterface::fluidInterfaceName
+(
+    const label interfaceI
+) const
+{
+    if (immersedInterfaces_[interfaceI])
+    {
+        return
+            "immersed body "
+          + immersedInterfaceList_[interfaceI].bodyName();
+    }
+
+    return fluidMesh().boundary()[fluidPatchIndices()[interfaceI]].name();
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::fluidSolidInterface::fluidZoneTraction
+(
+    const label interfaceI
+) const
+{
+    if (immersedInterfaces_[interfaceI])
+    {
+        // The traction on the fluid side is minus that on the solid faces
+        return -immersedInterfaceList_[interfaceI].zoneTraction();
+    }
+
+    // Total traction of the fluid zone: viscous force minus the pressure
+    // force along the zone normals
+    return
+        fluid().faceZoneViscousForce(interfaceI)
+      - fluid().faceZonePressureForce(interfaceI)
+       *fluidZone(interfaceI).faceNormals();
+}
+
+
+void Foam::fluidSolidInterface::makeImmersedInterfaces()
+{
+    immersedInterfaceList_.setSize(nGlobalPatches_);
+    immersedClosurePatches_.setSize(nGlobalPatches_);
+
+    if (!anyImmersedInterface())
+    {
+        return;
+    }
+
+#ifdef OPENFOAM_COM
+    const dictionary& interfacesDict =
+        fsiProperties_.subDict("immersedInterfaces");
+
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
+    {
+        if (!immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
+        const word& solidPatchName = solidPatchNames_[interfaceI];
+        const dictionary& dict = interfacesDict.subDict(solidPatchName);
+        const word bodyName(dict.lookup("body"));
+        const wordList closureNames
+        (
+            dict.lookupOrDefault<wordList>("closurePatches", wordList())
+        );
+
+        Info<< "Immersed interface " << interfaceI << ": solid patch "
+            << solidPatchName << " drives the immersed body " << bodyName
+            << endl;
+
+        // Find the immersed boundary option of the fluid that holds the body
+        fsiImmersedBoundary* ibPtr = nullptr;
+        label bodyi = -1;
+
+        PtrList<fv::option>& options = fluid().options();
+        forAll(options, optioni)
+        {
+            fsiImmersedBoundary* ptr =
+                dynamic_cast<fsiImmersedBoundary*>(&options[optioni]);
+
+            if (ptr && ptr->findBody(bodyName) >= 0)
+            {
+                ibPtr = ptr;
+                bodyi = ptr->findBody(bodyName);
+                break;
+            }
+        }
+
+        if (!ibPtr)
+        {
+            FatalErrorInFunction
+                << "No immersedBoundaryForce option of the fluid has a body "
+                << "named " << bodyName << " for the immersed interface of "
+                << "solid patch " << solidPatchName << nl
+                << "The body must be given in the fvOptions of the fluid, "
+                << "with libs (immersedBoundary) in the controlDict"
+                << abort(FatalError);
+        }
+
+        if (!ibPtr->fsiDriven(bodyi))
+        {
+            FatalErrorInFunction
+                << "The motion of immersed body " << bodyName
+                << " must be fsiDriven for it to be driven by the "
+                << "fluid-solid interface" << abort(FatalError);
+        }
+
+        // Global patches of the closure patches, with their current points
+        // (those of the restart time on a restart; the surface is at rest
+        // until it is first moved)
+        immersedClosurePatches_.set
+        (
+            interfaceI,
+            new PtrList<globalPolyPatch>(closureNames.size())
+        );
+        PtrList<globalPolyPatch>& closurePatches =
+            immersedClosurePatches_[interfaceI];
+        List<const standAlonePatch*> closureZones(closureNames.size());
+        List<pointField> closurePoints(closureNames.size());
+
+        forAll(closureNames, i)
+        {
+            if (solidMesh().boundaryMesh().findPatchID(closureNames[i]) < 0)
+            {
+                FatalErrorInFunction
+                    << "Closure patch " << closureNames[i]
+                    << " of the immersed interface of solid patch "
+                    << solidPatchName << " not found" << abort(FatalError);
+            }
+
+            closurePatches.set
+            (
+                i,
+                new globalPolyPatch(closureNames[i], solidMesh())
+            );
+            closureZones[i] = &closurePatches[i].globalPatch();
+            closurePoints[i] = solidZonePointsOld(closurePatches[i], true);
+        }
+
+        immersedInterfaceList_.set
+        (
+            interfaceI,
+            new fsiImmersedInterface
+            (
+                *ibPtr,
+                bodyi,
+                bodyName,
+                solidZone(interfaceI),
+                solidZonePointsOld
+                (
+                    solid().globalPatches()[interfaceI],
+                    true
+                ),
+                closureZones,
+                closurePoints,
+                fluidMesh().solutionD(),
+                fluidMesh().bounds()
+            )
+        );
+    }
+#else
+    FatalErrorInFunction
+        << "Immersed interfaces (fluidPatch none) require the immersed "
+        << "boundary library, which is only available with OpenFOAM.com"
+        << abort(FatalError);
+#endif
+}
+
+
+Foam::tmp<Foam::pointField> Foam::fluidSolidInterface::solidZonePointsOld
+(
+    const globalPolyPatch& gp,
+    const bool current
+) const
+{
+    const polyPatch& pp = gp.patch();
+
+    pointField patchPoints(pp.localPoints());
+
+    // For a solid that does not move its mesh, the mesh points are in the
+    // reference configuration: add the total displacement of the previous
+    // time step, or the current one
+    if (!solid().movingMesh())
+    {
+        const pointVectorField& pointD =
+        (
+            current ? solid().pointD() : solid().pointD().oldTime()
+        );
+
+        patchPoints += vectorField(pointD.internalField(), pp.meshPoints());
+    }
+
+    return gp.patchPointToGlobal(patchPoints);
+}
+
+
+void Foam::fluidSolidInterface::updateImmersedInterfacePoints0()
+{
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
+    {
+        if (!immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
+        const PtrList<globalPolyPatch>& closurePatches =
+            immersedClosurePatches_[interfaceI];
+
+        List<pointField> closurePoints(closurePatches.size());
+        forAll(closurePatches, i)
+        {
+            closurePoints[i] = solidZonePointsOld(closurePatches[i]);
+        }
+
+        immersedInterfaceList_[interfaceI].setPoints0
+        (
+            solidZonePointsOld(solid().globalPatches()[interfaceI]),
+            closurePoints
+        );
+    }
+}
+
+
 Foam::vector Foam::fluidSolidInterface::totalForceOnInterface
 (
     const standAlonePatch& zone, const vectorField& zoneTraction
@@ -1036,6 +1346,11 @@ void Foam::fluidSolidInterface::initializeFields()
     bool needUpdate = false;
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         const label nFaces = returnReduce
         (
             fluid().globalPatches()[interfaceI].patch().size(),
@@ -1064,15 +1379,15 @@ void Foam::fluidSolidInterface::initializeFields()
         interfaceToInterfaceList();
     }
 
+    // The immersed interfaces start the time step from the solid
+    updateImmersedInterfacePoints0();
+
     // Reset the point fields
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
-        const label nPoints =
-            fluid().globalPatches()[interfaceI].globalPatch().nPoints();
-        const label nFluidFaces =
-            fluid().globalPatches()[interfaceI].globalPatch().size();
-        const label nSolidFaces =
-            solid().globalPatches()[interfaceI].globalPatch().size();
+        const label nPoints = fluidZone(interfaceI).nPoints();
+        const label nFluidFaces = fluidZone(interfaceI).size();
+        const label nSolidFaces = solidZone(interfaceI).size();
 
         fluidZonesPointsDispls_[interfaceI] = vectorField(nPoints, vector::zero);
 
@@ -1111,18 +1426,22 @@ void Foam::fluidSolidInterface::initializeFields()
 
         const label fluidPatchID = fluidPatchIndices()[interfaceI];
         robinInterfaces_[interfaceI] =
-            isA<elasticWallPressureFvPatchScalarField>
+            !immersedInterfaces_[interfaceI]
+         && isA<elasticWallPressureFvPatchScalarField>
             (
                 fluid().solutionP().boundaryField()[fluidPatchID]
             );
         maxRobinPressureNorm_[interfaceI] = 0;
 
         // Robin-Neumann coupling is designed for unrelaxed fixed-point
-        // iterations; warn once otherwise (not during construction, when the
-        // derived coupling interface is not yet available)
+        // iterations; warn once otherwise. Not in the call from the
+        // base-class constructor, where the derived coupling interface is not
+        // yet available and fluidMeshFollowsSolid() is the base-class one:
+        // the time index alone does not exclude it on a restart
         if
         (
             robinInterfaces_[interfaceI]
+         && fieldsInitialized_
          && runTime().timeIndex() > 0
          && !robinRelaxationWarned_
          && !fluidMeshFollowsSolid()
@@ -1158,7 +1477,11 @@ void Foam::fluidSolidInterface::initializeFields()
         interfacesPointsDisplsPrev_[interfaceI] =
             vectorField(nPoints, vector::zero);
 
-        if (accumulatedFluidInterfacesDisplacementsList_.size())
+        if
+        (
+            accumulatedFluidInterfacesDisplacementsList_.size()
+         && !immersedInterfaces_[interfaceI]
+        )
         {
             accumulatedFluidInterfacesDisplacementsList_[interfaceI] =
                 vectorField
@@ -1171,6 +1494,8 @@ void Foam::fluidSolidInterface::initializeFields()
                 );
         }
     }
+
+    fieldsInitialized_ = true;
 }
 
 
@@ -1202,6 +1527,36 @@ void Foam::fluidSolidInterface::updateInterpolatorAndGlobalPatches()
 
 void Foam::fluidSolidInterface::moveFluidMesh()
 {
+    // Immersed interfaces: move the surfaces of the bodies to the interface
+    // displacement, with the velocity of the displacement increment over
+    // the time step. The bodies are re-positioned in the fluid mesh when
+    // the fluid is next solved
+    bool anyFluidPatch = false;
+
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
+    {
+        if (!immersedInterfaces_[interfaceI])
+        {
+            anyFluidPatch = true;
+            continue;
+        }
+
+        Info<< "Moving the immersed surface of interface " << interfaceI
+            << endl;
+
+        immersedInterfaceList_[interfaceI].move
+        (
+            fluidZonesPointsDispls()[interfaceI],
+            fluidZonesPointsDispls()[interfaceI]
+           /fluid().runTime().deltaT().value()
+        );
+    }
+
+    if (!anyFluidPatch)
+    {
+        return;
+    }
+
     // Get fluid patch displacement from fluid zone displacement
     // Take care: these are local patch fields not global patch fields
 
@@ -1219,6 +1574,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         fluidPatchesPointsDispls[interfaceI] =
             fluid().globalPatches()[interfaceI].globalPointToPatch
             (
@@ -1303,6 +1663,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         forAll(fluid().globalPatches(), interfaceI)
         {
+            if (immersedInterfaces_[interfaceI])
+            {
+                continue;
+            }
+
             const labelList& meshPoints =
                 fluid().globalPatches()[interfaceI].globalPatch().meshPoints();
 
@@ -1404,6 +1769,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             forAll(fluid().globalPatches(), interfaceI)
             {
+                if (immersedInterfaces_[interfaceI])
+                {
+                    continue;
+                }
+
                 fixedValueTetPolyPatchVectorField& motionUFluidPatch =
                     refCast<fixedValueTetPolyPatchVectorField>
                     (
@@ -1438,6 +1808,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             forAll(fluid().globalPatches(), interfaceI)
             {
+                if (immersedInterfaces_[interfaceI])
+                {
+                    continue;
+                }
+
                 fixedValuePointPatchVectorField& motionUFluidPatch =
                     refCast<fixedValuePointPatchVectorField>
                     (
@@ -1482,6 +1857,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
                 forAll(fluid().globalPatches(), interfaceI)
                 {
+                    if (immersedInterfaces_[interfaceI])
+                    {
+                        continue;
+                    }
+
                     fixedValuePointPatchVectorField& motionUFluidPatch =
                         refCast<fixedValuePointPatchVectorField>
                         (
@@ -1518,6 +1898,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             // Loop through all FSI interfaces
             forAll(fluid().globalPatches(), interfaceI)
             {
+                if (immersedInterfaces_[interfaceI])
+                {
+                    continue;
+                }
+
                 // Interpolate the FSI interface point motion to the faces
                 const vectorField interfacePatchMotion
                 (
@@ -1555,6 +1940,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         forAll(fluid().globalPatches(), interfaceI)
         {
+            if (immersedInterfaces_[interfaceI])
+            {
+                continue;
+            }
+
             accumulatedFluidInterfacesDisplacements()[interfaceI] =
                 vectorField
                 (
@@ -1598,17 +1988,65 @@ void Foam::fluidSolidInterface::updateForce()
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
+
+        if (immersedInterfaces_[interfaceI])
+        {
+            // The traction on the solid faces from the immersed boundary,
+            // which follows the solid zone point by point: no transfer
+            const fsiImmersedInterface& immersed =
+                immersedInterfaceList_[interfaceI];
+
+            const vectorField solidZoneTotalTraction(immersed.zoneTraction());
+
+            fluidZonesTractions()[interfaceI] = -solidZoneTotalTraction;
+            solidZonesTractions()[interfaceI] = solidZoneTotalTraction;
+
+            if (coupled())
+            {
+                solid().setTraction
+                (
+                    interfaceI,
+                    solidPatchIndices()[interfaceI],
+                    solidZoneTotalTraction
+                );
+            }
+
+            // The force from the surface traction is compared with the
+            // momentum exchange between the fluid and the whole body, which
+            // is the force that the fluid receives
+            const vector tractionForce
+            (
+                totalForceOnInterface(solidZone, solidZoneTotalTraction)
+            );
+            const vector momentumExchangeForce
+            (
+                immersed.momentumExchangeForce()
+            );
+
+            Info<< "Total force on solid interface " << interfaceI
+                << " (" << fluidInterfaceName(interfaceI) << "): "
+                << tractionForce << nl
+                << "Force on the body from the momentum exchange: "
+                << momentumExchangeForce << ", relative difference "
+                << mag(tractionForce - momentumExchangeForce)
+                  /(mag(momentumExchangeForce) + SMALL) << nl;
+
+            if (immersed.nFacesWithoutPoints() > 0)
+            {
+                Info<< immersed.nFacesWithoutPoints() << " interface faces "
+                    << "without quadrature points in the fluid mesh have "
+                    << "zero traction" << nl;
+            }
+
+            Info<< endl;
+
+            continue;
+        }
 
         // Calculate total traction of fluid zone
-        vectorField fluidZoneTotalTraction
-        (
-            fluid().faceZoneViscousForce(interfaceI)
-          - fluid().faceZonePressureForce(interfaceI)*fluidZone.faceNormals()
-        );
+        vectorField fluidZoneTotalTraction(fluidZoneTraction(interfaceI));
 
         fluidZonesTractions()[interfaceI] = fluidZoneTotalTraction;
 
@@ -1691,13 +2129,18 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
 
     Info<< "Setting traction and pressure on solid interfaces" << endl;
 
+    if (anyImmersedInterface())
+    {
+        FatalErrorInFunction
+            << "The separate viscous force and pressure are not available "
+            << "on an immersed interface" << abort(FatalError);
+    }
+
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
         // Calculate total traction of fluid zone
         vectorField fluidZoneTraction
@@ -1773,10 +2216,8 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
         // Calculate the point displacements of the solid interface
         const vectorField solidZonePointsDisplsAtSolid
@@ -1794,22 +2235,31 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
             solidZonesPointsDispls()[interfaceI].size(), vector::zero
         );
 
-        // Transfer displacement field from the solid to the fluid
-        interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
-        (
-            solidZone,                              // from zone
-            fluidZone,                              // to zone
-            solidZonePointsDisplsAtSolid,           // from field
-            solidZonesPointsDispls()[interfaceI]    // to field
-        );
+        if (immersedInterfaces_[interfaceI])
+        {
+            // The immersed surface follows the solid zone point by point
+            solidZonesPointsDispls()[interfaceI] = solidZonePointsDisplsAtSolid;
+            solidZonePointsTotDispl = solidZonePointsTotDisplsAtSolid;
+        }
+        else
+        {
+            // Transfer displacement field from the solid to the fluid
+            interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
+            (
+                solidZone,                              // from zone
+                fluidZone,                              // to zone
+                solidZonePointsDisplsAtSolid,           // from field
+                solidZonesPointsDispls()[interfaceI]    // to field
+            );
 
-        interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
-        (
-            solidZone,                              // from zone
-            fluidZone,                              // to zone
-            solidZonePointsTotDisplsAtSolid,        // from field
-            solidZonePointsTotDispl                 // to field
-        );
+            interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
+            (
+                solidZone,                              // from zone
+                fluidZone,                              // to zone
+                solidZonePointsTotDisplsAtSolid,        // from field
+                solidZonePointsTotDispl                 // to field
+            );
+        }
 
         // Update interface residuals
         residualsPrev()[interfaceI] = residuals()[interfaceI];
@@ -1846,34 +2296,48 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
                 solidZonePointsAtSolid += solidZonePointsTotDisplsAtSolid;
             }
 
-            // Map solid points to the fluid interface
+            if (immersedInterfaces_[interfaceI])
+            {
+                // The immersed surface points are those of the solid at the
+                // start of the time step plus the interface displacement
+                residuals()[interfaceI] =
+                    solidZonePointsAtSolid
+                  - (
+                        immersedInterfaceList_[interfaceI].zonePoints0()
+                      + fluidZonesPointsDispls()[interfaceI]
+                    );
+            }
+            else
+            {
+                // Map solid points to the fluid interface
 
-            vectorField solidZonePoints
-            (
-                fluidZonesPointsDispls()[interfaceI].size(), vector::zero
-            );
-
-            interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
-            (
-                solidZone,                              // from zone
-                fluidZone,                              // to zone
-                solidZonePointsAtSolid,                 // from field
-                solidZonePoints                         // to field
-            );
-
-            // Calculate fluid zone positions
-            const vectorField fluidZonePoints
-            (
-                fluid().globalPatches()[interfaceI].patchPointToGlobal
+                vectorField solidZonePoints
                 (
-                    fluidMesh().boundaryMesh()
-                    [
-                        fluid().globalPatches()[interfaceI].patch().index()
-                    ].localPoints()
-                )
-            );
+                    fluidZonesPointsDispls()[interfaceI].size(), vector::zero
+                );
 
-            residuals()[interfaceI] = solidZonePoints - fluidZonePoints;
+                interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
+                (
+                    solidZone,                              // from zone
+                    fluidZone,                              // to zone
+                    solidZonePointsAtSolid,                 // from field
+                    solidZonePoints                         // to field
+                );
+
+                // Calculate fluid zone positions
+                const vectorField fluidZonePoints
+                (
+                    fluid().globalPatches()[interfaceI].patchPointToGlobal
+                    (
+                        fluidMesh().boundaryMesh()
+                        [
+                            fluid().globalPatches()[interfaceI].patch().index()
+                        ].localPoints()
+                    )
+                );
+
+                residuals()[interfaceI] = solidZonePoints - fluidZonePoints;
+            }
         }
 
         // We will use two definitions of residual
@@ -2398,6 +2862,11 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
 {
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         if
         (
             isA<movingWallPressureFvPatchScalarField>
@@ -2417,10 +2886,8 @@ void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
                 << endl;
 
             // Take references to zones
-            const standAlonePatch& fluidZone =
-               fluid().globalPatches()[interfaceI].globalPatch();
-            const standAlonePatch& solidZone =
-               solid().globalPatches()[interfaceI].globalPatch();
+            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+            const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
             const vectorField solidZoneAcceleration
             (
@@ -2478,6 +2945,11 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         // Set interface acceleration
         if
         (
@@ -2499,10 +2971,8 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 << endl;
 
             // Take references to zones
-            const standAlonePatch& fluidZone =
-               fluid().globalPatches()[interfaceI].globalPatch();
-            const standAlonePatch& solidZone =
-               solid().globalPatches()[interfaceI].globalPatch();
+            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+            const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
             const vectorField solidZoneAcceleration
             (
@@ -2622,11 +3092,13 @@ void Foam::fluidSolidInterface::syncFluidZonePointsDispl
             // pass to all procs
             reduce(fluidZonesPointsDispls[interfaceI], FieldSumOp<vector>());
 
+            // The immersed surface follows the solid zone
             const labelList& map =
-                fluid().globalPatches()
-                [
-                    interfaceI
-                ].globalMasterToCurrentProcPointAddr();
+            (
+                immersedInterfaces_[interfaceI]
+              ? solid().globalPatches()[interfaceI]
+              : fluid().globalPatches()[interfaceI]
+            ).globalMasterToCurrentProcPointAddr();
 
             if (!Pstream::master())
             {

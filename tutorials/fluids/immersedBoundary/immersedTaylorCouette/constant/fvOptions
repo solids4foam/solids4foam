@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Immersed cylinder, see src/immersedBoundary/README.md
+immersedBoundary
+{
+    type            immersedBoundaryForce;
+
+    // Sharp interface penalisation with the fluid cells next to the
+    // surfaces penalised along the cell links cut by the surfaces (see
+    // src/immersedBoundary/README.md); "method penalty;" for comparison
+    method          cutLink;
+
+    bodies
+    {
+        rotor
+        {
+            // Cylinder of radius 0.05 m rotating at 1 rad/s about the z axis
+            surface     "rotor.stl";
+            CofR        (0 0 0);
+
+            motion
+            {
+                type        solidBodyRotation;
+                origin      (0 0 0);
+                axis        (0 0 1);
+                omega       1;
+            }
+        }
+
+        stator
+        {
+            // Fixed annulus between r = 0.1 m and 0.25 m, covering the
+            // corners of the mesh
+            surface     "stator.stl";
+            CofR        (0 0 0);
+        }
+    }
+}
+
+// ************************************************************************* //

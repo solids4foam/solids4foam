@@ -21,6 +21,12 @@ Class
 Description
     Virtual base class for fluid-solid interface coupling.
 
+    Each interface pairs a solid patch with a fluid patch, or, with
+    fluidPatch none, with an immersed body of the fluid (see
+    fsiImmersedInterface), which the solid patch drives and from which it
+    takes the traction; an immersed interface needs no mapping and does not
+    move the fluid mesh.
+
 Author
     Zeljko Tukovic, FSB Zagreb.
     Philip Cardiff, UCD.
@@ -43,6 +49,7 @@ SourceFiles
 #include "solidModel.H"
 #include "dynamicFvMesh.H"
 #include "interfaceToInterfaceMapping.H"
+#include "fsiImmersedInterface.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -88,7 +95,19 @@ class fluidSolidInterface
         //- Mapping objects for passing fields between the pairs of solid and
         //  fluid interfaces
         //  e.g. this could be RBF or GGI or a direct map or other
+        //  Unset for the immersed interfaces
         mutable PtrList<interfaceToInterfaceMapping> interfaceToInterfaceList_;
+
+        //- Is each interface immersed: the solid interface patch drives an
+        //  immersed body of the fluid (fluidPatch none), and there is no
+        //  fluid patch and no mapping
+        List<bool> immersedInterfaces_;
+
+        //- Immersed interfaces, unset for the interfaces with a fluid patch
+        PtrList<fsiImmersedInterface> immersedInterfaceList_;
+
+        //- Global patches of the closure patches of the immersed interfaces
+        PtrList<PtrList<globalPolyPatch>> immersedClosurePatches_;
 
         //- Outer correction loop stoping tolerance
         const scalar outerCorrTolerance_;
@@ -255,6 +274,11 @@ class fluidSolidInterface
         //- Has the warning about relaxed Robin coupling been issued
         bool robinRelaxationWarned_;
 
+        //- Have the fields been initialised once, i.e. is the base-class
+        //  constructor, which calls initializeFields() before the derived
+        //  coupling interface exists, finished
+        bool fieldsInitialized_;
+
         //- Has the hint about the Robin reference scales been issued
         bool robinReferenceHintIssued_;
 
@@ -290,6 +314,24 @@ class fluidSolidInterface
 
         //- Calculate interface-to-interface list
         void calcInterfaceToInterfaceList() const;
+
+        //- Create the immersed interfaces from the immersedInterfaces
+        //  dictionary
+        void makeImmersedInterfaces();
+
+        //- Points of a solid global patch at the start of the time step:
+        //  the mesh patch points, plus the old total displacement for a
+        //  solid that does not move its mesh; or the current points, with
+        //  the current total displacement
+        tmp<pointField> solidZonePointsOld
+        (
+            const globalPolyPatch& gp,
+            const bool current = false
+        ) const;
+
+        //- Set the points at the start of the time step of the immersed
+        //  interfaces
+        void updateImmersedInterfacePoints0();
 
         //- Accumulated fluid interfaces displacements
         void calcAccumulatedFluidInterfacesDisplacements() const;
@@ -488,6 +530,42 @@ public:
             {
                 return nGlobalPatches_;
             }
+
+            //- Return the number of fluid-solid interfaces
+            label nInterfaces() const
+            {
+                return nGlobalPatches_;
+            }
+
+            //- Is the interface immersed (no fluid patch)?
+            bool immersedInterface(const label interfaceI) const
+            {
+                return immersedInterfaces_[interfaceI];
+            }
+
+            //- Is any interface immersed?
+            bool anyImmersedInterface() const;
+
+            //- Return the fluid zone (global patch) of an interface; for an
+            //  immersed interface, the solid zone, which the immersed
+            //  surface follows point by point
+            const standAlonePatch& fluidZone(const label interfaceI) const;
+
+            //- Return the solid zone (global patch) of an interface
+            const standAlonePatch& solidZone(const label interfaceI) const;
+
+            //- Return the name of the fluid side of an interface, for
+            //  reports: the fluid patch name, or the immersed body name
+            word fluidInterfaceName(const label interfaceI) const;
+
+            //- Return the total traction (viscous and pressure) exerted by
+            //  the fluid on the faces of the fluid zone of an interface; for
+            //  an immersed interface, minus the traction on the solid faces
+            //  from the immersed boundary
+            virtual tmp<vectorField> fluidZoneTraction
+            (
+                const label interfaceI
+            ) const;
 
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const
