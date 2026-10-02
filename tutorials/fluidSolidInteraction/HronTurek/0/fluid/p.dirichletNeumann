@@ -24,37 +24,37 @@ boundaryField
 {
     plate
     {
-        type zeroGradient;
-        value uniform 0;
+        type            zeroGradient;
+        value           uniform 0;
     }
     outlet
     {
-        type fixedValue;
-        value uniform 0;
+        type            fixedValue;
+        value           uniform 0;
     }
     inlet
     {
-        type zeroGradient;
-        value uniform 0;
+        type            zeroGradient;
+        value           uniform 0;
     }
     cylinder
     {
-        type zeroGradient;
-        value uniform 0;
+        type            zeroGradient;
+        value           uniform 0;
     }
     bottom
     {
-        type zeroGradient;
-        value uniform 0;
+        type            zeroGradient;
+        value           uniform 0;
     }
     top
     {
-        type zeroGradient;
-        value uniform 0;
+        type            zeroGradient;
+        value           uniform 0;
     }
     frontAndBackPlanes
     {
-        type empty;
+        type            empty;
     }
 }
 

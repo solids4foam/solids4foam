@@ -481,6 +481,11 @@ def create_plot(script_name: str, run_name: str, options: str = "") -> None:
 
 
 def study_cores(requested: str, factor: int, spec: dict) -> int:
+    """The requested rank count, or the spec's per-level value for auto.
+
+    spec is any dictionary with a "cores" entry: the FSI3 or FSI2
+    specification, or its "fsi1" part.
+    """
     if requested != "auto":
         return int(requested)
     return int(spec["cores"].get(str(factor), spec["cores"]["default"]))
@@ -804,17 +809,7 @@ def coupling_level(args: argparse.Namespace, spec: dict, factor: int,
             enable_restart(case)
             shutil.copytree(start_directory, case / start_directory.name)
             if coupling == "robin":
-                for field, condition in (("p", "elasticWallPressure"),
-                                         ("U", "elasticWallVelocity")):
-                    path = case / start_directory.name / "fluid" / field
-                    text, count = re.subn(
-                        r"(\bplate\s*\{\s*type\s+)\w+;",
-                        rf"\g<1>{condition};",
-                        path.read_text(),
-                    )
-                    if count != 1:
-                        fail(f"Could not set the Robin condition on plate in {path}")
-                    path.write_text(text)
+                set_robin_conditions(case / start_directory.name)
         run_case(case, name, cores, coupling, args.reuse)
         row: dict = {"case": name, "coupling": coupling, "refinement": factor,
                      "delta_t": delta_t, "cores": cores, "end_time": end_time,
@@ -1053,10 +1048,7 @@ def fsi1_run(args: argparse.Namespace, spec: dict, factor: int,
     index = mesh["refinementFactors"].index(factor)
     delta_t = mesh["deltaTs"][index]
     end_time = args.end_time or (fsi1["quick"]["endTime"] if args.quick else mesh["endTime"])
-    if args.cores == "auto":
-        cores = int(fsi1["cores"].get(str(factor), fsi1["cores"]["default"]))
-    else:
-        cores = int(args.cores)
+    cores = study_cores(args.cores, factor, fsi1)
     name = f"fsi1_{coupling}_mesh_{factor}x"
     case = WORK_ROOT / name
     if not (args.reuse and case.is_dir()):
@@ -1372,7 +1364,9 @@ def main() -> int:
     parser.add_argument("--cores", default="auto",
                         help="MPI ranks per case: positive integer or auto (default)")
     parser.add_argument("--end-time", type=float,
-                        help="override the end time in seconds (mesh study default 7, coupling study 2.3)")
+                        help="override the end time in seconds (defaults: FSI3 mesh study 7, "
+                        "FSI3 coupling study 2.05, FSI2 10.5, FSI1 30; --quick shortens the "
+                        "mesh studies to 2.3, or 2.5 for FSI1)")
     parser.add_argument("--window", type=float,
                         help="length of the closing analysis window in seconds")
     parser.add_argument("--write-interval", type=int,
@@ -1394,9 +1388,11 @@ def main() -> int:
         fail(f"Tutorial not found at {TUTORIAL}")
     spec = json.loads(REFERENCE_FILE.read_text())
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    (OUTPUT_ROOT / "verification_summary.md").write_text(
-        "# HronTurek verification summary\n\n"
-    )
+    # Each study appends its section, so that, for example, an FSI1 run
+    # followed by an FSI2 run keeps both; delete the file to start afresh
+    summary = OUTPUT_ROOT / "verification_summary.md"
+    if not summary.exists():
+        summary.write_text("# HronTurek verification summary\n\n")
     if args.benchmark == "fsi1":
         study = fsi1_coupling_study if args.study == "coupling" else fsi1_mesh_study
         return 0 if study(args, spec) else 1

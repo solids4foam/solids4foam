@@ -14,17 +14,18 @@ cleanCase solid
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
 
 # Restore the stored FSI3 dictionaries if an Allrun benchmark run was
-# interrupted before it could restore them
-for file in 0/fluid/U.dirichletNeumann 0/fluid/U.robin \
-    constant/solid/mechanicalProperties system/controlDict \
-    constant/fsiProperties.iqnils constant/fsiProperties.robin \
-    system/fluid/fvSolution
+# interrupted before it could restore them: every backup found, so that a
+# file added to the Allrun list cannot leave a backup that blocks the next run
+while IFS= read -r -d '' file
 do
-    if [[ -f "${file}.stored" ]]
-    then
-        mv -f "${file}.stored" "${file}"
-    fi
-done
+    mv -f "${file}" "${file%.stored}"
+done < <(find 0 constant system -name '*.stored' -print0)
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
+
+# Link the default Dirichlet-Neumann IQN-ILS dictionaries, which a Robin run
+# replaces; foam-extend's case conversion may also have replaced the links
+ln -vnsf fsiProperties.iqnils constant/fsiProperties
+ln -vnsf U.dirichletNeumann 0/fluid/U
+ln -vnsf p.dirichletNeumann 0/fluid/p

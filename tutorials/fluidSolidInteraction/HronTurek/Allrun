@@ -65,15 +65,12 @@ restore_benchmark()
 
 # A backup left by an interrupted benchmark run holds the stored
 # dictionaries, and the case files still hold that benchmark's settings
-for file in $benchmarkFiles
-do
-    if [[ -e "${file}.stored" ]]
-    then
-        echo "${file}.stored exists from an interrupted run:"
-        echo "run ./Allclean to restore the stored case first"
-        exit 1
-    fi
-done
+if [[ -n $(find 0 constant system -name '*.stored') ]]
+then
+    echo "A *.stored backup exists from an interrupted run:"
+    echo "run ./Allclean to restore the stored case first"
+    exit 1
+fi
 
 if [[ -n "$benchmark" ]]
 then
@@ -82,9 +79,10 @@ then
             # Steady: mean inflow 0.2 m/s ramped over 2 s, run as a
             # pseudo-transient route to the steady state. The loads are
             # 30 to 40 times smaller than in FSI3, so the fluid solver
-            # tolerances are tightened and the interface tolerance is that of
-            # the verification study; otherwise the solver residuals stall
-            # IQN-ILS just above 1e-6
+            # tolerances are tightened. The interface tolerance stays at the
+            # stored 1e-5, that of the verification study: do not tighten it
+            # to 1e-6, at which the solver residuals stall IQN-ILS just above
+            # the tolerance
             maxValue=0.3; transitionPeriod=2; rho=1000; E=1.4e6
             deltaT=0.025; endTime=30; writeInterval=40
             outerCorrTolerance=1e-5; fluidTolerance=1e-9

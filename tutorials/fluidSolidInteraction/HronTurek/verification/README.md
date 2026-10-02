@@ -27,7 +27,9 @@ The driver requires `python3`, `blockMesh` and `solids4Foam`; `gnuplot` is
 optional and is used for the history plots. Each run is a complete copy of the
 tutorial under `verification/work/`, so the tutorial itself and its regression
 test are not modified. Results are written to `verification/postProcessing/`
-as CSV files, `verification_summary.md`, and PNG history plots. Both
+as CSV files, `verification_summary.md`, and PNG history plots. Each study
+appends its section to `verification_summary.md`, so that consecutive studies,
+such as FSI1 then FSI2, are kept together; delete it to start afresh. Both
 directories are ignored by Git and are retained to make a failed run
 diagnosable.
 

@@ -13,7 +13,7 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 
 # Shortened regression horizon: 100 coupled time-steps after coupling starts
 # at t = 2. The flap oscillation grows from here, and it amplifies differences
-# at the level of the FSI tolerance (1e-6): by t = 2.5, runs that converge
+# at the level of the FSI tolerance (1e-5): by t = 2.5, runs that converge
 # every step but differ only in coupling settings disagree by several times the
 # tolerances below. Up to t = 2.1 that spread stays within 0.15 of them.
 REG_END_TIME=2.1

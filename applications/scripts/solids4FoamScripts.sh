@@ -365,10 +365,12 @@ function solids4Foam::applyFoamExtendTweaks()
     if [[ -n $(find "${CASE_DIR}" -name p) ]]
     then
         echo "Changing uniformFixedValue to timeVaryingUniformFixedValue in p"
+        # --follow-symlinks edits the target of a linked p, such as a case's
+        # p -> p.<variant>, instead of replacing the link with a copy
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)type\(.*\)uniformFixedValue;|\1//type\2uniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)type\(.*\)uniformFixedValue;|\1//type\2uniformFixedValue;|g" {} +
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)//type\(.*\)timeVaryingUniformFixedValue;|\1type\2timeVaryingUniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)//type\(.*\)timeVaryingUniformFixedValue;|\1type\2timeVaryingUniformFixedValue;|g" {} +
     fi
 
     # 7. Use the foam extend changeDictionaryDict, if present
@@ -542,9 +544,9 @@ function solids4Foam::undoFoamExtendTweaks()
     then
         echo "Changing timeVaryingUniformFixedValue to uniformFixedValue in p"
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)//type\(.*\)uniformFixedValue;|\1type\2uniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)//type\(.*\)uniformFixedValue;|\1type\2uniformFixedValue;|g" {} +
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)type\(.*\)timeVaryingUniformFixedValue;|\1//type\2timeVaryingUniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)type\(.*\)timeVaryingUniformFixedValue;|\1//type\2timeVaryingUniformFixedValue;|g" {} +
     fi
 
     # 7. Restore the OpenFOAM changeDictionaryDict, if it was replaced
