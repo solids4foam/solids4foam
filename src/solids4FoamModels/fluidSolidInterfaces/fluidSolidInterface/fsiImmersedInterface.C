@@ -21,6 +21,54 @@ License
 #include "HashTable.H"
 #include "EdgeMap.H"
 #include "DynamicList.H"
+#include "compatibilityFunctions.H"
+#ifdef OPENFOAM_ORG
+    #include "polygonTriangulate.H"
+#endif
+
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+    // Append the triangles of face f, with the orientation of f, to tris and
+    // return their number
+    static label appendTriangles
+    (
+        const face& f,
+        const pointField& points,
+        DynamicList<face>& tris
+    )
+    {
+#ifdef OPENFOAM_ORG
+        // OpenFOAM.org has no face::triangles
+        polygonTriangulate triEngine;
+        triEngine.triangulate(UIndirectList<point>(points, f));
+        const List<triFace> triPoints(triEngine.triPoints(f));
+
+        for (const triFace& t : triPoints)
+        {
+            face tri(3);
+            tri[0] = t[0];
+            tri[1] = t[1];
+            tri[2] = t[2];
+            tris.append(tri);
+        }
+
+        return triPoints.size();
+#else
+        faceList faceTris(f.nTriangles(points));
+        label triI = 0;
+        f.triangles(points, triI, faceTris);
+
+        for (const face& tri : faceTris)
+        {
+            tris.append(tri);
+        }
+
+        return faceTris.size();
+#endif
+    }
+}
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -149,6 +197,7 @@ void Foam::fsiImmersedInterface::buildSurface
     // Triangulate the faces of the zones
     DynamicList<face> triangles(2*zone.size());
     DynamicList<label> triangleFaces(2*zone.size());
+    const pointField mergedPoints(points);
 
     auto addFaces = [&]
     (
@@ -165,13 +214,11 @@ void Foam::fsiImmersedInterface::buildSurface
                 f[i] = map[f[i]];
             }
 
-            faceList tris(f.nTriangles(points));
-            label triI = 0;
-            f.triangles(points, triI, tris);
+            const label nTris =
+                appendTriangles(f, mergedPoints, triangles);
 
-            for (const face& tri : tris)
+            for (label i = 0; i < nTris; ++i)
             {
-                triangles.append(tri);
                 triangleFaces.append(interfaceZone ? facei : -1);
             }
         }
@@ -183,7 +230,7 @@ void Foam::fsiImmersedInterface::buildSurface
         addFaces(closureZones[zonei]->localFaces(), closureMaps[zonei], false);
     }
 
-    pointOffsets_.setSize(points.size(), Zero);
+    pointOffsets_.setSize(points.size(), vector::zero);
 
     // Two-dimensional fluid mesh: extend the surface through the mesh in
     // the empty direction and cap its boundary loops
@@ -346,13 +393,11 @@ void Foam::fsiImmersedInterface::buildSurface
                 polygon = polygon.reverseFace();
             }
 
-            faceList tris(polygon.nTriangles(offsetPoints));
-            label triI = 0;
-            polygon.triangles(offsetPoints, triI, tris);
+            const label nTris =
+                appendTriangles(polygon, offsetPoints, triangles);
 
-            for (const face& tri : tris)
+            for (label i = 0; i < nTris; ++i)
             {
-                triangles.append(tri);
                 triangleFaces.append(-1);
             }
 
@@ -459,7 +504,7 @@ void Foam::fsiImmersedInterface::move
     }
 
     pointField points(pointZones_.size());
-    vectorField velocities(pointZones_.size(), Zero);
+    vectorField velocities(pointZones_.size(), vector::zero);
 
     forAll(pointZones_, i)
     {
@@ -496,9 +541,9 @@ Foam::tmp<Foam::vectorField> Foam::fsiImmersedInterface::zoneTraction() const
             << abort(FatalError);
     }
 
-    tmp<vectorField> tzoneTraction(new vectorField(nZoneFaces_, Zero));
-    vectorField& zoneTraction = tzoneTraction.ref();
-    scalarField zoneAreas(nZoneFaces_, Zero);
+    tmp<vectorField> tzoneTraction(new vectorField(nZoneFaces_, vector::zero));
+    vectorField& zoneTraction = tmpRef(tzoneTraction);
+    scalarField zoneAreas(nZoneFaces_, 0.0);
 
     forAll(triangleFaces_, i)
     {
@@ -520,7 +565,7 @@ Foam::tmp<Foam::vectorField> Foam::fsiImmersedInterface::zoneTraction() const
         }
         else
         {
-            zoneTraction[facei] = Zero;
+            zoneTraction[facei] = vector::zero;
             ++nFacesWithoutPoints_;
         }
     }
