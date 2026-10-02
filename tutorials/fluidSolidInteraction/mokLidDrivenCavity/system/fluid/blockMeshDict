@@ -1,0 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// 1 m x 1 m cavity. The flexible bottom (the fluid-solid interface) is at
+// y = 0 and the moving lid at y = 1. The openings occupy the top 0.125 m of the
+// side walls: the inlet on the left and the outlet on the right. The lower
+// block holds 7/8 of the vertical cells and the upper block 1/8, so the
+// openings are resolved by the same uniform spacing as the rest of the cavity
+scale 1;
+
+vertices
+(
+    (0 0     0)      // 0
+    (1 0     0)      // 1
+    (1 0.875 0)      // 2
+    (0 0.875 0)      // 3
+    (1 1     0)      // 4
+    (0 1     0)      // 5
+    (0 0     0.1)    // 6
+    (1 0     0.1)    // 7
+    (1 0.875 0.1)    // 8
+    (0 0.875 0.1)    // 9
+    (1 1     0.1)    // 10
+    (0 1     0.1)    // 11
+);
+
+blocks
+(
+    hex (0 1 2 3 6 7 8 9) (32 28 1) simpleGrading (1 1 1)
+    hex (3 2 4 5 9 8 10 11) (32 4 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+patches
+(
+    patch interface
+    (
+        (0 1 7 6)
+    )
+    wall lid
+    (
+        (5 11 10 4)
+    )
+    patch inlet
+    (
+        (3 9 11 5)
+    )
+    patch outlet
+    (
+        (2 4 10 8)
+    )
+    wall walls
+    (
+        (0 6 9 3)
+        (1 2 8 7)
+    )
+    empty frontAndBack
+    (
+        (0 3 2 1)
+        (3 5 4 2)
+        (6 7 8 9)
+        (9 8 10 11)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

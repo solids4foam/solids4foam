@@ -171,6 +171,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/flexibleDamBreak"
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/HronTurekFsi3"
+    "fluidSolidInteraction/mokLidDrivenCavity"
     "fluidSolidInteraction/fillingElasticContainer"
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
