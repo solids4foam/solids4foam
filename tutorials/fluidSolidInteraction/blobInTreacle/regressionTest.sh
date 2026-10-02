@@ -22,10 +22,10 @@ DISP_END_TOL=0.005
 FORCE_END_TOL=0.01
 
 # Reference values for all forks: OpenFOAM v2512, serial, Linux. OpenFOAM-9
-# agrees to 6e-4 and foam-extend 4.1 to 1.3e-3
-REF_DISP_T1=0.0565505
-REF_DISP_END=0.117216
-REF_FORCE_END=15.8193
+# agrees to 4e-4 and foam-extend 4.1 to 1.4e-3
+REF_DISP_T1=0.056563
+REF_DISP_END=0.117303
+REF_FORCE_END=15.8338
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"

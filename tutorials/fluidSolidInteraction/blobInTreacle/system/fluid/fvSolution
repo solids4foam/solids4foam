@@ -72,9 +72,10 @@ PIMPLE
     // response consistent between FSI iterations. With a single corrector,
     // the IQN-ILS coupling stagnates on the refined meshes of the
     // verification study, where the viscous number nu*deltaT/dx^2 is large.
-    // The consistent (SIMPLEC) formulation makes the outer correctors
-    // converge on OpenFOAM.org too, where without it the IQN-ILS coupling
-    // diverges in the first time step; foam-extend ignores it.
+    // The consistent (SIMPLEC) formulation, without pressure relaxation,
+    // makes the outer correctors converge on OpenFOAM.org too, where
+    // without it the IQN-ILS coupling diverges in the first time step;
+    // foam-extend ignores it.
     momentumPredictor   on;
     consistent          yes;
     nOuterCorrectors    5;
@@ -95,7 +96,7 @@ relaxationFactors
 {
     fields
     {
-        p       0.5;
+        p       1;
         pFinal  1;
     }
     equations
