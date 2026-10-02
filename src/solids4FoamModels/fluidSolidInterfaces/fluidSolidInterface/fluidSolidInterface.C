@@ -258,6 +258,12 @@ void Foam::fluidSolidInterface::checkFluidInterfaceVelocity()
 
     forAll(fluidPatchIndices_, interfaceI)
     {
+        // An immersed interface has no fluid patch
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         const fvPatchVectorField& Up =
             U.boundaryField()[fluidPatchIndices_[interfaceI]];
 
