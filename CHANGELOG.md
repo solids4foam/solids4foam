@@ -128,9 +128,17 @@ release. For complete commit-level details and contributor information, see the
   second-order. The velocity and acceleration are stored as `NewmarkV(D)` and
   `NewmarkA(D)`, which are written, read on restart, and can set the initial
   conditions; otherwise the body starts at rest or in equilibrium. The
-  time-step may vary. Add `"d2dt2\(.*\)" NewmarkBeta;` to `ddtSchemes` too,
-  because `fvc::d2dt2` reads its scheme there (#502); a fatal error says so
-  if it is missing. The updated Lagrangian solid models are not supported.
+  time-step may vary. Only `d2dt2Schemes` needs the entry (#502). An
+  optional `"d2dt2\(.*\)" NewmarkBeta;` in `ddtSchemes`, with the same
+  coefficients, makes the linear predictor use the Newmark acceleration;
+  differing coefficients are a fatal error. The updated Lagrangian solid
+  models are not supported.
+- The `cantileverVibration` tutorial takes the time scheme as a second
+  `Allrun` argument: `bdf2` (default), `newmark`, `bossak`, or `all` to
+  compare the three with Abaqus. Its regression test runs all three, checks
+  the physical and Bossak-weighted accelerations with `Test-fvcD2dt2`, and
+  checks both `ddtSchemes` forms for `NewmarkBeta` and the fatal error for
+  mismatched coefficients.
 - Added the `collapsibleChannel` fluid-solid interaction tutorial: flow in a
   2D channel with a very light, thin elastic wall that bends and stretches,
   after the oomph-lib collapsible-channel problem of Heil and co-workers,
@@ -395,6 +403,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The explicit inertia term of the solid models now takes its scheme from
+  `d2dt2Schemes`, as the implicit term does (#502). OpenFOAM's `fvc::d2dt2`
+  looks up `ddtSchemes`, so when the two defaults differed, the PETSc SNES
+  residuals, standard and high-order, of `linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` and
+  `nonLinearGeometryUpdatedLagrangian`, the old-time inertia term of the
+  segregated updated Lagrangian solver, and the solid interface acceleration
+  passed to the fluid, used the `ddtSchemes` scheme. Cases in
+  which both dictionaries select the same scheme for these terms, e.g. through
+  equal defaults, are unaffected; the one tutorial whose defaults differ, the
+  hyperelastic `cooksMembrane`, changes by about 1e-9 relative in its
+  `petscSnes` variant. The lookup names are unchanged, so a case that sets
+  these terms through named entries, or sets `ddtSchemes` but not
+  `d2dt2Schemes`, must now give them in `d2dt2Schemes`.
 - `pimpleFluid` now applies finite volume options to its momentum and optional
   temperature equations: `fvOptions` in OpenFOAM.com, and `fvModels` and
   `fvConstraints` in OpenFOAM.org, called where the corresponding standard
