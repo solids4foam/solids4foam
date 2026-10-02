@@ -81,7 +81,11 @@ release. For complete commit-level details and contributor information, see the
   inside a body. Its force is the momentum exchange or the traction on
   the surface (new `immersedSurfaceTraction` class). Added the
   `uniformTranslation` and `solidBodyRotation` body motions, deforming bodies
-  (the `quadraticBend` and `customProfileBend` motions), and the `cut`
+  (the `quadraticBend` and `customProfileBend` motions, and the heart valve
+  motions `valveSliceAxis` and `valveMorph`, with the
+  `immersedBodyRefinementCells` utility to refine the mesh around the region
+  swept by thin bodies, which need about three cells across their
+  thickness), and the `cut`
   (exact volume fraction) occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
@@ -91,8 +95,9 @@ release. For complete commit-level details and contributor information, see the
   `fluids/immersedBoundary/oscillatingCylinderInChannel`,
   `fluids/immersedBoundary/translatingCylinderInChannel`,
   `fluids/immersedBoundary/oscillatingWallStokesLayer`,
-  `fluids/immersedBoundary/immersedTaylorCouette` and
-  `fluids/immersedBoundary/bendingBeamInChannel` tutorials, with
+  `fluids/immersedBoundary/immersedTaylorCouette`,
+  `fluids/immersedBoundary/bendingBeamInChannel` and
+  `fluids/immersedBoundary/heartValveInDuct` tutorials, with
   regression tests.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane

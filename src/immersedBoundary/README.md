@@ -8,6 +8,14 @@ OpenFOAM.com, where `libimmersedBoundary` is built with solids4foam.
 The option works with the solids4foam `pimpleFluid` fluid model and with the
 standard `pimpleFoam` solver. See `tutorials/fluids/immersedBoundary`.
 
+The bodies are closed surfaces with a thickness, represented by the cells of
+the fluid mesh whose centre is inside them: **the mesh needs about three cells
+or more across the thickness of a body**, everywhere and at all times. Thinner
+bodies, or thinner parts of a body, are not blocked reliably and let the flow
+through. Zero-thickness (open) surfaces are not supported. For thin moving
+bodies, such as the leaflets of a heart valve, refine the mesh around the
+region they sweep (see Mesh refinement below).
+
 ## Usage
 
 In `system/controlDict`:
@@ -52,8 +60,12 @@ The complete list of entries is in the header of
 `fvOptions/immersedBoundaryForce/immersedBoundaryForce.H`. The body motions
 are `static` (the default), `sinusoidalTranslation`, `uniformTranslation`
 (constant velocity) and `solidBodyRotation` (constant angular velocity about
-an axis), and the deforming `quadraticBend` and `customProfileBend` (bending
-of a beam about its base), in `immersedBodyMotion`. A deforming motion gives
+an axis), the deforming `quadraticBend` and `customProfileBend` (bending
+of a beam about its base), and the heart valve motions `valveSliceAxis` (the
+collapse of the leaflets towards the valve axis, with the vertices on the
+annulus held fixed) and `valveMorph` (the interpolation between a closed and
+an open valve surface with the same vertices), with the periodic time laws of
+`valveTimeLaw`, in `immersedBodyMotion`. A deforming motion gives
 the position and velocity of each vertex of the surface, and the velocity of
 the body at a point is interpolated from the vertices of the nearest triangle.
 
@@ -257,6 +269,35 @@ static reference. In a short zero-viscosity diagnostic, all 36 partially
 covered cells had positive penalty rates, compared with zero for the old
 cap. This does not establish inviscid no-slip accuracy.
 
+### Mesh refinement
+
+The `immersedBodyRefinementCells` utility writes the cell set of the cells
+within a given distance of the immersed bodies of the `immersedBoundaryForce`
+options, over their motion between two times, for `refineMesh`. The surfaces
+are sampled wherever a vertex has moved by half the distance since the
+previous sample, so that the bands around the samples overlap. Two levels of
+refinement, halving the band at each level:
+
+```bash
+immersedBodyRefinementCells -distance 0.002 -startTime 0 -endTime 0.8
+refineMesh -overwrite
+immersedBodyRefinementCells -distance 0.001 -startTime 0 -endTime 0.8
+refineMesh -overwrite
+```
+
+with `system/refineMeshDict` refining the cell set `refineCells` in the three
+directions (see the `heartValveInDuct` tutorial, `REFINE_LEVELS=1 ./Allrun`).
+The option `-bodies "(name ...)"` restricts the refinement to some bodies.
+
+For the valves of solids4foam/cardiacFoam#20 (leaflets about 0.9 mm thick) in
+a mesh of 1.3 mm cells, no cell centre is inside the open leaflets for most of
+the cycle, and the leaflets are not seen; after two levels of refinement
+around the swept region (0.34 mm cells, from 213 000 to 779 000 cells), 4 000
+to 19 000 cells are inside the mitral leaflets and 1 700 to 12 000 inside the
+aortic leaflets at all times. The `valveSliceAxis` motion shrinks the
+thickness of the leaflets with their radius, so the free edge of a closed
+valve with `Fmax` close to 1 can remain thinner than the refined cells.
+
 ## Provenance
 
 This library is a rewrite, for prescribed motion and as a finite volume
@@ -297,9 +338,13 @@ The lineage of the code is:
 The occupancy (`immersedBody::addOccupancy`) follows the openHFDIB-DEM
 `nonConvexBody`, and the forcing and force calculation
 (`immersedBoundaryForce`, `immersedBody::force`) follow the openHFDIB-DEM
-`pimpleHFDIBFoam` solver and `immersedBody`. The sinusoidal translation
-and the `quadraticBend` and `customProfileBend` deformations follow the
-versions of Sairam Pamulaparthi Venkata. The openHFDIB-DEM
+`pimpleHFDIBFoam` solver and `immersedBody`. The sinusoidal translation,
+the `quadraticBend` and `customProfileBend` deformations, and the
+`valveSliceAxis` and `valveMorph` valve motions and their time laws follow
+the versions of Sairam Pamulaparthi Venkata in solids4foam/cardiacFoam#20,
+except the closed-to-open valve morph, which is from his later working copy
+of xenosim-erc/immersedBoundaryRigidMotion
+(`src/HFDIBDEM/geomModels/stlBased/stlBased.C`, June 2026, not committed). The openHFDIB-DEM
 interpolation of the velocity at the immersed boundary (`lineInt`,
 `leastSquares`), which the benchmark cases do not use, is not included.
 

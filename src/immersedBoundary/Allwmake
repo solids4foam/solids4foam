@@ -8,3 +8,4 @@ then
 fi
 
 wmake $targetType libso
+wmake $targetType utilities/immersedBodyRefinementCells
