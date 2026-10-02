@@ -519,6 +519,8 @@ const scalarField& elasticWallPressureFvPatchScalarField::solidThickness() const
     const labelList& solidPatchIndices = fsi.solidPatchIndices();
     label nTwoSided = 0;
     label nMissed = 0;
+    twoSidedFaces_.setSize(H.size());
+    twoSidedFaces_ = false;
     forAll(H, faceI)
     {
         if (hitPatch[faceI] == -1)
@@ -532,6 +534,7 @@ const scalarField& elasticWallPressureFvPatchScalarField::solidThickness() const
         )
         {
             H[faceI] *= 0.5;
+            twoSidedFaces_[faceI] = true;
             nTwoSided++;
         }
     }
@@ -545,6 +548,62 @@ const scalarField& elasticWallPressureFvPatchScalarField::solidThickness() const
     solidThicknessPtr_.reset(new scalarField(H));
 
     return solidThicknessPtr_();
+}
+
+
+void elasticWallPressureFvPatchScalarField::reportTwoSidedContraction
+(
+    const scalarField& H,
+    const scalarField& ell
+) const
+{
+    // A face of a wall wetted on both sides has the interface impedance
+    // rho_s*l*tanh(h/l) for loads that push both faces the same way, and
+    // rho_s*l*coth(h/l) for loads that squeeze the wall. The coefficient
+    // cannot exceed about twice the first without the former diverging, so
+    // the latter contract at best at 1 - 2*tanh^2(h/l)
+    scalar sumRate = 0;
+    label nFaces = 0;
+    forAll(H, faceI)
+    {
+        if (twoSidedFaces_.size() == H.size() && twoSidedFaces_[faceI])
+        {
+            if (ell[faceI] < GREAT)
+            {
+                sumRate += 1 - 2*sqr(tanh(H[faceI]/ell[faceI]));
+                nFaces++;
+            }
+        }
+    }
+
+    reduce(sumRate, sumOp<scalar>());
+    reduce(nFaces, sumOp<label>());
+
+    if (nFaces == 0)
+    {
+        return;
+    }
+
+    const scalar rate = sumRate/nFaces;
+
+    Info<< type() << " " << patch().name() << ": walls wetted on both sides:"
+        << " best contraction factor of the squeeze modes with a single"
+        << " Robin coefficient = " << rate << endl;
+
+    if (rate > 0.95)
+    {
+        WarningInFunction
+            << "Patch " << patch().name() << " has " << nFaces
+            << " faces on walls wetted on both sides, where the squeeze"
+            << " (through-thickness) modes of the wall contract at best by"
+            << " about " << rate << " per FSI iteration with a single Robin"
+            << " coefficient, i.e. about "
+            << label(log(0.1)/log(max(rate, SMALL)) + 0.5)
+            << " iterations per order of magnitude of the FSI residual."
+            << " A smaller time-step helps; for such walls, IQN-ILS with a"
+            << " Dirichlet-Neumann interface is usually much cheaper. See the"
+            << " elasticWallPressure header documentation." << endl;
+    }
 }
 
 
@@ -624,6 +683,11 @@ tmp<scalarField> elasticWallPressureFvPatchScalarField::calcSeedCoeff
         else
         {
             hs = min(ell, H);
+        }
+
+        if (seedCoeffTimeIndex_ == -1)
+        {
+            reportTwoSidedContraction(H, ell);
         }
     }
 

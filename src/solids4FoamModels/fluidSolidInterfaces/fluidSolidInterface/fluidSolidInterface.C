@@ -615,6 +615,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     robinConvergenceState_(0),
     robinKinematicConsistency_(true),
     robinRelaxationWarned_(false),
+    fieldsInitialized_(false),
     robinReferenceHintIssued_(false),
     residuals_(),
     residualsPrev_(),
@@ -1381,11 +1382,14 @@ void Foam::fluidSolidInterface::initializeFields()
         maxRobinPressureNorm_[interfaceI] = 0;
 
         // Robin-Neumann coupling is designed for unrelaxed fixed-point
-        // iterations; warn once otherwise (not during construction, when the
-        // derived coupling interface is not yet available)
+        // iterations; warn once otherwise. Not in the call from the
+        // base-class constructor, where the derived coupling interface is not
+        // yet available and fluidMeshFollowsSolid() is the base-class one:
+        // the time index alone does not exclude it on a restart
         if
         (
             robinInterfaces_[interfaceI]
+         && fieldsInitialized_
          && runTime().timeIndex() > 0
          && !robinRelaxationWarned_
          && !fluidMeshFollowsSolid()
@@ -1438,6 +1442,8 @@ void Foam::fluidSolidInterface::initializeFields()
                 );
         }
     }
+
+    fieldsInitialized_ = true;
 }
 
 

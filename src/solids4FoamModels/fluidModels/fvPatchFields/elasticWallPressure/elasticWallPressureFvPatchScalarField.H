@@ -45,7 +45,23 @@ Description
 
     thicknessLimited is a safe a-priori alternative (a lower bound of the
     solid impedance), while pWaveSpeed can diverge for thin or nearly
-    incompressible walls and large time steps. With writeDiagnostics, the
+    incompressible walls and large time steps.
+
+    Walls wetted on both sides (e.g. the flap of HronTurekFsi3) are slow to
+    converge with any single coefficient. With h the halved wall thickness,
+    each face has two interface impedances: rho_s*l*tanh(h/l) for loads that
+    push both faces the same way (translation and bending), which is the
+    thicknessLimited seed, and rho_s*l*coth(h/l) for loads that squeeze the
+    wall through its thickness, which for an enclosed incompressible fluid
+    include the change of interface volume. The coefficient must stay below
+    about twice the first, or the bending modes diverge, so the squeeze modes
+    contract at best at about 1 - 2*tanh^2(h/l) per FSI iteration: 0.96 in
+    HronTurekFsi3, i.e. about 150 iterations per time-step, against 3-6 for
+    walls wetted on one side, where a single impedance applies. This
+    estimate is reported at the start of the run, with a warning when it
+    exceeds 0.95 (about 45 iterations per order of magnitude of the
+    residual; the beamInCrossFlow Robin variant has about 0.91). A smaller time-step reduces l and helps; for such walls,
+    IQN-ILS with a Dirichlet-Neumann interface is usually much cheaper. With writeDiagnostics, the
     measured impedances and the predicted and observed contraction factors
     are written to postProcessing/robinCoefficient_<patch>.dat.
 
@@ -220,6 +236,10 @@ class elasticWallPressureFvPatchScalarField
         //- Local solid wall thickness on the solid patch
         mutable autoPtr<scalarField> solidThicknessPtr_;
 
+        //- Solid patch faces of walls wetted on both sides, set together
+        //  with the wall thickness
+        mutable boolList twoSidedFaces_;
+
         //- A-priori (seed) coefficient rho_s*hs on the fluid patch, before
         //  hsScale is applied
         mutable autoPtr<scalarField> seedCoeffPtr_;
@@ -298,6 +318,16 @@ class elasticWallPressureFvPatchScalarField
         //- Return the solid wall thickness on the solid patch, found by ray
         //  casting through the solid; wetted-on-both-sides walls are halved
         const scalarField& solidThickness() const;
+
+        //- Report the best contraction factor that a single coefficient can
+        //  reach for the squeeze modes of walls wetted on both sides, given
+        //  the (halved) wall thickness H and the p-wave length ell on the
+        //  solid patch, and warn when it is close to 1
+        void reportTwoSidedContraction
+        (
+            const scalarField& H,
+            const scalarField& ell
+        ) const;
 
         //- Calculate the a-priori coefficient rho_s*hs on the fluid patch
         tmp<scalarField> calcSeedCoeff(const word& model) const;

@@ -274,6 +274,11 @@ class fluidSolidInterface
         //- Has the warning about relaxed Robin coupling been issued
         bool robinRelaxationWarned_;
 
+        //- Have the fields been initialised once, i.e. is the base-class
+        //  constructor, which calls initializeFields() before the derived
+        //  coupling interface exists, finished
+        bool fieldsInitialized_;
+
         //- Has the hint about the Robin reference scales been issued
         bool robinReferenceHintIssued_;
 

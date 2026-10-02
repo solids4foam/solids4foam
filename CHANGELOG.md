@@ -289,6 +289,17 @@ release. For complete commit-level details and contributor information, see the
   end time in 475 s instead of 761 s, with new regression references for each
   fork. Set `predictor no` to recover the previous behaviour.
 
+- `elasticWallPressure` documents and reports why Robin-Neumann coupling is
+  slow on walls wetted on both sides, such as the `HronTurekFsi3` flap. There,
+  each face has two interface impedances: one for loads that push both faces
+  the same way (translation and bending), which the automatic coefficient
+  matches, and one about `coth^2(h/l)` times larger for loads that squeeze
+  the wall through its thickness. A single coefficient cannot match both, so
+  the squeeze modes contract at best at about `1 - 2*tanh^2(h/l)` per FSI
+  iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
+  The estimate is printed at the start of the run, with a warning when it
+  exceeds 0.95.
+
 ### Removed
 
 - OpenFOAM.com versions older than v2312 (v2306, v2212, v2206, v2112, v2106
@@ -416,6 +427,10 @@ release. For complete commit-level details and contributor information, see the
   `constant/fsiProperties.aitken` that did not exist. The Aitken setup is now
   in that file, and `constant/fsiProperties` is a link to the selected
   `constant/fsiProperties.<mode>` (`robin` by default).
+- On a restart, the warning that an `elasticWallPressure` (Robin) interface is
+  used with relaxed or accelerated coupling was issued for `fixedRelaxation`
+  with `relaxationFactor 1` too, as the check ran during the construction of
+  the base coupling class.
 
 ## [v2.4] - 2026-08-24
 
