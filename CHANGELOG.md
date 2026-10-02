@@ -111,6 +111,13 @@ release. For complete commit-level details and contributor information, see the
   a README, a `regressionTest.sh`, and an opt-in `verification/` study
   (`./Allverify`) with mesh, time-step and standard-versus-high-order solid
   sweeps against the published curves of Valdés and Kratos Multiphysics.
+- Added the `ringAddedMass` fluid-solid interaction tutorial: the free n = 2
+  vibration of an elastic ring in a fluid-filled rigid annulus, whose
+  added-mass frequency reduction is known exactly, with IQN-ILS and
+  Robin-Neumann coupling variants and a `regressionTest.sh`. Its opt-in
+  `verification/` study compares the dry and wet frequencies and their ratio
+  with the exact continuum solution for added-to-structural mass ratios of
+  0.1, 1 and 10, under mesh and time-step refinement.
 
 ### Changed
 
