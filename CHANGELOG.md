@@ -104,6 +104,13 @@ release. For complete commit-level details and contributor information, see the
   second-order solid's 17%), and with Robin coupling the results converge
   to within 0.5% of oomph-lib under fluid-mesh refinement and at second
   order in time.
+- Added the `mokLidDrivenCavity` tutorial (under
+  `tutorials/fluidSolidInteraction`): the lid-driven cavity with a flexible
+  bottom of Wall and Mok, a strongly coupled partitioned FSI benchmark with a
+  1:500 membrane, solved with IQN-ILS coupling and the high-order solid. It has
+  a README, a `regressionTest.sh`, and an opt-in `verification/` study
+  (`./Allverify`) with mesh, time-step and standard-versus-high-order solid
+  sweeps against the published curves of Valdés and Kratos Multiphysics.
 
 ### Changed
 
