@@ -4,11 +4,6 @@ sort: 7
 
 # Immersed heart valve in a duct: `heartValveInDuct`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/heartValveInDuct`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/heartValveInDuct).
-
----
-
 ## Tutorial Aims
 
 - Demonstrate the heart valve motions of the `immersedBoundaryForce` finite

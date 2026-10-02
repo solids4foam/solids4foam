@@ -97,7 +97,8 @@ if [[ ! -f "${CASE_DIR}/${FORCE_FILE}" ]]; then
 fi
 
 # Cd = 2 Fx/(rho Uref^2 D Lz) = 1296.9 Fx, and likewise for Cl, from the force
-# of the forcing, which excludes the inertia of the fluid inside the cylinder
+# from the surface traction (forceEstimator surfaceTraction), which includes
+# the inertia of the fluid inside the cylinder
 final_cd=$(awk '!/^#/ { cd = 1296.9*$2 } END { print cd }' "${CASE_DIR}/${FORCE_FILE}")
 final_cl=$(awk '!/^#/ { cl = 1296.9*$3 } END { print cl }' "${CASE_DIR}/${FORCE_FILE}")
 

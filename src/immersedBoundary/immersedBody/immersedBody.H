@@ -211,6 +211,19 @@ public:
                 return max(cmptSum(cmptMultiply(cmptMag(n), span)), VSMALL);
             }
 
+            //- Smallest width of a bounding box span in the solved
+            //  directions
+            static scalar solvedWidth
+            (
+                const vector& span,
+                const Vector<label>& solD
+            );
+
+            //- Width of a cell: its smallest bounding box width in the
+            //  solved directions. Used for the stencil radius of the surface
+            //  traction and the pinned rate, which must agree
+            static scalar cellWidth(const polyMesh& mesh, const label celli);
+
 
         // Access
 

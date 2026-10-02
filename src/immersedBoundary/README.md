@@ -143,13 +143,15 @@ Four forcing methods are available:
   (this has no effect for rigid bodies). The
   force is the momentum exchange (`forceEstimator momentumExchange`, the
   default), which includes the inertia of the fluid inside the body; the
-  surface traction (`forceEstimator surfaceTraction`), from quadratic least
-  squares fits of the pressure and velocity at quadrature points moving
-  with the surface, is written in the columns after the inertia (or is the
-  force, with the momentum exchange after the inertia). A third estimate
-  (`forceEstimator forcing`) is the forcing applied in these cells plus the
-  inertia of the fluid inside the body taken as rigid. The momentum
-  exchange assumes a laminar flow of constant viscosity on a static mesh.
+  alternative surface traction (`forceEstimator surfaceTraction`) is from
+  quadratic least squares fits of the pressure and velocity at quadrature
+  points moving with the surface. A third estimate (`forceEstimator forcing`) is
+  the forcing applied in these cells plus the inertia of the fluid inside
+  the body taken as rigid. The estimates that are not selected are written
+  after the inertia: the momentum exchange, unless it is selected, then the
+  surface traction, with `writeSurfaceTraction yes`, unless it is selected.
+  The momentum exchange assumes a laminar flow of constant viscosity on a
+  static mesh.
 - `incremental`: the direct forcing of the openHFDIB-DEM `pimpleHFDIBFoam`
   solver. An explicit forcing `f` is added to the momentum equation. After
   each pressure corrector, `f` is increased by `couplingCoeff*(Ui - U)/deltaT`

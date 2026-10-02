@@ -4,11 +4,6 @@ sort: 3
 
 # Immersed cylinder translating in a channel: `translatingCylinderInChannel`
 
-You can find the files for this tutorial under
-[`tutorials/fluids/immersedBoundary/translatingCylinderInChannel`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluids/immersedBoundary/translatingCylinderInChannel).
-
----
-
 ## Tutorial Aims
 
 - Verify the force on an immersed body that moves through the mesh, against
