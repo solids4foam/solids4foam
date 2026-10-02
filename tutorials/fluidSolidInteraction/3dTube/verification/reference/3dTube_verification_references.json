@@ -1,0 +1,165 @@
+{
+  "description": "3D pressure-pulse propagation in a straight compliant tube (Fernandez and Moubachir 2005 form of the Formaggia et al. 2001 case)",
+  "geometry": {
+    "length_m": 0.05,
+    "inner_radius_m": 0.005,
+    "wall_thickness_m": 0.001
+  },
+  "fluid": {
+    "rho_kg_m3": 1000.0,
+    "nu_m2_s": 3e-6
+  },
+  "solid": {
+    "rho_kg_m3": 1200.0,
+    "E_Pa": 3e5,
+    "nu": 0.3
+  },
+  "inlet_pressure_Pa": 1333.2,
+  "inlet_pulse_duration_s": 0.003,
+  "end_time_s": 0.02,
+  "point_A_z_m": 0.025,
+  "incident_axial_trough_before_s": 0.0065,
+  "late_minimum_after_s": 0.014,
+  "stations_z_m": [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045],
+  "pressure_probe_offset_m": 0.0005,
+  "wave_front": {
+    "arrival_fraction": 0.5,
+    "peak_fraction": 0.5,
+    "fit_z_range_m": [0.01, 0.04]
+  },
+  "wave_speed_reference": "thick_wall_inertia",
+  "mesh": {
+    "default_levels": [1, 2],
+    "base_delta_t_s": 2.5e-5,
+    "auto_cores": {"1": 4, "2": 6, "3": 6}
+  },
+  "timestep": {
+    "default_levels": [1, 2, 3, 4],
+    "delta_t_s": [1e-4, 5e-5, 2.5e-5, 1.25e-5],
+    "auto_cores": {"1": 4, "2": 4, "3": 4, "4": 4}
+  },
+  "literature": {
+    "default_levels": [1],
+    "delta_t_s": [1e-4],
+    "time_scheme": "Euler",
+    "auto_cores": {"1": 4}
+  },
+  "quick": {
+    "end_time_s": 0.01
+  },
+  "acceptance": {
+    "mesh_self_convergence": {
+      "ur_max_A_m": 0.05,
+      "uz_min_A_m": 0.05,
+      "t_arrival_A_s": 0.02,
+      "wave_speed_pressure_m_s": 0.03
+    },
+    "timestep_self_convergence": {
+      "ur_max_A_m": 0.02,
+      "uz_min_A_m": 0.02,
+      "t_arrival_A_s": 0.01,
+      "wave_speed_pressure_m_s": 0.01
+    },
+    "change_resolution_floor": 0.002,
+    "wave_speed_vs_estimate": {
+      "mesh": 0.10
+    }
+  },
+  "coupling": {
+    "default_couplings": ["robin", "iqnils"],
+    "relative_tolerance": 0.01,
+    "auto_cores": {"1": 4},
+    "compared_quantities": [
+      "ur_max_A_m", "uz_min_A_m", "t_arrival_A_s", "wave_speed_pressure_m_s"
+    ]
+  },
+  "published": {
+    "tukovic2018": {
+      "citation": "Tukovic et al. (2018)",
+      "label": "Tukovic_2018_(backward,_dt=2.5e-5)",
+      "reference": "Z. Tukovic, A. Karac, P. Cardiff, H. Jasak, A. Ivankovic, OpenFOAM finite volume solver for fluid-solid interaction, Transactions of FAMENA 42(3):1-31, 2018, doi:10.21278/TOF.42301, Section 4.4",
+      "setup": "Exact parameter set. Full tube, 449,600 fluid and 288,000 solid hexahedra; St Venant-Kirchhoff wall; second-order backward scheme; IQN-ILS coupling; dt 2.5e-5, 5e-5 and 1e-4 s; run to 10 ms.",
+      "history": "Tukovic2018_fig25a_pointA.csv",
+      "values": {
+        "ur_max_A_m": {
+          "dt_2.5e-5_s": 1.5694e-4,
+          "dt_5e-5_s": 1.5631e-4,
+          "dt_1e-4_s": 1.5203e-4,
+          "source": "Fig. 25(b), inner wall at the tube midsection",
+          "quality": "extracted from the vector graphics of the PDF"
+        },
+        "t_ur_max_A_s": {
+          "value": 7.23e-3,
+          "source": "Fig. 25(a), dt = 2.5e-5 s curve",
+          "quality": "extracted from the vector graphics of the PDF"
+        },
+        "simulated_wave_speed_m_s": {
+          "value": 4.54,
+          "source": "Section 4.4, p. 21",
+          "quality": "printed; evaluated with the procedure of Kanyanta et al. (2009), not with the front fit used here, so it is reported for information only"
+        },
+        "analytical_wave_speed_m_s": {
+          "value": 4.81,
+          "source": "Eqs. (35) and (36), pp. 21-22",
+          "quality": "printed; reproduced by the thick_wall_inertia estimate"
+        }
+      }
+    },
+    "lozovskiy2019": {
+      "citation": "Lozovskiy et al. (2019)",
+      "label": "Lozovskiy_2019_(Euler,_dt=1e-4)",
+      "reference": "A. Lozovskiy, M.A. Olshanskii, Y.V. Vassilevski, Analysis and assessment of a monolithic FSI finite element method, Computers and Fluids 179:277-288, 2019, doi:10.1016/j.compfluid.2018.11.004, Section 5.1",
+      "setup": "Exact parameter set. Monolithic P2-P1/P2 finite elements; St Venant-Kirchhoff wall; implicit Euler; dt = 1e-4 s; three meshes, the finer with 89,232 fluid and 38,016 solid tetrahedra; run to 20 ms.",
+      "history": "Lozovskiy2019_fig3_pointA.csv",
+      "values": {
+        "ur_max_A_m": {"value": 1.194e-4, "time_s": 7.00e-3},
+        "uz_min_A_m": {"value": -7.40e-5, "time_s": 4.68e-3},
+        "ur_min_late_A_m": {"value": -7.55e-5, "time_s": 17.49e-3},
+        "source": "Fig. 3 (finer mesh), inner tube wall at half the length",
+        "quality": "read from the raster figure by colour masking, about +/-3e-6 m and +/-0.05 ms",
+        "printed": "maximum relative deviation between the fine and finer mesh 0.7% (axial) and 2.3% (radial)"
+      }
+    },
+    "eken2016": {
+      "citation": "Eken (2016)",
+      "label": "Eken_2016_(Euler,_dt=1e-4)",
+      "reference": "A. Eken, PhD thesis, Istanbul Technical University, 2016, Section 5.2, Fig. 5.6; the study published as A. Eken, M. Sahin, Int. J. Numer. Meth. Fluids 80(12):687-714, 2016, doi:10.1002/fld.4169",
+      "setup": "Exact parameter set. Monolithic ALE finite elements; St Venant-Kirchhoff wall; first-order implicit Euler; dt = 1e-4 s; meshes M1 (324,122 DOF) and M2 (2,557,571 DOF); run to 20 ms.",
+      "history": "Eken2016_fig5.6_pointA.csv",
+      "values": {
+        "ur_max_A_m": {"value": 1.242e-4, "time_s": 6.69e-3},
+        "uz_min_A_m": {"value": -7.94e-5, "time_s": 4.64e-3},
+        "ur_min_late_A_m": {"value": -7.63e-5, "time_s": 17.24e-3},
+        "source": "Fig. 5.6 (mesh M2), inner wall halfway along the pipe",
+        "quality": "read from the raster figure by colour masking, about +/-3e-6 m and +/-0.05 ms"
+      }
+    }
+  },
+  "published_checks": {
+    "mesh": {
+      "tukovic2018": {
+        "ur_max_A_m": {"value": 1.5694e-4, "tolerance": 0.05, "quality": "vector graphics"},
+        "t_ur_max_A_s": {"value": 7.23e-3, "tolerance": 0.03, "quality": "vector graphics"}
+      }
+    },
+    "literature": {
+      "lozovskiy2019": {
+        "ur_max_A_m": {"value": 1.194e-4, "tolerance": 0.08, "quality": "raster figure"},
+        "t_ur_max_A_s": {"value": 7.00e-3, "tolerance": 0.05, "quality": "raster figure"},
+        "uz_min_A_m": {"value": -7.40e-5, "tolerance": 0.10, "quality": "raster figure"},
+        "ur_min_late_A_m": {"value": -7.55e-5, "tolerance": 0.10, "quality": "raster figure"}
+      },
+      "eken2016": {
+        "ur_max_A_m": {"value": 1.242e-4, "tolerance": 0.08, "quality": "raster figure"},
+        "t_ur_max_A_s": {"value": 6.69e-3, "tolerance": 0.05, "quality": "raster figure"},
+        "uz_min_A_m": {"value": -7.94e-5, "tolerance": 0.10, "quality": "raster figure"},
+        "ur_min_late_A_m": {"value": -7.63e-5, "tolerance": 0.10, "quality": "raster figure"}
+      }
+    }
+  },
+  "published_histories": {
+    "mesh": ["tukovic2018", "lozovskiy2019", "eken2016"],
+    "timestep": ["tukovic2018"],
+    "literature": ["lozovskiy2019", "eken2016"]
+  }
+}
