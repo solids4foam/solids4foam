@@ -45,7 +45,7 @@ fluidSolidInterface    IQNILS;
     predictor            yes;
 
     // Tolerance for the FSI loop within each time-step
-    outerCorrTolerance   1e-6;
+    outerCorrTolerance   1e-5;
 
     // Maximum number of outer FSI loop correctors within each time-step
     nOuterCorr           30;

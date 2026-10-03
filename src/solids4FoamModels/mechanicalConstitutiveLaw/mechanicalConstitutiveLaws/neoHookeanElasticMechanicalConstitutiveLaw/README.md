@@ -179,7 +179,6 @@ The `rubberSealing` tutorial gives `E` and `nu` instead, with
   `nu 0.5` with `coupledPressureDisplacementSolid`
 - [plateHole](../../../../../tutorials/solids/linearElasticity/plateHole/README.md),
   in both `caseOptions/pressureDisplacement` variants
-- [HronTurekFsi3](../../../../../tutorials/fluidSolidInteraction/HronTurekFsi3/README.md)
 - [fillingElasticContainer](../../../../../tutorials/fluidSolidInteraction/fillingElasticContainer/README.md)
 - [flexibleDamBreak](../../../../../tutorials/fluidSolidInteraction/flexibleDamBreak/README.md)
 

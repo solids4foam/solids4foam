@@ -11,12 +11,12 @@ sort: 8
   option, on a fixed fluid mesh, rather than a fluid patch on a moving mesh;
 - Compare the immersed solution of the Turek and Hron [1] FSI2 benchmark with
   the benchmark values, and with the body-fitted solution of the
-  `HronTurekFsi3` tutorial set up with the FSI2 parameters while the
+  `HronTurek` tutorial with the FSI2 parameters (`./Allrun fsi2`) while the
   oscillation grows.
 
 ## Case Overview
 
-The geometry is that of the `HronTurekFsi3` tutorial: a channel of 2.5 m by
+The geometry is that of the `HronTurek` tutorial: a channel of 2.5 m by
 0.41 m with a rigid cylinder of radius 0.05 m centred at (0.2, 0.2) m and an
 elastic flag of 0.35 m by 0.02 m attached to its downstream side, with the
 tip point A at (0.6, 0.2) m. The FSI2 parameters are used: fluid density
@@ -132,9 +132,9 @@ While the oscillation grows, the tip displacement follows that of the
 body-fitted solution closely (for $$3.5 < t < 4$$ s, $$u_y$$ from -0.7 to
 4.5 mm immersed and from -0.9 to 4.6 mm body-fitted). The body-fitted
 solution with the FSI2 parameters and the mesh of the `HronTurekFsi3`
-tutorial diverges at about $$t = 6.5$$ s, before the oscillation saturates
-(solids4foam issue #489), whereas the immersed solution, with the same solid
-mesh and solid model, runs to $$t = 15$$ s.
+tutorial (now `HronTurek`) diverged at about $$t = 6.5$$ s, before the
+oscillation saturates (solids4foam issue #489), whereas the immersed solution,
+with the same solid mesh and solid model, runs to $$t = 15$$ s.
 
 The regression test runs `MESH_LEVEL=1` with the coupling started at
 $$t = 0.5$$ s to $$t = 0.6$$ s, and checks the tip displacement and the

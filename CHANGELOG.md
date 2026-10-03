@@ -173,6 +173,20 @@ release. For complete commit-level details and contributor information, see the
   time discretisation, with Lozovskiy et al. (2019) and Eken (2016), checks
   the pulse-wave speed against a thick-wall estimate, and compares the
   Robin-Neumann and IQN-ILS solutions.
+- Added an opt-in verification study to the `HronTurek` tutorial (formerly
+  `HronTurekFsi3`), which
+  runs the Turek-Hron FSI3 benchmark through a mesh and time-step sweep with
+  the partitioned IQN-ILS or Robin-Neumann coupling and compares the periodic
+  point-A displacement, drag and lift (mean, amplitude and frequency) with the
+  published values and time history of Turek and Hron (2006). A `coupling`
+  study compares the Robin-Neumann and IQN-ILS results and checks the Robin
+  convergence criteria. The tutorial's `Allrun` gained a `robin` option that
+  runs the Robin-Neumann variant of the case. A `--benchmark fsi1` option runs
+  the steady FSI1 benchmark instead, with a mesh study against the Featflow
+  values and an informative steady Robin-Neumann versus IQN-ILS comparison.
+  A `--benchmark fsi2` option runs the periodic, large-deformation FSI2
+  benchmark through the same mesh study against the Featflow FSI2 values and
+  history.
 - Added the `blobInTreacle` fluid-solid interaction tutorial, the
   temporal-accuracy case of Liu, Jaiman and Gurugubelli (2014): a linear
   elastic half cylinder in a ramped, highly viscous channel flow, with equal
@@ -191,6 +205,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- Renamed the `fluidSolidInteraction/HronTurekFsi3` tutorial to
+  `fluidSolidInteraction/HronTurek`, which now covers all three Turek-Hron
+  benchmarks: `./Allrun fsi1`, `./Allrun fsi2` or `./Allrun fsi3` (the
+  default) selects the inflow, plate material and run control of each, and
+  combines with the existing `robin` and `parallel` options. The stored case
+  and its regression test remain FSI3, now with the benchmark's
+  `StVenantKirchhoffElastic` plate in place of `neoHookeanElastic`.
 - `Allwmake` and `Allwclean` now stop with an error when an unsupported
   OpenFOAM version is sourced, listing the supported versions, where before
   they printed a warning and carried on.
@@ -455,8 +476,8 @@ release. For complete commit-level details and contributor information, see the
 - With OpenFOAM.org, `libsolids4FoamModels` now links `libfvModels` and
   `libfvConstraints`, without which a fluid case with an `fvConstraints` file
   crashed with a segmentation fault.
-- `HronTurekFsi3` no longer diverges once the plate deformation is large. With
-  the FSI2 parameters it failed at t = 6.4-6.9 s (#489), and with its own
+- `HronTurekFsi3` (now `HronTurek`) no longer diverges once the plate
+  deformation is large. With the FSI2 parameters it failed at t = 6.4-6.9 s (#489), and with its own
   FSI3 parameters shortly after its end time (#383). With a relaxed first
   coupling iteration, the fluid saw the plate stop or reverse within each time
   step, and the solid had to converge under a first-iteration fluid force of

@@ -16,32 +16,35 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 
 # Shortened regression horizon: 100 coupled time-steps after coupling starts
 # at t = 2. The flap oscillation grows from here, and it amplifies differences
-# at the level of the FSI tolerance (1e-6): by t = 2.5, runs that converge
+# at the level of the FSI tolerance (1e-5): by t = 2.5, runs that converge
 # every step but differ only in coupling settings disagree by several times the
 # tolerances below. Up to t = 2.1 that spread stays within 0.15 of them.
 REG_END_TIME=2.1
 
 # Regression tolerances
 DISP_TOL=2e-5
-FX_TOL=5e-4
-FY_TOL=1e-3
+# The force tolerances are relative to the reference, as the total force on
+# the plate and cylinder is dominated by the cylinder drag. OpenFOAM-v2412 and
+# v2512 are within 6e-5 of the references below, and OpenFOAM-9 within 1.5e-4
+FX_REL_TOL=1e-3
+FY_REL_TOL=5e-3
 
 # Reference values at REG_END_TIME
-# The force references are the total force.
-# The values are the midpoint of OpenFOAM-v2412, OpenFOAM-v2512 and
-# OpenFOAM-9. Fx differs across them by up to 3.4e-4 once the coupling starts
-# (the forces agree at t = 2), which FX_TOL covers; Uy and Fy agree to within
-# 0.1 of their tolerances.
-REF_TIP_UY=-0.000282442
-REF_FX=-0.0318083
-REF_FY=-0.0388867
+# The force references are the total force on the plate and cylinder, in N
+# before the plotting depth correction. All references use the benchmark
+# St. Venant-Kirchhoff law and FSI3 interface tolerance of 1e-5.
+# The displacement and force values are the midpoint of
+# OpenFOAM-v2412 and OpenFOAM-v2512 runs with rhoInf 1000 at t = 2.1.
+REF_TIP_UY=-0.000282008
+REF_FX=6.6783815
+REF_FY=-0.6751037
 
 # foam-extend uses GGI rather than AMI for the interface interpolation and has
 # a distinct, repeatable tip displacement and force at the regression end time.
 if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-    REF_TIP_UY=-0.000244033
-    REF_FX=-0.0308966
-    REF_FY=-0.0371161
+    REF_TIP_UY=-0.000242835
+    REF_FX=6.722682
+    REF_FY=-0.6478985
 fi
 
 ALLRUN_LOGFILE="log.Allrun"
@@ -51,8 +54,8 @@ echo "============================================================"
 echo "Hron-Turek FSI3 regression test"
 echo "Regression end time         = ${REG_END_TIME}"
 echo "Tip Uy tolerance            < ${DISP_TOL}"
-echo "Final Fx tolerance          < ${FX_TOL}"
-echo "Final Fy tolerance          < ${FY_TOL}"
+echo "Final Fx relative tolerance < ${FX_REL_TOL}"
+echo "Final Fy relative tolerance < ${FY_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -62,7 +65,7 @@ prepare_case() {
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
-        if [[ "${base_item}" == "regressionTests" ]]; then
+        if [[ "${base_item}" == "regressionTests" || "${base_item}" == "verification" ]]; then
             continue
         fi
         cp -a "${item}" "${CASE_DIR}/"
@@ -213,8 +216,8 @@ final_fx=$(awk '{print $1}' <<< "${force_components}")
 final_fy=$(awk '{print $2}' <<< "${force_components}")
 
 tip_uy_diff_abs=$(abs "$(awk "BEGIN {print ${tip_uy} - ${REF_TIP_UY}}")")
-final_fx_diff_abs=$(abs "$(awk "BEGIN {print ${final_fx} - ${REF_FX}}")")
-final_fy_diff_abs=$(abs "$(awk "BEGIN {print ${final_fy} - ${REF_FY}}")")
+final_fx_diff_rel=$(abs "$(awk "BEGIN {print (${final_fx} - ${REF_FX})/${REF_FX}}")")
+final_fy_diff_rel=$(abs "$(awk "BEGIN {print (${final_fy} - ${REF_FY})/${REF_FY}}")")
 
 failures=0
 
@@ -225,14 +228,14 @@ else
     failures=$((failures + 1))
 fi
 
-if awk "BEGIN {exit !(${final_fx_diff_abs} < ${FX_TOL})}"; then
+if awk "BEGIN {exit !(${final_fx_diff_rel} < ${FX_REL_TOL})}"; then
     printf "PASS: final Fx = %.6g\n" "${final_fx}"
 else
     printf "FAIL: final Fx = %.6g\n" "${final_fx}"
     failures=$((failures + 1))
 fi
 
-if awk "BEGIN {exit !(${final_fy_diff_abs} < ${FY_TOL})}"; then
+if awk "BEGIN {exit !(${final_fy_diff_rel} < ${FY_REL_TOL})}"; then
     printf "PASS: final Fy = %.6g\n" "${final_fy}"
 else
     printf "FAIL: final Fy = %.6g\n" "${final_fy}"

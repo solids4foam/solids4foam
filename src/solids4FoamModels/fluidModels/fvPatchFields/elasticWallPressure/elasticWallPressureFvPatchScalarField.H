@@ -47,7 +47,7 @@ Description
     solid impedance), while pWaveSpeed can diverge for thin or nearly
     incompressible walls and large time steps.
 
-    Walls wetted on both sides (e.g. the flap of HronTurekFsi3) are slow to
+    Walls wetted on both sides (e.g. the flap of HronTurek) are slow to
     converge with any single coefficient. With h the halved wall thickness,
     each face has two interface impedances: rho_s*l*tanh(h/l) for loads that
     push both faces the same way (translation and bending), which is the
@@ -56,7 +56,7 @@ Description
     include the change of interface volume. The coefficient must stay below
     about twice the first, or the bending modes diverge, so the squeeze modes
     contract at best at about 1 - 2*tanh^2(h/l) per FSI iteration: 0.96 in
-    HronTurekFsi3, i.e. about 150 iterations per time-step, against 3-6 for
+    HronTurek (FSI3), i.e. about 150 iterations per time-step, against 3-6 for
     walls wetted on one side, where a single impedance applies. This
     estimate is reported at the start of the run, with a warning when it
     exceeds 0.95 (about 45 iterations per order of magnitude of the

@@ -11,22 +11,51 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       dictionary;
-    object      mechanicalProperties;
+    class       volScalarField;
+    object      p;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-planeStress no;
+dimensions      [0 2 -2 0 0 0 0];
 
-mechanical
-(
-    rubber
+internalField   uniform 0;
+
+boundaryField
+{
+    plate
     {
-        type    neoHookeanElastic;
-        rho     rho [1 -3 0 0 0 0 0] 1000;
-        E       E [1 -1 -2 0 0 0 0] 5.6e6;
-        nu      nu [0 0 0 0 0 0 0] 0.4;
+        type            elasticWallPressure;
+        value           uniform 0;
     }
-);
+    outlet
+    {
+        type            fixedValue;
+        value           uniform 0;
+    }
+    inlet
+    {
+        type            zeroGradient;
+        value           uniform 0;
+    }
+    cylinder
+    {
+        type            zeroGradient;
+        value           uniform 0;
+    }
+    bottom
+    {
+        type            zeroGradient;
+        value           uniform 0;
+    }
+    top
+    {
+        type            zeroGradient;
+        value           uniform 0;
+    }
+    frontAndBackPlanes
+    {
+        type            empty;
+    }
+}
 
 // ************************************************************************* //
