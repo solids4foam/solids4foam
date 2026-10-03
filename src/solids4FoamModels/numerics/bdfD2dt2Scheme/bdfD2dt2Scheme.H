@@ -55,20 +55,27 @@ Description
     vertex-centred solid models select their own d2dt2 schemes and do not use
     this scheme.
 
-    With a constant time-step and a constant density, "BDF 1" is identical
-    to Euler, and, once 2k old-time levels are available, "BDF 2" is
-    identical to the solids4foam backward d2dt2 scheme.
+    Start-up: with n genuine old-time levels, the order is min(k, n), and
+    the velocity at old-time level j uses the order it had when it was the
+    current velocity, min(k, n - j), at least one; a velocity with no genuine
+    level before it, at the initial time, is zero. This is the start-up of
+    the backward scheme, and it keeps the velocity history consistent, so
+    the order ramps up from Euler at the first time-step. Recomputing the old
+    velocities at a higher order than they were computed with would add an
+    error of order deltaT to the velocity, and make the scheme first order.
+    After a sudden load, the Euler first step limits the global accuracy to
+    second order. A missing level is detected as an old-time field with the
+    same time index as its parent, as in the backward scheme; on
+    OpenFOAM.org and foam-extend this needs the GeometricField.C fix in
+    optionalFixes. The old-time levels are written with the field (with
+    "restart yes" in the solid model coefficients), so a restart continues
+    at full order. A restart within the first 2k time-steps can read copies
+    of the initial field as genuine levels, so its order can rise earlier
+    than in a continuous run, and its results can differ.
 
-    Start-up: when fewer than 2k genuine old-time levels are available, the
-    order is reduced to half of the number of available levels (at least
-    one), as the backward scheme falls back to Euler. A missing level is
-    detected as an old-time field with the same time index as its parent, as
-    in the backward scheme; on OpenFOAM.org and foam-extend this needs the
-    GeometricField.C fix in optionalFixes. The old-time levels are written
-    with the field (with "restart yes" in the solid model coefficients), so a
-    restart continues at full order. A restart within the first 2k time-steps
-    can read copies of the initial field as genuine levels, so its order can
-    rise earlier than in a continuous run, and its results can differ.
+    With a constant time-step and a constant density, "BDF 1" is identical
+    to Euler and "BDF 2" is identical to the solids4foam backward d2dt2
+    scheme, including during start-up.
 
     The time-step must be constant: a fatal error is raised if the time-step
     changes while two or more genuine old-time levels are available. The
@@ -137,13 +144,17 @@ class bdfD2dt2Scheme
             const label n
         );
 
-        //- Return the order to use this time-step: the order is reduced
-        //  during start-up, and a fatal error is raised if the time-step
-        //  has changed
-        label order
+        //- Return the number of genuine old-time levels, up to 2*order_,
+        //  and raise a fatal error if the time-step has changed
+        label nOldTimes
         (
             const GeometricField<Type, fvPatchField, volMesh>& vf
         ) const;
+
+        //- Return the order of the velocity at old-time level j, given the
+        //  number of genuine old-time levels; level 0 gives the order of
+        //  the scheme this time-step
+        label levelOrder(const label nOldTimes, const label j) const;
 
         //- Return sum_{i=i0}^{p} a_i u^{n-j-i}, where a_i are the BDF
         //  coefficients of order p and j is the old-time level
