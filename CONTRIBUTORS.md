@@ -43,3 +43,6 @@ from other repositories. If your name is missing, please let
 - Simão Nieto de Castro
 - Seevani Bali
 - Andrea Luigi Facci
+- Chanikya Valeti
+- Pablo Castrillo
+- Andy Jair Valdes Rivera
