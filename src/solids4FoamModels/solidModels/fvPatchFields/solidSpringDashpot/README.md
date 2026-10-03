@@ -155,6 +155,14 @@ E = 100 kPa, ν = 0.3, 20 cells along the bar):
 - **Total Lagrangian, free lateral faces, 20 % strain**, spring-face area
   change ≈ 13 %: force balance F = k·D·A₀ exact to 2e-7.
 - **`weightField`, restart and a 2-processor run:** exact to 2e-10.
+- **Bar with a body force** (quadratic solution): the loaded-end error falls
+  by 4 with each mesh halving (2.3e-6, 5.7e-7, 1.4e-7, 3.5e-8 for 10–80
+  cells), so the first-order boundary value gives second-order convergence.
+- **Thick cylinder under internal pressure, normal springs on the curved
+  outer surface** (plane strain, exact Lamé solution with the Robin outer
+  condition): inner radial displacement errors 1.7e-3, 4.0e-4 and 9.8e-5 on
+  10×20, 20×40 and 40×80 cells, with 51–64 outer iterations on all meshes
+  and k = 1e5 … 1e8 Pa/m.
 - **Refusals:** `secondOrder yes` and an updated Lagrangian (incremental)
   model stop with a fatal error; a dashpot in a `steadyState` run prints the
   warning.
