@@ -4,6 +4,8 @@ sort: 6
 
 # Immersed beam bending in a channel: `bendingBeamInChannel`
 
+Prepared by Sairam Pamulaparthi Venkata and Philip Cardiff
+
 ## Tutorial Aims
 
 - Verify the force on a deforming immersed body against a body-fitted
