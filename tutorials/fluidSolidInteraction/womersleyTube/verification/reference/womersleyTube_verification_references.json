@@ -1,0 +1,306 @@
+{
+  "description": "Exact linear solution (womersley_exact.py --json) for the womersleyTube tutorial, the study definition and the tolerances of the verification driver; see ../README.md for their justification.",
+  "reference": {
+    "parameters": {
+      "innerRadius": 1.0,
+      "thickness": 0.1,
+      "length": 15.0,
+      "youngsModulus": 20000.0,
+      "poissonsRatio": 0.3,
+      "solidDensity": 1000.0,
+      "fluidDensity": 1000.0,
+      "dynamicViscosity": 5.0,
+      "frequency": 0.02,
+      "pressureAmplitude": 1.0,
+      "tethered": false
+    },
+    "derived": {
+      "omega": 0.12566370614359174,
+      "period": 50.0,
+      "womersleyNumber": 5.0132565492620005,
+      "F10": [
+        0.28330523410113956,
+        -0.2410579255460079
+      ],
+      "moensKortewegSpeed": 1.0,
+      "massRatio": 0.1
+    },
+    "exact": {
+      "k": [
+        0.14397837071646385,
+        -0.020726589651181286
+      ],
+      "waveSpeed": 0.8727957228454881,
+      "wavelength": 43.6397861422744,
+      "amplitudeRatioPerWavelength": 0.4047426119989875,
+      "s": [
+        3.5459188687544887,
+        3.5430552414651273
+      ],
+      "A": [
+        1.0,
+        0.0
+      ],
+      "B": [
+        0.00017303312779256988,
+        -3.4836855520015694e-05
+      ],
+      "wallRadialDisplacement": [
+        0.0005268278703007417,
+        1.819280161553272e-05
+      ],
+      "wallAxialDisplacement": [
+        0.0005042341649220739,
+        -0.0005229844516965318
+      ],
+      "flowRate": [
+        0.002816364069562742,
+        0.0005052014577734888
+      ]
+    },
+    "womersleyThinWall": {
+      "k": [
+        0.13755263657227124,
+        -0.019272069804027393
+      ],
+      "waveSpeed": 0.9135681385326775,
+      "wavelength": 45.678406926633876,
+      "amplitudeRatioPerWavelength": 0.41465126105957545
+    },
+    "tetheredExact": {
+      "k": [
+        0.1426435164853932,
+        -0.02341532189026943
+      ],
+      "waveSpeed": 0.8809633219919939,
+      "wavelength": 44.04816609959969,
+      "amplitudeRatioPerWavelength": 0.3565067918280507
+    },
+    "tetheredWomersleyThinWall": {
+      "k": [
+        0.13609522271965957,
+        -0.022274492069832955
+      ],
+      "waveSpeed": 0.9233513391020671,
+      "wavelength": 46.167566955103354,
+      "amplitudeRatioPerWavelength": 0.3575932527445008
+    },
+    "collocationCheck": {
+      "k8": [
+        0.14397837071589895,
+        -0.02072658965154189
+      ],
+      "k24": [
+        0.14397837071959965,
+        -0.02072658964715594
+      ]
+    },
+    "thickness": [
+      {
+        "hOverR": 0.2,
+        "free": {
+          "k": [
+            0.1501901223348359,
+            -0.022002995226409323
+          ],
+          "kOverWomersley": [
+            1.092833144742109,
+            -0.006847113950373296
+          ]
+        },
+        "tethered": {
+          "k": [
+            0.1490278486876959,
+            -0.024432466007297815
+          ],
+          "kOverWomersley": [
+            1.0950746886612817,
+            -0.0002956278555065737
+          ]
+        }
+      },
+      {
+        "hOverR": 0.1,
+        "free": {
+          "k": [
+            0.14397837071646385,
+            -0.020726589651181286
+          ],
+          "kOverWomersley": [
+            1.0472683827568534,
+            -0.003951652899468347
+          ]
+        },
+        "tethered": {
+          "k": [
+            0.1426435164853932,
+            -0.02341532189026943
+          ],
+          "kOverWomersley": [
+            1.048196439375743,
+            -0.0004943495621877194
+          ]
+        }
+      },
+      {
+        "hOverR": 0.05,
+        "free": {
+          "k": [
+            0.14087992694500853,
+            -0.020070635144621762
+          ],
+          "kOverWomersley": [
+            1.0245212588171282,
+            -0.0023699286114139784
+          ]
+        },
+        "tethered": {
+          "k": [
+            0.13945006732854812,
+            -0.02290381656816973
+          ],
+          "kOverWomersley": [
+            1.0247446975326118,
+            -0.0005742224290795115
+          ]
+        }
+      },
+      {
+        "hOverR": 0.02,
+        "free": {
+          "k": [
+            0.13902679157043102,
+            -0.019671316868440807
+          ],
+          "kOverWomersley": [
+            1.0109095319920598,
+            -0.0013740034872676888
+          ]
+        },
+        "tethered": {
+          "k": [
+            0.13753660500076428,
+            -0.02259649928252349
+          ],
+          "kOverWomersley": [
+            1.0106918245818213,
+            -0.000616129274452465
+          ]
+        }
+      },
+      {
+        "hOverR": 0.01,
+        "free": {
+          "k": [
+            0.13841041709375299,
+            -0.019537251638649597
+          ],
+          "kOverWomersley": [
+            1.0063808666094727,
+            -0.0010338538864686996
+          ]
+        },
+        "tethered": {
+          "k": [
+            0.13689951600408656,
+            -0.02249404242385614
+          ],
+          "kOverWomersley": [
+            1.0060127494811473,
+            -0.000629114025286846
+          ]
+        }
+      },
+      {
+        "hOverR": 0.005,
+        "free": {
+          "k": [
+            0.13810251659204786,
+            -0.019470038930722928
+          ],
+          "kOverWomersley": [
+            1.004118398439875,
+            -0.0008622085874679197
+          ]
+        },
+        "tethered": {
+          "k": [
+            0.1365811390481112,
+            -0.02244281587467672
+          ],
+          "kOverWomersley": [
+            1.003674413083377,
+            -0.0006354236249345026
+          ]
+        }
+      }
+    ]
+  },
+  "study": {
+    "periods": 6,
+    "analysisPeriods": 2,
+    "studyCoupling": "robin",
+    "baseMesh": {
+      "axial": 32,
+      "fluidRadial": 10,
+      "solidRadial": 4
+    },
+    "meshFactors": [
+      1,
+      2,
+      4
+    ],
+    "meshStudySteps": 200,
+    "timeSteps": [
+      50,
+      100,
+      200
+    ],
+    "timeStudyFactor": 2,
+    "couplingFactor": 2,
+    "couplingSteps": 100,
+    "quick": {
+      "meshFactor": 1,
+      "steps": 50
+    }
+  },
+  "tolerances": {
+    "periodicity": 0.0005,
+    "quick": {
+      "profile": 0.03,
+      "wallMid_amp": 0.02,
+      "speed": 0.01
+    },
+    "finest": {
+      "profile": 0.003,
+      "flow_amp": 0.003,
+      "flow_phase": 0.003,
+      "wallMid_amp": 0.003,
+      "wallMid_phase": 0.005,
+      "speed": 0.003,
+      "attenuation": 0.01
+    },
+    "coupling": {
+      "profile": 0.006,
+      "wallMid_amp": 0.003,
+      "speed": 0.003
+    },
+    "meshOrderQuantities": [
+      "profile",
+      "flow_amp",
+      "wallMid_amp",
+      "speed"
+    ],
+    "minMeshOrder": 1.5,
+    "timeOrderQuantities": [
+      "flow_amp",
+      "flow_phase",
+      "wallMid_amp",
+      "wallMid_phase",
+      "speed",
+      "attenuation"
+    ],
+    "minTimeOrder": 1.2,
+    "couplingAgreement": 0.001
+  }
+}
