@@ -134,13 +134,14 @@ displacements at $$-\Delta t$$, $$-2 \Delta t$$ and $$-3 \Delta t$$, as the
 `backward` d2dt2 scheme applies the backward ddt twice), so there is no
 start-up ramp. A small start-up transient remains, of about 0.5% in the wall
 displacement over the first period, and it grows as the time-step is reduced.
-Its source has not been pinned down. One candidate is that the initial point
-displacement is the exact value at the points, which differs slightly from
-the solid model's interpolation of the cell values that moves the fluid mesh
-from the first time-step on; a mismatch of this kind would grow as the
-time-step is reduced. The transient decays slowly, so the driver runs six
-periods and analyses the last two; `periodicity` is the change in the wall
-displacement coefficient from the fifth to the sixth period.
+With Robin-Neumann coupling it grows as the time-step is reduced because the
+boundary values of the old-time displacements are zero rather than exact, and
+the Robin condition imposes the solid's boundary acceleration on the fluid;
+with exact boundary values, or with IQN-ILS, it does not grow
+(`womersley_temporal_investigation.md`, section 6.2). The transient decays
+slowly, so the driver runs six periods and analyses the last two;
+`periodicity` is the change in the wall displacement coefficient from the
+fifth to the sixth period.
 
 ### Why the wall is not tethered
 
@@ -288,7 +289,12 @@ finest mesh).
   $$\mathrm{Im}(k)$$.
 - In time, the orders are 1.3 to 1.8, below the nominal second order of the
   `backward` scheme, which is used in both regions and in the interface
-  velocity condition; the cause has not been identified.
+  velocity condition; it is caused by an O(dt) mass-flux
+  inconsistency at the tube ends, where the exact pressure and the exact
+  normal velocity gradient are imposed (OpenFOAM treats the mixed velocity
+  condition as fixing the value), not by the coupling; with 400 steps per
+  period the orders fall to about one. See
+  `womersley_temporal_investigation.md`.
 - IQN-ILS and Robin-Neumann agree to $$3 \times 10^{-4}$$ or better on every
   quantity. Robin-Neumann takes 8.7 coupling iterations per time-step against
   14.8 for IQN-ILS, and half the run time.
