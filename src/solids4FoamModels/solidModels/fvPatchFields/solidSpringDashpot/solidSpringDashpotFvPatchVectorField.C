@@ -17,20 +17,48 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "solidRobinFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "transformField.H"
 #include "volFields.H"
 #include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
+#include "IStringStream.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
+// * * * * * * * * * * * * * * * Local Functions  * * * * * * * * * * * * * //
+
+namespace
+{
+
+// Dictionary for the base class, which requires refValue, refGradient and
+// valueFraction; they are set in updateCoeffs here
+dictionary baseDict(const dictionary& dict)
+{
+    dictionary d
+    (
+        IStringStream
+        (
+            "refValue uniform (0 0 0);"
+            "refGradient uniform (0 0 0);"
+            "valueFraction uniform (0 0 0 0 0 0);"
+        )()
+    );
+    d.merge(dict);
+
+    return d;
+}
+
+} // End anonymous namespace
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF
@@ -46,14 +74,14 @@ solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
 {}
 
 
-solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const dictionary& dict
 )
 :
-    solidDirectionMixedFvPatchVectorField(p, iF),
+    solidDirectionMixedFvPatchVectorField(p, iF, baseDict(dict)),
     kNormal_("kNormal", dict, p.size()),
     kTangential_(p.size(), 0.0),
     cNormal_(p.size(), 0.0),
@@ -62,6 +90,18 @@ solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
     pressure_(p.size(), 0.0)
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
+
+    // valueFraction below assumes the first-order boundary value
+    if (dict.lookupOrDefault<Switch>("secondOrder", false))
+    {
+        FatalIOErrorIn
+        (
+            "solidSpringDashpotFvPatchVectorField::"
+            "solidSpringDashpotFvPatchVectorField(...)",
+            dict
+        )   << "secondOrder is not supported on patch " << patch().name()
+            << exit(FatalIOError);
+    }
 
     if (dict.found("kTangential"))
     {
@@ -124,9 +164,29 @@ solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
     {
         FatalErrorIn
         (
-            "solidRobinFvPatchVectorField::solidRobinFvPatchVectorField"
+            "solidSpringDashpotFvPatchVectorField::"
+            "solidSpringDashpotFvPatchVectorField(...)"
         )   << "Spring and dashpot coefficients must be non-negative on patch "
             << patch().name() << abort(FatalError);
+    }
+
+    // The dashpot velocity is (D - D.oldTime())/deltaT, so deltaT must be a
+    // physical time step
+    if
+    (
+        (gMax(cNormal_) > 0 || gMax(cTangential_) > 0)
+     && word(d2dt2SchemeCompat(patch().boundaryMesh().mesh(), "d2dt2(D)"))
+     == "steadyState"
+    )
+    {
+        WarningIn
+        (
+            "solidSpringDashpotFvPatchVectorField::"
+            "solidSpringDashpotFvPatchVectorField(...)"
+        )   << "Patch " << patch().name() << ": the dashpot uses "
+            << "(D - D.oldTime())/deltaT, which is a physical velocity only "
+            << "if deltaT is a physical time step. Set cNormal and "
+            << "cTangential to 0 for pseudo-time load stepping." << endl;
     }
 
     refValue() = vector::zero;
@@ -144,9 +204,9 @@ solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
 }
 
 
-solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
-    const solidRobinFvPatchVectorField& pvf,
+    const solidSpringDashpotFvPatchVectorField& pvf,
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const fvPatchFieldMapper& mapper
@@ -171,9 +231,9 @@ solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
 {}
 
 
-solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
-    const solidRobinFvPatchVectorField& pvf,
+    const solidSpringDashpotFvPatchVectorField& pvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
@@ -189,7 +249,39 @@ solidRobinFvPatchVectorField::solidRobinFvPatchVectorField
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void solidRobinFvPatchVectorField::autoMap
+tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
+(
+    const vectorField& nPressure,
+    const scalarField& areaRatio
+) const
+{
+    const vectorField n(patch().nf());
+    const symmTensorField nn(sqr(n));
+    const scalar rDeltaT = 1.0/db().time().deltaTValue();
+
+    const vectorField& DP = *this;
+    const vectorField& DoldP =
+        db().lookupObject<volVectorField>("D").oldTime().boundaryField()
+        [
+            patch().index()
+        ];
+
+    return tmp<vectorField>
+    (
+        new vectorField
+        (
+            traction_ - nPressure*pressure_
+          - areaRatio
+           *(
+                ((kNormal_*nn + kTangential_*(I - nn)) & DP)
+              + rDeltaT*((cNormal_*nn + cTangential_*(I - nn)) & (DP - DoldP))
+            )
+        )
+    );
+}
+
+
+void solidSpringDashpotFvPatchVectorField::autoMap
 (
     const fvPatchFieldMapper& m
 )
@@ -214,7 +306,7 @@ void solidRobinFvPatchVectorField::autoMap
 }
 
 
-void solidRobinFvPatchVectorField::rmap
+void solidSpringDashpotFvPatchVectorField::rmap
 (
     const fvPatchField<vector>& pvf,
     const labelList& addr
@@ -222,8 +314,8 @@ void solidRobinFvPatchVectorField::rmap
 {
     solidDirectionMixedFvPatchVectorField::rmap(pvf, addr);
 
-    const solidRobinFvPatchVectorField& rpvf =
-        refCast<const solidRobinFvPatchVectorField>(pvf);
+    const solidSpringDashpotFvPatchVectorField& rpvf =
+        refCast<const solidSpringDashpotFvPatchVectorField>(pvf);
 
     kNormal_.rmap(rpvf.kNormal_, addr);
     kTangential_.rmap(rpvf.kTangential_, addr);
@@ -234,7 +326,7 @@ void solidRobinFvPatchVectorField::rmap
 }
 
 
-void solidRobinFvPatchVectorField::updateCoeffs()
+void solidSpringDashpotFvPatchVectorField::updateCoeffs()
 {
     if (this->updated())
     {
@@ -243,11 +335,16 @@ void solidRobinFvPatchVectorField::updateCoeffs()
 
     const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
-    if (solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
+    if
+    (
+        solMod.incremental()
+     || solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN
+    )
     {
-        FatalErrorIn("solidRobinFvPatchVectorField::updateCoeffs()")
-            << "solidRobin requires reference-configuration normals and does "
-            << "not support updated Lagrangian solid models (patch "
+        FatalErrorIn("solidSpringDashpotFvPatchVectorField::updateCoeffs()")
+            << "solidSpringDashpot acts on the total displacement D with "
+            << "reference-configuration normals, and does not support "
+            << "incremental or updated Lagrangian solid models (patch "
             << patch().name() << ")" << abort(FatalError);
     }
 
@@ -318,7 +415,21 @@ void solidRobinFvPatchVectorField::updateCoeffs()
 }
 
 
-void solidRobinFvPatchVectorField::write(Ostream& os) const
+tmp<Field<vector> >
+solidSpringDashpotFvPatchVectorField::snGradTransformDiag() const
+{
+    const symmTensorField& f = valueFraction();
+
+    vectorField diag(f.size());
+    diag.replace(vector::X, f.component(symmTensor::XX));
+    diag.replace(vector::Y, f.component(symmTensor::YY));
+    diag.replace(vector::Z, f.component(symmTensor::ZZ));
+
+    return tmp<Field<vector> >(new vectorField(diag));
+}
+
+
+void solidSpringDashpotFvPatchVectorField::write(Ostream& os) const
 {
 #ifdef OPENFOAM_ORG
     writeEntry(os, "kNormal", kNormal_);
@@ -342,7 +453,7 @@ void solidRobinFvPatchVectorField::write(Ostream& os) const
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-makePatchTypeField(fvPatchVectorField, solidRobinFvPatchVectorField);
+makePatchTypeField(fvPatchVectorField, solidSpringDashpotFvPatchVectorField);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

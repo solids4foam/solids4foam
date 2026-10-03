@@ -187,13 +187,15 @@ Here `oldTime()` means the value stored at the previous time step.
 The solver treats the following patch field types specially:
 
 - `solidTraction`
+- `solidSpringDashpot`
 - `fixedDisplacementZeroShear`
 - `symmetry`
 - `slip`
 
 On traction patches, the force is formed using the current deformed normals and
-area measures. On zero-shear, symmetry, and slip patches, the tangential force
-is projected away.
+area measures. On spring-dashpot patches, the spring and dashpot force uses the
+reference area and the traction and pressure use the current area. On
+zero-shear, symmetry, and slip patches, the tangential force is projected away.
 
 The `solidTraction` patch also has an optional `useUndeformedArea()` switch.
 This is not implemented for the total-Lagrangian model when it is asked to use

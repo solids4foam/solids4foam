@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    solidRobinFvPatchVectorField
+    solidSpringDashpotFvPatchVectorField
 
 Description
     Spring-dashpot (Robin) boundary condition for solid solvers, with
@@ -29,12 +29,12 @@ Author
     Simao Nieto de Castro, UCD.
 
 SourceFiles
-    solidRobinFvPatchVectorField.C
+    solidSpringDashpotFvPatchVectorField.C
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef solidRobinFvPatchVectorField_H
-#define solidRobinFvPatchVectorField_H
+#ifndef solidSpringDashpotFvPatchVectorField_H
+#define solidSpringDashpotFvPatchVectorField_H
 
 #include "fvPatchFields.H"
 #include "solidDirectionMixedFvPatchVectorField.H"
@@ -45,10 +45,10 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                 Class solidRobinFvPatchVectorField Declaration
+                 Class solidSpringDashpotFvPatchVectorField Declaration
 \*---------------------------------------------------------------------------*/
 
-class solidRobinFvPatchVectorField
+class solidSpringDashpotFvPatchVectorField
 :
     public solidDirectionMixedFvPatchVectorField
 {
@@ -66,50 +66,50 @@ class solidRobinFvPatchVectorField
         //- Tangential dashpot coefficient per unit reference area [Pa s/m]
         scalarField cTangential_;
 
-        //- Additional traction, as in solidTraction [Pa]
+        //- Additional traction per unit current area [Pa]
         vectorField traction_;
 
-        //- Additional pressure, as in solidTraction [Pa]
+        //- Additional pressure [Pa]
         scalarField pressure_;
 
 public:
 
     //- Runtime type information
-    TypeName("solidRobin");
+    TypeName("solidSpringDashpot");
 
 
     // Constructors
 
         //- Construct from patch and internal field
-        solidRobinFvPatchVectorField
+        solidSpringDashpotFvPatchVectorField
         (
             const fvPatch&,
             const DimensionedField<vector, volMesh>&
         );
 
         //- Construct from patch, internal field and dictionary
-        solidRobinFvPatchVectorField
+        solidSpringDashpotFvPatchVectorField
         (
             const fvPatch&,
             const DimensionedField<vector, volMesh>&,
             const dictionary&
         );
 
-        //- Construct by mapping given solidRobinFvPatchVectorField
+        //- Construct by mapping given solidSpringDashpotFvPatchVectorField
         //  onto a new patch
-        solidRobinFvPatchVectorField
+        solidSpringDashpotFvPatchVectorField
         (
-            const solidRobinFvPatchVectorField&,
+            const solidSpringDashpotFvPatchVectorField&,
             const fvPatch&,
             const DimensionedField<vector, volMesh>&,
             const fvPatchFieldMapper&
         );
 
-#ifdef OPENFOAM_ORG
+#if defined(OPENFOAM_ORG) || (OPENFOAM >= 2606)
         //- Construct as copy
-        solidRobinFvPatchVectorField
+        solidSpringDashpotFvPatchVectorField
         (
-            const solidRobinFvPatchVectorField&
+            const solidSpringDashpotFvPatchVectorField&
         ) = delete;
 #else
         //- Construct and return a clone
@@ -117,15 +117,15 @@ public:
         {
             return tmp<fvPatchVectorField>
             (
-                new solidRobinFvPatchVectorField(*this)
+                new solidSpringDashpotFvPatchVectorField(*this)
             );
         }
 #endif
 
         //- Construct as copy setting internal field reference
-        solidRobinFvPatchVectorField
+        solidSpringDashpotFvPatchVectorField
         (
-            const solidRobinFvPatchVectorField&,
+            const solidSpringDashpotFvPatchVectorField&,
             const DimensionedField<vector, volMesh>&
         );
 
@@ -137,17 +137,29 @@ public:
         {
             return tmp<fvPatchField<vector> >
             (
-                new solidRobinFvPatchVectorField(*this, iF)
+                new solidSpringDashpotFvPatchVectorField(*this, iF)
             );
         }
 
     // Destructor
 
-        virtual ~solidRobinFvPatchVectorField()
+        virtual ~solidSpringDashpotFvPatchVectorField()
         {}
 
 
     // Member functions
+
+        // Access
+
+            //- Spring-dashpot traction per unit current area from the current
+            //  boundary value, for solid models that impose boundary tractions
+            //  directly; nPressure is the normal for the pressure and
+            //  areaRatio the reference-to-current face area ratio
+            tmp<vectorField> springDashpotTraction
+            (
+                const vectorField& nPressure,
+                const scalarField& areaRatio
+            ) const;
 
         // Mapping functions
 
@@ -169,6 +181,10 @@ public:
 
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
+
+            //- Diagonal of the valueFraction, used for the implicit matrix
+            //  coefficient (the base class returns its square root)
+            virtual tmp<Field<vector> > snGradTransformDiag() const;
 
 
         //- Write
