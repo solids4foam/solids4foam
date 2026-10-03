@@ -208,7 +208,9 @@ void pimpleFluid::correctFluxConsistentPatches
     // HbyA_b carries the pressure gradient of the boundary cell, as HbyA does
     // in the cell, HbyA_b = U_b + rAtU_b grad(p)_P, so that
     // phi_b = U_b.S_f + rAtU_b (grad(p)_P.S_f - snGrad(p)|S_f|): the
-    // boundary velocity flux to O(rAtU h d2p/dn2). The fixed pressure stays
+    // boundary velocity flux to O(rAtU h d2p/dn2) (grad(p)_P.n - snGrad(p)
+    // = -(h/4) d2p/dn2 for a fixed-value pressure): an O(deltaT h) term,
+    // formally first order in time at a fixed mesh. The fixed pressure stays
     // implicit in the pressure equation
     forAll(fluxConsistentPatches_, i)
     {

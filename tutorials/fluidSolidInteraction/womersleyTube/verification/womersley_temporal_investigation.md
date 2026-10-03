@@ -1,18 +1,20 @@
 # womersleyTube: investigation of the sub-nominal temporal order
 
 Status: **complete.** Sections 1-4 are the code trace and the hypotheses as
-written before any run (commit 8f8c8468e), unchanged. Sections 5-14 are the
+written before any run (commit 8f8c8468e), unchanged. Sections 5-15 are the
 results. Short answer: the sub-nominal order is caused by an O(dt)
 mass-flux inconsistency on the artificial tube ends, where the exact
 pressure and the exact normal velocity gradient are imposed (section 8); it
 is not an FSI, interface, ALE, solid, start-up or tolerance effect. A
-small, opt-in `pimpleFluid` option that makes the end flux equal to the
-boundary velocity flux (`fluxConsistentPatches`, section 6.10) recovers
-second order in every QoI of the production study (m2, Robin-Neumann,
-exact end data unchanged): 1.87-2.08 from 100/200/400 steps per period,
-and reduces most finest-mesh errors of the mesh study (the wave speed by
-about 70 times; the profile is unchanged and the flow phase, 1.5e-5 before,
-is 8.3e-5).
+small, opt-in `pimpleFluid` option that makes the end flux consistent with
+the boundary velocity flux (`fluxConsistentPatches`, section 6.10) removes
+the O(dt) term and gives second order in every QoI of the production study
+(m2, Robin-Neumann, exact end data unchanged): 1.87-2.08 from 100/200/400
+steps per period. It leaves an O(dt h) boundary-flux term, so at fixed mesh
+the order formally tends to one as dt -> 0, well beyond the steps used
+(section 15). It also reduces most finest-mesh errors of the mesh study
+(the wave speed by about 70 times; the profile is unchanged and the flow
+phase, 1.5e-5 before, is 8.3e-5).
 
 Scope: the `womersleyTube` verification case only. No change to the
 production numerical methods; the manuscript is not edited here.
@@ -651,14 +653,17 @@ v2412 against v2512, m2, n100 (periods; relative errors):
 ## 10. Is nominal second order recovered?
 
 Without a code change, no (6.7). With `fluxConsistentPatches` on the tube
-ends (6.10), **yes**: every QoI of the production study (m2, Robin-Neumann,
-same exact end data) converges at 1.87-2.08 from 100/200/400 steps per
-period and 1.85-2.14 from 50/100/200, in both analysis windows, and the
-fluid sub-problem converges at second order to 1600 steps per period. This
-is scientifically justified because the change does not alter the
-discretisation of the equations; it makes the discrete end flux satisfy the
-boundary condition that the case already intends (the boundary velocity
-flux), removing a demonstrated O(dt) inconsistency.
+ends (6.10), **over the range tested, yes; formally, at fixed mesh, no**
+(section 15). Every QoI of the production study (m2, Robin-Neumann, same
+exact end data) converges at 1.87-2.08 from 100/200/400 steps per period and
+1.85-2.14 from 50/100/200, in both analysis windows. The change does not
+alter the discretisation of the equations; it removes a demonstrated O(dt)
+inconsistency of the end flux. The boundary-flux term that remains is
+O(dt h): the scheme is formally second order under joint refinement, and at
+fixed mesh second order holds until the BDF2 error falls to the size of
+that term (about 3200 steps per period on m1, 6400 on m2), beyond which the
+order tends to one. The exact-flux form has no such term but is not robust
+(15.6).
 
 ## 11. Statement for the paper
 
@@ -674,10 +679,15 @@ flux), removing a demonstrated O(dt) inconsistency.
 > algorithm treats the mixed velocity condition as fixing the value, so the
 > end flux differed from the boundary velocity flux by the momentum
 > coefficient (∝ Δt) times the axial pressure gradient. With the end flux
-> made equal to the boundary velocity flux (an option of the fluid solver,
-> leaving the boundary data unchanged), every quantity converges at second
-> order in time (1.87-2.08 from 100/200/400 steps per period), and the
-> time error at 200 steps per period falls by an order of magnitude.
+> made consistent with the boundary velocity flux (an option of the fluid
+> solver, leaving the boundary data unchanged), every quantity converges at
+> second order in time over the steps used (1.87-2.08 from 100/200/400 steps
+> per period), and the time error at 200 steps per period falls by an order
+> of magnitude. The remaining boundary-flux inconsistency is O(Δt h), the
+> same order as OpenFOAM's standard treatment of a fixed-pressure outlet:
+> the scheme is second order under joint refinement, while at fixed mesh the
+> order would tend to one only at much smaller time steps (beyond about
+> 6400 steps per period on this mesh).
 
 The exact reference is what made this boundary inconsistency visible: the
 orders are reference-free, but the fluid-only and end-flux diagnostics, and
@@ -746,3 +756,232 @@ error were the end-flux time error.
   variants (not present with `fluxConsistent`).
 - `fluxConsistentPatches` is implemented for OpenFOAM.com only (the tutorial
   runs only there).
+
+## 15. Addendum: formal order of `fluxConsistentPatches`
+
+Question: at fixed mesh, is the final treatment (`HbyA_b = U_b + rAtU_b
+grad(p)_P`) formally second order in time, or does it keep an
+O(dt h) boundary-flux error that eventually makes the time order one?
+
+**Answer: it keeps an O(dt h) boundary-flux term.** At fixed mesh it is
+formally first order in time as dt -> 0, with a coefficient proportional to
+h; it is second order under joint refinement (dt proportional to h) and in
+practice over the tested range, and it has the same boundary consistency as
+OpenFOAM's standard fixed-pressure outlet. "Restores second order" must be
+qualified accordingly (15.8).
+
+### 15.1 Derivation
+
+From `pimpleFluid::evolve()` (OpenFOAM.com form), with `consistent` off so
+that `rAtU = rAU`:
+
+- `UEqn.A()` is `D()/V`, the diagonal including the implicit boundary
+  coefficients, with `extrapolatedCalculated` patches, so on the end patch
+  `rAU_b = rAU_P = 1/A_P`.
+- The pressure equation `laplacian(rAU, p) = div(phiHbyA)` gives on a
+  fixed-value pressure patch (orthogonal end faces, no non-orthogonal
+  correction) `pEqn.flux()_b = rAU_P |S_f| snGrad(p)`, with
+  `snGrad(p) = (p_b - p_P)/d`, d the centre-to-face distance (h/2 for the
+  axial cell size h).
+- After the corrector, `U = HbyA - rAU grad(p)`, so at PISO convergence
+  `HbyA_P = U_P + rAU_P g_P`, with `g_P = fvc::grad(p)_P` (the same
+  `gradp()` the implementation uses).
+
+With `phiHbyA_b = (U_b + rAU_P g_P) . S_f` (the implementation; `U_b` and
+`g_P` from the previous corrector, equal to the current ones at
+convergence):
+
+    phi_b = phiHbyA_b - pEqn.flux()_b
+          = U_b . S_f + rAU_P |S_f| (g_P . n - snGrad(p)).          (1)
+
+Equivalently, since `HbyA_P - U_P = rAU_P g_P`,
+`phiHbyA_b = (HbyA_P + U_b - U_P) . S_f`: HbyA is extrapolated to the face
+with the increment that the velocity condition gives U. For a zero-gradient
+velocity (`U_b = U_P`) this is exactly OpenFOAM's standard treatment of a
+fixed-pressure outlet (an assignable velocity condition, `HbyA_b` the
+extrapolated cell value), which therefore carries the same residual (1).
+The original `codedMixed` treatment instead gives
+`phi_b = U_b . S_f - rAU_P |S_f| snGrad(p)`.
+
+### 15.2 Scaling of rAU with dt
+
+`A_P = gamma/dt + a_nu` (+ the negligible convection), with gamma = 1
+(Euler, first step) or 3/2 (BDF2) and `a_nu ~ nu sum |S_f| delta_f / V`
+(about 1.05, 4.2 and 17 s^-1 in the end cells of m1, m2 and m4). Hence
+
+    rAU_P = dt / (gamma + a_nu dt) = dt/gamma - a_nu dt^2/gamma^2 + ...
+
+`A` is the same in every PIMPLE outer corrector (the problem is linear). So
+`rAU = O(dt)` once `dt < gamma/a_nu` (about 35, 140 and 560 steps per period
+on m1, m2 and m4); at larger steps it is limited by viscosity, which is why
+the end-flux inconsistency fell slowly at 100-400 steps on m4.
+
+### 15.3 Spatial order of `g_P . n - snGrad(p)`
+
+Applying OpenFOAM's own operators (`leastSquares` gradient, the
+fixed-value `snGrad`) to the *exact* pressure (values set at the cell
+centres and on the end faces), on every end face:
+
+| Mesh | h (axial) | (g_P.n - snGrad p) / (h d2p/dn2) | max misfit | max abs value |
+|---|---:|---:|---:|---:|
+| m1 | 0.469 | -0.244 | 0.5% | 2.34e-6 |
+| m2 | 0.234 | -0.247 | 0.3% | 1.18e-6 |
+| m4 | 0.117 | -0.249 | 0.1% | 5.94e-7 |
+
+So `g_P . n - snGrad(p) = -(h/4) d2p/dn2 + O(h^2)`. The least-squares
+gradient is accurate at the cell centre; the fixed-value `snGrad` is the
+normal gradient at the midpoint between the cell centre and the face, h/4
+away. The residual is a first-order *location* mismatch. (On interior faces
+both are centred on the face and the corresponding Rhie-Chow difference is
+O(h^2).) From (1),
+
+    phi_b - U_b . S_f = -(dt/gamma) (h/4) |S_f| d2p/dn2 + O(dt h^2, dt^2 h).   (2)
+
+The original treatment has `-(dt/gamma) |S_f| dp/dn`: the ratio is
+`(h/4) |d2p/dn2| / |dp/dn| = (h/4)|k|` for the travelling wave
+(|k| = 0.1455 m^-1), about 1/59, 1/117 and 1/234 on m1, m2 and m4.
+
+### 15.4 Formal order of the time discretisation at fixed mesh
+
+The boundary-flux error (2) is a source of mass on the end faces,
+proportional to dt, which the solution responds to linearly. At fixed h the
+solution therefore has an error
+
+    e(dt) = B dt^2 + C h dt + ...,
+
+with B the BDF2 coefficient and C independent of dt and h (proportional to
+the pressure curvature on the ends):
+**formally first order in time at fixed mesh**, with a coefficient that
+vanishes as O(h). Under joint refinement (dt proportional to h) the term is
+O(h^2), so the space-time scheme is formally second order. The order seen
+at fixed mesh is two while `B dt > C h`, and tends to one for
+`dt < C h / B`.
+
+(By the same argument the interior momentum interpolation carries an
+O(dt h^2) term, `rAU (interp(grad p) - snGrad p)`, one order higher in h
+than the boundary term. It was not isolated here: with exact-flux ends the
+fluid sub-problem converges at second order to 12800 steps per period on
+m1 (15.5), so any such term is below about 1e-7 there.)
+
+### 15.5 Numerical evidence
+
+Fluid-only static problem (exact wall velocity, tutorial end data, m1),
+periods 5-6, 200 ... 12800 steps per period; `scripts/womersley_boundary_order.py`.
+
+**The term itself.** `D = Q(fluxConsistent2) - Q(fluxConsistent)` (complex
+flow-rate coefficient) isolates (2): the two runs differ only in it.
+
+| steps/period | 200 | 400 | 800 | 1600 | 3200 | 6400 | 12800 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| \|D\| | 1.25e-5 | 6.49e-6 | 3.37e-6 | 1.72e-6 | 8.68e-7 | 4.36e-7 | 2.19e-7 |
+
+Halving ratios 1.93, 1.93, 1.96, 1.98, 1.99, 1.99 (constant `ddtCorr`
+coefficient; 1.90-1.96 with the default): **exactly first order in dt**.
+`|D/F|`, with F the first-order part of the original (`codedMixed`)
+solution, tends to 0.027 on m1 and is still falling (0.069, 0.036, 0.022,
+0.0175 from n200 to n1600) on m2, consistent with the scaling with h in (2)
+(on m2 the viscous part of `rAU` matters to smaller dt, 15.2).
+
+**The order it produces.** Successive-difference orders of the complex
+flow-rate coefficient, with a constant `ddtCorr` coefficient (`backward 1`;
+see the note below):
+
+| triplet (steps/period) | 200/400/800 | 400/800/1600 | 800/1600/3200 | 1600/3200/6400 | 3200/6400/12800 |
+|---|---:|---:|---:|---:|---:|
+| exact end flux (`fluxConsistent`) | 2.00 | 2.01 | 2.02 | 2.04 | **2.08** |
+| final form (`fluxConsistent2`) | 2.02 | 2.03 | 2.05 | 1.97 | **1.57** |
+
+and for the flow phase 1.94, 1.98, 2.00, 2.03, 2.08 against 1.77, 1.70,
+1.58, 1.42, **1.27**; the wave speed and attenuation of the final form
+change sign in their differences beyond 1600 steps, where the O(dt h) term
+crosses the BDF2 term. The BDF2 error of the exact-flux form at 3200 steps
+is 9.1e-7, against `|D|` = 8.7e-7: on m1 the crossover is at about 3200
+steps per period (by (2), about 6400 on m2 and 12800 on m4). The coupled
+study (to 400 steps per period on m2) is well inside the second-order
+range, which is why it shows 1.87-2.08.
+
+**Spatial order of the residual** (15.3): `-(h/4) d2p/dn2` from OpenFOAM's
+operators on the exact pressure, on m1, m2 and m4.
+
+**Note: the default `ddtCorr` limits fixed-mesh convergence at about
+1e-6.** With OpenFOAM's default Rhie-Chow `ddtCorr` coefficient,
+`1 - min(|phi - U_f.S|/|phi|, 1)`, both implementations stop converging
+below differences of about 1e-6 from 3200 steps per period (e.g. the
+profile differences stay at -3.6e-6 per halving), which hides the turn to
+first order. The floor is not the PIMPLE iteration (10 outer correctors
+change nothing), nor the start-up transient (identical at every step); it
+disappears with a constant coefficient. The coefficient switches as the
+oscillating face fluxes pass through zero, so it is not smooth in time. This
+is an interior effect of OpenFOAM's standard momentum interpolation, two
+orders of magnitude below the differences used in the coupled study.
+
+### 15.6 The first implementation (exact end flux)
+
+`phiHbyA_b = U_b . S_f + rAU_P |S_f| snGrad(p^{k-1})`, with `snGrad` from
+the previous corrector, gives at convergence `phi_b = U_b . S_f` exactly: no
+dt-proportional term (it shows second order where the second form shows
+the first-order term, 15.5). But with exact flux and an exact pressure on
+the same patch, the pressure equation has two boundary conditions for one
+second-order equation. The converged state is that of a *Neumann*
+(prescribed-flux) pressure problem on the ends, in which the imposed
+pressure value enters only through the momentum gradient `grad(p)` of the
+end cells. The implicit Dirichlet coefficient is cancelled by the lagged
+explicit term, so the iteration is a deferred correction whose contraction
+depends on how strongly the pressure level is otherwise fixed (through a
+Robin interface, weakly; with a zero-gradient interface, not at all). That
+is why it stagnated on m4 and diverged with IQN-ILS at 50 steps. Making the
+cancellation implicit (removing the patch from the pressure equation)
+turns the ends into a genuine Neumann condition and leaves the pressure
+level undetermined with IQN-ILS. There is therefore no well-posed treatment
+that both imposes the flux exactly and keeps the fixed pressure as an
+implicit Dirichlet condition of the pressure equation: the data are
+over-specified for the projection, and one of the two can only be
+satisfied to the accuracy of the discretisation.
+
+The clean choice is to keep the pressure implicit and make the flux
+consistent to the order of the pressure equation's own boundary gradient:
+
+- the present form, `G = g_P . n`, gives O(dt h);
+- a location-consistent form, `G = g_P . n + (d/2) (d2p/dn2)_P`, i.e. the
+  cell gradient carried to where `snGrad` is centred, gives O(dt h^2), the
+  same order as the interior faces. It needs a curvature estimate from the
+  interior cells only (e.g. the normal derivative of `grad(p)` between the
+  boundary cell and its interior neighbour), so that the fixed pressure
+  stays implicit; using `snGrad` itself for the curvature reproduces the
+  first implementation. Not implemented or tested here.
+
+### 15.7 Where the treatment belongs
+
+- OpenFOAM's convention is that a velocity condition on a fixed-pressure
+  patch is *assignable* (`inletOutlet`, `pressureInletOutletVelocity`,
+  `fixedNormalInletOutletVelocity` are mixed conditions that override
+  `assignable()` to true), so `HbyA_b` is extrapolated, and the residual (1)
+  is accepted. The tutorial's `codedMixed` (non-assignable) with a fixed
+  pressure is outside that convention, which is what produced the O(dt)
+  term.
+- An assignable `fixedGradient` alone is not enough for a non-zero gradient:
+  `HbyA_b` is then the cell value and misses `U_b - U_P`, and the pressure
+  absorbs the mismatch with weight 1/rAU (the `endsFixedGradient` failure).
+  The consistent rule is `HbyA_b = HbyA_P + (U_b - U_P)` on such patches,
+  which the present implementation reproduces at convergence and which
+  reduces to the standard treatment when `U_b = U_P`.
+- Recommendation: a **specialised capability for over-specified
+  (exact/manufactured) boundary data**, keyed to the velocity boundary
+  condition rather than to a solver patch list: a dedicated assignable
+  velocity condition that imposes a prescribed normal gradient, recognised
+  by the solver, which applies `HbyA_b = HbyA_P + (U_b - U_P)` on it. This
+  removes the possibility of pairing the option with an inconsistent
+  condition (the patch list only checks the pairing at start-up). It should
+  not be made a general change to all assignable patches: for inflow
+  segments of `inletOutlet` it would change OpenFOAM's standard behaviour.
+  Ordinary outlets (zero-gradient or `inletOutlet` velocity with a fixed
+  pressure) already have the same O(dt h) consistency and need nothing.
+
+### 15.8 Wording
+
+Replace "restores second order" by: "removes the O(dt) end-flux
+inconsistency; the remaining boundary term is O(dt h), so the time order is
+two over the tested range (to 400 steps per period in the coupled study, to
+about 1600-3200 steps per period on the fluid sub-problem) and the scheme is
+formally second order under joint refinement, but at fixed mesh the order
+tends to one as dt -> 0, with a coefficient that vanishes with h".

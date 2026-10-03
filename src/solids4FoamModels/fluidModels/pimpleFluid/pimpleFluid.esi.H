@@ -105,7 +105,10 @@ class pimpleFluid
         //  the boundary velocity flux by a term proportional to the
         //  time-step; on these patches HbyA_b carries the pressure gradient
         //  of the boundary cell, so the flux is the boundary velocity flux
-        //  to O(rAU h). Read from the PIMPLE dictionary; empty by default
+        //  to O(rAU h), i.e. O(deltaT h): formally first order in time at a
+        //  fixed mesh, with a coefficient that vanishes with h (the same
+        //  order as a standard fixed-pressure outlet). Read from the PIMPLE
+        //  dictionary; empty by default
         labelList fluxConsistentPatches_;
 
         //- Cumulative continuity errors

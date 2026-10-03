@@ -294,8 +294,9 @@ finest mesh).
   normal velocity gradient are imposed (OpenFOAM treats the mixed velocity
   condition as fixing the value), not by the coupling; with 400 steps per
   period the orders fall to about one. The `pimpleFluid` option
-  `fluxConsistentPatches (inlet outlet);` makes the end flux consistent and
-  restores second order (1.87-2.08). See
+  `fluxConsistentPatches (inlet outlet);` removes the O(dt) term (orders
+  1.87-2.08 over the steps used); an O(dt h) boundary term remains, so at
+  fixed mesh the order tends to one only at much smaller steps. See
   `womersley_temporal_investigation.md`.
 - IQN-ILS and Robin-Neumann agree to $$3 \times 10^{-4}$$ or better on every
   quantity. Robin-Neumann takes 8.7 coupling iterations per time-step against
