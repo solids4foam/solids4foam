@@ -1,0 +1,34 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+# -------------------------------------------------------------------------
+# Usage:
+#   ./Allrun [linearGeometry|totalLagrangian]     (default: linearGeometry)
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+OPTION="${1:-linearGeometry}"
+
+if [[ ! -d "caseOptions/${OPTION}" ]]; then
+    echo "Error: unknown option '${OPTION}'"
+    echo "Usage: ./Allrun [linearGeometry|totalLagrangian]"
+    exit 1
+fi
+
+echo "Using the ${OPTION} case"
+cp -a "caseOptions/${OPTION}/." .
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create mesh
+solids4Foam::runApplication blockMesh
+
+# Run solver
+solids4Foam::runApplication solids4Foam

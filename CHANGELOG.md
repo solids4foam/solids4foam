@@ -8,6 +8,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `solidSpringDashpot`, a spring-dashpot (Robin) displacement boundary
+  condition for elastic supports such as the pericardium or perivascular
+  tissue: the traction is proportional to the displacement and the velocity,
+  with separate normal and tangential coefficients that act per unit
+  reference area. The spring and dashpot are implicit, through
+  `solidDirectionMixed` with the exact matrix diagonal, and the linear-geometry
+  and total Lagrangian total-displacement models impose the spring-dashpot
+  traction on the boundary faces, including in their PETSc SNES residuals.
+  The coefficients can be scaled by a weight field. Its README gives the
+  formulation, literature values and verification, and the
+  `springSupportedBar` tutorial checks it against exact solutions.
 - A documentation page for each `mechanicalConstitutiveLaw`, next to its
   class, giving its entries and defaults, its state, its tangents, whether it
   supports the mixed displacement-pressure formulation, how it differs from
