@@ -6,6 +6,8 @@ reads the final fluid fields and reports, on the inlet and outlet patches,
 
     mean |phi_b - U_b . S_f|  /  max |U_b . S_f|
 
+over the patch faces that do not touch the wall (see measure()).
+
 the difference between the face flux used by the continuity equation and
 the flux of the boundary velocity used by the momentum equation. With the
 tutorial's codedMixed end condition (valueFraction 0), OpenFOAM's
@@ -43,6 +45,18 @@ def boundary_values(path: Path, patch: str):
                 re.findall(r"[-+\d.eE]+", body.split(")")[0])[:n]]
     return [tuple(map(float, v.split()))
             for v in re.findall(r"\(([^)]*)\)", body)[:n]]
+
+
+def patch_faces(mesh: Path, patch: str):
+    faces = [list(map(int, f.split())) for f in
+             re.findall(r"\d+\(([\d ]+)\)", (mesh / "faces").read_text())]
+    boundary = (mesh / "boundary").read_text()
+    if f"\n    {patch}\n" not in boundary:
+        return []
+    block = boundary[boundary.index(f"\n    {patch}\n"):]
+    first = int(re.search(r"startFace\s+(\d+)", block).group(1))
+    count = int(re.search(r"nFaces\s+(\d+)", block).group(1))
+    return faces[first:first + count]
 
 
 def face_areas(mesh: Path, final: Path, patch: str):
@@ -85,6 +99,14 @@ def measure(case: Path) -> list[dict]:
         flux_u = [sum(a * b for a, b in zip(uf, sf))
                   for uf, sf in zip(u, areas)]
         diff = [p - f for p, f in zip(phi, flux_u)]
+        # On a moving mesh phi is relative to the mesh motion; the end
+        # faces next to the wall have a corner point that moves axially with
+        # the solid and sweep volume, so they are left out
+        wall = {i for f in patch_faces(mesh, "interface") for i in f}
+        keep = [k for k, f in enumerate(patch_faces(mesh, patch))
+                if not wall.intersection(f)]
+        diff = [diff[k] for k in keep]
+        flux_u = [flux_u[k] for k in keep]
         rows.append({"run": case.name, "patch": patch, "time": times[-1][0],
                      "mean_abs_mismatch_over_max_flux":
                      sum(abs(d) for d in diff) / len(diff)

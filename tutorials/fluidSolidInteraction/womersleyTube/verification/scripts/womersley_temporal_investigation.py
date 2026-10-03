@@ -535,6 +535,19 @@ def ends_dirichlet_velocity(case: Path) -> None:
     fv.write_text(text)
 
 
+def flux_consistent(case: Path) -> None:
+    """pimpleFluid fluxConsistentPatches on the tube ends: the same end
+    conditions, with the end flux made equal to the boundary velocity flux
+    (needs a solids4foam build with that option)."""
+    path = fluid_dict(case, "fvSolution")
+    text, found = re.subn(r"(PIMPLE\s*\{)",
+                          r"\g<1>\n    fluxConsistentPatches (inlet outlet);",
+                          path.read_text())
+    if found != 1:
+        wtv.fail(f"No PIMPLE dictionary in {path}")
+    path.write_text(text)
+
+
 def no_change(case: Path) -> None:
     """A tag only: of2412 runs the same case with the OpenFOAM-v2412 build."""
 
@@ -553,6 +566,9 @@ VARIANTS = {
     "endsFixedGradient": ends_fixed_gradient,
     "lsS4f": least_squares_s4f,
     "endsDirichletU": ends_dirichlet_velocity,
+    "fluxConsistent": flux_consistent,
+    # The same option, second implementation (HbyA_b = U_b + rAtU grad(p)_P)
+    "fluxConsistent2": flux_consistent,
     "tight": tight_tolerances,
     "pimple4": pimple4,
 }
@@ -586,20 +602,44 @@ def configure(spec: dict) -> Path:
 # ---------------------------------------------------------------------------
 
 def run(specs: list[dict], local: bool, env_script: str, version: str,
-        hours: int) -> None:
+        hours: int, nprocs: int = 1) -> None:
     for spec in specs:
         case = configure(spec)
         if "of2412" in spec["variants"]:
             version = "v2412"
+        mode = ""
+        if nprocs > 1:
+            # Axial slabs, with no processor boundary near a sampling
+            # station: the flow-rate faceZone (L/2), the profile set
+            # (L/2 + 0.03) and the wall points (L/4, L/2, 3L/4); a faceZone
+            # on a processor boundary gives a wrong flow rate
+            length = 15.0
+            cuts = [length * i / nprocs for i in range(1, nprocs)]
+            stations = (3.75, 7.5, 7.53, 11.25)
+            if any(abs(c - x) < 0.5 for c in cuts for x in stations):
+                wtv.fail(f"{nprocs} axial slabs put a processor boundary "
+                         "near a sampling station; choose another --np")
+            for path in case.glob("system/**/decomposeParDict"):
+                set_option(path, "numberOfSubdomains", str(nprocs))
+                text = path.read_text()
+                text = re.sub(r"^method\s+\w+;\n", "", text,
+                              flags=re.MULTILINE)
+                text = text.replace(
+                    f"numberOfSubdomains {nprocs};",
+                    f"numberOfSubdomains {nprocs};\n\nmethod          simple;"
+                    f"\n\nsimpleCoeffs\n{{\n    n               "
+                    f"({nprocs} 1 1);\n}}", 1)
+                path.write_text(text)
+            mode = " parallel"
         command = (f"source {env_script} {version} && cd {case} && "
-                   f"./Allrun {spec['coupling']} > log.Allverify 2>&1")
+                   f"./Allrun {spec['coupling']}{mode} > log.Allverify 2>&1")
         if local:
             subprocess.run(["bash", "-c", command], check=False)
             print(f"{spec['name']}: {wtv.solver_log_problem(case) or 'done'}")
         else:
             job = subprocess.run(
                 ["sbatch", "--parsable", f"--job-name=wt_{spec['name']}",
-                 "--partition=main", "--ntasks=1", "--cpus-per-task=1",
+                 "--partition=main", f"--ntasks={nprocs}", "--cpus-per-task=1",
                  f"--time={hours}:00:00", f"--output={case}/log.slurm",
                  f"--chdir={case}", "--wrap", f"bash -c '{command}'"],
                 check=True, capture_output=True, text=True).stdout.strip()
@@ -636,6 +676,20 @@ def fluid_series(case: Path, exact: wtv.Exact, periods: int, expected: dict):
         times = sorted((float(d.name), d) for d in root.iterdir()
                        if re.fullmatch(r"[0-9.eE+-]+", d.name))
         rows = [wtv.read_rows(d / f"{set_name}_p_U.xy", 5) for _, d in times]
+        # In parallel, a set point on a processor boundary is written by
+        # both processors, with coordinates that differ by round-off: merge
+        # points closer than 1e-2 m (the set spacings are 0.05 m or more;
+        # the copies differ by up to about 1e-4 m on the moving mesh)
+        def unique(rs):
+            out = []
+            for r in sorted(rs, key=lambda r: r[0]):
+                if out and abs(r[0] - out[-1][0][0]) < 1e-2:
+                    out[-1].append(r)
+                else:
+                    out.append([r])
+            return [[sum(c) / len(group) for c in zip(*group)]
+                    for group in out]
+        rows = [unique(rs) for rs in rows]
         if any(len(r) != expected[set_name] for r in rows):
             wtv.fail(f"Unexpected {set_name} sample count in {root}")
         out[set_name] = ([t for t, _ in times], rows)
@@ -939,6 +993,8 @@ def main() -> int:
     p_run.add_argument("--local", action="store_true")
     p_run.add_argument("--version", default="v2512")
     p_run.add_argument("--hours", type=int, default=24)
+    p_run.add_argument("--np", type=int, default=1,
+                       help="MPI ranks per run (decomposes both regions)")
     p_run.add_argument("--env", default=os.environ.get("S4F_ENV_SCRIPT", ""),
                        help="script sourced with the version as argument to "
                        "load OpenFOAM and solids4foam in the job")
@@ -951,7 +1007,7 @@ def main() -> int:
         if not args.env:
             parser.error("--env (or S4F_ENV_SCRIPT) is required")
         run([parse_spec(s) for s in args.specs], args.local, args.env,
-            args.version, args.hours)
+            args.version, args.hours, args.np)
     elif args.command == "analyse":
         names = args.specs or sorted(p.name for p in RUN_ROOT.iterdir()
                                      if p.is_dir())

@@ -5,7 +5,14 @@ written before any run (commit 8f8c8468e), unchanged. Sections 5-14 are the
 results. Short answer: the sub-nominal order is caused by an O(dt)
 mass-flux inconsistency on the artificial tube ends, where the exact
 pressure and the exact normal velocity gradient are imposed (section 8); it
-is not an FSI, interface, ALE, solid, start-up or tolerance effect.
+is not an FSI, interface, ALE, solid, start-up or tolerance effect. A
+small, opt-in `pimpleFluid` option that makes the end flux equal to the
+boundary velocity flux (`fluxConsistentPatches`, section 6.10) recovers
+second order in every QoI of the production study (m2, Robin-Neumann,
+exact end data unchanged): 1.87-2.08 from 100/200/400 steps per period,
+and reduces most finest-mesh errors of the mesh study (the wave speed by
+about 70 times; the profile is unchanged and the flow phase, 1.5e-5 before,
+is 8.3e-5).
 
 Scope: the `womersleyTube` verification case only. No change to the
 production numerical methods; the manuscript is not edited here.
@@ -322,22 +329,28 @@ flux through the ends therefore differs from the flux of the boundary
 velocity used by the momentum equation by `rAU dp/dn |S_f|`, with
 `rAU ~ dt/1.5`: an O(dt) inconsistency, independent of the mesh and of the
 coupling. Measured in the converged fields (final time, same phase in every
-run; mean |phi_b - U_b . S_f| over the patch / largest |U_b . S_f|):
+run; mean |phi_b - U_b . S_f| over the patch / largest |U_b . S_f|, leaving
+out the end faces that touch the wall: on the moving mesh `phi` is relative
+to the mesh motion, and those faces have a corner point that moves axially
+with the solid):
 
-| Run | n50 | n100 | n200 | n400 | n800 | n1600 |
+| Run (outlet) | n50 | n100 | n200 | n400 | n800 | n1600 |
 |---|---:|---:|---:|---:|---:|---:|
-| fluid-only static, m1, outlet | | 3.3e-2 | 2.0e-2 | 1.1e-2 | 5.8e-3 | 3.0e-3 |
-| fluid-only static, m2, outlet | | 2.0e-2 | 1.4e-2 | 9.1e-3 | 5.3e-3 | 2.8e-3 |
-| fluid-only static, m4, outlet | | 7.3e-3 | 6.4e-3 | 5.2e-3 | 3.7e-3 | 2.4e-3 |
-| **coupled Robin, m2 (the study), outlet** | 2.2e-2 | 1.8e-2 | 1.3e-2 | 9.1e-3 | | |
-| coupled IQN-ILS, m2, outlet | 2.2e-2 | 1.8e-2 | 1.3e-2 | 9.2e-3 | | |
-| fluid-only, exact end velocity + `fixedFluxPressure` | | 9.8e-11 | | 9.8e-11 | | 9.8e-11 |
+| fluid-only static, m1 |  | 3.1e-02 | 1.8e-02 | 1.0e-02 | 5.3e-03 | 2.7e-03 |
+| fluid-only static, m2 |  | 1.9e-02 | 1.4e-02 | 8.8e-03 | 5.1e-03 | 2.7e-03 |
+| fluid-only static, m4 |  | 7.3e-03 | 6.4e-03 | 5.1e-03 | 3.7e-03 | 2.3e-03 |
+| **coupled Robin, m2 (the study)** | 2.2e-02 | 1.9e-02 | 1.4e-02 | 9.2e-03 |  |  |
+| coupled IQN-ILS, m2 | 2.2e-02 | 1.9e-02 | 1.4e-02 | 9.3e-03 |  |  |
+| coupled Robin, m2, `fluxConsistent2` (final fix, 6.10) | 2.3e-04 | 1.8e-04 | 1.3e-04 | 8.7e-05 |  |  |
+| coupled Robin, m2, `fluxConsistent` (first fix, 6.10) | 1.6e-05 | 1.0e-05 | 1.0e-05 | 1.0e-05 |  |  |
+| fluid-only static, m2, `fluxConsistent2` |  | 2.9e-03 |  | 2.4e-05 |  | 2.5e-05 |
+| fluid-only, exact end velocity + `fixedFluxPressure` |  | 1.0e-10 |  | 1.0e-10 |  | 1.0e-10 |
 
-(Inlet values are 3-5 times smaller; `end_flux_inconsistency.csv`.) The
-inconsistency tends to halve with dt; at large dt on fine meshes it falls
-more slowly because the viscous part of the momentum diagonal then limits
-`rAU`. It is present, at about 1-2% of the end flux, in the production
-study for both couplings.
+(Inlet values are similar or smaller; all in `end_flux_inconsistency.csv`.)
+Without the fix the inconsistency tends to halve with dt; at large dt on
+fine meshes it falls more slowly because the viscous part of the momentum
+diagonal then limits `rAU`. It is present, at about 1-2% of the end flux,
+in the production study for both couplings.
 
 ### 6.7 Consistent alternatives: is second order recovered?
 
@@ -375,21 +388,30 @@ algorithm:
    or less at 50 steps per period, but it is not a usable verification
    configuration.
 
-Second order is therefore **not recovered under any configuration that
-keeps the exact end data and is usable for the coupled problem**. With the
-consistent but gauge-free alternative, the temporal error at 50 steps per
-period drops by more than an order of magnitude, to the 1e-4 floor of that
-set-up.
+None of these end conditions, available without a code change, is both
+exact and flux consistent. Section 6.10 adds the missing piece in the fluid
+solver.
 
 ### 6.8 Mesh factor 4 (C)
 
-Robin, m4, 100/200/400 steps per period, 8 periods: **running at the time of
-this commit**. The runs cost far more than estimated (about 2.5 h, 4 h and
-6 h on one core). They are not needed for the diagnosis: the O(dt) term is
-already shown to be mesh independent on the coupled m1 and m2 series (6.1)
-and on the fluid-only static problem on m1, m2 and m4 (6.5: 6.6e-5, 8.0e-5,
-7.7e-5), and on m4 the end-flux inconsistency is still present (6.6). The
-results will be added when the runs finish.
+Robin, m4 (128 axial cells), tutorial end conditions, 100/200/400 steps per
+period, 8 periods (about 2.5, 4 and 6 h on one core):
+
+| Quantity | n100 | n200 | n400 | order (5-6) | order (7-8) | m2 order |
+|---|---:|---:|---:|---:|---:|---:|
+| flow_amp | -1.195e-3 | -7.167e-4 | -5.357e-4 | 1.40 | 1.41 | 1.12 |
+| flow_phase | -2.518e-4 | 1.360e-5 | 9.431e-5 | 1.72 | 1.73 | 1.79 |
+| wallMid_amp | 2.541e-3 | 8.611e-4 | 2.724e-4 | 1.51 | 1.52 | 1.31 |
+| wallMid_phase | -2.833e-3 | -1.875e-3 | -1.531e-3 | 1.48 | 1.47 | 1.14 |
+| speed | 1.401e-3 | 8.957e-4 | 6.287e-4 | 0.92 | 0.93 | 0.75 |
+| attenuation | -6.884e-3 | -4.470e-3 | -3.479e-3 | 1.28 | 1.28 | 0.94 |
+
+Refining the mesh does not restore second order: spatial contamination does
+not explain the temporal order. The m4 differences are somewhat smaller
+than on m2 (e.g. attenuation 9.9e-4 against 1.9e-3 from 200 to 400 steps),
+consistent with the slower fall of the end-flux inconsistency on finer
+meshes, where the viscous part of the momentum diagonal also limits `rAU`
+(6.6).
 
 ### 6.9 Post-processing (H8)
 
@@ -408,6 +430,146 @@ results will be added when the runs finish.
   `speed_ux`, m1 static: 1.69/1.54/1.36/1.29) and lose it with consistent
   ends. The low orders are not an artefact of the measurement; the
   reported definitions were not changed.
+
+### 6.10 Fix: flux-consistent end patches (`fluxConsistentPatches`)
+
+Added after the first version of this report (commit f0bab2730), on request,
+as an opt-in option of `pimpleFluid` (OpenFOAM.com form,
+`pimpleFluid.esi.C`):
+
+```
+PIMPLE
+{
+    ...
+    fluxConsistentPatches (inlet outlet);
+}
+```
+
+The listed patches must have a velocity condition that fixes the boundary
+value (fixedValue, or mixed such as the tutorial's `codedMixed`, so that
+`constrainHbyA` sets `HbyA_b = U_b`) and a fixed pressure; anything else
+stops with a fatal error. The option is empty by default, so no other case
+changes, and the end conditions themselves (exact pressure, exact normal
+velocity gradient) are unchanged. A pure boundary condition cannot do this,
+because `phiHbyA` is assembled in the solver and, on an assignable patch,
+`HbyA_b` is the extrapolated `UEqn.H()` that a velocity condition cannot
+set.
+
+**Implementation (final).** On the listed patches `HbyA` is given the
+pressure gradient of the boundary cell, as it has in the cell:
+
+    phiHbyA_b = (U_b + rAtU_b grad(p)_P) . S_f,
+
+so that the pressure equation gives
+
+    phi_b = U_b . S_f + rAtU_b (grad(p)_P . S_f - snGrad(p) |S_f|),
+
+the boundary velocity flux up to `O(rAtU h d2p/dn2)` (about 60 times
+smaller than the original `rAtU dp/dn` on m2, and vanishing with the mesh),
+while the fixed pressure stays an implicit Dirichlet condition of the
+pressure equation.
+
+**First implementation (superseded, recorded).** It set
+`phiHbyA_b = U_b . S_f + rAtU_b snGrad(p)|S_f|` with `snGrad(p)` from the
+previous iterate, which makes the converged end flux exactly `U_b . S_f`.
+It gave the same orders on m1 and m2 (variant `fluxConsistent`; Robin m2
+2.03/1.86/1.96/2.14/1.94/2.10 from 50/100/200 and 2.00/1.90/1.96/2.09/
+1.92/2.08 from 100/200/400; fluid-only m2 flow_amp 2.61 2.04 1.96 1.96),
+but it failed twice: IQN-ILS m2 n50 diverged in the first time-step (PETSc
+floating-point exception after the quasi-Newton iteration diverged), and
+Robin m4 n200 stagnated at a coupling residual of about 2e-2 in the first
+step (also with exact old-time boundary values). At convergence the fixed
+end pressure no longer enters the end flux, so the pressure level near the
+ends is held only through the momentum gradient, and the lagged correction
+becomes unstable as the mesh is refined. The final implementation keeps the
+pressure implicit and converges in both cases (m4 n200: 14 iterations in
+the first step, as without the option; IQN-ILS m2 n50: at most 14).
+
+Results with the final implementation (variant `fluxConsistent2`; private
+build; the m2 and m4 coupled runs on 5 and 7 MPI ranks, decomposed into
+axial slabs that keep processor boundaries away from the sampling
+stations, see 6.11):
+
+- Fluid-only static problem, orders 50/100/200/400/800/1600:
+
+| m2 | tutorial ends | `fluxConsistent2` |
+|---|---|---|
+| flow_amp | 1.79 1.42 1.05 0.90 | **2.10 2.06 2.02 2.04** |
+| flow_phase | 1.42 1.51 1.46 1.42 | **1.96 2.02 1.95 1.82** |
+| speed | 0.21 -0.72 0.04 0.33 | **2.05 2.23 2.47 2.66** |
+| attenuation | 0.62 0.60 0.38 0.96 | **2.75 2.76 2.71 2.92** |
+| speed_ux | 1.79 1.39 1.05 0.92 | **2.24 2.19 2.13 2.18** |
+
+  (m1: flow_amp 2.02 2.01 2.02 1.99.)
+
+- **Coupled Robin-Neumann, m2 (the production study):**
+
+| Quantity | tutorial 50/100/200 | tutorial 100/200/400 | **fix 50/100/200** | **fix 100/200/400** | fix, periods 11-12 |
+|---|---:|---:|---:|---:|---:|
+| flow_amp | 1.64 | 1.12 | 2.04 | **2.03** | 2.04 / 2.05 |
+| flow_phase | 1.85 | 1.79 | 1.85 | **1.87** | 1.85 / 1.91 |
+| wallMid_amp | 1.71 | 1.31 | 1.96 | **1.95** | 1.96 / 1.97 |
+| wallMid_phase | 1.73 | 1.14 | 2.14 | **2.08** | 2.14 / 2.06 |
+| speed | 1.29 | 0.75 | 1.94 | **1.93** | 1.94 / 1.97 |
+| attenuation | 1.51 | 0.94 | 2.10 | **2.08** | 2.11 / 2.07 |
+
+  Errors with the fix (periods 5-6; n50, n100, n200, n400): flow_amp
+  -1.229e-3, 5.151e-4, 9.406e-4, 1.045e-3; flow_phase 1.430e-4, 1.074e-3,
+  1.332e-3, 1.403e-3; wallMid_amp 5.283e-3, -6.653e-4, -2.196e-3,
+  -2.592e-3; wallMid_phase -6.118e-3, -2.342e-3, -1.486e-3, -1.283e-3;
+  speed 1.408e-3, -6.79e-5, -4.534e-4, -5.549e-4; attenuation -1.307e-2,
+  -4.234e-3, -2.177e-3, -1.690e-3. The pressure and profile errors become
+  independent of dt from n100 (changes 2e-6 to 2e-5). Coupling iterations
+  9.2-11.0 per step (8.7-10.3 without the fix); period-to-period change
+  <=7e-5.
+- Coupled Robin, m1 (first implementation): 2.03/1.99, 1.85/1.85,
+  1.96/1.95, 2.14/2.09, 1.94/1.90, 2.07/2.17.
+- IQN-ILS against Robin-Neumann with the fix, m2 n100: at most 2.3e-4
+  (wall amplitude), as without it (3.0e-4); 15.2 against 9.2 coupling
+  iterations per step.
+
+The time error at the study's 200 steps per period, estimated with order two
+from the n200 -> n400 difference (e/3), is now 1.3e-4 (wall amplitude),
+3.4e-5 (speed) and 1.6e-4 (attenuation), against 1.6e-3, 0.9e-3 and 3.8e-3
+(order one) with the tutorial ends.
+
+**Mesh study with the fix** (Robin, 200 steps per period, periods 5-6;
+original values from PR #513 for comparison):
+
+| QoI | m1 | m2 | m4 | mesh order | original m4 | original order |
+|---|---:|---:|---:|---:|---:|---:|
+| profile | 1.790e-2 | 4.960e-3 | 1.203e-3 | 2.04 | 1.18e-3 | 2.06 |
+| flow_amp | 6.100e-3 | 9.406e-4 | -3.083e-4 | 2.05 | -7.15e-4 | 2.16 |
+| flow_phase | 6.048e-3 | 1.332e-3 | 8.33e-5 | 1.92 | 1.5e-5 | 1.92 |
+| wallMid_amp | -1.031e-2 | -2.196e-3 | -1.787e-4 | 2.01 | 8.57e-4 | 2.15 |
+| wallMid_phase | -2.372e-3 | -1.486e-3 | -1.148e-3 | 1.40 | -1.88e-3 | 0.97 |
+| speed | -2.333e-3 | -4.534e-4 | 1.24e-5 | 2.01 | 8.93e-4 | 2.48 |
+| attenuation | -2.076e-3 | -2.177e-3 | -1.961e-3 | - | -4.47e-3 | 0.63 |
+
+(Profile order from the errors of the two finest meshes, the others from
+successive differences, as in `Allverify`.) The amplitude, flow and
+wave-speed QoIs converge at second order, with smaller finest-mesh errors
+(the wave speed to 1.2e-5). The wall phase improves from first order to
+1.40. The attenuation error no longer converges at a low order: it is
+about -2e-3 on all three meshes, a level that no longer depends on the
+mesh or (6.10) the time-step, consistent with the linear-theory limit of
+about 1e-3 (README) amplified about seven times in Im(k); it was about half
+of the original finest-mesh attenuation error, the rest being the end-flux
+time error.
+
+### 6.11 Parallel sampling artefact
+
+With scotch decomposition on 4 and 8 ranks, processor boundaries fell
+exactly at x = L/4, L/2 and 3L/4: the axial pressure set then contains
+duplicate points (merged by the driver; serial results are unchanged), and,
+more seriously, the flow rate through the `midPlane` faceZone at L/2 is
+wrong (flow phase error -1.58e-2 instead of 1.07e-3 at m2 n100), while the
+wall, wave-speed and attenuation QoIs are unaffected. The offset does not
+depend on dt, so it does not change the orders, but the values are
+unusable. Parallel runs therefore use axial slabs (`simple`) with a number
+of ranks (3, 5 or 7) that keeps every processor boundary at least 0.5 m
+from the sampling stations; the driver refuses other counts. With 5 slabs
+the flow-phase error at m2 n100 is 1.074e-3 (serial 1.079e-3).
 
 ## 7. Version difference
 
@@ -457,7 +619,9 @@ v2412 against v2512, m2, n100 (periods; relative errors):
    present in every coupled and fluid-only configuration that keeps these
    end conditions, independent of the mesh, the coupling, ALE, `ddtCorr`,
    the gradient scheme, the tolerances and the start-up, and it disappears
-   with a flux-consistent end condition (6.7). The observed orders are the
+   with a flux-consistent end condition (6.7), and in particular with the
+   end flux made equal to the boundary velocity flux, which restores second
+   order in the coupled study (6.10). The observed orders are the
    transition from the BDF2 O(dt^2) error to this O(dt) term: 1.3-1.8 from
    50/100/200 and 0.75-1.8 (mostly about 1) from 100/200/400.
 2. **Start-up transient (established, but not the cause of the order).**
@@ -486,44 +650,60 @@ v2412 against v2512, m2, n100 (periods; relative errors):
 
 ## 10. Is nominal second order recovered?
 
-No, not in any configuration that keeps the exact end data and remains
-usable for the coupled problem (6.7). With a flux-consistent but gauge-free
-end condition (fluid only), the first-order term disappears and the
-remaining time dependence is at the 1e-4 level already at 50 steps per
-period, which bounds the BDF2 time error of the fluid scheme but does not
-give a measurable order.
+Without a code change, no (6.7). With `fluxConsistentPatches` on the tube
+ends (6.10), **yes**: every QoI of the production study (m2, Robin-Neumann,
+same exact end data) converges at 1.87-2.08 from 100/200/400 steps per
+period and 1.85-2.14 from 50/100/200, in both analysis windows, and the
+fluid sub-problem converges at second order to 1600 steps per period. This
+is scientifically justified because the change does not alter the
+discretisation of the equations; it makes the discrete end flux satisfy the
+boundary condition that the case already intends (the boundary velocity
+flux), removing a demonstrated O(dt) inconsistency.
 
 ## 11. Statement for the paper
 
-> In womersleyTube the observed temporal orders at fixed mesh fall from
-> 1.3-1.8 (50/100/200 steps per period) to about one (100/200/400). The
-> cause is not the fluid-solid coupling: the behaviour is identical for
-> IQN-ILS and Robin-Neumann, persists in a fluid-only computation with the
-> exact wall motion and on a static mesh, and is independent of the mesh,
-> the start-up, the analysis window and the solver and coupling
-> tolerances. It is an O(Δt) inconsistency of the mass flux on the
-> artificial tube ends, where the exact pressure and the exact normal
-> velocity gradient are imposed: OpenFOAM treats the mixed velocity
-> condition as fixing the value, so the end flux carries a term
-> proportional to the momentum coefficient (∝ Δt) times the axial pressure
-> gradient. With a flux-consistent end treatment the time dependence at 50
-> steps per period falls by more than an order of magnitude. The time
-> study of this case therefore verifies the boundary treatment of the
-> truncated domain rather than the second-order accuracy of the coupled
-> scheme, and we do not claim temporal second order from it.
+> With the exact travelling-wave data imposed on the artificial tube ends
+> as a fixed pressure and a prescribed normal velocity gradient, the
+> observed temporal orders fell from 1.3-1.8 (50/100/200 steps per period)
+> to about one (100/200/400), on every mesh (m1, m2, m4). The cause was not
+> the fluid-solid coupling: the behaviour was identical for IQN-ILS and
+> Robin-Neumann, persisted in a fluid-only computation with the exact wall
+> motion on a static mesh, and was independent of the mesh, the start-up,
+> the analysis window and the tolerances. It was an O(Δt) inconsistency of
+> the mass flux through the ends: the segregated pressure-velocity
+> algorithm treats the mixed velocity condition as fixing the value, so the
+> end flux differed from the boundary velocity flux by the momentum
+> coefficient (∝ Δt) times the axial pressure gradient. With the end flux
+> made equal to the boundary velocity flux (an option of the fluid solver,
+> leaving the boundary data unchanged), every quantity converges at second
+> order in time (1.87-2.08 from 100/200/400 steps per period), and the
+> time error at 200 steps per period falls by an order of magnitude.
 
-The mesh orders are unaffected (successive differences at fixed dt cancel
-the common time error), but the finest-mesh errors against the exact
-solution at 200 steps per period contain this time error: extrapolating the
-m2 sequence with order one, the time error at n200 is about twice the
-200 -> 400 difference, e.g. 1.6e-3 in the wall amplitude, 0.9e-3 in the
-speed and 3.8e-3 in the attenuation, comparable to or larger than the
-finest-mesh errors in `tab:womersley`.
+The exact reference is what made this boundary inconsistency visible: the
+orders are reference-free, but the fluid-only and end-flux diagnostics, and
+the confirmation that the fixed solution converges at second order towards
+the exact one, are not.
+
+With the fix, the mesh study (6.10) gives second order for the profile,
+flow rate, wall amplitude and wave speed (2.01-2.05; the flow phase 1.92),
+1.40 for the wall phase, and an attenuation error of about -2e-3 that no
+longer depends on the mesh or the time-step (the linear-theory limit,
+amplified in Im(k)). The finest-mesh errors fall to 1.2e-3 (profile),
+3.1e-4 (flow amplitude), 1.8e-4 (wall amplitude), 1.15e-3 (wall phase),
+1.2e-5 (wave speed) and 2.0e-3 (attenuation); the flow-phase error,
+8.3e-5, is larger than the original 1.5e-5, which was smaller than the
+time error it contained (probably a cancellation between the spatial error
+and the end-flux time error). In the original set-up,
+about half of the finest-mesh attenuation error and most of the wave-speed
+error were the end-flux time error.
 
 ## 12. Bugs
 
 - **No solids4foam source bug** was found in the coupling, the interface
-  conditions, the solid, the time schemes or the mesh motion.
+  conditions, the solid, the time schemes or the mesh motion. The
+  `fluxConsistentPatches` option fills a gap (no flux-consistent way to
+  combine a fixed pressure with a prescribed velocity gradient) rather than
+  fixing an error in existing code.
 - **Verification set-up defects** (demonstrated, in the tutorial files, not
   in the library):
   - the end velocity condition (`codedMixed`, `valueFraction 0`, with a
@@ -542,28 +722,27 @@ finest-mesh errors in `tab:womersley`.
 
 ## 13. Recommended final verification configuration
 
-1. Keep the production algorithms and the six-period, last-two-periods
-   analysis; keep the mesh study at 200 steps per period (its orders are
-   valid) and the IQN-ILS/Robin comparison.
-2. Report the time study as a diagnosed boundary-limited result (section
-   11), with the fluid-only and end-flux evidence; do not tighten
-   tolerances or change the window to improve it (neither helps).
-3. Fix the old-time boundary values in `0/solid/D*` (the `exactOldBoundary`
-   change). It removes the dt-growing start-up transient and changes the
-   analysed periods by less than 3e-6, but it moves the regression value at
-   t = 25 s, so it needs new regression references on both versions; not
-   applied here.
-4. State in the finest-mesh table that the errors at 200 steps per period
-   contain a time error of 1e-3 order from the end treatment.
-5. If a temporal-order verification of the coupled scheme is wanted, it
-   needs a flux-consistent exact outflow condition (for example an
-   assignable gradient condition whose `HbyA` boundary value carries the
-   imposed gradient, or exact Dirichlet velocity with `fixedFluxPressure` and
-   a time-dependent pressure datum), which is a code change outside this
-   investigation.
+1. Add `fluxConsistentPatches (inlet outlet);` to the tutorial's
+   `system/fluid/fvSolution` PIMPLE dictionary once the option is merged,
+   and regenerate the regression references (both versions) and the stored
+   results in the verification README; the numbers in 6.10 are those this
+   configuration gives.
+2. Fix the old-time boundary values in `0/solid/D*` (the `exactOldBoundary`
+   change) at the same time. It removes the Robin start-up transient that
+   grows as dt falls and changes the analysed periods by less than 3e-6;
+   it also moves the regression value at t = 25 s.
+3. Keep the six-period, last-two-periods analysis, the QoI definitions and
+   the tolerances; none needed changing.
+4. Extend the time study to 400 steps per period (50/100/200/400), and run
+   any parallel cases with axial slabs that avoid the sampling stations
+   (6.11).
+5. Report the attenuation as converged to the linear-theory level
+   (-2e-3), not as a first-order quantity.
 
 ## 14. Remaining open items
 
 - The persistent IQN-ILS v2412/v2512 offset (1e-4 in the attenuation).
-- The ~1e-4 floor of the self-convergence and consistent-end fluid-only
-  variants.
+- The ~1e-4 floor of the self-convergence and Dirichlet-velocity fluid-only
+  variants (not present with `fluxConsistent`).
+- `fluxConsistentPatches` is implemented for OpenFOAM.com only (the tutorial
+  runs only there).
