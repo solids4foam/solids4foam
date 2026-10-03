@@ -19,7 +19,7 @@ Class
     Foam::fv::bdfD2dt2Scheme
 
 Description
-    Implicit backward differentiation formula (BDF) d2dt2 of order 1 to 4,
+    Implicit backward differentiation formula (BDF) d2dt2 of order 1 to 6,
     for a constant time-step.
 
     The BDFk first derivative is applied twice, in the same way as the
@@ -34,17 +34,17 @@ Description
     implied by the scheme is recomputed from the stored displacements, so no
     velocity field is stored.
 
-    Usage in system/fvSchemes, where the order is 1, 2, 3 or 4:
+    Usage in system/fvSchemes, where the order is 1 to 6:
 
         d2dt2Schemes
         {
-            default bdf 3;
+            default BDF 3;
         }
 
         ddtSchemes
         {
             default         backward;
-            "d2dt2\(.*\)"   bdf 3;
+            "d2dt2\(.*\)"   BDF 3;
         }
 
     The ddtSchemes entry is needed because fvc::d2dt2 in OpenFOAM and
@@ -55,8 +55,8 @@ Description
     vertex-centred solid models select their own d2dt2 schemes and do not use
     this scheme.
 
-    With a constant time-step and a constant density, "bdf 1" is identical
-    to Euler, and, once 2k old-time levels are available, "bdf 2" is
+    With a constant time-step and a constant density, "BDF 1" is identical
+    to Euler, and, once 2k old-time levels are available, "BDF 2" is
     identical to the solids4foam backward d2dt2 scheme.
 
     Start-up: when fewer than 2k genuine old-time levels are available, the
@@ -74,12 +74,18 @@ Description
     changes while two or more genuine old-time levels are available. The
     scheme is not implemented for a moving mesh.
 
-    Note: BDF3 and BDF4 are not A-stable. For an undamped oscillator with
+    Note: BDF3 to BDF6 are not A-stable. For an undamped oscillator with
     angular frequency omega, the BDF3 amplitude grows for omega*deltaT below
     1.94 and the BDF4 amplitude grows for omega*deltaT below 4.71. At 20
     steps per period the growth is about 4.5% per period for BDF3 and 0.6%
-    per period for BDF4. They are therefore not recommended for undamped
-    structural dynamics; "bdf 1" and "bdf 2" are dissipative.
+    per period for BDF4. BDF5 and BDF6 slightly damp well-resolved modes,
+    but a spurious root grows, by up to 38% and 58% per time-step, for
+    omega*deltaT between 0.71 and 9.39 (BDF5) and between 0.84 and 17.6
+    (BDF6), that is for modes with fewer than about 9 and 7.5 steps per
+    period. A mesh normally has such modes, so BDF5 and BDF6 are unstable
+    unless the time-step resolves the highest mesh frequency. BDF3 to BDF6
+    are therefore not recommended for undamped structural dynamics;
+    "BDF 1" and "BDF 2" are dissipative.
 
 SourceFiles
     bdfD2dt2Scheme.C
@@ -170,7 +176,7 @@ class bdfD2dt2Scheme
 public:
 
     //- Runtime type information
-    TypeName("bdf");
+    TypeName("BDF");
 
 
     // Constructors

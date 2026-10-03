@@ -63,6 +63,25 @@ scalarList bdfD2dt2Scheme<Type>::coeffs(const label order)
         a[3] = -4.0/3.0;
         a[4] = 1.0/4.0;
     }
+    else if (order == 5)
+    {
+        a[0] = 137.0/60.0;
+        a[1] = -5.0;
+        a[2] = 5.0;
+        a[3] = -10.0/3.0;
+        a[4] = 5.0/4.0;
+        a[5] = -1.0/5.0;
+    }
+    else if (order == 6)
+    {
+        a[0] = 147.0/60.0;
+        a[1] = -6.0;
+        a[2] = 15.0/2.0;
+        a[3] = -20.0/3.0;
+        a[4] = 15.0/4.0;
+        a[5] = -6.0/5.0;
+        a[6] = 1.0/6.0;
+    }
     else
     {
         FatalErrorInFunction
@@ -234,10 +253,10 @@ bdfD2dt2Scheme<Type>::bdfD2dt2Scheme(const fvMesh& mesh, Istream& is)
     d2dt2Scheme<Type>(mesh, is),
     order_(readLabel(is))
 {
-    if (order_ < 1 || order_ > 4)
+    if (order_ < 1 || order_ > 6)
     {
         FatalIOErrorInFunction(is)
-            << "The order of the bdf d2dt2 scheme must be 1, 2, 3 or 4, "
+            << "The order of the BDF d2dt2 scheme must be 1 to 6, "
             << "but it is " << order_ << exit(FatalIOError);
     }
 }
