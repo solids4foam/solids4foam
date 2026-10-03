@@ -184,6 +184,15 @@ Description
     pimpleFoam, or the solids4foam pimpleFluid fluid model), and is only
     available for incompressible flow.
 
+    A body with the fsiDriven motion may be driven by a solids4foam
+    fluid-solid interface (fluidSolidInterface with an immersed interface),
+    through the fsiImmersedBoundary interface of solids4FoamModels that this
+    option implements: the interface gives the body its surface, moves it in
+    each coupling iteration, when the bodies are re-positioned in the mesh,
+    and takes the surface traction (cutLink only). The forcing, momentum
+    and apertures of the previous time step are kept when the bodies are
+    re-positioned within a time step.
+
     References:
     \verbatim
         Municchi, F. openHFDIB. DOI: 10.5281/zenodo.3940236.
@@ -320,6 +329,7 @@ SourceFiles
 #include "IOdictionary.H"
 #include "immersedBody.H"
 #include "immersedSurfaceTraction.H"
+#include "fsiImmersedBoundary.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -337,7 +347,8 @@ namespace fv
 
 class immersedBoundaryForce
 :
-    public fv::option
+    public fv::option,
+    public fsiImmersedBoundary
 {
     // Private Data
 
@@ -357,6 +368,10 @@ class immersedBoundaryForce
 
         //- Immersed bodies
         PtrList<immersedBody> bodies_;
+
+        //- Configuration index of the motion of each body when the bodies
+        //  were last located in the mesh
+        labelList bodyConfigurations_;
 
         //- Forcing method: cutLink (the default), penalty (implicit volume
         //  penalisation), ghostCell (sharp penalisation with a linear
@@ -629,6 +644,13 @@ class immersedBoundaryForce
         //- Move the bodies to the current time and calculate the occupancy
         void updateBodies(const bool move);
 
+        //- Has a body been re-positioned (by a fluid-solid interface) since
+        //  the bodies were last located in the mesh?
+        bool bodiesRepositioned() const;
+
+        //- Check that the body index is valid
+        void checkBody(const label bodyi) const;
+
         //- Residual of the momentum equation of the final velocity and
         //  pressure without the forcing: the forcing received by the fluid,
         //  given the time derivative of the velocity
@@ -780,6 +802,44 @@ public:
 
             //- Update the forcing after a pressure corrector
             virtual void correct(volVectorField& U);
+
+
+        // Fluid-solid interaction, see fsiImmersedBoundary
+
+            //- Index of the body with the given name, or -1 if there is none
+            virtual label findBody(const word& bodyName) const;
+
+            //- Is the motion of the body fsiDriven?
+            virtual bool fsiDriven(const label bodyi) const;
+
+            //- Set the reference surface of the body
+            virtual void setReferenceSurface
+            (
+                const label bodyi,
+                const pointField& points,
+                const faceList& triangles
+            );
+
+            //- Move the surface of the body to the given point positions,
+            //  with the given point velocities
+            virtual void moveSurface
+            (
+                const label bodyi,
+                const pointField& points,
+                const vectorField& velocities
+            );
+
+            //- Traction exerted by the fluid on each triangle of the surface
+            //  of the body (cutLink only), and the area of the quadrature
+            //  points of each triangle
+            virtual tmp<vectorField> surfaceTraction
+            (
+                const label bodyi,
+                scalarField& areas
+            );
+
+            //- Force on the body from the momentum exchange (cutLink only)
+            virtual vector momentumExchangeForce(const label bodyi) const;
 
 
         // IO

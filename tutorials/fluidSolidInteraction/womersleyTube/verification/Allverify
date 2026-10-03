@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Opt-in verification driver for womersleyTube.
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for womersleyTube verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 -u "${SCRIPT_DIR}/scripts/womersley_tube_verification.py" "$@"

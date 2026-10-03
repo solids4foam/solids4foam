@@ -1,0 +1,69 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        // Liu et al. (2014): u = g(t)*(1 + 2y)*(1 - y), which is a parabola
+        // across y = -0.5 to 1 with a peak of 1.125 m/s at y = 0.25, ramped
+        // with g(t) = 0.5*(1 - cos(pi*t/2)) for t < 2 s
+        type            transitionalParabolicVelocity;
+        maxValue        1.125;
+        n               (1 0 0);
+        y               (0 1 0);
+        transitionPeriod 2;
+        boundBoxMin     (0 -0.5 -0.5);
+        boundBoxMax     (0 1 0.5);
+        value           uniform (0 0 0);
+    }
+
+    outlet
+    {
+        type            zeroGradient;
+    }
+
+    top
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+
+    bottom
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

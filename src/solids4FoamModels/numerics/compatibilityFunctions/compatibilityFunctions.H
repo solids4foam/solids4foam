@@ -33,6 +33,7 @@ Description
         - makeList<T>()      : construct a List<T> from an initializer_list
         - forAllIters()      : iterate a container without naming its type
         - forAllConstIters() : as above, with const access
+        - fvcD2dt2Compat()   : fvc::d2dt2 using the d2dt2Schemes entry
 
       Usage example:
           #include "compatibilityFunctions.H"
@@ -54,6 +55,7 @@ Author
 #include "CompactListList.H"
 #include "GeometricFields.H"
 #include "fvm.H"
+#include "d2dt2Scheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -247,6 +249,62 @@ namespace Foam
     #else
         return Foam::fvm::ddt(D);
     #endif
+    }
+
+    // Return the d2dt2 scheme for the given name
+    inline ITstream& d2dt2SchemeCompat(const fvMesh& mesh, const word& name)
+    {
+    #ifdef OPENFOAM_NOT_EXTEND
+        return mesh.d2dt2Scheme(name);
+    #else
+        return mesh.schemesDict().d2dt2Scheme(name);
+    #endif
+    }
+
+    // Explicit second time derivative using the d2dt2Schemes entry.
+    // fvc::d2dt2 looks its scheme up in ddtSchemes, whereas fvm::d2dt2 uses
+    // d2dt2Schemes, in all OpenFOAM variants; so this function is used in
+    // place of fvc::d2dt2 for the inertia terms of the momentum equation,
+    // keeping their explicit and implicit forms consistent (#502)
+    template<class Type>
+    inline tmp<GeometricField<Type, fvPatchField, volMesh>> fvcD2dt2Compat
+    (
+        const GeometricField<Type, fvPatchField, volMesh>& vf
+    )
+    {
+        tmp<fv::d2dt2Scheme<Type>> tscheme
+        (
+            fv::d2dt2Scheme<Type>::New
+            (
+                vf.mesh(),
+                d2dt2SchemeCompat(vf.mesh(), "d2dt2(" + vf.name() + ')')
+            )
+        );
+
+        return tmpRef(tscheme).fvcD2dt2(vf);
+    }
+
+    // As above, for the (rho, vf) form
+    template<class Type>
+    inline tmp<GeometricField<Type, fvPatchField, volMesh>> fvcD2dt2Compat
+    (
+        const volScalarField& rho,
+        const GeometricField<Type, fvPatchField, volMesh>& vf
+    )
+    {
+        tmp<fv::d2dt2Scheme<Type>> tscheme
+        (
+            fv::d2dt2Scheme<Type>::New
+            (
+                vf.mesh(),
+                d2dt2SchemeCompat
+                (
+                    vf.mesh(), "d2dt2(" + rho.name() + ',' + vf.name() + ')'
+                )
+            )
+        );
+
+        return tmpRef(tscheme).fvcD2dt2(rho, vf);
     }
 
     // Provide OpenFOAM.com ends_with function

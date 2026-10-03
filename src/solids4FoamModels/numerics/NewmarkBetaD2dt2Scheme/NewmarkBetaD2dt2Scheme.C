@@ -22,6 +22,7 @@ License
 #include "calculatedFvPatchFields.H"
 #include "compatibilityFunctions.H"
 #include "fvcD2dt2.H"
+#include "HashSet.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -332,11 +333,18 @@ void NewmarkBetaD2dt2Scheme<Type>::updateState
 
 
 template<class Type>
-void NewmarkBetaD2dt2Scheme<Type>::checkFvcScheme(const word& name) const
+void NewmarkBetaD2dt2Scheme<Type>::checkDdtSchemesEntry
+(
+    const word& name
+) const
 {
-    // fvc::d2dt2 reads its scheme from ddtSchemes (issue #502), so, without
-    // a ddtSchemes entry, an fvc::d2dt2 residual would silently use another
-    // scheme than this fvm::d2dt2
+    // fvm::d2dt2 and the inertia terms of the momentum residuals
+    // (fvcD2dt2Compat) read d2dt2Schemes (issue #502). ddtSchemes is still
+    // read by plain fvc::d2dt2, such as for the acceleration of the linear
+    // predictor of the total Lagrangian solid model, which then only changes
+    // the initial guess. If ddtSchemes also selects this scheme, though, the
+    // two share the NewmarkV, NewmarkA and NewmarkD state, which each
+    // advances with its own coefficients, so the coefficients must agree
 
 #ifdef OPENFOAM_NOT_EXTEND
     ITstream& is = mesh().ddtScheme(name);
@@ -346,9 +354,9 @@ void NewmarkBetaD2dt2Scheme<Type>::checkFvcScheme(const word& name) const
 
     const word schemeName(is);
 
-    bool same = (schemeName == typeName);
+    bool same = true;
 
-    if (same)
+    if (schemeName == typeName)
     {
         // Compare the coefficients
         const NewmarkBetaD2dt2Scheme<Type> other(mesh(), is);
@@ -358,24 +366,34 @@ void NewmarkBetaD2dt2Scheme<Type>::checkFvcScheme(const word& name) const
          && other.gamma_ == gamma_
          && other.alphaM_ == alphaM_;
     }
+    else
+    {
+        // Say once per term that plain fvc::d2dt2 uses another scheme
+        static wordHashSet reported;
+
+        if (reported.insert(name))
+        {
+            Info<< type() << ": fvc::" << name << " outside the momentum "
+                << "residual, e.g. for the acceleration of the linear "
+                << "predictor, uses the ddtSchemes scheme " << schemeName
+                << nl << "    Add \"d2dt2\\(.*\\)\" " << typeName
+                << " to ddtSchemes, with the same coefficients, for it to use "
+                << "the " << typeName << " acceleration" << endl;
+        }
+    }
 
     is.rewind();
 
     if (!same)
     {
         FatalErrorInFunction
-            << "fvm::" << name << " uses the " << typeName
-            << " scheme with beta = " << beta_ << ", gamma = " << gamma_
-            << " and alphaM = " << alphaM_ << ", but fvc::" << name
-            << ", which reads its scheme from ddtSchemes, would use a "
-            << "different scheme or coefficients" << nl
-            << "Add the same scheme to ddtSchemes, for example" << nl << nl
-            << "    ddtSchemes" << nl
-            << "    {" << nl
-            << "        default         backward;" << nl
-            << "        \"d2dt2\\(.*\\)\"   " << typeName << ";" << nl
-            << "    }" << nl
-            << exit(FatalError);
+            << "d2dt2Schemes selects the " << typeName << " scheme for "
+            << name << " with beta = " << beta_ << ", gamma = " << gamma_
+            << " and alphaM = " << alphaM_ << ", but ddtSchemes selects it "
+            << "with different coefficients" << nl
+            << "The two would advance the same stored velocity and "
+            << "acceleration differently: use the same coefficients, or "
+            << "remove the ddtSchemes entry" << exit(FatalError);
     }
 }
 
@@ -466,6 +484,10 @@ NewmarkBetaD2dt2Scheme<Type>::acceleration
 ) const
 {
     typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
+
+    // The PETSc SNES solid models reach this scheme through fvc::d2dt2
+    // only, without fvm::d2dt2, so the check is made here too
+    checkDdtSchemesEntry("d2dt2(" + vf.name() + ')');
 
     updateState(vf);
 
@@ -580,19 +602,34 @@ NewmarkBetaD2dt2Scheme<Type>::physicalAcceleration
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
-
-    tmp<fieldType> ta = fvc::d2dt2(vf);
-
-    // fvc::d2dt2 reads its scheme from ddtSchemes (issue #502)
     const fvMesh& mesh = vf.mesh();
     const word name("d2dt2(" + vf.name() + ')');
 
 #ifdef OPENFOAM_NOT_EXTEND
-    ITstream& is = mesh.ddtScheme(name);
+    return physicalAcceleration(vf, mesh.ddtScheme(name));
 #else
-    ITstream& is = mesh.schemesDict().ddtScheme(name);
+    return physicalAcceleration(vf, mesh.schemesDict().ddtScheme(name));
 #endif
+}
+
+
+template<class Type>
+tmp<GeometricField<Type, fvPatchField, volMesh> >
+NewmarkBetaD2dt2Scheme<Type>::physicalAcceleration
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    ITstream& is
+)
+{
+    typedef GeometricField<Type, fvPatchField, volMesh> fieldType;
+    const fvMesh& mesh = vf.mesh();
+
+    tmp<fv::d2dt2Scheme<Type>> tscheme
+    (
+        fv::d2dt2Scheme<Type>::New(mesh, is)
+    );
+    tmp<fieldType> ta = tmpRef(tscheme).fvcD2dt2(vf);
+    is.rewind();
 
     const word schemeName(is);
 
@@ -621,7 +658,7 @@ NewmarkBetaD2dt2Scheme<Type>::physicalAcceleration
 
     // d2dt2 is the Bossak-weighted (1 - alphaM) a^{n+1} + alphaM a^n, and
     // the stored NewmarkA is a^n once the state has been updated in this
-    // time-step, as fvc::d2dt2 did above; before the first time-step, both
+    // time-step, as fvcD2dt2 did above; before the first time-step, both
     // are the initial acceleration
     const fieldType& A =
         mesh.template lookupObject<fieldType>("NewmarkA(" + vf.name() + ')');
@@ -680,7 +717,7 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
 
     fvMatrix<Type>& fvm = tmpRef(tfvm);
 
-    checkFvcScheme("d2dt2(" + vf.name() + ')');
+    checkDdtSchemesEntry("d2dt2(" + vf.name() + ')');
 
     const scalarField& V = mesh().V();
     const tmp<GeometricField<Type, fvPatchField, volMesh> > texplicit =
@@ -712,7 +749,7 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
 
     fvMatrix<Type>& fvm = tmpRef(tfvm);
 
-    checkFvcScheme("d2dt2(" + vf.name() + ')');
+    checkDdtSchemesEntry("d2dt2(" + vf.name() + ')');
 
     const scalarField& V = mesh().V();
     const tmp<GeometricField<Type, fvPatchField, volMesh> > texplicit =
@@ -744,7 +781,8 @@ NewmarkBetaD2dt2Scheme<Type>::fvmD2dt2
 
     fvMatrix<Type>& fvm = tmpRef(tfvm);
 
-    checkFvcScheme("d2dt2(" + rho.name() + ',' + vf.name() + ')');
+    // The state, and plain fvc::d2dt2 of the linear predictor, are of vf
+    checkDdtSchemesEntry("d2dt2(" + vf.name() + ')');
 
     const scalarField& V = mesh().V();
     const tmp<GeometricField<Type, fvPatchField, volMesh> > texplicit =

@@ -88,7 +88,11 @@ release. For complete commit-level details and contributor information, see the
   inside a body. Its force is the momentum exchange or the traction on
   the surface (new `immersedSurfaceTraction` class). Added the
   `uniformTranslation` and `solidBodyRotation` body motions, deforming bodies
-  (the `quadraticBend` and `customProfileBend` motions), and the `cut`
+  (the `quadraticBend` and `customProfileBend` motions, and the heart valve
+  motions `valveSliceAxis` and `valveMorph`, with the
+  `immersedBodyRefinementCells` utility to refine the mesh around the region
+  swept by thin bodies, which need about three cells across their
+  thickness), and the `cut`
   (exact volume fraction) occupancy. The explicit direct
   forcing of openHFDIB-DEM is available as `method incremental`, for
   comparison. The option is based on the immersed boundary code contributed to
@@ -98,9 +102,28 @@ release. For complete commit-level details and contributor information, see the
   `fluids/immersedBoundary/oscillatingCylinderInChannel`,
   `fluids/immersedBoundary/translatingCylinderInChannel`,
   `fluids/immersedBoundary/oscillatingWallStokesLayer`,
-  `fluids/immersedBoundary/immersedTaylorCouette` and
-  `fluids/immersedBoundary/bendingBeamInChannel` tutorials, with
+  `fluids/immersedBoundary/immersedTaylorCouette`,
+  `fluids/immersedBoundary/bendingBeamInChannel` and
+  `fluids/immersedBoundary/heartValveInDuct` tutorials, with
   regression tests.
+- Added immersed fluid-solid interfaces: in `constant/fsiProperties`, a solid
+  interface patch paired with `fluidPatch none;` drives an immersed body of
+  the `immersedBoundaryForce` option of the fluid (motion `fsiDriven`), named
+  in an `immersedInterfaces` entry with optional `closurePatches` of the
+  solid that close its surface. The surface is built from the solid patches
+  (extended and capped in the empty direction of a two-dimensional fluid
+  mesh), moved in every coupling iteration, and the surface traction of the
+  immersed boundary is returned to the solid patch; the momentum exchange
+  with the body is logged for comparison. The interface works with the
+  Dirichlet-Neumann coupling schemes (`fixedRelaxation`, `Aitken`, `IQNILS`)
+  and needs no interface mapping. The bodies of `immersedBoundaryForce` are
+  now re-positioned within a time step when their configuration changes, and
+  the `surface` entry of a body is optional. The coupling schemes use the new
+  `fluidSolidInterface` accessors `nInterfaces()`, `fluidZone(i)`,
+  `solidZone(i)`, `fluidInterfaceName(i)` and `fluidZoneTraction(i)`. Added
+  the `fluids/immersedBoundary/immersedHronTurekFsi2` tutorial (the
+  Turek-Hron FSI2 benchmark with the cylinder and flag immersed in a fixed
+  background mesh), with a regression test.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.
@@ -112,9 +135,17 @@ release. For complete commit-level details and contributor information, see the
   second-order. The velocity and acceleration are stored as `NewmarkV(D)` and
   `NewmarkA(D)`, which are written, read on restart, and can set the initial
   conditions; otherwise the body starts at rest or in equilibrium. The
-  time-step may vary. Add `"d2dt2\(.*\)" NewmarkBeta;` to `ddtSchemes` too,
-  because `fvc::d2dt2` reads its scheme there (#502); a fatal error says so
-  if it is missing. The updated Lagrangian solid models are not supported.
+  time-step may vary. Only `d2dt2Schemes` needs the entry (#502). An
+  optional `"d2dt2\(.*\)" NewmarkBeta;` in `ddtSchemes`, with the same
+  coefficients, makes the linear predictor use the Newmark acceleration;
+  differing coefficients are a fatal error. The updated Lagrangian solid
+  models are not supported.
+- The `cantileverVibration` tutorial takes the time scheme as a second
+  `Allrun` argument: `bdf2` (default), `newmark`, `bossak`, or `all` to
+  compare the three with Abaqus. Its regression test runs all three, checks
+  the physical and Bossak-weighted accelerations with `Test-fvcD2dt2`, and
+  checks both `ddtSchemes` forms for `NewmarkBeta` and the fatal error for
+  mismatched coefficients.
 - Added the `collapsibleChannel` fluid-solid interaction tutorial: flow in a
   2D channel with a very light, thin elastic wall that bends and stretches,
   after the oomph-lib collapsible-channel problem of Heil and co-workers,
@@ -142,9 +173,52 @@ release. For complete commit-level details and contributor information, see the
   `verification/` study compares the dry and wet frequencies and their ratio
   with the exact continuum solution for added-to-structural mass ratios of
   0.1, 1 and 10, under mesh and time-step refinement.
+- Added an opt-in verification study to the `3dTube` tutorial, which runs the
+  pressure-pulse benchmark through a mesh and time-step sweep with the
+  partitioned Robin-Neumann or IQN-ILS coupling, compares the point-A wall
+  displacement with Tuković et al. (2018) and, using the published first-order
+  time discretisation, with Lozovskiy et al. (2019) and Eken (2016), checks
+  the pulse-wave speed against a thick-wall estimate, and compares the
+  Robin-Neumann and IQN-ILS solutions.
+- Added an opt-in verification study to the `HronTurek` tutorial (formerly
+  `HronTurekFsi3`), which
+  runs the Turek-Hron FSI3 benchmark through a mesh and time-step sweep with
+  the partitioned IQN-ILS or Robin-Neumann coupling and compares the periodic
+  point-A displacement, drag and lift (mean, amplitude and frequency) with the
+  published values and time history of Turek and Hron (2006). A `coupling`
+  study compares the Robin-Neumann and IQN-ILS results and checks the Robin
+  convergence criteria. The tutorial's `Allrun` gained a `robin` option that
+  runs the Robin-Neumann variant of the case. A `--benchmark fsi1` option runs
+  the steady FSI1 benchmark instead, with a mesh study against the Featflow
+  values and an informative steady Robin-Neumann versus IQN-ILS comparison.
+  A `--benchmark fsi2` option runs the periodic, large-deformation FSI2
+  benchmark through the same mesh study against the Featflow FSI2 values and
+  history.
+- Added the `blobInTreacle` fluid-solid interaction tutorial, the
+  temporal-accuracy case of Liu, Jaiman and Gurugubelli (2014): a linear
+  elastic half cylinder in a ramped, highly viscous channel flow, with equal
+  fluid and solid densities, solved with partitioned IQN-ILS coupling. It has a
+  `regressionTest.sh` and an opt-in `verification/` study: a mesh study against
+  the steady solution and interface shape of the authors' preprint, and a
+  time-step study that checks second-order temporal accuracy.
+- Added the `womersleyTube` fluid-solid interaction tutorial: pulsatile
+  (Womersley) flow in an elastic tube, driven at both ends by the exact
+  travelling-wave solution so that nothing reflects, with a
+  `regressionTest.sh` and an opt-in verification study. The study compares the
+  velocity profile, the flow rate, the wall displacement and the complex wave
+  number with the exact linear solution for a thick elastic wall, under mesh
+  and time-step refinement, and compares the IQN-ILS and Robin-Neumann
+  couplings.
 
 ### Changed
 
+- Renamed the `fluidSolidInteraction/HronTurekFsi3` tutorial to
+  `fluidSolidInteraction/HronTurek`, which now covers all three Turek-Hron
+  benchmarks: `./Allrun fsi1`, `./Allrun fsi2` or `./Allrun fsi3` (the
+  default) selects the inflow, plate material and run control of each, and
+  combines with the existing `robin` and `parallel` options. The stored case
+  and its regression test remain FSI3, now with the benchmark's
+  `StVenantKirchhoffElastic` plate in place of `neoHookeanElastic`.
 - `Allwmake` and `Allwclean` now stop with an error when an unsupported
   OpenFOAM version is sourced, listing the supported versions, where before
   they printed a warning and carried on.
@@ -245,6 +319,20 @@ release. For complete commit-level details and contributor information, see the
   solved, so converged results are unchanged within tolerance, but the
   iteration count and the path taken to get there move for every case that
   selects this option.
+- Partitioned fluid-solid interaction (`fixedRelaxation`, `Aitken`, `IQNILS`,
+  `weakCoupling`, and `thermal` with `mechanicalCoupling yes`) now stops with
+  a fatal error when the fluid velocity on a coupled interface patch is
+  `fixedValue` or `noSlip`. These conditions ignore the interface motion and
+  silently remove the added-mass effect; the message names the patch and
+  suggests `newMovingWallVelocity`, or `elasticWallVelocity` for a Robin
+  interface. `oneWayCoupling`, where the fluid wall is rigid, and runs that
+  are never coupled are not checked.
+- `solids4Foam::convertCaseFormat` renames an OpenFOAM.com `residualControl`
+  (with `tolerance` and `relTol` sub-dictionaries) in the `PIMPLE` dictionary
+  to `outerCorrectorResidualControl` for OpenFOAM.org, where `residualControl`
+  is the criterion for ending the run, and `solids4Foam::restoreCaseFormat`
+  reverses it. This replaces the same rename in the `3dTube`,
+  `flowOverHeatedPlate` and `thermalCavity` Allrun and Allclean scripts.
 
 - **Breaking:** the FSI `predictor` switch now defaults to `yes`, and `Aitken`
   and `fixedRelaxation` honour it as `IQNILS` did. The first coupling iteration
@@ -265,6 +353,17 @@ release. For complete commit-level details and contributor information, see the
   response depend on the FSI iteration history; it now uses two, and runs to its
   end time in 475 s instead of 761 s, with new regression references for each
   fork. Set `predictor no` to recover the previous behaviour.
+
+- `elasticWallPressure` documents and reports why Robin-Neumann coupling is
+  slow on walls wetted on both sides, such as the `HronTurekFsi3` flap. There,
+  each face has two interface impedances: one for loads that push both faces
+  the same way (translation and bending), which the automatic coefficient
+  matches, and one about `coth^2(h/l)` times larger for loads that squeeze
+  the wall through its thickness. A single coefficient cannot match both, so
+  the squeeze modes contract at best at about `1 - 2*tanh^2(h/l)` per FSI
+  iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
+  The estimate is printed at the start of the run, with a warning when it
+  exceeds 0.95.
 
 ### Removed
 
@@ -361,6 +460,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The explicit inertia term of the solid models now takes its scheme from
+  `d2dt2Schemes`, as the implicit term does (#502). OpenFOAM's `fvc::d2dt2`
+  looks up `ddtSchemes`, so when the two defaults differed, the PETSc SNES
+  residuals, standard and high-order, of `linearGeometryTotalDisplacement`,
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` and
+  `nonLinearGeometryUpdatedLagrangian`, the old-time inertia term of the
+  segregated updated Lagrangian solver, and the solid interface acceleration
+  passed to the fluid, used the `ddtSchemes` scheme. Cases in
+  which both dictionaries select the same scheme for these terms, e.g. through
+  equal defaults, are unaffected; the one tutorial whose defaults differ, the
+  hyperelastic `cooksMembrane`, changes by about 1e-9 relative in its
+  `petscSnes` variant. The lookup names are unchanged, so a case that sets
+  these terms through named entries, or sets `ddtSchemes` but not
+  `d2dt2Schemes`, must now give them in `d2dt2Schemes`.
 - `pimpleFluid` now applies finite volume options to its momentum and optional
   temperature equations: `fvOptions` in OpenFOAM.com, and `fvModels` and
   `fvConstraints` in OpenFOAM.org, called where the corresponding standard
@@ -370,8 +483,8 @@ release. For complete commit-level details and contributor information, see the
 - With OpenFOAM.org, `libsolids4FoamModels` now links `libfvModels` and
   `libfvConstraints`, without which a fluid case with an `fvConstraints` file
   crashed with a segmentation fault.
-- `HronTurekFsi3` no longer diverges once the plate deformation is large. With
-  the FSI2 parameters it failed at t = 6.4-6.9 s (#489), and with its own
+- `HronTurekFsi3` (now `HronTurek`) no longer diverges once the plate
+  deformation is large. With the FSI2 parameters it failed at t = 6.4-6.9 s (#489), and with its own
   FSI3 parameters shortly after its end time (#383). With a relaxed first
   coupling iteration, the fluid saw the plate stop or reverse within each time
   step, and the solid had to converge under a first-iteration fluid force of
@@ -393,6 +506,10 @@ release. For complete commit-level details and contributor information, see the
   `constant/fsiProperties.aitken` that did not exist. The Aitken setup is now
   in that file, and `constant/fsiProperties` is a link to the selected
   `constant/fsiProperties.<mode>` (`robin` by default).
+- On a restart, the warning that an `elasticWallPressure` (Robin) interface is
+  used with relaxed or accelerated coupling was issued for `fixedRelaxation`
+  with `relaxationFactor 1` too, as the check ran during the construction of
+  the base coupling class.
 
 ## [v2.4] - 2026-08-24
 

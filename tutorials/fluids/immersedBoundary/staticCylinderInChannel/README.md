@@ -4,6 +4,8 @@ sort: 1
 
 # Immersed cylinder in a channel: `staticCylinderInChannel`
 
+Prepared by Sairam Pamulaparthi Venkata and Philip Cardiff
+
 ## Tutorial Aims
 
 - Demonstrate how to represent a body with the immersed boundary finite volume
