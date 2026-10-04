@@ -20,6 +20,7 @@ License
 #include "bdfD2dt2Scheme.H"
 #include "fvMatrices.H"
 #include "token.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -298,11 +299,7 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
             rDeltaT2*C[0]*vf
         )
     );
-#ifdef FOAMEXTEND
-    GeometricField<Type, fvPatchField, volMesh>& d2dt2 = td2dt2();
-#else
-    GeometricField<Type, fvPatchField, volMesh>& d2dt2 = td2dt2.ref();
-#endif
+    GeometricField<Type, fvPatchField, volMesh>& d2dt2 = tmpRef(td2dt2);
 
     const GeometricField<Type, fvPatchField, volMesh>* fieldPtr = &vf;
 
@@ -354,11 +351,7 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
             rDeltaT2*sqr(a0[0])*rho*vf
         )
     );
-#ifdef FOAMEXTEND
-    GeometricField<Type, fvPatchField, volMesh>& d2dt2 = td2dt2();
-#else
-    GeometricField<Type, fvPatchField, volMesh>& d2dt2 = td2dt2.ref();
-#endif
+    GeometricField<Type, fvPatchField, volMesh>& d2dt2 = tmpRef(td2dt2);
 
     for (label i = 1; i <= p0; i++)
     {
@@ -399,11 +392,7 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
         )
     );
 
-#ifdef FOAMEXTEND
-    fvMatrix<Type>& fvm = tfvm();
-#else
-    fvMatrix<Type>& fvm = tfvm.ref();
-#endif
+    fvMatrix<Type>& fvm = tmpRef(tfvm);
 
     const label n = nOldTimes(vf);
     const scalarList C = composedCoeffs(n);
@@ -419,11 +408,7 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
 
         if (mag(C[m]) > 1e-12)
         {
-#ifdef FOAMEXTEND
-            oldTerms += C[m]*fieldPtr->internalField();
-#else
-            oldTerms += C[m]*fieldPtr->primitiveField();
-#endif
+            oldTerms += C[m]*primitiveField(*fieldPtr);
         }
     }
 
@@ -465,11 +450,7 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
         )
     );
 
-#ifdef FOAMEXTEND
-    fvMatrix<Type>& fvm = tfvm();
-#else
-    fvMatrix<Type>& fvm = tfvm.ref();
-#endif
+    fvMatrix<Type>& fvm = tmpRef(tfvm);
 
     const label n = nOldTimes(vf);
     const label p0 = levelOrder(n, 0);
@@ -481,21 +462,13 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
     // first time-step
     oldTimeLevel(rho, order_);
 
-#ifdef FOAMEXTEND
-    const scalarField& rhoI = rho.internalField();
-#else
-    const scalarField& rhoI = rho.primitiveField();
-#endif
+    const scalarField& rhoI = primitiveField(rho);
 
     Field<Type> oldTerms(vf.size(), pTraits<Type>::zero);
 
     for (label i = 1; i <= p0; i++)
     {
-#ifdef FOAMEXTEND
-        const Field<Type>& vfi = oldTimeLevel(vf, i).internalField();
-#else
-        const Field<Type>& vfi = oldTimeLevel(vf, i).primitiveField();
-#endif
+        const Field<Type>& vfi = primitiveField(oldTimeLevel(vf, i));
         oldTerms += a0[0]*a0[i]*rhoI*vfi;
     }
 
@@ -503,19 +476,11 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
     {
         const label pj = levelOrder(n, j);
         const scalarList aj = coeffs(pj);
-#ifdef FOAMEXTEND
-        const scalarField& rhoJ = oldTimeLevel(rho, j).internalField();
-#else
-        const scalarField& rhoJ = oldTimeLevel(rho, j).primitiveField();
-#endif
+        const scalarField& rhoJ = primitiveField(oldTimeLevel(rho, j));
 
         for (label i = 0; i <= pj; i++)
         {
-#ifdef FOAMEXTEND
-            const Field<Type>& vfji = oldTimeLevel(vf, j + i).internalField();
-#else
-            const Field<Type>& vfji = oldTimeLevel(vf, j + i).primitiveField();
-#endif
+            const Field<Type>& vfji = primitiveField(oldTimeLevel(vf, j + i));
             oldTerms += a0[j]*aj[i]*rhoJ*vfji;
         }
     }
