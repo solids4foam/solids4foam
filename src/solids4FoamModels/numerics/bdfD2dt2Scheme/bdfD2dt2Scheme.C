@@ -19,6 +19,7 @@ License
 
 #include "bdfD2dt2Scheme.H"
 #include "fvMatrices.H"
+#include "token.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -175,77 +176,62 @@ label bdfD2dt2Scheme<Type>::levelOrder
 
 
 template<class Type>
-tmp<Field<Type> > bdfD2dt2Scheme<Type>::levelSum
+scalarList bdfD2dt2Scheme<Type>::composedCoeffs
 (
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const label j,
-    const label i0,
-    const label p
+    const label nOldTimes
 ) const
 {
-    const scalarList a = coeffs(p);
+    const label p0 = levelOrder(nOldTimes, 0);
+    const scalarList a0 = coeffs(p0);
 
-    tmp<Field<Type> > tsum(new Field<Type>(vf.size(), pTraits<Type>::zero));
-#ifdef FOAMEXTEND
-    Field<Type>& sum = tsum();
-#else
-    Field<Type>& sum = tsum.ref();
-#endif
+    scalarList C(2*order_ + 1, 0.0);
 
-    for (label i = i0; i <= p; i++)
+    for (label j = 0; j <= p0; j++)
     {
-#ifdef FOAMEXTEND
-        sum += a[i]*oldTimeLevel(vf, j + i).internalField();
-#else
-        sum += a[i]*oldTimeLevel(vf, j + i).primitiveField();
-#endif
+        const label pj = levelOrder(nOldTimes, j);
+        const scalarList aj = coeffs(pj);
+
+        for (label i = 0; i <= pj; i++)
+        {
+            C[j + i] += a0[j]*aj[i];
+        }
     }
 
-    return tsum;
+    return C;
 }
 
 
 template<class Type>
-tmp<GeometricField<Type, fvPatchField, volMesh> >
-bdfD2dt2Scheme<Type>::levelDdt
-(
-    const GeometricField<Type, fvPatchField, volMesh>& vf,
-    const label j,
-    const label p
-) const
+label bdfD2dt2Scheme<Type>::readOrder(Istream& is)
 {
-    const scalarList a = coeffs(p);
-    const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
-    const GeometricField<Type, fvPatchField, volMesh>& vfj =
-        oldTimeLevel(vf, j);
+    token t(is);
 
-    tmp<GeometricField<Type, fvPatchField, volMesh> > tddt
-    (
-        new GeometricField<Type, fvPatchField, volMesh>
-        (
-            IOobject
-            (
-                "ddt(" + vfj.name() + ')',
-                mesh().time().timeName(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            ),
-            rDeltaT*a[0]*vfj
-        )
-    );
-#ifdef FOAMEXTEND
-    GeometricField<Type, fvPatchField, volMesh>& ddt = tddt();
-#else
-    GeometricField<Type, fvPatchField, volMesh>& ddt = tddt.ref();
-#endif
-
-    for (label i = 1; i <= p; i++)
+    if (is.eof())
     {
-        ddt += rDeltaT*a[i]*oldTimeLevel(vf, j + i);
+        FatalIOErrorInFunction(is)
+            << "The BDF d2dt2 scheme requires an order (1 to 6): "
+            << "e.g. \"BDF 2;\" in d2dt2Schemes"
+            << exit(FatalIOError);
     }
 
-    return tddt;
+    if (!t.isLabel())
+    {
+        FatalIOErrorInFunction(is)
+            << "The BDF d2dt2 scheme requires an integer order (1 to 6), "
+            << "but found: " << t.info()
+            << exit(FatalIOError);
+    }
+
+    const label order = t.labelToken();
+
+    if (order < 1 || order > 6)
+    {
+        FatalIOErrorInFunction(is)
+            << "The order of the BDF d2dt2 scheme must be 1 to 6, "
+            << "but it is " << order << exit(FatalIOError);
+    }
+
+    return order;
 }
 
 
@@ -265,15 +251,8 @@ template<class Type>
 bdfD2dt2Scheme<Type>::bdfD2dt2Scheme(const fvMesh& mesh, Istream& is)
 :
     d2dt2Scheme<Type>(mesh, is),
-    order_(readLabel(is))
+    order_(readOrder(is))
 {
-    if (order_ < 1 || order_ > 6)
-    {
-        FatalIOErrorInFunction(is)
-            << "The order of the BDF d2dt2 scheme must be 1 to 6, "
-            << "but it is " << order_ << exit(FatalIOError);
-    }
-
     static bool warned = false;
 
     if (order_ >= 3 && !warned)
@@ -301,9 +280,8 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
     checkMesh();
 
     const label n = nOldTimes(vf);
-    const label p = levelOrder(n, 0);
-    const scalarList a = coeffs(p);
-    const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
+    const scalarList C = composedCoeffs(n);
+    const dimensionedScalar rDeltaT2 = 1.0/sqr(mesh().time().deltaT());
 
     tmp<GeometricField<Type, fvPatchField, volMesh> > td2dt2
     (
@@ -317,7 +295,7 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            rDeltaT*a[0]*levelDdt(vf, 0, levelOrder(n, 0))
+            rDeltaT2*C[0]*vf
         )
     );
 #ifdef FOAMEXTEND
@@ -326,9 +304,16 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
     GeometricField<Type, fvPatchField, volMesh>& d2dt2 = td2dt2.ref();
 #endif
 
-    for (label j = 1; j <= p; j++)
+    const GeometricField<Type, fvPatchField, volMesh>* fieldPtr = &vf;
+
+    for (label m = 1; m <= 2*order_; m++)
     {
-        d2dt2 += rDeltaT*a[j]*levelDdt(vf, j, levelOrder(n, j));
+        fieldPtr = &fieldPtr->oldTime();
+
+        if (mag(C[m]) > 1e-12)
+        {
+            d2dt2 += rDeltaT2*C[m]*(*fieldPtr);
+        }
     }
 
     return td2dt2;
@@ -346,9 +331,9 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
     checkMesh();
 
     const label n = nOldTimes(vf);
-    const label p = levelOrder(n, 0);
-    const scalarList a = coeffs(p);
-    const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
+    const label p0 = levelOrder(n, 0);
+    const scalarList a0 = coeffs(p0);
+    const dimensionedScalar rDeltaT2 = 1.0/sqr(mesh().time().deltaT());
 
     // Create all density old-time levels, so that they are stored from the
     // first time-step
@@ -366,7 +351,7 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
-            rDeltaT*a[0]*rho*levelDdt(vf, 0, levelOrder(n, 0))
+            rDeltaT2*sqr(a0[0])*rho*vf
         )
     );
 #ifdef FOAMEXTEND
@@ -375,9 +360,21 @@ bdfD2dt2Scheme<Type>::fvcD2dt2
     GeometricField<Type, fvPatchField, volMesh>& d2dt2 = td2dt2.ref();
 #endif
 
-    for (label j = 1; j <= p; j++)
+    for (label i = 1; i <= p0; i++)
     {
-        d2dt2 += rDeltaT*a[j]*oldTimeLevel(rho, j)*levelDdt(vf, j, levelOrder(n, j));
+        d2dt2 += rDeltaT2*a0[0]*a0[i]*rho*oldTimeLevel(vf, i);
+    }
+
+    for (label j = 1; j <= p0; j++)
+    {
+        const label pj = levelOrder(n, j);
+        const scalarList aj = coeffs(pj);
+        const volScalarField& rhoJ = oldTimeLevel(rho, j);
+
+        for (label i = 0; i <= pj; i++)
+        {
+            d2dt2 += rDeltaT2*a0[j]*aj[i]*rhoJ*oldTimeLevel(vf, j + i);
+        }
     }
 
     return td2dt2;
@@ -409,21 +406,28 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
 #endif
 
     const label n = nOldTimes(vf);
-    const label p = levelOrder(n, 0);
-    const scalarList a = coeffs(p);
+    const scalarList C = composedCoeffs(n);
     const scalar rDeltaT2 = 1.0/sqr(mesh().time().deltaT().value());
     const scalarField& V = mesh().V();
 
-    // Old-time terms: the current velocity uses levels 1 to p and the
-    // velocity at old-time level j uses levels j to j + levelOrder(n, j)
-    Field<Type> oldTerms(a[0]*levelSum(vf, 0, 1, levelOrder(n, 0)));
+    Field<Type> oldTerms(vf.size(), pTraits<Type>::zero);
+    const GeometricField<Type, fvPatchField, volMesh>* fieldPtr = &vf;
 
-    for (label j = 1; j <= p; j++)
+    for (label m = 1; m <= 2*order_; m++)
     {
-        oldTerms += a[j]*levelSum(vf, j, 0, levelOrder(n, j));
+        fieldPtr = &fieldPtr->oldTime();
+
+        if (mag(C[m]) > 1e-12)
+        {
+#ifdef FOAMEXTEND
+            oldTerms += C[m]*fieldPtr->internalField();
+#else
+            oldTerms += C[m]*fieldPtr->primitiveField();
+#endif
+        }
     }
 
-    fvm.diag() = sqr(a[0])*rDeltaT2*V;
+    fvm.diag() = C[0]*rDeltaT2*V;
     fvm.source() = -rDeltaT2*V*oldTerms;
 
     return tfvm;
@@ -438,40 +442,7 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
     const GeometricField<Type, fvPatchField, volMesh>& vf
 )
 {
-    checkMesh();
-
-    tmp<fvMatrix<Type> > tfvm
-    (
-        new fvMatrix<Type>
-        (
-            vf,
-            vf.dimensions()*rho.dimensions()*dimVol/dimTime/dimTime
-        )
-    );
-
-#ifdef FOAMEXTEND
-    fvMatrix<Type>& fvm = tfvm();
-#else
-    fvMatrix<Type>& fvm = tfvm.ref();
-#endif
-
-    const label n = nOldTimes(vf);
-    const label p = levelOrder(n, 0);
-    const scalarList a = coeffs(p);
-    const scalar rDeltaT2 = 1.0/sqr(mesh().time().deltaT().value());
-    const scalarField& V = mesh().V();
-
-    Field<Type> oldTerms(a[0]*levelSum(vf, 0, 1, levelOrder(n, 0)));
-
-    for (label j = 1; j <= p; j++)
-    {
-        oldTerms += a[j]*levelSum(vf, j, 0, levelOrder(n, j));
-    }
-
-    fvm.diag() = sqr(a[0])*rDeltaT2*rho.value()*V;
-    fvm.source() = -rDeltaT2*rho.value()*V*oldTerms;
-
-    return tfvm;
+    return rho*fvmD2dt2(vf);
 }
 
 
@@ -501,8 +472,8 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
 #endif
 
     const label n = nOldTimes(vf);
-    const label p = levelOrder(n, 0);
-    const scalarList a = coeffs(p);
+    const label p0 = levelOrder(n, 0);
+    const scalarList a0 = coeffs(p0);
     const scalar rDeltaT2 = 1.0/sqr(mesh().time().deltaT().value());
     const scalarField& V = mesh().V();
 
@@ -510,31 +481,51 @@ bdfD2dt2Scheme<Type>::fvmD2dt2
     // first time-step
     oldTimeLevel(rho, order_);
 
-    // The density at old-time level j multiplies the velocity at level j
 #ifdef FOAMEXTEND
     const scalarField& rhoI = rho.internalField();
 #else
     const scalarField& rhoI = rho.primitiveField();
 #endif
 
-    Field<Type> oldTerms(a[0]*rhoI*levelSum(vf, 0, 1, levelOrder(n, 0)));
+    Field<Type> oldTerms(vf.size(), pTraits<Type>::zero);
 
-    for (label j = 1; j <= p; j++)
+    for (label i = 1; i <= p0; i++)
     {
+#ifdef FOAMEXTEND
+        const Field<Type>& vfi = oldTimeLevel(vf, i).internalField();
+#else
+        const Field<Type>& vfi = oldTimeLevel(vf, i).primitiveField();
+#endif
+        oldTerms += a0[0]*a0[i]*rhoI*vfi;
+    }
+
+    for (label j = 1; j <= p0; j++)
+    {
+        const label pj = levelOrder(n, j);
+        const scalarList aj = coeffs(pj);
 #ifdef FOAMEXTEND
         const scalarField& rhoJ = oldTimeLevel(rho, j).internalField();
 #else
         const scalarField& rhoJ = oldTimeLevel(rho, j).primitiveField();
 #endif
 
-        oldTerms += a[j]*rhoJ*levelSum(vf, j, 0, levelOrder(n, j));
+        for (label i = 0; i <= pj; i++)
+        {
+#ifdef FOAMEXTEND
+            const Field<Type>& vfji = oldTimeLevel(vf, j + i).internalField();
+#else
+            const Field<Type>& vfji = oldTimeLevel(vf, j + i).primitiveField();
+#endif
+            oldTerms += a0[j]*aj[i]*rhoJ*vfji;
+        }
     }
 
-    fvm.diag() = sqr(a[0])*rDeltaT2*rhoI*V;
+    fvm.diag() = sqr(a0[0])*rDeltaT2*rhoI*V;
     fvm.source() = -rDeltaT2*V*oldTerms;
 
     return tfvm;
 }
+
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

@@ -156,23 +156,13 @@ class bdfD2dt2Scheme
         //  the scheme this time-step
         label levelOrder(const label nOldTimes, const label j) const;
 
-        //- Return sum_{i=i0}^{p} a_i u^{n-j-i}, where a_i are the BDF
-        //  coefficients of order p and j is the old-time level
-        tmp<Field<Type> > levelSum
-        (
-            const GeometricField<Type, fvPatchField, volMesh>& vf,
-            const label j,
-            const label i0,
-            const label p
-        ) const;
+        //- Return the composed BDF d2dt2 coefficients for the genuine
+        //  old-time levels
+        scalarList composedCoeffs(const label nOldTimes) const;
 
-        //- Return the BDF first derivative of order p at old-time level j
-        tmp<GeometricField<Type, fvPatchField, volMesh> > levelDdt
-        (
-            const GeometricField<Type, fvPatchField, volMesh>& vf,
-            const label j,
-            const label p
-        ) const;
+        //- Read and validate the BDF order from an Istream, raising a
+        //  FatalIOError for a missing or out-of-range value
+        static label readOrder(Istream& is);
 
         //- Check that the mesh is not moving
         void checkMesh() const;
