@@ -170,6 +170,45 @@ def configure_solid_preconditioner(case: Path, preconditioner: str) -> None:
     path.write_text(text)
 
 
+def configure_tight_tolerances(case: Path, coupling: str) -> None:
+    """Tighten every iterative tolerance, to bound the iterative error.
+
+    A diagnostic, not the benchmark setup: the fluid linear solvers go from
+    relTol 1e-3 to 1e-6 (and the pressure tolerance from 1e-6 to 1e-9), the
+    PIMPLE residual control from 1e-5 to 1e-7, the solid Newton tolerance
+    from 1e-6 to 1e-9 with a linear tolerance of 1e-8, and the FSI
+    outerCorrTolerance from 1e-6 to 1e-8.
+    """
+    fluid = case / "system/fluid/fvSolution"
+    text = fluid.read_text()
+    text, count = re.subn(r"(relTol\s+)(1e-03|0\.001)\s*;", r"\g<1>1e-06;", text)
+    if count != 3:
+        fail(f"Expected three relTol 1e-3 entries in {fluid}, found {count}")
+    text, count = re.subn(r"(tolerance\s+)1e-06\s*;", r"\g<1>1e-09;", text)
+    if count != 1:
+        fail(f"Expected one pressure tolerance 1e-6 in {fluid}")
+    text, count = re.subn(r"((?:relTol|tolerance)\s+)1e-5\s*;", r"\g<1>1e-7;", text)
+    if count != 2:
+        fail(f"Expected the PIMPLE residualControl in {fluid}")
+    fluid.write_text(text)
+    solid = case / "system/solid/fvSolution"
+    text, count = re.subn(
+        r'snes_rtol\s+"1e-6"\s*;',
+        'snes_rtol "1e-9";\n            ksp_rtol "1e-8";', solid.read_text()
+    )
+    if count != 1:
+        fail(f"Expected one snes_rtol in {solid}")
+    solid.write_text(text)
+    properties = case / COUPLINGS[coupling]["fsiProperties"]
+    text, count = re.subn(
+        r"(outerCorrTolerance\s+)1e-6\s*;", r"\g<1>1e-8;",
+        properties.read_text()
+    )
+    if count < 1:
+        fail(f"Expected outerCorrTolerance 1e-6 in {properties}")
+    properties.write_text(text)
+
+
 def station_name(z: float) -> str:
     return f"verificationWallZ{round(z * 1.0e4):03d}"
 
@@ -289,6 +328,8 @@ def prepare_case(name: str, coupling: str, factor: int, delta_t: float,
     configure_time_scheme(case, args.time_scheme)
     configure_solid_preconditioner(case, args.solid_preconditioner)
     configure_coupling(case, coupling)
+    if args.tight_tolerances:
+        configure_tight_tolerances(case, coupling)
     add_monitors(case, reference, args.probe_z_shift)
     configure_parallel(case, cores)
     return case
@@ -428,12 +469,22 @@ def require_complete(path: Path, rows: list[list[float]], end_time: float,
         reached = times[-1] if times else 0.0
         fail(f"{path} ends at t={reached:g}, not at the end time "
              f"t={end_time:g}")
-    if len(times) != expected or any(
-        not math.isclose(later - earlier, delta_t, rel_tol=1e-3)
-        for earlier, later in zip(times, times[1:])
+    # The function objects write the time with the case's timePrecision
+    # (6 significant digits), which does not resolve dt = 6.25e-6 s beyond
+    # t = 10 ms; each time must therefore round to the next multiple of dt,
+    # and is then replaced by that exact multiple, so that the histories
+    # are equally spaced for the peak and arrival interpolation.
+    steps = [round(time / delta_t) for time in times]
+    if len(times) != expected or steps != list(
+        range(steps[0], steps[0] + expected)
+    ) or any(
+        abs(time - step * delta_t) > 1e-5 * abs(time) + 1e-3 * delta_t
+        for time, step in zip(times, steps)
     ):
         fail(f"{path} has {len(times)} time levels, expected {expected} "
              f"at dt = {delta_t:g}")
+    for row, step in zip(rows, steps):
+        row[0] = step * delta_t
     if any(not math.isfinite(value) for row in rows for value in row):
         fail(f"{path} contains non-finite values")
 
@@ -714,13 +765,14 @@ def coupling_summary(case: Path, coupling: str, end_time: float
     # The residual evaluated for each step must be that of its last
     # FSI iteration, as recorded independently in fsiConvergenceData.dat.
     _, residuals = residual_rows(case, end_time)
+    delta_t = dictionary_scalar(case / "system/controlDict", "deltaT")
     iterations = {
-        row[0]: row[1] for row in last_per_time(numeric_rows(next(
-            case.glob("postProcessing/**/fsiConvergenceData.dat")
-        )))
+        round(row[0] / delta_t): row[1] for row in last_per_time(numeric_rows(
+            next(case.glob("postProcessing/**/fsiConvergenceData.dat"))
+        ))
     }
     mismatched = [row[0] for row in residuals
-                  if iterations.get(row[0]) != row[1]]
+                  if iterations.get(round(row[0] / delta_t)) != row[1]]
     if mismatched:
         fail(f"{len(mismatched)} step(s) in {case} have a final residual row "
              "that is not their last FSI iteration, starting at "
@@ -884,6 +936,7 @@ def run_settings(coupling: str, factor: int, delta_t: float, end_time: float,
         # Recorded only when used, so runs without a shift stay reusable
         **({"pressure_probe_z_shift_m": args.probe_z_shift}
            if args.probe_z_shift else {}),
+        **({"tight_tolerances": True} if args.tight_tolerances else {}),
     }
 
 
@@ -1014,6 +1067,8 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
         suffix = f"_dt{args.delta_t:g}" + suffix
     if args.probe_z_shift:
         suffix = f"_pz{args.probe_z_shift:g}" + suffix
+    if args.tight_tolerances:
+        suffix = "_tight" + suffix
     rows, history_files = [], []
     for level, factor, delta_t in sweep_levels(args, reference, study):
         cores = study_cores(args.cores, study, level, reference)
@@ -1332,6 +1387,11 @@ def main() -> int:
         "--delta-t", type=float,
         help="mesh study only: use this time step on every level instead of "
              "halving it with the mesh (separates the spatial error)",
+    )
+    parser.add_argument(
+        "--tight-tolerances", action="store_true",
+        help="diagnostic: tighten the fluid, solid and FSI tolerances to "
+             "bound the iterative error",
     )
     parser.add_argument(
         "--probe-z-shift", type=float, default=0.0,
