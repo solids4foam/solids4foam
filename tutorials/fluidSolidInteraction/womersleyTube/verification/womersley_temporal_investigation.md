@@ -471,9 +471,20 @@ smaller than the original `rAtU dp/dn` on m2, and vanishing with the mesh),
 while the fixed pressure stays an implicit Dirichlet condition of the
 pressure equation.
 
-**First implementation (superseded, recorded).** It set
+**First implementation (superseded, recorded; never committed).** It set
 `phiHbyA_b = U_b . S_f + rAtU_b snGrad(p)|S_f|` with `snGrad(p)` from the
-previous iterate, which makes the converged end flux exactly `U_b . S_f`.
+previous iterate, which makes the converged end flux exactly `U_b . S_f`:
+
+```
+phiHbyA.boundaryFieldRef()[patchI] =
+    (U().boundaryField()[patchI] & mesh().Sf().boundaryField()[patchI])
+  + rAtU.boundaryField()[patchI]
+   *p().boundaryField()[patchI].snGrad()
+   *mesh().magSf().boundaryField()[patchI];
+```
+
+(in place of the final `(U_b + rAtU_b grad(p)_P) . S_f`; the results labelled
+`fluxConsistent` in `temporal/` were produced with it).
 It gave the same orders on m1 and m2 (variant `fluxConsistent`; Robin m2
 2.03/1.86/1.96/2.14/1.94/2.10 from 50/100/200 and 2.00/1.90/1.96/2.09/
 1.92/2.08 from 100/200/400; fluid-only m2 flow_amp 2.61 2.04 1.96 1.96),
@@ -985,3 +996,48 @@ two over the tested range (to 400 steps per period in the coupled study, to
 about 1600-3200 steps per period on the fluid sub-problem) and the scheme is
 formally second order under joint refinement, but at fixed mesh the order
 tends to one as dt -> 0, with a coefficient that vanishes with h".
+
+## 16. Final verification from the production path
+
+The two changes are now in the tutorial (`fluxConsistentPatches (inlet
+outlet)` in `system/fluid/fvSolution`; exact boundary values of `D`, `D_0`,
+`D_0_0`, `D_0_0_0` through `womersleyPatchDisplacement` in
+`system/womersleyCode`), and `Allverify` runs the time study at
+50/100/200/400 steps per period and checks the order of the finest three
+(threshold 1.7). The full `./Allverify --cores 7` (OpenFOAM-v2512, Linux,
+serial cases, a clean build of the branch) passes every check;
+`temporal/production/` holds its summary and CSV.
+
+| Quantity | mesh order | time order 50/100/200 | 100/200/400 | finest-mesh error (m4, n200) |
+|---|---:|---:|---:|---:|
+| profile | 2.04 | - | - | 1.20e-3 |
+| flow_amp | 2.05 | 2.04 | 2.05 | -3.09e-4 |
+| flow_phase | 1.92 | 1.86 | 1.91 | 8.23e-5 |
+| wallMid_amp | 2.01 | 1.96 | 1.97 | -1.76e-4 |
+| wallMid_phase | 1.40 | 2.14 | 2.06 | -1.15e-3 |
+| speed | 2.02 | 1.94 | 1.97 | 1.40e-5 |
+| attenuation | - (-2.08e-3, -2.18e-3, -1.96e-3) | 2.10 | 2.07 | -1.96e-3 |
+
+- IQN-ILS against Robin-Neumann (m2, n100): at most 2.16e-4 (wall
+  amplitude); 14.6 and 9.3 coupling iterations per step.
+- Periodicity (change from the fifth to the sixth period): at most 6.6e-5.
+- First-period transient (largest residual over the amplitude, m2): 1.6e-2,
+  2.7e-3, 2.2e-3, 2.7e-3 at 50, 100, 200, 400 steps per period, against 1.8e-2,
+  8.4e-3, 1.5e-2, 3.4e-2 before the old-time boundary values were exact: it
+  no longer grows as dt falls.
+- These agree with the investigation runs (6.10): the mesh-study values to
+  two or three digits, and the time orders to within 0.04. The differences
+  come from the investigation's m2 runs having been decomposed on five
+  ranks and run without exact old-time boundary values (which changes the
+  analysed periods by less than 3e-6).
+- Regression (`regressionTest.sh`, u_r at t = 25 s, 50 steps): new
+  references -2.241790827e-4 m (IQN-ILS) and -2.242599027e-4 m (Robin) from
+  v2512, which changed by -5.1e-7 and -1.3e-6 m with the two tutorial
+  changes. v2412 now differs by 1.1e-7 (IQN-ILS) and 1.2e-8 m (Robin): the
+  former 1.2e-6 m Robin difference came from the start-up and has gone, so
+  the tolerance between versions is reduced from 2e-6 to 5e-7 m. Passes on
+  both versions.
+- The tutorial's default run (IQN-ILS, two periods) is now within 0.5%
+  (profile), 0.05% and 0.0011 rad (flow rate), 0.08% (wall amplitude), 0.02%
+  (wave speed) and 0.41% (attenuation) in the second period; the tutorial
+  README is updated.

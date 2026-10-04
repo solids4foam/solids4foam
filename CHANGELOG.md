@@ -201,7 +201,17 @@ release. For complete commit-level details and contributor information, see the
   velocity profile, the flow rate, the wall displacement and the complex wave
   number with the exact linear solution for a thick elastic wall, under mesh
   and time-step refinement, and compares the IQN-ILS and Robin-Neumann
-  couplings.
+  couplings. The tube ends use `fluxConsistentPatches` (below), and the
+  old-time solid displacements carry exact boundary values; the time-step
+  study runs 50/100/200/400 steps per period.
+- `pimpleFluid` (OpenFOAM.com) has an opt-in PIMPLE entry,
+  `fluxConsistentPatches (<patches>);`, for patches that fix the pressure and
+  whose velocity condition fixes the boundary value, such as a mixed
+  condition imposing an exact normal gradient. On such a patch the pressure
+  equation otherwise gives an end flux that differs from the boundary
+  velocity flux by a term proportional to the time-step, which limits a
+  fixed-mesh time-step study to first order; with the entry the flux is
+  consistent to O(Δt h). It is empty by default, so no other case changes.
 
 ### Changed
 

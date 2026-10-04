@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """Diagnostics for the temporal order of the womersleyTube verification study.
 
+DIAGNOSTIC TOOL. It is not part of the verification (use Allverify). It was
+used for the investigation in womersley_temporal_investigation.md, mostly on
+the tutorial as it was before fluxConsistentPatches and the exact old-time
+boundary values were added to it; those two changes are now in the tutorial
+itself, so the exactOldBoundary and fluxConsistent/fluxConsistent2 variants
+leave the final tutorial unchanged. Variants that change the numerical
+method (ddtCoeff*, noDdtCorr, endsFixedGradient, endsDirichletU, ...) are
+diagnostics only.
+
 Reuses the case set-up, history readers and Fourier extraction of
 womersley_tube_verification.py, and adds:
 
@@ -139,6 +148,8 @@ def exact_old_boundary(case: Path) -> None:
     condition). The cell values, and every other field, are unchanged."""
     code = case / "system" / "womersleyCode"
     text = code.read_text()
+    if "womersleyPatchDisplacement" in text:
+        return  # already in the tutorial
     marker = "// ************"
     text = text.replace(marker, PATCH_CODE + "\n" + marker, 1) \
         if marker in text else text + PATCH_CODE
@@ -540,6 +551,8 @@ def flux_consistent(case: Path) -> None:
     conditions, with the end flux made equal to the boundary velocity flux
     (needs a solids4foam build with that option)."""
     path = fluid_dict(case, "fvSolution")
+    if "fluxConsistentPatches" in path.read_text():
+        return  # already in the tutorial
     text, found = re.subn(r"(PIMPLE\s*\{)",
                           r"\g<1>\n    fluxConsistentPatches (inlet outlet);",
                           path.read_text())
