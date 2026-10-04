@@ -39,6 +39,8 @@ REFERENCE = json.loads(
 RATIO = 2.0
 NOMINAL_ORDER = 2.0
 ORDER_RANGE = (0.5, 4.0)
+# Richardson extrapolation only within one of the nominal order
+RICHARDSON_RANGE = (1.0, 3.0)
 
 # Quantity, unit scale, unit, extraction floor (relative). The extraction
 # floor is the resolution of the extraction itself: the parabolic peak fit
@@ -128,8 +130,12 @@ def classify(values: list[float], floor: float) -> dict:
         elif not ORDER_RANGE[0] <= order <= ORDER_RANGE[1]:
             verdict = (f"order unreliable: {order:.2f} is outside "
                        f"[{ORDER_RANGE[0]}, {ORDER_RANGE[1]}]")
+        elif not RICHARDSON_RANGE[0] <= order <= RICHARDSON_RANGE[1]:
+            verdict = (f"monotone; formal order {order:.2f} reported, far from "
+                       f"the nominal {NOMINAL_ORDER:g}, so no Richardson "
+                       "estimate")
         else:
-            verdict = "monotone; order reported"
+            verdict = "monotone; order and Richardson estimate reported"
             extrapolated = f3 + e32 / (RATIO**order - 1.0)
             out["richardson_estimate"] = extrapolated
             out["richardson_relative_error_fine"] = (
@@ -216,12 +222,45 @@ def main() -> int:
         result = classify([row[quantity] for row in mesh[:3]], floor)
         result["floor_relative"] = floor
         evidence["mesh_study"]["quantities"][quantity] = result
+    # The axis pressure probes of the default runs lie on cell faces, so
+    # their pressure-front speed carries a sampling error of up to one axial
+    # cell; the probe-shifted runs (identical otherwise) give c_p.
+    shifted = read_csv("mesh_robin_backward_pz7.8125e-05.csv")
+    if len(shifted) >= 3:
+        quantity = "wave_speed_pressure_m_s"
+        result = classify([row[quantity] for row in shifted[:3]],
+                          max(1e-4, floors.get(quantity, 0.0)))
+        result["values"] = [row[quantity] for row in shifted[:3]]
+        result["floor_relative"] = max(1e-4, floors.get(quantity, 0.0))
+        result["note"] = ("probes shifted 7.8125e-5 m axially, inside one "
+                          "cell on every level; the default-probe values "
+                          "carry a one-cell sampling ambiguity")
+        evidence["mesh_study"]["quantities"][
+            "wave_speed_pressure_shifted_probes_m_s"] = result
+        evidence["mesh_study"]["shifted_probe_runs_identical"] = {
+            q: max(abs(a[q] - b[q]) / abs(b[q]) for a, b in zip(shifted, mesh))
+            for q in ("ur_max_A_m", "uz_min_A_m", "t_arrival_A_s")
+        }
     evidence["mesh_study"]["history_differences"] = {
         "level_1_to_2": history_difference("robin_backward_mesh1",
                                            "robin_backward_mesh2"),
         "level_2_to_3": history_difference("robin_backward_mesh2",
                                            "robin_backward_mesh3"),
     }
+
+    # Iterative error: every level again with tight tolerances
+    tight = {int(row["level"]): row for row in read_csv("mesh_robin_backward_tight.csv")}
+    if tight:
+        evidence["iterative_error_tight_tolerances"] = {
+            f"level{level}": {
+                **{q: {"default": mesh[level - 1][q], "tight": row[q],
+                       "relative_difference": rel(mesh[level - 1][q], row[q])}
+                   for q, *_ in QUANTITIES},
+                "mean_fsi_iterations_tight": row["mean_fsi_iterations"],
+                "clock_time_s_tight": row["clock_time_s"],
+            }
+            for level, row in sorted(tight.items()) if level <= len(mesh)
+        }
 
     # Spatial versus temporal error
     separation = {}
