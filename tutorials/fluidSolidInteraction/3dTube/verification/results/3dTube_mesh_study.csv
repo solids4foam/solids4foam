@@ -1,0 +1,10 @@
+quantity,unit,level1,level2,level3,rel_change_1_2,rel_change_2_3,observed_order,richardson_estimate,uncertainty_band_Fs3_p2,floor,verdict
+ur_max_A_m,mm,0.159641,0.159759,0.158471,7.447e-04,8.132e-03,,,0.00129,5.6e-04,order undefined: non-monotone (the changes change sign)
+t_ur_max_A_s,ms,7.20187,7.20724,7.25382,7.399e-04,6.422e-03,,,0.0466,5.0e-03,order undefined: a change is below the iterative/extraction floor
+uz_min_A_m,mm,-0.0895432,-0.0887971,-0.0883469,8.445e-03,5.096e-03,0.729,,0.00045,4.7e-04,"monotone; formal order 0.73 reported, far from the nominal 2, so no Richardson estimate"
+t_uz_min_A_s,ms,4.72259,4.75219,4.7658,6.211e-03,2.856e-03,1.121,4.77738,0.0136,1.0e-03,monotone; order and Richardson estimate reported
+ur_min_late_A_m,mm,-0.0999771,-0.0935223,-0.0956589,6.748e-02,2.233e-02,,,0.00645,1.8e-03,order undefined: non-monotone (the changes change sign)
+t_arrival_A_s,ms,5.87216,5.85689,5.82997,2.619e-03,4.617e-03,-0.818,,0.0269,6.6e-04,order undefined: the changes do not decrease
+wave_speed_pressure_m_s,m/s,4.66007,4.64631,4.60028,2.993e-03,1.000e-02,-1.741,,0.046,1.0e-04,"order undefined: the changes do not decrease; default probes on cell faces, tie-affected"
+wave_speed_wall_m_s,m/s,5.06536,5.14309,5.06379,1.535e-02,1.566e-02,,,0.0793,5.5e-04,order undefined: non-monotone (the changes change sign)
+wave_speed_pressure_shifted_probes_m_s,m/s,4.65059,4.63169,4.59091,4.116e-03,8.883e-03,-1.110,,0.0408,1.0e-04,order undefined: the changes do not decrease; preferred c_p (probes off the cell faces)

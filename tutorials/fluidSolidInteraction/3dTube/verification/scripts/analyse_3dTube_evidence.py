@@ -286,7 +286,68 @@ def main() -> int:
             }
             for quantity, *_ in QUANTITIES
         }
+    if len(fixed) >= 3:
+        separation["fixed_dt_2.5e-5_three_levels"] = {
+            quantity: {
+                "values": [row[quantity] for row in fixed[:3]],
+                **classify([row[quantity] for row in fixed[:3]],
+                           max(extraction, floors.get(quantity, 0.0))),
+            }
+            for quantity, _, _, extraction in QUANTITIES
+        }
+        # Time-step error on the level-3 mesh: dt 2.5e-5 against the
+        # level-3 time step 6.25e-6 (and 1.25e-5 when available)
+        level3 = {"2.5e-05": fixed[2], "6.25e-06": mesh[2]}
+        halved = read_csv("mesh_robin_backward_dt1.25e-05.csv")
+        if halved:
+            level3["1.25e-05"] = halved[-1]
+        separation["level3_time_step"] = {
+            quantity: {dt: row[quantity] for dt, row in level3.items()}
+            | {"relative_change_2.5e-5_to_6.25e-6":
+               rel(mesh[2][quantity], fixed[2][quantity])}
+            for quantity, *_ in QUANTITIES
+        }
     evidence["space_time_separation"] = separation
+
+    # Cross-platform replicate (MeluXina, OpenFOAM v2412 EasyBuild)
+    platform = RESULTS / "3dTube_meluxina_runs.csv"
+    if platform.is_file():
+        lines = [line for line in platform.read_text().splitlines()
+                 if not line.startswith("#")]
+        runs = {row["run"]: row for row in csv.DictReader(lines)}
+        pairs = {  # MeluXina run: (XenoSim row, label)
+            "m_fx1": (fixed[0] if fixed else None, "level 1, dt 2.5e-5"),
+            "m_fx2": (fixed[1] if len(fixed) > 1 else None, "level 2, dt 2.5e-5"),
+            "m_fx3": (fixed[2] if len(fixed) > 2 else None, "level 3, dt 2.5e-5"),
+            "m_l3": (mesh[2], "level 3, dt 6.25e-6"),
+        }
+        names = {"ur_max_mm": "ur_max_A_m", "uz_min_mm": "uz_min_A_m",
+                 "t_arr_ms": "t_arrival_A_s", "ur_min_late_mm": "ur_min_late_A_m"}
+        comparison = {}
+        for run, (row, label) in pairs.items():
+            if row is None or run not in runs:
+                continue
+            comparison[label] = {
+                key: {"meluxina": float(runs[run][key]),
+                      "xenosim": row[quantity] * 1e3,
+                      "relative_difference":
+                          rel(float(runs[run][key]), row[quantity] * 1e3)}
+                for key, quantity in names.items()
+            }
+        evidence["platform_comparison"] = {
+            "note": ("XenoSim: OpenFOAM v2512 (Ubuntu package), PETSc 3.24 "
+                     "development; MeluXina: OpenFOAM v2412 EasyBuild "
+                     "foss-2024a, PETSc 3.22. Each platform is invariant to "
+                     "MPI ranks (1-8), solid preconditioner (hypre/LU) and "
+                     "tight tolerances; XenoSim v2412 equals XenoSim v2512."),
+            "pairs": comparison,
+            "meluxina_fixed_dt_uz_min": classify(
+                [float(runs[r]["uz_min_mm"]) for r in ("m_fx1", "m_fx2", "m_fx3")],
+                1e-4),
+            "meluxina_fixed_dt_ur_max": classify(
+                [float(runs[r]["ur_max_mm"]) for r in ("m_fx1", "m_fx2", "m_fx3")],
+                1e-4),
+        }
 
     # Implicit Euler
     euler = {}
@@ -374,7 +435,23 @@ def main() -> int:
                 "" if q["richardson_estimate"] is None
                 else f"{q['richardson_estimate'] * scale:.6g}",
                 f"{q['uncertainty_band_Fs3_p2'] * scale:.3g}",
-                f"{q['floor_relative']:.1e}", q["verdict"]])
+                f"{q['floor_relative']:.1e}",
+                q["verdict"] + ("; default probes on cell faces, tie-affected"
+                                if quantity == "wave_speed_pressure_m_s" else "")])
+        shifted_cp = evidence["mesh_study"]["quantities"].get(
+            "wave_speed_pressure_shifted_probes_m_s")
+        if shifted_cp:
+            q = shifted_cp
+            writer.writerow([
+                "wave_speed_pressure_shifted_probes_m_s", "m/s",
+                *[f"{v:.6g}" for v in q["values"]],
+                f"{q['relative_change_1_2']:.3e}", f"{q['relative_change_2_3']:.3e}",
+                "" if q["observed_order"] is None else f"{q['observed_order']:.3f}",
+                "" if q["richardson_estimate"] is None
+                else f"{q['richardson_estimate']:.6g}",
+                f"{q['uncertainty_band_Fs3_p2']:.3g}",
+                f"{q['floor_relative']:.1e}",
+                q["verdict"] + "; preferred c_p (probes off the cell faces)"])
     with (RESULTS / "3dTube_runs.csv").open("w", newline="") as handle:
         writer = csv.writer(handle)
         columns = ["study", "level", "time_scheme", "coupling", "fluid_cells",
