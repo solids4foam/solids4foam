@@ -273,6 +273,19 @@ bdfD2dt2Scheme<Type>::bdfD2dt2Scheme(const fvMesh& mesh, Istream& is)
             << "The order of the BDF d2dt2 scheme must be 1 to 6, "
             << "but it is " << order_ << exit(FatalIOError);
     }
+
+    static bool warned = false;
+
+    if (order_ >= 3 && !warned)
+    {
+        warned = true;
+
+        WarningInFunction
+            << "The " << type() << " " << order_ << " d2dt2 scheme "
+            << "adds energy to undamped modes for finite time steps; "
+            << "it should be used only where the problem provides damping"
+            << endl;
+    }
 }
 
 
