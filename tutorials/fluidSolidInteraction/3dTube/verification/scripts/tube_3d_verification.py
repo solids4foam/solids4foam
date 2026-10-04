@@ -174,7 +174,8 @@ def station_name(z: float) -> str:
     return f"verificationWallZ{round(z * 1.0e4):03d}"
 
 
-def add_monitors(case: Path, reference: dict) -> None:
+def add_monitors(case: Path, reference: dict, probe_z_shift: float = 0.0
+                 ) -> None:
     """Add wall-displacement and axis-pressure monitors along the tube."""
     geometry = reference["geometry"]
     radius = float(geometry["inner_radius_m"])
@@ -189,7 +190,7 @@ def add_monitors(case: Path, reference: dict) -> None:
         )
     offset = float(reference["pressure_probe_offset_m"])
     locations = " ".join(
-        f"({offset:.10g} {offset:.10g} {z:.10g})"
+        f"({offset:.10g} {offset:.10g} {z + probe_z_shift:.10g})"
         for z in reference["stations_z_m"]
     )
     entries.append(
@@ -288,7 +289,7 @@ def prepare_case(name: str, coupling: str, factor: int, delta_t: float,
     configure_time_scheme(case, args.time_scheme)
     configure_solid_preconditioner(case, args.solid_preconditioner)
     configure_coupling(case, coupling)
-    add_monitors(case, reference)
+    add_monitors(case, reference, args.probe_z_shift)
     configure_parallel(case, cores)
     return case
 
@@ -880,6 +881,9 @@ def run_settings(coupling: str, factor: int, delta_t: float, end_time: float,
         "openfoam": os.environ.get("WM_PROJECT", "") + "-"
         + os.environ.get("WM_PROJECT_VERSION", ""),
         "tutorial_inputs": tutorial_fingerprint(),
+        # Recorded only when used, so runs without a shift stay reusable
+        **({"pressure_probe_z_shift_m": args.probe_z_shift}
+           if args.probe_z_shift else {}),
     }
 
 
@@ -1008,6 +1012,8 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
     suffix = "_quick" if args.quick else ""
     if args.delta_t:
         suffix = f"_dt{args.delta_t:g}" + suffix
+    if args.probe_z_shift:
+        suffix = f"_pz{args.probe_z_shift:g}" + suffix
     rows, history_files = [], []
     for level, factor, delta_t in sweep_levels(args, reference, study):
         cores = study_cores(args.cores, study, level, reference)
@@ -1326,6 +1332,13 @@ def main() -> int:
         "--delta-t", type=float,
         help="mesh study only: use this time step on every level instead of "
              "halving it with the mesh (separates the spatial error)",
+    )
+    parser.add_argument(
+        "--probe-z-shift", type=float, default=0.0,
+        help="shift the axis pressure probes axially by this distance (m); "
+             "the stations lie on cell faces of every mesh level, where the "
+             "containing cell is ambiguous, so a shift of half a level-3 "
+             "cell (7.8125e-5) samples each probe inside one cell",
     )
     parser.add_argument(
         "--time-scheme", choices=("backward", "Euler"), default="backward",
