@@ -927,7 +927,11 @@ def sweep_levels(args: argparse.Namespace, reference: dict, study: str
     for level in levels:
         if study == "mesh":
             factor = 2 ** (level - 1)
-            members.append((level, factor, float(spec["base_delta_t_s"]) / factor))
+            # --delta-t holds the time step fixed, so that the mesh alone is
+            # refined; by default it is halved with the mesh spacing.
+            delta_t = (args.delta_t if args.delta_t
+                       else float(spec["base_delta_t_s"]) / factor)
+            members.append((level, factor, delta_t))
         else:
             if level > len(spec["delta_t_s"]):
                 fail(f"{study} level {level} is not defined")
@@ -1002,6 +1006,8 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
     end_time = float(reference["quick"]["end_time_s"] if args.quick
                      else reference["end_time_s"])
     suffix = "_quick" if args.quick else ""
+    if args.delta_t:
+        suffix = f"_dt{args.delta_t:g}" + suffix
     rows, history_files = [], []
     for level, factor, delta_t in sweep_levels(args, reference, study):
         cores = study_cores(args.cores, study, level, reference)
@@ -1102,6 +1108,8 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
         "timestep": "Time-step study (tutorial mesh",
         "literature": "Published-discretisation study (tutorial mesh",
     }[study]
+    if args.delta_t:
+        title = f"Mesh study (fixed Δt = {args.delta_t:g} s"
     lines = [
         f"## {title}; {args.coupling}, {args.time_scheme}"
         f"{', quick smoke test' if args.quick else ''})",
@@ -1315,6 +1323,11 @@ def main() -> int:
         help="comma-separated levels; mesh level 1 is the tutorial mesh",
     )
     parser.add_argument(
+        "--delta-t", type=float,
+        help="mesh study only: use this time step on every level instead of "
+             "halving it with the mesh (separates the spatial error)",
+    )
+    parser.add_argument(
         "--time-scheme", choices=("backward", "Euler"), default="backward",
         help="time scheme of the fluid and solid (default: backward; the "
              "tutorial uses Euler)",
@@ -1345,6 +1358,11 @@ def main() -> int:
             b <= a for a, b in zip(args.levels, args.levels[1:])
         ):
             parser.error("--levels must be strictly increasing positive integers")
+    if args.delta_t is not None and (
+        args.study != "mesh" or not args.delta_t > 0.0
+    ):
+        parser.error("--delta-t takes a positive time step and applies only "
+                     "to the mesh study")
     if args.couplings:
         args.couplings = [value.strip() for value in args.couplings.split(",")]
         invalid = [name for name in args.couplings if name not in COUPLINGS]
