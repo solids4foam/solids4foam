@@ -2,6 +2,10 @@
   "original": {
     "description": "Richter/Tukovic small-deformation benchmark",
     "pointA": [0.45, 0.15, -0.15],
+    "referenceProvenance": {
+      "richter": "Richter (2012), Goal-oriented error estimation for fluid-structure interaction problems, Tables 5 and 6: the source values 1.327 N and 5.924e-5 m are extrapolations from the finest three of five finite-element levels, not single-level values; the commonly quoted 1.33 N and 5.95e-5 m are rounded benchmark values, and approximately 1% reference accuracy was claimed. Richter places the solid at x=0.4..0.5 m, samples A=(0.45,0.15,0.15) m and prescribes peak inlet speed 0.3 m/s, whereas this solids4foam form places the solid at x=0.45..0.55 m, samples the upstream face A=(0.45,0.15,-0.15) m and prescribes peak speed 0.2 m/s; it is therefore not an exact problem match",
+      "tukovic": "Tukovic et al. (2018), OpenFOAM Finite Volume Solver for Fluid-Solid Interaction: same solids4foam code lineage"
+    },
     "references": {
       "ux": {"value": 5.95e-5, "tolerance": 0.05, "primary": true, "source": "Richter/Tukovic"},
       "uy": {"value": 2.40e-5, "tolerance": 0.35, "primary": false, "source": "Tukovic OpenFOAM calculation"},
@@ -13,6 +17,10 @@
         "ux": 5.95e-5,
         "fx": 1.33
       },
+      "richter2012Table6": {
+        "ux": 5.924e-5,
+        "fx": 1.327
+      },
       "tukovicOpenFOAM": {
         "ux": 5.93e-5,
         "uy": 2.40e-5,
@@ -23,6 +31,10 @@
   },
   "modified": {
     "description": "Tukovic large-deformation form using St Venant-Kirchhoff elasticity",
+    "referenceProvenance": {
+      "tukovic": "Tukovic et al. (2018), Figure 28: single graded-mesh result from the same code lineage",
+      "gillebaart": "Gillebaart (2016), Partitioned simulation of fluid-structure interaction, section 2.3.4: same geometry and material parameters but a different load protocol (solid fixed until t=5 s, then force ramp), and no tabulated steady point-A values"
+    },
     "references": {
       "ux": {"value": 0.01463, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28"},
       "uy": {"value": 0.005, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28"},
@@ -47,6 +59,16 @@
     "deltaTs": [0.05, 0.025, 0.0125, 0.00625],
     "endTime": 8.0,
     "minimumReferenceErrorOrder": 0.0
+  },
+  "gradedMesh": {
+    "refinementFactors": [1, 2, 4, 8],
+    "deltaTs": [0.00625, 0.00625, 0.00625, 0.00625],
+    "endTime": 8.0,
+    "minimumReferenceErrorOrder": 0.0,
+    "temporalFactor": 4,
+    "temporalDeltaTs": [0.0125],
+    "temporalComparisonDeltaT": 0.00625,
+    "temporalComparisonStudy": "original graded mesh L2"
   },
   "coupling": {
     "relativeTolerance": 0.01

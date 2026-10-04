@@ -1,0 +1,10 @@
+variant,factor,fluid_cells,solid_cells,delta_t,ux,uy,uz,fx,fy,fz,value_source
+original,1,14592,256,0.05,3.92234e-5,1.47766e-5,-1.74067e-7,1.204109,0.1068957,-0.04764647,surviving raw function-object data
+original,2,116736,2048,0.025,5.0277e-5,2.01477e-5,-6.18034e-7,1.255899,0.1111747,-0.05026169,surviving raw function-object data
+original,4,933888,16384,0.0125,5.69e-5,2.31e-5,,1.294,0.1086,,digitised approximately from versioned PNG
+original,8,7471104,131072,0.00625,5.95387e-5,,,1.310774,,,merged PR 412 summary; other final QoIs were not retained
+modified,1,14592,256,0.05,0.0097815,0.00329882,-7.33813e-5,2.223445,0.226897,-0.2785785,surviving raw function-object data
+modified,2,116736,2048,0.025,0.0121414,0.00426205,-0.000165664,2.254164,0.2578233,-0.2865437,surviving raw function-object data
+modified,3,393984,6912,0.0166667,0.013145,0.00460737,-0.00019645,2.287735,0.2469183,-0.2852208,surviving raw function-object data
+modified,4,933888,16384,0.0125,0.0136386,0.00476673,-0.000203339,2.309274,0.2402567,-0.2850147,surviving raw function-object data
+modified,8,7471104,131072,0.00625,0.0143007,0.00496486,-0.000228715,,,,merged PR 412 summary; final forces were not retained

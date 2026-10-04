@@ -1,0 +1,5 @@
+mesh_level,refinement_factor,region,cells,max_aspect_ratio,max_non_orthogonality,average_non_orthogonality,max_skewness,min_volume,max_volume,check_mesh_result
+L0,1,fluid,7584,8.15917,0,0,4.75292e-14,1.39526e-6,4.30893e-4,OK
+L0,1,solid,256,1,0,0,1.77636e-14,1.5625e-5,1.5625e-5,OK
+L3,8,fluid,3883008,7.90392,0,0,5.16037e-13,3.06026e-9,9.31975e-7,OK
+L3,8,solid,131072,1,0,0,2.13163e-13,3.05176e-8,3.05176e-8,OK

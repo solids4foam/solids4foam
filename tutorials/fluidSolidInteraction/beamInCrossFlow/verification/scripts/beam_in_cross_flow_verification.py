@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve()
@@ -71,12 +72,14 @@ def set_case_form(case: Path, form: str, delta_t: float | None = None,
 
 def configure_output(case: Path, delta_t: float, end_time: float,
                      requested_interval: int | None) -> None:
-    """Write fields and function-object data only when verification needs them."""
+    """Limit field output while retaining compact QoI histories."""
     interval = requested_interval or round(end_time / delta_t)
     if interval < 1:
         fail("Verification write interval must be at least one time step")
     replace_entry(case / "system/controlDict.iqnils", "writeInterval", str(interval))
-    replace_entry(case / "system/functions", "writeInterval", str(interval))
+    # Forces and point displacement are tiny compared with volume fields and
+    # are required to demonstrate that the t=8 evaluation is steady.
+    replace_entry(case / "system/functions", "writeInterval", "1")
 
 
 def configure_time_scheme(case: Path, scheme: str) -> None:
@@ -124,6 +127,100 @@ def refine_mesh(path: Path, factor: int) -> None:
     path.write_text(text)
 
 
+def configure_graded_fluid_mesh(path: Path, factor: int) -> None:
+    """Create the systematic verification mesh from the tutorial topology.
+
+    The interface has the same topology as the solid mesh.  All cell counts
+    are multiplied by ``factor``; fixed total block-expansion ratios therefore
+    define one geometrically consistent family rather than independently tuned
+    meshes.  The x grading clusters cells upstream/downstream of the plate and
+    through the wake, while the y/z grading clusters cells at the free end and
+    side face.
+    """
+    base = [
+        ((12, 8, 8), (0.125, 1, 1)),
+        ((12, 8, 6), (0.125, 1, 1 / 6)),
+        ((12, 6, 8), (0.125, 6, 1)),
+        ((12, 6, 6), (0.125, 6, 1 / 6)),
+        ((4, 8, 6), (1, 1, 1 / 6)),
+        ((4, 6, 6), (1, 6, 1 / 6)),
+        ((4, 6, 8), (1, 6, 1)),
+        ((24, 8, 8), (8, 1, 1)),
+        ((24, 8, 6), (8, 1, 1 / 6)),
+        ((24, 6, 8), (8, 6, 1)),
+        ((24, 6, 6), (8, 6, 1 / 6)),
+    ]
+    text = path.read_text()
+    index = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal index
+        if index >= len(base):
+            fail(f"Unexpected extra block in {path}")
+        counts, grading = base[index]
+        index += 1
+        scaled = " ".join(str(value * factor) for value in counts)
+        grading_text = " ".join(f"{value:.12g}" for value in grading)
+        return f"{match.group(1)}({scaled}) simpleGrading ({grading_text})"
+
+    text = re.sub(
+        r"(hex\s+\([^)]*\)\s+)\([^()]+\)\s+simpleGrading\s+\([^)]*\)",
+        replace,
+        text,
+    )
+    if index != len(base):
+        fail(f"Expected {len(base)} fluid blocks in {path}, found {index}")
+    path.write_text(text)
+
+
+def cell_counts(case: Path) -> tuple[int, int]:
+    counts = []
+    for region in ("fluid", "solid"):
+        total = 0
+        mesh = case / f"system/{region}/blockMeshDict"
+        for match in re.finditer(
+            r"hex\s+\([^)]*\)\s+\(([^()]+)\)\s+simpleGrading",
+            mesh.read_text(),
+        ):
+            total += math.prod(int(value) for value in match.group(1).split())
+        counts.append(total)
+    return counts[0], counts[1]
+
+
+def geometric_end_cells(length: float, count: int,
+                        total_ratio: float) -> tuple[float, float]:
+    """Return first/last cell widths for an OpenFOAM simpleGrading block."""
+    if total_ratio == 1:
+        return length / count, length / count
+    expansion = total_ratio ** (1 / (count - 1))
+    first = length * (1 - expansion) / (1 - expansion ** count)
+    return first, first * total_ratio
+
+
+def mesh_characteristics(family: str, factor: int) -> dict[str, float | int | str]:
+    if family == "uniform":
+        spacing = 0.025 / factor
+        return {
+            "near_body_cell_size": spacing,
+            "far_field_cell_size": spacing,
+            "cells_across_plate_thickness": 4 * factor,
+            "interface_cells_y": 8 * factor,
+            "interface_cells_z": 8 * factor,
+            "grading_ratios": "1,1,1",
+        }
+    upstream = geometric_end_cells(0.45, 12 * factor, 0.125)
+    downstream = geometric_end_cells(0.95, 24 * factor, 8)
+    outer = geometric_end_cells(0.2, 6 * factor, 6)
+    return {
+        "near_body_cell_size": min(upstream[1], downstream[0], outer[0]),
+        "far_field_cell_size": max(upstream[0], downstream[1], outer[1]),
+        "cells_across_plate_thickness": 4 * factor,
+        "interface_cells_y": 8 * factor,
+        "interface_cells_z": 8 * factor,
+        "grading_ratios": "xUp=0.125,xDown=8,yOuter=6,zOuter=0.1666667",
+    }
+
+
 def copy_case(name: str) -> Path:
     destination = WORK_ROOT / name
     if destination.exists():
@@ -134,7 +231,7 @@ def copy_case(name: str) -> Path:
 
 
 def run_case(case: Path, label: str, cores: int,
-             coupling: str = "iqnils") -> None:
+             coupling: str = "iqnils") -> float:
     allrun = case / "Allrun"
     if not allrun.is_file():
         fail(f"Missing {allrun}")
@@ -148,9 +245,11 @@ def run_case(case: Path, label: str, cores: int,
         ):
             replace_entry(dictionary, "numberOfSubdomains", str(cores))
         command.append("parallel")
+    start = time.monotonic()
     with log.open("w") as handle:
         result = subprocess.run(command, cwd=case, stdout=handle,
                                 stderr=subprocess.STDOUT, text=True)
+    elapsed = time.monotonic() - start
     if result.returncode:
         fail(f"{label} failed on {cores} core(s); see {log}")
     solver_log = case / "log.solids4Foam"
@@ -165,6 +264,7 @@ def run_case(case: Path, label: str, cores: int,
         fail(f"{label} failed inside Allrun; see {solver_log}")
     if not re.search(r"^End\s*$", solver_text, re.MULTILINE):
         fail(f"{label} did not run to completion; see {solver_log}")
+    return elapsed
 
 
 def numeric_rows(path: Path):
@@ -251,12 +351,22 @@ def force_at_or_before(path: Path, target: float | None) -> tuple[float, tuple[f
 
 
 def cell_count(case: Path) -> int:
-    total = 0
-    for mesh in (case / "system/fluid/blockMeshDict", case / "system/solid/blockMeshDict"):
-        for match in re.finditer(r"hex\s+\([^)]*\)\s+\(([^()]+)\)\s+simpleGrading", mesh.read_text()):
-            values = [int(value) for value in match.group(1).split()]
-            total += math.prod(values)
-    return total
+    return sum(cell_counts(case))
+
+
+def coupling_iteration_summary(case: Path) -> dict[str, float | int]:
+    path = case / "postProcessing/fsiResiduals.dat"
+    rows = [[float(value) for value in fields[:3]] for _, fields in numeric_rows(path)]
+    if not rows:
+        fail(f"No coupling residual rows in {path}")
+    final_by_time = {values[0]: values for values in rows}
+    iterations = [int(values[1]) for values in final_by_time.values()]
+    return {
+        "time_steps": len(iterations),
+        "total_coupling_iterations": sum(iterations),
+        "mean_coupling_iterations": sum(iterations) / len(iterations),
+        "maximum_coupling_iterations": max(iterations),
+    }
 
 
 def relative_error(value: float, reference: float) -> float:
@@ -284,6 +394,26 @@ def extract(case: Path, evaluation_time: float | None,
             "fy": force[1], "fz": force[2],
             "uz_symmetry_difference": 2.0 * displacement[2],
             "cell_count": cell_count(case)}
+
+
+def steady_state_summary(case: Path, end_time: float,
+                         window: float = 1.0) -> dict[str, float]:
+    displacement_path = find_displacement(case)
+    force_path = find_force(case)
+    _, displacement_start = vector_at_or_before(
+        displacement_path, end_time - window
+    )
+    _, displacement_end = vector_at_or_before(displacement_path, end_time)
+    _, force_start = force_at_or_before(force_path, end_time - window)
+    _, force_end = force_at_or_before(force_path, end_time)
+    result = {}
+    for name, start, end in zip(
+        ("ux", "uy", "uz", "fx", "fy", "fz"),
+        displacement_start + force_start,
+        displacement_end + force_end,
+    ):
+        result[f"{name}_last_second_relative_change"] = relative_error(end, start)
+    return result
 
 
 def robin_residual_summary(case: Path,
@@ -367,11 +497,13 @@ def dictionary_scalar(path: Path, key: str) -> float:
     return float(match.group(1))
 
 
-def observed_order(coarse: float, medium: float, fine: float) -> float | None:
+def observed_order(coarse: float, medium: float, fine: float,
+                   refinement_ratio: float = 2.0) -> float | None:
     numerator, denominator = coarse - medium, medium - fine
-    if numerator == 0 or denominator == 0 or numerator * denominator <= 0:
+    if (refinement_ratio <= 1.0 or numerator == 0 or denominator == 0
+            or numerator * denominator <= 0):
         return None
-    return math.log(abs(numerator / denominator), 2.0)
+    return math.log(abs(numerator / denominator), refinement_ratio)
 
 
 def reference_error_order(coarse_error: float, fine_error: float,
@@ -425,8 +557,23 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     csv_path = OUTPUT_ROOT / f"{name}.csv"
     quantities = ("ux", "uy", "uz", "fx", "fy", "fz", "uz_symmetry_difference")
-    columns = ["case", "study", "time_scheme", "mesh_level", "cell_count", "delta_t", "cores", "evaluation_time"]
+    columns = [
+        "case", "study", "mesh_family", "time_scheme", "mesh_level",
+        "refinement_factor", "fluid_cells", "solid_cells", "cell_count",
+        "near_body_cell_size", "far_field_cell_size",
+        "cells_across_plate_thickness", "interface_cells_y",
+        "interface_cells_z", "grading_ratios", "delta_t", "cores",
+        "wall_time_seconds", "time_steps", "total_coupling_iterations",
+        "mean_coupling_iterations", "maximum_coupling_iterations",
+        "evaluation_time", "ux_last_second_relative_change",
+        "uy_last_second_relative_change", "uz_last_second_relative_change",
+        "fx_last_second_relative_change", "fy_last_second_relative_change",
+        "fz_last_second_relative_change",
+    ]
     columns += list(quantities)
+    columns += [item for quantity in quantities for item in
+                (f"{quantity}_relative_change", f"{quantity}_observed_order",
+                 f"{quantity}_monotone")]
     columns += [item for quantity in quantities for item in
                 (f"reference_{quantity}", f"{quantity}_relative_error", f"{quantity}_pass")]
     for source, source_references in (published_references or {}).items():
@@ -435,7 +582,44 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
     columns += ["observed_order", "pass"]
     columns += [f"{quantity}_reference_error_order" for quantity in (reference_orders or {})]
     passed = True
+    monotone = {}
+    for quantity in quantities:
+        differences = [
+            rows[index][quantity] - rows[index - 1][quantity]
+            for index in range(1, len(rows))
+        ]
+        monotone[quantity] = bool(differences) and (
+            all(value > 0 for value in differences)
+            or all(value < 0 for value in differences)
+        )
     for row_index, row in enumerate(rows):
+        for quantity in quantities:
+            row[f"{quantity}_monotone"] = monotone[quantity]
+            if row_index:
+                row[f"{quantity}_relative_change"] = relative_error(
+                    row[quantity], rows[row_index - 1][quantity]
+                )
+            else:
+                row[f"{quantity}_relative_change"] = ""
+            if row_index >= 2:
+                factors = [
+                    rows[index]["refinement_factor"]
+                    for index in range(row_index - 2, row_index + 1)
+                ]
+                ratios = (factors[1] / factors[0], factors[2] / factors[1])
+                local_order = None
+                if math.isclose(ratios[0], ratios[1]):
+                    local_order = observed_order(
+                        rows[row_index - 2][quantity],
+                        rows[row_index - 1][quantity],
+                        row[quantity],
+                        ratios[0],
+                    )
+                row[f"{quantity}_observed_order"] = (
+                    local_order if local_order is not None else ""
+                )
+            else:
+                row[f"{quantity}_observed_order"] = ""
         for quantity, spec in references.items():
             row[f"reference_{quantity}"] = spec["value"]
             row[f"{quantity}_relative_error"] = relative_error(row[quantity], spec["value"])
@@ -573,9 +757,17 @@ def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", choices=("original", "modified"), required=True)
-    parser.add_argument("--study", choices=("mesh", "coupling"), required=True)
+    parser.add_argument("--study", choices=("mesh", "temporal", "coupling"), required=True)
+    parser.add_argument(
+        "--family", choices=("uniform", "graded"), default="uniform",
+        help="mesh family for mesh/temporal studies (default: uniform)",
+    )
     parser.add_argument("--cores", default="auto", help="MPI ranks per case: positive integer or auto (default)")
     parser.add_argument("--write-interval", type=int, help="write every N time steps (default: final time only)")
+    parser.add_argument(
+        "--levels",
+        help="comma-separated refinement factors to run (mesh study only)",
+    )
     parser.add_argument(
         "--time-scheme",
         choices=("backward", "Euler"),
@@ -587,8 +779,16 @@ def main() -> int:
         parser.error("--cores must be a positive integer or auto")
     if args.write_interval is not None and args.write_interval < 1:
         parser.error("--write-interval must be a positive integer")
+    requested_levels = None
+    if args.levels:
+        try:
+            requested_levels = [int(value) for value in args.levels.split(",")]
+        except ValueError:
+            parser.error("--levels must be a comma-separated list of integers")
+        if args.study != "mesh" or any(value < 1 for value in requested_levels):
+            parser.error("--levels is only valid for mesh studies and requires positive factors")
     required_executables = ["python3", "blockMesh", "solids4Foam"]
-    if args.study == "mesh":
+    if args.study in ("mesh", "temporal"):
         required_executables.append("gnuplot")
     for executable in required_executables:
         if not command_exists(executable):
@@ -601,27 +801,80 @@ def main() -> int:
     rows: list[dict] = []
     if args.study == "coupling":
         return 0 if run_coupling_study(args, references) else 1
-    if args.study == "mesh":
-        mesh_spec = references[args.case].get("mesh", references["mesh"])
+    if args.study in ("mesh", "temporal"):
+        mesh_spec = (
+            references["gradedMesh"]
+            if args.family == "graded"
+            else references[args.case].get("mesh", references["mesh"])
+        )
         mesh_end_time = mesh_spec["endTime"]
-        mesh_factors = mesh_spec["refinementFactors"]
-        mesh_delta_ts = mesh_spec["deltaTs"]
+        if args.study == "temporal":
+            if args.family != "graded":
+                fail("The temporal study is defined for the graded family")
+            mesh_factors = [mesh_spec["temporalFactor"]] * len(
+                mesh_spec["temporalDeltaTs"]
+            )
+            mesh_delta_ts = mesh_spec["temporalDeltaTs"]
+        else:
+            mesh_factors = mesh_spec["refinementFactors"]
+            mesh_delta_ts = mesh_spec["deltaTs"]
+            if requested_levels is not None:
+                invalid = set(requested_levels) - set(mesh_factors)
+                if invalid:
+                    fail(f"Unknown refinement factor(s): {sorted(invalid)}")
+                selected = [
+                    (factor, delta_t)
+                    for factor, delta_t in zip(mesh_factors, mesh_delta_ts)
+                    if factor in requested_levels
+                ]
+                mesh_factors = [factor for factor, _ in selected]
+                mesh_delta_ts = [delta_t for _, delta_t in selected]
         if len(mesh_factors) != len(mesh_delta_ts):
             fail("mesh refinementFactors and deltaTs must have the same length")
         scheme_suffix = "" if args.time_scheme == "backward" else f"_{args.time_scheme}"
-        for level, (factor, mesh_delta_t) in enumerate(zip(mesh_factors, mesh_delta_ts)):
-            case = copy_case(f"{args.case}_mesh{scheme_suffix}_{factor}x")
+        family_factors = mesh_spec["refinementFactors"]
+        for factor, mesh_delta_t in zip(mesh_factors, mesh_delta_ts):
+            label_suffix = (
+                f"dt{mesh_delta_t:g}" if args.study == "temporal" else f"{factor}x"
+            )
+            case = copy_case(
+                f"{args.case}_{args.family}_{args.study}{scheme_suffix}_{label_suffix}"
+            )
             set_case_form(case, args.case, mesh_delta_t, mesh_end_time)
             configure_time_scheme(case, args.time_scheme)
             configure_output(case, mesh_delta_t, mesh_end_time, args.write_interval)
-            refine_mesh(case / "system/fluid/blockMeshDict", factor)
+            if args.family == "graded":
+                configure_graded_fluid_mesh(
+                    case / "system/fluid/blockMeshDict", factor
+                )
+            else:
+                refine_mesh(case / "system/fluid/blockMeshDict", factor)
             refine_mesh(case / "system/solid/blockMeshDict", factor)
             cores = study_cores(args.cores, args.case, factor)
-            run_case(case, f"mesh level {factor}x", cores)
+            wall_time = run_case(case, f"mesh level {factor}x", cores)
             row = extract(case, None, mesh_end_time)
-            row.update({"case": args.case, "study": "mesh", "time_scheme": args.time_scheme, "mesh_level": level, "delta_t": mesh_delta_t, "cores": cores})
+            fluid_cells, solid_cells = cell_counts(case)
+            row.update(mesh_characteristics(args.family, factor))
+            row.update(coupling_iteration_summary(case))
+            row.update(steady_state_summary(case, mesh_end_time))
+            row.update({
+                "case": args.case,
+                "study": args.study,
+                "mesh_family": args.family,
+                "time_scheme": args.time_scheme,
+                # Preserve the family level when --levels runs a subset.  The
+                # temporal study deliberately has one comparison row and uses
+                # the spatial family's level for its selected mesh factor.
+                "mesh_level": family_factors.index(factor),
+                "refinement_factor": factor,
+                "fluid_cells": fluid_cells,
+                "solid_cells": solid_cells,
+                "delta_t": mesh_delta_t,
+                "cores": cores,
+                "wall_time_seconds": wall_time,
+            })
             rows.append(row)
-        name = f"{args.case}_mesh_sweep{scheme_suffix}"
+        name = f"{args.case}_{args.family}_{args.study}_sweep{scheme_suffix}"
         # Both families contain a systematic 2x/4x/8x subset.  The modified
         # family also has a 3x member to compare with the published cell count,
         # so do not use the last three entries indiscriminately.
@@ -647,11 +900,12 @@ def main() -> int:
             references[args.case]["references"],
             order,
             reference_orders,
-            mesh_spec["minimumReferenceErrorOrder"],
+            mesh_spec["minimumReferenceErrorOrder"] if args.study == "mesh" else None,
             -1,
             references[args.case].get("publishedReferences"),
         )
-        create_mesh_plot(name, args.case)
+        if args.study == "mesh":
+            create_mesh_plot(name, args.case)
         return 0 if passed else 1
     fail(f"Unsupported study: {args.study}")
 
