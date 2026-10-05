@@ -125,12 +125,13 @@ solids4foam built with PETSc. It runs in serial.
 ## Expected results
 
 Figure 1 compares the tip displacement over the periodic state with the
-oomph-lib solution at the same time step. With the cubic solid, the tip
-history differs from oomph-lib by at most 1.1% of the largest tip
-displacement (0.43 m) over the last period, and by 1.1-1.3% over the third and
-fourth periods; the start-up transient differs by up to 5.5%. The linear solid
-differs by 3.2-3.7%. The periodic state repeats to 0.5% between the third and
-fourth periods.
+oomph-lib solution at the same time step (a run on macOS). With the cubic
+solid, the tip history differs from oomph-lib over the last period by 1.1% of
+the largest tip displacement (0.43 m) on macOS and 1.8% on Linux; the
+start-up transient differs by up to 5.5%. The linear solid differs by 3.5-3.7%.
+The solids4foam periodic state is reproducible only to about 1-1.5%: between
+platforms, between the time steps 0.01 and 0.005 s, and from one period to the
+next (0.5-0.8%), which is the precision of the comparison.
 
 ![Leaflet tip displacement](images/channelLeaflet-tip.png)
 
@@ -144,14 +145,15 @@ The `verification/` directory holds an opt-in study against oomph-lib; see
 - the oomph-lib reference is good to about 0.2% of the tip displacement;
 - the static deflection of the cubic solid is within 1.2% of the beam, for
   $$h$$ from 0.05 to 0.0125 m;
-- the periodic-state difference from oomph-lib is 1.1-1.3% with the cubic
-  solid, which is the model difference of the finite-thickness continuum on
-  this mesh; its components could not be separated, because
+- the periodic-state difference from oomph-lib is 1.1-1.8% with the cubic
+  solid, against a scatter of about 1-1.5% of the solids4foam periodic state
+  itself; it is the model difference of the finite-thickness continuum on
+  this mesh, whose components could not be separated, because
   - thinning the leaflet at fixed bending stiffness does not bring the
     solution towards the beam model (2.5-2.8% at $$h = 0.025\,\mathrm{m}$$),
   - refined fluid meshes stall in the coupling during the first deflection;
-- halving the time step changes the periodic state by 0.3%; time steps of
-  0.02 and 0.0025 s fail in the solid Newton solve, so no order of
+- halving the time step changes the periodic state by up to 1.4%; time
+  steps of 0.02 and 0.0025 s fail in the solid Newton solve, so no order of
   convergence is claimed.
 
 ## Regression test

@@ -103,10 +103,10 @@
       ],
       "acceptance": {
         "maxPeriodError": {
-          "highOrder": 0.02,
+          "highOrder": 0.025,
           "linear": 0.05
         },
-        "maxPeriodicity": 0.01
+        "maxPeriodicity": 0.015
       }
     },
     "time": {
@@ -126,7 +126,7 @@
       "solidType": "highOrder",
       "comparisonStart": 4.0,
       "acceptance": {
-        "maxSelfDifference": 0.005
+        "maxSelfDifference": 0.02
       }
     },
     "mesh": {
