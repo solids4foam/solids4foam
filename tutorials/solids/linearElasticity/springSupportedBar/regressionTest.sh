@@ -41,6 +41,8 @@ prepare_case() {
         fi
         cp -a "${item}" "${case_dir}/"
     done
+    # never start a variant from another variant's mesh
+    \rm -rf "${case_dir}/constant/polyMesh"
 }
 
 CHECK_ONLY=false

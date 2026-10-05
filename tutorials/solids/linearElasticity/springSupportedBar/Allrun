@@ -28,6 +28,9 @@ cp -a "caseOptions/${OPTION}/." .
 solids4Foam::convertCaseFormat .
 
 # Create mesh
+# A mesh left by the other variant carries that variant's patch types, which
+# blockMesh on OpenFOAM v2512 refuses to override.
+\rm -rf constant/polyMesh
 solids4Foam::runApplication blockMesh
 
 # Run solver
