@@ -1123,6 +1123,11 @@ def plot_phase_i(rows: list[dict], measured_line: list[dict],
     loz = read_csv(REFERENCE_DIR / "Lozovskiy2019_fig9_upper_surface.csv")
     ax.plot([r["z_mm"] for r in loz], [r["y_upper_mm"] - 1.0 for r in loz],
             "c-.", lw=1, label="Lozovskiy et al. (2019), digitised")
+    published = reference["published_phase_I_tip_y_mm"]
+    ax.plot([62.5], [published["cheart_inf_sup_stable_rl3"]], "m^", ms=5,
+            label="CHeart inf-sup stable, tip (read from figure)")
+    ax.plot([62.5], [published["cheart_cG1cG1"]], "mv", ms=5,
+            label="CHeart cG(1)cG(1), tip (read from figure)")
     for row in rows:
         data = read_csv(OUTPUT_ROOT / f"phaseI_{row['level']}_centreline.csv")
         ax.plot([d["z_mm"] for d in data], [d["y_mm"] for d in data],
@@ -1133,6 +1138,22 @@ def plot_phase_i(rows: list[dict], measured_line: list[dict],
     ax.grid(alpha=0.3)
     fig.tight_layout()
     fig.savefig(OUTPUT_ROOT / "phaseI_centreline.png", dpi=150)
+    plt.close(fig)
+
+    # Tip history
+    fig, ax = plt.subplots(figsize=(6.4, 3.2))
+    for row in rows:
+        data = read_csv(OUTPUT_ROOT / f"phaseI_{row['level']}_tip_history.csv")
+        ax.plot([d["time_s"] for d in data], [d["tip_dy_mm"] for d in data],
+                label=f"solids4foam, {row['level']} mesh")
+    ax.axhline(reference["targets"]["phase_I_tip_y_mm"], color="k", lw=0.8,
+               label="experiment, 16.41 mm")
+    ax.set_xlabel("time (s)")
+    ax.set_ylabel("tip displacement y (mm)")
+    ax.legend(fontsize=7)
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(OUTPUT_ROOT / "phaseI_tip_history.png", dpi=150)
     plt.close(fig)
 
     # Velocity profiles along y at x = 0 on both planes

@@ -41,6 +41,15 @@ release. For complete commit-level details and contributor information, see the
   `verification/` directory, is run with `./Allverify`, works on copies under
   the ignored `verification/work/` directory, and is not run by
   `tutorials/Alltest` or `tutorials/Alltest-regression`.
+- Added the `fluidSolidInteraction/hessenthalerFsi` tutorial, a validation
+  against Phase I (steady inflow) of the Hessenthaler et al. (2017) 3D FSI
+  experiment: a buoyant silicone flap in the merging flow of two inlets,
+  measured by MRI. The fluid mesh is built with `cartesianMesh` from the
+  published surface, the interface is non-conforming (AMI), and buoyancy is a
+  net solid body force. An opt-in `validation/Allvalidate` calibrates the
+  shear modulus to the zero-flow deflection and compares the Phase I flap
+  centreline and the voxel-averaged MRI velocity with the measurements; the
+  CC0 measured data are included. The case has a `regressionTest.sh`.
 - Added the `fluids/poiseuilleChannel` tutorial: laminar channel flow driven
   by the `meanVelocityForce` finite volume option, compared with the plane
   Poiseuille solution, with a `regressionTest.sh`.
