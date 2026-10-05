@@ -18,7 +18,7 @@ Prepared by Philip Cardiff
 
 A silicone flap of 11 x 2 x 65 mm is clamped to the wall where two inlet pipes
 (diameter 21.9 mm, centres at y = ±27.15 mm) merge into one outlet pipe
-(diameter 76.2 mm). The z axis points downstream, gravity acts in −y, and the
+(diameter 76.2 mm). The z-axis points downstream, gravity acts in −y, and the
 origin is at the centre of the clamped end of the flap. An aqueous glycerol
 solution flows in through both inlets.
 
@@ -56,8 +56,8 @@ variables used by Hessenthaler, Röhrle and Nordsletten [3]; it also keeps the
 traction-free outlet consistent. The buoyancy of the flap is then applied to
 the solid as the net body force, with
 
-```text
-g_eff = (rho_s - rho_f)/rho_s * g = (0 0.9733 0) m/s^2
+```c++
+g_eff = (rho_s - rho_f)/rho_s*g = (0 0.9733 0) m/s^2
 ```
 
 in `constant/solid/g`, so that the solid still has its own inertia. No code is
@@ -126,9 +126,9 @@ The case requires PETSc, `cartesianMesh` (cfMesh, part of OpenFOAM.com) and
 
 The case is expensive: the default 10 s of simulated time (5000 time steps)
 took 5.5 h on 24 cores for the coarse mesh and 11.4 h on 32 cores for the
-medium mesh. The regression test runs the first five time steps only.
+medium mesh. The regression test runs only the first five time steps.
 
-In parallel the solid uses block-Jacobi LU as checked in; the validation
+In parallel, the solid uses block-Jacobi LU as checked in; the validation
 driver switches it to an exact parallel LU (MUMPS) so that the solid solve
 does not depend on the decomposition. Both converged for this case.
 
@@ -158,7 +158,7 @@ calibrated for their incompressible solid; it gives 29.48 mm. On the finest
 mesh the calibrated value is 62.8 kPa, so the tutorial mesh is about 3 % (0.6
 mm of tip deflection) too stiff. The neo-Hookean fit of the uniaxial test
 gives 96.9 kPa, 60 % stiffer, which gives a tip deflection of only 21.7 mm:
-the test does not represent the flap at the time of the experiment.
+The test does not represent the flap at the time of the experiment.
 
 ν = 0.49 needs a 6 % smaller μ (57.4 kPa) for the same deflection. The
 tutorial uses ν = 0.45: with ν = 0.49 the compact Jacobian preconditioner of
@@ -176,9 +176,9 @@ standard mesh. It is not used in the coupled case:
 - With the compact Jacobian as preconditioner, its Krylov solver stalls in
   the first Newton iteration for this thin flap, on hexahedral and Gmsh
   tetrahedral meshes, for polynomial orders 1 to 3 and ν from 0.3 to 0.49.
-  In a time-dependent run the inertia term lets it converge, but with
+  In a time-dependent run, the inertia term lets it converge, but with
   hundreds of Krylov iterations per Newton iteration: a time step of the solid
-  alone cost about 20 times more than with the standard solid.
+  alone costs about 20 times more than with the standard solid.
 - The linear high-order Jacobian (`highOrderJacobian true`) converges, but it
   is assembled once for the undeformed flap and is not updated as the flap
   rotates; beyond about 15 mm of tip deflection the linear solves stop
@@ -190,7 +190,7 @@ standard mesh. It is not used in the coupled case:
 
 The standard total Lagrangian solid has the same preconditioner problem. The
 updated Lagrangian standard solid assembles its compact Jacobian on the
-current configuration, which follows the rotation, and converged in every
+current configuration, which follows the rotation, and converges in every
 time step of every run, in serial and in parallel. On Gmsh tetrahedral meshes
 it inverted cells at about 5 mm of deflection, so the flap uses hexahedra.
 
