@@ -1,0 +1,47 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    // Solve the momentum equation using the segregated (outer-iteration)
+    // approach
+    solutionAlgorithm   implicitSegregated;
+
+    // Maximum number of momentum correctors per time step
+    nCorrectors         100000;
+
+    // Tight relative residual tolerance so that the discretisation error
+    // dominates the iteration error
+    rTol                1e-9;
+
+    // Disable the step-norm convergence check so that convergence is
+    // controlled by rTol only
+    sTol                0;
+
+    // Write frequency for the residuals
+    infoFrequency       100;
+
+    // Predict D at the start of each time step using the velocity and
+    // acceleration from the previous time step
+    predictor           yes;
+}
+
+// ************************************************************************* //

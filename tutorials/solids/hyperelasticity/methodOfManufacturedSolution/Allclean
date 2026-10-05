@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Clean the tutorial library and both cases
+wclean lib src
+rm -rf src/lnInclude
+
+for case in steady transient
+do
+    (cd "$case" && ./Allclean)
+done
+
+rm -rf verification/work verification/postProcessing regressionTests

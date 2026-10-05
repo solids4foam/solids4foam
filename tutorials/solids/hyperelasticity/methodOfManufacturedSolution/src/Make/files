@@ -1,0 +1,7 @@
+neoHookeanMMS.C
+neoHookeanMMSSource.C
+neoHookeanMMSSolid.C
+neoHookeanMMSFunctionObject.C
+neoHookeanMMSFvPatchVectorField.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libneoHookeanMMS

@@ -1,0 +1,1359 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{microtype}
+\usepackage{hyperref}
+\geometry{margin=2cm}
+
+\newcommand{\Grad}{\nabla}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\dev}{\operatorname{dev}}
+\newcommand{\Id}{\textbf{I}}
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\dd}{\text{d}}
+
+\title{Manufactured Dynamic Solution for a Compressible Neo-Hookean Solid}
+\author{Pablo Castrillo}
+\date{}
+
+\begin{document}
+\maketitle
+%\tableofcontents
+
+\section{Dynamic problem in the reference configuration}
+
+The solid is formulated in the reference configuration. Material coordinates are written as $\textbf{X}$ and the current position is:
+%
+\begin{equation}
+\textbf{x}(\textbf{X},t)=\textbf{X}+\textbf{u}(\textbf{X},t),
+\end{equation}
+%
+where $\textbf{u}$ is the displacement field.
+
+The balance of linear momentum in material form is:
+%
+\begin{equation}\label{eq_momentum}
+\rho_0\,\ddot{\textbf{u}}=\Grad_0\cdot\textbf{P}+\textbf{f}_0,
+\end{equation}
+%
+where $\rho_0$ is the reference mass density, $\textbf{P}$ is the first Piola--Kirchhoff stress, and $\textbf{f}_0$ is the body force per unit reference volume. Therefore, for a prescribed exact displacement field,
+%
+\begin{equation}\label{eq_manufacturedForce}
+\textbf{f}_0(\textbf{X},t)
+=\rho_0\ddot{\textbf{u}}^{\text{ex}}
+-\Grad_0\cdot\textbf{P}(\textbf{u}^{\text{ex}}).
+\end{equation}
+
+All external boundaries are Dirichlet boundaries,
+%
+\begin{equation}\label{eq_allDirichlet}
+\textbf{u}=\textbf{u}^{\text{ex}}
+\qquad\text{on }\partial\Omega.
+\end{equation}
+%
+No traction boundary condition is required for this manufactured problem.
+
+\section{Neo-Hookean model with isochoric--volumetric split}
+
+\subsection{Finite-deformation kinematics}
+
+The deformation gradient \textbf{F}, Jacobian $J$, right Cauchy--Green tensor \textbf{C}, left Cauchy--Green tensor \textbf{B}, and Green--Lagrange strain \textbf{E} are
+%
+\begin{align}
+\textbf{F}&=\dfrac{\partial\,\textbf{x}}{\partial\,\textbf{X}}
+=\Id+\Grad_0\textbf{u},
+&J&=\det(\textbf{F})>0,
+\\
+\textbf{C}&=\textbf{F}^{\text{T}}\textbf{F},
+&\textbf{B}&=\textbf{F}\textbf{F}^{\text{T}},
+\\
+\textbf{E}&=\dfrac12(\textbf{C}-\Id).
+\end{align}
+
+
+\subsection{Strain-energy density and derivation of the stress measures}
+
+The strain-energy density is additively split into isochoric and volumetric parts,
+%
+\begin{equation}
+\Psi=\Psi_{\text{iso}}+\Psi_{\text{vol}},
+\end{equation}
+%
+with
+%
+\begin{equation}
+\Psi_{\text{iso}}
+=\dfrac{\mu}{2}(\overline I_1-3),
+\qquad
+\Psi_{\text{vol}}
+=\dfrac{\kappa}{4}\left(J^2-1-2\ln J\right),
+\end{equation}
+%
+where\footnote{In terms of Young's modulus $E$ and Poisson's ratio $\nu$,
+$$
+\mu=\dfrac{E}{2(1+\nu)},
+\qquad
+\kappa=\dfrac{E}{3(1-2\nu)}=\kappa=\lambda+\dfrac23\mu\longleftarrow \text{Lam\'e parameters}.
+$$
+}
+%
+\begin{equation}
+\overline I_1=J^{-2/3}I_1\quad\text{and}\quad I_1=\tr\textbf{C}=\tr\textbf{B}.
+\end{equation}
+
+Thus
+%
+\begin{equation}\label{eq_energy}
+\Psi(\textbf{F})
+=\dfrac{\mu}{2}\left(J^{-2/3}I_1-3\right)
++\dfrac{\kappa}{4}\left(J^2-1-2\ln J\right).
+\end{equation}
+%
+
+\paragraph{Derivation of the stress measures} Since
+%
+\begin{eqnarray}
+\det\left( \textbf{C}\right)=\det\left( \textbf{F}^{\text{T}}\textbf{F}\right)=\det\left( \textbf{F}^{\text{T}}\right)\det\left(\textbf{F}\right)=J^2\underbrace{\Rightarrow}_{J>0} \boxed{J=\sqrt{\det\left( \textbf{C}\right)}},
+\end{eqnarray}
+%
+\begin{eqnarray}
+\boxed{\dfrac{\partial (J^{-2/3})}{\partial J}
+	=-\dfrac{2}{3}\,J^{-5/3}},
+\end{eqnarray}
+%
+\begin{eqnarray}
+J=\left( \det(\textbf{C})\right)^{\frac{1}{2}}\Rightarrow\dfrac{\partial\, J}{\partial\, \textbf{C}}=\underbrace{\dfrac{1}{2}\left( \det(\textbf{C})\right)^{-\frac{1}{2}}\dfrac{\partial\, \det(\textbf{C})}{\partial \,\textbf{C}}}_{\underbrace{\dfrac{\partial \det(\textbf{C})}{\partial \textbf{C}}=\det(\textbf{C})\,\textbf{C}^{-\text{T}}}_{\text{Classical identity.}}}=\underbrace{\dfrac{1}{2}\left( \det(\textbf{C})\right)^{\frac{1}{2}}\textbf{C}^{-\text{T}}}_{\textbf{C}=\textbf{C}^{\text{T}}\Rightarrow\textbf{C}^{-1}=\textbf{C}^{\text{-T}}}\Rightarrow\boxed{\dfrac{\partial \,J}{\partial\, \textbf{C}}=\dfrac{J}{2}\,\textbf{C}^{-1}},
+\end{eqnarray}
+%
+\begin{eqnarray}
+I_1=\tr(\textbf{C})=C_{11}+C_{22}+C_{33}\Rightarrow \dfrac{\partial\,I_1}{\partial\, C_{ij}}=\dfrac{\partial \,C_{kk}}{\partial\, C_{ij}}=\delta_{ij}\Rightarrow \boxed{\dfrac{\partial\, I_1}{\partial\,\textbf{C}}=\Id}.
+\end{eqnarray}
+%
+Then the second Piola--Kirchhoff stress
+$\textbf{S}$ is:
+%
+\begin{eqnarray}
+\begin{array}{ccl}
+\textbf{S}=2\dfrac{\partial \,\Psi}{\partial\,\textbf{C}}&=&
+2\dfrac{\partial \left( \dfrac{\mu}{2}\left(J^{-2/3}I_1-3\right)
+	+\dfrac{\kappa}{4}\left(J^2-1-2\ln J\right)\right) }{\partial\,\textbf{C}},\\[2ex]
+&=&\mu\dfrac{\partial \,(J^{-2/3}I_1)}{\partial\,\textbf{C}}+\dfrac{\kappa}{2}\dfrac{\partial \,(J^{2}-2\,\ln J)}{\partial\,\textbf{C}},\\[2ex]
+&=&\mu\left(\dfrac{\partial\,(J^{-2/3})}{\partial \,J}\dfrac{\partial \,J}{\partial\,\textbf{C}}\,I_1+J^{-2/3}\dfrac{\partial\,I_1}{\partial\,\textbf{C}}\right) +\dfrac{\kappa}{2}\dfrac{\partial\, (J^{2}-2\,\ln J)}{\partial\, J}\dfrac{\partial\, J}{\partial\,\textbf{C}},\\[2ex]
+&=&\mu\left(\left(-\dfrac{2}{3}\,J^{-5/3}\right) \left(\dfrac{J}{2}\,\textbf{C}^{-1}\right) I_1+J^{-2/3}\textbf{I}\right) +\dfrac{\kappa}{2}\left(2\,J-\dfrac{2}{J} \right) \dfrac{J}{2}\,\textbf{C}^{-1},
+	\end{array}
+\end{eqnarray}
+%
+therefore
+%
+\begin{eqnarray}\label{eq_Sgeneral}
+\boxed{\textbf{S}=\mu\,J^{-\frac{2}{3}}
+\left(
+\Id-\dfrac{I_1}{3}\textbf{C}^{-1}
+\right)
++\dfrac{\kappa}{2}(J^2-1)\textbf{C}^{-1}=\mu\,J^{-\frac{2}{3}}
+\,\Id
++\left( \dfrac{\kappa}{2}(J^2-1)-\mu\,J^{-\frac{2}{3}}\dfrac{I_1}{3}\right) \textbf{C}^{-1}}.
+\end{eqnarray}
+%
+The first Piola--Kirchhoff stress is
+%
+\begin{equation}\label{eq_Pgeneral}
+\boxed{\textbf{P}=\textbf{F}\textbf{S}
+=\mu\, J^{-\frac{2}{3}}
+\left(
+\textbf{F}-\dfrac{I_1}{3}\textbf{F}^{-\text{T}}
+\right)
++\dfrac{\kappa}{2}(J^2-1)\textbf{F}^{-\text{T}}=\mu\,J^{-\frac{2}{3}}
+\,\textbf{F}
++\left( \dfrac{\kappa}{2}(J^2-1)-\mu\,J^{-\frac{2}{3}}\dfrac{I_1}{3}\right) \textbf{F}^{-\text{T}}}.
+\end{equation}
+%
+The Kirchhoff stress is
+%
+\begin{equation}\label{eq_taugeneral}
+	\boxed{\boldsymbol{\tau}=\textbf{P}\textbf{F}^{\text{T}}
+	=\mu J^{-\frac{2}{3}}
+	\left(
+	\textbf{B}-\dfrac{I_1}{3}\Id
+	\right)
+	+\dfrac{\kappa}{2}(J^2-1)\Id=\mu\,J^{-\frac{2}{3}}
+	\,\textbf{B}
+	+\left( \dfrac{\kappa}{2}(J^2-1)-\mu\,J^{-\frac{2}{3}}\dfrac{I_1}{3}\right) \Id}.
+\end{equation}
+%
+Finally,
+%
+\begin{equation}\label{eq_sigmaSource}
+	\boxed{\boldsymbol{\sigma}=\dfrac1J\boldsymbol{\tau}
+	=\mu J^{-\frac{5}{3}}
+	\left(
+	\textbf{B}-\dfrac{I_1}{3}\Id
+	\right)
+	+\dfrac{\kappa}{2}\left( \dfrac{J^2-1}{J}\right) \Id=\mu\,J^{-\frac{5}{3}}
+	\,\textbf{B}
+	+\left( \dfrac{\kappa}{2}\left( \dfrac{J^2-1}{J}\right)-\mu\,J^{-\frac{5}{3}}\dfrac{I_1}{3}\right) \Id}.
+\end{equation}
+%
+Other expressions for $\boldsymbol{\tau}$ and $\boldsymbol{\sigma}$ are
+%
+\begin{equation}
+	\boldsymbol{\tau}
+=\mu\,\dev(\overline{\textbf{B}})
++\dfrac{\kappa}{2}\left( J^2-1\right) \Id
+\quad\text{and}\quad
+	\boldsymbol{\sigma}
+	=\dfrac{\mu}{J}\dev(\overline{\textbf{B}})
+	+\dfrac{\kappa}{2}\left( \dfrac{J^2-1}{J}\right) \Id,
+\end{equation}
+%
+where
+%
+\begin{equation}
+	\dev(\overline{\textbf{B}})=\overline{\textbf{B}}-\dfrac13\tr(\overline{\textbf{B}})\Id\quad\text{and}\quad \overline{\textbf{B}}=J^{-2/3}\textbf{B}.
+\end{equation}
+
+Defining
+%
+\begin{eqnarray}\label{eq_mc}
+\boxed{m=\mu\,J^{-2/3}\quad\text{and}\quad c=\dfrac{\kappa}{2}\left(J^2-1\right)-m\,\dfrac{I_1}{3}},
+\end{eqnarray}
+%
+then the compact form of stresses is:
+%
+\begin{eqnarray}\label{eq_stressesCompact}
+\boxed{\textbf{S}=m\,\textbf{I}+c\,\textbf{C}^{-1},\quad\textbf{P}=m\,\textbf{F}+c\,\textbf{F}^{-\text{T}},\quad \boldsymbol{\tau}=m\,\textbf{B}+c\,\textbf{I}\quad\text{and}\quad \boldsymbol{\sigma}=\dfrac{m}{J}\,\textbf{B}+\dfrac{c}{J}\,\textbf{I}}.
+\end{eqnarray}
+
+\section{Manufactured displacement}
+
+Suppose that the manufactured field has the form
+%
+\begin{equation}
+\textbf{u}(\textbf{X},t)=\textbf{a}\,q(\textbf{X},t),
+\label{eq_uCompact}
+\end{equation}
+%
+where $\textbf{a}=[a_x,\,a_y,\,a_z]^{\text{T}}$ is constant, therefore $u_i=a_i\,q$. Define
+%
+\begin{equation}
+\textbf{g}=\Grad_0 q,
+\qquad
+A=\textbf{a}\cdot\textbf{a},
+\qquad
+G=\textbf{g}\cdot\textbf{g}.
+\end{equation}
+%
+Then
+%
+\begin{eqnarray}
+\Grad_0\textbf{u}=\Grad_0(\textbf{a}\,q)\Rightarrow \dfrac{\partial u_i}{\partial X_j} = a_i\dfrac{\partial q}{\partial X_j}= a_i\,g_j\Rightarrow \boxed{\Grad_0\,\textbf{u}=\textbf{a}\,\textbf{g}^{\text{T}}=\textbf{a}\otimes\textbf{g}},
+\end{eqnarray}
+%
+therefore
+%
+\begin{equation}
+\boxed{\textbf{F}=\Id+\textbf{a}\,\textbf{g}^{\text{T}}=\Id+\textbf{a}\otimes\textbf{g}}.
+\label{eq_FJcompact}
+\end{equation}
+
+For the determinant we can use the identity $\det(\textbf{A}+\textbf{u}\,\textbf{v}^\text{T})=\det(\textbf{A})(1+\textbf{v}^\text{T}\,\textbf{A}^{-1}\,\textbf{u})$, therefore:
+%
+\begin{eqnarray}
+J=\det(\textbf{F})=\det(\Id+\textbf{a}\,\textbf{g}^\text{T})=\det(\Id)(1+\textbf{g}^\text{T}\,\Id\,\textbf{a})=1+\textbf{g}^\text{T}\,\textbf{a}\Rightarrow \boxed{J=1+\textbf{g}^\text{T}\,\textbf{a}=1+\textbf{a}\cdot\textbf{g}}.
+\end{eqnarray}
+
+The Sherman--Morrison identity is
+%
+\begin{eqnarray}
+\left( \textbf{A}+\textbf{u}\,\textbf{v}^\text{T}\right) ^{-1}=\textbf{A}^{-1}-\dfrac{\textbf{A}^{-1}\,\textbf{u}\,\textbf{v}^\text{T}\,\textbf{A}^{-1}}{1+\textbf{v}^\text{T}\,\textbf{A}^{-1}\,\textbf{u}},
+\end{eqnarray}
+%
+therefore:
+%
+\begin{eqnarray}
+\textbf{F}^{-1}=\left( \Id+\textbf{a}\,\textbf{g}^{\text{T}}\right)^{-1}=\Id^{-1}-\dfrac{\Id^{-1}\,\textbf{a}\,\textbf{g}^\text{T}\,\Id^{-1}}{1+\textbf{g}^\text{T}\,\Id^{-1}\,\textbf{a}}=\Id-\dfrac{\textbf{a}\,\textbf{g}^\text{T}}{1+\textbf{g}^\text{T}\,\textbf{a}}=\Id-\dfrac{\textbf{a}\,\textbf{g}^\text{T}}{J}=\Id-\dfrac{\textbf{a}\otimes\textbf{g}}{J},
+\end{eqnarray}
+%
+then
+%
+\begin{equation}
+\boxed{
+\textbf{F}^{-1}
+=\Id-\dfrac{\textbf{a}\,\textbf{g}^\text{T}}{J}=\Id-\dfrac{\textbf{a}\otimes\textbf{g}}{J},
+\qquad
+\textbf{F}^{-\text{T}}
+=\Id-\dfrac{\textbf{g}\,\textbf{a}^\text{T}}{J}=\Id-\dfrac{\textbf{g}\otimes\textbf{a}}{J}
+}.
+\label{eq_FinvCompact}
+\end{equation}
+
+The strain tensors are
+%
+\begin{eqnarray}
+\textbf{C}=\textbf{F}^\text{T}\textbf{F}=\left( \Id+\textbf{g}\,\textbf{a}^{\text{T}}\right)\left( \Id+\textbf{a}\,\textbf{g}^{\text{T}}\right) =\Id+\textbf{g}\,\textbf{a}^{\text{T}}+\textbf{a}\,\textbf{g}^{\text{T}}+\textbf{g}\,\textbf{a}^{\text{T}}\,\textbf{a}\,\textbf{g}^{\text{T}}=\Id+\textbf{g}\,\textbf{a}^{\text{T}}+\textbf{a}\,\textbf{g}^{\text{T}}+\textbf{g}\,(\textbf{a}\cdot\textbf{a})\,\textbf{g}^{\text{T}}
+\end{eqnarray}
+%
+\begin{eqnarray}
+\textbf{B}=\textbf{F}\textbf{F}^\text{T}=\left( \Id+\textbf{a}\,\textbf{g}^{\text{T}}\right)\left( \Id+\textbf{g}\,\textbf{a}^{\text{T}}\right) =\Id+\textbf{a}\,\textbf{g}^{\text{T}}+\textbf{g}\,\textbf{a}^{\text{T}}+\textbf{a}\,\textbf{g}^{\text{T}}\,\textbf{g}\,\textbf{a}^{\text{T}}=\Id+\textbf{a}\,\textbf{g}^{\text{T}}+\textbf{g}\,\textbf{a}^{\text{T}}+\textbf{a}\,(\textbf{g}\cdot\textbf{g})\,\textbf{a}^{\text{T}}
+\end{eqnarray}
+%
+therefore
+%
+\begin{equation}
+\boxed{
+\textbf{C}
+=\Id+\textbf{g}\,\textbf{a}^{\text{T}}+\textbf{a}\,\textbf{g}^{\text{T}}+A\,\textbf{g}\,\textbf{g}^{\text{T}}=\Id+\textbf{g}\otimes\textbf{a}
++\textbf{a}\otimes\textbf{g}
++A\,\textbf{g}\otimes\textbf{g}
+},
+\label{eq_Ccompact}
+\end{equation}
+%
+\begin{equation}
+\boxed{
+\textbf{B}
+=\Id+\textbf{a}\,\textbf{g}^{\text{T}}+\textbf{g}\,\textbf{a}^{\text{T}}+G\,\textbf{a}\,\textbf{a}^{\text{T}}=\Id+\textbf{a}\otimes\textbf{g}
++\textbf{g}\otimes\textbf{a}
++G\,\textbf{a}\otimes\textbf{a}
+},
+\label{eq_Bcompact}
+\end{equation}
+%
+and
+%
+\begin{eqnarray}
+\begin{array}{rcl}
+\textbf{C}^{-1}&=&\left(\textbf{F}^\text{T}\textbf{F}\right)^{-1} =\textbf{F}^{-1}\textbf{F}^{-\text{T}}=\left( \Id-\dfrac{\textbf{a}\,\textbf{g}^\text{T}}{J}\right) \left(\Id-\dfrac{\textbf{g}\,\textbf{a}^\text{T}}{J} \right) =\Id -\dfrac{\textbf{a}\,\textbf{g}^\text{T}}{J}-\dfrac{\textbf{g}\,\textbf{a}^\text{T}}{J}+\dfrac{\textbf{a}\,\textbf{g}^\text{T}}{J}\dfrac{\textbf{g}\,\textbf{a}^\text{T}}{J}\\
+&=&\Id -\dfrac{\textbf{a}\,\textbf{g}^\text{T}}{J}-\dfrac{\textbf{g}\,\textbf{a}^\text{T}}{J}+\dfrac{1}{J^2}\textbf{a}\,\left( \textbf{g}\cdot\textbf{g}\right) \,\textbf{a}^\text{T}=\Id -\left( \dfrac{\textbf{a}\,\textbf{g}^\text{T}+\textbf{g}\,\textbf{a}^\text{T}}{J}\right) +\dfrac{\left( \textbf{g}\cdot\textbf{g}\right)}{J^2}\,\textbf{a}\, \textbf{a}^\text{T},
+\end{array}
+\end{eqnarray}
+%
+therefore
+%
+\begin{equation}
+\boxed{
+\textbf{C}^{-1}=
+\Id -\left( \dfrac{\textbf{a}\,\textbf{g}^\text{T}+\textbf{g}\,\textbf{a}^\text{T}}{J}\right) +\dfrac{G}{J^2}\,\textbf{a}\,\textbf{a}^\text{T}=\Id
+-\left( \dfrac{\textbf{a}\otimes\textbf{g}+\textbf{g}\otimes\textbf{a}}{J}\right) 
++\dfrac{G}{J^2}\,\textbf{a}\otimes\textbf{a}
+}.
+\label{eq_CinvCompact}
+\end{equation}
+%
+In three dimensions, including the plane-strain embedding used later,
+%
+\begin{equation}
+\boxed{
+I_1=\tr(\textbf{C})=3+2\,\textbf{a}\cdot\textbf{g}+A\,G
+}.
+\label{eq_I1compact}
+\end{equation}
+
+Define also
+\begin{equation}
+\boxed{
+d=m+c\quad\text{and}
+\quad
+e=\dfrac{c}{J}
+},
+\label{eq_de}
+\end{equation}
+%
+and using Eqs.~\eqref{eq_stressesCompact},~\eqref{eq_FJcompact}~and~\eqref{eq_FinvCompact}, the first Piola stress becomes
+%
+\begin{equation}
+\boxed{
+\textbf{P}
+=d\,\Id+m\,\textbf{a}\,\textbf{g}^\text{T}
+-e\,\textbf{g}\,\textbf{a}^\text{T}=d\,\Id+m\,\textbf{a}\otimes\textbf{g}
+-e\,\textbf{g}\otimes\textbf{a}
+}.
+\label{eq_PcompactRankOne}
+\end{equation}
+
+\section{Exact material divergence and manufactured body force}
+
+For later use define
+%
+\begin{equation}
+\boxed{\textbf{H}=\Grad_0\,\textbf{g},
+\qquad
+\textbf{h}=\textbf{H}\textbf{a}=\Grad_0\, J,
+\qquad
+\textbf{r}=\textbf{H}\textbf{g}},
+\end{equation}
+% 
+and the following equalities
+%
+\begin{eqnarray}
+\boxed{\Grad\cdot (\textbf{x}\,\textbf{y}^\text{T})=\left(\Grad\,\textbf{x}\right)\textbf{y}+\textbf{x}\left(\Grad\cdot\textbf{y} \right)},
+\end{eqnarray}
+%
+\begin{eqnarray}
+\boxed{\Grad(\textbf{x}\cdot\textbf{y})= \left( \Grad \textbf{x}\right)^\text{T}\textbf{y}+\left(\Grad\textbf{y} \right)^\text{T}\textbf{x}}.
+\end{eqnarray}
+%
+\begin{eqnarray}
+	\boxed{\Grad(\alpha\,\textbf{x})= \textbf{x}\left( \Grad \alpha\right)^\text{T}+\alpha\,\Grad\textbf{x}}.
+\end{eqnarray}
+
+Then the divergence of \textbf{P} is:
+%
+\begin{equation}
+\begin{array}{rcl}
+\Grad_0\cdot\textbf{P}
+&=&\Grad_0\cdot\left( d\,\Id+m\,\textbf{a}\,\textbf{g}^\text{T}
+-e\,\textbf{g}\,\textbf{a}^\text{T}\right),\\[1ex]
+&=&\Grad_0\cdot\left( d\,\Id\right) +\Grad_0\cdot\left(m\,\textbf{a}\,\textbf{g}^\text{T}\right) 
+-\Grad_0\cdot\left(e\,\textbf{g}\,\textbf{a}^\text{T}\right),
+\\[1ex]
+&=&\Grad_0\,d +\Grad_0\cdot\left(m\,\textbf{a}\,\textbf{g}^\text{T}\right) 
+-\Grad_0\cdot\left(e\,\textbf{g}\,\textbf{a}^\text{T}\right),\\[1ex]
+&=&\Grad_0\,d +\Grad_0\left(m\,\textbf{a}\right) \textbf{g} +m\,\textbf{a}\,\Grad_0\cdot \textbf{g}
+-\Grad_0\left(e\,\textbf{g}\right) \textbf{a} -e\,\textbf{g}\,\underbrace{\Grad_0\cdot \textbf{a}}_{=0},\\[1ex]
+&=&\Grad_0\,d +\textbf{a}\,\underbrace{\left(\Grad_0\, m\right)^\text{T} \textbf{g}}_{\textbf{g}\cdot \Grad_0\,m}+m\underbrace{\left( \Grad_0\, \textbf{a}\right)}_{=\textbf{0}}\textbf{g}  +m\,\textbf{a}\,\underbrace{\Grad_0\cdot \textbf{g}}_{=\Delta_0\, q}
+-\textbf{g}\underbrace{\left(\Grad_0\, e\right)^\text{T} \textbf{a}}_{\textbf{a}\cdot \Grad_0\, e} -e\underbrace{\left( \Grad_0\, \textbf{g}\right) \textbf{a}}_{=\textbf{h}},
+\end{array}
+\end{equation}
+%
+Therefore:
+%
+\begin{equation}
+\boxed{
+\Grad_0\cdot\textbf{P}
+=\Grad_0\, d
++\textbf{a}\left(\textbf{g}\cdot\Grad_0\, m+m\,\Delta_0\, q\right)
+-\textbf{g}\left(\textbf{a}\cdot\Grad_0\, e\right)
+-e\,\textbf{h}
+}.
+\label{eq_DivPCompact}
+\end{equation}
+%
+Consequently,
+%
+\begin{equation}
+\boxed{
+\textbf{f}_0
+=\rho_0\,\textbf{a}\,\ddot q
+-\Grad_0\, d
+-\textbf{a}\left(\textbf{g}\cdot\Grad_0\, m+m\,\Delta_0\, q\right)
++\textbf{g}\left(\textbf{a}\cdot\Grad_0\, e\right)
++e\,\textbf{h}
+}.
+\label{eq_fCompact}
+\end{equation}
+%
+The rest of the expressions are:
+%
+\begin{eqnarray}\label{eq_gradm}
+\Grad_0\, m=\Grad_0\left(\mu\,J^{-\frac{2}{3}}\right)=-\dfrac{2}{3}\mu\,J^{-\frac{5}{3}}\Grad_0\, J =-\dfrac{2\,\mu\,J^{-\frac{2}{3}}}{3\,J}\,\textbf{h}\Rightarrow\boxed{\Grad_0 m=-\dfrac{2\,m}{3\,J}\,\textbf{h}},
+\end{eqnarray}
+%
+\begin{eqnarray}\label{eq_gradI1}
+\begin{array}{rcl}
+\Grad_0\, I_1&=&\Grad_0\left(3+2\,\textbf{a}\cdot\textbf{g}+A\,G\right)=2\,\underbrace{\left( \Grad_0\, \textbf{a}\right)^\text{T}}_{=\textbf{0}}\textbf{g}+2\,\underbrace{\left( \Grad_0\, \textbf{g}\right)^\text{T}\textbf{a}}_{\textbf{H}=\textbf{H}^\text{T}\Rightarrow\textbf{h}} +G\,\underbrace{\Grad_0 A}_{=\textbf{0}} + A\,\Grad_0 \left( \textbf{g}\cdot \textbf{g}\right),\\[1ex]
+&=&2\,\textbf{h} + 2\,A\,\underbrace{\left( \Grad_0\, \textbf{g}\right)^\text{T}\textbf{g}}_{\textbf{H}=\textbf{H}^\text{T}\Rightarrow\textbf{r}}\Rightarrow \boxed{\Grad_0 I_1=2\textbf{h}+2A\textbf{r}}.
+\end{array}
+\end{eqnarray}
+%
+\begin{eqnarray}\label{eq_gradc}
+\begin{array}{rcl}
+\Grad_0\, c&=&\Grad_0\left(\dfrac{\kappa}{2}\,(J^2-1)-m\,\dfrac{I_1}{3}\right)=\kappa\,J\,\Grad_0\, J-\dfrac{I_1}{3}\Grad_0\, m - \dfrac{m}{3}\Grad_0\, I_1,\\[1ex] 
+&&\Rightarrow\boxed{\Grad_0\, c=\kappa\,J\,\textbf{h}-\dfrac{I_1}{3}\Grad_0\, m - \dfrac{m}{3}\Grad_0\, I_1},
+\end{array}
+\end{eqnarray}
+%
+\begin{eqnarray}
+\boxed{
+\Grad_0\, d=\Grad_0\, m+\Grad_0\, c,
+\qquad
+\Grad_0\, e=\dfrac1J\Grad_0\, c-\dfrac{c}{J^2}\,\textbf{h}
+}.
+\label{eq_gradde}
+\end{eqnarray}
+
+
+
+\section{Two-dimensional problem: plane-strain use of the 3D constitutive law}
+
+\subsection{Important interpretation of the 2D case}
+
+The constitutive law in Eq.~\eqref{eq_sigmaSource} is a three-dimensional law:
+it uses $J^{-2/3}$ and the three-dimensional deviatoric operator with the factor
+$1/3$. Therefore, to use \emph{exactly the same material model} in a 2D problem,
+we adopt plane strain,
+%
+\begin{equation}
+\boxed{
+u_z=0,
+\qquad
+\dfrac{\partial(\cdot)}{\partial z}=0,
+\qquad
+F_{zz}=1
+}.
+\end{equation}
+%
+The tensors are still three-dimensional, although only the in-plane momentum
+equations are solved. In particular, $\sigma_{zz}$ is generally nonzero. Replacing
+$J^{-2/3}$ by $J^{-1}$ or replacing $1/3$ by $1/2$ would define a different,
+intrinsically two-dimensional constitutive model and would no longer reproduce
+Eq.~\eqref{eq_sigmaSource}.
+
+\subsection{Manufactured displacement and derivatives}
+
+Let
+%
+\begin{equation}
+q(x,y,t)=\sin(\omega_x\,x)\sin(\omega_y\,y)\sin(\omega_t\,t),
+\end{equation}
+%
+with
+%
+\begin{equation}
+\boxed{
+\textbf{u}(x,y,t)=
+\begin{bmatrix}a_x\,q\\a_y\,q\end{bmatrix}
+}.                
+\label{eq_u2D}    
+\end{equation}
+%
+For the three-dimensional plane-strain embedding we use
+%
+\begin{equation}
+\textbf{a}=\begin{bmatrix}a_x\\a_y\\0\end{bmatrix},
+\qquad
+\textbf{g}=\begin{bmatrix}g_x\\g_y\\0\end{bmatrix}.
+\end{equation}
+%
+Introduce
+%
+\begin{eqnarray}
+s_x=\sin(\omega_x\,x),\,\,\, c_x=\cos(\omega_x\,x),\,\,\,
+s_y=\sin(\omega_y\,y),\,\,\, c_y=\cos(\omega_y\,y),\,\,\,s_t=\sin(\omega_t\,t),\,\,\, c_t=\cos(\omega_t\,t).
+\end{eqnarray}
+%
+Then
+%
+\begin{equation}
+\boxed{
+q=s_x\,s_y\,s_t,
+\quad
+g_x=\omega_x\,c_x\,s_y\,s_t,
+\quad
+g_y=\omega_y\,s_x\,c_y\,s_t
+}.
+\end{equation}
+%
+The nonzero Hessian components are
+%
+\begin{equation}
+\boxed{
+H_{xx}=-\omega_x^2\,q,
+\qquad
+H_{yy}=-\omega_y^2\,q,
+\qquad
+H_{xy}=H_{yx}=\omega_x\,\omega_y\,c_x\,c_y\,s_t
+}.
+\end{equation}
+%
+Moreover,
+%
+\begin{equation}
+\boxed{
+\Delta\, q=-(\omega_x^2+\omega_y^2)\,q,
+\qquad
+\ddot q=-\omega_t^2\,q
+}.
+\label{eq_qDeriv2D}
+\end{equation}
+
+\subsection{Deformation and strain tensors in 2D plane strain}
+
+The three-dimensional deformation gradient associated with the 2D field is
+%
+\begin{equation}
+\boxed{
+\textbf{F}=
+\begin{bmatrix}
+1+a_x\,g_x&a_x\,g_y&0\\
+a_y\,g_x&1+a_y\,g_y&0\\
+0&0&1
+\end{bmatrix}
+}.
+\label{eq_F2D}
+\end{equation}
+%
+Its determinant is
+%
+\begin{equation}
+\boxed{J=1+a_x\,g_x+a_y\,g_y}.
+\label{eq_J2D}
+\end{equation}
+%
+The inverse transpose is
+%
+\begin{equation}
+\boxed{
+\textbf{F}^{-\text{T}}=
+\begin{bmatrix}
+\dfrac{1+a_y\,g_y}{J}&-\dfrac{a_y\,g_x}{J}&0\\[1.3ex]
+-\dfrac{a_x\,g_y}{J}&\dfrac{1+a_x\,g_x}{J}&0\\[1.3ex]
+0&0&1
+\end{bmatrix}
+}.
+\label{eq_FinvT2D}
+\end{equation}
+%
+Define
+%
+\begin{equation}
+A=a_x^2+a_y^2,
+\qquad
+G=g_x^2+g_y^2.
+\end{equation}
+%
+The right Cauchy--Green tensor is
+%
+\begin{equation}
+\boxed{
+\textbf{C}=
+\begin{bmatrix}
+1+2\,a_x\,g_x+A\,g_x^2&a_y\,g_x+a_x\,g_y+A\,g_x\,g_y&0\\
+a_y\,g_x+a_x\,g_y+A\,g_x\,g_y&1+2\,a_y\,g_y+A\,g_y^2&0\\
+0&0&1
+\end{bmatrix}
+}.
+\label{eq_C2D}
+\end{equation}
+%
+The Green--Lagrange strain is
+%
+\begin{equation}
+\boxed{
+\textbf{E}=\dfrac12
+\begin{bmatrix}
+2\,a_x\,g_x+A\,g_x^2&a_y\,g_x+a_x\,g_y+A\,g_x\,g_y&0\\
+a_y\,g_x+a_x\,g_y+A\,g_x\,g_y&2\,a_y\,g_y+A\,g_y^2&0\\
+0&0&0
+\end{bmatrix}
+}.
+\label{eq_E2D}
+\end{equation}
+%
+The left Cauchy--Green tensor is
+%
+\begin{equation}
+\boxed{
+\textbf{B}=
+\begin{bmatrix}
+1+2\,a_x\,g_x+G\,a_x^2&a_x\,g_y+a_y\,g_x+G\,a_x\,a_y&0\\
+a_x\,g_y+a_y\,g_x+G\,a_x\,a_y&1+2\,a_y\,g_y+G\,a_y^2&0\\
+0&0&1
+\end{bmatrix}
+}.
+\label{eq_B2D}
+\end{equation}
+%
+The isochoric left Cauchy--Green tensor is simply
+%
+\begin{equation}
+\boxed{\overline{\textbf{B}}=J^{-2/3}\textbf{B}}.
+\end{equation}
+%
+The first invariant is
+%
+\begin{equation}
+\boxed{I_1=3+2\,(a_x\,g_x+a_y\,g_y)+A\,G}.
+\label{eq_I12D}
+\end{equation}
+%
+The inverse right Cauchy--Green tensor is
+%
+\begin{equation}
+\boxed{
+\textbf{C}^{-1}=
+\begin{bmatrix}
+D_{xx}&D_{xy}&0\\
+D_{xy}&D_{yy}&0\\
+0&0&1
+\end{bmatrix}
+},
+\end{equation}
+%
+where
+%
+\begin{eqnarray}
+D_{xx}&=&1-\dfrac{2\,a_x\,g_x}{J}+\dfrac{G\,a_x^2}{J^2},\\
+D_{yy}&=&1-\dfrac{2\,a_y\,g_y}{J}+\dfrac{G\,a_y^2}{J^2},\\
+D_{xy}&=&-\dfrac{a_x\,g_y+a_y\,g_x}{J}+\dfrac{G\,a_x\,a_y}{J^2}.
+\end{eqnarray}
+
+\subsection{Stress tensors in 2D}
+
+As before, with $I_1$ given by Eq.~\eqref{eq_I12D},
+%
+\begin{equation}
+m=\mu\,J^{-2/3},
+\qquad
+c=\dfrac{\kappa}{2}\,(J^2-1)-\dfrac{m\,I_1}{3},
+\qquad
+d=m+c,
+\qquad
+e=\dfrac{c}{J}.
+\end{equation}
+%
+The second Piola--Kirchhoff stress is
+%
+\begin{equation}
+\boxed{
+\textbf{S}=\begin{bmatrix}
+m+c\,D_{xx}&c\,D_{xy}&0\\
+c\,D_{xy}&m+c\,D_{yy}&0\\
+0&0&d
+\end{bmatrix}
+}.
+\label{eq_S2D}
+\end{equation}
+%
+The first Piola--Kirchhoff stress is
+%
+\begin{equation}
+\boxed{
+\textbf{P}=\begin{bmatrix}
+d+(m-e)\,a_x\,g_x&m\, a_x\,g_y-e\, g_x\,a_y&0\\
+m\, a_y\,g_x-e\, g_y\,a_x&d+(m-e)\,a_y\,g_y&0\\
+0&0&d
+\end{bmatrix}
+}.
+\label{eq_P2D}
+\end{equation}
+%
+The Kirchhoff stress is
+%
+\begin{equation}
+\boxed{
+\boldsymbol{\tau}=\begin{bmatrix}
+m\,B_{xx}+c&m\,B_{xy}&0\\
+m\,B_{xy}&m\,B_{yy}+c&0\\
+0&0&d
+\end{bmatrix}
+},
+\label{eq_tau2D}
+\end{equation}
+%
+where $B_{xx}$, $B_{xy}$ and $B_{yy}$ are the in-plane components of $\textbf{B}$ in Eq.~\eqref{eq_B2D}. The Cauchy stress is
+%
+\begin{equation}
+\boxed{
+\boldsymbol{\sigma}=\dfrac1J
+\begin{bmatrix}
+m\,B_{xx}+c&m\,B_{xy}&0\\
+m\,B_{xy}&m\,B_{yy}+c&0\\
+0&0&d
+\end{bmatrix}
+}.
+\label{eq_sigma2D}
+\end{equation}
+%
+The out-of-plane components $S_{zz}=P_{zz}=\tau_{zz}=d$ and $\sigma_{zz}=d/J$ are generally nonzero, but they do not depend on $z$ and therefore do not enter the in-plane momentum equations.
+
+
+\subsection{Exact body force in 2D}
+
+The vectors $\textbf{h}=\textbf{H}\textbf{a}$ and $\textbf{r}=\textbf{H}\textbf{g}$ have in-plane components
+%
+\begin{align}
+h_x&=H_{xx}\,a_x+H_{xy}\,a_y,
+&h_y&=H_{xy}\,a_x+H_{yy}\,a_y,
+\\
+r_x&=H_{xx}\,g_x+H_{xy}\,g_y,
+&r_y&=H_{xy}\,g_x+H_{yy}\,g_y.
+\end{align}
+%
+Then, for $i=x,y$, it is possible to obtain $(\bullet)_{,i}=\dfrac{\partial\,(\bullet)}{\partial\,i}$ as
+%
+\begin{eqnarray}
+(I_1)_{,i}&=&2\,h_i+2\,A\,r_i,
+\\
+m_{,i}&=&-\dfrac{2\,m}{3\,J}\,h_i,
+\\
+c_{,i}&=&\kappa \,J\,h_i-\dfrac{I_1}{3}\,m_{,i}
+-\dfrac{m}{3}\,(I_1)_{,i},
+\\
+d_{,i}&=&m_{,i}+c_{,i},
+\\
+e_{,i}&=&\dfrac{c_{,i}}{J}-\dfrac{c}{J^2}\,h_i.
+\end{eqnarray}
+%
+Define the two scalars
+%
+\begin{equation}
+\boxed{
+R_{2D}=m\,\Delta q+g_x\,m_{,x}+g_y\,m_{,y},
+\qquad
+T_{2D}=a_x\,e_{,x}+a_y\,e_{,y}
+}.
+\end{equation}
+%
+The exact body force per unit reference volume is then $\textbf{f}_0=[f_{0x},\,f_{0y},\,f_{0z}]^\text{T}$:
+%
+\begin{equation}
+\boxed{
+\begin{aligned}
+f_{0x}&=-\rho_0\,\omega_t^2\,a_x\,q-d_{,x}-a_x\,R_{2D}+g_x\,T_{2D}+e\,h_x,
+\\
+f_{0y}&=-\rho_0\,\omega_t^2\,a_y\,q-d_{,y}-a_y\,R_{2D}+g_y\,T_{2D}+e\,h_y,
+\\
+f_{0z}&=0
+\end{aligned}
+}.
+\label{eq_f2D}
+\end{equation}
+
+\subsection{Dirichlet boundary conditions in 2D}
+
+For
+%
+\begin{equation}
+\Omega=[0,L_x]\times[0,L_y],
+\end{equation}
+%
+the exact displacement is prescribed on every side:
+%
+\begin{align}
+\textbf{u}(0,y,t)&=\textbf{0},\\
+\textbf{u}(L_x,y,t)&=
+\begin{bmatrix}a_x\\a_y\end{bmatrix}
+\sin(\omega_x\,L_x)\sin(\omega_y\,y)\sin(\omega_t\,t),\\
+\textbf{u}(x,0,t)&=\textbf{0},\\
+\textbf{u}(x,L_y,t)&=
+\begin{bmatrix}a_x\\a_y\end{bmatrix}
+\sin(\omega_x\,x)\sin(\omega_y\,L_y)\sin(\omega_t\,t).
+\end{align}
+%
+If
+%
+\begin{equation}
+\omega_x=\dfrac{n_x\,\pi}{L_x},
+\qquad
+\omega_y=\dfrac{n_y\,\pi}{L_y},
+\qquad n_x,n_y\in\mathbb{N},
+\end{equation}
+%
+all boundary conditions are homogeneous Dirichlet conditions.
+
+\subsection{Initial conditions in 2D}
+
+Because $\sin(\omega_t t)=0$ at $t=0$,
+%
+\begin{equation}
+\boxed{\textbf{u}(x,y,0)=\textbf{0}}.
+\label{eq_u0_2D}
+\end{equation}
+%
+The initial velocity is nonzero:
+%
+\begin{equation}
+\boxed{
+\dot{\textbf{u}}(x,y,0)
+=\omega_t
+\begin{bmatrix}a_x\\a_y\end{bmatrix}
+\sin(\omega_x\,x)\sin(\omega_y\,y)
+}.
+\label{eq_v0_2D}
+\end{equation}
+%
+Also $\ddot{\textbf{u}}(x,y,0)=\textbf{0}$. At the initial instant
+%
+\begin{equation}
+\textbf{F}=\Id,
+\qquad J=1,
+\qquad \textbf{C}=\textbf{B}=\Id,
+\end{equation}
+%
+and the constitutive law is stress free:
+%
+\begin{equation}
+\boxed{
+\textbf{S}=\textbf{P}=\boldsymbol{\tau}=\boldsymbol{\sigma}=\textbf{0}
+\qquad (t=0)
+}.
+\end{equation}
+
+\section{Three-dimensional manufactured solution}
+
+\subsection{Displacement field and derivatives}
+
+Let
+%
+\begin{equation}
+q(x,y,z,t)=
+\sin(\omega_x\,x)\sin(\omega_y\,y)\sin(\omega_z\,z)\sin(\omega_t\,t),
+\end{equation}
+%
+and
+%
+\begin{equation}
+\boxed{
+\textbf{u}(x,y,z,t)=
+\begin{bmatrix}a_x\,q\\a_y\,q\\a_z\,q\end{bmatrix}
+}.
+\label{eq_u3D}
+\end{equation}
+%
+Define
+%
+\begin{equation}
+s_z=\sin(\omega_z\,z),\qquad c_z=\cos(\omega_z\,z),
+\end{equation}
+%
+with $s_x,c_x,s_y,c_y,s_t,c_t$ defined as before. Then
+%
+\begin{equation}
+\boxed{
+\textbf{g}=
+\begin{bmatrix}
+\omega_x\,c_x\,s_y\,s_z\,s_t\\
+\omega_y\,s_x\,c_y\,s_z\,s_t\\
+\omega_z\,s_x\,s_y\,c_z\,s_t
+\end{bmatrix}
+}.
+\label{eq_g3D}
+\end{equation}
+%
+The Hessian is
+%
+\begin{equation}
+\boxed{
+\textbf{H}=
+\begin{bmatrix}
+-\omega_x^2\,q&H_{xy}&H_{xz}\\
+H_{xy}&-\omega_y^2\,q&H_{yz}\\
+H_{xz}&H_{yz}&-\omega_z^2\,q
+\end{bmatrix}
+},
+\label{eq_H3D}
+\end{equation}
+%
+where
+%
+\begin{align}
+H_{xy}&=\omega_x\,\omega_y\,c_x\,c_y\,s_z\,s_t,\\
+H_{xz}&=\omega_x\,\omega_z\,c_x\,s_y\,c_z\,s_t,\\
+H_{yz}&=\omega_y\,\omega_z\,s_x\,c_y\,c_z\,s_t.
+\end{align}
+%
+Moreover,
+%
+\begin{equation}
+\boxed{
+\Delta\, q=-(\omega_x^2+\omega_y^2+\omega_z^2)\,q,
+\qquad
+\ddot q=-\omega_t^2\,q
+}.
+\label{eq_qDeriv3D}
+\end{equation}
+
+\subsection{Deformation and strain tensors in 3D}
+
+The deformation gradient is
+%
+\begin{equation}
+\boxed{
+\textbf{F}=\begin{bmatrix}
+1+a_x\,g_x&a_x\,g_y&a_x\,g_z\\
+a_y\,g_x&1+a_y\,g_y&a_y\,g_z\\
+a_z\,g_x&a_z\,g_y&1+a_z\,g_z
+\end{bmatrix}
+}.
+\label{eq_F3D}
+\end{equation}
+%
+Its Jacobian is
+%
+\begin{equation}
+\boxed{J=1+a_x\,g_x+a_y\,g_y+a_z\,g_z}.
+\label{eq_J3D}
+\end{equation}
+%
+The inverse transpose is
+%
+\begin{equation}
+\boxed{
+\textbf{F}^{-\text{T}}=\Id-
+\dfrac1J
+\begin{bmatrix}
+g_x\,a_x&g_x\,a_y&g_x\,a_z\\
+g_y\,a_x&g_y\,a_y&g_y\,a_z\\
+g_z\,a_x&g_z\,a_y&g_z\,a_z
+\end{bmatrix}
+}.
+\end{equation}
+%
+Define
+%
+\begin{equation}
+A=a_x^2+a_y^2+a_z^2,
+\qquad
+G=g_x^2+g_y^2+g_z^2.
+\end{equation}
+%
+The right Cauchy--Green tensor is
+%
+\begin{equation}
+\boxed{
+\textbf{C}=
+\begin{bmatrix}
+C_{xx}&C_{xy}&C_{xz}\\
+C_{xy}&C_{yy}&C_{yz}\\
+C_{xz}&C_{yz}&C_{zz}
+\end{bmatrix}
+},
+\end{equation}
+%
+where
+%
+\begin{align}
+C_{xx}&=1+2\,a_x\,g_x+A\,g_x^2,
+&C_{xy}&=a_y\,g_x+a_x\,g_y+A\,g_x\,g_y,
+\\
+C_{yy}&=1+2\,a_y\,g_y+A\,g_y^2,
+&C_{xz}&=a_z\,g_x+a_x\,g_z+A\,g_x\,g_z,
+\\
+C_{zz}&=1+2\,a_z\,g_z+A\,g_z^2,
+&C_{yz}&=a_z\,g_y+a_y\,g_z+A\,g_y\,g_z.
+\end{align}
+%
+The Green--Lagrange strain is
+%
+\begin{equation}
+\boxed{\textbf{E}=\dfrac12(\textbf{C}-\Id)}.
+\end{equation}
+%
+The left Cauchy--Green tensor is
+%
+\begin{equation}
+\boxed{
+\textbf{B}=
+\begin{bmatrix}
+B_{xx}&B_{xy}&B_{xz}\\
+B_{xy}&B_{yy}&B_{yz}\\
+B_{xz}&B_{yz}&B_{zz}
+\end{bmatrix}
+},
+\end{equation}
+%
+where
+%
+\begin{align}
+B_{xx}&=1+2\,a_x\,g_x+G\,a_x^2,
+&B_{xy}&=a_x\,g_y+a_y\,g_x+G\,a_x\,a_y,
+\\
+B_{yy}&=1+2\,a_y\,g_y+G\,a_y^2,
+&B_{xz}&=a_x\,g_z+a_z\,g_x+G\,a_x\,a_z,
+\\
+B_{zz}&=1+2\,a_z\,g_z+G\,a_z^2,
+&B_{yz}&=a_y\,g_z+a_z\,g_y+G\,a_y\,a_z.
+\end{align}
+%
+The isochoric tensor is
+%
+\begin{equation}
+\boxed{\overline{\textbf{B}}=J^{-2/3}\textbf{B}},
+\end{equation}
+%
+and the first invariant is
+%
+\begin{equation}
+\boxed{I_1=3+2\,(a_x\,g_x+a_y\,g_y+a_z\,g_z)+A\,G}.
+\end{equation}
+%
+The inverse right Cauchy--Green tensor is
+%
+\begin{equation}
+\boxed{
+\textbf{C}^{-1}=
+\begin{bmatrix}
+D_{xx}&D_{xy}&D_{xz}\\
+D_{xy}&D_{yy}&D_{yz}\\
+D_{xz}&D_{yz}&D_{zz}
+\end{bmatrix}
+},
+\end{equation}
+%
+with
+%
+\begin{align}
+D_{xx}&=1-\dfrac{2\,a_x\,g_x}{J}+\dfrac{G\,a_x^2}{J^2},
+&D_{xy}&=-\dfrac{a_x\,g_y+a_y\,g_x}{J}+\dfrac{G\,a_x\,a_y}{J^2},
+\\
+D_{yy}&=1-\dfrac{2\,a_y\,g_y}{J}+\dfrac{G\,a_y^2}{J^2},
+&D_{xz}&=-\dfrac{a_x\,g_z+a_z\,g_x}{J}+\dfrac{G\,a_x\,a_z}{J^2},
+\\
+D_{zz}&=1-\dfrac{2\,a_z\,g_z}{J}+\dfrac{G\,a_z^2}{J^2},
+&D_{yz}&=-\dfrac{a_y\,g_z+a_z\,g_y}{J}+\dfrac{G\,a_y\,a_z}{J^2}.
+\end{align}
+
+\subsection{Stress tensors in 3D}
+
+As before,
+%
+\begin{equation}
+m=\mu\,J^{-2/3},
+\qquad
+c=\dfrac{\kappa}{2}\,(J^2-1)-\dfrac{m\,I_1}{3},
+\qquad
+d=m+c,
+\qquad
+e=\dfrac{c}{J}.
+\end{equation}
+%
+The second Piola--Kirchhoff stress is
+%
+\begin{equation}
+\boxed{
+\textbf{S}=\begin{bmatrix}
+m+c\,D_{xx}&c\,D_{xy}&c\,D_{xz}\\
+c\,D_{xy}&m+c\,D_{yy}&c\,D_{yz}\\
+c\,D_{xz}&c\,D_{yz}&m+c\,D_{zz}
+\end{bmatrix}
+}.
+\label{eq_S3D}
+\end{equation}
+%
+The first Piola--Kirchhoff stress is
+%
+\begin{equation}
+\boxed{
+\textbf{P}=\begin{bmatrix}
+d+(m-e)\,a_x\,g_x&m\, a_x\,g_y-e\, g_x\,a_y&m\, a_x\,g_z-e\, g_x\,a_z\\
+m\, a_y\,g_x-e\, g_y\,a_x&d+(m-e)\,a_y\,g_y&m\, a_y\,g_z-e\, g_y\,a_z\\
+m\, a_z\,g_x-e\, g_z\,a_x&m\, a_z\,g_y-e\, g_z\,a_y&d+(m-e)\,a_z\,g_z
+\end{bmatrix}
+}.
+\label{eq_P3D}
+\end{equation}
+%
+The Kirchhoff stress is
+%
+\begin{equation}
+\boxed{
+\boldsymbol{\tau}=\begin{bmatrix}
+m\,B_{xx}+c&m\,B_{xy}&m\,B_{xz}\\
+m\,B_{xy}&m\,B_{yy}+c&m\,B_{yz}\\
+m\,B_{xz}&m\,B_{yz}&m\,B_{zz}+c
+\end{bmatrix}
+}.
+\label{eq_tau3D}
+\end{equation}
+%
+The Cauchy stress is
+%
+\begin{equation}
+\boxed{
+\boldsymbol{\sigma}=\dfrac1J
+\begin{bmatrix}
+m\,B_{xx}+c&m\,B_{xy}&m\,B_{xz}\\
+m\,B_{xy}&m\,B_{yy}+c&m\,B_{yz}\\
+m\,B_{xz}&m\,B_{yz}&m\,B_{zz}+c
+\end{bmatrix}
+}.
+\label{eq_sigma3D}
+\end{equation}
+
+\subsection{Exact body force in 3D}
+
+The vector $\textbf{h}=\textbf{H}\textbf{a}$ has components
+%
+\begin{align}
+h_x&=-\omega_x^2\,q\,a_x+H_{xy}\,a_y+H_{xz}\,a_z,\\
+h_y&=H_{xy}\,a_x-\omega_y^2\,q\,a_y+H_{yz}\,a_z,\\
+h_z&=H_{xz}\,a_x+H_{yz}\,a_y-\omega_z^2\,q\,a_z.
+\end{align}
+%
+The vector $\textbf{r}=\textbf{H}\textbf{g}$ has components
+%
+\begin{align}
+r_x&=-\omega_x^2\,q\,g_x+H_{xy}\,g_y+H_{xz}\,g_z,\\
+r_y&=H_{xy}\,g_x-\omega_y^2\,q\,g_y+H_{yz}\,g_z,\\
+r_z&=H_{xz}\,g_x+H_{yz}\,g_y-\omega_z^2\,q\,g_z.
+\end{align}
+%
+For $i=x,y,z$, it is possible to obtain $(\bullet)_{,i}=\dfrac{\partial\,(\bullet)}{\partial\,i}$ as
+%
+\begin{align}
+(I_1)_{,i}&=2\,h_i+2\,A\,r_i,
+\\
+m_{,i}&=-\dfrac{2\,m}{3\,J}\,h_i,
+\\
+c_{,i}&=\kappa\, J\,h_i-\dfrac{I_1}{3}\,m_{,i}
+-\dfrac{m}{3}\,(I_1)_{,i},
+\\
+d_{,i}&=m_{,i}+c_{,i},
+\\
+e_{,i}&=\dfrac{c_{,i}}{J}-\dfrac{c}{J^2}\,h_i.
+\end{align}
+%
+Define
+%
+\begin{equation}
+\boxed{
+R_{3D}=m\,\Delta q+g_x\,m_{,x}+g_y\,m_{,y}+g_z\,m_{,z}
+},
+\end{equation}
+%
+and
+%
+\begin{equation}
+\boxed{
+T_{3D}=a_x\,e_{,x}+a_y\,e_{,y}+a_z\,e_{,z}
+}.
+\end{equation}
+%
+Then the exact body-force vector is
+%
+\begin{equation}
+\boxed{
+\begin{aligned}
+f_{0x}&=-\rho_0\,\omega_t^2\,a_x\,q-d_{,x}-a_x\,R_{3D}+g_x\,T_{3D}+e\,h_x,
+\\
+f_{0y}&=-\rho_0\,\omega_t^2\,a_y\,q-d_{,y}-a_y\,R_{3D}+g_y\,T_{3D}+e\,h_y,
+\\
+f_{0z}&=-\rho_0\,\omega_t^2\,a_z\,q-d_{,z}-a_z\,R_{3D}+g_z\,T_{3D}+e\,h_z
+\end{aligned}
+}.
+\label{eq_f3D}
+\end{equation}
+
+
+\subsection{Dirichlet boundary conditions in 3D}
+
+For
+%
+\begin{equation}
+\Omega=[0,L_x]\times[0,L_y]\times[0,L_z],
+\end{equation}
+%
+$\textbf{u}=\textbf{u}^{\text{ex}}$ is imposed on all six faces:
+%
+\begin{align}
+\textbf{u}(0,y,z,t)&=\textbf{0},\\
+\textbf{u}(L_x,y,z,t)&=\textbf{a}\sin(\omega_x\,L_x)\sin(\omega_y\,y)
+\sin(\omega_z\,z)\sin(\omega_t\,t),\\
+\textbf{u}(x,0,z,t)&=\textbf{0},\\
+\textbf{u}(x,L_y,z,t)&=\textbf{a}\sin(\omega_x\,x)\sin(\omega_y\,L_y)
+\sin(\omega_z\,z)\sin(\omega_t\,t),\\
+\textbf{u}(x,y,0,t)&=\textbf{0},\\
+\textbf{u}(x,y,L_z,t)&=\textbf{a}\sin(\omega_x\,x)\sin(\omega_y\,y)
+\sin(\omega_z\,L_z)\sin(\omega_t\,t).
+\end{align}
+%
+If
+%
+\begin{equation}
+\omega_i=\dfrac{n_i\,\pi}{L_i},
+\qquad n_i\in\mathbb{N},
+\qquad i=x,y,z,
+\end{equation}
+%
+all six conditions are homogeneous Dirichlet conditions.
+
+\subsection{Initial conditions in 3D}
+
+The exact initial displacement is
+%
+\begin{equation}
+\boxed{\textbf{u}(x,y,z,0)=\textbf{0}}.
+\label{eq_u0_3D}
+\end{equation}
+%
+The initial velocity is
+%
+\begin{equation}
+\boxed{
+\dot{\textbf{u}}(x,y,z,0)
+=\omega_t\,\textbf{a}\,
+\sin(\omega_x\,x)\sin(\omega_y\,y)\sin(\omega_z\,z)
+}.
+\label{eq_v0_3D}
+\end{equation}
+%
+Also $\ddot{\textbf{u}}(x,y,z,0)=\textbf{0}$. Since $\textbf{g}=\textbf{0}$ at $t=0$,
+%
+\begin{equation}
+\textbf{F}=\Id,
+\qquad
+J=1,
+\qquad
+\textbf{C}=\textbf{B}=\Id,
+\end{equation}
+%
+and therefore
+%
+\begin{equation}
+\boxed{
+\textbf{S}=\textbf{P}=\boldsymbol{\tau}=\boldsymbol{\sigma}=\textbf{0}
+\qquad (t=0)
+}.
+\end{equation}
+
+\section{Implementation summary}
+
+For each point $\textbf{X}$ and time $t$, a direct implementation of the MMS can follow this sequence:
+\begin{enumerate}
+%
+\item Evaluate $q$, $\textbf{g}=\Grad_0 q$, $\textbf{H}=\Grad_0\textbf{g}$, $\Delta_0 q$, and $\ddot q$: Eqs.~\eqref{eq_u2D}--\eqref{eq_qDeriv2D} in 2D and Eqs.~\eqref{eq_u3D}--\eqref{eq_qDeriv3D} in 3D. In 2D, use the plane-strain embedding $a_z=g_z=0$ and keep all tensors $3\times3$.
+%
+\item Evaluate $\textbf{F}=\Id+\textbf{a}\otimes\textbf{g}$ and $J=1+\textbf{a}\cdot\textbf{g}$ from Eq.~\eqref{eq_FJcompact} and Eqs.~\eqref{eq_J2D} or~\eqref{eq_J3D}. Check that $J>0$.
+%
+\item Evaluate $A=\textbf{a}\cdot\textbf{a}$, $G=\textbf{g}\cdot\textbf{g}$, and $I_1=3+2\,\textbf{a}\cdot\textbf{g}+A\,G$ from Eq.~\eqref{eq_I1compact}. The constant is $3$ also in 2D (Eq.~\eqref{eq_I12D}), because $C_{zz}=1$.
+%
+\item Evaluate the scalars of Eqs.~\eqref{eq_mc} and~\eqref{eq_de},
+%
+$$
+m=\mu\,J^{-2/3},
+\qquad
+c=\dfrac{\kappa}{2}(J^2-1)-\dfrac{m\,I_1}{3},
+\qquad
+d=m+c,
+\qquad
+e=\dfrac{c}{J}.
+$$
+\item Construct the required stress measure with Eq.~\eqref{eq_stressesCompact},
+%
+$$
+\textbf{S}=m\,\Id+c\,\textbf{C}^{-1},\quad
+\textbf{P}=m\,\textbf{F}+c\,\textbf{F}^{-\text{T}},\quad
+\boldsymbol{\tau}=m\,\textbf{B}+c\,\Id,\quad
+\boldsymbol{\sigma}=J^{-1}\boldsymbol{\tau},
+$$
+%
+where $\textbf{F}^{-\text{T}}$, $\textbf{B}$ and $\textbf{C}^{-1}$ are given by Eqs.~\eqref{eq_FinvCompact}, \eqref{eq_Bcompact} and~\eqref{eq_CinvCompact}. Equivalently, $\textbf{P}=d\,\Id+m\,\textbf{a}\otimes\textbf{g}-e\,\textbf{g}\otimes\textbf{a}$ (Eq.~\eqref{eq_PcompactRankOne}). In components, see Eqs.~\eqref{eq_S2D}--\eqref{eq_sigma2D} in 2D and Eqs.~\eqref{eq_S3D}--\eqref{eq_sigma3D} in 3D.
+%
+\item Evaluate $\textbf{h}=\textbf{H}\textbf{a}=\Grad_0 J$, $\textbf{r}=\textbf{H}\textbf{g}$, and the scalar gradients $\Grad_0 m$, $\Grad_0 I_1$, $\Grad_0 c$, $\Grad_0 d$ and $\Grad_0 e$ from Eqs.~\eqref{eq_gradm}--\eqref{eq_gradde}.
+%
+\item Evaluate $\Grad_0\cdot\textbf{P}$ from Eq.~\eqref{eq_DivPCompact} and then $\textbf{f}_0$ from Eq.~\eqref{eq_fCompact}. In components, see Eq.~\eqref{eq_f2D} in 2D (where $f_{0z}=0$) and Eq.~\eqref{eq_f3D} in 3D.
+%
+\item Impose $\textbf{u}=\textbf{u}^{\text{ex}}$ on the complete boundary, Eq.~\eqref{eq_allDirichlet}, and use the exact initial displacement and velocity, Eqs.~\eqref{eq_u0_2D}--\eqref{eq_v0_2D} in 2D and Eqs.~\eqref{eq_u0_3D}--\eqref{eq_v0_3D} in 3D.
+%
+\end{enumerate}
+
+The body force in this report is per unit \emph{reference} volume. If a solver instead uses the spatial equation
+%
+\begin{equation}
+\rho\,\ddot{\textbf{u}}=\nabla_{\textbf{x}}\cdot\boldsymbol{\sigma}+\textbf{f},
+\end{equation}
+%
+then $\rho=\rho_0/J$ and the corresponding body force per unit current volume is
+%
+\begin{equation}
+\boxed{\textbf{f}=\dfrac{1}{J}\,\textbf{f}_0}.
+\end{equation}
+
+\end{document}
