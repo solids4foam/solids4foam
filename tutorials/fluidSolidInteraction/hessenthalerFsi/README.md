@@ -128,6 +128,10 @@ The case is expensive: the default 10 s of simulated time (5000 time steps)
 took 5.5 h on 24 cores for the coarse mesh and 11.4 h on 32 cores for the
 medium mesh. The regression test runs the first five time steps only.
 
+In parallel the solid uses block-Jacobi LU as checked in; the validation
+driver switches it to an exact parallel LU (MUMPS) so that the solid solve
+does not depend on the decomposition. Both converged for this case.
+
 ## Calibration
 
 The silicone keeps curing, so the shear modulus is calibrated to the measured
@@ -152,7 +156,7 @@ On the tutorial mesh, μ = 60.9 kPa reproduces the measured deflection, so the
 tutorial keeps the 61 kPa that Hessenthaler, Röhrle and Nordsletten [3]
 calibrated for their incompressible solid; it gives 29.48 mm. On the finest
 mesh the calibrated value is 62.8 kPa, so the tutorial mesh is about 3 % (0.6
-mm of tip deflection) too flexible. The neo-Hookean fit of the uniaxial test
+mm of tip deflection) too stiff. The neo-Hookean fit of the uniaxial test
 gives 96.9 kPa, 60 % stiffer, which gives a tip deflection of only 21.7 mm:
 the test does not represent the flap at the time of the experiment.
 

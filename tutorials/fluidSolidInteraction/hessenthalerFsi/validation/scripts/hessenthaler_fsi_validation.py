@@ -284,8 +284,11 @@ def set_subdomains(case: Path, cores: int, regions: tuple[str, ...]) -> None:
 def use_parallel_lu(fv_solution: Path) -> None:
     """Replace the block-Jacobi LU by an exact parallel LU (MUMPS).
 
-    Block Jacobi drops the coupling between subdomains, which the thin flap
-    does not tolerate: its Krylov solver then stalls.
+    Block Jacobi drops the coupling between subdomains, so its Krylov
+    iterations depend on the decomposition; it stalls for the high-order
+    solid of this thin flap, although the tutorial's updated Lagrangian solid
+    also converged with it on 24 ranks. The exact parallel LU makes the solid
+    solve independent of the decomposition.
     """
     text = fv_solution.read_text()
     text, found = re.subn(
@@ -535,6 +538,10 @@ def monitor_history(case: Path, name: str, end_time: float,
         fail(f"No '{name}' history in {case}")
     rows = []
     for path in candidates:
+        # A restart supersedes everything the earlier segments wrote after
+        # its start time
+        start = float(path.parent.name)
+        rows = [row for row in rows if row[0] <= start + 1e-12]
         rows.extend(numeric_rows(path))
     rows = last_per_time(rows)
     require_history(candidates[-1], rows, end_time, delta_t, 5)
@@ -865,7 +872,8 @@ def latest_time(case: Path, cores: int) -> str:
     return max(times, key=float)
 
 
-def sample_voxels(case: Path, cores: int, velocity: list[dict]) -> list[dict]:
+def sample_voxels(case: Path, cores: int, velocity: list[dict],
+                  end_time: float) -> list[dict]:
     """Average the computed velocity over every MRI voxel."""
     points = voxel_points(velocity)
     write_sampling_dict(case, points)
@@ -875,6 +883,9 @@ def sample_voxels(case: Path, cores: int, velocity: list[dict]) -> list[dict]:
         command = ["mpirun", "-np", str(cores)] + command + ["-parallel"]
     run(command, case, "log.sampleVoxels")
     time = latest_time(case, cores)
+    if not math.isclose(float(time), end_time, rel_tol=1e-9, abs_tol=1e-9):
+        fail(f"The latest field time of {case} is {time}, not the end "
+             f"time {end_time:g}")
     files = sorted(path for path in
                    (case / "postProcessing").rglob("voxels*U*")
                    if "sampleVoxels" in path.parts
@@ -1066,7 +1077,7 @@ def run_phase_i(args: argparse.Namespace, reference: dict) -> bool:
                        for z, y in line])
             row.update({f"centreline_{k}": v for k, v in
                         centreline_errors(line, measured_line).items()})
-            voxels = sample_voxels(case, cores, velocity)
+            voxels = sample_voxels(case, cores, velocity, end_time)
             write_csv(OUTPUT_ROOT / f"{name}_voxels.csv", voxels)
             row.update(velocity_errors(voxels, scale))
             tip_error = abs(row["tip_y_mm"] - tip_target)
