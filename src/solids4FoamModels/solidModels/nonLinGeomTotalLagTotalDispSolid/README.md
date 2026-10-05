@@ -33,7 +33,12 @@ total-displacement linear solver. It:
 - supports segregated implicit and PETSc SNES solution paths;
 - can also solve pressure when requested, but only through the PETSc SNES
   path;
-- uses the selected mechanical law to compute stress.
+- uses the selected mechanical law to compute stress;
+- adds `fvOptions` sources, for example a manufactured body force, to the
+  momentum equation of both solution paths on OpenFOAM.com. The source is per
+  unit reference volume. On OpenFOAM.org and foam-extend a derived model can
+  supply the same source through the protected `fvOptionsSource()` function,
+  as the `methodOfManufacturedSolution` tutorial does.
 
 The model is appropriate when deformation is large enough that linear geometry
 is not valid.
