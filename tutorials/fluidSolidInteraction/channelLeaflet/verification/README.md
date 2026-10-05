@@ -125,9 +125,8 @@ Default studies:
 - `time`: the tutorial at $$\Delta t = 0.01$$ and $$0.005\,\mathrm{s}$$; over
   the periodic state, $$t \ge 4\,\mathrm{s}$$, the two must agree to 2%.
 
-The comparison and time tolerances are set just above the measured scatter of
-the solids4foam periodic state (see "Recorded results"). They guard against
-regressions; they do not demonstrate convergence.
+The comparison and time tolerances are empirical regression thresholds, set
+just above the recorded results below; they do not demonstrate convergence.
 
 Optional studies, run only when named with `--study`; they have no acceptance
 criteria beyond completing, and do not currently complete:
@@ -171,20 +170,19 @@ $$\Delta t = 0.01\,\mathrm{s}$$, against oomph-lib at the same time step:
 
 "Whole run" includes the start-up transient, where the difference is
 largest, during the first large deflection. "Periodicity" is the largest
-change of the last period from the one before. The same case gives a
-periodic-state difference of 1.1% on macOS (PETSc 3.22) and 1.8% on Linux
-(PETSc 3.24): the solids4foam periodic state is reproducible only to about
-1-1.5%, a few times the FSI tolerance, and changes by up to 0.8% from one
-period to the next. Within that scatter, the difference from oomph-lib is the
-model difference of this discretisation of the finite-thickness leaflet, not
-a discretisation error that the study shows to converge: see below.
+change of the last period from the one before. The same case differs from
+oomph-lib by 1.1% on macOS (PETSc 3.22) and 1.8% on Linux (PETSc 3.24); the
+two histories were not compared directly. The difference from oomph-lib is a
+code-to-code discrepancy that includes the model difference of the
+finite-thickness leaflet; its numerical and modelling contributions have not
+been separated, and the study does not show it to converge: see below.
 
 ### Time step
 
 Halving the time step to $$0.005\,\mathrm{s}$$ changes the tip history by up
 to 1.4% over the periodic state, $$t \ge 4\,\mathrm{s}$$ (0.9% during the
-start-up), of the order of the run-to-run scatter above; the run takes
-4.5 hours. $$\Delta t = 0.02\,\mathrm{s}$$ and
+start-up), comparable with the period-to-period change of the solution; the
+run takes 4.5 hours. $$\Delta t = 0.02\,\mathrm{s}$$ and
 $$0.0025\,\mathrm{s}$$ fail in the solid Newton solve during the first large
 deflection, with every line search, trust-region Newton, a tighter Krylov
 tolerance and without the solid predictor, so no order of convergence is

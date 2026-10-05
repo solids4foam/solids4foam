@@ -40,17 +40,17 @@ ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
 solids4Foam::convertCaseFormat .
 
 # Create meshes
-solids4Foam::runApplication -s solid blockMesh -region solid
-solids4Foam::runApplication -s fluid blockMesh -region fluid
+solids4Foam::runApplication -s solid blockMesh -region solid || exit $?
+solids4Foam::runApplication -s fluid blockMesh -region fluid || exit $?
 
 # Run solver
-solids4Foam::runApplication solids4Foam
+solids4Foam::runApplication solids4Foam || exit $?
 
-# Create plots
+# Create plots; a failed plot does not fail the case
 if command -v gnuplot &> /dev/null
 then
     echo "Generating tip.pdf using gnuplot"
-    gnuplot tip.gnuplot &> /dev/null
+    gnuplot tip.gnuplot &> /dev/null || echo "gnuplot failed to plot tip.pdf"
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
