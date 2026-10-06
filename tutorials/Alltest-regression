@@ -129,6 +129,7 @@ REGRESSION_TESTS=(
     "solids/hyperelasticity/ratCarotid"
     "solids/hyperelasticity/cantileverVibration"
     "solids/hyperelasticity/cooksMembrane"
+    "solids/hyperelasticity/manufacturedSolution"
     "solids/hyperelasticity/compressedSpheres"
     "solids/hyperelasticity/twistingHemisphere"
     "solids/hyperelasticity/rubberSealing"

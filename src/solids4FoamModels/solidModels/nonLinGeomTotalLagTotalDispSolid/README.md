@@ -38,7 +38,7 @@ total-displacement linear solver. It:
   momentum equation of both solution paths on OpenFOAM.com. The source is per
   unit reference volume. On OpenFOAM.org and foam-extend a derived model can
   supply the same source through the protected `fvOptionsSource()` function,
-  as the `methodOfManufacturedSolution` tutorial does.
+  as the hyperelasticity `manufacturedSolution` tutorial does.
 
 The model is appropriate when deformation is large enough that linear geometry
 is not valid.

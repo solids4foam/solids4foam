@@ -170,8 +170,9 @@ The `rubberSealing` tutorial gives `E` and `nu` instead, with
 - [cantileverVibration](../../../../../tutorials/solids/hyperelasticity/cantileverVibration/README.md)
 - [compressedSpheres](../../../../../tutorials/solids/hyperelasticity/compressedSpheres/README.md)
 - [cooksMembrane](../../../../../tutorials/solids/hyperelasticity/cooksMembrane/README.md)
-- [methodOfManufacturedSolution](../../../../../tutorials/solids/hyperelasticity/methodOfManufacturedSolution/README.md),
-  which verifies the law's stress against a manufactured solution
+- [manufacturedSolution](../../../../../tutorials/solids/hyperelasticity/manufacturedSolution/README.md),
+  in `hyperelasticity`, which verifies the law's stress against a
+  manufactured solution
 - [rubberSealing](../../../../../tutorials/solids/hyperelasticity/rubberSealing/README.md)
 - [shallowIroning](../../../../../tutorials/solids/hyperelasticity/shallowIroning/README.md)
 - [twistingHemisphere](../../../../../tutorials/solids/hyperelasticity/twistingHemisphere/README.md),
