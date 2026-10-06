@@ -4,8 +4,7 @@ sort: 17
 
 # Method of Manufactured Solutions at Finite Strain: `manufacturedSolution`
 
-Prepared by Ivan Batistić, with the manufactured solution derived by Pablo
-Castrillo
+Prepared by Ivan Batistić,  Pablo Castrillo and Philip Cardiff
 
 ---
 
@@ -55,11 +54,8 @@ split used by the `neoHookeanElastic` law,
 $$
 \Psi = \frac{\mu}{2}\left(J^{-2/3} I_1 - 3\right)
 + \frac{\kappa}{4}\left(J^2 - 1 - 2\ln J\right).
-$$
-
-The derivation is given in
-[`docs/neoHookean_isoVol_dynamic_MMS_2D_3D.tex`](docs/neoHookean_isoVol_dynamic_MMS_2D_3D.tex).
 The tutorial-local library in `src/` implements the solution:
+$$
 
 - `neoHookeanManufacturedSolution`: the exact displacement, Cauchy stress,
   and body force;
