@@ -381,9 +381,9 @@ loadSteps
 }
 """
 
-# High-order total Lagrangian solid of the comparison: cubic residual, with
-# the linear high-order Jacobian as preconditioner (the compact Jacobian
-# stalls the Krylov solver for this thin flap)
+# High-order total Lagrangian solid of the comparison: cubic residual; the
+# Jacobian (compact or the linear high-order one) and the extra stencil cells
+# are set per run
 HIGH_ORDER_PROPERTIES = """
 solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
@@ -422,6 +422,28 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 """
 
 
+# Momentum stabilisation scale factor of the tutorial's solid
+TUTORIAL_STABILISATION = 0.01
+
+# Standard solid models of the calibration study; "tutorial" keeps the
+# tutorial's own
+SOLID_MODELS = {
+    "tutorial": None,
+    "ul": "nonLinearGeometryUpdatedLagrangian",
+    "tl": "nonLinearGeometryTotalLagrangianTotalDisplacement",
+}
+
+
+def set_displacement_field(directory: Path, name: str) -> None:
+    """Name the initial displacement field D (total) or DD (increment)."""
+    other = "DD" if name == "D" else "D"
+    if (directory / other).is_file():
+        text = (directory / other).read_text().replace(
+            f"object      {other};", f"object      {name};")
+        (directory / other).unlink()
+        (directory / name).write_text(text)
+
+
 def solid_case(name: str, spec: dict, end_time: float) -> Path:
     """Build a solid-only copy of the tutorial's solid region."""
     case = WORK_ROOT / name
@@ -453,18 +475,29 @@ def solid_case(name: str, spec: dict, end_time: float) -> Path:
     if spec["solid"] == "highOrder":
         text = solid_properties.read_text()
         header = text[:text.index("solidModel")]
-        solid_properties.write_text(header + HIGH_ORDER_PROPERTIES.lstrip())
-        displacement = case / "0" / "DD"
-        displacement.rename(case / "0" / "D")
-        replace_text(case / "0" / "D", "object      DD;", "object      D;")
+        body = HIGH_ORDER_PROPERTIES.replace(
+            "highOrderJacobian true;",
+            f"highOrderJacobian {'true' if spec.get('hoj') else 'false'};")
+        body = re.sub(r"faceStencilExtraCells\s+\d+;",
+                      f"faceStencilExtraCells {spec.get('extra', 65)};", body)
+        solid_properties.write_text(header + body.lstrip())
+        set_displacement_field(case / "0", "D")
         solution = case / "system" / "fvSolution"
-        # Accept an inexact linear solve rather than stopping: the linear
-        # high-order Jacobian loses accuracy as the flap rotates
+        # Accept an inexact linear solve rather than stopping: the Krylov
+        # solver does not always reach its tolerance for this thin flap
         replace_entry(solution, "ksp_max_it", '"200"')
         replace_text(solution, '            snes_monitor;\n',
                      '            snes_monitor;\n'
                      '            snes_max_linear_solve_fail "1000";\n')
     else:
+        text = solid_properties.read_text()
+        model = SOLID_MODELS[spec.get("model", "tutorial")]
+        if model:
+            text = re.sub(r"nonLinearGeometry(UpdatedLagrangian|"
+                          r"TotalLagrangianTotalDisplacement)\b", model, text)
+            set_displacement_field(
+                case / "0", "DD" if "Updated" in model else "D")
+        solid_properties.write_text(text)
         replace_entry(solid_properties, "scaleFactor", f"{spec['sf']:g}")
     replace_text(solid_properties, "    solutionAlgorithm PETScSNES;\n",
                  "    solutionAlgorithm PETScSNES;\n\n"
@@ -559,28 +592,33 @@ def calibration_runs(args: argparse.Namespace) -> list[dict]:
               (args.levels or ["coarse", "medium", "fine"])]
     if args.quick:
         meshes = meshes[:1]
-    runs = [{"solid": "standard", "mesh": m, "nu": 0.45, "sf": 0.05,
-             "cores": 1} for m in meshes]
+
+    def run(**changes) -> dict:
+        spec = {"solid": "standard", "model": "tutorial",
+                "mesh": SOLID_MESHES["medium"], "nu": 0.45,
+                "sf": TUTORIAL_STABILISATION, "cores": 1}
+        spec.update(changes)
+        return spec
+
+    runs = [run(mesh=m) for m in meshes]
     if args.quick:
         return runs
-    medium = SOLID_MESHES["medium"]
-    runs += [{"solid": "standard", "mesh": medium, "nu": 0.49, "sf": 0.05,
-              "cores": 1},
-             {"solid": "standard", "mesh": medium, "nu": 0.49, "sf": 0.01,
-              "cores": 1},
-             {"solid": "standard", "mesh": medium, "nu": 0.45, "sf": 0.01,
-              "cores": 1},
-             {"solid": "highOrder", "mesh": (6, 4, 33), "nu": 0.45, "sf": 0.1,
-              "cores": 1}]
+    runs += [run(sf=0.05), run(sf=0.001), run(nu=0.49),
+             run(model="ul", sf=0.05),
+             # Cubic high-order solid with the compact Jacobian and a larger
+             # least-squares stencil
+             run(solid="highOrder", mesh=(6, 4, 33), sf=0.1, extra=60)]
     cores = int(args.cores) if args.cores != "auto" else 8
     if cores > 1:
-        runs.append({"solid": "standard", "mesh": medium, "nu": 0.45,
-                     "sf": 0.05, "cores": cores})
+        runs.append(run(cores=cores))
     return runs
 
 
 def run_name(spec: dict) -> str:
-    return (f"calibration_{spec['solid']}_{'x'.join(map(str, spec['mesh']))}"
+    solid = spec["solid"] if spec["solid"] == "highOrder" else \
+        f"standard{spec['model'].upper() if spec['model'] != 'tutorial' else ''}"
+    extra = f"_x{spec['extra']}" if spec["solid"] == "highOrder" else ""
+    return (f"calibration_{solid}{extra}_{'x'.join(map(str, spec['mesh']))}"
             f"_nu{spec['nu']:g}_sf{spec['sf']:g}_np{spec['cores']}")
 
 
@@ -664,7 +702,8 @@ def run_calibration(args: argparse.Namespace, reference: dict) -> bool:
         curve.sort(key=lambda item: item[1])
         mu_cal = interpolate([(tip, mu) for mu, tip in curve], target)
         row = {
-            "solid": spec["solid"], "mesh": "x".join(map(str, spec["mesh"])),
+            "solid": run_name(spec).split("_")[1],
+            "mesh": "x".join(map(str, spec["mesh"])),
             "cells": math.prod(spec["mesh"]), "nu": spec["nu"],
             "stabilisation": spec["sf"], "ranks": spec["cores"],
             "mu_calibrated_Pa": mu_cal,
@@ -740,6 +779,7 @@ def plot_calibration(rows: list[dict], target: float, cheart: float) -> None:
         print("matplotlib is unavailable: skipping the calibration plot")
         return
     fig, ax = plt.subplots(figsize=(6.4, 4.2))
+    ax.set_prop_cycle(color=plt.cm.tab20.colors)
     for row in rows:
         mus = [MU_REFERENCE / load / 1e3 for load in LOAD_LEVELS]
         tips = [row[f"tip_mm_load{load:g}"] for load in LOAD_LEVELS]
