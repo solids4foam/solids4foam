@@ -377,16 +377,17 @@ def history_rows(case: Path, pattern: str) -> list[list[float]]:
 def checkmesh_metrics(log: Path) -> dict:
     text = log.read_text(errors="replace")
     metrics = {}
+    number = r"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)"
     patterns = {
         "cells": r"^\s*cells:\s+(\d+)",
         "faces": r"^\s*faces:\s+(\d+)",
         "points": r"^\s*points:\s+(\d+)",
-        "max_non_orthogonality_deg": r"Mesh non-orthogonality Max:\s*([0-9.eE+-]+)",
-        "mean_non_orthogonality_deg": r"Mesh non-orthogonality Max:\s*[0-9.eE+-]+\s+average:\s*([0-9.eE+-]+)",
-        "max_skewness": r"Max skewness\s*=\s*([0-9.eE+-]+)",
-        "max_aspect_ratio": r"Max aspect ratio\s*=\s*([0-9.eE+-]+)",
-        "total_volume_m3": r"Total volume\s*=\s*([0-9.eE+-]+)",
-        "min_volume_m3": r"Min volume\s*=\s*([0-9.eE+-]+)",
+        "max_non_orthogonality_deg": r"Mesh non-orthogonality Max:\s*" + number,
+        "mean_non_orthogonality_deg": r"Mesh non-orthogonality Max:\s*[0-9.eE+-]+\s+average:\s*" + number,
+        "max_skewness": r"Max skewness\s*=\s*" + number,
+        "max_aspect_ratio": r"Max aspect ratio\s*=\s*" + number,
+        "total_volume_m3": r"Total volume\s*=\s*" + number,
+        "min_volume_m3": r"Min volume\s*=\s*" + number,
     }
     for key, pattern in patterns.items():
         match = re.search(pattern, text, re.MULTILINE)
