@@ -638,17 +638,15 @@ def main() -> int:
         else:
             levels = select_levels(args, study_reference["default_time_steps"])
             runner = run_temporal_level
-        tet_or_perturbed = any(
-            study_reference["variants"][name]["mesh"] in {"tet", "distHex"}
-            for name in variant_names
-        )
-        if tet_or_perturbed:
-            extra = ["perturbMeshPoints"]
-            if any(study_reference["variants"][name]["mesh"] == "tet" for name in variant_names):
-                extra.extend(["gmsh", "gmshToFoam", "createPatch"])
-            missing = [command for command in extra if shutil.which(command) is None]
-            if missing:
-                raise SystemExit(f"required command(s) not found: {', '.join(missing)}")
+        meshes = {study_reference["variants"][name]["mesh"] for name in variant_names}
+        extra = []
+        if "distHex" in meshes:
+            extra.append("perturbMeshPoints")
+        if meshes & {"structTet", "unstructTet"}:
+            extra.extend(["gmsh", "gmshToFoam", "createPatch"])
+        missing = [command for command in extra if shutil.which(command) is None]
+        if missing:
+            raise SystemExit(f"required command(s) not found: {', '.join(missing)}")
 
         results: list[dict] = []
         for name in variant_names:

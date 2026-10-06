@@ -113,7 +113,8 @@ for the dynamic mode, the time scheme:
 ```bash
 ./Allrun steady segregated hex
 ./Allrun steady petscSnes distHex
-./Allrun steady petscSnes tet
+./Allrun steady petscSnes structTet
+./Allrun steady segregated unstructTet
 ./Allrun steady highOrder-movingLeastSquares
 ./Allrun steady highOrder-kExactLeastSquares
 ./Allrun dynamic
@@ -129,8 +130,10 @@ cell with the cell quadrature, the boundary condition evaluates the exact
 displacement at the face quadrature points, and, because `kExactLeastSquares`
 stores cell averages, its displacement error is measured against the cell
 average of the exact solution. The `distHex` mesh perturbs the hexahedral
-mesh with `perturbMeshPoints`, and the `tet` mesh requires Gmsh. The tutorial
-supports OpenFOAM.com, OpenFOAM.org, and foam-extend.
+mesh with `perturbMeshPoints`, and the `structTet` and `unstructTet`
+tetrahedral meshes require Gmsh; both read their cell size from
+`gmsh/meshSpacing.geo`. The tutorial supports OpenFOAM.com, OpenFOAM.org, and
+foam-extend.
 
 The error norms are printed in the solver log after each time step, for
 example, for the default steady run at the end of the ramp:
@@ -154,8 +157,8 @@ second-order discretisation.
 
 Mean L2 and L-infinity errors with respect to the exact solution at the end of
 the load ramp, and the net order of accuracy between the coarsest and the
-finest meshes. The structured tetrahedral meshes (`tet`) have six cells per
-hexahedron and the given numbers of cells per side:
+finest meshes. The structured tetrahedral meshes (`structTet`) have six cells
+per hexahedron and the given numbers of cells per side:
 
 | Mesh | Cells/side | D L2 [m] | D Linf [m] | sigma L2 [Pa] | sigma Linf [Pa] |
 | --- | --- | --- | --- | --- | --- |
@@ -169,10 +172,10 @@ hexahedron and the given numbers of cells per side:
 | distHex | 20 | 3.74e-4 | 1.30e-3 | 6.73e3 | 4.12e4 |
 | distHex | 40 | 9.09e-5 | 3.19e-4 | 2.76e3 | 2.38e4 |
 | distHex | net order | 2.00 | 1.76 | 1.31 | 0.64 |
-| tet | 5 | 8.20e-3 | 1.84e-2 | 4.77e4 | 1.14e5 |
-| tet | 10 | 1.65e-3 | 4.51e-3 | 1.53e4 | 5.83e4 |
-| tet | 20 | 3.89e-4 | 1.18e-3 | 6.30e3 | 2.73e4 |
-| tet | net order | 1.96 | 1.76 | 1.30 | 0.92 |
+| structTet | 5 | 8.20e-3 | 1.84e-2 | 4.77e4 | 1.14e5 |
+| structTet | 10 | 1.65e-3 | 4.51e-3 | 1.53e4 | 5.83e4 |
+| structTet | 20 | 3.89e-4 | 1.18e-3 | 6.30e3 | 2.73e4 |
+| structTet | net order | 1.96 | 1.76 | 1.30 | 0.92 |
 
 With the cubic high-order reconstructions, `movingLeastSquares` (MLS) and
 `kExactLeastSquares` (kExact), on the regular hexahedral meshes:

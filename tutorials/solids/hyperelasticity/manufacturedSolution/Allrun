@@ -17,11 +17,12 @@ approach:   segregated (default),
 
 mesh:       hex (default),
             distHex,
-            tet
+            structTet,
+            unstructTet
 
 timeScheme: backward (default),
             Euler,
-            NewmarkBeta
+            NewmarkBeta (dynamic mode only)
 USAGE
 }
 
@@ -45,7 +46,8 @@ case "$MODE" in
 esac
 
 case "$APPROACH" in
-    segregated|petscSnes|highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
+    segregated|petscSnes) ;;
+    highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
     *)
         echo "Error: unknown approach '$APPROACH'"
         usage
@@ -54,7 +56,7 @@ case "$APPROACH" in
 esac
 
 case "$MESH" in
-    hex|distHex|tet) ;;
+    hex|distHex|structTet|unstructTet) ;;
     *)
         echo "Error: unknown mesh '$MESH'"
         usage
@@ -129,15 +131,19 @@ case "$MESH" in
             solids4Foam::runApplication perturbMeshPoints
         fi
         ;;
-    tet)
+    structTet|unstructTet)
         if ! command -v gmsh >/dev/null 2>&1; then
             echo "Gmsh is required for the $MESH mesh"
             exit 1
         fi
+        GMSH_MESH=tet-structured
+        if [[ "$MESH" == "unstructTet" ]]; then
+            GMSH_MESH=tet-unstructured
+        fi
         mv 0 0.tmp
         # The cell size is set in gmsh/meshSpacing.geo
-        solids4Foam::runApplication gmsh -3 -format msh2 gmsh/tet-structured.geo
-        solids4Foam::runApplication gmshToFoam gmsh/tet-structured.msh
+        solids4Foam::runApplication gmsh -3 -format msh2 "gmsh/$GMSH_MESH.geo"
+        solids4Foam::runApplication gmshToFoam "gmsh/$GMSH_MESH.msh"
         solids4Foam::runApplication createPatch -overwrite
         mv 0.tmp 0
         ;;

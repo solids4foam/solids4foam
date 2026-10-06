@@ -20,6 +20,7 @@ sweep, and `--keep-going` to continue after a failed case. For example:
 ```bash
 ./Allverify --study spatial --variants hex-segregated,hex-petscSnes
 ./Allverify --study spatial --variants distHex-segregated --levels 5,10,20
+./Allverify --study spatial --variants structTet-segregated,unstructTet-segregated
 ./Allverify --study temporal --variants Euler-segregated,backward-segregated
 ./Allverify --study temporal --levels 10,20,40,80,160,320
 ```
@@ -37,7 +38,8 @@ exact solution are taken at the end of the load ramp from the mean L2 and
 L-infinity norms printed by the `neoHookeanManufacturedSolution` function
 object. The default variants combine the segregated and PETSc SNES solution
 procedures with the regular (`hex`) and distorted (`distHex`) hexahedral meshes.
-The structured tetrahedral (`tet`) variants are available explicitly and require
+The structured and unstructured tetrahedral (`structTet`, `unstructTet`)
+variants are available explicitly and require
 Gmsh. The PETSc SNES variants require a PETSc-enabled solids4foam build.
 
 The net order is measured from the coarsest and finest errors and the effective

@@ -6,6 +6,7 @@ IFS=$'\n\t'
 # coarse case in the steady and dynamic modes with the segregated and PETSc
 # SNES approaches and checks the final displacement and stress L2 errors
 # against the manufactured solution (tolerances from OpenFOAM.com v2412).
+# Dynamic case use default time scheme - backward.
 
 STEADY_DISP_TOL=1.5e-3
 STEADY_STRESS_TOL=1.8e4
