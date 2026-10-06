@@ -33,11 +33,12 @@ relaxationFactors
     equations
     {
     }
-    // Under-relaxing the D field speeds up convergence of this
-    // large-strain case
+    // The whole 20 % stretch is applied in one step, and the segregated
+    // iterations oscillate in the lateral contraction. With a D relaxation
+    // factor of 0.7 or more they diverge on x86-64.
     fields
     {
-        D       0.9;
+        D       0.5;
     }
 }
 
