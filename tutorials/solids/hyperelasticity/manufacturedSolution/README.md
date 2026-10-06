@@ -136,9 +136,14 @@ example, for the default steady run at the end of the ramp:
 
 ```text
 Writing DDifference field
-    Displacement error norms: mean L1, mean L2, LInf:
+    Displacement error norms: volume-weighted L1, L2, LInf:
     Magnitude: 0.00118961959573 0.00133089091585 0.00356930685812
 ```
+
+The cell displacement and stress norms are weighted by the cell volumes, so
+they are discrete spatial norms on the distorted and tetrahedral meshes as
+well; the point displacement norms are arithmetic means over the points. On
+the uniform hexahedral mesh the two coincide.
 
 ---
 
@@ -152,9 +157,9 @@ the segregated results are shown for the second-order discretisation.
 
 ### Spatial convergence (`steady` mode)
 
-Mean L2 and L-infinity errors with respect to the exact solution at the end of
-the load ramp, and the net order of accuracy between the coarsest and the
-finest meshes. The structured tetrahedral meshes (`structTet`) have six cells
+Volume-weighted L2 and L-infinity errors with respect to the exact solution at
+the end of the load ramp, and the net order of accuracy between the coarsest
+and the finest meshes. The structured tetrahedral meshes (`structTet`) have six cells
 per hexahedron and the given numbers of cells per side:
 
 | Mesh | Cells/side | D L2 [m] | D Linf [m] | sigma L2 [Pa] | sigma Linf [Pa] |
@@ -164,11 +169,11 @@ per hexahedron and the given numbers of cells per side:
 | hex | 20 | 3.15e-4 | 9.42e-4 | 5.41e3 | 3.39e4 |
 | hex | 40 | 7.30e-5 | 2.39e-4 | 1.85e3 | 1.68e4 |
 | hex | net order | 2.09 | 1.92 | 1.54 | 0.86 |
-| distHex | 5 | 5.87e-3 | 1.25e-2 | 4.25e4 | 9.07e4 |
-| distHex | 10 | 1.57e-3 | 4.76e-3 | 1.79e4 | 6.16e4 |
-| distHex | 20 | 3.74e-4 | 1.30e-3 | 6.73e3 | 4.12e4 |
-| distHex | 40 | 9.09e-5 | 3.19e-4 | 2.76e3 | 2.38e4 |
-| distHex | net order | 2.00 | 1.76 | 1.31 | 0.64 |
+| distHex | 5 | 5.90e-3 | 1.25e-2 | 4.23e4 | 9.07e4 |
+| distHex | 10 | 1.59e-3 | 4.76e-3 | 1.78e4 | 6.16e4 |
+| distHex | 20 | 3.77e-4 | 1.30e-3 | 6.64e3 | 4.12e4 |
+| distHex | 40 | 9.16e-5 | 3.19e-4 | 2.74e3 | 2.38e4 |
+| distHex | net order | 2.00 | 1.76 | 1.32 | 0.64 |
 | structTet | 5 | 8.20e-3 | 1.84e-2 | 4.77e4 | 1.14e5 |
 | structTet | 10 | 1.65e-3 | 4.51e-3 | 1.53e4 | 5.83e4 |
 | structTet | 20 | 3.89e-4 | 1.18e-3 | 6.30e3 | 2.73e4 |

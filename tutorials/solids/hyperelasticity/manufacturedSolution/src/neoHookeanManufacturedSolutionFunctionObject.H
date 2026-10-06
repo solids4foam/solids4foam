@@ -20,9 +20,11 @@ Class
 
 Description
     Compares the solid model fields with the neo-Hookean manufactured solution
-    at the current time. At every time step the mean L1, mean L2 and L-infinity
-    norms of the cell displacement error, the point displacement error and the
-    cell Cauchy stress error are written to the log. At write times the
+    at the current time. At every time step the L1, L2 and L-infinity norms of
+    the cell displacement error, the point displacement error and the cell
+    Cauchy stress error are written to the log. The cell norms are weighted by
+    the cell volumes, so that they are discrete spatial norms on any mesh; the
+    point norms are arithmetic means over the points. At write times the
     analytical fields and the difference fields are written:
 
         analyticalD, DDifference
@@ -83,9 +85,17 @@ class neoHookeanManufacturedSolutionFunctionObject
 
     // Private Member Functions
 
-        //- Write the error norms of a difference field to the log
+        //- Write the error norms of a difference field to the log: the
+        //  weighted L1 and L2 norms, with the given weights, and the
+        //  L-infinity norm
         template<class Type>
-        void writeNorms(const word& title, const Field<Type>& diff) const;
+        void writeNorms
+        (
+            const word& title,
+            const word& normsDescription,
+            const Field<Type>& diff,
+            const scalarField& weights
+        ) const;
 
         //- Calculate and write the errors
         bool writeData();

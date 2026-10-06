@@ -33,24 +33,28 @@ are written to the ignored `verification/postProcessing/` directory:
 
 ## Spatial study
 
-The case is run in the `steady` mode on 5, 10, 15, and 20 cells per
-coordinate direction by default, which keeps the full sweep of all variants
-to about an hour; finer levels can be requested with `--levels`, for example
-`--levels 5,10,20,40`. The displacement and stress errors with
-respect to the exact solution are taken at the end of the load ramp from the
-mean L2 and L-infinity norms printed by the `neoHookeanManufacturedSolution`
-function object. The default variants combine every solution approach,
-`segregated`, `petscSnes`, `highOrder-movingLeastSquares`, and
-`highOrder-kExactLeastSquares`, with every mesh type, the regular (`hex`) and
+The case is run in the `steady` mode on 5, 10, 15, and 20 cells per coordinate
+direction by default, which keeps the full sweep of all variants to about an
+hour; finer levels can be requested with `--levels`, for example `--levels
+5,10,20,40`. The displacement and stress errors with respect to the exact
+solution are taken at the end of the load ramp from the volume-weighted L2 and
+L-infinity norms printed by the `neoHookeanManufacturedSolution` function
+object, so that the measured orders do not depend on the cell size distribution
+of the distorted and tetrahedral meshes.
+
+The default variants, named `<mesh>-<approach>`, combine the `segregated` and
+`petscSnes` approaches with all four mesh types, the regular (`hex`) and
 distorted (`distHex`) hexahedral meshes and the structured (`structTet`) and
-unstructured (`unstructTet`) tetrahedral meshes, named `<mesh>-<approach>`.
-The tetrahedral meshes require Gmsh, and the PETSc SNES and high-order
-approaches require a PETSc-enabled solids4foam build. The structured
-tetrahedral meshes have six cells per hexahedron. The high-order approaches
-are not combined with the distorted hexahedral mesh: with the 30 % point
-perturbation of `perturbMeshPointsDict` the cubic reconstruction converges to
-a wrong solution, and the reconstructed deformation gradient can have a
-negative determinant at a face quadrature point, which stops the solver.
+unstructured (`unstructTet`) tetrahedral meshes, and the
+`highOrder-movingLeastSquares` and `highOrder-kExactLeastSquares` approaches
+with the `hex`, `structTet`, and `unstructTet` meshes. The tetrahedral meshes
+require Gmsh, and the PETSc SNES and high-order approaches require a
+PETSc-enabled solids4foam build. The structured tetrahedral meshes have six
+cells per hexahedron. The high-order approaches are not combined with the
+distorted hexahedral mesh: with the 30 % point perturbation of
+`perturbMeshPointsDict` the cubic reconstruction converges to a wrong solution,
+and the reconstructed deformation gradient can have a negative determinant at a
+face quadrature point, which stops the solver.
 
 The net order is measured from the coarsest and finest errors and the effective
 cell spacing. Each variant has `minimum_net_order` entries in the reference JSON
@@ -79,6 +83,8 @@ measured from the finest three levels meets the `minimum_order` entry of the
 variant, 0.8 for Euler and 1.5 for the second-order schemes. The errors with
 respect to the exact solution are reported alongside. The final displacement
 fields are written in ASCII with 12 significant digits for this comparison.
+The differences are root-mean-square values over the cells, which equal the
+volume-weighted norms on this uniform mesh.
 
 Each temporal variant sets the `timeFunction` in the dynamic parameters file of
 the copied case. The default variants use `cosineSquared`,

@@ -46,21 +46,27 @@ template<class Type>
 void Foam::neoHookeanManufacturedSolutionFunctionObject::writeNorms
 (
     const word& title,
-    const Field<Type>& diff
+    const word& normsDescription,
+    const Field<Type>& diff,
+    const scalarField& weights
 ) const
 {
-    Info<< "    " << title << " error norms: mean L1, mean L2, LInf: " << nl
-        << "    Magnitude: " << gAverage(mag(diff))
-        << " " << Foam::sqrt(gAverage(magSqr(diff)))
+    const scalar sumWeights = gSum(weights);
+
+    Info<< "    " << title << " error norms: " << normsDescription << ": " << nl
+        << "    Magnitude: " << gSum(weights*mag(diff))/sumWeights
+        << " " << Foam::sqrt(gSum(weights*magSqr(diff))/sumWeights)
         << " " << gMax(mag(diff))
         << endl;
 
     for (direction cmpt = 0; cmpt < pTraits<Type>::nComponents; cmpt++)
     {
+        const scalarField cmptDiff(diff.component(cmpt));
+
         Info<< "    " << cmpt << " "
-            << gAverage(mag(diff.component(cmpt)))
-            << " " << Foam::sqrt(gAverage(magSqr(diff.component(cmpt))))
-            << " " << gMax(mag(diff.component(cmpt)))
+            << gSum(weights*mag(cmptDiff))/sumWeights
+            << " " << Foam::sqrt(gSum(weights*magSqr(cmptDiff))/sumWeights)
+            << " " << gMax(mag(cmptDiff))
             << endl;
     }
 }
@@ -89,6 +95,14 @@ bool Foam::neoHookeanManufacturedSolutionFunctionObject::writeData()
 
     const scalar t = time_.value();
     const pointMesh& pMesh = pointMesh::New(mesh);
+
+    // Cell errors are measured with volume-weighted norms, so that the
+    // convergence orders do not depend on the cell size distribution; point
+    // errors have no natural volume and use arithmetic means
+    const word cellNorms("volume-weighted L1, L2, LInf");
+    const word pointNorms("arithmetic mean L1, L2, LInf");
+    const scalarField& cellVolumes = mesh.V();
+    const scalarField pointWeights(mesh.nPoints(), 1.0);
     const pointField& points = mesh.points();
     const volVectorField& C = mesh.C();
 
@@ -226,7 +240,7 @@ bool Foam::neoHookeanManufacturedSolutionFunctionObject::writeData()
 
         const volVectorField diff("DDifference", analyticalD - D);
         Info<< "Writing DDifference field" << endl;
-        writeNorms("Displacement", vectorField(diff));
+        writeNorms("Displacement", cellNorms, vectorField(diff), cellVolumes);
 
         if (writeTime)
         {
@@ -245,7 +259,10 @@ bool Foam::neoHookeanManufacturedSolutionFunctionObject::writeData()
             "pointDDifference", analyticalPointD - pointD
         );
         Info<< "Writing pointDDifference field" << endl;
-        writeNorms("Point displacement", vectorField(diff));
+        writeNorms
+        (
+            "Point displacement", pointNorms, vectorField(diff), pointWeights
+        );
 
         if (writeTime)
         {
@@ -264,7 +281,7 @@ bool Foam::neoHookeanManufacturedSolutionFunctionObject::writeData()
             "sigmaDifference", analyticalSigma - sigma
         );
         Info<< "Writing sigmaDifference field" << endl;
-        writeNorms("Stress", symmTensorField(diff));
+        writeNorms("Stress", cellNorms, symmTensorField(diff), cellVolumes);
 
         if (writeTime)
         {
