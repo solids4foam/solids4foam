@@ -25,8 +25,8 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 REG_END_TIME=0.01
 
 # Flap tip displacement components (m)
-REF_TIP_DY=-1.84381e-07
-REF_TIP_DZ=-2.35088e-08
+REF_TIP_DY=-1.86627e-07
+REF_TIP_DZ=-2.54964e-08
 TIP_TOL=2e-08
 
 ALLRUN_LOGFILE="log.Allrun"

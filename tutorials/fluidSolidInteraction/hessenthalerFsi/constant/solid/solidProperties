@@ -17,29 +17,28 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Updated Lagrangian form: the flap rotates by up to about 35 degrees, and
-// the compact Jacobian assembled on the current configuration remains a good
-// preconditioner for such rotations, unlike the total Lagrangian forms
+// Total Lagrangian form with the standard (second-order) discretisation
 // (see README.md)
-solidModel     nonLinearGeometryUpdatedLagrangian;
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-nonLinearGeometryUpdatedLagrangianCoeffs
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     // Solution algorithm
     solutionAlgorithm PETScSNES;
 
-    // Predictor DD at the start of a new time step using U and A
+    // Predictor D at the start of a new time step using U and A
     predictor yes;
 
-    // A small stabilisation: the default scaleFactor 0.5 stiffens the
-    // bending of the thin flap, as the stabilisation scales with the
-    // (nearly incompressible) bulk modulus
+    // A small stabilisation: the stabilisation scales with the (nearly
+    // incompressible) bulk modulus, so the default scaleFactor stiffens the
+    // bending of the thin flap; 0.01 changes the calibrated shear modulus by
+    // 4 % against 0.001 (see README.md)
     stabilisation
     {
         momentum
         {
             type        diffStencilLaplacian;
-            scaleFactor 0.05;
+            scaleFactor 0.01;
         }
     }
 }

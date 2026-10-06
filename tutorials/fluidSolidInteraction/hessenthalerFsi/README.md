@@ -79,11 +79,12 @@ the flow near the flap.
 
 ### Solid
 
-The flap is a neo-Hookean solid (`neoHookeanElastic`), solved with the updated
-Lagrangian form (`nonLinearGeometryUpdatedLagrangian`) and PETSc SNES. The
-shear modulus is calibrated to the zero-flow deflection, as recommended in
-[1], because the silicone keeps curing (see [Calibration](#calibration)). The
-solid is compressible with ν = 0.45; see the calibration for the effect of ν.
+The flap is a neo-Hookean solid (`neoHookeanElastic`), solved with the total
+Lagrangian form (`nonLinearGeometryTotalLagrangianTotalDisplacement`), the
+standard second-order discretisation and PETSc SNES, with a momentum
+stabilisation scale factor of 0.01. The shear modulus is calibrated to the
+zero-flow deflection, as recommended in [1], because the silicone keeps curing
+(see [Calibration](#calibration)): μ = 58.45 kPa with ν = 0.45.
 
 ### Coupling
 
@@ -125,12 +126,14 @@ The case requires PETSc, `cartesianMesh` (cfMesh, part of OpenFOAM.com) and
 ```
 
 The case is expensive: the default 10 s of simulated time (5000 time steps)
-took 5.5 h on 24 cores for the coarse mesh and 11.4 h on 32 cores for the
-medium mesh. The regression test runs only the first five time steps.
+took 4.7 h on 24 cores for the coarse mesh and 5.8 h on 32 cores for the
+medium mesh, on MeluXina CPU nodes. The regression test runs only the first
+five time steps.
 
 In parallel, the solid uses block-Jacobi LU as checked in; the validation
 driver switches it to an exact parallel LU (MUMPS) so that the solid solve
-does not depend on the decomposition. Both converged for this case.
+does not depend on the decomposition. Block-Jacobi LU, MUMPS and hypre
+BoomerAMG all converged for this case and gave the same deflections.
 
 ## Calibration
 
@@ -138,82 +141,123 @@ The silicone keeps curing, so the shear modulus is calibrated to the measured
 zero-flow tip deflection of 29.50 mm, as recommended in [1]. The calibration
 study (`validation/Allvalidate --study calibration`) relaxes the flap alone,
 under its net buoyancy, to its static deflection at three buoyancy levels,
-which maps the static tip deflection against μ.
+which maps the static tip deflection against μ. The ν = 0.45 results are:
 
-| Solid | Mesh | ν | Calibrated μ (kPa) | Tip at 61 kPa (mm) |
-| --- | --- | --- | --- | --- |
-| standard, updated Lagrangian | 6 x 4 x 33 | 0.45 | below 51 | 25.72 |
-| standard, updated Lagrangian | 12 x 8 x 65 (tutorial) | 0.45 | 60.9 | 29.48 |
-| standard, updated Lagrangian | 18 x 12 x 98 | 0.45 | 62.8 | 30.08 |
-| standard, updated Lagrangian | 12 x 8 x 65 | 0.49 | 57.4 | 28.33 |
-| high-order, total Lagrangian | 6 x 4 x 33 | 0.45 | 61.7 | 29.72 |
+| Solid | Mesh | Stabilisation | Calibrated μ (kPa) |
+| --- | --- | --- | --- |
+| standard, total Lagrangian | 6 x 4 x 33 | 0.01 | below 51 |
+| standard, total Lagrangian | 12 x 8 x 65 (tutorial) | 0.01 | 58.4 |
+| standard, total Lagrangian | 18 x 12 x 98 | 0.01 | 61.7 |
+| standard, total Lagrangian | 12 x 8 x 65 | 0.05 | 51.6 |
+| standard, total Lagrangian | 12 x 8 x 65 | 0.001 | 60.9 |
+| standard, updated Lagrangian | 12 x 8 x 65 | 0.05 | 60.9 |
+| standard, updated Lagrangian | 18 x 12 x 98 | 0.01 | 62.7 |
+| high-order, compact Jacobian | 6 x 4 x 33 | 0.1 | 62.0 |
+| high-order, compact Jacobian | 12 x 8 x 65 | 0.1 | 62.8 |
+| high-order, compact Jacobian | Gmsh tetrahedra, 1 mm | 0.1 | 63.6 |
 
 ![Calibration](images/calibration_tip_vs_mu.png)
 
 **Figure 1: Static zero-flow tip position against the shear modulus.**
 
-On the tutorial mesh, μ = 60.9 kPa reproduces the measured deflection, so the
-tutorial keeps the 61 kPa that Hessenthaler, Röhrle and Nordsletten [3]
-calibrated for their incompressible solid; it gives 29.48 mm. On the finest
-mesh the calibrated value is 62.8 kPa, so the tutorial mesh is about 3 % (0.6
-mm of tip deflection) too stiff. The neo-Hookean fit of the uniaxial test
-gives 96.9 kPa, 60 % stiffer, which gives a tip deflection of only 21.7 mm:
-The test does not represent the flap at the time of the experiment.
+The calibrated μ converges to about 62–63 kPa with the mesh for every solid,
+close to the 61 kPa that Hessenthaler, Röhrle and Nordsletten [3] calibrated
+for their incompressible solid. The tutorial calibrates μ for its own solid
+model and mesh, 58.45 kPa, so that the zero-flow deflection is reproduced; on
+the tutorial mesh 61 kPa would give 28.6 mm. The neo-Hookean fit of the
+uniaxial test gives 96.9 kPa, 60 % stiffer, which gives a tip deflection of
+only about 21 mm: The test does not represent the flap at the time of the
+experiment.
 
-ν = 0.49 needs a 6 % smaller μ (57.4 kPa) for the same deflection. The
-tutorial uses ν = 0.45: with ν = 0.49 the compact Jacobian preconditioner of
-the solid is much weaker, and the coupled run on 24 ranks failed in its first
-time step. The stabilisation scale factor (0.05 against 0.01) changes the
-calibrated μ by 0.4 %. A parallel calibration run on 8 ranks gives the same
-tip deflections as the serial run to five digits.
+The standard solid is stiffer in bending on coarse meshes, and more so the
+larger the momentum stabilisation, because the stabilisation scales with the
+nearly incompressible bulk modulus; the total Lagrangian form is more
+sensitive to it than the updated Lagrangian one. The tutorial uses 0.01,
+which is within 4 % of 0.001 on its mesh.
+
+ν = 0.49 makes the flap stiffer on this mesh (the tip reaches only 25.9 mm at
+58 kPa, against 29.6 mm with ν = 0.45), needs about twice the Krylov
+iterations, and its coupled run failed in the first time step with the
+updated Lagrangian solid; the tutorial uses ν = 0.45.
+
+Parallel calibration runs on 8 ranks, with block-Jacobi LU, MUMPS and hypre,
+give the serial tip deflections to five digits.
 
 ### Choice of solid solver
 
-The cubic high-order solid is the most accurate per cell: on the coarse
-6 x 4 x 33 mesh it calibrates to 61.7 kPa, against 62.8 kPa for the finest
-standard mesh. It is not used in the coupled case:
+The coupled case and the calibration are time-dependent, and in that setting
+all three solids completed the calibration (times are from xenosim with
+several runs at once, so they are only roughly comparable):
 
-- With the compact Jacobian as preconditioner, its Krylov solver stalls in
-  the first Newton iteration for this thin flap, on hexahedral and Gmsh
-  tetrahedral meshes, for polynomial orders 1 to 3 and ν from 0.3 to 0.49.
-  In a time-dependent run, the inertia term lets it converge, but with
-  hundreds of Krylov iterations per Newton iteration: a time step of the solid
-  alone costs about 20 times more than with the standard solid.
-- The linear high-order Jacobian (`highOrderJacobian true`) converges, but it
-  is assembled once for the undeformed flap and is not updated as the flap
-  rotates; beyond about 15 mm of tip deflection the linear solves stop
-  converging, and the calibration accepts inexact linear solves to finish.
-- In parallel, the block-Jacobi preconditioner fails on four ranks; on two
-  ranks, and with MUMPS on four, the high-order solid gives the serial answer
-  to seven digits, at several times the serial cost. No wrong parallel answer
-  (issue #509) was seen for this case.
+| Solid (6240 hexahedra unless noted) | Newton/step | Krylov/Newton | Time/step |
+| --- | --- | --- | --- |
+| standard, total Lagrangian, LU | 2.2 | 118 | 3.8 s |
+| standard, total Lagrangian, hypre | 1.8 | 274 | 3.8 s |
+| standard, total Lagrangian, 8 ranks, hypre | 1.8 | 257 | 0.8 s |
+| standard, total Lagrangian, 8 ranks, block-Jacobi LU | 1.9 | 708 | 1.6 s |
+| standard, total Lagrangian, 8 ranks, MUMPS | 2.2 | 116 | 2.1 s |
+| standard, total Lagrangian, 792 hexahedra | 2.1 | 104 | 0.3 s |
+| high-order, compact Jacobian, 792 hexahedra | 2.3 | 123 | 3.2–4.6 s |
+| high-order, compact Jacobian, 6240 hexahedra | 2.3 | 109 | 34 s |
+| high-order, compact Jacobian, 8350 tetrahedra | 2.4 | 90 | 22 s |
 
-The standard total Lagrangian solid has the same preconditioner problem. The
-updated Lagrangian standard solid assembles its compact Jacobian on the
-current configuration, which follows the rotation, and converges in every
-time step of every run, in serial and in parallel. On Gmsh tetrahedral meshes
-it inverted cells at about 5 mm of deflection, so the flap uses hexahedra.
+- **Total Lagrangian standard solid.** It converged in every step of every
+  calibration run, with every preconditioner, in serial and in parallel. The
+  failures reported earlier for it came from steady-state (static) solves,
+  where neither standard nor high-order solids converge for this thin flap:
+  without the inertia term the compact Jacobian is a poor preconditioner and
+  the Krylov solver stalls. In the coupled case it is about 25 % cheaper per
+  time step than the updated Lagrangian solid on the same cores.
+- **High-order solid with the compact Jacobian.** The cubic least-squares
+  stencil size is set by `faceStencilExtraCells`. With 40, 50 or 60 extra
+  cells, the time-dependent calibration converges on the coarse hexahedral
+  mesh, but 10–15 % of the linear solves stop at the 200-iteration limit and
+  are accepted as inexact Newton steps; larger stencils did not remove this.
+  On the 12 x 8 x 65 hexahedral mesh and on 1 mm Gmsh tetrahedra, 40 and 50
+  extra cells stopped in the first time step and 60 converged, with 35–60 %
+  of the linear solves inexact; on 1.5 mm tetrahedra all three stopped in the
+  first time step. A static solve still stalls with 40 or 60. The high-order
+  solid is the most accurate per cell, but costs 10–15 times more per cell
+  than the standard solid.
+- **Coupled high-order runs.** On the coarse fluid mesh with the 6 x 4 x 33
+  high-order flap and 60 extra cells, 8 ranks with MUMPS ran to 10 s with no
+  failed linear solve (3.0 Newton iterations and 81 Krylov iterations per
+  solid solve) and passed the validation: tip 16.46 mm, centreline RMS
+  difference 0.25 mm, d̄ = 0.050. Block-Jacobi LU on 8 ranks gave the same
+  result (tip 16.48 mm) at 25 % more cost; MUMPS cost 6.5 s per time step,
+  as much as the updated Lagrangian solid on the same 8 ranks. A Gmsh
+  tetrahedral flap (1 mm) was stable to 3.3 s, at 25 s per time step. The
+  parallel failure of issue #509 was not seen for this case.
+- **Updated Lagrangian standard solid.** It also converged everywhere and
+  gave the same Phase I results (see below), but it is less well tested and
+  more expensive. On Gmsh tetrahedra it inverted cells at about 5 mm of
+  deflection.
 
 ## Phase I results
 
 The buoyancy and the inflow are ramped in together over 0.5 s from the
-straight flap, as in [3]. The flap rises to about 18.9 mm at 0.9 s and then
-settles to a steady deflection within about 2 s, with a residual fluctuation
-of the tip of about ±0.07 mm. Because the zero-flow deflection of 29.5 mm is
-never reached, the fluid mesh deforms much less than if the buoyancy were
-applied first: the maximum non-orthogonality of the coarse mesh grows from
-39° to 64° at 1 s and is 58° at 10 s.
+straight flap, as in [3]. The flap rises to about 18.5 mm at about 1 s and
+then settles to a steady deflection within about 2 s, with a residual
+fluctuation of the tip of about ±0.1 mm. Because the zero-flow deflection of
+29.5 mm is never reached, the fluid mesh deforms much less than if the
+buoyancy were applied first: the maximum non-orthogonality of the coarse mesh
+grows from 39° to 64° at 1 s and is 58° at 10 s.
 
 | Quantity | Experiment | Coarse | Medium |
 | --- | --- | --- | --- |
-| tip y (mm) | 16.41 | 16.55 | 16.45 |
-| centreline RMS difference (mm) | | 0.25 | 0.20 |
-| centreline maximum difference (mm) | | 0.58 | 0.48 |
-| velocity d̄ (/630 mm/s) | | 0.050 | 0.050 |
-| velocity d∞ (/630 mm/s) | | 0.33 | 0.31 |
-| RMS difference of vz (mm/s) | | 48.7 | 48.3 |
-| FSI iterations per time step, mean (max) | | 3.2 (12) | 3.2 (12) |
-| wall time, ranks | | 5.5 h, 24 | 11.4 h, 32 |
+| tip y (mm) | 16.41 | 16.54 | 16.66 |
+| centreline RMS difference (mm) | | 0.23 | 0.28 |
+| centreline maximum difference (mm) | | 0.59 | 0.62 |
+| velocity d̄ (/630 mm/s) | | 0.050 | 0.048 |
+| velocity d∞ (/630 mm/s) | | 0.34 | 0.32 |
+| RMS difference of vz (mm/s) | | 48.6 | 47.6 |
+| FSI iterations per time step, mean (max) | | 3.2 (12) | 3.3 (12) |
+| wall time, ranks | | 4.7 h, 24 | 5.8 h, 32 |
+
+The other solids give the same picture on the coarse mesh: the updated
+Lagrangian solid (μ = 61 kPa) gives a tip of 16.55 mm (16.45 mm on the medium
+mesh), and the high-order solid 16.46 mm, all with a centreline RMS
+difference of about 0.25 mm and d̄ = 0.050.
 
 ![Centreline](images/phaseI_centreline.png)
 
@@ -221,10 +265,9 @@ applied first: the maximum non-orthogonality of the coarse mesh grows from
 positions of CHeart [3] and the computed upper surface of Lozovskiy et al.
 [4] lowered by 1 mm, both read from the published figures.**
 
-The computed centreline lies within 0.6 mm of the measurement everywhere,
-less than the MRI voxel of 0.977 mm, and the tip is within 0.15 mm. For
-comparison, the
-CHeart inf-sup stable scheme [3] gives a tip about 0.5 mm above the
+The computed centreline lies within 0.62 mm of the measurement everywhere,
+less than the MRI voxel of 0.977 mm, and the tip is within 0.25 mm. For
+comparison, the CHeart inf-sup stable scheme [3] gives a tip about 0.5 mm above the
 measurement and its cG(1)cG(1) scheme about 0.8 mm below; Lozovskiy et al.
 [4] are about 2.5 mm below, with a coarse mesh, a short outlet and their own
 solid parameters.

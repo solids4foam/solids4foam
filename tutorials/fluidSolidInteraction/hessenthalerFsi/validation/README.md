@@ -49,13 +49,16 @@ The static deflection of a neo-Hookean solid with a fixed Poisson's ratio
 depends only on ρg/μ, so load factor f at 61 kPa is the static state at
 μ = 61/f kPa. Interpolation to 29.50 mm gives the calibrated μ.
 
-With ν = 0.45 and the tutorial's updated Lagrangian solid, the calibrated μ
-is 60.9 kPa on the tutorial mesh (12 x 8 x 65) and 62.8 kPa on the finest
-mesh (18 x 12 x 98); the coarse mesh (6 x 4 x 33) does not reach 29.50 mm
-within the tested range. ν = 0.49 gives 57.4 kPa on the tutorial mesh. The
-cubic high-order solid gives 61.7 kPa on the coarse mesh. The 8-rank run
-reproduces the serial run. The results and their discussion are in the
-tutorial README.
+The study runs the tutorial's total Lagrangian solid (stabilisation 0.01)
+on three meshes, the tutorial mesh with stabilisation 0.05 and 0.001 and with
+ν = 0.49, the updated Lagrangian solid, the cubic high-order solid with the
+compact Jacobian and `faceStencilExtraCells 60` on the coarse mesh, and an
+8-rank run. With ν = 0.45 the calibrated μ is 58.4 kPa on the tutorial mesh
+(12 x 8 x 65) and 61.7 kPa on the finest mesh (18 x 12 x 98); the coarse mesh
+(6 x 4 x 33) does not reach 29.50 mm within the tested range. The updated
+Lagrangian solid gives 60.9 kPa and the high-order solid 62.0 kPa. The
+8-rank run reproduces the serial run. The results and their discussion are
+in the tutorial README.
 
 ## Phase I study
 
@@ -77,10 +80,11 @@ A run passes if the tip is within 1 mm of the measured 16.41 mm, the
 centreline RMS difference is below 1 mm, and the tip moves by less than
 0.1 mm over the last tenth of the run.
 
-Both fluid meshes pass: the tip is at 16.55 mm (coarse) and 16.45 mm
-(medium) against the measured 16.41 mm, the centreline RMS difference is
-0.25 and 0.20 mm, and d̄ = 0.050 and d∞ = 0.33 and 0.31. See the tutorial
-README for the figures.
+Both fluid meshes pass with the tutorial's total Lagrangian solid: the tip
+is at 16.54 mm (coarse) and 16.66 mm (medium) against the measured 16.41 mm,
+the centreline RMS difference is 0.23 and 0.28 mm, and d̄ = 0.050 and 0.048
+and d∞ = 0.34 and 0.32. See the tutorial README for the figures and the other
+solids.
 
 ## Reference data and quality
 
