@@ -49,19 +49,53 @@ def prepare_case(factor: int, cores: int, traction: float) -> Path:
     verify.refine_mesh(case / "system/blockMeshDict", factor)
     verify.replace_entry(case / "system/decomposeParDict", "numberOfSubdomains", str(cores))
 
+    mesh = case / "system/blockMeshDict"
+    text = mesh.read_text()
+    old_interface = """wall interface
+    (
+        (3 0 4 7)
+        (2 3 7 6)
+        (1 2 6 5)
+        (4 5 6 7)
+    )"""
+    split_interface = """wall loaded
+    (
+        (3 0 4 7)
+    )
+    wall free
+    (
+        (2 3 7 6)
+        (1 2 6 5)
+        (4 5 6 7)
+    )"""
+    if old_interface not in text:
+        raise RuntimeError("could not split the solid interface patch")
+    mesh.write_text(text.replace(old_interface, split_interface))
+
     physics = case / "constant/physicsProperties"
     text = physics.read_text().replace("type    fluidSolidInteraction;", "type    solid;")
     physics.write_text(text)
 
     displacement = case / "0/D"
     text = displacement.read_text()
-    text = re.sub(
-        r"(interface\s*\{.*?traction\s+uniform\s*)\([^)]*\)",
-        rf"\g<1>({traction:.12g} 0 0)",
-        text,
-        count=1,
-        flags=re.DOTALL,
-    )
+    interface_match = re.search(r"interface\s*\{.*?\n\s*\}", text, re.DOTALL)
+    if not interface_match:
+        raise RuntimeError("could not find the solid interface boundary condition")
+    loaded_and_free = f"""loaded
+    {{
+        type            solidTraction;
+        traction        uniform ({traction:.12g} 0 0);
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }}
+    free
+    {{
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressure        uniform 0;
+        value           uniform (0 0 0);
+    }}"""
+    text = text[:interface_match.start()] + loaded_and_free + text[interface_match.end():]
     displacement.write_text(text)
 
     schemes = case / "system/fvSchemes"
@@ -133,6 +167,16 @@ def main() -> int:
     parser.add_argument("--traction", type=float, default=100.0)
     args = parser.parse_args()
     factors = [int(value) for value in args.levels.split(",")]
+    # Slender Euler--Bernoulli comparison for a full-width 0.4 m cantilever
+    # under the same uniform pressure on its upstream 0.1 x 0.4 m face.  This
+    # is diagnostic only: the actual solve is three-dimensional and includes
+    # Poisson/end effects.
+    y, length, young, second_moment = 0.15, 0.2, 1.4e6, 0.4 * 0.1**3 / 12
+    line_load = args.traction * 0.4
+    analytical_ux = (
+        line_load * y**2 * (6 * length**2 - 4 * length * y + y**2)
+        / (24 * young * second_moment)
+    )
     rows = []
     for level, factor in enumerate(factors):
         case = prepare_case(factor, args.cores, args.traction)
@@ -161,6 +205,7 @@ def main() -> int:
                 "ux_A": displacement[0],
                 "uy_A": displacement[1],
                 "uz_A": displacement[2],
+                "euler_bernoulli_ux_A": analytical_ux,
             }
         )
     for index, row in enumerate(rows):
