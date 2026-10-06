@@ -71,6 +71,8 @@ read_csv = vmod.read_csv
 write_csv = vmod.write_csv
 replace_entry = vmod.replace_entry
 replace_text = vmod.replace_text
+# The verification runs keep their own settings file, which vmod.reusable reads
+vmod.SETTINGS_FILE = SETTINGS_FILE
 
 # ---------------------------------------------------------------------------
 # Fixed model parameters of the verification problem
@@ -83,7 +85,7 @@ MU_VERIFICATION = 62800.0
 NU = 0.45
 STABILISATION = 0.01
 DELTA_T = 0.002
-END_TIME = 10.0
+END_TIME = 15.0
 # Fraction of the run at its end over which quantities are time-averaged,
 # and the preceding window of the same length used for the drift test
 WINDOW_FRACTION = 0.2
@@ -127,8 +129,14 @@ PROBES = (
     (0.0, 0.010, 0.030), (0.0, 0.0, 0.080),
 )
 
-# Undeformed z (mm) at which the centreline is compared between levels
-CENTRELINE_Z = [2.5 * j for j in range(1, 27)]
+# Undeformed (material) z (mm) of the centreline monitors: every 1 mm, which
+# are exact mesh nodes of S2-S4 (S1 uses its nearest nodes, 1.97 mm apart)
+CENTRELINE_Z = [float(j) for j in range(1, 66)]
+# Material stations at which displacements are compared between levels;
+# exact nodes of S2-S4, interpolated linearly between the S1 nodes
+COMPARE_Z = [5.0 * j for j in range(1, 14)]
+# Time between the fixed-voxel velocity samples of the averaging window (s)
+VOXEL_SAMPLE_INTERVAL = 0.1
 
 
 def fluid_scale(level: str) -> float:
@@ -167,7 +175,7 @@ def write_mesh_dict(case: Path, level: str) -> Path:
 
 
 def centreline_nodes(nz: int) -> list[float]:
-    """Undeformed z (mm) of the mesh nodes nearest to every 2.5 mm.
+    """Undeformed z (mm) of the mesh nodes nearest to every 1 mm.
 
     solidPointDisplacement reports the displacement of the closest mesh
     point, so the monitors are placed exactly on nodes, and their true
@@ -196,6 +204,55 @@ def write_centreline_monitors(case: Path, nz: int) -> list[float]:
                     "mesh nodes, written by the verification driver\n"
                     + "\n".join(blocks))
     return nodes
+
+
+def voxel_history(avg_start: float, end_time: float, delta_t: float) -> str:
+    """Fixed-point velocity samples on the MRI voxels during the window.
+
+    The fluid mesh moves, so the cell-based fieldAverage mean is not the time
+    average at the fixed MRI voxels; these samples are, after averaging.
+    """
+    velocity = read_csv(vmod.REFERENCE_DIR / "phaseI_velocity.csv")
+    points = "\n".join(f"                ({p[0]:.8g} {p[1]:.8g} {p[2]:.8g})"
+                       for _, p in vmod.voxel_points(velocity))
+    # At least ten samples in the window
+    interval = min(VOXEL_SAMPLE_INTERVAL, (end_time - avg_start) / 10)
+    every = max(1, round(interval / delta_t))
+    return f"""FoamFile
+{{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      voxelHistory;
+}}
+
+// Velocity at the sub-sampling points of every MRI voxel, every
+// {every*delta_t:g} s of the averaging window (verification driver)
+voxelHistory
+{{
+    type            sets;
+    libs            (sampling);
+    region          fluid;
+    interpolationScheme cellPoint;
+    setFormat       raw;
+    fields          (U);
+    timeStart       {avg_start:.10g};
+    writeControl    timeStep;
+    writeInterval   {every};
+    sets
+    {{
+        voxels
+        {{
+            type    cloud;
+            axis    xyz;
+            points
+            (
+{points}
+            );
+        }}
+    }}
+}}
+"""
 
 
 def verification_monitors(avg_start: float) -> str:
@@ -269,6 +326,8 @@ fluidAverage
     libs            (fieldFunctionObjects);
     region          fluid;
     timeStart       {avg_start:.10g};
+    // Write the means with the fields only
+    writeControl    writeTime;
     restartOnRestart false;
     restartOnOutput false;
     fields
@@ -351,27 +410,96 @@ def set_material(mechanical: Path, mu: float, nu: float) -> None:
 
 def window_stats(rows: list[list[float]], column: int, start: float,
                  end: float) -> dict[str, float]:
-    values = [r[column] for r in rows if start - 1e-9 < r[0] <= end + 1e-9]
+    """Statistics of one column over the half-open window (start, end].
+
+    The histories have a constant time step, so the plain mean is the time
+    average.
+    """
+    values = [r[column] for r in rows if start + 1e-9 < r[0] <= end + 1e-9]
     if not values:
-        fail(f"No samples in the window [{start:g}, {end:g}]")
+        fail(f"No samples in the window ({start:g}, {end:g}]")
     mean = sum(values) / len(values)
     return {"mean": mean, "min": min(values), "max": max(values),
             "std": math.sqrt(sum((v - mean) ** 2 for v in values)
-                             / len(values))}
+                             / len(values)), "samples": len(values)}
 
 
-def history_rows(case: Path, pattern: str) -> list[list[float]]:
-    """Rows of a postProcessing history, restart segments merged."""
-    candidates = sorted(case.glob(pattern),
-                        key=lambda path: float(path.parent.name))
+def history_rows(case: Path, name: str, filename: str, end_time: float,
+                 delta_t: float, columns: int) -> list[list[float]]:
+    """A complete postProcessing history of function object 'name'.
+
+    Region function objects write to postProcessing/<region>/<name>/<t0>/ or
+    postProcessing/<name>/<region>/<t0>/; restart segments are merged, and
+    the history must cover every time step to the end time.
+    """
+    candidates = [path for path in case.glob(f"postProcessing/**/{filename}")
+                  if name in path.parts]
+    candidates.sort(key=lambda path: float(path.parent.name))
     if not candidates:
-        fail(f"No history matching {pattern} in {case}")
+        fail(f"No '{name}' history ({filename}) in {case}")
     rows: list[list[float]] = []
     for path in candidates:
         start = float(path.parent.name)
         rows = [row for row in rows if row[0] <= start + 1e-12]
         rows.extend(numeric_rows(path))
-    return last_per_time(rows)
+    rows = last_per_time(rows)
+    vmod.require_history(candidates[-1], rows, end_time, delta_t, columns)
+    return rows
+
+
+def settling_estimate(rows: list[list[float]], column: int, end_time: float,
+                      scale: float = 1.0) -> dict:
+    """Steady value of a decaying oscillation and its residual transient.
+
+    The history is smoothed by a moving average over one oscillation period
+    (estimated from the mean crossings of the last 40 % of the run), and the
+    smoothed signal is fitted with a + b*exp(-t/tau) over the second half of
+    the run (and, for sensitivity, over its last 40 % and 30 %). 'a' is the
+    estimated steady value; its distance from the final-window mean is the
+    estimated residual transient error of that mean.
+    """
+    data = [(r[0], scale * r[column]) for r in rows]
+    tail = [(t, y) for t, y in data if t > 0.6 * end_time]
+    mean = sum(y for _, y in tail) / len(tail)
+    crossings = [t for (t0, y0), (t, y) in zip(tail, tail[1:])
+                 if (y0 - mean) * (y - mean) < 0]
+    period = (2 * (crossings[-1] - crossings[0]) / (len(crossings) - 1)
+              if len(crossings) > 3 else 0.5)
+    delta_t = data[1][0] - data[0][0]
+    width = max(1, round(period / delta_t))
+    smoothed, total = [], 0.0
+    for i, (t, y) in enumerate(data):
+        total += y
+        if i >= width:
+            total -= data[i - width][1]
+        if i >= width - 1:
+            smoothed.append((t - 0.5 * (width - 1) * delta_t, total / width))
+    out = {"period_s": period}
+    for start_fraction in (0.5, 0.6, 0.7):
+        part = [(t, y) for t, y in smoothed if t >= start_fraction * end_time]
+        best = None
+        for k in range(200):
+            tau = 0.2 * 1.04 ** k
+            xs = [math.exp(-(t - end_time) / tau) for t, _ in part]
+            n = len(part)
+            sx, sy = sum(xs), sum(y for _, y in part)
+            sxx = sum(x * x for x in xs)
+            sxy = sum(x * y for x, (_, y) in zip(xs, part))
+            det = n * sxx - sx * sx
+            if abs(det) < 1e-300:
+                continue
+            b = (n * sxy - sx * sy) / det
+            a = (sy - b * sx) / n
+            sse = sum((a + b * x - y) ** 2 for x, (_, y) in zip(xs, part))
+            if best is None or sse < best[0]:
+                best = (sse, a, b, tau)
+        _, a, b, tau = best
+        out[f"steady_fit{start_fraction:g}"] = a
+        out[f"tau_fit{start_fraction:g}_s"] = tau
+    fits = [out[f"steady_fit{f:g}"] for f in (0.5, 0.6, 0.7)]
+    out["steady_estimate"] = fits[0]
+    out["steady_fit_spread"] = max(fits) - min(fits)
+    return out
 
 
 def checkmesh_metrics(log: Path) -> dict:
@@ -415,6 +543,8 @@ def patch_faces(boundary: Path, patch: str) -> int:
 # the plateaus span 48.8-66.3 kPa.
 SOLID_LOADS = (0.92, 1.0, 1.1, 1.25)
 SOLID_PLATEAU = 2.0
+# Largest tip movement (mm) over the last 0.25 s of a settled plateau
+SETTLED_DRIFT_MM = 0.005
 MU_REFERENCE = 61000.0
 
 
@@ -550,6 +680,7 @@ def run_solid(args: argparse.Namespace) -> bool:
             future.result()
 
     rows = []
+    passed = True
     for spec in specs:
         name = solid_run_name(spec["level"], spec["sf"], spec["cores"])
         case = WORK_ROOT / name
@@ -577,6 +708,11 @@ def run_solid(args: argparse.Namespace) -> bool:
             row[f"tip_mm_load{load:g}"] = tip
             row[f"tip_mm_mu{MU_REFERENCE / load / 1e3:.2f}kPa"] = tip
         row.update(solid_interpolation(points, target, MU_VERIFICATION))
+        # Accept a run only if every plateau has settled well below the
+        # calibration resolution and the target lies within the plateaus
+        row["accepted"] = (row["max_plateau_drift_mm"] < SETTLED_DRIFT_MM
+                           and not row["cal_extrapolated_quadratic"])
+        passed &= row["accepted"]
         rows.append(row)
         print(f"  {name}: mu_cal = {row['mu_cal_Pa']:.6g} Pa, tip at "
               f"{MU_VERIFICATION / 1e3:g} kPa = "
@@ -595,7 +731,7 @@ def run_solid(args: argparse.Namespace) -> bool:
                   key=lambda r: (r["stabilisation"], r["cells"]))
     path.write_text(json.dumps(rows, indent=2) + "\n")
     write_csv(OUTPUT_ROOT / "solid_study.csv", fmt_rows(rows))
-    return True
+    return passed
 
 
 def fmt_rows(rows: list[dict]) -> list[dict]:
@@ -613,7 +749,7 @@ def fmt_rows(rows: list[dict]) -> list[dict]:
 DEFAULT_SPEC = {
     "fluid": "F1", "solid": "S2", "mu": MU_VERIFICATION, "sf": STABILISATION,
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
-    "fluidtol": "default",
+    "fluidtol": "default", "pimple": 1.0,
 }
 
 
@@ -652,6 +788,8 @@ def spec_name(spec: dict) -> str:
         name += f"_{spec['coupling']}"
     if spec["fluidtol"] != "default":
         name += f"_fluid{spec['fluidtol']}"
+    if spec["pimple"] != 1:
+        name += f"_pimple{spec['pimple']:g}"
     return name
 
 
@@ -731,10 +869,13 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     replace_text(control, '    #include "flapCentreline"\n',
                  '    #include "flapCentreline"\n\n'
                  '    // Monitors of the verification study\n'
-                 '    #include "verificationMonitors"\n')
+                 '    #include "verificationMonitors"\n'
+                 '    #include "voxelHistory"\n')
     avg_start = end_time * (1.0 - WINDOW_FRACTION)
     (case / "system" / "verificationMonitors").write_text(
         verification_monitors(avg_start))
+    (case / "system" / "voxelHistory").write_text(
+        voxel_history(avg_start, end_time, delta_t))
 
     # Coupling
     fsi = case / "constant" / "fsiProperties"
@@ -772,10 +913,15 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
                            r"\g<1>0;", text, flags=re.DOTALL)
         text, n3 = re.subn(r'("U\|UFinal"\s*\{[^}]*?tolerance\s+)[^;]+;',
                            r"\g<1>1e-11;", text, flags=re.DOTALL)
-        text, n4 = re.subn(r"(nOuterCorrectors\s+)\d+;", r"\g<1>3;", text)
+        text, n4 = re.subn(r'("cellMotionU\|cellMotionUFinal"\s*\{[^}]*?'
+                           r'tolerance\s+)[^;]+;', r"\g<1>1e-11;", text,
+                           flags=re.DOTALL)
         if (n1, n2, n3, n4) != (1, 1, 1, 1):
             fail(f"Could not tighten the fluid tolerances in {solution}")
         solution.write_text(text)
+    if spec["pimple"] != 1:
+        solution = case / "system" / "fluid" / "fvSolution"
+        replace_entry(solution, "nOuterCorrectors", f"{int(spec['pimple'])}")
 
     # Decomposition and the solid's parallel linear solver
     vmod.set_subdomains(case, cores, ("", "fluid", "solid"))
@@ -852,54 +998,114 @@ def run_meshes(args: argparse.Namespace) -> bool:
     return True
 
 
-def sample_fields(case: Path, cores: int, velocity: list[dict],
-                  time_name: str, fields: tuple[str, ...]) -> dict:
-    """Voxel averages of each field (as in the validation driver)."""
-    points = vmod.voxel_points(velocity)
-    dictionary = vmod.write_sampling_dict(case, points)
-    text = dictionary.read_text().replace("fields          (U);",
-                                          f"fields          ({' '.join(fields)});")
-    dictionary.write_text(text)
-    command = mpirun(cores, ["postProcess", "-region", "fluid", "-dict",
-                             "system/sampleVoxels", "-time", time_name])
-    run(command, case, "log.sampleVoxels")
+def read_set_samples(path: Path, values: int) -> dict[tuple, list[float]]:
+    """Samples of a raw cloud set, keyed by the point on a 10 um grid."""
+    lookup = {}
+    for row in numeric_rows(path):
+        if len(row) != 3 + values:
+            fail(f"{path}: expected {3 + values} columns, found {len(row)}")
+        lookup[tuple(round(v * 1.0e5) for v in row[:3])] = row[3:]
+    return lookup
+
+
+def voxel_average(velocity: list[dict], points: list[tuple],
+                  lookups: list[dict]) -> list[dict]:
+    """Average samples over each voxel's points and over the sample times.
+
+    A voxel is compared only if at least half of its points lie in the
+    computed fluid (at every sample time).
+    """
     per_voxel = math.prod(vmod.VOXEL_SAMPLES)
-    result = {}
-    for field in fields:
-        files = sorted(path for path in
-                       (case / "postProcessing").rglob(f"voxels*{field}*")
-                       if "sampleVoxels" in path.parts
-                       and path.parent.name == time_name
-                       and re.search(rf"_{field}(\.|_|$)|voxels_{field}",
-                                     path.name))
-        files = [f for f in files if (field == "U" and "UMean" not in f.name)
-                 or field != "U"]
-        if not files:
-            fail(f"No voxel samples of {field} in {case}")
-        samples = numeric_rows(files[0])
-
-        def key(point) -> tuple:
-            return tuple(round(v * 1.0e5) for v in point)
-
-        lookup = {key(row[:3]): row[3:6] for row in samples}
-        sums = [[0.0, 0.0, 0.0, 0] for _ in velocity]
+    sums = [[0.0, 0.0, 0.0, 0] for _ in velocity]
+    counts = [0] * len(velocity)
+    for lookup in lookups:
+        found = [0] * len(velocity)
         for index, point in points:
-            value = lookup.get(key(point))
+            value = lookup.get(tuple(round(v * 1.0e5) for v in point))
             if value is not None:
                 for d in range(3):
                     sums[index][d] += value[d]
                 sums[index][3] += 1
-        voxels = []
-        for row, total in zip(velocity, sums):
-            entry = dict(row)
-            entry["fluid_fraction"] = total[3] / per_voxel
-            for d, comp in enumerate(("vx", "vy", "vz")):
-                entry[f"{comp}_sim_mm_s"] = (
-                    1.0e3 * total[d] / total[3]
-                    if total[3] >= 0.5 * per_voxel else None)
-            voxels.append(entry)
-        result[field] = voxels
-    return result
+                found[index] += 1
+        for index, n in enumerate(found):
+            if n >= 0.5 * per_voxel:
+                counts[index] += 1
+    voxels = []
+    for row, total, count in zip(velocity, sums, counts):
+        entry = dict(row)
+        entry["fluid_fraction"] = total[3] / (per_voxel * len(lookups))
+        valid = count == len(lookups) and total[3] > 0
+        for d, comp in enumerate(("vx", "vy", "vz")):
+            entry[f"{comp}_sim_mm_s"] = (1.0e3 * total[d] / total[3]
+                                         if valid else None)
+        voxels.append(entry)
+    return voxels
+
+
+def sample_field_at_voxels(case: Path, cores: int, velocity: list[dict],
+                           time_name: str, field: str) -> list[dict]:
+    """Voxel averages of one volVectorField at one written time."""
+    points = vmod.voxel_points(velocity)
+    function = f"sampleVoxels{field}"
+    lines = "\n".join(f"                ({p[0]:.8g} {p[1]:.8g} {p[2]:.8g})"
+                      for _, p in points)
+    (case / "system" / function).write_text(f"""FoamFile
+{{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      {function};
+}}
+
+functions
+{{
+    {function}
+    {{
+        type            sets;
+        libs            (sampling);
+        region          fluid;
+        interpolationScheme cellPoint;
+        setFormat       raw;
+        fields          ({field});
+        sets
+        {{
+            voxels
+            {{
+                type    cloud;
+                axis    xyz;
+                points
+                (
+{lines}
+                );
+            }}
+        }}
+    }}
+}}
+""")
+    command = mpirun(cores, ["postProcess", "-region", "fluid", "-dict",
+                             f"system/{function}", "-fields", f"({field})",
+                             "-time", time_name])
+    run(command, case, f"log.{function}")
+    files = [path for path in case.glob(f"postProcessing/**/voxels_{field}.xy")
+             if function in path.parts and path.parent.name == time_name]
+    if len(files) != 1:
+        fail(f"Expected one voxel sample file of {field} in {case}, "
+             f"found {len(files)}")
+    return voxel_average(velocity, points, [read_set_samples(files[0], 3)])
+
+
+def voxel_history_average(case: Path, velocity: list[dict], start: float,
+                          end: float) -> tuple[list[dict], int]:
+    """Time average of the fixed-voxel velocity samples in (start, end]."""
+    points = vmod.voxel_points(velocity)
+    files = [path for path in case.glob("postProcessing/**/voxels_U.xy")
+             if "voxelHistory" in path.parts
+             and start + 1e-9 < float(path.parent.name) <= end + 1e-9]
+    if len(files) < 5:
+        fail(f"Only {len(files)} fixed-voxel velocity samples in the window "
+             f"of {case}")
+    lookups = [read_set_samples(path, 3) for path in sorted(files)]
+    return voxel_average(velocity, points, lookups), len(files)
 
 
 def jet_peaks(voxels: list[dict]) -> dict:
@@ -907,25 +1113,24 @@ def jet_peaks(voxels: list[dict]) -> dict:
     peaks = {}
     for plane in (10.0, 30.0):
         for jet, sign in (("upper", 1), ("lower", -1)):
-            values = [(v["vz_sim_mm_s"], v) for v in voxels
+            values = [v["vz_sim_mm_s"] for v in voxels
                       if abs(v["z_mm"] - plane) < 1e-6
                       and sign * v["y_mm"] > 0
                       and v["vz_sim_mm_s"] is not None]
             if values:
-                best = max(values, key=lambda item: item[0])
-                peaks[f"peak_vz_{jet}_z{plane:g}_mm_s"] = best[0]
+                peaks[f"peak_vz_{jet}_z{plane:g}_mm_s"] = max(values)
     return peaks
 
 
 def solid_centreline_final(case: Path, cores: int, time_name: str) -> list:
-    """Deformed centreline at the final time from the written D field.
+    """Displacement at the material stations COMPARE_Z at the final time.
 
-    Samples D (cell-point interpolation) at the 2.5 mm stations of the
-    undeformed centreline x = y = 0: an independent check of the node
-    monitors that does not depend on where the nodes are.
+    Samples D (cell-point interpolation) on the undeformed centreline
+    x = y = 0: a check of the node monitors that does not depend on where
+    the nodes are.
     """
     points = "\n".join(f"                (0 0 {z * 1e-3:.10g})"
-                       for z in CENTRELINE_Z)
+                       for z in COMPARE_Z)
     (case / "system" / "sampleCentreline").write_text(f"""FoamFile
 {{
     version     2.0;
@@ -960,15 +1165,28 @@ functions
 }}
 """)
     command = mpirun(cores, ["postProcess", "-region", "solid", "-dict",
-                             "system/sampleCentreline", "-time", time_name])
+                             "system/sampleCentreline", "-fields", "(D)",
+                             "-time", time_name])
     run(command, case, "log.sampleCentreline")
-    files = sorted(path for path in (case / "postProcessing").rglob(
-        "centreline*D*") if "sampleCentreline" in path.parts
-        and path.parent.name == time_name)
-    if not files:
-        fail(f"No centreline samples in {case}")
+    files = [path for path in case.glob("postProcessing/**/centreline_D.xy")
+             if "sampleCentreline" in path.parts
+             and path.parent.name == time_name]
+    if len(files) != 1:
+        fail(f"Expected one centreline sample file in {case}")
     rows = numeric_rows(files[0])
-    return [(1e3 * (r[2] + r[5]), 1e3 * r[4], 1e3 * r[2]) for r in rows]
+    if len(rows) != len(COMPARE_Z):
+        fail(f"{files[0]}: {len(rows)} of {len(COMPARE_Z)} stations sampled")
+    # (z0, Dy, Dz) in mm
+    return [[1e3 * r[2], 1e3 * r[4], 1e3 * r[5]] for r in rows]
+
+
+def material_stations(nodes: list[float], dy: list[float],
+                      dz: list[float]) -> list[list[float]]:
+    """Displacement (Dy, Dz) at COMPARE_Z by linear interpolation in z0."""
+    curve_y = list(zip([0.0] + nodes, [0.0] + dy))
+    curve_z = list(zip([0.0] + nodes, [0.0] + dz))
+    return [[z, vmod.interpolate(curve_y, z), vmod.interpolate(curve_z, z)]
+            for z in COMPARE_Z]
 
 
 def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
@@ -978,7 +1196,7 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
     w2 = (end_time - window, end_time)
     w1 = (end_time - 2 * window, end_time - window)
     result = {"name": spec_name(spec), "spec": spec, "ranks": cores,
-              "window_s": [w2[0], w2[1]], "previous_window_s": [w1[0], w1[1]]}
+              "window_s": list(w2), "previous_window_s": list(w1)}
     result["meshes"] = meshes
     result["fluid_sizes_mm"] = {k: 1e3 * v for k, v in
                                 info.get("fluid_sizes_m", {}).items()}
@@ -1000,14 +1218,19 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
         q[f"tip_y_{label}_range_mm"] = 1e3 * (stats_y["max"] - stats_y["min"])
         q[f"tip_z_{label}_mean_mm"] = 65.0 + 1e3 * stats_z["mean"]
     q["tip_y_window_change_mm"] = q["tip_y_w2_mean_mm"] - q["tip_y_w1_mean_mm"]
-    tail = [r[2] for r in tip if r[0] >= 0.9 * end_time - 1e-9]
+    tail = [r[2] for r in tip if r[0] > 0.9 * end_time + 1e-9]
     q["tip_drift_last_tenth_mm"] = 1e3 * (max(tail) - min(tail))
-    # Tip history at 1/10 s resolution for the time-convergence plots
-    result["tip_history_coarse"] = [
-        [round(r[0], 6), 1e3 * r[2]] for r in tip
-        if abs(r[0] * 10 - round(r[0] * 10)) < 1e-6]
+    settle = settling_estimate(tip, 2, end_time, 1e3)
+    q.update({f"tip_y_settle_{k}": v for k, v in settle.items()})
+    q["tip_y_transient_error_mm"] = abs(q["tip_y_w2_mean_mm"]
+                                        - settle["steady_estimate"])
+    result["tip_history"] = [[round(r[0], 6), 1e3 * r[2], 1e3 * r[3]]
+                             for r in tip
+                             if abs(r[0] * 50 - round(r[0] * 50)) < 1e-6]
 
-    # Centreline: window mean of the node monitors, final-time D samples
+    # Centreline from the node monitors: the window-mean and final
+    # displacements at the nodes, in material coordinates, and the deformed
+    # line y(z) for the validation
     names = sorted({p.name[len("solidPointDisplacement_"):-len(".dat")]
                     for p in case.glob("postProcessing/*/"
                                        "solidPointDisplacement_flapCentrelineN*.dat")})
@@ -1015,72 +1238,95 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
     if len(names) != len(nodes):
         fail(f"Expected {len(nodes)} centreline monitors in {case}, "
              f"found {len(names)}")
-    line_mean, line_final = [(0.0, 0.0)], [(0.0, 0.0)]
-    for name, z0 in zip(names, nodes):
+    mean_dy, mean_dz, final_dy, final_dz = [], [], [], []
+    for name in names:
         rows = vmod.monitor_history(case, name, end_time, delta_t)
-        sy = window_stats(rows, 2, *w2)
-        sz = window_stats(rows, 3, *w2)
-        line_mean.append((z0 + 1e3 * sz["mean"], 1e3 * sy["mean"]))
-        line_final.append((z0 + 1e3 * rows[-1][3], 1e3 * rows[-1][2]))
-    line_mean.append((65.0 + 1e3 * window_stats(tip, 3, *w2)["mean"],
-                      q["tip_y_w2_mean_mm"]))
-    line_final.append((q["tip_z_final_mm"], q["tip_y_final_mm"]))
-    result["centreline_mean"] = sorted(line_mean)
-    result["centreline_final"] = sorted(line_final)
+        mean_dy.append(1e3 * window_stats(rows, 2, *w2)["mean"])
+        mean_dz.append(1e3 * window_stats(rows, 3, *w2)["mean"])
+        final_dy.append(1e3 * rows[-1][2])
+        final_dz.append(1e3 * rows[-1][3])
+    result["centreline_nodes_mm"] = nodes
+    result["centreline_mean_D_mm"] = [mean_dy, mean_dz]
+    result["stations_mean"] = material_stations(nodes, mean_dy, mean_dz)
+    result["stations_final"] = material_stations(nodes, final_dy, final_dz)
+    result["centreline_mean"] = sorted(
+        [(0.0, 0.0)] + [(z + dz, dy) for z, dy, dz in
+                        zip(nodes, mean_dy, mean_dz)])
+    result["centreline_final"] = sorted(
+        [(0.0, 0.0)] + [(z + dz, dy) for z, dy, dz in
+                        zip(nodes, final_dy, final_dz)])
     time_name = vmod.latest_time(case, cores)
     if not math.isclose(float(time_name), end_time, rel_tol=1e-9):
         fail(f"The latest field time of {case} is {time_name}")
     sampled = solid_centreline_final(case, cores, time_name)
-    result["centreline_final_from_D"] = [[z, y] for z, y, _ in sampled]
-    # Agreement of the node monitors and the D samples at the final time
-    diffs = [abs(vmod.interpolate(sorted(line_final), z) - y)
-             for z, y, _ in sampled
-             if math.isfinite(vmod.interpolate(sorted(line_final), z))]
-    q["centreline_monitor_vs_field_max_mm"] = max(diffs) if diffs else math.nan
+    result["stations_final_from_D"] = sampled
+    q["centreline_monitor_vs_field_max_mm"] = max(
+        math.hypot(a[1] - b[1], a[2] - b[2])
+        for a, b in zip(result["stations_final"], sampled))
 
     # Fluid force on the flap and the inlet pressures
-    try:
-        force = history_rows(case, "postProcessing/flapForce/*/force.dat")
-        for comp, column in (("x", 1), ("y", 2), ("z", 3)):
-            q[f"force_{comp}_w2_mean_N"] = window_stats(force, column, *w2)["mean"]
-        q["force_y_w1_mean_N"] = window_stats(force, 2, *w1)["mean"]
-        q["force_y_w2_std_N"] = window_stats(force, 2, *w2)["std"]
-    except RuntimeError as error:
-        print(f"WARNING: {error}")
+    force = history_rows(case, "flapForce", "force.dat", end_time, delta_t, 4)
+    for comp, column in (("x", 1), ("y", 2), ("z", 3)):
+        q[f"force_{comp}_w2_mean_N"] = window_stats(force, column, *w2)["mean"]
+        q[f"force_{comp}_w1_mean_N"] = window_stats(force, column, *w1)["mean"]
+    q["force_y_w2_std_N"] = window_stats(force, 2, *w2)["std"]
+    settle = settling_estimate(force, 2, end_time)
+    q["force_y_transient_error_N"] = abs(q["force_y_w2_mean_N"]
+                                         - settle["steady_estimate"])
     for inlet in ("upperInlet", "lowerInlet"):
-        try:
-            pressure = history_rows(
-                case, f"postProcessing/{inlet}Pressure/*/surfaceFieldValue.dat")
-            # Kinematic pressure: Pa = rho*p
-            q[f"dp_{inlet}_w2_mean_Pa"] = 1163.3 * window_stats(
-                pressure, 1, *w2)["mean"]
-            q[f"dp_{inlet}_w1_mean_Pa"] = 1163.3 * window_stats(
-                pressure, 1, *w1)["mean"]
-        except RuntimeError as error:
-            print(f"WARNING: {error}")
-    try:
-        probes = history_rows(case, "postProcessing/velocityProbes/*/U")
-        for i in range(len(PROBES)):
-            column = 1 + 3 * i + 2
-            q[f"probe{i}_vz_w2_mean_mm_s"] = 1e3 * window_stats(
-                probes, column, *w2)["mean"]
-            q[f"probe{i}_vz_w1_mean_mm_s"] = 1e3 * window_stats(
-                probes, column, *w1)["mean"]
-            q[f"probe{i}_vz_w2_std_mm_s"] = 1e3 * window_stats(
-                probes, column, *w2)["std"]
-    except RuntimeError as error:
-        print(f"WARNING: {error}")
+        pressure = history_rows(case, f"{inlet}Pressure",
+                                "surfaceFieldValue.dat", end_time, delta_t, 2)
+        # Kinematic pressure: Pa = rho*p
+        q[f"dp_{inlet}_w2_mean_Pa"] = 1163.3 * window_stats(
+            pressure, 1, *w2)["mean"]
+        q[f"dp_{inlet}_w1_mean_Pa"] = 1163.3 * window_stats(
+            pressure, 1, *w1)["mean"]
+    probes = history_rows(case, "velocityProbes", "U", end_time, delta_t,
+                          1 + 3 * len(PROBES))
+    for i in range(len(PROBES)):
+        column = 1 + 3 * i + 2
+        q[f"probe{i}_vz_w2_mean_mm_s"] = 1e3 * window_stats(
+            probes, column, *w2)["mean"]
+        q[f"probe{i}_vz_w1_mean_mm_s"] = 1e3 * window_stats(
+            probes, column, *w1)["mean"]
+        q[f"probe{i}_vz_w2_std_mm_s"] = 1e3 * window_stats(
+            probes, column, *w2)["std"]
 
-    # Velocity on the MRI voxels: instantaneous and window mean
+    # Velocity on the MRI voxels: the time average of the fixed-voxel
+    # samples over the window (primary), the final instantaneous field, and
+    # the cell-based fieldAverage mean (check of the moving-mesh effect)
     velocity = read_csv(vmod.REFERENCE_DIR / "phaseI_velocity.csv")
-    voxels = sample_fields(case, cores, velocity, time_name, ("U", "UMean"))
+    mean_voxels, samples = voxel_history_average(case, velocity, *w2)
+    q["voxel_history_samples"] = samples
+    final_voxels = sample_field_at_voxels(case, cores, velocity, time_name,
+                                          "U")
+    cell_mean_voxels = sample_field_at_voxels(case, cores, velocity,
+                                              time_name, "UMean")
     result["voxels"] = {}
-    for field, label in (("U", "final"), ("UMean", "mean")):
+    for label, voxels in (("mean", mean_voxels), ("final", final_voxels),
+                          ("cellmean", cell_mean_voxels)):
         result["voxels"][label] = [
             [v["x_mm"], v["y_mm"], v["z_mm"], v["vx_sim_mm_s"],
-             v["vy_sim_mm_s"], v["vz_sim_mm_s"]] for v in voxels[field]]
-        for key, value in jet_peaks(voxels[field]).items():
+             v["vy_sim_mm_s"], v["vz_sim_mm_s"], v["fluid_fraction"]]
+            for v in voxels]
+        for key, value in jet_peaks(voxels).items():
             q[f"{key}_{label}"] = value
+    check = velocity_difference(result["voxels"]["mean"],
+                                result["voxels"]["cellmean"])
+    q["voxel_mean_vs_cellmean_mean"] = check["mean"]
+    q["voxel_mean_vs_cellmean_max"] = check["max"]
+
+    # Deformed fluid mesh quality at the end
+    run(mpirun(cores, ["checkMesh", "-region", "fluid", "-time", time_name]),
+        case, "log.checkMesh.fluid.final")
+    final_mesh = checkmesh_metrics(case / "log.checkMesh.fluid.final")
+    q["fluid_final_max_non_orthogonality_deg"] = final_mesh.get(
+        "max_non_orthogonality_deg", math.nan)
+    q["fluid_final_max_skewness"] = final_mesh.get("max_skewness", math.nan)
+    text = (case / "log.solids4Foam").read_text(errors="replace")
+    ami = re.findall(r"interface-to-interface face error:\s*([0-9.eE+-]+)",
+                     text)
+    q["ami_face_error_last"] = float(ami[-1]) if ami else math.nan
 
     # Cost and coupling
     mean_it, max_it = vmod.fsi_iterations(case)
@@ -1157,24 +1403,35 @@ def run_coupled(args: argparse.Namespace) -> bool:
 # Analysis: successive differences, observed orders, uncertainties
 # ---------------------------------------------------------------------------
 
-def three_level(values: list[float], ratio: float, formal: float = 2.0
-                ) -> dict:
-    """Observed order, Richardson estimate and GCI of three levels.
+def three_level(values: list[float], ratio: float, noise: float = 0.0,
+                formal: float = 2.0) -> dict:
+    """Observed order and Richardson estimate of a refinement triplet.
 
-    values are ordered coarse, medium, fine with a constant refinement
-    ratio. The observed order is reported only for a monotone sequence
-    whose convergence ratio lies in (0, 1); otherwise the sequence is
-    flagged and the uncertainty is the larger successive difference times a
-    safety factor of 3 (Roache), with no order claimed.
+    values are ordered coarse, medium, fine with constant nominal ratio.
+    'noise' is the resolution of the QoI (e.g. its residual transient
+    error): differences below it are not interpreted. Monotone convergence
+    with a convergence ratio in (0, 1) and an order in [0.5, 2*formal] is a
+    screening criterion consistent with (not proof of) the asymptotic range;
+    then a Richardson estimate and a fine-level GCI (Fs = 1.25) are given.
+    Otherwise no order is claimed and a heuristic difference envelope
+    (3 x the largest successive difference) is reported instead.
     """
     f1, f2, f3 = values
     e21, e32 = f2 - f1, f3 - f2
     out = {"coarse": f1, "medium": f2, "fine": f3,
            "diff_medium_coarse": e21, "diff_fine_medium": e32,
-           "ratio": ratio}
-    if e21 == 0:
-        out.update(status="no change", order=math.nan,
-                   richardson=f3, gci_fine=0.0)
+           "ratio": ratio, "resolution": noise, "order": math.nan,
+           "richardson": math.nan, "gci_fine": math.nan,
+           "envelope": 3.0 * max(abs(e21), abs(e32))}
+    if max(abs(e21), abs(e32)) <= noise:
+        out["status"] = "changes below the QoI resolution"
+        return out
+    if abs(e32) <= noise:
+        out["status"] = ("fine-level change below the QoI resolution: "
+                         "no order")
+        return out
+    if abs(e21) <= noise:
+        out["status"] = "coarse-level change below resolution: no order"
         return out
     convergence_ratio = e32 / e21
     out["convergence_ratio"] = convergence_ratio
@@ -1186,20 +1443,11 @@ def three_level(values: list[float], ratio: float, formal: float = 2.0
             out["richardson"] = f3 + e32 / (ratio ** order - 1)
             out["gci_fine"] = 1.25 * abs(e32) / (ratio ** order - 1)
         else:
-            out["status"] = ("monotone, order outside [0.5, 2*formal]: "
-                             "no Richardson estimate")
-            out["richardson"] = math.nan
-            out["gci_fine"] = 3.0 * abs(e32) / (ratio ** formal - 1)
+            out["status"] = "monotone, order outside [0.5, 2 x formal]"
     elif convergence_ratio < 0:
-        out["status"] = "oscillatory (difference changes sign): no order"
-        out["order"] = math.nan
-        out["richardson"] = math.nan
-        out["gci_fine"] = 3.0 * max(abs(e21), abs(e32)) / (ratio ** formal - 1)
+        out["status"] = "oscillatory (difference changes sign)"
     else:
-        out["status"] = "divergent (differences grow): no order"
-        out["order"] = math.nan
-        out["richardson"] = math.nan
-        out["gci_fine"] = 3.0 * max(abs(e21), abs(e32))
+        out["status"] = "divergent (differences grow)"
     return out
 
 
@@ -1211,22 +1459,21 @@ def load_runs() -> dict[str, dict]:
     return runs
 
 
-def line_difference(a: list, b: list) -> tuple[float, float]:
-    """RMS and max y difference (mm) of two centrelines on common z."""
-    diffs = []
-    for z in CENTRELINE_Z:
-        ya = vmod.interpolate(sorted(map(tuple, a)), z)
-        yb = vmod.interpolate(sorted(map(tuple, b)), z)
-        if math.isfinite(ya) and math.isfinite(yb):
-            diffs.append(ya - yb)
-    if not diffs:
-        return math.nan, math.nan
-    return (math.sqrt(sum(d * d for d in diffs) / len(diffs)),
-            max(abs(d) for d in diffs))
+def station_difference(a: list, b: list) -> tuple[float, float]:
+    """RMS and max displacement-vector difference (mm) at COMPARE_Z."""
+    diffs = [math.hypot(pa[1] - pb[1], pa[2] - pb[2])
+             for pa, pb in zip(a, b)
+             if math.isfinite(pa[1]) and math.isfinite(pb[1])]
+    if len(diffs) != len(COMPARE_Z):
+        fail("Centreline stations are missing")
+    return (math.sqrt(sum(d * d for d in diffs) / len(diffs)), max(diffs))
 
 
 def velocity_difference(a: list, b: list, scale: float = 630.0) -> dict:
-    """Mean and max vector difference of two voxel sets, normalised."""
+    """Mean and max vector difference of two voxel sets, normalised.
+
+    Only voxels valid in both sets are compared (a common mask).
+    """
     distances = []
     for va, vb in zip(a, b):
         if va[3] is None or vb[3] is None:
@@ -1240,6 +1487,7 @@ def velocity_difference(a: list, b: list, scale: float = 630.0) -> dict:
 
 
 def validation_metrics(run: dict, reference: dict) -> dict:
+    """Comparison with the measurements (validation, not verification)."""
     measured_line = read_csv(vmod.REFERENCE_DIR / "phaseI_centreline.csv")
     velocity = read_csv(vmod.REFERENCE_DIR / "phaseI_velocity.csv")
     tip_target = float(reference["targets"]["phase_I_tip_y_mm"])
@@ -1252,6 +1500,7 @@ def validation_metrics(run: dict, reference: dict) -> dict:
         out[f"centreline_rms_{label}_mm"] = errors["rms_mm"]
         out[f"centreline_max_{label}_mm"] = errors["max_mm"]
         out[f"centreline_mean_{label}_mm"] = errors["mean_mm"]
+    for label in ("mean", "final"):
         voxels = []
         for row, sim in zip(velocity, run["voxels"][label]):
             entry = dict(row)
@@ -1259,77 +1508,122 @@ def validation_metrics(run: dict, reference: dict) -> dict:
                 entry[f"{comp}_sim_mm_s"] = sim[3 + k]
             voxels.append(entry)
         errors = vmod.velocity_errors(voxels, 630.0)
-        for key in ("d_mean", "d_max", "d_mean_z10", "d_mean_z30",
-                    "rms_vz_mm_s"):
+        for key in ("voxels", "d_mean", "d_max", "d_mean_z10", "d_mean_z30",
+                    "rms_vx_mm_s", "rms_vy_mm_s", "rms_vz_mm_s"):
             out[f"velocity_{key}_{label}"] = errors.get(key, math.nan)
     return out
 
 
+# Principal QoIs: key, label, and the key of its resolution (residual
+# transient error), if any
 QOIS = (
-    ("tip_y_w2_mean_mm", "tip y, window mean (mm)"),
-    ("tip_y_final_mm", "tip y, final (mm)"),
-    ("tip_z_w2_mean_mm", "tip z, window mean (mm)"),
-    ("force_y_w2_mean_N", "flap force y, window mean (N)"),
-    ("force_z_w2_mean_N", "flap force z, window mean (N)"),
-    ("dp_upperInlet_w2_mean_Pa", "upper inlet pressure (Pa)"),
-    ("peak_vz_upper_z10_mm_s_mean", "upper jet peak vz, z = 10 mm (mm/s)"),
-    ("peak_vz_lower_z10_mm_s_mean", "lower jet peak vz, z = 10 mm (mm/s)"),
-    ("peak_vz_upper_z30_mm_s_mean", "upper jet peak vz, z = 30 mm (mm/s)"),
-    ("peak_vz_lower_z30_mm_s_mean", "lower jet peak vz, z = 30 mm (mm/s)"),
+    ("tip_y_w2_mean_mm", "tip y, window mean (mm)", "tip_y_transient_error_mm"),
+    ("tip_z_w2_mean_mm", "tip z, window mean (mm)", None),
+    ("force_y_w2_mean_N", "flap force y, window mean (N)",
+     "force_y_transient_error_N"),
+    ("force_z_w2_mean_N", "flap force z, window mean (N)", None),
+    ("dp_upperInlet_w2_mean_Pa", "upper inlet pressure (Pa)", None),
+    ("dp_lowerInlet_w2_mean_Pa", "lower inlet pressure (Pa)", None),
+    ("peak_vz_upper_z10_mm_s_mean", "upper jet peak vz, z = 10 mm (mm/s)",
+     None),
+    ("peak_vz_lower_z10_mm_s_mean", "lower jet peak vz, z = 10 mm (mm/s)",
+     None),
+    ("peak_vz_upper_z30_mm_s_mean", "upper jet peak vz, z = 30 mm (mm/s)",
+     None),
+    ("peak_vz_lower_z30_mm_s_mean", "lower jet peak vz, z = 30 mm (mm/s)",
+     None),
 )
 
 
-def series_analysis(series: dict[str, list[str]], runs: dict) -> dict:
-    """Successive differences and three-level estimates of each series."""
+def compare_pair(a: dict, b: dict) -> dict:
+    rms, mx = station_difference(a["stations_mean"], b["stations_mean"])
+    vel = velocity_difference(a["voxels"]["mean"], b["voxels"]["mean"])
+    out = {"from": a["name"], "to": b["name"],
+           "centreline_rms_change_mm": rms, "centreline_max_change_mm": mx,
+           "velocity_mean_change": vel["mean"],
+           "velocity_max_change": vel["max"],
+           "velocity_compared_voxels": vel["voxels"]}
+    for key, _, _ in QOIS:
+        out[f"{key}_change"] = b["qoi"].get(key, math.nan) - a["qoi"].get(
+            key, math.nan)
+    return out
+
+
+def series_analysis(series: dict, runs: dict) -> dict:
+    """Successive comparisons and explicit refinement triplets.
+
+    series: {label: {"runs": [names, coarse to fine], "ratio": r,
+                     "triplets": true}}. A triplet is analysed only when its
+    three runs are all present and consecutive in the stated list.
+    """
     out = {}
-    for label, names in series.items():
+    for label, definition in series.items():
+        names = definition["runs"]
+        entry = {"runs": names, "ratio": definition.get("ratio"),
+                 "missing": [n for n in names if n not in runs]}
         present = [n for n in names if n in runs]
-        entry = {"runs": names, "complete": len(present) == len(names)}
-        if len(present) < 2:
-            out[label] = entry
-            continue
-        members = [runs[n] for n in present]
-        entry["values"] = {key: [m["qoi"].get(key, math.nan)
-                                 for m in members] for key, _ in QOIS}
         entry["successive"] = []
-        for a, b in zip(members, members[1:]):
-            rms, mx = line_difference(a["centreline_mean"],
-                                      b["centreline_mean"])
-            vel = velocity_difference(a["voxels"]["mean"],
-                                      b["voxels"]["mean"])
-            entry["successive"].append({
-                "from": a["name"], "to": b["name"],
-                "tip_y_change_mm": b["qoi"]["tip_y_w2_mean_mm"]
-                - a["qoi"]["tip_y_w2_mean_mm"],
-                "centreline_rms_change_mm": rms,
-                "centreline_max_change_mm": mx,
-                "velocity_mean_change": vel["mean"],
-                "velocity_max_change": vel["max"]})
-        ratio = SERIES_RATIOS.get(label.split(":")[0])
-        if len(present) == 3 and ratio:
-            entry["three_level"] = {
-                key: three_level(entry["values"][key], ratio)
-                for key, _ in QOIS
-                if all(math.isfinite(v) for v in entry["values"][key])}
-            # Centreline and velocity: the successive RMS changes
-            s = entry["successive"]
-            for key in ("centreline_rms_change_mm", "velocity_mean_change"):
-                e21, e32 = s[0][key], s[1][key]
-                if e21 > 0 and e32 > 0 and e32 < e21:
-                    entry[f"{key}_order"] = math.log(e21 / e32) / math.log(ratio)
+        for a, b in zip(names, names[1:]):
+            if a in runs and b in runs:
+                entry["successive"].append(compare_pair(runs[a], runs[b]))
+        entry["values"] = {key: [runs[n]["qoi"].get(key, math.nan)
+                                 if n in runs else None for n in names]
+                           for key, _, _ in QOIS}
+        entry["triplets"] = []
+        ratio = definition.get("ratio")
+        if ratio and definition.get("triplets", True):
+            for i in range(len(names) - 2):
+                trio = names[i:i + 3]
+                if not all(n in runs for n in trio):
+                    continue
+                result = {"runs": trio}
+                for key, _, noise_key in QOIS:
+                    values = [runs[n]["qoi"].get(key, math.nan) for n in trio]
+                    if not all(math.isfinite(v) for v in values):
+                        continue
+                    noise = max((runs[n]["qoi"].get(noise_key, 0.0)
+                                 for n in trio), default=0.0) \
+                        if noise_key else 0.0
+                    result[key] = three_level(values, ratio, noise)
+                # Norms of the field differences: convergence ratio only
+                # (norms discard signs, so no order is claimed)
+                s1 = compare_pair(runs[trio[0]], runs[trio[1]])
+                s2 = compare_pair(runs[trio[1]], runs[trio[2]])
+                for key in ("centreline_rms_change_mm",
+                            "velocity_mean_change"):
+                    result[f"{key}_ratio"] = (s2[key] / s1[key]
+                                              if s1[key] > 0 else math.nan)
+                entry["triplets"].append(result)
         out[label] = entry
     return out
 
 
-SERIES_RATIOS = {"fluid": FLUID_RATIO, "solid": 2.0, "matched": 2.0,
-                 "time": 2.0}
+def solid_limit_analysis() -> dict:
+    """Richardson analysis of the solid study and the common-limit test."""
+    path = OUTPUT_ROOT / "solid_study.json"
+    if not path.is_file():
+        return {}
+    rows = json.loads(path.read_text())
+    out = {}
+    for sf in sorted({r["stabilisation"] for r in rows}):
+        by_level = {r["level"]: r for r in rows if r["stabilisation"] == sf}
+        entry = {}
+        for trio in (("S1", "S2", "S3"), ("S2", "S3", "S4")):
+            if all(level in by_level for level in trio):
+                for key in ("mu_cal_Pa", "tip_at_mu_fixed_mm"):
+                    noise = max(by_level[level].get(
+                        "mu_cal_interp_uncertainty_Pa" if key == "mu_cal_Pa"
+                        else "tip_interp_uncertainty_mm", 0.0)
+                        for level in trio)
+                    entry[f"{key}_{''.join(trio)}"] = three_level(
+                        [by_level[level][key] for level in trio], 2.0, noise)
+        out[f"sf{sf:g}"] = entry
+    return out
 
 
 def run_analyse(args: argparse.Namespace) -> bool:
     reference = json.loads(vmod.REFERENCE_FILE.read_text())
     runs = load_runs()
-    if not runs:
-        fail(f"No evaluated runs in {RUNS_ROOT}")
     table = []
     for name, data in runs.items():
         row = {"name": name, **{f"spec_{k}": v for k, v in data["spec"].items()},
@@ -1350,13 +1644,14 @@ def run_analyse(args: argparse.Namespace) -> bool:
                   for k, v in validation_metrics(data, reference).items()}}
         table.append(row)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    write_csv(OUTPUT_ROOT / "verification_runs.csv", fmt_rows(table))
-
+    if table:
+        write_csv(OUTPUT_ROOT / "verification_runs.csv", fmt_rows(table))
     series = json.loads(Path(args.series).read_text()) if args.series else {}
-    analysis = series_analysis(series, runs)
+    analysis = {"solid_study": solid_limit_analysis(),
+                "series": series_analysis(series, runs)}
     (OUTPUT_ROOT / "verification_series.json").write_text(
         json.dumps(analysis, indent=2, default=str) + "\n")
-    print(json.dumps(analysis, indent=1, default=str)[:20000])
+    print(json.dumps(analysis["solid_study"], indent=1, default=str))
     return True
 
 
