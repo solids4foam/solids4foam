@@ -98,6 +98,24 @@ def prepare_case(factor: int, cores: int, traction: float) -> Path:
     text = text[:interface_match.start()] + loaded_and_free + text[interface_match.end():]
     displacement.write_text(text)
 
+    point_displacement = case / "0/pointD"
+    text = point_displacement.read_text()
+    interface_match = re.search(r"interface\s*\{.*?\n\s*\}", text, re.DOTALL)
+    if not interface_match:
+        raise RuntimeError("could not find the point-displacement interface boundary")
+    loaded_and_free = """loaded
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }
+    free
+    {
+        type            calculated;
+        value           uniform (0 0 0);
+    }"""
+    text = text[:interface_match.start()] + loaded_and_free + text[interface_match.end():]
+    point_displacement.write_text(text)
+
     schemes = case / "system/fvSchemes"
     text = schemes.read_text()
     text = re.sub(
