@@ -39,8 +39,8 @@ def replace_entry(path: Path, key: str, value: str) -> None:
     path.write_text(text)
 
 
-def set_case_form(case: Path, form: str, delta_t: float | None = None,
-                  end_time: float | None = None) -> None:
+def configure_richter_case(case: Path, delta_t: float | None = None,
+                           end_time: float | None = None) -> None:
     u_files = [
         case / "0/fluid/U.dirichletNeumann",
         case / "0/fluid/U.robin",
@@ -50,20 +50,15 @@ def set_case_form(case: Path, form: str, delta_t: float | None = None,
         u_files = [case / "0/fluid/U"]
     mechanical = case / "constant/solid/mechanicalProperties"
     control = case / "system/controlDict.iqnils"
-    if form == "original":
-        for u_file in u_files:
-            replace_entry(u_file, "maxVelocity", "0.2")
-            replace_entry(u_file, "timeVaryingEndTime", "4.0")
-            replace_entry(u_file, "timeAtMaxVelocity", "4.0")
-        replace_entry(mechanical, "E", "E [1 -1 -2 0 0 0 0] 1.4e6")
-    elif form == "modified":
-        for u_file in u_files:
-            replace_entry(u_file, "maxVelocity", "0.3")
-            replace_entry(u_file, "timeVaryingEndTime", "1.0")
-            replace_entry(u_file, "timeAtMaxVelocity", "1.0")
-        replace_entry(mechanical, "E", "E [1 -1 -2 0 0 0 0] 1e4")
-    else:
-        fail(f"Unknown case form: {form}")
+    for u_file in u_files:
+        replace_entry(u_file, "maxVelocity", "0.3")
+        # Richter's problem is stationary.  The ramp is only a continuation
+        # device for the transient-to-steady partitioned solve; all reported
+        # quantities are evaluated after the inlet has been constant for a
+        # quantitatively checked steady window.
+        replace_entry(u_file, "timeVaryingEndTime", "1.0")
+        replace_entry(u_file, "timeAtMaxVelocity", "1.0")
+    replace_entry(mechanical, "E", "E [1 -1 -2 0 0 0 0] 1.4e6")
     if delta_t is not None:
         replace_entry(control, "deltaT", f"{delta_t:.8g}")
     if end_time is not None:
@@ -208,8 +203,8 @@ def mesh_characteristics(family: str, factor: int) -> dict[str, float | int | st
             "interface_cells_z": 8 * factor,
             "grading_ratios": "1,1,1",
         }
-    upstream = geometric_end_cells(0.45, 12 * factor, 0.125)
-    downstream = geometric_end_cells(0.95, 24 * factor, 8)
+    upstream = geometric_end_cells(0.4, 12 * factor, 0.125)
+    downstream = geometric_end_cells(1.0, 24 * factor, 8)
     outer = geometric_end_cells(0.2, 6 * factor, 6)
     return {
         "near_body_cell_size": min(upstream[1], downstream[0], outer[0]),
@@ -518,20 +513,15 @@ def reference_error_order(coarse_error: float, fine_error: float,
     return math.log(coarse_error / fine_error) / math.log(refinement_ratio)
 
 
-def study_cores(requested: str, form: str, refinement: int = 1) -> int:
+def study_cores(requested: str, refinement: int = 1) -> int:
     if requested != "auto":
         return int(requested)
-    if form == "original":
-        return {1: 1, 2: 4, 4: 8, 8: 64}[refinement]
-    if form == "modified":
-        return {1: 8, 2: 4, 3: 16, 4: 8, 8: 64}[refinement]
-    fail(f"Unknown case form: {form}")
+    return {1: 1, 2: 4, 4: 16, 8: 128, 16: 512}[refinement]
 
 
-def create_mesh_plot(name: str, form: str) -> None:
+def create_mesh_plot(name: str) -> None:
     """Render the PNG convergence plot for a completed mesh sweep."""
-    script_name = "plotMeshConvergence.gnuplot" if form == "original" else "plotModifiedMeshConvergence.gnuplot"
-    plot_script = VERIFICATION / "scripts" / script_name
+    plot_script = VERIFICATION / "scripts" / "plotMeshConvergence.gnuplot"
     data = OUTPUT_ROOT / f"{name}.csv"
     output = OUTPUT_ROOT / f"{name}.png"
     result = subprocess.run(
@@ -665,30 +655,38 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
 
 
 def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
-    mesh_spec = references[args.case].get("mesh", references["mesh"])
+    mesh_spec = references["richter"].get("mesh", references["mesh"])
     delta_t = mesh_spec["deltaTs"][0]
     end_time = mesh_spec["endTime"]
-    cores = study_cores(args.cores, args.case, 1)
+    cores = study_cores(args.cores, 1)
     results: dict[str, dict[str, float]] = {}
+    tolerances = {
+        "production": references["coupling"]["productionOuterTolerance"],
+        "tight": references["coupling"]["tightOuterTolerance"],
+    }
 
-    for coupling in ("iqnils", "robin"):
-        case = copy_case(f"{args.case}_coupling_{coupling}")
-        set_case_form(case, args.case, delta_t, end_time)
+    for label, tolerance in tolerances.items():
+        case = copy_case(f"richter_coupling_{label}")
+        configure_richter_case(case, delta_t, end_time)
         configure_time_scheme(case, args.time_scheme)
         configure_output(case, delta_t, end_time, args.write_interval)
-        run_case(case, f"{coupling} coupling", cores, coupling)
-        results[coupling] = extract(case, None, end_time)
-        if coupling == "robin":
-            results[coupling].update(robin_residual_summary(case, end_time))
+        replace_entry(
+            case / "constant/fsiProperties.iqnils",
+            "outerCorrTolerance",
+            f"{tolerance:.8g}",
+        )
+        run_case(case, f"{label} coupling tolerance", cores, "iqnils")
+        results[label] = extract(case, None, end_time)
+        results[label].update(coupling_iteration_summary(case))
 
     primary_quantities = [
         quantity
-        for quantity, spec in references[args.case]["references"].items()
+        for quantity, spec in references["richter"]["references"].items()
         if spec.get("primary", True)
     ]
     comparison_errors = {
         quantity: relative_error(
-            results["robin"][quantity], results["iqnils"][quantity]
+            results["tight"][quantity], results["production"][quantity]
         )
         for quantity in primary_quantities
     }
@@ -696,36 +694,35 @@ def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
     passed = all(
         error <= comparison_tolerance for error in comparison_errors.values()
     )
-    name = f"{args.case}_coupling_comparison"
+    name = "richter_coupling_comparison"
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     csv_path = OUTPUT_ROOT / f"{name}.csv"
     columns = [
-        "case", "study", "coupling", "time_scheme", "cell_count", "delta_t",
+        "case", "study", "coupling_tolerance", "time_scheme", "cell_count", "delta_t",
         "cores", "evaluation_time", "ux", "uy", "uz", "fx", "fy", "fz",
         "uz_symmetry_difference", "comparison_tolerance",
     ]
-    columns += [f"{quantity}_vs_iqnils_relative_error" for quantity in primary_quantities]
+    columns += [f"{quantity}_tight_vs_production_relative_error" for quantity in primary_quantities]
     columns += [
-        "total_outer_iterations", "maximum_outer_iterations", "n_outer_corr",
-        "maximum_final_displacement_residual",
-        "maximum_final_pressure_residual", "maximum_final_flux_residual", "pass",
+        "time_steps", "total_coupling_iterations", "mean_coupling_iterations",
+        "maximum_coupling_iterations", "pass",
     ]
     rows = []
-    for coupling in ("iqnils", "robin"):
-        row = dict(results[coupling])
+    for label, tolerance in tolerances.items():
+        row = dict(results[label])
         row.update({
-            "case": args.case,
+            "case": "richter",
             "study": "coupling",
-            "coupling": coupling,
+            "coupling_tolerance": tolerance,
             "time_scheme": args.time_scheme,
             "delta_t": delta_t,
             "cores": cores,
             "comparison_tolerance": comparison_tolerance,
             "pass": passed,
         })
-        if coupling == "robin":
+        if label == "tight":
             for quantity, error in comparison_errors.items():
-                row[f"{quantity}_vs_iqnils_relative_error"] = error
+                row[f"{quantity}_tight_vs_production_relative_error"] = error
         rows.append(row)
     with csv_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
@@ -738,17 +735,9 @@ def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
         handle.write(f"- Result: {'PASS' if passed else 'FAIL'}\n")
         for quantity, error in comparison_errors.items():
             handle.write(
-                f"- Robin vs IQN-ILS relative difference for {quantity}: "
+                f"- Tight vs production relative difference for {quantity}: "
                 f"{error:.6g}\n"
             )
-        handle.write(
-            "- Worst converged Robin pressure residual: "
-            f"{results['robin']['maximum_final_pressure_residual']:.6g}\n"
-        )
-        handle.write(
-            "- Worst converged Robin leakage-flux residual: "
-            f"{results['robin']['maximum_final_flux_residual']:.6g}\n"
-        )
         handle.write(f"- Data: `{csv_path.name}`\n\n")
     print(f"{name}: {'PASS' if passed else 'FAIL'}; results: {csv_path}")
     return passed
@@ -756,7 +745,6 @@ def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", choices=("original", "modified"), required=True)
     parser.add_argument("--study", choices=("mesh", "temporal", "coupling"), required=True)
     parser.add_argument(
         "--family", choices=("uniform", "graded"), default="uniform",
@@ -805,7 +793,7 @@ def main() -> int:
         mesh_spec = (
             references["gradedMesh"]
             if args.family == "graded"
-            else references[args.case].get("mesh", references["mesh"])
+            else references["richter"].get("mesh", references["mesh"])
         )
         mesh_end_time = mesh_spec["endTime"]
         if args.study == "temporal":
@@ -838,9 +826,9 @@ def main() -> int:
                 f"dt{mesh_delta_t:g}" if args.study == "temporal" else f"{factor}x"
             )
             case = copy_case(
-                f"{args.case}_{args.family}_{args.study}{scheme_suffix}_{label_suffix}"
+                f"richter_{args.family}_{args.study}{scheme_suffix}_{label_suffix}"
             )
-            set_case_form(case, args.case, mesh_delta_t, mesh_end_time)
+            configure_richter_case(case, mesh_delta_t, mesh_end_time)
             configure_time_scheme(case, args.time_scheme)
             configure_output(case, mesh_delta_t, mesh_end_time, args.write_interval)
             if args.family == "graded":
@@ -850,7 +838,7 @@ def main() -> int:
             else:
                 refine_mesh(case / "system/fluid/blockMeshDict", factor)
             refine_mesh(case / "system/solid/blockMeshDict", factor)
-            cores = study_cores(args.cores, args.case, factor)
+            cores = study_cores(args.cores, factor)
             wall_time = run_case(case, f"mesh level {factor}x", cores)
             row = extract(case, None, mesh_end_time)
             fluid_cells, solid_cells = cell_counts(case)
@@ -858,7 +846,7 @@ def main() -> int:
             row.update(coupling_iteration_summary(case))
             row.update(steady_state_summary(case, mesh_end_time))
             row.update({
-                "case": args.case,
+                "case": "richter",
                 "study": args.study,
                 "mesh_family": args.family,
                 "time_scheme": args.time_scheme,
@@ -874,10 +862,8 @@ def main() -> int:
                 "wall_time_seconds": wall_time,
             })
             rows.append(row)
-        name = f"{args.case}_{args.family}_{args.study}_sweep{scheme_suffix}"
-        # Both families contain a systematic 2x/4x/8x subset.  The modified
-        # family also has a 3x member to compare with the published cell count,
-        # so do not use the last three entries indiscriminately.
+        name = f"richter_{args.family}_{args.study}_sweep{scheme_suffix}"
+        # Use the common systematic 2x/4x/8x subset for the summary order.
         order_factors = (2, 4, 8)
         if all(factor in mesh_factors for factor in order_factors):
             order_rows = [rows[mesh_factors.index(factor)] for factor in order_factors]
@@ -891,21 +877,21 @@ def main() -> int:
                 relative_error(rows[-1][quantity], spec["value"]),
                 refinement_ratio,
             )
-            for quantity, spec in references[args.case]["references"].items()
+            for quantity, spec in references["richter"]["references"].items()
             if spec.get("primary", True)
         }
         passed = write_results(
             name,
             rows,
-            references[args.case]["references"],
+            references["richter"]["references"],
             order,
             reference_orders,
             mesh_spec["minimumReferenceErrorOrder"] if args.study == "mesh" else None,
             -1,
-            references[args.case].get("publishedReferences"),
+            references["richter"].get("publishedReferences"),
         )
         if args.study == "mesh":
-            create_mesh_plot(name, args.case)
+            create_mesh_plot(name)
         return 0 if passed else 1
     fail(f"Unsupported study: {args.study}")
 
