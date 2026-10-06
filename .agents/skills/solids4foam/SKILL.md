@@ -39,6 +39,10 @@ This document defines how automated coding changes should be made in this reposi
   redundant explanatory comments. This restriction does not apply to mandatory
   OpenFOAM structural comments and `//-` API documentation comments, which must
   be preserved and reproduced.
+- Blank lines between functions differ by file type:
+  - In `.H` files, separate member function declarations with exactly one
+    blank line.
+  - In `.C` files, separate function definitions with exactly two blank lines.
 
 ### OpenFOAM structural comments
 
@@ -101,14 +105,77 @@ Source files should include the applicable standard banners:
 ### File/header conventions
 
 - Preserve existing license/header block format in C++ files.
+- Every new file must start with the solids4foam banner, never the OpenFOAM
+  one. Copy the banner from a neighbouring file of the same kind:
+  - C++ sources/headers: the `License` block stating
+    "This file is part of solids4foam."
+  - Case dictionaries: the `solids4foam: solid mechanics and fluid-solid
+    interaction simulations` banner with `Version:`, `Web:` and `Disclaimer:`
+    lines.
+- The banner `Version:` must be the current solids4foam version. Check what
+  existing files in the repository use (currently `v2.4`) and never copy a
+  stale version (e.g. `v2.3`) from an old file or from memory.
 - Keep include ordering consistent with nearby files.
 - Do not change copyright headers unless explicitly asked.
 
 ### Scripts and docs
 
 - Match existing shell script style in `Allwmake`, `Allrun`, `Alltest`, etc.
+- Python is used only in tutorial `verification/` scripts (e.g.
+  `verification/scripts/*.py`). Regression tests (`regressionTest.sh`,
+  `regressionTests/`, `Alltest`) and all other scripts must be written in
+  bash with standard Unix tools (`awk`, `sed`, `grep`); do not introduce Python
+  there unless it is genuinely unavoidable, and say so if it is.
 - Keep Markdown concise, practical, and repository-specific.
 - All Markdown files must pass the Lint checker, e.g. `markdownlint README.md`
+
+### Case files (dictionaries, blockMeshDict, tutorial README)
+
+- In field files (`0/D`, `0/p`, ...) and other dictionaries, write every
+  patch entry in the expanded multi-line form, one keyword per line:
+
+  ```text
+  frontAndBack
+  {
+      type            empty;
+  }
+  ```
+
+  Never collapse a patch to a single line such as `frontAndBack {type empty;}`.
+- In `blockMeshDict`, put each vertex on its own line so the vertex index is
+  easy to count when assembling blocks and faces. Likewise, in each patch or
+  boundary entry put each face on its own line:
+
+  ```text
+  vertices
+  (
+      (0 0 0)
+      (1 0 0)
+      (1 1 0)
+      (0 1 0)
+  );
+
+  patches
+  (
+      patch left
+      (
+          (0 4 7 3)
+          (3 7 11 8)
+      )
+  );
+  ```
+
+- Tutorial `README.md` files follow the structure of existing tutorial
+  READMEs. Read a neighbouring one first and reproduce its layout:
+  - optional `sort:` front matter,
+  - a level-one title ending with the case name in backticks, following the
+    pattern "Descriptive Title: caseName",
+  - `Prepared by <authors>`,
+  - then `## Tutorial Aims`, `## Case Overview`, `## Running the Case`,
+    `## Expected Results`, and optionally `## Verification and Convergence
+    Study` and `## References`, with `---` separators between sections.
+  - Do not insert a "where the case can be found" path or location line between
+    the title and the authors; existing READMEs do not have it.
 
 ## 3) OpenFOAM Conventions to Follow
 
