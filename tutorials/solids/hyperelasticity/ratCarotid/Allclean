@@ -14,3 +14,9 @@ rm -r logs
 
 rm *.png
 rm *.dat
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

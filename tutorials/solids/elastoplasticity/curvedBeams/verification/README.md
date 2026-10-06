@@ -101,6 +101,10 @@ The tutorial `Allrun` returns zero even when the solver diverges, so the driver
 also inspects `log.solids4Foam` for a fatal error, a stack trace, or a run that
 never reached its end time.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference results
 
 Recorded with foam-extend-4.1 and the default `mu0.3` variant on an Apple M1

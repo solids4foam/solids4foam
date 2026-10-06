@@ -205,6 +205,11 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
+  `verification/work/` and `verification/postProcessing/` outputs of the
+  opt-in studies, which can take hours to produce; `./Allclean all` removes
+  them too, in a tutorial directory or in `tutorials/`. Each `verification/`
+  directory has an `Allclean` for its generated cases and results (#542).
 - Renamed the `fluidSolidInteraction/HronTurekFsi3` tutorial to
   `fluidSolidInteraction/HronTurek`, which now covers all three Turek-Hron
   benchmarks: `./Allrun fsi1`, `./Allrun fsi2` or `./Allrun fsi3` (the

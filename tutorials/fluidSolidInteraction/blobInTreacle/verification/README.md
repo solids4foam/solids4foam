@@ -45,6 +45,10 @@ are never modified. Results are written to the ignored
 `blobInTreacle_interfaces.png`. The exit code is zero only if every check
 passes.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference data
 
 Liu et al. (2014) report only the self-convergence of their errors in time,

@@ -79,6 +79,10 @@ it is itself a numerical solution rather than a published reference.
 A `--quick` run only exercises the two coarsest meshes and checks only that
 the sweep produces usable numbers.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference results
 
 Recorded with OpenFOAM v2512 on a 20-core Apple M1 Ultra using the default
