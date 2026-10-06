@@ -242,29 +242,36 @@ Schedule any requested levels only on suitable resources.
 
 ## Graded-family findings
 
-The original L0--L2 calculations completed at fixed `deltaT = 0.00625 s`.
-L3 reached the unchanged 100-iteration coupling limit on its first time step;
-that failed result is retained rather than weakening the tolerance. The
-completed results are:
+All four original calculations completed at fixed `deltaT = 0.00625 s`.
+The first L3 attempt reached the unchanged 100-iteration coupling limit on
+OpenFOAM v2512 with 64 ranks. A decomposition diagnostic and production retry
+on MeluXina, using OpenFOAM v2412 and 128 ranks, converged without changing the
+coupling settings. A repeated L2 control quantifies the platform/version
+difference below.
 
 | L | Cells | `u_x(A)` (m) | `u_y(A)` (m) | `u_z(A)` (m) |
 | --- | ---: | ---: | ---: | ---: |
 | 0 | 7,840 | 4.08348e-5 | 1.56846e-5 | -3.18602e-7 |
 | 1 | 62,720 | 5.21672e-5 | 2.10399e-5 | -7.38201e-7 |
 | 2 | 501,760 | 5.79343e-5 | 2.36525e-5 | -9.26181e-7 |
+| 3 | 4,014,080 | 6.01533e-5 | 2.44087e-5 | -1.73881e-6 |
 
 | L | `F_x` (N) | `F_y` (N) | `F_z` (N) |
 | --- | ---: | ---: | ---: |
 | 0 | 1.197706 | 0.1077488 | -0.0417130 |
 | 1 | 1.279401 | 0.1065742 | -0.0463250 |
 | 2 | 1.308220 | 0.1082129 | -0.0504448 |
+| 3 | 1.317197 | 0.1087008 | -0.0516540 |
 
-The L0--L2 local orders are 0.975 for `u_x(A)`, 1.035 for `u_y(A)`,
-1.158 for `u_z(A)` and 1.503 for `F_x`. These are useful three-point trends,
-not proof of an asymptotic range: the last displacement changes remain
-11--25%, and L3 did not converge. `F_y` is non-monotone and `F_z` has only
-order 0.163, so neither supports extrapolation. No Richardson estimate is
-reported.
+The L1--L3 apparent orders are 1.378 for `u_x(A)`, 1.789 for `u_y(A)`,
+1.683 for `F_x` and 1.768 for `F_z`. The L3 changes are 3.83%, 3.20%, 0.69%
+and 2.40%, respectively. These are useful fine-level trends, not proof of an
+asymptotic range, because L1--L2 used v2512 whereas L3 used v2412. The v2412
+L2 control differs from the v2512 result by 0.26% in `u_x(A)` and 0.0015% in
+`F_x`, supporting the principal trend. The much smaller `u_z(A)` differs by
+77% between controls and has negative apparent order, so it remains
+unresolved. `F_y` is non-monotone over L0--L3 even though its finest three
+values rise with shrinking differences. No Richardson estimate is reported.
 
 At the same solid/interface factors, graded-fluid `u_x(A)` differs from the
 old uniform results by 4.11%, 3.76% and 1.82% on L0--L2. This supports the
@@ -279,17 +286,24 @@ On original L2, halving `deltaT` from 0.0125 to 0.00625 s changes `u_x(A)`,
 subordinate to the reported spatial changes. Graded L2 uses 501,760 cells and
 completed in about 0.99 h on 64 ranks; old uniform 8x uses 7,602,176 cells,
 has a 13% coarser near-body spacing, and took about 11 h on the same machine.
-The graded allocation is therefore materially cheaper, even though its finest
-successful level does not yet prove asymptotic convergence.
+The graded allocation is therefore materially cheaper. L3 completed in
+16.4 h on 128 MeluXina ranks; it has 47% fewer cells than old uniform 8x while
+its representative near-body spacing is 2.25 times finer.
 
-Modified L0--L2 also completed at fixed `deltaT = 0.00625 s`. All six QoIs
-are monotone. Their local orders (`u_x`, `u_y`, `u_z`, `F_x`, `F_y`, `F_z`)
-are 0.978, 1.146, 1.549, 1.432, 1.921 and 0.320. Finest changes remain
-9.6--15.6% for displacement and 2.1--3.9% for force, so no Richardson estimate
-is justified. L2 lies 4.51%, 2.55% and 1.72% below Tukovic's `u_x`, `u_y` and
-symmetry-paired `2u_z` values. This is convergence toward a same-code-lineage
-reference, not independent validation. At L2 all components except `F_z`
-change by at most 0.42% over `t = 7...8 s`; `F_z` changes by 0.93%.
+Modified L0--L3 also completed at fixed `deltaT = 0.00625 s`, and all six
+QoIs are monotone. L3 gives `u_x(A)=0.0144735 m`, `u_y(A)=0.00496883 m`,
+`F_x=2.359966 N` and `F_y=0.2280017 N`. Their L2--L3 changes are 3.60%,
+1.98%, 0.64% and 0.77%. The mixed-version L1--L3 apparent orders are 1.375,
+2.142, 1.697 and 2.397. The v2412 L2 control differs from v2512 by 0.29%,
+0.74%, 0.062% and 0.19%, respectively, supporting those principal trends.
+The small `u_z(A)` is strongly platform-sensitive and has negative apparent
+order, so it is not converged. L3 lies 1.07% below Tukovic's `u_x` and 0.62%
+below `u_y`, but its symmetry-paired `2u_z` does not approach the published
+value. This is same-code-lineage comparison, not independent validation. The
+L3 transverse forces still change by 0.91--0.97% over `t = 7...8 s`.
+
+Exact production and control values are in `reference/graded_mesh_results.csv`
+and `reference/graded_platform_controls.csv`.
 
 ## Case variants and parallel runs
 
