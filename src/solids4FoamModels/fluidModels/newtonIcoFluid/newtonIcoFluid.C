@@ -297,9 +297,14 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+    // Named normal: a tmp normal field would be reused as the storage of
+    // the inner product, which aliases an input of the loop and gives
+    // wrong results with some -O3 builds (see the 3dTube verification)
+    const vectorField nf(mesh().boundary()[patchID].nf());
+
     tmpRef(tvF) = rho_.value()
        *(
-            mesh().boundary()[patchID].nf()
+            nf
 #ifdef OPENFOAM_ORG
           & (-turbulence_->devTau()().boundaryField()[patchID])
 #else
@@ -343,7 +348,12 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce
     const vectorField deformedNf(deformedSf/mag(deformedSf));
     const tensorField& gradU = this->gradU().boundaryField()[patchID];
 
-    tmpRef(tvF) = rho_.value()*deformedNf & (nuEff*invFm.T() & gradU);
+    // Named intermediates: a reused tmp would alias an input of the inner
+    // products (see pimpleFluid::patchViscousForce)
+    const tensorField nuInvFmT(nuEff*invFm.T());
+    const tensorField stress(nuInvFmT & gradU);
+    const vectorField rhoNf(rho_.value()*deformedNf);
+    tmpRef(tvF) = rhoNf & stress;
 
     // Deformed mesh
     // tmpRef(tvF) = rho_.value()

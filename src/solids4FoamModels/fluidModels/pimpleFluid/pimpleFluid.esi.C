@@ -354,9 +354,14 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+    // Named normal: a tmp normal field would be reused as the storage of
+    // the inner product, which aliases an input of the loop and gives
+    // wrong results with some -O3 builds (see the 3dTube verification)
+    const vectorField nf(mesh().boundary()[patchID].nf());
+
     tvF.ref() = rho_.value()
        *(
-            mesh().boundary()[patchID].nf()
+            nf
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
 

@@ -1,0 +1,136 @@
+diff --git a/src/solids4FoamModels/fluidModels/fvPatchFields/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C b/src/solids4FoamModels/fluidModels/fvPatchFields/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C
+index 224a11e90..021100745 100644
+--- a/src/solids4FoamModels/fluidModels/fvPatchFields/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C
++++ b/src/solids4FoamModels/fluidModels/fvPatchFields/elasticWallVelocity/elasticWallVelocityFvPatchVectorField.C
+@@ -399,6 +399,26 @@ snGrad() const
+ 
+     const vectorField dUP(k & gradU.patchInternalField());
+ 
++    // TEMPORARY DIAGNOSTIC (3dTube platform investigation)
++    if (getenv("S4F_DEBUG_TRACTION"))
++    {
++        const volTensorField& gU =
++            db().lookupObject<volTensorField>("grad(" + UName + ")");
++        const tensorField gUP(gradU.patchInternalField());
++        Sout.precision(17);
++        Sout<< "DBGSN snGrad: grad field " << gU.name()
++            << " at " << static_cast<const void*>(&gU)
++            << " timeIndex " << gU.timeIndex()
++            << " sum|internal| " << sum(mag(gU.primitiveField()))
++            << " max|internal| " << max(mag(gU.primitiveField()))
++            << " sum|patchInternal| " << sum(mag(gUP))
++            << " max|k| " << max(mag(k))
++            << " max|dUP| " << max(mag(dUP))
++            << " gUP[0] " << gUP[0]
++            << " tensorFields " << db().names<volTensorField>() << nl;
++        Sout.precision(6);
++    }
++
+     if (secondOrder_)
+     {
+         const vectorField nGradUP(n & gradU.patchInternalField());
+diff --git a/src/solids4FoamModels/fluidModels/pimpleFluid/pimpleFluid.esi.C b/src/solids4FoamModels/fluidModels/pimpleFluid/pimpleFluid.esi.C
+index 5ab25d330..6d524bfb6 100644
+--- a/src/solids4FoamModels/fluidModels/pimpleFluid/pimpleFluid.esi.C
++++ b/src/solids4FoamModels/fluidModels/pimpleFluid/pimpleFluid.esi.C
+@@ -360,6 +360,54 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
+           & (-turbulence_->devReff()().boundaryField()[patchID])
+         );
+ 
++    // TEMPORARY DIAGNOSTIC (3dTube platform investigation)
++    if (getenv("S4F_DEBUG_TRACTION"))
++    {
++        const tmp<volTensorField> tgU(fvc::grad(U()));
++        const tmp<volSymmTensorField> tdR(turbulence_->devReff());
++        const tmp<volScalarField> tnu(turbulence_->nuEff());
++        const vectorField nf(mesh().boundary()[patchID].nf());
++        const labelUList& fc = mesh().boundary()[patchID].faceCells();
++        // Same expression on a fresh devReff, held in a named variable
++        const symmTensorField dRb(tdR().boundaryField()[patchID]);
++        const vectorField again(rho_.value()*(nf & (-dRb)));
++        // Hand-written loop
++        vectorField byHand(nf.size());
++        forAll(byHand, i)
++        {
++            const vector& n = nf[i];
++            const symmTensor& d = dRb[i];
++            byHand[i] = -rho_.value()*vector
++            (
++                n.x()*d.xx() + n.y()*d.xy() + n.z()*d.xz(),
++                n.x()*d.xy() + n.y()*d.yy() + n.z()*d.yz(),
++                n.x()*d.xz() + n.y()*d.yz() + n.z()*d.zz()
++            );
++        }
++        Sout.precision(17);
++        Sout<< "DBGVF sums: native " << gSum(tvF()*mesh().boundary()[patchID].magSf())
++            << " again " << gSum(again*mesh().boundary()[patchID].magSf())
++            << " byHand " << gSum(byHand*mesh().boundary()[patchID].magSf())
++            << " max|native-byHand| " << gMax(mag(tvF() - byHand))
++            << " max|again-byHand| " << gMax(mag(again - byHand)) << nl;
++        for (label i = 0; i < min(3, nf.size()); ++i)
++        {
++            Sout<< "DBGVF face " << i << " cell " << fc[i]
++                << " nf " << nf[i] << nl
++                << "DBGVF   gradU_b " << tgU().boundaryField()[patchID][i] << nl
++                << "DBGVF   gradU_P " << tgU()[fc[i]] << nl
++                << "DBGVF   U_b " << U().boundaryField()[patchID][i]
++                << " U_P " << U()[fc[i]] << nl
++                << "DBGVF   snGrad " << U().boundaryField()[patchID].snGrad()()[i]
++                << nl
++                << "DBGVF   nuEff_b " << tnu().boundaryField()[patchID][i] << nl
++                << "DBGVF   devReff_b " << tdR().boundaryField()[patchID][i] << nl
++                << "DBGVF   devReff_P " << tdR()[fc[i]] << nl
++                << "DBGVF   vF " << tvF()[i] << nl;
++        }
++        Sout.precision(6);
++    }
++
+     return tvF;
+ }
+ 
+diff --git a/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C b/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
+index 3b1c68377..5add8161a 100644
+--- a/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
++++ b/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
+@@ -2054,6 +2054,41 @@ void Foam::fluidSolidInterface::updateForce()
+         // Calculate total traction of fluid zone
+         vectorField fluidZoneTotalTraction(fluidZoneTraction(interfaceI));
+ 
++        // TEMPORARY DIAGNOSTIC (3dTube platform investigation)
++        if (getenv("S4F_DEBUG_TRACTION"))
++        {
++            const label pI = fluidPatchIndices()[interfaceI];
++            const fvPatch& fp = fluidMesh().boundary()[pI];
++            const vectorField vF(fluid().patchViscousForce(pI));
++            const scalarField pF(fluid().patchPressureForce(pI));
++            const vectorField zN(fluidZone.faceNormals());
++            const vectorField zV(fluid().faceZoneViscousForce(interfaceI));
++            const scalarField zP(fluid().faceZonePressureForce(interfaceI));
++            const vectorField nf(fp.nf());
++            Sout.precision(17);
++            Info<< "DBG patch viscous  sum(vF*magSf) = "
++                << gSum(vF*fp.magSf()) << nl
++                << "DBG patch pressure sum(pF*Sf)    = "
++                << gSum(pF*fp.Sf()) << nl
++                << "DBG zone  viscous  total         = "
++                << totalForceOnInterface(fluidZone, zV) << nl
++                << "DBG zone  pressure total (zoneN) = "
++                << totalForceOnInterface(fluidZone, -zP*zN) << nl
++                << "DBG max|zoneN.z| = " << max(mag(zN.component(2)))
++                << ", max|patch nf.z| = " << gMax(mag(nf.component(2)))
++                << nl;
++            forAll(zN, i)
++            {
++                if (i < 3 || mag(zN[i].z()) > 1e-6)
++                {
++                    Info<< "DBG zone face " << i << " n " << zN[i]
++                        << " p " << zP[i] << " v " << zV[i] << nl;
++                    if (i > 20) break;
++                }
++            }
++            Sout.precision(6);
++        }
++
+         fluidZonesTractions()[interfaceI] = fluidZoneTotalTraction;
+ 
+         // Initialise the solid zone traction field that is to be interpolated
