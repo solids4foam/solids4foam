@@ -396,6 +396,36 @@ def use_hypre(fv_solution: Path) -> None:
     fv_solution.write_text(text)
 
 
+def telescope_ranks(spec: dict, cores: int) -> int:
+    """Ranks of the solid preconditioner's sub-communicator.
+
+    The flap is small next to the fluid, so its LU preconditioner is applied
+    on a few ranks (PCTELESCOPE): an exact LU distributed over hundreds of
+    ranks is dominated by communication latency.
+    """
+    wanted = int(spec["pcranks"]) or (
+        8 if math.prod(SOLID_LEVELS[spec["solid"]]) < 20000 else 16)
+    wanted = max(1, min(wanted, cores))
+    while cores % wanted:
+        wanted -= 1
+    return wanted
+
+
+def use_telescope(fv_solution: Path, cores: int, ranks: int) -> None:
+    """Apply the solid's LU (MUMPS) preconditioner on 'ranks' ranks."""
+    text = fv_solution.read_text()
+    telescope = ("pc_type telescope;\n"
+                 f"            pc_telescope_reduction_factor \"{cores // ranks}\";\n"
+                 "            telescope_ksp_type preonly;\n"
+                 "            telescope_pc_type lu;\n"
+                 "            telescope_pc_factor_mat_solver_type mumps;")
+    text, found = re.subn(r"pc_type\s+bjacobi\s*;\s*sub_pc_type\s+lu\s*;",
+                          telescope, text)
+    if found != 1:
+        fail(f"Expected one block-Jacobi LU preconditioner in {fv_solution}")
+    fv_solution.write_text(text)
+
+
 def set_material(mechanical: Path, mu: float, nu: float) -> None:
     bulk = 2.0 * mu * (1.0 + nu) / (3.0 * (1.0 - 2.0 * nu))
     text = mechanical.read_text()
@@ -755,7 +785,7 @@ DEFAULT_SPEC = {
     "fluid": "F1", "solid": "S2", "mu": MU_VERIFICATION, "sf": STABILISATION,
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
-    "lag": -2.0,
+    "lag": -2.0, "pcranks": 0.0,
 }
 
 
@@ -778,8 +808,8 @@ def parse_spec(text: str) -> dict:
                      else float(value))
     if spec["coupling"] not in ("iqnils", "robin"):
         fail("coupling must be iqnils or robin")
-    if spec["pc"] not in ("auto", "mumps", "hypre", "bjacobi"):
-        fail("pc must be auto, mumps, hypre or bjacobi")
+    if spec["pc"] not in ("auto", "mumps", "hypre", "bjacobi", "telescope"):
+        fail("pc must be auto, mumps, hypre, bjacobi or telescope")
     if spec["fluidtol"] not in ("default", "tight"):
         fail("fluidtol must be default or tight")
     return spec
@@ -802,6 +832,8 @@ def spec_name(spec: dict) -> str:
         name += f"_pc{spec['pc']}"
     if spec["lag"] != -2:
         name += f"_lag{spec['lag']:g}"
+    if spec["pcranks"]:
+        name += f"_pcranks{spec['pcranks']:g}"
     return name
 
 
@@ -938,11 +970,15 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     # Decomposition and the solid's parallel linear solver
     vmod.set_subdomains(case, cores, ("", "fluid", "solid"))
     info["solid_preconditioner"] = solid_preconditioner(spec, cores)
+    if info["solid_preconditioner"] == "telescope":
+        info["solid_preconditioner_ranks"] = telescope_ranks(spec, cores)
     solution = case / "system" / "solid" / "fvSolution"
     if info["solid_preconditioner"] == "mumps":
         vmod.use_parallel_lu(solution)
     elif info["solid_preconditioner"] == "hypre":
         use_hypre(solution)
+    elif info["solid_preconditioner"].startswith("telescope"):
+        use_telescope(solution, cores, telescope_ranks(spec, cores))
     if spec["lag"] != -2:
         # Rebuild the solid preconditioner every 'lag' Newton iterations
         # (the tutorial builds it once and keeps it for the whole run)
