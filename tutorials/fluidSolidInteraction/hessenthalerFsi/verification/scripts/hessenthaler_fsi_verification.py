@@ -754,7 +754,8 @@ def fmt_rows(rows: list[dict]) -> list[dict]:
 DEFAULT_SPEC = {
     "fluid": "F1", "solid": "S2", "mu": MU_VERIFICATION, "sf": STABILISATION,
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
-    "fluidtol": "default", "pimple": 1.0,
+    "fluidtol": "default", "pimple": 1.0, "pc": "auto",
+    "lag": -2.0,
 }
 
 
@@ -777,6 +778,8 @@ def parse_spec(text: str) -> dict:
                      else float(value))
     if spec["coupling"] not in ("iqnils", "robin"):
         fail("coupling must be iqnils or robin")
+    if spec["pc"] not in ("auto", "mumps", "hypre", "bjacobi"):
+        fail("pc must be auto, mumps, hypre or bjacobi")
     if spec["fluidtol"] not in ("default", "tight"):
         fail("fluidtol must be default or tight")
     return spec
@@ -795,6 +798,10 @@ def spec_name(spec: dict) -> str:
         name += f"_fluid{spec['fluidtol']}"
     if spec["pimple"] != 1:
         name += f"_pimple{spec['pimple']:g}"
+    if spec["pc"] != "auto":
+        name += f"_pc{spec['pc']}"
+    if spec["lag"] != -2:
+        name += f"_lag{spec['lag']:g}"
     return name
 
 
@@ -930,9 +937,35 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
 
     # Decomposition and the solid's parallel linear solver
     vmod.set_subdomains(case, cores, ("", "fluid", "solid"))
-    if cores > 1:
-        vmod.use_parallel_lu(case / "system" / "solid" / "fvSolution")
+    info["solid_preconditioner"] = solid_preconditioner(spec, cores)
+    solution = case / "system" / "solid" / "fvSolution"
+    if info["solid_preconditioner"] == "mumps":
+        vmod.use_parallel_lu(solution)
+    elif info["solid_preconditioner"] == "hypre":
+        use_hypre(solution)
+    if spec["lag"] != -2:
+        # Rebuild the solid preconditioner every 'lag' Newton iterations
+        # (the tutorial builds it once and keeps it for the whole run)
+        replace_entry(solution, "snes_lag_preconditioner",
+                      f'"{int(spec["lag"])}"')
     return case, info
+
+
+def solid_preconditioner(spec: dict, cores: int) -> str:
+    """The solid's linear preconditioner (it does not change the solution).
+
+    Serial runs keep the tutorial's LU (block Jacobi with one block). In
+    parallel, PC_AUTO_RULE.
+    """
+    if spec["pc"] != "auto":
+        return spec["pc"]
+    if cores == 1:
+        return "bjacobi"
+    return PC_AUTO_RULE(spec, cores)
+
+
+def PC_AUTO_RULE(spec: dict, cores: int) -> str:
+    return "mumps"
 
 
 def build_meshes(case: Path, spec: dict, cores: int) -> dict:
