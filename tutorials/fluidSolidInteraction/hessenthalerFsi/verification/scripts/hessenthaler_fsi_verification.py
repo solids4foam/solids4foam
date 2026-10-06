@@ -493,6 +493,10 @@ def settling_estimate(rows: list[list[float]], column: int, end_time: float,
             sse = sum((a + b * x - y) ** 2 for x, (_, y) in zip(xs, part))
             if best is None or sse < best[0]:
                 best = (sse, a, b, tau)
+        if best is None or len(part) < 20:
+            out[f"steady_fit{start_fraction:g}"] = math.nan
+            out[f"tau_fit{start_fraction:g}_s"] = math.nan
+            continue
         _, a, b, tau = best
         out[f"steady_fit{start_fraction:g}"] = a
         out[f"tau_fit{start_fraction:g}_s"] = tau
