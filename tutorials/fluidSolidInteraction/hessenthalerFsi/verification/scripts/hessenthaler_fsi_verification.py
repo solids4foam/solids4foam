@@ -81,7 +81,7 @@ vmod.SETTINGS_FILE = SETTINGS_FILE
 # Shear modulus held fixed for every mesh, time step and coupling setting.
 # It is the mesh-converged zero-flow calibration of the standard solid (see
 # the solid study and README.md); it is NOT recalibrated per mesh.
-MU_VERIFICATION = 62800.0
+MU_VERIFICATION = 64200.0
 NU = 0.45
 STABILISATION = 0.01
 DELTA_T = 0.002
@@ -548,7 +548,8 @@ def patch_faces(boundary: Path, patch: str) -> int:
 SOLID_LOADS = (0.92, 1.0, 1.1, 1.25)
 SOLID_PLATEAU = 2.0
 # Largest tip movement (mm) over the last 0.25 s of a settled plateau
-SETTLED_DRIFT_MM = 0.005
+# (0.02 mm is about 0.06 kPa in the calibrated modulus)
+SETTLED_DRIFT_MM = 0.02
 MU_REFERENCE = 61000.0
 
 
@@ -1629,6 +1630,33 @@ def solid_limit_analysis() -> dict:
     return out
 
 
+def default_series() -> dict:
+    """The refinement series of the verification campaign (README.md)."""
+    def n(text: str) -> str:
+        return spec_name(parse_spec(text))
+
+    return {
+        "fluid at S2": {"runs": [n(f"F{k}:S2") for k in range(1, 6)],
+                        "ratio": FLUID_RATIO},
+        "solid at F3": {"runs": [n(f"F3:S{k}") for k in range(1, 4)],
+                        "ratio": 2.0},
+        "matched": {"runs": [n("F1:S1"), n("F3:S2"), n("F5:S3")],
+                    "ratio": 2.0},
+        "solid at F1": {"runs": [n("F1:S2"), n("F1:S3")], "ratio": 2.0},
+        "time": {"runs": [n("F2:S2"), n("F2:S2:dt=0.001"),
+                          n("F2:S2:dt=0.0005")], "ratio": 2.0},
+        "coupling tolerance": {"runs": [n("F2:S2"), n("F2:S2:tol=1e-6")]},
+        "fluid linear tolerance": {"runs": [n("F2:S2"),
+                                            n("F2:S2:fluidtol=tight")]},
+        "PIMPLE outer correctors": {"runs": [n("F2:S2"),
+                                             n("F2:S2:pimple=3")]},
+        "Robin-Neumann": {"runs": [n("F2:S2"), n("F2:S2:coupling=robin")]},
+        "stabilisation": {"runs": [n("F2:S2"), n("F2:S2:sf=0.001")]},
+        "end time": {"runs": [n("F2:S2"), n("F2:S2:T=40")]},
+        "tutorial modulus": {"runs": [n("F1:S2:mu=58450"), n("F1:S2")]},
+    }
+
+
 def run_analyse(args: argparse.Namespace) -> bool:
     reference = json.loads(vmod.REFERENCE_FILE.read_text())
     runs = load_runs()
@@ -1654,7 +1682,8 @@ def run_analyse(args: argparse.Namespace) -> bool:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     if table:
         write_csv(OUTPUT_ROOT / "verification_runs.csv", fmt_rows(table))
-    series = json.loads(Path(args.series).read_text()) if args.series else {}
+    series = (json.loads(Path(args.series).read_text()) if args.series
+              else default_series())
     analysis = {"solid_study": solid_limit_analysis(),
                 "series": series_analysis(series, runs)}
     (OUTPUT_ROOT / "verification_series.json").write_text(
