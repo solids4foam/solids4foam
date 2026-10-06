@@ -1,3 +1,0 @@
-variant,level,dt_s,ranks,ux_m,uy_m,uz_m,fx_N,fy_N,fz_N,relative_difference_vs_dt_0.00625,wall_s,steps,mean_coupling,max_coupling
-original,L2,0.0125,64,5.79142e-5,2.36433e-5,-9.24298e-7,1.307957,0.1081365,-0.0503947,"ux=0.000347;uy=0.000389;uz=0.002033;fx=0.000201;fy=0.000706;fz=0.000994",3236.32,640,8.05781,20
-original,L2,0.00625,64,5.79343e-5,2.36525e-5,-9.26181e-7,1.308220,0.1082129,-0.0504448,baseline,3561,1280,5.97734,14

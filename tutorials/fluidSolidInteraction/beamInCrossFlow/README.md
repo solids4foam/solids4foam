@@ -5,7 +5,7 @@ sort: 4
 # My third tutorial: `beamInCrossFlow`
 
 You can find the files for this tutorial under
-[`tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils).
+[`tutorials/fluidSolidInteraction/beamInCrossFlow`](https://github.com/solids4foam/solids4foam/tree/development/tutorials/fluidSolidInteraction/beamInCrossFlow).
 
 ---
 
@@ -60,8 +60,8 @@ $$
 + \boldsymbol{f_b}
 $$
 
-For the solid, we assume finite strains (though a small strain assumption would
-be OK in the the original form of the case) with the material behaviour
+For the solid, we assume finite strains (although the benchmark deformation is
+small enough for a small-strain approximation) with the material behaviour
 described by the St Venant-Kirchhoff hyperelastic law:
 
 $$

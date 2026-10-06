@@ -1,6 +1,0 @@
-variant,level,openfoam,platform,status,ranks,wall_s,ux_m,uy_m,uz_m,fx_N,fy_N,fz_N,ux_difference_vs_v2512,uy_difference_vs_v2512,uz_difference_vs_v2512,fx_difference_vs_v2512,fy_difference_vs_v2512,fz_difference_vs_v2512,notes
-original,L2,v2512,XenoSim,complete,64,3561,5.79343e-5,2.36525e-5,-9.26181e-7,1.308220,0.1082129,-0.0504448,,,,,,,baseline production result
-original,L2,v2412,MeluXina,complete,32,8584.09,5.80843e-5,2.35301e-5,-1.64373e-6,1.308239,0.1082073,-0.05043729,0.00258914,0.00517491,0.774695,0.00001452,0.00005175,0.00014888,principal QoIs agree closely; small uz is platform-sensitive
-modified,L2,v2512,XenoSim,complete,32,5095.05,0.0139699,0.00487255,-0.000219652,2.344948,0.229769,-0.281750,,,,,,,baseline production result
-modified,L2,v2412,MeluXina,failed_coupling,32,2244,,,,,,,,,,,,,reached unchanged 100-iteration limit at t=1.68125 s
-modified,L2,v2412,MeluXina,complete,128,4724.31,0.0140102,0.00483633,-0.000411398,2.345535,0.2301964,-0.2809785,0.00288477,0.00743346,0.872987,0.00025033,0.00186099,0.00273824,rank sensitivity included; principal QoIs remain within 0.75 percent
