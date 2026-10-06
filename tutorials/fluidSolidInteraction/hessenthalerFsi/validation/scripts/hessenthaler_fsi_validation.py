@@ -493,8 +493,10 @@ def solid_case(name: str, spec: dict, end_time: float) -> Path:
         text = solid_properties.read_text()
         model = SOLID_MODELS[spec.get("model", "tutorial")]
         if model:
+            # Rename both the model and its coefficients dictionary
             text = re.sub(r"nonLinearGeometry(UpdatedLagrangian|"
-                          r"TotalLagrangianTotalDisplacement)\b", model, text)
+                          r"TotalLagrangianTotalDisplacement)(?=;|Coeffs)",
+                          model, text)
             set_displacement_field(
                 case / "0", "DD" if "Updated" in model else "D")
         solid_properties.write_text(text)
@@ -617,7 +619,8 @@ def calibration_runs(args: argparse.Namespace) -> list[dict]:
 def run_name(spec: dict) -> str:
     solid = spec["solid"] if spec["solid"] == "highOrder" else \
         f"standard{spec['model'].upper() if spec['model'] != 'tutorial' else ''}"
-    extra = f"_x{spec['extra']}" if spec["solid"] == "highOrder" else ""
+    extra = (f"_x{spec['extra']}{'_hoj' if spec.get('hoj') else ''}"
+             if spec["solid"] == "highOrder" else "")
     return (f"calibration_{solid}{extra}_{'x'.join(map(str, spec['mesh']))}"
             f"_nu{spec['nu']:g}_sf{spec['sf']:g}_np{spec['cores']}")
 
