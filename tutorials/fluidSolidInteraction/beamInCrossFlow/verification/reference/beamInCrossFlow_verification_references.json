@@ -51,6 +51,7 @@
     "temporalComparisonStudy": "Richter graded mesh L3"
   },
   "coupling": {
+    "refinementFactor": 8,
     "relativeTolerance": 0.01,
     "productionOuterTolerance": 1e-6,
     "tightOuterTolerance": 1e-7

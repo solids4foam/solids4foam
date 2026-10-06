@@ -1,362 +1,177 @@
-# beamInCrossFlow verification studies
+# beamInCrossFlow Richter verification
 
-This directory contains opt-in numerical-verification studies for the
-`beamInCrossFlow` tutorial. It is deliberately separate from `regressionTest.sh`:
-the regression test checks that the existing tutorial remains numerically stable,
-whereas these studies check mesh convergence against published benchmark
-quantities. Nothing here is run by `tutorials/Alltest` or
-`tutorials/Alltest-regression`.
+This opt-in study verifies the solids4foam discretisation against the
+stationary three-dimensional benchmark introduced by Richter (2012). It is
+separate from the tutorial regression test and is not run by normal CI.
 
-Source a supported OpenFOAM environment, build solids4foam with PETSc, and run
-from either this directory or the repository root:
+## Commands
+
+After sourcing a supported OpenFOAM environment and building solids4foam with
+PETSc, run from this directory:
 
 ```bash
-cd tutorials/fluidSolidInteraction/beamInCrossFlow/verification
-./Allverify --case original --study mesh
-./Allverify --case modified --study mesh
-# Fixed-time-step, parametrically graded verification family
-./Allverify --case original --study mesh --family graded
-./Allverify --case modified --study mesh --family graded
-# Temporal check on the graded 4x mesh
-./Allverify --case original --study temporal --family graded
-# Compare base-mesh Robin and IQNILS solutions
-./Allverify --case original --study coupling
-./Allverify --case modified --study coupling
-# Optional steady-solution acceleration diagnostic
-./Allverify --case original --study mesh --time-scheme Euler
+# Richter-consistent graded spatial family
+./Allverify --study mesh --family graded
+
+# Individual factors for scheduled runs
+./Allverify --study mesh --family graded --levels 4,8 --cores 128
+
+# L3 time-step and coupling-tolerance controls
+./Allverify --study temporal --family graded --cores 128
+./Allverify --study coupling --family graded --cores 128
+
+# Static structural diagnostic
+python3 scripts/solid_discretisation.py --levels 1,2,4,8 --cores 8
 ```
 
-From the repository root, invoke the same driver as
-`./tutorials/fluidSolidInteraction/beamInCrossFlow/verification/Allverify ...`.
+The driver creates isolated copies under `work/` and compact CSV output under
+`postProcessing/`; both directories are ignored. Versioned reference CSVs in
+`reference/` contain the completed production evidence. No raw transient
+fields are versioned.
 
-The driver requires `python3`, `blockMesh`, `solids4Foam`, and (for the mesh
-study) `gnuplot`; it stops with an actionable error if one is unavailable.
+## Exact Richter definition
 
-Each run is a complete copy under `verification/work/`, so the tutorial itself,
-its symlinks, and its normal regression tests are not modified. Results are
-written to `verification/postProcessing/` as CSV plus `verification_summary.md`.
-Both directories are ignored by Git and are retained to make a failed run
-diagnosable.
+The primary source is Thomas Richter, *Goal-oriented error estimation for
+fluid-structure interaction problems*, Computer Methods in Applied Mechanics
+and Engineering 223--224 (2012), 28--42,
+doi:10.1016/j.cma.2012.02.014, section 7.2 and Tables 5--6.
 
-## Problem and quantity definitions
+<!-- markdownlint-disable MD013 -->
 
-The computational fluid half-domain is
-`[0, 1.5] x [0, 0.4] x [-0.4, 0] m`; reflection about the `z = 0` symmetry
-plane gives the physical `0.8 m` width. The initially undeformed solid occupies
-`[0.45, 0.55] x [0, 0.2] x [-0.2, 0] m`: it is `0.1 m` thick in the flow
-direction and `0.2 m` high and half-wide. Its `y = 0` face is clamped and its
-`z = 0` face has solid-symmetry conditions. Fluid inlet, outlet and interface
-are at `x = 0`, `x = 1.5` and the wetted beam surface respectively; the
-remaining channel faces are no-slip except for `z = 0` symmetry. Outlet
-pressure is zero gauge.
+| Item | Richter definition | solids4foam production definition |
+| --- | --- | --- |
+| Fluid domain | `(0,1.5) x (0,0.4) x (-0.4,0.4) m` | Same; negative-`z` symmetry half |
+| Solid | `(0.4,0.5) x (0,0.2) x (-0.2,0.2) m` | Same; negative-`z` half |
+| Symmetry | `x-y` plane | `z=0` fluid and solid symmetry |
+| Inlet | exact bi-parabolic profile, peak `0.3 m/s` | Same stationary profile after numerical ramp |
+| Mean speed / Reynolds number | `0.2 m/s`; `Re=40` for height `0.2 m` | Same |
+| Fluid | `rho=1000 kg/m3`, `nu=0.001 m2/s` | Same |
+| Outlet | do-nothing / zero traction | zero gauge kinematic pressure and zero-gradient velocity |
+| Other fluid walls | no slip | Same |
+| Solid law | compressible St Venant--Kirchhoff | Same |
+| Solid constants | shear modulus `0.5 MPa`, Poisson ratio `0.4` | `E=1.4 MPa`, `nu=0.4`, hence the same `mu` and `lambda=2 MPa` |
+| Clamp | solid base at `y=0` | Same |
+| Point A | `(0.45,0.15,0.15) m` | symmetry-equivalent `(0.45,0.15,-0.15) m` |
+| Drag | fluid traction integral on the half-solid interface | pressure plus viscous traction on the same half-interface |
+| Problem type | stationary monolithic ALE FSI | partitioned transient-to-steady continuation |
 
-Both forms use fluid density `1000 kg/m3`, kinematic viscosity `0.001 m2/s`,
-solid density `1000 kg/m3`, Poisson ratio `0.4` and St Venant--Kirchhoff
-elasticity. The original form uses `E = 1.4 MPa`, peak inlet velocity
-`0.2 m/s` and a cosine ramp ending at `4 s`. The modified form uses
-`E = 10 kPa`, `0.3 m/s` and a `1 s` ramp. The driver otherwise leaves the
-physical case, BDF2/PIMPLE and solid schemes, solver tolerances and IQN-ILS
-coupling unchanged. IQN-ILS uses direct interface mapping, prediction,
-`outerCorrTolerance = 1e-6` and at most 100 outer iterations.
+<!-- markdownlint-enable MD013 -->
 
-Point A is `(0.45, 0.15, -0.15) m` in the half-domain. `u_x(A)`, `u_y(A)` and
-`u_z(A)` are the components written by `solidPointDisplacement`. `F_x`, `F_y`
-and `F_z` are the pressure-plus-viscous forces exerted by the fluid on the
-half-beam interface, as written by the OpenFOAM `forces` function object;
-positive `x` is downstream and positive `y` is upward. Tukovic's published
-modified transverse difference is compared with `2 u_z(A)` because the two
-physical points are related by symmetry. All studies evaluate the solution at
-`t = 8 s`. The reported steady diagnostic is each principal QoI's relative
-change over `t = 7...8 s`; a change below 0.5% is treated as steady for the
-reported precision.
+The inlet field is
 
-## Mesh audit and graded family
+```text
+u_x = 0.3 y(0.4-y)(0.4^2-z^2)/(0.2^2 0.4^2),  u_y=u_z=0.
+```
 
-The original structured mesh has 14,592 fluid cells and 256 solid cells. Its
-uniform `0.025 m` spacing gives only four solid cells through the plate
-thickness and eight cells along each half-interface direction. The first fluid
-cell normal to every beam face is also `0.025 m` wide, placing its centre
-`0.0125 m` from the undeformed interface. Four downstream blocks hold
-9,728 fluid cells (two thirds of the fluid mesh), yet use the same spacing from
-the beam to the outlet. Uniform refinement therefore spends most added cells
-away from the beam while refining the interface-normal velocity and pressure
-gradients no faster than the whole domain. This topology, the persistent
-changes in both displacement and force, and the different pressure/viscous
-contributions to `F_y` motivate local refinement; they do not by themselves
-prove that a conventional boundary layer is the only error source.
+The custom inlet condition implements this expression exactly. A one-second
+cosine ramp is used only to start the partitioned calculation robustly. The
+reported state must satisfy the steady criterion after the boundary value has
+been constant; the ramp is not part of the benchmark physics. Richter does not
+state a solid density for this stationary example. Solids4foam uses
+`1000 kg/m3` during continuation, but density drops out of the converged
+stationary balance. A temporal control checks that the continuation does not
+pollute the reported quantities.
 
-On the completed original graded L2 solution at `t = 8 s`, OpenFOAM
-post-processing locates both the maximum velocity-gradient magnitude
-(`34.13 1/s`) and kinematic pressure-gradient magnitude (`6.412 m/s2`, or
-`6.412 kPa/m` at the specified density) in the cell centred at approximately
-`(0.4487, 0.1969, -0.1969) m`, immediately upstream
-of the beam's free outer corner. This directly supports local body refinement,
-while also pointing to the sharp corner/free-end region rather than uniquely
-to a smooth-wall boundary layer.
+The old solids4foam definition placed the solid at `x=0.45...0.55 m`, sampled
+its upstream face rather than its mid-thickness, and the old verification
+driver reduced the peak speed to `0.2 m/s`. Those are material changes to the
+problem. They have been replaced, not retained as another production variant;
+git history preserves the earlier study.
 
-The graded family retains the same conformal 11-block fluid topology and the
-same solid topology. It changes the base fluid counts and applies fixed total
-block expansion ratios: `xUp = 0.125`, `xDown = 8`, `yOuter = 6` and
-`zOuter = 1/6`. Cells are clustered on both flow-normal beam faces, at the free
-end and side face, and through the near wake, then grow toward the inlet,
-outlet and outer channel boundaries. Every count is multiplied by the level
-factor 1, 2, 4 or 8, so the controlling spacings refine consistently by about
-two while the topology and expansion ratios remain fixed. The solid and both
-interface directions use the same level factor.
+## Richter reference provenance
 
-| Level | F | Fluid | Solid | Near (m) | Far (m) | Thick. | Face y x z |
+Richter solves a stationary, monolithic ALE formulation with equal-order
+piecewise-linear finite elements and local-projection stabilisation. Table 5
+reports five uniformly refined levels. The finest has 7,600,775 algebraic
+unknowns, `F_x=1.3380 N`, and `u_x(A)=5.9202e-5 m`. Table 6 extrapolates the
+finest three levels:
+
+| Quantity | Reference | Stated accuracy |
+| --- | ---: | ---: |
+| `u_x(A)` | `5.924e-5 m` | `+/-1e-7 m` |
+| `F_x` | `1.327 N` | `+/-0.01 N` |
+
+The values are tabulated, not digitised. Richter says their relative accuracy
+is at most about 1%. Re-entrant solid corners prevent the expected improvement
+from piecewise-quadratic elements, so this is a strong independent source with
+finite and explicitly retained numerical uncertainty, not an exact solution.
+Richter defines interface drag and evaluates an equivalent solid-base/residual
+functional. The solids4foam surface-traction integral is physically equivalent
+at equilibrium but not algebraically identical, which is retained as a small
+comparison-method qualification.
+
+## Graded family
+
+The conformal 11-block fluid topology and one-block solid topology are fixed.
+Every cell count is multiplied by the level factor. Fixed total block
+expansion ratios `xUp=0.125`, `xDown=8`, `yOuter=6`, and `zOuter=1/6` cluster
+cells on the beam faces, free corner, and near wake while coarsening toward the
+outer boundaries. Solid and fluid interface counts match at every level.
+
+<!-- markdownlint-disable MD013 -->
+
+| Level | Factor | Fluid | Solid | Near `h` (m) | Far `h` (m) | Through thickness | Interface `y x z` |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| L0 | 1 | 7,584 | 256 | 0.0108071 | 0.0927085 | 4 | 8 x 8 |
-| L1 | 2 | 60,672 | 2,048 | 0.00548932 | 0.0466999 | 8 | 16 x 16 |
-| L2 | 4 | 485,376 | 16,384 | 0.00276512 | 0.0234344 | 16 | 32 x 32 |
-| L3 | 8 | 3,883,008 | 131,072 | 0.00138756 | 0.0117380 | 32 | 64 x 64 |
+| L0 | 1 | 7,584 | 256 | 0.00960629 | 0.0975879 | 4 | `8 x 8` |
+| L1 | 2 | 60,672 | 2,048 | 0.00487940 | 0.0491578 | 8 | `16 x 16` |
+| L2 | 4 | 485,376 | 16,384 | 0.00245789 | 0.0246687 | 16 | `32 x 32` |
+| L3 | 8 | 3,883,008 | 131,072 | 0.00123339 | 0.0123567 | 32 | `64 x 64` |
+| L4 | 16 | 31,064,064 | 1,048,576 | 0.000617792 | 0.00618338 | 64 | `128 x 128` |
 
-`Near` is the full interface-adjacent cell width. The corresponding nominal
-first-cell-centre distances are half those values: `0.005404`, `0.002745`,
-`0.001383` and `0.000694 m`. They are geometric distances, not wall-function
-`y+` values.
+<!-- markdownlint-enable MD013 -->
 
-The mesh study holds `deltaT = 0.00625 s` at every level, instead of following
-the old combined space--time path. The separate temporal command runs
-`deltaT = 0.0125 s` on L2; it is compared with the L2
-`deltaT = 0.00625 s` result already produced by the mesh command, avoiding a
-duplicate fine-time-step run. The old uniform family remains available with
-`--family uniform` and is retained as evidence about the cost and inefficiency
-of global refinement.
+The table values are calculated from the geometric-series block definitions;
+final `checkMesh` measurements and quality results are recorded with the
+production evidence.
 
-Full `checkMesh -allTopology -allGeometry` checks were run on both regions at
-the family endpoints. L0/L3 maximum fluid aspect ratios were 8.159/7.904;
-maximum non-orthogonality was zero and maximum skewness was
-`4.75e-14`/`5.16e-13`. The uniform solid meshes had aspect ratio one, zero
-non-orthogonality and comparable round-off-level skewness. Both endpoints
-reported `Mesh OK`; the fixed grading and improving aspect ratio rule out a
-level-dependent quality deterioration. Exact results are in
-`reference/graded_mesh_quality.csv`.
-The L3 64-rank decomposition is balanced: the largest-to-smallest per-rank
-cell-count ratios are 1.0202 in the fluid and 1.0197 in the solid. A gross
-decomposition imbalance therefore does not explain its coupling failure.
+## Numerical controls
 
-## Studies and acceptance criteria
+All definitive coupled levels use one MeluXina build and software stack. The
+spatial family holds `deltaT=0.00625 s` fixed. L3 is repeated with
+`deltaT=0.003125 s`. Production IQN-ILS uses direct mapping,
+`outerCorrTolerance=1e-6`, a maximum of 100 iterations, prediction, no reused
+modes, and relative QR filtering `0.01`; L3 is repeated at `1e-7` with a
+200-iteration cap. The cap increase only permits the tighter target to be
+reached and is reported explicitly.
 
-The reference data and initial tolerances are in
-`reference/beamInCrossFlow_verification_references.json`. They are
-intentionally moderate:
-the verification signal is convergence toward the reference, not bitwise
-reproduction across OpenFOAM versions, PETSc configurations, or hardware.
+The continuation runs to `t=8 s`. A primary quantity is treated as steady only
+when its relative change over `t=7...8 s` is below `0.1%`; otherwise the run is
+extended. Temporal and coupling changes must be materially smaller than the
+last retained spatial change.
 
-The `coupling` study runs base-mesh IQNILS and Robin cases with otherwise
-identical settings. It checks every primary quantity for the selected benchmark
-form and requires the Robin result to agree with IQNILS within 1%. It also
-checks the recorded residual history to ensure every Robin time step terminates
-with the displacement, pressure-change, and leakage-flux residuals below their
-configured tolerances. Unlike the mesh study, this comparison does not require
-`gnuplot`.
+## Static solid diagnostic
 
-- `original --study mesh` uses the Richter/Tukovic small-deformation form with
-  St Venant-Kirchhoff elasticity and clean runs to `t = 8 s`. The inlet reaches
-  its peak at `t = 4 s`; the additional interval is required because the
-  published comparison is steady-state. It runs the supplied mesh and uniform
-  2x/4x/8x cell-count refinements. The time step is reduced with linear mesh
-  refinement (`0.05`, `0.025`, `0.0125`, and `0.00625 s`) so the finer mesh
-  results are not contaminated by a larger local Courant number. It extracts
-  point-A displacement and total interface force, and reports the observed
-  order from `u_x(A)`. The finest result is checked against the published
-  primary quantities `u_x(A)=5.95e-5 m` and `F_x=1.33 N`; `u_y` and `F_y` use
-  the additional Tukovic OpenFOAM values as diagnostics only. The CSV also
-  records both literature columns: the Richter benchmark (`u_x`, `F_x`) and
-  the Tukovic OpenFOAM calculation (`u_x`, `u_y`, `F_x`, `F_y`), each with its
-  own relative error.
-- `modified --study mesh` uses the large-deformation form shown in Tukovic's
-  Figure 28: `maxVelocity = 0.3`, a 1 s ramp, `E = 1e4 Pa`, and
-  St Venant-Kirchhoff elasticity. It runs 1x/2x/3x/4x/8x uniform refinements
-  to `t = 8 s`, with time steps `0.05`, `0.025`, `0.0166667`, `0.0125`, and
-  `0.00625 s`. Its primary checks are the Figure 28 values
-  `u_x(A)=0.01463 m`, `u_y(A)=0.005 m`, and `u_z(A)=-0.000447 m`.
-  The tutorial represents one side of the `z = 0` symmetry plane, whereas the
-  published transverse value is verified here as the symmetry-paired quantity
-  `2 u_z(A)`. The CSV retains both raw `u_z(A)` and
-  `uz_symmetry_difference = 2 u_z(A)`, making that convention explicit.
+The exact three-dimensional Richter solid is loaded by a uniform `100 Pa`
+horizontal traction on its upstream face, with all other wetted faces
+traction-free. Four systematically refined solid meshes use the coupled
+family's solid/interface resolution. The diagnostic records displacement at
+the exact material point A and compares it with the slender Euler--Bernoulli
+value for the corresponding full-width uniform load. The analytical value is
+diagnostic only because it omits three-dimensional Poisson and clamp/end
+effects.
 
-The tutorial and every verification copy use `StVenantKirchhoffElastic`; the
-driver does not change the constitutive model.
+<!-- SOLID_RESULTS -->
 
-## Reference provenance and limitations
+## Mesh quality
 
-Richter's 2012 source paper, *Goal-oriented error estimation for
-fluid--structure interaction problems* (doi:10.1016/j.cma.2012.02.014),
-reports five uniform finite-element levels in Table 5. The finest has
-7,600,775 unknowns, `F_x = 1.3380 N` and `u_x(A) = 5.9202e-5 m`. Table 6
-extrapolates the finest three levels to `1.327 +/- 0.01 N` and
-`5.924e-5 +/- 1e-7 m`, with claimed relative accuracy of at most 1%. The
-commonly quoted `1.33 N` and `5.95e-5 m` are rounded benchmark values, not
-results from one unidentified level.
+<!-- MESH_QUALITY -->
 
-This is not an exact problem match. Richter places the beam at
-`x = 0.4...0.5 m`, samples `A = (0.45, 0.15, +0.15) m`, and states a peak
-inlet speed of `0.3 m/s`. The solids4foam form places the beam at
-`x = 0.45...0.55 m`, samples its upstream face at
-`A = (0.45, 0.15, -0.15) m`, and uses peak speed `0.2 m/s`. It also approaches
-steady state through a transient ramp, whereas Richter solves a stationary
-problem. The independent finite-element values are therefore evidence for a
-closely related configuration, not a strong exact-definition reference.
-The `z` sign is only the symmetry-half convention; the important point
-difference is that Richter samples at mid-thickness in `x`, while the current
-solids4foam point is on the upstream face. The graded study intentionally
-preserves that existing point so mesh and benchmark-definition changes are not
-mixed; reconciliation is left to a separate follow-up.
+## MeluXina environment
 
-Tukovic et al. (2018, doi:10.21278/TOF.42301) supply the values used for both
-forms, but they are from the same finite-volume code lineage and a single
-locally concentrated mesh. Gillebaart's 2016 dissertation
-(doi:10.4233/uuid:c078909a-a39c-47b5-8ca6-2cbc9e04486e), section 2.3.4, uses
-the modified dimensions, properties and peak velocity but holds the solid
-fixed to `t = 5 s` and ramps the applied fluid load over `t = 5...6 s`. It
-does not tabulate matching steady point-A values. The modified reference must
-therefore remain classified as weak/same-lineage pending an independent result
-for the exact present definition.
+<!-- ENVIRONMENT -->
 
-For a completed sweep, `Allverify` returns zero only when every primary
-quantity on the finest mesh
-is within 5% of its published reference and its reference error decreases from
-the coarsest to the finest mesh with positive net order. For the original form
-the primaries are the Richter `u_x(A)` and `F_x`; for the modified form they
-are the Tukovic Figure 28 `u_x(A)`, `u_y(A)`, and symmetry-paired `2u_z(A)`.
-This checks convergence toward the reference without requiring a fixed
-numerical regression value, so a future solver improvement is not rejected
-merely for changing a result.
-Because of the provenance limitations above, a pass is a regression/convergence
-diagnostic and must not be described as exact independent validation.
+## Spatial convergence
 
-The old uniform original levels have approximately 1x, 8x, 64x, and 512x
-cells. The old modified sequence additionally includes a 3x level, which is
-close in overall cell count to the published calculation.
-The published Tukovic calculation used a 273,539-cell unstructured fluid mesh
-and a 6,661-cell solid mesh; it visibly concentrates resolution around the
-plate. The supplied tutorial uses a reproducible structured mesh instead, so
-the historical uniform family remains available for comparison and the graded
-family is the efficient spatial-verification path. Neither structured family
-reproduces the published unstructured mesh at an identical cell count. Runtime
-is highly machine- and coupling-dependent: old uniform original 8x has roughly
-7.6 million cells and took about 11 hours on 64 cores in the reference run.
-Schedule any requested levels only on suitable resources.
+<!-- SPATIAL_RESULTS -->
 
-## Graded-family findings
+## Temporal and coupling controls
 
-All four original calculations completed at fixed `deltaT = 0.00625 s`.
-The first L3 attempt reached the unchanged 100-iteration coupling limit on
-OpenFOAM v2512 with 64 ranks. A decomposition diagnostic and production retry
-on MeluXina, using OpenFOAM v2412 and 128 ranks, converged without changing the
-coupling settings. A repeated L2 control quantifies the platform/version
-difference below.
+<!-- CONTROL_RESULTS -->
 
-| L | Cells | `u_x(A)` (m) | `u_y(A)` (m) | `u_z(A)` (m) |
-| --- | ---: | ---: | ---: | ---: |
-| 0 | 7,840 | 4.08348e-5 | 1.56846e-5 | -3.18602e-7 |
-| 1 | 62,720 | 5.21672e-5 | 2.10399e-5 | -7.38201e-7 |
-| 2 | 501,760 | 5.79343e-5 | 2.36525e-5 | -9.26181e-7 |
-| 3 | 4,014,080 | 6.01533e-5 | 2.44087e-5 | -1.73881e-6 |
+## Numerical uncertainty and Richter comparison
 
-| L | `F_x` (N) | `F_y` (N) | `F_z` (N) |
-| --- | ---: | ---: | ---: |
-| 0 | 1.197706 | 0.1077488 | -0.0417130 |
-| 1 | 1.279401 | 0.1065742 | -0.0463250 |
-| 2 | 1.308220 | 0.1082129 | -0.0504448 |
-| 3 | 1.317197 | 0.1087008 | -0.0516540 |
+<!-- UNCERTAINTY_RESULTS -->
 
-The L1--L3 apparent orders are 1.378 for `u_x(A)`, 1.789 for `u_y(A)`,
-1.683 for `F_x` and 1.768 for `F_z`. The L3 changes are 3.83%, 3.20%, 0.69%
-and 2.40%, respectively. These are useful fine-level trends, not proof of an
-asymptotic range, because L1--L2 used v2512 whereas L3 used v2412. The v2412
-L2 control differs from the v2512 result by 0.26% in `u_x(A)` and 0.0015% in
-`F_x`, supporting the principal trend. The much smaller `u_z(A)` differs by
-77% between controls and has negative apparent order, so it remains
-unresolved. `F_y` is non-monotone over L0--L3 even though its finest three
-values rise with shrinking differences. No Richardson estimate is reported.
+## Limitations
 
-At the same solid/interface factors, graded-fluid `u_x(A)` differs from the
-old uniform results by 4.11%, 3.76% and 1.82% on L0--L2. This supports the
-near-body fluid-resolution diagnosis, but does not establish it as the sole
-error: graded L2 has a slightly finer near-body cell than old uniform 8x while
-using only the old 4x solid/interface resolution, and its displacement remains
-2.70% lower. Displacement, pressure-dominated `F_x`, and cancellation-sensitive
-`F_y` must therefore be assessed separately.
-
-On original L2, halving `deltaT` from 0.0125 to 0.00625 s changes `u_x(A)`,
-`u_y(A)`, `F_x` and `F_y` by 0.035%, 0.039%, 0.020% and 0.071%. Time error is
-subordinate to the reported spatial changes. Graded L2 uses 501,760 cells and
-completed in about 0.99 h on 64 ranks; old uniform 8x uses 7,602,176 cells,
-has a 13% coarser near-body spacing, and took about 11 h on the same machine.
-The graded allocation is therefore materially cheaper. L3 completed in
-16.4 h on 128 MeluXina ranks; it has 47% fewer cells than old uniform 8x while
-its representative near-body spacing is 2.25 times finer.
-
-Modified L0--L3 also completed at fixed `deltaT = 0.00625 s`, and all six
-QoIs are monotone. L3 gives `u_x(A)=0.0144735 m`, `u_y(A)=0.00496883 m`,
-`F_x=2.359966 N` and `F_y=0.2280017 N`. Their L2--L3 changes are 3.60%,
-1.98%, 0.64% and 0.77%. The mixed-version L1--L3 apparent orders are 1.375,
-2.142, 1.697 and 2.397. The v2412 L2 control differs from v2512 by 0.29%,
-0.74%, 0.062% and 0.19%, respectively, supporting those principal trends.
-The small `u_z(A)` is strongly platform-sensitive and has negative apparent
-order, so it is not converged. L3 lies 1.07% below Tukovic's `u_x` and 0.62%
-below `u_y`, but its symmetry-paired `2u_z` does not approach the published
-value. This is same-code-lineage comparison, not independent validation. The
-L3 transverse forces still change by 0.91--0.97% over `t = 7...8 s`.
-
-Exact production and control values are in `reference/graded_mesh_results.csv`
-and `reference/graded_platform_controls.csv`.
-
-## Case variants and parallel runs
-
-The driver selects the tutorial's `iqnils` coupling variant for every study so
-that a sweep changes only mesh resolution and time step. Each form is set
-explicitly in its isolated copy, including its inlet ramp and Young's modulus;
-both use `StVenantKirchhoffElastic`.
-
-Pass `--cores N` to use `N` MPI ranks for every case. `--cores auto` (the
-default) uses 1, 4, 8, and 64 ranks for the original 1x, 2x, 4x, and 8x mesh
-levels respectively. For the modified 1x, 2x, 3x, 4x, and 8x levels it uses
-8, 4, 16, 8, and 64 ranks respectively, matching the completed reference
-runs. Override this with `--cores N` when a scheduler allocation requires a
-single rank count.
-The selected count is written to the CSV. For a shared machine, choose `N` from
-the available physical cores and available memory; do not launch multiple sweep
-members concurrently unless those resources are reserved.
-
-By default, verification copies write volume fields only at the final/evaluation
-time, while retaining the compact point-displacement and force histories needed
-to check that the final state is steady. Use `--write-interval N` when
-intermediate volume fields are needed.
-
-`backward` is the default time scheme, matching the second-order backward
-scheme reported by Tukovic et al. `--time-scheme Euler` remains available as an
-opt-in diagnostic, but is not a substitute for the published-discretisation
-verification. A literal `steadyState` fluid/solid scheme is not offered: in
-this coupled PIMPLE configuration it removes the stabilising transient storage
-and diverges during the inlet ramp.
-
-The mesh driver automatically writes a PNG comparison of predictions and
-published references: four panels for the original form and three displacement
-panels for the modified form. Regenerate them manually, if needed, with:
-
-```bash
-gnuplot scripts/plotMeshConvergence.gnuplot
-gnuplot scripts/plotModifiedMeshConvergence.gnuplot
-```
-
-The output names include the selected family and study. The mesh plots use the
-representative near-body cell size recorded in the CSV, so uniform and graded
-families share the same plotting scripts.
-
-## Reference results
-
-The following plots are versioned with this verification setup. They record the
-successful backward/BDF2 studies at `t = 8 s` and provide visual references for
-future local or manually dispatched reproductions.
-
-### Original small-deformation form
-
-![Original benchmark mesh-convergence result](reference/original_mesh_t8_backward_vs_references.png)
-
-### Modified large-deformation form
-
-![Modified benchmark mesh-convergence result](reference/modified_mesh_t8_backward_vs_references.png)
+<!-- LIMITATIONS -->

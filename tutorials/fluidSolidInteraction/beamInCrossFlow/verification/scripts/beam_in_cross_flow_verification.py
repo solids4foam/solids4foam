@@ -562,7 +562,14 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
     ]
     columns += list(quantities)
     columns += [item for quantity in quantities for item in
-                (f"{quantity}_relative_change", f"{quantity}_observed_order",
+                (f"{quantity}_absolute_change",
+                 f"{quantity}_relative_change",
+                 f"{quantity}_difference_ratio",
+                 f"{quantity}_observed_order",
+                 f"{quantity}_richardson_estimate",
+                 f"{quantity}_gci_absolute",
+                 f"{quantity}_gci_relative",
+                 f"{quantity}_asymptotic",
                  f"{quantity}_monotone")]
     columns += [item for quantity in quantities for item in
                 (f"reference_{quantity}", f"{quantity}_relative_error", f"{quantity}_pass")]
@@ -586,10 +593,13 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
         for quantity in quantities:
             row[f"{quantity}_monotone"] = monotone[quantity]
             if row_index:
+                change = row[quantity] - rows[row_index - 1][quantity]
+                row[f"{quantity}_absolute_change"] = abs(change)
                 row[f"{quantity}_relative_change"] = relative_error(
                     row[quantity], rows[row_index - 1][quantity]
                 )
             else:
+                row[f"{quantity}_absolute_change"] = ""
                 row[f"{quantity}_relative_change"] = ""
             if row_index >= 2:
                 factors = [
@@ -608,8 +618,59 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
                 row[f"{quantity}_observed_order"] = (
                     local_order if local_order is not None else ""
                 )
+                previous_difference = (
+                    rows[row_index - 2][quantity]
+                    - rows[row_index - 1][quantity]
+                )
+                current_difference = (
+                    rows[row_index - 1][quantity] - row[quantity]
+                )
+                row[f"{quantity}_difference_ratio"] = (
+                    abs(previous_difference / current_difference)
+                    if current_difference else ""
+                )
+                previous_order = None
+                if row_index >= 3:
+                    previous_order = observed_order(
+                        rows[row_index - 3][quantity],
+                        rows[row_index - 2][quantity],
+                        rows[row_index - 1][quantity],
+                        ratios[0],
+                    )
+                stable_order = (
+                    monotone[quantity]
+                    and local_order is not None
+                    and previous_order is not None
+                    and local_order > 0
+                    and previous_order > 0
+                    and abs(local_order - previous_order)
+                    <= max(0.25, 0.2 * abs(local_order))
+                )
+                row[f"{quantity}_asymptotic"] = stable_order
+                if stable_order:
+                    denominator = ratios[1] ** local_order - 1.0
+                    correction = (
+                        row[quantity] - rows[row_index - 1][quantity]
+                    ) / denominator
+                    estimate = row[quantity] + correction
+                    gci_absolute = 1.25 * abs(correction)
+                    row[f"{quantity}_richardson_estimate"] = estimate
+                    row[f"{quantity}_gci_absolute"] = gci_absolute
+                    row[f"{quantity}_gci_relative"] = (
+                        gci_absolute / abs(row[quantity])
+                        if row[quantity] else ""
+                    )
+                else:
+                    row[f"{quantity}_richardson_estimate"] = ""
+                    row[f"{quantity}_gci_absolute"] = ""
+                    row[f"{quantity}_gci_relative"] = ""
             else:
+                row[f"{quantity}_difference_ratio"] = ""
                 row[f"{quantity}_observed_order"] = ""
+                row[f"{quantity}_richardson_estimate"] = ""
+                row[f"{quantity}_gci_absolute"] = ""
+                row[f"{quantity}_gci_relative"] = ""
+                row[f"{quantity}_asymptotic"] = False
         for quantity, spec in references.items():
             row[f"reference_{quantity}"] = spec["value"]
             row[f"{quantity}_relative_error"] = relative_error(row[quantity], spec["value"])
@@ -655,10 +716,11 @@ def write_results(name: str, rows: list[dict], references: dict, order: float | 
 
 
 def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
-    mesh_spec = references["richter"].get("mesh", references["mesh"])
-    delta_t = mesh_spec["deltaTs"][0]
+    mesh_spec = references["gradedMesh"]
+    factor = references["coupling"]["refinementFactor"]
+    delta_t = mesh_spec["deltaTs"][mesh_spec["refinementFactors"].index(factor)]
     end_time = mesh_spec["endTime"]
-    cores = study_cores(args.cores, 1)
+    cores = study_cores(args.cores, factor)
     results: dict[str, dict[str, float]] = {}
     tolerances = {
         "production": references["coupling"]["productionOuterTolerance"],
@@ -670,6 +732,10 @@ def run_coupling_study(args: argparse.Namespace, references: dict) -> bool:
         configure_richter_case(case, delta_t, end_time)
         configure_time_scheme(case, args.time_scheme)
         configure_output(case, delta_t, end_time, args.write_interval)
+        configure_graded_fluid_mesh(
+            case / "system/fluid/blockMeshDict", factor
+        )
+        refine_mesh(case / "system/solid/blockMeshDict", factor)
         replace_entry(
             case / "constant/fsiProperties.iqnils",
             "outerCorrTolerance",
