@@ -4,20 +4,52 @@
     "default_levels": [
       5,
       10,
-      20,
-      40
+      15,
+      20
     ],
     "default_variants": [
       "hex-segregated",
-      "hex-petscSnes",
       "distHex-segregated",
+      "structTet-segregated",
+      "unstructTet-segregated",
+      "hex-petscSnes",
       "distHex-petscSnes",
+      "structTet-petscSnes",
+      "unstructTet-petscSnes",
       "hex-highOrder-movingLeastSquares",
-      "hex-highOrder-kExactLeastSquares"
+      "structTet-highOrder-movingLeastSquares",
+      "unstructTet-highOrder-movingLeastSquares",
+      "hex-highOrder-kExactLeastSquares",
+      "structTet-highOrder-kExactLeastSquares",
+      "unstructTet-highOrder-kExactLeastSquares"
     ],
     "variants": {
       "hex-segregated": {
         "mesh": "hex",
+        "approach": "segregated",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "distHex-segregated": {
+        "mesh": "distHex",
+        "approach": "segregated",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "structTet-segregated": {
+        "mesh": "structTet",
+        "approach": "segregated",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "unstructTet-segregated": {
+        "mesh": "unstructTet",
         "approach": "segregated",
         "minimum_net_order": {
           "displacement": 1.5,
@@ -32,16 +64,24 @@
           "stress": 0.5
         }
       },
-      "distHex-segregated": {
+      "distHex-petscSnes": {
         "mesh": "distHex",
-        "approach": "segregated",
+        "approach": "petscSnes",
         "minimum_net_order": {
           "displacement": 1.5,
           "stress": 0.5
         }
       },
-      "distHex-petscSnes": {
-        "mesh": "distHex",
+      "structTet-petscSnes": {
+        "mesh": "structTet",
+        "approach": "petscSnes",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "unstructTet-petscSnes": {
+        "mesh": "unstructTet",
         "approach": "petscSnes",
         "minimum_net_order": {
           "displacement": 1.5,
@@ -56,6 +96,22 @@
           "stress": 2.5
         }
       },
+      "structTet-highOrder-movingLeastSquares": {
+        "mesh": "structTet",
+        "approach": "highOrder-movingLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      },
+      "unstructTet-highOrder-movingLeastSquares": {
+        "mesh": "unstructTet",
+        "approach": "highOrder-movingLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      },
       "hex-highOrder-kExactLeastSquares": {
         "mesh": "hex",
         "approach": "highOrder-kExactLeastSquares",
@@ -64,36 +120,20 @@
           "stress": 2.5
         }
       },
-      "structTet-segregated": {
+      "structTet-highOrder-kExactLeastSquares": {
         "mesh": "structTet",
-        "approach": "segregated",
+        "approach": "highOrder-kExactLeastSquares",
         "minimum_net_order": {
-          "displacement": 1.5,
-          "stress": 0.5
+          "displacement": 3.0,
+          "stress": 2.5
         }
       },
-      "structTet-petscSnes": {
-        "mesh": "structTet",
-        "approach": "petscSnes",
-        "minimum_net_order": {
-          "displacement": 1.5,
-          "stress": 0.5
-        }
-      },
-      "unstructTet-segregated": {
+      "unstructTet-highOrder-kExactLeastSquares": {
         "mesh": "unstructTet",
-        "approach": "segregated",
+        "approach": "highOrder-kExactLeastSquares",
         "minimum_net_order": {
-          "displacement": 1.5,
-          "stress": 0.5
-        }
-      },
-      "unstructTet-petscSnes": {
-        "mesh": "unstructTet",
-        "approach": "petscSnes",
-        "minimum_net_order": {
-          "displacement": 1.5,
-          "stress": 0.5
+          "displacement": 3.0,
+          "stress": 2.5
         }
       }
     },

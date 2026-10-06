@@ -144,10 +144,11 @@ Writing DDifference field
 
 ## Expected Results
 
-The tables below come from `verification/Allverify` on OpenFOAM.com v2412.
-The segregated and PETSc SNES approaches give the same errors to at least
-five significant digits, so only the segregated results are shown for the
-second-order discretisation.
+The tables below come from `verification/Allverify` on OpenFOAM.com v2412,
+run with `--levels 5,10,20,40` for the hexahedral meshes; the default sweep
+uses 5, 10, 15, and 20 cells per side. The segregated and PETSc SNES
+approaches give the same errors to at least five significant digits, so only
+the segregated results are shown for the second-order discretisation.
 
 ### Spatial convergence (`steady` mode)
 
@@ -194,7 +195,11 @@ order and the cell-centred stress, which involves the gradient of the
 displacement, at between first and second order in the L2 norm, as for the
 small-strain `manufacturedSolution` tutorial. The cubic reconstructions give
 fourth order in displacement and about third order in stress, and on the
-$40^3$ mesh their errors are 300 to 400 times smaller.
+$40^3$ mesh their errors are 300 to 400 times smaller. On the structured and
+unstructured tetrahedral meshes (5, 10, 15, and 20 cells per side) they give
+net orders of 3.8 to 4.2 in displacement and 2.9 to 3.2 in stress; on the
+distorted hexahedral mesh the cubic reconstruction does not converge, so that
+combination is not part of the verification sweep.
 
 ### Temporal convergence (`dynamic` mode)
 
