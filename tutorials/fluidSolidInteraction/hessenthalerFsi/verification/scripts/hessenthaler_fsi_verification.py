@@ -1177,7 +1177,11 @@ functions
              and path.parent.name == time_name]
     if len(files) != 1:
         fail(f"Expected one centreline sample file in {case}")
-    rows = numeric_rows(files[0])
+    # A station on a processor boundary is sampled by both processors
+    unique = {}
+    for row in numeric_rows(files[0]):
+        unique.setdefault(round(row[2] * 1e6), row)
+    rows = [unique[key] for key in sorted(unique)]
     if len(rows) != len(COMPARE_Z):
         fail(f"{files[0]}: {len(rows)} of {len(COMPARE_Z)} stations sampled")
     # (z0, Dy, Dz) in mm
