@@ -105,27 +105,36 @@ Source files should include the applicable standard banners:
 ### File/header conventions
 
 - Preserve existing license/header block format in C++ files.
-- Every new file must start with the solids4foam banner, never the OpenFOAM
-  one. Copy the banner from a neighbouring file of the same kind:
+- Every new C++ source/header or OpenFOAM dictionary must use the solids4foam
+  banner rather than the OpenFOAM banner, following a neighbouring file of the
+  same type:
   - C++ sources/headers: the `License` block stating
     "This file is part of solids4foam."
   - Case dictionaries: the `solids4foam: solid mechanics and fluid-solid
     interaction simulations` banner with `Version:`, `Web:` and `Disclaimer:`
     lines.
-- The banner `Version:` must be the current solids4foam version. Check what
-  existing files in the repository use (currently `v2.4`) and never copy a
-  stale version (e.g. `v2.3`) from an old file or from memory.
+  This rule does not apply to Markdown files, shell scripts, or other
+  non-C++/non-dictionary files; follow the neighbouring files of that type.
+- The banner `Version:` must be the current solids4foam version. Determine it
+  from the repository rather than from memory: the most recent released
+  `## [vX.Y]` heading in `CHANGELOG.md` is authoritative, and the headers of
+  the tutorial `system/controlDict` files should match it. Never copy a stale
+  version from an old file.
 - Keep include ordering consistent with nearby files.
 - Do not change copyright headers unless explicitly asked.
 
 ### Scripts and docs
 
 - Match existing shell script style in `Allwmake`, `Allrun`, `Alltest`, etc.
-- Python is used only in tutorial `verification/` scripts (e.g.
-  `verification/scripts/*.py`). Regression tests (`regressionTest.sh`,
-  `regressionTests/`, `Alltest`) and all other scripts must be written in
-  bash with standard Unix tools (`awk`, `sed`, `grep`); do not introduce Python
-  there unless it is genuinely unavoidable, and say so if it is.
+- Prefer bash and standard Unix tools (`awk`, `sed`, `grep`) for
+  regression-test infrastructure (`regressionTest.sh`, `regressionTests/`,
+  `Alltest`) and simple tutorial automation; do not introduce Python there
+  unless it is genuinely unavoidable, and say so if it is.
+- Python is appropriate for verification scripts (e.g.
+  `verification/scripts/*.py`), analytical solutions, numerical
+  post-processing, geometry generation (e.g. `makeBlockMeshDict.py`, STL
+  generation), or other tasks where shell scripting would be unnecessarily
+  cumbersome.
 - Keep Markdown concise, practical, and repository-specific.
 - All Markdown files must pass the Lint checker, e.g. `markdownlint README.md`
 
@@ -168,8 +177,9 @@ Source files should include the applicable standard banners:
 - Tutorial `README.md` files follow the structure of existing tutorial
   READMEs. Read a neighbouring one first and reproduce its layout:
   - optional `sort:` front matter,
-  - a level-one title ending with the case name in backticks, following the
-    pattern "Descriptive Title: caseName",
+  - a level-one title that ends with the case name in backticks (most
+    tutorials use a descriptive title such as "Descriptive Title: `caseName`";
+    some use "Tutorial: `caseName`"; follow the neighbouring tutorial),
   - `Prepared by <authors>`,
   - then `## Tutorial Aims`, `## Case Overview`, `## Running the Case`,
     `## Expected Results`, and optionally `## Verification and Convergence
