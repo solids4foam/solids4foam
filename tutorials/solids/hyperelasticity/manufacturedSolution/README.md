@@ -146,8 +146,9 @@ Writing DDifference field
 ## Expected Results
 
 The tables below come from `verification/Allverify` on OpenFOAM.com v2412.
-Both solution approaches, segregated and PETSc SNES, give the same errors to
-at least five significant digits, so only the segregated results are shown.
+The segregated and PETSc SNES approaches give the same errors to at least
+five significant digits, so only the segregated results are shown for the
+second-order discretisation.
 
 ### Spatial convergence (`steady` mode)
 
@@ -173,9 +174,28 @@ hexahedron and the given numbers of cells per side:
 | tet | 20 | 3.89e-4 | 1.18e-3 | 6.30e3 | 2.73e4 |
 | tet | net order | 1.96 | 1.76 | 1.30 | 0.92 |
 
-The displacement converges at second order and the cell-centred stress, which
-involves the gradient of the displacement, at between first and second order
-in the L2 norm, as for the small-strain `manufacturedSolution` tutorial.
+With the cubic high-order reconstructions, `movingLeastSquares` (MLS) and
+`kExactLeastSquares` (kExact), on the regular hexahedral meshes:
+
+| Method | Cells/side | D L2 [m] | D Linf [m] | sigma L2 [Pa] | sigma Linf [Pa] |
+| --- | --- | --- | --- | --- | --- |
+| MLS | 5 | 1.43e-3 | 3.18e-3 | 7.73e3 | 2.50e4 |
+| MLS | 10 | 5.86e-5 | 1.62e-4 | 6.36e2 | 5.09e3 |
+| MLS | 20 | 2.90e-6 | 7.02e-6 | 5.81e1 | 4.12e2 |
+| MLS | 40 | 1.91e-7 | 5.26e-7 | 5.47e0 | 3.08e1 |
+| MLS | net order | 4.29 | 4.19 | 3.49 | 3.22 |
+| kExact | 5 | 1.22e-3 | 4.52e-3 | 5.81e3 | 1.78e4 |
+| kExact | 10 | 6.53e-5 | 1.50e-4 | 8.69e2 | 3.59e3 |
+| kExact | 20 | 4.42e-6 | 9.31e-6 | 8.17e1 | 2.97e2 |
+| kExact | 40 | 3.04e-7 | 7.30e-7 | 7.55e0 | 3.31e1 |
+| kExact | net order | 3.99 | 4.20 | 3.20 | 3.02 |
+
+With the second-order discretisation the displacement converges at second
+order and the cell-centred stress, which involves the gradient of the
+displacement, at between first and second order in the L2 norm, as for the
+small-strain `manufacturedSolution` tutorial. The cubic reconstructions give
+fourth order in displacement and about third order in stress, and on the
+$40^3$ mesh their errors are 300 to 400 times smaller.
 
 ### Temporal convergence (`dynamic` mode)
 
