@@ -43,8 +43,8 @@ doi:10.1016/j.cma.2012.02.014, section 7.2 and Tables 5--6.
 | Fluid domain | `(0,1.5) x (0,0.4) x (-0.4,0.4) m` | Same; negative-`z` symmetry half |
 | Solid | `(0.4,0.5) x (0,0.2) x (-0.2,0.2) m` | Same; negative-`z` half |
 | Symmetry | `x-y` plane | `z=0` fluid and solid symmetry |
-| Inlet | exact bi-parabolic profile, peak `0.3 m/s` | Same stationary profile after numerical ramp |
-| Mean speed / Reynolds number | `0.2 m/s`; `Re=40` for height `0.2 m` | Same |
+| Inlet | printed profile has coefficient `0.3 m/s`, inconsistent with its stated mean/Re and Table 6 | reference-producing peak `0.2 m/s`, after a numerical ramp |
+| Reynolds-number convention | `Re=40` from speed `0.2 m/s` and height `0.2 m` | Same |
 | Fluid | `rho=1000 kg/m3`, `nu=0.001 m2/s` | Same |
 | Outlet | do-nothing / zero traction | zero gauge kinematic pressure and zero-gradient velocity |
 | Other fluid walls | no slip | Same |
@@ -60,10 +60,16 @@ doi:10.1016/j.cma.2012.02.014, section 7.2 and Tables 5--6.
 The inlet field is
 
 ```text
-u_x = 0.3 y(0.4-y)(0.4^2-z^2)/(0.2^2 0.4^2),  u_y=u_z=0.
+u_x = 0.2 y(0.4-y)(0.4^2-z^2)/(0.2^2 0.4^2),  u_y=u_z=0.
 ```
 
-The custom inlet condition implements this expression exactly. A one-second
+The `0.2 m/s` coefficient is not fitted. It is used by an independent
+finite-volume reproduction that recovers Richter's reference displacement. A
+MeluXina control using the journal's literal `0.3 m/s` value gave, already at
+L2, `u_x(A)=1.00488e-4 m` and `F_x=2.374774 N`; both sequences were monotone
+away from Table 6. The printed `0.3 m/s` coefficient and the tabulated
+reference therefore do not describe the same numerical problem. The custom
+inlet condition implements the selected expression exactly. A one-second
 cosine ramp is used only to start the partitioned calculation robustly. The
 reported state must satisfy the steady criterion after the boundary value has
 been constant; the ramp is not part of the benchmark physics. Richter does not
@@ -72,11 +78,11 @@ state a solid density for this stationary example. Solids4foam uses
 stationary balance. A temporal control checks that the continuation does not
 pollute the reported quantities.
 
-The old solids4foam definition placed the solid at `x=0.45...0.55 m`, sampled
-its upstream face rather than its mid-thickness, and the old verification
-driver reduced the peak speed to `0.2 m/s`. Those are material changes to the
-problem. They have been replaced, not retained as another production variant;
-git history preserves the earlier study.
+The old solids4foam definition placed the solid at `x=0.45...0.55 m` and
+sampled its upstream face rather than its mid-thickness. Those material changes
+have been replaced. Its `0.2 m/s` peak is retained after resolving the source
+inconsistency above. The old definition is not retained as another production
+variant; git history preserves the earlier study.
 
 ## Richter reference provenance
 
