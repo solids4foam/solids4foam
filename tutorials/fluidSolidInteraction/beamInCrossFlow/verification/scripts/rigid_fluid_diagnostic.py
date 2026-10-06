@@ -85,7 +85,7 @@ def prepare_case(factor: int, cores: int, delta_t: float, end_time: float) -> Pa
         "        patches (interface);\n"
         "        pName p;\n"
         "        UName U;\n"
-        "        rhoName rhoInf;\n"
+        "        \"rhoName|rho\" rhoInf;\n"
         "        rhoInf 1000;\n"
         "        CofR (0.45 0.1 0);\n"
         "    }\n}\n"

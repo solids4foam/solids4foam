@@ -76,6 +76,9 @@ def prepare_case(factor: int, cores: int, traction: float) -> Path:
     text = physics.read_text().replace("type    fluidSolidInteraction;", "type    solid;")
     physics.write_text(text)
 
+    solid_properties = case / "constant/solidProperties"
+    verify.replace_entry(solid_properties, "predictor", "no")
+
     displacement = case / "0/D"
     text = displacement.read_text()
     interface_match = re.search(r"interface\s*\{.*?\n\s*\}", text, re.DOTALL)
