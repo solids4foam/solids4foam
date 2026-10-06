@@ -25,7 +25,7 @@ boundaryField
 {
     patch0
     {
-        // Manufactured displacement at the face centres; the parameters are
+        // Manufactured displacement; the parameters are
         // read from constant/neoHookeanManufacturedSolutionProperties
         type            neoHookeanManufacturedSolution;
         value           uniform (0 0 0);

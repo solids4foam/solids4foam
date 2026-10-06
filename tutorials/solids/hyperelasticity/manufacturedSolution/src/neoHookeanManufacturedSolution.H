@@ -76,7 +76,9 @@ Description
     constant/neoHookeanManufacturedSolutionProperties.
 
 Author
-    Ivan Batistic, FSB Zagreb. Derivation by Pablo Castrillo.
+    Ivan Batistic, UCD.
+    Pablo Castrillo, UCD.
+    Philip Cardiff, UCD.
 
 SourceFiles
     neoHookeanManufacturedSolution.C

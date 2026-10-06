@@ -7,11 +7,21 @@ usage()
     cat <<'USAGE'
 Usage: ./Allrun [mode] [approach] [mesh] [timeScheme]
 
-mode:       steady (default), dynamic
-approach:   segregated (default), petscSnes,
-            highOrder-movingLeastSquares, highOrder-kExactLeastSquares
-mesh:       hex (default), distHex, tet
-timeScheme: backward (default), Euler, NewmarkBeta (dynamic mode only)
+mode:       steady (default),
+            dynamic
+
+approach:   segregated (default),
+            petscSnes,
+            highOrder-movingLeastSquares,
+            highOrder-kExactLeastSquares
+
+mesh:       hex (default),
+            distHex,
+            tet
+
+timeScheme: backward (default),
+            Euler,
+            NewmarkBeta
 USAGE
 }
 

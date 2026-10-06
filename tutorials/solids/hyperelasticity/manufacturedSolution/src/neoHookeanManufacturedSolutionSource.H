@@ -37,6 +37,11 @@ Usage
     The solution parameters are read from
     constant/neoHookeanManufacturedSolutionProperties.
 
+Author
+    Ivan Batistic, UCD.
+    Pablo Castrillo, UCD.
+    Philip Cardiff, UCD.
+
 SourceFiles
     neoHookeanManufacturedSolutionSource.C
 

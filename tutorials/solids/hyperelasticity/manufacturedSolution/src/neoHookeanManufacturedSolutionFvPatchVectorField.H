@@ -20,7 +20,7 @@ Class
 
 Description
     Fixed displacement condition that prescribes the neo-Hookean manufactured
-    displacement at the patch face centres at the current time. The solution
+    displacement at the patch faces at the current time. The solution
     parameters are read from constant/neoHookeanManufacturedSolutionProperties.
 
 Usage
