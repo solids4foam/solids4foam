@@ -10,39 +10,40 @@
   },
   "coupling": {
     "robin": {
-      "ur_max_A_m": 0.00015964135531496064,
-      "uz_min_A_m": -8.954319011655566e-05,
-      "t_arrival_A_s": 0.005872159097982797,
-      "wave_speed_pressure_m_s": 4.660074416152634,
-      "mean_fsi_iterations": 4.7775,
+      "ur_max_A_m": 0.0001597822214566929,
+      "uz_min_A_m": -8.81903580177373e-05,
+      "t_arrival_A_s": 0.005872715112570655,
+      "wave_speed_pressure_m_s": 4.663341692182265,
+      "mean_fsi_iterations": 4.77875,
       "maximum_fsi_iterations": 9.0,
-      "total_fsi_iterations": 3822.0,
-      "clock_time_s": 524.0,
+      "total_fsi_iterations": 3823.0,
+      "clock_time_s": 483.0,
       "cores": 4.0
     },
     "iqnils": {
-      "ur_max_A_m": 0.00015955271901709403,
-      "uz_min_A_m": -8.950128030193238e-05,
-      "t_arrival_A_s": 0.005868281287151284,
-      "wave_speed_pressure_m_s": 4.660097137102892,
-      "mean_fsi_iterations": 15.52125,
-      "maximum_fsi_iterations": 21.0,
-      "total_fsi_iterations": 12417.0,
-      "clock_time_s": 1891.0,
+      "ur_max_A_m": 0.00015969272844827586,
+      "uz_min_A_m": -8.814951488095238e-05,
+      "t_arrival_A_s": 0.005868837132635996,
+      "wave_speed_pressure_m_s": 4.663156109215589,
+      "mean_fsi_iterations": 15.52,
+      "maximum_fsi_iterations": 20.0,
+      "total_fsi_iterations": 12416.0,
+      "clock_time_s": 1994.0,
       "cores": 4.0
     },
-    "radial_history_difference_vs_iqnils": 0.002557272242940864,
+    "radial_history_difference_vs_iqnils": 0.0025550462162771486,
     "relative_difference": {
-      "ur_max_A_m": 0.0005555298487712821,
-      "t_ur_max_A_s": 0.0019469072562167506,
-      "uz_min_A_m": 0.0004682593867025923,
-      "t_uz_min_A_s": 0.00044284838215644844,
-      "ur_min_late_A_m": 0.0018362934145621517,
-      "t_arrival_A_s": 0.0006608086152931704,
-      "wave_speed_pressure_m_s": 4.875638766674141e-06,
-      "wave_speed_wall_m_s": 0.0005452404403335335
+      "ur_max_A_m": 0.000560407535688315,
+      "t_ur_max_A_s": 0.001916114767442096,
+      "uz_min_A_m": 0.00046333932569093717,
+      "t_uz_min_A_s": 0.00045091884996814304,
+      "ur_min_late_A_m": 0.0018310727981495768,
+      "t_arrival_A_s": 0.0006607748429571793,
+      "wave_speed_pressure_m_s": 3.9797716895894616e-05,
+      "wave_speed_wall_m_s": 0.0005551576791786617
     }
   },
+  "mesh_study_probes": "shifted 7.8125e-5 m off the cell faces",
   "mesh_study": {
     "levels": [
       {
@@ -53,23 +54,23 @@
         "time_scheme": "backward",
         "coupling": "robin",
         "cores": 4.0,
-        "clock_time_s": 504.0,
-        "mean_fsi_iterations": 4.7775,
+        "clock_time_s": 531.0,
+        "mean_fsi_iterations": 4.77875,
         "maximum_fsi_iterations": 9.0,
-        "total_fsi_iterations": 3822.0,
+        "total_fsi_iterations": 3823.0,
         "robin_stalled_steps": 0.0,
         "unconverged_steps": 0.0,
-        "maximum_final_displacement_residual": 6.06422e-07,
-        "maximum_final_pressure_residual": 9.9527e-06,
-        "maximum_final_flux_residual": 9.73743e-06,
-        "ur_max_A_m": 0.00015964135531496064,
-        "t_ur_max_A_s": 0.007201870078740158,
-        "uz_min_A_m": -8.954319011655566e-05,
-        "t_uz_min_A_s": 0.004722585632730733,
-        "ur_min_late_A_m": -9.997710936532507e-05,
-        "t_arrival_A_s": 0.005872159097982797,
-        "wave_speed_pressure_m_s": 4.660074416152634,
-        "wave_speed_wall_m_s": 5.065355787990639
+        "maximum_final_displacement_residual": 6.05547e-07,
+        "maximum_final_pressure_residual": 9.76952e-06,
+        "maximum_final_flux_residual": 9.1057e-06,
+        "ur_max_A_m": 0.0001597822214566929,
+        "t_ur_max_A_s": 0.0072014763779527586,
+        "uz_min_A_m": -8.81903580177373e-05,
+        "t_uz_min_A_s": 0.004720409875359541,
+        "ur_min_late_A_m": -0.0001001359453125,
+        "t_arrival_A_s": 0.005872715112570655,
+        "wave_speed_pressure_m_s": 4.653911632557012,
+        "wave_speed_wall_m_s": 5.066405804566241
       },
       {
         "level": 2.0,
@@ -79,23 +80,23 @@
         "time_scheme": "backward",
         "coupling": "robin",
         "cores": 8.0,
-        "clock_time_s": 3641.0,
-        "mean_fsi_iterations": 4.185625,
+        "clock_time_s": 3744.0,
+        "mean_fsi_iterations": 3.8675,
         "maximum_fsi_iterations": 9.0,
-        "total_fsi_iterations": 6697.0,
+        "total_fsi_iterations": 6188.0,
         "robin_stalled_steps": 0.0,
         "unconverged_steps": 0.0,
-        "maximum_final_displacement_residual": 5.17146e-07,
-        "maximum_final_pressure_residual": 9.99303e-06,
-        "maximum_final_flux_residual": 4.60536e-06,
-        "ur_max_A_m": 0.00015975936842105263,
-        "t_ur_max_A_s": 0.007207236842105262,
-        "uz_min_A_m": -8.879713290636042e-05,
-        "t_uz_min_A_s": 0.004752186395759716,
-        "ur_min_late_A_m": -9.35223348756906e-05,
-        "t_arrival_A_s": 0.005856890009685443,
-        "wave_speed_pressure_m_s": 4.646306171040403,
-        "wave_speed_wall_m_s": 5.14308970964691
+        "maximum_final_displacement_residual": 6.5466e-07,
+        "maximum_final_pressure_residual": 9.99824e-06,
+        "maximum_final_flux_residual": 8.26067e-06,
+        "ur_max_A_m": 0.00015946013636363636,
+        "t_ur_max_A_s": 0.007215340909090911,
+        "uz_min_A_m": -8.658730017730496e-05,
+        "t_uz_min_A_s": 0.004758289007092197,
+        "ur_min_late_A_m": -9.408584016497462e-05,
+        "t_arrival_A_s": 0.005842903117187652,
+        "wave_speed_pressure_m_s": 4.635015254023137,
+        "wave_speed_wall_m_s": 5.138088825443155
       },
       {
         "level": 3.0,
@@ -104,146 +105,146 @@
         "delta_t_s": 6.25e-06,
         "time_scheme": "backward",
         "coupling": "robin",
-        "cores": 32.0,
-        "clock_time_s": 22502.0,
-        "mean_fsi_iterations": 4.06125,
+        "cores": 128.0,
+        "clock_time_s": 15317.0,
+        "mean_fsi_iterations": 3.1753125,
         "maximum_fsi_iterations": 9.0,
-        "total_fsi_iterations": 12996.0,
+        "total_fsi_iterations": 10161.0,
         "robin_stalled_steps": 0.0,
         "unconverged_steps": 0.0,
-        "maximum_final_displacement_residual": 4.76858e-07,
-        "maximum_final_pressure_residual": 9.99904e-06,
-        "maximum_final_flux_residual": 5.42104e-06,
-        "ur_max_A_m": 0.00015847068055555556,
-        "t_ur_max_A_s": 0.007253819444444439,
-        "uz_min_A_m": -8.834691523972603e-05,
-        "t_uz_min_A_s": 0.004765796232876713,
-        "ur_min_late_A_m": -9.565885089285715e-05,
-        "t_arrival_A_s": 0.005829974324977803,
-        "wave_speed_pressure_m_s": 4.600282201599158,
-        "wave_speed_wall_m_s": 5.063788006477558
+        "maximum_final_displacement_residual": 6.19006e-07,
+        "maximum_final_pressure_residual": 9.93268e-06,
+        "maximum_final_flux_residual": 4.86078e-06,
+        "ur_max_A_m": 0.00015851025,
+        "t_ur_max_A_s": 0.007251562499999995,
+        "uz_min_A_m": -8.571155e-05,
+        "t_uz_min_A_s": 0.004765625000000001,
+        "ur_min_late_A_m": -9.602857867647059e-05,
+        "t_arrival_A_s": 0.005824822403415454,
+        "wave_speed_pressure_m_s": 4.594402091503451,
+        "wave_speed_wall_m_s": 5.066256777536654
       }
     ],
     "quantities": {
       "ur_max_A_m": {
-        "change_1_2": 1.1801310609199146e-07,
-        "change_2_3": -1.2886878654970707e-06,
-        "relative_change_1_2": 0.0007446999386780524,
-        "relative_change_2_3": 0.00813202707894784,
-        "observed_order": null,
+        "change_1_2": -3.220850930565444e-07,
+        "change_2_3": -9.498863636363578e-07,
+        "relative_change_1_2": 0.002031951202250608,
+        "relative_change_2_3": 0.005992586369880546,
+        "observed_order": -1.5603130413915156,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
-        "verdict": "order undefined: non-monotone (the changes change sign)",
-        "uncertainty_band_Fs3_p2": 1.2886878654970707e-06,
-        "relative_uncertainty_band_Fs3_p2": 0.00813202707894784,
-        "floor_relative": 0.0005555298487712821
+        "verdict": "order undefined: the changes do not decrease",
+        "uncertainty_band_Fs3_p2": 9.498863636363578e-07,
+        "relative_uncertainty_band_Fs3_p2": 0.005992586369880546,
+        "floor_relative": 0.000560407535688315
       },
       "t_ur_max_A_s": {
-        "change_1_2": 5.366763365104339e-06,
-        "change_2_3": 4.6582602339176674e-05,
-        "relative_change_1_2": 0.0007398534532334741,
-        "relative_change_2_3": 0.006421803395568854,
+        "change_1_2": 1.3864531138152274e-05,
+        "change_2_3": 3.622159090908416e-05,
+        "relative_change_1_2": 0.0019119370671013707,
+        "relative_change_2_3": 0.004995004995004068,
         "observed_order": null,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
         "verdict": "order undefined: a change is below the iterative/extraction floor",
-        "uncertainty_band_Fs3_p2": 4.6582602339176674e-05,
-        "relative_uncertainty_band_Fs3_p2": 0.006421803395568854,
+        "uncertainty_band_Fs3_p2": 3.622159090908416e-05,
+        "relative_uncertainty_band_Fs3_p2": 0.004995004995004068,
         "floor_relative": 0.005
       },
       "uz_min_A_m": {
-        "change_1_2": 7.46057210195236e-07,
-        "change_2_3": 4.502176666343886e-07,
-        "relative_change_1_2": 0.008444632256495178,
-        "relative_change_2_3": 0.005096020222242507,
-        "observed_order": 0.7286635959127499,
+        "change_1_2": 1.6030578404323454e-06,
+        "change_2_3": 8.75750177304954e-07,
+        "relative_change_1_2": 0.018702938407161526,
+        "relative_change_2_3": 0.010217411507608415,
+        "observed_order": 0.872235200534507,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
-        "verdict": "monotone; formal order 0.73 reported, far from the nominal 2, so no Richardson estimate",
-        "uncertainty_band_Fs3_p2": 4.502176666343886e-07,
-        "relative_uncertainty_band_Fs3_p2": 0.005096020222242507,
-        "floor_relative": 0.0004682593867025923
+        "verdict": "monotone; formal order 0.87 reported, far from the nominal 2, so no Richardson estimate",
+        "uncertainty_band_Fs3_p2": 8.75750177304954e-07,
+        "relative_uncertainty_band_Fs3_p2": 0.010217411507608415,
+        "floor_relative": 0.00046333932569093717
       },
       "t_uz_min_A_s": {
-        "change_1_2": 2.9600763028983165e-05,
-        "change_2_3": 1.3609837116996745e-05,
-        "relative_change_1_2": 0.0062110844825431525,
-        "relative_change_2_3": 0.0028557320648981304,
-        "observed_order": 1.1209845644557082,
-        "richardson_estimate": 0.004777379531265479,
-        "richardson_relative_error_fine": 0.0024246133917054653,
+        "change_1_2": 3.7879131732656245e-05,
+        "change_2_3": 7.335992907803526e-06,
+        "relative_change_1_2": 0.007948407970131145,
+        "relative_change_2_3": 0.0015393558888505757,
+        "observed_order": 2.3683391123615363,
+        "richardson_estimate": 0.004767386992840748,
+        "richardson_relative_error_fine": 0.00036959299578436205,
         "verdict": "monotone; order and Richardson estimate reported",
-        "uncertainty_band_Fs3_p2": 1.3609837116996745e-05,
-        "relative_uncertainty_band_Fs3_p2": 0.0028557320648981304,
+        "uncertainty_band_Fs3_p2": 7.335992907803526e-06,
+        "relative_uncertainty_band_Fs3_p2": 0.0015393558888505757,
         "floor_relative": 0.001
       },
       "ur_min_late_A_m": {
-        "change_1_2": 6.45477448963447e-06,
-        "change_2_3": -2.136516017166545e-06,
-        "relative_change_1_2": 0.06747702308136809,
-        "relative_change_2_3": 0.02233474474368873,
+        "change_1_2": 6.050105147525382e-06,
+        "change_2_3": -1.9427385114959646e-06,
+        "relative_change_1_2": 0.06300317291906155,
+        "relative_change_2_3": 0.020230836884936466,
         "observed_order": null,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
         "verdict": "order undefined: non-monotone (the changes change sign)",
-        "uncertainty_band_Fs3_p2": 6.45477448963447e-06,
-        "relative_uncertainty_band_Fs3_p2": 0.06747702308136809,
-        "floor_relative": 0.0018362934145621517
+        "uncertainty_band_Fs3_p2": 6.050105147525382e-06,
+        "relative_uncertainty_band_Fs3_p2": 0.06300317291906155,
+        "floor_relative": 0.0018310727981495768
       },
       "t_arrival_A_s": {
-        "change_1_2": -1.526908829735385e-05,
-        "change_2_3": -2.6915684707640164e-05,
-        "relative_change_1_2": 0.002619066130692091,
-        "relative_change_2_3": 0.004616775856511622,
-        "observed_order": -0.8178332037519944,
+        "change_1_2": -2.9811995383002832e-05,
+        "change_2_3": -1.8080713772197776e-05,
+        "relative_change_1_2": 0.005118095165531951,
+        "relative_change_2_3": 0.0031040798362531935,
+        "observed_order": 0.721441309202911,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
-        "verdict": "order undefined: the changes do not decrease",
-        "uncertainty_band_Fs3_p2": 2.6915684707640164e-05,
-        "relative_uncertainty_band_Fs3_p2": 0.004616775856511622,
-        "floor_relative": 0.0006608086152931704
+        "verdict": "monotone; formal order 0.72 reported, far from the nominal 2, so no Richardson estimate",
+        "uncertainty_band_Fs3_p2": 1.8080713772197776e-05,
+        "relative_uncertainty_band_Fs3_p2": 0.0031040798362531935,
+        "floor_relative": 0.0006607748429571793
       },
       "wave_speed_pressure_m_s": {
-        "change_1_2": -0.013768245112230737,
-        "change_2_3": -0.04602396944124543,
-        "relative_change_1_2": 0.0029929131537723046,
-        "relative_change_2_3": 0.010004596984342938,
-        "observed_order": -1.7410407308048632,
+        "change_1_2": -0.018896378533875158,
+        "change_2_3": -0.04061316251968616,
+        "relative_change_1_2": 0.004112913532061273,
+        "relative_change_2_3": 0.008839705735550043,
+        "observed_order": -1.1038376030023018,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
         "verdict": "order undefined: the changes do not decrease",
-        "uncertainty_band_Fs3_p2": 0.04602396944124543,
-        "relative_uncertainty_band_Fs3_p2": 0.010004596984342938,
+        "uncertainty_band_Fs3_p2": 0.04061316251968616,
+        "relative_uncertainty_band_Fs3_p2": 0.008839705735550043,
         "floor_relative": 0.0001
       },
       "wave_speed_wall_m_s": {
-        "change_1_2": 0.07773392165627069,
-        "change_2_3": -0.07930170316935214,
-        "relative_change_1_2": 0.015350943119426419,
-        "relative_change_2_3": 0.01566054958618134,
+        "change_1_2": 0.07168302087691458,
+        "change_2_3": -0.07183204790650155,
+        "relative_change_1_2": 0.014149109297963522,
+        "relative_change_2_3": 0.01417852490718565,
         "observed_order": null,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
         "verdict": "order undefined: non-monotone (the changes change sign)",
-        "uncertainty_band_Fs3_p2": 0.07930170316935214,
-        "relative_uncertainty_band_Fs3_p2": 0.01566054958618134,
-        "floor_relative": 0.0005452404403335335
+        "uncertainty_band_Fs3_p2": 0.07183204790650155,
+        "relative_uncertainty_band_Fs3_p2": 0.01417852490718565,
+        "floor_relative": 0.0005551576791786617
       },
       "wave_speed_pressure_shifted_probes_m_s": {
-        "change_1_2": -0.018894502029882965,
-        "change_2_3": -0.04077933239637854,
-        "relative_change_1_2": 0.004115631864430929,
-        "relative_change_2_3": 0.00888262202175622,
-        "observed_order": -1.1098716605544576,
+        "change_1_2": -0.018896378533875158,
+        "change_2_3": -0.04061316251968616,
+        "relative_change_1_2": 0.004112913532061273,
+        "relative_change_2_3": 0.008839705735550043,
+        "observed_order": -1.1038376030023018,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
         "verdict": "order undefined: the changes do not decrease",
-        "uncertainty_band_Fs3_p2": 0.04077933239637854,
-        "relative_uncertainty_band_Fs3_p2": 0.00888262202175622,
+        "uncertainty_band_Fs3_p2": 0.04061316251968616,
+        "relative_uncertainty_band_Fs3_p2": 0.008839705735550043,
         "values": [
-          4.650585425226552,
-          4.631690923196669,
-          4.590911590800291
+          4.653911632557012,
+          4.635015254023137,
+          4.594402091503451
         ],
         "floor_relative": 0.0001,
         "note": "probes shifted 7.8125e-5 m axially, inside one cell on every level; the default-probe values carry a one-cell sampling ambiguity"
@@ -256,482 +257,360 @@
     },
     "history_differences": {
       "level_1_to_2": {
-        "radial_history_max_difference": 0.06716868224041665,
-        "axial_history_max_difference": 0.07882533759626524,
-        "pressure_history_max_difference": 0.06448598130841122,
+        "radial_history_max_difference": 0.07217968255162771,
+        "axial_history_max_difference": 0.09610749446273822,
+        "pressure_history_max_difference": 0.04118470073372704,
         "common_time_levels": 800
       },
       "level_2_to_3": {
-        "radial_history_max_difference": 0.05797816621442545,
-        "axial_history_max_difference": 0.046869229477925066,
-        "pressure_history_max_difference": 0.030981443131522315,
+        "radial_history_max_difference": 0.05223014320863037,
+        "axial_history_max_difference": 0.05411249772034496,
+        "pressure_history_max_difference": 0.05099045268558812,
         "common_time_levels": 1600
       }
-    }
-  },
-  "iterative_error_tight_tolerances": {
-    "level2": {
-      "ur_max_A_m": {
-        "default": 0.00015975936842105263,
-        "tight": 0.00015975936842105263,
-        "relative_difference": 0.0
-      },
-      "t_ur_max_A_s": {
-        "default": 0.007207236842105262,
-        "tight": 0.007207236842105262,
-        "relative_difference": 0.0
-      },
-      "uz_min_A_m": {
-        "default": -8.879713290636042e-05,
-        "tight": -8.879713290636042e-05,
-        "relative_difference": 0.0
-      },
-      "t_uz_min_A_s": {
-        "default": 0.004752186395759716,
-        "tight": 0.004752186395759716,
-        "relative_difference": 0.0
-      },
-      "ur_min_late_A_m": {
-        "default": -9.35223348756906e-05,
-        "tight": -9.35223348756906e-05,
-        "relative_difference": 0.0
-      },
-      "t_arrival_A_s": {
-        "default": 0.005856890009685443,
-        "tight": 0.005856890009685443,
-        "relative_difference": 0.0
-      },
-      "wave_speed_pressure_m_s": {
-        "default": 4.646306171040403,
-        "tight": 4.6463193673955585,
-        "relative_difference": -2.8401739337785195e-06
-      },
-      "wave_speed_wall_m_s": {
-        "default": 5.14308970964691,
-        "tight": 5.143089449314615,
-        "relative_difference": 5.06178820808275e-08
-      },
-      "mean_fsi_iterations_tight": 7.26125,
-      "clock_time_s_tight": 10889.0
     }
   },
   "space_time_separation": {
     "timestep_level1_mesh_backward": [
       {
         "delta_t_s": 0.0001,
-        "mean_fsi_iterations": 4.56,
-        "clock_time_s": 185.0,
-        "ur_max_A_m": 0.0001561818507584771,
-        "t_ur_max_A_s": 0.007210261748958954,
-        "uz_min_A_m": -8.700754291563018e-05,
-        "t_uz_min_A_s": 0.0048337790215588735,
-        "ur_min_late_A_m": -9.334254146737409e-05,
-        "t_arrival_A_s": 0.005753825623645582,
-        "wave_speed_pressure_m_s": 4.644117986172662,
-        "wave_speed_wall_m_s": 5.070191072178167
+        "mean_fsi_iterations": 4.565,
+        "clock_time_s": 176.0,
+        "ur_max_A_m": 0.0001563181817102138,
+        "t_ur_max_A_s": 0.0072098574821852736,
+        "uz_min_A_m": -8.564547443550074e-05,
+        "t_uz_min_A_s": 0.00483103700606314,
+        "ur_min_late_A_m": -9.347343090729002e-05,
+        "t_arrival_A_s": 0.00575475483163815,
+        "wave_speed_pressure_m_s": 4.647259228242719,
+        "wave_speed_wall_m_s": 5.071531183720214
       },
       {
         "delta_t_s": 5e-05,
         "mean_fsi_iterations": 4.2925,
-        "clock_time_s": 285.0,
-        "ur_max_A_m": 0.0001584071454326923,
-        "t_ur_max_A_s": 0.0072013221153846155,
-        "uz_min_A_m": -8.927097517911975e-05,
-        "t_uz_min_A_s": 0.00476512282497441,
-        "ur_min_late_A_m": -9.829648082987552e-05,
-        "t_arrival_A_s": 0.005850572337667459,
-        "wave_speed_pressure_m_s": 4.658655006860675,
-        "wave_speed_wall_m_s": 5.0593009407172245
+        "clock_time_s": 272.0,
+        "ur_max_A_m": 0.00015854805861244018,
+        "t_ur_max_A_s": 0.007200837320574163,
+        "uz_min_A_m": -8.791056242276003e-05,
+        "t_uz_min_A_s": 0.004763066426364573,
+        "ur_min_late_A_m": -9.845055524360032e-05,
+        "t_arrival_A_s": 0.0058512107562031694,
+        "wave_speed_pressure_m_s": 4.6618846840520245,
+        "wave_speed_wall_m_s": 5.060414296823026
       },
       {
         "delta_t_s": 2.5e-05,
-        "mean_fsi_iterations": 4.7775,
-        "clock_time_s": 510.0,
-        "ur_max_A_m": 0.00015964135531496064,
-        "t_ur_max_A_s": 0.007201870078740158,
-        "uz_min_A_m": -8.954319011655566e-05,
-        "t_uz_min_A_s": 0.004722585632730733,
-        "ur_min_late_A_m": -9.997710936532507e-05,
-        "t_arrival_A_s": 0.005872159097982797,
-        "wave_speed_pressure_m_s": 4.660074416152634,
-        "wave_speed_wall_m_s": 5.065355787990639
+        "mean_fsi_iterations": 4.77875,
+        "clock_time_s": 480.0,
+        "ur_max_A_m": 0.0001597822214566929,
+        "t_ur_max_A_s": 0.0072014763779527586,
+        "uz_min_A_m": -8.81903580177373e-05,
+        "t_uz_min_A_s": 0.004720409875359541,
+        "ur_min_late_A_m": -0.0001001359453125,
+        "t_arrival_A_s": 0.005872715112570655,
+        "wave_speed_pressure_m_s": 4.663341692182265,
+        "wave_speed_wall_m_s": 5.066405804566241
       },
       {
         "delta_t_s": 1.25e-05,
-        "mean_fsi_iterations": 7.4325,
-        "clock_time_s": 1154.0,
-        "ur_max_A_m": 0.00015975239112903225,
-        "t_ur_max_A_s": 0.0072433467741935525,
-        "uz_min_A_m": -8.953266004901961e-05,
-        "t_uz_min_A_s": 0.004707475490196083,
-        "ur_min_late_A_m": -9.866878907563025e-05,
-        "t_arrival_A_s": 0.005864834464809385,
-        "wave_speed_pressure_m_s": 4.660844157329076,
-        "wave_speed_wall_m_s": 5.07239040568338
+        "mean_fsi_iterations": 7.425,
+        "clock_time_s": 1110.0,
+        "ur_max_A_m": 0.00015989093951612905,
+        "t_ur_max_A_s": 0.007242943548387095,
+        "uz_min_A_m": -8.818360666666667e-05,
+        "t_uz_min_A_s": 0.00470527777777778,
+        "ur_min_late_A_m": -9.883859210251046e-05,
+        "t_arrival_A_s": 0.005865371906941579,
+        "wave_speed_pressure_m_s": 4.664244013950513,
+        "wave_speed_wall_m_s": 5.073423015367849
       }
     ],
     "fixed_dt_2.5e-5": {
       "ur_max_A_m": {
-        "level1": 0.00015964135531496064,
-        "level2": 0.0001596080822368421,
-        "spatial_change_level1_to_2_relative": -0.000208423926575172,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": 0.0009478604221684995,
-        "combined_change_level1_to_2_relative": 0.000739238938802294
+        "level1": 0.0001597822214566929,
+        "level2": 0.00015921180086206897,
+        "spatial_change_level1_to_2_relative": -0.0035699878836554003,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": 0.0015597807462936456,
+        "combined_change_level1_to_2_relative": -0.0020157755357271823
       },
       "t_ur_max_A_s": {
-        "level1": 0.007201870078740158,
-        "level2": 0.007232072368421052,
-        "spatial_change_level1_to_2_relative": 0.004193673219689364,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.003434081553751463,
-        "combined_change_level1_to_2_relative": 0.0007451902500917041
+        "level1": 0.0072014763779527586,
+        "level2": 0.007235086206896552,
+        "spatial_change_level1_to_2_relative": 0.004667074802423776,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.002729103322475921,
+        "combined_change_level1_to_2_relative": 0.0019252345505983168
       },
       "uz_min_A_m": {
-        "level1": -8.954319011655566e-05,
-        "level2": -8.863143051104973e-05,
-        "spatial_change_level1_to_2_relative": 0.010182344456559108,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.001869566973648638,
-        "combined_change_level1_to_2_relative": 0.008331814057820767
+        "level1": -8.81903580177373e-05,
+        "level2": -8.643421900837988e-05,
+        "spatial_change_level1_to_2_relative": 0.019913050007169964,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.0017710713497652894,
+        "combined_change_level1_to_2_relative": 0.018177246089758816
       },
       "t_uz_min_A_s": {
-        "level1": 0.004722585632730733,
-        "level2": 0.004759350828729279,
-        "spatial_change_level1_to_2_relative": 0.007784971805219988,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.001505338275614251,
-        "combined_change_level1_to_2_relative": 0.006267914513572762
+        "level1": 0.004720409875359541,
+        "level2": 0.004760907821229052,
+        "spatial_change_level1_to_2_relative": 0.008579328265731618,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.0005500661292321482,
+        "combined_change_level1_to_2_relative": 0.008024542938608926
       },
       "ur_min_late_A_m": {
-        "level1": -9.997710936532507e-05,
-        "level2": -9.263562598920863e-05,
-        "spatial_change_level1_to_2_relative": 0.07343164273023764,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.009572007281359245,
-        "combined_change_level1_to_2_relative": 0.0645625236677744
+        "level1": -0.0001001359453125,
+        "level2": -9.333627313084112e-05,
+        "spatial_change_level1_to_2_relative": 0.06790440895563284,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.00803082241223347,
+        "combined_change_level1_to_2_relative": 0.06041891479272973
       },
       "t_arrival_A_s": {
-        "level1": 0.005872159097982797,
-        "level2": 0.005853042961140061,
-        "spatial_change_level1_to_2_relative": -0.003255384693051512,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": 0.0006572732458866475,
-        "combined_change_level1_to_2_relative": -0.002600251124428676
+        "level1": 0.005872715112570655,
+        "level2": 0.005837479651184561,
+        "spatial_change_level1_to_2_relative": -0.0059998587894501965,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": 0.0009290766438887135,
+        "combined_change_level1_to_2_relative": -0.005076356474229392
       },
       "wave_speed_pressure_m_s": {
-        "level1": 4.660074416152634,
-        "level2": 4.6415952655342245,
-        "spatial_change_level1_to_2_relative": -0.0039654196410163454,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": 0.0010149324179898084,
-        "combined_change_level1_to_2_relative": -0.002954511855971138
+        "level1": 4.663341692182265,
+        "level2": 4.644946099514876,
+        "spatial_change_level1_to_2_relative": -0.003944723308229307,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": -0.0021379893929827716,
+        "combined_change_level1_to_2_relative": -0.004060321730581048
       },
       "wave_speed_wall_m_s": {
-        "level1": 5.065355787990639,
-        "level2": 5.056212154386422,
-        "spatial_change_level1_to_2_relative": -0.001805131561714869,
-        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": 0.017182339784757385,
-        "combined_change_level1_to_2_relative": 0.015346191839192943
+        "level1": 5.066405804566241,
+        "level2": 5.057136495078736,
+        "spatial_change_level1_to_2_relative": -0.0018295631745784123,
+        "temporal_change_on_level2_dt_2.5e-5_to_1.25e-5_relative": 0.01600754309147017,
+        "combined_change_level1_to_2_relative": 0.014148693105536127
       }
     },
     "fixed_dt_2.5e-5_three_levels": {
       "ur_max_A_m": {
         "values": [
-          0.00015964135531496064,
-          0.0001596080822368421,
-          0.00015832560333333334
+          0.0001597822214566929,
+          0.00015921180086206897,
+          0.00015834924916107384
         ],
-        "change_1_2": -3.32730781185263e-08,
-        "change_2_3": -1.282478903508774e-06,
-        "relative_change_1_2": 0.00021015601657600695,
-        "relative_change_2_3": 0.008100262222331069,
-        "observed_order": null,
-        "richardson_estimate": null,
-        "richardson_relative_error_fine": null,
-        "verdict": "order undefined: a change is below the iterative/extraction floor",
-        "uncertainty_band_Fs3_p2": 1.282478903508774e-06,
-        "relative_uncertainty_band_Fs3_p2": 0.008100262222331069
-      },
-      "t_ur_max_A_s": {
-        "values": [
-          0.007201870078740158,
-          0.007232072368421052,
-          0.0072598333333333325
-        ],
-        "change_1_2": 3.020228968089473e-05,
-        "change_2_3": 2.7760964912280223e-05,
-        "relative_change_1_2": 0.004160190502200886,
-        "relative_change_2_3": 0.003823912153026501,
-        "observed_order": null,
-        "richardson_estimate": null,
-        "richardson_relative_error_fine": null,
-        "verdict": "order undefined: a change is below the iterative/extraction floor",
-        "uncertainty_band_Fs3_p2": 2.7760964912280223e-05,
-        "relative_uncertainty_band_Fs3_p2": 0.003823912153026501
-      },
-      "uz_min_A_m": {
-        "values": [
-          -8.954319011655566e-05,
-          -8.863143051104973e-05,
-          -8.817800558035713e-05
-        ],
-        "change_1_2": 9.117596055059288e-07,
-        "change_2_3": 4.534249306925928e-07,
-        "relative_change_1_2": 0.010339988974631967,
-        "relative_change_2_3": 0.005142154528312437,
-        "observed_order": 1.0077897765659702,
-        "richardson_estimate": -8.77294377999305e-05,
-        "richardson_relative_error_fine": 0.0051130816710532505,
-        "verdict": "monotone; order and Richardson estimate reported",
-        "uncertainty_band_Fs3_p2": 4.534249306925928e-07,
-        "relative_uncertainty_band_Fs3_p2": 0.005142154528312437
-      },
-      "t_uz_min_A_s": {
-        "values": [
-          0.004722585632730733,
-          0.004759350828729279,
-          0.004775279017857142
-        ],
-        "change_1_2": 3.6765195998545754e-05,
-        "change_2_3": 1.5928189127863666e-05,
-        "relative_change_1_2": 0.00769906760653407,
-        "relative_change_2_3": 0.0033355515077339456,
-        "observed_order": 1.206758419561793,
-        "richardson_estimate": 0.0047874548169278795,
-        "richardson_relative_error_fine": 0.002543271850354601,
-        "verdict": "monotone; order and Richardson estimate reported",
-        "uncertainty_band_Fs3_p2": 1.5928189127863666e-05,
-        "relative_uncertainty_band_Fs3_p2": 0.0033355515077339456
-      },
-      "ur_min_late_A_m": {
-        "values": [
-          -9.997710936532507e-05,
-          -9.263562598920863e-05,
-          -9.58585675e-05
-        ],
-        "change_1_2": 7.3414833761164465e-06,
-        "change_2_3": -3.222941510791372e-06,
-        "relative_change_1_2": 0.07658661679996884,
-        "relative_change_2_3": 0.03362184095637953,
-        "observed_order": null,
-        "richardson_estimate": null,
-        "richardson_relative_error_fine": null,
-        "verdict": "order undefined: non-monotone (the changes change sign)",
-        "uncertainty_band_Fs3_p2": 7.3414833761164465e-06,
-        "relative_uncertainty_band_Fs3_p2": 0.07658661679996884
-      },
-      "t_arrival_A_s": {
-        "values": [
-          0.005872159097982797,
-          0.005853042961140061,
-          0.005820140102359844
-        ],
-        "change_1_2": -1.9116136842736373e-05,
-        "change_2_3": -3.290285878021666e-05,
-        "relative_change_1_2": 0.003284480529083056,
-        "relative_change_2_3": 0.005653276072662892,
-        "observed_order": -0.7834219383805369,
+        "change_1_2": -5.704205946239376e-07,
+        "change_2_3": -8.625517009951296e-07,
+        "relative_change_1_2": 0.0036022942808128016,
+        "relative_change_2_3": 0.005447147400855287,
+        "observed_order": -0.5965848637333624,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
         "verdict": "order undefined: the changes do not decrease",
-        "uncertainty_band_Fs3_p2": 3.290285878021666e-05,
-        "relative_uncertainty_band_Fs3_p2": 0.005653276072662892
+        "uncertainty_band_Fs3_p2": 8.625517009951296e-07,
+        "relative_uncertainty_band_Fs3_p2": 0.005447147400855287
       },
-      "wave_speed_pressure_m_s": {
+      "t_ur_max_A_s": {
         "values": [
-          4.660074416152634,
-          4.6415952655342245,
-          4.628998410984975
+          0.0072014763779527586,
+          0.007235086206896552,
+          0.007258808724832215
         ],
-        "change_1_2": -0.018479150618409435,
-        "change_2_3": -0.012596854549249414,
-        "relative_change_1_2": 0.00399204082130531,
-        "relative_change_2_3": 0.002721291612318573,
-        "observed_order": 0.552834909890884,
+        "change_1_2": 3.3609828943793364e-05,
+        "change_2_3": 2.3722517935663434e-05,
+        "relative_change_1_2": 0.004630212782548592,
+        "relative_change_2_3": 0.0032681007083861092,
+        "observed_order": null,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
-        "verdict": "monotone; formal order 0.55 reported, far from the nominal 2, so no Richardson estimate",
-        "uncertainty_band_Fs3_p2": 0.012596854549249414,
-        "relative_uncertainty_band_Fs3_p2": 0.002721291612318573
+        "verdict": "order undefined: a change is below the iterative/extraction floor",
+        "uncertainty_band_Fs3_p2": 2.3722517935663434e-05,
+        "relative_uncertainty_band_Fs3_p2": 0.0032681007083861092
       },
-      "wave_speed_wall_m_s": {
+      "uz_min_A_m": {
         "values": [
-          5.065355787990639,
-          5.056212154386422,
-          5.121627624037653
+          -8.81903580177373e-05,
+          -8.643421900837988e-05,
+          -8.554193271889401e-05
         ],
-        "change_1_2": -0.009143633604216994,
-        "change_2_3": 0.06541546965123057,
-        "relative_change_1_2": 0.0017852984003176278,
-        "relative_change_2_3": 0.012772398630508022,
+        "change_1_2": 1.7561390093574254e-06,
+        "change_2_3": 8.922862894858696e-07,
+        "relative_change_1_2": 0.020529568990782687,
+        "relative_change_2_3": 0.010430981170580758,
+        "observed_order": 0.9768284703905022,
+        "richardson_estimate": null,
+        "richardson_relative_error_fine": null,
+        "verdict": "monotone; formal order 0.98 reported, far from the nominal 2, so no Richardson estimate",
+        "uncertainty_band_Fs3_p2": 8.922862894858696e-07,
+        "relative_uncertainty_band_Fs3_p2": 0.010430981170580758
+      },
+      "t_uz_min_A_s": {
+        "values": [
+          0.004720409875359541,
+          0.004760907821229052,
+          0.004777188940092167
+        ],
+        "change_1_2": 4.049794586951077e-05,
+        "change_2_3": 1.6281118863115465e-05,
+        "relative_change_1_2": 0.008477359044695735,
+        "relative_change_2_3": 0.00340809607224816,
+        "observed_order": 1.3146488865038863,
+        "richardson_estimate": 0.004788134834505374,
+        "richardson_relative_error_fine": 0.00228604556712269,
+        "verdict": "monotone; order and Richardson estimate reported",
+        "uncertainty_band_Fs3_p2": 1.6281118863115465e-05,
+        "relative_uncertainty_band_Fs3_p2": 0.00340809607224816
+      },
+      "ur_min_late_A_m": {
+        "values": [
+          -0.0001001359453125,
+          -9.333627313084112e-05,
+          -9.618336048387097e-05
+        ],
+        "change_1_2": 6.799672181658886e-06,
+        "change_2_3": -2.8470873530298473e-06,
+        "relative_change_1_2": 0.07069489096088638,
+        "relative_change_2_3": 0.029600622589052467,
         "observed_order": null,
         "richardson_estimate": null,
         "richardson_relative_error_fine": null,
         "verdict": "order undefined: non-monotone (the changes change sign)",
-        "uncertainty_band_Fs3_p2": 0.06541546965123057,
-        "relative_uncertainty_band_Fs3_p2": 0.012772398630508022
+        "uncertainty_band_Fs3_p2": 6.799672181658886e-06,
+        "relative_uncertainty_band_Fs3_p2": 0.07069489096088638
+      },
+      "t_arrival_A_s": {
+        "values": [
+          0.005872715112570655,
+          0.005837479651184561,
+          0.005815051415679856
+        ],
+        "change_1_2": -3.523546138609404e-05,
+        "change_2_3": -2.242823550470483e-05,
+        "relative_change_1_2": 0.006059355088604071,
+        "relative_change_2_3": 0.0038569281510097662,
+        "observed_order": 0.6517119815507106,
+        "richardson_estimate": null,
+        "richardson_relative_error_fine": null,
+        "verdict": "monotone; formal order 0.65 reported, far from the nominal 2, so no Richardson estimate",
+        "uncertainty_band_Fs3_p2": 2.242823550470483e-05,
+        "relative_uncertainty_band_Fs3_p2": 0.0038569281510097662
+      },
+      "wave_speed_pressure_m_s": {
+        "values": [
+          4.663341692182265,
+          4.644946099514876,
+          4.660177158081283
+        ],
+        "change_1_2": -0.018395592667388883,
+        "change_2_3": 0.01523105856640683,
+        "relative_change_1_2": 0.003947402007129452,
+        "relative_change_2_3": 0.00326834325171403,
+        "observed_order": null,
+        "richardson_estimate": null,
+        "richardson_relative_error_fine": null,
+        "verdict": "order undefined: non-monotone (the changes change sign)",
+        "uncertainty_band_Fs3_p2": 0.018395592667388883,
+        "relative_uncertainty_band_Fs3_p2": 0.003947402007129452
+      },
+      "wave_speed_wall_m_s": {
+        "values": [
+          5.066405804566241,
+          5.057136495078736,
+          5.122456696628062
+        ],
+        "change_1_2": -0.009269309487504707,
+        "change_2_3": 0.0653202015493255,
+        "relative_change_1_2": 0.001809543747555031,
+        "relative_change_2_3": 0.012751733283040452,
+        "observed_order": null,
+        "richardson_estimate": null,
+        "richardson_relative_error_fine": null,
+        "verdict": "order undefined: non-monotone (the changes change sign)",
+        "uncertainty_band_Fs3_p2": 0.0653202015493255,
+        "relative_uncertainty_band_Fs3_p2": 0.012751733283040452
       }
     },
     "level3_time_step": {
       "ur_max_A_m": {
-        "2.5e-05": 0.00015832560333333334,
-        "6.25e-06": 0.00015847068055555556,
-        "1.25e-05": 0.0001584600657894737,
-        "relative_change_2.5e-5_to_6.25e-6": 0.0009163219287835613
+        "2.5e-05": 0.00015834924916107384,
+        "6.25e-06": 0.00015851025,
+        "relative_change_2.5e-5_to_6.25e-6": 0.0010167451994824044
       },
       "t_ur_max_A_s": {
-        "2.5e-05": 0.0072598333333333325,
-        "6.25e-06": 0.007253819444444439,
-        "1.25e-05": 0.007252960526315785,
-        "relative_change_2.5e-5_to_6.25e-6": -0.0008283783680379174
+        "2.5e-05": 0.007258808724832215,
+        "6.25e-06": 0.007251562499999995,
+        "relative_change_2.5e-5_to_6.25e-6": -0.0009982663969958594
       },
       "uz_min_A_m": {
-        "2.5e-05": -8.817800558035713e-05,
-        "6.25e-06": -8.834691523972603e-05,
-        "1.25e-05": -8.82936373995984e-05,
-        "relative_change_2.5e-5_to_6.25e-6": -0.001915553184234459
+        "2.5e-05": -8.554193271889401e-05,
+        "6.25e-06": -8.571155e-05,
+        "relative_change_2.5e-5_to_6.25e-6": -0.001982855375309184
       },
       "t_uz_min_A_s": {
-        "2.5e-05": 0.004775279017857142,
-        "6.25e-06": 0.004765796232876713,
-        "1.25e-05": 0.00476644076305221,
-        "relative_change_2.5e-5_to_6.25e-6": -0.0019858075193027805
+        "2.5e-05": 0.004777188940092167,
+        "6.25e-06": 0.004765625000000001,
+        "relative_change_2.5e-5_to_6.25e-6": -0.0024206578883906064
       },
       "ur_min_late_A_m": {
-        "2.5e-05": -9.58585675e-05,
-        "6.25e-06": -9.565885089285715e-05,
-        "1.25e-05": -9.570459175257732e-05,
-        "relative_change_2.5e-5_to_6.25e-6": 0.0020834507791163285
+        "2.5e-05": -9.618336048387097e-05,
+        "6.25e-06": -9.602857867647059e-05,
+        "relative_change_2.5e-5_to_6.25e-6": 0.0016092368432722283
       },
       "t_arrival_A_s": {
-        "2.5e-05": 0.005820140102359844,
-        "6.25e-06": 0.005829974324977803,
-        "1.25e-05": 0.005827647441673316,
-        "relative_change_2.5e-5_to_6.25e-6": 0.0016896882970173896
+        "2.5e-05": 0.005815051415679856,
+        "6.25e-06": 0.005824822403415454,
+        "relative_change_2.5e-5_to_6.25e-6": 0.0016802925781965606
       },
       "wave_speed_pressure_m_s": {
-        "2.5e-05": 4.628998410984975,
-        "6.25e-06": 4.600282201599158,
-        "1.25e-05": 4.631813417936227,
-        "relative_change_2.5e-5_to_6.25e-6": -0.006203547038960201
+        "2.5e-05": 4.660177158081283,
+        "6.25e-06": 4.594402091503451,
+        "relative_change_2.5e-5_to_6.25e-6": -0.014114284574733595
       },
       "wave_speed_wall_m_s": {
-        "2.5e-05": 5.121627624037653,
-        "6.25e-06": 5.063788006477558,
-        "1.25e-05": 5.063020661430813,
-        "relative_change_2.5e-5_to_6.25e-6": -0.011293210246022723
+        "2.5e-05": 5.122456696628062,
+        "6.25e-06": 5.066256777536654,
+        "relative_change_2.5e-5_to_6.25e-6": -0.01097128241775128
       }
     }
   },
   "platform_comparison": {
-    "note": "XenoSim: OpenFOAM v2512 (Ubuntu package), PETSc 3.24 development; MeluXina: OpenFOAM v2412 EasyBuild foss-2024a, PETSc 3.22. Each platform is invariant to MPI ranks (1-8), solid preconditioner (hypre/LU) and tight tolerances; XenoSim v2412 equals XenoSim v2512.",
+    "note": "Both fixes (commits 635ff464f, 0ff7f462b). XenoSim: OpenFOAM v2512 (Ubuntu package, solids4foam -O3), PETSc 3.24 development; MeluXina: OpenFOAM v2412 EasyBuild foss-2024a (solids4foam -O2), PETSc 3.22. Values are the 5-digit Allverify table rows.",
     "pairs": {
-      "level 1, dt 2.5e-5": {
+      "level 1, scaled": {
         "ur_max_mm": {
           "meluxina": 0.15978,
-          "xenosim": 0.15964135531496063,
-          "relative_difference": 0.0008684759958711445
+          "xenosim": 0.1597822214566929,
+          "relative_difference": -1.3903027962998452e-05
         },
         "uz_min_mm": {
           "meluxina": -0.08819,
-          "xenosim": -0.08954319011655566,
-          "relative_difference": 0.015112149955728085
+          "xenosim": -0.08819035801773731,
+          "relative_difference": 4.059601813064291e-06
         },
         "t_arr_ms": {
           "meluxina": 5.873,
-          "xenosim": 5.872159097982797,
-          "relative_difference": 0.00014320150445041468
+          "xenosim": 5.8727151125706545,
+          "relative_difference": 4.8510343833285955e-05
         },
         "ur_min_late_mm": {
           "meluxina": -0.1001,
-          "xenosim": -0.09997710936532507,
-          "relative_difference": -0.0012291877156186937
+          "xenosim": -0.1001359453125,
+          "relative_difference": 0.0003589651287340519
         }
       },
-      "level 2, dt 2.5e-5": {
+      "level 2, scaled": {
         "ur_max_mm": {
-          "meluxina": 0.15927,
-          "xenosim": 0.1596080822368421,
-          "relative_difference": -0.0021182024876436976
+          "meluxina": 0.15946,
+          "xenosim": 0.15946013636363637,
+          "relative_difference": -8.551581573449203e-07
         },
         "uz_min_mm": {
-          "meluxina": -0.08638,
-          "xenosim": -0.08863143051104973,
-          "relative_difference": 0.025402168260942624
+          "meluxina": -0.08659,
+          "xenosim": -0.08658730017730495,
+          "relative_difference": -3.118035427271022e-05
         },
         "t_arr_ms": {
-          "meluxina": 5.839,
-          "xenosim": 5.853042961140061,
-          "relative_difference": -0.002399258169348113
+          "meluxina": 5.843,
+          "xenosim": 5.842903117187652,
+          "relative_difference": 1.6581279957008306e-05
         },
         "ur_min_late_mm": {
-          "meluxina": -0.09316,
-          "xenosim": -0.09263562598920863,
-          "relative_difference": -0.0056606084882770856
-        }
-      },
-      "level 3, dt 2.5e-5": {
-        "ur_max_mm": {
-          "meluxina": 0.1582,
-          "xenosim": 0.15832560333333334,
-          "relative_difference": -0.000793322941387402
-        },
-        "uz_min_mm": {
-          "meluxina": -0.08551,
-          "xenosim": -0.08817800558035714,
-          "relative_difference": 0.03025704156946223
-        },
-        "t_arr_ms": {
-          "meluxina": 5.811,
-          "xenosim": 5.8201401023598445,
-          "relative_difference": -0.001570426518794378
-        },
-        "ur_min_late_mm": {
-          "meluxina": -0.09612,
-          "xenosim": -0.09585856749999999,
-          "relative_difference": -0.002727273177747056
-        }
-      },
-      "level 3, dt 6.25e-6": {
-        "ur_max_mm": {
-          "meluxina": 0.15836,
-          "xenosim": 0.15847068055555555,
-          "relative_difference": -0.0006984292309942234
-        },
-        "uz_min_mm": {
-          "meluxina": -0.08567,
-          "xenosim": -0.08834691523972603,
-          "relative_difference": 0.030300041970478808
-        },
-        "t_arr_ms": {
-          "meluxina": 5.82,
-          "xenosim": 5.829974324977803,
-          "relative_difference": -0.001710869451871998
-        },
-        "ur_min_late_mm": {
-          "meluxina": -0.09593,
-          "xenosim": -0.09565885089285715,
-          "relative_difference": -0.0028345428009223053
+          "meluxina": -0.09409,
+          "xenosim": -0.09408584016497462,
+          "relative_difference": -4.4213188914270395e-05
         }
       }
-    },
-    "meluxina_fixed_dt_uz_min": {
-      "change_1_2": 0.001810000000000006,
-      "change_2_3": 0.0008699999999999958,
-      "relative_change_1_2": 0.021167114957315002,
-      "relative_change_2_3": 0.010174248625891658,
-      "observed_order": 1.056902391234489,
-      "richardson_estimate": -0.08470478723404257,
-      "richardson_relative_error_fine": 0.009506106942133061,
-      "verdict": "monotone; order and Richardson estimate reported",
-      "uncertainty_band_Fs3_p2": 0.0008699999999999958,
-      "relative_uncertainty_band_Fs3_p2": 0.010174248625891658
-    },
-    "meluxina_fixed_dt_ur_max": {
-      "change_1_2": -0.0005100000000000104,
-      "change_2_3": -0.0010699999999999876,
-      "relative_change_1_2": 0.0032237673830594845,
-      "relative_change_2_3": 0.006763590391908898,
-      "observed_order": -1.0690416444296051,
-      "richardson_estimate": null,
-      "richardson_relative_error_fine": null,
-      "verdict": "order undefined: the changes do not decrease",
-      "uncertainty_band_Fs3_p2": 0.0010699999999999876,
-      "relative_uncertainty_band_Fs3_p2": 0.006763590391908898
     }
   },
   "implicit_euler": {
@@ -740,158 +619,158 @@
         "level": 1.0,
         "fluid_cells": 16000.0,
         "delta_t_s": 0.0001,
-        "ur_max_A_m": 0.00012233204826732672,
-        "t_ur_max_A_s": 0.007005445544554456,
-        "uz_min_A_m": -7.601149502139245e-05,
-        "t_uz_min_A_s": 0.004665616491637495,
-        "ur_min_late_A_m": -7.756345635050626e-05,
-        "t_arrival_A_s": 0.005225011488579195,
-        "wave_speed_pressure_m_s": 4.59181375940673,
-        "wave_speed_wall_m_s": 5.297510077442829
+        "ur_max_A_m": 0.00012241486511299434,
+        "t_ur_max_A_s": 0.007004943502824859,
+        "uz_min_A_m": -7.4802244366024e-05,
+        "t_uz_min_A_s": 0.004661056462718867,
+        "ur_min_late_A_m": -7.76680722057075e-05,
+        "t_arrival_A_s": 0.005225123058362723,
+        "wave_speed_pressure_m_s": 4.595311001430385,
+        "wave_speed_wall_m_s": 5.29952689735467
       },
       {
         "level": 2.0,
         "fluid_cells": 128000.0,
         "delta_t_s": 0.0001,
-        "ur_max_A_m": 0.00012106900907407407,
-        "t_ur_max_A_s": 0.007036518518518519,
-        "uz_min_A_m": -7.515031631668283e-05,
-        "t_uz_min_A_s": 0.004673782735208535,
-        "ur_min_late_A_m": -7.611047618623961e-05,
-        "t_arrival_A_s": 0.005215835751981267,
-        "wave_speed_pressure_m_s": 4.574516920804944,
-        "wave_speed_wall_m_s": 5.308442260693407
+        "ur_max_A_m": 0.0001209955544205052,
+        "t_ur_max_A_s": 0.0070351411589896,
+        "uz_min_A_m": -7.325559239992072e-05,
+        "t_uz_min_A_s": 0.004670610384462941,
+        "ur_min_late_A_m": -7.627540838252656e-05,
+        "t_arrival_A_s": 0.005212914558836782,
+        "wave_speed_pressure_m_s": 4.578370232898804,
+        "wave_speed_wall_m_s": 5.311194218007855
       }
     ],
     "euler_timestep_level1_mesh": [
       {
         "delta_t_s": 0.0001,
-        "ur_max_A_m": 0.00012233204826732672,
-        "t_ur_max_A_s": 0.007005445544554456,
-        "uz_min_A_m": -7.601149502139245e-05,
-        "t_uz_min_A_s": 0.004665616491637495,
-        "ur_min_late_A_m": -7.756345635050626e-05,
-        "t_arrival_A_s": 0.005225011488579195,
-        "wave_speed_pressure_m_s": 4.59181375940673,
-        "wave_speed_wall_m_s": 5.297510077442829
+        "ur_max_A_m": 0.00012241486511299434,
+        "t_ur_max_A_s": 0.007004943502824859,
+        "uz_min_A_m": -7.4802244366024e-05,
+        "t_uz_min_A_s": 0.004661056462718867,
+        "ur_min_late_A_m": -7.76680722057075e-05,
+        "t_arrival_A_s": 0.005225123058362723,
+        "wave_speed_pressure_m_s": 4.595311001430385,
+        "wave_speed_wall_m_s": 5.29952689735467
       },
       {
         "delta_t_s": 5e-05,
-        "ur_max_A_m": 0.00013638496376811593,
-        "t_ur_max_A_s": 0.0070778985507246395,
-        "uz_min_A_m": -8.096684007996379e-05,
-        "t_uz_min_A_s": 0.004712085093542547,
-        "ur_min_late_A_m": -8.572540614244742e-05,
-        "t_arrival_A_s": 0.0054316449534722476,
-        "wave_speed_pressure_m_s": 4.634094747914603,
-        "wave_speed_wall_m_s": 5.186695683199011
+        "ur_max_A_m": 0.0001364893061594203,
+        "t_ur_max_A_s": 0.007077355072463766,
+        "uz_min_A_m": -7.969118975609756e-05,
+        "t_uz_min_A_s": 0.004708170731707318,
+        "ur_min_late_A_m": -8.584135604684512e-05,
+        "t_arrival_A_s": 0.005431958515861717,
+        "wave_speed_pressure_m_s": 4.637418857610374,
+        "wave_speed_wall_m_s": 5.1884758159182605
       },
       {
         "delta_t_s": 2.5e-05,
-        "ur_max_A_m": 0.0001463941303763441,
-        "t_ur_max_A_s": 0.007121102150537636,
-        "uz_min_A_m": -8.430372045454546e-05,
-        "t_uz_min_A_s": 0.00472568181818182,
-        "ur_min_late_A_m": -9.03641753125e-05,
-        "t_arrival_A_s": 0.005604870204241601,
-        "wave_speed_pressure_m_s": 4.649380337321264,
-        "wave_speed_wall_m_s": 5.132929497173772
+        "ur_max_A_m": 0.00014651439130434782,
+        "t_ur_max_A_s": 0.007120652173913046,
+        "uz_min_A_m": -8.299078155850092e-05,
+        "t_uz_min_A_s": 0.0047224634369287,
+        "ur_min_late_A_m": -9.048260939440994e-05,
+        "t_arrival_A_s": 0.005605376398940705,
+        "wave_speed_pressure_m_s": 4.6526386131230515,
+        "wave_speed_wall_m_s": 5.134459037032828
       },
       {
         "delta_t_s": 1.25e-05,
-        "ur_max_A_m": 0.00015259157142857144,
-        "t_ur_max_A_s": 0.007155357142857141,
-        "uz_min_A_m": -8.650132007142858e-05,
-        "t_uz_min_A_s": 0.004726464285714285,
-        "ur_min_late_A_m": -9.366978099315069e-05,
-        "t_arrival_A_s": 0.005729639403150042,
-        "wave_speed_pressure_m_s": 4.655783650530618,
-        "wave_speed_wall_m_s": 5.100513505592857
+        "ur_max_A_m": 0.00015272116071428571,
+        "t_ur_max_A_s": 0.007154910714285716,
+        "uz_min_A_m": -8.516828851156069e-05,
+        "t_uz_min_A_s": 0.004723735549132947,
+        "ur_min_late_A_m": -9.379751113013699e-05,
+        "t_arrival_A_s": 0.00573022517291126,
+        "wave_speed_pressure_m_s": 4.659028126658762,
+        "wave_speed_wall_m_s": 5.10184149178433
       }
     ],
     "fraction_of_published_gap_reproduced": {
       "level1_lozovskiy2019_vs_bdf2_level3": {
-        "published_gap_m": 3.907068055555556e-05,
-        "euler_damping_m": 3.613863228822884e-05,
-        "fraction_reproduced": 0.9249552803883831,
+        "published_gap_m": 3.911025e-05,
+        "euler_damping_m": 3.609538488700566e-05,
+        "fraction_reproduced": 0.9229136834207314,
         "fraction_range_reading_accuracy": [
-          0.8589980435545065,
-          1.0018838494762698
+          0.8571638707204461,
+          0.9995883409005936
         ],
-        "euler_vs_published_relative": 0.02455651815181506
+        "euler_vs_published_relative": 0.025250126574491952
       },
       "level1_lozovskiy2019_vs_tukovic2018": {
         "published_gap_m": 3.7539999999999996e-05,
-        "euler_damping_m": 3.613863228822884e-05,
-        "fraction_reproduced": 0.9626700130055632,
+        "euler_damping_m": 3.609538488700566e-05,
+        "fraction_reproduced": 0.9615179778104865,
         "fraction_range_reading_accuracy": [
-          0.8914314821960742,
-          1.0462835057391096
+          0.890364698742123,
+          1.045031409583256
         ],
-        "euler_vs_published_relative": 0.02455651815181506
+        "euler_vs_published_relative": 0.025250126574491952
       },
       "level1_eken2016_vs_bdf2_level3": {
-        "published_gap_m": 3.427068055555555e-05,
-        "euler_damping_m": 3.613863228822884e-05,
-        "fraction_reproduced": 1.0545058254575712,
+        "published_gap_m": 3.431024999999999e-05,
+        "euler_damping_m": 3.609538488700566e-05,
+        "fraction_reproduced": 1.052029200807504,
         "fraction_range_reading_accuracy": [
-          0.9696263054376139,
-          1.1556714355488642
+          0.9674388375045911,
+          1.1528296607981625
         ],
-        "euler_vs_published_relative": -0.015039869023134379
+        "euler_vs_published_relative": -0.01437306672307302
       },
       "level1_eken2016_vs_tukovic2018": {
         "published_gap_m": 3.273999999999999e-05,
-        "euler_damping_m": 3.613863228822884e-05,
-        "fraction_reproduced": 1.10380672841261,
+        "euler_damping_m": 3.609538488700566e-05,
+        "fraction_reproduced": 1.1024857937387194,
         "fraction_range_reading_accuracy": [
-          1.0111536734255415,
-          1.2151523970487172
+          1.009943617431608,
+          1.21369821408896
         ],
-        "euler_vs_published_relative": -0.015039869023134379
+        "euler_vs_published_relative": -0.01437306672307302
       },
       "level2_lozovskiy2019_vs_bdf2_level3": {
-        "published_gap_m": 3.907068055555556e-05,
-        "euler_damping_m": 3.740167148148149e-05,
-        "fraction_reproduced": 0.9572823137364894,
+        "published_gap_m": 3.911025e-05,
+        "euler_damping_m": 3.751469557949481e-05,
+        "fraction_reproduced": 0.9592036762612054,
         "fraction_range_reading_accuracy": [
-          0.8890198824355003,
-          1.0368995235306404
+          0.8908685077741122,
+          1.03889326657929
         ],
-        "euler_vs_published_relative": 0.013978300452881627
+        "euler_vs_published_relative": 0.013363102349289726
       },
       "level2_lozovskiy2019_vs_tukovic2018": {
         "published_gap_m": 3.7539999999999996e-05,
-        "euler_damping_m": 3.740167148148149e-05,
-        "fraction_reproduced": 0.9963151699915156,
+        "euler_damping_m": 3.751469557949481e-05,
+        "fraction_reproduced": 0.9993259344564415,
         "fraction_range_reading_accuracy": [
-          0.9225868643680685,
-          1.0828509404018962
+          0.9253748292919293,
+          1.0861232072812625
         ],
-        "euler_vs_published_relative": 0.013978300452881627
+        "euler_vs_published_relative": 0.013363102349289726
       },
       "level2_eken2016_vs_bdf2_level3": {
-        "published_gap_m": 3.427068055555555e-05,
-        "euler_damping_m": 3.740167148148149e-05,
-        "fraction_reproduced": 1.0913606288282005,
+        "published_gap_m": 3.431024999999999e-05,
+        "euler_damping_m": 3.751469557949481e-05,
+        "fraction_reproduced": 1.093396159441998,
         "fraction_range_reading_accuracy": [
-          1.003514583688127,
-          1.1960619601813145
+          1.0054796089411038,
+          1.1981602056673075
         ],
-        "euler_vs_published_relative": -0.025209266714379563
+        "euler_vs_published_relative": -0.02580068904585197
       },
       "level2_eken2016_vs_tukovic2018": {
         "published_gap_m": 3.273999999999999e-05,
-        "euler_damping_m": 3.740167148148149e-05,
-        "fraction_reproduced": 1.1423845901490992,
+        "euler_damping_m": 3.751469557949481e-05,
+        "fraction_reproduced": 1.1458367617438858,
         "fraction_range_reading_accuracy": [
-          1.046493326286556,
-          1.25762177140153
+          1.0496557241044997,
+          1.2614221781941768
         ],
-        "euler_vs_published_relative": -0.025209266714379563
+        "euler_vs_published_relative": -0.02580068904585197
       }
     },
-    "bdf2_level3_ur_max_A_m": 0.00015847068055555556,
+    "bdf2_level3_ur_max_A_m": 0.00015851025,
     "published_fe_ur_max_A_m": {
       "lozovskiy2019": 0.0001194,
       "eken2016": 0.0001242
@@ -900,19 +779,19 @@
   },
   "literature_comparison_level3_bdf2": {
     "tukovic2018": {
-      "ur_max_A_m": 0.009753285048780182,
-      "t_ur_max_A_s": 0.0032945289688019767
+      "ur_max_A_m": 0.010005416082579356,
+      "t_ur_max_A_s": 0.002982365145227479
     },
     "lozovskiy2019": {
-      "ur_max_A_m": 0.32722513028103484,
-      "uz_min_A_m": -0.19387723296927076,
-      "ur_min_late_A_m": -0.2670046475875118
+      "ur_max_A_m": 0.3275565326633166,
+      "uz_min_A_m": -0.1582641891891893,
+      "ur_min_late_A_m": -0.27190170432411365
     },
     "eken2016": {
-      "ur_max_A_m": 0.2759314054392556,
-      "uz_min_A_m": -0.11268155213760737,
-      "ur_min_late_A_m": -0.25372019518816713
+      "ur_max_A_m": 0.27624999999999994,
+      "uz_min_A_m": -0.07949055415617126,
+      "ur_min_late_A_m": -0.25856590663788453
     },
-    "thick_wall_inertia_wave_speed": -0.04371246496510901
+    "thick_wall_inertia_wave_speed": -0.04493479780095174
   }
 }

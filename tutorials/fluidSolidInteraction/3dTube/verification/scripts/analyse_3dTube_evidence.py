@@ -26,11 +26,13 @@ from __future__ import annotations
 import csv
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
 VERIFICATION = Path(__file__).resolve().parents[1]
-POST = VERIFICATION / "postProcessing"
+# The Allverify output to read; S4F_3DTUBE_POST selects another run tree
+POST = Path(os.environ.get("S4F_3DTUBE_POST", VERIFICATION / "postProcessing"))
 RESULTS = VERIFICATION / "results"
 REFERENCE = json.loads(
     (VERIFICATION / "reference/3dTube_verification_references.json").read_text()
@@ -199,8 +201,15 @@ def main() -> int:
                 evidence["coupling"].setdefault("relative_difference", {})[
                     quantity] = floors[quantity]
 
-    # Mesh study
-    mesh = read_csv("mesh_robin_backward.csv")
+    # Mesh study: the probe-shifted sweep if present (the same solution, with
+    # the axis pressure probes off the cell faces), else the default sweep
+    mesh = read_csv("mesh_robin_backward_pz7.8125e-05.csv")
+    mesh_suffix = "_pz7.8125e-05"
+    if len(mesh) < 3:
+        mesh, mesh_suffix = read_csv("mesh_robin_backward.csv"), ""
+    evidence["mesh_study_probes"] = (
+        "shifted 7.8125e-5 m off the cell faces" if mesh_suffix
+        else "default (on cell faces)")
     if len(mesh) < 3:
         print("ERROR: the mesh study CSV does not have three levels",
               file=sys.stderr)
@@ -242,10 +251,10 @@ def main() -> int:
             for q in ("ur_max_A_m", "uz_min_A_m", "t_arrival_A_s")
         }
     evidence["mesh_study"]["history_differences"] = {
-        "level_1_to_2": history_difference("robin_backward_mesh1",
-                                           "robin_backward_mesh2"),
-        "level_2_to_3": history_difference("robin_backward_mesh2",
-                                           "robin_backward_mesh3"),
+        "level_1_to_2": history_difference(f"robin_backward_mesh1{mesh_suffix}",
+                                           f"robin_backward_mesh2{mesh_suffix}"),
+        "level_2_to_3": history_difference(f"robin_backward_mesh2{mesh_suffix}",
+                                           f"robin_backward_mesh3{mesh_suffix}"),
     }
 
     # Iterative error: every level again with tight tolerances
@@ -315,11 +324,11 @@ def main() -> int:
         lines = [line for line in platform.read_text().splitlines()
                  if not line.startswith("#")]
         runs = {row["run"]: row for row in csv.DictReader(lines)}
-        pairs = {  # MeluXina run: (XenoSim row, label)
-            "m_fx1": (fixed[0] if fixed else None, "level 1, dt 2.5e-5"),
-            "m_fx2": (fixed[1] if len(fixed) > 1 else None, "level 2, dt 2.5e-5"),
-            "m_fx3": (fixed[2] if len(fixed) > 2 else None, "level 3, dt 2.5e-5"),
-            "m_l3": (mesh[2], "level 3, dt 6.25e-6"),
+        # MeluXina run: (XenoSim row of the same run, label); level 3 of
+        # the corrected sweep is the MeluXina run itself, so not paired
+        pairs = {
+            "m2_l1": (mesh[0], "level 1, scaled"),
+            "m2_l2": (mesh[1], "level 2, scaled"),
         }
         names = {"ur_max_mm": "ur_max_A_m", "uz_min_mm": "uz_min_A_m",
                  "t_arr_ms": "t_arrival_A_s", "ur_min_late_mm": "ur_min_late_A_m"}
@@ -335,18 +344,12 @@ def main() -> int:
                 for key, quantity in names.items()
             }
         evidence["platform_comparison"] = {
-            "note": ("XenoSim: OpenFOAM v2512 (Ubuntu package), PETSc 3.24 "
-                     "development; MeluXina: OpenFOAM v2412 EasyBuild "
-                     "foss-2024a, PETSc 3.22. Each platform is invariant to "
-                     "MPI ranks (1-8), solid preconditioner (hypre/LU) and "
-                     "tight tolerances; XenoSim v2412 equals XenoSim v2512."),
+            "note": ("Both fixes (commits 635ff464f, 0ff7f462b). XenoSim: "
+                     "OpenFOAM v2512 (Ubuntu package, solids4foam -O3), "
+                     "PETSc 3.24 development; MeluXina: OpenFOAM v2412 "
+                     "EasyBuild foss-2024a (solids4foam -O2), PETSc 3.22. "
+                     "Values are the 5-digit Allverify table rows."),
             "pairs": comparison,
-            "meluxina_fixed_dt_uz_min": classify(
-                [float(runs[r]["uz_min_mm"]) for r in ("m_fx1", "m_fx2", "m_fx3")],
-                1e-4),
-            "meluxina_fixed_dt_ur_max": classify(
-                [float(runs[r]["ur_max_mm"]) for r in ("m_fx1", "m_fx2", "m_fx3")],
-                1e-4),
         }
 
     # Implicit Euler
@@ -437,7 +440,8 @@ def main() -> int:
                 f"{q['uncertainty_band_Fs3_p2'] * scale:.3g}",
                 f"{q['floor_relative']:.1e}",
                 q["verdict"] + ("; default probes on cell faces, tie-affected"
-                                if quantity == "wave_speed_pressure_m_s" else "")])
+                                if quantity == "wave_speed_pressure_m_s"
+                                and not mesh_suffix else "")])
         shifted_cp = evidence["mesh_study"]["quantities"].get(
             "wave_speed_pressure_shifted_probes_m_s")
         if shifted_cp:

@@ -1,15 +1,7 @@
-# Cross-platform replicate on MeluXina (AMD EPYC 7H12, OpenFOAM v2412 foss-2024a EasyBuild, PETSc 3.22.0 + Hypre 2.31.0, GCC 13.3.0),
-# solids4foam verification/3dtube-level3 at c13b8679; values are the Allverify table rows of each run (mm, ms, m/s).
-# pz = axis pressure probes shifted 7.8125e-5 m off the cell faces (c_p comparable); pz 0 or 1e-9/2e-9 = default probes.
+# Cross-platform runs on MeluXina (AMD EPYC 7H12, OpenFOAM v2412 foss-2024a EasyBuild, PETSc 3.22.0 + Hypre 2.31.0, GCC 13.3.0, solids4foam built -O2),
+# solids4foam verification/3dtube-level3 at 0ff7f462b (both fixes); values are the Allverify table rows of each run (mm, ms, m/s). Probes shifted 7.8125e-5 m except m2_fx3.
 run,level,fluid_cells,solid_cells,delta_t_s,ranks,probe_z_shift_m,options,ur_max_mm,t_ur_max_ms,uz_min_mm,ur_min_late_mm,t_arr_ms,c_wall_m_s,c_p_m_s,mean_fsi_iter,clock_s
-m_fx1,1,16000,6400,2.5e-05,8,7.8125e-05,,0.15978,7.201,-0.08819,-0.1001,5.873,5.066,4.654,4.78,453
-m_fx2,2,128000,51200,2.5e-05,32,7.8125e-05,,0.15927,7.228,-0.08638,-0.09316,5.839,5.057,4.639,4.07,1714
-m_fx3,3,1024000,409600,2.5e-05,128,7.8125e-05,,0.15820,7.257,-0.08551,-0.09612,5.811,5.124,4.633,3.31,5429
-m_dt3,3,1024000,409600,1.25e-05,128,7.8125e-05,,0.15834,7.251,-0.08561,-0.09599,5.818,5.066,4.629,3.26,9299
-m_l3,3,1024000,409600,6.25e-06,128,7.8125e-05,,0.15836,7.251,-0.08567,-0.09593,5.820,5.067,4.592,4.04,17512
-m_def1,1,16000,6400,2.5e-05,4,1e-09,,0.15978,7.201,-0.08819,-0.1001,5.873,5.066,4.770,4.78,711
-m_np1,1,16000,6400,2.5e-05,1,2e-09,serial,0.15978,7.201,-0.08819,-0.1001,5.873,5.066,4.770,4.78,3061
-m_lu1,1,16000,6400,2.5e-05,4,0,solid LU preconditioner,0.15978,7.201,-0.08819,-0.1001,5.873,5.066,4.770,4.78,887
-m_tight1,1,16000,6400,2.5e-05,4,0,tight tolerances,0.15978,7.201,-0.08819,-0.1001,5.873,5.066,4.770,8.21,1539
-m_coup_robin,1,16000,6400,2.5e-05,4,0,coupling study robin (default probes),0.15978,,-0.08819,,5.873,,4.770,4.78,713
-m_coup_iqnils,1,16000,6400,2.5e-05,4,0,coupling study IQN-ILS (default probes),0.15969,,-0.08815,,5.869,,4.771,15.47,2753
+m2_l1,1,16000,6400,2.5e-05,8,7.8125e-05,,0.15978,7.201,-0.08819,-0.1001,5.873,5.066,4.654,4.78,454
+m2_l2,2,128000,51200,1.25e-05,32,7.8125e-05,,0.15946,7.215,-0.08659,-0.09409,5.843,5.138,4.634,3.87,2565
+m2_l3,3,1024000,409600,6.25e-06,128,7.8125e-05,,0.15851,7.252,-0.08571,-0.09603,5.825,5.066,4.594,3.18,15317
+m2_fx3,3,1024000,409600,2.5e-05,128,0,fixed dt,0.15835,7.259,-0.08554,-0.09618,5.815,5.122,4.660,3.11,4979
