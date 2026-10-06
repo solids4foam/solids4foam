@@ -20,6 +20,7 @@ License
 #ifdef OPENFOAM_NOT_EXTEND
 
 #include "amiInterfaceToInterfaceMapping.H"
+#include "triangleWeights.H"
 #include "addToRunTimeSelectionTable.H"
 #include "FieldField.H"
 #include "pointIOField.H"
@@ -325,9 +326,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
             // zoneAPointWeights[pointI][1] = t.Ni(1, I);
             // zoneAPointWeights[pointI][2] = t.Ni(2, I);
 
-            zoneAPointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            zoneAPointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            zoneAPointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            zoneAPointWeights[pointI][0] = w[0];
+            zoneAPointWeights[pointI][1] = w[1];
+            zoneAPointWeights[pointI][2] = w[2];
         }
         else
         {
@@ -527,9 +531,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
             // zoneBPointWeights[pointI][1] = t.Ni(1, I);
             // zoneBPointWeights[pointI][2] = t.Ni(2, I);
 
-            zoneBPointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            zoneBPointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            zoneBPointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            zoneBPointWeights[pointI][0] = w[0];
+            zoneBPointWeights[pointI][1] = w[1];
+            zoneBPointWeights[pointI][2] = w[2];
         }
         else
         {
