@@ -991,7 +991,10 @@ def solid_preconditioner(spec: dict, cores: int) -> str:
     """The solid's linear preconditioner (it does not change the solution).
 
     Serial runs keep the tutorial's LU (block Jacobi with one block). In
-    parallel, PC_AUTO_RULE.
+    parallel, hypre BoomerAMG on all ranks: on 128-256 ranks it was 6-10
+    times faster per time step than an exact MUMPS LU on all ranks or on a
+    sub-communicator of 4-16 ranks (PCTELESCOPE), although it needs about
+    1.6 times more Krylov iterations.
     """
     if spec["pc"] != "auto":
         return spec["pc"]
@@ -1001,7 +1004,7 @@ def solid_preconditioner(spec: dict, cores: int) -> str:
 
 
 def PC_AUTO_RULE(spec: dict, cores: int) -> str:
-    return "mumps"
+    return "hypre"
 
 
 def build_meshes(case: Path, spec: dict, cores: int) -> dict:
