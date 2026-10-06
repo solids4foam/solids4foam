@@ -777,3 +777,10 @@ volume solver for fluid-solid interaction, *Transactions of FAMENA*, 42(3),
 partitioned fluid-structure interaction solver based on a Robin boundary
 condition for pressure. In: *OpenFOAM: Selected Papers of the 11th Workshop*,
 Springer, 2019, 1-22.
+
+## CSM3 structural study
+
+`csm3/` holds a structural-only study of the FSI3 plate (the Turek-Hron CSM3
+benchmark and its steady CSM2 analogue, which has the FSI3 material), used to
+isolate the spatial convergence of the solid from the fluid and the coupling.
+See `csm3/README.md`; it is run separately from `Allverify`.
