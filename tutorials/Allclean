@@ -26,4 +26,16 @@ echo ""
 
 foamCleanTutorials -self
 
+# With "all", also remove the regression test cases and the verification study
+# cases and results of every tutorial
+if [ "${1:-}" = "all" ]
+then
+    echo ""
+    echo "Removing the regression test and verification outputs"
+    for allclean in $(find . -mindepth 2 -name Allclean -type f)
+    do
+        (cd "$(dirname "$allclean")" && ./Allclean all > /dev/null 2>&1)
+    done
+fi
+
 # ----------------------------------------------------------------- end-of-file

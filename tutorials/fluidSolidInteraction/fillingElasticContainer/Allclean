@@ -17,3 +17,9 @@ rm -rf case.foam *.pdf 0/fluid/alpha.water
 
 # Restore the default (robin) coupling mode
 ln -nsf fsiProperties.robin constant/fsiProperties
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi
