@@ -3,8 +3,8 @@
 This directory contains opt-in verification studies for the `HronTurek`
 tutorial. By default they compare the periodic response of the Turek-Hron FSI3
 benchmark, computed with the partitioned Dirichlet-Neumann IQN-ILS and
-Robin-Neumann couplings, with the published reference values of Turek and
-Hron (2006). The steady FSI1 and the periodic FSI2 benchmarks are described
+Robin-Neumann couplings, with the Featflow reference values of the Turek and
+Hron benchmark (see the provenance section below). The steady FSI1 and the periodic FSI2 benchmarks are described
 in their own sections below. The studies are deliberately separate from `regressionTest.sh`:
 the regression test checks that the tutorial remains numerically stable,
 whereas these studies check convergence towards the benchmark. Nothing here is
@@ -21,7 +21,18 @@ cd tutorials/fluidSolidInteraction/HronTurek/verification
 ./Allverify --study coupling           # Robin vs IQN-ILS, 1x and 2x meshes
 ./Allverify --quick                    # smoke run to t = 2.3 s, no checks
 ./Allverify --reuse                    # re-evaluate completed runs
+./Allverify --levels 2 --delta-t 0.00025          # time-step diagnostic
+./Allverify --levels 2 --outer-corr-tolerance 1e-6 --allow-unconverged-coupling
+python3 scripts/fsi3_refinement_analysis.py \
+    --diagnostic iqnils_mesh_2x_dt0.00025      # three-level analysis of 1x, 2x, 4x
 ```
+
+`--delta-t` and `--outer-corr-tolerance` override the time step and the
+interface tolerance of every level of an FSI3 or FSI2 mesh study; the runs
+and results carry a `_dt<value>` or `_tol<value>` suffix.
+`--allow-unconverged-coupling` lets a tighter-tolerance diagnostic accept a
+step that stalls at `nOuterCorr` instead of aborting; the residual file
+records it and the analysis counts such steps.
 
 The driver requires `python3`, `blockMesh` and `solids4Foam`; `gnuplot` is
 optional and is used for the history plots. Each run is a complete copy of the
@@ -62,33 +73,83 @@ The FSI3 verification run continues to `t = 7 s` (the tutorial stops at
 `6 s`) so that the closing window is well inside the periodic regime.
 The coupling is activated at `t = 2 s`, as in the tutorial.
 
-The reference values are in `reference/HronTurek_verification_references.json`.
-The primary values are the Featflow FSI3 results on level 4 with
-`Δt = 0.00025 s`: `u_x = -2.88 ± 2.72 mm [10.93 Hz]`,
-`u_y = 1.47 ± 34.99 mm [5.46 Hz]`, `F_D = 460.5 ± 27.74 N/m [10.93 Hz]` and
-`F_L = 2.50 ± 153.91 N/m [5.46 Hz]`. This is the discretisation of the
-published reference time history, `reference/TurekHron_fsi3_reference_history.csv`
-(subsampled to `1 ms` from the Featflow `ref_fsi3.point` file): the driver's
-extraction applied to that history reproduces the table, which checks the
-extraction itself. The displacement statistics, the drag mean and the lift
-amplitude agree to within `0.7%`, and the frequencies to within `0.3%`
-(`5.473` against `5.46 Hz` for `u_y`). The drag amplitude is `1.1%` low
-(`27.43` against `27.74 N/m`), and the near-zero `u_y` and lift means differ
-by `0.02 mm` and `0.04 N/m`. These differences are small against the
-tolerances below. The frequently quoted
-summary values of Turek and Hron (2006), `u_x = -2.69 ± 2.53 mm [10.9 Hz]`,
-`u_y = 1.48 ± 34.38 mm [5.3 Hz]`, `F_D = 457.3 ± 22.66 N/m` and
-`F_L = 2.22 ± 149.78 N/m`, and the solids4foam values of Tuković et al.
-(2018) are reported alongside for information. The driver overlays the
-published history on the closing window of each run, with the phases aligned
-at the last `u_y` maximum.
+The benchmark is the FSI3 test of Turek and Hron as published: a channel of
+`2.5 m × 0.41 m`, a cylinder of radius `0.05 m` centred at `(0.2, 0.2)`, a
+plate of `0.35 m × 0.02 m` attached to it with its tip at point A,
+`(0.6, 0.2)`, a parabolic inflow of mean `2 m/s`, a fluid of
+`ρ = 1000 kg/m^3` and `ν = 0.001 m^2/s`, and a St. Venant-Kirchhoff plate of
+`ρ = 1000 kg/m^3`, `E = 5.6 MPa` and `ν = 0.4` in plane strain. The inflow is
+applied without the benchmark's `2 s` start-up ramp, and the coupling starts
+at `t = 2 s`; neither affects the periodic state that is evaluated.
+
+### FSI3 reference values and their provenance
+
+The reference values are in `reference/HronTurek_verification_references.json`,
+which also records all nine rows of the Featflow FSI3 tables
+(`featflowTables`) and the 2006 tables (`turekHron2006Tables`). Three sets of
+values are in circulation, and only the first is used for verification:
+
+- **A. Featflow FSI3 table, level 4+0 (15 872 elements), `Δt = 0.00025 s`**
+  (primary): `u_x = -2.88 ± 2.72 mm [10.93 Hz]`,
+  `u_y = 1.47 ± 34.99 mm [5.46 Hz]`, `F_D = 460.5 ± 27.74 N/m [10.93 Hz]` and
+  `F_L = 2.50 ± 153.91 N/m [5.46 Hz]`. Source: the "Results for FSI3 with
+  timestep Δt=0.00025" table of the Featflow FSI tests page (retrieved
+  2026-10-03). This is the discretisation of the published reference history
+  `ref_fsi3.point` (`media/fsi/data/fsi3/0p00025`), from which
+  `reference/TurekHron_fsi3_reference_history.csv` is subsampled to `1 ms`.
+- **B. Turek and Hron (2006)** (historical only):
+  `u_x = -2.69 ± 2.53 mm [10.9 Hz]`, `u_y = 1.48 ± 34.38 mm [5.3 Hz]`,
+  `F_D = 457.3 ± 22.66 N/m` and `F_L = 2.22 ± 149.78 N/m`. These are level 4
+  of the 2006 proceedings table at the smaller of its two time steps
+  (`Δt = 0.0005 s`). The Featflow page keeps the 2006 tables only inside an
+  HTML comment marked "old values"; they were superseded by table A. Its
+  drag amplitude is `18%` below A, and its frequency is given to two digits.
+- **C. Tuković et al. (2018)** (historical only): the earlier solids4foam
+  result, `u_x = -2.72 ± 2.58 mm [11.07 Hz]`, `u_y = 1.67 ± 33.84 mm [5.53 Hz]`,
+  `F_D = 459.18 ± 24.86 N/m` and `F_L = 1.59 ± 155.9 N/m`.
+
+The driver's extraction, applied to the reference history at its full
+`0.25 ms` sampling, reproduces table A: the displacement statistics, the drag
+mean and the lift amplitude to within `0.6%`, the frequencies to within
+`0.3%`, and the drag amplitude to `0.8%` (`27.51` against `27.74 N/m`;
+`27.43 N/m` from the `1 ms` CSV). This checks the extraction itself.
+
+The reference is not exact, and its uncertainty differs between the
+quantities:
+
+- From level 3 to level 4 at `Δt = 0.00025 s`, table A changes by `3.8%` in
+  the `u_x` mean, `4.0%` in the `u_x` amplitude, `1.6%` in the `u_y`
+  amplitude, `0.3%` in the drag mean, `4.5%` in the drag amplitude and `2.6%`
+  in the lift amplitude. The frequencies do not change.
+- Levels 2, 3 and 4 are not monotone in the `u_x` mean, the `u_x` and `u_y`
+  amplitudes and the drag amplitude (`35.73`, `34.43`, `34.99 mm` in `u_y`).
+  The lift amplitude rises by about `4 N/m` per level (`146.0`, `149.9`,
+  `153.9 N/m`) with no sign of convergence.
+- At level 4, the three tabulated time steps differ by up to `0.7%` in the
+  lift amplitude and `1.0%` in the drag amplitude.
+- The reference history itself is not strictly periodic: over its `7.9`
+  periods (`t = 5` to `6.44 s`) the per-period lift amplitude falls from
+  `157.7` to `153.5 N/m` (`2.7%`) and the drag amplitude from `27.8` to
+  `27.5 N/m`.
+
+An uncertainty of about `1%` is therefore defensible for the drag mean and
+the frequencies only. For the `u_y` amplitude it is about `2%`, and for the
+`u_x` mean and amplitude and the drag and lift amplitudes it is `3` to `5%`
+at least.
+
+The driver overlays the published history on the closing window of each run,
+with the phases aligned at the last `u_y` maximum.
 
 ## Mesh levels and time steps
 
 Level 1 is the mesh shipped with the tutorial. Each further level doubles the
 in-plane block divisions of both the fluid and the solid mesh, leaving the
 single spanwise cell alone, and halves the time step so that the Courant number
-is unchanged:
+is unchanged. The block gradings are kept, so the meshes are a smooth family
+with a refinement ratio of 2 rather than strictly nested; the plate has 6, 12
+and 24 cells through its thickness. Because the time step is halved with the
+cell size, the sequence is a combined space-time refinement path, and an
+order observed along it is not a purely spatial order:
 
 | Level | Refinement | Fluid cells | Solid cells | Δt (s) | Default cores |
 |---:|---:|---:|---:|---:|---:|
@@ -98,7 +159,10 @@ is unchanged:
 
 Levels 1 and 2 form the default sweep; level 3 is reachable with
 `--levels 1,2,4` and is expensive. Use `--cores N` to run every level on the
-same number of MPI ranks (`--cores 1` runs in serial). Level 1 is serial by
+same number of MPI ranks (`--cores 1` runs in serial). The recorded 4x run
+used 32 ranks, which gives each rank about as many cells as the 2x run on
+eight; on one 128-core node it ran at `9.1 s` per step on 32 ranks, `11.1 s`
+on 64 and `18.9 s` on 128, so more ranks do not help. Level 1 is serial by
 default because the small meshes and the many short solid solves make a
 four-rank run slower than a serial one. Fields are written only at the end
 time; the point displacement and force histories are written every time step
@@ -115,10 +179,12 @@ regardless.
   tolerance of the Featflow level-4 value: `2%` for the mean drag, `3%` for
   the frequencies, `5%` for the `u_y` amplitude, `10%` for the `u_x` mean and
   amplitude, and `15%` for the drag and lift amplitudes. The `u_y` and lift
-  means, which are close to zero, are reported as diagnostics only. The lift
-  amplitude converges slowest of all the quantities: its error falls from
-  `49%` on the 1x mesh to `13%` on the 2x mesh, an observed order of about
-  `1.9`, and the `15%` bound applies to the default 2x finest level.
+  means, which are close to zero, are reported as diagnostics only. The
+  tolerances were set from the 1x and 2x results and are not changed here.
+  With `--levels 1,2,4` the study fails on the 4x drag amplitude (`18.1%`
+  against `15%`); the lift amplitude passes at `15.0%`. See the three-level
+  study below: both amplitudes are inflated at `Δt = 0.00025 s` by
+  coupling noise, and the drag amplitude is still rising.
 - The reference error of a primary quantity may not grow by more than one
   percentage point between the coarsest and the finest level of the sweep.
 
@@ -174,9 +240,9 @@ routinely. The cost and the uncoupled-phase behaviour are the subject of
 
 ## Reference results
 
-Recorded with OpenFOAM v2412 on an Apple M1 Ultra shared with other jobs.
-
 ### Coupling comparison
+
+Recorded with OpenFOAM v2412 on an Apple M1 Ultra shared with other jobs.
 
 | Quantity | Robin vs IQN-ILS, 1x | Robin vs IQN-ILS, 2x | IQN-ILS 1x to 2x |
 |---|---:|---:|---:|
@@ -195,25 +261,182 @@ Recorded with OpenFOAM v2412 on an Apple M1 Ultra shared with other jobs.
 The worst converged Robin pressure-change and leakage-flux residuals were
 `1.0e-5` and `4.7e-7`.
 
-### Mesh study
+### Three-level mesh study (1x, 2x, 4x)
 
-IQN-ILS with `predictor yes`, run to `t = 7 s` and evaluated over the closing
-`1 s`. Level 1 ran in serial and level 2 on eight ranks. Both have been
-periodic since about `t = 4.2 s`.
+Recorded with OpenFOAM v2512 on a shared 192-core node (xenosim), solids4foam
+`development` at `aee0c8e35`. IQN-ILS with `predictor yes` and
+`outerCorrTolerance 1e-5`, run to `t = 7 s` and evaluated over the closing
+`1 s`. The compact results are in `reference/fsi3_refinement/`:
+`fsi3_iqnils_refinement_study.json` and the two CSV files (per level and per
+quantity), the driver's `iqnils_mesh_sweep_1x2x4x.csv`, and the histories of
+every run from `t = 4.5 s` at `1 ms`. `reference/iqnils_mesh_4x_history.png`
+overlays the 4x history on the published one.
 
-| Quantity | 1x | 2x | Featflow level 4 | Error at 2x |
-|---|---:|---:|---:|---:|
-| `u_x` mean (mm) | -2.266 | -2.791 | -2.880 | 3.1% |
-| `u_x` amplitude (mm) | 2.198 | 2.662 | 2.720 | 2.1% |
-| `u_y` amplitude (mm) | 29.94 | 34.17 | 34.99 | 2.3% |
-| `u_y` frequency (Hz) | 5.594 | 5.524 | 5.460 | 1.2% |
-| drag mean (N/m) | 457.2 | 459.3 | 460.5 | 0.3% |
-| drag amplitude (N/m) | 23.43 | 28.06 | 27.74 | 1.2% |
-| lift amplitude (N/m) | 229.2 | 174.4 | 153.9 | 13.3% |
+| Level | Fluid cells | Solid cells | Δt (s) | Ranks | Wall time | Mean (max) FSI iterations | Largest final residual |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1x | 5 336 | 630 | 0.001 | 1 | 1.4 h | 6.96 (11) | 9.994e-6 |
+| 2x | 21 344 | 2 520 | 0.0005 | 8 | 5.5 h | 7.01 (13) | 9.999e-6 |
+| 4x | 85 376 | 10 080 | 0.00025 | 32 | 40.8 h | 6.69 (15) | 9.9996e-6 |
 
-Every primary error decreases from the 1x to the 2x mesh. IQN-ILS needed
-about 7 FSI iterations per coupled step on both levels; the runs took about
-`1.1 h` (1x, serial) and `4.1 h` (2x, eight ranks).
+All three runs completed. Every one of the 5 000, 10 000 and 20 000 coupled
+steps ended with the interface residual below `1e-5`; an unconverged step
+aborts the run, so this holds by construction and is confirmed from the
+residual files. The iteration count does not grow with refinement. In the
+analysis window the largest two-against-two amplitude change was `1.9%`
+(4x drag), and the 4x lift passed the `2%` periodicity test at `1.75%`.
+
+The 1x and 2x results reproduce the earlier record (OpenFOAM v2412 on an
+Apple M1 Ultra) to within `0.5%` on the 2x mesh, for example
+`174.14` against `174.4 N/m` in the lift amplitude. On the 1x mesh they agree
+to within `2.4%` (`22.87` against `23.43 N/m` in the drag amplitude). A 1x
+run with OpenFOAM v2412 on MeluXina agrees with the v2512 1x run to within
+`1.6%` in all primary quantities.
+
+Benchmark statistics (extrema over the last full `u_y` period), and errors
+against Featflow level 4 (signed, relative to the reference):
+
+| Quantity | 1x | 2x | 4x | Featflow L4 | Error 1x | Error 2x | Error 4x |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `u_x` mean (mm) | -2.232 | -2.788 | -3.085 | -2.880 | +22.5% | +3.2% | -7.1% |
+| `u_x` amplitude (mm) | 2.163 | 2.657 | 2.917 | 2.720 | -20.5% | -2.3% | +7.2% |
+| `u_x` frequency (Hz) | 11.176 | 11.046 | 10.950 | 10.930 | +2.3% | +1.1% | +0.2% |
+| `u_y` mean (mm) | 1.669 | 1.495 | 1.467 | 1.470 | - | - | - |
+| `u_y` amplitude (mm) | 29.85 | 34.18 | 36.23 | 34.99 | -14.7% | -2.3% | +3.5% |
+| `u_y` frequency (Hz) | 5.588 | 5.523 | 5.474 | 5.460 | +2.3% | +1.2% | +0.3% |
+| drag mean (N/m) | 456.6 | 459.7 | 462.1 | 460.5 | -0.8% | -0.2% | +0.3% |
+| drag amplitude (N/m) | 22.87 | 28.03 | 32.76 | 27.74 | -17.6% | +1.0% | +18.1% |
+| lift mean (N/m) | 0.82 | 0.25 | 6.00 | 2.50 | - | - | - |
+| lift amplitude (N/m) | 229.1 | 174.1 | 177.0 | 153.9 | +48.8% | +13.2% | +15.0% |
+| lift frequency (Hz) | 5.588 | 5.523 | 5.493 | 5.460 | +2.4% | +1.2% | +0.6% |
+
+The drag and lift frequencies equal the `u_x` and `u_y` frequencies; the 4x
+lift frequency is biased by `0.3%` by the coupling noise described below,
+which moves the zero crossings.
+
+#### Coupling noise in the 4x forces
+
+At `Δt = 0.00025 s` the `1e-5` interface tolerance leaves step-to-step noise
+in the forces: an rms of `7.3 N/m` in the lift, with peaks of about
+`35 N/m`, and `1.1 N/m` in the drag on the 4x mesh, against `1.7` and
+`0.3 N/m` on the 2x mesh at `Δt = 0.0005 s`. The same noise appears on the 2x
+mesh when the time step alone is halved (`7.2 N/m`), so it comes from the
+time step, not the mesh. Because the benchmark amplitude is taken from the
+extrema, the noise inflates the 4x drag and lift amplitudes. The
+displacements are not affected. The analysis therefore also reports the
+statistics of the histories smoothed by a centred `4 ms` moving average,
+which attenuates the `5.5 Hz` fundamental by less than `0.1%`:
+
+| Quantity | 1x | 2x | 4x | Featflow L4 | Error 4x | Ratio (4x-2x)/(2x-1x) | Order |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| drag amplitude, smoothed (N/m) | 22.63 | 27.63 | 30.63 | 27.74 | +10.4% | 0.60 | 0.74 |
+| lift amplitude, smoothed (N/m) | 228.78 | 172.27 | 165.56 | 153.91 | +7.6% | 0.12 | 3.1 |
+
+#### Observed order along the refinement path
+
+The table gives the successive differences, their ratio
+`R = (f_4x - f_2x)/(f_2x - f_1x)`, and the observed order
+`p = log2(1/R)` along the space-time refinement path. An order is reported
+only where the differences have the same sign and decrease, the quantity is
+not near zero, and the 2x-to-4x change exceeds the late-time variability. The
+late-time variability is the range of the per-period values from `t = 4.5 s`
+to the end of the run (13 periods). After the amplitudes saturate, the means,
+amplitudes and frequency still wander slowly, by up to about `1%` over a
+second or more, which the `1 s` window and the periodicity test do not see.
+On the 4x mesh the late-time variability is `1.0%` in the `u_x` mean, `0.8%`
+in the `u_x` amplitude, `0.6%` in the `u_y` amplitude, `0.1%` in the
+frequency, `0.8%` in the drag mean and `1.0%` in the smoothed lift amplitude.
+
+| Quantity | 2x - 1x | 4x - 2x | Ratio | Order | Status |
+|---|---:|---:|---:|---:|---|
+| `u_x` mean (mm) | -0.556 | -0.297 | 0.53 | 0.91 | monotone, not asymptotic |
+| `u_x` amplitude (mm) | 0.494 | 0.260 | 0.53 | 0.93 | monotone, not asymptotic |
+| `u_y` amplitude (mm) | 4.32 | 2.06 | 0.48 | 1.07 | monotone, not asymptotic |
+| `u_y` frequency (Hz) | -0.065 | -0.049 | 0.75 | 0.42 | monotone, not asymptotic |
+| drag mean (N/m) | 3.10 | 2.35 | 0.76 | - | 2x-to-4x change within the variability |
+| drag amplitude (N/m) | 5.16 | 4.73 | 0.92 | 0.13 | monotone, not asymptotic; noise-inflated |
+| drag amplitude, smoothed (N/m) | 5.00 | 3.00 | 0.60 | 0.74 | monotone, not asymptotic |
+| lift amplitude (N/m) | -54.9 | 2.8 | -0.05 | - | sign change within the variability |
+| lift amplitude, smoothed (N/m) | -56.5 | -6.7 | 0.12 | 3.1 | monotone, order above 2: not demonstrably asymptotic |
+| `u_y` and lift means | | | | - | near zero: undefined |
+
+The schemes are formally second order in space and time. No quantity shows
+an observed order consistent with that (taken as `1.5 ≤ p ≤ 2.5`), so no
+Richardson extrapolation is meaningful, and none is used.
+
+#### Time-step and coupling contributions
+
+The time step halves with the cell size, so the observed orders mix the two.
+Four runs on the 2x mesh separate the contributions there: `Δt = 0.0005` and
+`0.00025 s`, each with the interface tolerance `1e-5` and `1e-6`. The run at
+`Δt = 0.00025 s` and `1e-6` stopped at `t = 6.73 s` (see below) and is
+evaluated over `t = 5.73` to `6.73 s`; its 18 923 completed steps all
+converged. The changes are relative, from the smoothed statistics for the
+amplitudes and means; the changes in the means are in their magnitudes:
+
+| Quantity | Halving Δt at 1e-5 | Halving Δt at 1e-6 | 1e-5 to 1e-6 at Δt = 0.0005 | 1e-5 to 1e-6 at Δt = 0.00025 | 2x to 4x |
+|---|---:|---:|---:|---:|---:|
+| `u_x` mean | +1.4% | -0.7% | +1.7% | -0.4% | +10.6% |
+| `u_x` amplitude | +1.4% | -0.4% | +1.7% | -0.2% | +9.8% |
+| `u_y` amplitude | +0.8% | -0.0% | +0.2% | -0.7% | +6.0% |
+| `u_y` frequency | -0.1% | +0.4% | -0.4% | +0.0% | -0.9% |
+| drag mean | +0.1% | -0.2% | +0.2% | -0.1% | +0.7% |
+| drag amplitude | +3.3% | +2.5% | -1.4% | -2.2% | +10.9% |
+| lift amplitude | +0.3% | +1.2% | -0.5% | +0.4% | -3.9% |
+
+The changes from the time step and the tolerance are small against the
+2x-to-4x change for the displacements. They are of the same size as the
+change for the frequency, about a third of it for the smoothed lift
+amplitude, and a quarter of it for the smoothed drag amplitude. The
+frequency is therefore not resolved beyond about `0.4%`. On the
+benchmark-defined extrema, halving the time step at `1e-5` raises the drag
+amplitude by `11%` and the lift amplitude by `3.3%`; tightening the
+tolerance to `1e-6` at `Δt = 0.00025 s` removes most of that
+(`-9.8%` and `-3.2%`). The force noise is coupling error, not time
+discretisation error.
+
+The tighter tolerance cannot be used for the 4x level itself. At
+`Δt = 0.00025 s` and `outerCorrTolerance 1e-6`, IQN-ILS twice stalled just
+above the tolerance (`5` to `9 × 10^-6`, at `nOuterCorr 30`) and then
+diverged within a step, after which the solid SNES failed: on the 2x mesh
+at `t = 6.73 s`, and on the 4x mesh, restarted at `t = 4 s` from the `1e-5`
+run, at `t = 4.73 s`. The fluid solver tolerances (`1e-6`, absolute) put a
+floor of about `5e-6` on the relative interface residual at this time step,
+as they do for FSI1 at `1e-4`. A clean `1e-6` 4x run would need tighter fluid
+tolerances.
+
+#### Interpretation
+
+Self-convergence. Every primary quantity except the benchmark-defined lift
+amplitude changes monotonically from 1x through 2x to 4x; for the drag mean
+the 2x-to-4x change (`0.5%`) is within its late-time variability. The frequency converges at a decreasing rate. The displacements change
+by `6` to `11%` from 2x to 4x with an observed order of about `1`, half the
+formal order, so they are not yet in the asymptotic range. The smoothed lift
+amplitude changes by only `3.9%` from 2x to 4x after `25%` from 1x to 2x,
+but its apparent order of `3.1` exceeds the formal order and rests on three
+points, so it does not demonstrate an asymptotic range either. The
+smoothed drag amplitude is still rising (`+10.9%`).
+
+Agreement with Featflow. The 2x displacements and drag amplitude were within
+`1` to `3%` of Featflow level 4, but the 4x mesh moves past it: the `u_y`
+amplitude to `+3.5%` and the `u_x` mean and amplitude to `7%` beyond, still
+changing in the same direction. The 2x agreement was a crossing, not
+convergence. The frequency converges onto Featflow (`+0.25%` at 4x, within
+the `0.4%` time-step and coupling uncertainty), and the drag mean agrees to
+`0.3%`, within its late-time variability of `0.8%`. The lift amplitude does
+not close onto Featflow: smoothed, it is `11.9%` above on the 2x mesh and
+`7.6%` above on the 4x mesh, and its small last change points to a limit of
+about `164` to `166 N/m`, `6` to `8%` above `153.9 N/m`. The
+benchmark-defined value at 4x is `15.0%` above, inflated by coupling noise.
+
+Reference uncertainty. The remaining differences in the lift amplitude and
+the displacements exceed the `1%` sometimes assigned to Featflow level 4 but
+are comparable to the reference's own level-3-to-4 changes (`2.6%` in the
+lift amplitude, `4%` in `u_x`), and the Featflow lift amplitude itself rises
+by `4 N/m` per level without converging. Whether solids4foam converges to a
+value different from the exact solution, or Featflow level 4 is itself
+`5%` or more from it, cannot be settled from these data. It needs either a
+finer solids4foam level or the CSM3 and CFD3 sub-benchmarks, which separate
+the plate and the fluid discretisations.
 
 ## FSI1 steady benchmark
 

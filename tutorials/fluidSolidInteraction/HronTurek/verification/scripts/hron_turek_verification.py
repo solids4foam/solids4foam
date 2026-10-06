@@ -179,6 +179,27 @@ def configure_case(case: Path, spec: dict, factor: int, delta_t: float,
             replace_entry(dictionary, "method", "scotch")
 
 
+def configure_coupling_diagnostic(case: Path, args: argparse.Namespace) -> None:
+    """Apply the optional interface-tolerance diagnostic of the mesh study.
+
+    A tighter outerCorrTolerance bounds the coupling-iteration error. Below
+    the default, IQN-ILS occasionally stalls just above the tolerance, so the
+    diagnostic may accept such steps (allowUnconvergedCoupling); the residual
+    file records them and the analysis reports how many there were.
+    """
+    for coupling in ("iqnils", "robin"):
+        path = case / f"constant/fsiProperties.{coupling}"
+        if args.outer_corr_tolerance:
+            replace_entry(path, "outerCorrTolerance", f"{args.outer_corr_tolerance:.8g}")
+        if args.allow_unconverged_coupling:
+            text, count = re.subn(r"^(\s*outerCorrTolerance\s+[^;]+;)",
+                                  r"\g<1>\n    allowUnconvergedCoupling yes;",
+                                  path.read_text(), flags=re.MULTILINE)
+            if count != 1:
+                fail(f"Could not enable allowUnconvergedCoupling in {path}")
+            path.write_text(text)
+
+
 def run_case(case: Path, label: str, cores: int, coupling: str,
              reuse: bool) -> None:
     solver_log = case / "log.solids4Foam"
@@ -564,7 +585,7 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 def run_level(args: argparse.Namespace, spec: dict, factor: int, coupling: str,
               end_time: float, window: float, name: str) -> dict:
     index = spec["mesh"]["refinementFactors"].index(factor)
-    delta_t = spec["mesh"]["deltaTs"][index]
+    delta_t = args.delta_t or spec["mesh"]["deltaTs"][index]
     cores = study_cores(args.cores, factor, spec)
     case = WORK_ROOT / name
     if not (args.reuse and case.is_dir()):
@@ -573,18 +594,18 @@ def run_level(args: argparse.Namespace, spec: dict, factor: int, coupling: str,
                        args.write_interval, cores)
         if spec.get("benchmark") == "fsi2":
             configure_fsi2(case, spec["fsi2"])
+        configure_coupling_diagnostic(case, args)
     run_case(case, name, cores, coupling, args.reuse)
     row: dict = {"case": name, "coupling": coupling, "mesh_level": index + 1,
                  "refinement": factor, "delta_t": delta_t, "cores": cores,
                  "end_time": end_time, "window": window}
-    if spec.get("benchmark") == "fsi2":
-        # A reused run keeps the rank count it was run with
-        row["cores"] = len(list(case.glob("processor*"))) or 1
-        row["execution_time"] = execution_time(case)
-        row.update(iqnils_iteration_summary(case))
-        if "coupled_time_steps" in row:
-            row["mean_outer_iterations"] = (row["total_outer_iterations"]
-                                            / row["coupled_time_steps"])
+    # A reused run keeps the rank count it was run with
+    row["cores"] = len(list(case.glob("processor*"))) or 1
+    row["execution_time"] = execution_time(case)
+    row.update(iqnils_iteration_summary(case))
+    if "coupled_time_steps" in row:
+        row["mean_outer_iterations"] = (row["total_outer_iterations"]
+                                        / row["coupled_time_steps"])
     if args.quick:
         return row
     row.update(extract(case, spec, window, end_time))
@@ -609,6 +630,10 @@ def mesh_study(args: argparse.Namespace, spec: dict) -> bool:
     failures = []
     for factor in factors:
         name = f"{prefix}{args.coupling}_mesh_{factor}x"
+        if args.delta_t:
+            name += f"_dt{args.delta_t:g}"
+        if args.outer_corr_tolerance:
+            name += f"_tol{args.outer_corr_tolerance:g}"
         row = run_level(args, spec, factor, args.coupling, end_time, window, name)
         rows.append(row)
         if args.quick:
@@ -619,7 +644,9 @@ def mesh_study(args: argparse.Namespace, spec: dict) -> bool:
         level_failures = check_references(row, spec["references"])
         if factor == factors[-1]:
             failures += [f"{name}: {message}" for message in level_failures]
-    csv_name = f"{prefix}{args.coupling}_mesh_sweep.csv"
+    csv_name = f"{prefix}{args.coupling}_mesh_sweep" + (
+        f"_dt{args.delta_t:g}" if args.delta_t else "") + (
+        f"_tol{args.outer_corr_tolerance:g}" if args.outer_corr_tolerance else "") + ".csv"
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     if args.quick:
         write_csv(OUTPUT_ROOT / csv_name, rows)
@@ -733,17 +760,20 @@ def iqnils_iteration_summary(case: Path) -> dict[str, float]:
     path = case / "postProcessing/fsiResiduals.dat"
     if not path.is_file():
         return {}
-    final_by_time: dict[float, float] = {}
+    # One line per FSI iteration: time, iteration and residual; the last line
+    # of a time step holds its final residual
+    final_by_time: dict[float, tuple[float, float]] = {}
     for fields in numeric_rows(path):
-        final_by_time[float(fields[0])] = float(fields[1])
+        final_by_time[float(fields[0])] = (float(fields[1]), float(fields[2]))
     coupling_start = dictionary_scalar(case / "constant/fsiProperties.iqnils", "couplingStartTime")
-    coupled = [n for time, n in final_by_time.items() if time > coupling_start]
+    coupled = [value for time, value in final_by_time.items() if time > coupling_start]
     if not coupled:
         fail(f"No coupled time steps recorded in {path}")
     return {
         "coupled_time_steps": len(coupled),
-        "total_outer_iterations": sum(coupled),
-        "maximum_outer_iterations": max(coupled),
+        "total_outer_iterations": sum(n for n, _ in coupled),
+        "maximum_outer_iterations": max(n for n, _ in coupled),
+        "maximum_final_residual": max(r for _, r in coupled),
     }
 
 
@@ -1367,6 +1397,17 @@ def main() -> int:
                         help="override the end time in seconds (defaults: FSI3 mesh study 7, "
                         "FSI3 coupling study 2.05, FSI2 10.5, FSI1 30; --quick shortens the "
                         "mesh studies to 2.3, or 2.5 for FSI1)")
+    parser.add_argument("--delta-t", type=float,
+                        help="override the time step of every level of the FSI3 or FSI2 "
+                        "mesh study, e.g. to estimate the time discretisation error at "
+                        "a fixed mesh; runs and results carry a _dt<value> suffix")
+    parser.add_argument("--outer-corr-tolerance", type=float,
+                        help="override the FSI interface tolerance of the FSI3 or FSI2 mesh "
+                        "study, to bound the coupling-iteration error; runs and results "
+                        "carry a _tol<value> suffix")
+    parser.add_argument("--allow-unconverged-coupling", action="store_true",
+                        help="accept FSI steps that reach nOuterCorr above the tolerance "
+                        "(recorded in fsiResiduals.dat) instead of aborting the run")
     parser.add_argument("--window", type=float,
                         help="length of the closing analysis window in seconds")
     parser.add_argument("--write-interval", type=int,
@@ -1378,6 +1419,13 @@ def main() -> int:
     args = parser.parse_args()
     if args.cores != "auto" and (not args.cores.isdecimal() or int(args.cores) < 1):
         parser.error("--cores must be a positive integer or auto")
+    if args.delta_t is not None and (args.delta_t <= 0 or args.benchmark == "fsi1"
+                                     or args.study != "mesh"):
+        parser.error("--delta-t must be positive and applies to the FSI3 and FSI2 mesh studies only")
+    if ((args.outer_corr_tolerance is not None or args.allow_unconverged_coupling)
+            and (args.benchmark == "fsi1" or args.study != "mesh")):
+        parser.error("--outer-corr-tolerance and --allow-unconverged-coupling apply to "
+                     "the FSI3 and FSI2 mesh studies only")
     if args.write_interval is not None and args.write_interval < 1:
         parser.error("--write-interval must be a positive integer")
     for executable in ("blockMesh", "solids4Foam"):
