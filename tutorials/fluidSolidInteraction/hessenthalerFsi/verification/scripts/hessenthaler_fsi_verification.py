@@ -479,61 +479,40 @@ def history_rows(case: Path, name: str, filename: str, end_time: float,
 
 def settling_estimate(rows: list[list[float]], column: int, end_time: float,
                       scale: float = 1.0) -> dict:
-    """Steady value of a decaying oscillation and its residual transient.
+    """Time-average of a QoI over the last third of the run, with its
+    residual time (statistical and drift) uncertainty.
 
-    The history is smoothed by a moving average over one oscillation period
-    (estimated from the mean crossings of the last 40 % of the run), and the
-    smoothed signal is fitted with a + b*exp(-t/tau) over the second half of
-    the run (and, for sensitivity, over its last 40 % and 30 %). 'a' is the
-    estimated steady value; its distance from the final-window mean is the
-    estimated residual transient error of that mean.
+    After the ramp the flap does not settle to a strict steady state: it
+    wanders at low frequency (periods of seconds) by a few hundredths of a
+    millimetre, and on some meshes still drifts slowly. The QoI is the mean
+    over (2T/3, T]; its time uncertainty is the larger of
+      - the difference between the means of the two halves of that window
+        (a drift that has not died out), and
+      - twice the standard error of the means of its 1-s batches (the
+        low-frequency wander; batches of 1 s are not independent, so this
+        is indicative).
     """
-    data = [(r[0], scale * r[column]) for r in rows]
-    tail = [(t, y) for t, y in data if t > 0.6 * end_time]
-    mean = sum(y for _, y in tail) / len(tail)
-    crossings = [t for (t0, y0), (t, y) in zip(tail, tail[1:])
-                 if (y0 - mean) * (y - mean) < 0]
-    period = (2 * (crossings[-1] - crossings[0]) / (len(crossings) - 1)
-              if len(crossings) > 3 else 0.5)
-    delta_t = data[1][0] - data[0][0]
-    width = max(1, round(period / delta_t))
-    smoothed, total = [], 0.0
-    for i, (t, y) in enumerate(data):
-        total += y
-        if i >= width:
-            total -= data[i - width][1]
-        if i >= width - 1:
-            smoothed.append((t - 0.5 * (width - 1) * delta_t, total / width))
-    out = {"period_s": period}
-    for start_fraction in (0.5, 0.6, 0.7):
-        part = [(t, y) for t, y in smoothed if t >= start_fraction * end_time]
-        best = None
-        for k in range(200):
-            tau = 0.2 * 1.04 ** k
-            xs = [math.exp(-(t - end_time) / tau) for t, _ in part]
-            n = len(part)
-            sx, sy = sum(xs), sum(y for _, y in part)
-            sxx = sum(x * x for x in xs)
-            sxy = sum(x * y for x, (_, y) in zip(xs, part))
-            det = n * sxx - sx * sx
-            if abs(det) < 1e-300:
-                continue
-            b = (n * sxy - sx * sy) / det
-            a = (sy - b * sx) / n
-            sse = sum((a + b * x - y) ** 2 for x, (_, y) in zip(xs, part))
-            if best is None or sse < best[0]:
-                best = (sse, a, b, tau)
-        if best is None or len(part) < 20:
-            out[f"steady_fit{start_fraction:g}"] = math.nan
-            out[f"tau_fit{start_fraction:g}_s"] = math.nan
-            continue
-        _, a, b, tau = best
-        out[f"steady_fit{start_fraction:g}"] = a
-        out[f"tau_fit{start_fraction:g}_s"] = tau
-    fits = [out[f"steady_fit{f:g}"] for f in (0.5, 0.6, 0.7)]
-    out["steady_estimate"] = fits[0]
-    out["steady_fit_spread"] = max(fits) - min(fits)
-    return out
+    start = end_time * 2.0 / 3.0
+    data = [(r[0], scale * r[column]) for r in rows
+            if start + 1e-9 < r[0] <= end_time + 1e-9]
+    mid = 0.5 * (start + end_time)
+    first = [y for t, y in data if t <= mid + 1e-9]
+    second = [y for t, y in data if t > mid + 1e-9]
+    mean = sum(y for _, y in data) / len(data)
+    batches = []
+    edge = start
+    while edge + 1.0 <= end_time + 1e-9:
+        batch = [y for t, y in data if edge + 1e-9 < t <= edge + 1.0 + 1e-9]
+        if batch:
+            batches.append(sum(batch) / len(batch))
+        edge += 1.0
+    n = len(batches)
+    se = (math.sqrt(sum((b - sum(batches) / n) ** 2 for b in batches)
+                    / (n - 1) / n) if n > 1 else math.nan)
+    drift = abs(sum(second) / len(second) - sum(first) / len(first))
+    return {"mean": mean, "window_start_s": start, "half_difference": drift,
+            "batch_standard_error": se, "batches": n,
+            "uncertainty": max(drift, 2.0 * se if math.isfinite(se) else 0.0)}
 
 
 def checkmesh_metrics(log: Path) -> dict:
@@ -1334,10 +1313,15 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
     q["tip_y_window_change_mm"] = q["tip_y_w2_mean_mm"] - q["tip_y_w1_mean_mm"]
     tail = [r[2] for r in tip if r[0] > 0.9 * end_time + 1e-9]
     q["tip_drift_last_tenth_mm"] = 1e3 * (max(tail) - min(tail))
-    settle = settling_estimate(tip, 2, end_time, 1e3)
-    q.update({f"tip_y_settle_{k}": v for k, v in settle.items()})
-    q["tip_y_transient_error_mm"] = abs(q["tip_y_w2_mean_mm"]
-                                        - settle["steady_estimate"])
+    # Primary steady-state values: means over the last third of the run,
+    # with their time (wander and drift) uncertainty
+    for label, column in (("y", 2), ("z", 3)):
+        settle = settling_estimate(tip, column, end_time, 1e3)
+        offset = 65.0 if label == "z" else 0.0
+        q[f"tip_{label}_mean_mm"] = offset + settle["mean"]
+        q[f"tip_{label}_time_uncertainty_mm"] = settle["uncertainty"]
+        q[f"tip_{label}_half_difference_mm"] = settle["half_difference"]
+        q[f"tip_{label}_batch_se_mm"] = settle["batch_standard_error"]
     result["tip_history"] = [[round(r[0], 6), 1e3 * r[2], 1e3 * r[3]]
                              for r in tip
                              if abs(r[0] * 50 - round(r[0] * 50)) < 1e-6]
@@ -1355,8 +1339,9 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
     mean_dy, mean_dz, final_dy, final_dz = [], [], [], []
     for name in names:
         rows = vmod.monitor_history(case, name, end_time, delta_t)
-        mean_dy.append(1e3 * window_stats(rows, 2, *w2)["mean"])
-        mean_dz.append(1e3 * window_stats(rows, 3, *w2)["mean"])
+        last_third = (end_time * 2.0 / 3.0, end_time)
+        mean_dy.append(1e3 * window_stats(rows, 2, *last_third)["mean"])
+        mean_dz.append(1e3 * window_stats(rows, 3, *last_third)["mean"])
         final_dy.append(1e3 * rows[-1][2])
         final_dz.append(1e3 * rows[-1][3])
     result["centreline_nodes_mm"] = nodes
@@ -1384,9 +1369,10 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
         q[f"force_{comp}_w2_mean_N"] = window_stats(force, column, *w2)["mean"]
         q[f"force_{comp}_w1_mean_N"] = window_stats(force, column, *w1)["mean"]
     q["force_y_w2_std_N"] = window_stats(force, 2, *w2)["std"]
-    settle = settling_estimate(force, 2, end_time)
-    q["force_y_transient_error_N"] = abs(q["force_y_w2_mean_N"]
-                                         - settle["steady_estimate"])
+    for comp, column in (("y", 2), ("z", 3)):
+        settle = settling_estimate(force, column, end_time)
+        q[f"force_{comp}_mean_N"] = settle["mean"]
+        q[f"force_{comp}_time_uncertainty_N"] = settle["uncertainty"]
     for inlet in ("upperInlet", "lowerInlet"):
         pressure = history_rows(case, f"{inlet}Pressure",
                                 "surfaceFieldValue.dat", end_time, delta_t, 2)
@@ -1395,6 +1381,9 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
             pressure, 1, *w2)["mean"]
         q[f"dp_{inlet}_w1_mean_Pa"] = 1163.3 * window_stats(
             pressure, 1, *w1)["mean"]
+        settle = settling_estimate(pressure, 1, end_time, 1163.3)
+        q[f"dp_{inlet}_mean_Pa"] = settle["mean"]
+        q[f"dp_{inlet}_time_uncertainty_Pa"] = settle["uncertainty"]
     probes = history_rows(case, "velocityProbes", "U", end_time, delta_t,
                           1 + 3 * len(PROBES))
     for i in range(len(PROBES)):
@@ -1405,6 +1394,9 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
             probes, column, *w1)["mean"]
         q[f"probe{i}_vz_w2_std_mm_s"] = 1e3 * window_stats(
             probes, column, *w2)["std"]
+        settle = settling_estimate(probes, column, end_time, 1e3)
+        q[f"probe{i}_vz_mean_mm_s"] = settle["mean"]
+        q[f"probe{i}_vz_time_uncertainty_mm_s"] = settle["uncertainty"]
 
     # Velocity on the MRI voxels: the time average of the fixed-voxel
     # samples over the window (primary), the final instantaneous field, and
@@ -1632,7 +1624,7 @@ def validation_metrics(run: dict, reference: dict) -> dict:
     tip_target = float(reference["targets"]["phase_I_tip_y_mm"])
     q = run["qoi"]
     out = {"tip_error_final_mm": q["tip_y_final_mm"] - tip_target,
-           "tip_error_mean_mm": q["tip_y_w2_mean_mm"] - tip_target}
+           "tip_error_mean_mm": q["tip_y_mean_mm"] - tip_target}
     for label in ("mean", "final"):
         line = [tuple(p) for p in run[f"centreline_{label}"]]
         errors = vmod.centreline_errors(line, measured_line)
@@ -1656,13 +1648,16 @@ def validation_metrics(run: dict, reference: dict) -> dict:
 # Principal QoIs: key, label, and the key of its resolution (residual
 # transient error), if any
 QOIS = (
-    ("tip_y_w2_mean_mm", "tip y, window mean (mm)", "tip_y_transient_error_mm"),
-    ("tip_z_w2_mean_mm", "tip z, window mean (mm)", None),
-    ("force_y_w2_mean_N", "flap force y, window mean (N)",
-     "force_y_transient_error_N"),
-    ("force_z_w2_mean_N", "flap force z, window mean (N)", None),
-    ("dp_upperInlet_w2_mean_Pa", "upper inlet pressure (Pa)", None),
-    ("dp_lowerInlet_w2_mean_Pa", "lower inlet pressure (Pa)", None),
+    ("tip_y_mean_mm", "tip y, mean of last third (mm)",
+     "tip_y_time_uncertainty_mm"),
+    ("tip_z_mean_mm", "tip z, mean of last third (mm)",
+     "tip_z_time_uncertainty_mm"),
+    ("force_y_mean_N", "flap force y (N)", "force_y_time_uncertainty_N"),
+    ("force_z_mean_N", "flap force z (N)", "force_z_time_uncertainty_N"),
+    ("dp_upperInlet_mean_Pa", "upper inlet pressure (Pa)",
+     "dp_upperInlet_time_uncertainty_Pa"),
+    ("dp_lowerInlet_mean_Pa", "lower inlet pressure (Pa)",
+     "dp_lowerInlet_time_uncertainty_Pa"),
     ("peak_vz_upper_z10_mm_s_mean", "upper jet peak vz, z = 10 mm (mm/s)",
      None),
     ("peak_vz_lower_z10_mm_s_mean", "lower jet peak vz, z = 10 mm (mm/s)",
@@ -1682,6 +1677,8 @@ def compare_pair(a: dict, b: dict) -> dict:
            "velocity_mean_change": vel["mean"],
            "velocity_max_change": vel["max"],
            "velocity_compared_voxels": vel["voxels"]}
+    out["tip_y_change_mm"] = (b["qoi"]["tip_y_mean_mm"]
+                              - a["qoi"]["tip_y_mean_mm"])
     for key, _, _ in QOIS:
         out[f"{key}_change"] = b["qoi"].get(key, math.nan) - a["qoi"].get(
             key, math.nan)
