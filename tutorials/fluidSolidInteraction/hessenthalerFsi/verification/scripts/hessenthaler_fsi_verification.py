@@ -1443,10 +1443,21 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
     q["ami_face_error_last"] = float(ami[-1]) if ami else math.nan
 
     # Cost and coupling
-    mean_it, max_it = vmod.fsi_iterations(case)
-    q["fsi_iterations_mean"] = mean_it
-    q["fsi_iterations_max"] = max_it
-    q["clock_time_h"] = vmod.clock_time(case) / 3600.0
+    counts: dict[str, int] = {}
+    clock = 0.0
+    for log in sorted(case.glob("log.solids4Foam*")):
+        text = log.read_text(errors="replace")
+        for time_value, iteration in re.findall(
+                r"^Time = ([0-9.eE+-]+), iteration: (\d+)", text,
+                re.MULTILINE):
+            counts[time_value] = max(counts.get(time_value, 0),
+                                     int(iteration))
+        times = re.findall(r"ClockTime\s*=\s*([0-9.eE+-]+)", text)
+        clock += float(times[-1]) if times else 0.0
+    q["fsi_iterations_mean"] = sum(counts.values()) / len(counts)
+    q["fsi_iterations_max"] = max(counts.values())
+    q["clock_time_h"] = clock / 3600.0
+    q["restart_segments"] = len(list(case.glob("log.solids4Foam*")))
     q["fsi_max_iteration_hits"] = count_max_iterations(case, spec)
     result["qoi"] = q
     return result
@@ -1478,7 +1489,21 @@ def run_coupled(args: argparse.Namespace) -> bool:
                 "tutorial_inputs": vmod.tutorial_fingerprint(),
                 "build": vmod.build_fingerprint()}
     info_file = case / "verification_info.json"
-    if args.evaluate_only:
+    if args.restart:
+        # Continue an interrupted run from its latest written time
+        info = json.loads(info_file.read_text())
+        meshes = info.pop("meshes")
+        segment = 1
+        while (case / f"log.solids4Foam.{segment}").exists():
+            segment += 1
+        shutil.move(str(case / "log.solids4Foam"),
+                    str(case / f"log.solids4Foam.{segment}"))
+        print(f"Restarting {name} on {cores} ranks", flush=True)
+        run(mpirun(cores, ["solids4Foam"]), case, "log.solids4Foam")
+        vmod.check_solver_log(case, name)
+        (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
+                                          + "\n")
+    elif args.evaluate_only:
         info = json.loads(info_file.read_text())
         meshes = info.pop("meshes")
     elif vmod.reusable(case, settings, args, name):
@@ -1741,12 +1766,15 @@ def default_series() -> dict:
         return spec_name(parse_spec(text))
 
     return {
-        "fluid at S2": {"runs": [n(f"F{k}:S2") for k in range(1, 6)],
+        # F5 (11 M cells) was not affordable: the solid's matrix-free
+        # Krylov iterations do not scale to the ~512 ranks it needs
+        "fluid at S2": {"runs": [n(f"F{k}:S2") for k in range(1, 5)],
                         "ratio": FLUID_RATIO},
         "solid at F3": {"runs": [n(f"F3:S{k}") for k in range(1, 4)],
                         "ratio": 2.0},
-        "matched": {"runs": [n("F1:S1"), n("F3:S2"), n("F5:S3")],
-                    "ratio": 2.0},
+        # Two levels of the r = 2 matched path; its third level, F5:S3,
+        # was not affordable
+        "matched": {"runs": [n("F1:S1"), n("F3:S2")], "ratio": 2.0},
         "solid at F1": {"runs": [n("F1:S2"), n("F1:S3")], "ratio": 2.0},
         "time": {"runs": [n("F2:S2"), n("F2:S2:dt=0.001"),
                           n("F2:S2:dt=0.0005")], "ratio": 2.0},
@@ -1824,6 +1852,8 @@ def main() -> int:
     parser.add_argument("--reuse", action="store_true")
     parser.add_argument("--evaluate-only", action="store_true",
                         help="run, solid: evaluate existing run directories")
+    parser.add_argument("--restart", action="store_true",
+                        help="run: continue an interrupted run")
     parser.add_argument("--work", help="work directory holding the runs "
                         "(default verification/work)")
     args = parser.parse_args()
