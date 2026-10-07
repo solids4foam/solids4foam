@@ -1793,21 +1793,35 @@ def solid_limit_analysis() -> dict:
 
 
 def default_series() -> dict:
-    """The refinement series of the verification campaign (README.md)."""
+    """The refinement series of the verification campaign (README.md).
+
+    The flap reaches its steady state only after about 20 s, so the spatial
+    series compare runs to T = 30 s (means over 20-30 s). The paired
+    iterative, time-step and stabilisation comparisons use T = 15 s: both
+    members of a pair are at the same stage of the slow development, and
+    the end-time series (15, 30, 40 s) measures the time error itself.
+    """
     def n(text: str) -> str:
         return spec_name(parse_spec(text))
 
+    long = ":T=30"
     return {
         # F5 (11 M cells) was not affordable: the solid's matrix-free
         # Krylov iterations do not scale to the ~512 ranks it needs
-        "fluid at S2": {"runs": [n(f"F{k}:S2") for k in range(1, 5)],
+        "fluid at S2": {"runs": [n(f"F{k}:S2{long}") for k in range(1, 5)],
                         "ratio": FLUID_RATIO},
-        "solid at F3": {"runs": [n(f"F3:S{k}") for k in range(1, 4)],
+        "solid at F3": {"runs": [n(f"F3:S{k}{long}") for k in range(1, 4)],
                         "ratio": 2.0},
         # Two levels of the r = 2 matched path; its third level, F5:S3,
         # was not affordable
-        "matched": {"runs": [n("F1:S1"), n("F3:S2")], "ratio": 2.0},
-        "solid at F1": {"runs": [n("F1:S2"), n("F1:S3")], "ratio": 2.0},
+        "matched": {"runs": [n(f"F1:S1{long}"), n(f"F3:S2{long}")],
+                    "ratio": 2.0},
+        "solid at F1": {"runs": [n(f"F1:S2{long}"), n(f"F1:S3{long}")],
+                        "ratio": 2.0},
+        "tutorial modulus": {"runs": [n(f"F1:S2:mu=58450{long}"),
+                                      n(f"F1:S2{long}")]},
+        "end time": {"runs": [n("F2:S2"), n(f"F2:S2{long}"),
+                              n("F2:S2:T=40")]},
         "time": {"runs": [n("F2:S2"), n("F2:S2:dt=0.001"),
                           n("F2:S2:dt=0.0005")], "ratio": 2.0},
         # With the default fluid tolerances IQN-ILS stalls at a residual of
@@ -1815,18 +1829,15 @@ def default_series() -> dict:
         # tolerances it reaches 1e-5 but stalls at 2.5-5e-6 (it fails at
         # 1e-6). The iterative study is therefore (default fluid, 1e-4),
         # (tight fluid, 1e-4) and (tight fluid, 1e-5).
+        "fluid linear tolerance": {"runs": [n("F2:S2"),
+                                            n("F2:S2:fluidtol=tight")]},
         "coupling tolerance": {"runs": [n("F2:S2:fluidtol=tight"),
                                         n("F2:S2:tol=1e-5:fluidtol=tight")]},
         "all iterative tolerances": {
             "runs": [n("F2:S2"), n("F2:S2:tol=1e-5:fluidtol=tight")]},
-        "fluid linear tolerance": {"runs": [n("F2:S2"),
-                                            n("F2:S2:fluidtol=tight")]},
         "PIMPLE outer correctors": {"runs": [n("F2:S2"),
                                              n("F2:S2:pimple=3")]},
-        "Robin-Neumann": {"runs": [n("F2:S2"), n("F2:S2:coupling=robin")]},
         "stabilisation": {"runs": [n("F2:S2"), n("F2:S2:sf=0.001")]},
-        "end time": {"runs": [n("F2:S2"), n("F2:S2:T=40")]},
-        "tutorial modulus": {"runs": [n("F1:S2:mu=58450"), n("F1:S2")]},
     }
 
 
