@@ -576,6 +576,8 @@ def patch_faces(boundary: Path, patch: str) -> int:
 # rho*g/mu, so load f at MU_REFERENCE is the static state at MU_REFERENCE/f:
 # the plateaus span 48.8-66.3 kPa.
 SOLID_LOADS = (0.92, 1.0, 1.1, 1.25)
+# Ranks of the parallel solid-study runs (the recorded campaign)
+SOLID_STUDY_CORES = {"S3": 32, "S4": 128}
 SOLID_PLATEAU = 2.0
 # Largest tip movement (mm) over the last 0.25 s of a settled plateau
 # (0.02 mm is about 0.06 kPa in the calibrated modulus)
@@ -681,7 +683,8 @@ def run_solid(args: argparse.Namespace) -> bool:
     for level in levels:
         for sf in stabilisations:
             cells = math.prod(SOLID_LEVELS[level])
-            cores = 1 if cells < 20000 else (args.cores_solid or 32)
+            cores = 1 if cells < 20000 else (
+                args.cores_solid or SOLID_STUDY_CORES[level])
             specs.append({"level": level, "sf": sf, "cores": cores})
 
     def settings_of(spec: dict) -> dict:
@@ -710,9 +713,10 @@ def run_solid(args: argparse.Namespace) -> bool:
         (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
                                           + "\n")
 
-    with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
-        for future in [pool.submit(execute, spec) for spec in specs]:
-            future.result()
+    if not args.evaluate_only:
+        with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+            for future in [pool.submit(execute, spec) for spec in specs]:
+                future.result()
 
     rows = []
     passed = True
@@ -1819,10 +1823,15 @@ def main() -> int:
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--reuse", action="store_true")
     parser.add_argument("--evaluate-only", action="store_true",
-                        help="run: evaluate an existing run directory")
+                        help="run, solid: evaluate existing run directories")
+    parser.add_argument("--work", help="work directory holding the runs "
+                        "(default verification/work)")
     args = parser.parse_args()
     if args.levels:
         args.levels = [v.strip() for v in args.levels.split(",")]
+    if args.work:
+        global WORK_ROOT
+        WORK_ROOT = Path(args.work).resolve()
     WORK_ROOT.mkdir(parents=True, exist_ok=True)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     study = {"solid": run_solid, "meshes": run_meshes, "run": run_coupled,
