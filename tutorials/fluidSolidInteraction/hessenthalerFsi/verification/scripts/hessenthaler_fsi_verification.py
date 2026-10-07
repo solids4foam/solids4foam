@@ -1778,11 +1778,11 @@ def default_series() -> dict:
         "solid at F1": {"runs": [n("F1:S2"), n("F1:S3")], "ratio": 2.0},
         "time": {"runs": [n("F2:S2"), n("F2:S2:dt=0.001"),
                           n("F2:S2:dt=0.0005")], "ratio": 2.0},
-        # IQN-ILS stalls at a residual of about 3e-5 with the default fluid
-        # tolerances, so 1e-6 is run with tight fluid tolerances
+        # IQN-ILS cannot reach 1e-6: it stalls at about 3e-5 with the default
+        # fluid tolerances, and at 2.5-5e-6 in the first step with tight ones
         "coupling tolerance": {"runs": [n("F2:S2"), n("F2:S2:tol=1e-5")]},
         "all iterative tolerances": {
-            "runs": [n("F2:S2"), n("F2:S2:tol=1e-6:fluidtol=tight")]},
+            "runs": [n("F2:S2"), n("F2:S2:tol=1e-5:fluidtol=tight")]},
         "fluid linear tolerance": {"runs": [n("F2:S2"),
                                             n("F2:S2:fluidtol=tight")]},
         "PIMPLE outer correctors": {"runs": [n("F2:S2"),
