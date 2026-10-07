@@ -1501,8 +1501,10 @@ def run_coupled(args: argparse.Namespace) -> bool:
         replace_entry(control, "endTime", f"{end_time:.10g}", True)
         replace_entry(control, "writeInterval", "5", True)
         avg_start = end_time * (1.0 - WINDOW_FRACTION)
+        # The cell mean restarts at the new window
         (case / "system" / "verificationMonitors").write_text(
-            verification_monitors(avg_start))
+            verification_monitors(avg_start).replace(
+                "restartOnRestart false;", "restartOnRestart true;"))
         (case / "system" / "voxelHistory").write_text(
             voxel_history(avg_start, end_time, delta_t))
         for path in case.glob("postProcessing/**/sample*"):
