@@ -515,6 +515,24 @@ def settling_estimate(rows: list[list[float]], column: int, end_time: float,
             "uncertainty": max(drift, 2.0 * se if math.isfinite(se) else 0.0)}
 
 
+def declare_total_strain_restart(case: Path) -> None:
+    """Allow the solid to continue from a written time.
+
+    The flap is a total-Lagrangian, total-displacement neo-Hookean solid:
+    its stress follows from the total deformation gradient, and the old-time
+    displacements the time scheme needs (D_0, D_0_0) and U are written, so
+    the incremental restart fields are not needed ('restart no').
+    """
+    path = case / "constant" / "solid" / "solidProperties"
+    text = path.read_text()
+    if re.search(r"^\s*restart\s+\w+;", text, re.MULTILINE):
+        return
+    replace_text(path, "    solutionAlgorithm PETScSNES;\n",
+                 "    solutionAlgorithm PETScSNES;\n\n"
+                 "    // Continuing a total-strain solid needs no incremental "
+                 "fields\n    restart no;\n")
+
+
 def checkmesh_metrics(log: Path) -> dict:
     text = log.read_text(errors="replace")
     metrics = {}
@@ -1505,6 +1523,7 @@ def run_coupled(args: argparse.Namespace) -> bool:
             fail(f"Neither {old} nor a renamed copy of it exists")
         info = json.loads(info_file.read_text())
         meshes = info.pop("meshes")
+        declare_total_strain_restart(case)
         end_time, delta_t = spec["T"], spec["dt"]
         control = case / "system" / "controlDict"
         replace_entry(control, "endTime", f"{end_time:.10g}", True)
@@ -1535,6 +1554,7 @@ def run_coupled(args: argparse.Namespace) -> bool:
             segment += 1
         shutil.move(str(case / "log.solids4Foam"),
                     str(case / f"log.solids4Foam.{segment}"))
+        declare_total_strain_restart(case)
         print(f"Restarting {name} on {cores} ranks", flush=True)
         run(mpirun(cores, ["solids4Foam"]), case, "log.solids4Foam")
         vmod.check_solver_log(case, name)
