@@ -1481,7 +1481,40 @@ def run_coupled(args: argparse.Namespace) -> bool:
                 "tutorial_inputs": vmod.tutorial_fingerprint(),
                 "build": vmod.build_fingerprint()}
     info_file = case / "verification_info.json"
-    if args.restart:
+    if args.extend_from:
+        # Continue a finished shorter run (same spec but T) to this end time
+        old_spec = parse_spec(args.extend_from)
+        if dict(old_spec, T=spec["T"]) != spec or old_spec["T"] >= spec["T"]:
+            fail("--extend-from must name the same run with a shorter T")
+        old = WORK_ROOT / spec_name(old_spec)
+        vmod.check_solver_log(old, spec_name(old_spec))
+        if case.exists():
+            shutil.rmtree(case)
+        print(f"Copying {old.name} to {name}", flush=True)
+        shutil.copytree(old, case, symlinks=True)
+        shutil.move(str(case / "log.solids4Foam"),
+                    str(case / "log.solids4Foam.1"))
+        info = json.loads(info_file.read_text())
+        meshes = info.pop("meshes")
+        end_time, delta_t = spec["T"], spec["dt"]
+        control = case / "system" / "controlDict"
+        replace_entry(control, "endTime", f"{end_time:.10g}", True)
+        replace_entry(control, "writeInterval", "5", True)
+        avg_start = end_time * (1.0 - WINDOW_FRACTION)
+        (case / "system" / "verificationMonitors").write_text(
+            verification_monitors(avg_start))
+        (case / "system" / "voxelHistory").write_text(
+            voxel_history(avg_start, end_time, delta_t))
+        for path in case.glob("postProcessing/**/sample*"):
+            if path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+        print(f"Extending {name} on {cores} ranks", flush=True)
+        run(mpirun(cores, ["solids4Foam"]), case, "log.solids4Foam")
+        vmod.check_solver_log(case, name)
+        (case / SETTINGS_FILE).write_text(json.dumps(
+            {**settings, "extended_from": spec_name(old_spec)}, indent=2)
+            + "\n")
+    elif args.restart:
         # Continue an interrupted run from its latest written time
         info = json.loads(info_file.read_text())
         meshes = info.pop("meshes")
@@ -1853,6 +1886,9 @@ def main() -> int:
     parser.add_argument("--reuse", action="store_true")
     parser.add_argument("--evaluate-only", action="store_true",
                         help="run, solid: evaluate existing run directories")
+    parser.add_argument("--extend-from",
+                        help="run: continue this finished run (same spec, "
+                             "shorter T) to the end time of --spec")
     parser.add_argument("--restart", action="store_true",
                         help="run: continue an interrupted run")
     parser.add_argument("--work", help="work directory holding the runs "
