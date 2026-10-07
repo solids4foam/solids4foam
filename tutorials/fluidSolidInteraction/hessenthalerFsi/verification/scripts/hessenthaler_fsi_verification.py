@@ -892,9 +892,11 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     replace_entry(control, "startFrom", "latestTime", True)
     replace_entry(control, "endTime", f"{end_time:.10g}", True)
     replace_entry(control, "deltaT", f"{delta_t:.10g}", True)
-    # Fields every 5 s (restart points) and at the end
+    # Fields every 5 s (restart points) and at the end; only the last two
+    # writes are kept (the project's file quota is limited)
     write_every = end_time if end_time <= 10 else 5.0
     replace_entry(control, "writeInterval", f"{write_every:.10g}", True)
+    replace_entry(control, "purgeWrite", "2", True)
     replace_text(control, '    #include "flapCentreline"\n',
                  '    #include "flapCentreline"\n\n'
                  '    // Monitors of the verification study\n'
@@ -1487,19 +1489,27 @@ def run_coupled(args: argparse.Namespace) -> bool:
         if dict(old_spec, T=spec["T"]) != spec or old_spec["T"] >= spec["T"]:
             fail("--extend-from must name the same run with a shorter T")
         old = WORK_ROOT / spec_name(old_spec)
-        vmod.check_solver_log(old, spec_name(old_spec))
-        if case.exists():
-            shutil.rmtree(case)
-        print(f"Copying {old.name} to {name}", flush=True)
-        shutil.copytree(old, case, symlinks=True)
-        shutil.move(str(case / "log.solids4Foam"),
-                    str(case / "log.solids4Foam.1"))
+        if old.exists():
+            # The shorter run's results are kept in its JSON; its case is
+            # renamed, not copied (the project's file quota is limited)
+            vmod.check_solver_log(old, spec_name(old_spec))
+            if not (RUNS_ROOT / f"{spec_name(old_spec)}.json").is_file():
+                fail(f"Evaluate {old.name} before extending it")
+            if case.exists():
+                shutil.rmtree(case)
+            print(f"Renaming {old.name} to {name}", flush=True)
+            shutil.move(str(old), str(case))
+            shutil.move(str(case / "log.solids4Foam"),
+                        str(case / "log.solids4Foam.1"))
+        elif not (case / "log.solids4Foam.1").is_file():
+            fail(f"Neither {old} nor a renamed copy of it exists")
         info = json.loads(info_file.read_text())
         meshes = info.pop("meshes")
         end_time, delta_t = spec["T"], spec["dt"]
         control = case / "system" / "controlDict"
         replace_entry(control, "endTime", f"{end_time:.10g}", True)
         replace_entry(control, "writeInterval", "5", True)
+        replace_entry(control, "purgeWrite", "2", True)
         avg_start = end_time * (1.0 - WINDOW_FRACTION)
         # The cell mean restarts at the new window
         (case / "system" / "verificationMonitors").write_text(
