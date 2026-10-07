@@ -92,13 +92,15 @@ namespace
     }
 
 
-    // Flag cells whose stencil does not span three directions.
+    // Flag cells whose stencil does not span three directions, or spans one
+    // of them poorly.
     //
     // dd is symmetric positive semi-definite, so its eigenvalues are real and
     // non-negative, and the smallest one vanishes exactly when the stencil is
-    // confined to a plane or a line. Healthy and degenerate cells are separated
-    // by many orders of magnitude, so this ratio is not sensitive: any value
-    // between 1e-4 and 1e-12 selects the same cells
+    // confined to a plane or a line. This ratio sets how poorly conditioned a
+    // face stencil may be before the cell is given the wider stencil. It is
+    // not used to decide how a tensor is inverted, which pseudoInverse does
+    // from the eigenvalues alone
     const Foam::scalar minEigenRatio = 1e-4;
 
     // A 2-D or axisymmetric mesh carries no information in its empty
@@ -119,7 +121,7 @@ namespace
         return emptyDirs;
     }
 
-    bool rankDeficient
+    bool illConditioned
     (
         const Foam::symmTensor& dd,
         const Foam::symmTensor& emptyDirs,
@@ -134,6 +136,156 @@ namespace
 
         return lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax;
     }
+
+
+    // The eigen-decomposition of a symmetric tensor by cyclic Jacobi
+    // rotations: T = sum_i lambda_i e_i e_i^T. Each rotation zeroes one
+    // off-diagonal entry exactly, and for a positive semi-definite tensor
+    // the small eigenvalues come out with high relative accuracy, which the
+    // closed-form roots of the characteristic cubic cannot give
+    void jacobiEigenDecomposition
+    (
+        const Foam::symmTensor& T,
+        Foam::vector& lambda,
+        Foam::List<Foam::vector>& e
+    )
+    {
+        using namespace Foam;
+
+        scalar a[3][3] =
+        {
+            {T.xx(), T.xy(), T.xz()},
+            {T.xy(), T.yy(), T.yz()},
+            {T.xz(), T.yz(), T.zz()}
+        };
+
+        scalar v[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+
+        for (label sweep = 0; sweep < 50; sweep++)
+        {
+            const scalar offDiag =
+                sqr(a[0][1]) + sqr(a[0][2]) + sqr(a[1][2]);
+            const scalar diag = sqr(a[0][0]) + sqr(a[1][1]) + sqr(a[2][2]);
+
+            if (offDiag == 0 || offDiag <= sqr(VSMALL)*diag)
+            {
+                break;
+            }
+
+            for (label p = 0; p < 2; p++)
+            {
+                for (label q = p + 1; q < 3; q++)
+                {
+                    // An entry already negligible next to its diagonal is
+                    // zeroed rather than rotated away: its rotation angle
+                    // would be huge, and its square can overflow
+                    if
+                    (
+                        mag(a[p][q])
+                     <= VSMALL*(mag(a[p][p]) + mag(a[q][q]))
+                    )
+                    {
+                        a[p][q] = 0;
+                        a[q][p] = 0;
+                        continue;
+                    }
+
+                    // The tangent of the rotation angle that zeroes a[p][q],
+                    // in its small-angle form when the angle is tiny
+                    const scalar theta = (a[q][q] - a[p][p])/(2.0*a[p][q]);
+                    scalar t = 0;
+                    if (mag(theta) > 1.0/ROOTVSMALL)
+                    {
+                        t = 0.5/theta;
+                    }
+                    else
+                    {
+                        t =
+                            (theta >= 0 ? 1.0 : -1.0)
+                           /(mag(theta) + Foam::sqrt(sqr(theta) + 1.0));
+                    }
+                    const scalar cs = 1.0/Foam::sqrt(sqr(t) + 1.0);
+                    const scalar sn = t*cs;
+
+                    for (label k = 0; k < 3; k++)
+                    {
+                        const scalar akp = a[k][p];
+                        const scalar akq = a[k][q];
+                        a[k][p] = cs*akp - sn*akq;
+                        a[k][q] = sn*akp + cs*akq;
+                    }
+
+                    for (label k = 0; k < 3; k++)
+                    {
+                        const scalar apk = a[p][k];
+                        const scalar aqk = a[q][k];
+                        a[p][k] = cs*apk - sn*aqk;
+                        a[q][k] = sn*apk + cs*aqk;
+                    }
+
+                    for (label k = 0; k < 3; k++)
+                    {
+                        const scalar vkp = v[k][p];
+                        const scalar vkq = v[k][q];
+                        v[k][p] = cs*vkp - sn*vkq;
+                        v[k][q] = sn*vkp + cs*vkq;
+                    }
+                }
+            }
+        }
+
+        lambda = vector(a[0][0], a[1][1], a[2][2]);
+
+        e.setSize(3);
+        for (label i = 0; i < 3; i++)
+        {
+            e[i] = vector(v[0][i], v[1][i], v[2][i]);
+        }
+    }
+}
+
+
+// * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
+
+Foam::symmTensor Foam::leastSquaresS4fVectors::pseudoInverse
+(
+    const symmTensor& dd,
+    label& rank
+)
+{
+    // A direction whose eigenvalue is below this fraction of the sum of
+    // them is treated as one the stencil does not span: the inverse along it
+    // would amplify round-off by its reciprocal
+    const scalar rankTol = 1e-12;
+
+    // Sum of the eigenvalues, all non-negative
+    const scalar scale = tr(dd);
+
+    if (scale < VSMALL)
+    {
+        rank = 0;
+        return symmTensor::zero;
+    }
+
+    vector lambda(vector::zero);
+    List<vector> e;
+    jacobiEigenDecomposition(dd, lambda, e);
+
+    const scalar tol = rankTol*scale;
+
+    rank = 0;
+    symmTensor pinv(symmTensor::zero);
+
+    for (label i = 0; i < 3; i++)
+    {
+        if (lambda[i] > tol)
+        {
+            rank++;
+            pinv += (1.0/lambda[i])*sqr(e[i]);
+        }
+    }
+
+    return pinv;
 }
 
 
@@ -376,19 +528,24 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
     // zero, and the division then raises a floating point exception on a
     // build that traps them (issue #417). The inverse is not needed there:
     // calcWideStencilVectors replaces the face stencil in every such cell and
-    // switches these vectors off. The unit tensor is inverted instead
+    // switches these vectors off. The unit tensor of the mesh's directions is
+    // inverted instead. It keeps the empty directions of a 2-D mesh empty,
+    // which matters on OpenFOAM.org and foam-extend, where
+    // inv(symmTensorField) reads the empty directions off the first tensor
+    // and applies them to the whole field
     symmTensorField ddInvertible(dd);
     {
         const symmTensor emptyDirs(emptyDirections(mesh));
+        const symmTensor unitSpanned(symmTensor(I) - emptyDirs);
 
         forAll(dd, cellI)
         {
             scalar lambdaMin = 0;
             scalar lambdaMax = 0;
 
-            if (rankDeficient(dd[cellI], emptyDirs, lambdaMin, lambdaMax))
+            if (illConditioned(dd[cellI], emptyDirs, lambdaMin, lambdaMax))
             {
-                ddInvertible[cellI] = symmTensor(I);
+                ddInvertible[cellI] = unitSpanned;
             }
         }
     }
@@ -554,7 +711,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         scalar lambdaMax = 0;
 
         const bool deficient =
-            rankDeficient(dd[cellI], emptyDirs, lambdaMin, lambdaMax);
+            illConditioned(dd[cellI], emptyDirs, lambdaMin, lambdaMax);
 
         const bool simplex = (cells[cellI].size() <= maxSimplexFaces);
 
@@ -742,7 +899,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         scalar lambdaMin = 0;
         scalar lambdaMax = 0;
 
-        if (rankDeficient(wideDd[wcI], emptyDirs, lambdaMin, lambdaMax))
+        if (illConditioned(wideDd[wcI], emptyDirs, lambdaMin, lambdaMax))
         {
             nStillSingular++;
             stillSingular[wcI] = true;
@@ -775,11 +932,12 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     if (nStillSingular > 0 && !multiMaterial)
     {
         // With a single material nothing has been filtered, so the stencil is
-        // the one this scheme used before the filtering arrived, and so is the
-        // answer. A body one cell thick in some direction produces this in
-        // serial - the striker in pipeCrush is a single row of cells - and a
-        // point-cell stencil truncated at a processor boundary can produce it
-        // in parallel. Neither is new, so neither is fatal
+        // the one this scheme used before the filtering arrived. A body one
+        // cell thick in some direction produces this in serial - the striker
+        // in pipeCrush is a single row of cells - and a point-cell stencil
+        // truncated at a processor boundary can produce it in parallel.
+        // Neither is new, so neither is fatal: the gradient is reconstructed
+        // in the directions the stencil spans and is zero along the others
         WarningInFunction
             << nStillSingular
             << " cells remain rank-deficient after widening the gradient"
@@ -819,23 +977,47 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
             << exit(FatalError);
     }
 
-    // A cell that is still rank-deficient keeps a finite inverse, as its
-    // determinant may round to exactly zero (issue #417): the directions its
-    // stencil does not span are regularised with a small fraction of its
-    // largest eigenvalue
+    // Invert the wide tensors. A flagged cell is kept out of the field
+    // inversion, whose division by a determinant that rounds to exactly zero
+    // raises a floating point exception on a build that traps them (issue
+    // #417), and whose treatment of the empty directions of a 2-D mesh is
+    // read off the first tensor on OpenFOAM.org and foam-extend: it is given
+    // the unit tensor of the mesh's directions there, and its own inverse
+    // below. That is the exact inverse when the tensor is invertible, so a
+    // linear field is still reproduced in every direction the stencil spans,
+    // and the pseudo-inverse when it is not. A cell with no admissible
+    // stencil at all has nothing to reconstruct a gradient from
+    symmTensorField wideDdInvertible(wideDd);
+    {
+        const symmTensor unitSpanned(symmTensor(I) - emptyDirs);
+
+        forAll(wideDd, wcI)
+        {
+            if (stillSingular[wcI])
+            {
+                wideDdInvertible[wcI] = unitSpanned;
+            }
+        }
+    }
+    symmTensorField wideInvDd(inv(wideDdInvertible));
+
     forAll(wideDd, wcI)
     {
         if (stillSingular[wcI])
         {
-            scalar lambdaMin = 0;
-            scalar lambdaMax = 0;
-            minMaxEigenValues(wideDd[wcI], lambdaMin, lambdaMax);
+            label rank = 0;
+            wideInvDd[wcI] = pseudoInverse(wideDd[wcI], rank);
 
-            wideDd[wcI] += (minEigenRatio*lambdaMax + VSMALL)*symmTensor(I);
+            if (rank == 0)
+            {
+                FatalErrorInFunction
+                    << "Cell " << wideCells_[wcI] << " has no admissible "
+                    << "gradient stencil: no face or point neighbour of its "
+                    << "own material, and no known-value boundary face."
+                    << exit(FatalError);
+            }
         }
     }
-
-    const symmTensorField wideInvDd(inv(wideDd));
 
     forAll(wideCells_, wcI)
     {

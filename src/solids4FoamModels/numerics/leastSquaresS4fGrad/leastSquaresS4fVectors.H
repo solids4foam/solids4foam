@@ -151,6 +151,17 @@ public:
             return wideVectors_;
         }
 
+        //- Return the Moore-Penrose pseudo-inverse of a symmetric positive
+        //  semi-definite stencil tensor, and its rank: the sum over the
+        //  eigenvalues above 1e-12 times their sum of the inverse eigenvalue
+        //  times the outer product of its eigenvector, from a Jacobi
+        //  eigen-decomposition. A direction below that threshold is one the
+        //  stencil does not span, and the inverse is zero along it; every
+        //  direction above it, however weak, is inverted exactly, so a
+        //  linear field is reproduced in every direction the stencil spans.
+        //  The zero tensor has rank 0 and a zero inverse
+        static symmTensor pseudoInverse(const symmTensor& dd, label& rank);
+
         //- Delete the least square vectors when the mesh moves
 #ifdef OPENFOAM_NOT_EXTEND
         virtual bool movePoints();
