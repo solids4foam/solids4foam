@@ -36,6 +36,8 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
 
+namespace Foam
+{
 namespace
 {
     // The smallest and largest eigenvalues of a symmetric tensor.
@@ -50,17 +52,15 @@ namespace
     // eigenvalues included, and gives the same answer on every fork
     void minMaxEigenValues
     (
-        const Foam::symmTensor& T,
-        Foam::scalar& lambdaMin,
-        Foam::scalar& lambdaMax
+        const symmTensor& T,
+        scalar& lambdaMin,
+        scalar& lambdaMax
     )
     {
-        using namespace Foam;
-
         const scalar q = tr(T)/3.0;
 
         const scalar p =
-            Foam::sqrt
+            sqrt
             (
                 (
                     sqr(T.xx() - q) + sqr(T.yy() - q) + sqr(T.zz() - q)
@@ -82,13 +82,13 @@ namespace
         B.zz() -= q;
         B /= p;
 
-        const scalar phi = Foam::acos(max(min(0.5*det(B), 1.0), -1.0))/3.0;
+        const scalar phi = acos(max(min(0.5*det(B), 1.0), -1.0))/3.0;
 
         // The three eigenvalues are q + 2p cos(phi + 2k pi/3), k = 0, 1, 2, and
         // with phi in [0, pi/3] the largest is k = 0 and the smallest k = 1
-        lambdaMax = q + 2.0*p*Foam::cos(phi);
+        lambdaMax = q + 2.0*p*cos(phi);
         lambdaMin =
-            q - p*(Foam::cos(phi) + Foam::sqrt(3.0)*Foam::sin(phi));
+            q - p*(cos(phi) + sqrt(3.0)*sin(phi));
     }
 
 
@@ -101,16 +101,14 @@ namespace
     // face stencil may be before the cell is given the wider stencil. It is
     // not used to decide how a tensor is inverted, which pseudoInverse does
     // from the eigenvalues alone
-    const Foam::scalar minEigenRatio = 1e-4;
+    const scalar minEigenRatio = 1e-4;
 
     // A 2-D or axisymmetric mesh carries no information in its empty
     // direction, and that is not a degeneracy. The unit tensor of the empty
     // directions is added, scaled by the mean eigenvalue, before testing, as
     // inv(symmTensorField) does through safeInv()
-    Foam::symmTensor emptyDirections(const Foam::fvMesh& mesh)
+    symmTensor emptyDirections(const fvMesh& mesh)
     {
-        using namespace Foam;
-
         const Vector<label> geometricD = mesh.geometricD();
 
         symmTensor emptyDirs(symmTensor::zero);
@@ -123,14 +121,12 @@ namespace
 
     bool illConditioned
     (
-        const Foam::symmTensor& dd,
-        const Foam::symmTensor& emptyDirs,
-        Foam::scalar& lambdaMin,
-        Foam::scalar& lambdaMax
+        const symmTensor& dd,
+        const symmTensor& emptyDirs,
+        scalar& lambdaMin,
+        scalar& lambdaMax
     )
     {
-        using namespace Foam;
-
         const symmTensor ddc(dd + (tr(dd)/3.0)*emptyDirs);
         minMaxEigenValues(ddc, lambdaMin, lambdaMax);
 
@@ -145,13 +141,11 @@ namespace
     // closed-form roots of the characteristic cubic cannot give
     void jacobiEigenDecomposition
     (
-        const Foam::symmTensor& T,
-        Foam::vector& lambda,
-        Foam::List<Foam::vector>& e
+        const symmTensor& T,
+        vector& lambda,
+        List<vector>& e
     )
     {
-        using namespace Foam;
-
         scalar a[3][3] =
         {
             {T.xx(), T.xy(), T.xz()},
@@ -202,9 +196,9 @@ namespace
                     {
                         t =
                             (theta >= 0 ? 1.0 : -1.0)
-                           /(mag(theta) + Foam::sqrt(sqr(theta) + 1.0));
+                           /(mag(theta) + sqrt(sqr(theta) + 1.0));
                     }
-                    const scalar cs = 1.0/Foam::sqrt(sqr(t) + 1.0);
+                    const scalar cs = 1.0/sqrt(sqr(t) + 1.0);
                     const scalar sn = t*cs;
 
                     for (label k = 0; k < 3; k++)
@@ -243,6 +237,7 @@ namespace
         }
     }
 }
+} // End namespace Foam
 
 
 // * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
