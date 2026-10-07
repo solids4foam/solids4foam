@@ -743,7 +743,6 @@ Foam::solidModels::linGeomTotalDispSolid::fvOptionsSource() const
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
 {
-    Info<< "#417 stage: makeImpK start" << endl; // TEMPORARY, issue #417
     // For the mixed displacement-pressure formulation the implicit stiffness
     // is the scalar Laplacian surrogate for div(dev(sigma)), which is
     // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu
@@ -752,9 +751,7 @@ Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
       ? tangentRequest::scalarDeviatoric
       : tangentRequest::scalar;
 
-    tmp<volScalarField> tImpK(lawImpK(mechanicalManager(), req));
-    Info<< "#417 stage: makeImpK end" << endl; // TEMPORARY, issue #417
-    return tImpK;
+    return lawImpK(mechanicalManager(), req);
 }
 
 
@@ -822,7 +819,6 @@ Foam::solidModels::linGeomTotalDispSolid::faceMaterialTangent
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::linGeomTotalDispSolid::makeRKappa() const
 {
-    Info<< "#417 stage: makeRKappa start" << endl; // TEMPORARY, issue #417
     return tmp<volScalarField>
     (
         new volScalarField(1.0/mechanicalManager().kappa())
@@ -892,21 +888,17 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
         dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     )
 {
-    Info<< "#417 stage: constructor body start" << endl; // TEMPORARY, issue #417
     DisRequired();
 
     // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(D().name());
-    Info<< "#417 stage: before d2dt2" << endl; // TEMPORARY, issue #417
 
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
-    Info<< "#417 stage: before correctBoundaryConditions" << endl; // TEMPORARY, issue #417
 
     // For consistent restarts, we will calculate the gradient field
     D().correctBoundaryConditions();
     D().storePrevIter();
-    Info<< "#417 stage: before grad" << endl; // TEMPORARY, issue #417
     gradD() = fvc::grad(D());
 
     Info<< "solvePressure = " << solvePressure() << endl;

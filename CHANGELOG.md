@@ -453,6 +453,15 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
+  cell whose face stencil does not span three directions, for example a
+  corner cell bounded by traction patches, the tensor's determinant can round
+  to exactly zero, and the division then raised a floating point exception
+  on foam-extend, where it stopped the `sphericalCavity` regression test on
+  CI (#417). The inverse is not used in such cells, which take the wider
+  point-cell stencil, and a cell that remains rank-deficient after widening
+  is regularised rather than inverted as is. `sphericalCavity` now runs and
+  is regression tested on foam-extend.
 - The explicit inertia term of the solid models now takes its scheme from
   `d2dt2Schemes`, as the implicit term does (#502). OpenFOAM's `fvc::d2dt2`
   looks up `ddtSchemes`, so when the two defaults differed, the PETSc SNES

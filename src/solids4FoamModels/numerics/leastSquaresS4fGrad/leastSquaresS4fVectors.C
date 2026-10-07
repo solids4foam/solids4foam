@@ -90,6 +90,50 @@ namespace
         lambdaMin =
             q - p*(Foam::cos(phi) + Foam::sqrt(3.0)*Foam::sin(phi));
     }
+
+
+    // Flag cells whose stencil does not span three directions.
+    //
+    // dd is symmetric positive semi-definite, so its eigenvalues are real and
+    // non-negative, and the smallest one vanishes exactly when the stencil is
+    // confined to a plane or a line. Healthy and degenerate cells are separated
+    // by many orders of magnitude, so this ratio is not sensitive: any value
+    // between 1e-4 and 1e-12 selects the same cells
+    const Foam::scalar minEigenRatio = 1e-4;
+
+    // A 2-D or axisymmetric mesh carries no information in its empty
+    // direction, and that is not a degeneracy. The unit tensor of the empty
+    // directions is added, scaled by the mean eigenvalue, before testing, as
+    // inv(symmTensorField) does through safeInv()
+    Foam::symmTensor emptyDirections(const Foam::fvMesh& mesh)
+    {
+        using namespace Foam;
+
+        const Vector<label> geometricD = mesh.geometricD();
+
+        symmTensor emptyDirs(symmTensor::zero);
+        emptyDirs.xx() = (geometricD.x() == -1 ? 1.0 : 0.0);
+        emptyDirs.yy() = (geometricD.y() == -1 ? 1.0 : 0.0);
+        emptyDirs.zz() = (geometricD.z() == -1 ? 1.0 : 0.0);
+
+        return emptyDirs;
+    }
+
+    bool rankDeficient
+    (
+        const Foam::symmTensor& dd,
+        const Foam::symmTensor& emptyDirs,
+        Foam::scalar& lambdaMin,
+        Foam::scalar& lambdaMax
+    )
+    {
+        using namespace Foam;
+
+        const symmTensor ddc(dd + (tr(dd)/3.0)*emptyDirs);
+        minMaxEigenValues(ddc, lambdaMin, lambdaMax);
+
+        return lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax;
+    }
 }
 
 
@@ -327,8 +371,28 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
         }
     }
 
-    // Invert the dd tensor
-    const symmTensorField invDd(inv(dd));
+    // Invert the dd tensor. A cell whose face stencil does not span three
+    // directions has a singular dd, whose determinant can round to exactly
+    // zero, and the division then raises a floating point exception on a
+    // build that traps them (issue #417). The inverse is not needed there:
+    // calcWideStencilVectors replaces the face stencil in every such cell and
+    // switches these vectors off. The unit tensor is inverted instead
+    symmTensorField ddInvertible(dd);
+    {
+        const symmTensor emptyDirs(emptyDirections(mesh));
+
+        forAll(dd, cellI)
+        {
+            scalar lambdaMin = 0;
+            scalar lambdaMax = 0;
+
+            if (rankDeficient(dd[cellI], emptyDirs, lambdaMin, lambdaMax))
+            {
+                ddInvertible[cellI] = symmTensor(I);
+            }
+        }
+    }
+    const symmTensorField invDd(inv(ddInvertible));
 
     // Revisit all faces and calculate the pVectors_ and nVectors_ vectors
     forAll(owner, facei)
@@ -462,22 +526,9 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     const volVectorField& C = mesh.C();
     const surfaceScalarField& w = mesh.weights();
 
-    // Flag cells whose face stencil does not span three directions.
-    // dd is symmetric positive semi-definite, so its eigenvalues are real and
-    // non-negative, and the smallest one vanishes exactly when the stencil is
-    // confined to a plane or a line. Healthy and degenerate cells are separated
-    // by many orders of magnitude, so this ratio is not sensitive: any value
-    // between 1e-4 and 1e-12 selects the same cells
-    const scalar minEigenRatio = 1e-4;
-
-    // A 2-D or axisymmetric mesh carries no information in its empty
-    // direction, and that is not a degeneracy. Fill the empty directions
-    // before testing, as inv(symmTensorField) does through safeInv()
-    const Vector<label> geometricD = mesh.geometricD();
-    symmTensor emptyDirs(symmTensor::zero);
-    emptyDirs.xx() = (geometricD.x() == -1 ? 1.0 : 0.0);
-    emptyDirs.yy() = (geometricD.y() == -1 ? 1.0 : 0.0);
-    emptyDirs.zz() = (geometricD.z() == -1 ? 1.0 : 0.0);
+    // Flag cells whose face stencil does not span three directions, with the
+    // empty directions of a 2-D or axisymmetric mesh filled first
+    const symmTensor emptyDirs(emptyDirections(mesh));
 
     // A simplex cell carries the smallest face stencil a mesh can offer: only
     // nDim + 1 face neighbours, i.e. one more equation than unknowns. Such a
@@ -499,24 +550,19 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
     forAll(dd, cellI)
     {
-        const symmTensor ddc(dd[cellI] + (tr(dd[cellI])/3.0)*emptyDirs);
-
         scalar lambdaMin = 0;
         scalar lambdaMax = 0;
-        minMaxEigenValues(ddc, lambdaMin, lambdaMax);
 
-        const bool rankDeficient =
-        (
-            lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax
-        );
+        const bool deficient =
+            rankDeficient(dd[cellI], emptyDirs, lambdaMin, lambdaMax);
 
         const bool simplex = (cells[cellI].size() <= maxSimplexFaces);
 
-        if (rankDeficient || simplex)
+        if (deficient || simplex)
         {
             cellToWide[cellI] = nWide++;
 
-            if (simplex && !rankDeficient)
+            if (simplex && !deficient)
             {
                 nSimplex++;
             }
@@ -689,18 +735,17 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     label nStillSingular = 0;
     label worstCell = -1;
     scalar worstRatio = GREAT;
+    boolList stillSingular(nWide, false);
 
     forAll(wideDd, wcI)
     {
-        const symmTensor ddc(wideDd[wcI] + (tr(wideDd[wcI])/3.0)*emptyDirs);
-
         scalar lambdaMin = 0;
         scalar lambdaMax = 0;
-        minMaxEigenValues(ddc, lambdaMin, lambdaMax);
 
-        if (lambdaMax < VSMALL || lambdaMin <= minEigenRatio*lambdaMax)
+        if (rankDeficient(wideDd[wcI], emptyDirs, lambdaMin, lambdaMax))
         {
             nStillSingular++;
+            stillSingular[wcI] = true;
 
             const scalar ratio =
                 lambdaMax < VSMALL ? 0.0 : lambdaMin/lambdaMax;
@@ -772,6 +817,22 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
             << " truncated at a processor boundary, in which case decompose"
             << " so that it is not."
             << exit(FatalError);
+    }
+
+    // A cell that is still rank-deficient keeps a finite inverse, as its
+    // determinant may round to exactly zero (issue #417): the directions its
+    // stencil does not span are regularised with a small fraction of its
+    // largest eigenvalue
+    forAll(wideDd, wcI)
+    {
+        if (stillSingular[wcI])
+        {
+            scalar lambdaMin = 0;
+            scalar lambdaMax = 0;
+            minMaxEigenValues(wideDd[wcI], lambdaMin, lambdaMax);
+
+            wideDd[wcI] += (minEigenRatio*lambdaMax + VSMALL)*symmTensor(I);
+        }
     }
 
     const symmTensorField wideInvDd(inv(wideDd));
