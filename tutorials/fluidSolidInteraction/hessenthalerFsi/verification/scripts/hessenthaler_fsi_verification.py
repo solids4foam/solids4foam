@@ -1854,6 +1854,11 @@ def default_series() -> dict:
                               n("F2:S2:T=40")]},
         "time": {"runs": [n("F2:S2"), n("F2:S2:dt=0.001"),
                           n("F2:S2:dt=0.0005")], "ratio": 2.0},
+        "time at T = 30 s": {"runs": [n(f"F2:S2{long}"),
+                                      n(f"F2:S2:dt=0.001{long}")]},
+        # The same calculation on 48 and 64 ranks agrees only to the
+        # low-frequency wander: a direct measure of run-to-run noise
+        "replicate (ranks)": {"runs": [n("F2:S2"), n("F2:S2:T=40")]},
         # With the default fluid tolerances IQN-ILS stalls at a residual of
         # about 3e-5 (it fails at 1e-5 and 1e-6); with tight fluid
         # tolerances it reaches 1e-5 but stalls at 2.5-5e-6 (it fails at
