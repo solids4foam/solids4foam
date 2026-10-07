@@ -128,9 +128,11 @@ def cell_count(case: Path) -> int:
 
 def configure_case(case: Path, spec: dict, factor: int, delta_t: float,
                    end_time: float, write_interval: int | None,
-                   cores: int) -> None:
+                   cores: int, solid_factor: int | None = None) -> None:
     refine_mesh(case / "system/fluid/blockMeshDict", factor)
-    refine_mesh(case / "system/solid/blockMeshDict", factor)
+    # The solid may be refined independently of the fluid (error-decomposition
+    # study); by default both follow the same factor
+    refine_mesh(case / "system/solid/blockMeshDict", solid_factor or factor)
 
     control = case / "system/controlDict"
     replace_entry(control, "deltaT", f"{delta_t:.8g}")
@@ -591,13 +593,15 @@ def run_level(args: argparse.Namespace, spec: dict, factor: int, coupling: str,
     if not (args.reuse and case.is_dir()):
         case = copy_case(name)
         configure_case(case, spec, factor, delta_t, end_time,
-                       args.write_interval, cores)
+                       args.write_interval, cores, args.solid_refinement)
         if spec.get("benchmark") == "fsi2":
             configure_fsi2(case, spec["fsi2"])
         configure_coupling_diagnostic(case, args)
     run_case(case, name, cores, coupling, args.reuse)
     row: dict = {"case": name, "coupling": coupling, "mesh_level": index + 1,
-                 "refinement": factor, "delta_t": delta_t, "cores": cores,
+                 "refinement": factor,
+                 "solid_refinement": args.solid_refinement or factor,
+                 "delta_t": delta_t, "cores": cores,
                  "end_time": end_time, "window": window}
     # A reused run keeps the rank count it was run with
     row["cores"] = len(list(case.glob("processor*"))) or 1
@@ -630,6 +634,8 @@ def mesh_study(args: argparse.Namespace, spec: dict) -> bool:
     failures = []
     for factor in factors:
         name = f"{prefix}{args.coupling}_mesh_{factor}x"
+        if args.solid_refinement:
+            name += f"_solid{args.solid_refinement}x"
         if args.delta_t:
             name += f"_dt{args.delta_t:g}"
         if args.outer_corr_tolerance:
@@ -1090,7 +1096,9 @@ def fsi1_run(args: argparse.Namespace, spec: dict, factor: int,
     # A reused run keeps the rank count it was run with
     cores = len(list(case.glob("processor*"))) or 1
     row: dict = {"case": name, "coupling": coupling, "mesh_level": index + 1,
-                 "refinement": factor, "delta_t": delta_t, "cores": cores,
+                 "refinement": factor,
+                 "solid_refinement": args.solid_refinement or factor,
+                 "delta_t": delta_t, "cores": cores,
                  "end_time": end_time, "cell_count": cell_count(case),
                  "execution_time": execution_time(case)}
     if coupling == "robin":
@@ -1405,6 +1413,10 @@ def main() -> int:
                         help="override the FSI interface tolerance of the FSI3 or FSI2 mesh "
                         "study, to bound the coupling-iteration error; runs and results "
                         "carry a _tol<value> suffix")
+    parser.add_argument("--solid-refinement", type=int,
+                        help="refine the solid mesh by this factor independently of the "
+                        "fluid (FSI3 mesh study, a single --levels value): fluid at "
+                        "--levels, solid at this factor; runs carry a _solid<N>x suffix")
     parser.add_argument("--allow-unconverged-coupling", action="store_true",
                         help="accept FSI steps that reach nOuterCorr above the tolerance "
                         "(recorded in fsiResiduals.dat) instead of aborting the run")
@@ -1426,6 +1438,11 @@ def main() -> int:
             and (args.benchmark == "fsi1" or args.study != "mesh")):
         parser.error("--outer-corr-tolerance and --allow-unconverged-coupling apply to "
                      "the FSI3 and FSI2 mesh studies only")
+    if args.solid_refinement is not None and (
+            args.solid_refinement < 1 or args.benchmark != "fsi3" or args.study != "mesh"
+            or not args.levels or "," in args.levels):
+        parser.error("--solid-refinement applies to the FSI3 mesh study with a single "
+                     "--levels value")
     if args.write_interval is not None and args.write_interval < 1:
         parser.error("--write-interval must be a positive integer")
     for executable in ("blockMesh", "solids4Foam"):

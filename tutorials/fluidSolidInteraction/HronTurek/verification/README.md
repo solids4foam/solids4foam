@@ -784,3 +784,25 @@ Springer, 2019, 1-22.
 benchmark and its steady CSM2 analogue, which has the FSI3 material), used to
 isolate the spatial convergence of the solid from the fluid and the coupling.
 See `csm3/README.md`; it is run separately from `Allverify`.
+
+## FSI3 solid-only refinement at fixed fluid resolution
+
+An error-decomposition study: the 2x fluid mesh, `dt = 0.0005 s`, the IQN-ILS
+coupling and its `1e-5` tolerance are fixed, and only the solid mesh is
+refined (2x = 210 x 12, 4x = 420 x 24, 8x = 840 x 48 cells). The fluid
+(168 interface faces) is not refined, so this is not a spatial-order study and
+no order is computed.
+
+```bash
+./Allverify --levels 2 --cores 8                              # solid 2x (baseline)
+./Allverify --levels 2 --solid-refinement 4 --cores 14
+./Allverify --levels 2 --solid-refinement 8 --cores 14
+python3 scripts/fsi3_solid_refinement_analysis.py
+```
+
+`--solid-refinement` refines the solid block mesh by that factor
+independently of `--levels` (runs carry a `_solid<N>x` suffix). The analysis
+writes the QoIs, the successive changes, the interface face counts, the force
+balance across the AMI (rms of fluid + solid interface force over the rms
+fluid force, over the analysis window) and the coupling iterations; the
+compact results are in `reference/fsi3_solid_refinement/`.
