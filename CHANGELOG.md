@@ -8,6 +8,25 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- A method of manufactured solutions tutorial for finite strains,
+  `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
+  compressible neo-Hookean solid and the total Lagrangian solid model. A
+  tutorial-local library, `libneoHookeanManufacturedSolution`, supplies the
+  manufactured body force, displacement boundary condition, and error
+  function object. The case runs in a `steady` mode, which measures spatial
+  convergence under a quasi-static load ramp, and a `dynamic` mode, which
+  measures temporal convergence of the `Euler`, `backward`, and `NewmarkBeta`
+  schemes on one mesh, with the segregated, PETSc SNES, and high-order
+  (`movingLeastSquares` and `kExactLeastSquares`) solution approaches. The
+  `NewmarkBeta` scheme is shown to need a zero, or supplied, initial
+  acceleration to reach second order. The case is part of
+  `tutorials/Alltest-regression`, and an opt-in `verification/` study runs
+  both convergence sweeps.
+- `nonLinearGeometryTotalLagrangianTotalDisplacement` adds `fvOptions`
+  sources, such as a manufactured body force per unit reference volume, to
+  the momentum equation of both the segregated and PETSc SNES paths on
+  OpenFOAM.com, with the same protected `fvOptionsSource()` hook as the linear
+  geometry model for OpenFOAM.org and foam-extend.
 - A documentation page for each `mechanicalConstitutiveLaw`, next to its
   class, giving its entries and defaults, its state, its tangents, whether it
   supports the mixed displacement-pressure formulation, how it differs from
