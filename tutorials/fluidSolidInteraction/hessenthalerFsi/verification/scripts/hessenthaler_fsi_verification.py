@@ -785,7 +785,7 @@ DEFAULT_SPEC = {
     "fluid": "F1", "solid": "S2", "mu": MU_VERIFICATION, "sf": STABILISATION,
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
-    "lag": -2.0, "pcranks": 0.0,
+    "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0,
 }
 
 
@@ -834,6 +834,8 @@ def spec_name(spec: dict) -> str:
         name += f"_lag{spec['lag']:g}"
     if spec["pcranks"]:
         name += f"_pcranks{spec['pcranks']:g}"
+    if spec["solidranks"]:
+        name += f"_solidranks{spec['solidranks']:g}"
     return name
 
 
@@ -1023,6 +1025,8 @@ def build_meshes(case: Path, spec: dict, cores: int) -> dict:
     shutil.move(str(case / "constant" / "polyMesh"),
                 str(case / "constant" / "fluid" / "polyMesh"))
     run(["blockMesh", "-region", "solid"], case, "log.blockMesh")
+    if spec.get("solidranks"):
+        write_solid_decomposition(case, spec, cores)
     run(["checkMesh", "-region", "fluid"], case, "log.checkMesh.fluid")
     run(["checkMesh", "-region", "solid"], case, "log.checkMesh.solid")
     metrics = {
@@ -1042,6 +1046,31 @@ def build_meshes(case: Path, spec: dict, cores: int) -> dict:
         fluid["h_eff_mm"] = 1e3 * (fluid["total_volume_m3"]
                                    / fluid["cells"]) ** (1 / 3)
     return metrics
+
+
+def write_solid_decomposition(case: Path, spec: dict, cores: int) -> None:
+    """Put the whole flap on the first 'solidranks' ranks, in z slabs.
+
+    The flap is small next to the fluid: spread over hundreds of ranks, the
+    solid's matrix-free Krylov iterations are dominated by communication.
+    The other ranks get no solid cells (the fluid still uses every rank).
+    """
+    ranks = int(spec["solidranks"])
+    nx, ny, nz = SOLID_LEVELS[spec["solid"]]
+    labels = [min(ranks - 1, (c // (nx * ny)) * ranks // nz)
+              for c in range(nx * ny * nz)]
+    (case / "constant" / "solid" / "cellDecomposition").write_text(
+        "FoamFile\n{\n    version     2.0;\n    format      ascii;\n"
+        "    class       labelList;\n    object      cellDecomposition;\n}\n\n"
+        f"{len(labels)}\n(\n" + "\n".join(map(str, labels)) + "\n)\n")
+    path = case / "system" / "solid" / "decomposeParDict"
+    text = path.read_text()
+    text, found = re.subn(r"^method\s+\w+;", "method          manual;\n\n"
+                          "manualCoeffs\n{\n    dataFile    "
+                          '"cellDecomposition";\n}', text, flags=re.MULTILINE)
+    if found != 1:
+        fail(f"Could not set the manual decomposition in {path}")
+    path.write_text(text)
 
 
 def run_meshes(args: argparse.Namespace) -> bool:
