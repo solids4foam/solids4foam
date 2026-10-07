@@ -2382,6 +2382,7 @@ Foam::solidModel::mechanicalManager() const
         (
             restartKinematicsAvailable_
         );
+    Info<< "#417 stage: mechanicalManager created" << endl; // TEMPORARY, issue #417
     }
 
     return mechanicalManagerPtr_();
@@ -2539,6 +2540,7 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
         dimensionedTensor("zero", gradD().dimensions(), tensor::zero)
     );
 
+    Info<< "#417 stage: lawImpK before updateScalarTangent" << endl; // TEMPORARY, issue #417
     manager.updateScalarTangent
     (
         zeroGradD,
@@ -2548,6 +2550,7 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
         req,
         true        // evaluate against a state with no history
     );
+    Info<< "#417 stage: lawImpK after updateScalarTangent" << endl; // TEMPORARY, issue #417
 
     return tImpK;
 }

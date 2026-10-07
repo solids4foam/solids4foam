@@ -20,6 +20,20 @@ solids4Foam::requireGnuSed
 # handler, which only reports the signal
 export PETSC_OPTIONS="${PETSC_OPTIONS:-} -no_signal_handler"
 
+# TEMPORARY, issue #417: on foam-extend, whose stack printer stayed silent,
+# preload glibc's libSegFault, which prints a backtrace with symbol names
+# when the OpenFOAM handler re-raises the floating point exception
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    for lib in /lib/x86_64-linux-gnu/libSegFault.so /usr/lib/x86_64-linux-gnu/libSegFault.so; do
+        if [[ -f "${lib}" ]]; then
+            export SEGFAULT_SIGNALS="fpe segv abrt"
+            export LD_PRELOAD="${lib}${LD_PRELOAD:+:${LD_PRELOAD}}"
+            echo "Preloading ${lib} for backtraces"
+            break
+        fi
+    done
+fi
+
 # ============================================================
 # sphericalCavity regression test
 # Checks selected solution approaches against the expected solution bounds
@@ -354,13 +368,16 @@ if [ "$CHECK_ONLY" = false ]; then
 
         if [[ "${RUN_MODE}" == "parallel" ]]; then
             run_parallel_case \
-                > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
+                > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1 \
+                || echo "Parallel run exited with status $?"
         else
+            # TEMPORARY, issue #417: a crashed run must not stop the script,
+            # so that every approach runs and keeps its log
             (
                 cd "${CASE_DIR}"
                 ./Allrun "${RUN_APPROACH}" \
                     > "${ALLRUN_LOGFILE}" 2>&1
-            )
+            ) || echo "Allrun ${RUN_APPROACH} exited with status $?"
         fi
 
         if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then

@@ -1847,9 +1847,12 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFlat
     }
 
     // Update old time fields at the start of a new time step
+    Info<< "#417 stage: evaluateFlat before updateOldTimeIfNeeded" << endl; // TEMPORARY, issue #417
     updateOldTimeIfNeeded();
 
+    Info<< "#417 stage: evaluateFlat before topology" << endl; // TEMPORARY, issue #417
     topologyEntry& tp = topology(topo);
+    Info<< "#417 stage: evaluateFlat after topology" << endl; // TEMPORARY, issue #417
 
     // One collective per law, before any of them is evaluated.
     //
@@ -1936,6 +1939,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFlat
         // wrapper built on them
         const typename kinematicsViewsOf<Fields>::type views(fields, ipIDs);
         UIndirectList<symmTensor> stressView(stress, ipIDs);
+        Info<< "#417 stage: evaluateFlat before evaluateResponse" << endl; // TEMPORARY, issue #417
 
         // Constitutive response
         evaluateResponse
@@ -1952,6 +1956,7 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFlat
             volumetricPtr,
             !preserveState
         );
+        Info<< "#417 stage: evaluateFlat after evaluateResponse" << endl; // TEMPORARY, issue #417
     }
 
     // Boundary integration points.
@@ -2224,11 +2229,13 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentVol
             << exit(FatalError);
     }
 
+    Info<< "#417 stage: updateScalarTangentVol before topologyFor" << endl; // TEMPORARY, issue #417
     const integrationPointTopology& topo =
         topologyFor(cellCentredIntegrationPointTopology::typeName);
 
     // A constitutive law produces a stress alongside its tangent, so give it
     // somewhere to put one that is not the caller's storage
+    Info<< "#417 stage: updateScalarTangentVol before evaluateFlat" << endl; // TEMPORARY, issue #417
     evaluateFlat
     (
         topo,
@@ -2244,7 +2251,9 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentVol
     );
 
     // The flat-list primitive fills internal integration points only
+    Info<< "#417 stage: updateScalarTangentVol before fillScalarTangentBoundary" << endl; // TEMPORARY, issue #417
     fillScalarTangentBoundary(scalarTangent);
+    Info<< "#417 stage: updateScalarTangentVol end" << endl; // TEMPORARY, issue #417
 }
 
 
