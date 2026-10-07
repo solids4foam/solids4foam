@@ -109,7 +109,13 @@ mkdir -p "${REG_ROOT}"
 #     and whose stress band holds on OpenFOAM.com and OpenFOAM.org but not on
 #     foam-extend, where the case reads 7.2e5 against [1.5e6, 2.2e6], as the
 #     removed legacy model also did
+# TEMPORARY, issue #417: only the spherical cavity, so that the foam-extend CI
+# job runs it quickly and its artifact holds only the relevant logs. Restore
+# the full list below before merging.
 REGRESSION_TESTS=(
+    "solids/linearElasticity/sphericalCavity"
+)
+FULL_REGRESSION_TESTS=(
     "solids/elastoplasticity/perforatedPlate"
     "solids/elastoplasticity/cooksMembrane"
     "solids/elastoplasticity/curvedBeams"

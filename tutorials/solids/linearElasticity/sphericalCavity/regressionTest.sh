@@ -15,6 +15,11 @@ fi
 # GNU sed, for the in-place edits below
 solids4Foam::requireGnuSed
 
+# TEMPORARY, issue #417: leave floating point exceptions to the OpenFOAM
+# sigFpe handler, which prints the stack trace, instead of PETSc's signal
+# handler, which only reports the signal
+export PETSC_OPTIONS="${PETSC_OPTIONS:-} -no_signal_handler"
+
 # ============================================================
 # sphericalCavity regression test
 # Checks selected solution approaches against the expected solution bounds
@@ -164,7 +169,6 @@ link_case_files_for_suffix() {
 }
 
 run_parallel_case() {
-    solids4Foam::caseDoesNotRunWithFoamExtend
     solids4Foam::caseDoesNotRunWithOpenFOAMOrg
     solids4Foam::requirePetscOrExitSilently
 
@@ -234,6 +238,70 @@ run_parallel_high_order_grad_test() {
     return 1
 }
 
+# TEMPORARY, issue #417: keep a copy of the solver log of each run outside the
+# case directory, which Allclean empties, so that the CI artifact holds them,
+# and show the end of the log when a run fails
+save_solver_log() {
+    local label="$1"
+    local log="${CASE_DIR}/${SOLVER_LOGFILE}"
+
+    if [[ -f "${log}" ]]; then
+        cp "${log}" "${REGRESSION_ROOT}/log.solids4Foam.${label}"
+    fi
+}
+
+show_solver_log_tail() {
+    local log="${CASE_DIR}/${SOLVER_LOGFILE}"
+
+    if [[ -f "${log}" ]]; then
+        echo "---- last 60 lines of ${log}"
+        tail -n 60 "${log}"
+        echo "----"
+    else
+        echo "---- ${log} was not written"
+    fi
+}
+
+# TEMPORARY, issue #417: on foam-extend, run the segregated case once without
+# floating point exception trapping, to see whether the run completes and what
+# it reports, and once with FOAM_SETNAN, which fills new memory with NaN and
+# so catches a read of uninitialised data
+run_foam_extend_diagnostics() {
+    if [[ "${WM_PROJECT:-}" != "foam" ]]; then
+        return 0
+    fi
+
+    local label
+    for label in noSigFpe setNan; do
+        echo
+        echo "------------------------------------------------------------"
+        echo "Diagnostic run (issue #417): segregated, ${label}"
+        echo "------------------------------------------------------------"
+
+        ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+
+        case "${label}" in
+            noSigFpe)
+                (
+                    cd "${CASE_DIR}"
+                    env -u FOAM_SIGFPE ./Allrun segregated > "${ALLRUN_LOGFILE}" 2>&1
+                ) || true
+                ;;
+            setNan)
+                (
+                    cd "${CASE_DIR}"
+                    FOAM_SETNAN=1 ./Allrun segregated > "${ALLRUN_LOGFILE}" 2>&1
+                ) || true
+                ;;
+        esac
+
+        save_solver_log "${label}"
+        echo "Max epsilonEq: $(extract_max_epsilon)"
+        echo "Max sigmaEq:   $(extract_max_sigma)"
+        show_solver_log_tail
+    done
+}
+
 check_solver_extrema() {
     local approach="$1"
     local epsilon
@@ -245,6 +313,7 @@ check_solver_extrema() {
 
     if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
         echo "FAIL: Could not extract one or more regression quantities for ${approach}"
+        show_solver_log_tail
         return 1
     fi
 
@@ -272,6 +341,8 @@ check_solver_extrema() {
 failures=0
 
 if [ "$CHECK_ONLY" = false ]; then
+    run_foam_extend_diagnostics
+
     for approach in "${APPROACHES[@]}"; do
         echo
         echo "------------------------------------------------------------"
@@ -296,6 +367,8 @@ if [ "$CHECK_ONLY" = false ]; then
             echo "Skipping ${approach} because it is unavailable in this environment"
             continue
         fi
+
+        save_solver_log "${approach}"
 
         if [[ "${approach}" == highOrder-*-parallel ]]; then
             least_squares_type="${approach#highOrder-}"
