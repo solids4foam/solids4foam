@@ -786,7 +786,7 @@ DEFAULT_SPEC = {
     "fluid": "F1", "solid": "S2", "mu": MU_VERIFICATION, "sf": STABILISATION,
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
-    "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0,
+    "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
 }
 
 
@@ -837,6 +837,9 @@ def spec_name(spec: dict) -> str:
         name += f"_pcranks{spec['pcranks']:g}"
     if spec["solidranks"]:
         name += f"_solidranks{spec['solidranks']:g}"
+    if spec["rep"]:
+        # A replicate of the same calculation (run on another rank count)
+        name += f"_rep{spec['rep']:g}"
     return name
 
 
