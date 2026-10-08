@@ -830,3 +830,31 @@ copies and 4 s force histories are in `reference/cfd3/`. The published
 reference is Featflow level 4+0, `dt = 0.005`. Pressure difference is not a
 CFD3 benchmark quantity and is not reported; the pressure and viscous parts
 of drag and lift are.
+
+## Prescribed-motion ALE study (fluid only)
+
+`scripts/hron_turek_ale.py` restarts the developed rigid CFD3 state of a level
+(`cfd3_<level>x_dt<dt>`, 25 s) and bends the flag with a prescribed
+periodic motion, on the same fluid mesh with the FSI3 mesh motion
+(`velocityLaplacian`, `newMovingWallVelocity` on the plate): the transverse
+displacement is `A s(t) phi(x) sin(2 pi f (t - 25))` with `A = 35 mm`,
+`f = 5.5 Hz`, `phi` the clamped-free beam mode 2 normalised to unit tip value,
+`s` a smooth 1 s ramp; the point velocity is the finite difference of the
+displacement, so the Euler-integrated mesh follows it exactly. The motion is
+a `codedFixedValue` point-patch condition (compiled at run time); a `coded`
+function object prints the pressure force on the flag projected on `phi`
+(`GENF` log lines). Nothing in `src/` is changed.
+
+```bash
+python3 scripts/hron_turek_ale.py --level 2 --delta-t 0.0005 --duration 8 --cores 8
+python3 scripts/ale_analysis.py     # reads verification/work/ale_*
+```
+
+`ale_analysis.py` takes the Fourier components at the forcing frequency over
+the last five periods (in phase with the displacement, `a1`; in phase with the
+velocity, `b1`), the extrema-based amplitude, the drag mean and second
+harmonic, and the pressure/viscous split, with the change between the last two
+five-period windows as the noise level; the matched (1x/2x/4x with
+`dt = 1e-3/5e-4/2.5e-4`) and fixed-`dt` (`2.5e-4`) paths are written to
+`postProcessing/ale_study.json` and two CSV files (compact copies and 2 s
+histories in `reference/ale/`).
