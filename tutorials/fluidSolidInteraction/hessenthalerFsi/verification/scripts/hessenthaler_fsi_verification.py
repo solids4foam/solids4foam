@@ -787,7 +787,7 @@ DEFAULT_SPEC = {
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
-    "solidtol": "default",
+    "solidtol": "default", "coupled": "yes",
 }
 
 
@@ -842,6 +842,8 @@ def spec_name(spec: dict) -> str:
         name += f"_solidranks{spec['solidranks']:g}"
     if spec["solidtol"] != "default":
         name += f"_solid{spec['solidtol']}"
+    if spec["coupled"] != "yes":
+        name += "_uncoupled"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -957,6 +959,9 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
         u.write_text(text)
     else:
         replace_entry(fsi, "outerCorrTolerance", f"{spec['tol']:g}")
+        if spec["coupled"] == "no":
+            # Diagnostic: fluid past the fixed flap, solid under buoyancy
+            replace_entry(fsi, "coupled", "no")
         if spec["tol"] < 1e-4:
             replace_entry(fsi, "nOuterCorr", "60")
 
