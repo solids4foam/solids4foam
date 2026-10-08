@@ -787,6 +787,7 @@ DEFAULT_SPEC = {
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
+    "solidtol": "default",
 }
 
 
@@ -811,6 +812,8 @@ def parse_spec(text: str) -> dict:
         fail("coupling must be iqnils or robin")
     if spec["pc"] not in ("auto", "mumps", "hypre", "bjacobi", "telescope"):
         fail("pc must be auto, mumps, hypre, bjacobi or telescope")
+    if spec["solidtol"] not in ("default", "tight"):
+        fail("solidtol must be default or tight")
     if spec["fluidtol"] not in ("default", "tight"):
         fail("fluidtol must be default or tight")
     return spec
@@ -837,6 +840,8 @@ def spec_name(spec: dict) -> str:
         name += f"_pcranks{spec['pcranks']:g}"
     if spec["solidranks"]:
         name += f"_solidranks{spec['solidranks']:g}"
+    if spec["solidtol"] != "default":
+        name += f"_solid{spec['solidtol']}"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -971,6 +976,13 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
         if (n1, n2, n3, n4) != (1, 1, 1, 1):
             fail(f"Could not tighten the fluid tolerances in {solution}")
         solution.write_text(text)
+    if spec["solidtol"] == "tight":
+        # Solid Newton and Krylov tolerances far below the production ones
+        solution = case / "system" / "solid" / "fvSolution"
+        replace_entry(solution, "snes_rtol", '"1e-10"')
+        replace_entry(solution, "snes_atol", '"1e-16"')
+        replace_entry(solution, "snes_stol", '"0"')
+        replace_entry(solution, "ksp_rtol", '"1e-9"')
     if spec["pimple"] != 1:
         solution = case / "system" / "fluid" / "fvSolution"
         replace_entry(solution, "nOuterCorrectors", f"{int(spec['pimple'])}")
