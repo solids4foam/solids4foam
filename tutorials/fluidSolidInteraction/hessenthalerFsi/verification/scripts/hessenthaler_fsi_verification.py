@@ -980,7 +980,8 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
         # Solid Newton and Krylov tolerances far below the production ones
         solution = case / "system" / "solid" / "fvSolution"
         replace_entry(solution, "snes_rtol", '"1e-10"')
-        replace_entry(solution, "snes_atol", '"1e-16"')
+        # Just above the residual floor of the matrix-free Jacobian (~5e-15)
+        replace_entry(solution, "snes_atol", '"1e-14"')
         replace_entry(solution, "snes_stol", '"0"')
         replace_entry(solution, "ksp_rtol", '"1e-9"')
     if spec["pimple"] != 1:
