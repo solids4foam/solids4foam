@@ -1,0 +1,1163 @@
+{
+  "reference": {
+    "drag_mean": 439.45,
+    "drag_amplitude": 5.6183,
+    "drag_frequency": 4.3956,
+    "lift_mean": -11.893,
+    "lift_amplitude": 437.81,
+    "lift_frequency": 4.3956
+  },
+  "runs": {
+    "cfd3_1x_dt0.001": {
+      "level": 1,
+      "delta_t": 0.001,
+      "end_time": 40.0,
+      "periods_in_window": 4,
+      "fluid_cells": 5336,
+      "cores": 1,
+      "runtime_s": 1961.75,
+      "core_hours": 0.5449305555555556,
+      "drag_mean": 446.0104666666667,
+      "drag_amplitude": 4.0615999999999985,
+      "drag_mean_allperiods": 446.0103916666667,
+      "drag_amplitude_allperiods": 4.061941666666662,
+      "drag_cycle_spread_mean": 0.0009333333333643168,
+      "drag_cycle_spread_amplitude": 0.0014666666666869332,
+      "drag_amplitude_smoothed": 4.0289933333333465,
+      "drag_mean_smoothed": 446.0338333333333,
+      "lift_mean": -67.92150000000001,
+      "lift_amplitude": 296.0431,
+      "lift_mean_allperiods": -67.83233333333334,
+      "lift_amplitude_allperiods": 296.0391833333333,
+      "lift_cycle_spread_mean": 0.19556666666665024,
+      "lift_cycle_spread_amplitude": 0.023033333333330575,
+      "lift_amplitude_smoothed": 295.0572,
+      "lift_mean_smoothed": -67.93388000000003,
+      "drag_p_mean": 401.52750000000003,
+      "drag_p_amplitude": 3.1851000000000056,
+      "drag_p_mean_allperiods": 401.52616666666665,
+      "drag_p_amplitude_allperiods": 3.1861000000000104,
+      "drag_p_cycle_spread_mean": 0.002999999999985903,
+      "drag_p_cycle_spread_amplitude": 0.0023333333333823703,
+      "drag_p_amplitude_smoothed": 3.160780000000017,
+      "drag_p_mean_smoothed": 401.54339333333337,
+      "lift_p_mean": -66.71066666666667,
+      "lift_p_amplitude": 294.47786666666667,
+      "lift_p_mean_allperiods": -66.61998333333332,
+      "lift_p_amplitude_allperiods": 294.45165000000003,
+      "lift_p_cycle_spread_mean": 0.19873333333333676,
+      "lift_p_cycle_spread_amplitude": 0.04599999999999227,
+      "lift_p_amplitude_smoothed": 293.4928266666667,
+      "lift_p_mean_smoothed": -66.72340000000004,
+      "drag_v_mean": 44.29003333333334,
+      "drag_v_amplitude": 1.3105200000000004,
+      "drag_v_mean_allperiods": 44.29008666666667,
+      "drag_v_amplitude_allperiods": 1.3104616666666669,
+      "drag_v_cycle_spread_mean": 0.00010999999999228294,
+      "drag_v_cycle_spread_amplitude": 0.00011666666666698688,
+      "drag_v_amplitude_smoothed": 1.3093893333333284,
+      "drag_v_mean_smoothed": 44.28935466666667,
+      "lift_v_mean": -1.1327436666666664,
+      "lift_v_amplitude": 3.693745,
+      "lift_v_mean_allperiods": -1.1326960833333333,
+      "lift_v_amplitude_allperiods": 3.6937687500000003,
+      "lift_v_cycle_spread_mean": 8.866666666662582e-05,
+      "lift_v_cycle_spread_amplitude": 4.4666666666692834e-05,
+      "lift_v_amplitude_smoothed": 3.690734066666667,
+      "lift_v_mean_smoothed": -1.1328156666666664,
+      "lift_frequency": 4.415117916531548,
+      "drag_frequency": 8.830235833063096,
+      "strouhal": 0.2207558958265774,
+      "frequency_cycle_spread": 0.0003669675998404654,
+      "lift_amplitude_late_variability": 0.11256666666668025,
+      "lift_amplitude_late_drift": -0.020200000000045293
+    },
+    "cfd3_2x_dt0.0005": {
+      "level": 2,
+      "delta_t": 0.0005,
+      "end_time": 25.0,
+      "periods_in_window": 3,
+      "fluid_cells": 21344,
+      "cores": 8,
+      "runtime_s": 5135.84,
+      "core_hours": 11.412977777777778,
+      "drag_mean": 441.80673333333334,
+      "drag_amplitude": 5.526666666666671,
+      "drag_mean_allperiods": 441.80654444444446,
+      "drag_amplitude_allperiods": 5.52681111111112,
+      "drag_cycle_spread_mean": 0.00036666666665041703,
+      "drag_cycle_spread_amplitude": 0.00030000000000995897,
+      "drag_amplitude_smoothed": 5.506829629629635,
+      "drag_mean_smoothed": 441.81276296296295,
+      "lift_mean": -18.975433333333342,
+      "lift_amplitude": 424.43503333333337,
+      "lift_mean_allperiods": -18.978566666666655,
+      "lift_amplitude_allperiods": 424.4452555555556,
+      "lift_cycle_spread_mean": 0.006599999999963302,
+      "lift_cycle_spread_amplitude": 0.021000000000015007,
+      "lift_amplitude_smoothed": 423.7846333333334,
+      "lift_mean_smoothed": -18.848811111111104,
+      "drag_p_mean": 395.75303333333335,
+      "drag_p_amplitude": 4.244366666666679,
+      "drag_p_mean_allperiods": 395.75345555555555,
+      "drag_p_amplitude_allperiods": 4.24474444444444,
+      "drag_p_cycle_spread_mean": 0.0008333333333325754,
+      "drag_p_cycle_spread_amplitude": 0.0007666666666352739,
+      "drag_p_amplitude_smoothed": 4.23666666666665,
+      "drag_p_mean_smoothed": 395.75125185185186,
+      "lift_p_mean": -18.380566666666653,
+      "lift_p_amplitude": 421.71903333333336,
+      "lift_p_mean_allperiods": -18.3836,
+      "lift_p_amplitude_allperiods": 421.72808888888886,
+      "lift_p_cycle_spread_mean": 0.006400000000013506,
+      "lift_p_cycle_spread_amplitude": 0.018666666666661058,
+      "lift_p_amplitude_smoothed": 421.0486333333333,
+      "lift_p_mean_smoothed": -18.292574074074082,
+      "drag_v_mean": 45.938143333333336,
+      "drag_v_amplitude": 1.5729299999999995,
+      "drag_v_mean_allperiods": 45.938143333333336,
+      "drag_v_amplitude_allperiods": 1.5729299999999995,
+      "drag_v_cycle_spread_mean": 0.0,
+      "drag_v_cycle_spread_amplitude": 0.0,
+      "drag_v_amplitude_smoothed": 1.5710692592592572,
+      "drag_v_mean_smoothed": 45.937255925925925,
+      "lift_v_mean": -0.45316766666666686,
+      "lift_v_amplitude": 5.534740333333334,
+      "lift_v_mean_allperiods": -0.45316544444444445,
+      "lift_v_amplitude_allperiods": 5.534741666666666,
+      "lift_v_cycle_spread_mean": 4.666666666874875e-06,
+      "lift_v_cycle_spread_amplitude": 2.666666667039408e-06,
+      "lift_v_amplitude_smoothed": 5.531119296296296,
+      "lift_v_mean_smoothed": -0.4536364814814817,
+      "lift_frequency": 4.454160680426866,
+      "drag_frequency": 8.908321360853732,
+      "strouhal": 0.22270803402134332,
+      "frequency_cycle_spread": 1.4566775205226335e-06,
+      "lift_amplitude_late_variability": 0.11486666666661449,
+      "lift_amplitude_late_drift": -0.11486666666661449
+    },
+    "cfd3_4x_dt0.00025": {
+      "level": 4,
+      "delta_t": 0.00025,
+      "end_time": 25.0,
+      "periods_in_window": 3,
+      "fluid_cells": 85376,
+      "cores": 24,
+      "runtime_s": 28145.5,
+      "core_hours": 187.63666666666666,
+      "drag_mean": 440.1482,
+      "drag_amplitude": 5.731666666666655,
+      "drag_mean_allperiods": 440.14864444444447,
+      "drag_amplitude_allperiods": 5.732177777777764,
+      "drag_cycle_spread_mean": 0.0008333333333894188,
+      "drag_cycle_spread_amplitude": 0.0009000000000014552,
+      "drag_amplitude_smoothed": 5.7209647058823805,
+      "drag_mean_smoothed": 440.14458431372543,
+      "lift_mean": -13.841733333333337,
+      "lift_amplitude": 438.0441333333333,
+      "lift_mean_allperiods": -13.851122222222225,
+      "lift_amplitude_allperiods": 438.0550111111111,
+      "lift_cycle_spread_mean": 0.014966666666651918,
+      "lift_cycle_spread_amplitude": 0.02053333333338969,
+      "lift_amplitude_smoothed": 437.7113784313725,
+      "lift_mean_smoothed": -13.8489196078431,
+      "drag_p_mean": 394.3059666666667,
+      "drag_p_amplitude": 4.252699999999976,
+      "drag_p_mean_allperiods": 394.30595555555556,
+      "drag_p_amplitude_allperiods": 4.252711111111097,
+      "drag_p_cycle_spread_mean": 0.00010000000003174137,
+      "drag_p_cycle_spread_amplitude": 3.3333333334439885e-05,
+      "drag_p_amplitude_smoothed": 4.246517647058795,
+      "drag_p_mean_smoothed": 394.304305882353,
+      "lift_p_mean": -13.320400000000006,
+      "lift_p_amplitude": 434.824,
+      "lift_p_mean_allperiods": -13.333422222222225,
+      "lift_p_amplitude_allperiods": 434.83302222222227,
+      "lift_p_cycle_spread_mean": 0.020666666666670608,
+      "lift_p_cycle_spread_amplitude": 0.014733333333310838,
+      "lift_p_amplitude_smoothed": 434.5010313725491,
+      "lift_p_mean_smoothed": -13.312741176470638,
+      "drag_v_mean": 45.78553,
+      "drag_v_amplitude": 1.6648700000000005,
+      "drag_v_mean_allperiods": 45.78553,
+      "drag_v_amplitude_allperiods": 1.6648677777777767,
+      "drag_v_cycle_spread_mean": 1.9999999992137418e-05,
+      "drag_v_cycle_spread_amplitude": 1.3333333328091612e-05,
+      "drag_v_amplitude_smoothed": 1.6629125490196124,
+      "drag_v_mean_smoothed": 45.78491882352941,
+      "lift_v_mean": -0.36322100000000024,
+      "lift_v_amplitude": 5.742983000000001,
+      "lift_v_mean_allperiods": -0.36322833333333343,
+      "lift_v_amplitude_allperiods": 5.742976777777778,
+      "lift_v_cycle_spread_mean": 1.533333333281206e-05,
+      "lift_v_cycle_spread_amplitude": 9.33333333374975e-06,
+      "lift_v_amplitude_smoothed": 5.739566647058824,
+      "lift_v_mean_smoothed": -0.3636564901960786,
+      "lift_frequency": 4.448432286522791,
+      "drag_frequency": 8.896864573045582,
+      "strouhal": 0.22242161432613955,
+      "frequency_cycle_spread": 0.0007289909253791612,
+      "lift_amplitude_late_variability": 0.02463333333338369,
+      "lift_amplitude_late_drift": 0.0009333333333643168
+    },
+    "cfd3_1x_dt0.00025": {
+      "level": 1,
+      "delta_t": 0.00025,
+      "end_time": 25.0,
+      "periods_in_window": 3,
+      "fluid_cells": 5336,
+      "cores": 2,
+      "runtime_s": 2567.14,
+      "core_hours": 1.4261888888888887,
+      "drag_mean": 445.49240000000003,
+      "drag_amplitude": 3.926400000000001,
+      "drag_mean_allperiods": 445.4829222222222,
+      "drag_amplitude_allperiods": 3.93632222222224,
+      "drag_cycle_spread_mean": 0.01690000000002101,
+      "drag_cycle_spread_amplitude": 0.017766666666688025,
+      "drag_amplitude_smoothed": 3.886078431372539,
+      "drag_mean_smoothed": 445.527937254902,
+      "lift_mean": -69.33786666666666,
+      "lift_amplitude": 284.5956666666667,
+      "lift_mean_allperiods": -69.34857777777778,
+      "lift_amplitude_allperiods": 284.5810222222222,
+      "lift_cycle_spread_mean": 0.04406666666668002,
+      "lift_cycle_spread_amplitude": 0.0881333333333032,
+      "lift_amplitude_smoothed": 283.6052529411765,
+      "lift_mean_smoothed": -69.32932745098043,
+      "drag_p_mean": 401.0061666666667,
+      "drag_p_amplitude": 3.0415666666666823,
+      "drag_p_mean_allperiods": 401.0005444444444,
+      "drag_p_amplitude_allperiods": 3.048100000000005,
+      "drag_p_cycle_spread_mean": 0.010533333333341943,
+      "drag_p_cycle_spread_amplitude": 0.012466666666654191,
+      "drag_p_amplitude_smoothed": 3.0126588235294207,
+      "drag_p_mean_smoothed": 401.03005490196085,
+      "lift_p_mean": -68.11449999999999,
+      "lift_p_amplitude": 283.1349666666666,
+      "lift_p_mean_allperiods": -68.1215,
+      "lift_p_amplitude_allperiods": 283.11352222222223,
+      "lift_p_cycle_spread_mean": 0.045400000000014984,
+      "lift_p_cycle_spread_amplitude": 0.07019999999994297,
+      "lift_p_amplitude_smoothed": 282.0697725490196,
+      "lift_p_mean_smoothed": -68.07186666666665,
+      "drag_v_mean": 44.32600666666667,
+      "drag_v_amplitude": 1.2612466666666684,
+      "drag_v_mean_allperiods": 44.32603555555556,
+      "drag_v_amplitude_allperiods": 1.2612822222222242,
+      "drag_v_cycle_spread_mean": 5.999999999772854e-05,
+      "drag_v_cycle_spread_amplitude": 7.333333333647829e-05,
+      "drag_v_amplitude_smoothed": 1.260481176470595,
+      "drag_v_mean_smoothed": 44.32556352941175,
+      "lift_v_mean": -1.2088059999999998,
+      "lift_v_amplitude": 3.5110753333333333,
+      "lift_v_mean_allperiods": -1.2088534444444443,
+      "lift_v_amplitude_allperiods": 3.511063,
+      "lift_v_cycle_spread_mean": 9.233333333336091e-05,
+      "lift_v_cycle_spread_amplitude": 1.866666666661132e-05,
+      "lift_v_amplitude_smoothed": 3.5088087647058828,
+      "lift_v_mean_smoothed": -1.2086704509803923,
+      "lift_frequency": 4.410937758956736,
+      "drag_frequency": 8.821875517913472,
+      "strouhal": 0.22054688794783683,
+      "frequency_cycle_spread": 0.0013191102172510575,
+      "lift_amplitude_late_variability": 0.18770000000006348,
+      "lift_amplitude_late_drift": 0.027033333333349674
+    },
+    "cfd3_2x_dt0.00025": {
+      "level": 2,
+      "delta_t": 0.00025,
+      "end_time": 25.0,
+      "periods_in_window": 3,
+      "fluid_cells": 21344,
+      "cores": 8,
+      "runtime_s": 7754.8,
+      "core_hours": 17.23288888888889,
+      "drag_mean": 441.78173333333336,
+      "drag_amplitude": 5.519666666666666,
+      "drag_mean_allperiods": 441.7814111111111,
+      "drag_amplitude_allperiods": 5.519944444444444,
+      "drag_cycle_spread_mean": 0.0009000000000014552,
+      "drag_cycle_spread_amplitude": 0.0006333333333259361,
+      "drag_amplitude_smoothed": 5.500531372548977,
+      "drag_mean_smoothed": 441.78877843137263,
+      "lift_mean": -18.938133333333326,
+      "lift_amplitude": 423.67420000000004,
+      "lift_mean_allperiods": -18.93675555555555,
+      "lift_amplitude_allperiods": 423.6608666666668,
+      "lift_cycle_spread_mean": 0.04933333333335099,
+      "lift_cycle_spread_amplitude": 0.020600000000001728,
+      "lift_amplitude_smoothed": 422.8519568627451,
+      "lift_mean_smoothed": -18.967470588235358,
+      "drag_p_mean": 395.77563333333336,
+      "drag_p_amplitude": 4.235233333333326,
+      "drag_p_mean_allperiods": 395.7753,
+      "drag_p_amplitude_allperiods": 4.236388888888892,
+      "drag_p_cycle_spread_mean": 0.0012000000000398359,
+      "drag_p_cycle_spread_amplitude": 0.0033666666666647416,
+      "drag_p_amplitude_smoothed": 4.228052941176458,
+      "drag_p_mean_smoothed": 395.77480980392147,
+      "lift_p_mean": -18.323500000000024,
+      "lift_p_amplitude": 420.97063333333335,
+      "lift_p_mean_allperiods": -18.33353333333334,
+      "lift_p_amplitude_allperiods": 420.9651777777778,
+      "lift_p_cycle_spread_mean": 0.048966666666672154,
+      "lift_p_cycle_spread_amplitude": 0.010733333333291739,
+      "lift_p_amplitude_smoothed": 420.1149568627451,
+      "lift_p_mean_smoothed": -18.385180392156883,
+      "drag_v_mean": 45.894913333333335,
+      "drag_v_amplitude": 1.5652666666666661,
+      "drag_v_mean_allperiods": 45.89491999999999,
+      "drag_v_amplitude_allperiods": 1.5652622222222223,
+      "drag_v_cycle_spread_mean": 1.3333333328091612e-05,
+      "drag_v_cycle_spread_amplitude": 6.66666666759852e-06,
+      "drag_v_amplitude_smoothed": 1.5635652941176446,
+      "drag_v_mean_smoothed": 45.89409862745098,
+      "lift_v_mean": -0.4652286666666665,
+      "lift_v_amplitude": 5.497478666666667,
+      "lift_v_mean_allperiods": -0.4652202222222221,
+      "lift_v_amplitude_allperiods": 5.497485555555556,
+      "lift_v_cycle_spread_mean": 1.866666666705541e-05,
+      "lift_v_cycle_spread_amplitude": 1.0666666667269453e-05,
+      "lift_v_amplitude_smoothed": 5.494295960784314,
+      "lift_v_mean_smoothed": -0.46561454901960886,
+      "lift_frequency": 4.453842575035187,
+      "drag_frequency": 8.907685150070375,
+      "strouhal": 0.22269212875175937,
+      "frequency_cycle_spread": 9.425100707383151e-05,
+      "lift_amplitude_late_variability": 0.07030000000003156,
+      "lift_amplitude_late_drift": 0.03200000000003911
+    },
+    "cfd3_2x_dt0.000125": {
+      "level": 2,
+      "delta_t": 0.000125,
+      "end_time": 25.0,
+      "periods_in_window": 3,
+      "fluid_cells": 21344,
+      "cores": 12,
+      "runtime_s": 15464.7,
+      "core_hours": 51.54900000000001,
+      "drag_mean": 441.7330333333333,
+      "drag_amplitude": 5.504500000000007,
+      "drag_mean_allperiods": 441.7352333333333,
+      "drag_amplitude_allperiods": 5.502322222222214,
+      "drag_cycle_spread_mean": 0.003766666666706442,
+      "drag_cycle_spread_amplitude": 0.0033666666666931633,
+      "drag_amplitude_smoothed": 5.4824717171717054,
+      "drag_mean_smoothed": 441.74344949494935,
+      "lift_mean": -19.153033333333326,
+      "lift_amplitude": 421.99123333333335,
+      "lift_mean_allperiods": -19.155644444444448,
+      "lift_amplitude_allperiods": 422.00426666666675,
+      "lift_cycle_spread_mean": 0.023300000000034515,
+      "lift_cycle_spread_amplitude": 0.028233333333332666,
+      "lift_amplitude_smoothed": 421.3423070707071,
+      "lift_mean_smoothed": -19.058048484848484,
+      "drag_p_mean": 395.8006333333334,
+      "drag_p_amplitude": 4.22029999999998,
+      "drag_p_mean_allperiods": 395.8014222222223,
+      "drag_p_amplitude_allperiods": 4.221466666666657,
+      "drag_p_cycle_spread_mean": 0.001199999999926149,
+      "drag_p_cycle_spread_amplitude": 0.003899999999987358,
+      "drag_p_amplitude_smoothed": 4.2121040404040855,
+      "drag_p_mean_smoothed": 395.80034444444436,
+      "lift_p_mean": -18.50776666666664,
+      "lift_p_amplitude": 419.28943333333336,
+      "lift_p_mean_allperiods": -18.540088888888874,
+      "lift_p_amplitude_allperiods": 419.3180888888889,
+      "lift_p_cycle_spread_mean": 0.052566666666677975,
+      "lift_p_cycle_spread_amplitude": 0.055966666666677156,
+      "lift_p_amplitude_smoothed": 418.6129242424241,
+      "lift_p_mean_smoothed": -18.477192929292897,
+      "drag_v_mean": 45.82989666666667,
+      "drag_v_amplitude": 1.5555433333333362,
+      "drag_v_mean_allperiods": 45.829898888888884,
+      "drag_v_amplitude_allperiods": 1.5555455555555575,
+      "drag_v_cycle_spread_mean": 3.3333333249174757e-06,
+      "drag_v_cycle_spread_amplitude": 3.333333332022903e-06,
+      "drag_v_amplitude_smoothed": 1.5539419191919102,
+      "drag_v_mean_smoothed": 45.82917404040404,
+      "lift_v_mean": -0.4784503333333334,
+      "lift_v_amplitude": 5.450625666666667,
+      "lift_v_mean_allperiods": -0.4784442222222222,
+      "lift_v_amplitude_allperiods": 5.450623333333334,
+      "lift_v_cycle_spread_mean": 1.2333333333280905e-05,
+      "lift_v_cycle_spread_amplitude": 1.5000000000320313e-05,
+      "lift_v_amplitude_smoothed": 5.447632777777778,
+      "lift_v_mean_smoothed": -0.47878039393939353,
+      "lift_frequency": 4.452543322434695,
+      "drag_frequency": 8.90508664486939,
+      "strouhal": 0.22262716612173478,
+      "frequency_cycle_spread": 0.0012708250075810967,
+      "lift_amplitude_late_variability": 0.0973666666667441,
+      "lift_amplitude_late_drift": 0.013766666666640504
+    }
+  },
+  "paths": {
+    "matched": {
+      "cases": [
+        "cfd3_1x_dt0.001",
+        "cfd3_2x_dt0.0005",
+        "cfd3_4x_dt0.00025"
+      ],
+      "quantities": {
+        "drag_mean": {
+          "d21": -4.203733333333332,
+          "d32": -1.6585333333333665,
+          "ratio": 0.394538188277095,
+          "order": 1.3417631460515222,
+          "status": "monotone; sub-nominal (observed order below 1.5)",
+          "values": [
+            446.0104666666667,
+            441.80673333333334,
+            440.1482
+          ],
+          "reference_error_pct": [
+            1.4928812530815074,
+            0.5362915765919564,
+            0.15888041870519642
+          ],
+          "relative_change_pct": [
+            -0.9425189872225717,
+            -0.37539793040728514
+          ]
+        },
+        "drag_amplitude": {
+          "d21": 1.4650666666666723,
+          "d32": 0.20499999999998408,
+          "ratio": 0.13992537313431697,
+          "order": 2.837270499962009,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            4.0615999999999985,
+            5.526666666666671,
+            5.731666666666655
+          ],
+          "reference_error_pct": [
+            -27.70766957976614,
+            -1.630979715097606,
+            2.017810844324
+          ],
+          "relative_change_pct": [
+            36.07117063882885,
+            3.709288299155318
+          ]
+        },
+        "drag_amplitude_smoothed": {
+          "d21": 1.4778362962962888,
+          "d32": 0.2141350762527452,
+          "ratio": 0.14489769725469892,
+          "order": 2.7868934274295416,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            4.0289933333333465,
+            5.506829629629635,
+            5.7209647058823805
+          ],
+          "relative_change_pct": [
+            36.68003826339459,
+            3.888536429392804
+          ]
+        },
+        "lift_mean": {
+          "d21": 48.94606666666667,
+          "d32": 5.133700000000005,
+          "ratio": null,
+          "order": null,
+          "status": "undefined: mean near zero against the amplitude",
+          "values": [
+            -67.92150000000001,
+            -18.975433333333342,
+            -13.841733333333337
+          ],
+          "reference_error_pct": [
+            -471.10485159337424,
+            -59.55127666134147,
+            -16.385548922335296
+          ],
+          "relative_change_pct": null
+        },
+        "lift_amplitude": {
+          "d21": 128.39193333333338,
+          "d32": 13.609099999999955,
+          "ratio": 0.10599653456940922,
+          "order": 3.237910996525815,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            296.0431,
+            424.43503333333337,
+            438.0441333333333
+          ],
+          "reference_error_pct": [
+            -32.38091866334712,
+            -3.0549705732319126,
+            0.053478297282683857
+          ],
+          "relative_change_pct": [
+            43.369338225864205,
+            3.2064035555971513
+          ]
+        },
+        "lift_amplitude_smoothed": {
+          "d21": 128.72743333333335,
+          "d32": 13.926745098039135,
+          "ratio": 0.10818785660067123,
+          "order": 3.2083895199847876,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            295.0572,
+            423.7846333333334,
+            437.7113784313725
+          ],
+          "relative_change_pct": [
+            43.62795869185139,
+            3.2862789262783085
+          ]
+        },
+        "lift_frequency": {
+          "d21": 0.03904276389531791,
+          "d32": -0.005728393904075091,
+          "ratio": -0.14672101389732942,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            4.415117916531548,
+            4.454160680426866,
+            4.448432286522791
+          ],
+          "reference_error_pct": [
+            0.444033045125762,
+            1.3322568119680114,
+            1.2019357203292114
+          ],
+          "relative_change_pct": [
+            0.8842971950789784,
+            -0.1286077067055001
+          ]
+        },
+        "strouhal": {
+          "d21": 0.0019521381947659178,
+          "d32": -0.00028641969520376565,
+          "ratio": -0.14672101389733344,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            0.2207558958265774,
+            0.22270803402134332,
+            0.22242161432613955
+          ],
+          "relative_change_pct": [
+            0.8842971950789885,
+            -0.12860770670550506
+          ]
+        },
+        "drag_p_mean": {
+          "d21": -5.774466666666683,
+          "d32": -1.4470666666666716,
+          "ratio": 0.25059745777387826,
+          "order": 1.9965563158046926,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            401.52750000000003,
+            395.75303333333335,
+            394.3059666666667
+          ],
+          "relative_change_pct": [
+            -1.4381248274817249,
+            -0.3656489135353871
+          ]
+        },
+        "drag_v_mean": {
+          "d21": 1.6481099999999955,
+          "d32": -0.15261333333333482,
+          "ratio": -0.09259899723521806,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            44.29003333333334,
+            45.938143333333336,
+            45.78553
+          ],
+          "relative_change_pct": [
+            3.721175795005788,
+            -0.3322148486192661
+          ]
+        },
+        "drag_p_amplitude": {
+          "d21": 1.059266666666673,
+          "d32": 0.008333333333297333,
+          "ratio": 0.007867077852568396,
+          "order": 6.9899564240835526,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            3.1851000000000056,
+            4.244366666666679,
+            4.252699999999976
+          ],
+          "relative_change_pct": [
+            33.256935941310196,
+            0.19633867636233068
+          ]
+        },
+        "drag_v_amplitude": {
+          "d21": 0.26240999999999914,
+          "d32": 0.09194000000000102,
+          "ratio": 0.35036774513166924,
+          "order": 1.5130581283971278,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            1.3105200000000004,
+            1.5729299999999995,
+            1.6648700000000005
+          ],
+          "relative_change_pct": [
+            20.02334951011805,
+            5.845142504752344
+          ]
+        },
+        "lift_p_amplitude": {
+          "d21": 127.24116666666669,
+          "d32": 13.104966666666655,
+          "ratio": 0.1029931350833783,
+          "order": 3.2793799158403205,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            294.47786666666667,
+            421.71903333333336,
+            434.824
+          ],
+          "relative_change_pct": [
+            43.20907649426058,
+            3.1075113122314977
+          ]
+        },
+        "lift_v_amplitude": {
+          "d21": 1.8409953333333338,
+          "d32": 0.20824266666666702,
+          "ratio": 0.11311417410799175,
+          "order": 3.1441483730393007,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            3.693745,
+            5.534740333333334,
+            5.742983000000001
+          ],
+          "relative_change_pct": [
+            49.84088867350978,
+            3.762464978031797
+          ]
+        }
+      }
+    },
+    "fixed_dt": {
+      "cases": [
+        "cfd3_1x_dt0.00025",
+        "cfd3_2x_dt0.00025",
+        "cfd3_4x_dt0.00025"
+      ],
+      "quantities": {
+        "drag_mean": {
+          "d21": -3.7106666666666683,
+          "d32": -1.6335333333333892,
+          "ratio": 0.4402263744161126,
+          "order": 1.1836825137208302,
+          "status": "monotone; sub-nominal (observed order below 1.5)",
+          "values": [
+            445.49240000000003,
+            441.78173333333336,
+            440.1482
+          ],
+          "reference_error_pct": [
+            1.3749914666059946,
+            0.530602647248464,
+            0.15888041870519642
+          ],
+          "relative_change_pct": [
+            -0.8329360201580696,
+            -0.3697602707581517
+          ]
+        },
+        "drag_amplitude": {
+          "d21": 1.5932666666666648,
+          "d32": 0.21199999999998909,
+          "ratio": 0.13305996066780368,
+          "order": 2.9098515825117093,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            3.926400000000001,
+            5.519666666666666,
+            5.731666666666655
+          ],
+          "reference_error_pct": [
+            -30.11409145115068,
+            -1.7555725634681987,
+            2.017810844324
+          ],
+          "relative_change_pct": [
+            40.578307525128984,
+            3.840811643214973
+          ]
+        },
+        "drag_amplitude_smoothed": {
+          "d21": 1.6144529411764381,
+          "d32": 0.22043333333340343,
+          "ratio": 0.13653747824496856,
+          "order": 2.8726310832538027,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            3.886078431372539,
+            5.500531372548977,
+            5.7209647058823805
+          ],
+          "relative_change_pct": [
+            41.544527978202005,
+            4.007491611328696
+          ]
+        },
+        "lift_mean": {
+          "d21": 50.39973333333333,
+          "d32": 5.0963999999999885,
+          "ratio": null,
+          "order": null,
+          "status": "undefined: mean near zero against the amplitude",
+          "values": [
+            -69.33786666666666,
+            -18.938133333333326,
+            -13.841733333333337
+          ],
+          "reference_error_pct": [
+            -483.01409792875353,
+            -59.23764679503342,
+            -16.385548922335296
+          ],
+          "relative_change_pct": null
+        },
+        "lift_amplitude": {
+          "d21": 139.07853333333333,
+          "d32": 14.369933333333279,
+          "ratio": 0.1033224394083339,
+          "order": 3.274774484367973,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            284.5956666666667,
+            423.67420000000004,
+            438.0441333333333
+          ],
+          "reference_error_pct": [
+            -34.99562214963872,
+            -3.228752198442238,
+            0.053478297282683857
+          ],
+          "relative_change_pct": [
+            48.86881622699806,
+            3.3917414214349795
+          ]
+        },
+        "lift_amplitude_smoothed": {
+          "d21": 139.2467039215686,
+          "d32": 14.859421568627397,
+          "ratio": 0.10671291420296052,
+          "order": 3.2281933158275335,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            283.6052529411765,
+            422.8519568627451,
+            437.7113784313725
+          ],
+          "relative_change_pct": [
+            49.09877460924542,
+            3.5140954954716372
+          ]
+        },
+        "lift_frequency": {
+          "d21": 0.04290481607845109,
+          "d32": -0.005410288512396555,
+          "ratio": -0.1260997950091171,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            4.410937758956736,
+            4.453842575035187,
+            4.448432286522791
+          ],
+          "reference_error_pct": [
+            0.34893436520011556,
+            1.3250199070704198,
+            1.2019357203292114
+          ],
+          "relative_change_pct": [
+            0.9726914870047686,
+            -0.12147462379390028
+          ]
+        },
+        "strouhal": {
+          "d21": 0.0021452408039225324,
+          "d32": -0.00027051442561981665,
+          "ratio": -0.12609979500911325,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            0.22054688794783683,
+            0.22269212875175937,
+            0.22242161432613955
+          ],
+          "relative_change_pct": [
+            0.9726914870047584,
+            -0.1214746237938953
+          ]
+        },
+        "drag_p_mean": {
+          "d21": -5.230533333333312,
+          "d32": -1.4696666666666829,
+          "ratio": 0.280978357847515,
+          "order": 1.8314690826920463,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            401.0061666666667,
+            395.77563333333336,
+            394.3059666666667
+          ],
+          "relative_change_pct": [
+            -1.3043523437087574,
+            -0.37133833992980775
+          ]
+        },
+        "drag_v_mean": {
+          "d21": 1.5689066666666633,
+          "d32": -0.10938333333333361,
+          "ratio": -0.06971946493524185,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            44.32600666666667,
+            45.894913333333335,
+            45.78553
+          ],
+          "relative_change_pct": [
+            3.539472162391942,
+            -0.23833432811798955
+          ]
+        },
+        "drag_p_amplitude": {
+          "d21": 1.193666666666644,
+          "d32": 0.017466666666649644,
+          "ratio": 0.014632784138494814,
+          "order": 6.094651896671816,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            3.0415666666666823,
+            4.235233333333326,
+            4.252699999999976
+          ],
+          "relative_change_pct": [
+            39.24512586715085,
+            0.412413326301967
+          ]
+        },
+        "drag_v_amplitude": {
+          "d21": 0.30401999999999774,
+          "d32": 0.09960333333333438,
+          "ratio": 0.32762098984716503,
+          "order": 1.6099003051295964,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            1.2612466666666684,
+            1.5652666666666661,
+            1.6648700000000005
+          ],
+          "relative_change_pct": [
+            24.104721783208994,
+            6.3633459687380896
+          ]
+        },
+        "lift_p_amplitude": {
+          "d21": 137.83566666666673,
+          "d32": 13.853366666666659,
+          "ratio": 0.1005064001334922,
+          "order": 3.3146407213751337,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            283.1349666666666,
+            420.97063333333335,
+            434.824
+          ],
+          "relative_change_pct": [
+            48.68196545605049,
+            3.290815455931643
+          ]
+        },
+        "lift_v_amplitude": {
+          "d21": 1.9864033333333335,
+          "d32": 0.24550433333333377,
+          "ratio": 0.12359238892403544,
+          "order": 3.0163381930661335,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            3.5110753333333333,
+            5.497478666666667,
+            5.742983000000001
+          ],
+          "relative_change_pct": [
+            56.575354976718444,
+            4.465762365244293
+          ]
+        }
+      }
+    },
+    "temporal_2x": {
+      "cases": [
+        "cfd3_2x_dt0.0005",
+        "cfd3_2x_dt0.00025",
+        "cfd3_2x_dt0.000125"
+      ],
+      "quantities": {
+        "drag_mean": {
+          "d21": -0.024999999999977263,
+          "d32": -0.04870000000005348,
+          "ratio": 1.9480000000039108,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            441.80673333333334,
+            441.78173333333336,
+            441.7330333333333
+          ],
+          "reference_error_pct": [
+            0.5362915765919564,
+            0.530602647248464,
+            0.5195206128873185
+          ],
+          "relative_change_pct": [
+            -0.005658582840365025,
+            -0.011023543149374248
+          ]
+        },
+        "drag_amplitude": {
+          "d21": -0.007000000000005002,
+          "d32": -0.015166666666658557,
+          "ratio": 2.16666666666396,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            5.526666666666671,
+            5.519666666666666,
+            5.504500000000007
+          ],
+          "reference_error_pct": [
+            -1.630979715097606,
+            -1.7555725634681987,
+            -2.0255237349374786
+          ],
+          "relative_change_pct": [
+            -0.12665862484930634,
+            -0.2747750468021963
+          ]
+        },
+        "drag_amplitude_smoothed": {
+          "d21": -0.006298257080658232,
+          "d32": -0.01805965537727161,
+          "ratio": 2.8674052433858725,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            5.506829629629635,
+            5.500531372548977,
+            5.4824717171717054
+          ],
+          "relative_change_pct": [
+            -0.1143717438936244,
+            -0.3283256499072137
+          ]
+        },
+        "lift_mean": {
+          "d21": 0.0373000000000161,
+          "d32": -0.2149000000000001,
+          "ratio": null,
+          "order": null,
+          "status": "undefined: mean near zero against the amplitude",
+          "values": [
+            -18.975433333333342,
+            -18.938133333333326,
+            -19.153033333333326
+          ],
+          "reference_error_pct": [
+            -59.55127666134147,
+            -59.23764679503342,
+            -61.0445920569522
+          ],
+          "relative_change_pct": null
+        },
+        "lift_amplitude": {
+          "d21": -0.7608333333333235,
+          "d32": -1.6829666666666867,
+          "ratio": 2.2120043811610626,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            424.43503333333337,
+            423.67420000000004,
+            421.99123333333335
+          ],
+          "reference_error_pct": [
+            -3.0549705732319126,
+            -3.228752198442238,
+            -3.613157914772766
+          ],
+          "relative_change_pct": [
+            -0.17925790134665842,
+            -0.3972313316852163
+          ]
+        },
+        "lift_amplitude_smoothed": {
+          "d21": -0.9326764705882624,
+          "d32": -1.509649792038033,
+          "ratio": 1.6186210756296435,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            423.7846333333334,
+            422.8519568627451,
+            421.3423070707071
+          ],
+          "relative_change_pct": [
+            -0.22008265454369447,
+            -0.35701615365305145
+          ]
+        },
+        "lift_frequency": {
+          "d21": -0.0003181053916785359,
+          "d32": -0.001299252600492018,
+          "ratio": 4.084346365952165,
+          "order": null,
+          "status": "unreliable: a change is within the cycle-to-cycle spread",
+          "values": [
+            4.454160680426866,
+            4.453842575035187,
+            4.452543322434695
+          ],
+          "reference_error_pct": [
+            1.3322568119680114,
+            1.3250199070704198,
+            1.2954618808512002
+          ],
+          "relative_change_pct": [
+            -0.007141758335670328,
+            -0.029171498062698215
+          ]
+        },
+        "strouhal": {
+          "d21": -1.5905269583949e-05,
+          "d32": -6.49626300245898e-05,
+          "ratio": 4.084346365945764,
+          "order": null,
+          "status": "unreliable: a change is within the cycle-to-cycle spread",
+          "values": [
+            0.22270803402134332,
+            0.22269212875175937,
+            0.22262716612173478
+          ],
+          "relative_change_pct": [
+            -0.007141758335680298,
+            -0.02917149806269323
+          ]
+        },
+        "drag_p_mean": {
+          "d21": 0.022600000000011278,
+          "d32": 0.025000000000034106,
+          "ratio": 1.106194690266444,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            395.75303333333335,
+            395.77563333333336,
+            395.8006333333334
+          ],
+          "relative_change_pct": [
+            0.005710632161087148,
+            0.0063167102505723
+          ]
+        },
+        "drag_v_mean": {
+          "d21": -0.04323000000000121,
+          "d32": -0.06501666666666495,
+          "ratio": 1.5039710077877197,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            45.938143333333336,
+            45.894913333333335,
+            45.82989666666667
+          ],
+          "relative_change_pct": [
+            -0.09410480455493929,
+            -0.14166421057264214
+          ]
+        },
+        "drag_p_amplitude": {
+          "d21": -0.009133333333352311,
+          "d32": -0.0149333333333459,
+          "ratio": 1.6350364963483435,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            4.244366666666679,
+            4.235233333333326,
+            4.22029999999998
+          ],
+          "relative_change_pct": [
+            -0.21518718929449118,
+            -0.3525976530221694
+          ]
+        },
+        "drag_v_amplitude": {
+          "d21": -0.007663333333333355,
+          "d32": -0.009723333333329975,
+          "ratio": 1.268812527185291,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            1.5729299999999995,
+            1.5652666666666661,
+            1.5555433333333362
+          ],
+          "relative_change_pct": [
+            -0.48720116809606007,
+            -0.6211934068740137
+          ]
+        },
+        "lift_p_amplitude": {
+          "d21": -0.7484000000000037,
+          "d32": -1.6811999999999898,
+          "ratio": 2.246392303580948,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            421.71903333333336,
+            420.97063333333335,
+            419.28943333333336
+          ],
+          "relative_change_pct": [
+            -0.17746412678710108,
+            -0.39936277423626854
+          ]
+        },
+        "lift_v_amplitude": {
+          "d21": -0.03726166666666675,
+          "d32": -0.04685299999999959,
+          "ratio": 1.257404839647524,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            5.534740333333334,
+            5.497478666666667,
+            5.450625666666667
+          ],
+          "relative_change_pct": [
+            -0.6732324268630262,
+            -0.8522634254878949
+          ]
+        }
+      }
+    }
+  }
+}

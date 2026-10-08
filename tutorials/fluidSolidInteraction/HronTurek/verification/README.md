@@ -806,3 +806,27 @@ writes the QoIs, the successive changes, the interface face counts, the force
 balance across the AMI (rms of fluid + solid interface force over the rms
 fluid force, over the analysis window) and the coupling iterations; the
 compact results are in `reference/fsi3_solid_refinement/`.
+
+## CFD3 fluid-only study (rigid flag)
+
+`scripts/hron_turek_cfd3.py` builds a single-region, static-mesh version of the
+tutorial's fluid region (same `blockMeshDict` refined by the FSI3 factor,
+same schemes and solver settings, same inlet and outlet), with the plate a
+fixed no-slip wall: the Turek-Hron CFD3 benchmark (rigid flag, mean inflow
+`2 m/s`, `Re = 200`). It is not part of `Allverify`.
+
+```bash
+python3 scripts/hron_turek_cfd3.py --level 2 --delta-t 0.0005 --end-time 25 --cores 8
+python3 scripts/cfd3_analysis.py     # reads verification/work/cfd3_*
+```
+
+The impulsively started flow needs about 15 s (1x) to reach the periodic
+state, so the runs go to 25 s and the closing 1 s is analysed (3-4 lift
+periods). `cfd3_analysis.py` evaluates the matched path (1x/2x/4x with
+`dt = 1e-3/5e-4/2.5e-4`), the fixed-`dt` path (`dt = 2.5e-4`) and a temporal
+control on 2x, with the lift period delimiting the periods of all signals,
+and writes `postProcessing/cfd3_study.json` and two CSV files; the compact
+copies and 4 s force histories are in `reference/cfd3/`. The published
+reference is Featflow level 4+0, `dt = 0.005`. Pressure difference is not a
+CFD3 benchmark quantity and is not reported; the pressure and viscous parts
+of drag and lift are.
