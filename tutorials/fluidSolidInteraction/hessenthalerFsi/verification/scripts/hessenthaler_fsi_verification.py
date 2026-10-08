@@ -1650,10 +1650,38 @@ def three_level(values: list[float], ratio: float, noise: float = 0.0,
     return out
 
 
+def upgrade_legacy(run: dict) -> dict:
+    """Complete a result written by an earlier evaluation of this driver.
+
+    The 15-s stages of the runs later extended to 30 s were evaluated before
+    the last-third statistics existed, and their case directories became the
+    30-s runs. Their tip statistics are recomputed from the stored 50-Hz tip
+    history; their voxel means cover the same window (12-15 s) as every
+    other 15-s run; the material-station comparison is not available.
+    """
+    q = run["qoi"]
+    if "tip_y_mean_mm" in q:
+        return run
+    run["legacy_evaluation"] = True
+    end_time = run["spec"]["T"]
+    rows = [[t, 0.0, y / 1e3, z / 1e3] for t, y, z in run["tip_history"]]
+    for label, column in (("y", 2), ("z", 3)):
+        settle = settling_estimate(rows, column, end_time, 1e3)
+        offset = 65.0 if label == "z" else 0.0
+        q[f"tip_{label}_mean_mm"] = offset + settle["mean"]
+        q[f"tip_{label}_time_uncertainty_mm"] = settle["uncertainty"]
+    for key in ("force_y", "force_z"):
+        q.setdefault(f"{key}_mean_N", q.get(f"{key}_w2_mean_N", math.nan))
+    for inlet in ("upperInlet", "lowerInlet"):
+        q.setdefault(f"dp_{inlet}_mean_Pa",
+                     q.get(f"dp_{inlet}_w2_mean_Pa", math.nan))
+    return run
+
+
 def load_runs() -> dict[str, dict]:
     runs = {}
     for path in sorted(RUNS_ROOT.glob("*.json")):
-        data = json.loads(path.read_text())
+        data = upgrade_legacy(json.loads(path.read_text()))
         runs[data["name"]] = data
     return runs
 
@@ -1738,7 +1766,10 @@ QOIS = (
 
 
 def compare_pair(a: dict, b: dict) -> dict:
-    rms, mx = station_difference(a["stations_mean"], b["stations_mean"])
+    if "stations_mean" in a and "stations_mean" in b:
+        rms, mx = station_difference(a["stations_mean"], b["stations_mean"])
+    else:
+        rms, mx = math.nan, math.nan
     vel = velocity_difference(a["voxels"]["mean"], b["voxels"]["mean"])
     out = {"from": a["name"], "to": b["name"],
            "centreline_rms_change_mm": rms, "centreline_max_change_mm": mx,
@@ -1795,8 +1826,10 @@ def series_analysis(series: dict, runs: dict) -> dict:
                 s2 = compare_pair(runs[trio[1]], runs[trio[2]])
                 for key in ("centreline_rms_change_mm",
                             "velocity_mean_change"):
-                    result[f"{key}_ratio"] = (s2[key] / s1[key]
-                                              if s1[key] > 0 else math.nan)
+                    result[f"{key}_ratio"] = (
+                        s2[key] / s1[key]
+                        if math.isfinite(s1[key]) and s1[key] > 0
+                        else math.nan)
                 entry["triplets"].append(result)
         out[label] = entry
     return out
@@ -1859,9 +1892,11 @@ def default_series() -> dict:
                           n("F2:S2:dt=0.0005")], "ratio": 2.0},
         "time at T = 30 s": {"runs": [n(f"F2:S2{long}"),
                                       n(f"F2:S2:dt=0.001{long}")]},
-        # The same calculation on 48 and 64 ranks agrees only to the
-        # low-frequency wander: a direct measure of run-to-run noise
-        "replicate (ranks)": {"runs": [n("F2:S2"), n("F2:S2:T=40")]},
+        # Replicates of the same calculation on other rank counts measure
+        # the run-to-run noise of the slow wake dynamics
+        "replicate, dt": {"runs": [n("F2:S2"), n("F2:S2:rep=1")]},
+        "replicate, dt/2": {"runs": [n("F2:S2:dt=0.001"),
+                                     n("F2:S2:dt=0.001:rep=1")]},
         # With the default fluid tolerances IQN-ILS stalls at a residual of
         # about 3e-5 (it fails at 1e-5 and 1e-6); with tight fluid
         # tolerances it reaches 1e-5 but stalls at 2.5-5e-6 (it fails at
