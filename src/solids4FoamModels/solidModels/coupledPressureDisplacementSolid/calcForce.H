@@ -50,7 +50,14 @@ else
 
     surfaceVectorField nf = mesh().Sf()/mesh().magSf();
     // surfaceVectorField tGradDDn = ((I-sqr(nf)) & (gradDDf_ & nf));
-    surfaceVectorField nGradDDn = ((nf*nf) & fvc::snGrad(DD()));
+
+    // Named operands: a tmp operand with the type of the result would be
+    // reused as the storage of the inner product, which aliases an input of the
+    // loop and gives wrong results with some -O3 builds (see
+    // pimpleFluid::patchViscousForce)
+    const surfaceTensorField nfnf(nf*nf);
+    const surfaceVectorField snGradDD(fvc::snGrad(DD()));
+    surfaceVectorField nGradDDn = (nfnf & snGradDD);
 
     surfaceVectorField linearForceIncrement =
         impKf_*fvc::snGrad(DD())*mesh().magSf()

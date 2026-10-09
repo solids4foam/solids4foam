@@ -399,13 +399,14 @@ snGrad() const
             << "Did not find grad(" + UName + ")!" << endl;
     }
 
-    return
+    // Named operands: see pimpleFluid::patchViscousForce
+    const symmTensorField Pn(I - sqr(patch().nf()));
+    const vectorField dU
     (
-        (I - sqr(patch().nf()))
-      & (
-         *this - patchInternalField()
-         )*this->patch().deltaCoeffs()
+        (*this - patchInternalField())*this->patch().deltaCoeffs()
     );
+
+    return Pn & dU;
 }
 
 

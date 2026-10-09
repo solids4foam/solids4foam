@@ -132,6 +132,12 @@
         const scalarField& pMagSf =
             magSf.boundaryField()[patchI];
 
+        // Named operands are used in the products below: a tmp operand with
+        // the type of the result would be reused as the storage of the inner
+        // product, which aliases an input of the loop and gives wrong results
+        // with some -O3 builds (see pimpleFluid::patchViscousForce)
+        const tensorField nfnf(nf*nf);
+
         const vectorField& pCorrection =
             correction.boundaryField()[patchI];
 
@@ -146,20 +152,28 @@
             tensor4Field& cu = DDDpEqn.coupleUpper()[patchI].asSquare();
             tensor4Field& cl = DDDpEqn.coupleLower()[patchI].asSquare();
 
+            const diagTensorField coeffs1
+            (
+                diag(DD().boundaryField()[patchI].gradientBoundaryCoeffs())
+            );
+
             tensorField boundaryCoeffs =
                -impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientBoundaryCoeffs())
+                    nfnf & coeffs1
                 );
 
             bouCoeffsSourceContrib = vector::zero;
 
+            const diagTensorField coeffs2
+            (
+                diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+            );
+
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+                    nfnf & coeffs2
                 );
 
             forAll(cu, faceI)
@@ -223,18 +237,26 @@
             )
         )
         {
+            const vectorField coeffs3
+            (
+                DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+            );
+
             bouCoeffsSourceContrib =
                -impKf.boundaryField()[patchI]*pMagSf
                *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+                   nfnf & coeffs3
                 );
+
+            const diagTensorField coeffs4
+            (
+                diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+            );
 
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+                    nfnf & coeffs4
                 );
         }
         else if
@@ -245,18 +267,26 @@
             )
         )
         {
+            const diagTensorField coeffs5
+            (
+                diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+            );
+
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+                    nfnf & coeffs5
                 );
+
+            const vectorField coeffs6
+            (
+                DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+            );
 
             bouCoeffsSourceContrib =
                -impKf.boundaryField()[patchI]*pMagSf
                *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+                   nfnf & coeffs6
                 );
         }
         else if
@@ -267,18 +297,26 @@
             )
         )
         {
+            const vectorField coeffs7
+            (
+                DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+            );
+
             bouCoeffsSourceContrib =
                -impKf.boundaryField()[patchI]*pMagSf
                *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+                   nfnf & coeffs7
                 );
+
+            const diagTensorField coeffs8
+            (
+                diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+            );
 
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+                    nfnf & coeffs8
                 );
         }
         else if
@@ -286,19 +324,27 @@
             DD().boundaryField()[patchI].blockCoupled()
         )
         {
+            const vectorField coeffs9
+            (
+                DD().boundaryField()[patchI].blockGradientBoundaryCoeffs()
+            );
+
             bouCoeffsSourceContrib =
                -impKf.boundaryField()[patchI]*pMagSf
                *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].blockGradientBoundaryCoeffs()
+                   nfnf & coeffs9
                 );
+
+            const tensorField coeffs10
+            (
+                DD().boundaryField()[patchI].blockGradientInternalCoeffs()()
+               .asSquare()
+            );
 
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & DD().boundaryField()[patchI].blockGradientInternalCoeffs()()
-                   .asSquare()
+                    nfnf & coeffs10
                 );
         }
         else if

@@ -954,9 +954,13 @@ label newtonIcoFluid::formResidual
     momentumStabilisation().updateVector(U, &gradU());
 
     // Calculate the residual over the reference configuration
+    // Named intermediates: a reused tmp would alias an input of the inner
+    // product (see pimpleFluid::patchViscousForce)
+    const surfaceTensorField nuInvFmfT(nuEfff*invFmf.T());
+    const surfaceTensorField stressf(nuInvFmfT & gradUf);
     vectorField residual
     (
-        fvc::div(deformedSf & (nuEfff*invFmf.T() & gradUf))
+        fvc::div(deformedSf & stressf)
       - (Jm*invFm.T() & gradp())
       - Jm*fvc::ddt(U)
       - fvc::div(phi, U)

@@ -261,10 +261,13 @@ void fixedRotationPointPatchVectorField::updateCoeffs()
     // Rotation tensor
     const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle_);
 
+    // Named operand: a tmp field would be reused as the storage of the inner
+    // product, which aliases an input of the loop and gives wrong results
+    // with some -O3 builds (see pimpleFluid::patchViscousForce)
+    const vectorField relPatchPoints(origPatchPoints_ - rotationOrigin_);
     const vectorField newPatchPoints
     (
-        (rotMat & (origPatchPoints_ - rotationOrigin_))
-      + rotationOrigin_
+        (rotMat & relPatchPoints) + rotationOrigin_
     );
 
     vectorField pointDisp(newPatchPoints - origPatchPoints_);
