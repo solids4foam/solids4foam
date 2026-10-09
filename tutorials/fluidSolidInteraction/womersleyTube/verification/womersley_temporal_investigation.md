@@ -136,7 +136,7 @@ conditions read `this->db().time().value()`, the new time).
 
 ---
 
-# Results
+## Results
 
 All runs: solids4foam `development` at aee0c8e35 (no source change), built
 privately; OpenFOAM-v2512 (stock) unless marked v2412 (which has the
@@ -439,7 +439,7 @@ Added after the first version of this report (commit f0bab2730), on request,
 as an opt-in option of `pimpleFluid` (OpenFOAM.com form,
 `pimpleFluid.esi.C`):
 
-```
+```cpp
 PIMPLE
 {
     ...
@@ -475,7 +475,7 @@ pressure equation.
 `phiHbyA_b = U_b . S_f + rAtU_b snGrad(p)|S_f|` with `snGrad(p)` from the
 previous iterate, which makes the converged end flux exactly `U_b . S_f`:
 
-```
+```cpp
 phiHbyA.boundaryFieldRef()[patchI] =
     (U().boundaryField()[patchI] & mesh().Sf().boundaryField()[patchI])
   + rAtU.boundaryField()[patchI]
@@ -535,6 +535,7 @@ stations, see 6.11):
   independent of dt from n100 (changes 2e-6 to 2e-5). Coupling iterations
   9.2-11.0 per step (8.7-10.3 without the fix); period-to-period change
   <=7e-5.
+
 - Coupled Robin, m1 (first implementation): 2.03/1.99, 1.85/1.85,
   1.96/1.95, 2.14/2.09, 1.94/1.90, 2.07/2.17.
 - IQN-ILS against Robin-Neumann with the fix, m2 n100: at most 2.3e-4
