@@ -100,6 +100,7 @@ error can still contaminate the analysis window if it excites a slowly
 decaying free mode (the elastic wall is undamped apart from the fluid
 viscosity and the weak BDF2 dissipation, 0.9996 per period at 100 steps).
 
+<!-- markdownlint-disable MD013 -->
 | # | Hypothesis | Mechanism | QoIs affected | Supporting signature | Refuting signature | Cheapest test |
 |---|---|---|---|---|---|---|
 | H1 | BDF2 first-step (Euler) treatment | One first-order step: local O(dt^2) error once | All, through the transient | Transient amplitude falls as dt^2 | Transient grows as dt falls (already reported) | Per-period Fourier coefficients vs dt |
@@ -115,6 +116,7 @@ viscosity and the weak BDF2 dissipation, 0.9996 per period at 100 steps).
 | H10 | Coupling / solver tolerance floor | Per-step residual errors accumulate over N = steps x periods steps; a floor grows relative to O(dt^2) as dt falls | All, most for small differences | Results move by a fraction of the successive differences when tolerances are tightened 100x | Movement << successive differences | One run at 200 steps with tolerances tightened 100x |
 | H11 | Boundary data at the wrong time level | Coded BCs evaluated at t^n instead of t^{n+1} | All | Phase error O(dt) | Coded BCs use the current time | Code inspection (they use `time().value()` = t^{n+1}) |
 | H12 | OpenFOAM detail making a term first order part of the time | e.g. `timeIndex() < 2` Euler fallback for every field (v2512), lazily created old levels, ddtCorr | Start-up; version differences | v2412/v2512 differences confined to the start-up | Differences persist in the periodic state | Version comparison of per-period coefficients |
+<!-- markdownlint-enable MD013 -->
 
 Ranking before running (from the code trace only): H2a (Robin study) and
 H2b first, then H9 and H10, then H8; H4/H5/H6 are not expected to be first
@@ -163,6 +165,7 @@ results are in `temporal/`:
 Run names are `<coupling>_m<mesh factor>_n<steps per period>_p<periods>[_variants]`.
 Variants (all in the driver, none changes the production case):
 
+<!-- markdownlint-disable MD013 -->
 | Variant | What changes |
 |---|---|
 | `exactOldBoundary` | boundary values of `D`, `D_0`, `D_0_0`, `D_0_0_0` set to the exact solution (initial data only) |
@@ -177,11 +180,13 @@ Variants (all in the driver, none changes the production case):
 | `endsFixedGradient` | the same exact end velocity gradient through `fixedGradient` (set each step by a coded function object) instead of `codedMixed` |
 | `endsDirichletU` | (fluid-only) exact end velocity with `fixedFluxPressure` and a pressure reference cell |
 | `of2412` | the OpenFOAM-v2412 build |
+<!-- markdownlint-enable MD013 -->
 
 ## 5. Reproduction of the original anomaly (A)
 
 Robin-Neumann, m2, periods 5-6, v2512/Linux:
 
+<!-- markdownlint-disable MD013 -->
 | Quantity | n50 | n100 | n200 | order (this work) | order (PR #513, v2412/macOS) |
 |---|---:|---:|---:|---:|---:|
 | flow_amp | -2.061e-3 | -1.701e-4 | 4.371e-4 | 1.64 | 1.64 |
@@ -190,6 +195,7 @@ Robin-Neumann, m2, periods 5-6, v2512/Linux:
 | wallMid_phase | -7.872e-3 | -3.737e-3 | -2.494e-3 | 1.73 | 1.74 |
 | speed | 2.969e-3 | 1.208e-3 | 4.889e-4 | 1.29 | 1.29 |
 | attenuation | -1.988e-2 | -9.629e-3 | -6.040e-3 | 1.51 | 1.51 |
+<!-- markdownlint-enable MD013 -->
 
 The stored values are reproduced to three or four digits and the orders to
 0.01. The anomaly is reproducible and platform independent.
@@ -200,6 +206,7 @@ The stored values are reproduced to three or four digits and the orders to
 
 Robin, m2, successive-difference orders from 50/100/200 and 100/200/400:
 
+<!-- markdownlint-disable MD013 -->
 | Quantity | periods 5-6 | periods 11-12 | exact old-time boundary values (5-6) | IQN-ILS (5-6) |
 |---|---|---|---|---|
 | flow_amp | 1.64 / **1.12** | 1.64 / 1.12 | 1.64 / 1.12 | 1.94 / 0.41 |
@@ -208,6 +215,7 @@ Robin, m2, successive-difference orders from 50/100/200 and 100/200/400:
 | wallMid_phase | 1.73 / **1.14** | 1.73 / 1.14 | 1.73 / 1.14 | 1.61 / 1.43 |
 | speed | 1.29 / **0.75** | 1.29 / 0.76 | 1.29 / 0.76 | 1.38 / 0.22 |
 | attenuation | 1.51 / **0.94** | 1.52 / 0.93 | 1.51 / 0.93 | 1.46 / 0.92 |
+<!-- markdownlint-enable MD013 -->
 
 - The orders **fall** as dt is refined, towards one. Pre-asymptotic
   higher-order terms would make them rise towards two; an emerging O(dt)
@@ -259,10 +267,12 @@ periods 11-12 fundamental, relative to the amplitude, in period 1:
 
 ### 6.3 Tolerances (G) and fluid inner iterations
 
+<!-- markdownlint-disable MD013 -->
 | Change (periods 5-6) | flow_amp | wallMid_amp | wallMid_phase | speed | attenuation | coupling iterations/step |
 |---|---:|---:|---:|---:|---:|---:|
 | `tight` - base, m2 n200 | 1.3e-7 | -1.3e-6 | 1.5e-6 | -5.0e-7 | 5.2e-6 | 10.3 -> 15.5 |
 | `tight` - base, m1 n400 | 2.6e-7 | 4.8e-7 | -1.5e-6 | 4.7e-8 | -1.2e-6 | 8.2 -> 16.9 |
+<!-- markdownlint-enable MD013 -->
 
 The smallest successive difference at 200 -> 400 steps is 7.5e-5 (flow
 phase); the tolerance effect is at least 15 times smaller, and the `tight`
@@ -288,6 +298,7 @@ first-order behaviour. Each row removes or replaces one ingredient.
 Orders of flow_amp from 50/100/200/400/800/1600 steps per period, and the
 last difference:
 
+<!-- markdownlint-disable MD013 -->
 | Fluid-only variant | flow_amp orders | d(800->1600) | profile orders |
 |---|---|---:|---|
 | moving mesh, exact wall motion (`fluidOnly`) | 1.60 1.33 1.13 **1.03** | 6.7e-5 | 0.53 0.55 0.83 0.74 |
@@ -297,6 +308,7 @@ last difference:
 | + no `ddtCorr` (`noDdtCorr`) | 1.67 1.17 0.77 0.63 | 1.6e-4 | 2.13 1.60 - - |
 | + `leastSquaresS4f` (`lsS4f`) | 1.70 1.47 1.26 1.12 | 6.6e-5 | 1.73 1.63 1.72 1.52 |
 | + zero-gradient end velocity (`endsZeroGrad`, not exact) | **2.05 2.35** - - | 8.7e-5 (floor) | 2.00 1.64 1.95 1.37 |
+<!-- markdownlint-enable MD013 -->
 
 - Mesh motion, ALE, the moving-wall condition, the solid and the coupling
   are not needed: the static-mesh problem with Dirichlet wall data has the
@@ -336,6 +348,7 @@ out the end faces that touch the wall: on the moving mesh `phi` is relative
 to the mesh motion, and those faces have a corner point that moves axially
 with the solid):
 
+<!-- markdownlint-disable MD013 -->
 | Run (outlet) | n50 | n100 | n200 | n400 | n800 | n1600 |
 |---|---:|---:|---:|---:|---:|---:|
 | fluid-only static, m1 |  | 3.1e-02 | 1.8e-02 | 1.0e-02 | 5.3e-03 | 2.7e-03 |
@@ -347,6 +360,7 @@ with the solid):
 | coupled Robin, m2, `fluxConsistent` (first fix, 6.10) | 1.6e-05 | 1.0e-05 | 1.0e-05 | 1.0e-05 |  |  |
 | fluid-only static, m2, `fluxConsistent2` |  | 2.9e-03 |  | 2.4e-05 |  | 2.5e-05 |
 | fluid-only, exact end velocity + `fixedFluxPressure` |  | 1.0e-10 |  | 1.0e-10 |  | 1.0e-10 |
+<!-- markdownlint-enable MD013 -->
 
 (Inlet values are similar or smaller; all in `end_flux_inconsistency.csv`.)
 Without the fix the inconsistency tends to halve with dt; at large dt on
@@ -439,13 +453,11 @@ Added after the first version of this report (commit f0bab2730), on request,
 as an opt-in option of `pimpleFluid` (OpenFOAM.com form,
 `pimpleFluid.esi.C`):
 
-```cpp
-PIMPLE
-{
-    ...
-    fluxConsistentPatches (inlet outlet);
-}
-```
+    PIMPLE
+    {
+        ...
+        fluxConsistentPatches (inlet outlet);
+    }
 
 The listed patches must have a velocity condition that fixes the boundary
 value (fixedValue, or mixed such as the tutorial's `codedMixed`, so that
@@ -475,13 +487,11 @@ pressure equation.
 `phiHbyA_b = U_b . S_f + rAtU_b snGrad(p)|S_f|` with `snGrad(p)` from the
 previous iterate, which makes the converged end flux exactly `U_b . S_f`:
 
-```cpp
-phiHbyA.boundaryFieldRef()[patchI] =
-    (U().boundaryField()[patchI] & mesh().Sf().boundaryField()[patchI])
-  + rAtU.boundaryField()[patchI]
-   *p().boundaryField()[patchI].snGrad()
-   *mesh().magSf().boundaryField()[patchI];
-```
+    phiHbyA.boundaryFieldRef()[patchI] =
+        (U().boundaryField()[patchI] & mesh().Sf().boundaryField()[patchI])
+      + rAtU.boundaryField()[patchI]
+       *p().boundaryField()[patchI].snGrad()
+       *mesh().magSf().boundaryField()[patchI];
 
 (in place of the final `(U_b + rAtU_b grad(p)_P) . S_f`; the results labelled
 `fluxConsistent` in `temporal/` were produced with it).
@@ -517,6 +527,7 @@ stations, see 6.11):
 
 - **Coupled Robin-Neumann, m2 (the production study):**
 
+<!-- markdownlint-disable MD013 -->
 | Quantity | tutorial 50/100/200 | tutorial 100/200/400 | **fix 50/100/200** | **fix 100/200/400** | fix, periods 11-12 |
 |---|---:|---:|---:|---:|---:|
 | flow_amp | 1.64 | 1.12 | 2.04 | **2.03** | 2.04 / 2.05 |
@@ -525,6 +536,7 @@ stations, see 6.11):
 | wallMid_phase | 1.73 | 1.14 | 2.14 | **2.08** | 2.14 / 2.06 |
 | speed | 1.29 | 0.75 | 1.94 | **1.93** | 1.94 / 1.97 |
 | attenuation | 1.51 | 0.94 | 2.10 | **2.08** | 2.11 / 2.07 |
+<!-- markdownlint-enable MD013 -->
 
   Errors with the fix (periods 5-6; n50, n100, n200, n400): flow_amp
   -1.229e-3, 5.151e-4, 9.406e-4, 1.045e-3; flow_phase 1.430e-4, 1.074e-3,
@@ -589,6 +601,7 @@ the flow-phase error at m2 n100 is 1.074e-3 (serial 1.079e-3).
 
 v2412 against v2512, m2, n100 (periods; relative errors):
 
+<!-- markdownlint-disable MD013 -->
 | Period | Robin wallMid_amp | Robin flow_amp | IQN-ILS wallMid_amp | IQN-ILS attenuation |
 |---|---:|---:|---:|---:|
 | 1 | -1.7e-3 | -3.3e-4 | 1.3e-6 | - |
@@ -597,6 +610,7 @@ v2412 against v2512, m2, n100 (periods; relative errors):
 | 4 | 4.5e-5 | 1.1e-5 | -1.7e-5 | 1.2e-4 |
 | 6 | 4.5e-6 | 5.3e-7 | -1.6e-5 | 1.2e-4 |
 | 12 | 1.3e-6 | 1.5e-7 | -1.6e-5 | 1.1e-4 |
+<!-- markdownlint-enable MD013 -->
 
 - **Reproduced exactly**: the regression value u_r(t = 25) is
   -2.229508061e-4 (v2512) and -2.217864674e-4 (v2412) for Robin, and
@@ -646,6 +660,7 @@ v2412 against v2512, m2, n100 (periods; relative errors):
 
 ## 9. Hypotheses ruled out
 
+<!-- markdownlint-disable MD013 -->
 | # | Hypothesis | Verdict and evidence |
 |---|---|---|
 | H1 | BDF2 first-step treatment | Ruled out: windows 5-6 and 11-12 agree; transient gone by period 5 |
@@ -661,6 +676,7 @@ v2412 against v2512, m2, n100 (periods; relative errors):
 | H10 | Tolerance floor | Ruled out: 100x tighter tolerances move QoIs by <5e-6 |
 | H11 | Boundary data time level | Ruled out by inspection: coded conditions use the new time |
 | H12 | OpenFOAM detail | Confirmed in a different form: `mixedFvPatchField::assignable() == false` with `constrainHbyA` (6.6); `ddtCorr` and the `timeIndex() < 2` Euler fall-back ruled out as causes of the order |
+<!-- markdownlint-enable MD013 -->
 
 ## 10. Is nominal second order recovered?
 
@@ -834,11 +850,13 @@ Applying OpenFOAM's own operators (`leastSquares` gradient, the
 fixed-value `snGrad`) to the *exact* pressure (values set at the cell
 centres and on the end faces), on every end face:
 
+<!-- markdownlint-disable MD013 -->
 | Mesh | h (axial) | (g_P.n - snGrad p) / (h d2p/dn2) | max misfit | max abs value |
 |---|---:|---:|---:|---:|
 | m1 | 0.469 | -0.244 | 0.5% | 2.34e-6 |
 | m2 | 0.234 | -0.247 | 0.3% | 1.18e-6 |
 | m4 | 0.117 | -0.249 | 0.1% | 5.94e-7 |
+<!-- markdownlint-enable MD013 -->
 
 So `g_P . n - snGrad(p) = -(h/4) d2p/dn2 + O(h^2)`. The least-squares
 gradient is accurate at the cell centre; the fixed-value `snGrad` is the
@@ -898,10 +916,12 @@ solution, tends to 0.027 on m1 and is still falling (0.069, 0.036, 0.022,
 flow-rate coefficient, with a constant `ddtCorr` coefficient (`backward 1`;
 see the note below):
 
+<!-- markdownlint-disable MD013 -->
 | triplet (steps/period) | 200/400/800 | 400/800/1600 | 800/1600/3200 | 1600/3200/6400 | 3200/6400/12800 |
 |---|---:|---:|---:|---:|---:|
 | exact end flux (`fluxConsistent`) | 2.00 | 2.01 | 2.02 | 2.04 | **2.08** |
 | final form (`fluxConsistent2`) | 2.02 | 2.03 | 2.05 | 1.97 | **1.57** |
+<!-- markdownlint-enable MD013 -->
 
 and for the flow phase 1.94, 1.98, 2.00, 2.03, 2.08 against 1.77, 1.70,
 1.58, 1.42, **1.27**; the wave speed and attenuation of the final form
@@ -1009,6 +1029,7 @@ outlet)` in `system/fluid/fvSolution`; exact boundary values of `D`, `D_0`,
 serial cases, a clean build of the branch) passes every check;
 `temporal/production/` holds its summary and CSV.
 
+<!-- markdownlint-disable MD013 -->
 | Quantity | mesh order | time order 50/100/200 | 100/200/400 | finest-mesh error (m4, n200) |
 |---|---:|---:|---:|---:|
 | profile | 2.04 | - | - | 1.20e-3 |
@@ -1018,6 +1039,7 @@ serial cases, a clean build of the branch) passes every check;
 | wallMid_phase | 1.40 | 2.14 | 2.06 | -1.15e-3 |
 | speed | 2.02 | 1.94 | 1.97 | 1.40e-5 |
 | attenuation | - (-2.08e-3, -2.18e-3, -1.96e-3) | 2.10 | 2.07 | -1.96e-3 |
+<!-- markdownlint-enable MD013 -->
 
 - IQN-ILS against Robin-Neumann (m2, n100): at most 2.16e-4 (wall
   amplitude); 14.6 and 9.3 coupling iterations per step.

@@ -2,6 +2,7 @@
 
 Errors are relative to the exact linear solution unless stated.
 
+<!-- markdownlint-disable MD013 -->
 | Case | profile | flow_amp | flow_phase | wallMid_amp | wallMid_phase | speed | attenuation | wallQuarter_amp | wallThreeQuarter_amp | axialMid_amp | periodicity | Iter./step | Time (s) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | iqnils_m2_n100 | 4.98e-03 | 5.48e-04 | 1.09e-03 | -4.47e-04 | -2.40e-03 | -3.72e-05 | -4.41e-03 | -7.44e-04 | 5.62e-04 | 2.57e-03 | 1.50e-05 | 14.56 | 805 |
@@ -11,6 +12,7 @@ Errors are relative to the exact linear solution unless stated.
 | robin_m2_n200 | 4.96e-03 | 9.39e-04 | 1.33e-03 | -2.19e-03 | -1.48e-03 | -4.50e-04 | -2.18e-03 | -1.61e-03 | -1.02e-03 | 2.36e-03 | 6.11e-06 | 10.96 | 771 |
 | robin_m2_n400 | 4.95e-03 | 1.04e-03 | 1.40e-03 | -2.58e-03 | -1.28e-03 | -5.48e-04 | -1.69e-03 | -1.80e-03 | -1.37e-03 | 2.31e-03 | 7.88e-06 | 9.46 | 1127 |
 | robin_m4_n200 | 1.20e-03 | -3.09e-04 | 8.23e-05 | -1.76e-04 | -1.15e-03 | 1.40e-05 | -1.96e-03 | -2.80e-04 | 1.96e-04 | 1.45e-04 | 7.35e-06 | 8.38 | 2239 |
+<!-- markdownlint-enable MD013 -->
 
 ## Checks
 
@@ -99,6 +101,7 @@ cancel the error shared by the series, such as the time error of the
 mesh study. Time-step series of more than three runs give one order per
 three successive steps.
 
+<!-- markdownlint-disable MD013 -->
 | Series | Quantity | Errors | Order |
 |---|---|---|---:|
 | mesh | profile | 1.79e-02, 4.96e-03, 1.20e-03 | 2.04 |
@@ -114,5 +117,6 @@ three successive steps.
 | time step | wallMid_phase | -6.12e-03, -2.34e-03, -1.48e-03, -1.28e-03 | 2.14, 2.06 |
 | time step | speed | 1.41e-03, -6.62e-05, -4.50e-04, -5.48e-04 | 1.94, 1.97 |
 | time step | attenuation | -1.31e-02, -4.24e-03, -2.18e-03, -1.69e-03 | 2.10, 2.07 |
+<!-- markdownlint-enable MD013 -->
 
 PASSED
