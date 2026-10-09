@@ -510,6 +510,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
         tmpRef(tRhsEqn) += fvc::div(force);
         tmpRef(tRhsEqn) += rho()*g();
+        const tmp<volVectorField> tsource(fvOptionsSource());
+        if (tsource.valid())
+        {
+            tmpRef(tRhsEqn) += tsource();
+        }
 
         fvVectorMatrix DEqn
         (
@@ -524,6 +529,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(force)
           + rho()*g()
+          + fvOptions()(ds_, D())
         );
 #endif
 
@@ -859,6 +865,16 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
 }
 
 
+#ifndef OPENFOAM_COM
+Foam::tmp<Foam::volVectorField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::fvOptionsSource() const
+{
+    // An empty tmp means no source, so callers can skip the field operations
+    return tmp<volVectorField>();
+}
+#endif
+
+
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 {
@@ -1008,6 +1024,19 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
+    ),
+    ds_
+    (
+        IOobject
+        (
+            "ds",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     )
 {
     DisRequired();
@@ -1504,9 +1533,17 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
 
+#ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
     // Note that "source()" is already multiplied by the volumes
-    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+    residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+#else
+    const tmp<volVectorField> tsource(fvOptionsSource());
+    if (tsource.valid())
+    {
+        residual += mesh.V()*tsource().internalField();
+    }
+#endif
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>
