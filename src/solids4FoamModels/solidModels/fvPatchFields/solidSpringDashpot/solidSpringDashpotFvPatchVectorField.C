@@ -22,6 +22,8 @@ License
 #include "transformField.H"
 #include "volFields.H"
 #include "lookupSolidModel.H"
+#include "linGeomTotalDispSolid.H"
+#include "nonLinGeomTotalLagTotalDispSolid.H"
 #include "compatibilityFunctions.H"
 #include "IStringStream.H"
 
@@ -335,17 +337,32 @@ void solidSpringDashpotFvPatchVectorField::updateCoeffs()
 
     const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
+    // Only these solid models impose the spring-dashpot traction on the
+    // boundary faces (enforceTractionBoundaries); in other models the
+    // condition would be silently ignored or act on the wrong field
     if
     (
-        solMod.incremental()
-     || solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN
+        !isA<solidModels::linGeomTotalDispSolid>(solMod)
+     && !isA<solidModels::nonLinGeomTotalLagTotalDispSolid>(solMod)
     )
     {
         FatalErrorIn("solidSpringDashpotFvPatchVectorField::updateCoeffs()")
-            << "solidSpringDashpot acts on the total displacement D with "
-            << "reference-configuration normals, and does not support "
-            << "incremental or updated Lagrangian solid models (patch "
-            << patch().name() << ")" << abort(FatalError);
+            << "solidSpringDashpot is supported only by the "
+            << solidModels::linGeomTotalDispSolid::typeName << " and "
+            << solidModels::nonLinGeomTotalLagTotalDispSolid::typeName
+            << " solid models, not by " << solMod.type() << " (patch "
+            << patch().name() << ")" << exit(FatalError);
+    }
+
+    // The high-order residual has no quadrature treatment of this condition,
+    // and the high-order Jacobian assembles it as a fixed-value patch
+    // (directionMixed::fixesValue() is true)
+    if (solMod.highOrderResidual() || solMod.highOrderJacobian())
+    {
+        FatalErrorIn("solidSpringDashpotFvPatchVectorField::updateCoeffs()")
+            << "solidSpringDashpot does not support the high-order residual "
+            << "or Jacobian of the PETSc SNES algorithm (patch "
+            << patch().name() << ")" << exit(FatalError);
     }
 
     // Reference unit normal (mesh is not moved)

@@ -84,11 +84,14 @@ stiffness, including `2μ` when `solvePressure` is used.
   `Finv`, because `tractionBoundarySnGrad` expects a traction per unit current
   area there.
 
-Supported solid models: total-displacement models with linear geometry or a
-total Lagrangian formulation (verified with `linearGeometryTotalDisplacement`
-and `nonLinearGeometryTotalLagrangianTotalDisplacement`). Incremental models,
-which solve for `DD`, and updated Lagrangian models, whose patch normals are
-not reference normals, are refused with a fatal error.
+Supported solid models: `linearGeometryTotalDisplacement` and
+`nonLinearGeometryTotalLagrangianTotalDisplacement`, the models that impose
+the spring-dashpot traction on the boundary faces. Other solid models are
+refused with a fatal error: incremental models solve for `DD`, updated
+Lagrangian patch normals are not reference normals, and the remaining models
+would ignore the imposed traction. The high-order residual and Jacobian of the
+PETSc SNES algorithm are also refused, because they have no treatment of this
+condition.
 
 The `nonOrthogonalCorrections` and `limitCoeff` entries of `solidDirectionMixed`
 are read. `secondOrder yes` is refused, because the valueFraction above assumes
@@ -170,9 +173,9 @@ E = 100 kPa, ν = 0.3, 20 cells along the bar):
   condition): inner radial displacement errors 1.7e-3, 4.0e-4 and 9.8e-5 on
   10×20, 20×40 and 40×80 cells, with 51–64 outer iterations on all meshes
   and k = 1e5 … 1e8 Pa/m.
-- **Refusals:** `secondOrder yes` and an updated Lagrangian (incremental)
-  model stop with a fatal error; a dashpot in a `steadyState` run prints the
-  warning.
+- **Refusals:** `secondOrder yes`, an unsupported solid model and the
+  high-order SNES residual or Jacobian stop with a fatal error; a dashpot in
+  a `steadyState` run prints the warning.
 
 Outer iterations to a step-norm tolerance of 1e-10, against the same
 condition with the base-class diagonal and without the imposed traction:
