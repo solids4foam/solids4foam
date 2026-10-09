@@ -33,24 +33,53 @@ internalField   #codeStream
 
 boundaryField
 {
-    "inlet|outlet"
+    inlet
     {
         type            calculated;
-        value           uniform (0 0 0);
+        value #codeStream
+        {
+            codeInclude     $womersleyCodeInclude;
+            codeOptions     $womersleyCodeOptions;
+            codeLibs        $womersleyCodeLibs;
+            code            $womersleyPatchDisplacement;
+        };
+    }
+    outlet
+    {
+        type            calculated;
+        value #codeStream
+        {
+            codeInclude     $womersleyCodeInclude;
+            codeOptions     $womersleyCodeOptions;
+            codeLibs        $womersleyCodeLibs;
+            code            $womersleyPatchDisplacement;
+        };
     }
     interface
     {
         type            solidTraction;
         traction        uniform (0 0 0);
         pressure        uniform 0;
-        value           uniform (0 0 0);
+        value #codeStream
+        {
+            codeInclude     $womersleyCodeInclude;
+            codeOptions     $womersleyCodeOptions;
+            codeLibs        $womersleyCodeLibs;
+            code            $womersleyPatchDisplacement;
+        };
     }
     outer
     {
         type            solidTraction;
         traction        uniform (0 0 0);
         pressure        uniform 0;
-        value           uniform (0 0 0);
+        value #codeStream
+        {
+            codeInclude     $womersleyCodeInclude;
+            codeOptions     $womersleyCodeOptions;
+            codeLibs        $womersleyCodeLibs;
+            code            $womersleyPatchDisplacement;
+        };
     }
     "front|back"
     {

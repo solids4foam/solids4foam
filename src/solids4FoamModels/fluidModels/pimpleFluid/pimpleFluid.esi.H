@@ -98,6 +98,19 @@ class pimpleFluid
         //  condition
         const bool robinKinematicConsistency_;
 
+        //- Patches with a fixed pressure and a velocity condition that fixes
+        //  the boundary value (fixedValue, or mixed, e.g. a prescribed
+        //  normal gradient). On such a patch constrainHbyA sets HbyA_b = U_b,
+        //  and the flux is U_b.S_f - rAU snGrad(p)|S_f|, which differs from
+        //  the boundary velocity flux by a term proportional to the
+        //  time-step; on these patches HbyA_b carries the pressure gradient
+        //  of the boundary cell, so the flux is the boundary velocity flux
+        //  to O(rAU h), i.e. O(deltaT h): formally first order in time at a
+        //  fixed mesh, with a coefficient that vanishes with h (the same
+        //  order as a standard fixed-pressure outlet). Read from the PIMPLE
+        //  dictionary; empty by default
+        labelList fluxConsistentPatches_;
+
         //- Cumulative continuity errors
         scalar cumulativeContErr_;
 
@@ -125,6 +138,14 @@ class pimpleFluid
 
         //- Update phi for Robin FSI boundary conditions
         void updateRobinFsiInterface(surfaceScalarField& phiHbyA);
+
+        //- Set phiHbyA on fluxConsistentPatches to
+        //  (U_b + rAtU_b grad(p)_P).S_f
+        void correctFluxConsistentPatches
+        (
+            surfaceScalarField& phiHbyA,
+            const volScalarField& rAtU
+        ) const;
 
         //- Solve energy equation if requred
         void solveEnergyEq();
