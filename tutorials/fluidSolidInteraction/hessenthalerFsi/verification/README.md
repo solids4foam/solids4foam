@@ -38,6 +38,40 @@ numerical term: a consistent face flux
 displacement. It is therefore part of the discretisation, and its effect is
 measured as part of the solid discretisation error.
 
+## Fixed shear modulus
+
+The silicone's shear modulus is calibrated against the measured zero-flow
+tip deflection (`./Allverify --study solid`): the flap alone under its net
+buoyancy, damped to rest, on the nested hexahedral meshes S1-S4 (ratio 2 in
+every direction), at two stabilisation scale factors. The calibrated value
+converges at second order on the three finest levels:
+
+| Level | μ_cal, sf 0.01 (kPa) | μ_cal, sf 0.001 (kPa) |
+| --- | --- | --- |
+| S1 | 44.81 | 50.07 |
+| S2 | 58.42 | 60.68 |
+| S3 | 62.58 | 63.23 |
+| S4 | 63.61 | 63.79 |
+| Richardson (S2-S4) | 63.95 (p = 2.01, GCI 0.42) | 63.94 (p = 2.21, GCI 0.19) |
+
+Both scale factors give the same continuum limit, 63.9-64.0 kPa. μ* =
+64.2 kPa was fixed from the S1-S3 limits (64.41 and 64.03 kPa) before S4
+was available; it lies within the S2-S4 GCI of the limit. It is retained
+because the steady coupled tip changes by only about -0.007 mm per kPa
+(F1S2 with μ = 58.45 and 64.2 kPa), so the 0.25 kPa difference shifts the
+tip by about 0.002 mm, far below the numerical uncertainties of the coupled
+problem.
+
+- The tutorial's 58.45 kPa is the S2-specific calibration (58.42 kPa at sf
+  0.01): it compensates for the discretisation error of that mesh and is
+  not used for verification.
+- With ν = 0.45, the bending stiffness 2μ/(1 − ν) of a plate (2μ(1 + ν) of a
+  beam) needs a higher μ than with ν ≈ 0.5, so 64 kPa is consistent with the
+  ≈ 61 kPa reported by Hessenthaler et al. for a nearly incompressible model.
+- The calibration uncertainty from the measured deflection is a model
+  (validation) uncertainty. It is not part of the numerical uncertainty: μ*
+  is a fixed parameter of the verified mathematical problem.
+
 ## Running
 
 Source OpenFOAM, build solids4foam with PETSc, and run from this directory:
