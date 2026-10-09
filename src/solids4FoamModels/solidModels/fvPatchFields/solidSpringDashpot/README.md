@@ -73,6 +73,13 @@ stiffness, including `2μ` when `solvePressure` is used.
   `-K·D - C·(D - D_old)/Δt + t - p n` directly on the boundary faces,
   through `springDashpotTraction()`, as they do for `solidTraction`. This is
   used by the implicit segregated, explicit and PETSc SNES algorithms.
+- **Least-squares gradient:** the `leastSquaresS4f` gradient scheme
+  extrapolates to the faces of this condition, as it does for
+  `solidTraction`, instead of using the boundary value. The boundary value
+  comes from the Robin closure, which uses the stress of the previous
+  evaluation; in a PETSc SNES residual that lag acts as a hidden fixed-point
+  iteration, and Newton diverged on the `cerebralAneurysm` tutorial, even for
+  a very soft spring.
 - **Area ratio:** in the total Lagrangian model, `dA/da` is taken from `J` and
   `Finv`, because `tractionBoundarySnGrad` expects a traction per unit current
   area there.
@@ -182,7 +189,11 @@ condition with the base-class diagonal and without the imposed traction:
 
 The tutorial `tutorials/solids/linearElasticity/springSupportedBar` contains
 the bar on a normal spring and the total Lagrangian force balance, with a
-regression test against the exact solutions.
+regression test against the exact solutions. The
+`tutorials/fluidSolidInteraction/cerebralAneurysm` tutorial uses the condition
+for the brain tissue and cerebrospinal fluid around the arterial wall, with
+the PETSc SNES algorithm; with a very soft spring (k = 1e3 Pa/m) it reproduces
+the traction-free wall.
 
 ## References
 

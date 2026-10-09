@@ -25,6 +25,7 @@ License
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -1335,6 +1336,10 @@ Foam::solidModel::solidModel
             (
                 D_.boundaryField()[patchI]
             )
+         || isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
         )
         {
             useBoundaryFaceValuesD_[patchI] = false;
@@ -1353,6 +1358,10 @@ Foam::solidModel::solidModel
                 DD_.boundaryField()[patchI]
             )
          || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+         || isA<solidSpringDashpotFvPatchVectorField>
             (
                 DD_.boundaryField()[patchI]
             )
