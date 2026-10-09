@@ -94,7 +94,8 @@ the exposed inner face of the extruded mesh is named `innerWall` (via
   good value is known for the geometry: this case previously used
   `constantHs 5e-4`, which converges at a comparable rate: over the first
   2000 time steps, i.e. through the initial transient and systole, it needs
-  2.62 FSI correctors per time step against 2.48 for `secant`. The case
+  2.62 FSI correctors per time step against 2.48 for `secant` (both measured
+  before the outer-wall spring support was added). The case
   permits up to 30 FSI correctors per time step.
   The `fixedRelaxation` coupling uses a relaxation factor of 1.0, i.e. no
   additional under-relaxation is applied, as the Robin condition already
@@ -111,7 +112,7 @@ steps over the cardiac cycle. As the time step is fixed, the Courant number
 follows the flow-rate waveform: over the cycle it peaks at 8.84 near peak
 systole ($$t\approx0.098\,\mathrm{s}$$), with a cycle-averaged value of 4.32.
 The implicit PIMPLE fluid solution and the FSI coupling remain stable at these
-Courant numbers, requiring an average of 1.8 FSI correctors per time step
+Courant numbers, requiring an average of 1.45 FSI correctors per time step
 (see Figure 6).
 
 The `endTime` in `system/controlDict` is currently `1`, which corresponds to
@@ -226,9 +227,9 @@ cardiac cycle.**
 
 The partitioned coupling is inexpensive once the initial transient has passed:
 11 iterations are needed in the first time step, after which the count settles
-to one or two iterations, averaging 1.3 over the cardiac cycle. In the measured
-run below, 77% of the time steps converged in a single FSI corrector and a
-further 19% in two. The limit of 30 FSI correctors per time step is never
+to one or two iterations, averaging 1.45 over the cardiac cycle. In the measured
+run below, 65% of the time steps converged in a single FSI corrector and a
+further 29% in two. The limit of 30 FSI correctors per time step is never
 reached.
 
 ## Running the Case
@@ -246,13 +247,14 @@ The case is configured for 16 subdomains by default
 `parallel` to run in serial.
 
 As a representative run time, the full cardiac cycle (20,000 time steps of
-$$5\times10^{-5}\,\mathrm{s}$$) completed in 5633 s of solver time
-(approximately 1 hour 34 minutes) using **8 cores**, i.e. with
+$$5\times10^{-5}\,\mathrm{s}$$) completed in 6514 s of solver time
+(approximately 1 hour 49 minutes) using **8 cores**, i.e. with
 `numberOfSubdomains` reduced from the default 16 to 8. The hardware was an
 Apple Mac Studio with an M1 Ultra chip (20 cores: 16 performance and 4
-efficiency) and 64 GB of unified memory, running macOS 26.5 and OpenFOAM
-v2412. This timing excludes mesh generation, which takes a few seconds, and
-the reconstruction of the parallel results.
+efficiency) and 64 GB of unified memory, running macOS 26.6 and OpenFOAM
+v2512, with other jobs sharing the machine. This timing excludes mesh
+generation, which takes a few seconds, and the reconstruction of the parallel
+results.
 
 Performance varies with hardware and through the cardiac cycle, as the cost per
 time step follows the FSI iteration count shown in Figure 6.
