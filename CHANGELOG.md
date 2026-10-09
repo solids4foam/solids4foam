@@ -18,7 +18,9 @@ release. For complete commit-level details and contributor information, see the
   traction on the boundary faces, including in their PETSc SNES residuals.
   The coefficients can be scaled by a weight field. Its README gives the
   formulation, literature values and verification, and the
-  `springSupportedBar` tutorial checks it against exact solutions.
+  `springSupportedBar` tutorial checks it against exact solutions. The
+  `cerebralAneurysm` tutorial now uses it to represent the brain tissue and
+  cerebrospinal fluid around the arterial wall.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A

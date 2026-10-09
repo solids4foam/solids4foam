@@ -45,6 +45,15 @@ $$1200\,\mathrm{kg\,m^{-3}}$$, Young's modulus of $$640\,\mathrm{kPa}$$ and
 Poisson's ratio of $$0.45$$. A uniform wall thickness of $$0.3\,\mathrm{mm}$$
 is discretised using three cells through the thickness.
 
+The brain tissue and cerebrospinal fluid around the artery support the outer
+wall. They are represented by elastic springs on the `outerWall` patch, using
+the `solidSpringDashpot` condition in `0/solid/D`, with a stiffness of
+$$10^7\,\mathrm{Pa\,m^{-1}}$$ in the normal and tangential directions and no
+damping: the value Shidhore et al. [4] use for tissue contact. Moireau et al.
+[5] discuss external tissue support in vascular fluid-solid interaction. To
+remove the support, set `kNormal` and `kTangential` to zero, or use a
+traction-free `solidTraction` condition on `outerWall`.
+
 ## Mesh Generation
 
 The vascular surface is converted from STL to the `.fms` format using
@@ -93,6 +102,8 @@ the exposed inner face of the extruded mesh is named `innerWall` (via
   such unrelaxed iterations, and Aitken or IQN-ILS acceleration is not
   recommended with it.
 - **Interface:** `wall` in the fluid region and `innerWall` in the solid region.
+- **External support:** `solidSpringDashpot` springs on the solid
+  `outerWall`.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
 
 The fixed time step is $$5\times10^{-5}\,\mathrm{s}$$, giving 20,000 time
@@ -293,3 +304,10 @@ and the script skips the checks rather than reporting a failure.
    Newton-Krylov Method for Cell-Centred Finite Volume Solid Mechanics,"
    *International Journal for Numerical Methods in Engineering*, 127(3),
    e70268 (2026). <https://doi.org/10.1002/nme.70268>.
+4. T. C. Shidhore et al., "Comparative assessment of biomechanical parameters
+   in subjects with multiple cerebral aneurysms using fluid-structure
+   interaction simulations," *Journal of Biomechanical Engineering*, 145,
+   051003 (2023). <https://doi.org/10.1115/1.4056317>.
+5. P. Moireau et al., "External tissue support and fluid-structure simulation
+   in blood flows," *Biomechanics and Modeling in Mechanobiology*, 11, 1-18
+   (2012). <https://doi.org/10.1007/s10237-011-0289-z>.
