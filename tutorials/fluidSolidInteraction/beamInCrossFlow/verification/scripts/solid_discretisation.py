@@ -38,8 +38,10 @@ def copy_contents(source: Path, destination: Path) -> None:
             shutil.copy2(path.resolve(), target)
 
 
-def prepare_case(factor: int, cores: int, traction: float) -> Path:
-    case = verify.copy_case(f"richter_solid_static_{factor}x")
+def prepare_case(factor: int, cores: int, traction: float,
+                 discretisation: str) -> Path:
+    suffix = "" if discretisation == "standard" else "_high_order"
+    case = verify.copy_case(f"richter_solid_static_{factor}x{suffix}")
     shutil.rmtree(case / "0/fluid")
     copy_contents(case / "0/solid", case / "0")
     shutil.rmtree(case / "0/solid")
@@ -77,6 +79,11 @@ def prepare_case(factor: int, cores: int, traction: float) -> Path:
     physics.write_text(text)
 
     solid_properties = case / "constant/solidProperties"
+    if discretisation == "high-order":
+        shutil.copy2(
+            case / "constant/solidProperties.iqnils.highOrder",
+            solid_properties,
+        )
     verify.replace_entry(solid_properties, "predictor", "no")
 
     displacement = case / "0/D"
@@ -186,6 +193,12 @@ def main() -> int:
     parser.add_argument("--levels", default="1,2,4,8")
     parser.add_argument("--cores", type=int, default=1)
     parser.add_argument("--traction", type=float, default=100.0)
+    parser.add_argument(
+        "--discretisation",
+        choices=("standard", "high-order"),
+        default="standard",
+        help="solid spatial discretisation used for the diagnostic",
+    )
     args = parser.parse_args()
     factors = [int(value) for value in args.levels.split(",")]
     # Slender Euler--Bernoulli comparison for a full-width 0.4 m cantilever
@@ -200,7 +213,9 @@ def main() -> int:
     )
     rows = []
     for level, factor in enumerate(factors):
-        case = prepare_case(factor, args.cores, args.traction)
+        case = prepare_case(
+            factor, args.cores, args.traction, args.discretisation
+        )
         elapsed = run(case, args.cores)
         _, displacement = verify.vector_at_or_before(
             verify.find_displacement(case), 1.0
@@ -221,6 +236,7 @@ def main() -> int:
                 "interface_cells_y": 8 * factor,
                 "interface_cells_z": 8 * factor,
                 "traction_x_pa": args.traction,
+                "discretisation": args.discretisation,
                 "ranks": args.cores,
                 "wall_time_seconds": elapsed,
                 "ux_A": displacement[0],
@@ -238,7 +254,10 @@ def main() -> int:
                 rows[index - 2]["ux_A"], rows[index - 1]["ux_A"], row["ux_A"]
             ) or ""
         )
-    output = VERIFICATION / "postProcessing/richter_solid_discretisation.csv"
+    suffix = "" if args.discretisation == "standard" else "_high_order"
+    output = VERIFICATION / (
+        f"postProcessing/richter_solid_discretisation{suffix}.csv"
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
