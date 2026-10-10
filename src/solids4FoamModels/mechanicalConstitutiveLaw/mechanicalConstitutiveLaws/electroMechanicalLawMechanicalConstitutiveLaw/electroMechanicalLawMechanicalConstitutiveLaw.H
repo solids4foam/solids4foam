@@ -29,6 +29,8 @@ Description
     model or read from the case, or a constant ramped over rampTime. The field
     is read when activeTensionFromField is set, under the name given by
     activeTensionFieldName (default Ta), and the constant is used otherwise.
+    activeTensionFromField is on by default when no constant activeTension
+    is given, and rampTime defaults to 0.
     Unlike the removed legacy law, a registered field is not picked up
     unasked: a coupled case sets activeTensionFromField, and one that does not
     is warned that it is running on the constant.
@@ -99,7 +101,8 @@ class electroMechanicalLawMechanicalConstitutiveLaw
         //  Asked for explicitly rather than detected, because a law that
         //  quietly looks for a field it was never given the chance to receive
         //  reports nothing and uses the constant instead - which is a wrong
-        //  answer that runs to completion
+        //  answer that runs to completion. On by default when no constant
+        //  'activeTension' is given
         const Switch TaFromField_;
 
         //- The fibre direction to use where a case supplies no f0 field
