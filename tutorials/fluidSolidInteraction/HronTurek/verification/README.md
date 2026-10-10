@@ -1182,8 +1182,8 @@ cylinder; `smooth_mid` the rest, split into five equal segments `mid_1` to
 | mid_1 (0.27-0.33) | 1.74 | 1.73 | 1.58 | -0.02 | -0.15 | -1.7% | no |
 | mid_2 | 11.16 | 11.49 | 11.52 | +0.33 | +0.03 | 0.4% | 3.3 |
 | mid_3 | 18.03 | 19.77 | 20.69 | +1.74 | +0.92 | 10% | 0.9 |
-| mid_4 | 5.78 | 9.33 | 11.83 | +3.55 | +2.50 | 28% | 0.5 |
-| mid_5 (0.48-0.58) | 11.24 | 22.94 | 26.54 | +11.70 | +3.60 | 41% | 1.7 |
+| mid_4 (0.46-0.52) | 5.78 | 9.33 | 11.83 | +3.55 | +2.50 | 28% | 0.5 |
+| mid_5 (0.52-0.58) | 11.24 | 22.94 | 26.54 | +11.70 | +3.60 | 41% | 1.7 |
 | all smooth faces (mid_1..5) | 47.96 | 65.27 | 72.17 | +17.31 | +6.90 | 78% | 1.3 |
 | total | 50.31 | 72.17 | 81.02 | +21.86 | +8.85 | 100% | 1.3 |
 
@@ -1201,15 +1201,15 @@ share of the 1x-to-2x change (21%), and its order (1.2) equals that of the
 total, so it does not converge more slowly than the rest; the end face itself
 is converged (order 3.8). The smooth long faces carry 78% of the change and converge at
 the same order as the total (1.3). The change comes from the aft third of the flag
-(`mid_4`, `mid_5`, x of 0.38 to 0.58 m, 69% of the 2x-to-4x change): the
+(`mid_4`, `mid_5`, x of 0.46 to 0.58 m, 69% of the 2x-to-4x change): the
 traction profile (`traction_distribution.png`) has a second pressure lobe near
 x of 0.56 m, whose amplitude and in-phase part keep growing with refinement
 (Q_in density at the lobe peak, upper face, 140, 248, 283 N/m per m), with a minimum near
-x of 0.50 m that is poorly resolved at 1x. This is a smooth, resolved-flow
-feature (the vortex near the tip), not a corner singularity. Per unit length the tip corner
+x of 0.50 m that is poorly resolved at 1x. This is a smooth flow feature of the aft flag, not a corner singularity. Per unit length the tip corner
 is the most sensitive region together with `mid_5`, so a tip contribution of
-the expected kind exists, but it is a minority of the total. The last
-0.5 t of the flag (`tip_cumulative.png`) varies little with refinement.
+the expected kind exists, but it is a minority of the total. Within the last
+0.5 t the cumulative Q_in (`tip_cumulative.png`) is 2.5, 4.8, 6.0 N/m, so the
+refinement change is small in absolute terms there.
 Caveats: the geometric bands below one cell width (0.1 t) are not resolved by any of the
 meshes, so nothing is concluded about the corner at that scale; three
 levels with orders of 0.5 to 1.7 in the segments (not asymptotic) mean orders
