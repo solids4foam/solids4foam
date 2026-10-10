@@ -6,6 +6,7 @@
   solutions.
 - Show the condition with linear geometry and with a total Lagrangian
   formulation at large strain.
+- Verify the dashpot term with a spring-dashpot (Kelvin-Voigt) support.
 
 ## Case overview
 
@@ -45,11 +46,35 @@ $$
 \bar{D}_x(0) = \frac{F}{k_N A_0} = 2.0 \times 10^{-4}\ \mathrm{m}
 $$
 
+### dashpot
+
+- The linearGeometry case with a normal dashpot, c = 1e7 Pa·s/m, in parallel
+  with the spring, so the support relaxes with time constant c/k = 1 s.
+- The load is applied at time 0 and held for 10 time steps of Δt = 0.1 s.
+  Inertia is neglected (`d2dt2` is `steadyState`), so the bar transmits the
+  traction t to the support at every step, and the time step is still a
+  physical time for the dashpot. The condition prints its warning about a
+  dashpot in a `steadyState` run, which is expected here.
+
+The dashpot velocity is (D − D.oldTime())/Δt, so the support follows the
+backward-Euler recurrence $$k D_n + c (D_n - D_{n-1})/\Delta t = t$$ with
+$$D_0 = 0$$, whose exact solution after n steps is
+
+$$
+D_x(0) = \frac{t}{k}\left[1 - r^n\right],\qquad
+r = \frac{c/\Delta t}{k + c/\Delta t} = \frac{10}{11}
+$$
+
+giving $$D_x(0) = 6.144567 \times 10^{-5}\ \mathrm{m}$$ and
+$$D_x(L) = D_x(0) + t L/M = 1.357314 \times 10^{-4}\ \mathrm{m}$$ at the end time
+of 1 s.
+
 ## Running
 
 ```bash
 ./Allrun                    # linearGeometry
 ./Allrun totalLagrangian
+./Allrun dashpot
 ```
 
 `Allrun` copies the files of the chosen `caseOptions/` entry into the case,
@@ -61,6 +86,6 @@ is column 8.
 
 ## Regression test
 
-`regressionTest.sh` runs both cases and compares the mean x displacement of
-`springEnd` (both cases) and `loadedEnd` (linearGeometry) with the exact
-values above, with a relative tolerance of 1e-6.
+`regressionTest.sh` runs the three cases and compares the mean x displacement
+of `springEnd` (all cases) and `loadedEnd` (linearGeometry and dashpot) with
+the exact values above, with a relative tolerance of 1e-6.

@@ -8,7 +8,7 @@ REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 # ============================================================
 # springSupportedBar regression test
 # Compares the spring-end and loaded-end displacements with the exact
-# solutions, for the linearGeometry and totalLagrangian cases
+# solutions, for the linearGeometry, totalLagrangian and dashpot cases
 # ============================================================
 
 # Relative tolerance against the exact solutions
@@ -20,6 +20,9 @@ LG_SPRING_END=1e-4
 LG_LOADED_END=1.742857142857e-4
 # totalLagrangian: F = 9 x 0.02 N, kN = 1e8 Pa/m, A0 = 9 mm^2
 TL_SPRING_END=2e-4
+# dashpot: linearGeometry with c = 1e7 Pa s/m, 10 steps of 0.1 s
+DP_SPRING_END=6.144567105705e-5
+DP_LOADED_END=1.357313853428e-4
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -57,7 +60,7 @@ for arg in "$@"; do
     esac
 done
 
-for option in linearGeometry totalLagrangian; do
+for option in linearGeometry totalLagrangian dashpot; do
     if [ "$CHECK_ONLY" = false ]; then
         prepare_case "${REGRESSION_ROOT}/${option}"
         ( cd "${REGRESSION_ROOT}/${option}" \
@@ -100,10 +103,14 @@ check "linearGeometry Dx(loadedEnd)" \
     "$(extract_avg_dx linearGeometry loadedEnd)" "${LG_LOADED_END}"
 check "totalLagrangian Dx(springEnd)" \
     "$(extract_avg_dx totalLagrangian springEnd)" "${TL_SPRING_END}"
+check "dashpot Dx(springEnd)" \
+    "$(extract_avg_dx dashpot springEnd)" "${DP_SPRING_END}"
+check "dashpot Dx(loadedEnd)" \
+    "$(extract_avg_dx dashpot loadedEnd)" "${DP_LOADED_END}"
 
 # Clean cases again
 if [ "$CHECK_ONLY" = false ]; then
-    for option in linearGeometry totalLagrangian; do
+    for option in linearGeometry totalLagrangian dashpot; do
         ( cd "${REGRESSION_ROOT}/${option}" && ./Allclean > /dev/null 2>&1 ) \
             || true
     done

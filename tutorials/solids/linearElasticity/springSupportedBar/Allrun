@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 # -------------------------------------------------------------------------
 # Usage:
-#   ./Allrun [linearGeometry|totalLagrangian]     (default: linearGeometry)
+#   ./Allrun [linearGeometry|totalLagrangian|dashpot]     (default: linearGeometry)
 # -------------------------------------------------------------------------
 
 export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
@@ -17,7 +17,7 @@ OPTION="${1:-linearGeometry}"
 
 if [[ ! -d "caseOptions/${OPTION}" ]]; then
     echo "Error: unknown option '${OPTION}'"
-    echo "Usage: ./Allrun [linearGeometry|totalLagrangian]"
+    echo "Usage: ./Allrun [linearGeometry|totalLagrangian|dashpot]"
     exit 1
 fi
 
