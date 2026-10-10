@@ -299,7 +299,8 @@ def case_name(level: int, delta_t: float) -> str:
     return f"replay_{level}x_dt{delta_t:g}"
 
 
-def build_case(level: int, delta_t: float, duration: float, cores: int) -> Path:
+def build_case(level: int, delta_t: float, duration: float, cores: int,
+               plate_pressure: str | None = None, tag: str = "_replay") -> Path:
     source = driver.WORK_ROOT / SOURCE
     times, path, disp = read_source(source)
     fit = fit_trajectory(times, path, disp)
@@ -313,8 +314,9 @@ def build_case(level: int, delta_t: float, duration: float, cores: int) -> Path:
           "        #};\n"
           "        code\n        #{" + BC_CODE % dict(t0=START, ramp=RAMP, key=KEY)
           + "        #};\n    }")
-    case = ale.build_case(level, delta_t, duration, cores, tag="_replay",
-                          plate_bc=bc, extra_functions=POWER_FO)
+    case = ale.build_case(level, delta_t, duration, cores, tag=tag,
+                          plate_bc=bc, extra_functions=POWER_FO,
+                          plate_pressure=plate_pressure)
     write_table(case / "constant/plateMotion.tab", target_path, target_coef, fit["omega"])
     summary = {k: v for k, v in fit.items() if k != "coef"}
     (case / "replay_fit.json").write_text(__import__("json").dumps(summary, indent=2, default=str))
@@ -331,8 +333,13 @@ def main() -> int:
     parser.add_argument("--duration", type=float, default=8.0)
     parser.add_argument("--cores", type=int, default=1)
     parser.add_argument("--setup-only", action="store_true")
+    parser.add_argument("--pressure", default=None,
+                        help="plate pressure condition instead of zeroGradient, "
+                             "e.g. movingWallPressure (case tag _replay_<name>)")
     args = parser.parse_args()
-    case = build_case(args.level, args.delta_t, args.duration, args.cores)
+    tag = "_replay" + (f"_{args.pressure}" if args.pressure else "")
+    case = build_case(args.level, args.delta_t, args.duration, args.cores,
+                      args.pressure, tag)
     if not args.setup_only:
         ale.run(case, args.cores)
     return 0

@@ -883,3 +883,10 @@ motion in over 1 s, and runs to 33 s. `replay_analysis.py` splits the first
 harmonic of the force on the flag and on cylinder + flag into the parts in
 phase with the tip displacement and velocity, and gives the pressure work per
 cycle on the flag. Compact results and 2 s histories: `reference/replay/`.
+
+### Wall-pressure condition on the replay
+
+`hron_turek_replay.py --pressure movingWallPressure` replays the same
+trajectory with `movingWallPressure` (`dp/dn = -rho n.a_wall`) on the flag instead
+of the tutorial's `zeroGradient`; `scripts/replay_compare.py` prints the two
+sets of harmonics side by side (results in `reference/replay_wallpressure/`).

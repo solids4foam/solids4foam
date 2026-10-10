@@ -62,8 +62,8 @@ def harmonics(t: list[float], y: list[float], end: float, f: float,
             "unlocked": w["unlocked_fraction"]}
 
 
-def analyse_run(level: int, delta_t: float) -> dict | None:
-    case = driver.WORK_ROOT / ale.case_name(level, delta_t, "_replay")
+def analyse_run(level: int, delta_t: float, tag: str = "_replay") -> dict | None:
+    case = driver.WORK_ROOT / ale.case_name(level, delta_t, tag)
     log = case / "log.solids4Foam"
     if not log.is_file() or not driver.re.search(r"^End\s*$", log.read_text(errors="replace"),
                                                  driver.re.MULTILINE):

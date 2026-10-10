@@ -116,7 +116,7 @@ def case_name(level: int, delta_t: float, tag: str = "") -> str:
 
 def build_case(level: int, delta_t: float, duration: float, cores: int,
                tag: str = "", plate_bc: str | None = None,
-               extra_functions: str = "") -> Path:
+               extra_functions: str = "", plate_pressure: str | None = None) -> Path:
     source = WORK_ROOT / cfd3_case_name(level, delta_t)
     if not (source / "25").is_dir():
         driver.fail(f"{source} has no developed state at 25 s")
@@ -136,6 +136,17 @@ def build_case(level: int, delta_t: float, duration: float, cores: int,
     if count != 1:
         driver.fail("Could not restore the moving-wall velocity on the plate")
     u.write_text(text)
+    if plate_pressure:
+        # Wall-pressure condition on the flag (the tutorial uses zeroGradient)
+        pfile = case / "25/p"
+        # A reconstructed field may lack the value entry the fixed-gradient
+        # type requires, so add it; the type recomputes the gradient itself
+        text, count = re.subn(r"(plate\s*\{\s*type\s+)zeroGradient;(\s*value\s+[^;]+;)?",
+                              rf"\g<1>{plate_pressure};\n        value           uniform 0;",
+                              pfile.read_text())
+        if count != 1:
+            driver.fail("Could not set the plate pressure condition")
+        pfile.write_text(text)
     # Point velocity of the prescribed motion
     pm = (TUTORIAL / "0/fluid/pointMotionU").read_text()
     beta, sigma = MODES[MODE]
