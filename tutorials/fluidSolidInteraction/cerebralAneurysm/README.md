@@ -205,7 +205,10 @@ below show representative fields from the simulation.
 
 **Video 1: Time evolution of the equivalent (von Mises) stress distribution
 in the arterial wall over a cardiac cycle. The deformation has been scaled
-by a factor of 5.**
+by a factor of 5. The video was produced with an earlier version of the case,
+in which the outer wall was traction-free rather than supported by the
+`solidSpringDashpot` springs; the springs reduce the wall deformation in the
+current case.**
 
 The number of FSI (outer) iterations performed in each time step is recorded in
 `postProcessing/fsiResiduals.dat`. `Allrun` post-processes this file with
