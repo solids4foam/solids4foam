@@ -191,24 +191,26 @@ below show representative fields from the simulation.
 
 ![Velocity streamlines](images/velocity.webp)
 
-**Figure 3: Fluid velocity streamlines coloured by velocity magnitude.**
+**Figure 3: Fluid velocity streamlines coloured by velocity magnitude. From an
+earlier version of the case with a traction-free outer wall.**
 
 ![Fluid pressure](images/pressure.webp)
 
-**Figure 4: Pressure distribution in the fluid domain.**
+**Figure 4: Pressure distribution in the fluid domain. From an earlier version
+of the case with a traction-free outer wall.**
 
 ![Wall shear stress](images/wallShearStress.webp)
 
-**Figure 5: Wall shear stress distribution on the vascular wall.**
+**Figure 5: Wall shear stress distribution on the vascular wall. From an
+earlier version of the case with a traction-free outer wall.**
 
 {% include youtube.html id="gFhhHJvkhM4" %}
 
 **Video 1: Time evolution of the equivalent (von Mises) stress distribution
 in the arterial wall over a cardiac cycle. The deformation has been scaled
-by a factor of 5. The video was produced with an earlier version of the case,
-in which the outer wall was traction-free rather than supported by the
-`solidSpringDashpot` springs; the springs reduce the wall deformation in the
-current case.**
+by a factor of 5. From an earlier version of the case with a traction-free
+outer wall; in the current case the outer wall is supported by
+`solidSpringDashpot` springs, which reduce the wall deformation.**
 
 The number of FSI (outer) iterations performed in each time step is recorded in
 `postProcessing/fsiResiduals.dat`. `Allrun` post-processes this file with
