@@ -91,9 +91,10 @@ bool Foam::solidTractions::writeData()
                 if (!traction.boundaryField()[patchI].coupled())
                 {
                     // It is assumed that sigma is the true (Cauchy) stress
+                    // Named normal: see pimpleFluid::patchViscousForce
+                    const vectorField nf(mesh.boundary()[patchI].nf());
                     boundaryFieldRef(traction)[patchI] =
-                        mesh.boundary()[patchI].nf()
-                      & sigma.boundaryField()[patchI];
+                        nf & sigma.boundaryField()[patchI];
                 }
             }
 
@@ -127,11 +128,13 @@ bool Foam::solidTractions::writeData()
             {
                 if (!traction.boundaryField()[patchI].coupled())
                 {
-                    vectorField nCurrent
+                    // Named operands: see pimpleFluid::patchViscousForce
+                    const vectorField nf(mesh.boundary()[patchI].nf());
+                    const tensorField FinvT
                     (
                         Finv.boundaryField()[patchI].T()
-                      & mesh.boundary()[patchI].nf()
                     );
+                    vectorField nCurrent(FinvT & nf);
                     nCurrent /= mag(nCurrent);
 
                    // It is assumed that sigma is the true (Cauchy) stress
@@ -165,9 +168,10 @@ bool Foam::solidTractions::writeData()
             {
                 if (!traction.boundaryField()[patchI].coupled())
                 {
+                    // Named normal: see pimpleFluid::patchViscousForce
+                    const vectorField nf(mesh.boundary()[patchI].nf());
                     boundaryFieldRef(traction)[patchI] =
-                        mesh.boundary()[patchI].nf()
-                      & sigma.boundaryField()[patchI];
+                        nf & sigma.boundaryField()[patchI];
                 }
             }
 

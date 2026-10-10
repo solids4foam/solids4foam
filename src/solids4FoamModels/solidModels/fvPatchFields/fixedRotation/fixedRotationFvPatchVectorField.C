@@ -255,10 +255,11 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
     // Rotation tensor
     const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle_);
 
-    vectorField newFaceCentres
-    (
-        (rotMat & (origFaceCentres_ - rotationOrigin_)) + rotationOrigin_
-    );
+    // Named operand: a tmp field would be reused as the storage of the inner
+    // product, which aliases an input of the loop and gives wrong results
+    // with some -O3 builds (see pimpleFluid::patchViscousForce)
+    const vectorField relFaceCentres(origFaceCentres_ - rotationOrigin_);
+    vectorField newFaceCentres((rotMat & relFaceCentres) + rotationOrigin_);
 
     vectorField disp(newFaceCentres - origFaceCentres_);
 
@@ -326,10 +327,14 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
                     boundaryFieldRef(pointDField)[patch().index()]
                 );
 
+            // Named operand: see above
+            const vectorField relPatchPoints
+            (
+                origPatchPoints_ - rotationOrigin_
+            );
             const vectorField newPatchPoints
             (
-                (rotMat & (origPatchPoints_ - rotationOrigin_))
-              + rotationOrigin_
+                (rotMat & relPatchPoints) + rotationOrigin_
             );
 
             vectorField pointDisp(newPatchPoints - origPatchPoints_);

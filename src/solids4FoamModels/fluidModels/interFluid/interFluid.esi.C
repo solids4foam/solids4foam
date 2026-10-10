@@ -445,9 +445,14 @@ tmp<vectorField> interFluid::patchViscousForce(const label patchID) const
     const incompressible::turbulenceModel& turb =
         mesh().lookupObject<icoTurbModel>(icoTurbModel::propertiesName);
 
+    // Named normal: a tmp normal field would be reused as the storage of
+    // the inner product, which aliases an input of the loop and gives
+    // wrong results with some -O3 builds (see the 3dTube verification)
+    const vectorField nf(mesh().boundary()[patchID].nf());
+
     tvF.ref() =
         (
-            mesh().boundary()[patchID].nf()
+            nf
           & (
                - rho_.boundaryField()[patchID]
                 *turb.devReff()().boundaryField()[patchID]
