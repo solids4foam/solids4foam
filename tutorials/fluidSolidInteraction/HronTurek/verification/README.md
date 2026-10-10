@@ -1125,6 +1125,22 @@ option that is better than the baseline is `gcl`, and its gain is 25%. The
 untested items are the `ddtCorr`/PISO splitting, the convection scheme and
 the tip geometry.
 
+**Correction (coordinator review, 2026-10-10): the `gcl` variant is not a
+GCL fix, and its result should not be used as evidence.** OpenFOAM v2512
+`backwardDdtScheme::meshPhi` already returns
+`(1 + c) mesh.phi() - c mesh.phi().oldTime()` with `c = dt/(dt + dt0)`, which is
+`1.5 phi^n - 0.5 phi^(n-1)` at constant dt. solids4foam takes the mesh flux
+through `fvc::meshPhi` (`pimpleFluid.esi.C` via `fvc::makeRelative`, and
+`newMovingWallVelocity`). The baseline therefore already satisfies the
+space-conservation law for backward ddt; the standard flux is not an `O(dt)`
+GCL violation. `dynamicMotionSolverBDF2FvMesh` overwrites `mesh.phi()` itself
+with `1.5 phiE^n - 0.5 phiE^(n-1)`, so `fvc::meshPhi` applies the BDF2
+combination a second time. That variant is thus GCL-inconsistent, and its
+modest gain (2x to 4x change -25%) is unexplained and possibly an artefact.
+The conclusion that all valid treatments share an observed order of about
+1.1-1.3 is unchanged. The statements above that `gcl` "helps" and is "the
+cheapest option that is better than the baseline" are withdrawn.
+
 Cost: about 132 core-hours of wall time times ranks on xenosim, which was
 heavily loaded (1x about 2, 2x about 47 of which 12 are restarts, 4x about 78,
 about 4 lost to a run killed by mistake). No 8x run was made.
