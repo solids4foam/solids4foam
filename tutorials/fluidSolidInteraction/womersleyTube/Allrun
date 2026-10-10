@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun            # default behaviour is IQNILS coupling
+# ./Allrun robin      # Robin-Neumann coupling
+# ./Allrun robin parallel
+
+# The exact solution is set with coded boundary conditions and #codeStream,
+# which foam-extend lacks, and the sampling uses OpenFOAM.com set types
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
+coupling=iqnils
+interfaceCondition=dirichletNeumann
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        iqnils|IQNILS)
+            coupling=iqnils
+            interfaceCondition=dirichletNeumann
+            ;;
+        robin|Robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [iqnils|robin] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling"
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Face zone at x = L/2 for the flow rate
+solids4Foam::runApplication -s fluid topoSet -region fluid
+
+# Run solver
+if [[ "$runMode" == "parallel" ]]; then
+    # Run parallel
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating wallDisplacement.pdf using gnuplot"
+    gnuplot wallDisplacement.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

@@ -33,7 +33,12 @@ total-displacement linear solver. It:
 - supports segregated implicit and PETSc SNES solution paths;
 - can also solve pressure when requested, but only through the PETSc SNES
   path;
-- uses the selected mechanical law to compute stress.
+- uses the selected mechanical law to compute stress;
+- adds `fvOptions` sources, for example a manufactured body force, to the
+  momentum equation of both solution paths on OpenFOAM.com. The source is per
+  unit reference volume. On OpenFOAM.org and foam-extend a derived model can
+  supply the same source through the protected `fvOptionsSource()` function,
+  as the hyperelasticity `manufacturedSolution` tutorial does.
 
 The model is appropriate when deformation is large enough that linear geometry
 is not valid.
@@ -68,7 +73,6 @@ The following `solidModel` options are particularly relevant here:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `writeResidualField` | `false` | Writes a residual field during output |
@@ -114,7 +118,6 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     nCorrectors          10000;
     solutionTolerance    1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance    1e-05;
     infoFrequency        100;
 
     restart              false;
@@ -227,7 +230,7 @@ are:
 - geometry is evaluated in the reference configuration;
 - `D` is the primary variable;
 - `F`, `Finv`, and `J` are updated from `grad(D)`;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver supports segregated implicit and PETSc SNES paths only.
 
 The class inherits from `solidModel` and `foamPetscSnesHelper`.

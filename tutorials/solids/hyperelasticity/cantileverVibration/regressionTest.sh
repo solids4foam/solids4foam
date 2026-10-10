@@ -4,137 +4,185 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-CASE_DIR="${REGRESSION_ROOT}/main"
-SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+source "${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
-if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
-    source "${SOLIDS4FOAM_SCRIPTS}"
-fi
-
-# ============================================================
-# cantileverVibration regression test
-#
-# Checks the peak magnitude of the tip displacement over the run (one full
-# oscillation, 0 <= t <= 0.65 s), taken from column 5 (magD) of
-# postProcessing/0/solidPointDisplacement_pointDisp.dat.
-#
-# The peak is used rather than the final-time value because, at the end of
-# the period, the tip is close to its undeformed position: the final value is
-# small and very sensitive to small phase errors, whereas the peak amplitude is
-# a well-conditioned measure of the dynamic, geometrically nonlinear response.
-#
-# Measured with the default petscSnes approach (6 x 6 x 60 mesh,
-# deltaT = 0.005 s, OpenFOAM-v2512): peak = 2.7247 m at t = 0.31 s.
-# The Abaqus (C3D8) reference peak is 2.8007 m at t = 0.318 s (see
-# reference/abaqusC3D8.dat); the tutorial mesh is a coarse demonstration
-# mesh, so the band below is based on the measured solids4foam values, not
-# on the Abaqus value. The peak varies slightly between OpenFOAM versions (v2512: 2.7247 m,
-# foam-extend-4.1: 2.7404 m, OpenFOAM-9: 2.7556 m), so the band covers all
-# three with a margin of approximately 0.9%.
-# ============================================================
-
+# Check one full oscillation for BDF2, trapezoidal Newmark and Bossak-Newmark.
+# The coarse-mesh peak is close to 2.725 m for all three schemes on v2512.
+# The BDF2 peaks on foam-extend-4.1 and OpenFOAM-9 are 2.7404 and 2.7556 m.
+# Keep the existing cross-version amplitude band; the operator check also
+# verifies the selected scheme and its physical/weighted accelerations.
 PEAK_MIN=2.70
 PEAK_MAX=2.78
-
-SOLVER_LOGFILE="log.solids4Foam"
-ALLRUN_LOGFILE="log.Allrun"
-
-echo "============================================================"
-echo "cantileverVibration regression test"
-echo "Peak tip displacement magnitude in [${PEAK_MIN}, ${PEAK_MAX}] m"
-echo "============================================================"
-echo
-
-prepare_case() {
-    rm -rf "${CASE_DIR}"
-    mkdir -p "${CASE_DIR}"
-
-    for item in "${SCRIPT_DIR}"/*; do
-        base_item=$(basename "${item}")
-        if [[ "${base_item}" == "regressionTests" ]]; then
-            continue
-        fi
-        cp -a "${item}" "${CASE_DIR}/"
-    done
-}
-
+END_TIME=0.65
+SCHEMES=(bdf2 newmark bossak)
 CHECK_ONLY=false
 
 for arg in "$@"; do
     case "$arg" in
-        --check-only|--no-run)
-            CHECK_ONLY=true
+        --check-only|--no-run) CHECK_ONLY=true ;;
+        *) echo "Unknown argument: $arg"; exit 1 ;;
+    esac
+done
+
+prepare_case() {
+    local case_dir="$1"
+    rm -rf "$case_dir"
+    mkdir -p "$case_dir"
+    cp -a "${SCRIPT_DIR}/0" "${SCRIPT_DIR}/constant" \
+        "${SCRIPT_DIR}/system" "${SCRIPT_DIR}/reference" \
+        "${SCRIPT_DIR}/Allrun" "${SCRIPT_DIR}/Allclean" \
+        "${SCRIPT_DIR}/plot.gnuplot" "$case_dir/"
+}
+
+failures=0
+for scheme in "${SCHEMES[@]}"; do
+    case_dir="${REGRESSION_ROOT}/${scheme}"
+    echo "============================================================"
+    echo "cantileverVibration: ${scheme} (PETSc SNES)"
+    echo "Peak tip displacement magnitude in [${PEAK_MIN}, ${PEAK_MAX}] m"
+
+    if [ "$CHECK_ONLY" = false ]; then
+        prepare_case "$case_dir"
+        if ! (cd "$case_dir" && ./Allclean > /dev/null 2>&1 \
+            && ./Allrun petscSnes "$scheme" > log.Allrun 2>&1)
+        then
+            echo "FAIL: Allrun failed; see ${case_dir}/log.Allrun"
+            failures=$((failures + 1))
+            continue
+        fi
+    fi
+
+    if solids4Foam::regressionCaseSkipped "${case_dir}/log.Allrun"; then
+        echo "Skipping regression checks: tutorial skipped in this environment"
+        exit 0
+    fi
+
+    solver_log="${case_dir}/log.solids4Foam"
+    if [[ ! -f "$solver_log" ]] \
+        || grep -Eq 'FOAM FATAL|^ERROR$|\[stack trace\]' "$solver_log" \
+        || ! grep -q '^End' "$solver_log"
+    then
+        echo "FAIL: solids4Foam did not complete; see ${solver_log}"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    disp_file="${case_dir}/postProcessing/0/solidPointDisplacement_pointDisp.dat"
+    if [[ ! -s "$disp_file" ]]; then
+        echo "FAIL: Missing point displacement output"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    if ! awk -v end="$END_TIME" '
+        !/^#/ && NF >= 5 {t = $1; n++}
+        END {exit !(n && t >= end - 1e-10)}' "$disp_file"
+    then
+        echo "FAIL: Displacement history does not reach ${END_TIME} s"
+        failures=$((failures + 1))
+        continue
+    fi
+
+    peak=$(awk '!/^#/ && NF >= 5 {if (!n++ || $5 > m) m = $5}
+        END {if (n) print m}' "$disp_file")
+    if awk -v peak="$peak" -v low="$PEAK_MIN" -v high="$PEAK_MAX" \
+        'BEGIN {exit !(peak >= low && peak <= high)}'
+    then
+        echo "PASS: Peak tip displacement = ${peak} m"
+    else
+        echo "FAIL: Peak tip displacement = ${peak} m"
+        failures=$((failures + 1))
+    fi
+
+    # Use the same mesh and scheme dictionaries for the operator-level test.
+    # Its manufactured displacement does not read or change the solver fields.
+    if [ "$CHECK_ONLY" = false ]; then
+        if ! (cd "$case_dir" && Test-fvcD2dt2 > log.Test-fvcD2dt2 2>&1); then
+            echo "FAIL: Test-fvcD2dt2; see ${case_dir}/log.Test-fvcD2dt2"
+            failures=$((failures + 1))
+            continue
+        fi
+    fi
+    case "$scheme" in
+        bdf2) selected='Selected d2dt2 scheme: backward' ;;
+        newmark) selected='Selected d2dt2 scheme: NewmarkBeta beta=0.25 gamma=0.5 alphaM=0' ;;
+        bossak) selected='Selected d2dt2 scheme: NewmarkBeta beta=0.3025 gamma=0.6 alphaM=-0.1' ;;
+    esac
+    if grep -Fxq "$selected" "${case_dir}/log.Test-fvcD2dt2" \
+        && grep -q '^Test-fvcD2dt2: PASSED' "${case_dir}/log.Test-fvcD2dt2"
+    then
+        echo "PASS: ${scheme} inertia and physical-acceleration checks"
+    else
+        echo "FAIL: Missing operator-test success or incorrect time scheme"
+        failures=$((failures + 1))
+    fi
+
+    # newmark selects NewmarkBeta in d2dt2Schemes only, so the linear
+    # predictor reports that it uses the ddtSchemes default; bossak also has
+    # the optional matching ddtSchemes entry, so it does not
+    predictor_note='uses the ddtSchemes scheme backward'
+    case "$scheme" in
+        newmark)
+            if grep -Fq "$predictor_note" "$solver_log"; then
+                echo "PASS: d2dt2Schemes-only NewmarkBeta accepted"
+            else
+                echo "FAIL: Missing the ddtSchemes predictor note"
+                failures=$((failures + 1))
+            fi
             ;;
-        *)
+        bossak)
+            if ! grep -Fq "$predictor_note" "$solver_log"; then
+                echo "PASS: Matching ddtSchemes NewmarkBeta entry accepted"
+            else
+                echo "FAIL: The matching ddtSchemes entry was not used"
+                failures=$((failures + 1))
+            fi
             ;;
     esac
 done
 
+# A NewmarkBeta ddtSchemes entry whose coefficients differ from d2dt2Schemes
+# must stop with a fatal error, as the two would advance the same stored
+# state. Test-fvcD2dt2 calls fvm::d2dt2, which makes the check, on the bossak
+# mesh with trapezoidal coefficients in ddtSchemes
+mismatch_dir="${REGRESSION_ROOT}/mismatch"
+mismatch_log="${mismatch_dir}/log.Test-fvcD2dt2"
+echo "============================================================"
+echo "cantileverVibration: mismatched NewmarkBeta coefficients"
+
 if [ "$CHECK_ONLY" = false ]; then
-    prepare_case
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
-else
-    echo "Running in check-only mode: skipping Allclean and Allrun"
+    rm -rf "$mismatch_dir"
+    mkdir -p "$mismatch_dir/system"
+    cp -a "${REGRESSION_ROOT}/bossak/constant" "$mismatch_dir/"
+    cp -a "${SCRIPT_DIR}/system/controlDict" \
+        "${SCRIPT_DIR}/system/fvSolution.petscSnes" "$mismatch_dir/system/"
+    mv "$mismatch_dir/system/fvSolution.petscSnes" \
+        "$mismatch_dir/system/fvSolution"
+    awk '
+        /^ddtSchemes/ {inDdt = 1}
+        inDdt && /NewmarkBeta/ {sub(/NewmarkBeta.*;/, "NewmarkBeta 0.25 0.5;")}
+        inDdt && /^}/ {inDdt = 0}
+        {print}' "${SCRIPT_DIR}/system/fvSchemes.bossak" \
+        > "$mismatch_dir/system/fvSchemes"
+
+    if (cd "$mismatch_dir" && Test-fvcD2dt2 > log.Test-fvcD2dt2 2>&1); then
+        echo "FAIL: Test-fvcD2dt2 ran with mismatched coefficients"
+        failures=$((failures + 1))
+    fi
 fi
 
-if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-    echo "Skipping regression checks because the tutorial skipped in this environment"
-    exit 0
-fi
-
-failures=0
-
-# The Allrun script can exit successfully even if the solver fails, so check
-# the solver log directly
-solver_log="${CASE_DIR}/${SOLVER_LOGFILE}"
-if [[ ! -f "${solver_log}" ]]; then
-    echo "FAIL: Could not find ${SOLVER_LOGFILE}"
-    failures=$((failures + 1))
-elif grep -Eq 'FOAM FATAL|^ERROR$|\[stack trace\]' "${solver_log}" \
-    || ! grep -q '^End' "${solver_log}"
+if [[ -f "$mismatch_log" ]] \
+    && grep -q 'selects it with different coefficients' "$mismatch_log"
 then
-    echo "FAIL: solids4Foam did not complete successfully"
-    failures=$((failures + 1))
+    echo "PASS: Mismatched coefficients stop with a fatal error"
 else
-    echo "PASS: solids4Foam completed"
-fi
-
-disp_file=$(find "${CASE_DIR}/postProcessing" \
-    -name 'solidPointDisplacement_pointDisp.dat' -print 2>/dev/null | tail -n 1)
-
-if [[ -z "${disp_file}" ]]; then
-    echo "FAIL: Could not find point displacement output"
-    exit 1
-fi
-
-peak=$(awk '!/^#/ && NF >= 5 {if (!n++ || $5 > m) {m = $5; t = $1}} END {if (n) print m}' "${disp_file}")
-peak_time=$(awk '!/^#/ && NF >= 5 {if (!n++ || $5 > m) {m = $5; t = $1}} END {if (n) print t}' "${disp_file}")
-
-if [[ -z "${peak}" ]]; then
-    echo "FAIL: Could not extract the peak tip displacement"
-    exit 1
-fi
-
-if awk "BEGIN {exit !(${peak} >= ${PEAK_MIN} && ${peak} <= ${PEAK_MAX})}"; then
-    printf "PASS: Peak tip displacement = %.6g m at t = %s s\n" "${peak}" "${peak_time}"
-else
-    printf "FAIL: Peak tip displacement = %.6g m at t = %s s\n" "${peak}" "${peak_time}"
+    echo "FAIL: No mismatched-coefficient error; see ${mismatch_log}"
     failures=$((failures + 1))
 fi
 
-if [ "$CHECK_ONLY" = false ]; then
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-fi
-
-echo
 if (( failures == 0 )); then
-    echo "============================================================"
     echo "Regression test PASSED"
-    echo "============================================================"
-    exit 0
 else
-    echo "============================================================"
     echo "Regression test FAILED (${failures} checks)"
-    echo "============================================================"
     exit 1
 fi

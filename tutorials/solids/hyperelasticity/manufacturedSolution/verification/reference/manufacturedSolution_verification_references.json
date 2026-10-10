@@ -1,0 +1,282 @@
+{
+  "spatial": {
+    "domain_length_m": 1.0,
+    "default_levels": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "default_variants": [
+      "hex-segregated",
+      "distHex-segregated",
+      "structTet-segregated",
+      "unstructTet-segregated",
+      "hex-petscSnes",
+      "distHex-petscSnes",
+      "structTet-petscSnes",
+      "unstructTet-petscSnes",
+      "hex-highOrder-movingLeastSquares",
+      "structTet-highOrder-movingLeastSquares",
+      "unstructTet-highOrder-movingLeastSquares",
+      "hex-highOrder-kExactLeastSquares",
+      "structTet-highOrder-kExactLeastSquares",
+      "unstructTet-highOrder-kExactLeastSquares"
+    ],
+    "variants": {
+      "hex-segregated": {
+        "mesh": "hex",
+        "approach": "segregated",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "distHex-segregated": {
+        "mesh": "distHex",
+        "approach": "segregated",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "structTet-segregated": {
+        "mesh": "structTet",
+        "approach": "segregated",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "unstructTet-segregated": {
+        "mesh": "unstructTet",
+        "approach": "segregated",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "hex-petscSnes": {
+        "mesh": "hex",
+        "approach": "petscSnes",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "distHex-petscSnes": {
+        "mesh": "distHex",
+        "approach": "petscSnes",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "structTet-petscSnes": {
+        "mesh": "structTet",
+        "approach": "petscSnes",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "unstructTet-petscSnes": {
+        "mesh": "unstructTet",
+        "approach": "petscSnes",
+        "minimum_net_order": {
+          "displacement": 1.5,
+          "stress": 0.5
+        }
+      },
+      "hex-highOrder-movingLeastSquares": {
+        "mesh": "hex",
+        "approach": "highOrder-movingLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.5,
+          "stress": 2.5
+        }
+      },
+      "structTet-highOrder-movingLeastSquares": {
+        "mesh": "structTet",
+        "approach": "highOrder-movingLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      },
+      "unstructTet-highOrder-movingLeastSquares": {
+        "mesh": "unstructTet",
+        "approach": "highOrder-movingLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      },
+      "hex-highOrder-kExactLeastSquares": {
+        "mesh": "hex",
+        "approach": "highOrder-kExactLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.5,
+          "stress": 2.5
+        }
+      },
+      "structTet-highOrder-kExactLeastSquares": {
+        "mesh": "structTet",
+        "approach": "highOrder-kExactLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      },
+      "unstructTet-highOrder-kExactLeastSquares": {
+        "mesh": "unstructTet",
+        "approach": "highOrder-kExactLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      }
+    },
+    "acceptance": {
+      "required_metrics": [
+        "displacement_l2_m",
+        "displacement_linf_m",
+        "stress_l2_pa",
+        "stress_linf_pa"
+      ]
+    }
+  },
+  "temporal": {
+    "mesh_divisions": 10,
+    "end_time_s": 0.05,
+    "default_time_steps": [
+      10,
+      20,
+      40,
+      80,
+      160,
+      320,
+      640
+    ],
+    "default_variants": [
+      "Euler-segregated",
+      "backward-segregated",
+      "NewmarkBeta-segregated",
+      "backward-petscSnes"
+    ],
+    "variants": {
+      "Euler-segregated": {
+        "scheme": "Euler",
+        "approach": "segregated",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 1,
+        "minimum_order": 0.8
+      },
+      "Euler-segregated-cosine": {
+        "scheme": "Euler",
+        "approach": "segregated",
+        "mesh": "hex",
+        "time_function": "cosine",
+        "nominal_order": 1,
+        "minimum_order": 0.6
+      },
+      "Euler-petscSnes": {
+        "scheme": "Euler",
+        "approach": "petscSnes",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 1,
+        "minimum_order": 0.8
+      },
+      "Euler-petscSnes-cosine": {
+        "scheme": "Euler",
+        "approach": "petscSnes",
+        "mesh": "hex",
+        "time_function": "cosine",
+        "nominal_order": 1,
+        "minimum_order": 0.6
+      },
+      "backward-segregated": {
+        "scheme": "backward",
+        "approach": "segregated",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      },
+      "backward-segregated-cosine": {
+        "scheme": "backward",
+        "approach": "segregated",
+        "mesh": "hex",
+        "time_function": "cosine",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      },
+      "backward-petscSnes": {
+        "scheme": "backward",
+        "approach": "petscSnes",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      },
+      "backward-petscSnes-cosine": {
+        "scheme": "backward",
+        "approach": "petscSnes",
+        "mesh": "hex",
+        "time_function": "cosine",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      },
+      "NewmarkBeta-segregated": {
+        "scheme": "NewmarkBeta",
+        "approach": "segregated",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      },
+      "NewmarkBeta-segregated-cosine": {
+        "scheme": "NewmarkBeta",
+        "approach": "segregated",
+        "mesh": "hex",
+        "time_function": "cosine",
+        "nominal_order": 1,
+        "minimum_order": 0.8
+      },
+      "NewmarkBeta-petscSnes": {
+        "scheme": "NewmarkBeta",
+        "approach": "petscSnes",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      },
+      "NewmarkBeta-petscSnes-cosine": {
+        "scheme": "NewmarkBeta",
+        "approach": "petscSnes",
+        "mesh": "hex",
+        "time_function": "cosine",
+        "nominal_order": 1,
+        "minimum_order": 0.8
+      },
+      "backward-highOrder-movingLeastSquares": {
+        "scheme": "backward",
+        "approach": "highOrder-movingLeastSquares",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      },
+      "backward-highOrder-kExactLeastSquares": {
+        "scheme": "backward",
+        "approach": "highOrder-kExactLeastSquares",
+        "mesh": "hex",
+        "time_function": "cosineSquared",
+        "nominal_order": 2,
+        "minimum_order": 1.5
+      }
+    }
+  }
+}

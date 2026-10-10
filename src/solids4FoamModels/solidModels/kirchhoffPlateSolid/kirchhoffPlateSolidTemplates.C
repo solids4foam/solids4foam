@@ -69,7 +69,7 @@ mapAreaFieldToSingleLayerVolumeField
     // 2. Next, we map to the vf internal field
 
     {
-        const unallocLabelList& faceCells = areaPatch().faceCells();
+        const labelUList& faceCells = areaPatch().faceCells();
         const Field<Type>& patchField = vf.boundaryField()[areaPatchID];
 
         forAll(faceCells, faceI)
@@ -82,7 +82,7 @@ mapAreaFieldToSingleLayerVolumeField
     // 3. Finally, we map to the areaShadowPatch
 
     {
-        const unallocLabelList& faceCells = areaShadowPatch().faceCells();
+        const labelUList& faceCells = areaShadowPatch().faceCells();
         Field<Type>& patchField =
             boundaryFieldRef(vf)[areaShadowPatch().index()];
 

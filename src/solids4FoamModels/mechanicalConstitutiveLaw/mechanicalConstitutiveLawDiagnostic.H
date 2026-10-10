@@ -137,16 +137,6 @@ public:
         {
             return op_;
         }
-
-        //- The value that leaves a combination unchanged
-        scalar identity() const
-        {
-            // Both quantities reported so far are non-negative, so zero is
-            // the identity for each. A signed quantity that had to be
-            // maximised would need -VGREAT here instead, and would have to
-            // say so rather than inherit this
-            return 0.0;
-        }
 };
 
 
