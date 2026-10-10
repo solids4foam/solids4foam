@@ -115,7 +115,8 @@ def case_name(level: int, delta_t: float, tag: str = "") -> str:
 
 
 def build_case(level: int, delta_t: float, duration: float, cores: int,
-               tag: str = "") -> Path:
+               tag: str = "", plate_bc: str | None = None,
+               extra_functions: str = "") -> Path:
     source = WORK_ROOT / cfd3_case_name(level, delta_t)
     if not (source / "25").is_dir():
         driver.fail(f"{source} has no developed state at 25 s")
@@ -140,7 +141,7 @@ def build_case(level: int, delta_t: float, duration: float, cores: int,
     beta, sigma = MODES[MODE]
     code = BC_CODE % dict(A=AMPLITUDE, f=FREQUENCY, t0=START, ramp=RAMP,
                           xr=X_ROOT, xt=X_TIP, beta=repr(beta), sigma=repr(sigma))
-    plate = ("plate\n    {\n        type            codedFixedValue;\n"
+    plate = plate_bc or ("plate\n    {\n        type            codedFixedValue;\n"
              "        value           uniform (0 0 0);\n"
              "        name            plateBendingMode%d;" % MODE + "\n"
              "        code\n        #{" + code + "        #};\n    }")
@@ -184,7 +185,7 @@ def build_case(level: int, delta_t: float, duration: float, cores: int,
         "functions\n{\n"
         + template % dict(name="forces", patches="(plate cylinder)")
         + template % dict(name="forcesPlate", patches="(plate)")
-        + generalised + "}\n")
+        + generalised + extra_functions + "}\n")
     driver.replace_entry(case / "system/decomposeParDict", "numberOfSubdomains", str(cores))
     return case
 

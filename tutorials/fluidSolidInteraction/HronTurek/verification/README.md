@@ -858,3 +858,28 @@ five-period windows as the noise level; the matched (1x/2x/4x with
 `dt = 1e-3/5e-4/2.5e-4`) and fixed-`dt` (`2.5e-4`) paths are written to
 `postProcessing/ale_study.json` and two CSV files (compact copies and 2 s
 histories in `reference/ale/`).
+
+## Coupled-trajectory replay (fluid only)
+
+Replays the flag motion of a coupled FSI3 run on the CFD3 fluid meshes, with no
+solid and no coupling, to compare the fluid load on 1x/2x/4x for the same
+motion.
+
+```bash
+# 1. restart a completed FSI3 run (default fluid 2x / solid 2x, t = 7 s) for 1.2 s and
+#    record the plate-patch point positions at every step
+python3 scripts/hron_turek_replay_source.py --run iqnils_mesh_2x --cores 8 --duration 1.2
+# 2. fit the last five periods (mean + 4 harmonics per point), interpolate along the
+#    flag surface to the target mesh, build and run the replay case
+python3 scripts/hron_turek_replay.py --level 4 --delta-t 0.00025 --cores 24 --duration 8
+python3 scripts/replay_analysis.py
+```
+
+The restart uses `restart no` in the solid coefficients, which is valid for the
+total-Lagrangian St. Venant-Kirchhoff plate; the replay of the 2x trajectory on
+the 2x mesh reproduces the coupled total forces to 0.2-0.5%. The replay runs
+from the developed rigid CFD3 state (`cfd3_<level>x_dt<dt>`, 25 s), ramps the
+motion in over 1 s, and runs to 33 s. `replay_analysis.py` splits the first
+harmonic of the force on the flag and on cylinder + flag into the parts in
+phase with the tip displacement and velocity, and gives the pressure work per
+cycle on the flag. Compact results and 2 s histories: `reference/replay/`.

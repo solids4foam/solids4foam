@@ -1,0 +1,980 @@
+{
+  "runs": {
+    "ale_1x_dt0.001_replay": {
+      "level": 1,
+      "delta_t": 0.001,
+      "frequency_hz": 5.523578239779732,
+      "runtime_s": 680.6,
+      "cores": 1,
+      "core_hours": 0.18905555555555556,
+      "total_drag_mean": 464.79706777149363,
+      "total_drag_amp1": 1.5018155811851488,
+      "total_drag_amp2": 26.000626431219697,
+      "total_drag_inphase": 1.3727823038860059,
+      "total_drag_quad": -0.6090310222212956,
+      "total_drag_unlocked": 0.005704693020042506,
+      "total_drag_amp1_change_prev": 0.4208216501176747,
+      "total_drag_mean_change_prev": 0.8872838202289017,
+      "total_lift_mean": 5.153134875403176,
+      "total_lift_amp1": 138.91541282082048,
+      "total_lift_amp2": 5.370905934855429,
+      "total_lift_inphase": -101.72189251770853,
+      "total_lift_quad": 94.60522449523988,
+      "total_lift_unlocked": 0.0002695349617944931,
+      "total_lift_amp1_change_prev": 0.825110764305208,
+      "total_lift_mean_change_prev": -0.2932962378435029,
+      "total_drag_p_mean": 414.4961140993277,
+      "total_drag_p_amp1": 1.362573943989517,
+      "total_drag_p_amp2": 21.735159960689618,
+      "total_drag_p_inphase": 1.2967198444200545,
+      "total_drag_p_quad": -0.4184798656164688,
+      "total_drag_p_unlocked": 0.0035417538410140725,
+      "total_drag_p_amp1_change_prev": 0.4951266289745807,
+      "total_drag_p_mean_change_prev": 0.6443899907127388,
+      "total_lift_p_mean": 5.616943683704411,
+      "total_lift_p_amp1": 139.86283365626448,
+      "total_lift_p_amp2": 5.346099335605822,
+      "total_lift_p_inphase": -103.81458601456607,
+      "total_lift_p_quad": 93.72376416354696,
+      "total_lift_p_unlocked": 0.00030043908295862565,
+      "total_lift_p_amp1_change_prev": 0.9214223002652773,
+      "total_lift_p_mean_change_prev": -0.2934473954964414,
+      "plate_drag_mean": -13.477280985197373,
+      "plate_drag_amp1": 1.2823565144474454,
+      "plate_drag_amp2": 23.933116082787137,
+      "plate_drag_inphase": 1.183194618699431,
+      "plate_drag_quad": -0.4944580107820169,
+      "plate_drag_unlocked": 0.0,
+      "plate_drag_amp1_change_prev": 0.008677959332016094,
+      "plate_drag_mean_change_prev": 0.34828923474693063,
+      "plate_lift_mean": 6.305863603412242,
+      "plate_lift_amp1": 176.1288966769865,
+      "plate_lift_amp2": 4.227967624953563,
+      "plate_lift_inphase": -174.01338045938977,
+      "plate_lift_quad": 27.216385978822593,
+      "plate_lift_unlocked": 0.001308251854475695,
+      "plate_lift_amp1_change_prev": 0.8116727077608061,
+      "plate_lift_mean_change_prev": -0.3410788105809397,
+      "plate_drag_p_mean": 17.955595338522148,
+      "plate_drag_p_amp1": 1.1318444938544618,
+      "plate_drag_p_amp2": 19.58338539111501,
+      "plate_drag_p_inphase": 1.082528238354572,
+      "plate_drag_p_quad": -0.330461149658489,
+      "plate_drag_p_unlocked": 0.00040402071875522694,
+      "plate_drag_p_amp1_change_prev": 0.06469314662365333,
+      "plate_drag_p_mean_change_prev": 0.19477449769823707,
+      "plate_lift_p_mean": 6.413960439045992,
+      "plate_lift_p_amp1": 173.81157839934906,
+      "plate_lift_p_amp2": 4.2030604878095845,
+      "plate_lift_p_inphase": -171.68526419182623,
+      "plate_lift_p_quad": 27.10414811529594,
+      "plate_lift_p_unlocked": 0.0013412063130283647,
+      "plate_lift_p_amp1_change_prev": 0.8978955732469842,
+      "plate_lift_p_mean_change_prev": -0.3396671242817595,
+      "work_per_cycle": -2.0768227341261882,
+      "work_per_cycle_change_prev": 0.019969631813516256
+    },
+    "ale_2x_dt0.0005_replay": {
+      "level": 2,
+      "delta_t": 0.0005,
+      "frequency_hz": 5.523578239779732,
+      "runtime_s": 2420.27,
+      "cores": 8,
+      "core_hours": 5.378377777777778,
+      "total_drag_mean": 459.446847752834,
+      "total_drag_amp1": 2.5178366923192677,
+      "total_drag_amp2": 25.742451811592886,
+      "total_drag_inphase": 2.4540039413889656,
+      "total_drag_quad": -0.5633527002124457,
+      "total_drag_unlocked": 0.004194815101762117,
+      "total_drag_amp1_change_prev": 0.4525675807049576,
+      "total_drag_mean_change_prev": 0.44437096720878344,
+      "total_lift_mean": 4.352300078458682,
+      "total_lift_amp1": 166.93157716068038,
+      "total_lift_amp2": 3.765050484289055,
+      "total_lift_inphase": -82.62888236755416,
+      "total_lift_quad": 145.046955335302,
+      "total_lift_unlocked": 0.0,
+      "total_lift_amp1_change_prev": -0.04986326517231987,
+      "total_lift_mean_change_prev": -0.4081578187595145,
+      "total_drag_p_mean": 407.2257865977685,
+      "total_drag_p_amp1": 2.2147160756763444,
+      "total_drag_p_amp2": 19.238593847965035,
+      "total_drag_p_inphase": 2.193766037799057,
+      "total_drag_p_quad": -0.30390437189789676,
+      "total_drag_p_unlocked": 0.0025797338149775584,
+      "total_drag_p_amp1_change_prev": 0.43596181479863927,
+      "total_drag_p_mean_change_prev": 0.35287782806187806,
+      "total_lift_p_mean": 4.729023196074354,
+      "total_lift_p_amp1": 166.2263825891243,
+      "total_lift_p_amp2": 3.7502519322745598,
+      "total_lift_p_inphase": -85.10951264536864,
+      "total_lift_p_quad": 142.7850871972762,
+      "total_lift_p_unlocked": 0.0,
+      "total_lift_p_amp1_change_prev": -0.011662401669269684,
+      "total_lift_p_mean_change_prev": -0.40858382961049244,
+      "plate_drag_mean": -16.229168830688884,
+      "plate_drag_amp1": 2.039122437351125,
+      "plate_drag_amp2": 23.43044126901806,
+      "plate_drag_inphase": 2.0107041005170743,
+      "plate_drag_quad": -0.33924819037486065,
+      "plate_drag_unlocked": 0.0,
+      "plate_drag_amp1_change_prev": 0.03691895421144675,
+      "plate_drag_mean_change_prev": 0.17088823750980353,
+      "plate_lift_mean": 5.096544426088964,
+      "plate_lift_amp1": 178.7189800651963,
+      "plate_lift_amp2": 2.9771883219809276,
+      "plate_lift_inphase": -162.23117341481716,
+      "plate_lift_quad": 74.97679779768906,
+      "plate_lift_unlocked": 0.000534078988651987,
+      "plate_lift_amp1_change_prev": 0.7631365990259553,
+      "plate_lift_mean_change_prev": -0.3621156711261939,
+      "plate_drag_p_mean": 16.811749643719896,
+      "plate_drag_p_amp1": 1.7264710632952238,
+      "plate_drag_p_amp2": 16.854353623389436,
+      "plate_drag_p_inphase": 1.7229694731958543,
+      "plate_drag_p_quad": -0.10990235134400649,
+      "plate_drag_p_unlocked": 0.0002572079072515887,
+      "plate_drag_p_amp1_change_prev": 0.07167653586799072,
+      "plate_drag_p_mean_change_prev": 0.12777241011893636,
+      "plate_lift_p_mean": 5.133538160963682,
+      "plate_lift_p_amp1": 176.01319210809444,
+      "plate_lift_p_amp2": 2.9587542676146925,
+      "plate_lift_p_inphase": -159.9427716360528,
+      "plate_lift_p_quad": 73.4775720710641,
+      "plate_lift_p_unlocked": 0.000552757529707737,
+      "plate_lift_p_amp1_change_prev": 0.7815900180521282,
+      "plate_lift_p_mean_change_prev": -0.3648830055319996,
+      "work_per_cycle": -0.13002250732127868,
+      "work_per_cycle_change_prev": 0.022526063706940515
+    },
+    "ale_4x_dt0.00025_replay": {
+      "level": 4,
+      "delta_t": 0.00025,
+      "frequency_hz": 5.523578239779732,
+      "runtime_s": 21009.8,
+      "cores": 24,
+      "core_hours": 140.0653333333333,
+      "total_drag_mean": 456.01345888823056,
+      "total_drag_amp1": 2.6003648014887193,
+      "total_drag_amp2": 26.167956531613992,
+      "total_drag_inphase": 2.5556947754524506,
+      "total_drag_quad": -0.47991803002858363,
+      "total_drag_unlocked": 0.0,
+      "total_drag_amp1_change_prev": 0.41621212104934235,
+      "total_drag_mean_change_prev": 0.3341459675820033,
+      "total_lift_mean": 4.880823629848837,
+      "total_lift_amp1": 168.36913836129247,
+      "total_lift_amp2": 3.8203992834877503,
+      "total_lift_inphase": -49.241733462727716,
+      "total_lift_quad": 161.0075105021804,
+      "total_lift_unlocked": 0.0,
+      "total_lift_amp1_change_prev": -0.07704374809469527,
+      "total_lift_mean_change_prev": -0.019291248051145793,
+      "total_drag_p_mean": 402.8231899901237,
+      "total_drag_p_amp1": 2.1962064845338563,
+      "total_drag_p_amp2": 19.20186773830361,
+      "total_drag_p_inphase": 2.182916001742057,
+      "total_drag_p_quad": -0.24124811304346655,
+      "total_drag_p_unlocked": 0.0,
+      "total_drag_p_amp1_change_prev": 0.38708227017689567,
+      "total_drag_p_mean_change_prev": 0.28158570337683386,
+      "total_lift_p_mean": 5.23005717036276,
+      "total_lift_p_amp1": 167.12847476808892,
+      "total_lift_p_amp2": 3.794298206148173,
+      "total_lift_p_inphase": -52.563882541309304,
+      "total_lift_p_quad": 158.6472985288157,
+      "total_lift_p_unlocked": 0.0,
+      "total_lift_p_amp1_change_prev": -0.0670464951171823,
+      "total_lift_p_mean_change_prev": -0.02355200621112008,
+      "plate_drag_mean": -18.444869602830284,
+      "plate_drag_amp1": 2.0643834019485046,
+      "plate_drag_amp2": 23.721076137593702,
+      "plate_drag_inphase": 2.064249015658341,
+      "plate_drag_quad": -0.023554863490459963,
+      "plate_drag_unlocked": 0.0,
+      "plate_drag_amp1_change_prev": -0.011979077154878226,
+      "plate_drag_mean_change_prev": 0.06449464315821274,
+      "plate_lift_mean": 5.424321273775965,
+      "plate_lift_amp1": 164.0264372040987,
+      "plate_lift_amp2": 3.001239690852285,
+      "plate_lift_inphase": -135.48204477472365,
+      "plate_lift_quad": 92.4623579924821,
+      "plate_lift_unlocked": 0.0,
+      "plate_lift_amp1_change_prev": 0.3341309448331913,
+      "plate_lift_mean_change_prev": -0.06635136388805929,
+      "plate_drag_p_mean": 13.963845044491125,
+      "plate_drag_p_amp1": 1.7077773659606648,
+      "plate_drag_p_amp2": 16.731841063768144,
+      "plate_drag_p_inphase": 1.6962816378361154,
+      "plate_drag_p_quad": 0.19781844410360816,
+      "plate_drag_p_unlocked": 0.0,
+      "plate_drag_p_amp1_change_prev": 0.021257759645648244,
+      "plate_drag_p_mean_change_prev": 0.0595681912550976,
+      "plate_lift_p_mean": 5.445411678737518,
+      "plate_lift_p_amp1": 161.629447020526,
+      "plate_lift_p_amp2": 2.9711872101314345,
+      "plate_lift_p_inphase": -133.80399220660536,
+      "plate_lift_p_quad": 90.6673580387987,
+      "plate_lift_p_unlocked": 0.0,
+      "plate_lift_p_amp1_change_prev": 0.3367149978474515,
+      "plate_lift_p_mean_change_prev": -0.06860716536368816,
+      "work_per_cycle": -0.08003302723496328,
+      "work_per_cycle_change_prev": 0.013818053270913098
+    },
+    "ale_1x_dt0.00025_replay": {
+      "level": 1,
+      "delta_t": 0.00025,
+      "frequency_hz": 5.523578239779732,
+      "runtime_s": 1232.64,
+      "cores": 2,
+      "core_hours": 0.6848000000000001,
+      "total_drag_mean": 464.85316688548716,
+      "total_drag_amp1": 1.5835145814457843,
+      "total_drag_amp2": 27.199572573118786,
+      "total_drag_inphase": 1.521982592366412,
+      "total_drag_quad": -0.4371354689167123,
+      "total_drag_unlocked": 0.0006205637931566699,
+      "total_drag_amp1_change_prev": 0.3731073292796929,
+      "total_drag_mean_change_prev": 0.5377646223324746,
+      "total_lift_mean": 11.206209152291963,
+      "total_lift_amp1": 140.27203781066916,
+      "total_lift_amp2": 4.226986064384514,
+      "total_lift_inphase": -112.59869035224166,
+      "total_lift_quad": 83.65273170983602,
+      "total_lift_unlocked": 0.0005588331829500248,
+      "total_lift_amp1_change_prev": 0.4904400508978881,
+      "total_lift_mean_change_prev": 0.38591450992765,
+      "total_drag_p_mean": 414.9666423837152,
+      "total_drag_p_amp1": 1.3985189755538785,
+      "total_drag_p_amp2": 22.446745182548796,
+      "total_drag_p_inphase": 1.3796007208759358,
+      "total_drag_p_quad": -0.22925351893235585,
+      "total_drag_p_unlocked": 0.0007249748714928117,
+      "total_drag_p_amp1_change_prev": 0.368511273366642,
+      "total_drag_p_mean_change_prev": 0.3972551283682719,
+      "total_lift_p_mean": 11.573442950260263,
+      "total_lift_p_amp1": 140.72334122317346,
+      "total_lift_p_amp2": 4.2078360408101245,
+      "total_lift_p_inphase": -114.08806956740634,
+      "total_lift_p_quad": 82.38307561263034,
+      "total_lift_p_unlocked": 0.0005656857478844035,
+      "total_lift_p_amp1_change_prev": 0.5443241955154008,
+      "total_lift_p_mean_change_prev": 0.3777295306418651,
+      "plate_drag_mean": -13.232389406988146,
+      "plate_drag_amp1": 1.2224100393953041,
+      "plate_drag_amp2": 25.011597738515945,
+      "plate_drag_inphase": 1.139618601693348,
+      "plate_drag_quad": -0.4422168552745669,
+      "plate_drag_unlocked": 0.00034089351908495047,
+      "plate_drag_amp1_change_prev": -0.0048548625838811255,
+      "plate_drag_mean_change_prev": 0.2670787348094148,
+      "plate_lift_mean": 10.469093304820689,
+      "plate_lift_amp1": 183.20770636023894,
+      "plate_lift_amp2": 3.164380545260379,
+      "plate_lift_inphase": -182.33966820526825,
+      "plate_lift_quad": 17.813171210433826,
+      "plate_lift_unlocked": 0.0005365929978421446,
+      "plate_lift_amp1_change_prev": 1.5808066440741015,
+      "plate_lift_mean_change_prev": 0.22292549028148834,
+      "plate_drag_p_mean": 18.797967314306156,
+      "plate_drag_p_amp1": 1.0361995553064502,
+      "plate_drag_p_amp2": 20.225049293984828,
+      "plate_drag_p_inphase": 1.006268607755891,
+      "plate_drag_p_quad": -0.24725089982102347,
+      "plate_drag_p_unlocked": 0.0005902292844007784,
+      "plate_drag_p_amp1_change_prev": 0.018699839269366025,
+      "plate_drag_p_mean_change_prev": 0.170055746736697,
+      "plate_lift_p_mean": 10.56995020243208,
+      "plate_lift_p_amp1": 180.39099000510123,
+      "plate_lift_p_amp2": 3.149195950031521,
+      "plate_lift_p_inphase": -179.55871424676695,
+      "plate_lift_p_quad": 17.308304742764914,
+      "plate_lift_p_unlocked": 0.0005551413280889816,
+      "plate_lift_p_amp1_change_prev": 1.6098011547403246,
+      "plate_lift_p_mean_change_prev": 0.22207409742810036,
+      "work_per_cycle": -1.874376696873419,
+      "work_per_cycle_change_prev": 0.005369560151427868
+    },
+    "ale_2x_dt0.00025_replay": {
+      "level": 2,
+      "delta_t": 0.00025,
+      "frequency_hz": 5.523578239779732,
+      "runtime_s": 3804.12,
+      "cores": 8,
+      "core_hours": 8.4536,
+      "total_drag_mean": 459.5054454721728,
+      "total_drag_amp1": 2.552922888371391,
+      "total_drag_amp2": 25.969422193348006,
+      "total_drag_inphase": 2.5051969712941142,
+      "total_drag_quad": -0.49132820903070884,
+      "total_drag_unlocked": 7.385577292950973e-05,
+      "total_drag_amp1_change_prev": 0.4334416018047631,
+      "total_drag_mean_change_prev": 0.4120081970988849,
+      "total_lift_mean": 6.0355141354554735,
+      "total_lift_amp1": 167.9065122330928,
+      "total_lift_amp2": 3.6388029589009343,
+      "total_lift_inphase": -81.74332424205673,
+      "total_lift_quad": 146.66501216084131,
+      "total_lift_unlocked": 0.0,
+      "total_lift_amp1_change_prev": -0.05543086366188277,
+      "total_lift_mean_change_prev": -0.06932707383348191,
+      "total_drag_p_mean": 407.43993606858555,
+      "total_drag_p_amp1": 2.2110964492954976,
+      "total_drag_p_amp2": 19.39173964670777,
+      "total_drag_p_inphase": 2.1991759317845005,
+      "total_drag_p_quad": -0.22928743783062402,
+      "total_drag_p_unlocked": 4.213290843091411e-05,
+      "total_drag_p_amp1_change_prev": 0.40934393289421345,
+      "total_drag_p_mean_change_prev": 0.33361463617632126,
+      "total_lift_p_mean": 6.397549967921523,
+      "total_lift_p_amp1": 167.09652704510543,
+      "total_lift_p_amp2": 3.630347157317686,
+      "total_lift_p_inphase": -84.15808934781919,
+      "total_lift_p_quad": 144.35603675586324,
+      "total_lift_p_unlocked": 0.0,
+      "total_lift_p_amp1_change_prev": -0.02285162388963613,
+      "total_lift_p_mean_change_prev": -0.07250442562231108,
+      "plate_drag_mean": -16.257209042581497,
+      "plate_drag_amp1": 1.901799214464466,
+      "plate_drag_amp2": 23.600019163563278,
+      "plate_drag_inphase": 1.8719590182843762,
+      "plate_drag_quad": -0.3355736670262653,
+      "plate_drag_unlocked": 0.0,
+      "plate_drag_amp1_change_prev": 0.0066388292493932965,
+      "plate_drag_mean_change_prev": 0.14307444602417974,
+      "plate_lift_mean": 6.337513470519934,
+      "plate_lift_amp1": 178.94302438114536,
+      "plate_lift_amp2": 2.8170190863487283,
+      "plate_lift_inphase": -161.68847241986754,
+      "plate_lift_quad": 76.66448891893118,
+      "plate_lift_unlocked": 8.550748764557525e-05,
+      "plate_lift_amp1_change_prev": 0.6823373839268925,
+      "plate_lift_mean_change_prev": -0.10578990672383703,
+      "plate_drag_p_mean": 16.935586562101545,
+      "plate_drag_p_amp1": 1.575803611692396,
+      "plate_drag_p_amp2": 16.985044626918643,
+      "plate_drag_p_inphase": 1.5732065052099569,
+      "plate_drag_p_quad": -0.09043403445536058,
+      "plate_drag_p_unlocked": 0.0,
+      "plate_drag_p_amp1_change_prev": 0.036846449158215444,
+      "plate_drag_p_mean_change_prev": 0.11235379245184163,
+      "plate_lift_p_mean": 6.380667846475288,
+      "plate_lift_p_amp1": 176.139272759638,
+      "plate_lift_p_amp2": 2.8078147980966652,
+      "plate_lift_p_inphase": -159.3225939831246,
+      "plate_lift_p_quad": 75.10895056371504,
+      "plate_lift_p_unlocked": 9.476394391461085e-05,
+      "plate_lift_p_amp1_change_prev": 0.6965797010213919,
+      "plate_lift_p_mean_change_prev": -0.1073962093959846,
+      "work_per_cycle": -0.07522273582793138,
+      "work_per_cycle_change_prev": 0.021995546557101942
+    }
+  },
+  "paths": {
+    "matched": {
+      "cases": [
+        "ale_1x_dt0.001_replay",
+        "ale_2x_dt0.0005_replay",
+        "ale_4x_dt0.00025_replay"
+      ],
+      "quantities": {
+        "work_per_cycle": {
+          "d21": 1.9468002268049096,
+          "d32": 0.0499894800863154,
+          "ratio": 0.025677765698824778,
+          "order": 5.283336515175136,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            -2.0768227341261882,
+            -0.13002250732127868,
+            -0.08003302723496328
+          ],
+          "noise": 0.022526063706940515,
+          "relative_change_pct": [
+            93.73935458309663,
+            38.44678980293317
+          ]
+        },
+        "plate_lift_amp1": {
+          "d21": 2.5900833882097913,
+          "d32": -14.692542861097593,
+          "ratio": -5.672613834743273,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            176.1288966769865,
+            178.7189800651963,
+            164.0264372040987
+          ],
+          "noise": 0.8116727077608061,
+          "relative_change_pct": [
+            1.4705612974797104,
+            -8.221031059900737
+          ]
+        },
+        "plate_lift_inphase": {
+          "d21": 11.782207044572601,
+          "d32": 26.749128640093517,
+          "ratio": 2.2702986408998247,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            -174.01338045938977,
+            -162.23117341481716,
+            -135.48204477472365
+          ],
+          "noise": 0.8116727077608061,
+          "relative_change_pct": [
+            6.770862685080854,
+            16.48827908782815
+          ]
+        },
+        "plate_lift_quad": {
+          "d21": 47.760411818866466,
+          "d32": 17.485560194793038,
+          "ratio": 0.3661099125591258,
+          "order": 1.4496512592228012,
+          "status": "monotone; sub-nominal (observed order below 1.5)",
+          "values": [
+            27.216385978822593,
+            74.97679779768906,
+            92.4623579924821
+          ],
+          "noise": 0.8116727077608061,
+          "relative_change_pct": [
+            175.48403324390475,
+            23.32129499845348
+          ]
+        },
+        "plate_drag_mean": {
+          "d21": -2.7518878454915114,
+          "d32": -2.2157007721413997,
+          "ratio": 0.8051566402938402,
+          "order": 0.31265861328557154,
+          "status": "monotone; sub-nominal (observed order below 1.5)",
+          "values": [
+            -13.477280985197373,
+            -16.229168830688884,
+            -18.444869602830284
+          ],
+          "noise": 0.34828923474693063,
+          "relative_change_pct": [
+            -20.41871686517494,
+            -13.652583168347935
+          ]
+        },
+        "plate_drag_amp1": {
+          "d21": 0.7567659229036796,
+          "d32": 0.025260964597379587,
+          "ratio": 0.033380156046739405,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            1.2823565144474454,
+            2.039122437351125,
+            2.0643834019485046
+          ],
+          "noise": 0.03691895421144675,
+          "relative_change_pct": [
+            59.013691931823075,
+            1.2388154891863317
+          ]
+        },
+        "plate_drag_amp2": {
+          "d21": -0.502674813769076,
+          "d32": 0.2906348685756406,
+          "ratio": -0.5781767071169702,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            23.933116082787137,
+            23.43044126901806,
+            23.721076137593702
+          ],
+          "noise": 0.03691895421144675,
+          "relative_change_pct": [
+            -2.100331657734294,
+            1.240415685042797
+          ]
+        },
+        "plate_lift_mean": {
+          "d21": -1.2093191773232785,
+          "d32": 0.32777684768700155,
+          "ratio": -0.27104246243122243,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            6.305863603412242,
+            5.096544426088964,
+            5.424321273775965
+          ],
+          "noise": 0.3621156711261939,
+          "relative_change_pct": [
+            -19.17769322934434,
+            6.43135466472396
+          ]
+        },
+        "total_lift_amp1": {
+          "d21": 28.0161643398599,
+          "d32": 1.4375612006120946,
+          "ratio": 0.051311849230082134,
+          "order": 4.28456416995589,
+          "status": "monotone; order above 2, i.e. pre-asymptotic error reduction, not an asymptotic order",
+          "values": [
+            138.91541282082048,
+            166.93157716068038,
+            168.36913836129247
+          ],
+          "noise": 0.825110764305208,
+          "relative_change_pct": [
+            20.16778683586136,
+            0.8611679258432733
+          ]
+        },
+        "total_lift_inphase": {
+          "d21": 19.09301015015437,
+          "d32": 33.38714890482644,
+          "ratio": 1.7486582074936203,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            -101.72189251770853,
+            -82.62888236755416,
+            -49.241733462727716
+          ],
+          "noise": 0.825110764305208,
+          "relative_change_pct": [
+            18.76981412514569,
+            40.40614848971569
+          ]
+        },
+        "total_lift_quad": {
+          "d21": 50.44173084006211,
+          "d32": 15.960555166878407,
+          "ratio": 0.31641569194929625,
+          "order": 1.6601069459740538,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            94.60522449523988,
+            145.046955335302,
+            161.0075105021804
+          ],
+          "noise": 0.825110764305208,
+          "relative_change_pct": [
+            53.3181239294032,
+            11.003716093166332
+          ]
+        },
+        "total_lift_mean": {
+          "d21": -0.8008347969444944,
+          "d32": 0.5285235513901556,
+          "ratio": -0.6599657674799905,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            5.153134875403176,
+            4.352300078458682,
+            4.880823629848837
+          ],
+          "noise": 0.4081578187595145,
+          "relative_change_pct": [
+            -15.54073037690165,
+            12.143545754256133
+          ]
+        },
+        "total_drag_mean": {
+          "d21": -5.350220018659627,
+          "d32": -3.433388864603444,
+          "ratio": 0.6417285368880212,
+          "order": 0.6399649553418736,
+          "status": "monotone; sub-nominal (observed order below 1.5)",
+          "values": [
+            464.79706777149363,
+            459.446847752834,
+            456.01345888823056
+          ],
+          "noise": 0.8872838202289017,
+          "relative_change_pct": [
+            -1.1510873001655713,
+            -0.7472875004793774
+          ]
+        },
+        "total_drag_amp2": {
+          "d21": -0.25817461962681065,
+          "d32": 0.42550472002110595,
+          "ratio": -1.6481276146980273,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            26.000626431219697,
+            25.742451811592886,
+            26.167956531613992
+          ],
+          "noise": 0.4525675807049576,
+          "relative_change_pct": [
+            -0.9929553824780659,
+            1.6529300438642898
+          ]
+        },
+        "total_drag_amp1": {
+          "d21": 1.0160211111341189,
+          "d32": 0.08252810916945164,
+          "ratio": 0.08122676612234053,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            1.5018155811851488,
+            2.5178366923192677,
+            2.6003648014887193
+          ],
+          "noise": 0.4525675807049576,
+          "relative_change_pct": [
+            67.65285457568177,
+            3.2777387596743655
+          ]
+        },
+        "plate_lift_p_amp1": {
+          "d21": 2.201613708745384,
+          "d32": -14.383745087568457,
+          "ratio": -6.533273766616036,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            173.81157839934906,
+            176.01319210809444,
+            161.629447020526
+          ],
+          "noise": 0.8978955732469842,
+          "relative_change_pct": [
+            1.2666668866483461,
+            -8.171969904809755
+          ]
+        },
+        "plate_drag_p_mean": {
+          "d21": -1.143845694802252,
+          "d32": -2.8479045992287713,
+          "ratio": 2.489762921843332,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            17.955595338522148,
+            16.811749643719896,
+            13.963845044491125
+          ],
+          "noise": 0.19477449769823707,
+          "relative_change_pct": [
+            -6.370413641190899,
+            -16.93996555731853
+          ]
+        }
+      }
+    },
+    "fixed_dt": {
+      "cases": [
+        "ale_1x_dt0.00025_replay",
+        "ale_2x_dt0.00025_replay",
+        "ale_4x_dt0.00025_replay"
+      ],
+      "quantities": {
+        "work_per_cycle": {
+          "d21": 1.7991539610454876,
+          "d32": -0.0048102914070319025,
+          "ratio": -0.0026736407840475445,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            -1.874376696873419,
+            -0.07522273582793138,
+            -0.08003302723496328
+          ],
+          "noise": 0.021995546557101942,
+          "relative_change_pct": [
+            95.98678665001503,
+            -6.394730734116382
+          ]
+        },
+        "plate_lift_amp1": {
+          "d21": -4.264681979093581,
+          "d32": -14.916587177046665,
+          "ratio": 3.4977021147581677,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            183.20770636023894,
+            178.94302438114536,
+            164.0264372040987
+          ],
+          "noise": 1.5808066440741015,
+          "relative_change_pct": [
+            -2.3277852574105107,
+            -8.335942252364422
+          ]
+        },
+        "plate_lift_inphase": {
+          "d21": 20.651195785400716,
+          "d32": 26.20642764514389,
+          "ratio": 1.2690029147692465,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            -182.33966820526825,
+            -161.68847241986754,
+            -135.48204477472365
+          ],
+          "noise": 1.5808066440741015,
+          "relative_change_pct": [
+            11.325673666441414,
+            16.20797528292052
+          ]
+        },
+        "plate_lift_quad": {
+          "d21": 58.85131770849736,
+          "d32": 15.797869073550913,
+          "ratio": 0.26843696434803715,
+          "order": 1.8973447474561038,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            17.813171210433826,
+            76.66448891893118,
+            92.4623579924821
+          ],
+          "noise": 1.5808066440741015,
+          "relative_change_pct": [
+            330.3809131639963,
+            20.606501518918833
+          ]
+        },
+        "plate_drag_mean": {
+          "d21": -3.024819635593351,
+          "d32": -2.187660560248787,
+          "ratio": 0.7232366963326902,
+          "order": 0.4674602143216719,
+          "status": "monotone; sub-nominal (observed order below 1.5)",
+          "values": [
+            -13.232389406988146,
+            -16.257209042581497,
+            -18.444869602830284
+          ],
+          "noise": 0.2670787348094148,
+          "relative_change_pct": [
+            -22.859209645054097,
+            -13.456556746725614
+          ]
+        },
+        "plate_drag_amp1": {
+          "d21": 0.6793891750691619,
+          "d32": 0.16258418748403858,
+          "ratio": 0.23930935824446645,
+          "order": 2.06305128000469,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            1.2224100393953041,
+            1.901799214464466,
+            2.0643834019485046
+          ],
+          "noise": 0.011979077154878226,
+          "relative_change_pct": [
+            55.577846481466956,
+            8.548967012262713
+          ]
+        },
+        "plate_drag_amp2": {
+          "d21": -1.4115785749526673,
+          "d32": 0.1210569740304237,
+          "ratio": -0.08575999677133309,
+          "order": null,
+          "status": "undefined: differences change sign (non-monotone)",
+          "values": [
+            25.011597738515945,
+            23.600019163563278,
+            23.721076137593702
+          ],
+          "noise": 0.011979077154878226,
+          "relative_change_pct": [
+            -5.64369613532903,
+            0.51295286326431
+          ]
+        },
+        "plate_lift_mean": {
+          "d21": -4.131579834300755,
+          "d32": -0.9131921967439682,
+          "ratio": 0.22102736322860395,
+          "order": 2.1777031083001055,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            10.469093304820689,
+            6.337513470519934,
+            5.424321273775965
+          ],
+          "noise": 0.22292549028148834,
+          "relative_change_pct": [
+            -39.4645430507176,
+            -14.409313699952568
+          ]
+        },
+        "total_lift_amp1": {
+          "d21": 27.634474422423636,
+          "d32": 0.4626261281996733,
+          "ratio": 0.01674090562128735,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            140.27203781066916,
+            167.9065122330928,
+            168.36913836129247
+          ],
+          "noise": 0.4904400508978881,
+          "relative_change_pct": [
+            19.700629472370682,
+            0.27552601864389986
+          ]
+        },
+        "total_lift_inphase": {
+          "d21": 30.85536611018493,
+          "d32": 32.501590779329014,
+          "ratio": 1.0533529455870136,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            -112.59869035224166,
+            -81.74332424205673,
+            -49.241733462727716
+          ],
+          "noise": 0.4904400508978881,
+          "relative_change_pct": [
+            27.402952923928613,
+            39.76054446120388
+          ]
+        },
+        "total_lift_quad": {
+          "d21": 63.012280451005296,
+          "d32": 14.34249834133908,
+          "ratio": 0.22761433547054336,
+          "order": 2.135336671421398,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            83.65273170983602,
+            146.66501216084131,
+            161.0075105021804
+          ],
+          "noise": 0.4904400508978881,
+          "relative_change_pct": [
+            75.32602840702717,
+            9.779086456973303
+          ]
+        },
+        "total_lift_mean": {
+          "d21": -5.17069501683649,
+          "d32": -1.154690505606636,
+          "ratio": 0.22331437105588436,
+          "order": 2.1628519982996566,
+          "status": "monotone; consistent with the formal second order",
+          "values": [
+            11.206209152291963,
+            6.0355141354554735,
+            4.880823629848837
+          ],
+          "noise": 0.38591450992765,
+          "relative_change_pct": [
+            -46.141339560657286,
+            -19.131601379631213
+          ]
+        },
+        "total_drag_mean": {
+          "d21": -5.347721413314332,
+          "d32": -3.491986583942264,
+          "ratio": 0.652985882033457,
+          "order": 0.6148762947550148,
+          "status": "monotone; sub-nominal (observed order below 1.5)",
+          "values": [
+            464.85316688548716,
+            459.5054454721728,
+            456.01345888823056
+          ],
+          "noise": 0.5377646223324746,
+          "relative_change_pct": [
+            -1.150410881170075,
+            -0.7599445487210739
+          ]
+        },
+        "total_drag_amp2": {
+          "d21": -1.2301503797707802,
+          "d32": 0.19853433826598632,
+          "ratio": -0.16139029953637063,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            27.199572573118786,
+            25.969422193348006,
+            26.167956531613992
+          ],
+          "noise": 0.4334416018047631,
+          "relative_change_pct": [
+            -4.522682760781808,
+            0.7644927052587267
+          ]
+        },
+        "total_drag_amp1": {
+          "d21": 0.9694083069256065,
+          "d32": 0.04744191311732848,
+          "ratio": 0.04893904124649638,
+          "order": null,
+          "status": "unreliable: the last change is within the cycle-to-cycle spread",
+          "values": [
+            1.5835145814457843,
+            2.552922888371391,
+            2.6003648014887193
+          ],
+          "noise": 0.4334416018047631,
+          "relative_change_pct": [
+            61.21877993952636,
+            1.858337097976098
+          ]
+        },
+        "plate_lift_p_amp1": {
+          "d21": -4.251717245463226,
+          "d32": -14.509825739112017,
+          "ratio": 3.412697717515118,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            180.39099000510123,
+            176.139272759638,
+            161.629447020526
+          ],
+          "noise": 1.6098011547403246,
+          "relative_change_pct": [
+            -2.3569454579427678,
+            -8.237700492219199
+          ]
+        },
+        "plate_drag_p_mean": {
+          "d21": -1.8623807522046114,
+          "d32": -2.97174151761042,
+          "ratio": 1.5956680792005566,
+          "order": null,
+          "status": "undefined: differences do not decrease",
+          "values": [
+            18.797967314306156,
+            16.935586562101545,
+            13.963845044491125
+          ],
+          "noise": 0.170055746736697,
+          "relative_change_pct": [
+            -9.907351795357418,
+            -17.547319702882824
+          ]
+        }
+      }
+    }
+  },
+  "source_coupled_2x": {
+    "total_drag_mean": 458.4430672486661,
+    "total_drag_amp1": 2.957955306115896,
+    "total_drag_amp2": 25.622952012240646,
+    "total_lift_mean": 2.864704407190866,
+    "total_lift_amp1": 167.28760317370353,
+    "total_lift_amp2": 3.646978782001226
+  }
+}
