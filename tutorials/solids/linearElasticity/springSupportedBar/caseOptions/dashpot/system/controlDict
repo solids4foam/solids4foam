@@ -11,43 +11,53 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+application     solids4Foam;
 
-internalField   uniform (0 0 0);
+startFrom       startTime;
 
-boundaryField
+startTime       0;
+
+stopAt          endTime;
+
+endTime         1;
+
+deltaT          0.1;
+
+writeControl    timeStep;
+
+writeInterval   10;
+
+cycleWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  10;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+functions
 {
-    "inlet[1-2]"
+    springEndDisplacement
     {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
+        type          solidDisplacements;
+        historyPatch  springEnd;
     }
-    "outlet[1-4]"
+    loadedEndDisplacement
     {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    innerWall
-    {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    outerWall
-    {
-        // Elastic support from the surrounding brain tissue and cerebrospinal
-        // fluid, following Shidhore et al. (2023): springs in all directions
-        // and no dashpot
-        type            solidSpringDashpot;
-        kNormal         uniform 1e7;    // [Pa/m]
-        kTangential     uniform 1e7;    // [Pa/m]
-        value           uniform (0 0 0);
+        type          solidDisplacements;
+        historyPatch  loadedEnd;
     }
 }
 

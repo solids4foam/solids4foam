@@ -11,44 +11,45 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
-
-internalField   uniform (0 0 0);
-
-boundaryField
+d2dt2Schemes
 {
-    "inlet[1-2]"
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    "outlet[1-4]"
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    innerWall
-    {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    outerWall
-    {
-        // Elastic support from the surrounding brain tissue and cerebrospinal
-        // fluid, following Shidhore et al. (2023): springs in all directions
-        // and no dashpot
-        type            solidSpringDashpot;
-        kNormal         uniform 1e7;    // [Pa/m]
-        kTangential     uniform 1e7;    // [Pa/m]
-        value           uniform (0 0 0);
-    }
+    default            steadyState;
+}
+
+ddtSchemes
+{
+    default            steadyState;
+}
+
+gradSchemes
+{
+    default            pointCellsLeastSquares;
+}
+
+divSchemes
+{
+    default            Gauss linear;
+}
+
+laplacianSchemes
+{
+    default            Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default            corrected;
+}
+
+interpolationSchemes
+{
+    default            linear;
 }
 
 // ************************************************************************* //

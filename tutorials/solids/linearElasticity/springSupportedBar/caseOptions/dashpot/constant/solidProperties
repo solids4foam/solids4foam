@@ -11,44 +11,31 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+// linearGeometry: assumes small strains and rotations
+solidModel     linearGeometryTotalDisplacement;
 
-internalField   uniform (0 0 0);
-
-boundaryField
+linearGeometryTotalDisplacementCoeffs
 {
-    "inlet[1-2]"
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    "outlet[1-4]"
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    innerWall
-    {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    outerWall
-    {
-        // Elastic support from the surrounding brain tissue and cerebrospinal
-        // fluid, following Shidhore et al. (2023): springs in all directions
-        // and no dashpot
-        type            solidSpringDashpot;
-        kNormal         uniform 1e7;    // [Pa/m]
-        kTangential     uniform 1e7;    // [Pa/m]
-        value           uniform (0 0 0);
-    }
+    // Maximum number of momentum correctors
+    nCorrectors     2000;
+
+    // Solution tolerance for displacement
+    solutionTolerance 1e-10;
+
+    // Alternative solution tolerance for displacement
+    alternativeTolerance 1e-10;
+
+    // Material law solution tolerance
+    materialTolerance 1e-10;
+
+    // Write frequency for the residuals
+    infoFrequency   100;
 }
 
 // ************************************************************************* //

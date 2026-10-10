@@ -11,44 +11,57 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+// Bar of length 10 mm along x, square cross-section of side 0.5 mm
+scale 1;
 
-internalField   uniform (0 0 0);
+vertices
+(
+    (0    0    0)
+    (0.01 0    0)
+    (0.01 0.0005 0)
+    (0    0.0005 0)
+    (0    0    0.0005)
+    (0.01 0    0.0005)
+    (0.01 0.0005 0.0005)
+    (0    0.0005 0.0005)
+);
 
-boundaryField
-{
-    "inlet[1-2]"
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    "outlet[1-4]"
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    innerWall
-    {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    outerWall
-    {
-        // Elastic support from the surrounding brain tissue and cerebrospinal
-        // fluid, following Shidhore et al. (2023): springs in all directions
-        // and no dashpot
-        type            solidSpringDashpot;
-        kNormal         uniform 1e7;    // [Pa/m]
-        kTangential     uniform 1e7;    // [Pa/m]
-        value           uniform (0 0 0);
-    }
-}
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (20 1 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+patches
+(
+    patch springEnd
+    (
+        (0 4 7 3)
+    )
+    patch loadedEnd
+    (
+        (1 2 6 5)
+    )
+    symmetry sides
+    (
+        (0 1 5 4)
+        (3 7 6 2)
+        (0 3 2 1)
+        (4 5 6 7)
+    )
+);
+
+mergePatchPairs
+(
+);
 
 // ************************************************************************* //

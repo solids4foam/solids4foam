@@ -1,0 +1,40 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+# -------------------------------------------------------------------------
+# Usage:
+#   ./Allrun [linearGeometry|totalLagrangian|dashpot]     (default: linearGeometry)
+# -------------------------------------------------------------------------
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+OPTION="${1:-linearGeometry}"
+
+if [[ ! -d "caseOptions/${OPTION}" ]]; then
+    echo "Error: unknown option '${OPTION}'"
+    echo "Usage: ./Allrun [linearGeometry|totalLagrangian|dashpot]"
+    exit 1
+fi
+
+echo "Using the ${OPTION} case"
+cp -a "caseOptions/${OPTION}/." .
+
+# A mesh left by the other variant carries that variant's patch types, which
+# blockMesh on OpenFOAM v2512 refuses to override. It is removed before the
+# case is converted, as foam-extend's conversion moves blockMeshDict into
+# constant/polyMesh.
+\rm -rf constant/polyMesh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create mesh
+solids4Foam::runApplication blockMesh
+
+# Run solver
+solids4Foam::runApplication solids4Foam

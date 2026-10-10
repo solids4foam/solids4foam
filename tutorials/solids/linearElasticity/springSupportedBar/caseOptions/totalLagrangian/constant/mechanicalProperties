@@ -11,44 +11,23 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    location    "constant";
+    object      mechanicalProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+planeStress     no;
 
-internalField   uniform (0 0 0);
-
-boundaryField
-{
-    "inlet[1-2]"
+mechanical
+(
+    bar
     {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
+        type            neoHookeanElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        E               E [1 -1 -2 0 0 0 0] 100e+3;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
     }
-    "outlet[1-4]"
-    {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
-    }
-    innerWall
-    {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    outerWall
-    {
-        // Elastic support from the surrounding brain tissue and cerebrospinal
-        // fluid, following Shidhore et al. (2023): springs in all directions
-        // and no dashpot
-        type            solidSpringDashpot;
-        kNormal         uniform 1e7;    // [Pa/m]
-        kTangential     uniform 1e7;    // [Pa/m]
-        value           uniform (0 0 0);
-    }
-}
+);
 
 // ************************************************************************* //

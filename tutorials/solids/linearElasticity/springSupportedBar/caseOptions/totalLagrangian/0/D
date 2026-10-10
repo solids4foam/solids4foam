@@ -22,31 +22,24 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    "inlet[1-2]"
+    springEnd
     {
-        type            fixedDisplacement;
+        type            solidSpringDashpot;
+        kNormal         uniform 1e8;    // [Pa/m]
+        kTangential     uniform 1e3;    // [Pa/m]
         value           uniform (0 0 0);
     }
-    "outlet[1-4]"
+    loadedEnd
     {
-        type            fixedDisplacement;
+        type            solidForce;
+        force           uniform (0.02 0 0); // [N] per face
         value           uniform (0 0 0);
     }
-    innerWall
+    sides
     {
         type            solidTraction;
-        traction        uniform ( 0 0 0 );
+        traction        uniform (0 0 0);
         pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    outerWall
-    {
-        // Elastic support from the surrounding brain tissue and cerebrospinal
-        // fluid, following Shidhore et al. (2023): springs in all directions
-        // and no dashpot
-        type            solidSpringDashpot;
-        kNormal         uniform 1e7;    // [Pa/m]
-        kTangential     uniform 1e7;    // [Pa/m]
         value           uniform (0 0 0);
     }
 }

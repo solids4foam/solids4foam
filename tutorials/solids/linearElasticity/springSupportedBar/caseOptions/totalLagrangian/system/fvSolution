@@ -11,43 +11,34 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      D;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
-
-internalField   uniform (0 0 0);
-
-boundaryField
+solvers
 {
-    "inlet[1-2]"
+    D
     {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
+        solver          PCG;
+        preconditioner  DIC;
+        tolerance       1e-14;
+        relTol          0.01;
     }
-    "outlet[1-4]"
+}
+
+relaxationFactors
+{
+    equations
     {
-        type            fixedDisplacement;
-        value           uniform (0 0 0);
     }
-    innerWall
+    // The whole 20 % stretch is applied in one step, and the segregated
+    // iterations oscillate in the lateral contraction. With a D relaxation
+    // factor of 0.7 or more they diverge on x86-64.
+    fields
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
-    outerWall
-    {
-        // Elastic support from the surrounding brain tissue and cerebrospinal
-        // fluid, following Shidhore et al. (2023): springs in all directions
-        // and no dashpot
-        type            solidSpringDashpot;
-        kNormal         uniform 1e7;    // [Pa/m]
-        kTangential     uniform 1e7;    // [Pa/m]
-        value           uniform (0 0 0);
+        D       0.5;
     }
 }
 
