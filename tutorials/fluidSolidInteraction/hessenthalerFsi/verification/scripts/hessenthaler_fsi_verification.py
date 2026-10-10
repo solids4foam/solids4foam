@@ -787,7 +787,7 @@ DEFAULT_SPEC = {
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
-    "solidtol": "default", "coupled": "yes",
+    "solidtol": "default", "coupled": "yes", "fsitest": "default",
 }
 
 
@@ -816,6 +816,8 @@ def parse_spec(text: str) -> dict:
         fail("solidtol must be default or tight")
     if spec["fluidtol"] not in ("default", "tight"):
         fail("fluidtol must be default or tight")
+    if spec["fsitest"] not in ("default", "strict"):
+        fail("fsitest must be default or strict")
     return spec
 
 
@@ -844,6 +846,8 @@ def spec_name(spec: dict) -> str:
         name += f"_solid{spec['solidtol']}"
     if spec["coupled"] != "yes":
         name += "_uncoupled"
+    if spec["fsitest"] != "default":
+        name += f"_fsi{spec['fsitest']}"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -964,6 +968,23 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
             replace_entry(fsi, "coupled", "no")
         if spec["tol"] < 1e-4:
             replace_entry(fsi, "nOuterCorr", "60")
+        if spec["fsitest"] == "strict":
+            # The default test accepts a step when the smaller of two
+            # measures is below the tolerance; one of them is normalised by
+            # the TOTAL interface displacement, so slow steps pass after one
+            # (relaxed) iteration and the lag accumulates. Require both.
+            # A rare step still above the tolerance after 60 iterations is
+            # accepted with a warning and counted in the evaluation.
+            replace_entry(fsi, "nOuterCorr", "60")
+            text = fsi.read_text()
+            text, found = re.subn(
+                r"^(\s*)(outerCorrTolerance\s+[^;]+;)",
+                r"\1\2\n\1requireAllResidualMeasures yes;"
+                r"\n\1allowUnconvergedCoupling yes;",
+                text, count=1, flags=re.MULTILINE)
+            if found != 1:
+                fail(f"Could not set the strict coupling test in {fsi}")
+            fsi.write_text(text)
 
     # Fluid linear-solver tolerances
     if spec["fluidtol"] == "tight":
@@ -1492,6 +1513,9 @@ def evaluate_run(case: Path, spec: dict, cores: int, info: dict,
     q["clock_time_h"] = clock / 3600.0
     q["restart_segments"] = len(list(case.glob("log.solids4Foam*")))
     q["fsi_max_iteration_hits"] = count_max_iterations(case, spec)
+    q["fsi_unconverged_accepted"] = sum(
+        log.read_text(errors="replace").count("Accepting the unconverged")
+        for log in case.glob("log.solids4Foam*"))
     result["qoi"] = q
     return result
 
@@ -1500,7 +1524,7 @@ def count_max_iterations(case: Path, spec: dict) -> int:
     """Time steps whose FSI loop stopped at nOuterCorr without converging."""
     text = (case / "log.solids4Foam").read_text(errors="replace")
     limit = 100 if spec["coupling"] == "robin" else (
-        60 if spec["tol"] < 1e-4 else 30)
+        60 if spec["tol"] < 1e-4 or spec.get("fsitest") == "strict" else 30)
     counts: dict[str, int] = {}
     for time_value, iteration in re.findall(
             r"^Time = ([0-9.eE+-]+), iteration: (\d+)", text, re.MULTILINE):
