@@ -205,8 +205,8 @@ scalarList bdfD2dt2Scheme<Type>::composedCoeffs
 template<class Type>
 label bdfD2dt2Scheme<Type>::readOrder(Istream& is)
 {
-    token t(is);
-
+    // Check for the end of the stream before reading: an ITstream reports
+    // eof as soon as its last token has been read
     if (is.eof())
     {
         FatalIOErrorInFunction(is)
@@ -214,6 +214,8 @@ label bdfD2dt2Scheme<Type>::readOrder(Istream& is)
             << "e.g. \"BDF 2;\" in d2dt2Schemes"
             << exit(FatalIOError);
     }
+
+    token t(is);
 
     if (!t.isLabel())
     {
@@ -262,8 +264,10 @@ bdfD2dt2Scheme<Type>::bdfD2dt2Scheme(const fvMesh& mesh, Istream& is)
 
         WarningInFunction
             << "The " << type() << " " << order_ << " d2dt2 scheme "
-            << "adds energy to undamped modes for finite time steps; "
-            << "it should be used only where the problem provides damping"
+            << "adds energy to undamped modes for finite time steps"
+            << (order_ >= 5 ? " and can diverge on under-resolved modes" : "")
+            << "; it should be used only where the problem provides "
+            << "damping. For undamped problems, use backward or NewmarkBeta"
             << endl;
     }
 }

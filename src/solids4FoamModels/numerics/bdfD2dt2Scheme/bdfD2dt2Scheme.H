@@ -41,19 +41,26 @@ Description
             default BDF 3;
         }
 
-        ddtSchemes
-        {
-            default         backward;
-            "d2dt2\(.*\)"   BDF 3;
-        }
+    The solid models' explicit inertia terms read their scheme from
+    d2dt2Schemes too (#502), so no ddtSchemes entry is needed. An optional
+    "d2dt2\(.*\)" BDF entry in ddtSchemes also makes the linear predictor,
+    which calls fvc::d2dt2 directly, use this scheme. The velocity from
+    fvc::ddt keeps the ddtSchemes default scheme. The vertex-centred solid
+    models select their own d2dt2 schemes and do not use this scheme.
 
-    The ddtSchemes entry is needed because fvc::d2dt2 in OpenFOAM and
-    foam-extend reads its scheme from ddtSchemes, while fvm::d2dt2 reads it
-    from d2dt2Schemes. Without it, fvc::d2dt2, which is used for example in
-    the PETSc SNES residual, falls back to the ddtSchemes default. The
-    velocity from fvc::ddt keeps the ddtSchemes default scheme. The
-    vertex-centred solid models select their own d2dt2 schemes and do not use
-    this scheme.
+    Warning: orders 3 to 6 are not suitable for undamped structural
+    dynamics. On an undamped oscillator, BDF3 and BDF4 amplify every
+    resolved mode, e.g. by about 4.5% (BDF3) and 0.6% (BDF4) per period at
+    20 time-steps per period; the growth vanishes as the time-step is
+    refined, but over a long run it can dominate the solution. BDF5 and BDF6
+    damp well-resolved modes, but amplify modes with fewer than about 9
+    (BDF5) and 7.5 (BDF6) time-steps per period by up to 38% and 58% per
+    time-step, and a mesh normally has such modes, so they can diverge
+    within tens of time-steps. Orders 1 and 2 are dissipative. Orders 3 and
+    above are intended for problems with enough physical or numerical
+    damping, e.g. viscoelastic or damped solids, or some fluid-solid
+    interaction cases; for undamped problems, use backward or NewmarkBeta.
+    A warning is printed when an order of 3 or above is selected.
 
     Start-up: with n genuine old-time levels, the order is min(k, n), and
     the velocity at old-time level j uses the order it had when it was the

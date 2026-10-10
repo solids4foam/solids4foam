@@ -19,7 +19,10 @@ Where [timeScheme] is one of:
   bdf2              (default) second-order backward
   newmark           trapezoidal Newmark (beta=0.25, gamma=0.5)
   bossak            Bossak-Newmark (beta=0.3025, gamma=0.6, alphaM=-0.1)
-  all               run all three in timeSchemeRuns/ and compare with Abaqus
+  bdf3              third-order BDF; not recommended for this undamped case,
+                    as it amplifies the oscillation (see README.md)
+  all               run bdf2, newmark and bossak in timeSchemeRuns/ and
+                    compare with Abaqus
 
 Examples:
   ./Allrun
@@ -27,6 +30,7 @@ Examples:
   ./Allrun segregated
   ./Allrun petscSnes newmark
   ./Allrun petscSnes bossak
+  ./Allrun petscSnes bdf3
   ./Allrun petscSnes all
 USAGE
 }
@@ -50,7 +54,7 @@ case "$APPROACH" in
 esac
 
 case "$TIME_SCHEME" in
-    bdf2|newmark|bossak|all) ;;
+    bdf2|newmark|bossak|bdf3|all) ;;
     *)
         echo "Error: Unknown time scheme '$TIME_SCHEME'"
         usage
