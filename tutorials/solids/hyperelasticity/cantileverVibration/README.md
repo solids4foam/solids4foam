@@ -102,7 +102,7 @@ solution algorithm; its optional second argument selects the time scheme:
 ./Allrun segregated            # Segregated algorithm with BDF2
 ./Allrun petscSnes newmark      # Trapezoidal Newmark
 ./Allrun petscSnes bossak       # Damped Bossak-Newmark
-./Allrun petscSnes bdf3         # Third-order BDF (fails; see below)
+./Allrun petscSnes bdf3         # Third-order BDF (fails)
 ./Allrun petscSnes all          # All three schemes and a comparison plot
 ```
 
@@ -147,7 +147,7 @@ the end time. It is included only to show the deficit of the higher-order
 the backward differentiation formula of order 1 to 6 twice, as `backward`
 applies BDF2. It is third-order accurate in time, but, unlike BDF1 and BDF2,
 BDF3 and BDF4 are not dissipative for an undamped oscillation: they
-*amplify* every resolved mode, by about 4.5% (BDF3) and 0.6% (BDF4) per
+_amplify_ every resolved mode, by about 4.5% (BDF3) and 0.6% (BDF4) per
 period at 20 time-steps per period. BDF5 and BDF6 damp well-resolved modes
 but amplify modes with fewer than about 9 and 7.5 time-steps per period by
 up to 38% and 58% per time-step. The growth vanishes as the time-step is
@@ -173,7 +173,8 @@ The `bdf3` option is not part of `all` or the regression test.
 For a single run, `Allrun` links `constant/solidProperties` and
 `system/fvSolution` to the selected algorithm's dictionaries and
 `system/fvSchemes` to `fvSchemes.bdf2`, `fvSchemes.newmark`,
-`fvSchemes.bossak` or `fvSchemes.bdf3`. It then creates the mesh with `blockMesh`, runs
+`fvSchemes.bossak` or `fvSchemes.bdf3`. It then creates the mesh with
+`blockMesh`, runs
 `solids4Foam` and, if `gnuplot` is installed, plots the selected scheme
 against Abaqus in `tipDisplacement.png`. Run `./Allclean` before changing
 options for a single run to remove previous results.
