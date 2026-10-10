@@ -1010,3 +1010,121 @@ same `src/` as 27c9bfdf7.
     `newMovingWallVelocity`.
 
   The comparison script is `scripts/ab_compare.py`.
+
+## Fluid-side variants of the trajectory replay (Q_in convergence)
+
+At fixed coupled 2x motion the in-phase generalised force on the flag,
+`Q_in`, is 50.3, 72.2 and 81.0 N/m at 1x, 2x and 4x (dt 1e-3, 5e-4, 2.5e-4;
+observed order 1.3). This section tests which fluid treatment limits that
+convergence. Each variant changes one treatment of the replay restart cases
+of the section above, the rest of the setup is unchanged. The analysis is the
+same (`energy_analysis.py`, last five periods, windows ending 33.2 s at 1x
+and 2x and 30.2 s at 4x).
+
+Tools: `scripts/hron_turek_variants.py` (builds the case with
+`hron_turek_energy.py`, then applies the variants), `scripts/run_replay_variant.sh`,
+`scripts/variants_summary.py`, and `platform/htVariants/` (a small library with
+the GCL mesh class). Results: `reference/replay_variants/`
+(`variants.csv` and `.json`: all runs; `convergence.csv`: per variant).
+
+Setup: parent commit c821aeb8b, study binary built from aee0c8e35 (PR #546
+has no effect), OpenFOAM v2512 (OpenCFD), GCC 11.4.0 `-O3`, Ubuntu 22.04,
+xenosim, run on 1 (1x), 8 (2x) and 24 (4x) MPI ranks. The baseline restart at
+2x reproduces `Q_in = 72.172` of the earlier study to all digits.
+
+### Variants, as checked in the source
+
+The FSI3 fluid has `p` zeroGradient and `U` `newMovingWallVelocity` on the
+flag, `default leastSquares`, `ddt backward`, `velocityLaplacian` with
+`diffusivity quadratic inverseDistance`. There is no `fixedValueCorrected`
+in v2512 or solids4foam.
+
+| name | change (dictionary) | what it does (source) |
+|---|---|---|
+| pwall | `0/p` plate: `type movingWallPressure;` | solids4foam: `gradient = -n.a_wall`, `a_wall` the BDF2 wall acceleration from `newMovingWallVelocity`; `pimpleFluid` adds `rAU*snGrad(p)*|Sf|` to `phiHbyA`, so the wall flux stays the mesh flux |
+| uwall | `0/U` plate: `type movingWallVelocity;` | v2512: Euler face-centre velocity, normal part from meshPhi; drops the non-orthogonal `snGrad` of `newMovingWallVelocity` |
+| gradS4f | `fvSchemes`: `grad(U) leastSquaresS4f; grad(p) leastSquaresS4f;` | solids4foam: the least-squares fit uses boundary values only on patches that fix the value, so a zeroGradient `p` wall is extrapolated; `default` cannot be changed because `cellMotionU` has no face-value list. It also changes the viscous force evaluation |
+| gcl | `dynamicMeshDict`: `dynamicFvMesh dynamicMotionSolverBDF2FvMesh;`, `controlDict`: `libs ("libhtVariants.so");` | mesh flux `1.5 phiE^n - 0.5 phiE^(n-1)`, so that `div(meshPhi)` equals the backward volume derivative `(3V - 4V0 + V00)/(2 dt)`. The standard flux is the Euler swept-volume flux, a GCL violation of `O(dt)` for backward. One Euler step at a restart |
+| mesh_inv | `dynamicMeshDict`: `diffusivity inverseDistance 2(plate cylinder);` | linear instead of quadratic inverse distance |
+
+`pwall` needs `newMovingWallVelocity`, so it cannot be combined with
+`uwall`. The mesh variant is only a screening: the velocity-Laplacian mesh is
+path dependent, so a restart changes the interior mesh slowly, and it was not
+run at 4x.
+
+### Results
+
+`Q_in` in N/m (1x and 2x are full runs from t = 25 s or restarts from 32 s;
+4x are restarts from 29 s):
+
+| variant | 1x | 2x | 4x | 1x to 2x | 2x to 4x | order |
+|---|---:|---:|---:|---:|---:|---:|
+| baseline | 50.3 | 72.2 | 81.0 | +21.9 | +8.8 | 1.31 |
+| pwall | 30.3 | 62.7 | 77.3 | +32.4 | +14.6 | 1.15 |
+| uwall | 47.1 | 66.8 | | +19.6 | | |
+| gradS4f | 11.0 | 50.8 | 69.3 | +39.7 | +18.5 | 1.10 |
+| gcl | 57.1 | 76.1 | 82.7 | +19.0 | +6.6 | 1.51 |
+| mesh_inv | 48.8 | 69.3 | | +20.6 | | |
+| pwall + gradS4f + gcl | 39.4 | 65.0 | 76.2 | +25.6 | +11.2 | 1.19 |
+
+Other 1x/2x combinations (restart from 32 s at 2x): pwall + gradS4f 32.8 /
+61.5, pwall + gcl 36.9 / 66.4, gradS4f + gcl 17.6 / 54.3.
+`Q_quad` (N/m), `W` (J/m) and the force amplitudes are in `variants.csv`;
+for the 4x runs they are, baseline / pwall / gradS4f / gcl / all three:
+
+| 4x | Q_quad | W | lift amplitude (N/m) | mean drag (N/m) |
+|---|---:|---:|---:|---:|
+| baseline | 2.34 | 0.125 | 163.3 | -18.6 |
+| pwall | 2.48 | 0.140 | 161.8 | -17.3 |
+| gradS4f | 1.90 | 0.084 | 167.5 | -14.4 |
+| gcl | 1.18 | -0.033 | 161.1 | -19.2 |
+| pwall + gradS4f + gcl | 0.77 | -0.066 | 163.6 | -15.6 |
+
+The order is `log2` of the ratio of the two differences, for sequences that
+are monotone in every row with a value (spatial and temporal refinement are
+refined together, so it is a combined order).
+
+### Validation
+
+- A restart from 32 s with a variant switched on reproduces the same
+  variant run from the developed rigid state at t = 25 s (2x): `Q_in` 62.90
+  against 62.74 (pwall), 75.66 against 76.07 (gcl), 50.88 against 50.75
+  (gradS4f). The switching transient is at most 0.4 N/m, so the 4x restarts
+  are valid. This does not hold for `mesh_inv` (72.14 against 69.35), which
+  is why the mesh variant is only a screening.
+- The time step alone is minor (earlier study): at 1x, dt 1e-3 to 2.5e-4
+  changes `Q_in` by -2.6 N/m, at 2x, dt 5e-4 to 2.5e-4 by +0.5 N/m.
+- The `gcl` run selects `dynamicMotionSolverBDF2FvMesh` (log) and gives a
+  first step identical to the baseline, as it should (no old flux).
+
+### Findings
+
+- No variant removes the slow convergence of `Q_in`. Every one that was run at
+  all three levels is monotone with an observed order of 1.1 to 1.5.
+- The `gcl` variant is the only one that helps, modestly: the 2x to 4x change
+  falls from +8.8 to +6.6 N/m (-25%) and the order rises to 1.5. It moves the
+  in-phase force up and `Q_quad` and `W` down at every level.
+- `pwall` and `gradS4f` change the 1x value strongly (to 30 and 11 N/m) and
+  give a larger 2x to 4x change than the baseline. They remove the
+  zero-normal-gradient wall pressure error of the standard treatment, but
+  `Q_in` then approaches the common value from further below.
+- Across variants the spread of `Q_in` is 46, 25 and 14 N/m at 1x, 2x and
+  4x: the treatments differ by first-order terms and the spread itself
+  converges at about first order. The indicative limits from the three-level
+  fits (not a Richardson extrapolation to be quoted) are 85 to 89 N/m for
+  all five variants with 4x values, a tight cluster.
+- `uwall` and `mesh_inv` move `Q_in` by at most 8% and 4% at 1x and 2x, and
+  change the 1x to 2x difference by -10% and -6%.
+
+Conclusion: no single fluid-side treatment limits the convergence of `Q_in`.
+The first-order behaviour is shared by all treatments tested (wall pressure,
+wall velocity, gradient, mesh motion, GCL), so it is a property of the
+discretisation as a whole (a hypothesis: the singular flag tip and the
+vortical in-phase load) rather than of one of these options. The cheapest
+option that is better than the baseline is `gcl`, and its gain is 25%. The
+untested items are the `ddtCorr`/PISO splitting, the convection scheme and
+the tip geometry.
+
+Cost: about 132 core-hours of wall time times ranks on xenosim, which was
+heavily loaded (1x about 2, 2x about 47 of which 12 are restarts, 4x about 78,
+about 4 lost to a run killed by mistake). No 8x run was made.
