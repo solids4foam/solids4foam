@@ -858,3 +858,155 @@ five-period windows as the noise level; the matched (1x/2x/4x with
 `dt = 1e-3/5e-4/2.5e-4`) and fixed-`dt` (`2.5e-4`) paths are written to
 `postProcessing/ale_study.json` and two CSV files (compact copies and 2 s
 histories in `reference/ale/`).
+
+## Trajectory replay and energy balance (fluid only)
+
+The ALE study above prescribes an assumed mode-2 motion. The replay
+replaces it by the actual coupled motion:
+
+1. `scripts/hron_turek_replay_source.py` restarts the converged FSI3 2x run
+   (`iqnils_mesh_2x`, t = 7 s) for 1.2 s and records the fluid `plate`
+   point positions at every step.
+2. `scripts/hron_turek_replay.py` fits them over five periods (mean plus
+   four harmonics in x and y per point, f = 5.5236 Hz) and replays them on
+   the CFD3 fluid mesh of any level from its developed rigid state (25 s,
+   1 s ramp, 8 s). The setup is the same as in the ALE study.
+3. `scripts/replay_analysis.py` gives the force harmonics.
+
+```bash
+python3 scripts/hron_turek_replay_source.py --run iqnils_mesh_2x --cores 8 --duration 1.2
+python3 scripts/hron_turek_replay.py --level 2 --delta-t 0.0005 --duration 8 --cores 8
+```
+
+`scripts/hron_turek_energy.py` restarts a finished replay from a written
+time (1.2 s; 0.3 s blend and 1.6 s for the perturbed runs). It fixes the
+replay boundary condition so that it keys the table on the `constant`
+points, which a restart needs. It optionally scales the amplitude or the
+frequency of the motion smoothly, with continuous phase. A `coded` function
+object writes `energy.dat` at every step. The force is
+`rho (p Sf + Sf . devReff)`, as in the `forces` function object; its plate
+totals match `forcesPlate` to all printed digits. The file contains:
+
+- the pressure and viscous power on the flag;
+- the discrete work increments `sum_f f.(d^n - d^(n-1))` of each harmonic
+  and direction;
+- the generalised forces on the harmonic shapes.
+
+`scripts/energy_analysis.py` evaluates, over the last five periods:
+
+- the net work per cycle W, which is positive into the flag;
+- its split by harmonic;
+- the first-harmonic generalised force on the replayed y shape, normalised
+  to the tip amplitude: `Q_in` is in phase with the displacement
+  (added stiffness or mass), and `Q_quad` is in phase with the velocity,
+  with `W_1y = pi A Q_quad`;
+- a restart check against the `POWR` trace of the original replay.
+
+`scripts/energy_summary.py` combines this with the coupled FSI3 levels.
+
+All runs use the coupled 2x motion (tip amplitude 34.30 mm, 5.5236 Hz),
+v2512, GCC 11.4 `-O3`, xenosim. The work per cycle is in J/m, the forces
+in N/m. The work increments are weighted by the shape of each face, and
+their sum (`W_dd`) differs from the power-based W by `O(omega dt)`: the
+fluid wall velocity is a BDF2 mesh-flux velocity. That difference is
+0.12 J/m at dt = 1e-3 and 0.03 J/m at dt = 2.5e-4.
+
+| run | W | W_dd | W_p | W_v | Q_in | Q_quad | gross \|P\| work |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1x, dt 1e-3 | -1.987 | -1.870 | -2.073 | 0.086 | 50.34 | -16.97 | 8.38 |
+| 1x, dt 2.5e-4 | -1.745 | -1.717 | -1.874 | 0.129 | 47.75 | -14.70 | 8.38 |
+| 2x, dt 5e-4 (source mesh) | 0.082 | 0.161 | -0.123 | 0.205 | 72.17 | 2.00 | 7.40 |
+| 2x, dt 2.5e-4 | 0.141 | 0.181 | -0.071 | 0.212 | 72.67 | 2.55 | 7.34 |
+| 4x, dt 2.5e-4 | 0.125 | 0.170 | -0.103 | 0.229 | 81.02 | 2.34 | 6.89 |
+| 2x, amplitude x0.95 | 0.018 | 0.102 | | | 81.03 | 1.14 | 5.98 |
+| 2x, amplitude x1.05 | -0.031 | 0.041 | | | 60.83 | 1.19 | 9.02 |
+| 2x, frequency x0.99 | 1.326 | 1.402 | | | 69.66 | 13.39 | 7.24 |
+
+### Validation
+
+- The replayed coupled motion on its own mesh gives W = 0.08 to 0.18 J/m,
+  depending on dt and on the work definition. That is 1 to 2% of the gross
+  exchange, but 10 to 20% of E1 = 0.81 J/m, so zero is resolved only to
+  about 0.1 J/m.
+- The plate lift fundamental (179 N/m) matches the coupled lift amplitude
+  (174 N/m).
+- Each restart reproduces the original pressure-power trace: the largest
+  difference is 0.38 W/m at a rms of 41 to 51 W/m, and the work difference
+  is at most 0.0015 J/m per cycle.
+- W changes by less than 0.003 J/m between windows shifted by half a period.
+
+### Findings
+
+- **1x mesh.** At fixed motion the 1x mesh extracts 1.9 to 2.1 J/m per
+  cycle more than 2x. Nearly all of it is pressure work on the first
+  transverse harmonic. The sign matches the smaller 1x coupled amplitude.
+  Read literally as numerical dissipation, this is an overstatement: the
+  1x fluid response has a different phase.
+- **Energy route is indeterminate for 2x to 4x.** The 4x mesh changes W by
+  -0.016 J/m (fixed dt) or +0.044 J/m (matched dt). This is within the
+  resolution of W, about ±0.05 J/m from dt and from the definition of the
+  discrete work.
+  - At fixed shape and frequency, W is almost flat in amplitude: ±5%
+    amplitude gives +0.02 and -0.03 J/m, against +0.08 J/m at the baseline.
+    The secant is about -0.014 J/m per mm, but curvature or noise is not
+    resolved.
+  - With that slope, 0.03 J/m would already account for the +2 mm 2x to
+    4x change. The energy argument therefore can neither confirm nor
+    exclude the mechanism there.
+  - For 1x it fails quantitatively: it predicts a change of about 100 mm.
+  - The implied dA/dW is incompatible between levels: 2.1 to 2.3 mm per
+    J/m from 1x, against +47 or -129 mm per J/m from 4x.
+- **W depends strongly on frequency** (-22.5 J/m per Hz). Extrapolated to
+  the observed 0.9% frequency decrease from 2x to 4x, the frequency shift
+  adds about 1 J/m, which the amplitude cannot remove. Shape and harmonic
+  changes must close the balance, and the replay of a single motion
+  cannot show how.
+- **In-phase force (hypothesis).** What changes measurably with the mesh at
+  fixed motion is the in-phase generalised force: Q_in = 50.3, 72.2 and
+  81.0 N/m (+12% from 2x to 4x). Q_in also falls steeply with amplitude
+  (-5.9 N/m per mm).
+  - A one-mode in-phase balance at fixed frequency,
+    `dA = -dQ_in/(dQ_in/dA)`, optionally with a secant structural term
+    `Q_in/A`, gives -2.7 to -4.2 mm for 1x (observed -4.32) and +1.0 to
+    +1.5 mm for 4x (observed +2.05).
+  - This is a consistent hypothesis, not an identified mechanism. At one
+    frequency, Q_in cannot separate added mass, stiffness and reactive
+    vortical load. The structural tangent is not measured. The energy
+    residual is not closed.
+- **u_x mean.** The time-mean tip u_x is kinematic: the inextensible
+  estimate `-1/4 int |W'|^2 dx` gives -2.66 mm against -2.70 mm fitted.
+  Across the coupled levels the time-mean u_x scales as A^1.88 to 1.93,
+  and A^2 is within 1.6% (1x) and 0.4% (4x). The benchmark midrange
+  (max+min)/2 scales as A^1.64 to 1.70, because the 2f waveform changes
+  too.
+
+`reference/energy_balance/` holds:
+
+- `energy_runs.json`, the per-run analysis;
+- `energy_balance.csv` and `energy_balance.json`, the summary and
+  predictions;
+- `defect_exposure.json`, the PR #546 exposure check.
+
+### PR #546 exposure
+
+The study binary was built at aee0c8e35 with GCC 11.4 `-O3`; it has the
+same `src/` as 27c9bfdf7.
+
+- **Aliasing defect.** The alias reproducer fails at `-O3` on xenosim.
+  For the original vector & symmTensor product the error is in the z
+  component only, and it vanishes for 2-D data
+  (`platform/Test-tmpDotAlias2D.C`).
+- **Barycentric weights.** The degenerate-weight branch cannot trigger
+  here: the smallest interface fan triangle is 9.8e3 times above the
+  threshold, at solid 8x (`scripts/plate_interface_faces.py`).
+- **A/B against the fixed tree.** 27c9bfdf7 + 28751407c + c8efdd390 was
+  built with the same toolchain. Against the study binary, all of these
+  are identical to every written digit:
+  - an FSI3 2x coupled restart (600 steps): forces, point A, every plate
+    point and the residual file;
+  - a CFD3 2x restart (500 steps), run with the 28751407c build only (the
+    rigid flag uses `fixedValue`, not `newMovingWallVelocity`);
+  - a replay 2x restart (600 steps), whose run exercises
+    `newMovingWallVelocity`.
+
+  The comparison script is `scripts/ab_compare.py`.

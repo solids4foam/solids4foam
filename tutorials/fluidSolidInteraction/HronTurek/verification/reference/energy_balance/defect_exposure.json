@@ -1,0 +1,95 @@
+{
+  "question": "Are the HronTurek FSI3/CFD3/ALE/replay results on xenosim exposed to the two defects fixed by solids4foam PR #546 (28751407c): (1) GCC -O3 tmp aliasing in nf() & (-devReff().boundaryField()) in the fluid patchViscousForce; (2) scale-dependent barycentric weights (triangle::pointToBarycentric) in the AMI point transfer? Also the further aliasing sites of the audit commit c8efdd390 (newMovingWallVelocity::snGrad, fvcGradf, mechanicalEnergies, ...).",
+  "verdict": "Not exposed. The aliasing miscompilation manifests with the study toolchain (GCC 11.4 -O3) in standalone tests, but in the FSI3/CFD3/replay runs it changes nothing: A/B restarts with the fixed tree (27c9bfdf7 + 28751407c + c8efdd390) are identical to all written digits (coupled FSI3 2x 600 steps incl. the FSI residual file; replay 2x 600 steps, which uses newMovingWallVelocity; CFD3 2x 500 steps with 28751407c). The barycentric defect cannot trigger (smallest interface fan triangle 1e4 above threshold).",
+  "study_build": {
+    "binary": "/tmp/claude-1000/.../scratchpad/ht_build/bin/solids4Foam (FOAM_USER_LIBBIN .../ht_build/lib)",
+    "libsolids4FoamModels_built": "2026-10-03 23:00-23:02 +0100 (before the first study job at 23:05; never rebuilt)",
+    "source_commit": "aee0c8e35 (checked out 2026-10-03 22:59); git diff aee0c8e35 27c9bfdf7 -- src applications is empty, so every study ran the source of the ale-prescribed branch without PR #546",
+    "compiler": "g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0",
+    "flags": "-std=c++17 -m64 -pthread -O3 (wmake rules linux64Gcc c++OPT = -O3; WM_OPTIONS linux64GccDPInt32Opt), -DUSE_PETSC (PETSc 3.24.1)",
+    "openfoam": "OpenCFD v2512 Ubuntu package openfoam2512 2512.0-1, build _87ed40d2-20251219 (all 26 study logs)",
+    "platform": "xenosim: AMD EPYC 9684X, Ubuntu 22.04.5 LTS, Open MPI 4.1.2",
+    "studies_using_it": [
+      "FSI3 IQN-ILS 1x/2x/4x and the dt/tolerance variants",
+      "FSI3 solid-only refinement (solid 4x, 8x)",
+      "CFD3 rigid-flag study",
+      "prescribed-motion ALE study",
+      "trajectory replay source and replays",
+      "energy restarts of this branch"
+    ]
+  },
+  "defect1_tmp_alias": {
+    "reproducer": "Test-tmpDotAlias.C / buildAliasTest.sh from origin/verification/3dtube-level3, run on xenosim with the system toolchain",
+    "results_max_abs_error_vs_hand_loop": {
+      "O3": 0.00070014,
+      "O2": 0,
+      "O1": 0,
+      "O0": 0,
+      "O3 -D__restrict__=": 0,
+      "O3 -ffp-contract=off": 0.00070014,
+      "O3 -march=native": 0
+    },
+    "per_component_O3_3D_inputs": [
+      0,
+      0,
+      0.000700143
+    ],
+    "per_component_O3_2D_inputs": [
+      0,
+      0,
+      0
+    ],
+    "note_2D": "platform/Test-tmpDotAlias2D.C keeps the loop structure of the reproducer and sets n_z = 0, D_xz = D_yz = 0 (D_zz != 0), as on the FSI3 plate of a one-cell-thick x-y mesh; the miscompiled loop forms z last from the overwritten normal, z = (n.D)_x D_xz + (n.D)_y D_yz, which is the exact value 0 when D_xz = D_yz = 0. A restructured variant (function called with several sizes) did not miscompile at all: code generation is context dependent, hence the A/B test.",
+    "where_it_acts": "pimpleFluid::patchViscousForce is called only for the fluid-to-solid traction of a coupled run; fluid-only runs (CFD3, ALE, replay) report OpenFOAM forces function-object loads and do not call it."
+  },
+  "defect2_barycentric": {
+    "threshold": "4 A^2 < SMALL = 1e-15 m^4, i.e. fan-triangle area A < 1.58e-8 m^2 (face area < 6.3e-8 m^2)",
+    "transfer": "interfaceTransferMethod not set in fsiProperties: default AMI (amiInterfaceToInterfaceMapping), point weights on fan triangles (two face vertices + face centre, area = face/4 for these rectangles)",
+    "smallest_fan_triangle_m2": {
+      "iqnils_mesh_1x": {
+        "solid": 1.25e-05,
+        "fluid": 7.846e-06,
+        "fourA2_over_SMALL_min": 246000.0
+      },
+      "iqnils_mesh_2x": {
+        "solid": 6.25e-06,
+        "fluid": 3.955e-06,
+        "fourA2_over_SMALL_min": 62600.0
+      },
+      "iqnils_mesh_4x": {
+        "solid": 3.125e-06,
+        "fluid": 1.985e-06,
+        "fourA2_over_SMALL_min": 15800.0
+      },
+      "iqnils_mesh_2x_solid8x": {
+        "solid": 1.562e-06,
+        "fluid": 3.955e-06,
+        "fourA2_over_SMALL_min": 9770.0
+      }
+    },
+    "note": "The interface faces span the 15 mm mesh depth; the in-plane edge would have to fall below about 4 micrometres to trigger the degenerate branch."
+  },
+  "ab_test": {
+    "fixed_tree": "local/hronturek-ab-fix546 = 27c9bfdf7 + cherry-pick -x 28751407c (a3d1d05ce) + cherry-pick -x c8efdd390 (df0e9e455); same toolchain (GCC 11.4, -O3, PETSc 3.24.1). Cherry-picks instead of a merge because the fix branch also carries the #541 HronTurek -> TurekHron2006 rename. Runs with 28751407c alone were also identical.",
+    "fsi3_2x": "restart of the developed coupled 2x state at t = 7 s (replaysrc_iqnils_mesh_2x), dt 5e-4, 600 coupled steps to 7.3 s (1.66 periods), 8 cores each: drag, lift, point-A ux/uy, all fluid plate-patch point positions (12 digits) and the FSI residual file identical (byte-identical fsiResiduals.dat); the old-binary restart also reproduces the original replay-source run exactly",
+    "cfd3_2x": "restart of the developed rigid state at 25 s, dt 5e-4, 500 steps: drag and lift identical (28751407c build only; the rigid flag uses fixedValue, not newMovingWallVelocity)",
+    "relative_change_vs_2x_to_4x": "0 (identical) against +6.0% u_y amplitude and +10.6% u_x mean from 2x to 4x",
+    "replay_2x": "restart of ale_2x_dt0.0005_replay at 32 s (prescribed coupled motion, newMovingWallVelocity), 600 steps, old binary vs fixed tree: pressure/viscous power and plate forces identical to 12 digits"
+  },
+  "defect1b_audit_sites": {
+    "commit": "c8efdd390 (origin/fix/fsi-tmp-alias-and-barycentric-weights)",
+    "fsi3_relevance": "newMovingWallVelocity is the U condition on the flag in the coupled FSI3, ALE and replay cases (CFD3: fixedValue); its snGrad() computes (I - sqr(nf)) & tmp<vector>",
+    "Test-tmpAliasProducts_xenosim": {
+      "O3_failed": [
+        "tmp vector & -tmp symmTensor (9.9e-5)",
+        "tmp vector & const symmTensor (9.9e-5)"
+      ],
+      "O2_failed": [
+        "tmp tensor & tmp tensor (5.3e-4)",
+        "tmp tensor & const tensor (5.3e-4)",
+        "const tensor & tmp tensor (1.9e-4)"
+      ],
+      "note": "the symmTensor & tmp vector form of snGrad is not in the test list; tmp tensor & tmp vector and const tensor & tmp vector pass at O3 and O2"
+    }
+  }
+}
