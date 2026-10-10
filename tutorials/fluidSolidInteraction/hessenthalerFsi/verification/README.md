@@ -154,6 +154,59 @@ last 40 % and 30 %). The distance between the window mean and the fitted
 steady value a is the residual transient error. One run to 40 s tests the
 estimator.
 
+## Finding: the default FSI convergence test lets an iterative error accumulate
+
+With the default IQN-ILS settings (`outerCorrTolerance 1e-4`), every coupled
+run's tip kept rising long after the initial transient: +0.3-0.4 mm from 8 to
+30 s, and still +0.003-0.005 mm/s at 60-80 s. Runs that differed only in rank
+count or time step ended up 0.05-0.3 mm apart, so this drift exceeded every
+spatial difference. Diagnosis:
+
+1. Not the fluid alone: restarted at 30 s with the coupling off (the mesh is
+   static), the flap force and a wake probe settle within ~2 s and stay
+   constant to 0.3 % until 60 s.
+2. Not the solid alone: the flap under buoyancy alone (production solver
+   settings, velocity damping) is constant to 1e-15 mm.
+3. The convergence test. A step is accepted when `min(r1, r2)` is below the
+   tolerance. Here r1 is the interface residual relative to its largest value
+   in the step. r2 is normalised by the TOTAL interface displacement, which is
+   large for this flap (tip deflection ~17 mm). Late steps are therefore
+   accepted as soon as r2 is small, whether or not the coupling iteration
+   converged. The first iterations of every step are also under-relaxed
+   (`relaxationFactor 0.05`). Per-step histories of the F2S2 run (0-80 s;
+   iterations and the residuals at the accepting iteration):
+
+   | Window (s) | Iterations per step | r1 at acceptance (median) | Steps with r1 > 1e-2 | r2 at acceptance (median) |
+   | --- | --- | --- | --- | --- |
+   | 0-1 | 4.65 | 9.3e-4 | 4 % | 5.4e-5 |
+   | 1-5 | 3.19 | 4.9e-2 | 87 % | 3.9e-5 |
+   | 5-80 (each window) | 3.10-3.12 | 6.8e-2 | 90-91 % | 3.5e-5 |
+
+   After the first second, every step is accepted with r1 above the
+   tolerance: the coupling iteration reduces the step's interface mismatch
+   by only ~15x. The fluid interface lags the solid (measured: ~0.03 mm in
+   -y between the fluid interface and the deformed solid surface at 30, 55
+   and 60 s), and the lag drives the slow drift.
+
+4. With both measures required (`requireAllResidualMeasures yes`,
+   `nOuterCorr 60`, `allowUnconvergedCoupling yes`; spec key
+   `fsitest=strict`), from the F2S2 state at 80 s at the production time
+   step: 10-11 iterations per step, median r1 5e-5 and r2 < 1e-8 at
+   acceptance, and 0.0-0.4 % of steps above the tolerance. The tip drops
+   within ~0.3 s from 17.031 to 17.0195 mm, then stays constant to
+   +-0.0002 mm from 80 to 87.5 s. The same run with solid velocity damping
+   (15 1/s) gives the same plateau (17.0193 mm).
+
+Restarts from states built up under the default test keep part of that
+history: a strict restart from another default-test state (the 48-rank
+replicate at 60 s, 16.92 mm) settles at a different value (16.90 mm after
+0.9 s, still being checked). The verification runs are therefore repeated
+with the strict test from t = 0, which defines one trajectory and one end
+state. The default-test runs are kept as the record of the finding.
+
+The test is a solids4foam default, so other steady or slowly varying FSI
+cases with large interface displacements may be affected in the same way.
+
 ## Observed orders and uncertainty
 
 For three levels with a constant nominal ratio r, the observed order is
