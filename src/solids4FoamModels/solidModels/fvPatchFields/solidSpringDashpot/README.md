@@ -149,7 +149,9 @@ Unit conversions: 1 kPa/mm = 1e6 Pa/m; 1 dyne/cm³ = 10 Pa/m.
 ## Verification
 
 Tested with OpenFOAM v2412 against exact solutions (bar of length L = 10 mm,
-E = 100 kPa, ν = 0.3, 20 cells along the bar):
+E = 100 kPa, ν = 0.3, 20 cells along the bar); the `springSupportedBar`
+regression test and the `cerebralAneurysm` tutorial also run with OpenFOAM
+v2512:
 
 - **Bar in uniaxial strain on a normal spring**, loaded at the far end,
   k = 1e2 … 1e8 Pa/m: spring-face and loaded-face displacements exact to
@@ -191,8 +193,9 @@ condition with the base-class diagonal and without the imposed traction:
 | Total Lagrangian, uniaxial strain | 452 | 86 |
 
 The tutorial `tutorials/solids/linearElasticity/springSupportedBar` contains
-the bar on a normal spring and the total Lagrangian force balance, with a
-regression test against the exact solutions. The
+the bar on a normal spring, the total Lagrangian force balance and a
+spring-dashpot support under a held load, with a regression test against the
+exact solutions. The
 `tutorials/fluidSolidInteraction/cerebralAneurysm` tutorial uses the condition
 for the brain tissue and cerebrospinal fluid around the arterial wall, with
 the PETSc SNES algorithm; with a very soft spring (k = 1e3 Pa/m) it reproduces

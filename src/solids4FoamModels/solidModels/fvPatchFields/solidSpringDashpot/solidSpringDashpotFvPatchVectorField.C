@@ -160,8 +160,8 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 
     if
     (
-        min(kNormal_) < 0 || min(kTangential_) < 0
-     || min(cNormal_) < 0 || min(cTangential_) < 0
+        gMin(kNormal_) < 0 || gMin(kTangential_) < 0
+     || gMin(cNormal_) < 0 || gMin(cTangential_) < 0
     )
     {
         FatalErrorIn
@@ -169,16 +169,24 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
             "solidSpringDashpotFvPatchVectorField::"
             "solidSpringDashpotFvPatchVectorField(...)"
         )   << "Spring and dashpot coefficients must be non-negative on patch "
-            << patch().name() << abort(FatalError);
+            << patch().name() << exit(FatalError);
     }
 
     // The dashpot velocity is (D - D.oldTime())/deltaT, so deltaT must be a
     // physical time step
+    const word d2dt2Scheme
+    (
+        d2dt2SchemeCompat
+        (
+            patch().boundaryMesh().mesh(),
+            "d2dt2(" + internalFieldName(*this) + ")"
+        )
+    );
+
     if
     (
         (gMax(cNormal_) > 0 || gMax(cTangential_) > 0)
-     && word(d2dt2SchemeCompat(patch().boundaryMesh().mesh(), "d2dt2(D)"))
-     == "steadyState"
+     && d2dt2Scheme == "steadyState"
     )
     {
         WarningIn
@@ -262,11 +270,9 @@ tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
     const scalar rDeltaT = 1.0/db().time().deltaTValue();
 
     const vectorField& DP = *this;
-    const vectorField& DoldP =
-        db().lookupObject<volVectorField>("D").oldTime().boundaryField()
-        [
-            patch().index()
-        ];
+    const volVectorField& Dold =
+        db().lookupObject<volVectorField>(internalFieldName(*this)).oldTime();
+    const vectorField& DoldP = Dold.boundaryField()[patch().index()];
 
     return tmp<vectorField>
     (
@@ -386,7 +392,7 @@ void solidSpringDashpotFvPatchVectorField::updateCoeffs()
 
     // Old-time patch displacement
     const volVectorField& Dold =
-        db().lookupObject<volVectorField>("D").oldTime();
+        db().lookupObject<volVectorField>(internalFieldName(*this)).oldTime();
     const vectorField& DoldP = Dold.boundaryField()[patch().index()];
 
     // Explicit part of the dashpot traction, with dD/dt = (D - Dold)/dt
