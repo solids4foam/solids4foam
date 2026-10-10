@@ -346,7 +346,7 @@ check_case() {
 
 # St Venant-Kirchhoff reference values, regenerated from the OpenFOAM.com
 # v2512 IQNILS run after aligning the tutorial material law with the
-# Richter/Tukovic benchmark. The existing tolerances cover the known small
+# Richter benchmark. The existing tolerances cover the known small
 # cross-version differences; the high-order variant uses the same references
 # with its widened displacement tolerance.
 REF_MAX_DISP=0.0263297
