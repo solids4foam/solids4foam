@@ -788,6 +788,7 @@ DEFAULT_SPEC = {
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
     "solidtol": "default", "coupled": "yes", "fsitest": "default",
+    "reuse": -1.0,
 }
 
 
@@ -848,6 +849,8 @@ def spec_name(spec: dict) -> str:
         name += "_uncoupled"
     if spec["fsitest"] != "default":
         name += f"_fsi{spec['fsitest']}"
+    if spec["reuse"] >= 0:
+        name += f"_reuse{spec['reuse']:g}"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -985,6 +988,12 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
             if found != 1:
                 fail(f"Could not set the strict coupling test in {fsi}")
             fsi.write_text(text)
+        if spec["reuse"] >= 0:
+            # Secant modes reused from previous time steps (tutorial: 5).
+            # With strict convergence, stale near-dependent modes can make
+            # the first update of a step blow up; 0 builds the secants of
+            # each step from its own iterations only.
+            replace_entry(fsi, "couplingReuse", f"{int(spec['reuse'])}")
 
     # Fluid linear-solver tolerances
     if spec["fluidtol"] == "tight":
