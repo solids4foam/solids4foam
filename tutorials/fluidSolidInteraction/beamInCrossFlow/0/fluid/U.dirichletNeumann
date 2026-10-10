@@ -34,7 +34,7 @@ boundaryField
     inlet
     {
         type            paraboloidInletVelocity;
-        maxVelocity     0.2;
+        maxVelocity     0.3;
         yWidth          0.2;
         zWidth          0.4;
         timeVaryingEndTime 1.0;

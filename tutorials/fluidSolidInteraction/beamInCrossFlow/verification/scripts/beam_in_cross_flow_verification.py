@@ -51,7 +51,7 @@ def configure_richter_case(case: Path, delta_t: float | None = None,
     mechanical = case / "constant/solid/mechanicalProperties"
     control = case / "system/controlDict.iqnils"
     for u_file in u_files:
-        replace_entry(u_file, "maxVelocity", "0.2")
+        replace_entry(u_file, "maxVelocity", "0.3")
         # Richter's problem is stationary.  The ramp is only a continuation
         # device for the transient-to-steady partitioned solve; all reported
         # quantities are evaluated after the inlet has been constant for a

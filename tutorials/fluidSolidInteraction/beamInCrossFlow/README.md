@@ -30,14 +30,14 @@ The production case reproduces the stationary three-dimensional benchmark of
 [Richter](https://doi.org/10.1016/j.cma.2012.02.014). The channel is
 `[0, 1.5] x [0, 0.4] x [-0.4, 0.4] m`, and symmetry permits the computation to
 use its `z <= 0` half. The undeformed solid is
-`[0.4, 0.5] x [0, 0.2] x [-0.2, 0.2] m`. The inlet profile is bi-parabolic with
-a peak speed of `0.2 m/s`. This is the reference-producing interpretation used
-by independent reproductions of Richter's tabulated quantities. Richter's
-journal article prints `0.3 m/s`, but its mean-speed and Reynolds-number
-statements are inconsistent with the printed three-dimensional profile. The
-verification README documents the ambiguity and a literal `0.3 m/s`
-sensitivity calculation. The outlet uses the do-nothing/zero-traction
-condition, and the remaining outer walls are no-slip.
+`[0.4, 0.5] x [0, 0.2] x [-0.2, 0.2] m`. Following the explicit boundary
+condition in section 7.2 of Richter (2012), the inlet profile is bi-parabolic
+with peak speed `0.3 m/s`. The same paragraph states an average speed of
+`0.2 m/s` and `Re=40`, although the area average of the printed profile is
+`4/9` of its peak. This source inconsistency is retained explicitly rather
+than choosing the coefficient that best reproduces the reference table. The
+outlet uses the do-nothing/zero-traction condition, and the remaining outer
+walls are no-slip.
 
 The elastic plate has density `1000 kg/m3`, Young's modulus `1.4 MPa`, shear
 modulus `0.5 MPa`, Poisson ratio `0.4`, and the compressible St
