@@ -8,6 +8,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
+  applies the backward differentiation formula of order 1 to 6 twice, as the
+  `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and
+  it reduces the order during start-up. Only `d2dt2Schemes` needs the entry
+  (#502). BDF3 and BDF4 slowly amplify an undamped oscillation, by about 4.5%
+  and 0.6% per period at 20 steps per period, and BDF5 and BDF6 amplify modes
+  with fewer than about 9 and 7.5 steps per period, so they are not
+  recommended for undamped structures, and a warning is printed when an
+  order of 3 or above is selected. The `cantileverVibration` tutorial has a
+  non-default `bdf3` option that shows the effect.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A

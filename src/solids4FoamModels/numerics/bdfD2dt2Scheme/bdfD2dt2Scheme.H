@@ -1,0 +1,252 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::fv::bdfD2dt2Scheme
+
+Description
+    Implicit backward differentiation formula (BDF) d2dt2 of order 1 to 6,
+    for a constant time-step.
+
+    The BDFk first derivative is applied twice, in the same way as the
+    backward d2dt2 scheme applies the backward ddt scheme twice:
+
+        v^n = (1/deltaT) sum_{i=0}^{k} a_i u^{n-i}
+        a^n = (1/deltaT) sum_{j=0}^{k} a_j v^{n-j}
+
+    where a_i are the BDFk coefficients. This is BDFk applied to the
+    first-order system du/dt = v, dv/dt = a, so it inherits the stability of
+    BDFk. It uses the current and 2k previous time levels. The velocity
+    implied by the scheme is recomputed from the stored displacements, so no
+    velocity field is stored.
+
+    Usage in system/fvSchemes, where the order is 1 to 6:
+
+        d2dt2Schemes
+        {
+            default BDF 3;
+        }
+
+    The solid models' explicit inertia terms read their scheme from
+    d2dt2Schemes too (#502), so no ddtSchemes entry is needed. An optional
+    "d2dt2\(.*\)" BDF entry in ddtSchemes also makes the linear predictor,
+    which calls fvc::d2dt2 directly, use this scheme. The velocity from
+    fvc::ddt keeps the ddtSchemes default scheme. The vertex-centred solid
+    models select their own d2dt2 schemes and do not use this scheme.
+
+    Warning: orders 3 to 6 are not suitable for undamped structural
+    dynamics. On an undamped oscillator, BDF3 and BDF4 amplify every
+    resolved mode, e.g. by about 4.5% (BDF3) and 0.6% (BDF4) per period at
+    20 time-steps per period; the growth vanishes as the time-step is
+    refined, but over a long run it can dominate the solution. BDF5 and BDF6
+    damp well-resolved modes, but amplify modes with fewer than about 9
+    (BDF5) and 7.5 (BDF6) time-steps per period by up to 38% and 58% per
+    time-step, and a mesh normally has such modes, so they can diverge
+    within tens of time-steps. Orders 1 and 2 are dissipative. Orders 3 and
+    above are intended for problems with enough physical or numerical
+    damping, e.g. viscoelastic or damped solids, or some fluid-solid
+    interaction cases; for undamped problems, use backward or NewmarkBeta.
+    A warning is printed when an order of 3 or above is selected.
+
+    Start-up: with n genuine old-time levels, the order is min(k, n), and
+    the velocity at old-time level j uses the order it had when it was the
+    current velocity, min(k, n - j), at least one; a velocity with no genuine
+    level before it, at the initial time, is zero. This is the start-up of
+    the backward scheme, and it keeps the velocity history consistent, so
+    the order ramps up from Euler at the first time-step. Recomputing the old
+    velocities at a higher order than they were computed with would add an
+    error of order deltaT to the velocity, and make the scheme first order.
+    After a sudden load, the Euler first step limits the global accuracy to
+    second order. A missing level is detected as an old-time field with the
+    same time index as its parent, as in the backward scheme; on
+    OpenFOAM.org and foam-extend this needs the GeometricField.C fix in
+    optionalFixes. The old-time levels are written with the field (with
+    "restart yes" in the solid model coefficients), so a restart continues
+    at full order. A restart within the first 2k time-steps can read copies
+    of the initial field as genuine levels, so its order can rise earlier
+    than in a continuous run, and its results can differ.
+
+    With a constant time-step and a constant density, "BDF 1" is identical
+    to Euler and "BDF 2" is identical to the solids4foam backward d2dt2
+    scheme, including during start-up.
+
+    The time-step must be constant: a fatal error is raised if the time-step
+    changes while two or more genuine old-time levels are available. The
+    scheme is not implemented for a moving mesh.
+
+    Note: BDF3 to BDF6 are not A-stable. For an undamped oscillator with
+    angular frequency omega, the BDF3 amplitude grows for omega*deltaT below
+    1.94 and the BDF4 amplitude grows for omega*deltaT below 4.71. At 20
+    steps per period the growth is about 4.5% per period for BDF3 and 0.6%
+    per period for BDF4. BDF5 and BDF6 slightly damp well-resolved modes,
+    but a spurious root grows, by up to 38% and 58% per time-step, for
+    omega*deltaT between 0.71 and 9.39 (BDF5) and between 0.84 and 17.6
+    (BDF6), that is for modes with fewer than about 9 and 7.5 steps per
+    period. A mesh normally has such modes, so BDF5 and BDF6 are unstable
+    unless the time-step resolves the highest mesh frequency. BDF3 to BDF6
+    are therefore not recommended for undamped structural dynamics;
+    "BDF 1" and "BDF 2" are dissipative.
+
+SourceFiles
+    bdfD2dt2Scheme.C
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef bdfD2dt2Scheme_H
+#define bdfD2dt2Scheme_H
+
+#include "d2dt2Scheme.H"
+#include "scalarList.H"
+#include "Field.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace fv
+{
+
+/*---------------------------------------------------------------------------*\
+                       Class bdfD2dt2Scheme Declaration
+\*---------------------------------------------------------------------------*/
+
+template<class Type>
+class bdfD2dt2Scheme
+:
+    public fv::d2dt2Scheme<Type>
+{
+    // Private Data
+
+        //- Order of the scheme
+        const label order_;
+
+
+    // Private Member Functions
+
+        //- Return the BDF first derivative coefficients of the given order
+        static scalarList coeffs(const label order);
+
+        //- Return the n-th old-time level of the field
+        template<class GeoField>
+        static const GeoField& oldTimeLevel
+        (
+            const GeoField& vf,
+            const label n
+        );
+
+        //- Return the number of genuine old-time levels, up to 2*order_,
+        //  and raise a fatal error if the time-step has changed
+        label nOldTimes
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf
+        ) const;
+
+        //- Return the order of the velocity at old-time level j, given the
+        //  number of genuine old-time levels; level 0 gives the order of
+        //  the scheme this time-step
+        label levelOrder(const label nOldTimes, const label j) const;
+
+        //- Return the composed BDF d2dt2 coefficients for the genuine
+        //  old-time levels
+        scalarList composedCoeffs(const label nOldTimes) const;
+
+        //- Read and validate the BDF order from an Istream, raising a
+        //  FatalIOError for a missing or out-of-range value
+        static label readOrder(Istream& is);
+
+        //- Check that the mesh is not moving
+        void checkMesh() const;
+
+        //- Disallow default bitwise copy construct
+        bdfD2dt2Scheme(const bdfD2dt2Scheme&) = delete;
+
+        //- Disallow default bitwise assignment
+        void operator=(const bdfD2dt2Scheme&) = delete;
+
+
+public:
+
+    //- Runtime type information
+    TypeName("BDF");
+
+
+    // Constructors
+
+        //- Construct from mesh and Istream
+        bdfD2dt2Scheme(const fvMesh& mesh, Istream& is);
+
+
+    // Member Functions
+
+        //- Return mesh reference
+        const fvMesh& mesh() const
+        {
+            return fv::d2dt2Scheme<Type>::mesh();
+        }
+
+        tmp<GeometricField<Type, fvPatchField, volMesh> > fvcD2dt2
+        (
+            const GeometricField<Type, fvPatchField, volMesh>&
+        );
+
+        tmp<GeometricField<Type, fvPatchField, volMesh> > fvcD2dt2
+        (
+            const volScalarField&,
+            const GeometricField<Type, fvPatchField, volMesh>&
+        );
+
+        tmp<fvMatrix<Type> > fvmD2dt2
+        (
+            const GeometricField<Type, fvPatchField, volMesh>&
+        );
+
+        tmp<fvMatrix<Type> > fvmD2dt2
+        (
+            const dimensionedScalar&,
+            const GeometricField<Type, fvPatchField, volMesh>&
+        );
+
+        tmp<fvMatrix<Type> > fvmD2dt2
+        (
+            const volScalarField&,
+            const GeometricField<Type, fvPatchField, volMesh>&
+        );
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace fv
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#ifdef NoRepository
+#   include "bdfD2dt2Scheme.C"
+#endif
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //
