@@ -1144,3 +1144,80 @@ cheapest option that is better than the baseline" are withdrawn.
 Cost: about 132 core-hours of wall time times ranks on xenosim, which was
 heavily loaded (1x about 2, 2x about 47 of which 12 are restarts, 4x about 78,
 about 4 lost to a run killed by mistake). No 8x run was made.
+
+## Where the mesh dependence of Q_in sits on the flag (tip localisation)
+
+Question: is the slow convergence of `Q_in` (50.3, 72.2, 81.0 N/m at 1x, 2x,
+4x, order 1.3) carried by the geometric singularities, the free-end corners
+and the flag-cylinder corners? The baseline replays were rerun unchanged
+(same restart times, ranks, binary and window as the section above: 1x
+restart 25 s to 33.2 s on 1 rank, 2x restart 32 s to 33.2 s on 8, 4x restart
+29 s to 30.2 s on 24) with one added coded function object (`plateTraction`,
+`scripts/hron_turek_tip.py`) that writes the face traction (pressure and
+viscous, N/m, same definition as `plateEnergy`) of every flag face at every
+step of the last 5.2 periods. `scripts/tip_localisation.py extract` reduces this to the
+first-harmonic phasor of each face over the five-period window of
+`energy_analysis.py` (`reference/tip_localisation/faces_{1x,2x,4x}.csv`, 84, 168
+and 336 faces), and `analyse` sums the face contribution
+`Re[G1y_f (a_f + i b_f)]/|D_tip|` over geometric regions. The restarts
+reproduce `Q_in` of the baselines to all digits, and the sum over the regions
+reproduces `Q_in`, the lift amplitude and the mean drag of
+`energy_analysis.py` (50.3119, 72.1723, 81.0181 N/m; 176.50, 178.99,
+163.26 N/m; -13.406, -16.195, -18.643 N/m).
+
+Regions are defined by x on the undeformed flag (x from 0.24899 to 0.6 m,
+thickness t = 0.02 m); a face is split between regions in proportion to its
+x-extent, so the partition is the same on the three meshes (the 0.1 t bands,
+0.002 m, are below the face size at 1x/2x and about one face at 4x, so they
+only carry a fraction of one face). `tip_corner_1t` is the end face plus the
+last 1 t of both long faces; `cyl_corner_1t` the first 1 t at the
+cylinder; `smooth_mid` the rest, split into five equal segments `mid_1` to
+`mid_5` (x from 0.269 to 0.58 m).
+
+| Region | Q_in 1x | 2x | 4x | 1x to 2x | 2x to 4x | share of 2x to 4x | order |
+|---|---|---|---|---|---|---|---|
+| tip end face | 4.27 | 4.61 | 4.63 | +0.34 | +0.02 | 0.3% | 3.8 |
+| tip corner, last 1 t (incl. end face) | 2.33 | 6.89 | 8.84 | +4.56 | +1.95 | 22% | 1.2 |
+| cylinder corner, first 1 t | 0.015 | 0.013 | 0.007 | -0.002 | -0.006 | -0.1% | non-convergent |
+| mid_1 (0.27-0.33) | 1.74 | 1.73 | 1.58 | -0.02 | -0.15 | -1.7% | no |
+| mid_2 | 11.16 | 11.49 | 11.52 | +0.33 | +0.03 | 0.4% | 3.3 |
+| mid_3 | 18.03 | 19.77 | 20.69 | +1.74 | +0.92 | 10% | 0.9 |
+| mid_4 | 5.78 | 9.33 | 11.83 | +3.55 | +2.50 | 28% | 0.5 |
+| mid_5 (0.48-0.58) | 11.24 | 22.94 | 26.54 | +11.70 | +3.60 | 41% | 1.7 |
+| all smooth faces (mid_1..5) | 47.96 | 65.27 | 72.17 | +17.31 | +6.90 | 78% | 1.3 |
+| total | 50.31 | 72.17 | 81.02 | +21.86 | +8.85 | 100% | 1.3 |
+
+(N/m; share is of the 2x to 4x change; order only where the 1x-2x and 2x-4x changes have the same sign
+and the ratio exceeds 1. `reference/tip_localisation/tip_localisation_regions.csv` and `.json`
+also hold the per-length values, the lift amplitude and the mean drag of
+every region, and the nested sub-bands.) The mean drag changes by -1.2 N/m
+(tip end face), -2.1 N/m (smooth faces) and -0.35 N/m (tip corner, last 1 t) from 2x to 4x, of a total of
+-2.45 N/m.
+
+Reading. The singularity hypothesis is not supported. The cylinder corners
+contribute nothing (the traction there is small and the flag is nearly at
+rest). The free-end corner carries 22% of the 2x-to-4x change, about its
+share of the 1x-to-2x change (21%), and its order (1.2) equals that of the
+total, so it does not converge more slowly than the rest; the end face itself
+is converged (order 3.8). The smooth long faces carry 78% of the change and converge at
+the same order as the total (1.3). The change comes from the aft third of the flag
+(`mid_4`, `mid_5`, x of 0.38 to 0.58 m, 69% of the 2x-to-4x change): the
+traction profile (`traction_distribution.png`) has a second pressure lobe near
+x of 0.56 m, whose amplitude and in-phase part keep growing with refinement
+(Q_in density at the lobe peak, upper face, 140, 248, 283 N/m per m), with a minimum near
+x of 0.50 m that is poorly resolved at 1x. This is a smooth, resolved-flow
+feature (the vortex near the tip), not a corner singularity. Per unit length the tip corner
+is the most sensitive region together with `mid_5`, so a tip contribution of
+the expected kind exists, but it is a minority of the total. The last
+0.5 t of the flag (`tip_cumulative.png`) varies little with refinement.
+Caveats: the geometric bands below one cell width (0.1 t) are not resolved by any of the
+meshes, so nothing is concluded about the corner at that scale; three
+levels with orders of 0.5 to 1.7 in the segments (not asymptotic) mean orders
+are indicative.
+
+Run: `hron_turek_tip.py` (case set-up), `run_replay_variant.sh <case>` (as
+above), `tip_localisation.py extract|analyse`; run directories on xenosim
+`~/ht_tip/work/t_{1x,2x,4x}`, about 19 core-hours in total. Plots:
+`reference/tip_localisation/traction_distribution.png` (amplitude, phase and
+Q_in density of the first-harmonic traction along the upper and lower faces) and
+`tip_cumulative.png` (cumulative Q_in from the tip).
