@@ -14,7 +14,9 @@ TurekHron2006 tutorial with the corrections of the second-order replay study:
                the interface position only (no creep);
   wall p       movingWallPressure on the flag (dp/dn = -n.a_wall);
   coupling     requireAllResidualMeasures yes (max of the two residual
-               measures, issue #552), outerCorrTolerance --fsi-tol, no reuse;
+               measures, issue #552), outerCorrTolerance --fsi-tol, no reuse; a step
+               that reaches nOuterCorr at the IQN-ILS noise floor is accepted
+               (allowUnconvergedCoupling) and counted by the analysis;
   solvers      fluid absolute tolerances --fluid-tol (p, U, cellDisplacement),
                non-final p solves relTol 0.01, PIMPLE 3/3/1 as the tutorial;
                p by GAMG (DICGaussSeidel smoother) unless --p-solver gs.
@@ -101,8 +103,10 @@ def main() -> int:
     ap.add_argument("--delta-t", type=float, required=True)
     ap.add_argument("--end", type=float, default=7.0)
     ap.add_argument("--write-every", type=float, default=0.25, help="checkpoint interval (s)")
-    ap.add_argument("--fsi-tol", type=float, default=1e-6)
-    ap.add_argument("--n-outer", type=int, default=50)
+    ap.add_argument("--fsi-tol", type=float, default=1e-5)
+    ap.add_argument("--n-outer", type=int, default=30)
+    ap.add_argument("--no-allow-unconverged", dest="allow_unconverged", action="store_false",
+                    help="abort at nOuterCorr instead of accepting a step at the IQN-ILS noise floor")
     ap.add_argument("--fluid-tol", type=float, default=1e-9)
     ap.add_argument("--p-solver", choices=("dic", "gs"), default="dic")
     ap.add_argument("--solid-rtol", type=float, default=1e-9, help="PETSc snes_rtol (tutorial 1e-6)")
@@ -188,7 +192,11 @@ def main() -> int:
         t = sub1(t, r"^(\s*couplingStartTime\s+)[^;]*;", r"\g<1>2.0;", "couplingStartTime", regex=True)
         return sub1(t, r"^(\s*writeResidualsToFile\s+yes;)",
                     r"\1\n\n    // Strict convergence test (issue #552): both residual measures\n"
-                    r"    requireAllResidualMeasures yes;", "strict", regex=True)
+                    r"    requireAllResidualMeasures yes;"
+                    + (r"\n\n    // Steps that reach nOuterCorr at the IQN-ILS noise floor (r1 ~ 1e-6 to"
+                       r"\n    // 1e-5) are accepted and counted in the analysis"
+                       r"\n    allowUnconvergedCoupling yes;" if a.allow_unconverged else ""),
+                    "strict", regex=True)
     edit(case / "constant/fsiProperties", fsi)
     if re.search(r"(?m)^\s*couplingReuse\s", (case / "constant/fsiProperties").read_text()):
         raise SystemExit("couplingReuse must stay off")

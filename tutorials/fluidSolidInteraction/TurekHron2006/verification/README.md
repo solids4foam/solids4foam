@@ -1476,14 +1476,35 @@ renamed the tutorial to `TurekHron2006`, and the verification tree moved with it
 
 ### STATUS (work in progress)
 
-| job | what | where (xenosim) | cores |
+| job | what | where | cores |
 |---|---|---|---:|
-| 10860 | 8x' ring+box replay, 752 896 cells, dt 1.25e-4, 25 to 31.2 s | `~/ht_prod/work/rb_8x_fastp` | 64 |
-| 10861 | coupled pilot 1x'/solid 2x, dt 5e-4, strict tol 1e-5 | `~/ht_prod/work/p_1x_dt5e-4_tol1e-5` | 8 |
-| 10873 | coupled 4x'/solid 8x, dt 5e-4, strict tol 1e-6, 0 to 7 s | `~/ht_prod/work/c_4x_dt5e-4_tol1e-6` | 24 |
+| MeluXina 5327153 | 8x' ring+box replay, 752 896 cells, dt 1.25e-4, 25 to 30.2 s | `/project/home/p201136/philip-ht/rb_8x_fastp_mlx` | 128 |
+| xenosim 10880 | coupled 4x'/solid 8x, dt 5e-4, strict tol 1e-5, 0 to 7 s | `~/ht_prod/work/c_4x_dt5e-4_tol1e-5` | 24 |
+| xenosim 10881 | coupled 1x'/solid 2x, dt 5e-4, strict tol 1e-5 (restart of the pilot at 2.5 s) | `~/ht_prod/work/c_1x_dt5e-4_tol1e-5` | 8 |
+| xenosim 10885 | coupled 2x'/solid 4x, dt 5e-4, strict tol 1e-5 | `~/ht_prod/work/c_2x_dt5e-4_tol1e-5` | 16 |
+| xenosim 10886 | coupled 2x'/solid 4x, dt 1e-3, strict tol 1e-5 (temporal) | `~/ht_prod/work/c_2x_dt1e-3_tol1e-5` | 16 |
 
-Next: coupling-tolerance branches on 1x' from the pilot's limit cycle; 1x' and 2x'
-production runs (tol 1e-6); 2x' temporal runs (dt 1e-3 cold, dt 2.5e-4 branch) and a 4x'
-dt 2.5e-4 branch; solid check at 2x'. Environments: `scripts/prod_env_study.sh` (replay,
-study binary of the 1x'-4x' replays) and `scripts/prod_env_build.sh` (coupled, production
-build at 30d6e22f3 with PR #554).
+Decisions so far (details below when complete):
+
+- The 8x' replay was started on xenosim (64 ranks, 0.82 s/step) and moved to MeluXina
+  when the shared node filled up and the step time rose to 2.6-3.7 s. The MeluXina binary
+  is built from the same solids4foam commit (aee0c8e3) and OpenFOAM v2512 (source build,
+  GCC 13.3, EPYC 7H12) as the xenosim study binary (GCC 11.4, EPYC 9684X). The xenosim
+  partial run (25 to 26.37 s) is kept as a platform cross-check
+  (`~/ht_prod/work/rb_8x_fastp_xenosim_partial`). The pressure solver is GAMG with the
+  DICGaussSeidel smoother and nCellsInCoarsestLevel 200 (same tolerances as 1x'-4x'),
+  2.1x faster than the GaussSeidel/20 setting at 8x' and equal to 1e-5 relative after 200
+  steps (`timing` runs).
+- Coupling: under the strict test the IQN-ILS relative residual r1 falls to 1e-7 to 1e-6
+  within about 15 iterations and then wanders between 1e-7 and 5e-6 (r2 ~ r1/100); a
+  tighter PIMPLE loop (6 outer correctors) does not lower that floor
+  (`reference/production/coupling_floor_1x.txt`). A 1x' pilot at strict tol 1e-5 aborted
+  at 2.74 s on one step at r1 = 1.4e-5 after 50 iterations. Production runs use strict tol
+  1e-5, nOuterCorr 30 and `allowUnconvergedCoupling yes`; steps that reach 30 iterations
+  are counted, with their residual.
+- Time design (Astra, `reference/production/astra_3_*`): fixed dt 5e-4 for the spatial
+  sequence, temporal runs at 2x' (1e-3, and a 2.5e-4 branch) and a 4x' 2.5e-4 branch.
+
+Environments: `scripts/prod_env_study.sh` (replay, study binary of the 1x'-4x' replays),
+`scripts/prod_env_build.sh` (coupled, production build at 30d6e22f3 with PR #554),
+`scripts/run_replay_meluxina.slurm`.
