@@ -473,6 +473,15 @@ release. For complete commit-level details and contributor information, see the
   caller to justify its shape. An external driver calling
   `solidModel::newDeltaT()` no longer compiles, and adaptive time stepping
   driven by material state will need a new interface rather than this one.
+- The `prevAcceleration_` field of the `movingWallPressure` boundary
+  condition, with its `prevAcceleration()` accessors, and the public virtual
+  `fluidSolidInterface::updateMovingWallPressureAcceleration()` that the
+  coupling interfaces called to set it, are removed (#377). The condition
+  takes the wall acceleration from `newMovingWallVelocity` and never read the
+  field, so results are unchanged; each outer iteration no longer interpolates
+  the solid interface acceleration only to discard it, and the log no longer
+  prints "Setting acceleration at fluid side of the interface". The
+  `elasticWallPressure` acceleration update is unaffected.
 - `vertexCentredNonLinTotalLagGeometry` is no longer compiled, on any fork. The
   solver does not currently run: no tutorial selected it, so nothing exercised
   it, an attempt to give it one failed inside the PETSc solve, and its
