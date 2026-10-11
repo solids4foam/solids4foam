@@ -32,9 +32,15 @@ if [ "${1:-}" = "all" ]
 then
     echo ""
     echo "Removing the regression test and verification outputs"
-    for allclean in $(find . -mindepth 2 -name Allclean -type f)
+    # Only tutorials with a regressionTest.sh create these outputs, and every
+    # tutorial with a verification study has one; skip the generated cases,
+    # which hold copies of the tutorial scripts
+    for script in $(find . -mindepth 2 \( -name regressionTests -o -name work \) \
+                        -prune -o -name regressionTest.sh -type f -print)
     do
-        (cd "$(dirname "$allclean")" && ./Allclean all > /dev/null 2>&1)
+        dir="$(dirname "$script")"
+        (cd "$dir" && ./Allclean all > /dev/null 2>&1) \
+            || echo "    Allclean all failed in $dir"
     done
 fi
 

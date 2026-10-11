@@ -10,7 +10,10 @@ export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# cleanCase reads unset variables in some OpenFOAM versions
+set +u
 cleanCase
+set -u
 \rm -rf 0
 \rm -rf constant/polyMesh
 \rm -rf case.foam postProcessing history logs system/*Subset constant/*Subset

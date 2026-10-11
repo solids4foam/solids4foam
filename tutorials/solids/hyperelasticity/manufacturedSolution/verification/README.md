@@ -100,3 +100,7 @@ recover second order with `cosine`, the exact initial acceleration would have to
 be supplied in the `NewmarkA(D)` field at the start time.
 
 The study is not run by `tutorials/Alltest`.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

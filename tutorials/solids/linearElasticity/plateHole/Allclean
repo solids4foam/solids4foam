@@ -12,7 +12,10 @@ source solids4FoamScripts.sh
 
 wclean lib src
 
+# cleanCase reads unset variables in some OpenFOAM versions
+set +u
 cleanCase
+set -u
 
 \rm -f constant/polyMesh/boundary case.foam postProcessing.gplt
 \rm -rf system/*Subset constant/*Subset postProcessing
