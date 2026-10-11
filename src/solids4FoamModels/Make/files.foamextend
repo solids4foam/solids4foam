@@ -44,6 +44,7 @@ $(fluidMeshMotionCouplers)/displacementFluidMeshMotionCoupler/displacementFluidM
 $(fluidMeshMotionCouplers)/RBFFluidMeshMotionCoupler/RBFFluidMeshMotionCoupler.C
 $(fluidMeshMotionCouplers)/tetFemVelocityFluidMeshMotionCoupler/tetFemVelocityFluidMeshMotionCoupler.C
 $(fluidMeshMotionCouplers)/subsetMeshFluidMeshMotionCoupler/subsetMeshFluidMeshMotionCoupler.C
+$(fluidMeshMotionCouplers)/solidModelFluidMeshMotionCoupler/solidModelFluidMeshMotionCoupler.C
 
 interfaceToInterface = fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping
 $(interfaceToInterface)/interfaceToInterfaceMapping/interfaceToInterfaceMapping.C

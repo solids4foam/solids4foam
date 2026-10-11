@@ -172,6 +172,19 @@ public:
                 return totalDisp_;
             }
 
+            //- Return true if the point displacement field is set from the
+            //  patch face values
+            Switch enforcePointPatchField() const
+            {
+                return enforcePointPatchField_;
+            }
+
+            //- Return true if the displacement is given by a time series
+            bool timeVarying() const
+            {
+                return dispSeries_.size() > 0;
+            }
+
         // Evaluation functions
 
             //- Update the coefficients associated with the patch field
