@@ -552,8 +552,10 @@ release. For complete commit-level details and contributor information, see the
   `triSurfaces` entries without the `triSurfaces` keyword, so a case using it
   could not be restarted at all; `solidContact` and `solidRigidContact` lost
   `quickReject`; `solidContact` lost `integralNormalGap`, and its point
-  distance switches when it has more than one shadow patch; and
-  `tractionPressureDisplacement` lost `blockCoupled` and `frozenTraction`.
+  distance switches when it has more than one shadow patch;
+  `tractionPressureDisplacement` lost `blockCoupled` and `frozenTraction`;
+  and `simpleCohesiveZone` lost its separation distances, and read
+  `oldSeparationDistance` into the current separation distance.
 
 ## [v2.4] - 2026-08-24
 
