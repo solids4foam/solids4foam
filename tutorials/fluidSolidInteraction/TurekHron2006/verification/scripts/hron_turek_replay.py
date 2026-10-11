@@ -75,7 +75,10 @@ def plate_polyline(mesh: Path) -> tuple[np.ndarray, dict]:
     start, n = patch_range(mesh / "boundary", "plate")
     edges = set()
     for face in faces[start:start + n]:
-        xy = {(round(pts[i][0] * KEY), round(pts[i][1] * KEY)) for i in face}
+        # Keys rounded half away from zero, as std::llround in the boundary
+        # condition (round() rounds ties to even; the ring+box 8x mesh has
+        # plate points on exact ties)
+        xy = {(int(np.floor(pts[i][0] * KEY + 0.5)), int(np.floor(pts[i][1] * KEY + 0.5))) for i in face}
         if len(xy) == 2:
             edges.add(tuple(sorted(xy)))
     adjacency: dict = {}
@@ -122,7 +125,7 @@ def read_source(case: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     disp = np.zeros((len(times), len(path), 2))
     count = np.zeros(len(path))
     for gid, xy in series.items():
-        key = (round(ref[gid][0] * KEY), round(ref[gid][1] * KEY))
+        key = (int(np.floor(ref[gid][0] * KEY + 0.5)), int(np.floor(ref[gid][1] * KEY + 0.5)))
         if key not in index:
             continue
         v = index[key]
@@ -191,7 +194,8 @@ def write_table(path: Path, reference: np.ndarray, coef: np.ndarray, omega: floa
     with path.open("w") as handle:
         handle.write(f"{omega:.12g} {len(reference)} {coef.shape[2]}\n")
         for xy, c in zip(reference, coef):
-            handle.write(f"{round(xy[0] * KEY)} {round(xy[1] * KEY)} "
+            # keys rounded half away from zero, see plate_polyline
+            handle.write(f"{int(np.floor(xy[0] * KEY + 0.5))} {int(np.floor(xy[1] * KEY + 0.5))} "
                          + " ".join(f"{v:.9g}" for v in c.reshape(-1)) + "\n")
 
 
