@@ -173,15 +173,14 @@ def tutorial_fingerprint() -> str:
     for directory in ("0", "constant", "system", "geometry"):
         for path in sorted((TUTORIAL / directory).rglob("*")):
             relative = path.relative_to(TUTORIAL)
-            if "polyMesh" in path.parts or "triSurface" in path.parts:
+            if "polyMesh" in path.parts:
                 continue
             if path.is_symlink():
                 digest.update(f"{relative}->{os.readlink(path)}".encode())
             elif path.is_file():
                 digest.update(str(relative).encode())
                 digest.update(path.read_bytes())
-    for name in ("Allrun", "makeFluidSurface.py"):
-        digest.update((TUTORIAL / name).read_bytes())
+    digest.update((TUTORIAL / "Allrun").read_bytes())
     return digest.hexdigest()
 
 
@@ -828,7 +827,7 @@ def ignored(directory: str, names: list[str]) -> set[str]:
             and directory_path.parent.name == "constant":
         skip.add("polyMesh")
     if directory_path == TUTORIAL / "constant":
-        skip.update({"polyMesh", "triSurface"})
+        skip.add("polyMesh")
     return skip.intersection(names)
 
 

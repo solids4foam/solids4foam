@@ -99,14 +99,17 @@ motion solver and a quadratic inverse-distance diffusivity.
 
 `Allrun` builds the meshes:
 
-1. `makeFluidSurface.py` reads the published surface, splits it into the
-   patches `upperInlet`, `lowerInlet`, `outlet`, `wall` and `interface` (the
-   five faces of the flap cavity), adds the 250 mm outlet extension and writes
-   `constant/triSurface/fluidDomain.stl`. It needs only the Python 3 standard
-   library.
-2. `cartesianMesh` builds the fluid mesh from `system/meshDict.coarse` or
-   `system/meshDict.medium`.
-3. `blockMesh` builds the solid mesh (`system/solid/blockMeshDict`).
+1. `cartesianMesh` builds the fluid mesh from `system/meshDict.coarse` or
+   `system/meshDict.medium` and the surface
+   `constant/triSurface/fluidDomain.stl.gz`.
+2. `blockMesh` builds the solid mesh (`system/solid/blockMeshDict`).
+
+The fluid surface is the published surface split into the patches
+`upperInlet`, `lowerInlet`, `outlet`, `wall` and `interface` (the five faces
+of the flap cavity), with the 250 mm outlet extension. It is committed, so the
+tutorial needs no Python. `validation/scripts/makeFluidSurface.py` generated it
+from `geometry/fluidDomain.vtk.gz` and reproduces it byte for byte; it needs
+only the Python 3 standard library.
 
 | Mesh | Cells | Wall and jets | Flap region | Flap surface |
 | --- | --- | --- | --- | --- |
@@ -116,8 +119,8 @@ motion solver and a quadratic inverse-distance diffusivity.
 
 ## Running
 
-The case requires PETSc, `cartesianMesh` (cfMesh, part of OpenFOAM.com) and
-`python3`. It does not run with foam-extend.
+The case requires PETSc and `cartesianMesh` (cfMesh, part of OpenFOAM.com).
+It does not run with foam-extend.
 
 ```bash
 ./Allrun                    # coarse fluid mesh, serial

@@ -150,7 +150,8 @@ release. For complete commit-level details and contributor information, see the
   against Phase I (steady inflow) of the Hessenthaler et al. (2017) 3D FSI
   experiment: a buoyant silicone flap in the merging flow of two inlets,
   measured by MRI. The fluid mesh is built with `cartesianMesh` from the
-  published surface, the interface is non-conforming (AMI), and buoyancy is a
+  published surface (split into patches and committed, so the tutorial needs
+  no Python), the interface is non-conforming (AMI), and buoyancy is a
   net solid body force. An opt-in `validation/Allvalidate` calibrates the
   shear modulus to the zero-flow deflection and compares the Phase I flap
   centreline and the voxel-averaged MRI velocity with the measurements; the

@@ -45,16 +45,14 @@ prepare_case() {
 
     # Copy only the case inputs: results, logs and generated meshes from any
     # previous run of the tutorial are deliberately left behind
-    for item in Allrun Allclean 0 constant system geometry \
-        makeFluidSurface.py
+    for item in Allrun Allclean 0 constant system
     do
         cp -a "${SCRIPT_DIR}/${item}" "${CASE_DIR}/"
     done
 
     rm -rf "${CASE_DIR}/constant/polyMesh" \
            "${CASE_DIR}/constant/fluid/polyMesh" \
-           "${CASE_DIR}/constant/solid/polyMesh" \
-           "${CASE_DIR}/constant/triSurface"
+           "${CASE_DIR}/constant/solid/polyMesh"
 
     # Portable in-place edit (GNU and BSD sed)
     sed -i.orig \
@@ -83,7 +81,7 @@ else
     echo "Running in check-only mode: skipping Allrun"
 fi
 
-# The case requires PETSc, cartesianMesh and python3: when any is missing
+# The case requires PETSc and cartesianMesh: when either is missing
 # Allrun writes a declared skip message, which is the only valid reason to
 # skip the checks
 if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then

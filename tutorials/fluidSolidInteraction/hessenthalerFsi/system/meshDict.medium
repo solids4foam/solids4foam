@@ -22,7 +22,7 @@ FoamFile
 // powers of two; each requested size is set just above the intended level so
 // that rounding does not select the next finer level.
 
-surfaceFile     "constant/triSurface/fluidDomain.stl";
+surfaceFile     "constant/triSurface/fluidDomain.stl.gz";
 
 // Bulk cell size, used in the outlet extension away from the wall
 maxCellSize     0.004;

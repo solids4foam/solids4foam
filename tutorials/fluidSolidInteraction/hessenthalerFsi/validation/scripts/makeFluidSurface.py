@@ -15,11 +15,17 @@ and extends the outlet pipe (diameter 76.2 mm) by --extension metres, as in
 Hessenthaler, Roehrle and Nordsletten (2017), who found that 50 mm changed
 the flow and used 250 mm.
 
+The tutorial does not run this script: its output,
+constant/triSurface/fluidDomain.stl.gz, is committed so that Allrun needs no
+Python. Run it from any directory to regenerate that file, e.g. after changing
+the extension; the gzip output is reproducible byte for byte.
+
 Only the Python 3 standard library is used.
 """
 
 import argparse
 import gzip
+import io
 import math
 from pathlib import Path
 
@@ -97,12 +103,37 @@ def rim_loop(triangles, names, patch):
     return loop
 
 
+def open_output(path):
+    """Text handle for path; gzip with a fixed header if it ends in .gz."""
+    if path.suffix != ".gz":
+        return path.open("w")
+    # mtime=0 and the bare file name keep the compressed bytes reproducible
+    raw = gzip.GzipFile(filename=path.stem, mode="wb", compresslevel=9,
+                        fileobj=path.open("wb"), mtime=0)
+    return _ClosingText(raw)
+
+
+class _ClosingText(io.TextIOWrapper):
+    """TextIOWrapper that also closes the file under a GzipFile."""
+
+    def __init__(self, raw):
+        super().__init__(raw)
+        self._file = raw.fileobj
+
+    def close(self):
+        super().close()
+        self._file.close()
+
+
 def main():
-    here = Path(__file__).resolve().parent
+    tutorial = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--input", default=here / "geometry/fluidDomain.vtk.gz")
+    parser.add_argument("--input",
+                        default=tutorial / "geometry/fluidDomain.vtk.gz")
     parser.add_argument("--output",
-                        default=here / "constant/triSurface/fluidDomain.stl")
+                        default=tutorial
+                        / "constant/triSurface/fluidDomain.stl.gz",
+                        help="output STL, gzipped if the name ends in .gz")
     parser.add_argument("--extension", type=float, default=0.25,
                         help="outlet extension length in metres (default 0.25)")
     parser.add_argument("--segments", type=int, default=25,
@@ -149,7 +180,7 @@ def main():
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w") as handle:
+    with open_output(out) as handle:
         for name, tris in faces.items():
             handle.write(f"solid {name}\n")
             for tri in tris:
