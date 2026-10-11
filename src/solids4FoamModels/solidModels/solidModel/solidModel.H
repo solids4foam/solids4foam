@@ -21,6 +21,14 @@ Class
 Description
     Virtual base class for solid mechanics models
 
+    Restarting: set "restart yes;" in the solid model's coefficients
+    dictionary, from the start of the run, to write the fields a run continued
+    from a later time needs: DD and its old-time levels, D_0, D_0_0, pointD_0,
+    pointDD, grad(D), grad(D)_0 and grad(DD). The default is "no". A run that
+    continues from a time without grad(D)_0 stops if "restart" is not set at
+    all, and continues with a warning if it is set to "no". See the "Restarting
+    a Solid Model" section of solidModels/README.md.
+
 Author
     Zeljko Tukovic, FSB Zagreb.
     Philip Cardiff, UCD.
@@ -301,8 +309,9 @@ private:
         //  not thought about restarting, and the other is one who has
         const Switch restartSpecified_;
 
-        //- Optional: restart flag
-        //  Write out all fields required for a consistent restart
+        //- Optional: restart flag (default: no)
+        //  Write out all fields required for a consistent restart; see the
+        //  class description for the fields and the checks on continuing
         const Switch restart_;
 
         //- Whether a continued run has the kinematic history, the old-time
