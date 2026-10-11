@@ -8,6 +8,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The fluid-solid interface now supports displacement-based fluid mesh motion
+  solvers, e.g. `displacementLaplacian` and `displacementSBRStress`, in
+  addition to the velocity-based ones. When the fluid mesh has a
+  `pointDisplacement` field, the interface is set to the total displacement
+  relative to the initial points; the `pointMotionU` behaviour is unchanged.
+  Velocity-based solvers are path dependent and the interior mesh can drift
+  under periodic motion, which `displacementLaplacian` avoids.
 - Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
   applies the backward differentiation formula of order 1 to 6 twice, as the
   `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and
