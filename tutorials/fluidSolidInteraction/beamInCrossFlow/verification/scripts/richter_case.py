@@ -28,6 +28,7 @@ import importlib.util
 import json
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve()
@@ -245,8 +246,11 @@ def build(args: argparse.Namespace) -> Path:
     # Fluid algorithm and linear solvers
     set_in_block(fluid_solution, "PIMPLE", "nOuterCorrectors", str(args.pimple_outer))
     text = fluid_solution.read_text()
-    for field, tolerance in (("p|pFinal", args.p_tol), ("U|UFinal", args.u_tol)):
-        block = re.search(rf'"{re.escape(field)}"\s*\{{[^}}]*\}}', text)
+    for field, tolerance in (
+        ('"p|pFinal"', args.p_tol), ('"U|UFinal"', args.u_tol),
+        ("cellMotionU", args.motion_tol),
+    ):
+        block = re.search(rf'{re.escape(field)}\s*\{{[^}}]*\}}', text)
         if not block:
             raise RuntimeError(f"no {field} solver in {fluid_solution}")
         new = re.sub(r"(tolerance\s+)[^;]+;", rf"\g<1>{tolerance:.12g};", block.group(0))
@@ -262,6 +266,14 @@ def build(args: argparse.Namespace) -> Path:
     set_petsc_option(solid_solution, "snes_rtol", f"{args.snes_rtol:.12g}")
     set_petsc_option(solid_solution, "snes_stol", f"{args.snes_stol:.12g}")
     set_entry(solid_props, "predictor", "yes")
+    text = solid_props.read_text()
+    if "restart" not in text:
+        # Total-displacement St Venant-Kirchhoff needs no extra restart
+        # fields; continuations happen only near the steady state (the
+        # missing old-old level of issue #555 then implies the correct, zero,
+        # old velocity).
+        text = text.replace("    predictor yes;", "    predictor yes;\n    restart no;", 1)
+        solid_props.write_text(text)
 
     for dictionary in (
         case / "system/decomposeParDict",
@@ -278,11 +290,51 @@ def build(args: argparse.Namespace) -> Path:
         "fluid_cells": sum(a * b * c for a, b, c in fluid),
         "solid_cells": solid[0] * solid[1] * solid[2],
         "solid_counts_xyz": solid,
+        "case_commit": subprocess.run(
+            ["git", "-C", str(SCRIPT.parent), "rev-parse", "HEAD"],
+            capture_output=True, text=True,
+        ).stdout.strip(),
     })
+    if args.init_fluid:
+        initialise_fluid(case, Path(args.init_fluid))
     if args.rigid:
         make_rigid(case)
     (case / "campaign_case.json").write_text(json.dumps(metadata, indent=2) + "\n")
     return case
+
+
+def internal_field(path: Path) -> str:
+    """Return the internalField entry (keyword to semicolon) of an ascii file."""
+    text = path.read_text()
+    start = text.index("internalField")
+    depth, index = 0, start
+    while True:
+        char = text[index]
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        elif char == ";" and depth == 0:
+            return text[start:index + 1]
+        index += 1
+
+
+def initialise_fluid(case: Path, source: Path) -> None:
+    """Start the fluid from a converged rigid-beam flow on the same mesh.
+
+    Only the internal fields of U and p are taken; the boundary conditions of
+    the coupled case are kept.  The inlet is then applied at full strength
+    from t = 0 (no ramp), because the flow is already developed.
+    """
+    for name in ("U", "p"):
+        target = case / "0/fluid" / name
+        text = target.read_text()
+        old = internal_field(target)
+        text = text.replace(old, internal_field(source / name), 1)
+        target.write_text(text)
+    u_file = case / "0/fluid/U"
+    set_entry(u_file, "timeVaryingEndTime", "0")
+    set_entry(u_file, "timeAtMaxVelocity", "1")
 
 
 def move_contents(source: Path, destination: Path) -> None:
@@ -369,9 +421,14 @@ def main() -> int:
     parser.add_argument("--pimple-residual-control", type=float)
     parser.add_argument("--p-tol", type=float, default=1e-6)
     parser.add_argument("--u-tol", type=float, default=1e-6)
+    parser.add_argument("--motion-tol", type=float, default=1e-6,
+                        help="cellMotionU (mesh-motion velocity) solver tolerance")
     parser.add_argument("--snes-rtol", type=float, default=1e-6)
     parser.add_argument("--snes-stol", type=float, default=1e-6)
     parser.add_argument("--ranks", type=int, default=1)
+    parser.add_argument("--init-fluid",
+                        help="time directory of a reconstructed rigid-beam run "
+                        "on the same fluid mesh; its U and p start the fluid")
     parser.add_argument("--rigid", action="store_true",
                         help="fluid-only case with the beam held rigid")
     args = parser.parse_args()
