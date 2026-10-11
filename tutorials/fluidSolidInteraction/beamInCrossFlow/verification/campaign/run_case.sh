@@ -17,14 +17,19 @@ else
 fi
 cd "$case_dir" || exit 1
 if [ ! -d processor0 ] && [ ! -d processors"$ranks" ]; then
-    blockMesh -region solid > log.blockMesh.solid 2>&1 || exit 1
-    blockMesh -region fluid > log.blockMesh.fluid 2>&1 || exit 1
-    checkMesh -region fluid > log.checkMesh.fluid 2>&1
-    checkMesh -region solid > log.checkMesh.solid 2>&1
-    if [ "$ranks" -gt 1 ]; then
-        decomposePar -region fluid > log.decomposePar.fluid 2>&1 || exit 1
-        decomposePar -region solid > log.decomposePar.solid 2>&1 || exit 1
+    if [ -d system/fluid ]; then
+        regions="solid fluid"
+    else
+        regions="none"
     fi
+    for region in $regions; do
+        opt=(); [ "$region" != none ] && opt=(-region "$region")
+        blockMesh "${opt[@]}" > log.blockMesh.$region 2>&1 || exit 1
+        checkMesh "${opt[@]}" > log.checkMesh.$region 2>&1
+        if [ "$ranks" -gt 1 ]; then
+            decomposePar "${opt[@]}" > log.decomposePar.$region 2>&1 || exit 1
+        fi
+    done
     log=log.solids4Foam
 else
     sed -i.bak -e 's/^startFrom .*/startFrom       latestTime;/' system/controlDict

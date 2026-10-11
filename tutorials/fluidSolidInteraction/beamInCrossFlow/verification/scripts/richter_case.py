@@ -279,8 +279,63 @@ def build(args: argparse.Namespace) -> Path:
         "solid_cells": solid[0] * solid[1] * solid[2],
         "solid_counts_xyz": solid,
     })
+    if args.rigid:
+        make_rigid(case)
     (case / "campaign_case.json").write_text(json.dumps(metadata, indent=2) + "\n")
     return case
+
+
+def move_contents(source: Path, destination: Path) -> None:
+    for path in source.iterdir():
+        target = destination / path.name
+        if target.is_symlink() or target.is_file():
+            target.unlink()
+        elif target.is_dir():
+            shutil.rmtree(target)
+        shutil.move(str(path), str(target))
+    source.rmdir()
+
+
+def make_rigid(case: Path) -> None:
+    """Turn the FSI case into the fluid-only case with a rigid beam.
+
+    The fluid mesh, schemes, solvers, inlet and time control are those of the
+    coupled case; the interface is a fixed no-slip wall and the mesh is static.
+    """
+    shutil.rmtree(case / "0/solid")
+    shutil.rmtree(case / "constant/solid")
+    shutil.rmtree(case / "system/solid")
+    for name in ("decomposeParDict",):
+        (case / "system" / name).unlink()
+    move_contents(case / "0/fluid", case / "0")
+    move_contents(case / "constant/fluid", case / "constant")
+    move_contents(case / "system/fluid", case / "system")
+    (case / "0/pointMotionU").unlink()
+    (case / "constant/fsiProperties").unlink()
+    physics = case / "constant/physicsProperties"
+    physics.write_text(
+        physics.read_text().replace("type    fluidSolidInteraction;", "type    fluid;")
+    )
+    velocity = case / "0/U"
+    text = velocity.read_text()
+    match = re.search(r"interface\s*\{.*?\n\s*\}", text, re.DOTALL)
+    if not match:
+        raise RuntimeError("no interface condition in 0/U")
+    text = (
+        text[:match.start()]
+        + "interface\n    {\n        type            noSlip;\n    }"
+        + text[match.end():]
+    )
+    velocity.write_text(text)
+    (case / "constant/dynamicMeshDict").write_text(
+        "FoamFile\n{\n    version 2.0;\n    format ascii;\n    class dictionary;\n"
+        "    object dynamicMeshDict;\n}\n\ndynamicFvMesh staticFvMesh;\n"
+    )
+    functions = case / "system/functions"
+    text = functions.read_text()
+    text = re.sub(r"\n\s*displacement\s*\{[^}]*\}", "", text)
+    text = re.sub(r"\n\s*region\s+fluid;", "", text)
+    functions.write_text(text)
 
 
 def main() -> int:
@@ -317,6 +372,8 @@ def main() -> int:
     parser.add_argument("--snes-rtol", type=float, default=1e-6)
     parser.add_argument("--snes-stol", type=float, default=1e-6)
     parser.add_argument("--ranks", type=int, default=1)
+    parser.add_argument("--rigid", action="store_true",
+                        help="fluid-only case with the beam held rigid")
     args = parser.parse_args()
     case = build(args)
     print(case)
