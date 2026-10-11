@@ -617,6 +617,11 @@ write(Ostream& os) const
     pressure_.writeEntry("pressure", os);
     secondaryGradient_.writeEntry("secondaryGradient", os);
 
+    os.writeKeyword("blockCoupled")
+        << blockCoupled_ << token::END_STATEMENT << nl;
+    os.writeKeyword("frozenTraction")
+        << Switch(frozenTraction_) << token::END_STATEMENT << nl;
+
     if (tractionSeries_.size())
     {
         os.writeKeyword("tractionSeries") << nl;

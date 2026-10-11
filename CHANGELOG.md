@@ -542,6 +542,18 @@ release. For complete commit-level details and contributor information, see the
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
   the base coupling class.
+- Boundary conditions now write the settings they read, so a run restarted
+  from a written time uses the settings of the run it continues (#409).
+  `fixedTemperature` lost its `temperatureSeries`, so a restarted run held
+  the temperature at its value at the restart time.
+  `fixedDisplacement` lost `enforcePointPatchField`, `fixedRotation` lost
+  `nonOrthogonalCorrections`, and the point `solidForce` condition lost the
+  `region` of its `forceField`. In foam-extend, `solidRigidContact` wrote its
+  `triSurfaces` entries without the `triSurfaces` keyword, so a case using it
+  could not be restarted at all; `solidContact` and `solidRigidContact` lost
+  `quickReject`; `solidContact` lost `integralNormalGap`, and its point
+  distance switches when it has more than one shadow patch; and
+  `tractionPressureDisplacement` lost `blockCoupled` and `frozenTraction`.
 
 ## [v2.4] - 2026-08-24
 
