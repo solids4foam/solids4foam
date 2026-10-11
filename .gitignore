@@ -8,6 +8,8 @@ tutorialsTest*
 regressionTests*
 **/verification/work/
 **/verification/postProcessing/
+**/validation/work/
+**/validation/postProcessing/
 codex*.md
 
 # Build log files

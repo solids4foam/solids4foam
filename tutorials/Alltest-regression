@@ -181,6 +181,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/TurekHron2006"
     "fluidSolidInteraction/mokLidDrivenCavity"
     "fluidSolidInteraction/fillingElasticContainer"
+    "fluidSolidInteraction/hessenthalerFsi"
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
     "fluidSolidInteraction/womersleyTube"
