@@ -546,16 +546,18 @@ release. For complete commit-level details and contributor information, see the
   from a written time uses the settings of the run it continues (#409).
   `fixedTemperature` lost its `temperatureSeries`, so a restarted run held
   the temperature at its value at the restart time.
-  `fixedDisplacement` lost `enforcePointPatchField`, `fixedRotation` lost
-  `nonOrthogonalCorrections`, and the point `solidForce` condition lost the
-  `region` of its `forceField`. In foam-extend, `solidRigidContact` wrote its
-  `triSurfaces` entries without the `triSurfaces` keyword, so a case using it
-  could not be restarted at all; `solidContact` and `solidRigidContact` lost
+  `fixedDisplacement` lost `enforcePointPatchField`, `fixedRotation` (finite
+  volume and point) lost `nonOrthogonalCorrections`, and the point
+  `solidForce` condition lost the `region` of its `forceField`. In
+  foam-extend, `solidRigidContact` wrote its `triSurfaces` entries without
+  the `triSurfaces` keyword, so a case using it could not be restarted at
+  all; `solidContact` and `solidRigidContact` lost
   `quickReject`; `solidContact` lost `integralNormalGap`, and its point
   distance switches when it has more than one shadow patch;
   `tractionPressureDisplacement` lost `blockCoupled` and `frozenTraction`;
-  and `simpleCohesiveZone` lost its separation distances, and read
-  `oldSeparationDistance` into the current separation distance.
+  and `simpleCohesiveZone` lost its separation distances, read
+  `oldSeparationDistance` into the current separation distance, and did not
+  read back the `initiationTraction` it wrote.
 - A case with a `fixedRotation` condition, such as `rigidRotation`, can now
   be restarted with OpenFOAM.com (#409). The condition read its nonuniform
   `value` a second time, which fails once the base class has read it, and

@@ -407,6 +407,9 @@ void fixedRotationPointPatchVectorField::write(Ostream& os) const
 {
     fixedValuePointPatchVectorField::write(os);
 
+    os.writeKeyword("nonOrthogonalCorrections")
+        << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
+
     if (angleSeries_.size())
     {
         os.writeKeyword("rotationAngleSeries") << nl;

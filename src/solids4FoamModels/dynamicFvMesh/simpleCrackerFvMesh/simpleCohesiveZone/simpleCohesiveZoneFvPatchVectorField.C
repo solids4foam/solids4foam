@@ -234,6 +234,12 @@ simpleCohesiveZoneFvPatchVectorField
         oldSeparationDistance_ =
             scalarField("oldSeparationDistance", dict, p.size());
     }
+
+    if (dict.found("initiationTraction"))
+    {
+        initiationTraction_ =
+            vectorField("initiationTraction", dict, p.size());
+    }
 }
 
 
