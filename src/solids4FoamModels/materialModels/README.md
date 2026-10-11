@@ -81,6 +81,7 @@ use it:
 | [`linearElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity, with an optional residual stress |
 | [`linearElasticMisesPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMisesPlasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity with von Mises plasticity and hardening |
 | [`linearElasticMohrCoulombPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity with Mohr-Coulomb plasticity |
+| [`diffusionElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/diffusionElasticMechanicalConstitutiveLaw/README.md) | small | Hookean elasticity scaled by a mesh motion diffusivity, for mesh motion |
 | [`viscousHookeanElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/viscousHookeanElasticMechanicalConstitutiveLaw/README.md) | small | Linear viscoelasticity (Prony series) |
 | [`anisotropicBiotElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/anisotropicBiotElasticMechanicalConstitutiveLaw/README.md) | small | Orthotropic elasticity for poroelastic soils |
 | [`thermoMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/thermoMechanicalLawMechanicalConstitutiveLaw/README.md) | small | Thermal expansion over a sub-law, from a temperature field |
@@ -88,6 +89,7 @@ use it:
 | [`StVenantKirchhoffElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/StVenantKirchhoffElasticMechanicalConstitutiveLaw/README.md) | finite | St. Venant-Kirchhoff hyperelasticity |
 | [`neoHookeanElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/neoHookeanElasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean hyperelasticity |
 | [`neoHookeanElasticMisesPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean elasticity with von Mises plasticity |
+| [`diffusionHyperElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/diffusionHyperElasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean hyperelasticity scaled by a mesh motion diffusivity, for mesh motion |
 | [`MooneyRivlinElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/MooneyRivlinElasticMechanicalConstitutiveLaw/README.md) | finite | Mooney-Rivlin hyperelasticity |
 | [`OgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/OgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Three-term Ogden hyperelasticity |
 | [`GuccioneElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/GuccioneElasticMechanicalConstitutiveLaw/README.md) | finite | Transversely isotropic myocardium (Guccione) |
