@@ -890,3 +890,10 @@ cycle on the flag. Compact results and 2 s histories: `reference/replay/`.
 trajectory with `movingWallPressure` (`dp/dn = -rho n.a_wall`) on the flag instead
 of the tutorial's `zeroGradient`; `scripts/replay_compare.py` prints the two
 sets of harmonics side by side (results in `reference/replay_wallpressure/`).
+
+## Run archive
+
+The raw run directories of these studies (coupled FSI3 1x/2x/4x and variants,
+CFD3, prescribed-motion and replay runs, and the 2x replay source) were moved on
+2026-10-11 to `xenosim:/home/philipc/ht_archive/fsi3_work_2026-10` (13 GB);
+`verification/work` in the original worktree is a symlink to it.
