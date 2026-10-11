@@ -8,6 +8,35 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
+  applies the backward differentiation formula of order 1 to 6 twice, as the
+  `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and
+  it reduces the order during start-up. Only `d2dt2Schemes` needs the entry
+  (#502). BDF3 and BDF4 slowly amplify an undamped oscillation, by about 4.5%
+  and 0.6% per period at 20 steps per period, and BDF5 and BDF6 amplify modes
+  with fewer than about 9 and 7.5 steps per period, so they are not
+  recommended for undamped structures, and a warning is printed when an
+  order of 3 or above is selected. The `cantileverVibration` tutorial has a
+  non-default `bdf3` option that shows the effect.
+- A method of manufactured solutions tutorial for finite strains,
+  `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
+  compressible neo-Hookean solid and the total Lagrangian solid model. A
+  tutorial-local library, `libneoHookeanManufacturedSolution`, supplies the
+  manufactured body force, displacement boundary condition, and error
+  function object. The case runs in a `steady` mode, which measures spatial
+  convergence under a quasi-static load ramp, and a `dynamic` mode, which
+  measures temporal convergence of the `Euler`, `backward`, and `NewmarkBeta`
+  schemes on one mesh, with the segregated, PETSc SNES, and high-order
+  (`movingLeastSquares` and `kExactLeastSquares`) solution approaches. The
+  `NewmarkBeta` scheme is shown to need a zero, or supplied, initial
+  acceleration to reach second order. The case is part of
+  `tutorials/Alltest-regression`, and an opt-in `verification/` study runs
+  both convergence sweeps.
+- `nonLinearGeometryTotalLagrangianTotalDisplacement` adds `fvOptions`
+  sources, such as a manufactured body force per unit reference volume, to
+  the momentum equation of both the segregated and PETSc SNES paths on
+  OpenFOAM.com, with the same protected `fvOptionsSource()` hook as the linear
+  geometry model for OpenFOAM.org and foam-extend.
 - A documentation page for each `mechanicalConstitutiveLaw`, next to its
   class, giving its entries and defaults, its state, its tangents, whether it
   supports the mixed displacement-pressure formulation, how it differs from
