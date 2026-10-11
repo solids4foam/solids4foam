@@ -162,6 +162,19 @@ selects `solidProperties.iqnils.highOrder`, enables the high-order MLS
 residual, and uses the existing face-based IQNILS traction transfer with a
 piecewise-constant traction at every solid face quadrature point.
 
+The fluid mesh is moved with `velocityLaplacian` by default. Adding
+`displacementLaplacian` selects displacement-based mesh motion with the same
+diffusivity, e.g. `./Allrun displacementLaplacian`, which gives the same mesh
+for the same beam position. Adding `diffusionElastic` or
+`diffusionHyperElastic` moves the fluid mesh with a solids4foam solid model
+(`solids4foamSolidModel`), using the law of that name, solved on a copy of the
+fluid mesh in the `fluidMeshMotion` region, which `Allrun` creates; the law's
+stiffness is scaled by the `quadratic inverseDistance (interface)` diffusivity.
+The displacement-based options are not available on foam-extend, and the
+solid model options only on OpenFOAM.com. See the
+[fluid-solid interfaces README](../../../src/solids4FoamModels/fluidSolidInterfaces/README.md)
+for the fluid mesh motion options.
+
 For a higher-level overview of the available FSI coupling schemes and the main
 `fluidSolidInterface` options, see the
 [fluid-solid interfaces documentation](https://www.solids4foam.com/documentation/fluid-solid-interfaces/).
@@ -197,6 +210,10 @@ shortened end time. On supported OpenFOAM versions, the high-order result is
 checked against the same displacement and force references as the lower-order
 variants; the displacement tolerance is widened to allow the expected
 discretisation difference. The high-order variant is skipped on foam-extend.
+The `iqnils` case is also run with each of the `displacementLaplacian`,
+`diffusionElastic` and `diffusionHyperElastic` fluid mesh motions, and checked
+against the same references: the mesh motion changes the beam response by much
+less than the tolerances.
 
 For an `elasticWallPressure` interface, FSI convergence also considers the
 normalized interface-pressure change (`robinPressureTolerance`, default
