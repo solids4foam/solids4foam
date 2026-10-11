@@ -556,6 +556,10 @@ release. For complete commit-level details and contributor information, see the
   `tractionPressureDisplacement` lost `blockCoupled` and `frozenTraction`;
   and `simpleCohesiveZone` lost its separation distances, and read
   `oldSeparationDistance` into the current separation distance.
+- A case with a `fixedRotation` condition, such as `rigidRotation`, can now
+  be restarted with OpenFOAM.com (#409). The condition read its nonuniform
+  `value` a second time, which fails once the base class has read it, and
+  rejected the old-time fields, such as `D_0`, read on restart.
 
 ## [v2.4] - 2026-08-24
 
