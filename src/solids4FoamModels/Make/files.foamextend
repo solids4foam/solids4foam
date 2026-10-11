@@ -40,6 +40,7 @@ fluidMeshMotionCouplers = fluidSolidInterfaces/fluidMeshMotionCouplers
 $(fluidMeshMotionCouplers)/fluidMeshMotionCoupler/fluidMeshMotionCoupler.C
 $(fluidMeshMotionCouplers)/fluidMeshMotionCoupler/fluidMeshMotionCouplerNew.C
 $(fluidMeshMotionCouplers)/velocityFluidMeshMotionCoupler/velocityFluidMeshMotionCoupler.C
+$(fluidMeshMotionCouplers)/displacementFluidMeshMotionCoupler/displacementFluidMeshMotionCoupler.C
 $(fluidMeshMotionCouplers)/RBFFluidMeshMotionCoupler/RBFFluidMeshMotionCoupler.C
 $(fluidMeshMotionCouplers)/tetFemVelocityFluidMeshMotionCoupler/tetFemVelocityFluidMeshMotionCoupler.C
 $(fluidMeshMotionCouplers)/subsetMeshFluidMeshMotionCoupler/subsetMeshFluidMeshMotionCoupler.C
