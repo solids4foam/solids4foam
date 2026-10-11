@@ -360,6 +360,12 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::serialPositions
         positionOf.set(serialEntities[i], i);
     }
 
+    // Read once, here, by every rank, rather than for each face that falls
+    // back below. The read can be collective under a collated file handler,
+    // and how many faces fall back differs from rank to rank - a rank holding
+    // no cells has none
+    const labelList cellAddr(cellProcAddressing(mesh));
+
     labelList positions(mine.size(), -1);
 
     forAll(mine, i)
@@ -395,8 +401,6 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::serialPositions
                 //
                 // Its owner cell is the nearest thing that does have history,
                 // and is what the face's own state grew from
-                const labelList cellAddr(cellProcAddressing(mesh));
-
                 iter = positionOf.find
                 (
                     cellEntity(cellAddr[mesh.faceOwner()[localFace]])

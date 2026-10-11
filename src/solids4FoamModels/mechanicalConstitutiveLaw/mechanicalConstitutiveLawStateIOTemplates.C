@@ -78,7 +78,8 @@ bool Foam::mechanicalConstitutiveLawStateIO::readSerialList
 {
     return readListFrom
     (
-        globalCasePath(mesh)/mesh.time().timeName(),
+        // dbDir() is the region name, and empty for the default region
+        globalCasePath(mesh)/mesh.time().timeName()/mesh.dbDir(),
         mesh,
         name,
         data,
@@ -513,7 +514,7 @@ bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
     {
         const fileName procDir
         (
-            casePath/("processor" + Foam::name(nProcs))/timeName
+            casePath/("processor" + Foam::name(nProcs))/timeName/mesh.dbDir()
         );
 
         if (!isDir(casePath/("processor" + Foam::name(nProcs))))

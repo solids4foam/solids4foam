@@ -545,6 +545,11 @@ release. For complete commit-level details and contributor information, see the
   `decomposePar` writes for such a processor to be missing files; in 2-D
   cases, the solid point displacement correction then failed on those
   processors as they hold no `empty` faces.
+- The constitutive state of a solid region, e.g. `solid` in an FSI case, is
+  now found when a serial run is continued in parallel, or a parallel one is
+  reconstructed and continued in serial. The state files were looked for in
+  `<time>/` rather than `<time>/<region>/`, so such a restart stopped, saying
+  that the state was not there.
 - On a restart, the warning that an `elasticWallPressure` (Robin) interface is
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
