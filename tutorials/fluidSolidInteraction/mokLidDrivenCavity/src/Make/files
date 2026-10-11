@@ -1,0 +1,3 @@
+mokCavityVelocity/mokCavityVelocityFvPatchVectorField.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libmokCavityVelocity

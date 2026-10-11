@@ -5,6 +5,10 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+# For solids4Foam::requireTestApp
+source "${SOLIDS4FOAM_SCRIPTS}"
 
 # ============================================================
 # cylinderExpansion regression test
@@ -28,10 +32,10 @@ echo
 # so this is the runtime coverage of that law: the elastic limit of its tangent
 # and, past yield, its return mapping
 run_constitutive_test() {
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
@@ -109,6 +113,18 @@ if awk "BEGIN {exit !(${sigma_rr} >= ${SIGMA_MIN} && ${sigma_rr} <= ${SIGMA_MAX}
     printf "PASS: Final inner radial stress = %.6g\n" "${sigma_rr}"
 else
     printf "FAIL: Final inner radial stress = %.6g\n" "${sigma_rr}"
+    failures=$((failures + 1))
+fi
+
+# The case asks for the hydrostatic stress smoothing with solvePressureEqn,
+# and the solid model has to say it is doing it, or the case is quietly
+# running without it
+if grep -q "smoothing the hydrostatic stress (solvePressureEqn)" \
+    "${CASE_DIR}/log.solids4Foam" 2>/dev/null
+then
+    echo "PASS: the hydrostatic stress is smoothed"
+else
+    echo "FAIL: no hydrostatic stress smoothing in the log"
     failures=$((failures + 1))
 fi
 

@@ -1,0 +1,52 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidSolidInterface    fixedRelaxation;
+
+fixedRelaxationCoeffs
+{
+    // Interface patches
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Robin-Neumann coupling (elasticWallPressure and elasticWallVelocity on
+    // the fluid interface): unrelaxed fixed-point iterations
+    predictor            yes;
+    predictSolid         yes;
+    relaxationFactor     1.0;
+
+    // Convergence: the interface displacement residual, the change in the
+    // interface pressure and the leakage flux through the moving interface
+    outerCorrTolerance     1e-4;
+    robinPressureTolerance 1e-4;
+    robinFluxTolerance     5e-3;
+
+    // Maximum number of outer FSI loop correctors within each time-step
+    nOuterCorr 200;
+
+    // Enable coupling from the start
+    coupled yes;
+
+    // The fluid and solid interface faces match
+    interfaceTransferMethod directMap;
+
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+}
+
+// ************************************************************************* //

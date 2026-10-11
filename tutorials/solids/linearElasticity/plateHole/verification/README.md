@@ -1,11 +1,9 @@
 # plateHole verification study
 
-This opt-in study migrates the mesh studies from
-`solid-benchmarks/linearElasticity/plateHole` into the tutorial itself. It
-supports both the structured `blockMesh` family and the unstructured
-triangular-prism Gmsh family from the benchmark. The driver reads the error
-norms that the `plateHoleAnalyticalSolution` function object already prints
-against the analytical plate-with-hole solution, so no extra sampling is
+This opt-in study is a mesh study. It supports both a structured `blockMesh`
+family and an unstructured triangular-prism Gmsh family. The driver reads the
+error norms that the `plateHoleAnalyticalSolution` function object already
+prints against the analytical plate-with-hole solution, so no extra sampling is
 needed.
 
 The reference here is an exact analytical solution rather than a digitised

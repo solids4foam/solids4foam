@@ -37,7 +37,7 @@ mechanicalConstitutiveLaw::New(const dictionary& dict)
     Info<< "Selecting mechanical constitutive law: "
         << lawType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr =
         mechanicalConstitutiveLawConstructorTable(lawType);
 

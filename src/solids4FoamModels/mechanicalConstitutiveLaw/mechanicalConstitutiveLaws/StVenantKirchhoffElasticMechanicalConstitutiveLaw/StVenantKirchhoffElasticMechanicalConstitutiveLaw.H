@@ -36,9 +36,9 @@ Description
     and may be used alongside history-dependent laws in multi-material
     simulations.
 
-    Material parameters are provided in terms of Young's modulus and
-    Poisson's ratio, specified as dimensioned quantities and validated at
-    construction time.
+    Material parameters are provided as Young's modulus and Poisson's ratio,
+    or as the shear and bulk moduli mu and K, specified as dimensioned
+    quantities and validated at construction time.
 
     The implementation is intended as a simple, robust finite-strain
     reference law and as a demonstrator for the finite-strain constitutive
@@ -80,7 +80,7 @@ class StVenantKirchhoffElasticMechanicalConstitutiveLaw
         //- Young's modulus
         dimensionedScalar E_;
 
-        //- Poisson's ration
+        //- Poisson's ratio
         dimensionedScalar nu_;
 
         //- First Lamé parameter
@@ -144,7 +144,7 @@ public:
 
     // Edit
 
-        //- Small-strain constitutive evaluation
+        //- Finite-strain constitutive evaluation
         virtual void evaluate
         (
             const finiteStrainMechanicalConstitutiveLawKinematics& kin,

@@ -37,9 +37,8 @@ for the implicit path.
 - solves the linear momentum equation in linear-geometry form over the dual
   mesh, with the primary unknown at the mesh points;
 - computes the displacement gradient and the stress at the **dual mesh faces**
-  (`dualGradDf`, `dualSigmaf`), through a `dualMechanicalModel` or, with
-  `useMechanicalConstitutiveLawManager yes;`, through the
-  `mechanicalConstitutiveLaw` framework;
+  (`dualGradDf`, `dualSigmaf`), through the `mechanicalConstitutiveLaw`
+  framework;
 - assembles the exact material tangent into the Jacobian by default, giving
   Newton-Raphson convergence;
 - enforces displacement boundary conditions as fixed degrees of freedom rather
@@ -101,7 +100,6 @@ The relevant inherited `solidModel` entries are:
 | --- | --- | --- |
 | `solutionAlgorithm` | `implicitSegregated` | Must be overridden, see above |
 | `solvePressure` | `false` | Adds pressure as an extra unknown per point |
-| `useMechanicalConstitutiveLawManager` | `false` | Use the framework, below |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 
 The block size of the PETSc system is 2 in 2-D and 3 in 3-D, or 3 and 4
@@ -183,15 +181,12 @@ from `controlDict` (default `0.1`).
 
 ### The mechanicalConstitutiveLaw framework
 
-`useMechanicalConstitutiveLawManager yes;` in
-`vertexCentredLinearGeometryCoeffs` takes the whole constitutive response from
-the `mechanicalConstitutiveLaw` framework, on the PETSc SNES and explicit paths
-alike, and the legacy `mechanicalModel` is then not constructed at all. The
-entries of `constant/mechanicalProperties` are read the same way on both
-paths.
+The whole constitutive response comes from the `mechanicalConstitutiveLaw`
+framework, on the PETSc SNES and explicit paths alike, read from
+`constant/mechanicalProperties`.
 
-More than one material is supported on this path, each dual face taking the
-law of the primary cell it lies in. The legacy path does not support it.
+More than one material is supported, each dual face taking the law of the
+primary cell it lies in.
 
 ---
 
@@ -205,10 +200,8 @@ available, from `foamPetscSnesHelper`. The key design choices are:
 - the unknowns live at points, so `solutionD()` is `notImplemented`;
 - the dual mesh comes from the base class's `dualMesh()` and
   `dualMeshMap()`, built by `meshDualiser`;
-- constitutive evaluation goes through a `dualMechanicalModel`, which maps
-  dual faces back to primary cells so that ordinary mechanical laws can be
-  reused unchanged, or through the `mechanicalConstitutiveLaw` framework (see
-  below);
+- constitutive evaluation goes through the `mechanicalConstitutiveLaw`
+  framework (see below);
 - displacement constraints are held as `fixedDofs_`, `fixedDofValues_` and
   `fixedDofDirections_`, all sized by the number of points, rather than being
   applied through patch fields.
@@ -216,8 +209,8 @@ available, from `foamPetscSnesHelper`. The key design choices are:
 ### Construction
 
 The constructor initialises the PETSc SNES helper with `pointD` as the
-solution field and `solutionLocation::POINTS`, builds the
-`dualMechanicalModel` on the legacy path, computes `blockSize_`, allocates the
+solution field and `solutionLocation::POINTS`, computes `blockSize_`,
+allocates the
 fixed-degree-of-freedom lists, and reads `fixedDofScale` — whose default is
 derived from the average implicit stiffness and the mesh size, so that the
 constraint equations are conditioned like the momentum equations.
@@ -236,8 +229,7 @@ constraint equations are conditioned like the momentum equations.
   through `vfvm::divSigma` using the fourth-order material tangent, or — when
   `approximateJacobian` is set — adds a compact Laplacian through
   `vfvm::laplacian` with `zetaImplicit` and a scalar tangent at the dual
-  faces. On the legacy path the tangents come from `dualMechanicalModel`
-  (`materialTangentFaceField()` and `dualImpKf()`), on the framework path from
+  faces. The tangents come from
   `mechanicalConstitutiveLawManager::updateTangentSmallStrain()`.
 
 Fixed degrees of freedom are removed from the system through
@@ -252,10 +244,10 @@ the approximate one is cheaper per iteration and needs more of them.
 update, using `pointDivSigma` and `pointGlobalVol`. `setDeltaT()` handles
 stability.
 
-### Framework path
+### Constitutive evaluation
 
 Everything that needs a constitutive response goes through one of three
-private members, each with a legacy branch and a framework branch:
+private members:
 
 - `correctDualStress()`, the stress at the dual faces, which is the residual.
   The internal dual faces are the integration points of a
@@ -263,17 +255,16 @@ private members, each with a legacy branch and a framework branch:
   `dualFaces`, and the Jacobian tangent is evaluated on the same topology. The
   boundary dual faces are a second topology of the same class, registered as
   `dualBoundaryFaces` and built from the boundary part of the dual-face-to-cell
-  map, so that they keep their own constitutive state as they did in
-  `dualMechanicalModel`. Faces of empty patches hold no values and are not
-  evaluated, nor are faces of coupled patches, whose tractions
-  `updatePointDivSigma()` sets to zero. A boundary dual face that
-  `dualMeshToMeshMap` leaves unmapped has a zero gradient from `vfvc::fGrad`,
-  and takes the law of the first primary cell about its dual cell's point;
+  map, so that they keep their own constitutive state. Faces of empty patches
+  hold no values and are not evaluated, nor are faces of coupled patches,
+  whose tractions `updatePointDivSigma()` sets to zero. A boundary dual face
+  that `dualMeshToMeshMap` leaves unmapped has a zero gradient from
+  `vfvc::fGrad`, and takes the law of the first primary cell about its dual
+  cell's point;
 - `correctCellStress()`, the cell-centred `sigma` for output, through the
-  manager's `volTensorField` overload, so that each cell takes its own law and
-  no subMeshes are needed;
+  manager's `volTensorField` overload, so that each cell takes its own law;
 - `impK()`, the implicit stiffness behind the default `fixedDofScale` and the
-  explicit wave speed, through `solidModel::frameworkImpK()`.
+  explicit wave speed, through `solidModel::lawImpK()`.
 
 The constitutive state is rolled over by the manager at the first evaluation
 of each new time step, and `solidModel::updateTotalFields()` tells the manager

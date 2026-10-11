@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # Rod and seabed regression test
 # Checks strain and stress
@@ -30,6 +33,17 @@ EPSILON_MAX=2.2e-3
 
 SIGMA_MIN=40e3
 SIGMA_MAX=58e3
+
+# The final D, as the max and mean component magnitude of the field written
+# to fourteen figures. The case as it ships is poroMechanicalLaw over
+# anisotropicBiotElastic, and the framework reproduced the removed legacy
+# mechanicalModel's D field exactly, in every one of those figures, on every
+# fork (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's;
+# OpenFOAM.org 9 agrees to 1e-8, and foam-extend 4.1 gives a max 3e-4 smaller.
+# The tolerance, 5e-4 of the largest value, covers that
+REF_D_MAX=0.024504218766989
+REF_D_MEAN=0.00528889093233214
+REF_D_REL_TOL=5e-4
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -53,6 +67,15 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    # Enough digits that the comparison with the legacy answer is about the
+    # solution and not about the last figure written
+    if grep -q "^writePrecision" "${CASE_DIR}/system/controlDict"; then
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
+            "${CASE_DIR}/system/controlDict"
+    else
+        echo "writePrecision  14;" >> "${CASE_DIR}/system/controlDict"
+    fi
 }
 
 # ------------------------------------------------------------
@@ -113,91 +136,35 @@ fi
 # ------------------------------------------------------------
 
 # Check the poroMechanicalLaw composite against the legacy law, on the case as
-# it ships: poroMechanicalLaw over anisotropicBiotElastic. The two arms differ
-# in one dictionary entry and nothing else, and must agree exactly.
+# it ships: poroMechanicalLaw over anisotropicBiotElastic.
 #
 # This is the case that exercises the effective stress the composite carries.
 # anisotropicBiotElastic leaves the zz, yz and xz components of the stress
 # unwritten in the branch this case takes, so they come from whatever the
 # sub-law was given to work in - which is the whole reason the composite hands
 # it the effective stress rather than the caller's total stress
-run_poro_framework_comparison() {
-    local legacy_dir="${REGRESSION_ROOT}/poroLegacy"
-    local framework_dir="${REGRESSION_ROOT}/poroFramework"
-    local dir
-
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        rm -rf "${dir}"
-        mkdir -p "${dir}"
-
-        local item base_item
-        for item in "${SCRIPT_DIR}"/*; do
-            base_item=$(basename "${item}")
-            if [[ "${base_item}" == "regressionTests" ]]; then
-                continue
-            fi
-            cp -a "${item}" "${dir}/"
-        done
-
-        # Enough digits that the comparison is about the solution and not
-        # about the last figure written
-        if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-            sed -i 's|^writePrecision.*|writePrecision  14;|' \
-                "${dir}/system/controlDict"
-        else
-            echo "writePrecision  14;" >> "${dir}/system/controlDict"
-        fi
-    done
-
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${framework_dir}/constant/solidProperties"
-
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-            echo "FAIL: the poro comparison could not run ${dir}"
-            return 1
-        }
-    done
-
-    # Each arm must have taken the path it was set up for
+check_poro_against_reference() {
     if ! grep -q "Selecting mechanical constitutive law" \
-        "${framework_dir}/${SOLVER_LOGFILE}"
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the framework arm did not use the framework"
+        echo "FAIL: the case constructed no mechanical constitutive law"
         return 1
     fi
 
-    if grep -q "Selecting mechanical constitutive law" \
-        "${legacy_dir}/${SOLVER_LOGFILE}"
+    local t end_time
+    t=$(solids4Foam::latestTime "${CASE_DIR}")
+    end_time=$(sed -n 's/^endTime[[:space:]]*\([^;]*\);.*/\1/p' \
+        "${CASE_DIR}/system/controlDict")
+
+    if [[ -z "${t}" || -z "${end_time}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${end_time})^2 <= 1e-20)}"
     then
-        echo "FAIL: the legacy arm used the framework"
+        echo "FAIL: the case stopped at '${t}', not at the end time '${end_time}'"
         return 1
     fi
 
-    local tL tF
-    tL=$(solids4Foam::latestTime "${legacy_dir}")
-    tF=$(solids4Foam::latestTime "${framework_dir}")
-
-    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
-        echo "FAIL: the poro arms reached different times ('${tL}' vs '${tF}')"
-        return 1
-    fi
-
-    if [[ ! -f "${legacy_dir}/${tL}/D" || ! -f "${framework_dir}/${tF}/D" ]]
-    then
-        echo "FAIL: the poro comparison produced no D field"
-        return 1
-    fi
-
-    if diff -q "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D" > /dev/null
-    then
-        echo "PASS: poro framework and legacy agree exactly"
-        return 0
-    fi
-
-    echo "FAIL: poro framework and legacy differ"
-    return 1
+    solids4Foam::checkFieldNorms "poro D at t = ${t}" "${CASE_DIR}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 failures=0
@@ -221,7 +188,7 @@ else
 fi
 
 echo
-if ! run_poro_framework_comparison; then
+if ! check_poro_against_reference; then
     failures=$((failures + 1))
 fi
 

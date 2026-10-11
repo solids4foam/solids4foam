@@ -153,7 +153,7 @@ bool fixedRelaxationCouplingInterface::evolve()
         // Transfer the displacement from the solid to the fluid, where we will
         // use no relaxation; in that way, we can force the solid and fluid
         // interfaces to stay aligned
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
@@ -174,16 +174,24 @@ void fixedRelaxationCouplingInterface::updateDisplacement()
     Info<< nl << "Time = " << fluid().runTime().timeName()
         << ", iteration: " << outerCorr() << endl;
 
-    Info<< "Current fsi under-relaxation factor: "
-        << relaxationFactor_ << endl;
+    // With the predictor, the first iteration takes the full solid predictor
+    // displacement
+    const scalar factor =
+        ((outerCorr() == 1) && predictor()) ? 1.0 : relaxationFactor_;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    Info<< "Current fsi under-relaxation factor: " << factor;
+    if ((outerCorr() == 1) && predictor())
+    {
+        Info<< " (predictor)";
+    }
+    Info<< endl;
+
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         fluidZonesPointsDisplsPrev()[interfaceI] =
             fluidZonesPointsDispls()[interfaceI];
 
-        fluidZonesPointsDispls()[interfaceI] +=
-            relaxationFactor_*residuals()[interfaceI];
+        fluidZonesPointsDispls()[interfaceI] += factor*residuals()[interfaceI];
     }
 
     // Update movingWallPressure boundary conditions, if found

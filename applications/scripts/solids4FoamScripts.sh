@@ -365,10 +365,12 @@ function solids4Foam::applyFoamExtendTweaks()
     if [[ -n $(find "${CASE_DIR}" -name p) ]]
     then
         echo "Changing uniformFixedValue to timeVaryingUniformFixedValue in p"
+        # --follow-symlinks edits the target of a linked p, such as a case's
+        # p -> p.<variant>, instead of replacing the link with a copy
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)type\(.*\)uniformFixedValue;|\1//type\2uniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)type\(.*\)uniformFixedValue;|\1//type\2uniformFixedValue;|g" {} +
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)//type\(.*\)timeVaryingUniformFixedValue;|\1type\2timeVaryingUniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)//type\(.*\)timeVaryingUniformFixedValue;|\1type\2timeVaryingUniformFixedValue;|g" {} +
     fi
 
     # 7. Use the foam extend changeDictionaryDict, if present
@@ -542,9 +544,9 @@ function solids4Foam::undoFoamExtendTweaks()
     then
         echo "Changing timeVaryingUniformFixedValue to uniformFixedValue in p"
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)//type\(.*\)uniformFixedValue;|\1type\2uniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)//type\(.*\)uniformFixedValue;|\1type\2uniformFixedValue;|g" {} +
         find "${CASE_DIR}" -name p \
-            -exec "${SOLIDS4FOAM_SED}" -i "s|^\([[:space:]]*\)type\(.*\)timeVaryingUniformFixedValue;|\1//type\2timeVaryingUniformFixedValue;|g" {} +
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)type\(.*\)timeVaryingUniformFixedValue;|\1//type\2timeVaryingUniformFixedValue;|g" {} +
     fi
 
     # 7. Restore the OpenFOAM changeDictionaryDict, if it was replaced
@@ -640,6 +642,43 @@ function solids4Foam::applyOpenFOAMOrgTweaks()
 
     # 10. OpenFOAM.org writes forces.dat rather than force.dat
     solids4Foam::useForcesDat "${CASE_DIR}"
+
+    # 14. OpenFOAM.org reads the PIMPLE outer-corrector convergence controls
+    #     from outerCorrectorResidualControl: its residualControl, with a
+    #     single tolerance per field, is the criterion for ending the run.
+    #     Only a residualControl with the OpenFOAM.com sub-dictionaries
+    #     (tolerance and relTol) is renamed, so a case may still give the
+    #     OpenFOAM.org form. Symlinked fvSolution files are edited in place
+    #     so the links are kept
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && awk '
+            /^PIMPLE/ { inPimple = 1; next }
+            inPimple && /^}/ { inPimple = 0 }
+            inPimple && /^[[:space:]]*residualControl([[:space:]]|$)/ \
+            {
+                inControl = 1; depth = 0; next
+            }
+            inControl \
+            {
+                nOpen = gsub(/\{/, "{"); nClose = gsub(/\}/, "}")
+                if (depth == 1 && nOpen > 0) { found = 1 }
+                depth += nOpen - nClose
+                if (depth <= 0 && nClose > 0) { inControl = 0 }
+            }
+            END { exit !found }
+        ' "${FILE}"
+        then
+            echo "OpenFOAM.org specific: replacing 'residualControl' with"
+            echo "'outerCorrectorResidualControl' in the PIMPLE dictionary of"
+            echo "${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                '/^PIMPLE\b/,/^}/ s/^([[:space:]]*)residualControl\b/\1outerCorrectorResidualControl/' \
+                "${FILE}"
+        fi
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -668,6 +707,22 @@ function solids4Foam::undoOpenFOAMOrgTweaks()
 
     # 10. OpenFOAM.com writes force.dat rather than forces.dat
     solids4Foam::useForceDat "${CASE_DIR}"
+
+    # 14. OpenFOAM.com reads the PIMPLE outer-corrector convergence controls
+    #     from residualControl
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && grep -qE '^[[:space:]]*outerCorrectorResidualControl\b' "${FILE}"
+        then
+            echo "Replacing 'outerCorrectorResidualControl' with"
+            echo "'residualControl' in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                's/^([[:space:]]*)outerCorrectorResidualControl\b/\1residualControl/' \
+                "${FILE}"
+        fi
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -860,6 +915,37 @@ function solids4Foam::regressionCaseSkipped()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requireTestApp
+#     Check that a test application a regression script runs is in PATH.
+#     Returns 0 if it is. If it is not, a local build may simply not have
+#     built it, so it prints SKIP and returns 1. In CI, where Allwmake always
+#     builds the test applications, a missing one means the check it serves
+#     would pass without running, so it prints FAIL and returns 2
+# Arguments:
+#     1: APPLICATION
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requireTestApp()
+{
+    local APPLICATION=$1
+
+    if command -v "${APPLICATION}" > /dev/null 2>&1
+    then
+        return 0
+    fi
+
+    if [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]
+    then
+        echo "FAIL: ${APPLICATION} not found in PATH, which a CI run must"
+        echo "      not skip: it is built by Allwmake"
+        return 2
+    fi
+
+    echo "SKIP: ${APPLICATION} not found in PATH"
+    return 1
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # latestTime
 #     Print the latest time directory of a case other than 0, or nothing if the
 #     case has none, as foamListTimes -latestTime does. foam-extend has no
@@ -895,6 +981,129 @@ function solids4Foam::latestTime()
     fi
 
     return 0
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# internalFieldValues
+#     Print every component of a field file's internal values, one per line, in
+#     the order written. Reads the uniform, nonuniform and N{value} forms. The
+#     boundary values and the header are not read. Returns 1, with a message
+#     on stderr, when the file has no internalField or it holds no values
+# Arguments:
+#     1: FIELD_FILE
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::internalFieldValues()
+{
+    local FIELD_FILE=$1
+
+    awk -v file="${FIELD_FILE}" '
+        { text = text " " $0 }
+        END {
+            i = index(text, "internalField")
+            if (i == 0) {
+                print "no internalField in " file > "/dev/stderr"
+                exit 1
+            }
+
+            # Everything up to the semicolon that closes the entry: a list
+            # body holds none
+            body = substr(text, i + length("internalField"))
+            body = substr(body, 1, index(body, ";") - 1)
+
+            # The keyword, the list type and, for a nonuniform list, the count
+            # in front of it
+            if (sub(/^[ \t]*nonuniform/, "", body)) {
+                sub(/^[ \t]*List<[^>]*>/, "", body)
+                sub(/^[ \t]*[0-9]+/, "", body)
+            } else {
+                sub(/^[ \t]*uniform/, "", body)
+            }
+
+            gsub(/[(){}]/, " ", body)
+            n = split(body, values, " ")
+            if (n == 0) {
+                print "empty internalField in " file > "/dev/stderr"
+                exit 1
+            }
+            for (k = 1; k <= n; k++) {
+                print values[k]
+            }
+        }
+    ' "${FIELD_FILE}"
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# internalFieldNorms
+#     Print the largest magnitude of any component of a field file's internal
+#     values, and the mean magnitude, as "max<TAB>mean". Returns 1 when the
+#     values cannot be read
+# Arguments:
+#     1: FIELD_FILE
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::internalFieldNorms()
+{
+    local FIELD_FILE=$1
+    local VALUES
+
+    VALUES=$(solids4Foam::internalFieldValues "${FIELD_FILE}") || return 1
+
+    awk '
+        { v = ($1 < 0 ? -$1 : $1); if (v > max) max = v; sum += v; n++ }
+        END { printf "%.15g\t%.15g\n", max, sum/n }
+    ' <<< "${VALUES}"
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# checkFieldNorms
+#     Compare a field file's internal values with a reference, through the
+#     norms of internalFieldNorms. Both differences are bounded by the largest
+#     pointwise difference, so a field that agrees with the reference to TOL
+#     times its largest value passes, and one that does not is caught by at
+#     least one of the two in all but contrived cases. Prints PASS or FAIL and
+#     returns 0 or 1
+# Arguments:
+#     1: LABEL
+#     2: FIELD_FILE
+#     3: REF_MAX
+#     4: REF_MEAN
+#     5: TOL, relative to REF_MAX
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::checkFieldNorms()
+{
+    local LABEL=$1
+    local FIELD_FILE=$2
+    local REF_MAX=$3
+    local REF_MEAN=$4
+    local TOL=$5
+    local NORMS FIELD_MAX FIELD_MEAN
+
+    if [[ ! -f "${FIELD_FILE}" ]] \
+        || ! NORMS=$(solids4Foam::internalFieldNorms "${FIELD_FILE}")
+    then
+        echo "FAIL: ${LABEL}: no field to compare with the reference"
+        return 1
+    fi
+
+    read -r FIELD_MAX FIELD_MEAN <<< "${NORMS}"
+
+    if awk "BEGIN {
+            a = ${FIELD_MAX} - ${REF_MAX}; if (a < 0) a = -a
+            b = ${FIELD_MEAN} - ${REF_MEAN}; if (b < 0) b = -b
+            exit !(${FIELD_MAX} > 0 && a <= ${TOL}*${REF_MAX} \
+                && b <= ${TOL}*${REF_MAX})
+        }"
+    then
+        printf "PASS: %s matches the reference: max %.15g (%.15g), mean %.15g (%.15g)\n" \
+            "${LABEL}" "${FIELD_MAX}" "${REF_MAX}" "${FIELD_MEAN}" "${REF_MEAN}"
+        return 0
+    fi
+
+    printf "FAIL: %s differs from the reference: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
+        "${LABEL}" "${FIELD_MAX}" "${REF_MAX}" "${FIELD_MEAN}" "${REF_MEAN}" "${TOL}"
+    return 1
 }
 
 

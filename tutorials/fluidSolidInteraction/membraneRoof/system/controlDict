@@ -1,0 +1,83 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         12;
+
+// Resolves the roof oscillation period (about 0.2 s) with about 40 steps, so
+// that the numerical damping of the backward scheme is small
+deltaT          0.005;
+
+writeControl    runTime;
+
+writeInterval   1;
+
+purgeWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable yes;
+
+adjustTimeStep  no;
+
+functions
+{
+    forces
+    {
+        type                forces;
+        region              fluid;
+        libs                ( "libforces.so" );
+        outputControl       timeStep;
+        outputInterval      1;
+        patches             (membrane-fluid);
+        "pName|p"           p;
+        "UName|U"           U;
+        "rhoName|rho"       rhoInf;
+        log                 true;
+        rhoInf              1.25;
+        CofR                (50 5 0);
+    }
+    pointDisp
+    {
+        type                solidPointDisplacement;
+        point               (50 5 0);
+    }
+    fsiConvData
+    {
+        type                fsiConvergenceData;
+        region              fluid;
+    }
+}
+
+// ************************************************************************* //

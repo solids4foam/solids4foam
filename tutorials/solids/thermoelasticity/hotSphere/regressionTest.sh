@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # hotSphere regression test
 # Uses the tutorial's reported temperature and stress extrema.
@@ -54,7 +57,7 @@ prepare_case() {
 
 shorten_case() {
     local controlDict="${CASE_DIR}/system/controlDict"
-    sed -i.bak 's/^endTime[[:space:]]\+5;/endTime         1;/' "${controlDict}"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+5;/endTime         1;/' "${controlDict}"
     rm -f "${controlDict}.bak"
 }
 
@@ -104,204 +107,111 @@ extract_max_sigma() {
         | awk '{print $NF}'
 }
 
-# Run the case a second time with the stress taken from the
-# mechanicalConstitutiveLaw framework rather than the legacy mechanicalModel.
+# Run the case to its full end time, and hold it to the answer of the removed
+# legacy mechanicalModel.
 #
 # This case runs several time steps, so unlike slabCooling it exercises the
 # framework rolling its constitutive state over between them.
 #
-# The two arms are compared to a tolerance rather than exactly. They solve the
-# same problem but reach it by slightly different iteration paths, because the
-# implicit stiffness that steers the iteration is built differently: the
-# framework interpolates its cell tangent to the faces where the legacy model
-# forms a face value directly. The converged answers therefore agree only to
-# the solution tolerance, and the difference shrinks with it - at
-# solutionTolerance 1e-6 it is around 1e-7 of the displacement, and tightening
-# to 1e-10 takes it to 1e-8. The threshold here is well above that and far
-# below anything physical
+# The comparison is to a tolerance rather than exact. The framework and the
+# legacy model solved the same problem but reached it by slightly different
+# iteration paths, because the implicit stiffness that steers the iteration is
+# built differently: the framework interpolates its cell tangent to the faces
+# where the legacy model formed a face value directly. The converged answers
+# therefore agreed only to the solution tolerance, and the difference shrank
+# with it - at solutionTolerance 1e-6 it was around 1e-7 of the displacement,
+# and tightening to 1e-10 took it to 1e-8. The threshold here is well above
+# that and far below anything physical
 FRAMEWORK_D_REL_TOL=1e-6
 COMPARISON_END_TIME=5
 
-compare_internal_vector_fields() {
-    python3 - "$1" "$2" << 'PYEOF'
-import re
-import sys
+# The final D, as the max and mean component magnitude of the field written
+# to fourteen figures, from the removed legacy mechanicalModel on the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d). OpenFOAM.com v2512's;
+# OpenFOAM.org 9 agrees to 2e-9. foam-extend is not compared, as below
+REF_D_MAX=0.00015702498751748
+REF_D_MEAN=7.86486280639836e-05
 
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-
-def read_internal(path):
-    text = open(path).read()
-    uniform = re.search(
-        rf"\binternalField\s+uniform\s+\(({number})\s+({number})\s+({number})\)\s*;",
-        text,
-    )
-    if uniform:
-        return [tuple(map(float, uniform.groups()))]
-
-    nonuniform = re.search(
-        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not nonuniform:
-        raise ValueError(f"cannot parse internalField in {path}")
-
-    values = re.findall(
-        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
-    )
-    if not values:
-        raise ValueError(f"empty internalField in {path}")
-    return [tuple(map(float, value)) for value in values]
-
-try:
-    a = read_internal(sys.argv[1])
-    b = read_internal(sys.argv[2])
-    if len(a) == 1 and len(b) > 1:
-        a *= len(b)
-    if len(b) == 1 and len(a) > 1:
-        b *= len(a)
-    if len(a) != len(b):
-        raise ValueError("different internalField sizes")
-    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
-    max_value = max(abs(x) for av in a for x in av)
-    print(f"{max_diff/max_value if max_value else max_diff:.10g}")
-except (OSError, ValueError) as error:
-    print(error, file=sys.stderr)
-    sys.exit(1)
-PYEOF
-}
-
-run_framework_comparison() {
-    # Not on foam-extend, where the two arms differ by 0.6 % in D, and the
-    # framework's answer is the one kept. They match to 1e-13 for two correctors
-    # and part of the third, and differ only in the stress on the three
-    # symmetryPlane patches. The framework corrects the stress's boundary
-    # conditions after evaluating it; the legacy law does not. On foam-extend's
-    # symmetryPlane that correction replaces the law's boundary value with the
-    # symmetry transform of the adjacent cell's stress, which has zero shear
-    # traction on the plane, as symmetry requires. Correcting the legacy stress
-    # too reproduces the framework's answer to 2e-8.
+run_reference_comparison() {
+    # Not on foam-extend, where the framework and the legacy model differed by
+    # 0.6 % in D, and the framework's answer is the one kept. They matched to
+    # 1e-13 for two correctors and part of the third, and differed only in the
+    # stress on the three symmetryPlane patches. The framework corrects the
+    # stress's boundary conditions after evaluating it; the legacy law did not.
+    # On foam-extend's symmetryPlane that correction replaces the law's
+    # boundary value with the symmetry transform of the adjacent cell's
+    # stress, which has zero shear traction on the plane, as symmetry
+    # requires. Correcting the legacy stress too reproduced the framework's
+    # answer to 2e-8.
     #
     # The transform was checked because older OpenFOAM versions were thought to
     # get it wrong for tensors: 0.5*(x + transform(I - 2nn, x)) matches a
     # hand-written reference to 4e-16 for symmTensor and tensor, with zero shear
     # traction and all other components kept, on v1912-v2606, OpenFOAM.org 8-13
-    # and foam-extend 4.1 and 5.0. The two arms still differ, so an exact
-    # comparison here would only report the known difference
+    # and foam-extend 4.1 and 5.0. So the legacy answer there is the one known
+    # to be wrong, and there is nothing to hold the framework to
     if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-        echo "SKIP: framework comparison (known foam-extend symmetryPlane difference)"
+        echo "SKIP: reference comparison (known foam-extend symmetryPlane difference)"
         return 0
     fi
 
-    local legacy_dir="${REGRESSION_ROOT}/frameworkLegacy"
-    local framework_dir="${REGRESSION_ROOT}/framework"
-    local dir
+    local dir="${REGRESSION_ROOT}/comparison"
 
-    # Both arms are prepared and run here rather than reusing the main case,
-    # so the comparison does not depend on what the main run left behind
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        rm -rf "${dir}"
-        mkdir -p "${dir}"
+    rm -rf "${dir}"
+    mkdir -p "${dir}"
 
-        local item base_item
-        for item in "${SCRIPT_DIR}"/*; do
-            base_item=$(basename "${item}")
-            if [[ "${base_item}" == "regressionTests" ]]; then
-                continue
-            fi
-            cp -a "${item}" "${dir}/"
-        done
+    local item base_item
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${dir}/"
     done
 
     # Write enough digits for the comparison to be about the solution rather
     # than about the file format. At the default six significant figures the
-    # two arms differ by around 3e-6 simply because that is the last digit
-    # written, which would tell us nothing
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-            sed -i 's|^writePrecision.*|writePrecision  14;|' \
-                "${dir}/system/controlDict"
-        else
-            echo "writePrecision  14;" >> "${dir}/system/controlDict"
-        fi
-    done
+    # two differ by around 3e-6 simply because that is the last digit written,
+    # which would tell us nothing
+    if grep -q "^writePrecision" "${dir}/system/controlDict"; then
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
+            "${dir}/system/controlDict"
+    else
+        echo "writePrecision  14;" >> "${dir}/system/controlDict"
+    fi
 
-    # The two arms differ in this one entry and nothing else. It goes inside
-    # the solid model's coeffs block, which is where the model looks for it
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${framework_dir}/constant/solidProperties"
+    ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+        echo "FAIL: the reference comparison could not run ${dir}"
+        return 1
+    }
 
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-            echo "FAIL: the framework comparison could not run ${dir}"
-            return 1
-        }
-    done
-
-    # Each arm must have taken the path it was set up for
     if ! grep -q "Selecting mechanical constitutive law" \
-        "${framework_dir}/${SOLVER_LOGFILE}"
+        "${dir}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the framework arm did not use the framework"
+        echo "FAIL: the comparison constructed no mechanical constitutive law"
         return 1
     fi
 
-    if grep -q "Selecting mechanical constitutive law" \
-        "${legacy_dir}/${SOLVER_LOGFILE}"
+    if ! grep -q "^End" "${dir}/${SOLVER_LOGFILE}" \
+      || grep -qE "Nonlinear solve did not converge|SNES convergence error|FOAM FATAL" \
+          "${dir}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the legacy arm used the framework"
+        echo "FAIL: ${dir} did not complete and converge"
         return 1
     fi
 
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        if ! grep -q "^End" "${dir}/${SOLVER_LOGFILE}" \
-          || grep -qE "Nonlinear solve did not converge|SNES convergence error|FOAM FATAL" \
-              "${dir}/${SOLVER_LOGFILE}"
-        then
-            echo "FAIL: ${dir} did not complete and converge"
-            return 1
-        fi
-    done
+    local t
+    t=$(solids4Foam::latestTime "${dir}")
 
-    local tL tF
-    tL=$(solids4Foam::latestTime "${legacy_dir}")
-    tF=$(solids4Foam::latestTime "${framework_dir}")
-
-    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
-        echo "FAIL: the two arms reached different times ('${tL}' vs '${tF}')"
-        return 1
-    fi
-
-    if ! awk "BEGIN {exit !((${tL} - ${COMPARISON_END_TIME})^2 <= 1e-20)}"
+    if [[ -z "${t}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${COMPARISON_END_TIME})^2 <= 1e-20)}"
     then
-        echo "FAIL: comparison stopped at ${tL}; expected ${COMPARISON_END_TIME}"
+        echo "FAIL: comparison stopped at '${t}'; expected ${COMPARISON_END_TIME}"
         return 1
     fi
 
-    if [[ ! -f "${legacy_dir}/${tL}/D" || ! -f "${framework_dir}/${tF}/D" ]]
-    then
-        echo "FAIL: the framework comparison produced no D field"
-        return 1
-    fi
-
-    local rel
-    if ! rel=$(compare_internal_vector_fields \
-        "${legacy_dir}/${tL}/D" "${framework_dir}/${tF}/D")
-    then
-        echo "FAIL: could not compare the two D internal fields"
-        return 1
-    fi
-
-    if awk "BEGIN {exit !(${rel} < ${FRAMEWORK_D_REL_TOL})}"; then
-        printf "PASS: framework and legacy agree, relative D diff = %.4g\n" \
-            "${rel}"
-        return 0
-    fi
-
-    printf "FAIL: framework and legacy differ, relative D diff = %.4g\n" \
-        "${rel}"
-    return 1
+    solids4Foam::checkFieldNorms "D at t = ${t}" "${dir}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${FRAMEWORK_D_REL_TOL}"
 }
 
 # ------------------------------------------------------------
@@ -346,9 +256,9 @@ fi
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then
-if ! run_framework_comparison; then
-    failures=$((failures + 1))
-fi
+    if ! run_reference_comparison; then
+        failures=$((failures + 1))
+    fi
 
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi

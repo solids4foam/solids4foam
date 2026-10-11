@@ -39,23 +39,6 @@ const Foam::scalarField* Foam::mechanicalConstitutiveLawInputs::findScalar
 }
 
 
-const Foam::vectorField* Foam::mechanicalConstitutiveLawInputs::findVector
-(
-    const word& name
-) const
-{
-    HashTable<const vectorField*>::const_iterator iter =
-        vectorFields_.find(name);
-
-    if (iter == vectorFields_.end())
-    {
-        return nullptr;
-    }
-
-    return *iter;
-}
-
-
 const Foam::scalarField& Foam::mechanicalConstitutiveLawInputs::getScalar
 (
     const word& name
@@ -78,25 +61,6 @@ const Foam::scalarField& Foam::mechanicalConstitutiveLawInputs::getScalar
 }
 
 
-const Foam::vectorField& Foam::mechanicalConstitutiveLawInputs::getVector
-(
-    const word& name
-) const
-{
-    const vectorField* ptr = findVector(name);
-
-    if (!ptr)
-    {
-        FatalErrorInFunction
-            << "The vector input '" << name << "' was not supplied." << nl
-            << "Available vector inputs: " << vectorFields_.toc()
-            << exit(FatalError);
-    }
-
-    return *ptr;
-}
-
-
 void Foam::mechanicalConstitutiveLawInputs::setScalar
 (
     const word& name,
@@ -104,16 +68,6 @@ void Foam::mechanicalConstitutiveLawInputs::setScalar
 )
 {
     scalarFields_.set(name, &fld);
-}
-
-
-void Foam::mechanicalConstitutiveLawInputs::setVector
-(
-    const word& name,
-    const vectorField& fld
-)
-{
-    vectorFields_.set(name, &fld);
 }
 
 

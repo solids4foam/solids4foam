@@ -52,12 +52,11 @@ relaxation, Aitken or IQN-ILS. See
 The constitutive behaviour of a solid is separate from the solid model that
 uses it, so the two can be varied independently:
 
-- `materialModels/mechanicalModel` reads `constant/mechanicalProperties` and
-  creates the mechanical laws. A `mechanicalLaw` returns the stress for a
-  given deformation; the laws are grouped into `linearGeometryLaws` and
-  `nonLinearGeometryLaws`. Multiple materials are supported, each region
-  taking its own law, with corrections at bi-material interfaces to keep the
-  stress continuous without oscillations.
+- `mechanicalConstitutiveLaw` reads `constant/mechanicalProperties` and
+  creates the mechanical constitutive laws. A `mechanicalConstitutiveLaw`
+  returns the stress, and on request its tangent, for a given deformation, at
+  small or finite strain. Multiple materials are supported, each cellZone
+  taking its own law.
 - `materialModels/thermalModel` does the same for thermal properties, reading
   `constant/thermalProperties` and creating `thermalLaw` objects.
 

@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun            # default behaviour is IQNILS coupling
+# ./Allrun robin      # Robin-Neumann coupling
+# ./Allrun standard   # standard (second-order) solid residual
+# ./Allrun robin standard parallel
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
+
+# python3 is required to set the initial velocity
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for the ringAddedMass tutorial." >&2
+    exit 2
+fi
+
+coupling=iqnils
+interfaceCondition=dirichletNeumann
+runMode=serial
+solidModel=highOrder
+
+for arg in "$@"
+do
+    case "$arg" in
+        iqnils|IQNILS)
+            coupling=iqnils
+            interfaceCondition=dirichletNeumann
+            ;;
+        robin|Robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
+        standard)
+            solidModel=standard
+            ;;
+        highOrder)
+            solidModel=highOrder
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [iqnils|robin] [highOrder|standard] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling setup"
+
+solverArgs=()
+if [[ "$WM_PROJECT" == "foam" ]]; then
+    # Permit foam-extend's round-off-level closed-domain flux imbalance
+    solverArgs=(-Tolerances closedDomainTol=1e-5)
+fi
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+ln -vnsf "solidProperties.${solidModel}" constant/solid/solidProperties
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
+# Set D_0 and D_0_0 from the current mesh description and time-step
+python3 setInitialVelocity.py \
+    system/solid/blockMeshDict system/controlDict 0/solid || exit 1
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+if [[ "$runMode" == "parallel" ]]; then
+    # Run parallel
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel solids4Foam "${solverArgs[@]}"
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam "${solverArgs[@]}"
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating displacement.pdf using gnuplot"
+    gnuplot displacement.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

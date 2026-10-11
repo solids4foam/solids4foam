@@ -105,7 +105,7 @@ calculateEigens
         {
             const scalar disc = Foam::max(sqr(a) - 4*b, 0.0);
 
-            WarningIn("poroMohrCoulob::calculateEigens(...)")
+            WarningIn("linearElasticMohrCoulombPlastic::calculateEigens(...)")
                 << "Stress tensor has a zero root!" << endl;
 
             const scalar q = -0.5*Foam::sqrt(max(scalar(0), disc));
@@ -468,6 +468,27 @@ linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
 
     K_ = lambda_ + (2.0/3.0)*mu_;
 
+    // The derived parameter k = (1 + sin(varPhi))/(1 - sin(varPhi)) tends to 1
+    // as varPhi tends to zero, and the apex stress 2*c*sqrt(k)/(k - 1) then
+    // tends to infinity: the apex of the Mohr-Coulomb surface moves to
+    // infinity. That limiting, Tresca-like case is not implemented, so it is
+    // refused here rather than dividing by zero below, as the legacy law did
+    const scalar smallFrictionAngle = 1e-3;
+
+    if (mag(varPhi_.value()) < smallFrictionAngle)
+    {
+        FatalIOErrorInFunction(dict)
+            << "The 'frictionAngle' is " << varPhi_.value() << " degrees, "
+            << "which is at or near zero." << nl
+            << "As the friction angle tends to zero, the apex of the "
+            << "Mohr-Coulomb surface moves to infinity and the law's derived "
+            << "parameters become singular." << nl
+            << "Give a 'frictionAngle' of at least " << smallFrictionAngle
+            << " degrees in magnitude or, for a pressure-independent law, use "
+            << "linearElasticMisesPlastic."
+            << exit(FatalIOError);
+    }
+
 #ifdef OPENFOAM_NOT_EXTEND
     const scalar piBy180 = constant::mathematical::pi/180.0;
 #else
@@ -568,9 +589,8 @@ void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::evaluate
 
     Field<scalar>& activeYield = state.scalarField("activeYield");
 
-    // Read at old time, so that a tangent query evaluated into a shadow state
-    // sees the value rather than a silently zero field. See linearElastic for
-    // the same reasoning
+    // Read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
 
     const scalar muVal = mu_.value();
@@ -598,36 +618,12 @@ void Foam::linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw::evaluate
         deltaSigma[i] = sigma[i] - sigma0[i];
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), as for linearElastic
+    fillScalarTangent(response, 2.0*muVal + lambdaVal, (4.0/3.0)*muVal);
 
-        const scalar Keff = 2.0*muVal + lambdaVal;
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // No analytical consistent tangent has been derived for this law. The
-    // finite-difference one of the base class is well defined for any law and
-    // is evaluated against a shadow state, so it disturbs neither the stress
-    // just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

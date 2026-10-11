@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      topoSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Faces on the plane x = L/2, through which the flow rate is measured
+actions
+(
+    {
+        name    midPlaneFaces;
+        type    faceSet;
+        action  new;
+        source  boxToFace;
+        box     (7.49 -1 -1) (7.51 2 1);
+    }
+    {
+        name    midPlane;
+        type    faceZoneSet;
+        action  new;
+        source  setToFaceZone;
+        faceSet midPlaneFaces;
+    }
+);
+
+// ************************************************************************* //

@@ -19,12 +19,15 @@ FoamFile
 pointSync   false;
 
 // Patches to create
-patches
+// The regex keys match both naming conventions, so one dictionary works on all
+// versions: OpenFOAM.com/.org read "patches" and "patchInfo", while
+// foam-extend reads "patchInfo" and "dictionary"
+"patches|patchInfo"
 (
     {
         //- Master side patch
         name            patch0;
-        patchInfo
+        "patchInfo|dictionary"
         {
             type            patch;
         }

@@ -526,7 +526,7 @@ Prepared by Ivan Batistić with edits by Philip Cardiff
   `solids/linearElasticity/wobblyNewton`
   `solids/linearElasticity/plateHole`
   `fluidSolidInteraction/beamInCrossFlow`
-  `fluidSolidInteraction/HronTurekFsi3`
+  `fluidSolidInteraction/HronTurek`
   `fluidSolidInteraction/3dTubeRobin`
 
 ---

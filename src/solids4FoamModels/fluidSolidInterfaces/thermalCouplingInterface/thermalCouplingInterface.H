@@ -144,6 +144,14 @@ public:
 
             //- Set equivalent interface heat transfer coeff (delta/lambda_eq)
             void setEqInterHeatTransferCoeff();
+
+        // Access
+
+            //- Without mechanical coupling the fluid interface is a rigid wall
+            virtual bool movesFluidInterface() const
+            {
+                return mechanicalCoupling_;
+            }
 };
 
 

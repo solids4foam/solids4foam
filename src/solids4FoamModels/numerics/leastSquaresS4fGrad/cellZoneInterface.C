@@ -34,16 +34,41 @@ namespace Foam
 
         // The materials are the entries of the "mechanical" list in
         // mechanicalProperties, each named after the cell zone it occupies.
-        // Looked up rather than read, because the mechanical model registers
-        // it and reading it again on every gradient would be wasteful
+        // Looked up where the mechanical model has registered it. Where it has
+        // not yet - the gradient can be constructed first, and its stencil is
+        // then cached - it is read from the case, so that the answer does not
+        // depend on which was built first. A case without the file, a fluid
+        // one say, is one material
+        autoPtr<IOdictionary> readPropsPtr;
+
         if (!mesh.foundObject<IOdictionary>("mechanicalProperties"))
         {
-            // Nothing says otherwise, so treat the mesh as one material
-            return materialID;
+            IOobject io
+            (
+                "mechanicalProperties",
+                mesh.time().constant(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            );
+
+#ifdef OPENFOAM_NOT_EXTEND
+            if (!io.typeHeaderOk<IOdictionary>(true))
+#else
+            if (!io.headerOk())
+#endif
+            {
+                return materialID;
+            }
+
+            readPropsPtr.reset(new IOdictionary(io));
         }
 
         const IOdictionary& mechProps =
-            mesh.lookupObject<IOdictionary>("mechanicalProperties");
+            readPropsPtr.valid()
+          ? readPropsPtr()
+          : mesh.lookupObject<IOdictionary>("mechanicalProperties");
 
         if (!mechProps.found("mechanical"))
         {

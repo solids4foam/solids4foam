@@ -21,47 +21,32 @@ solids4Foam::runApplication -s fluid blockMesh -region fluid -dict system/fluid/
 \cp 0/fluid/org/alpha.water 0/fluid/alpha.water
 solids4Foam::runApplication setFields -region fluid
 
-# Determine coupling mode
+# Select the coupling mode: constant/fsiProperties is a link to
+# constant/fsiProperties.<mode>
 MODE=${1:-robin}
-FSP=constant/fsiProperties
-FSP_BACKUP="${FSP}.bak"
 
 case "$MODE" in
     robin)
         echo "Using Robin-Neumann coupling with fixed relaxation 1"
-        COUPLING_FILE="${FSP}.robin"
         ;;
     aitken)
-        echo "Using Aitken coupling"
-        COUPLING_FILE="${FSP}.aitken"
+        echo "Using Robin-Neumann coupling with Aitken relaxation"
         ;;
     iqnils)
-        echo "Using IQNILS coupling"
-        COUPLING_FILE="${FSP}.iqnils"
+        echo "Using Robin-Neumann coupling accelerated with IQNILS"
         ;;
     *)
         echo "Unknown coupling mode '$MODE'"
+        echo "Usage: ./Allrun [robin|aitken|iqnils]"
         exit 1
         ;;
 esac
 
-# Swap property file for this run, restore afterwards
-cp -p "$FSP" "$FSP_BACKUP"
-cp "$COUPLING_FILE" "$FSP"
-restore_fsi()
-{
-    if [[ -f "$FSP_BACKUP" ]]; then
-        mv "$FSP_BACKUP" "$FSP"
-    fi
-}
-trap restore_fsi EXIT
+ln -nsf "fsiProperties.${MODE}" constant/fsiProperties
 
 # Run solver
 solids4Foam::runApplication solids4Foam
 RET=$?
-restore_fsi
-trap - EXIT
-exit $RET
 
 # Create plots
 if command -v gnuplot &> /dev/null
@@ -74,3 +59,5 @@ then
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
+
+exit $RET

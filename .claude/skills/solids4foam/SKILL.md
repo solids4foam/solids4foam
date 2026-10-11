@@ -35,19 +35,157 @@ This document defines how automated coding changes should be made in this reposi
   as local code.
 - Keep lines and expressions readable; avoid clever/condensed code.
 - Prefer explicit, local, maintainable changes over abstraction-heavy rewrites.
-- Add comments only when behavior is non-obvious; do not add redundant comments.
+- Add explanatory comments only when behavior is non-obvious; do not add
+  redundant explanatory comments. This restriction does not apply to mandatory
+  OpenFOAM structural comments and `//-` API documentation comments, which must
+  be preserved and reproduced.
+- Blank lines between functions differ by file type:
+  - In `.H` files, separate member function declarations with exactly one
+    blank line.
+  - In `.C` files, separate function definitions with exactly two blank lines.
+
+### OpenFOAM structural comments
+
+- Preserve and reproduce the standard OpenFOAM/solids4foam structural comment
+  layout when creating or editing C++ classes in both `.H` and `.C` files.
+- These comments are mandatory style, not optional explanatory comments.
+- Do not remove existing OpenFOAM section separators, class declaration banners,
+  namespace separators, end-of-file banners, or `//-` API documentation comments
+  when editing a class unless the user explicitly asks for style cleanup.
+- When creating a new `.H`/`.C` class pair, copy the structural comment pattern
+  from the closest existing class in the same directory or model family.
+
+Header files should include the applicable standard banners:
+
+```cpp
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+                        Class myClass Declaration
+\*---------------------------------------------------------------------------*/
+
+// class declaration here
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //
+```
+
+Source files should include the applicable standard banners:
+
+```cpp
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+// ************************************************************************* //
+```
+
+- Header declarations should use OpenFOAM `//-` documentation comments for
+  private data, constructors, runtime type information, and public member
+  functions, following nearby classes.
+- Do not add empty section banners for sections that do not exist, but do add
+  the normal banner whenever a section exists.
 
 ### File/header conventions
 
 - Preserve existing license/header block format in C++ files.
+- Every new C++ source/header or OpenFOAM dictionary must use the solids4foam
+  banner rather than the OpenFOAM banner, following a neighbouring file of the
+  same type:
+  - C++ sources/headers: the `License` block stating
+    "This file is part of solids4foam."
+  - Case dictionaries: the `solids4foam: solid mechanics and fluid-solid
+    interaction simulations` banner with `Version:`, `Web:` and `Disclaimer:`
+    lines.
+  This rule does not apply to Markdown files, shell scripts, or other
+  non-C++/non-dictionary files; follow the neighbouring files of that type.
+- The banner `Version:` must be the current solids4foam version. Determine it
+  from the repository rather than from memory: the most recent released
+  `## [vX.Y]` heading in `CHANGELOG.md` is authoritative, and the headers of
+  the tutorial `system/controlDict` files should match it. Never copy a stale
+  version from an old file.
 - Keep include ordering consistent with nearby files.
 - Do not change copyright headers unless explicitly asked.
 
 ### Scripts and docs
 
 - Match existing shell script style in `Allwmake`, `Allrun`, `Alltest`, etc.
+- Prefer bash and standard Unix tools (`awk`, `sed`, `grep`) for
+  regression-test infrastructure (`regressionTest.sh`, `regressionTests/`,
+  `Alltest`) and simple tutorial automation; do not introduce Python there
+  unless it is genuinely unavoidable, and say so if it is.
+- Python is appropriate for verification scripts (e.g.
+  `verification/scripts/*.py`), analytical solutions, numerical
+  post-processing, geometry generation (e.g. `makeBlockMeshDict.py`, STL
+  generation), or other tasks where shell scripting would be unnecessarily
+  cumbersome.
 - Keep Markdown concise, practical, and repository-specific.
 - All Markdown files must pass the Lint checker, e.g. `markdownlint README.md`
+
+### Case files (dictionaries, blockMeshDict, tutorial README)
+
+- In field files (`0/D`, `0/p`, ...) and other dictionaries, write every
+  patch entry in the expanded multi-line form, one keyword per line:
+
+  ```text
+  frontAndBack
+  {
+      type            empty;
+  }
+  ```
+
+  Never collapse a patch to a single line such as `frontAndBack {type empty;}`.
+- In `blockMeshDict`, put each vertex on its own line so the vertex index is
+  easy to count when assembling blocks and faces. Likewise, in each patch or
+  boundary entry put each face on its own line:
+
+  ```text
+  vertices
+  (
+      (0 0 0)
+      (1 0 0)
+      (1 1 0)
+      (0 1 0)
+  );
+
+  patches
+  (
+      patch left
+      (
+          (0 4 7 3)
+          (3 7 11 8)
+      )
+  );
+  ```
+
+- Tutorial `README.md` files follow the structure of existing tutorial
+  READMEs. Read a neighbouring one first and reproduce its layout:
+  - optional `sort:` front matter,
+  - a level-one title that ends with the case name in backticks (most
+    tutorials use a descriptive title such as "Descriptive Title: `caseName`";
+    some use "Tutorial: `caseName`"; follow the neighbouring tutorial),
+  - `Prepared by <authors>`,
+  - then `## Tutorial Aims`, `## Case Overview`, `## Running the Case`,
+    `## Expected Results`, and optionally `## Verification and Convergence
+    Study` and `## References`, with `---` separators between sections.
+  - Do not insert a "where the case can be found" path or location line between
+    the title and the authors; existing READMEs do not have it.
 
 ## 3) OpenFOAM Conventions to Follow
 

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Opt-in verification and convergence driver for 3dTube.
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for 3dTube verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "${SCRIPT_DIR}/scripts/tube_3d_verification.py" "$@"

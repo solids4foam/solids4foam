@@ -25,7 +25,6 @@ linearGeometryTotalDisplacementCoeffs
     // than from a mu and lambda back-derived out of impK and the bulk
     // modulus. For a linear elastic material the two are identical; they
     // differ for any law where impK is not exactly 2*mu + lambda
-    useMechanicalConstitutiveLawManager yes;
     jacobianTangent fourthOrder;
 
     // Solution algorithm

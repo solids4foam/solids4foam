@@ -86,7 +86,6 @@ The relevant inherited `solidModel` entries are:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance, `p` and `D` |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `relaxationMethod` | `fixed` | Under-relaxation method (`fixed`, `aitken`) |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `stabilisation` | auto-created if absent | `momentum` sub-dictionary is used |
@@ -113,7 +112,6 @@ poroLinearGeometryCoeffs
     nCorrectors          1000;
     solutionTolerance    1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance    1e-05;
     infoFrequency        100;
 
     hydraulicConductivity hydraulicConductivity [0 1 -1 0 0 0 0] 0.001;

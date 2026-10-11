@@ -40,7 +40,7 @@ autoPtr<frictionLaw> frictionLaw::New
 {
     Info<< "        Friction law: " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)

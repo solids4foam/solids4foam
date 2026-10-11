@@ -1,0 +1,152 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+usage()
+{
+    cat <<'USAGE'
+Usage: ./Allrun [mode] [approach] [mesh] [timeScheme]
+
+mode:       steady (default),
+            dynamic
+
+approach:   segregated (default),
+            petscSnes,
+            highOrder-movingLeastSquares,
+            highOrder-kExactLeastSquares
+
+mesh:       hex (default),
+            distHex,
+            structTet,
+            unstructTet
+
+timeScheme: backward (default),
+            Euler,
+            NewmarkBeta (dynamic mode only)
+USAGE
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]; then
+    usage
+    exit 0
+fi
+
+MODE="${1:-steady}"
+APPROACH="${2:-segregated}"
+MESH="${3:-hex}"
+TIME_SCHEME="${4:-backward}"
+
+case "$MODE" in
+    steady|dynamic) ;;
+    *)
+        echo "Error: unknown mode '$MODE'"
+        usage
+        exit 1
+        ;;
+esac
+
+case "$APPROACH" in
+    segregated|petscSnes) ;;
+    highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
+    *)
+        echo "Error: unknown approach '$APPROACH'"
+        usage
+        exit 1
+        ;;
+esac
+
+case "$MESH" in
+    hex|distHex|structTet|unstructTet) ;;
+    *)
+        echo "Error: unknown mesh '$MESH'"
+        usage
+        exit 1
+        ;;
+esac
+
+case "$TIME_SCHEME" in
+    backward|Euler|NewmarkBeta) ;;
+    *)
+        echo "Error: unknown time scheme '$TIME_SCHEME'"
+        usage
+        exit 1
+        ;;
+esac
+
+if [[ "$MODE" == "steady" && -n "${4:-}" ]]; then
+    echo "Error: the time scheme applies to the dynamic mode only"
+    usage
+    exit 1
+fi
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+source solids4FoamScripts.sh
+
+if [[ "$APPROACH" != "segregated" ]]; then
+    solids4Foam::requirePetscOrExitSilently
+fi
+
+# The steady mode uses the steadyState d2dt2 scheme; the dynamic mode the
+# selected time scheme
+FV_SCHEMES="$TIME_SCHEME"
+if [[ "$MODE" == "steady" ]]; then
+    FV_SCHEMES=steady
+fi
+
+# Both high-order reconstructions share the PETSc settings
+FV_SOLUTION="$APPROACH"
+if [[ "$APPROACH" == highOrder-* ]]; then
+    FV_SOLUTION=highOrder
+fi
+
+for file in system/controlDict."${MODE}" \
+            constant/neoHookeanManufacturedSolutionProperties."${MODE}" \
+            constant/solidProperties."${APPROACH}" \
+            system/fvSolution."${FV_SOLUTION}" \
+            system/fvSchemes."${FV_SCHEMES}"
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
+
+if [[ "$WM_PROJECT" == "foam" || "$WM_PROJECT_VERSION" != v* ]]; then
+    # Use the tutorial source model where fvOptions is unavailable
+    rm -f constant/solidProperties
+    sed 's/^solidModel .*/solidModel neoHookeanManufacturedSolutionSolid;/' \
+        "constant/solidProperties.$APPROACH" > constant/solidProperties
+fi
+
+solids4Foam::convertCaseFormat .
+
+echo
+echo "Compiling tutorial library..."
+(cd src && ./Allwmake -s)
+
+case "$MESH" in
+    hex|distHex)
+        solids4Foam::runApplication blockMesh
+        if [[ "$MESH" == "distHex" ]]; then
+            solids4Foam::runApplication perturbMeshPoints
+        fi
+        ;;
+    structTet|unstructTet)
+        if ! command -v gmsh >/dev/null 2>&1; then
+            echo "Gmsh is required for the $MESH mesh"
+            exit 1
+        fi
+        GMSH_MESH=tet-structured
+        if [[ "$MESH" == "unstructTet" ]]; then
+            GMSH_MESH=tet-unstructured
+        fi
+        mv 0 0.tmp
+        # The cell size is set in gmsh/meshSpacing.geo
+        solids4Foam::runApplication gmsh -3 -format msh2 "gmsh/$GMSH_MESH.geo"
+        solids4Foam::runApplication gmshToFoam "gmsh/$GMSH_MESH.msh"
+        solids4Foam::runApplication createPatch -overwrite
+        mv 0.tmp 0
+        ;;
+esac
+
+solids4Foam::runApplication solids4Foam

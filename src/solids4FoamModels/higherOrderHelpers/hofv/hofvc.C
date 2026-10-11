@@ -19,7 +19,6 @@ License
 
 #include "hofvc.H"
 #include "lookupSolidModel.H"
-#include "fvcD2dt2.H"
 #include "compatibilityFunctions.H"
 #ifdef OPENFOAM_ORG
     #include "fvSchemes.H"
@@ -225,7 +224,7 @@ tmp<volVectorField> hofvc::d2dt2
 {
     // Default to second-order method for now
     // In the future, a consistent, higher-order scheme will be added
-    return fvc::d2dt2(D);
+    return fvcD2dt2Compat(D);
 }
 
 // ************************************************************************* //

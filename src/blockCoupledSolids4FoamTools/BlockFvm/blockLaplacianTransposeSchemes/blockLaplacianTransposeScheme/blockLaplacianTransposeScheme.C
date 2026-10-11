@@ -68,7 +68,7 @@ tmp<blockLaplacianTranspose> blockLaplacianTranspose::New
 
     const word schemeName(schemeData);
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = IstreamConstructorTable(schemeName);
 
     if (!ctorPtr)

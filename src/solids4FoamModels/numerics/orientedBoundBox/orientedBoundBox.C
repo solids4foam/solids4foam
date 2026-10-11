@@ -1,0 +1,648 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+
+#include "orientedBoundBox.H"
+#include <cmath>
+#include <limits>
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+const Foam::scalar Foam::orientedBoundBox::parallelTolerance_ = 1e-6;
+
+const Foam::orientedBoundBox Foam::orientedBoundBox::greatBox
+(
+    Foam::point::zero,
+    Foam::vector(Foam::VGREAT, Foam::VGREAT, Foam::VGREAT)
+);
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+void Foam::orientedBoundBox::calcCovariance
+(
+    const pointField& points,
+    point& mean,
+    symmTensor& covariance
+)
+{
+    mean = point::zero;
+
+    forAll(points, pointI)
+    {
+        mean += points[pointI];
+    }
+
+    mean /= points.size();
+
+    covariance = symmTensor::zero;
+
+    // Normalisation preserves the axes and avoids tiny covariance entries.
+    scalar lengthScale = 0;
+    forAll(points, pointI)
+    {
+        lengthScale = max
+        (
+            lengthScale, cmptMax(cmptMag(points[pointI] - mean))
+        );
+    }
+    if (lengthScale < VSMALL)
+    {
+        return;
+    }
+
+    forAll(points, pointI)
+    {
+        const vector d((points[pointI] - mean)/lengthScale);
+
+        covariance.xx() += d.x()*d.x();
+        covariance.xy() += d.x()*d.y();
+        covariance.xz() += d.x()*d.z();
+        covariance.yy() += d.y()*d.y();
+        covariance.yz() += d.y()*d.z();
+        covariance.zz() += d.z()*d.z();
+    }
+
+    // Scaling does not change the eigenvectors. Avoid division for one point.
+    if (points.size() > 1)
+    {
+        covariance /= scalar(points.size() - 1);
+    }
+}
+
+
+void Foam::orientedBoundBox::addToLocalBounds
+(
+    const vector& localPoint,
+    vector& minLocal,
+    vector& maxLocal
+)
+{
+    for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
+    {
+        minLocal[cmpt] = Foam::min(minLocal[cmpt], localPoint[cmpt]);
+        maxLocal[cmpt] = Foam::max(maxLocal[cmpt], localPoint[cmpt]);
+    }
+}
+
+
+void Foam::orientedBoundBox::orthonormaliseAxes()
+{
+    // A failed eigensystem must still produce a conservative fitted box.
+    for (direction cmpt = 0; cmpt < tensor::nComponents; ++cmpt)
+    {
+        if (!std::isfinite(axes_[cmpt]))
+        {
+            axes_ = tensor::I;
+            return;
+        }
+    }
+
+    vector axis0(axes_.x());
+    vector axis1(axes_.y());
+
+    if (mag(axis0) < SMALL)
+    {
+        axis0 = vector(1, 0, 0);
+    }
+    else
+    {
+        axis0 /= mag(axis0);
+    }
+
+    axis1 -= (axis0 & axis1)*axis0;
+
+    if (mag(axis1) < SMALL)
+    {
+        // Choose the Cartesian direction least aligned with axis0.
+        if
+        (
+            mag(axis0.x()) <= mag(axis0.y())
+         && mag(axis0.x()) <= mag(axis0.z())
+        )
+        {
+            axis1 = vector(1, 0, 0);
+        }
+        else if (mag(axis0.y()) <= mag(axis0.z()))
+        {
+            axis1 = vector(0, 1, 0);
+        }
+        else
+        {
+            axis1 = vector(0, 0, 1);
+        }
+
+        axis1 -= (axis0 & axis1)*axis0;
+    }
+
+    axis1 /= mag(axis1);
+
+    vector axis2(axis0 ^ axis1);
+    axis2 /= mag(axis2);
+
+    axes_ = tensor(axis0, axis1, axis2);
+}
+
+
+void Foam::orientedBoundBox::makeBox(const pointField& points)
+{
+    if (points.empty())
+    {
+        centre_ = point::zero;
+        halfLength_ = vector(-1, -1, -1);
+        axes_ = tensor::I;
+        return;
+    }
+
+    point mean(point::zero);
+    symmTensor covariance(symmTensor::zero);
+    calcCovariance(points, mean, covariance);
+
+    const scalar trace = tr(covariance);
+    const scalar secondInvariant =
+        covariance.xx()*covariance.yy()
+      + covariance.yy()*covariance.zz()
+      + covariance.zz()*covariance.xx()
+      - sqr(covariance.xy()) - sqr(covariance.xz()) - sqr(covariance.yz());
+
+    if (trace < VSMALL)
+    {
+        axes_ = tensor::I;
+    }
+    else if (mag(secondInvariant) <= SMALL*sqr(trace))
+    {
+        // Collinear points have one determined axis. Avoid the repeated-zero
+        // eigenvalues and complete the frame in orthonormaliseAxes().
+        vector axis(covariance.xx(), covariance.xy(), covariance.xz());
+        if (covariance.yy() > covariance.xx())
+        {
+            axis = vector(covariance.xy(), covariance.yy(), covariance.yz());
+        }
+        if (covariance.zz() > max(covariance.xx(), covariance.yy()))
+        {
+            axis = vector(covariance.xz(), covariance.yz(), covariance.zz());
+        }
+        axes_ = tensor(axis, vector::zero, vector::zero);
+    }
+    else
+    {
+        axes_ = eigenVectors(covariance);
+    }
+    orthonormaliseAxes();
+
+    vector minLocal(VGREAT, VGREAT, VGREAT);
+    vector maxLocal(-VGREAT, -VGREAT, -VGREAT);
+    point minGlobal(VGREAT, VGREAT, VGREAT);
+    point maxGlobal(-VGREAT, -VGREAT, -VGREAT);
+
+    forAll(points, pointI)
+    {
+        addToLocalBounds
+        (
+            axes_ & (points[pointI] - mean),
+            minLocal,
+            maxLocal
+        );
+        addToLocalBounds(points[pointI], minGlobal, maxGlobal);
+    }
+
+    const vector localCentre(0.5*(minLocal + maxLocal));
+    centre_ = mean + (localCentre & axes_);
+    halfLength_ = 0.5*(maxLocal - minLocal);
+
+    // Principal axes are arbitrary for near-isotropic point sets and can give
+    // a larger box than the axis-aligned one, so keep the smaller of the two.
+    // Ties, e.g. coplanar points, keep the axis-aligned box
+    const vector alignedHalfLength(0.5*(maxGlobal - minGlobal));
+    if
+    (
+        alignedHalfLength.x()*alignedHalfLength.y()*alignedHalfLength.z()
+     <= halfLength_.x()*halfLength_.y()*halfLength_.z()
+    )
+    {
+        centre_ = 0.5*(minGlobal + maxGlobal);
+        halfLength_ = alignedHalfLength;
+        axes_ = tensor::I;
+    }
+}
+
+
+void Foam::orientedBoundBox::makeBox
+(
+    const pointField& facePoints,
+    const vector& faceNormal,
+    const scalar normalPosExtent,
+    const scalar normalNegExtent,
+    const scalar scaleFactor
+)
+{
+    if (facePoints.size() < 3)
+    {
+        FatalErrorInFunction
+            << "At least three face points are required; supplied "
+            << facePoints.size() << abort(FatalError);
+    }
+
+    if (mag(faceNormal) < SMALL)
+    {
+        FatalErrorInFunction
+            << "The face normal has zero magnitude" << abort(FatalError);
+    }
+
+    if (normalPosExtent < 0 || normalNegExtent < 0 || scaleFactor <= 0)
+    {
+        FatalErrorInFunction
+            << "The normal extents must be non-negative and scaleFactor must "
+            << "be positive" << abort(FatalError);
+    }
+
+    const vector normal(faceNormal/mag(faceNormal));
+    scalar minArea = VGREAT;
+    vector bestAxis1(vector::zero);
+    vector bestAxis2(vector::zero);
+    point bestCentre(point::zero);
+
+    forAll(facePoints, pointI)
+    {
+        const label previousI = pointI ? pointI - 1 : facePoints.size() - 1;
+        vector axis1(facePoints[pointI] - facePoints[previousI]);
+
+        // Remove any small out-of-plane component before normalising.
+        axis1 -= (normal & axis1)*normal;
+
+        if (mag(axis1) < SMALL)
+        {
+            continue;
+        }
+
+        axis1 /= mag(axis1);
+        const vector axis2(normal ^ axis1);
+
+        scalar min1 = VGREAT;
+        scalar max1 = -VGREAT;
+        scalar min2 = VGREAT;
+        scalar max2 = -VGREAT;
+
+        forAll(facePoints, testPointI)
+        {
+            const vector d(facePoints[testPointI] - facePoints[previousI]);
+            const scalar projection1 = d & axis1;
+            const scalar projection2 = d & axis2;
+
+            min1 = Foam::min(min1, projection1);
+            max1 = Foam::max(max1, projection1);
+            min2 = Foam::min(min2, projection2);
+            max2 = Foam::max(max2, projection2);
+        }
+
+        const scalar area = (max1 - min1)*(max2 - min2);
+
+        if (area < minArea)
+        {
+            minArea = area;
+            bestAxis1 = axis1;
+            bestAxis2 = axis2;
+            bestCentre =
+                facePoints[previousI]
+              + 0.5*((min1 + max1)*axis1 + (min2 + max2)*axis2);
+        }
+    }
+
+    if (minArea == VGREAT)
+    {
+        FatalErrorInFunction
+            << "The face has no non-zero in-plane edge" << abort(FatalError);
+    }
+
+    axes_ = tensor(normal, bestAxis1, bestAxis2);
+    centre_ =
+        bestCentre + 0.5*(normalPosExtent - normalNegExtent)*normal;
+
+    vector minLocal(VGREAT, VGREAT, VGREAT);
+    vector maxLocal(-VGREAT, -VGREAT, -VGREAT);
+
+    forAll(facePoints, pointI)
+    {
+        const point positivePoint
+        (
+            facePoints[pointI] + normalPosExtent*normal
+        );
+        const point negativePoint
+        (
+            facePoints[pointI] - normalNegExtent*normal
+        );
+        addToLocalBounds
+        (
+            axes_ & (positivePoint - centre_),
+            minLocal,
+            maxLocal
+        );
+        addToLocalBounds
+        (
+            axes_ & (negativePoint - centre_),
+            minLocal,
+            maxLocal
+        );
+    }
+
+    halfLength_ = 0.5*scaleFactor*(maxLocal - minLocal);
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::orientedBoundBox::orientedBoundBox()
+:
+    centre_(point::zero),
+    halfLength_(vector(-1, -1, -1)),
+    axes_(tensor::I)
+{}
+
+
+Foam::orientedBoundBox::orientedBoundBox
+(
+    const point& centre,
+    const vector& halfLength
+)
+:
+    centre_(centre),
+    halfLength_(halfLength),
+    axes_(tensor::I)
+{}
+
+
+Foam::orientedBoundBox::orientedBoundBox
+(
+    const point& centre,
+    const vector& halfLength,
+    const tensor& axes
+)
+:
+    centre_(centre),
+    halfLength_(halfLength),
+    axes_(axes)
+{
+    orthonormaliseAxes();
+}
+
+
+Foam::orientedBoundBox::orientedBoundBox(const boundBox& box)
+:
+    centre_(box.midpoint()),
+    halfLength_(0.5*(box.max() - box.min())),
+    axes_(tensor::I)
+{}
+
+
+Foam::orientedBoundBox::orientedBoundBox(const pointField& points)
+:
+    centre_(point::zero),
+    halfLength_(vector::zero),
+    axes_(tensor::I)
+{
+    makeBox(points);
+}
+
+
+Foam::orientedBoundBox::orientedBoundBox(const tmp<pointField>& points)
+:
+    centre_(point::zero),
+    halfLength_(vector::zero),
+    axes_(tensor::I)
+{
+    makeBox(points());
+    points.clear();
+}
+
+
+Foam::orientedBoundBox::orientedBoundBox
+(
+    const pointField& facePoints,
+    const vector& faceNormal,
+    const scalar normalPosExtent,
+    const scalar normalNegExtent,
+    const scalar scaleFactor
+)
+:
+    centre_(point::zero),
+    halfLength_(vector::zero),
+    axes_(tensor::I)
+{
+    makeBox
+    (
+        facePoints,
+        faceNormal,
+        normalPosExtent,
+        normalNegExtent,
+        scaleFactor
+    );
+}
+
+
+Foam::orientedBoundBox::orientedBoundBox(Istream& is)
+:
+    centre_(point::zero),
+    halfLength_(vector::zero),
+    axes_(tensor::I)
+{
+    is >> *this;
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::orientedBoundBox::grow(const scalar distance)
+{
+    if (!(distance >= 0) || !std::isfinite(distance))
+    {
+        FatalErrorInFunction
+            << "Box growth distance must be finite and non-negative: "
+            << distance
+            << abort(FatalError);
+    }
+
+    if (!empty())
+    {
+        halfLength_ += vector::one*distance;
+    }
+}
+
+
+bool Foam::orientedBoundBox::contains(const point& p) const
+{
+    if (empty())
+    {
+        return false;
+    }
+
+    const vector local(axes_ & (p - centre_));
+    // Account for subtraction and projection round-off without a fixed
+    // length tolerance, so uniformly scaled geometry behaves consistently.
+    const scalar tolerance = 32*std::numeric_limits<scalar>::epsilon()
+       *max
+        (
+            cmptMax(halfLength_),
+            max(cmptMax(cmptMag(p)), cmptMax(cmptMag(centre_)))
+        );
+
+    for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
+    {
+        if (mag(local[cmpt]) > halfLength_[cmpt] + tolerance)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+bool Foam::orientedBoundBox::overlaps(const orientedBoundBox& box) const
+{
+    if (empty() || box.empty())
+    {
+        return false;
+    }
+
+    const vector& a = halfLength_;
+    const vector& b = box.halfLength_;
+
+    // Rotation from the other box coordinates into this box coordinates.
+    const tensor relativeAxes(axes_ & box.axes_.T());
+    tensor magRelativeAxes(tensor::zero);
+
+    for (direction i = 0; i < vector::nComponents; ++i)
+    {
+        for (direction j = 0; j < vector::nComponents; ++j)
+        {
+            magRelativeAxes(i, j) = mag(relativeAxes(i, j));
+        }
+    }
+
+    // Centre separation expressed in this box coordinates.
+    const vector separation(axes_ & (box.centre_ - centre_));
+
+    // The three axes of this box.
+    for (direction i = 0; i < vector::nComponents; ++i)
+    {
+        const scalar projectedB =
+            b.x()*magRelativeAxes(i, 0)
+          + b.y()*magRelativeAxes(i, 1)
+          + b.z()*magRelativeAxes(i, 2);
+
+        if (mag(separation[i]) > a[i] + projectedB)
+        {
+            return false;
+        }
+    }
+
+    // The three axes of the other box.
+    for (direction j = 0; j < vector::nComponents; ++j)
+    {
+        const scalar projectedSeparation = mag
+        (
+            separation.x()*relativeAxes(0, j)
+          + separation.y()*relativeAxes(1, j)
+          + separation.z()*relativeAxes(2, j)
+        );
+        const scalar projectedA =
+            a.x()*magRelativeAxes(0, j)
+          + a.y()*magRelativeAxes(1, j)
+          + a.z()*magRelativeAxes(2, j);
+
+        if (projectedSeparation > projectedA + b[j])
+        {
+            return false;
+        }
+    }
+
+    // The nine cross products of one axis from each box.
+    for (direction i = 0; i < vector::nComponents; ++i)
+    {
+        const direction i1 = (i + 1) % vector::nComponents;
+        const direction i2 = (i + 2) % vector::nComponents;
+
+        for (direction j = 0; j < vector::nComponents; ++j)
+        {
+            // A parallel pair has no cross-product separating axis.
+            if
+            (
+                1.0 - relativeAxes(i, j)*relativeAxes(i, j)
+              <= parallelTolerance_*parallelTolerance_
+            )
+            {
+                continue;
+            }
+
+            const direction j1 = (j + 1) % vector::nComponents;
+            const direction j2 = (j + 2) % vector::nComponents;
+            const scalar projectedSeparation = mag
+            (
+                separation[i2]*relativeAxes(i1, j)
+              - separation[i1]*relativeAxes(i2, j)
+            );
+            const scalar projectedA =
+                a[i1]*magRelativeAxes(i2, j)
+              + a[i2]*magRelativeAxes(i1, j);
+            const scalar projectedB =
+                b[j1]*magRelativeAxes(i, j2)
+              + b[j2]*magRelativeAxes(i, j1);
+
+            if (projectedSeparation > projectedA + projectedB)
+            {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+
+bool Foam::orientedBoundBox::operator==(const orientedBoundBox& box) const
+{
+    return
+        centre_ == box.centre_
+     && halfLength_ == box.halfLength_
+     && axes_ == box.axes_;
+}
+
+
+// * * * * * * * * * * * * * * IOstream Operators * * * * * * * * * * * * * //
+
+Foam::Ostream& Foam::operator<<(Ostream& os, const orientedBoundBox& box)
+{
+    os  << box.centre_ << token::SPACE
+        << box.halfLength_ << token::SPACE
+        << box.axes_;
+
+    os.check("Ostream& operator<<(Ostream&, const orientedBoundBox&)");
+    return os;
+}
+
+
+Foam::Istream& Foam::operator>>(Istream& is, orientedBoundBox& box)
+{
+    is >> box.centre_ >> box.halfLength_ >> box.axes_;
+
+    is.check("Istream& operator>>(Istream&, orientedBoundBox&)");
+    return is;
+}
+
+
+// ************************************************************************* //
