@@ -8,13 +8,27 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
-- The fluid-solid interface now supports displacement-based fluid mesh motion
-  solvers, e.g. `displacementLaplacian` and `displacementSBRStress`, in
-  addition to the velocity-based ones. When the fluid mesh has a
-  `pointDisplacement` field, the interface is set to the total displacement
-  relative to the initial points; the `pointMotionU` behaviour is unchanged.
-  Velocity-based solvers are path dependent and the interior mesh can drift
-  under periodic motion, which `displacementLaplacian` avoids.
+- The fluid-solid interface passes the interface motion to the fluid mesh
+  motion solver through a runtime-selectable *fluid mesh motion coupler*,
+  selected from the motion solver or with an optional `fluidMeshMotion`
+  sub-dictionary in `fsiProperties`, in place of the fixed list of supported
+  solvers in `moveFluidMesh`. Existing cases are unchanged. New couplers
+  support displacement-based solvers, e.g. `displacementLaplacian` and
+  `displacementSBRStress`, which set the total interface displacement relative
+  to the reference points from the current geometry, and the
+  `solids4foamSolidModel` solver. Velocity-based solvers are path dependent
+  and the interior mesh can drift under periodic motion, which
+  `displacementLaplacian` avoids.
+- The `solids4foamSolidModel` mesh motion solver can solve its solid model on
+  a static copy of the moving mesh, in its own region, and calculates the
+  `stiffnessScaleFactor` field from an optional mesh motion `diffusivity`.
+- Ported the `diffusionElastic` and `diffusionHyperElastic` laws, removed
+  with the legacy mechanical laws, to the `mechanicalConstitutiveLaw`
+  framework, for mesh motion with `solids4foamSolidModel`: `linearElastic`
+  and `neoHookeanElastic` with the stiffness scaled by `stiffnessScaleFactor`.
+  The `diffusivity` entries move from the law to the `dynamicMeshDict`.
+- `beamInCrossFlow`: `./Allrun displacementLaplacian`, `diffusionElastic`
+  and `diffusionHyperElastic` select the fluid mesh motion.
 - Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
   applies the backward differentiation formula of order 1 to 6 twice, as the
   `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and

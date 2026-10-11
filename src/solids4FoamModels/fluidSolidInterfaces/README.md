@@ -168,29 +168,81 @@ is the header-only interface implemented by `immersedBoundaryForce`.
 
 ## Fluid mesh motion
 
-The fluid mesh is moved with the fluid mesh motion solver in
-`constant/fluid/dynamicMeshDict`. The interface moves the mesh through the
-motion solver field found in the fluid mesh registry:
+The fluid mesh is moved by the mesh motion solver in
+`constant/fluid/dynamicMeshDict`. At each mesh update, the interface gives a
+*fluid mesh motion coupler* the change in the displacement of each fluid
+interface patch, and the coupler sets it in the form its family of motion
+solvers expects. The coupler is selected from the motion solver, or set
+explicitly in `constant/fsiProperties`:
 
-- `pointMotionU` (velocity-based solvers, e.g. `velocityLaplacian`): the
-  interface boundary values are the interface displacement increment divided
-  by the time-step size.
-- `pointDisplacement` (displacement-based solvers, e.g.
-  `displacementLaplacian`, `displacementSBRStress`): the interface boundary
-  values are the total interface displacement relative to the initial points.
-  Add a `0/fluid/pointDisplacement` file, with `fixedValue` on the FSI patches,
-  in place of `pointMotionU`.
+```text
+fluidMeshMotion
+{
+    type    auto;   // default
+}
+```
+
+- `velocity`: velocity-based solvers, e.g. `velocityLaplacian`; the
+  `pointMotionU` patch value is the displacement increment divided by the
+  time-step size.
+- `displacement`: displacement-based solvers, e.g. `displacementLaplacian` and
+  `displacementSBRStress`; the `pointDisplacement` patch value is the total
+  displacement relative to the solver reference points, `points0`.
+- `solidModel`: `solids4foamSolidModel` (OpenFOAM.com); the total
+  displacement is set on the solid model `pointD` and `fixedDisplacement` `D`.
+- `RBF`: `RBFMeshMotionSolver`; the patch face displacement increments are
+  set.
+- `tetFemVelocity`: foam-extend tetFEM solvers; the `motionU` patch value is
+  the displacement increment divided by the time-step size.
+- `subsetMesh`: foam-extend `newSubsetMotionSolverFvMesh`; `pointMotionU` is
+  set on the sub-mesh.
+
+The FSI patches must have a `fixedValue` condition in the motion field.
+Component solvers, e.g. `velocityComponentLaplacian`, are not supported.
+
+### Velocity- or displacement-based motion
 
 Velocity-based solvers are path dependent: the interior mesh is advanced from
-its current state each time step, so under periodic or long-running motion
-the interior mesh can drift cycle after cycle and periodic quantities of
-interest may not become stationary. A displacement-based solver, e.g.
+its current state each time step, so under periodic or long-running motion the
+interior mesh can drift cycle after cycle and periodic quantities of interest
+may not become stationary. A displacement-based solver, e.g.
 `displacementLaplacian` with the same `diffusivity`, always solves from the
-initial points and so avoids this drift. It is recommended for periodic or
-long-running FSI cases.
+reference points, so the mesh for a given interface position does not depend
+on how the interface got there. It is recommended for periodic or
+long-running FSI cases; add a `0/fluid/pointDisplacement` file, with
+`fixedValue` on the FSI patches, in place of `pointMotionU`.
 
-When restarting, a displacement-based solver reads `pointDisplacement` from the
-start time, so restart from a run that also used a displacement-based solver.
+The `displacement` coupler sets the interface value from the current geometry,
+`points + increment - points0`, rather than accumulating increments, so it is
+the same whatever the number of outer iterations, it includes the interface
+points moved directly when `interfaceDeformationLimit` is used, and it does
+not depend on the earlier boundary values. A restart still needs a
+`pointDisplacement` field to read, and `points0` must be the reference points
+of the run being continued.
+
+### Solid model mesh motion
+
+`solids4foamSolidModel` moves the fluid mesh with a solids4foam solid model
+solved on a static copy of the fluid mesh, in its own region (`regionName`),
+typically with the `diffusionElastic` or `diffusionHyperElastic` law, whose
+stiffness is scaled by a mesh motion diffusivity so that the mesh is stiffer
+near the interface:
+
+```text
+// constant/fluid/dynamicMeshDict
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+motionSolver    solids4foamSolidModel;
+regionName      fluidMeshMotion;
+diffusivity     quadratic inverseDistance (interface);
+```
+
+The region needs `constant/fluidMeshMotion/polyMesh`, a copy of the fluid mesh
+(decomposed in the same way in parallel), with `solidProperties`,
+`mechanicalProperties` and `g`, `0/fluidMeshMotion/D` and `pointD`, and
+`system/fluidMeshMotion/fvSchemes` and `fvSolution`. On the FSI patches, `D`
+must be `fixedDisplacement` with `enforcePointPatchField no`, and `pointD`
+must be `fixedValue`. The `beamInCrossFlow` tutorial has an example:
+`./Allrun diffusionElastic`.
 
 ---
 
