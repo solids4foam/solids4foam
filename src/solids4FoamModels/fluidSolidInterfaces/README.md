@@ -166,6 +166,34 @@ is the header-only interface implemented by `immersedBoundaryForce`.
 
 ---
 
+## Fluid mesh motion
+
+The fluid mesh is moved with the fluid mesh motion solver in
+`constant/fluid/dynamicMeshDict`. The interface moves the mesh through the
+motion solver field found in the fluid mesh registry:
+
+- `pointMotionU` (velocity-based solvers, e.g. `velocityLaplacian`): the
+  interface boundary values are the interface displacement increment divided
+  by the time-step size.
+- `pointDisplacement` (displacement-based solvers, e.g.
+  `displacementLaplacian`, `displacementSBRStress`): the interface boundary
+  values are the total interface displacement relative to the initial points.
+  Add a `0/fluid/pointDisplacement` file, with `fixedValue` on the FSI patches,
+  in place of `pointMotionU`.
+
+Velocity-based solvers are path dependent: the interior mesh is advanced from
+its current state each time step, so under periodic or long-running motion
+the interior mesh can drift cycle after cycle and periodic quantities of
+interest may not become stationary. A displacement-based solver, e.g.
+`displacementLaplacian` with the same `diffusivity`, always solves from the
+initial points and so avoids this drift. It is recommended for periodic or
+long-running FSI cases.
+
+When restarting, a displacement-based solver reads `pointDisplacement` from the
+start time, so restart from a run that also used a displacement-based solver.
+
+---
+
 ## Notes
 
 - The partitioned schemes share the common `fluidSolidInterface` machinery for

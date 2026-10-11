@@ -1693,6 +1693,41 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             accumulatedFluidInterfacesDisplacements()[interfaceI] +=
                 fluidPatchesPointsDispls[interfaceI]
               - fluidPatchesPointsDisplsPrev[interfaceI];
+
+            // A displacement-based motion solver takes its points from the
+            // reference points plus pointDisplacement so we keep the
+            // interface values of pointDisplacement consistent with the
+            // interface points
+            if (fluidMesh().foundObject<pointVectorField>("pointDisplacement"))
+            {
+                pointVectorField& pointDisplacement =
+                    const_cast<pointVectorField&>
+                    (
+                        fluidMesh().objectRegistry::
+                        lookupObject<pointVectorField>
+                        (
+                            "pointDisplacement"
+                        )
+                    );
+
+                fixedValuePointPatchVectorField& pointDisplacementFluidPatch =
+                    refCast<fixedValuePointPatchVectorField>
+                    (
+                        boundaryFieldRef
+                        (
+                            pointDisplacement
+                        )[fluidPatchIndices()[interfaceI]]
+                    );
+
+                const vectorField totalDispl
+                (
+                    static_cast<const vectorField&>(pointDisplacementFluidPatch)
+                  + fluidPatchesPointsDispls[interfaceI]
+                  - fluidPatchesPointsDisplsPrev[interfaceI]
+                );
+
+                pointDisplacementFluidPatch == totalDispl;
+            }
         }
     }
     else
@@ -1719,6 +1754,16 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         // that the fv motion solver is being used
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
+
+        // If the pointDisplacement field is in the object registry then we
+        // assume that a displacement-based fv motion solver is being used,
+        // e.g. displacementLaplacian or displacementSBRStress. These solve for
+        // the total displacement relative to the initial points, whereas the
+        // velocity-based solvers above solve for the increment over the time
+        // step; the latter is path dependent, which can cause the mesh to
+        // drift under periodic motion
+        const bool fvDisplacementMotionSolver =
+            fluidMesh().foundObject<pointVectorField>("pointDisplacement");
 
 #if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
         // Check for RBF motion solver
@@ -1884,6 +1929,48 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                     )/fluid().runTime().deltaT().value();
                 }
             }
+            else if (subMesh.foundObject<pointVectorField>("pointDisplacement"))
+            {
+                pointVectorField& pointDisplacement =
+                    const_cast<pointVectorField&>
+                    (
+                        subMesh.objectRegistry::
+                        lookupObject<pointVectorField>
+                        (
+                            "pointDisplacement"
+                        )
+                    );
+
+                forAll(fluid().globalPatches(), interfaceI)
+                {
+                    if (immersedInterfaces_[interfaceI])
+                    {
+                        continue;
+                    }
+
+                    fixedValuePointPatchVectorField&
+                        pointDisplacementFluidPatch =
+                        refCast<fixedValuePointPatchVectorField>
+                        (
+                            pointDisplacement.boundaryField()
+                            [
+                                fluidPatchIndices()[interfaceI]
+                            ]
+                        );
+
+                    const vectorField totalDispl
+                    (
+                        static_cast<const vectorField&>
+                        (
+                            pointDisplacementFluidPatch
+                        )
+                      + fluidPatchesPointsDispls[interfaceI]
+                      - fluidPatchesPointsDisplsPrev[interfaceI]
+                    );
+
+                    pointDisplacementFluidPatch == totalDispl;
+                }
+            }
         }
 #endif
 #if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
@@ -1932,10 +2019,56 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             rbfMotionSolverPtr->setMotion(motion);
         }
 #endif
+        else if (fvDisplacementMotionSolver)
+        {
+            pointVectorField& pointDisplacement =
+                const_cast<pointVectorField&>
+                (
+                    fluidMesh().objectRegistry::
+                    lookupObject<pointVectorField>
+                    (
+                        "pointDisplacement"
+                    )
+                );
+
+            forAll(fluid().globalPatches(), interfaceI)
+            {
+                if (immersedInterfaces_[interfaceI])
+                {
+                    continue;
+                }
+
+                fixedValuePointPatchVectorField& pointDisplacementFluidPatch =
+                    refCast<fixedValuePointPatchVectorField>
+                    (
+                        boundaryFieldRef
+                        (
+                            pointDisplacement
+                        )[fluidPatchIndices()[interfaceI]]
+                    );
+
+                // The interface patch holds the total displacement relative to
+                // the initial points: it is advanced by the change in the
+                // interface displacement over this outer iteration, so that it
+                // is consistent across outer iterations and time steps
+                const vectorField totalDispl
+                (
+                    static_cast<const vectorField&>(pointDisplacementFluidPatch)
+                  + fluidPatchesPointsDispls[interfaceI]
+                  - fluidPatchesPointsDisplsPrev[interfaceI]
+                );
+
+                pointDisplacementFluidPatch == totalDispl;
+            }
+        }
         else
         {
             FatalErrorIn("fluidSolidInterface::moveFluidMesh()")
-                << "Problem with fluid mesh motion solver selection"
+                << "Problem with fluid mesh motion solver selection: "
+                << "neither a pointMotionU (velocity-based) nor a "
+                << "pointDisplacement (displacement-based) field was found "
+                << "in the fluid mesh registry, and no other supported "
+                << "motion solver was detected"
                 << abort(FatalError);
         }
 
