@@ -1,0 +1,69 @@
+/home/philipc/ht_tip/work/t_1x     t_end 30.200  Q_in   48.872  Q_quad  -17.015  lift1   175.09  drag  -14.398  dQin/dt   0.288  ddrag/dt   0.299
+s1_1x_conv                         t_end 30.200  Q_in   48.869  Q_quad  -17.003  lift1   175.10  drag  -14.395  dQin/dt   0.288  ddrag/dt   0.299
+s1_1x_linear                       t_end 30.200  Q_in   67.353  Q_quad  -37.842  lift1   126.76  drag  -22.663  dQin/dt   1.323  ddrag/dt  -0.149
+m_std_1x_linear_dispLap            t_end 30.200  Q_in   61.618  Q_quad  -37.130  lift1   128.24  drag  -21.789  dQin/dt   0.017  ddrag/dt  -0.009
+s3_1x_linear_dispLap_dt5e-4        t_end 30.200  Q_in   63.560  Q_quad  -36.617  lift1   128.22  drag  -21.872  dQin/dt   0.005  ddrag/dt  -0.001
+s3_1x_linear_dispLap_gradS4f       t_end 30.200  Q_in   25.212  Q_quad  -31.304  lift1   153.59  drag   -4.519  dQin/dt   0.022  ddrag/dt  -0.005
+s3_1x_linear_dispLap_pwall_gradS4f t_end 30.200  Q_in   45.747  Q_quad  -31.326  lift1   140.65  drag   -7.044  dQin/dt   0.022  ddrag/dt  -0.005
+m_cl_1x_linear_dispLap             t_end 30.200  Q_in   45.031  Q_quad  -32.529  lift1   133.29  drag  -25.253  dQin/dt   0.018  ddrag/dt  -0.011
+m_cl_1x_linear_dispLap_pwall       t_end 30.200  Q_in   42.942  Q_quad  -31.324  lift1   139.36  drag  -19.251  dQin/dt   0.023  ddrag/dt  -0.011
+m_cx_1x_linear_dispLap_pwall       t_end 30.200  Q_in   46.888  Q_quad  -35.756  lift1   108.59  drag  -18.069  dQin/dt   0.032  ddrag/dt  -0.012
+m_clx_1x_linear_dispLap_pwall      t_end 30.200  Q_in   46.358  Q_quad  -31.597  lift1   126.86  drag  -18.780  dQin/dt   0.018  ddrag/dt  -0.010
+m_box_1x_linear_dispLap_pwall      t_end 30.200  Q_in   52.904  Q_quad  -29.225  lift1   127.56  drag  -18.585  dQin/dt   0.018  ddrag/dt  -0.009
+m_ring_1x_linear_dispLap_pwall     t_end 30.200  Q_in   57.720  Q_quad  -14.560  lift1   135.01  drag  -15.428  dQin/dt   0.008  ddrag/dt  -0.009
+m_ringbox_1x_linear_dispLap_pwall  t_end 30.200  Q_in   67.181  Q_quad   -1.788  lift1   155.30  drag  -15.206  dQin/dt   0.001  ddrag/dt  -0.006
+rb_1x_fastp_dt5e-4                 t_end 30.200  Q_in   67.717  Q_quad   -1.150  lift1   156.45  drag  -15.067  dQin/dt  -0.008  ddrag/dt  -0.001
+a25_1x_linear_dispLap              t_end 30.200  Q_in  104.404  Q_quad  -64.972  lift1    47.39  drag  -28.879  dQin/dt  -0.550  ddrag/dt  -0.000
+a25_1x_linear_dispLap_pwall        t_end 30.200  Q_in   94.942  Q_quad  -53.937  lift1    40.82  drag  -28.588  dQin/dt  -0.538  ddrag/dt  -0.001
+m_cl_2x_linear_dispLap             t_end 30.200  Q_in   78.241  Q_quad   -7.712  lift1   143.06  drag  -21.789  dQin/dt  -0.003  ddrag/dt  -0.004
+rb_2x_fastp_dt2.5e-4               t_end 30.200  Q_in   79.540  Q_quad    1.328  lift1   155.80  drag  -18.252  dQin/dt  -0.016  ddrag/dt   0.001
+s4_3x_linear_dispLap_pwall         t_end 30.200  Q_in   81.218  Q_quad   -3.527  lift1   147.71  drag  -19.814  dQin/dt  -0.020  ddrag/dt   0.000
+rb_3x_fastp                        t_end 30.200  Q_in   79.988  Q_quad    1.476  lift1   156.02  drag  -18.550  dQin/dt  -0.022  ddrag/dt   0.001
+s1_1x_dispLap                      t_end 30.200  Q_in   49.152  Q_quad  -17.332  lift1   170.84  drag  -15.575  dQin/dt   0.018  ddrag/dt  -0.005
+s2_2x_dispLap                      t_end 30.200  Q_in   74.483  Q_quad    0.884  lift1   174.57  drag  -17.266  dQin/dt  -0.010  ddrag/dt   0.001
+s4_4x_dispLap                      t_end 30.200  Q_in   81.546  Q_quad    2.040  lift1   162.41  drag  -18.827  dQin/dt  -0.023  ddrag/dt   0.004
+s2_1x_linear_dispLap               t_end 30.200  Q_in   61.619  Q_quad  -37.129  lift1   128.25  drag  -21.789  dQin/dt   0.017  ddrag/dt  -0.009
+s2_2x_linear_dispLap               t_end 30.200  Q_in   85.419  Q_quad  -10.264  lift1   150.12  drag  -21.828  dQin/dt  -0.004  ddrag/dt  -0.002
+s4_4x_linear_dispLap               t_end 30.200  Q_in   85.635  Q_quad   -1.677  lift1   152.43  drag  -21.026  dQin/dt  -0.016  ddrag/dt   0.001
+s3_1x_linear_dispLap_pwall         t_end 30.200  Q_in   43.663  Q_quad  -34.342  lift1   124.26  drag  -17.355  dQin/dt   0.026  ddrag/dt  -0.010
+s3_2x_linear_dispLap_pwall         t_end 30.200  Q_in   76.169  Q_quad   -9.083  lift1   142.38  drag  -19.293  dQin/dt  -0.004  ddrag/dt  -0.002
+s4_4x_linear_dispLap_pwall         t_end 30.200  Q_in   81.956  Q_quad   -1.456  lift1   150.49  drag  -19.695  dQin/dt  -0.015  ddrag/dt   0.000
+rb_1x_fastp                        t_end 30.200  Q_in   67.181  Q_quad   -1.788  lift1   155.30  drag  -15.206  dQin/dt   0.001  ddrag/dt  -0.006
+rb_2x_fastp                        t_end 30.200  Q_in   79.632  Q_quad    1.252  lift1   155.59  drag  -18.315  dQin/dt  -0.013  ddrag/dt  -0.002
+rb_4x_fastp                        t_end 30.200  Q_in   79.269  Q_quad    1.596  lift1   157.22  drag  -18.316  dQin/dt  -0.018  ddrag/dt  -0.001
+-- LU_dL: ['s1_1x_dispLap', 's2_2x_dispLap', 's4_4x_dispLap']
+   Q_in          49.152    74.483    81.546  d21   25.332  d32    7.063  p 1.84  lim 84.28
+   Q_quad       -17.332     0.884     2.040  d21   18.216  d32    1.156  p 3.98  lim 2.12
+   Q_in_p        48.000    72.802    79.422  d21   24.803  d32    6.619  p 1.91  lim 81.83
+   Q_quad_p     -19.031    -1.767    -0.760  d21   17.264  d32    1.007  p 4.10  lim -0.70
+   lift1_re      25.553    78.417    92.146  d21   52.864  d32   13.729  p 1.95  lim 96.96
+   lift1_im     168.920   155.961   133.737  d21  -12.959  d32  -22.224  p -
+   lift1_amp    170.842   174.565   162.408  d21    3.723  d32  -12.157  p -
+   drag_mean    -15.575   -17.266   -18.827  d21   -1.691  d32   -1.561  p 0.12  lim -37.54
+-- central_dL: ['s2_1x_linear_dispLap', 's2_2x_linear_dispLap', 's4_4x_linear_dispLap']
+   Q_in          61.619    85.419    85.635  d21   23.800  d32    0.216  p 6.78  lim 85.64
+   Q_quad       -37.129   -10.264    -1.677  d21   26.866  d32    8.587  p 1.65  lim 2.36
+   Q_in_p        59.244    83.195    83.389  d21   23.950  d32    0.194  p 6.95  lim 83.39
+   Q_quad_p     -37.964   -12.512    -4.146  d21   25.452  d32    8.366  p 1.61  lim -0.05
+   lift1_re      77.519   105.972   102.507  d21   28.453  d32   -3.465  p -
+   lift1_im     102.165   106.332   112.817  d21    4.166  d32    6.485  p -
+   lift1_amp    128.245   150.121   152.431  d21   21.876  d32    2.310  p 3.24  lim 152.70
+   drag_mean    -21.789   -21.828   -21.026  d21   -0.039  d32    0.802  p -
+-- central_dL_pwall: ['s3_1x_linear_dispLap_pwall', 's3_2x_linear_dispLap_pwall', 's4_4x_linear_dispLap_pwall']
+   Q_in          43.663    76.169    81.956  d21   32.506  d32    5.788  p 2.49  lim 83.21
+   Q_quad       -34.342    -9.083    -1.456  d21   25.259  d32    7.627  p 1.73  lim 1.84
+   Q_in_p        41.024    73.633    79.473  d21   32.609  d32    5.840  p 2.48  lim 80.75
+   Q_quad_p     -35.064   -11.110    -3.829  d21   23.954  d32    7.281  p 1.72  lim -0.65
+   lift1_re      16.497    86.594    97.003  d21   70.097  d32   10.409  p 2.75  lim 98.82
+   lift1_im     123.161   113.016   115.056  d21  -10.145  d32    2.040  p -
+   lift1_amp    124.261   142.377   150.491  d21   18.115  d32    8.114  p 1.16  lim 157.07
+   drag_mean    -17.355   -19.293   -19.695  d21   -1.939  d32   -0.402  p 2.27  lim -19.80
+-- rb_central_dL_pwall: ['rb_1x_fastp', 'rb_2x_fastp', 'rb_4x_fastp']
+   Q_in          67.181    79.632    79.269  d21   12.451  d32   -0.363  p -
+   Q_quad        -1.788     1.252     1.596  d21    3.040  d32    0.344  p 3.14  lim 1.64
+   Q_in_p        64.664    77.144    76.808  d21   12.480  d32   -0.336  p -
+   Q_quad_p      -3.603    -1.076    -0.883  d21    2.527  d32    0.192  p 3.72  lim -0.87
+   lift1_re      89.061    98.065    88.856  d21    9.004  d32   -9.209  p -
+   lift1_im     127.223   120.797   129.706  d21   -6.426  d32    8.909  p -
+   lift1_amp    155.299   155.592   157.223  d21    0.293  d32    1.631  p -
+   drag_mean    -15.206   -18.315   -18.316  d21   -3.110  d32   -0.001  p 12.12  lim -18.32

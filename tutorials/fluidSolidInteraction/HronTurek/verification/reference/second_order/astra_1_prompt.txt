@@ -1,0 +1,184 @@
+You are advising on a CFD/FSI verification campaign (OpenFOAM v2512 + solids4foam, pimpleFluid = standard pimpleFoam-type PIMPLE with ddtCorr, ALE moving mesh). Goal: identify and remove the mechanism that limits the observed order of the fluid loading on the flag in the Turek-Hron FSI3 benchmark to ~1.1-1.3, and demonstrate ~2nd order.
+
+GEOMETRY/MESH: 2D (one spanwise cell, empty), channel 2.5 x 0.41 m, cylinder D=0.1 at (0.2,0.2), flag 0.35 x 0.02 attached behind the cylinder (x 0.249-0.6, y 0.19-0.21), sharp 90 deg corners at the free end. Re=200 (Umean 2 m/s, nu 1e-3). Multi-block blockMesh, structured hexes. Level 1x: 5336 cells; along the flag cells ~10 mm in x; wall-normal cell size next to the long flag faces 8.75 mm (uniform block of 8 cells over 70 mm); the tip end face has 2 cells across its 20 mm thickness; refinement 2x/4x doubles all divisions with gradings kept (smooth family, ratio 2), dt halved (1e-3/5e-4/2.5e-4). Unsteady Stokes-layer thickness sqrt(2 nu/omega) ~ 7.6 mm at f=5.52 Hz; tip velocity amplitude ~1.2 m/s, amplitude 34 mm.
+
+DICTIONARIES (verbatim):
+=== fvSchemes
+
+ddtSchemes
+{
+    default backward;
+}
+
+gradSchemes
+{
+    default leastSquares;
+}
+
+divSchemes
+{
+    default none;
+    div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;
+    div((nuEff*dev2(T(grad(U))))) Gauss linear;
+    div((nuEff*dev(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default none;
+    laplacian(nuEff,U) Gauss linear corrected;
+    laplacian((1|A(U)),p) Gauss linear corrected;
+    laplacian(diffusivity,cellMotionU) Gauss linear corrected;
+
+    laplacian(rAU,p) Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default linear;
+    interpolate(U) skewCorrected linear;
+}
+
+snGradSchemes
+{
+    default corrected;
+}
+
+fluxRequired
+{
+    default no;
+    p;
+}
+
+// ************************************************************************* //
+=== fvSolution
+
+solvers
+{
+    "p|pFinal"
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0;
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0;
+        minIter         1;
+        maxIter         100;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    "U|UFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-06;
+        relTol          0;
+        minIter         1;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor   on;
+    // More than one outer corrector is needed for robust IQNILS coupling:
+    // the fluid solve in each FSI outer corrector starts from the previous
+    // one's solution, so with a single PIMPLE outer corrector the fluid
+    // response to a given interface displacement depends on the FSI iteration
+    // history, and IQNILS stalls near outerCorrTolerance. Two are enough once
+    // the coupling is under way, but the first coupled time-step, when the
+    // developed flow first loads the plate, needs three
+    nOuterCorrectors    3;
+    nCorrectors         3;
+    nNonOrthogonalCorrectors 1;
+}
+
+// ************************************************************************* //
+=== dynamicMeshDict
+
+dynamicFvMesh dynamicMotionSolverFvMesh;
+
+"solver|motionSolver" velocityLaplacian;
+
+diffusivity quadratic inverseDistance 2(plate cylinder);
+
+// ************************************************************************* //
+=== 0/fluid/p and U plate BCs
+0/fluid/pointMotionU:    plate
+0/fluid/pointMotionU-    {
+0/fluid/pointMotionU-        type            fixedValue;
+0/fluid/pointMotionU-        value           uniform (0 0 0);
+0/fluid/pointMotionU-    }
+0/fluid/pointMotionU-    outlet
+0/fluid/pointMotionU-    {
+0/fluid/p:    plate
+0/fluid/p-    {
+0/fluid/p-        type            zeroGradient;
+0/fluid/p-        value           uniform 0;
+0/fluid/p-    }
+0/fluid/p-    outlet
+0/fluid/p-    {
+0/fluid/p.robin:    plate
+0/fluid/p.robin-    {
+0/fluid/p.robin-        type            elasticWallPressure;
+0/fluid/p.robin-        value           uniform 0;
+0/fluid/p.robin-    }
+0/fluid/p.robin-    outlet
+0/fluid/p.robin-    {
+0/fluid/p.dirichletNeumann:    plate
+0/fluid/p.dirichletNeumann-    {
+0/fluid/p.dirichletNeumann-        type            zeroGradient;
+0/fluid/p.dirichletNeumann-        value           uniform 0;
+0/fluid/p.dirichletNeumann-    }
+0/fluid/p.dirichletNeumann-    outlet
+0/fluid/p.dirichletNeumann-    {
+0/fluid/U.robin:    plate
+0/fluid/U.robin-    {
+0/fluid/U.robin-        type            elasticWallVelocity;
+0/fluid/U.robin-        value           uniform (0 0 0);
+0/fluid/U.robin-    }
+0/fluid/U.robin-    outlet
+0/fluid/U.robin-    {
+0/fluid/U:    plate
+0/fluid/U-    {
+0/fluid/U-        type            newMovingWallVelocity;
+0/fluid/U-        value           uniform (0 0 0);
+0/fluid/U-    }
+
+ESTABLISHED EVIDENCE:
+- Coupled FSI3 matched 1x/2x/4x: tip u_y amplitude 29.85/34.18/36.23 mm, observed order ~1. Solid-only refinement converges at ~2nd order; solid refinement explains ~5% of the u_y change.
+- Rigid CFD3 (same fluid mesh/schemes, static flag): within 0.05-0.16% of Featflow at 4x; drag mean order ~1.3 (pressure drag mean order 2.0, viscous drag mean non-monotone), lift amplitude order >3 (pre-asymptotic).
+- Prescribed mode-2 bending motion (35 mm, 5.5 Hz, ALE, same mesh): in-phase generalised force 1391/1446/1443 N/m (1x/2x/4x), essentially converged at 2x.
+- "Replay": fluid-only ALE driven by the recorded coupled 2x flag motion (4 harmonics fitted per point, interpolated along the flag polyline). In-phase first-harmonic generalised force on the replayed shape, normalised by tip amplitude: Q_in = 50.3/72.2/81.0 N/m (1x/2x/4x), order 1.3. Q_in is a small residual of large in-phase components (added mass vs vortex load). Variants all give order 1.1-1.3: p BC movingWallPressure (dp/dn = -rho n.a_wall instead of zeroGradient) 30.3/62.7/77.3; U BC movingWallVelocity; leastSquares gradient variant that does not use zeroGradient boundary values 11.0/50.8/69.3; inverseDistance (linear) diffusivity. dt-only changes are small (1x -2.6, 2x +0.5 N/m). Indicative limits of all variants cluster at 85-89 N/m.
+- Tip localisation (first-harmonic traction per face): 69% of the 2x->4x change in Q_in sits on the smooth aft flag (x 0.46-0.58 m) in a vortex-induced pressure lobe near x=0.56 (40 mm upstream of the tip); in-phase density at lobe 140/248/283 N/m per m. Tip corner (last 1 thickness incl. end face) carries 22% at the same order (1.2) as the total; end face itself converged. Cylinder-flag corner contributes nothing.
+
+CANDIDATE MECHANISMS I am considering: (A) cellLimited linearUpwind limiter clipping at extrema in the vortex lobe; (B) mesh quality under large ALE motion; (C) under-resolution of the oscillatory Stokes layer / separating shear layers at the moving aft flag and tip by the uniform wall-normal spacing (8.75/4.4/2.2 mm vs delta_s ~ 5-8 mm) -> pre-asymptotic range; (D) PIMPLE splitting/ddtCorr/tolerances; (E) transient/window. Also: (F) pollution from the sharp re-entrant 270-deg tip corners (Stokes corner exponent lambda~0.545 -> functional error ~h^{2 lambda} ~ h^1.1), non-local via the shed vorticity; (G) first-order wall treatments (zeroGradient p on an accelerating wall, near-wall least-squares gradient, one-sided wall shear) that partially cancel each other.
+
+Compute is limited: replay costs 1x ~0.3, 2x ~1-2, 4x ~18 core-hours per 1.2 s restart window; a new mesh family needs ~5 s of replay development from a mapped rigid state (4x ~80+ core-h).
+
+QUESTIONS: (1) Rank the hypotheses with reasons. (2) Propose the 3-5 most diagnostic CHEAP experiments (what to change exactly, which levels, expected signature if hypothesis true/false). (3) Is the first-harmonic in-phase projection Q_in a well-conditioned QoI for an order study, or should a different QoI be used (e.g. the per-face traction harmonics, the lift fundamental, the total in-phase load including added mass)? (4) If the sharp-corner singularity sets an asymptotic limit, what is the expected observed order for force functionals in FV, and what systematic mesh family (e.g. fixed power-law grading toward the corners) would recover order 2 while remaining a legitimate ratio-2 family? Be concise and concrete (<= 900 words).

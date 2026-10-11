@@ -1,0 +1,80 @@
+
+codex
+My working ranking is **C ≳ A > G ≈ F > B > D > E**, with E conditional on demonstrated cycle stationarity. The evidence does not yet identify one mechanism.
+
+- **C:** Only approximately 0.9/1.7/3.5 cells span \(\delta_s=7.6\) mm. The aft pressure lobe is consistent with poorly resolved vorticity generation/transport; 4x need not be asymptotic.
+- **A:** Cheap to isolate. `cellLimited ... 1` clips the **velocity-gradient correction**, potentially affecting the pressure lobe indirectly. A pressure extremum alone does not demonstrate limiter activity. [Limiter documentation](https://doc.openfoam.com/2306/tools/processing/numerics/schemes/gradient/rtm/cellLimited/)
+- **G/F:** Both remain credible. Boundary variants change error coefficients substantially without removing the slow rate. The [local moving-wall implementation](/Users/philipc/OpenFOAM/philipc-v2512/solids4foam.development/src/solids4FoamModels/fluidModels/fvPatchFields/newMovingWallVelocity/newMovingWallVelocityFvPatchVectorField.C:305) hard-codes `secondOrder_ = false`; verify the deployed build matches. Conversely, aft localisation cannot exclude corner-generated pollution: it identifies where load error appears, not its source.
+- **B:** Weakened by diffusivity insensitivity, but needs phase-resolved mesh-quality evidence.
+- **D:** Weakened by small timestep sensitivity; three PIMPLE outers nevertheless do not establish nonlinear convergence.
+- **E:** Easily checked. A 1.2 s window contains approximately 6.6 cycles.
+
+The large mode-2 force and accurate rigid benchmark do not establish convergence of the small replay residual.
+
+I would run these five diagnostics:
+
+1. **Window/phase audit; existing 1x/2x/4x data.** Fit mean plus four harmonics simultaneously at the prescribed frequency, using identical forcing phase and complete-cycle windows. Compare successive cycles and shifted windows; extend 1x/2x only if necessary. Require uncertainty comfortably below the 8.8 N/m finest-grid difference—target \(<0.5\) N/m. Drift or window dependence supports E; stability weakens it. Also inspect nonorthogonality, skewness and wall-normal spacing through the cycle, specifically near the lobe.
+
+2. **Remove only the limiter; 1x and 2x first.** Set  
+   `div(phi,U) Gauss linearUpwind leastSquares;`  
+   Keep everything else fixed. Record componentwise limiter activity in the baseline near the wall and shed shear layers. Substantial reduction of intergrid differences, associated with previously clipped regions, supports A. Negligible changes weaken A. Run 4x only for a promising result; two levels cannot establish order.
+
+3. **Converge the fluid solve; 1x first, then 2x.** Set pressure, velocity and mesh-motion tolerances to \(10^{-9}\), retaining `relTol 0`; use PIMPLE counts **6/6/3**. Keep `backward`, timestep and `ddtCorr` unchanged. Changes below 0.5 N/m weaken D; appreciable changes warrant separating iteration-count and linear-tolerance effects. Removing `ddtCorr` is not a clean accuracy repair.
+
+4. **Separate force extraction from flow error; existing snapshots, all levels.** Reconstruct smooth-wall pressure with linear extrapolation from two interior layers and wall shear with a quadratic velocity fit constrained by wall velocity, using actual deformed coordinates. Compare pressure/viscous harmonics separately with production traction. An \(O(h)\) extraction discrepancy supports G. Little change weakens extraction error, but does not clear wall-flux errors in the solve. Acceleration-only pressure conditions also omit the viscous contribution to normal momentum.
+
+5. **Two targeted mesh perturbations; 1x screening.** Independently refine wall-normal spacing fourfold in the aft-lobe strip \(x=0.46–0.58\), leaving tip corners unchanged; then refine both in-plane directions fourfold within fixed 10 mm neighbourhoods of the tip corners, leaving the lobe mesh unchanged. A strong strip response supports C; a remote lobe response to corner refinement supports F or tip-shear under-resolution, without distinguishing them conclusively. Repeat the informative perturbation at 2x. Map a developed replay at identical phase; preserve time history or discard restart contamination, and verify stationarity rather than assuming 1.2 s suffices.
+
+**Keep \(Q_{\rm in}\), but do not use it alone.** It is a legitimate linear functional with poor *relative* conditioning under cancellation. Smallness itself does not lower asymptotic order. Phase errors mix quadrature load into it:
+\[
+|\delta Q_{\rm in}|\approx |Q_{\rm quad}\,\delta\phi|.
+\]
+Report the complex generalized-force fundamental, complex lift fundamental, pressure/viscous components, and traction harmonics integrated over fixed material-coordinate bins. Avoid comparing individual faces or corner point values. If full traction already defines \(Q_{\rm in}\), added mass is already included; adding a mesh-independent reference changes neither intergrid differences nor observed order.
+
+**There is no universal FV force rate \(2\lambda\).** With \(u\sim r^\lambda\), traction scales as \(r^{\lambda-1}\), \(\lambda\approx0.5445\). Conditional primal–adjoint error arguments give \(h^{\lambda+\lambda^*}\), hence \(h^{1.089}\) when both exponents equal \(\lambda\); adjoint consistency matters. Direct midpoint integration of even exact singular traction can instead have \(O(h^\lambda)\) error. [Corner theory](https://link.springer.com/article/10.1007/s10092-021-00402-z), [functional consistency](https://epubs.siam.org/doi/10.1137/060665117)
+
+For grading, use fixed-radius, shape-regular corner patches with a fixed power-law mapping
+\[
+r_i=R(i/N)^\gamma,\qquad N\rightarrow2N.
+\]
+Under the \(2\lambda\) mechanism, choose \(\gamma>1/\lambda\approx1.84\), e.g. 2.2. If direct singular-traction quadrature dominates, its scaling requires \(\gamma>2/\lambda\approx3.67\), or improved force evaluation. This is ratio-2 refinement in \(H=1/N\); corner cells shrink by \(2^\gamma\). Fixed `simpleGrading` ratios do not provide that asymptotic grading. Second-order smooth-wall treatment and controlled temporal error remain necessary; grading alone cannot guarantee order two.
+tokens used
+87,346
+My working ranking is **C ≳ A > G ≈ F > B > D > E**, with E conditional on demonstrated cycle stationarity. The evidence does not yet identify one mechanism.
+
+- **C:** Only approximately 0.9/1.7/3.5 cells span \(\delta_s=7.6\) mm. The aft pressure lobe is consistent with poorly resolved vorticity generation/transport; 4x need not be asymptotic.
+- **A:** Cheap to isolate. `cellLimited ... 1` clips the **velocity-gradient correction**, potentially affecting the pressure lobe indirectly. A pressure extremum alone does not demonstrate limiter activity. [Limiter documentation](https://doc.openfoam.com/2306/tools/processing/numerics/schemes/gradient/rtm/cellLimited/)
+- **G/F:** Both remain credible. Boundary variants change error coefficients substantially without removing the slow rate. The [local moving-wall implementation](/Users/philipc/OpenFOAM/philipc-v2512/solids4foam.development/src/solids4FoamModels/fluidModels/fvPatchFields/newMovingWallVelocity/newMovingWallVelocityFvPatchVectorField.C:305) hard-codes `secondOrder_ = false`; verify the deployed build matches. Conversely, aft localisation cannot exclude corner-generated pollution: it identifies where load error appears, not its source.
+- **B:** Weakened by diffusivity insensitivity, but needs phase-resolved mesh-quality evidence.
+- **D:** Weakened by small timestep sensitivity; three PIMPLE outers nevertheless do not establish nonlinear convergence.
+- **E:** Easily checked. A 1.2 s window contains approximately 6.6 cycles.
+
+The large mode-2 force and accurate rigid benchmark do not establish convergence of the small replay residual.
+
+I would run these five diagnostics:
+
+1. **Window/phase audit; existing 1x/2x/4x data.** Fit mean plus four harmonics simultaneously at the prescribed frequency, using identical forcing phase and complete-cycle windows. Compare successive cycles and shifted windows; extend 1x/2x only if necessary. Require uncertainty comfortably below the 8.8 N/m finest-grid difference—target \(<0.5\) N/m. Drift or window dependence supports E; stability weakens it. Also inspect nonorthogonality, skewness and wall-normal spacing through the cycle, specifically near the lobe.
+
+2. **Remove only the limiter; 1x and 2x first.** Set  
+   `div(phi,U) Gauss linearUpwind leastSquares;`  
+   Keep everything else fixed. Record componentwise limiter activity in the baseline near the wall and shed shear layers. Substantial reduction of intergrid differences, associated with previously clipped regions, supports A. Negligible changes weaken A. Run 4x only for a promising result; two levels cannot establish order.
+
+3. **Converge the fluid solve; 1x first, then 2x.** Set pressure, velocity and mesh-motion tolerances to \(10^{-9}\), retaining `relTol 0`; use PIMPLE counts **6/6/3**. Keep `backward`, timestep and `ddtCorr` unchanged. Changes below 0.5 N/m weaken D; appreciable changes warrant separating iteration-count and linear-tolerance effects. Removing `ddtCorr` is not a clean accuracy repair.
+
+4. **Separate force extraction from flow error; existing snapshots, all levels.** Reconstruct smooth-wall pressure with linear extrapolation from two interior layers and wall shear with a quadratic velocity fit constrained by wall velocity, using actual deformed coordinates. Compare pressure/viscous harmonics separately with production traction. An \(O(h)\) extraction discrepancy supports G. Little change weakens extraction error, but does not clear wall-flux errors in the solve. Acceleration-only pressure conditions also omit the viscous contribution to normal momentum.
+
+5. **Two targeted mesh perturbations; 1x screening.** Independently refine wall-normal spacing fourfold in the aft-lobe strip \(x=0.46–0.58\), leaving tip corners unchanged; then refine both in-plane directions fourfold within fixed 10 mm neighbourhoods of the tip corners, leaving the lobe mesh unchanged. A strong strip response supports C; a remote lobe response to corner refinement supports F or tip-shear under-resolution, without distinguishing them conclusively. Repeat the informative perturbation at 2x. Map a developed replay at identical phase; preserve time history or discard restart contamination, and verify stationarity rather than assuming 1.2 s suffices.
+
+**Keep \(Q_{\rm in}\), but do not use it alone.** It is a legitimate linear functional with poor *relative* conditioning under cancellation. Smallness itself does not lower asymptotic order. Phase errors mix quadrature load into it:
+\[
+|\delta Q_{\rm in}|\approx |Q_{\rm quad}\,\delta\phi|.
+\]
+Report the complex generalized-force fundamental, complex lift fundamental, pressure/viscous components, and traction harmonics integrated over fixed material-coordinate bins. Avoid comparing individual faces or corner point values. If full traction already defines \(Q_{\rm in}\), added mass is already included; adding a mesh-independent reference changes neither intergrid differences nor observed order.
+
+**There is no universal FV force rate \(2\lambda\).** With \(u\sim r^\lambda\), traction scales as \(r^{\lambda-1}\), \(\lambda\approx0.5445\). Conditional primal–adjoint error arguments give \(h^{\lambda+\lambda^*}\), hence \(h^{1.089}\) when both exponents equal \(\lambda\); adjoint consistency matters. Direct midpoint integration of even exact singular traction can instead have \(O(h^\lambda)\) error. [Corner theory](https://link.springer.com/article/10.1007/s10092-021-00402-z), [functional consistency](https://epubs.siam.org/doi/10.1137/060665117)
+
+For grading, use fixed-radius, shape-regular corner patches with a fixed power-law mapping
+\[
+r_i=R(i/N)^\gamma,\qquad N\rightarrow2N.
+\]
+Under the \(2\lambda\) mechanism, choose \(\gamma>1/\lambda\approx1.84\), e.g. 2.2. If direct singular-traction quadrature dominates, its scaling requires \(\gamma>2/\lambda\approx3.67\), or improved force evaluation. This is ratio-2 refinement in \(H=1/N\); corner cells shrink by \(2^\gamma\). Fixed `simpleGrading` ratios do not provide that asymptotic grading. Second-order smooth-wall treatment and controlled temporal error remain necessary; grading alone cannot guarantee order two.

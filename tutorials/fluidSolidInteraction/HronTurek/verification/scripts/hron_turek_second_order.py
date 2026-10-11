@@ -17,6 +17,8 @@ was checked against OpenFOAM v2512 / solids4foam:
             rigid state (restart 25).
   tight     p, U tolerances 1e-6 -> 1e-9 (relTol 0), mesh 1e-6 -> 1e-9
   noc4      nOuterCorrectors 3 -> 4 and nCorrectors 3 -> 4
+  fastp     p solves before the final PIMPLE/PISO/non-orthogonal iteration
+            with relTol 0.01 (pFinal unchanged: tolerance 1e-6, relTol 0)
   conv      tight, plus PIMPLE nOuterCorrectors/nCorrectors/nNonOrthogonal
             3/3/1 -> 6/6/3 (converged segregated solve per step)
 
@@ -90,6 +92,14 @@ def apply(case: Path, restart: str, variant: str) -> None:
         s = fv.read_text()
         s = hv.sub_once(s, "nOuterCorrectors    3;", "nOuterCorrectors    4;", variant)
         s = hv.sub_once(s, "nCorrectors         3;", "nCorrectors         4;", variant)
+        fv.write_text(s)
+    elif variant == "fastp":
+        s = fv.read_text()
+        s = hv.sub_once(s, '"p|pFinal"', "pFinal", variant)
+        i = s.index("pFinal")
+        j = s.index("}", i) + 1
+        block = s[s.index("{", i):j]
+        s = s[:j] + "\n\n    p\n    {\n        $pFinal;\n        relTol          0.01;\n    }" + s[j:]
         fv.write_text(s)
     elif variant == "conv":
         apply(case, restart, "tight")

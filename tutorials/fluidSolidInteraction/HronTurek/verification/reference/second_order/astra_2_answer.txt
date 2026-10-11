@@ -1,0 +1,68 @@
+
+codex
+**(a)** Yes—as the best-supported explanation, rather than a complete quantitative error decomposition. I would revise the earlier ranking accordingly.
+
+- The limiter explanation is ruled out for the tested configuration: your bit-identical comparison is decisive, consistent with `linearUpwind` looking up a named gradient scheme. [OpenFOAM source](https://api.openfoam.com/2512/linearUpwind_8C_source.html)
+- Mesh creep makes the original triplet unsuitable for identifying discretisation order: the levels contain different history-dependent biases.
+- The regional refinements strongly implicate underresolved cylinder shedding and wake–flag interaction. Corner errors are strongly demoted as the dominant cause, although excluding corner faces alone cannot exclude their influence elsewhere.
+- The measured wall-pressure effect supplies another substantial, approximately first-order contribution.
+
+Thus: **“The original apparent order ≈1.3 was contaminated by mesh-history effects and pre-asymptotic resolution, with an additional wall-pressure error.”** Avoid assigning additive percentages without matched controlled comparisons. The corrected standard family’s changing apparent orders also show that removing those problems has not yet established an asymptotic regime.
+
+**(b)** A ring+box triplet with \(p=1.8–2.2\) would justify **“observed convergence consistent with second order for \(Q_{\rm in}\) over these levels.”** It would not, by itself, establish asymptotic second-order convergence. Three values exactly determine \(Q_\infty,C,p\); there is no independent point testing that fit. Richardson extrapolation requires an asymptotic regime and controlled competing errors. [NASA convergence guidance](https://www.grc.nasa.gov/www/wind/valid/tutorial/spatconv.html)
+
+Before using stronger wording, I would require:
+
+- **An independent refinement:** stable orders and extrapolated limits across overlapping triplets.
+- **Fine-level temporal checks:** time-step effects small relative to the final mesh increment, or removed by temporal extrapolation. With \(\Delta t\propto h\), your present result concerns joint space–time refinement, not isolated spatial order.
+- **Resolved differences:** window sensitivity, residual drift, iterative error, and replay interpolation error comfortably below the smallest increment.
+
+Lift approaching order one does **not** disprove second order for this particular projection. Different functionals can cancel different leading errors. It does prevent claiming that “the forces” or “the method” are demonstrably second order. Likewise, the nearly constant ring+box lift on two levels is encouraging agreement, not established convergence.
+
+**(c)** **Complete 4x′ first; then, for the specific \(Q_{\rm in}\)-order claim, choose 8x′ ring+box.** It directly tests whether the promising triplet survives removal of its coarsest level.
+
+For a concrete prediction, exact second-order continuation of 67.18/79.63 gives:
+
+\[
+Q_{4x'}=82.7425,\qquad Q_{8x'}=83.5206,\qquad Q_\infty=83.78\ \mathrm{N/m}.
+\]
+
+Once 4x′ arrives, freeze its fitted prediction before running 8x′. Agreement, stable overlapping orders, and controlled temporal error would provide substantially stronger evidence than another three-point fit.
+
+8x standard would be useful for resolving that family’s anomalous behaviour, but 8x′ tests the proposed improved family most directly. Its roughly 755,000 cells make it a costly choice; wait for 4x′ before committing.
+
+The corrected coupled triplet addresses **transfer to coupled FSI**, a separate essential question. It introduces changing motion and coupling errors, and requires the mesh-creep fix first. I would not use it as the next experiment to establish replay-force order.
+tokens used
+22,925
+**(a)** Yes—as the best-supported explanation, rather than a complete quantitative error decomposition. I would revise the earlier ranking accordingly.
+
+- The limiter explanation is ruled out for the tested configuration: your bit-identical comparison is decisive, consistent with `linearUpwind` looking up a named gradient scheme. [OpenFOAM source](https://api.openfoam.com/2512/linearUpwind_8C_source.html)
+- Mesh creep makes the original triplet unsuitable for identifying discretisation order: the levels contain different history-dependent biases.
+- The regional refinements strongly implicate underresolved cylinder shedding and wake–flag interaction. Corner errors are strongly demoted as the dominant cause, although excluding corner faces alone cannot exclude their influence elsewhere.
+- The measured wall-pressure effect supplies another substantial, approximately first-order contribution.
+
+Thus: **“The original apparent order ≈1.3 was contaminated by mesh-history effects and pre-asymptotic resolution, with an additional wall-pressure error.”** Avoid assigning additive percentages without matched controlled comparisons. The corrected standard family’s changing apparent orders also show that removing those problems has not yet established an asymptotic regime.
+
+**(b)** A ring+box triplet with \(p=1.8–2.2\) would justify **“observed convergence consistent with second order for \(Q_{\rm in}\) over these levels.”** It would not, by itself, establish asymptotic second-order convergence. Three values exactly determine \(Q_\infty,C,p\); there is no independent point testing that fit. Richardson extrapolation requires an asymptotic regime and controlled competing errors. [NASA convergence guidance](https://www.grc.nasa.gov/www/wind/valid/tutorial/spatconv.html)
+
+Before using stronger wording, I would require:
+
+- **An independent refinement:** stable orders and extrapolated limits across overlapping triplets.
+- **Fine-level temporal checks:** time-step effects small relative to the final mesh increment, or removed by temporal extrapolation. With \(\Delta t\propto h\), your present result concerns joint space–time refinement, not isolated spatial order.
+- **Resolved differences:** window sensitivity, residual drift, iterative error, and replay interpolation error comfortably below the smallest increment.
+
+Lift approaching order one does **not** disprove second order for this particular projection. Different functionals can cancel different leading errors. It does prevent claiming that “the forces” or “the method” are demonstrably second order. Likewise, the nearly constant ring+box lift on two levels is encouraging agreement, not established convergence.
+
+**(c)** **Complete 4x′ first; then, for the specific \(Q_{\rm in}\)-order claim, choose 8x′ ring+box.** It directly tests whether the promising triplet survives removal of its coarsest level.
+
+For a concrete prediction, exact second-order continuation of 67.18/79.63 gives:
+
+\[
+Q_{4x'}=82.7425,\qquad Q_{8x'}=83.5206,\qquad Q_\infty=83.78\ \mathrm{N/m}.
+\]
+
+Once 4x′ arrives, freeze its fitted prediction before running 8x′. Agreement, stable overlapping orders, and controlled temporal error would provide substantially stronger evidence than another three-point fit.
+
+8x standard would be useful for resolving that family’s anomalous behaviour, but 8x′ tests the proposed improved family most directly. Its roughly 755,000 cells make it a costly choice; wait for 4x′ before committing.
+
+The corrected coupled triplet addresses **transfer to coupled FSI**, a separate essential question. It introduces changing motion and coupling errors, and requires the mesh-creep fix first. I would not use it as the next experiment to establish replay-force order.

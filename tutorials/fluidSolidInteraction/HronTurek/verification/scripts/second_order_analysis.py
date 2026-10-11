@@ -71,6 +71,8 @@ def window(col, omega, a_tip, t_end, periods=5):
 def analyse(case: Path, t_end: float | None, drift_span: float):
     col, omega, a_tip, s = load(case)
     te = t_end if t_end is not None else float(col["t"][-1])
+    if 0 < te - col["t"][-1] < 1e-4:  # end time not hit exactly (dt = 1/3000 s)
+        te = float(col["t"][-1])
     res = window(col, omega, a_tip, te)
     if res is None:
         return {"case": case.name, "error": f"window ending {te} not available (t {col['t'][0]}..{col['t'][-1]})"}
@@ -103,6 +105,7 @@ def main() -> int:
     ap.add_argument("--family", action="append", default=[], help="NAME=c1,c2,c3")
     ap.add_argument("--json", type=Path)
     ap.add_argument("--csv", type=Path)
+    ap.add_argument("--runs-csv", type=Path)
     a = ap.parse_args()
     names = [str(c) for c in a.cases]
     fams = []
@@ -140,6 +143,15 @@ def main() -> int:
                 for q, o in f["qoi"].items():
                     w.writerow([name, q] + [f"{o[k]:.6g}" if k in o else "" for k in
                                             ("v1", "v2", "v3", "d21", "d32", "order", "richardson_limit")])
+    if a.runs_csv:
+        keys = ["case", "variants", "dt", "t_end"] + QOIS + ["Q_in_p", "dQ_in_dt", "ddrag_dt"]
+        keys = list(dict.fromkeys(keys))
+        with a.runs_csv.open("w", newline="") as fh:
+            w = csv.writer(fh)
+            w.writerow(keys)
+            for c, r in runs.items():
+                if "error" not in r:
+                    w.writerow([r.get(k, "") if isinstance(r.get(k, ""), str) else f"{r.get(k):.6g}" for k in keys])
     return 0
 
 

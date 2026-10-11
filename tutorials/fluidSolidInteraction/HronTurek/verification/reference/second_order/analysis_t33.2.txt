@@ -1,0 +1,7 @@
+/home/philipc/ht_tip/work/t_1x     t_end 33.200  Q_in   50.312  Q_quad  -16.958  lift1   176.50  drag  -13.406  dQin/dt   0.358  ddrag/dt   0.400
+/home/philipc/ht_variants/work/r32_2x_base t_end 33.200  Q_in   72.172  Q_quad    1.995  lift1   178.99  drag  -16.195  dQin/dt     nan  ddrag/dt     nan
+s1_2x_r32_lu_unlim                 t_end 33.200  Q_in   72.172  Q_quad    1.995  lift1   178.99  drag  -16.195  dQin/dt     nan  ddrag/dt     nan
+s1_2x_r32_linear                   t_end 33.200  Q_in   86.072  Q_quad  -10.405  lift1   150.14  drag  -22.095  dQin/dt     nan  ddrag/dt     nan
+s1_1x_dispLap                      t_end 33.200  Q_in   49.225  Q_quad  -17.373  lift1   170.83  drag  -15.588  dQin/dt   0.018  ddrag/dt  -0.002
+s2_1x_linear_dispLap               t_end 33.200  Q_in   61.683  Q_quad  -37.158  lift1   128.31  drag  -21.804  dQin/dt   0.013  ddrag/dt  -0.003
+s1_1x_conv                         t_end 33.200  Q_in   50.309  Q_quad  -16.945  lift1   176.52  drag  -13.403  dQin/dt   0.358  ddrag/dt   0.400

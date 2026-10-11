@@ -1221,3 +1221,249 @@ above), `tip_localisation.py extract|analyse`; run directories on xenosim
 `reference/tip_localisation/traction_distribution.png` (amplitude, phase and
 Q_in density of the first-harmonic traction along the upper and lower faces) and
 `tip_cumulative.png` (cumulative Q_in from the tip).
+
+## Second-order study of the flag load (replay)
+
+Question: what limits the observed order of the in-phase flag load `Q_in`
+(50.3, 72.2, 81.0 N/m at 1x, 2x, 4x, order 1.3; sections above), and can the
+fluid loading be made to converge at the nominal second order? The vehicle is
+the trajectory replay (fluid-only ALE driven by the recorded coupled 2x flag
+motion, `Q_in` and the other harmonics from `energy_analysis.py`). Every run
+starts from the developed rigid CFD3 state at 25 s and is analysed over the
+same five periods ending at **30.2 s on every level**, so that a slow drift
+cannot bias the differences (the earlier studies used 33.2 s at 1x and 2x and
+30.2 s at 4x).
+
+Setup: study binary of the earlier replay sections (solids4foam `aee0c8e35`,
+OpenFOAM v2512 (OpenCFD), GCC 11.4.0 `-O3`, Ubuntu 22.04, xenosim), parent
+commit `d90657d02`. Nothing in `src/` is changed; all changes are case
+dictionaries. Runs on 1 (1x), 8 (2x) and 12 or 24 (4x) MPI ranks.
+
+Tools (`scripts/`):
+
+- `hron_turek_second_order.py`: builds a replay case from a source with
+  `hron_turek_energy.py` and applies variants (`linear`, `lu_unlim`,
+  `dispLap`, `pwall`, `gradS4f`, `tight`, `conv`, `fastp`, see its header);
+- `ht_mesh_family.py` and `hron_turek_mesh_source.py`: block-mesh families
+  with clustering (rows along the flag, columns along the aft flag and wake,
+  the cylinder ring, the end face), each a fixed set of block divisions and
+  gradings refined uniformly by the level factor; the source case gets the
+  developed rigid state mapped (`mapFields -consistent`) from the 4x CFD3 state
+  and the replay table interpolated to its plate points (`replay_table.py`,
+  which reproduces the existing 1x and 4x tables to 1e-10);
+- `second_order_analysis.py`: the harmonics in a fixed window, the drift, and
+  the observed orders of families; `qin_slide.py`: sliding windows; `second_order_plot.py`: the plot;
+  `submit_replay_slurm.sh`: Slurm submission.
+
+Results: `reference/second_order/` (`runs.csv`: every run in the common
+window; `families.csv` and `second_order.json`: runs, differences and
+orders; `analysis_t30.2.txt`, `analysis_t33.2.txt`: printed tables;
+`sliding_windows.txt`: stationarity; `q_in_families.png`; `astra_*.txt`).
+
+### Diagnosis
+
+| Hypothesis | Test | Result | Verdict |
+|---|---|---|---|
+| A. Limited convection scheme | `div(phi,U) Gauss linearUpwind grad(U)` against the tutorial's `Gauss linearUpwind cellLimited leastSquares 1` (2x restart) | **bit-identical** (`Q_in` 72.1723 both) | rejected: there is no limiter (see below) |
+| B. Mesh quality under motion | `checkMesh` of the deformed replay meshes at t = 32 s (87% of peak deflection) | max non-orthogonality 26.0/28.0/29.3 deg, skewness 0.41/0.43/0.44 (1x/2x/4x); undeformed 1x 24.5 deg / 0.41 | rejected: quality is good and level-independent |
+| D. Segregated solve / tolerance | `conv`: tolerances 1e-6 to 1e-9, PIMPLE 3/3/1 to 6/6/3 (1x); `fastp`: relTol 0.01 for the non-final p solves (1x') | -0.003 N/m; 0.000 N/m | rejected |
+| D. Time step | dt 1e-3 to 5e-4 (1x, central) | +1.9 N/m (3%) | minor; about -2.6/-0.65/-0.16 N/m along the matched path if BDF2 is second order |
+| E. Transient / window | sliding five-period windows | **the velocity-Laplacian mesh creeps**: `Q_in` drifts +0.29 N/m/s at 1x (drag +0.30 N/m/s), +1.3 N/m/s with central differencing, without settling | confirmed: a real bias; removed by `dispLap` |
+| G. Wall pressure | `pwall` (dp/dn = -n.a_wall) with central | central minus central+`pwall`: 17.96, 9.25 N/m at 1x, 2x (ratio 1.94) | confirmed: zeroGradient p on the accelerating wall is a first-order error |
+| C. Near-wall / tip resolution | 1x meshes with 4x finer wall-normal cells along the flag and 3x finer end face (`cl`), 4x finer streamwise cells at the tip (`cx`), both (central + `dispLap` + `pwall`) | -0.7, +3.2, +2.7 N/m, against +32.5 N/m from 1x to 2x | rejected as the main term |
+| C. Wake / shedding resolution | 1x with the flag and wake region refined 2x (`box`), with the cylinder ring refined 2x radially (`ring`), both | +9.2, +14.1, +23.5 N/m (`Q_quad`: +5.1, +19.8, +32.6 of +25.3) | confirmed: the coarse-level error sits in the cylinder shedding and the wake/flag interaction |
+| B. Amplitude scaling | replay at 0.25 of the amplitude (1x, central + `dispLap`, with and without `pwall`) | the wake no longer locks to the motion: `Q_in` fluctuates by +-2% between windows | not usable as a QoI test |
+| F. Tip-corner singularity | as C (end face 3x, tip cells 4x finer) | no response | no evidence at these levels |
+
+**The limiter is not active.** In OpenFOAM v2512 `linearUpwind` reads a
+single word from the scheme stream as the *name* of the gradient scheme
+(`gradSchemeName_(schemeData)`, `linearUpwind.H`) and looks it up in
+`gradSchemes` (`mesh.gradScheme(gradSchemeName_)`). The tutorial entry
+`Gauss linearUpwind cellLimited leastSquares 1` therefore asks for a gradient
+scheme called `cellLimited`, which is not in `gradSchemes`, so the `default`
+(`leastSquares`, unlimited) is used and `leastSquares 1` is silently ignored.
+A limited gradient would need `gradSchemes { grad(U) cellLimited leastSquares 1; }`
+and `div(phi,U) Gauss linearUpwind grad(U);`. Candidate A (limiter clipping
+in the vortex lobe) is therefore not the mechanism.
+
+**Mesh creep.** `velocityLaplacian` integrates the point velocity of a
+Laplacian whose coefficients (the quadratic inverse-distance diffusivity and
+the face geometry) depend on the current mesh. The boundary returns exactly to
+its position every period, but the interior mesh does not: it creeps, and the
+forces drift steadily for as long as the run lasts (1x: `Q_in` 48.6 to 50.3
+N/m from 28 s to 33.2 s). `displacementLaplacian` with the same diffusivity
+and the replayed displacement prescribed on the plate (`dispLap`) makes the
+interior mesh a function of the boundary position only; `Q_in` is then
+stationary to +-0.03 N/m (1x: 49.149 from 30.6 to 31.7 s; 2x: 85.40 to 85.43
+from 28.5 to 32.8 s). The earlier baseline values were taken after
+different amounts of creep (8.2 s at 1x and 2x, 5.2 s at 4x). The same
+velocity-based motion is used in the coupled FSI3 runs (solids4foam sets
+`pointMotionU` on the interface); `fluidSolidInterface::moveFluidMesh` has no
+branch for a displacement-based fvMotionSolver.
+
+**Wall pressure.** With `zeroGradient` p the wall pressure is the cell value,
+an O(d) error for dp/dn = -rho n.a_wall != 0; it enters `Q_in` directly
+(about +18 N/m at 1x for central) and halves with the level. `pwall`
+(`movingWallPressure`) removes it; clustering the wall-normal cells 4x (`cl`)
+removes most of it as well (central: 61.6 to 45.0 N/m at 1x, 85.4 to 78.2 at
+2x), and with `pwall` the clustering has no further effect (43.7 to 42.9).
+`pwall` omits the viscous part of the normal momentum balance; its effect is
+not measured.
+
+**Convection scheme.** At fixed mesh, central differencing (`Gauss linear`,
+unlimited) moves `Q_in` by +12.5 (1x) and +10.9 N/m (2x) against
+`linearUpwind` (both with `dispLap`), and the lift amplitude by -25%/-14%.
+Both schemes are formally second order; the difference does not halve from 1x
+to 2x, so 1x is outside the asymptotic range.
+
+### Families and observed orders
+
+`Q_in` and the other harmonics in the common window ending 30.2 s (N/m; `p`
+is the triplet order `log2(d21/d32)` where both changes have the same sign
+and shrink, `lim` the corresponding Richardson value, quoted only as an
+indication). 1x/2x/4x: dt 1e-3/5e-4/2.5e-4; 3x: dt 1/3000 s.
+
+| family (standard mesh unless noted) | 1x | 2x | 3x | 4x | d21 | d32 (2x to 4x) | p | lim |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| baseline (linearUpwind, velocityLaplacian; earlier windows 33.2/33.2/30.2 s) | 50.31 | 72.17 | | 81.02 | 21.86 | 8.85 | 1.31 | 87.0 |
+| linearUpwind + `dispLap` | 49.15 | 74.48 | | 81.55 | 25.33 | 7.06 | **1.84** | 84.3 |
+| central + `dispLap` | 61.62 | 85.42 | | 85.64 | 23.80 | 0.22 | (6.8) | 85.6 |
+| central + `dispLap` + `pwall` | 43.66 | 76.17 | 81.22 | 81.96 | 32.51 | 5.79 | **2.49** | 83.2 |
+| ring+box mesh family, central + `dispLap` + `pwall` | 67.18 | 79.63 | 79.99 | 79.27 | 12.45 | -0.36 | non-monotone | |
+
+Other harmonics of the same families:
+
+| family | quantity | 1x | 2x | 3x | 4x | p (1x/2x/4x) |
+|---|---|---:|---:|---:|---:|---:|
+| linearUpwind + `dispLap` | `Q_quad` | -17.33 | 0.88 | | 2.04 | 3.98 |
+| | lift amplitude | 170.84 | 174.57 | | 162.41 | non-monotone |
+| central + `dispLap` | `Q_quad` | -37.13 | -10.26 | | -1.68 | 1.65 |
+| | lift amplitude | 128.25 | 150.12 | | 152.43 | 3.24 |
+| central + `dispLap` + `pwall` | `Q_quad` | -34.34 | -9.08 | -3.53 | -1.46 | 1.73 |
+| | lift amplitude | 124.26 | 142.38 | 147.71 | 150.49 | 1.16 |
+| | mean drag | -17.36 | -19.29 | -19.81 | -19.70 | 2.27 |
+| ring+box, central + `dispLap` + `pwall` | `Q_quad` | -1.79 | 1.25 | 1.48 | 1.60 | 3.14 |
+| | lift amplitude | 155.30 | 155.59 | 156.02 | 157.22 | non-monotone |
+| | mean drag | -15.21 | -18.32 | | -18.32 | converged |
+
+On the 2x/3x/4x subsequence of central + `dispLap` + `pwall` (h = 1/2, 1/3,
+1/4), a three-point fit gives p = 4.4 for `Q_in` (changes 5.05, then 0.74;
+limit 82.3), 1.8 for `Q_quad` and 0.9 for the lift amplitude.
+
+Temporal error, measured: halving dt changes `Q_in` by +1.9 N/m on the
+standard 1x mesh (central), +0.54 on 1x' and -0.09 on 2x' of the ring+box
+family, so it is a minor part of every 2x-to-4x change.
+
+The ring+box family is the standard topology with, at every level, the
+radial divisions of the cylinder ring and the divisions of the rows next to
+the flag (y 0.12-0.28) and of the columns x 0.28-1.0 doubled, and four
+cells across the tip end face (`ht_mesh_family.py --ring-n 22 --rows-n 16
+--tip-n 4 --aft-n 60 --wake-n 70`); 11 764, 47 056, 105 876 and 188 224
+cells. Its 1x' places the plate points of the standard 2x mesh.
+
+Reading:
+
+- **The original order of about 1.3 is not a property of the discretisation.**
+  With the mesh creep removed and nothing else changed, the same scheme gives
+  p = 1.84 for `Q_in` (the 2x-to-4x change drops from 8.85 to 7.06 N/m). The
+  original triplet compared levels after 8.2, 8.2 and 5.2 s of creep, at
+  +0.3 N/m/s or more.
+- With central differencing and the consistent wall pressure, the standard
+  triplet gives p = 2.49 for `Q_in`; this family is the one whose components
+  are all formally second order (central convection, BDF2 with a GCL-consistent
+  mesh flux, `pwall`). Without `pwall`, the first-order zeroGradient term
+  (+18, +9.3, ~+4.6 N/m) nearly cancels the remaining error from 2x to 4x and
+  the apparent order (6.8) is meaningless.
+- **Second order is not demonstrated at the level of a few percent.** On
+  four levels of the standard family the local orders of `Q_in` (2.5 from
+  1x/2x/4x, 4.4 from 2x/3x/4x) and of the lift amplitude (1.2, 0.9) are not
+  consistent, and the better-resolved ring+box family converges to a
+  different value (79.6, 80.0, 79.3 N/m at 2x', 3x', 4x': non-monotone
+  within +-0.5%) than the standard family is approaching (82-83 N/m). The finest levels
+  of the two families, both of which are within 1% of their own previous
+  level, differ by 2.7 N/m (3.4%). At that level the in-phase load (a small
+  residual of the much larger added-mass and vortex loads) is set by how the
+  cylinder vortices meet the moving flag, and the first-harmonic phase of the
+  lift is still moving (ring+box lift phasor (89, 127), (98, 121), (89, 130)).
+- The 1x attribution runs show that the coarse-level error is dominated by
+  the resolution of the cylinder shedding (ring) and of the wake and flag
+  region (box), not by the flag boundary layer or the tip corners, so the
+  standard 1x level is pre-asymptotic for every treatment.
+
+What this means for the coupled amplitude: with the corrected treatment the
+in-phase load is converged to about 3% at 4x (and to +-0.5% within the ring+box
+family), compared with the 12% change from 2x to 4x of the original
+sequence. The coupled solver uses the velocity-based mesh motion, so the creep
+is present in every coupled run, and the zeroGradient wall pressure and the
+linearUpwind convection are those of the tutorial.
+
+
+### Astra (GPT-6-Astra, xhigh) advice
+
+Consulted twice with `codex exec -m gpt-6-astra -c model_reasoning_effort=xhigh`
+(prompts and answers in `reference/second_order/astra_*.txt`).
+
+1. Before the tests, with the evidence summary and the dictionaries: ranked
+   C (under-resolved Stokes/shear layers, 1x pre-asymptotic) >= A (limiter)
+   > G (first-order wall treatments) ~ F (tip-corner pollution, functional
+   error ~h^1.09) > B > D > E (conditional on stationarity). Proposed: a
+   window/stationarity audit, removing only the limiter, a converged-solve
+   test (1e-9, PIMPLE 6/6/3), separating force extraction from flow error, and
+   targeted refinements (wall-normal strip at the lobe; corner patches), and
+   power-law corner grading `r_i = R (i/N)^gamma`, gamma > 1.84, if F
+   dominated. It advised keeping `Q_in` but reporting the complex harmonics
+   too. Used: the audit (which found the creep), the limiter test (which found
+   the limiter inactive), the converged-solve test, the targeted refinements
+   (extended to the cylinder ring and the wake box), and the reporting of
+   `Q_quad`, lift and drag. Not done: the force-extraction reconstruction and
+   the corner grading, because the attribution runs showed no corner
+   sensitivity.
+2. On the interpretation: agrees that the original order 1.3 was
+   "contaminated by mesh-history effects and pre-asymptotic resolution, with
+   an additional wall-pressure error", but that the corrected families have
+   not reached an asymptotic regime; a ring+box triplet with p in 1.8-2.2
+   would only justify "convergence consistent with second order over these
+   levels", and an independent finer level (8x' of the ring+box family,
+   about 755 000 cells) would be the decisive replay run, ahead of a coupled
+   sequence. Its frozen second-order prediction for 4x' from 1x'/2x' was
+   82.74 N/m; the run gave 79.27.
+
+An independent Fable advisory review (via the coordinator) ranked the
+pre-asymptotic 1x level first and the limiter second, suggested 3x/6x levels
+and an exclusion of the tip faces; the limiter is inactive (above), a 3x
+level was added to two families, and excluding the last thickness at the tip
+from the localisation data leaves the order of the remaining faces at 1.33.
+
+
+### Cost
+
+About 430 core-hours on xenosim (wall time x ranks; the node was shared and
+at times fully loaded): 1x runs about 9, 2x about 57, 3x about 47, 4x
+standard 186 (three runs on 12 ranks), 4x' 124 (24 ranks), an aborted 8x
+replay 8 (it needed about 110 s per step: GAMG took about 1 000 iterations
+per step on 341 504 cells on 48 ranks, so a full 8x window would cost well
+over 1 000 core-hours and was stopped). Run directories: `~/ht_2nd/work`
+(cases), `~/ht_2nd/src` (sources, including the 12-rank 4x rigid state and
+the mapped family sources), `~/ht_2nd/ref` (exports).
+
+Reproduce (on a machine with the study binary):
+
+```bash
+python3 scripts/hron_turek_second_order.py --source <ale_1x_dt0.001_replay> --restart 25 --end 30.2 \
+    --name s3_1x_linear_dispLap_pwall --variants linear,dispLap,pwall --work <work>
+python3 scripts/hron_turek_mesh_source.py --map-from <4x replay source, reconstructed at 25> --level 2 \
+    --ring-n 22 --rows-n 16 --tip-n 4 --aft-n 60 --wake-n 70 --delta-t 0.0005 --cores 8 --out <src>/ringbox_2x
+python3 scripts/hron_turek_second_order.py --source <src>/ringbox_2x --restart 25 --end 30.2 \
+    --name rb_2x_fastp --variants linear,dispLap,pwall,fastp --work <work>
+scripts/run_replay_variant.sh <work>/rb_2x_fastp
+python3 scripts/second_order_analysis.py --work <work> --t-end 30.2 \
+    --family rb=rb_1x_fastp,rb_2x_fastp,rb_4x_fastp
+```
+
+Dictionary changes, exactly (all other settings as in the tutorial):
+
+- `linear`: `system/fvSchemes` `div(phi,U) Gauss linearUpwind cellLimited leastSquares 1;` -> `div(phi,U) Gauss linear;`
+- `dispLap`: `constant/dynamicMeshDict` `"solver|motionSolver" velocityLaplacian;` -> `motionSolverLibs (fvMotionSolvers); motionSolver displacementLaplacian;` (same `diffusivity quadratic inverseDistance 2(plate cylinder);`); `0/pointMotionU` -> `0/pointDisplacement` with the plate condition returning the replayed displacement `d1` instead of `(d1 - d0)/dt`; `fvSolution` solver entry `"cellMotionU|cellDisplacement"`; `fvSchemes` `laplacian(diffusivity,cellDisplacement) Gauss linear corrected;`
+- `pwall`: `0/p` plate `type movingWallPressure; gradient uniform 0;`
+- `fastp`: `fvSolution` `"p|pFinal"` -> `pFinal` (unchanged) and `p { $pFinal; relTol 0.01; }`
+
