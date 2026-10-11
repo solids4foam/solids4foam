@@ -287,7 +287,15 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::toSerialEntities
     const labelList cellAddr(cellProcAddressing(mesh));
     const labelList faceAddr(faceProcAddressing(mesh));
 
-    if (cellAddr.empty() || faceAddr.empty())
+    // An empty list is only a missing file when this rank has a mesh. A rank
+    // that holds no cells of this region - the region was decomposed onto
+    // fewer ranks than the run uses - is given zero-length addressing by
+    // decomposePar, and has nothing to relate
+    if
+    (
+        (cellAddr.empty() && mesh.nCells() > 0)
+     || (faceAddr.empty() && mesh.nFaces() > 0)
+    )
     {
         FatalErrorInFunction
             << "Relating '" << name << "' to the undecomposed mesh needs "
