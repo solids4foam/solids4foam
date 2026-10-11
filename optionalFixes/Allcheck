@@ -93,21 +93,15 @@ then
     if [ $? -ne 0 ]; then result=1; fi
 elif [[ $WM_PROJECT_VERSION == v* ]]
 then
-    # Fix time index storage in the storeOldTimes function
-    if [ "${WM_PROJECT_VERSION:1}" -ge 2412 ]
-    then
-        checkAndReport \
-            "OpenFOAM-v2412" \
-            "backwardDdtScheme.C" \
-            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-            "$FOAM_SRC/finiteVolume"
-    else
-        checkAndReport \
-            "OpenFOAM-v2012" \
-            "backwardDdtScheme.C" \
-            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-            "$FOAM_SRC/finiteVolume"
-    fi
+    # Fix the start-up of the backward scheme: use Euler only while the
+    # field has no old-old time level, rather than for the first time step
+    # of the run. The same file is used for all supported OpenFOAM.com
+    # versions (v2312 to v2606), where the upstream file is identical.
+    checkAndReport \
+        "OpenFOAM.com" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
     if [ $? -ne 0 ]; then result=1; fi
 else
     # Fix required for newer compilers

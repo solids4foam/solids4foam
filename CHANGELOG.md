@@ -542,6 +542,17 @@ release. For complete commit-level details and contributor information, see the
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
   the base coupling class.
+- The OpenFOAM.com `backwardDdtScheme.C` optional fix was based on the
+  upstream file of v2212 and older, so `optionalFixes/Allreplace` replaced
+  the v2312 to v2606 file with an older one, which drops the re-evaluation of
+  coupled boundaries in `fvc::ddt` and the use of `mesh().thisDb()`. The fix
+  is now the upstream file, which is identical in v2312 to v2606, with only
+  the start-up change of the scheme. It is kept once, in
+  `optionalFixes/OpenFOAM.com`, which replaces the `OpenFOAM-v2012`,
+  `OpenFOAM-v2212`, `OpenFOAM-v2312` and `OpenFOAM-v2412` directories, and
+  `Allcheck` and `Allreplace` no longer select a directory by version (#519).
+  Installations patched with the earlier file are reported by `Allcheck`
+  (with `S4F_NO_FILE_FIXES=0`), and `Allreplace` updates them.
 
 ## [v2.4] - 2026-08-24
 
