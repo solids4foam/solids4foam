@@ -410,10 +410,11 @@ autoPtr<leastSquaresScheme> leastSquaresScheme::New
 
 void leastSquaresScheme::checkMeshSupported(const fvMesh& mesh)
 {
-    // Wedge patches are present on all processors, even when empty, and
-    // in all forks a wedge direction is counted in solutionD but not in
-    // geometricD
-    bool wedge = mesh.nSolutionD() != mesh.nGeometricD();
+    // Wedge patches are present on all processors, even when empty, so the
+    // patch scan is checked first, without parallel communication. As a
+    // fallback, in all forks a wedge direction is counted in solutionD but
+    // not in geometricD
+    bool wedge = false;
 
     forAll(mesh.boundaryMesh(), patchI)
     {
@@ -424,7 +425,7 @@ void leastSquaresScheme::checkMeshSupported(const fvMesh& mesh)
         }
     }
 
-    if (wedge)
+    if (wedge || mesh.nSolutionD() != mesh.nGeometricD())
     {
         FatalErrorInFunction
             << "Axisymmetric (wedge) meshes are not supported by the "
