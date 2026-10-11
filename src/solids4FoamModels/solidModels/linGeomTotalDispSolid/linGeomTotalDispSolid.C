@@ -1325,8 +1325,18 @@ label linGeomTotalDispSolid::formResidual
 
 #ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
-    // Note that "source()" is already multiplied by the volumes
-    residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+    // The fvOptions enter with the same sign as rho*g, as they are added to
+    // the right-hand side of the segregated momentum equation. The fvOptions
+    // matrix M represents Su + Sp*D, and "M & D" evaluates it per unit
+    // volume. Note that "M.source()" alone is -V*Su (fvMatrix stores explicit
+    // sources with a negative sign) and omits any implicit Sp*D term
+    {
+        const tmp<fvVectorMatrix> tfvOptionsEqn
+        (
+            fvOptions()(ds_, const_cast<volVectorField&>(D))
+        );
+        residual += mesh.V().field()*(tfvOptionsEqn() & D)().primitiveField();
+    }
 #else
     const tmp<volVectorField> tsource(fvOptionsSource());
     if (tsource.valid())
