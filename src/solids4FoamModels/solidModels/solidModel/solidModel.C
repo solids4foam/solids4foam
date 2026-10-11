@@ -481,11 +481,12 @@ namespace
     // when the level above it is read-constructed, and again when that
     // level's readOldTimeIfPresent() replaces it. The replacement is created
     // while the first copy is still registered, so it fails to register.
-    // OpenFOAM.com then deletes the first copy, leaving the level in use
-    // unregistered and never written again, so a later restart from this run
-    // finds no D_0_0 and backward d2dt2 falls back to first order. OpenFOAM.org
-    // and foam-extend leak the first copy instead, which stays registered and
-    // is written with the values it was read with
+    // OpenFOAM.com v2412 and later then delete the first copy, leaving the
+    // level in use unregistered and never written again, so a later restart
+    // from this run finds no D_0_0 and backward d2dt2 falls back to first
+    // order. Earlier OpenFOAM.com versions, OpenFOAM.org and foam-extend leak
+    // the first copy instead, which stays registered and is written with the
+    // values it was read with
     template<class GeoField>
     void registerOldTimeLevels(const GeoField& field)
     {
