@@ -105,6 +105,8 @@ def main() -> int:
     ap.add_argument("--n-outer", type=int, default=50)
     ap.add_argument("--fluid-tol", type=float, default=1e-9)
     ap.add_argument("--p-solver", choices=("dic", "gs"), default="dic")
+    ap.add_argument("--solid-rtol", type=float, default=1e-9, help="PETSc snes_rtol (tutorial 1e-6)")
+    ap.add_argument("--solid-stol", type=float, default=1e-12, help="PETSc snes_stol (tutorial 1e-6)")
     ap.add_argument("--cores", type=int, default=1)
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
@@ -168,6 +170,16 @@ def main() -> int:
             raise SystemExit(f"fvSolution: expected two remaining tolerances, found {n}")
         return t
     edit(case / "system/fluid/fvSolution", solvers)
+
+    # Solid solver tolerances (the tutorial's 1e-6 relative step tolerance
+    # sets a floor of the interface residual)
+    def solid(t: str) -> str:
+        t = sub1(t, 'snes_rtol "1e-6";', f'snes_rtol "{a.solid_rtol:g}";', "snes_rtol")
+        return sub1(t, 'snes_stol "1e-6";', f'snes_stol "{a.solid_stol:g}";', "snes_stol")
+    edit(case / "system/solid/fvSolution", solid)
+    # Write the old-time solid fields so that a checkpoint restart is exact
+    edit(case / "constant/solid/solidProperties",
+         lambda t: sub1(t, r'(Coeffs"\s*\{)', r"\1\n    restart yes;", "restart", regex=True))
 
     # Coupling
     def fsi(t: str) -> str:

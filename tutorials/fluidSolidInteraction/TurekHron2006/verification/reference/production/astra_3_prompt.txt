@@ -1,0 +1,33 @@
+You are advising on the design of a coupled FSI convergence study (Turek-Hron FSI3, solids4foam v2512, partitioned IQN-ILS, Dirichlet-Neumann, finite-volume fluid on a moving mesh, finite-volume St Venant-Kirchhoff total-Lagrangian solid, BDF2 (backward) in fluid and solid). It is for a verification paper. Please give a concrete, costed recommendation; be critical.
+
+ESTABLISHED (fluid-only "replay" study: the coupled 2x flag motion prescribed on fluid meshes, in-phase generalised flag load Q_in in N/m, analysis = 5 periods ending at 30.2 s):
+- The original apparent order ~1.3 was contaminated by mesh creep (velocityLaplacian mesh motion is path dependent). displacementLaplacian (same quadratic inverseDistance diffusivity) removes it. New code (solids4foam PR #554) lets the coupled solver drive displacementLaplacian.
+- zeroGradient wall pressure on the moving flag is O(h); movingWallPressure (dp/dn = -rho n.a_wall) fixes it. The tutorial limiter was silently inactive. Central convection (Gauss linear) is used.
+- Two mesh families with central + displacementLaplacian + movingWallPressure. Standard: Q_in 43.66/76.17/81.22/81.96 (1x/2x/3x/4x). Ring+box (cylinder ring and flag/wake rows refined, 11764/47056/105876/188224 cells at 1x'/2x'/3x'/4x'; its 1x' has the flag resolution of standard 2x): 67.18/79.63/79.99/79.27 (flat within +-0.5% from 2x'). Families differ by 3.4% at the finest level. Lift amplitude in the standard family converges at ~order 1. 1x (standard) is pre-asymptotic in cylinder shedding and wake.
+- Replay temporal error: halving dt changed Q_in by +1.9 N/m (standard 1x, dt 1e-3 -> 5e-4), +0.54 (1x', 1e-3 -> 5e-4), -0.09 (2x', 5e-4 -> 2.5e-4). Replay dt sequence was 1e-3/5e-4/2.5e-4 for 1x'/2x'/4x'.
+- An 8x' ring+box replay (752896 cells, dt 1.25e-4) is now running (about 9 h on 64 cores; ~600 core-h) to settle the fluid side.
+- Earlier coupled FSI3 (standard family, velocityLaplacian, zeroGradient p, linearUpwind; matched fluid+solid refinement, dt 1e-3/5e-4/2.5e-4): u_y amplitude 29.9/34.2/36.2 mm; orders ~0.9-1.1; 4x u_y amplitude drifted +0.2 mm over 4.5-7 s (consistent with creep). Solid-only refinement at fixed fluid changes u_y amplitude by <=0.3%. The solid alone (CSM3) converges at p ~1.4-1.9 toward 2.
+- Coupling convergence (issue #552): the default test min(r1, r2) can accept unconverged steps; r1 = |res_k| / max_j<=k |res_j| within the step (relative reduction), r2 = |res_k| / |total interface displacement|. We use requireAllResidualMeasures yes = max(r1, r2); in practice r1 is binding (r2 ~ r1/40). A first 1x' coupled pilot at dt 1e-3, tol 1e-6 strict needed 20-26 IQN-ILS iterations per step at the start of coupling, with a stagnation near r1 ~ 1e-5 that we attribute to the tutorial's solid SNES tolerances (snes_rtol/stol 1e-6, now tightened to 1e-9/1e-12) and fluid tolerances (now absolute 1e-9). Earlier: dt 2.5e-4 with tol 1e-6 (legacy test) stalled at a 5e-6 to 9e-6 floor. couplingReuse>0 blew up under the strict test in another campaign, so no reuse.
+
+PLANNED COUPLED STUDY (budget for everything incl. the 8x' replay: ~5000 core-hours; ~4000 left for coupled work; xenosim node, up to 96 cores):
+- Fluid: ring+box 1x'/2x'/4x' (8x' coupled is unaffordable), central, movingWallPressure, displacementLaplacian.
+- Solid: refined in step, ratio 2, interface resolution matched: solid 2x/4x/8x (105x6 base -> 210x12, 420x24, 840x48 cells) with 1x'/2x'/4x'.
+- Protocol as before: impulsive parabolic inflow Um = 2 m/s from t = 0, coupling switched on at 2 s, limit cycle by ~4.5 s, run to 7 s on every level; analysis window = last 5 full u_y periods before 7 s; drift checked with sliding windows from 5 s.
+- QoIs: tip u_x time mean and (max+min)/2, u_x and u_y amplitudes, frequency, drag/lift mean and amplitude (cylinder + flag).
+- Cost estimate: per IQN-ILS iteration ~0.25 s at 1x' on 4 cores; 4x' is ~16x the work, ~0.5-1 s/iteration on 32-48 cores; with ~15 iterations/step at strict tol, 4x' costs ~10-15 s per coupled step, i.e. ~1300-2000 core-h for 10000 coupled steps (dt 5e-4) and ~2700-4000 for 20000 (dt 2.5e-4). 1x' and 2x' are 16x and 4x cheaper.
+
+TIME-STEP DESIGN QUESTION. Options:
+ (a) matched dt halving with Co constant: 1e-3/5e-4/2.5e-4 (combined space-time order; separate checks by halving dt at 1x' and 2x');
+ (b) fixed dt for the spatial sequence plus a temporal sequence at one level. Fixed dt = 2.5e-4 is the same 4x' cost as (a) and probably unaffordable together with a temporal sequence; fixed dt = 5e-4 makes 4x' affordable (max Courant ~3 locally at 4x', ~0.7-1.5 in the wake) with a temporal sequence 1e-3/5e-4/2.5e-4 at 2x', and optionally a short 4x' dt 2.5e-4 restart from the 4x' limit cycle (~1 s, ~500 core-h) to check the time error where the Courant number is largest.
+ The spatial differences we must resolve may be small: in the replay the ring+box Q_in changed only -0.5% from 2x' to 4x'.
+
+COUPLING TOLERANCE: we plan a tolerance study on 1x' (strict test, tol 1e-4/1e-5/1e-6/1e-7 from a common limit-cycle restart, or full runs), choose the loosest tolerance whose QoI change is far below the spatial differences, then use it on all levels; record iterations per step and r1 at acceptance.
+
+QUESTIONS:
+1. Which time design do you recommend, given the budget, and how do we demonstrate that the temporal error is below the spatial differences (what criterion, which level)? Is a fixed dt = 5e-4 defensible at 4x' with central convection and BDF2?
+2. Is the solid pairing 2x/4x/8x with 1x'/2x'/4x' right, or should the solid be refined further/less? 
+3. Coupling tolerance study design: which level, full runs vs restarts, and acceptance criterion? Is the r1-based strict criterion overly strict (r1 is a relative reduction within the step)?
+4. Run length/stationarity: is 7 s with sliding windows from 5 s enough, or should runs start from a developed state?
+5. What would make the sequence "resolved" enough to quote observed orders or Richardson/GCI, and what should be reported if the 1x'/2x'/4x' differences are non-monotone or below the time/iterative error?
+6. Anything we are missing that could invalidate the comparison (e.g. starting transients, restart artefacts, interface interpolation between non-matching meshes, force definition)?
+Answer in under 900 words, with a ranked, costed plan.

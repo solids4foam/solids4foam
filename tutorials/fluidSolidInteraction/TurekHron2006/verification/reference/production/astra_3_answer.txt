@@ -1,0 +1,45 @@
+Recommend **(b): fixed Δt = 5×10⁻⁴ s**, with the **4x′ temporal check mandatory**. Matched refinement would entangle errors already capable of cancelling. The 8x′ replay constrains the prescribed-motion problem; it cannot certify coupled amplitudes or eliminate the 3.4% family discrepancy.
+
+Use this ranked budget, in core-hours:
+
+| Priority | Work | Budget |
+|---|---|---:|
+| 1 | Timing pilot; tolerance and restart checks | 400 |
+| 2 | 1x′/2x′/4x′ spatial sequence | 1,970 |
+| 3 | 2x′ temporal branches: 10⁻³ and 2.5×10⁻⁴ | 280 |
+| 4 | 4x′ branch at 2.5×10⁻⁴ | 900 |
+| 5 | Fixed-fluid solid-refinement check | 150 |
+| 6 | Uncoupled startup, extensions, contingency | 300 |
+| | **Coupled-work allocation** | **4,000** |
+
+These estimates assume **1,500 core-hours for five coupled seconds at 4x′**, your relative mesh costs, and 1.5-second temporal branches. At 2,000 core-hours, the programme becomes approximately **5,050**. Benchmark developed-cycle performance at 32/48/64 cores; minimise core-hours. If necessary, save through validated developed-state starts on refined meshes. The budget cannot guarantee convergence if branches require substantial extensions.
+
+**Time accuracy.** Co≈3 does not automatically disqualify implicit BDF2, but stability and nominal second order do not establish accuracy; boundedness is not guaranteed. Inspect grid-scale oscillations, ALE-relative Courant numbers and coupling convergence. [OpenFOAM documentation](https://doc.openfoam.com/2306/tools/processing/numerics/schemes/time/rtm/backward/)
+
+For each QoI define \(D=|q_{2x'}-q_{4x'}|\) at the production timestep. My acceptance targets are:
+
+- Summed temporal-error estimates on the two meshes <0.2D.
+- Summed iterative errors <0.05D.
+- Combined window/drift uncertainty <0.05D.
+
+Apply equivalent checks to the coarse pair before quoting an order; a 1x′ halving check is cheap. Use dimensional thresholds for near-zero means. A 0.5% spatial change therefore demands roughly 0.1% combined temporal error.
+
+On 2x′, establish temporal order from three settled solutions. If \(p_t≈2\), the production-timestep error is approximately **4/3 times its difference from the halved timestep**, not one-third. Check 4x′ directly; importing \(p_t\) from 2x′ remains an assumption. A marginal or irregular result requires another timestep or a qualified accuracy claim.
+
+**Coupling.** Screen 10⁻⁴/10⁻⁵/10⁻⁶ on 1x′ from one clean, tightly converged limit-cycle checkpoint; attempt 10⁻⁷ only if inner solves support it. Validate the selected tolerance against a decade tighter on **2x′ at the smallest timestep**, and spot-check 4x′. Change tolerance at unchanged timestep to avoid confounding. Include a longer 1x′ comparison for cumulative drift. Require the iterative target above and no unconverged maximum-iteration exits.
+
+Keep the strict test. It can over-solve when the initial residual is tiny: r₁ measures reduction, not displacement accuracy, and changes with predictor quality and Δt. Record dimensional, preferably area-weighted residuals, r₁, r₂ and iteration distributions. Verify the alleged inner-solver floor by tightening inner tolerances; attribution alone is insufficient. Avoid checkpoints inherited from legacy underconverged runs. [Issue #552](https://github.com/solids4foam/solids4foam/issues/552)
+
+**Solid.** Keep 2x/4x/8x initially; this measures joint fluid–solid spatial convergence. At fixed fluid 2x′, compare solid 4x versus 8x. The earlier ≤0.3% sensitivity is not negligible beside a 0.5% difference. Further refinement needs evidence; matching interface resolution alone neither proves adequacy nor requires additional solid refinement.
+
+**Stationarity/restarts.** Seven seconds is a checkpoint, not an acceptance criterion. Require stable cycle amplitudes, means and periods, plus drift over five periods below the threshold above; compare successive windows. Use interpolated extrema and phase crossings, avoiding FFT-bin frequency estimates from five cycles.
+
+One second is approximately five FSI3 periods: it leaves essentially no washout. Budget 1.5 seconds initially, then extend until settled. Retain a clean cold-start reference and validate developed-state mapping against a cold run on 2x′ before saving fine-grid startup. This is appropriate for limit-cycle verification.
+
+Same-mesh restart versus uninterrupted continuation must agree. Preserve all fluid/solid multistep histories, previous timesteps, mesh-volume/flux histories, reference geometry and `pointDisplacement`. The solid’s twice-applied BDF2 needs particular attention when changing timestep. [PR #554](https://github.com/solids4foam/solids4foam/pull/554) explicitly requires compatible displacement-motion restarts.
+
+**Orders/reporting.** Quote observed order and Richardson/GCI only for QoIs with monotone, shrinking differences above the error allowances, consistent refinement, and order robust to window, tolerance and temporal uncertainty. Three points alone weakly establish asymptotia; do not impose second order. [NASA guidance](https://www.grc.nasa.gov/www/wind/valid/tutorial/spatconv.html)
+
+For non-monotone or indistinguishable values, report the mesh range and separate sensitivities, explicitly **“spatial order unresolved.”** That range is not a certified error bound.
+
+Finally audit identical geometry and plane-strain/material assumptions; mean versus peak inflow; pressure reference; current-area pressure-plus-viscous forces, signs and unit-span conversion; interface force/moment/work conservation; same-iteration wall acceleration; and ALE geometric conservation. Document the impulsive, delayed-coupling startup and demonstrate that its transient has decayed.
