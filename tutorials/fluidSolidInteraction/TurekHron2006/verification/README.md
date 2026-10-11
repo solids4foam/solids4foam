@@ -1467,3 +1467,23 @@ Dictionary changes, exactly (all other settings as in the tutorial):
 - `pwall`: `0/p` plate `type movingWallPressure; gradient uniform 0;`
 - `fastp`: `fvSolution` `"p|pFinal"` -> `pFinal` (unchanged) and `p { $pFinal; relTol 0.01; }`
 
+
+## Production runs: 8x' ring+box replay and the corrected coupled FSI3 sequence
+
+Branch `verification/hronturek-production` (merge of `verification/hronturek-second-order`
+f19536dbb and the PR #554 branch `feature/fsi-displacement-mesh-motion` 9692c0e08; master
+renamed the tutorial to `TurekHron2006`, and the verification tree moved with it).
+
+### STATUS (work in progress)
+
+| job | what | where (xenosim) | cores |
+|---|---|---|---:|
+| 10860 | 8x' ring+box replay, 752 896 cells, dt 1.25e-4, 25 to 31.2 s | `~/ht_prod/work/rb_8x_fastp` | 64 |
+| 10861 | coupled pilot 1x'/solid 2x, dt 5e-4, strict tol 1e-5 | `~/ht_prod/work/p_1x_dt5e-4_tol1e-5` | 8 |
+| 10873 | coupled 4x'/solid 8x, dt 5e-4, strict tol 1e-6, 0 to 7 s | `~/ht_prod/work/c_4x_dt5e-4_tol1e-6` | 24 |
+
+Next: coupling-tolerance branches on 1x' from the pilot's limit cycle; 1x' and 2x'
+production runs (tol 1e-6); 2x' temporal runs (dt 1e-3 cold, dt 2.5e-4 branch) and a 4x'
+dt 2.5e-4 branch; solid check at 2x'. Environments: `scripts/prod_env_study.sh` (replay,
+study binary of the 1x'-4x' replays) and `scripts/prod_env_build.sh` (coupled, production
+build at 30d6e22f3 with PR #554).
