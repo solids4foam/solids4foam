@@ -38,9 +38,22 @@ def copy_contents(source: Path, destination: Path) -> None:
             shutil.copy2(path.resolve(), target)
 
 
+def solid_counts(factor: int, thickness_multiplier: int,
+                 inplane_multiplier: int) -> tuple[int, int, int]:
+    """Return the solid block (thickness, y, z) cell counts."""
+    return (
+        4 * factor * thickness_multiplier,
+        8 * factor * inplane_multiplier,
+        8 * factor * inplane_multiplier,
+    )
+
+
 def prepare_case(factor: int, cores: int, traction: float,
-                 discretisation: str) -> Path:
+                 discretisation: str, thickness_multiplier: int = 1,
+                 inplane_multiplier: int = 1) -> Path:
     suffix = "" if discretisation == "standard" else "_high_order"
+    if thickness_multiplier != 1 or inplane_multiplier != 1:
+        suffix += f"_t{thickness_multiplier}_p{inplane_multiplier}"
     case = verify.copy_case(f"richter_solid_static_{factor}x{suffix}")
     shutil.rmtree(case / "0/fluid")
     copy_contents(case / "0/solid", case / "0")
@@ -48,10 +61,18 @@ def prepare_case(factor: int, cores: int, traction: float,
     copy_contents(case / "constant/solid", case / "constant")
     copy_contents(case / "system/solid", case / "system")
 
-    verify.refine_mesh(case / "system/blockMeshDict", factor)
+    counts = solid_counts(factor, thickness_multiplier, inplane_multiplier)
+    mesh = case / "system/blockMeshDict"
+    text, count = re.subn(
+        r"\(4 8 8\) simpleGrading",
+        "(" + " ".join(str(value) for value in counts) + ") simpleGrading",
+        mesh.read_text(),
+    )
+    if count != 1:
+        raise RuntimeError("could not set the solid block cell counts")
+    mesh.write_text(text)
     verify.replace_entry(case / "system/decomposeParDict", "numberOfSubdomains", str(cores))
 
-    mesh = case / "system/blockMeshDict"
     text = mesh.read_text()
     old_interface = """wall interface
     (
@@ -194,6 +215,18 @@ def main() -> int:
     parser.add_argument("--cores", type=int, default=1)
     parser.add_argument("--traction", type=float, default=100.0)
     parser.add_argument(
+        "--thickness-multiplier", type=int, default=1,
+        help="extra factor on the through-thickness (x) cell count",
+    )
+    parser.add_argument(
+        "--inplane-multiplier", type=int, default=1,
+        help="extra factor on the y and z cell counts",
+    )
+    parser.add_argument(
+        "--output-suffix", default="",
+        help="suffix appended to the output CSV name",
+    )
+    parser.add_argument(
         "--discretisation",
         choices=("standard", "high-order"),
         default="standard",
@@ -214,27 +247,25 @@ def main() -> int:
     rows = []
     for level, factor in enumerate(factors):
         case = prepare_case(
-            factor, args.cores, args.traction, args.discretisation
+            factor, args.cores, args.traction, args.discretisation,
+            args.thickness_multiplier, args.inplane_multiplier,
+        )
+        counts = solid_counts(
+            factor, args.thickness_multiplier, args.inplane_multiplier
         )
         elapsed = run(case, args.cores)
         _, displacement = verify.vector_at_or_before(
             verify.find_displacement(case), 1.0
         )
-        cells = sum(
-            math.prod(int(value) for value in match.group(1).split())
-            for match in re.finditer(
-                r"hex\s+\([^)]*\)\s+\(([^()]+)\)\s+simpleGrading",
-                (case / "system/blockMeshDict").read_text(),
-            )
-        )
+        cells = math.prod(counts)
         rows.append(
             {
                 "level": level,
                 "refinement_factor": factor,
                 "solid_cells": cells,
-                "cells_across_thickness": 4 * factor,
-                "interface_cells_y": 8 * factor,
-                "interface_cells_z": 8 * factor,
+                "cells_across_thickness": counts[0],
+                "interface_cells_y": counts[1],
+                "interface_cells_z": counts[2],
                 "traction_x_pa": args.traction,
                 "discretisation": args.discretisation,
                 "ranks": args.cores,
@@ -256,7 +287,8 @@ def main() -> int:
         )
     suffix = "" if args.discretisation == "standard" else "_high_order"
     output = VERIFICATION / (
-        f"postProcessing/richter_solid_discretisation{suffix}.csv"
+        f"postProcessing/richter_solid_discretisation{suffix}"
+        f"{args.output_suffix}.csv"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("w", newline="") as handle:
