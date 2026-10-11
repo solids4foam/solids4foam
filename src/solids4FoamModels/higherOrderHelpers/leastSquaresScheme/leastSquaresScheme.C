@@ -19,6 +19,7 @@ License
 
 #include "leastSquaresScheme.H"
 #include "compatibilityFunctions.H"
+#include "wedgePolyPatch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -405,6 +406,49 @@ autoPtr<leastSquaresScheme> leastSquaresScheme::New
 }
 
 
+// * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * //
+
+void leastSquaresScheme::checkMeshSupported(const fvMesh& mesh)
+{
+    // Wedge patches are present on all processors, even when empty, and
+    // in all forks a wedge direction is counted in solutionD but not in
+    // geometricD
+    bool wedge = mesh.nSolutionD() != mesh.nGeometricD();
+
+    forAll(mesh.boundaryMesh(), patchI)
+    {
+        if (isA<wedgePolyPatch>(mesh.boundaryMesh()[patchI]))
+        {
+            wedge = true;
+            break;
+        }
+    }
+
+    if (wedge)
+    {
+        FatalErrorInFunction
+            << "Axisymmetric (wedge) meshes are not supported by the "
+            << "high-order least-squares reconstruction." << nl
+            << "The high-order reconstruction supports planar 2-D meshes, "
+            << "with vector::Z as the empty direction, and 3-D meshes." << nl
+            << "For axisymmetric cases, use a 3-D mesh or the standard "
+            << "(second-order) solid model without highOrderCoeffs."
+            << exit(FatalError);
+    }
+
+    if (mesh.nGeometricD() == 2 && mesh.solutionD()[vector::Z] != -1)
+    {
+        FatalErrorInFunction
+            << "Empty direction should be vector::Z. "
+            << "Please change mesh orientation!" << nl
+            << "The high-order reconstruction requires planar 2-D meshes "
+            << "to be in the x-y plane with an empty z direction; the "
+            << "current mesh solution directions are " << mesh.solutionD()
+            << exit(FatalError);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * //
 
 leastSquaresScheme::leastSquaresScheme(const fvMesh& mesh)
@@ -412,7 +456,9 @@ leastSquaresScheme::leastSquaresScheme(const fvMesh& mesh)
     mesh_(mesh),
     ownerFaceCentreValueCoeffsPtr_(),
     neighbourFaceCentreValueCoeffsPtr_()
-{}
+{
+    checkMeshSupported(mesh_);
+}
 
 
 // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * //
