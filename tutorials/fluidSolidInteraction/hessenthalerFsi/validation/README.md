@@ -25,10 +25,11 @@ cd tutorials/fluidSolidInteraction/hessenthalerFsi/validation
 The driver needs Python 3.8 or newer; `matplotlib` is optional and is used for
 the figures. `scripts/makeFluidSurface.py` regenerates the tutorial's
 committed fluid surface, `constant/triSurface/fluidDomain.stl.gz`; the
-driver does not run it. Each run is a copy of the tutorial under `validation/work`, and
-the results are written to `validation/postProcessing` as CSV files, Markdown
-summaries and PNG figures. Both directories are ignored by Git. The copies
-never include result time directories of the tutorial.
+driver does not run it. Each run is a copy of the tutorial under
+`validation/work`, and the results are written to `validation/postProcessing`
+as CSV files, Markdown summaries and PNG figures. Both directories are
+ignored by Git. The copies never include result time directories of the
+tutorial.
 
 A run is checked before it is used. Its solver log must end with `End` and
 contain no fatal error. Every monitored history must be finite and cover every
