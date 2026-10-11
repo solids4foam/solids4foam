@@ -1,27 +1,27 @@
 //LIC// ====================================================================
-//LIC// This file forms part of oomph-lib, the object-oriented, 
-//LIC// multi-physics finite-element library, available 
+//LIC// This file forms part of oomph-lib, the object-oriented,
+//LIC// multi-physics finite-element library, available
 //LIC// at http://www.oomph-lib.org.
-//LIC// 
+//LIC//
 //LIC// Copyright (C) 2006-2026 Matthias Heil and Andrew Hazel
-//LIC// 
+//LIC//
 //LIC// This library is free software; you can redistribute it and/or
 //LIC// modify it under the terms of the GNU Lesser General Public
 //LIC// License as published by the Free Software Foundation; either
 //LIC// version 2.1 of the License, or (at your option) any later version.
-//LIC// 
+//LIC//
 //LIC// This library is distributed in the hope that it will be useful,
 //LIC// but WITHOUT ANY WARRANTY; without even the implied warranty of
 //LIC// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 //LIC// Lesser General Public License for more details.
-//LIC// 
+//LIC//
 //LIC// You should have received a copy of the GNU Lesser General Public
 //LIC// License along with this library; if not, write to the Free Software
 //LIC// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 //LIC// 02110-1301  USA.
-//LIC// 
+//LIC//
 //LIC// The authors may be contacted at oomph-lib@maths.man.ac.uk.
-//LIC// 
+//LIC//
 //LIC//====================================================================
 //
 // Reference driver for the solids4foam channelLeaflet verification.
@@ -85,9 +85,9 @@ namespace Global_Physical_Variables
 
  /// Non-dimensional wall thickness.
  double H=0.05;
- 
+
  /// Fluid structure interaction parameter: Ratio of stresses used for
- /// non-dimensionalisation of fluid to solid stresses. 
+ /// non-dimensionalisation of fluid to solid stresses.
  double Q=1.0e-6;
 
  /// Period for fluctuations in flux
@@ -95,10 +95,10 @@ namespace Global_Physical_Variables
 
  /// Min. flux
  double Min_flux=1.0;
- 
+
  /// Max. flux
  double Max_flux=2.0;
- 
+
  /// Timescale ratio of the leaflet, Lambda^2 = rho_s U^2/E_eff: zero for
  /// the massless leaflet of the original driver
  double Lambda_sq=0.0;
@@ -151,8 +151,8 @@ public:
   {
    X0=x0;
   }
- 
- /// Position vector at Lagrangian coordinate zeta 
+
+ /// Position vector at Lagrangian coordinate zeta
  void position(const Vector<double>& zeta, Vector<double>& r) const
   {
    // Position Vector
@@ -174,8 +174,8 @@ public:
 
  /// Posn vector and its  1st & 2nd derivatives
  /// w.r.t. to coordinates:
- /// \f$ \frac{dR_i}{d \zeta_\alpha}\f$ = drdzeta(alpha,i). 
- /// \f$ \frac{d^2R_i}{d \zeta_\alpha d \zeta_\beta}\f$ = 
+ /// \f$ \frac{dR_i}{d \zeta_\alpha}\f$ = drdzeta(alpha,i).
+ /// \f$ \frac{d^2R_i}{d \zeta_\alpha d \zeta_\beta}\f$ =
  /// ddrdzeta(alpha,beta,i). Evaluated at current time.
  void d2position(const Vector<double>& zeta,
                  Vector<double>& r,
@@ -196,11 +196,11 @@ public:
   } // end of d2position
 
  /// Number of geometric Data in GeomObject: None.
- unsigned ngeom_data() const {return 0;}  
+ unsigned ngeom_data() const {return 0;}
 
  private :
 
- /// x position of the undeformed leaflet's origin. 
+ /// x position of the undeformed leaflet's origin.
  double X0;
 
 }; //end_of_undeformed_wall
@@ -233,25 +233,25 @@ public:
                               const double& htot,
                               const unsigned& nleft, const unsigned& nright,
                               const unsigned& ny1, const unsigned&  ny2,
-                              const double& x_0);  
+                              const double& x_0);
 
  /// Destructor empty
  ~FSIChannelWithLeafletProblem(){}
- 
+
  /// Actions after solve (empty)
  void actions_after_newton_solve(){}
 
- /// Actions before solve (empty) 
+ /// Actions before solve (empty)
  void actions_before_newton_solve(){}
 
  /// Actions after adaptation
  void actions_after_adapt();
 
  /// Access function to the wall mesh
- OneDLagrangianMesh<FSIHermiteBeamElement>* wall_mesh_pt() 
+ OneDLagrangianMesh<FSIHermiteBeamElement>* wall_mesh_pt()
   {
    return Wall_mesh_pt;
-  } 
+  }
 
  /// Access function to fluid mesh
  RefineableAlgebraicChannelWithLeafletMesh<ELEMENT>* fluid_mesh_pt()
@@ -273,19 +273,19 @@ public:
    double ampl=Global_Physical_Variables::flux(t);
 
    // Update parabolic flow along boundary 3
-   unsigned ibound=3; 
+   unsigned ibound=3;
    unsigned num_nod= Fluid_mesh_pt->nboundary_node(ibound);
    for (unsigned inod=0;inod<num_nod;inod++)
    {
-    double ycoord = Fluid_mesh_pt->boundary_node_pt(ibound,inod)->x(1); 
+    double ycoord = Fluid_mesh_pt->boundary_node_pt(ibound,inod)->x(1);
     double uy = ampl*6.0*ycoord/Htot*(1.0-ycoord/Htot);
     Fluid_mesh_pt->boundary_node_pt(ibound,inod)->set_value(0,uy);
-    Fluid_mesh_pt->boundary_node_pt(ibound,inod)->set_value(1,0.0);    
+    Fluid_mesh_pt->boundary_node_pt(ibound,inod)->set_value(1,0.0);
    }
   } // end of actions_before_implicit_timestep
 
  /// Update before checking Newton convergence: Update the
- /// nodal positions in the fluid mesh in response to possible 
+ /// nodal positions in the fluid mesh in response to possible
  /// changes in the wall shape
  void actions_before_newton_convergence_check()
   {
@@ -293,7 +293,7 @@ public:
   }
 
 private:
- 
+
  /// Pointer to the fluid mesh
  RefineableAlgebraicChannelWithLeafletMesh<ELEMENT>* Fluid_mesh_pt;
 
@@ -302,7 +302,7 @@ private:
 
  /// Pointer to the GeomObject that represents the wall
  GeomObject* Leaflet_pt;
- 
+
  /// Total height of the domain
  double Htot;
 
@@ -366,7 +366,7 @@ FSIChannelWithLeafletProblem<ELEMENT>::FSIChannelWithLeafletProblem(
  // Build a geometric object (one Lagrangian, two Eulerian coordinates)
  // from the wall mesh
  MeshAsGeomObject* wall_geom_object_pt=
-  new MeshAsGeomObject(Wall_mesh_pt); 
+  new MeshAsGeomObject(Wall_mesh_pt);
 
 //Build the mesh
  Fluid_mesh_pt =new RefineableAlgebraicChannelWithLeafletMesh<ELEMENT>(
@@ -385,7 +385,7 @@ FSIChannelWithLeafletProblem<ELEMENT>::FSIChannelWithLeafletProblem(
 
  // Build global mesh
  //------------------
- 
+
  // Add the sub meshes to the problem
  add_sub_mesh(Fluid_mesh_pt);
  add_sub_mesh(Wall_mesh_pt);
@@ -406,55 +406,55 @@ FSIChannelWithLeafletProblem<ELEMENT>::FSIChannelWithLeafletProblem(
    for (unsigned inod=0;inod<num_nod;inod++)
     {
       Fluid_mesh_pt->boundary_node_pt(ibound,inod)->pin(1);
-     
+
       // Do not pin the x velocity of the outflow
       if( ibound != 1)
       {
-       Fluid_mesh_pt->boundary_node_pt(ibound,inod)->pin(0); 
-      }      
+       Fluid_mesh_pt->boundary_node_pt(ibound,inod)->pin(0);
+      }
     }
   }
  // end loop over boundaries
-   
 
- // Setup parabolic flow along boundary 3 (everything else that's 
+
+ // Setup parabolic flow along boundary 3 (everything else that's
  // pinned has homogenous boundary conditions so no action is required
  // as that's the default assignment). Inflow profile is parabolic
  // and this is interpolated correctly during mesh refinement so
  // no re-assignment necessary after adaptation.
- unsigned ibound=3; 
+ unsigned ibound=3;
  unsigned num_nod= Fluid_mesh_pt->nboundary_node(ibound);
  for (unsigned inod=0;inod<num_nod;inod++)
   {
-   double ycoord = Fluid_mesh_pt->boundary_node_pt(ibound,inod)->x(1); 
+   double ycoord = Fluid_mesh_pt->boundary_node_pt(ibound,inod)->x(1);
    double uy = Global_Physical_Variables::flux(0.0)*
     6.0*ycoord/htot*(1.0-ycoord/htot);
    Fluid_mesh_pt->boundary_node_pt(ibound,inod)->set_value(0,uy);
-   Fluid_mesh_pt->boundary_node_pt(ibound,inod)->set_value(1,0.0);    
+   Fluid_mesh_pt->boundary_node_pt(ibound,inod)->set_value(1,0.0);
   }// end of setup boundary condition
 
 
- 
+
  // Boundary conditions for wall mesh
  //----------------------------------
 
  // Set the boundary conditions: the lower end of the beam is fixed in space
- unsigned b=0; 
+ unsigned b=0;
 
  // Pin displacements in both x and y directions
- wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(0); 
+ wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(0);
  wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(1);
- 
- // Infinite slope: Pin type 1 (slope) dof for displacement direction 0 
+
+ // Infinite slope: Pin type 1 (slope) dof for displacement direction 0
  wall_mesh_pt()->boundary_node_pt(b,0)->pin_position(1,0);
- 
+
 
 
  // Complete build of fluid elements
  //---------------------------------
  unsigned n_element = Fluid_mesh_pt->nelement();
 
- // Loop over the elements to set up element-specific 
+ // Loop over the elements to set up element-specific
  // things that cannot be handled by constructor
  for(unsigned e=0;e<n_element;e++)
   {
@@ -463,30 +463,30 @@ FSIChannelWithLeafletProblem<ELEMENT>::FSIChannelWithLeafletProblem(
 
    //Set the Reynolds number
    el_pt->re_pt() = &Global_Physical_Variables::Re;
-   
+
    //Set the Womersley number
    el_pt->re_st_pt() = &Global_Physical_Variables::ReSt;
-      
+
   }// end loop over elements
 
 
  // Pin redudant pressure dofs
  RefineableNavierStokesEquations<2>::
   pin_redundant_nodal_pressures(Fluid_mesh_pt->element_pt());
- 
- 
+
+
  // Complete build of wall elements
  //--------------------------------
  n_element = wall_mesh_pt()->nelement();
  for(unsigned e=0;e<n_element;e++)
   {
    // Upcast to the specific element type
-   FSIHermiteBeamElement *elem_pt = 
+   FSIHermiteBeamElement *elem_pt =
     dynamic_cast<FSIHermiteBeamElement*>(wall_mesh_pt()->element_pt(e));
-    
+
    // Set physical parameters for each element:
    elem_pt->h_pt() = &Global_Physical_Variables::H;
-    
+
    // Function that specifies the load ratios
    elem_pt->q_pt() = &Global_Physical_Variables::Q;
 
@@ -499,52 +499,52 @@ FSIChannelWithLeafletProblem<ELEMENT>::FSIChannelWithLeafletProblem(
    // Leaflet is immersed and loaded by fluid on both sides
    elem_pt->enable_fluid_loading_on_both_sides();
 
-   // The normal to the leaflet, as computed by the 
-   // FSIHermiteElements points away from the fluid rather than 
+   // The normal to the leaflet, as computed by the
+   // FSIHermiteElements points away from the fluid rather than
    // into the fluid (as assumed by default) when viewed from
    // the "front" (face 0).
    elem_pt->set_normal_pointing_out_of_fluid();
 
   } // end of loop over elements
 
- 
+
  // Setup FSI
  //----------
- 
+
  // The velocity of the fluid nodes on the wall (fluid mesh boundary 4,5)
  // is set by the wall motion -- hence the no-slip condition must be
- // re-applied whenever a node update is performed for these nodes. 
- // Such tasks may be performed automatically by the auxiliary node update 
+ // re-applied whenever a node update is performed for these nodes.
+ // Such tasks may be performed automatically by the auxiliary node update
  // function specified by a function pointer:
  for(unsigned ibound=4;ibound<6;ibound++ )
-  { 
+  {
    unsigned num_nod= Fluid_mesh_pt->nboundary_node(ibound);
    for (unsigned inod=0;inod<num_nod;inod++)
-    {   
+    {
      Fluid_mesh_pt->boundary_node_pt(ibound, inod)->
       set_auxiliary_node_update_fct_pt(
        FSI_functions::apply_no_slip_on_moving_wall);
     }
   }// aux node update fct has been set
- 
+
  // Work out which fluid dofs affect the residuals of the wall elements:
- // We pass the boundary between the fluid and solid meshes and 
+ // We pass the boundary between the fluid and solid meshes and
  // pointers to the meshes. The interaction boundary is boundary 4 and 5
  // of the 2D fluid mesh.
 
  // Front of leaflet: Set face=0 (which is also the default so this argument
  // could be omitted)
- unsigned face=0; 
+ unsigned face=0;
  FSI_functions::setup_fluid_load_info_for_solid_elements<ELEMENT,2>
-  (this,4,Fluid_mesh_pt,Wall_mesh_pt,face); 
- 
+  (this,4,Fluid_mesh_pt,Wall_mesh_pt,face);
+
  // Back of leaflet: face 1, needs to be specified explicitly
- face=1; 
+ face=1;
  FSI_functions::setup_fluid_load_info_for_solid_elements<ELEMENT,2>
-  (this,5,Fluid_mesh_pt,Wall_mesh_pt,face); 
- 
+  (this,5,Fluid_mesh_pt,Wall_mesh_pt,face);
+
  // Setup equation numbering scheme
- cout <<"Number of equations: " << assign_eqn_numbers() << std::endl; 
+ cout <<"Number of equations: " << assign_eqn_numbers() << std::endl;
 
 
  // Iterative linear solver with the FSI preconditioner, as in the original
@@ -582,52 +582,52 @@ void FSIChannelWithLeafletProblem<ELEMENT>::actions_after_adapt()
  // Unpin all pressure dofs
  RefineableNavierStokesEquations<2>::
   unpin_all_pressure_dofs(Fluid_mesh_pt->element_pt());
- 
+
  // Pin redundant pressure dofs
  RefineableNavierStokesEquations<2>::
   pin_redundant_nodal_pressures(Fluid_mesh_pt->element_pt());
- 
+
 
  // (Re-)apply the no slip condition on the moving wall
  //-----------------------------------------------------
 
  // The velocity of the fluid nodes on the wall (fluid mesh boundary 4,5)
  // is set by the wall motion -- hence the no-slip condition must be
- // re-applied whenever a node update is performed for these nodes. 
- // Such tasks may be performed automatically by the auxiliary node update 
+ // re-applied whenever a node update is performed for these nodes.
+ // Such tasks may be performed automatically by the auxiliary node update
  // function specified by a function pointer:
  for(unsigned ibound=4;ibound<6;ibound++ )
-  { 
+  {
    unsigned num_nod= Fluid_mesh_pt->nboundary_node(ibound);
    for (unsigned inod=0;inod<num_nod;inod++)
-    {   
+    {
      Fluid_mesh_pt->boundary_node_pt(ibound, inod)->
       set_auxiliary_node_update_fct_pt(
        FSI_functions::apply_no_slip_on_moving_wall);
     }
   } // aux node update fct has been (re-)set
 
- 
- 
+
+
  // Re-setup FSI
  //-------------
- 
+
  // Work out which fluid dofs affect the residuals of the wall elements:
- // We pass the boundary between the fluid and solid meshes and 
+ // We pass the boundary between the fluid and solid meshes and
  // pointers to the meshes. The interaction boundary is boundary 4 and 5
  // of the 2D fluid mesh.
 
  // Front of leaflet: Set face=0 (which is also the default so this argument
  // could be omitted)
- unsigned face=0; 
+ unsigned face=0;
  FSI_functions::setup_fluid_load_info_for_solid_elements<ELEMENT,2>
-  (this,4,Fluid_mesh_pt,Wall_mesh_pt,face); 
- 
+  (this,4,Fluid_mesh_pt,Wall_mesh_pt,face);
+
  // Back of leaflet: face 1, needs to be specified explicitly
- face=1; 
+ face=1;
  FSI_functions::setup_fluid_load_info_for_solid_elements<ELEMENT,2>
-  (this,5,Fluid_mesh_pt,Wall_mesh_pt,face); 
-  
+  (this,5,Fluid_mesh_pt,Wall_mesh_pt,face);
+
 } // end_of_actions_after_adapt
 
 
@@ -640,23 +640,23 @@ void FSIChannelWithLeafletProblem<ELEMENT>::actions_after_adapt()
 template<class ELEMENT>
 void FSIChannelWithLeafletProblem<ELEMENT>::doc_solution(DocInfo& doc_info,
                                                          ofstream& trace)
-{ 
+{
  if (Global_Physical_Variables::Doc_fields)
   {
    ofstream some_file;
    char filename[1000];
 
    // Number of plot points
-   unsigned npts=5; 
+   unsigned npts=5;
 
-   // Output fluid solution 
+   // Output fluid solution
    snprintf(filename, sizeof(filename), "%s/soln%i.dat",
             doc_info.directory().c_str(), doc_info.number());
    some_file.open(filename);
    Fluid_mesh_pt->output(some_file,npts);
    some_file.close();
 
-   // Output wall solution 
+   // Output wall solution
    snprintf(filename, sizeof(filename), "%s/wall_soln%i.dat",
             doc_info.directory().c_str(), doc_info.number());
    some_file.open(filename);
@@ -673,8 +673,8 @@ void FSIChannelWithLeafletProblem<ELEMENT>::doc_solution(DocInfo& doc_info,
 
  // Write trace file: time, flux, tip position and velocity, number of
  // fluid elements and unknowns
- trace << time << " " 
-       << Global_Physical_Variables::flux(time) << " " 
+ trace << time << " "
+       << Global_Physical_Variables::flux(time) << " "
        << tip_node_pt->x(0) << " "
        << tip_node_pt->x(1) << " "
        << tip_node_pt->dposition_dt(0) << " "
@@ -683,7 +683,7 @@ void FSIChannelWithLeafletProblem<ELEMENT>::doc_solution(DocInfo& doc_info,
        << ndof() << std::endl;
 
 } // end_of_doc_solution
- 
+
 
 
 
@@ -789,30 +789,30 @@ int main(int argc, char* argv[])
  Global_Physical_Variables::Direct_solver=(direct!=0);
 
  //Parameters for the leaflet: x-position of root and height
- double x_0 = 1.0; 
+ double x_0 = 1.0;
  double hleaflet=0.5;
 
  // Number of elements in various regions of mesh: six per unit length
  // along the channel, as in the original driver
- unsigned nleft=6; 
+ unsigned nleft=6;
  unsigned nright=unsigned(std::lround(6.0*lright));
  if (nright<1)
   {
    nright=1;
   }
- unsigned ny1=3; 
- unsigned ny2=3; 
+ unsigned ny1=3;
+ unsigned ny2=3;
 
  // Dimensions of fluid mesh: length to the left and right of leaflet
  // and total height
- double lleft =1.0; 
+ double lleft =1.0;
  double htot=1.0;
-  
+
  //Build the problem
  FSIChannelWithLeafletProblem<
   AlgebraicElement<RefineableQTaylorHoodElement<2> > >
   problem(lleft,lright,hleaflet,
-          htot,nleft,nright,ny1,ny2,x_0); 
+          htot,nleft,nright,ny1,ny2,x_0);
 
  // Adaptivity
  problem.fluid_mesh_pt()->max_permitted_error()=max_err;
@@ -824,7 +824,7 @@ int main(int argc, char* argv[])
   }
 
  // Set up doc info
- DocInfo doc_info; 
+ DocInfo doc_info;
  doc_info.set_directory(outdir);
 
  // Trace file
@@ -839,7 +839,7 @@ int main(int argc, char* argv[])
   }
  trace.precision(12);
 
- // Initialise timestep 
+ // Initialise timestep
  problem.initialise_dt(dt);
 
  if (n_re>0)
@@ -851,7 +851,7 @@ int main(int argc, char* argv[])
     {
      Global_Physical_Variables::Re=re*double(i)/double(n_re);
      Global_Physical_Variables::ReSt=Global_Physical_Variables::Re;
-     std::cout << "Computing a steady solution for Re=" 
+     std::cout << "Computing a steady solution for Re="
                <<  Global_Physical_Variables::Re << std::endl;
      problem.steady_newton_solve(max_adapt);
     }
@@ -864,7 +864,7 @@ int main(int argc, char* argv[])
    problem.assign_initial_values_impulsive();
   }
  problem.doc_solution(doc_info,trace);
- doc_info.number()++; 
+ doc_info.number()++;
 
  // Proper time-dependent run
  //--------------------------
@@ -875,7 +875,7 @@ int main(int argc, char* argv[])
  // Timestepping loop
  unsigned nstep=unsigned((t_max+0.5*dt)/dt);
  for (unsigned istep=0;istep<nstep;istep++)
-  { 
+  {
    problem.unsteady_newton_solve(dt,unsigned(max_adapt_unsteady),first);
    bool last=(istep+1==nstep);
    bool save=Global_Physical_Variables::Doc_fields;
