@@ -185,6 +185,33 @@ public:
     {
         return false;
     }
+
+    //- Is each internal integration point a mesh cell, with the integration
+    //  point index equal to the cell index?
+    //
+    //  What depends on it: a state held this way can be written as a volField
+    //  for viewing, located on a different decomposition through the cell
+    //  addressing, and kept through a topology change that only moves faces
+    //  between patches, since the cells are unchanged. A topology holding
+    //  several points per cell, as the compact cell one does, must answer
+    //  false
+    virtual bool integrationPointsAreCells() const
+    {
+        return false;
+    }
+
+    //- The mesh face an integration point lies on, or -1 if it lies inside
+    //  a cell or is shared between cells without being a face.
+    //
+    //  What depends on it: a value given per cell reaches a point on a face
+    //  as the interpolated face value, which a decomposed run can form from
+    //  what each rank holds, rather than from the cells around the face,
+    //  which a processor face has on two ranks. A topology whose points are
+    //  the faces answers with the index itself
+    virtual label integrationPointFace(const label ipI) const
+    {
+        return integrationPointsAreFaces() ? ipI : -1;
+    }
 };
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

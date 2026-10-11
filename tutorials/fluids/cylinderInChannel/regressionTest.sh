@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # cylinderInChannel regression test
 # Uses the force history as a cheap fluid benchmark check.
@@ -48,7 +51,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i.bak 's/^endTime[[:space:]]\+50;/endTime         5;/' "${CASE_DIR}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+50;/endTime         5;/' "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 }
 

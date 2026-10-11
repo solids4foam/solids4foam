@@ -71,6 +71,22 @@ enum class tangentRequest
                                 // computed using finite differences
 };
 
+//- Does the request ask for a scalar tangent
+inline bool needsScalarTangent(const tangentRequest req)
+{
+    return
+        req == tangentRequest::scalar
+     || req == tangentRequest::scalarDeviatoric;
+}
+
+//- Does the request ask for a fourth-order tangent
+inline bool needsFourthOrderTangent(const tangentRequest req)
+{
+    return
+        req == tangentRequest::fourthOrder
+     || req == tangentRequest::fourthOrderFiniteDifference;
+}
+
 // Return the string name of a tangent request
 inline const word tangentRequestName
 (

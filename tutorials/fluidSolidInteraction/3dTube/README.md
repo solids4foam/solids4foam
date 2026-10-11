@@ -178,18 +178,6 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-# Check fvSolution for foundation version
-if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
-then
-    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
-    then
-        echo "OpenFOAM.org specific: replacing 'residualControl' with"
-        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
-        sed -i "s/residualControl/outerCorrectorResidualControl/g" \
-            "${CASE_DIR}"/system/fluid/fvSolution
-    fi
-fi
-
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
@@ -421,6 +409,32 @@ size for fluid-solid interaction simulations.
 
 **Table 1: Clock times for the Euler and backward with different time step
 sizes**
+
+## Verification Study
+
+The opt-in [`verification/`](verification/) directory runs the case through a
+mesh and time-step sweep with the second-order `backward` scheme and compares
+the radial displacement at point A with the finite volume results of Tuković
+et al. (2018, Trans. FAMENA 42(3)). A second study repeats the
+published first-order `Euler`, `Δt = 1e-4 s` discretisation and compares the
+point-A histories with the finite element results of Lozovskiy et al. (2019,
+Computers & Fluids 179) and Eken (2016). The pulse-wave speed is checked
+against a thick-wall estimate, and a coupling study compares the
+Robin-Neumann and IQN-ILS solutions:
+
+```bash
+cd verification
+./Allverify                      # Robin-Neumann mesh sweep, levels 1 and 2
+./Allverify --study literature   # the published Euler, dt = 1e-4 s setup
+./Allverify --study coupling     # Robin-Neumann vs IQN-ILS on the tutorial mesh
+```
+
+The published results are read from figures rather than tables. The
+first-order time scheme lowers the peak radial displacement by about a quarter
+at `Δt = 1e-4 s`, which is why the two families of published results differ. The
+study is separate from `regressionTest.sh` and is not run by the normal
+tutorial test suites. See the verification README for the mesh levels,
+options, acceptance criteria, reference quality and recorded results.
 
 ## Data Availability
 

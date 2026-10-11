@@ -1,0 +1,76 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+libs            (immersedBoundary);
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         1.6;
+
+deltaT          1e-4;
+
+writeControl    adjustableRunTime;
+
+writeInterval   0.08;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+adjustTimeStep  yes;
+
+maxCo           0.5;
+
+maxDeltaT       1e-3;
+
+functions
+{
+    // Volumetric flow rate through the outlet
+    flowRate
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        writeControl    timeStep;
+        writeInterval   1;
+        log             false;
+        writeFields     false;
+        regionType      patch;
+        name            outlet;
+        operation       sum;
+        fields          (phi);
+    }
+}
+
+// ************************************************************************* //

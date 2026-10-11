@@ -340,13 +340,7 @@ finite volume discretisation unless stated otherwise.
   - `linGeomTotalDispSolid`: solves for total displacement $$\boldsymbol{d}$$
     (`D`) using a segregated approach; also supports explicit time-stepping and
     a PETSc SNES-based nonlinear solver.
-  - `unsLinGeomSolid`: solves for total displacement $$\boldsymbol{d}$$ (`D`)
-    using a segregated approach and the _uns_ discretisation, which is more
-    accurate but more expensive than the `linGeomTotalDispSolid` discretisation.
 
-  - `weakThermalLinGeomSolid`: sequentially solves for the temperature $$T$$
-    (`T`) and total displacement $$\boldsymbol{d}$$ (`D`) in a segregated manner
-    with no outer displacement-temperature correctors.
   - `thermalLinGeomSolid`: solves for the temperature $$T$$ (`T`) and total
     displacement $$\boldsymbol{d}$$ (`D`), where outer iterations ensure
     convergence of the temperature-displacement coupling in a segregated manner.
@@ -359,8 +353,8 @@ finite volume discretisation unless stated otherwise.
     based on
     [https://doi.org/10.1002/nag.2361](https://doi.org/10.1002/nag.2361).
 
-  - `coupledUnsLinGeomLinearElasticSolid`: a block-coupled version of
-    `unsLinGeomSolid`, based on
+  - `coupledUnsLinGeomLinearElasticSolid`: a block-coupled linear elastic solid
+    model using the _uns_ discretisation, based on
     [https://doi.org/10.1016/j.compstruc.2016.07.004](https://doi.org/10.1016/j.compstruc.2016.07.004);
     _currently only available with foam-extend_.
   - `vertexCentredLinGeomSolid`: a block-coupled vertex-centred finite volume
@@ -380,16 +374,6 @@ finite volume discretisation unless stated otherwise.
   - `nonLinGeomUpdatedLagSolid`: an updated Lagrangian nonlinear geometry solid
     model which solves for the increment of displacement
     $$\Delta \boldsymbol{d}$$ (`DD`) using a segregated approach.
-  - `unsNonLinGeomTotalLagSolid`: a total Lagrangian nonlinear geometry version
-    of `unsLinGeomSolid`; solves for total displacement $$\boldsymbol{d}$$
-    (`D`).
-  - `unsNonLinGeomUpdatedLagSolid`: an updated Lagrangian nonlinear geometry
-    version of `unsLinGeomSolid`, except that the primary solution variable is
-    the increment of displacement $$\Delta \boldsymbol{d}$$ (`DD`).
-  - `vertexCentredNonLinGeomTotalLagSolid`: a vertex-centred total Lagrangian
-    nonlinear geometry approach which solves for the total displacement at the
-    mesh vertices/points (`pointD`); supports Newton-Raphson (PETSc SNES) and
-    explicit solution algorithms.
   - `coupledPressureDisplacementSolid`: a block-coupled mixed formulation for
     incompressible and nearly incompressible solids, solving the increments of
     displacement $$\Delta \boldsymbol{d}$$ (`DD`) and hydrostatic pressure

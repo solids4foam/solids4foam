@@ -55,9 +55,8 @@ linearElasticMechanicalConstitutiveLaw
     sigma0_(symmTensor::zero),
     sigma0FromDict_(false)
 {
-    // The material may be given either as E and nu or as mu and K, matching
-    // the legacy linearElastic law, so an existing case dictionary needs no
-    // change. The legacy law tries E and nu first, so this does too
+    // The material may be given either as E and nu or as mu and K. E and nu
+    // are tried first
     if (dict.found("E") && dict.found("nu"))
     {
         E_ = dimensionedScalar(dict.lookup("E"));
@@ -117,7 +116,7 @@ linearElasticMechanicalConstitutiveLaw
     {
         FatalIOErrorInFunction(dict)
             << "Invalid Poisson's ratio nu = " << nu_.value()
-            << ". Expected -1 <= nu for linear elasticity."
+            << ". Expected -1 < nu for linear elasticity."
             << exit(FatalIOError);
     }
 
@@ -164,10 +163,9 @@ void Foam::linearElasticMechanicalConstitutiveLaw::declareState
     mechanicalConstitutiveLawStateSpec& spec
 ) const
 {
-    // Legacy reads a sigma0 field if the case has one and then, if the law's
-    // dictionary also gives sigma0, assigns that over the whole field. The
-    // dictionary therefore wins, and saying so here is what keeps a case with
-    // both giving the same answer as before
+    // A sigma0 field is read if the case has one, but if the law's
+    // dictionary also gives sigma0, that is assigned over the whole field:
+    // the dictionary wins
     spec.addSymmTensor
     (
         "sigma0",
@@ -199,13 +197,9 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
     const scalar lambdaVal = lambda_.value();
 
     // The initial stress is zero in all but the cases that supply one, and
-    // adding a zero costs less than branching on it inside the loop.
-    //
-    // It is read at old time. A prescribed field is never written, so its two
-    // times always hold the same value, and the old-time one is what a shadow
-    // state aliases; a shadow owns current-time fields that start empty, so
-    // reading the current field would hand a tangent query a silent field of
-    // zeros
+    // adding a zero costs less than branching on it inside the loop. It is
+    // read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
 
     // Whether the caller wants the deviatoric stress and the volumetric
@@ -234,35 +228,17 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D))
+    fillScalarTangent
+    (
+        response,
+        2.0*mu_.value() + lambda_.value(),
+        (4.0/3.0)*mu_.value()
+    );
 
-        scalar Keff = 0.0;
-
-        switch (response.tangentReq())
-        {
-            case tangentRequest::scalar:
-                Keff = 2.0*mu_.value() + lambda_.value();
-                break;
-
-            case tangentRequest::scalarDeviatoric:
-                // Scalar Laplacian surrogate for div(dev(sigma)), which is
-                // mu*lap(D) + (1/3)*mu*grad(div(D))
-                Keff = (4.0/3.0)*mu_.value();
-                break;
-
-            default:
-                break;
-        }
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-    else if
+    // Fourth-order tangent, analytically or by finite differences
+    if
     (
         response.tangentReq()
      == tangentRequest::fourthOrderFiniteDifference

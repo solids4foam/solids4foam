@@ -120,6 +120,52 @@ Implementation:
 
 ---
 
+## Immersed interfaces
+
+A solid interface patch may drive an immersed body of the fluid (the
+`immersedBoundaryForce` finite volume option of `src/immersedBoundary`,
+OpenFOAM.com only) instead of a fluid patch: the fluid mesh is then fixed and
+needs no motion solver or interface mapping. The fluid patch of the interface
+is `none`, and the `immersedInterfaces` dictionary, keyed by the solid patch
+name, gives the body, whose motion must be `fsiDriven`, and optionally the
+`closurePatches`: other patches of the solid (e.g. a clamped root) such that
+the union of the interface and closure patches is a closed surface with
+outward normals. In a two-dimensional fluid mesh the patches of the empty
+direction are not needed: the surface is extended through the mesh and
+capped in that direction.
+
+```c++
+solidPatch      plate;
+fluidPatch      none;
+
+immersedInterfaces
+{
+    plate
+    {
+        body            flag;          // body of the fluid fvOptions
+        closurePatches  (plateFix);    // optional
+    }
+}
+```
+
+The lists `solidPatches`/`fluidPatches` may mix immersed (`none`) and
+body-fitted interfaces. In each coupling iteration the immersed surface is
+moved to the solid interface displacement of the coupling scheme (relaxed or
+accelerated as for a fluid patch), with the velocity of the displacement
+increment over the time step, and the traction on the solid patch is the
+surface traction of the immersed boundary averaged over the quadrature
+points of each face. The log compares its total with the momentum exchange
+between the fluid and the body. The immersed interfaces work with
+`fixedRelaxation`, `Aitken` and `IQNILS`, and not with `weakCoupling`,
+`oneWayCoupling`, `thermal` or the Robin (`elasticWallPressure`) interface
+conditions. See the `fluids/immersedBoundary/immersedHronTurekFsi2` tutorial.
+
+Implementation: `fluidSolidInterface/fsiImmersedInterface.{H,C}` builds the
+surface and maps the tractions, and `fluidSolidInterface/fsiImmersedBoundary.H`
+is the header-only interface implemented by `immersedBoundaryForce`.
+
+---
+
 ## Notes
 
 - The partitioned schemes share the common `fluidSolidInterface` machinery for
@@ -128,6 +174,18 @@ Implementation:
   `weakCoupling` is the cheapest, `fixedRelaxation` and `Aitken` are simple
   strong-coupling options, and `IQNILS` is the most sophisticated partitioned
   acceleration scheme in this directory.
+- `fixedRelaxation`, `Aitken` and `IQNILS` start each time step from the
+  solid predictor (`predictSolid`, default `yes`): the solid is solved once
+  with the fluid force of the previous time step. With `predictor` (default
+  `yes`), the first iteration moves the fluid interface with the full
+  predicted solid displacement; later iterations are relaxed or accelerated as
+  usual. The interface displacement is an increment within the time step, so
+  with `predictor no` the first iteration moves the fluid interface by only
+  `relaxationFactor` times the solid's step, and the interface stops, or with
+  backward time differencing reverses, as seen by the fluid. On cases with a
+  strong added-mass effect and a small `relaxationFactor`, the resulting
+  first-iteration fluid force can be hundreds of times the converged one and
+  make the solid diverge (#489).
 - For `IQNILS`, increasing `couplingReuse` can improve convergence, but it is
   not guaranteed to make a case monotonically more robust. The best reuse level
   is case dependent and interacts with time-step size and the quality of the

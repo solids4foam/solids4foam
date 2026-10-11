@@ -73,7 +73,7 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
 
     Info<< "Selecting stabilisation model " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = stabModelConstructorTable(modelType);
 
     if (!ctorPtr)

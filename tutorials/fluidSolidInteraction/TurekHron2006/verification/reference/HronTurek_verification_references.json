@@ -1,0 +1,561 @@
+{
+  "point_A": [
+    0.6,
+    0.2,
+    0.0075
+  ],
+  "thickness_m": 0.015,
+  "fluid_density": 1000,
+  "mechanical_law": "StVenantKirchhoffElastic",
+  "outer_corr_tolerance": 1e-05,
+  "history_reference": "TurekHron_fsi3_reference_history.csv",
+  "mesh": {
+    "refinementFactors": [
+      1,
+      2,
+      4
+    ],
+    "deltaTs": [
+      0.001,
+      0.0005,
+      0.00025
+    ],
+    "defaultLevels": [
+      1,
+      2
+    ],
+    "endTime": 7.0,
+    "analysisWindow": 1.0,
+    "maximumErrorGrowth": 0.01
+  },
+  "quick": {
+    "endTime": 2.3
+  },
+  "cores": {
+    "1": 1,
+    "2": 8,
+    "4": 16,
+    "default": 8
+  },
+  "coupling": {
+    "levels": [
+      1,
+      2
+    ],
+    "endTime": 2.05
+  },
+  "periodicity": {
+    "amplitudeTolerance": 0.02
+  },
+  "references": {
+    "ux_mean": {
+      "value": -0.00288,
+      "tolerance": 0.1,
+      "primary": true
+    },
+    "ux_amplitude": {
+      "value": 0.00272,
+      "tolerance": 0.1,
+      "primary": true
+    },
+    "ux_frequency": {
+      "value": 10.93,
+      "tolerance": 0.03,
+      "primary": true
+    },
+    "uy_mean": {
+      "value": 0.00147,
+      "tolerance": 0.25,
+      "primary": false
+    },
+    "uy_amplitude": {
+      "value": 0.03499,
+      "tolerance": 0.05,
+      "primary": true
+    },
+    "uy_frequency": {
+      "value": 5.46,
+      "tolerance": 0.03,
+      "primary": true
+    },
+    "drag_mean": {
+      "value": 460.5,
+      "tolerance": 0.02,
+      "primary": true
+    },
+    "drag_amplitude": {
+      "value": 27.74,
+      "tolerance": 0.15,
+      "primary": true
+    },
+    "drag_frequency": {
+      "value": 10.93,
+      "tolerance": 0.03,
+      "primary": false
+    },
+    "lift_mean": {
+      "value": 2.5,
+      "tolerance": 1.0,
+      "primary": false
+    },
+    "lift_amplitude": {
+      "value": 153.91,
+      "tolerance": 0.15,
+      "primary": true
+    },
+    "lift_frequency": {
+      "value": 5.46,
+      "tolerance": 0.03,
+      "primary": false
+    }
+  },
+  "publishedReferences": {
+    "Turek-Hron 2006": {
+      "ux_mean": -0.00269,
+      "ux_amplitude": 0.00253,
+      "ux_frequency": 10.9,
+      "uy_mean": 0.00148,
+      "uy_amplitude": 0.03438,
+      "uy_frequency": 5.3,
+      "drag_mean": 457.3,
+      "drag_amplitude": 22.66,
+      "drag_frequency": 10.9,
+      "lift_mean": 2.22,
+      "lift_amplitude": 149.78,
+      "lift_frequency": 5.3
+    },
+    "Tukovic 2018": {
+      "ux_mean": -0.00272,
+      "ux_amplitude": 0.00258,
+      "ux_frequency": 11.07,
+      "uy_mean": 0.00167,
+      "uy_amplitude": 0.03384,
+      "uy_frequency": 5.53,
+      "drag_mean": 459.18,
+      "drag_amplitude": 24.86,
+      "drag_frequency": 11.07,
+      "lift_mean": 1.59,
+      "lift_amplitude": 155.9,
+      "lift_frequency": 5.53
+    }
+  },
+  "references_source": "Featflow FSI3 table, level 4+0 (15872 elements), dt = 0.00025 s: the discretisation of the published reference history",
+  "fsi1": {
+    "source": "Featflow FSI1 table, https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/fsi_benchmark/fsi_tests/fsi_fsi_tests.html",
+    "inletMaxValue": 0.3,
+    "youngsModulus": 1400000.0,
+    "transitionPeriod": 2.0,
+    "couplingStartTime": 2.0,
+    "fluidSolverTolerance": 1e-09,
+    "mesh": {
+      "refinementFactors": [
+        1,
+        2,
+        4
+      ],
+      "deltaTs": [
+        0.025,
+        0.025,
+        0.0125
+      ],
+      "defaultLevels": [
+        1,
+        2
+      ],
+      "endTime": 30.0,
+      "maximumErrorGrowth": 0.001
+    },
+    "quick": {
+      "endTime": 2.5,
+      "continuation": 0.01
+    },
+    "cores": {
+      "1": 1,
+      "2": 4,
+      "4": 6,
+      "default": 4
+    },
+    "steadyState": {
+      "windowFraction": 0.2,
+      "relativeTolerance": 0.001
+    },
+    "coupling": {
+      "refinement": 1,
+      "deltaT": 0.001,
+      "continuation": 1.0
+    },
+    "references": {
+      "ux": {
+        "value": 2.270493e-05,
+        "tolerance": {
+          "2": 0.03,
+          "4": 0.03
+        },
+        "primary": false
+      },
+      "uy": {
+        "value": 0.0008208773,
+        "tolerance": {
+          "2": 0.06,
+          "4": 0.03
+        },
+        "primary": true
+      },
+      "drag": {
+        "value": 14.29426,
+        "tolerance": {
+          "2": 0.005,
+          "4": 0.005
+        },
+        "primary": true
+      },
+      "lift": {
+        "value": 0.763746,
+        "tolerance": {
+          "2": 0.03,
+          "4": 0.03
+        },
+        "primary": false
+      }
+    },
+    "featflowLevels": [
+      {
+        "level": "2+0",
+        "nel": 992,
+        "ndof": 19488,
+        "ux": 2.28708e-05,
+        "uy": 0.0008193038,
+        "drag": 14.27359,
+        "lift": 0.761755
+      },
+      {
+        "level": "3+0",
+        "nel": 3968,
+        "ndof": 76672,
+        "ux": 2.277423e-05,
+        "uy": 0.0008204231,
+        "drag": 14.29177,
+        "lift": 0.7630484
+      },
+      {
+        "level": "4+0",
+        "nel": 15872,
+        "ndof": 304128,
+        "ux": 2.273175e-05,
+        "uy": 0.0008207084,
+        "drag": 14.29484,
+        "lift": 0.7635608
+      },
+      {
+        "level": "5+0",
+        "nel": 63488,
+        "ndof": 1211392,
+        "ux": 2.271553e-05,
+        "uy": 0.0008208126,
+        "drag": 14.29486,
+        "lift": 0.7636992
+      },
+      {
+        "level": "6+0",
+        "nel": 253952,
+        "ndof": 4835328,
+        "ux": 2.270838e-05,
+        "uy": 0.0008208548,
+        "drag": 14.29451,
+        "lift": 0.7637359
+      },
+      {
+        "level": "7+0",
+        "nel": 1015808,
+        "ndof": 19320832,
+        "ux": 2.270493e-05,
+        "uy": 0.0008208773,
+        "drag": 14.29426,
+        "lift": 0.763746
+      }
+    ]
+  },
+  "fsi2": {
+    "source": "Featflow FSI2 tables, https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/fsi_benchmark/fsi_tests/fsi_fsi_tests.html",
+    "references_source": "Featflow FSI2 table, level 4+0 (15872 elements), dt = 0.0005 s: the discretisation of the published reference history",
+    "history_reference": "TurekHron_fsi2_reference_history.csv",
+    "inletMaxValue": 1.5,
+    "solidDensity": 10000.0,
+    "youngsModulus": 1400000.0,
+    "transitionPeriod": 2.0,
+    "couplingStartTime": 2.0,
+    "outer_corr_tolerance": 1e-06,
+    "mesh": {
+      "refinementFactors": [
+        1,
+        2,
+        4
+      ],
+      "deltaTs": [
+        0.001,
+        0.0005,
+        0.00025
+      ],
+      "defaultLevels": [
+        1,
+        2
+      ],
+      "endTime": 10.5,
+      "analysisWindow": 2.6,
+      "maximumErrorGrowth": 0.01
+    },
+    "quick": {
+      "endTime": 2.3
+    },
+    "cores": {
+      "1": 1,
+      "2": 8,
+      "4": 16,
+      "default": 8
+    },
+    "periodicity": {
+      "amplitudeTolerance": 0.02,
+      "reportOnly": []
+    },
+    "references": {
+      "ux_mean": {
+        "value": -0.01485,
+        "tolerance": 0.05,
+        "primary": true
+      },
+      "ux_amplitude": {
+        "value": 0.0127,
+        "tolerance": 0.05,
+        "primary": true
+      },
+      "ux_frequency": {
+        "value": 3.86,
+        "tolerance": 0.03,
+        "primary": true
+      },
+      "uy_mean": {
+        "value": 0.0013,
+        "tolerance": 1.0,
+        "primary": false
+      },
+      "uy_amplitude": {
+        "value": 0.0816,
+        "tolerance": 0.03,
+        "primary": true
+      },
+      "uy_frequency": {
+        "value": 1.93,
+        "tolerance": 0.03,
+        "primary": true
+      },
+      "drag_mean": {
+        "value": 215.06,
+        "tolerance": 0.015,
+        "primary": true
+      },
+      "drag_amplitude": {
+        "value": 77.65,
+        "tolerance": 0.05,
+        "primary": true
+      },
+      "drag_frequency": {
+        "value": 3.86,
+        "tolerance": 0.03,
+        "primary": false
+      },
+      "lift_mean": {
+        "value": 0.61,
+        "tolerance": 1.0,
+        "primary": false
+      },
+      "lift_amplitude": {
+        "value": 237.8,
+        "tolerance": 0.12,
+        "primary": true,
+        "errorGrowthChecked": false
+      },
+      "lift_frequency": {
+        "value": 1.93,
+        "tolerance": 0.03,
+        "primary": false
+      }
+    },
+    "publishedReferences": {
+      "Turek-Hron 2006": {
+        "ux_mean": -0.01458,
+        "ux_amplitude": 0.01244,
+        "ux_frequency": 3.8,
+        "uy_mean": 0.00123,
+        "uy_amplitude": 0.0806,
+        "uy_frequency": 2.0,
+        "drag_mean": 208.83,
+        "drag_amplitude": 73.75,
+        "drag_frequency": 3.8,
+        "lift_mean": 0.88,
+        "lift_amplitude": 234.2,
+        "lift_frequency": 2.0
+      }
+    },
+    "featflowTables": {
+      "0.02": [
+        {
+          "level": "2+0",
+          "nel": 992,
+          "ndof": 19488,
+          "ux_mean": -0.01402,
+          "ux_amplitude": 0.01203,
+          "ux_frequency": 3.85,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0793,
+          "uy_frequency": 1.93,
+          "drag_mean": 210.1,
+          "drag_amplitude": 72.62,
+          "drag_frequency": 3.85,
+          "lift_mean": 0.25,
+          "lift_amplitude": 227.9,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "3+0",
+          "nel": 3968,
+          "ndof": 76672,
+          "ux_mean": -0.01454,
+          "ux_amplitude": 0.0125,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0807,
+          "uy_frequency": 1.93,
+          "drag_mean": 213.06,
+          "drag_amplitude": 75.76,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.85,
+          "lift_amplitude": 234.4,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "4+0",
+          "nel": 15872,
+          "ndof": 304128,
+          "ux_mean": -0.01487,
+          "ux_amplitude": 0.01273,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00124,
+          "uy_amplitude": 0.0817,
+          "uy_frequency": 1.93,
+          "drag_mean": 212.83,
+          "drag_amplitude": 75.89,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.92,
+          "lift_amplitude": 234.3,
+          "lift_frequency": 1.93
+        }
+      ],
+      "0.01": [
+        {
+          "level": "2+0",
+          "nel": 992,
+          "ndof": 19488,
+          "ux_mean": -0.01401,
+          "ux_amplitude": 0.01204,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0793,
+          "uy_frequency": 1.93,
+          "drag_mean": 210.09,
+          "drag_amplitude": 72.82,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.52,
+          "lift_amplitude": 228.6,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "3+0",
+          "nel": 3968,
+          "ndof": 76672,
+          "ux_mean": -0.01454,
+          "ux_amplitude": 0.01248,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00125,
+          "uy_amplitude": 0.0807,
+          "uy_frequency": 1.93,
+          "drag_mean": 213.06,
+          "drag_amplitude": 75.76,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.85,
+          "lift_amplitude": 234.4,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "4+0",
+          "nel": 15872,
+          "ndof": 304128,
+          "ux_mean": -0.01487,
+          "ux_amplitude": 0.01273,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00124,
+          "uy_amplitude": 0.0817,
+          "uy_frequency": 1.93,
+          "drag_mean": 215.18,
+          "drag_amplitude": 77.78,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.87,
+          "lift_amplitude": 238.0,
+          "lift_frequency": 1.93
+        }
+      ],
+      "0.0005": [
+        {
+          "level": "2+0",
+          "nel": 992,
+          "ndof": 19488,
+          "ux_mean": -0.01401,
+          "ux_amplitude": 0.01204,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00128,
+          "uy_amplitude": 0.0792,
+          "uy_frequency": 1.93,
+          "drag_mean": 210.14,
+          "drag_amplitude": 72.86,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.49,
+          "lift_amplitude": 228.7,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "3+0",
+          "nel": 3968,
+          "ndof": 76672,
+          "ux_mean": -0.01448,
+          "ux_amplitude": 0.01245,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.00124,
+          "uy_amplitude": 0.0807,
+          "uy_frequency": 1.93,
+          "drag_mean": 213.05,
+          "drag_amplitude": 75.74,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.84,
+          "lift_amplitude": 234.8,
+          "lift_frequency": 1.93
+        },
+        {
+          "level": "4+0",
+          "nel": 15872,
+          "ndof": 304128,
+          "ux_mean": -0.01485,
+          "ux_amplitude": 0.0127,
+          "ux_frequency": 3.86,
+          "uy_mean": 0.0013,
+          "uy_amplitude": 0.0816,
+          "uy_frequency": 1.93,
+          "drag_mean": 215.06,
+          "drag_amplitude": 77.65,
+          "drag_frequency": 3.86,
+          "lift_mean": 0.61,
+          "lift_amplitude": 237.8,
+          "lift_frequency": 1.93
+        }
+      ]
+    }
+  }
+}

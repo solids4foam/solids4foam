@@ -230,7 +230,7 @@ void IQNILSCouplingInterface::cacheCurrentStepModes()
         return;
     }
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         if (fluidPatchesPointsV_[interfaceI].size() > 0)
         {
@@ -409,7 +409,7 @@ label IQNILSCouplingInterface::combinedCouplingSystemSize()
 {
     label size = 0;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         size += fluidZonesPointsDispls()[interfaceI].size();
     }
@@ -422,7 +422,7 @@ label IQNILSCouplingInterface::nCombinedCouplingModes()
 {
     label cols = 0;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         cols = max(cols, nSolveCouplingModes(interfaceI));
     }
@@ -447,7 +447,7 @@ void IQNILSCouplingInterface::combinedCouplingMode
 
     label offset = 0;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         const label localSize = fluidZonesPointsDispls()[interfaceI].size();
 
@@ -475,7 +475,7 @@ vectorField IQNILSCouplingInterface::combinedResidual()
 
     label offset = 0;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         const vectorField localResidual
         (
@@ -502,7 +502,7 @@ void IQNILSCouplingInterface::applyCombinedCorrection
 {
     label offset = 0;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         fluidZonesPointsDisplsPrev()[interfaceI] =
             fluidZonesPointsDispls()[interfaceI];
@@ -533,10 +533,7 @@ void IQNILSCouplingInterface::filterRelativeCouplingModes(const label interfaceI
     }
 
     const word patchName =
-        fluidMesh().boundary()
-        [
-            fluid().globalPatches()[interfaceI].patch().index()
-        ].name();
+        fluidInterfaceName(interfaceI);
 
     bool removedMode = true;
 
@@ -672,10 +669,7 @@ label IQNILSCouplingInterface::buildPreciceStyleCouplingQR
 {
     const label storedCols = nSolveCouplingModes(interfaceI);
     const word patchName =
-        fluidMesh().boundary()
-        [
-            fluid().globalPatches()[interfaceI].patch().index()
-        ].name();
+        fluidInterfaceName(interfaceI);
 
     solveQ.clear();
     solveW.clear();
@@ -806,10 +800,7 @@ label IQNILSCouplingInterface::buildPreciceStyleCombinedCouplingQR
 void IQNILSCouplingInterface::filterCouplingModes(const label interfaceI)
 {
     const word patchName =
-        fluidMesh().boundary()
-        [
-            fluid().globalPatches()[interfaceI].patch().index()
-        ].name();
+        fluidInterfaceName(interfaceI);
 
     while
     (
@@ -891,7 +882,7 @@ void IQNILSCouplingInterface::updateResidualPreconditioning()
         return;
     }
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         const vectorField& res = residuals()[interfaceI];
         scalarField& scale = residualPointScale_[interfaceI];
@@ -942,7 +933,7 @@ void IQNILSCouplingInterface::applyResidualPreconditioningCombined
 
     label offset = 0;
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         const scalarField& scale = residualPointScale_[interfaceI];
 
@@ -979,7 +970,7 @@ bool IQNILSCouplingInterface::useCombinedPreciceStyleCouplingQR() const
         return false;
     }
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         if (fluidPatchesPointsV_[interfaceI].size() > 0)
         {
@@ -1096,7 +1087,7 @@ bool IQNILSCouplingInterface::evolve()
         // Transfer the displacement from the solid to the fluid, where we will
         // use no relaxation; in that way, we can force the solid and fluid
         // interfaces to stay aligned
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
@@ -1119,13 +1110,10 @@ void IQNILSCouplingInterface::updateDisplacement()
 
     if (outerCorr() == 1)
     {
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             Info<< "Modes before clean-up ("
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[interfaceI].patch().index()
-                   ].name()
+                << fluidInterfaceName(interfaceI)
                 << "): " << fluidPatchesPointsT_[interfaceI].size();
 
             removeOldCouplingModes
@@ -1135,10 +1123,7 @@ void IQNILSCouplingInterface::updateDisplacement()
             );
 
             Info<< ", modes after clean-up ("
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[interfaceI].patch().index()
-                   ].name()
+                << fluidInterfaceName(interfaceI)
                 << "): " << fluidPatchesPointsT_[interfaceI].size();
 
             if (usePreviousStepModesInSolve(interfaceI))
@@ -1158,7 +1143,7 @@ void IQNILSCouplingInterface::updateDisplacement()
     else if (outerCorr() == 2)
     {
         // Set reference in the first coupling iteration
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             solidZonesPointsDisplsRef()[interfaceI] =
                 solidZonesPointsDispls()[interfaceI];
@@ -1172,7 +1157,7 @@ void IQNILSCouplingInterface::updateDisplacement()
     }
     else
     {
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             // Use consecutive iteration differences for the IQN-ILS secants.
             fluidPatchesPointsV_[interfaceI].append
@@ -1225,7 +1210,7 @@ void IQNILSCouplingInterface::updateDisplacement()
     }
 
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         filterCouplingModes(interfaceI);
     }
@@ -1411,7 +1396,12 @@ void IQNILSCouplingInterface::updateDisplacement()
 
                 bool reusedPreviousStepModes = false;
 
-                forAll(fluid().globalPatches(), interfaceI)
+                for
+                (
+                    label interfaceI = 0;
+                    interfaceI < nInterfaces();
+                    interfaceI++
+                )
                 {
                     reusedPreviousStepModes =
                         reusedPreviousStepModes
@@ -1457,13 +1447,10 @@ void IQNILSCouplingInterface::updateDisplacement()
             }
         }
 
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             Info<< "Current fsi under-relaxation factor ("
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[interfaceI].patch().index()
-                   ].name()
+                << fluidInterfaceName(interfaceI)
                 << "): " << relaxationFactor_ << endl;
 
             fluidZonesPointsDisplsPrev()[interfaceI] =
@@ -1483,7 +1470,7 @@ void IQNILSCouplingInterface::updateDisplacement()
         return;
     }
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         const label storedCols = nSolveCouplingModes(interfaceI);
 
@@ -1500,10 +1487,7 @@ void IQNILSCouplingInterface::updateDisplacement()
             DynamicList<vectorField> solveW(storedCols);
             DynamicList<vectorField> qBasis(storedCols);
             const word patchName =
-                fluidMesh().boundary()
-                [
-                    fluid().globalPatches()[interfaceI].patch().index()
-                ].name();
+                fluidInterfaceName(interfaceI);
             vectorField solveResidual
             (
                 fluidZonesPointsDispls()[interfaceI]
@@ -1748,10 +1732,7 @@ void IQNILSCouplingInterface::updateDisplacement()
         {
             // Relax the interface displacement
             Info<< "Current fsi under-relaxation factor ("
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[interfaceI].patch().index()
-                   ].name()
+                << fluidInterfaceName(interfaceI)
                 << "): " << relaxationFactor_ << endl;
 
             fluidZonesPointsDisplsPrev()[interfaceI] =

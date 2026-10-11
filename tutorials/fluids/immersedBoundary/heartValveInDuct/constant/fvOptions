@@ -1,0 +1,84 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Heart valve in a duct, see src/immersedBoundary/README.md
+//
+// The valve motion is set by the environment variable VALVE_MOTION:
+// sliceAxis (the default), the collapse of three leaflets on a cylinder
+// towards the axis, or morph, the interpolation between three closed flat
+// leaflets and the same leaflets open
+immersedBoundary
+{
+    type            immersedBoundaryForce;
+
+    bodies
+    {
+        // Static annular plate around the valve annulus
+        plate
+        {
+            surface     "plate.stl";
+        }
+
+#ifeq ${VALVE_MOTION:-sliceAxis} morph
+        valve
+        {
+            surface     "valveClosed.stl";
+
+            motion
+            {
+                type            valveMorph;
+                openSurface     "valveOpen.stl";
+                period          0.8;
+                openWindow      (0.05 0.15);
+                closeWindow     (0.35 0.45);
+            }
+        }
+#else
+        valve
+        {
+            surface     "valveTube.stl";
+
+            motion
+            {
+                type            valveSliceAxis;
+                bottomCentre    (0 0 0);
+                topCentre       (0 0 0.016);
+                fixedEnd        bottom;
+                Fmax            0.95;
+                spaceLaw        smootherstep;
+                nearRamp        0.008;
+                activeLen       0.016;
+
+                // Open until 0.3 T, closing until 0.4 T, closed until
+                // 0.8 T, and opening until 0.95 T
+                period          0.8;
+                timeLaw         twoWindow;
+                closeWindow     (0.3 0.4);
+                openWindow      (0.8 0.95);
+
+                // Vertices of the annulus, held fixed
+                annulusSurface   "annulus.stl";
+                annulusTolerance 0.0003;
+            }
+        }
+#endif
+    }
+}
+
+// ************************************************************************* //

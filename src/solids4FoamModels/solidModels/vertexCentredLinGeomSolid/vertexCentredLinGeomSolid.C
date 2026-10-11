@@ -26,7 +26,6 @@ License
 #include "solidTractionPointPatchVectorField.H"
 #include "symmetryPointPatchFields.H"
 #include "fixedDisplacementZeroShearPointPatchVectorField.H"
-#include "linearElasticMisesPlastic.H"
 #include "compatibilityFunctions.H"
 #include <vector>
 
@@ -547,7 +546,7 @@ vertexCentredLinGeomSolid::dualBoundaryFaceTopology() const
     if (!dualBoundaryFaceTopologyPtr_)
     {
         // The boundary dual faces are integration points of their own, with
-        // their own constitutive state, as they were for dualMechanicalModel.
+        // their own constitutive state.
         // They cannot join the internal dual-face topology, whose integration
         // points are the internal dual faces in order: the Jacobian assembly
         // reads the tangent by that index.
@@ -625,17 +624,8 @@ void vertexCentredLinGeomSolid::correctDualStress
     surfaceSymmTensorField& dualSigmaf
 )
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        // dualMechanicalModel looks up the gradient from the registry, where
-        // it is dualGradDf
-        dualMechanicalPtr_().correct(dualSigmaf);
-
-        return;
-    }
-
     // Each dual face takes the law of the primary cell it lies in, so more
-    // than one material needs no collapse rule and no sub-meshes.
+    // than one material needs no collapse rule.
     // There is no separate commit of the constitutive state: the manager rolls
     // it over at the first evaluation of a new time step, and
     // solidModel::updateTotalFields() tells it that the step has ended
@@ -690,21 +680,7 @@ void vertexCentredLinGeomSolid::correctDualStress
 
 void vertexCentredLinGeomSolid::correctCellStress()
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        // Map primary cell gradD field to sub-meshes for multi-material cases
-        if (mechanical().PtrList<mechanicalLaw>::size() > 1)
-        {
-            mechanical().mapGradToSubMeshes(gradD());
-        }
-
-        mechanical().correct(sigma());
-
-        return;
-    }
-
-    // Each cell takes the law of its own material, so there are no sub-meshes
-    // to map the gradient to
+    // Each cell takes the law of its own material
     mechanicalManager().updateStressSmallStrain
     (
         gradD(),
@@ -717,38 +693,7 @@ void vertexCentredLinGeomSolid::correctCellStress()
 
 tmp<volScalarField> vertexCentredLinGeomSolid::impK() const
 {
-    if (useMechanicalConstitutiveLawManager())
-    {
-        return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
-    }
-
-    return mechanical().impK();
-}
-
-
-void vertexCentredLinGeomSolid::makeDualImpKf() const
-{
-    if (dualImpKfPtr_.valid())
-    {
-        FatalErrorIn("void vertexCentredLinGeomSolid::makeDualImpKf() const")
-            << "Pointer already set!" << abort(FatalError);
-    }
-
-    dualImpKfPtr_.set
-    (
-        new surfaceScalarField(dualMechanicalPtr_().impKf())
-    );
-}
-
-
-const surfaceScalarField& vertexCentredLinGeomSolid::dualImpKf() const
-{
-    if (dualImpKfPtr_.empty())
-    {
-        makeDualImpKf();
-    }
-
-    return dualImpKfPtr_();
+    return lawImpK(mechanicalManager(), tangentRequest::scalar);
 }
 
 
@@ -999,19 +944,6 @@ vertexCentredLinGeomSolid::vertexCentredLinGeomSolid
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
 #endif
-    dualMechanicalPtr_
-    (
-        useMechanicalConstitutiveLawManager()
-      ? nullptr
-      : new dualMechanicalModel
-        (
-            dualMesh(),
-            nonLinGeom(),
-            incremental(),
-            mechanical(),
-            dualMeshMap().dualFaceToCell()
-        )
-    ),
     dualFaceTopologyPtr_(nullptr),
     dualBoundaryFaceTopologyPtr_(nullptr),
     dualBoundaryFaces_(),
@@ -1548,71 +1480,48 @@ label vertexCentredLinGeomSolid::formJacobian
 
     if (jacTangent == tangentRequest::scalar)
     {
-        if (useMechanicalConstitutiveLawManager())
-        {
-            // Scalar tangent at the internal dual faces, taken from the
-            // constitutive law framework. A tangent query does not disturb
-            // constitutive state, so this is safe alongside the residual
-            // stress update above.
-            // The field is built here rather than copied from dualImpKf(),
-            // which reads dualMechanicalModel::impKf(): there is no
-            // dualMechanicalModel on this path, and it would also need the
-            // "interpolate(impK)" scheme
-            surfaceScalarField dualImpKfNew
+        // Scalar tangent at the internal dual faces, taken from the
+        // constitutive law framework. A tangent query does not disturb
+        // constitutive state, so this is safe alongside the residual
+        // stress update above
+        surfaceScalarField dualImpKfNew
+        (
+            IOobject
             (
-                IOobject
-                (
-                    "dualImpKf",
-                    mesh.time().timeName(),
-                    dualMesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
+                "dualImpKf",
+                mesh.time().timeName(),
                 dualMesh(),
-                dimensionedScalar("0", dimPressure, 0.0)
-            );
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            dualMesh(),
+            dimensionedScalar("0", dimPressure, 0.0)
+        );
 
-            scalarField& tangent = Foam::primitiveFieldRef(dualImpKfNew);
+        scalarField& tangent = Foam::primitiveFieldRef(dualImpKfNew);
 
-            mechanicalManager().updateTangentSmallStrain
-            (
-                dualFaceTopology(),
-                Foam::primitiveField(dualGradDf_),
-                Foam::primitiveField(dualGradDf_.oldTime()),
-                mesh.time().deltaTValue(),
-                &tangent,
-                nullptr,
-                tangentRequest::scalar
-            );
+        mechanicalManager().updateTangentSmallStrain
+        (
+            dualFaceTopology(),
+            Foam::primitiveField(dualGradDf_),
+            Foam::primitiveField(dualGradDf_.oldTime()),
+            mesh.time().deltaTValue(),
+            &tangent,
+            nullptr,
+            tangentRequest::scalar
+        );
 
-            vfvm::laplacian
-            (
-                jac,
-                Switch(solidModelDict().lookup("compactImplicitStencil")),
-                zetaImplicit,
-                dualMesh(),
-                blockSize_,     // nScalarEqns
-                globalPoints().localToGlobalPointMap(),
-                dualImpKfNew,
-                false           // flip sign
-            );
-        }
-        else
-        {
-            // Add laplacian term as a compact approximate linearisation of
-            // div(sigma)
-            vfvm::laplacian
-            (
-                jac,
-                Switch(solidModelDict().lookup("compactImplicitStencil")),
-                zetaImplicit,
-                dualMesh(),
-                blockSize_,     // nScalarEqns
-                globalPoints().localToGlobalPointMap(),
-                dualImpKf(),
-                false           // flip sign
-            );
-        }
+        vfvm::laplacian
+        (
+            jac,
+            Switch(solidModelDict().lookup("compactImplicitStencil")),
+            zetaImplicit,
+            dualMesh(),
+            blockSize_,     // nScalarEqns
+            globalPoints().localToGlobalPointMap(),
+            dualImpKfNew,
+            false           // flip sign
+        );
     }
     else if (jacTangent != tangentRequest::fourthOrder)
     {
@@ -1630,23 +1539,16 @@ label vertexCentredLinGeomSolid::formJacobian
         // iterates dualMesh.owner()
         List<mat66> materialTangent(dualMesh().nInternalFaces());
 
-        if (useMechanicalConstitutiveLawManager())
-        {
-            mechanicalManager().updateTangentSmallStrain
-            (
-                dualFaceTopology(),
-                Foam::primitiveField(dualGradDf_),
-                Foam::primitiveField(dualGradDf_.oldTime()),
-                mesh.time().deltaTValue(),
-                nullptr,
-                &materialTangent,
-                tangentRequest::fourthOrder
-            );
-        }
-        else
-        {
-            dualMechanicalPtr_().materialTangentFaceField(materialTangent);
-        }
+        mechanicalManager().updateTangentSmallStrain
+        (
+            dualFaceTopology(),
+            Foam::primitiveField(dualGradDf_),
+            Foam::primitiveField(dualGradDf_.oldTime()),
+            mesh.time().deltaTValue(),
+            nullptr,
+            &materialTangent,
+            tangentRequest::fourthOrder
+        );
 
         // Add linearisation of div(sigma) to jac
         vfvm::divSigma

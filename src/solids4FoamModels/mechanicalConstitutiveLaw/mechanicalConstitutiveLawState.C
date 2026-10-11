@@ -167,7 +167,7 @@ Field<Type>& mechanicalConstitutiveLawState::accessField
 
 
 template<class Type>
-const Field<Type>& mechanicalConstitutiveLawState::getField
+const Field<Type>& mechanicalConstitutiveLawState::lookupField
 (
     const HashTable<autoPtr<Field<Type>>>& table,
     const word& name
@@ -269,9 +269,41 @@ bool mechanicalConstitutiveLawState::foundChild(const word& name) const
 }
 
 
-wordList mechanicalConstitutiveLawState::childNames() const
+template<class Type>
+void mechanicalConstitutiveLawState::resizeFields(const label newSize)
 {
-    return children_.toc();
+    forAllIters(fields<Type>(), iter)
+    {
+        iter()->setSize(newSize, pTraits<Type>::zero);
+    }
+
+    forAllIters(fields0<Type>(), iter)
+    {
+        iter()->setSize(newSize, pTraits<Type>::zero);
+    }
+}
+
+
+template<class Type>
+void mechanicalConstitutiveLawState::storeOldTimeFields()
+{
+    HashTable<autoPtr<Field<Type>>>& current = fields<Type>();
+    HashTable<autoPtr<Field<Type>>>& old = fields0<Type>();
+
+    forAllConstIters(old, iter)
+    {
+        const word& name = iter.key();
+
+        if (!current.found(name))
+        {
+            FatalErrorInFunction
+                << "Old-time " << pTraits<Type>::typeName << " state '"
+                << name << "' has no corresponding current field."
+                << exit(FatalError);
+        }
+
+        old[name]() = current[name]();
+    }
 }
 
 
@@ -286,39 +318,10 @@ void mechanicalConstitutiveLawState::setSize(const label newSize)
         citer()->setSize(newSize);
     }
 
-    forAllIters(scalarFields_, iter)
-    {
-        iter()->setSize(newSize, pTraits<scalar>::zero);
-    }
-    forAllIters(vectorFields_, iter)
-    {
-        iter()->setSize(newSize, pTraits<vector>::zero);
-    }
-    forAllIters(tensorFields_, iter)
-    {
-        iter()->setSize(newSize, pTraits<tensor>::zero);
-    }
-    forAllIters(symmTensorFields_, iter)
-    {
-        iter()->setSize(newSize, pTraits<symmTensor>::zero);
-    }
-
-    forAllIters(scalarFields0_, iter)
-    {
-        iter()->setSize(newSize, pTraits<scalar>::zero);
-    }
-    forAllIters(vectorFields0_, iter)
-    {
-        iter()->setSize(newSize, pTraits<vector>::zero);
-    }
-    forAllIters(tensorFields0_, iter)
-    {
-        iter()->setSize(newSize, pTraits<tensor>::zero);
-    }
-    forAllIters(symmTensorFields0_, iter)
-    {
-        iter()->setSize(newSize, pTraits<symmTensor>::zero);
-    }
+    resizeFields<scalar>(newSize);
+    resizeFields<vector>(newSize);
+    resizeFields<tensor>(newSize);
+    resizeFields<symmTensor>(newSize);
 }
 
 
@@ -334,256 +337,73 @@ void mechanicalConstitutiveLawState::storeOldTime()
         citer()->storeOldTime();
     }
 
-    // Scalars
-    forAllConstIters(scalarFields0_, iter)
-    {
-        const word& name = iter.key();
-        if (!scalarFields_.found(name))
-        {
-            FatalErrorInFunction
-                << "Old-time scalar state '" << name
-                << "' has no corresponding current field."
-                << exit(FatalError);
-        }
-        scalarFields0_[name]() = scalarFields_[name]();
-    }
-
-    // Vectors
-    forAllConstIters(vectorFields0_, iter)
-    {
-        const word& name = iter.key();
-        if (!vectorFields_.found(name))
-        {
-            FatalErrorInFunction
-                << "Old-time vector state '" << name
-                << "' has no corresponding current field."
-                << exit(FatalError);
-        }
-        vectorFields0_[name]() = vectorFields_[name]();
-    }
-
-    // Tensors
-    forAllConstIters(tensorFields0_, iter)
-    {
-        const word& name = iter.key();
-        if (!tensorFields_.found(name))
-        {
-            FatalErrorInFunction
-                << "Old-time tensor state '" << name
-                << "' has no corresponding current field."
-                << exit(FatalError);
-        }
-        tensorFields0_[name]() = tensorFields_[name]();
-    }
-
-    // SymmTensors
-    forAllConstIters(symmTensorFields0_, iter)
-    {
-        const word& name = iter.key();
-        if (!symmTensorFields_.found(name))
-        {
-            FatalErrorInFunction
-                << "Old-time symmTensor state '" << name
-                << "' has no corresponding current field."
-                << exit(FatalError);
-        }
-        symmTensorFields0_[name]() = symmTensorFields_[name]();
-    }
+    storeOldTimeFields<scalar>();
+    storeOldTimeFields<vector>();
+    storeOldTimeFields<tensor>();
+    storeOldTimeFields<symmTensor>();
 }
 
 
-// * * * * * * * * * * * * Scalar accessors * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * Typed accessors  * * * * * * * * * * * * * * //
 
-Field<scalar>& mechanicalConstitutiveLawState::scalarField(const word& name)
+template<class Type>
+Field<Type>& mechanicalConstitutiveLawState::field(const word& name)
 {
-    return accessField(fields<scalar>(), name);
+    return accessField(fields<Type>(), name);
 }
 
-const Field<scalar>& mechanicalConstitutiveLawState::scalarField
+
+template<class Type>
+Field<Type>& mechanicalConstitutiveLawState::field0(const word& name)
+{
+    checkNotShadow(word(pTraits<Type>::typeName) + "Field0");
+
+    return accessField(fields0<Type>(), name);
+}
+
+
+template<class Type>
+const Field<Type>& mechanicalConstitutiveLawState::getField
 (
     const word& name
 ) const
 {
-    return getField(fields<scalar>(), name);
+    return lookupField(fields<Type>(), name);
 }
 
-Field<scalar>& mechanicalConstitutiveLawState::scalarField0(const word& name)
-{
-    checkNotShadow("scalarField0");
 
-    return accessField(fields0<scalar>(), name);
-}
-
-const Field<scalar>& mechanicalConstitutiveLawState::scalarField0
+template<class Type>
+const Field<Type>& mechanicalConstitutiveLawState::getField0
 (
     const word& name
 ) const
 {
-    return getField(readableFields0<scalar>(), name);
-}
-
-const Field<scalar>& mechanicalConstitutiveLawState::getScalarField
-(
-    const word& name
-) const
-{
-    return getField(fields<scalar>(), name);
-}
-
-const Field<scalar>& mechanicalConstitutiveLawState::getScalarField0
-(
-    const word& name
-) const
-{
-    return getField(readableFields0<scalar>(), name);
+    return lookupField(readableFields0<Type>(), name);
 }
 
 
-// * * * * * * * * * * * * Vector accessors * * * * * * * * * * * * * //
+// The four types a state holds; the typed accessors in the header and
+// anything written over the field type use these
+#define makeStateFieldAccess(Type)                                             \
+    template Field<Type>& mechanicalConstitutiveLawState::field<Type>          \
+    (                                                                          \
+        const word&                                                            \
+    );                                                                         \
+    template Field<Type>& mechanicalConstitutiveLawState::field0<Type>         \
+    (                                                                          \
+        const word&                                                            \
+    );                                                                         \
+    template const Field<Type>&                                                \
+    mechanicalConstitutiveLawState::getField<Type>(const word&) const;         \
+    template const Field<Type>&                                                \
+    mechanicalConstitutiveLawState::getField0<Type>(const word&) const;
 
-Field<vector>& mechanicalConstitutiveLawState::vectorField(const word& name)
-{
-    return accessField(fields<vector>(), name);
-}
+makeStateFieldAccess(scalar)
+makeStateFieldAccess(vector)
+makeStateFieldAccess(tensor)
+makeStateFieldAccess(symmTensor)
 
-const Field<vector>& mechanicalConstitutiveLawState::vectorField
-(
-    const word& name
-) const
-{
-    return getField(fields<vector>(), name);
-}
-
-Field<vector>& mechanicalConstitutiveLawState::vectorField0(const word& name)
-{
-    checkNotShadow("vectorField0");
-
-    return accessField(fields0<vector>(), name);
-}
-
-const Field<vector>& mechanicalConstitutiveLawState::vectorField0
-(
-    const word& name
-) const
-{
-    return getField(readableFields0<vector>(), name);
-}
-
-const Field<vector>& mechanicalConstitutiveLawState::getVectorField
-(
-    const word& name
-) const
-{
-    return getField(fields<vector>(), name);
-}
-
-const Field<vector>& mechanicalConstitutiveLawState::getVectorField0
-(
-    const word& name
-) const
-{
-    return getField(readableFields0<vector>(), name);
-}
-
-
-// * * * * * * * * * * * * Tensor accessors * * * * * * * * * * * * * //
-
-Field<tensor>& mechanicalConstitutiveLawState::tensorField(const word& name)
-{
-    return accessField(fields<tensor>(), name);
-}
-
-const Field<tensor>& mechanicalConstitutiveLawState::tensorField
-(
-    const word& name
-) const
-{
-    return getField(fields<tensor>(), name);
-}
-
-Field<tensor>& mechanicalConstitutiveLawState::tensorField0(const word& name)
-{
-    checkNotShadow("tensorField0");
-
-    return accessField(fields0<tensor>(), name);
-}
-
-const Field<tensor>& mechanicalConstitutiveLawState::tensorField0
-(
-    const word& name
-) const
-{
-    return getField(readableFields0<tensor>(), name);
-}
-
-const Field<tensor>& mechanicalConstitutiveLawState::getTensorField
-(
-    const word& name
-) const
-{
-    return getField(fields<tensor>(), name);
-}
-
-const Field<tensor>& mechanicalConstitutiveLawState::getTensorField0
-(
-    const word& name
-) const
-{
-    return getField(readableFields0<tensor>(), name);
-}
-
-
-// * * * * * * * * * * * * SymmTensor accessors * * * * * * * * * * * * //
-
-Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField
-(
-    const word& name
-)
-{
-    return accessField(fields<symmTensor>(), name);
-}
-
-const Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField
-(
-    const word& name
-) const
-{
-    return getField(fields<symmTensor>(), name);
-}
-
-Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField0
-(
-    const word& name
-)
-{
-    checkNotShadow("symmTensorField0");
-
-    return accessField(fields0<symmTensor>(), name);
-}
-
-const Field<symmTensor>& mechanicalConstitutiveLawState::symmTensorField0
-(
-    const word& name
-) const
-{
-    return getField(readableFields0<symmTensor>(), name);
-}
-
-const Field<symmTensor>& mechanicalConstitutiveLawState::getSymmTensorField
-(
-    const word& name
-) const
-{
-    return getField(fields<symmTensor>(), name);
-}
-
-const Field<symmTensor>& mechanicalConstitutiveLawState::getSymmTensorField0
-(
-    const word& name
-) const
-{
-    return getField(readableFields0<symmTensor>(), name);
-}
+#undef makeStateFieldAccess
 
 } // End namespace Foam
 

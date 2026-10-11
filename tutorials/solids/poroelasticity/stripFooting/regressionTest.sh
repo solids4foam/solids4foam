@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # stripFooting regression test
 #
@@ -27,6 +30,34 @@ EPS_MAX=0.021
 P_MIN=5.0e4
 P_MAX=9.0e4
 
+# The final D of the removed legacy mechanicalModel, as the max and mean
+# component magnitude of the field written to fourteen figures, from the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d), per fork. This is the
+# case that exercises the Mohr-Coulomb return mapping and the history it
+# carries, over thirty-eight steps, underneath the poro composite, and the
+# framework reproduced the legacy D field exactly, in every one of those
+# figures. These are
+# recorded numbers, though, and another compiler, CPU or MPI build moves an
+# iterative solution by round-off at the solver tolerance: CI measures up to
+# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
+# largest value, allows for that, and is ten times below the 1e-5 that a
+# 0.001% change in a material constant makes
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        REF_D_MAX=0.045900554625415
+        REF_D_MEAN=0.00582265661842307
+        ;;
+    org)
+        REF_D_MAX=0.045900554625415
+        REF_D_MEAN=0.00582265661842306
+        ;;
+    foamextend)
+        REF_D_MAX=0.047361024905273
+        REF_D_MEAN=0.00607079996386413
+        ;;
+esac
+REF_D_REL_TOL=1e-6
+
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -34,7 +65,7 @@ echo "============================================================"
 echo "stripFooting regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max |p|       in [${P_MIN}, ${P_MAX}]"
-echo "Plus the legacy-versus-framework comparison"
+echo "Plus the comparison with the reference"
 echo "============================================================"
 echo
 
@@ -56,7 +87,7 @@ prepare_case() {
     # Enough digits that a comparison is about the solution rather than about
     # the last figure written
     if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-        sed -i 's|^writePrecision.*|writePrecision  14;|' \
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
             "${dir}/system/controlDict"
     else
         echo "writePrecision  14;" >> "${dir}/system/controlDict"
@@ -105,63 +136,29 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-# Run the case again with the stress taken from the mechanicalConstitutiveLaw
-# framework rather than the legacy mechanicalModel, and require the two to
-# agree exactly.
-#
-# This is the case that exercises the Mohr-Coulomb return mapping and the
-# history it carries, over thirty-eight steps, underneath the poro composite
-run_framework_comparison() {
-    local dir="${REGRESSION_ROOT}/framework"
-
-    prepare_case "${dir}"
-
-    # The two arms differ in this one entry and nothing else
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${dir}/constant/solidProperties"
-
-    ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-        echo "FAIL: the framework arm did not run"
-        return 1
-    }
-
-    # Each arm must have taken the path it was set up for
+# The case against the removed legacy model
+check_against_reference() {
     if ! grep -q "Selecting mechanical constitutive law" \
-        "${dir}/${SOLVER_LOGFILE}"
-    then
-        echo "FAIL: the framework arm did not use the framework"
-        return 1
-    fi
-
-    if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the legacy arm used the framework"
+        echo "FAIL: the case constructed no mechanical constitutive law"
         return 1
     fi
 
-    local tL tF
-    tL=$(solids4Foam::latestTime "${CASE_DIR}")
-    tF=$(solids4Foam::latestTime "${dir}")
+    local t end_time
+    t=$(solids4Foam::latestTime "${CASE_DIR}")
+    end_time=$(sed -n 's/^endTime[[:space:]]*\([^;]*\);.*/\1/p' \
+        "${CASE_DIR}/system/controlDict")
 
-    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
-        echo "FAIL: the arms reached different times ('${tL}' vs '${tF}')"
+    if [[ -z "${t}" || -z "${end_time}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${end_time})^2 <= 1e-20)}"
+    then
+        echo "FAIL: the case stopped at '${t}', not at the end time '${end_time}'"
         return 1
     fi
 
-    if [[ ! -f "${CASE_DIR}/${tL}/D" || ! -f "${dir}/${tF}/D" ]]; then
-        echo "FAIL: the comparison produced no D field"
-        return 1
-    fi
-
-    if diff -q "${CASE_DIR}/${tL}/D" "${dir}/${tF}/D" > /dev/null; then
-        echo "PASS: framework and legacy agree exactly"
-        return 0
-    fi
-
-    echo "FAIL: framework and legacy differ"
-    return 1
+    solids4Foam::checkFieldNorms "D at t = ${t}" "${CASE_DIR}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 epsilon=$(grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
@@ -194,7 +191,7 @@ else
     failures=$((failures + 1))
 fi
 
-if [ "$CHECK_ONLY" = false ] && ! run_framework_comparison; then
+if ! check_against_reference; then
     failures=$((failures + 1))
 fi
 
@@ -211,15 +208,15 @@ fi
 # CHILD's file alone has to stop the run. Without it this would only show that
 # two runs agree, not that they agree because the child's history came back
 run_restart_test() {
-    local d="${REGRESSION_ROOT}/frameworkRestart"
-    local g="${REGRESSION_ROOT}/frameworkRestartMissingChild"
+    local d="${REGRESSION_ROOT}/restart"
+    local g="${REGRESSION_ROOT}/restartMissingChild"
 
     prepare_case "${d}"
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1restart yes;\n\1nCorrectors|' \
+    "${SOLIDS4FOAM_SED}" -i \
+        's|^\( *\)nCorrectors|\1restart yes;\n\1nCorrectors|' \
         "${d}/constant/solidProperties"
-    sed -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
-    sed -i 's/^endTime         0.38;/endTime         0.2;/' "${d}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i 's/^endTime         0.38;/endTime         0.2;/' "${d}/system/controlDict"
 
     ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
         echo "FAIL: restart: the first leg did not run"
@@ -228,7 +225,7 @@ run_restart_test() {
 
     # The child's history must actually be on disk, under a name that says
     # which sub-law owns it
-    if ! ls "${d}"/0.2/*:effectiveStressMechanicalLaw:deltaSigma > /dev/null 2>&1
+    if ! ls "${d}"/0.2/*IntegrationPointTopology_effectiveStressMechanicalLaw_deltaSigma > /dev/null 2>&1
     then
         echo "FAIL: restart: the sub-law's history was not written"
         return 1
@@ -237,8 +234,8 @@ run_restart_test() {
 
     # Negative control, on the child specifically
     rm -rf "${g}"; cp -a "${d}" "${g}"
-    rm -f "${g}"/0.2/*:effectiveStressMechanicalLaw:*
-    sed -i \
+    rm -f "${g}"/0.2/*IntegrationPointTopology_effectiveStressMechanicalLaw_*
+    "${SOLIDS4FOAM_SED}" -i \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         0.2;/endTime         0.38;/' \
         "${g}/system/controlDict"
 
@@ -257,7 +254,7 @@ run_restart_test() {
     fi
 
     # The restart itself
-    sed -i \
+    "${SOLIDS4FOAM_SED}" -i \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         0.2;/endTime         0.38;/' \
         "${d}/system/controlDict"
     mv "${d}/${SOLVER_LOGFILE}" "${d}/log.solids4Foam.firstLeg"

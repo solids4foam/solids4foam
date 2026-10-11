@@ -580,6 +580,68 @@ directory and always returns successfully.
 
 ---
 
+## `solids4Foam::requireTestApp()`
+
+Regression scripts that run a test application, such as
+`Test-mechanicalConstitutiveLaw`, call this function first to check that the
+application is in the `PATH`.
+
+- **Function purpose**
+  Returns 0 if the application is found. If it is not, a local build may simply
+  not have built it, so the function prints `SKIP` and returns 1. In CI, where
+  `Allwmake` always builds the test applications, a missing application means
+  the check it serves would pass without running, so the function prints
+  `FAIL` and returns 2.
+- **Function argument** Name of the test application.
+- **Example of usage**
+
+  ```bash
+  # Source solids4Foam scripts
+  source solids4FoamScripts.sh
+
+  # 0 continues, a skip exits with 0 and a failure with 1
+  solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+      || exit $(( $? - 1 ))
+  ```
+
+---
+
+## Field comparison: `internalFieldValues()`, `internalFieldNorms()`, `checkFieldNorms()`
+
+These functions let a regression script compare a written field with a
+reference without Python.
+
+- **Function purpose**
+  - `internalFieldValues` prints every component of a field file's internal
+    values, one per line, in the order written. It reads the `uniform`,
+    `nonuniform` and `N{value}` forms, and not the header or the boundary
+    values. It returns 1 when the file has no `internalField` or it holds no
+    values.
+  - `internalFieldNorms` prints the largest magnitude of any component of the
+    internal values, and the mean magnitude, as `max<TAB>mean`.
+  - `checkFieldNorms` compares those two norms with reference values, to a
+    tolerance relative to the reference maximum, and prints `PASS` or `FAIL`.
+    Both differences are bounded by the largest pointwise difference, so a
+    field that agrees with the reference passes, and one that does not is
+    caught by at least one of the two norms in all but contrived cases.
+- **Function arguments**
+  - `internalFieldValues` and `internalFieldNorms`: path to the field file.
+  - `checkFieldNorms`: a label for the messages, path to the field file,
+    reference maximum, reference mean, relative tolerance.
+- **Example of usage**
+
+  ```bash
+  # Source solids4Foam scripts
+  source solids4FoamScripts.sh
+
+  read -r maxD meanD <<< "$(solids4Foam::internalFieldNorms 1/D)"
+
+  solids4Foam::checkFieldNorms "D" 1/D 0.0158458 0.00205454 1e-5 \
+      || failures=$((failures + 1))
+  ```
+
+---
+
 ## `solids4foam::err()`
 
 It will construct a message string with the current date time and timezone

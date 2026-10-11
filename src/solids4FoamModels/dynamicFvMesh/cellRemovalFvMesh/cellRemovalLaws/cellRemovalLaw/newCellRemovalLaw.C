@@ -42,7 +42,7 @@ autoPtr<cellRemovalLaw> cellRemovalLaw::New
 
     Info<< "Selecting meshFailure model " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)

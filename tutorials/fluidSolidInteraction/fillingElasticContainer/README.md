@@ -111,8 +111,11 @@ From the case directory:
 
 ```bash
 ./Allrun          # Robin-Neumann coupling with fixed relaxation 1 (default)
+./Allrun aitken   # Robin-Neumann coupling with Aitken relaxation
 ./Allrun iqnils   # Robin-Neumann coupling accelerated with IQN-ILS
 ```
+
+Each mode links `constant/fsiProperties` to `constant/fsiProperties.<mode>`.
 
 The Robin-Neumann coupling is designed for unrelaxed fixed-point iterations
 (`constant/fsiProperties.robin`). With IQN-ILS (or Aitken, or a relaxation

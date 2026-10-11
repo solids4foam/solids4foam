@@ -62,10 +62,10 @@ anisotropicBiotElasticMechanicalConstitutiveLaw
     // law is constructed from a dictionary and cannot ask the mesh
     const labelVector solutionD(dict.lookup("solutionD"));
 
-    // A mesh is two-dimensional when z is the empty direction. The legacy law
-    // tested this the other way round, so it ran the reduced plane model on
-    // three-dimensional meshes and quietly ignored the out-of-plane constants
-    // they supplied. Fixed in both places together, so the two still agree
+    // A mesh is two-dimensional when z is the empty direction. Testing this
+    // the other way round would run the reduced plane model on
+    // three-dimensional meshes and quietly ignore the out-of-plane constants
+    // they supply
     model2d_ = (solutionD[vector::Z] < 0);
 
     // A mesh empty in x or y is two-dimensional too, and this law has no
@@ -203,37 +203,13 @@ void Foam::anisotropicBiotElasticMechanicalConstitutiveLaw::evaluate
         }
     }
 
-    // Scalar tangent: only if explicitly requested. The legacy impK uses the
-    // largest direct stiffness
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for: the largest direct stiffness, for either
+    // request
+    const scalar Kmax = max(A11_, max(A22_, A33_));
+    fillScalarTangent(response, Kmax, Kmax);
 
-        const scalar Keff = max(A11_, max(A22_, A33_));
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // No analytical consistent tangent has been derived for this law. The
-    // finite-difference one of the base class is well defined for any law and
-    // is evaluated against a shadow state, so it disturbs neither the stress
-    // just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

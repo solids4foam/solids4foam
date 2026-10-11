@@ -12,6 +12,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # sphericalCavity regression test
 # Checks selected solution approaches against the expected solution bounds
@@ -62,7 +65,7 @@ prepare_case() {
     # The regression copy lives deeper than the source tutorial, so the
     # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
     # the repository root.
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
         "${CASE_DIR}/src/Make/options"
 
@@ -148,7 +151,6 @@ select_run_approach() {
     esac
 }
 
-
 link_case_files_for_suffix() {
     local suffix="$1"
 
@@ -160,7 +162,6 @@ link_case_files_for_suffix() {
             -type f -name "*.${suffix}" -print0
     )
 }
-
 
 run_parallel_case() {
     solids4Foam::caseDoesNotRunWithFoamExtend
@@ -232,7 +233,6 @@ run_parallel_high_order_grad_test() {
     echo "FAIL: Test-highOrderGrad (${least_squares_type}, parallel)"
     return 1
 }
-
 
 check_solver_extrema() {
     local approach="$1"

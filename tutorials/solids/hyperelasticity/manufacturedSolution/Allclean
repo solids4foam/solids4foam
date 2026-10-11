@@ -1,0 +1,19 @@
+#!/bin/bash
+
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
+source solids4FoamScripts.sh
+
+wclean lib src
+rm -rf src/lnInclude
+cleanCase
+rm -rf 0.tmp gmsh/*.msh
+solids4Foam::restoreCaseFormat .
+
+for file in system/controlDict.steady \
+            constant/neoHookeanManufacturedSolutionProperties.steady \
+            constant/solidProperties.segregated \
+            system/fvSolution.segregated \
+            system/fvSchemes.steady
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done

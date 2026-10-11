@@ -1,10 +1,9 @@
 # Elastoplastic Cook's membrane verification
 
-This opt-in study migrates the structured quadrilateral mesh sweep previously
-kept in `solid-benchmarks/elastoPlasticity/cooksMembrane`. It copies the parent
-tutorial into `verification/work/`, runs the updated-Lagrangian elastoplastic
-formulation on successively refined meshes, and records the top-right vertical
-displacement. The tutorial and normal regression tests are not modified.
+This opt-in study is a structured quadrilateral mesh sweep. It copies the
+parent tutorial into `verification/work/`, runs the updated-Lagrangian
+elastoplastic formulation on successively refined meshes, and records the
+top-right vertical displacement.
 
 With OpenFOAM and solids4foam loaded, run:
 

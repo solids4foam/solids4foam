@@ -53,12 +53,16 @@ OgdenElasticMechanicalConstitutiveLaw
     alpha2_(dict.lookup("alpha2")),
     alpha3_(dict.lookup("alpha3")),
     K_(dict.lookup("K")),
-    mu_(mu1_ + mu2_ + mu3_)
+    // The small-strain shear modulus. With principal stresses
+    // sum_k mu_k lambda^alpha_k it is half of sum_k mu_k alpha_k, not the sum
+    // of the mu_k, which is what a simple shear of the law measures
+    mu_(0.5*(mu1_*alpha1_ + mu2_*alpha2_ + mu3_*alpha3_))
 {
     Info<< "    Ogden: mu = (" << mu1_.value() << " " << mu2_.value()
         << " " << mu3_.value() << "), alpha = (" << alpha1_.value()
         << " " << alpha2_.value() << " " << alpha3_.value()
-        << "), K = " << K_.value() << endl;
+        << "), K = " << K_.value() << ", small-strain shear modulus "
+        << mu_.value() << endl;
 }
 
 
@@ -91,9 +95,8 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
     const UIndirectList<tensor>& F = kin.F();
     const UIndirectList<scalar>& J = kin.J();
 
-    // Read at old time, so that a tangent query evaluated into a shadow state
-    // sees the value rather than a silently zero field. See linearElastic for
-    // the same reasoning
+    // Read at old time, as a prescribed field always is: see
+    // mechanicalConstitutiveLawStateSpec
     const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
 
     const scalar mu1 = mu1_.value();
@@ -110,14 +113,18 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
         const tensor& Fi = F[i];
         const scalar Ji = J[i];
 
-        // Right Cauchy-Green tensor
-        const symmTensor C(symm(Fi.T() & Fi));
+        // Left Cauchy-Green tensor. Its eigenvalues are the squared principal
+        // stretches, as are those of the right one, but its eigenvectors are
+        // the spatial principal directions, which the Cauchy stress is
+        // assembled along. The right tensor's are the material directions,
+        // and assembling along those rotated the stress back by the rigid
+        // rotation, so the answer changed with a superposed rotation.
+        // Stored in the rows
+        const symmTensor b(symm(Fi & Fi.T()));
 
-        // Its eigenvalues are the squared principal stretches, and its
-        // eigenvectors are stored in the rows
         tensor eigVec(tensor::zero);
         vector lambdaSqr(vector::zero);
-        eig3().eigen_decomposition(C, eigVec, lambdaSqr);
+        eig3().eigen_decomposition(b, eigVec, lambdaSqr);
 
         // Principal stresses from the principal stretches
         const scalar l1 = max(sqrt(lambdaSqr.x()), VSMALL);
@@ -136,7 +143,7 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
         // Back to the global frame
         const symmTensor s(transform(eigVec.T(), prinStress));
 
-        // The volumetric term, as the legacy law forms it
+        // The volumetric term
         const scalar sigmaHyd = 0.5*KVal*(sqr(Ji) - 1.0);
 
         sigma[i] =
@@ -148,36 +155,12 @@ void Foam::OgdenElasticMechanicalConstitutiveLaw::evaluate
             );
     }
 
-    // Scalar tangent: only if explicitly requested
-    if (response.wantsScalarTangent())
-    {
-        UIndirectList<scalar>& K = response.scalarTangent();
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), which does not include the bulk stiffness
+    fillScalarTangent(response, (4.0/3.0)*muVal + KVal, (4.0/3.0)*muVal);
 
-        const scalar Keff = (4.0/3.0)*muVal + KVal;
-
-        forAll(K, i)
-        {
-            K[i] = Keff;
-        }
-    }
-
-    // Fourth-order tangent.
-    // No analytical consistent tangent has been derived for this law. The
-    // finite-difference one of the base class is well defined for any law and
-    // is evaluated against a shadow state, so it disturbs neither the stress
-    // just computed nor the history it started from
-    if (response.tangentReq() == tangentRequest::fourthOrderFiniteDifference)
-    {
-        finiteDifferenceFourthOrder(kin, inputs, state, response);
-    }
-    else if (response.tangentReq() == tangentRequest::fourthOrder)
-    {
-        FatalErrorInFunction
-            << "An analytical fourth-order tangent is not implemented for "
-            << type() << "." << nl
-            << "Use 'fourthOrderFiniteDifference' to obtain one by finite "
-            << "differences." << exit(FatalError);
-    }
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
 }
 
 

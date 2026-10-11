@@ -13,8 +13,6 @@
     ADI = 0;
 
     const surfaceScalarField& impKf = impKf_;
-    // surfaceScalarField impKf =
-    //     harmonic<scalar>(mesh()).interpolate(mechanical().impK());
 
     const scalarField& muI = impKf.internalField();
 

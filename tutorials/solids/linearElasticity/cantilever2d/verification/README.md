@@ -1,11 +1,8 @@
 # cantilever2d verification study
 
-This opt-in study adds the order-of-accuracy sweep that the tutorial README
-describes in words but does not ship. It is a port of the cantilever
-order-of-accuracy study in the `solid-benchmarks` repository
-(`linearElasticity/cantilever`) onto the block-structured tutorial mesh, so
-that the same measurement can be made with any of the tutorial's solution
-approaches rather than only the vertex-centred one.
+This opt-in study is the order-of-accuracy sweep that the tutorial README
+describes, on the block-structured tutorial mesh, so that the measurement can
+be made with any of the tutorial's solution approaches.
 
 The tutorial already builds the Timoshenko slender-cantilever analytical
 solution as the `cantileverAnalyticalSolution` function object, which writes

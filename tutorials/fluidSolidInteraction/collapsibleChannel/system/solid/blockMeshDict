@@ -1,0 +1,92 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Elastic wall of thickness h = 0.05 on top of the channel, 5 < x < 15
+scale 1;
+
+vertices
+(
+    (5 1 0)
+    (15 1 0)
+    (15 1.05 0)
+    (5 1.05 0)
+    (5 1 0.1)
+    (15 1 0.1)
+    (15 1.05 0.1)
+    (5 1.05 0.1)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (80 8 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+boundary
+(
+    interface
+    {
+        type patch;
+        faces
+        (
+            (0 4 5 1)
+        );
+    }
+    top
+    {
+        type patch;
+        faces
+        (
+            (3 2 6 7)
+        );
+    }
+    left
+    {
+        type patch;
+        faces
+        (
+            (0 3 7 4)
+        );
+    }
+    right
+    {
+        type patch;
+        faces
+        (
+            (1 5 6 2)
+        );
+    }
+    frontAndBack
+    {
+        type empty;
+        faces
+        (
+            (0 1 2 3)
+            (4 7 6 5)
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

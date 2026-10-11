@@ -44,7 +44,7 @@ autoPtr<pointNormalContactModel> pointNormalContactModel::New
 {
     Info<< "    Normal contact model: " << name << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(name);
 
     if (!ctorPtr)

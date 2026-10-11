@@ -1,0 +1,343 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      lawChecks;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The laws Test-mechanicalConstitutiveLawChecks checks, one at a time, with
+// the constants of the tutorials that use them. finiteStrain selects the
+// update the law implements, isotropic and linear the checks that apply, and
+// fields the coupling inputs the law reads, at its reference values.
+//
+// The plasticity laws read constant/plasticStrainVsYieldStress, which has
+// more than two rows, so that the nonlinear hardening branch is the one run.
+// electroMechanicalLaw appears twice: with its tension ramped over a long time
+// from zero, so that at time 0 the reference state is stress free and the
+// reference checks apply, and with the tension on from the start, so that the
+// objectivity check sees the active term; the reference checks, which assume
+// a stress-free reference, are off for that one. The two plasticity laws give
+// yieldBounds, the initial yield stress and the last of the hardening table
+
+linearElastic
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          yes;
+    law
+    {
+        type            linearElastic;
+        rho             rho [1 -3 0 0 0 0 0] 7854;
+        E               E [1 -1 -2 0 0 0 0] 200e9;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
+    }
+}
+
+linearElasticMisesPlastic
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          no;
+    yieldBounds     (243e6 600e6);
+    law
+    {
+        type            linearElasticMisesPlastic;
+        rho             rho [1 -3 0 0 0 0 0] 3500;
+        E               E [1 -1 -2 0 0 0 0] 70e9;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
+        "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+        outOfBounds     clamp;
+    }
+}
+
+linearElasticMohrCoulombPlastic
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            linearElasticMohrCoulombPlastic;
+        rho             rho [1 -3 0 0 0 0 0] 2000;
+        E               E [1 -1 -2 0 0 0 0] 20e6;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
+        frictionAngle   frictionAngle [0 0 0 0 0 0 0] 30;
+        dilationAngle   dilationAngle [0 0 0 0 0 0 0] 0;
+        cohesion        cohesion [1 -1 -2 0 0 0 0] 1e5;
+    }
+}
+
+viscousHookeanElastic
+{
+    finiteStrain    no;
+    isotropic       no;
+    linear          yes;
+    law
+    {
+        type            viscousHookeanElastic;
+        rho             rho [1 -3 0 0 0 0 0] 7850;
+        EInfinity       EInfinity [1 -1 -2 0 0 0 0] 39.58e9;
+        nu              nu [0 0 0 0 0 0 0] 0.33;
+        E               (2.9318518519e9 5.8637037037e9 6.5966666667e9 18.3240740741e9);
+        relaxationTimes (30 300 3000 12000);
+    }
+}
+
+anisotropicBiotElastic
+{
+    finiteStrain    no;
+    isotropic       no;
+    linear          yes;
+    law
+    {
+        type            anisotropicBiotElastic;
+        rho             rho [1 -3 0 0 0 0 0] 2650;
+        Ex              1.2e7;
+        Ey              1.2e7;
+        Ez              2e7;
+        nuxy            0.2;
+        nuyz            0.24;
+        nuzx            0.4;
+        Gxy             0.5e7;
+        Gyz             1.2e7;
+        Gzx             1.2e7;
+    }
+}
+
+thermoMechanicalLaw
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          yes;
+    fields
+    {
+        T T [0 0 0 1 0 0 0] 300;
+    }
+    law
+    {
+        type            thermoMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 7854;
+        alpha           alpha [0 0 0 -1 0 0 0] 1e-05;
+        T0              T0 [0 0 0 1 0 0 0] 300;
+        mechanicalLaw
+        {
+            type            linearElastic;
+            E               E [1 -1 -2 0 0 0 0] 2e+11;
+            nu              nu [0 0 0 0 0 0 0] 0.3;
+        }
+    }
+}
+
+poroMechanicalLaw
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          no;
+    fields
+    {
+        porePressure porePressure [1 -1 -2 0 0 0 0] 0;
+    }
+    law
+    {
+        type            poroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 2000;
+        biotCoeff       biotCoeff [0 0 0 0 0 0 0] 1.0;
+        effectiveStressMechanicalLaw
+        {
+            type            linearElasticMohrCoulombPlastic;
+            E               E [1 -1 -2 0 0 0 0] 20e6;
+            nu              nu [0 0 0 0 0 0 0] 0.3;
+            frictionAngle   frictionAngle [0 0 0 0 0 0 0] 30;
+            dilationAngle   dilationAngle [0 0 0 0 0 0 0] 0;
+            cohesion        cohesion [1 -1 -2 0 0 0 0] 1e5;
+        }
+    }
+}
+
+StVenantKirchhoffElastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            StVenantKirchhoffElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        E               E [1 -1 -2 0 0 0 0] 1.4e6;
+        nu              nu [0 0 0 0 0 0 0] 0.4;
+    }
+}
+
+neoHookeanElastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            neoHookeanElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        E               E [1 -1 -2 0 0 0 0] 5.6e6;
+        nu              nu [0 0 0 0 0 0 0] 0.4;
+    }
+}
+
+neoHookeanElasticMisesPlastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    yieldBounds     (243e6 600e6);
+    law
+    {
+        type            neoHookeanElasticMisesPlastic;
+        rho             rho [1 -3 0 0 0 0 0] 7800;
+        E               E [1 -1 -2 0 0 0 0] 2.069e10;
+        nu              nu [0 0 0 0 0 0 0] 0.29;
+        "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+        outOfBounds     clamp;
+    }
+}
+
+MooneyRivlinElastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            MooneyRivlinElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        K               K [1 -1 -2 0 0 0 0] 1.41e9;
+        c10             c10 [1 -1 -2 0 0 0 0] 0.293e6;
+        c01             c01 [1 -1 -2 0 0 0 0] 0.177e6;
+        c11             c11 [1 -1 -2 0 0 0 0] 0;
+    }
+}
+
+OgdenElastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            OgdenElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        mu1             mu1 [1 -1 -2 0 0 0 0] 0.63e6;
+        mu2             mu2 [1 -1 -2 0 0 0 0] 0.0012e6;
+        mu3             mu3 [1 -1 -2 0 0 0 0] -0.01e6;
+        alpha1          alpha1 [0 0 0 0 0 0 0] 1.3;
+        alpha2          alpha2 [0 0 0 0 0 0 0] 5.0;
+        alpha3          alpha3 [0 0 0 0 0 0 0] -2.0;
+        K               K [1 -1 -2 0 0 0 0] 2e9;
+    }
+}
+
+GuccioneElastic
+{
+    finiteStrain    yes;
+    isotropic       no;
+    linear          no;
+    law
+    {
+        type            GuccioneElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        k               k [1 -1 -2 0 0 0 0] 2e3;
+        cf              8.0;
+        ct              2.0;
+        cfs             4.0;
+        uniformFibreField yes;
+        f0              (0 0 1);
+        bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 16e6;
+    }
+}
+
+HolzapfelGasserOgdenElastic
+{
+    finiteStrain    yes;
+    isotropic       no;
+    linear          no;
+    law
+    {
+        type            HolzapfelGasserOgdenElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1200;
+        mu              mu [1 -1 -2 0 0 0 0] 44.23e3;
+        fibreAngle      fibreAngle [0 0 0 0 0 0 0] 39.76;
+        k1              k1 [1 -1 -2 0 0 0 0] 0.206e3;
+        k2              k2 [0 0 0 0 0 0 0] 1.465;
+        uniformLocalBasis yes;
+        Ec              (1 0 0);
+        Ea              (0 1 0);
+        bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 44.23e6;
+    }
+}
+
+electroMechanicalLaw
+{
+    finiteStrain    yes;
+    isotropic       no;
+    linear          no;
+    law
+    {
+        type            electroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        activeTension   activeTension [1 -1 -2 0 0 0 0] 60e3;
+        rampTime        1e6;
+        uniformFibreField yes;
+        f0              (0 0 1);
+        passiveMechanicalLaw
+        {
+            type            GuccioneElastic;
+            k               k [1 -1 -2 0 0 0 0] 2e3;
+            cf              8.0;
+            ct              2.0;
+            cfs             4.0;
+            uniformFibreField yes;
+            f0              (0 0 1);
+            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 16e6;
+        }
+    }
+}
+
+electroMechanicalLawActive
+{
+    finiteStrain    yes;
+    isotropic       no;
+    linear          no;
+    referenceChecks no;
+    law
+    {
+        type            electroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 1000;
+        activeTension   activeTension [1 -1 -2 0 0 0 0] 60e3;
+        rampTime        0;
+        uniformFibreField yes;
+        f0              (0 0 1);
+        passiveMechanicalLaw
+        {
+            type            GuccioneElastic;
+            k               k [1 -1 -2 0 0 0 0] 2e3;
+            cf              8.0;
+            ct              2.0;
+            cfs             4.0;
+            uniformFibreField yes;
+            f0              (0 0 1);
+            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 16e6;
+        }
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
+CASE_DIR="${REGRESSION_ROOT}/main"
+
+# ============================================================
+# Mok lid-driven cavity with a flexible bottom regression test
+# ============================================================
+
+# Shortened regression horizon: the first 50 time-steps, during which the
+# membrane is first pushed down and then lifted by the developing cavity flow
+REG_END_TIME=5
+
+# Reference values at REG_END_TIME and tolerances for each fork. The force
+# reference is the total vertical force on the interface.
+#
+# OpenFOAM.com: v2412 and v2512 agree to 5e-5 in Uy and 1.4e-6 in Fy; the
+# references are the v2512 values.
+REF_MID_UY=0.136377
+REF_FY=1.69653e-04
+DISP_TOL=2e-4
+FY_TOL=1e-5
+
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    # foam-extend 4.1: the pressure next to the membrane is lower than on the
+    # other forks, so the vertical force is about a tenth and the midpoint
+    # displacement 3% smaller. The references are one local run; the wider
+    # tolerances allow for the machine dependence seen on OpenFOAM.org
+    REF_MID_UY=0.132567
+    REF_FY=1.81995e-05
+    DISP_TOL=1e-3
+    FY_TOL=1.5e-5
+elif [[ "${WM_PROJECT_VERSION:-}" != v* ]]; then
+    # OpenFOAM.org: the result depends on the machine. OpenFOAM-9 gave
+    # Uy = 0.137318 and Fy = 1.768e-4 locally but 0.136042 and 1.589e-4 in CI,
+    # so the references are the midpoints, with tolerances that cover both
+    REF_MID_UY=0.13668
+    REF_FY=1.679e-04
+    DISP_TOL=1e-3
+    FY_TOL=1.5e-5
+fi
+
+ALLRUN_LOGFILE="log.Allrun"
+DISP_FILE="postProcessing/0/solidPointDisplacement_midpoint.dat"
+
+echo "============================================================"
+echo "Mok lid-driven cavity regression test"
+echo "Regression end time         = ${REG_END_TIME}"
+echo "Midpoint Uy tolerance       < ${DISP_TOL}"
+echo "Final Fy tolerance          < ${FY_TOL}"
+echo "============================================================"
+echo
+
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" \
+           || "${base_item}" == "verification" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+
+    solids4Foam::requireGnuSed
+    "${SOLIDS4FOAM_SED}" -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+}
+
+run_case() {
+    (
+        cd "${CASE_DIR}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
+    )
+}
+
+abs() {
+    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
+}
+
+latest_numeric_time() {
+    local file="$1"
+    awk '
+        ($1 + 0) == $1 { time = $1 }
+        END {
+            if (time != "") print time
+        }
+    ' "$file"
+}
+
+extract_final_mid_uy() {
+    awk '
+    ($1 + 0) == $1 {
+        uy = $3
+    }
+    END {
+        if (uy != "") print uy
+    }' "${CASE_DIR}/${DISP_FILE}"
+}
+
+extract_final_force_components() {
+    # The forces functionObject writes a different set of columns depending on
+    # the OpenFOAM version: OpenFOAM.com writes the total force followed by the
+    # pressure and viscous contributions, whereas OpenFOAM.org and foam-extend
+    # write the pressure and viscous contributions followed by the moments. The
+    # number of columns is used to tell them apart.
+    awk '
+    ($1 + 0) == $1 {
+        gsub(/[()]/, "", $0)
+        if (NF >= 13)
+        {
+            # time, pressure, viscous, moments: sum the contributions
+            fx = $2 + $5
+            fy = $3 + $6
+        }
+        else
+        {
+            # time, total, pressure, viscous: use the total directly
+            fx = $2
+            fy = $3
+        }
+    }
+    END {
+        if (fx != "" && fy != "") print fx, fy
+    }' "$1"
+}
+
+find_force_file() {
+    # OpenFOAM.com and OpenFOAM.org write the forces under postProcessing,
+    # whereas foam-extend writes them to <case>/forces/<startTime>
+    local candidate
+    for candidate in \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/fluid/forces/0/forces.dat" \
+        "${CASE_DIR}/postProcessing/forces/0/force.dat" \
+        "${CASE_DIR}/postProcessing/forces/0/forces.dat" \
+        "${CASE_DIR}/forces/0/forces.dat"
+    do
+        if [[ -f "${candidate}" ]]; then
+            echo "${candidate}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+prepare_case
+run_case
+
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing or incomplete is a failure.
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
+fi
+
+mid_time=$(latest_numeric_time "${CASE_DIR}/${DISP_FILE}" || true)
+
+if [[ -z "${mid_time}" ]]; then
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      displacement output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
+fi
+
+if ! awk "BEGIN {exit !(${mid_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "FAIL: the midpoint displacement history stops at t = ${mid_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
+fi
+
+if ! force_file=$(find_force_file); then
+    echo "FAIL: the case did not run or did not complete in this environment:"
+    echo "      force output is missing and the tutorial did not declare a skip"
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
+fi
+
+force_time=$(latest_numeric_time "${force_file}" || true)
+
+if [[ -z "${force_time}" ]]; then
+    echo "FAIL: the case did not complete in this environment:"
+    echo "      the force output contains no time data and the tutorial did not"
+    echo "      declare a skip (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    exit 1
+fi
+
+if ! awk "BEGIN {exit !(${force_time} + 0 >= ${REG_END_TIME})}"; then
+    echo "FAIL: the force history stops at t = ${force_time}, short of the"
+    echo "      requested end time ${REG_END_TIME}: the case did not complete"
+    exit 1
+fi
+
+mid_uy=$(extract_final_mid_uy)
+force_components=$(extract_final_force_components "${force_file}")
+
+if [[ -z "${mid_uy}" ]]; then
+    echo "FAIL: Could not extract the midpoint displacement"
+    exit 1
+fi
+
+if [[ -z "${force_components}" ]]; then
+    echo "FAIL: Could not extract the force components from ${force_file}"
+    exit 1
+fi
+
+final_fy=$(awk '{print $2}' <<< "${force_components}")
+
+mid_uy_diff_abs=$(abs "$(awk "BEGIN {print ${mid_uy} - ${REF_MID_UY}}")")
+final_fy_diff_abs=$(abs "$(awk "BEGIN {print ${final_fy} - ${REF_FY}}")")
+
+failures=0
+
+if awk "BEGIN {exit !(${mid_uy_diff_abs} < ${DISP_TOL})}"; then
+    printf "PASS: final midpoint Uy = %.6g\n" "${mid_uy}"
+else
+    printf "FAIL: final midpoint Uy = %.6g\n" "${mid_uy}"
+    failures=$((failures + 1))
+fi
+
+if awk "BEGIN {exit !(${final_fy_diff_abs} < ${FY_TOL})}"; then
+    printf "PASS: final Fy = %.6g\n" "${final_fy}"
+else
+    printf "FAIL: final Fy = %.6g\n" "${final_fy}"
+    failures=$((failures + 1))
+fi
+
+echo
+if (( failures == 0 )); then
+    echo "============================================================"
+    echo "Regression test PASSED"
+    echo "============================================================"
+    exit 0
+else
+    echo "============================================================"
+    echo "Regression test FAILED (${failures} checks)"
+    echo "============================================================"
+    exit 1
+fi

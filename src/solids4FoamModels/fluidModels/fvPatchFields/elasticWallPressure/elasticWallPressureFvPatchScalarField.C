@@ -247,6 +247,7 @@ void elasticWallPressureFvPatchScalarField::resetRobinState()
     kinematicConsistency_ = false;
     fluidMeshFollowsSolid_ = false;
     solidThicknessPtr_.clear();
+    twoSidedFaces_.clear();
     seedCoeffPtr_.clear();
     seedCoeffTimeIndex_ = -1;
     // The learned scales are kept (restart, mapping); only their size is

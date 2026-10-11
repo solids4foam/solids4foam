@@ -54,7 +54,7 @@ class manufacturedSolutionFvPatchVectorField
     // Private Data
 
         //- Manufactured solution object pointer
-        autoPtr<manufacturedSolution> mmsPtr_;
+        mutable autoPtr<manufacturedSolution> mmsPtr_;
 
         //- A copy of the constructor dict
         const dictionary dict_;
@@ -140,6 +140,9 @@ public:
 
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
+
+            //- Return analytical displacement at face quadrature points
+            virtual autoPtr<CompactListList<vector>> evaluateQuadrature() const;
 
         //- Write
         virtual void write(Ostream&) const;

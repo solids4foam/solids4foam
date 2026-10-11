@@ -41,15 +41,20 @@ Foam::word Foam::mechanicalConstitutiveLawStateIO::fieldName
     // topology, because the same law may hold state at cell centres and at
     // faces in the same run, and the two are different lengths. The child
     // path, because a composite law and its sub-law each have their own
-    // unqualified namespace and may both use the same name
-    word name(lawName + ':' + topologyName);
+    // unqualified namespace and may both use the same name.
+    //
+    // Joined with an underscore rather than a colon, which Windows file
+    // systems, archive tools and CI artifact uploads refuse. The topology
+    // names are fixed type names without one, so the parts cannot run into
+    // each other
+    word name(lawName + '_' + topologyName);
 
     forAll(childPath, i)
     {
-        name += ':' + childPath[i];
+        name += '_' + childPath[i];
     }
 
-    return name + ':' + variableName;
+    return name + '_' + variableName;
 }
 
 

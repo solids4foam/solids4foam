@@ -1,0 +1,44 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Standard second-order finite volume discretisation
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    // Solution algorithm
+    solutionAlgorithm PETScSNES;
+
+    // Predictor D at the start of a new time step using U and A
+    predictor yes;
+
+    // Stabilisation
+    stabilisation
+    {
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.5;
+        }
+
+        pressure
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.5;
+        }
+    }
+}
+
+// ************************************************************************* //

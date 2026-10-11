@@ -1,9 +1,7 @@
 # cavityFlexibleBottom verification study
 
-This opt-in study migrates the mesh study from
-`solid-benchmarks/papers/JFNK_quasi_monolithic_FSI/fluidSolidInteraction/cavityFlexibleBottom`
-into the tutorial itself. It uniformly refines the tutorial fluid and solid
-meshes, runs each level to a steady FSI response, and compares the steady
+This opt-in study is a mesh study. It uniformly refines the tutorial fluid and
+solid meshes, runs each level to a steady FSI response, and compares the steady
 vertical displacement at `(4 -1 0.5)` and the steady vertical interface force
 with the mesh study of Tuković et al. (2018).
 

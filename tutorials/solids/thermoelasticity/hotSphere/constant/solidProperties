@@ -17,7 +17,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//solidModel     weakThermalLinearGeometry;
 solidModel     thermalLinearGeometry;
 //solidModel     linearGeometryTotalDisplacement;
 

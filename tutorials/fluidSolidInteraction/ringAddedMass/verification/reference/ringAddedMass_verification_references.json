@@ -1,0 +1,95 @@
+{
+    "description": "Free n = 2 vibration of an elastic ring in a fluid-filled rigid annulus; exact values from scripts/ring_exact_frequencies.py",
+    "mode": 2,
+    "geometry": {
+        "innerRadius": 0.95,
+        "outerRadius": 1.05,
+        "wallRadius": 1.5
+    },
+    "material": {
+        "E": 1000000.0,
+        "nu": 0.3,
+        "rhoSolid": 1000.0,
+        "planeStrain": true
+    },
+    "fluid": {
+        "nu": 1e-07
+    },
+    "levels": {
+        "weak": {"rhoFluid": 14.0},
+        "moderate": {"rhoFluid": 140.0},
+        "strong": {"rhoFluid": 1400.0}
+    },
+    "study": {
+        "meshFactors": [1, 2, 4],
+        "stepsPerPeriod": 100,
+        "periods": 4,
+        "timeSteps": [25, 50, 100],
+        "timeStudyFactor": 2,
+        "couplingStudyFactor": 2,
+        "quick": {
+            "levels": ["moderate"],
+            "meshFactors": [1],
+            "stepsPerPeriod": 50,
+            "periods": 2
+        }
+    },
+    "tolerances": {
+        "omega": 0.003,
+        "omegaExtrapolated": 0.001,
+        "meshChange": 0.001,
+        "ratio": 0.001,
+        "ratioThinRing": 0.0025,
+        "minTimeOrder": 1.5,
+        "minMeshOrder": 1.5,
+        "maxLossPerPeriod": 0.02,
+        "maxGrowthPerPeriod": 0.002,
+        "couplingAgreement": 0.001,
+        "quick": {"omega": 0.01}
+    },
+    "exact": {
+        "dry": {
+            "omega": 2.55504219581415,
+            "omegaThinRing": 2.5677629550654797,
+            "collocationChange": 4.631405869925942e-08
+        },
+        "levels": {
+            "weak": {
+                "massRatio": 0.10075506514014997,
+                "omega": 2.4356148807267943,
+                "ratio": 0.9532581828656255,
+                "ratioThinRing": 0.9531355183614904,
+                "collocationChange": 4.631410199795738e-08,
+                "viscousOmega": 2.435514460533562,
+                "viscousFrequencyShift": -4.122991447752522e-05,
+                "viscousDampingRatio": 4.127683141126819e-05,
+                "viscousCollocationChange": 4.633393381086966e-08,
+                "stokesLayerOverGap": 0.0006367928444764594
+            },
+            "moderate": {
+                "massRatio": 1.0075506514014994,
+                "omega": 1.8045131724003833,
+                "ratio": 0.7062557226478153,
+                "ratioThinRing": 0.7057757695528193,
+                "collocationChange": 4.632971528639729e-08,
+                "viscousOmega": 1.804038745096307,
+                "viscousFrequencyShift": -0.00026291152169610754,
+                "viscousDampingRatio": 0.00026320273340254966,
+                "viscousCollocationChange": 4.6304783078929564e-08,
+                "stokesLayerOverGap": 0.0007398138470934754
+            },
+            "strong": {
+                "massRatio": 10.075506514014997,
+                "omega": 0.768654490979269,
+                "ratio": 0.30083827665880936,
+                "ratioThinRing": 0.3004818203342843,
+                "collocationChange": 4.634100447820089e-08,
+                "viscousOmega": 0.7680927569247913,
+                "viscousFrequencyShift": -0.0007308017595292204,
+                "viscousDampingRatio": 0.0007318031105521595,
+                "viscousCollocationChange": 4.636686828309261e-08,
+                "stokesLayerOverGap": 0.0011335401294593165
+            }
+        }
+    }
+}

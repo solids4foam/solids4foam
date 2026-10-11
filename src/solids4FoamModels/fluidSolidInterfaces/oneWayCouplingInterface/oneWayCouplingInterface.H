@@ -98,6 +98,14 @@ public:
 
             //- Update interface traction
             virtual void updateTraction();
+
+        // Access
+
+            //- The fluid interface is a rigid wall
+            virtual bool movesFluidInterface() const
+            {
+                return false;
+            }
 };
 
 

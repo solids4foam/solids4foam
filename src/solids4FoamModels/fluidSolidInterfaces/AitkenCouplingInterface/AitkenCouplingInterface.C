@@ -162,7 +162,7 @@ bool AitkenCouplingInterface::evolve()
         // Transfer the displacement from the solid to the fluid, where we will
         // use no relaxation; in that way, we can force the solid and fluid
         // interfaces to stay aligned
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
@@ -185,21 +185,35 @@ void AitkenCouplingInterface::updateDisplacement()
 
     if (outerCorr() < 3)
     {
-        Info<< "Current fsi under-relaxation factor (fixed): "
-            << relaxationFactor_ << endl;
+        // With the predictor, the first iteration takes the full solid
+        // predictor displacement
+        const scalar factor =
+            ((outerCorr() == 1) && predictor()) ? 1.0 : relaxationFactor_;
 
-        forAll(fluid().globalPatches(), interfaceI)
+        Info<< "Current fsi under-relaxation factor (fixed): " << factor;
+        if ((outerCorr() == 1) && predictor())
+        {
+            Info<< " (predictor)";
+        }
+        Info<< endl;
+
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
 
             fluidZonesPointsDispls()[interfaceI] +=
-                relaxationFactor_*residuals()[interfaceI];
+                factor*residuals()[interfaceI];
+
+            // The Aitken update of iteration 3 starts from the factor applied
+            // here, in iteration 2, rather than the one the previous time
+            // step ended with
+            aitkenRelaxationFactors_[interfaceI] = factor;
         }
     }
     else
     {
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             const vectorField resMinusResPrev
             (
@@ -245,10 +259,7 @@ void AitkenCouplingInterface::updateDisplacement()
             }
 
             Info<< "Current fsi under-relaxation factor (Aitken) of "
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[interfaceI].patch().index()
-                   ].name()
+                << fluidInterfaceName(interfaceI)
                 << ": " << aitkenRelaxationFactors_[interfaceI] << endl;
 
             fluidZonesPointsDisplsPrev()[interfaceI] =

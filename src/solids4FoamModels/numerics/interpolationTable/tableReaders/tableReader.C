@@ -33,7 +33,7 @@ Foam::autoPtr<Foam::tableReader<Type>> Foam::tableReader<Type>::New
         "openFoam"
     );
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(readerType);
 
     if (!ctorPtr)

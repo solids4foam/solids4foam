@@ -1,0 +1,27 @@
+#!/bin/bash
+cd "${0%/*}" || exit  # Run from this directory
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# The immersed boundary library is only built with OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# Create the mesh; the mesh density is set by MESH_LEVEL (default 1)
+solids4Foam::runApplication blockMesh
+
+# Run the solver
+solids4Foam::runApplication solids4Foam
+
+# Plot the force coefficients
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating wallShearStress.pdf using gnuplot"
+    gnuplot wallShearStress.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

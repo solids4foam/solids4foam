@@ -368,7 +368,7 @@ autoPtr<leastSquaresScheme> leastSquaresScheme::New
     Info<< "Selecting least-squares reconstruction scheme "
         << schemeType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(schemeType);
 
     if (!ctorPtr)
