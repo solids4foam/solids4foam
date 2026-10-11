@@ -1,0 +1,50 @@
+== c_1x_dt5e-4_tol1e-5, first step after 4.5 s
+Time = 4.5005
+Linear predictor
+  0 SNES Function norm 5.337781110379e-03
+  1 SNES Function norm 2.415358582762e-06
+  2 SNES Function norm 2.524935378965e-11
+  3 SNES Function norm 8.243047008831e-12
+FSI relative residual1 norm for interface 0: 1
+Time = 4.5005, iteration: 1
+  0 SNES Function norm 5.502941854643e-02
+  1 SNES Function norm 1.078502700825e-05
+  2 SNES Function norm 1.209786007571e-10
+  3 SNES Function norm 8.139087507433e-12
+FSI relative residual1 norm for interface 0: 0.00454286522022
+== failed/b_1x_r4.5_tol1e-5, first step after 4.5 s
+Time = 4.5005
+Linear predictor
+  0 SNES Function norm 3.421911270010e+00
+  1 SNES Function norm 2.658772357700e-02
+  2 SNES Function norm 4.791438941567e-06
+  3 SNES Function norm 6.343023705125e-11
+FSI relative residual1 norm for interface 0: 1
+Time = 4.5005, iteration: 1
+  0 SNES Function norm 6.871662179226e+01
+  1 SNES Function norm 1.734580832782e+00
+  2 SNES Function norm 1.828436921463e-03
+  3 SNES Function norm 8.523255476093e-08
+  4 SNES Function norm 8.149157489152e-12
+FSI relative residual1 norm for interface 0: 1
+D
+D_0
+DD
+DD_0
+F
+grad(D)
+grad(D)_0
+grad(DD)
+pointD
+pointD_0
+pointDD
+rubber_cellCentredIntegrationPointTopology_integrationPoints
+sigma
+sigmaEq
+U
+== log.solids4Foam.0-2.74_failed
+  0 SNES Function norm 1.186849947839e-02
+13
+== log.solids4Foam
+  0 SNES Function norm 2.255244872009e-01
+11

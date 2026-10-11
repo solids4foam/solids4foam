@@ -1502,6 +1502,15 @@ Decisions so far (details below when complete):
   at 2.74 s on one step at r1 = 1.4e-5 after 50 iterations. Production runs use strict tol
   1e-5, nOuterCorr 30 and `allowUnconvergedCoupling yes`; steps that reach 30 iterations
   are counted, with their residual.
+- **Restarts in the limit cycle are not usable.** Branches restarted from the 1x' run at
+  4.5 s (written with `restart yes`, binary, purgeWrite) diverge in the first step at
+  every tolerance: the solid predictor residual is 3.4 against 5.3e-3 in the continuous
+  run (`reference/production/restart_check_1x_4.5s.txt`); only `D`, `D_0` and no older
+  displacement level are written, while the backward d2dt2 needs the older history. A
+  restart at 2.5 s (small motion) ran on, with a 19x larger first residual. All
+  tolerance and time-step comparisons are therefore cold runs from t = 0, and the
+  planned branches (and the 4x' dt 2.5e-4 branch) are replaced: 1x' tol 1e-4, 1x' dt
+  1e-3 and 2.5e-4, 2x' dt 1e-3 and 2.5e-4 (to 6.5 s), all cold.
 - Time design (Astra, `reference/production/astra_3_*`): fixed dt 5e-4 for the spatial
   sequence, temporal runs at 2x' (1e-3, and a 2.5e-4 branch) and a 4x' 2.5e-4 branch.
 
