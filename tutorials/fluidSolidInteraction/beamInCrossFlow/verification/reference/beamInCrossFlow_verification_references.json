@@ -1,54 +1,59 @@
 {
-  "original": {
-    "description": "Richter/Tukovic small-deformation benchmark",
+  "richter": {
+    "description": "Richter (2012) stationary three-dimensional FSI benchmark",
     "pointA": [0.45, 0.15, -0.15],
-    "references": {
-      "ux": {"value": 5.95e-5, "tolerance": 0.05, "primary": true, "source": "Richter/Tukovic"},
-      "uy": {"value": 2.40e-5, "tolerance": 0.35, "primary": false, "source": "Tukovic OpenFOAM calculation"},
-      "fx": {"value": 1.33, "tolerance": 0.05, "primary": true, "source": "Richter/Tukovic"},
-      "fy": {"value": 0.1055, "tolerance": 0.35, "primary": false, "source": "Tukovic OpenFOAM calculation"}
+    "pointAEquivalentPublishedCoordinate": [0.45, 0.15, 0.15],
+    "referenceProvenance": {
+      "citation": "Thomas Richter (2012), Goal-oriented error estimation for fluid-structure interaction problems, Computer Methods in Applied Mechanics and Engineering 223-224, 28-42, doi:10.1016/j.cma.2012.02.014",
+      "detail": "Table 5 contains five uniformly refined Q1 finite-element results. Table 6 extrapolates the finest three to Fx=1.327 N with +/-0.01 N accuracy and ux(A)=5.924e-5 m with +/-1e-7 m accuracy; Richter states that the values are accurate to at most about 1% relative error."
     },
-    "publishedReferences": {
-      "richterBenchmark": {
-        "ux": 5.95e-5,
-        "fx": 1.33
+    "references": {
+      "ux": {
+        "value": 5.924e-5,
+        "absoluteUncertainty": 1e-7,
+        "tolerance": 0.05,
+        "primary": true,
+        "source": "Richter (2012), Table 6"
       },
-      "tukovicOpenFOAM": {
-        "ux": 5.93e-5,
-        "uy": 2.40e-5,
-        "fx": 1.31,
-        "fy": 0.1055
+      "fx": {
+        "value": 1.327,
+        "absoluteUncertainty": 0.01,
+        "tolerance": 0.05,
+        "primary": true,
+        "source": "Richter (2012), Table 6"
       }
-    }
-  },
-  "modified": {
-    "description": "Tukovic large-deformation form using St Venant-Kirchhoff elasticity",
-    "references": {
-      "ux": {"value": 0.01463, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28"},
-      "uy": {"value": 0.005, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28"},
-      "uz_symmetry_difference": {"value": -0.000447, "tolerance": 0.05, "primary": true, "source": "Tukovic Fig. 28; compared as 2*uz"}
     },
     "publishedReferences": {
-      "tukovicFig28": {
-        "ux": 0.01463,
-        "uy": 0.005,
-        "uz_symmetry_difference": -0.000447
+      "richter2012Table5Finest": {
+        "ux": 5.9202e-5,
+        "fx": 1.3380
+      },
+      "richter2012Table6": {
+        "ux": 5.924e-5,
+        "fx": 1.327
       }
-    },
-    "mesh": {
-      "refinementFactors": [1, 2, 3, 4, 8],
-      "deltaTs": [0.05, 0.025, 0.0166667, 0.0125, 0.00625],
-      "endTime": 8.0,
-      "minimumReferenceErrorOrder": 0.0
     }
   },
   "mesh": {
     "refinementFactors": [1, 2, 4, 8],
-    "deltaTs": [0.05, 0.025, 0.0125, 0.00625],
+    "deltaTs": [0.00625, 0.00625, 0.00625, 0.00625],
     "endTime": 8.0,
     "minimumReferenceErrorOrder": 0.0
   },
+  "gradedMesh": {
+    "refinementFactors": [1, 2, 4, 8, 16],
+    "deltaTs": [0.00625, 0.00625, 0.00625, 0.00625, 0.00625],
+    "endTime": 8.0,
+    "minimumReferenceErrorOrder": 0.0,
+    "temporalFactor": 8,
+    "temporalDeltaTs": [0.003125],
+    "temporalComparisonDeltaT": 0.00625,
+    "temporalComparisonStudy": "Richter graded mesh L3"
+  },
   "coupling": {
-    "relativeTolerance": 0.01
+    "refinementFactor": 8,
+    "relativeTolerance": 0.01,
+    "productionOuterTolerance": 1e-6,
+    "tightOuterTolerance": 1e-7
   }
 }

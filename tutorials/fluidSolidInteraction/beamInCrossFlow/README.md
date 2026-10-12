@@ -5,7 +5,7 @@ sort: 4
 # My third tutorial: `beamInCrossFlow`
 
 You can find the files for this tutorial under
-[`tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils).
+[`tutorials/fluidSolidInteraction/beamInCrossFlow`](https://github.com/solids4foam/solids4foam/tree/development/tutorials/fluidSolidInteraction/beamInCrossFlow).
 
 ---
 
@@ -26,32 +26,28 @@ is considered. An incompressible viscous fluid with a density of 1000 kg/m3 and
 kinematic viscosity of 0.001 m2/s enters the channel from the left-hand side
 with a parabolic velocity profile.
 
-This case can be analysed in two forms:
+The production case reproduces the stationary three-dimensional benchmark of
+[Richter](https://doi.org/10.1016/j.cma.2012.02.014). The channel is
+`[0, 1.5] x [0, 0.4] x [-0.4, 0.4] m`, and symmetry permits the computation to
+use its `z <= 0` half. The undeformed solid is
+`[0.4, 0.5] x [0, 0.2] x [-0.2, 0.2] m`. Following the explicit boundary
+condition in section 7.2 of Richter (2012), the inlet profile is bi-parabolic
+with peak speed `0.3 m/s`. The same paragraph states an average speed of
+`0.2 m/s` and `Re=40`, although the area average of the printed profile is
+`4/9` of its peak. This source inconsistency is retained explicitly rather
+than choosing the coefficient that best reproduces the reference table. The
+outlet uses the do-nothing/zero-traction condition, and the remaining outer
+walls are no-slip.
 
-- The original form, proposed by
-  [Richter](https://onlinelibrary.wiley.com/doi/10.1002/nme.4943): The peak
-  inlet velocity is 0.2 m/s, corresponding to Re = 40 with respect to the plate
-  height (h = 0.2 m). The peak inlet velocity gradually increases from zero at t
-  = 0 s to its maximum value at t = 4 s using the following transition function
-  $$0.2 [1 − \cos(\pi t/4)]/2$$. A constant pressure is imposed at the channel
-  outlet, and a no-slip boundary condition is applied on the channel walls. The
-  elastic plate has a density of 1000 kg/m3, Young’s modulus of 1.4 MPa (shear
-  modulus of 0.5 MPa), and a Poisson’s ratio of 0.4.
-- A modified form, analysed by
-  [Gillebaart et al.](https://doi.org/10.1016/j.cma.2015.09.025) and
-  [Tuković et al.](https://hrcak.srce.hr/206941): The peak inlet velocity is
-  increased to 0.3 m/s, and the Young’s modulus of the solid beam is reduced to
-  10 kPa. In addition, the velocity reaches its maximum value at 1 s, and the
-  simulation continues until the beam reaches steady-state. The purpose of these
-  changes is to demonstrate large solid displacements and fluid mesh motion.
-
-```note
-The `beamInCrossFlow` case in solids4foam is set up in the modified form;
- however, it is straight-forward to return the case to its original form by
- setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
- setting `E` to `1.4e6` in `constant/solid/mechanicalProperties`, and running
- past `t = 4 s` until the solution is steady.
-```
+The elastic plate has density `1000 kg/m3`, Young's modulus `1.4 MPa`, shear
+modulus `0.5 MPa`, Poisson ratio `0.4`, and the compressible St
+Venant--Kirchhoff law used by Richter. Point A is the material point
+`(0.45, 0.15, 0.15) m`; the supplied negative-`z` symmetry half samples its
+equivalent point `(0.45, 0.15, -0.15) m`. The inlet is ramped over the first
+second only as a continuation device for the transient-to-steady partitioned
+solution. Verification values are accepted only after the solution satisfies
+the documented steady-state criterion, so the ramp is not part of the
+stationary benchmark definition.
 
 The fluid is described by incompressible Newtonian isothermal laminar flow,
 where the Navier-Stokes governing equations take the form:
@@ -68,8 +64,8 @@ $$
 + \boldsymbol{f_b}
 $$
 
-For the solid, we assume finite strains (though a small strain assumption would
-be OK in the the original form of the case) with the material behaviour
+For the solid, we assume finite strains (although the benchmark deformation is
+small enough for a small-strain approximation) with the material behaviour
 described by the St Venant-Kirchhoff hyperelastic law:
 
 $$
@@ -132,15 +128,12 @@ end
 
 The incoming flow imparts pressure and viscous forces on the plate, causing it
 to bend. Following some initial transient effects, the flow and beam reach a
-steady-state. In the modified form of the case, with an increased peak inlet
-velocity of 0.3 m/s and reduced Young’s modulus of 10 kPa, displacement of point
-A is expected to be (0.01463, 0.005, −0.000447) m at steady state. Further
-details of the case can be found in
-[Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković (2018) OpenFOAM Finite
-Volume Solver for Fluid-Solid Interaction](https://hrcak.srce.hr/206941);
-in particular, see Fig. 28 therein. Figure 2 shows the displacement field in the
-beam, the fluid velocity streamlines, and the fluid pressure on the channel
-ground, wall and outlet.
+steady state. Richter's finite-element extrapolations are
+`u_x(A) = 5.924e-5 m` with stated accuracy `+/-1e-7 m` and
+`F_x = 1.327 N` with stated accuracy `+/-0.01 N`. These are independent-code
+verification targets, not regression values to which the discretisation is
+tuned. Figure 2 shows the displacement field in the beam, the fluid velocity
+streamlines, and the fluid pressure on the channel ground, wall and outlet.
 
 ![Diagram of the expected results](images/fs_over_2.PNG)
 
