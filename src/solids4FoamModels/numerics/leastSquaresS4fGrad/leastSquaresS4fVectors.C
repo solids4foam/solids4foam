@@ -161,7 +161,10 @@ namespace
                 sqr(a[0][1]) + sqr(a[0][2]) + sqr(a[1][2]);
             const scalar diag = sqr(a[0][0]) + sqr(a[1][1]) + sqr(a[2][2]);
 
-            if (offDiag == 0 || offDiag <= sqr(VSMALL)*diag)
+            // Stop once the off-diagonal entries are negligible next to the
+            // diagonal ones: a relative tolerance, since sqr(VSMALL)
+            // underflows to zero
+            if (offDiag == 0 || offDiag <= sqr(SMALL)*diag)
             {
                 break;
             }
@@ -236,52 +239,51 @@ namespace
             e[i] = vector(v[0][i], v[1][i], v[2][i]);
         }
     }
+
+
+    // The Moore-Penrose pseudo-inverse of a symmetric positive semi-definite
+    // stencil tensor: the sum over the eigenvalues above 1e-12 times their
+    // sum of the inverse eigenvalue times the outer product of its
+    // eigenvector, from a Jacobi eigen-decomposition. A direction below that
+    // threshold is one the stencil does not span, and the inverse is zero
+    // along it; every direction above it, however weak, is inverted exactly,
+    // so a linear field is reproduced in every direction the stencil spans.
+    // The zero tensor has a zero inverse
+    symmTensor pseudoInverse(const symmTensor& dd)
+    {
+        // A direction whose eigenvalue is below this fraction of the sum of
+        // them is treated as one the stencil does not span: the inverse
+        // along it would amplify round-off by its reciprocal
+        const scalar rankTol = 1e-12;
+
+        // Sum of the eigenvalues, all non-negative
+        const scalar scale = tr(dd);
+
+        if (scale < VSMALL)
+        {
+            return symmTensor::zero;
+        }
+
+        vector lambda(vector::zero);
+        List<vector> e;
+        jacobiEigenDecomposition(dd, lambda, e);
+
+        const scalar tol = rankTol*scale;
+
+        symmTensor pinv(symmTensor::zero);
+
+        for (label i = 0; i < 3; i++)
+        {
+            if (lambda[i] > tol)
+            {
+                pinv += (1.0/lambda[i])*sqr(e[i]);
+            }
+        }
+
+        return pinv;
+    }
 }
 } // End namespace Foam
-
-
-// * * * * * * * * * * * * * Static Member Functions * * * * * * * * * * * * //
-
-Foam::symmTensor Foam::leastSquaresS4fVectors::pseudoInverse
-(
-    const symmTensor& dd,
-    label& rank
-)
-{
-    // A direction whose eigenvalue is below this fraction of the sum of
-    // them is treated as one the stencil does not span: the inverse along it
-    // would amplify round-off by its reciprocal
-    const scalar rankTol = 1e-12;
-
-    // Sum of the eigenvalues, all non-negative
-    const scalar scale = tr(dd);
-
-    if (scale < VSMALL)
-    {
-        rank = 0;
-        return symmTensor::zero;
-    }
-
-    vector lambda(vector::zero);
-    List<vector> e;
-    jacobiEigenDecomposition(dd, lambda, e);
-
-    const scalar tol = rankTol*scale;
-
-    rank = 0;
-    symmTensor pinv(symmTensor::zero);
-
-    for (label i = 0; i < 3; i++)
-    {
-        if (lambda[i] > tol)
-        {
-            rank++;
-            pinv += (1.0/lambda[i])*sqr(e[i]);
-        }
-    }
-
-    return pinv;
-}
 
 
 // * * * * * * * * * * * * * * * * Constructors * * * * * * * * * * * * * * //
@@ -1000,10 +1002,8 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     {
         if (stillSingular[wcI])
         {
-            label rank = 0;
-            wideInvDd[wcI] = pseudoInverse(wideDd[wcI], rank);
-
-            if (rank == 0)
+            // A zero tensor comes from an empty stencil
+            if (tr(wideDd[wcI]) < VSMALL)
             {
                 FatalErrorInFunction
                     << "Cell " << wideCells_[wcI] << " has no admissible "
@@ -1011,6 +1011,8 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
                     << "own material, and no known-value boundary face."
                     << exit(FatalError);
             }
+
+            wideInvDd[wcI] = pseudoInverse(wideDd[wcI]);
         }
     }
 
