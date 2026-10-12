@@ -216,6 +216,10 @@ assumptions, and are stored in the reference JSON.
 A `--quick` run only checks that the coarse dry and moderate wet frequencies
 are within 1% of the exact values.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference results
 
 Recorded with OpenFOAM v2412 on xenosim with `./Allverify --cores 32`; all
