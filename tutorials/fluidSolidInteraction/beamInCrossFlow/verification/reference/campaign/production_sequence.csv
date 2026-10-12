@@ -1,0 +1,4 @@
+level,factor,fluid_cells,solid_cells,cells_through_thickness,dt,ux,uy,uz,fx,fy,fz,steady_uncertainty_ux_rel,steady_uncertainty_fx_rel,runs,notes
+0,1,8112,512,8,0.00625,8.1391864e-05,1.957234e-06,-2.030798e-06,2.157358,0.326940,-0.257415,1e-6,2e-6,P5_L0_rest(t=24) P5_L0_init(t=16) P_L0_rest P_L0_init,rest and rigid-flow starts and tol 1e-5/1e-6 agree to <=1.3e-6
+1,2,64896,4096,16,0.00625,9.626069e-05,1.940570e-06,-2.150348e-06,2.305679,0.337728,-0.276467,1.6e-6,1.6e-6,c1_L1_tol1e-5(rest t=16) P_L1_init(t=12) c1_L1_tol1e-4/1e-6/1e-7 b1_*,midpoint of rest and rigid-flow starts
+2,4,519168,32768,32,0.00625,1.0245468e-04,1.926320e-06,-2.202999e-06,2.363630,0.344281,-0.287987,3e-7,3e-7,P_L2_init(t=12) c2_L2_init_tol1e-4(t=8),drift over last 2 s 2.5e-7 (ux) 2.5e-7 (Fx); tol 1e-4 vs production differ <=1.1e-7 at t=8

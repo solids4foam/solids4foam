@@ -109,8 +109,15 @@ is identical) and 1.9e-5 in `u_x(A)`; the interior ALE mesh differs by up to
 start. With p/U tolerance 1e-10 both starts agree to 1.4e-6 (`F_x`) and
 2e-6 (`u_x`). Rigid-beam runs (no mesh motion) are unique to 2e-7 across
 decompositions even with loose tolerances. The production settings therefore
-use p/U 1e-10 and mesh motion 1e-12 (MeluXina confirmation at L1:
-`P_L1_init_loose` vs `P_L1_init`, running).
+use p/U 1e-10 and mesh motion 1e-12. The finding is local (workstation,
+v2512) at L0: on MeluXina at L1 the loose-tolerance run (`P_L1_init_loose`)
+agreed with the tight one to 1e-8, so the effect was not reproduced there; it
+is reported as solver-tolerance-sensitive ALE trajectories leading to
+different discrete equilibria (supported, not proven: a crossover test on a
+common interior mesh was not run). The interior mesh differences were up to
+1.6e-5 m, about 1e-3 of the local cell size. On MeluXina with the production
+tolerances the rest and rigid-flow starts agree to 1.3e-6 at L0 and 1.6e-6
+at L1.
 
 ### 3. Separating structural and fluid errors
 
@@ -146,30 +153,131 @@ dt. Rigid `F_x`, t = 12 s: L1 2.307303/2.306835/2.306578 for dt
 (1.7e-5). dt = 0.00625 s is held fixed at every level (max Courant 1.5 at
 L3); the FSI dt check is `c1_L1_tol1e-6_dt0125`.
 
-## Production design (pending Astra review and L1 matrix)
+### 5. Coupling criterion (final) and its evidence
 
-- Mesh family: graded fluid family, every count x2 per level, `m = 2`.
-- Coupling: strict `max(r1, r2) <= 1e-6`, `nOuterCorr 50`,
-  `allowUnconvergedCoupling yes` only as a counted safety net, IQN-ILS as in
-  the tutorial; PIMPLE `nOuterCorrectors 3`; p/U tolerance 1e-10, mesh
-  motion 1e-12, SNES rtol/stol 1e-6 (1e-9 checked at L1).
-- Steady state: L0-L2 from rest and from the converged rigid flow (history
-  check); L3 from the converged rigid flow.
+The relative measure `r1` normalises the residual by the largest residual of
+the current step. As the steady state is approached the per-step change, and
+with it that normaliser, goes to zero, so any fixed `r1` target eventually
+falls below the solver noise floor. On L1 (from rest, cap 50) the strict test
+needed 8-10 iterations per step until t ~ 10 s and then rose to the cap: at
+1e-6, 29 capped steps after t = 15.5 s (`r1` floor 1.5e-6, `r2` ~ 1e-14); at
+1e-7, 34 capped steps by t = 12 s; from the rigid flow, 67 capped steps with
+`r1` up to 0.04 and `r2` <= 7e-9. At 1e-5 no step capped (max 18 iterations).
 
-## STATUS (2026-10-12)
+Production criterion: strict `max(r1, r2) <= 1e-5`, `nOuterCorr 30`,
+`allowUnconvergedCoupling yes` as a counted safety net (capped steps are
+listed with their `r1`, `r2` in `campaign_steps.csv`), PIMPLE 3 correctors,
+p/U 1e-10, mesh motion 1e-12, SNES rtol/stol 1e-6.
 
-MeluXina jobs (account p201287, `/project/home/p201287/philip/beam-richter-opus`):
+Evidence that the coupling error is negligible (relative changes):
 
-- 5329141 `beamO_c1`: L1 coupling-tolerance matrix from rest to t = 16 s
-  (`runs/c1_L1_tol{1e-4,1e-5,1e-6,1e-7}`, `_loose`, `_dt0125`).
-- 5329220 `beamO_p0`: `P_L0_rest`, `P_L0_init`, `P_L1_init`,
-  `P_L1_rest_snes1e-9`, `P_L1_init_loose`, `P_L2_init` (L2 needs a
-  continuation beyond the 14 h walltime).
-- 5329151 `beamO_solid`: solid diagnostic on MeluXina (m = 1, m = 2,
-  high order; m = 1 at 16x).
+| test | `u_x(A)` | `F_x` |
+| --- | ---: | ---: |
+| L1 from rest, strict 1e-4 / 1e-5 / 1e-6 / 1e-7 at t = 16 s (12 s for 1e-7) | <= 1.0e-6 (1e-7: 2.4e-6, not yet steady) | <= 1.1e-6 |
+| L1, continued from steady with strict 1e-8 (cap 100, every step capped, `r2` ~ 1e-14) | 3e-7 | 2e-6 |
+| L1, continued with the legacy `min(r1, r2) <= 1e-6` for 6 s | +-1e-6 noise, no drift | +-3e-6 |
+| L1, continued with PIMPLE 6 correctors | 6e-7 | 3e-6 |
+| L1, SNES rtol/stol 1e-9 vs 1e-6 (from rest, t = 16 s) | < 1e-8 | < 1e-8 |
+| L0, strict 1e-5 vs 1e-6 (rest t = 24 s, rigid-flow start t = 16 s) | <= 3e-7 | <= 4e-7 |
+| L2, strict 1e-4 vs production (same start, compared at t = 2...8 s) | <= 1.9e-7 | <= 1.6e-6 (t = 2 s), 8e-8 (t = 8 s) |
 
-Next: Astra review of the coupling criterion and production plan; L2 from
-rest; L3 from the rigid L3 flow (estimate 2700-4500 core-h, to be confirmed
-with Philip if above 3000).
+The capped `1e-6`/`1e-7` runs are sensitivity evidence, not references; the
+coupling error is below 2e-6 at every tested setting, two to three orders
+below the L1-L2 mesh increments.
+
+### 6. Time step
+
+The steady state of this transient PIMPLE (Rhie-Chow) discretisation depends
+on dt. It is reversible (L1: from the dt = 0.00625 steady state, dt = 0.0125
+moves `u_x(A)` to 9.6168e-5 and the reverse branch returns to 9.6261e-5), so
+it is a property of the discrete steady equations, not of the transient
+path.
+
+| level | dt = 0.0125 | dt = 0.003125 | (relative to dt = 0.00625) |
+| --- | ---: | ---: | --- |
+| rigid L1 `F_x` | -1.1e-4 | +2.0e-4 | t = 12 s |
+| rigid L2 `F_x` | -1.7e-5 | +3.6e-5 | t = 12 s |
+| rigid L3 `F_x` | - | +3.4e-6 | t = 24 s |
+| FSI L1 `u_x(A)` | -9.6e-4 | +1.4e-3 | restarted from steady |
+| FSI L1 `F_x` | -5.9e-4 | +8.7e-4 | restarted from steady |
+| FSI L2 | running (`b2_L2_dt0125`, `b2_L2_dt003125`) | | |
+
+The dt effect falls by 6-10x per level (rigid), consistent with a Rhie-Chow
+term that vanishes with h at fixed dt, and grows as dt decreases (as the
+`rAU`-weighted pressure smoothing weakens). dt = 0.00625 s is therefore held
+fixed at all levels; the FSI dt effect is ~5x the rigid one because, on the
+moving mesh, `ddtCorr` uses the face velocity `Uf`, which is consistent with
+`phi` at steady state, so the `ddtCorr` contribution vanishes and only the
+`rAU`-dependent smoothing remains (interpretation).
+
+### 7. Steady state
+
+L0-L2 histories are in `reference/campaign/production_histories`. From the
+converged rigid-beam flow the FSI state is within 3.4e-4 (`u_x`) after 2 s,
+1.6e-5 after 4 s and 2.5e-7 per 2 s after 12 s (L2). From rest the wake mode
+(tau ~ 2 s) needs ~16-20 s.
+
+## Production sequence (MeluXina, one build), `m = 2`, dt = 0.00625
+
+| level | fluid cells | solid cells (`N_t`) | `u_x(A)` (m) | `u_y(A)` (m) | `u_z(A)` (m) | `F_x` (N) | `F_y` (N) | `F_z` (N) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| L0 | 8,112 | 512 (8) | 8.13919e-5 | 1.95723e-6 | -2.03080e-6 | 2.15736 | 0.32694 | -0.25742 |
+| L1 | 64,896 | 4,096 (16) | 9.62607e-5 | 1.94057e-6 | -2.15035e-6 | 2.30568 | 0.33773 | -0.27647 |
+| L2 | 519,168 | 32,768 (32) | 1.024547e-4 | 1.92632e-6 | -2.20300e-6 | 2.36363 | 0.34428 | -0.28799 |
+| L3 | 4,153,344 | 262,144 (64) | pending approval | | | | | |
+
+`u_z` is reported for the computed `z <= 0` half (Richter's A is the mirror
+point, `u_z` changes sign); `F` is the force on the half interface.
+
+Changes and observed orders (L0-L1-L2): `u_x` +15.4 %, +6.0 % (p = 1.26);
+`F_x` +6.4 %, +2.5 % (p = 1.36); `F_y` +3.2 %, +1.9 % (p = 0.72);
+`u_z` +5.6 %, +2.4 % (p = 1.18); `u_y` -0.86 %, -0.74 % (p = 0.23).
+Three levels are not enough to claim asymptotic behaviour and no
+Richardson/GCI value is quoted. Steady-state and coupling uncertainties are
+<= 2e-6 at every level; the dt effect is quantified separately (section 6).
+The rigid-beam `F_x` sequence (L0-L3) has orders 1.36 and 1.55; the FSI and
+rigid `F_x` differ by -0.48 %, -0.047 %, +0.11 % at L0-L2.
+
+Comparison with Richter is deferred until L3 is available.
+
+## Astra (GPT-6-Astra, xhigh) review, 2026-10-12
+
+Prompt and full reply: `reference/campaign/astra/`. Main points and actions:
+
+- Relative-reduction tests become unattainable at steady state; recommends a
+  calibrated absolute floor, `R <= max(1e-5 R_step, R_abs)`. Not available
+  in the frozen build; approximated by strict 1e-5 with a counted cap and an
+  `r2` audit of capped steps, plus the sensitivity table above. Possible
+  follow-up: implement the floor in solids4foam (separate PR).
+- Capped 1e-6/1e-7 runs are sensitivity evidence, not references (adopted);
+  check PIMPLE 3 vs 5-6 (done: PIMPLE 6, 6e-7) and SNES 1e-9 (done, < 1e-8).
+- History mechanism: "supported, not proven"; do not claim reproduction on
+  MeluXina (wording adopted; crossover test not run).
+- Keep dt fixed, conditional on dt checks at L2 (running) and ideally L3; a
+  rigid L4 at another dt cannot enter the extrapolation and does not bound
+  the FSI error (rigid L4 not run).
+- Keep L3 for credible coupled orders; rigid-flow initialisation at L3 is
+  acceptable; stopping budget: transient and iterative errors each < 5 % of
+  the finest mesh increment.
+- `m = 2` family is systematic; diagnostic solid/fluid errors cannot simply
+  be added; monotonicity alone is insufficient for GCI.
+- Reported L1 rest/rigid-start difference corrected to 1.6-3.2e-6 relative.
+
+## STATUS (2026-10-12 21:30 CEST)
+
+Completed (MeluXina, account p201287, `/project/home/p201287/philip/beam-richter-opus/runs`):
+L0-L2 production, the L1 coupling matrix and branches, L2 tolerance check,
+rigid-beam L0-L3 (+ dt checks), solid diagnostics. About 6,000 core-h used
+(node-charged) since 2026-10-11.
+
+Running: 5333539 `beamO_b2a` and 5333540 `beamO_b2b` (L2 dt = 0.0125 and
+0.003125 restarted from the L2 steady state).
+
+Pending approval: L3 FSI from the converged rigid L3 flow, case
+`runs/P5_L3_init` prepared (384 ranks, 0-4 s), submit with
+`jobs/SUBMIT_L3_segment1.sh`. Estimate 1,800-2,500 core-h (3 nodes, ~7 h);
+4 s from the rigid flow left 1.6e-5 at L2, below 5 % of the expected L2-L3
+increment. Then: L3 dt check (optional), orders L1-L3, Richter comparison,
+paper evidence.
 
 <!-- markdownlint-enable MD013 -->
