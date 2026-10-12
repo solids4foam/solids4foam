@@ -1517,3 +1517,76 @@ Decisions so far (details below when complete):
 Environments: `scripts/prod_env_study.sh` (replay, study binary of the 1x'-4x' replays),
 `scripts/prod_env_build.sh` (coupled, production build at 30d6e22f3 with PR #554),
 `scripts/run_replay_meluxina.slurm`.
+
+### Task 1: 8x' ring+box replay
+
+Setup: the ring+box family of the second-order study (`ht_mesh_family.py --ring-n 22
+--rows-n 16 --tip-n 4 --aft-n 60 --wake-n 70`, level 8: 752 896 cells), the developed rigid
+state mapped from the 4x CFD3 state at 25 s, the same replay table (the 2x coupled motion,
+interpolated to the 8x' plate points), central convection, `displacementLaplacian`,
+`movingWallPressure`, dt 1.25e-4 (the matched path 1e-3/5e-4/2.5e-4/1.25e-4), PIMPLE 3/3/1,
+tolerances 1e-6 with relTol 0.01 for the non-final p solves, 25 to 30.2 s, analysis over
+the five periods ending at 30.2 s as for every level. Two differences from 1x'-4x':
+
+- the p solver is GAMG with the DICGaussSeidel smoother and nCellsInCoarsestLevel 200
+  (the tolerances are unchanged): 0.73 s per step on 64 ranks against 1.53 s for the
+  GaussSeidel/20 setting of 1x'-4x', and the two agree to 1e-5 (relative) in the plate
+  forces after 200 steps; the earlier "1000 GAMG iterations per step" at 8x was the first
+  steps after mapping, not the developed state;
+- it ran on MeluXina (128 ranks, EPYC 7H12, OpenFOAM v2512 source build with GCC 13.3,
+  solids4foam aee0c8e3, the commit of the xenosim study binary), because the shared
+  xenosim node filled up and the step time there rose from 0.82 to 2.6-3.7 s. The xenosim
+  start (64 ranks, 25 to 26.37 s) is kept as a platform check: over the five periods
+  ending at 26.36 s, Q_in is 82.184 (xenosim) and 82.127 N/m (MeluXina), the lift
+  fundamental 152.26 and 152.16 N/m, the mean drag -23.452 and -23.450 N/m
+  (`reference/production/replay_8x_platform_overlap.csv`): the platform (and rank count)
+  changes Q_in by 0.07%, 30 times less than the 4x' to 8x' change below.
+
+The replay table builder rounded the 10 um point keys with Python's round-half-even, while
+the boundary condition uses `std::llround`; the 8x' tip face has points on exact ties, so
+both now round half away from zero (`hron_turek_replay.py`; the 1x'-4x' tables are
+unchanged, checked byte for byte).
+
+Stationarity: Q_in in sliding five-period windows is 77.43, 77.26, 77.20, 77.17, 77.16 N/m
+for windows ending 28.2, 28.6, 28.9, 29.5, 30.2 s (`replay_8x_sliding.txt`); the drift over
+the last second is -0.016 N/m/s, as at 2x' and 4x' (-0.013, -0.018).
+
+Results (N/m, J/m; window ending 30.2 s; `replay_8x_runs.csv`, `replay_8x_families.csv`,
+`replay_8x_energy.json`):
+
+| level | cells | Q_in | Q_quad | W | lift fundamental (re, im) | lift amplitude | mean drag |
+|---|---:|---:|---:|---:|---|---:|---:|
+| 1x' | 11 764 | 67.18 | -1.79 | | (89.1, 127.2) | 155.30 | -15.21 |
+| 2x' | 47 056 | 79.63 | 1.25 | 0.006 | (98.1, 120.8) | 155.59 | -18.32 |
+| 3x' | 105 876 | 79.99 | 1.48 | | (93.2, 125.2) | 156.02 | -18.55 |
+| 4x' | 188 224 | 79.27 | 1.60 | 0.042 | (88.9, 129.7) | 157.22 | -18.32 |
+| 8x' | 752 896 | **77.16** | 1.91 | 0.077 | (79.9, 139.6) | 160.85 | -17.46 |
+| standard 4x | 85 376 | 81.96 | -1.46 | | | 150.49 | -19.70 |
+
+Observed orders on 2x'/4x'/8x': none is defined for Q_in (differences -0.36 then -2.11:
+growing), the lift amplitude (+1.6, +3.6), W (+0.035, +0.035) or the mean drag (0.00, +0.86);
+Q_quad gives p = 0.13 (+0.34, +0.31), not an asymptotic order. On 3x'/4x'/8x' no quantity is
+monotone with shrinking differences.
+
+Reading:
+
+- **The ring+box plateau is not real.** 2x', 3x' and 4x' agreed within 0.5%, but the 8x'
+  level moves Q_in by -2.7% (-2.1 N/m), six times the 2x' to 4x' change, and away from the
+  standard family. The two families now differ by 4.8 N/m (6%) at their finest levels,
+  against 2.7 N/m (3.4%) before. Astra's frozen prediction (82.7 at 4x', implying an
+  increase) is not borne out either.
+- **The flag load is still being resolved through the phase of the lift.** The lift
+  fundamental rotates steadily with refinement, (98, 121), (89, 130), (80, 140) N/m at
+  2x', 4x', 8x', about 4 degrees per level, while its amplitude grows by 1.6 and 3.6 N/m.
+  Q_in (the in-phase part on the replayed shape) and W are small residuals of that
+  rotating phasor, so they inherit its slow, non-asymptotic change. The mean drag on the
+  flag, which had converged between 2x' and 4x', moves by 0.9 N/m at 8x'.
+- The fluid-side load is therefore converged only to a few percent, and not
+  monotonically: on the evidence of two families and five ring+box levels, the in-phase
+  load lies between 77 and 82 N/m, and the trend at the finest level is downwards. No
+  observed order, Richardson value or GCI is quoted for it.
+
+Cost: 1 730 core-hours on MeluXina (13.5 h on 128 cores) and about 210 on the abandoned
+xenosim start.
+
+![Replay families](reference/production/replay_families.png)

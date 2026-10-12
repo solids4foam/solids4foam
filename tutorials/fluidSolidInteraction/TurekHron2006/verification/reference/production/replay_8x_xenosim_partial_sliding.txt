@@ -1,0 +1,3 @@
+== /home/philipc/ht_prod/work/rb_8x_fastp_xenosim_partial
+  t_end 26.189  Q_in 56.719  Q_quad 24.072  lift1 170.31  drag -24.145
+  t_end 26.370  Q_in 81.498  Q_quad 2.543  lift1 149.94  drag -23.245

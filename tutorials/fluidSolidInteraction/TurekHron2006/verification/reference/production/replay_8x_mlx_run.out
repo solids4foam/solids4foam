@@ -1,0 +1,6 @@
+start 2026-10-11T13:36:07+02:00 host mel0326 n=128
+bin /project/home/p201287/philip/solids4foam-hronturek-v2512/platforms/bin/solids4Foam
+s4f aee0c8e3502675749ae89185cc957633ebd6d854
+gcc (GCC) 13.3.0
+Model name:          AMD EPYC 7H12 64-Core Processor
+exit 0 end 2026-10-12T03:54:07+02:00 log log.solids4Foam
