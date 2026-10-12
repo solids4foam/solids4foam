@@ -91,6 +91,9 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
   measures in the shared FSI convergence check to satisfy the tolerance.
   Legacy behavior uses the minimum of the available residual measures, which
   can stop earlier when only one measure has decayed.
+- `outerCorrAbsoluteTolerance`: optional absolute interface residual
+  tolerance in metres, available to all coupling schemes (see
+  [Absolute residual tolerance](#absolute-residual-tolerance)).
 - `qrSolveTolerance`: relative cutoff used to ignore nearly singular
   directions during the triangular back-substitution.
 - `reorthogonalizeCouplingColumns`: optionally apply a second
@@ -190,3 +193,37 @@ is the header-only interface implemented by `immersedBoundaryForce`.
   not guaranteed to make a case monotonically more robust. The best reuse level
   is case dependent and interacts with time-step size and the quality of the
   inner fluid and solid solves.
+
+---
+
+## Absolute residual tolerance
+
+The shared convergence check normalizes the interface residual in two ways:
+residual1, relative to the largest residual in the time step, and residual2,
+relative to the largest total interface displacement. The legacy default
+accepts a step when `min(residual1, residual2) < outerCorrTolerance`, which
+can stop after one iteration through residual2 while residual1 is still large
+in quasi-steady phases, so the coupling error accumulates (#552). The log
+prints a note when the legacy test is passed by one measure only.
+`requireAllResidualMeasures yes` uses the maximum instead, but near a steady
+state the residual is tiny from the first iteration, so the relative
+reduction residual1 can be unattainable and every step reaches `nOuterCorr`.
+
+`outerCorrAbsoluteTolerance` (default `0`, disabled) adds an absolute test: a
+step is also converged if the maximum point mismatch between the solid and
+fluid interface, `max |residual|` over the interface points in metres, is
+below the value. This is in addition to the existing test (legacy or
+`requireAllResidualMeasures`), so it does not reopen the `min()` loophole. The
+maximum, rather than an RMS, is used because it is independent of the number
+of interface points, so the same value is meaningful under mesh refinement,
+and it cannot hide a local mismatch. The absolute residual is printed next to
+the relative residuals, and a line states when it accepts a step.
+
+```c++
+requireAllResidualMeasures yes;
+outerCorrAbsoluteTolerance 1e-9; // m
+```
+
+Choose a small fraction of the smallest interface cell size, or of the
+displacement accuracy you need, e.g. 1e-3 of the cell size or below. With the
+option unset the behaviour is unchanged.

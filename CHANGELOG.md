@@ -8,6 +8,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
+  a fluid-solid coupling step is also converged if the maximum interface point
+  mismatch is below this absolute value in metres. It complements
+  `requireAllResidualMeasures`, whose relative-reduction measure can be
+  unattainable near a steady state. It is disabled by default. The log also
+  notes when the legacy minimum test is passed by one residual measure only
+  (#552).
 - Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
   applies the backward differentiation formula of order 1 to 6 twice, as the
   `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and
