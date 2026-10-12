@@ -179,7 +179,7 @@ Evidence that the coupling error is negligible (relative changes):
 | L1, continued with PIMPLE 6 correctors | 6e-7 | 3e-6 |
 | L1, SNES rtol/stol 1e-9 vs 1e-6 (from rest, t = 16 s) | < 1e-8 | < 1e-8 |
 | L0, strict 1e-5 vs 1e-6 (rest t = 24 s, rigid-flow start t = 16 s) | <= 3e-7 | <= 4e-7 |
-| L2, strict 1e-4 vs production (same start, compared at t = 2...8 s) | <= 1.9e-7 | <= 1.6e-6 (t = 2 s), 8e-8 (t = 8 s) |
+| L2, strict 1e-4 vs production (same start; t = 2 s / t = 8 s) | 1.9e-6 / 1.1e-7 | 1.6e-6 / 8e-8 |
 
 The capped `1e-6`/`1e-7` runs are sensitivity evidence, not references; the
 coupling error is below 2e-6 at every tested setting, two to three orders
