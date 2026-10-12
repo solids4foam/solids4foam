@@ -37,6 +37,9 @@ release. For complete commit-level details and contributor information, see the
   the momentum equation of both the segregated and PETSc SNES paths on
   OpenFOAM.com, with the same protected `fvOptionsSource()` hook as the linear
   geometry model for OpenFOAM.org and foam-extend.
+- The solid models page documents the `restart` switch: the fields it writes,
+  what happens when a run continues from a later time without it, and the
+  known restart limitations (#68).
 - A documentation page for each `mechanicalConstitutiveLaw`, next to its
   class, giving its entries and defaults, its state, its tangents, whether it
   supports the mixed displacement-pressure formulation, how it differs from
