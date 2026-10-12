@@ -200,9 +200,10 @@ path.
 | rigid L3 `F_x` | - | +3.4e-6 | t = 24 s |
 | FSI L1 `u_x(A)` | -9.6e-4 | +1.4e-3 | restarted from steady |
 | FSI L1 `F_x` | -5.9e-4 | +8.7e-4 | restarted from steady |
-| FSI L2 | running (`b2_L2_dt0125`, `b2_L2_dt003125`) | | |
+| FSI L2 `u_x(A)` | -2.3e-4 | +3.6e-4 at t = 13 s, still rising (running) | restarted from steady |
+| FSI L2 `F_x` | -1.4e-4 | +2.2e-4 at t = 13 s, still rising | restarted from steady |
 
-The dt effect falls by 6-10x per level (rigid), consistent with a Rhie-Chow
+The dt effect falls by 6-10x per level for the rigid beam and by 4.2x from L1 to L2 for the FSI (so ~5e-5 expected at L3, ~2 % of the expected L2-L3 increment), consistent with a Rhie-Chow
 term that vanishes with h at fixed dt, and grows as dt decreases (as the
 `rAU`-weighted pressure smoothing weakens). dt = 0.00625 s is therefore held
 fixed at all levels; the FSI dt effect is ~5x the rigid one because, on the
@@ -270,8 +271,8 @@ L0-L2 production, the L1 coupling matrix and branches, L2 tolerance check,
 rigid-beam L0-L3 (+ dt checks), solid diagnostics. About 6,000 core-h used
 (node-charged) since 2026-10-11.
 
-Running: 5333539 `beamO_b2a` and 5333540 `beamO_b2b` (L2 dt = 0.0125 and
-0.003125 restarted from the L2 steady state).
+Done: 5333539 (L2 dt = 0.0125). Running: 5333540 `beamO_b2b` (L2 dt = 0.003125
+from the L2 steady state, to t = 15 s).
 
 Pending approval: L3 FSI from the converged rigid L3 flow, case
 `runs/P5_L3_init` prepared (384 ranks, 0-4 s), submit with
