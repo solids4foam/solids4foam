@@ -515,6 +515,13 @@ def settling_estimate(rows: list[list[float]], column: int, end_time: float,
             "uncertainty": max(drift, 2.0 * se if math.isfinite(se) else 0.0)}
 
 
+def segment_write_interval(start: float, end: float,
+                           longest: float = 5.0) -> float:
+    """Largest write interval <= longest that divides end - start."""
+    length = end - start
+    return length / max(1, math.ceil(length / longest - 1e-9))
+
+
 def declare_total_strain_restart(case: Path) -> None:
     """Allow the solid to continue from a written time.
 
@@ -1581,7 +1588,12 @@ def run_coupled(args: argparse.Namespace) -> bool:
         end_time, delta_t = spec["T"], spec["dt"]
         control = case / "system" / "controlDict"
         replace_entry(control, "endTime", f"{end_time:.10g}", True)
-        replace_entry(control, "writeInterval", "5", True)
+        # Write times count from the restart time: use the largest interval
+        # of at most 5 s that divides the segment, so that the end time is
+        # written (the evaluation and later extensions need it)
+        replace_entry(control, "writeInterval",
+                      f"{segment_write_interval(old_spec['T'], end_time):.10g}",
+                      True)
         replace_entry(control, "purgeWrite", "2", True)
         avg_start = end_time * (1.0 - WINDOW_FRACTION)
         # The cell mean restarts at the new window
