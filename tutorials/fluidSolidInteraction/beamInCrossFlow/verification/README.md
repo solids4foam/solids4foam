@@ -200,10 +200,10 @@ path.
 | rigid L3 `F_x` | - | +3.4e-6 | t = 24 s |
 | FSI L1 `u_x(A)` | -9.6e-4 | +1.4e-3 | restarted from steady |
 | FSI L1 `F_x` | -5.9e-4 | +8.7e-4 | restarted from steady |
-| FSI L2 `u_x(A)` | -2.3e-4 | +3.6e-4 at t = 13 s, still rising (running) | restarted from steady |
-| FSI L2 `F_x` | -1.4e-4 | +2.2e-4 at t = 13 s, still rising | restarted from steady |
+| FSI L2 `u_x(A)` | -2.3e-4 | +3.9e-4 | restarted from steady |
+| FSI L2 `F_x` | -1.4e-4 | +2.4e-4 | restarted from steady |
 
-The dt effect falls by 6-10x per level for the rigid beam and by 4.2x from L1 to L2 for the FSI (so ~5e-5 expected at L3, ~2 % of the expected L2-L3 increment), consistent with a Rhie-Chow
+The dt effect falls by 6-10x per level for the rigid beam and by 3.6-4.2x from L1 to L2 for the FSI (so ~5e-5 expected at L3, ~2 % of the expected L2-L3 increment), consistent with a Rhie-Chow
 term that vanishes with h at fixed dt, and grows as dt decreases (as the
 `rAU`-weighted pressure smoothing weakens). dt = 0.00625 s is therefore held
 fixed at all levels; the FSI dt effect is ~5x the rigid one because, on the
@@ -264,21 +264,20 @@ Prompt and full reply: `reference/campaign/astra/`. Main points and actions:
   be added; monotonicity alone is insufficient for GCI.
 - Reported L1 rest/rigid-start difference corrected to 1.6-3.2e-6 relative.
 
-## STATUS (2026-10-12 21:30 CEST)
+## STATUS (2026-10-12 23:45 CEST)
 
-Completed (MeluXina, account p201287, `/project/home/p201287/philip/beam-richter-opus/runs`):
-L0-L2 production, the L1 coupling matrix and branches, L2 tolerance check,
-rigid-beam L0-L3 (+ dt checks), solid diagnostics. About 6,000 core-h used
-(node-charged) since 2026-10-11.
+Done: L0-L2 production and all checks (including L2 dt x2 and dt/2: 5333539,
+5333540). Obsolete processor directories of the finished runs were pruned
+after verified archives to
+`/project/home/p201136/philip-beam-archive/beam-richter-opus/` (logs and
+settings, all postProcessing data, decomposed L1/L2 steady states; md5 sums
+listed there). About 6,700 core-h used since 2026-10-11.
 
-Done: 5333539 (L2 dt = 0.0125). Running: 5333540 `beamO_b2b` (L2 dt = 0.003125
-from the L2 steady state, to t = 15 s).
-
-Pending approval: L3 FSI from the converged rigid L3 flow, case
-`runs/P5_L3_init` prepared (384 ranks, 0-4 s), submit with
-`jobs/SUBMIT_L3_segment1.sh`. Estimate 1,800-2,500 core-h (3 nodes, ~7 h);
-4 s from the rigid flow left 1.6e-5 at L2, below 5 % of the expected L2-L3
-increment. Then: L3 dt check (optional), orders L1-L3, Richter comparison,
-paper evidence.
+L3 (approved by Philip): case `runs/P5_L3_init` reset after the first attempt
+(job 5333773) died in decomposePar on the p201287 file quota. To be submitted
+by the coordinator with `jobs/SUBMIT_L3_segment1.sh` (3 nodes, 384 ranks,
+0-4 s from the converged rigid L3 flow; ~37-50k files with purgeWrite 2).
+Next: analyse L3, orders L1-L3, Richter comparison, final Astra review, paper
+evidence update.
 
 <!-- markdownlint-enable MD013 -->
