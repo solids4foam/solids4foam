@@ -185,8 +185,9 @@ class fluidSolidInterface
         const Switch requireAllResidualMeasures_;
 
         //- Optional absolute interface residual tolerance [m]: a step is also
-        //  converged if the maximum point mismatch between the solid and
-        //  fluid interfaces is below it. Disabled if not positive.
+        //  converged if the maximum point residual (displacement-increment
+        //  mismatch if incrementalResiduals) is below it. Disabled if not
+        //  positive.
         const scalar outerCorrAbsoluteTolerance_;
 
         //- Pressure-change tolerance for Robin interfaces: the normalised

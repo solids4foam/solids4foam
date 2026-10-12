@@ -2421,7 +2421,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
             // [m]
             const scalar absResidual = gMax(mag(residuals()[interfaceI]));
 
-            Info<< "FSI absolute residual (max point mismatch) for interface "
+            Info<< "FSI absolute residual (max point) for interface "
                 << interfaceI << ": " << absResidual << endl;
 
             if

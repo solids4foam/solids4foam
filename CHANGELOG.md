@@ -10,7 +10,7 @@ release. For complete commit-level details and contributor information, see the
 
 - Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
   a fluid-solid coupling step is also converged if the maximum interface point
-  mismatch is below this absolute value in metres. It complements
+  residual (the displacement-increment mismatch by default) is below this absolute value in metres. It complements
   `requireAllResidualMeasures`, whose relative-reduction measure can be
   unattainable near a steady state. It is disabled by default. The log also
   notes when the legacy minimum test is passed by one residual measure only
