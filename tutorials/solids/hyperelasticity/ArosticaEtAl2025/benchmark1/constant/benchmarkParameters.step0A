@@ -1,0 +1,32 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      benchmarkParameters;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Step 0, case A: active response only (zero endocardial pressure), Tables 1-3
+
+matA    59.0;
+matAf   18472.0;
+matAs   2481.0;
+matAfs  216.0;
+
+// Active stress table: constant/timeSeries/activeStress.sigma0_1.5e5
+// Pressure table:      constant/timeSeries/timeVsPressure.zero
+activeStressTable  sigma0_1.5e5;
+pressureTable      zero;
+
+// ************************************************************************* //

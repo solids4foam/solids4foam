@@ -1,0 +1,141 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Arostica et al. (2025) benchmark 1: elastodynamics of an idealised left
+# ventricle with visco-active Holzapfel-Ogden myocardium, a follower cavity
+# pressure and spring-dashpot (pericardium/base) boundary conditions.
+#
+# Usage:
+#     ./Allrun [step] [pressure|displacement] [parallel]
+#
+# where step is one of
+#     step0A   active response only (zero pressure)       Section 3.3.1
+#     step0B   passive response only (no active stress)   Section 3.3.2
+#     step1    active and passive response (default)      Section 3.4
+#     step2A   blinded parameter variation, case A        Section 3.5, Table 5
+#     step2B   blinded parameter variation, case B
+#     step2C   blinded parameter variation, case C
+#
+# The mesh density is set with MESH_NUMBER, 1 (coarsest) to 4 (finest),
+# default 2, and the mesh type with MESH_TYPE:
+#     ogrid    (default) all-hex mesh with an O-grid at the apex, written by
+#              scripts/makeOGridMesh.py (levels 1-2 are shipped ready-made;
+#              3-4 are generated, which needs python3 with numpy)
+#     revolved the LandEtAl2015/problem3-style revolved slice, which has a fan
+#              of wedge cells on the axis at the apex
+# e.g.
+#     MESH_NUMBER=3 ./Allrun step1 parallel
+#------------------------------------------------------------------------------
+cd "${0%/*}" || exit 1    # Run from this directory
+
+MESH_NUMBER="${MESH_NUMBER:-2}"
+MESH_TYPE="${MESH_TYPE:-ogrid}"
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# The case is solved with PETSc SNES
+solids4Foam::requirePetscOrExitSilently
+
+# The mesh is built with the OpenFOAM.com forms of blockMesh -dict, the
+# extrudeMesh sector model and createPatch, as in LandEtAl2015/problem3
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# Select the benchmark step
+STEP="step1"
+FORMULATION="pressure"
+for arg in "$@"
+do
+    case "$arg" in
+        step0A|step0B|step1|step2A|step2B|step2C) STEP="$arg" ;;
+        pressure|displacement) FORMULATION="$arg" ;;
+        parallel) ;;
+        *) echo "Unknown argument: $arg"; exit 1 ;;
+    esac
+done
+
+echo "Benchmark step: $STEP, mesh: $MESH_TYPE $MESH_NUMBER"
+
+# Material parameters and time series of the selected step
+ln -vnsf "benchmarkParameters.$STEP" constant/benchmarkParameters
+
+ACTIVE=$(awk '/^activeStressTable/ {gsub(";", "", $2); print $2}' \
+    "constant/benchmarkParameters.$STEP")
+PRESSURE=$(awk '/^pressureTable/ {gsub(";", "", $2); print $2}' \
+    "constant/benchmarkParameters.$STEP")
+
+ln -vnsf "timeSeries/activeStress.$ACTIVE" constant/activeStress
+ln -vnsf "timeSeries/timeVsPressure.$PRESSURE" constant/timeVsPressure
+
+# Solid formulation: "pressure" (default), the mixed displacement-pressure
+# formulation, or "displacement", with the bulk modulus as a penalty in the
+# momentum equation. The selected fvSolution and solidProperties variants are
+# linked into place, as in LandEtAl2015/problem3
+echo "Formulation: $FORMULATION"
+
+# The mixed formulation's Jacobian has no processor-boundary (coupled patch)
+# coupling of the pressure to the displacement in this solids4foam fork
+# (foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix: "patch.coupled(): D-in-p
+# not implemented"), so it only runs in serial
+if [[ "$FORMULATION" == "pressure" && " $* " == *" parallel "* ]]
+then
+    echo "The pressure formulation cannot run in parallel in this fork:"
+    echo "run it in serial, or use the displacement formulation in parallel."
+    exit 1
+fi
+for file in system/fvSolution.$FORMULATION constant/solidProperties.$FORMULATION
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
+
+# Restore 0 directory from 0.orig
+restore0Dir
+
+if [[ "$MESH_TYPE" == "revolved" ]]
+then
+    # Create the mesh in steps:
+    #     1. a one-cell-thick slice of the wall in the x-y plane
+    #     2. revolve it through 360 degrees about the long (x) axis
+    #     3. remove the empty patches left on the axis and the seam
+    runApplication blockMesh \
+        -dict verification/mesh/blockMeshDict.$MESH_NUMBER
+    runApplication extrudeMesh \
+        -dict verification/mesh/extrudeMeshDict.$MESH_NUMBER
+    runApplication createPatch -overwrite
+else
+    # All-hex O-grid mesh, written directly as constant/polyMesh
+    rm -rf constant/polyMesh
+    if [[ -d verification/mesh/ogrid/polyMesh.$MESH_NUMBER ]]
+    then
+        # Shipped gzipped; OpenFOAM reads the .gz files directly
+        cp -r verification/mesh/ogrid/polyMesh.$MESH_NUMBER constant/polyMesh
+    else
+        python3 scripts/makeOGridMesh.py $MESH_NUMBER > log.makeOGridMesh 2>&1 \
+            || { echo "makeOGridMesh.py failed (needs numpy)"; exit 1; }
+    fi
+fi
+runApplication checkMesh
+
+# Transmural coordinate t, fibres f0, sheets s0 and sheet-normals n0
+runApplication setEllipsoidFibreField
+
+# Run the solver
+if [[ " $* " == *" parallel "* ]]
+then
+    runApplication decomposePar
+    runParallel solids4Foam
+    runApplication reconstructPar
+else
+    runApplication solids4Foam
+fi
+
+# Compare with the benchmark participants, if python and numpy are available
+if python3 -c "import numpy" > /dev/null 2>&1
+then
+    python3 scripts/compareWithReference.py "$STEP" | tee log.compareWithReference
+fi
+
+#------------------------------------------------------------------------------

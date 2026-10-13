@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    // Gamma_top: J T F^-T N + alpha_top u + beta_top du/dt = 0
+    base
+    {
+        type            solidSpringDashpot;
+        stiffness       1e5;    // alpha_top [Pa/m], Table 1
+        damping         5e3;    // beta_top  [Pa s/m], Table 1
+        normalOnly      no;
+        value           uniform (0 0 0);
+    }
+
+    // Gamma_epi: normal spring-dashpot, tangentially traction free
+    //     J T F^-T N . N + alpha_epi u.N + beta_epi du/dt.N = 0
+    epi
+    {
+        type            solidSpringDashpot;
+        stiffness       1e8;    // alpha_epi [Pa/m], Table 1
+        damping         5e3;    // beta_epi  [Pa s/m], Table 1
+        normalOnly      yes;
+        value           uniform (0 0 0);
+    }
+
+    // Gamma_endo: follower cavity pressure p(t), eq. (7), applied on the
+    // deformed area along the deformed normal
+    endo
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressureSeries
+        {
+            "file|fileName" "$FOAM_CASE/constant/timeVsPressure";
+            outOfBounds clamp;
+        }
+        value           uniform (0 0 0);
+    }
+}
+
+// ************************************************************************* //

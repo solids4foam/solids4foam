@@ -8,6 +8,22 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
+  `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
+  idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an
+  all-hexahedral O-grid mesh, and `benchmark2`, the idealised biventricle on
+  the benchmark's tetrahedral mesh and fibres. Both compare the displacement
+  of the benchmark points with the participants' published solutions.
+- The `viscoActiveHolzapfelOgden` mechanical law: an orthotropic
+  Holzapfel-Ogden myocardium with a smooth fibre-compression switch, a
+  viscous term and a tabulated active stress along the fibres. It returns its
+  volumetric penalty separately, so it can be used with the mixed
+  displacement-pressure formulation.
+- The `solidSpringDashpot` boundary condition: a `solidTraction` whose
+  nominal traction is that of a spring and dashpot, in all directions or
+  normal to the reference surface only (pericardium-type Robin conditions).
+- The `setEllipsoidFibreField` utility: the transmural coordinate and the
+  fibre, sheet and sheet-normal fields of a truncated ellipsoid.
 - Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
   applies the backward differentiation formula of order 1 to 6 twice, as the
   `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and

@@ -1,0 +1,101 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Arostica et al. (2025) benchmark 2: elastodynamics of an idealised
+# biventricular geometry, with the rule-based fibres, LV and RV follower
+# pressures and spring-dashpot (pericardium/base) boundary conditions.
+#
+# Usage:
+#     ./Allrun [coarse|fine] [pressure|displacement] [parallel]
+#
+# coarse (default): 45 304 tetrahedra, fine: 121 133 tetrahedra (Table 6).
+# The meshes and fibres are those distributed with the benchmark, converted
+# by scripts/convertBiVMesh.py.
+#------------------------------------------------------------------------------
+cd "${0%/*}" || exit 1    # Run from this directory
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# The case is solved with PETSc SNES
+solids4Foam::requirePetscOrExitSilently
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+MESH="coarse"
+FORMULATION="pressure"
+for arg in "$@"
+do
+    case "$arg" in
+        coarse|fine) MESH="$arg" ;;
+        pressure|displacement) FORMULATION="$arg" ;;
+        parallel) ;;
+        *) echo "Unknown argument: $arg"; exit 1 ;;
+    esac
+done
+echo "Biventricular mesh: $MESH"
+
+# Solid formulation: "pressure" (default), the mixed displacement-pressure
+# formulation, or "displacement", with the bulk modulus as a penalty in the
+# momentum equation. The selected fvSolution and solidProperties variants are
+# linked into place, as in LandEtAl2015/problem3
+echo "Formulation: $FORMULATION"
+
+# The mixed formulation's Jacobian has no processor-boundary (coupled patch)
+# coupling of the pressure to the displacement in this solids4foam fork
+# (foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix: "patch.coupled(): D-in-p
+# not implemented"), so it only runs in serial
+if [[ "$FORMULATION" == "pressure" && " $* " == *" parallel "* ]]
+then
+    echo "The pressure formulation cannot run in parallel in this fork:"
+    echo "run it in serial, or use the displacement formulation in parallel."
+    exit 1
+fi
+for file in system/fvSolution.$FORMULATION constant/solidProperties.$FORMULATION
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
+
+# Restore 0 directory from 0.orig
+restore0Dir
+
+# Mesh (constant/polyMesh) and fibres (0/f0, 0/s0), shipped gzipped for the
+# coarse mesh; OpenFOAM reads the .gz files directly
+rm -rf constant/polyMesh
+if [[ ! -d "verification/mesh/biv_$MESH" ]]
+then
+    # Only the coarse mesh is shipped, to keep the repository small. The fine
+    # one is converted from the benchmark toolkit's data (needs numpy, h5py):
+    #     git clone https://github.com/Reidmen/cardiac_benchmark_toolkit
+    #     python3 scripts/convertBiVMesh.py \
+    #         cardiac_benchmark_toolkit/data/biv_mesh_and_fibers_fine_p1 tmp
+    #     mkdir -p verification/mesh/biv_fine
+    #     mv tmp/constant/polyMesh verification/mesh/biv_fine/polyMesh
+    #     mv tmp/0.orig verification/mesh/biv_fine/0
+    echo "verification/mesh/biv_$MESH not found: see Allrun for how to"
+    echo "create it from the cardiac benchmark toolkit"
+    exit 1
+fi
+cp -r "verification/mesh/biv_$MESH/polyMesh" constant/polyMesh
+cp "verification/mesh/biv_$MESH"/0/* 0/
+runApplication checkMesh
+
+# Run the solver
+if [[ " $* " == *" parallel "* ]]
+then
+    runApplication decomposePar
+    runParallel solids4Foam
+    runApplication reconstructPar
+else
+    runApplication solids4Foam
+fi
+
+# Compare with the benchmark participants, if python and numpy are available
+if python3 -c "import numpy" > /dev/null 2>&1
+then
+    python3 scripts/compareWithReference.py "$MESH" | tee log.compareWithReference
+fi
+
+#------------------------------------------------------------------------------

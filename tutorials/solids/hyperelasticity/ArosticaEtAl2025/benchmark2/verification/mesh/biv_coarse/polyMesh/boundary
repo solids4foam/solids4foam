@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       polyBoundaryMesh;
+    location    "constant/polyMesh";
+    object      boundary;
+}
+// Converted by scripts/convertBiVMesh.py from the cardiac-benchmark-toolkit
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+4
+(
+    base
+    {
+        type            patch;
+        nFaces          1160;
+        startFace       83011;
+    }
+    endo_lv
+    {
+        type            patch;
+        nFaces          2908;
+        startFace       84171;
+    }
+    endo_rv
+    {
+        type            patch;
+        nFaces          4134;
+        startFace       87079;
+    }
+    epi
+    {
+        type            patch;
+        nFaces          6992;
+        startFace       91213;
+    }
+)
