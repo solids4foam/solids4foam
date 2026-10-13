@@ -1,0 +1,23 @@
+1. **Asymptotic convergence is suggested, not demonstrated.** For \(u_x\) and \(F_x\), use: “Both quantities converge monotonically, with effective orders increasing toward second order. The finest three meshes suggest approach to an asymptotic regime, but order stability has not been established.” Avoid “in the asymptotic range.” The matching rigid-beam drag orders support a substantial fluid-discretisation contribution; they do not establish exclusive fluid control.
+
+   Report the Richardson values as **conditional extrapolations**, with corrections of approximately 0.94% and 0.41% relative to L3. Call the order “the L1–L3 observed order”: two levels alone cannot determine it. The \(p_{\mathrm{obs}}\) and \(p=2\) estimates form an *exponent-sensitivity range*, not an uncertainty bracket guaranteed to contain the limit. Multiplying the fitted corrections by \(F_s=3\) gives approximately 2.8% and 1.2%; that is an explicit safety allowance, not evidence validating the assumed error model. I would favour transparent conditional estimates over a headline GCI claim.
+
+   For \(F_y\) and \(u_z\), report monotone convergence with unstable effective orders; their latest near-second-order values are insufficient to establish asymptotic behaviour. For \(u_y\), state “slow convergence with low effective order.” Small increments do not establish a small remaining error. Include absolute increments, particularly for these small displacement components.
+
+2. **The fixed-\(\Delta t\) interpretation is defensible, with qualification.** Suggested wording: “Spatial refinement was performed at fixed \(\Delta t\); the resulting discretisation trend includes mesh-dependent effects of the time-step-dependent Rhie–Chow formulation.”
+
+   Your coupled sensitivity results show that this dependence decreases substantially with refinement and is small compared with the observed spatial increments. They support its subdominance over the tested range, not its elimination or a general interchangeability of spatial and temporal limits. Label these tests “steady-solution sensitivity to \(\Delta t\),” rather than conventional transient temporal-convergence tests. A settled **coupled L3 \(\Delta t/2\)** result would close the remaining gap; rigid L3 sensitivity alone cannot bound the coupled response.
+
+3. **The oscillation treatment is adequate provisionally.** A decaying relative amplitude of \(10^{-4}\) is small compared with the dominant spatial corrections, but a finite-window mean is still an estimate of the stationary limit. Finalise L3 after continuation and report the averaging window, amplitude definition, and change between successive window means for each reported quantity. Do not use the displacement amplitude as an uncertainty bound for every force or displacement component.
+
+   Describe the response as “consistent with a damped fluid-loaded bending mode” unless its identification has independent support. The measured damping belongs to the computed response; physical damping requires separation from numerical damping.
+
+   Restart re-excitation matters for reproducibility and settling time. Document it and verify return to the same stationary value. Decay after restart supports stability, but does not establish that restart operations preserve the state exactly.
+
+4. **The Richter comparison is legitimate as a qualified incompatibility statement.** First confirm identical force-integration domains—especially half-interface versus full-body loads—and displacement, geometry, material, and inlet conventions.
+
+   Then write: “For the implemented printed inlet definition, with peak velocity 0.3 m/s, the refinement sequence approaches values substantially above Richter’s Table 6; the discrepancy greatly exceeds the estimated numerical corrections.”
+
+   Follow with: “Earlier calculations using peak velocity 0.2 m/s closely reproduced the tabulated values. This suggests a possible inlet-definition mismatch, but does not establish which inlet was used for Table 6.” Identify the different solid family. Explicitly integrate the printed profile to obtain its mean and reconstruct Reynolds number; the quoted mean of 0.2 must not simply be reinterpreted as a peak. Avoid asserting that Table 6 is wrong.
+
+5. **Before publication:** finalise L3; verify convergence-cap compliance and absolute residual control; repeat a representative tighter-coupling/PIMPLE check with production settings, because the legacy test does not directly bound this configuration. Document force normalization, point-A extraction, mesh/grading definitions, solver revision and build, and the relative-increment denominator. Separate demonstrated solution convergence from unresolved reproduction of the published benchmark.

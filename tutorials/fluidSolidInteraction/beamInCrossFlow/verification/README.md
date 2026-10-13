@@ -225,21 +225,63 @@ converged rigid-beam flow the FSI state is within 3.4e-4 (`u_x`) after 2 s,
 | L0 | 8,112 | 512 (8) | 8.13919e-5 | 1.95723e-6 | -2.03080e-6 | 2.15736 | 0.32694 | -0.25742 |
 | L1 | 64,896 | 4,096 (16) | 9.62607e-5 | 1.94057e-6 | -2.15035e-6 | 2.30568 | 0.33773 | -0.27647 |
 | L2 | 519,168 | 32,768 (32) | 1.024547e-4 | 1.92632e-6 | -2.20300e-6 | 2.36363 | 0.34428 | -0.28799 |
-| L3 (t = 3.0-3.69 s mean, segment 1) | 4,153,344 | 262,144 (64) | 1.04477e-4 (+-4e-5 rel.) | 1.91581e-6 | -2.21533e-6 | 2.38303 (+-6e-5 rel.) | 0.34575 | -0.29118 |
+| L3 (mean over t = 3.0-3.5 s, provisional) | 4,153,344 | 262,144 (64) | 1.04477e-4 | 1.91581e-6 | -2.21533e-6 | 2.38303 | 0.34575 | -0.29118 |
 
 `u_z` is reported for the computed `z <= 0` half (Richter's A is the mirror
 point, `u_z` changes sign); `F` is the force on the half interface.
 
-Changes and observed orders (L0-L1-L2): `u_x` +15.4 %, +6.0 % (p = 1.26);
-`F_x` +6.4 %, +2.5 % (p = 1.36); `F_y` +3.2 %, +1.9 % (p = 0.72);
-`u_z` +5.6 %, +2.4 % (p = 1.18); `u_y` -0.86 %, -0.74 % (p = 0.23).
-Three levels are not enough to claim asymptotic behaviour and no
-Richardson/GCI value is quoted. Steady-state and coupling uncertainties are
-<= 2e-6 at every level; the dt effect is quantified separately (section 6).
-The rigid-beam `F_x` sequence (L0-L3) has orders 1.36 and 1.55; the FSI and
-rigid `F_x` differ by -0.48 %, -0.047 %, +0.11 % at L0-L2.
+Relative increments (L0-L1 / L1-L2 / L2-L3) and observed orders (L0-L2,
+L1-L3):
 
-Comparison with Richter is deferred until L3 is available.
+| quantity | increments | orders | conditional Richardson value (L1-L3 order) | correction to L3 | p = 2 instead |
+| --- | --- | --- | ---: | ---: | ---: |
+| `u_x(A)` | 15.4 / 6.0 / 1.9 % | 1.26, 1.61 | 1.0546e-4 m | +0.94 % | 1.0515e-4 m |
+| `F_x` | 6.4 / 2.5 / 0.81 % | 1.36, 1.58 | 2.3928 N | +0.41 % | 2.3896 N |
+| `F_y` | 3.2 / 1.9 / 0.43 % | 0.72, 2.16 | - | - | - |
+| `u_z(A)` | 5.6 / 2.4 / 0.56 % | 1.18, 2.09 | - | - | - |
+| `u_y(A)` | -0.86 / -0.74 / -0.55 % | 0.23, 0.44 | - | - | - |
+
+Interpretation (wording agreed with the final Astra review): `u_x` and `F_x`
+converge monotonically with effective orders increasing towards second order
+(rigid-beam `F_x`: 1.36, 1.55; static solid: 1.34, 1.71). The finest three
+meshes suggest an approach to the asymptotic regime, but order stability is
+not established, so no GCI is claimed. The Richardson values are conditional
+extrapolations; the `p_obs`/`p = 2` pair is an exponent-sensitivity range, not
+a bound (a factor-of-safety 3 allowance would be 2.8 % and 1.2 %). `F_y` and
+`u_z` converge monotonically with unstable orders; `u_y` converges slowly with
+a low effective order. All non-spatial errors (coupling <= 2e-6, history <=
+1.6e-6, steadiness, L3 oscillation ~1e-4 decaying) are far below the L2-L3
+increments; the fixed-dt Rhie-Chow sensitivity is 2-4e-4 at L2 and falls ~4x
+per level, so it is part of the mesh-dependent discretisation trend.
+
+### L3 late-time oscillation
+
+All levels show a ~8 Hz oscillation of the beam after the start (identical
+frequency at L2 and L3), consistent with a damped fluid-loaded first bending
+mode (dry cantilever estimate ~15 Hz, lowered by added mass). It decays by
+~4.7x per 0.5 s (computed damping ratio ~6 %, physical plus numerical):
+L2 amplitude 8e-5 (3.0-3.5 s), 1e-6 (5.5-6 s), 7e-10 (11.5-12 s). Restarts
+re-excite it (the L2 re-decomposition restart at t = 4 s raised it to 1.4e-4,
+after which it decayed again to the same mean, within 2e-7), so the reported
+values are window means after a documented settling time. At L3 the
+amplitude was 1e-4 in 3.0-3.5 s; segment 2 (t = 3-4.5 s, job 5336554) is
+queued to confirm the decay. It is not vortex shedding: the flow is laminar
+and steady (rigid-beam flows converge to 1e-7), and the frequency does not
+change with the mesh.
+
+## Comparison with Richter (2012), after the sequence above
+
+Richter Table 6 (half interface, symmetric half domain, as here): drag
+1.327 +- 0.01 N, `u_x(A)` 5.924e-5 +- 1e-7 m. For the implemented printed
+inlet (peak 0.3 m/s; area mean 0.133 m/s, `Re = 0.133 x 0.2 / 1e-3 = 27`
+with Richter's length scale) the sequence approaches 2.39 N and
+1.05e-4 m, i.e. 1.80x and 1.78x the tabulated values; the discrepancy greatly
+exceeds the estimated numerical corrections (< 1 %). Earlier solids4foam
+calculations with peak 0.2 m/s (coarser solid family, `N_t = 4f`) gave
+1.3311 N and 5.915e-5 m at L3, close to Table 6. This suggests a possible
+inlet-definition mismatch in the source (the stated mean 0.2 m/s and
+`Re = 40` are inconsistent with the printed profile) but does not establish
+which inlet produced Table 6. No setting was tuned to Table 6.
 
 ## Astra (GPT-6-Astra, xhigh) review, 2026-10-12
 
@@ -264,21 +306,32 @@ Prompt and full reply: `reference/campaign/astra/`. Main points and actions:
   be added; monotonicity alone is insufficient for GCI.
 - Reported L1 rest/rigid-start difference corrected to 1.6-3.2e-6 relative.
 
+## Astra final review (2026-10-13)
+
+Prompt and reply: `reference/campaign/astra/astra_2_final_*`. Adopted: the
+"suggested, not demonstrated" asymptotic wording; conditional Richardson
+values without a headline GCI; fixed-dt wording ("the discretisation trend
+includes mesh-dependent effects of the time-step-dependent Rhie-Chow
+formulation"); window means with stated settling and amplitude; the
+qualified Richter incompatibility statement. Open recommendation (decision
+for Philip, not run): a coupled L3 dt/2 steady-sensitivity run (estimated
+>= 60 node-hours) would close the remaining dt gap at L3.
+
+## Cost (physical cores = node-hours x 128)
+
+64.4 node-hours = 8,250 physical core-h for jobs up to L3 segment 1
+(5333947: 36.0 node-hours = 4,610 core-h). Earlier totals in this README
+and in reports were sacct CPUTimeRAW, which counts 256 logical CPUs per
+node and so doubled the physical figure. L3 segment 2: ~15 node-hours
+(~1,900 core-h) when it runs.
+
 ## STATUS (2026-10-13)
 
-L3 segment 1 (job 5333947, 3 nodes, 384 ranks) reached t = 3.69 s of 4 s
-before its 12 h walltime: 11,580 s wall per simulated second, 8.1-8.8 FSI
-iterations per step, no capped step. Charged 36 node-hours (4,608 physical
-core-h; sacct CPUTimeRAW counts 256 logical CPUs per node and reports 9,219
-h). My estimate (1,800-2,500 core-h) was about 2x too low. Last write: t = 3 s
-(all 384 processors hold `D_0_0`, `D_0_0_0`, `U_0`, `Uf_0`, so the v2412 build
-writes the old-old solid level; the solid velocity at t = 3 s is ~1e-8 m/s, so
-even an implied zero old velocity (issue #555) is harmless for the steady
-target). After t = 3 s the QoIs oscillate about their mean with relative
-amplitude ~4e-5 (`u_x`) and ~6e-5 (`F_x`), period ~0.4 s, i.e. far below 5 %
-of the L2-L3 increment (2.0 % and 0.8 %).
-
-Prepared (not submitted): `jobs/SUBMIT_L3_segment2.sh` continues from t = 3 to
-4.5 s (writeInterval 0.5 s), ~5 h, walltime 8 h, ~15 node-hours.
+L3 segment 2 (job 5336554, 3 nodes, t = 3 -> 4.5 s) is queued (expected start
+2026-10-14 09:12 CEST, ~5 h). When it ends: recompute the L3 window mean over
+the settled part (excluding the restart re-excitation) and the oscillation
+decay, update the tables above, `reference/campaign/production_sequence.csv`
+and the paper evidence branch. Segment-1 residuals are saved as
+`runs/P5_L3_init/fsiResiduals_segment1.dat`.
 
 <!-- markdownlint-enable MD013 -->
