@@ -536,6 +536,12 @@ release. For complete commit-level details and contributor information, see the
   any test. solids4foam's preCICE cases are now maintained upstream in the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
+- The `FixedList.C` (OpenFOAM.org and foam-extend) and `meshObjectBase.H`
+  (foam-extend) optional fixes are removed. `FixedList.C` is needed to build
+  OpenFOAM itself with Clang 17 or newer, so it is not a solids4foam fix, and
+  `meshObjectBase.H` only avoids a segmentation fault at the end of a
+  foam-extend run, after the results are written. `Allcheck` no longer
+  reports them, and `Allreplace` no longer copies them.
 
 ### Fixed
 
@@ -622,6 +628,10 @@ release. For complete commit-level details and contributor information, see the
   `Allcheck` and `Allreplace` no longer select a directory by version (#519).
   Installations patched with the earlier file are reported by `Allcheck`
   (with `S4F_NO_FILE_FIXES=0`), and `Allreplace` updates them.
+- The files in `optionalFixes` had their OpenFOAM and foam-extend copyright
+  and licence headers replaced by the solids4foam header. They now keep the
+  upstream headers, with a note on what solids4foam changed, and the file
+  header check skips `optionalFixes`.
 - The high-order least-squares reconstruction now rejects axisymmetric
   (wedge) meshes when the solid model is constructed, with an error that
   names the limitation, instead of stopping later with the misleading
