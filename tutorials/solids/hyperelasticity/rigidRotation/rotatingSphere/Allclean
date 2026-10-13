@@ -29,3 +29,9 @@ link_files_for_suffix() {
 }
 link_files_for_suffix totalLagrangian
 (cd 0 && rm -f D* && ln -s org/D .)
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

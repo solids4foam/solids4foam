@@ -174,6 +174,14 @@ public:
         );
 
 
+    // Static Member Functions
+
+        //- Check that the mesh is supported by the high-order
+        //  reconstruction: planar 2-D meshes with an empty z direction,
+        //  and 3-D meshes. Axisymmetric (wedge) meshes are not supported.
+        static void checkMeshSupported(const fvMesh& mesh);
+
+
     // Constructors
 
         //- Construct from mesh

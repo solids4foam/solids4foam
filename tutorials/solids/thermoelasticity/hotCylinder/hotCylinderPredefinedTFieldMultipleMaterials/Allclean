@@ -16,3 +16,9 @@ solids4Foam::restoreCaseFormat .
 # restored by solids4Foam::restoreCaseFormat, which only checks the 0 directory
 echo "Replacing symmetryPlane with symmetry for T files in hotCylinderTemperatureField"
 find hotCylinderTemperatureField -name T | xargs sed -i 's|symmetryPlane;|symmetry;|g'
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi
