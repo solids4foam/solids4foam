@@ -197,6 +197,7 @@ Here `oldTime()` means the value stored at the previous time step.
 The following boundary-condition types are treated specially by the solver:
 
 - `solidTraction` patch fields;
+- `solidSpringDashpot` patch fields;
 - `fixedDisplacementZeroShear` patch fields;
 - `symmetry` patch fields.
 
@@ -323,6 +324,8 @@ standard solids4foam displacement/traction patch types and applies model-specifi
 rules:
 
 - `solidTraction`: uses the patch traction and subtracts the pressure term;
+- `solidSpringDashpot`: uses the spring-dashpot traction of the current
+  boundary displacement, plus the patch traction and pressure;
 - `fixedDisplacementZeroShear` and `symmetry`: remove the tangential traction
   component by projection onto the normal direction.
 

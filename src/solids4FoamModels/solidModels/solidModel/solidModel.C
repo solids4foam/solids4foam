@@ -25,6 +25,7 @@ License
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -474,6 +475,49 @@ namespace
         }
 
         return includePatchInStencils;
+    }
+
+    // Make the registry hold the old-time levels of a field that are in use.
+    // On a restart, OpenFOAM reads each level below the first twice: once
+    // when the level above it is read-constructed, and again when that
+    // level's readOldTimeIfPresent() replaces it. The replacement is created
+    // while the first copy is still registered, so it fails to register.
+    // OpenFOAM.com v2412 and later then delete the first copy, leaving the
+    // level in use unregistered and never written again, so a later restart
+    // from this run finds no D_0_0 and backward d2dt2 falls back to first
+    // order. Earlier OpenFOAM.com versions, OpenFOAM.org and foam-extend leak
+    // the first copy instead, which stays registered and is written with the
+    // values it was read with
+    template<class GeoField>
+    void registerOldTimeLevels(const GeoField& field)
+    {
+        const Foam::label nOldTimes = field.nOldTimes();
+
+        const GeoField* levelPtr = &field;
+
+        for (Foam::label levelI = 0; levelI < nOldTimes; ++levelI)
+        {
+            levelPtr = &levelPtr->oldTime();
+            GeoField& level = const_cast<GeoField&>(*levelPtr);
+
+            const Foam::objectRegistry& db = level.db();
+
+            if (db.foundObject<GeoField>(level.name()))
+            {
+                const GeoField& registered =
+                    db.lookupObject<GeoField>(level.name());
+
+                if (&registered == &level)
+                {
+                    continue;
+                }
+
+                // A stale copy holds the name: release it
+                const_cast<GeoField&>(registered).checkOut();
+            }
+
+            level.checkIn();
+        }
     }
 }
 
@@ -1335,6 +1379,10 @@ Foam::solidModel::solidModel
             (
                 D_.boundaryField()[patchI]
             )
+         || isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
         )
         {
             useBoundaryFaceValuesD_[patchI] = false;
@@ -1353,6 +1401,10 @@ Foam::solidModel::solidModel
                 DD_.boundaryField()[patchI]
             )
          || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+         || isA<solidSpringDashpotFvPatchVectorField>
             (
                 DD_.boundaryField()[patchI]
             )
@@ -1384,6 +1436,12 @@ Foam::solidModel::solidModel
     gradD_.oldTime();
     gradDD_.oldTime();
     sigma_.oldTime();
+
+    // Re-register the old-time levels read on a restart, so that they are
+    // written again (see registerOldTimeLevels)
+    registerOldTimeLevels(D_);
+    registerOldTimeLevels(DD_);
+    registerOldTimeLevels(pointD_);
 
     // Whether a continued run has the old-time gradient a constitutive
     // history is measured against. Looked for rather than assumed from
@@ -1422,6 +1480,14 @@ Foam::solidModel::solidModel
         gradD_.writeOpt() = IOobject::AUTO_WRITE;
         gradD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         gradDD_.writeOpt() = IOobject::AUTO_WRITE;
+
+        // The velocity is created on first use, which is otherwise after the
+        // first time increment, where there is no U to read: a restart would
+        // then predict its first step from zero velocity
+        if (runTime.startTimeIndex() > 0)
+        {
+            U();
+        }
     }
     else
     {
@@ -1525,6 +1591,8 @@ Foam::solidModel::solidModel
                    [solidModel::solutionAlgorithm::PETSC_SNES]
                 << abort(FatalError);
         }
+
+        leastSquaresScheme::checkMeshSupported(mesh());
     }
 
     // Print out the relaxation factor

@@ -136,14 +136,10 @@ fixedRotationPointPatchVectorField::fixedRotationPointPatchVectorField
         rotationOrigin_ = vector(dict.lookup("rotationOrigin"));
     }
 
-    if (dict.found("value"))
-    {
-        pointPatchField<vector>::operator==
-        (
-            vectorField("value", dict, p.size())
-        );
-    }
-    else
+    // The value, when present, has been read by the base class: reading it
+    // again fails for a nonuniform value with OpenFOAM.com, whose compound
+    // tokens can be read only once, so a written time could not be read back
+    if (!dict.found("value"))
     {
         pointPatchField<vector>::operator==
         (
@@ -151,14 +147,22 @@ fixedRotationPointPatchVectorField::fixedRotationPointPatchVectorField
         );
     }
 
-    if
-    (
+    // On restart, the old-time fields, e.g. D_0, are read with this condition
 #ifdef OPENFOAM_NOT_EXTEND
-        internalField().name() != "pointD"
+    word fieldName = internalField().name();
 #else
-        dimensionedInternalField().name() != "pointD"
+    word fieldName = dimensionedInternalField().name();
 #endif
+    while
+    (
+        fieldName.size() > 2
+     && fieldName.substr(fieldName.size() - 2) == "_0"
     )
+    {
+        fieldName.resize(fieldName.size() - 2);
+    }
+
+    if (fieldName != "pointD")
     {
         FatalErrorIn
         (
@@ -261,10 +265,13 @@ void fixedRotationPointPatchVectorField::updateCoeffs()
     // Rotation tensor
     const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle_);
 
+    // Named operand: a tmp field would be reused as the storage of the inner
+    // product, which aliases an input of the loop and gives wrong results
+    // with some -O3 builds (see pimpleFluid::patchViscousForce)
+    const vectorField relPatchPoints(origPatchPoints_ - rotationOrigin_);
     const vectorField newPatchPoints
     (
-        (rotMat & (origPatchPoints_ - rotationOrigin_))
-      + rotationOrigin_
+        (rotMat & relPatchPoints) + rotationOrigin_
     );
 
     vectorField pointDisp(newPatchPoints - origPatchPoints_);
@@ -402,6 +409,9 @@ void fixedRotationPointPatchVectorField::updateCoeffs()
 void fixedRotationPointPatchVectorField::write(Ostream& os) const
 {
     fixedValuePointPatchVectorField::write(os);
+
+    os.writeKeyword("nonOrthogonalCorrections")
+        << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
 
     if (angleSeries_.size())
     {

@@ -1221,19 +1221,6 @@ movingLeastSquares::movingLeastSquares
             << "Check 'faceStencilExtraCells' entry in the dictionary."
             << endl;
     }
-
-    if (mesh_.nGeometricD() == 2)
-    {
-        const Vector<label>& solD = mesh_.solutionD();
-
-        if (solD[vector::Z] != -1)
-        {
-            FatalErrorInFunction
-                << "Empty direction should be vector::Z. "
-                << "Please change mesh orientation!"
-                << abort(FatalError);
-        }
-    }
 }
 
 

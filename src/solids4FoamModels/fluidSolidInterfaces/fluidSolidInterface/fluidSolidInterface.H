@@ -782,10 +782,6 @@ public:
             //- Update interface force
             virtual scalar updateResidual();
 
-            //- Update movingWallPressure boundary condition acceleration, if
-            //  found
-            virtual void updateMovingWallPressureAcceleration();
-
             //- Update elasticWallPressure boundary condition acceleration, if
             //  found
             virtual void updateElasticWallPressureAcceleration();

@@ -38,8 +38,7 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(p, iF),
-    prevAcceleration_(p.patch().size(), vector::zero)
+    fixedGradientFvPatchScalarField(p, iF)
 {}
 
 
@@ -51,8 +50,7 @@ movingWallPressureFvPatchScalarField
     const dictionary& dict
 )
 :
-    fixedGradientFvPatchScalarField(p, iF),
-    prevAcceleration_(p.patch().size(), vector::zero)
+    fixedGradientFvPatchScalarField(p, iF)
 {
     fvPatchField<scalar>::operator=(patchInternalField());
 }
@@ -67,12 +65,7 @@ movingWallPressureFvPatchScalarField
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedGradientFvPatchScalarField(ptf, p, iF, mapper),
-#ifdef OPENFOAM_ORG
-    prevAcceleration_(mapper(ptf.prevAcceleration_))
-#else
-    prevAcceleration_(ptf.prevAcceleration_, mapper)
-#endif
+    fixedGradientFvPatchScalarField(ptf, p, iF, mapper)
 {}
 
 
@@ -83,8 +76,7 @@ movingWallPressureFvPatchScalarField
     const movingWallPressureFvPatchScalarField& ptf
 )
 :
-    fixedGradientFvPatchScalarField(ptf),
-    prevAcceleration_(ptf.prevAcceleration_)
+    fixedGradientFvPatchScalarField(ptf)
 {}
 #endif
 
@@ -96,42 +88,11 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(ptf, iF),
-    prevAcceleration_(ptf.prevAcceleration_)
+    fixedGradientFvPatchScalarField(ptf, iF)
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-
-void movingWallPressureFvPatchScalarField::autoMap
-(
-    const fvPatchFieldMapper& m
-)
-{
-    fixedGradientFvPatchScalarField::autoMap(m);
-
-#ifdef OPENFOAM_ORG
-    m(prevAcceleration_, prevAcceleration_);
-#else
-    prevAcceleration_.autoMap(m);
-#endif
-}
-
-
-void movingWallPressureFvPatchScalarField::rmap
-(
-    const fvPatchField<scalar>& ptf,
-    const labelList& addr
-)
-{
-    fixedGradientFvPatchScalarField::rmap(ptf, addr);
-
-    const movingWallPressureFvPatchScalarField& mptf =
-        refCast<const movingWallPressureFvPatchScalarField>(ptf);
-
-    prevAcceleration_.rmap(mptf.prevAcceleration_, addr);
-}
 
 
 // void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
@@ -258,12 +219,10 @@ void movingWallPressureFvPatchScalarField::updateCoeffs()
         );
 
         gradient() = -rho.value()*(n & movingWallVelocity.acceleration());
-        // gradient() = -rho.value()*(n & prevAcceleration_);
     }
     else
     {
         gradient() = -(n & movingWallVelocity.acceleration());
-        // gradient() = -(n & prevAcceleration_);
         // gradient() = -(n&ddtU);
     }
 
