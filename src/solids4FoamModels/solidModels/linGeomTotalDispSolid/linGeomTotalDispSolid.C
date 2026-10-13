@@ -23,6 +23,7 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "compatibilityFunctions.H"
@@ -245,6 +246,32 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
                     tracPatch.traction() - nPatch*tracPatch.pressure();
 #endif
             }
+        }
+        else if
+        (
+            isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidSpringDashpotFvPatchVectorField& springPatch =
+                refCast<const solidSpringDashpotFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+#ifdef OPENFOAM_NOT_EXTEND
+            traction.boundaryFieldRef()[patchI] =
+#else
+            traction.boundaryField()[patchI] =
+#endif
+                springPatch.springDashpotTraction
+                (
+                    nPatch, scalarField(nPatch.size(), 1.0)
+                );
         }
         else if
         (
