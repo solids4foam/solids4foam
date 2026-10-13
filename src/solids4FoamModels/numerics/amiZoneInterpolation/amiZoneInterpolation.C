@@ -20,6 +20,7 @@ License
 #ifdef OPENFOAM_NOT_EXTEND
 
 #include "amiZoneInterpolation.H"
+#include "triangleWeights.H"
 #include "demandDrivenData.H"
 #ifdef OPENFOAM_ORG
     #include "newAMIMethod.H"
@@ -136,7 +137,9 @@ void Foam::amiZoneInterpolation::calcSourcePointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 scalar A = mag(n);
                 n /= A;
 
@@ -146,9 +149,12 @@ void Foam::amiZoneInterpolation::calcSourcePointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 scalar minEta = min(eta);
 
@@ -229,9 +235,12 @@ void Foam::amiZoneInterpolation::calcSourcePointWeights() const
             // sourcePointWeights[pointI][1] = t.Ni(1, I);
             // sourcePointWeights[pointI][2] = t.Ni(2, I);
 
-            sourcePointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            sourcePointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            sourcePointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            sourcePointWeights[pointI][0] = w[0];
+            sourcePointWeights[pointI][1] = w[1];
+            sourcePointWeights[pointI][2] = w[2];
         }
         else
         {
@@ -329,7 +338,9 @@ void Foam::amiZoneInterpolation::calcTargetPointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 scalar A = mag(n);
                 n /= A;
 
@@ -339,9 +350,12 @@ void Foam::amiZoneInterpolation::calcTargetPointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 scalar minEta = min(eta);
 
@@ -424,9 +438,12 @@ void Foam::amiZoneInterpolation::calcTargetPointWeights() const
             // targetPointWeights[pointI][1] = t.Ni(1, I);
             // targetPointWeights[pointI][2] = t.Ni(2, I);
 
-            targetPointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            targetPointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            targetPointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            targetPointWeights[pointI][0] = w[0];
+            targetPointWeights[pointI][1] = w[1];
+            targetPointWeights[pointI][2] = w[2];
         }
         else
         {
