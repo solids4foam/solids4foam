@@ -1643,22 +1643,24 @@ Results (`reference/production/coupled.json`, `coupled_runs.csv`, `coupled_summa
 | Featflow (level 4, dt 2.5e-4) | | -2.88 | 2.72 | 34.99 | 5.46 | 460.5 | 27.74 | 2.50 | 153.91 |
 
 (mm, Hz, N/m; amplitudes of the forces are the smoothed values; "-" = the two differences
-change sign; brackets = an order is formally defined but the temporal sensitivity is close
-to |d32| (ratio 0.9) and it is not quoted.)
+change sign; brackets = an order is formally defined but not quoted: for the drag
+(max+min)/2 the temporal and coupling sensitivities are 0.5 and 0.8 |d32|; for the lift
+(max+min)/2 the 2x' time sequence is non-monotone (1.99, 2.18, 2.09) and its
+cycle-to-cycle spread within the window (0.13 N/m) is a third of |d32|.)
 
 Error control, per quantity, against D = |q(4x') - q(2x')| (`coupled_summary.csv`):
 
 - **Time.** At 2x' the dt sequence 1e-3/5e-4/2.5e-4 changes u_y amplitude by +0.010 then
   -0.012 mm, u_x (max+min)/2 by +0.001 then +0.003 mm, f by +0.0027 then +0.0006 Hz (order
-  2.2), the drag mean by +0.13 then +0.04 N/m and the lift amplitude by +0.11 then +0.02 N/m.
+  2.2), the drag (max+min)/2 by +0.13 then +0.04 N/m and the lift amplitude by +0.11 then +0.02 N/m.
   With 4/3 of the last difference as the error at dt 5e-4: time/D = 0.31 (u_y amp), 0.30
-  (u_x mid), 0.13 (u_x amp), 1.3 (u_x time mean), 0.03 (f), 0.94 (drag mean), 0.04 (drag
+  (u_x mid), 0.13 (u_x amp), 1.3 (u_x time mean), 0.03 (f), 0.5 (drag (max+min)/2), 0.04 (drag
   amp) and 0.00 (lift amp). The temporal error is far below the 1x' to 2x' changes for every
   quantity, and below the 2x' to 4x' change for f, the force amplitudes and u_x amplitude;
   for the displacement means and u_y amplitude it is a third of that change or more.
 - **Coupling.** Tol 1e-4 against 1e-5 (cold 1x' runs) changes u_y amplitude by 0.019 mm,
-  u_x mid by 0.003 mm, f by 0.0005 Hz, the drag mean by 0.08 N/m, the lift amplitude by 0.15
-  N/m: relative to D 0.38, 0.21, 0.02, 0.9 and 0.02. This is a sensitivity, not a bound
+  u_x mid by 0.003 mm, f by 0.0005 Hz, the drag (max+min)/2 by 0.08 N/m, the lift amplitude by 0.15
+  N/m: relative to D 0.38, 0.21, 0.02, 0.8 and 0.02. This is a sensitivity, not a bound
   for the 1e-5 error (Astra). Mean IQN-ILS iterations per step 10.6 (2x', 4x') to 11.4
   (1x'), 13-16 at dt 1e-3, 10.1 at dt 2.5e-4. Steps accepted above the tolerance
   (`coupling_tolerance_audit.txt`): 1.2% at 1x', 0.34% at 2x', 0.35% at 4x' (none inside
