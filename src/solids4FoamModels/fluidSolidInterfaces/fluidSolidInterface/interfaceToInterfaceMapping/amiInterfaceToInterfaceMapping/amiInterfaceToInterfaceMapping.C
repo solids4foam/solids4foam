@@ -207,7 +207,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 const scalar A = mag(n);
                 n /= A;
 
@@ -217,9 +219,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 const scalar minEta = min(eta);
 
@@ -314,7 +319,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
                 ctr
             );
 
-            vector n = t.normal();
+            // Area normal on all versions: t.normal() is the unit normal
+            // in OpenFOAM.org, which would break the areal coordinates
+            vector n = triangleAreaNormal(t);
             n /= mag(n);
 
             // Intersection point
@@ -413,7 +420,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 const scalar A = mag(n);
                 n /= A;
 
@@ -423,9 +432,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 const scalar minEta = min(eta);
 
@@ -519,7 +531,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
                 ctr
             );
 
-            vector n = t.normal();
+            // Area normal on all versions: t.normal() is the unit normal
+            // in OpenFOAM.org, which would break the areal coordinates
+            vector n = triangleAreaNormal(t);
             n /= mag(n);
 
             // Intersection point
