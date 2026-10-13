@@ -297,6 +297,10 @@ $$t = 10$$ s, which took about 7 minutes on two ranks.
   the Kratos curve is digitised from a raster image and Tiba et al. give scalar
   values only.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## References
 
 - Wall, W.A. (1999). Fluid-Struktur-Interaktion mit stabilisierten Finiten
