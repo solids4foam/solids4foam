@@ -21,5 +21,11 @@ then
     \rm -rf constant/polyMesh
 fi
 
-\rm -rf case.foam postProcessing VTK regressionTests
+\rm -rf case.foam postProcessing VTK
 \rm -f constant/*.withDefaultValues
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

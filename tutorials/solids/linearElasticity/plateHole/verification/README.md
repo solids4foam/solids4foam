@@ -122,6 +122,10 @@ A `--quick` run only exercises the two coarsest meshes, which are still well
 outside the asymptotic range, so it checks only that the sweep produces usable
 finite positive numbers.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference results
 
 Recorded with OpenFOAM v2512 and the default `segregated` variant on an Apple

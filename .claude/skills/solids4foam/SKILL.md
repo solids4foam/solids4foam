@@ -197,6 +197,16 @@ Source files should include the applicable standard banners:
   - OpenFOAM.com
   - OpenFOAM.org
   - foam-extend
+- Beware of primitives whose meaning differs between flavours. For example,
+  `triangle::normal()` is the area-weighted normal in OpenFOAM.com and
+  foam-extend but the unit normal in OpenFOAM.org; use the explicit helper
+  `triangleAreaNormal()` (`numerics/amiZoneInterpolation/triangleWeights.H`)
+  instead of `normal()`.
+- Do not pass an unnamed `tmp` operand whose type equals the result type to
+  field products such as `nf() & (-devReff().boundaryField())`: OpenFOAM may
+  reuse its storage for the result while the `__restrict__` loop still reads
+  it, which gives wrong results with some GCC `-O3` builds. Name the
+  intermediate fields first (see `applications/test/tmpAliasProducts`).
 - When touching build lists, update both where relevant:
   - `Make/files.openfoam`
   - `Make/files.foamextend`

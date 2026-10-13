@@ -23,6 +23,7 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "compatibilityFunctions.H"
@@ -245,6 +246,32 @@ void linGeomTotalDispSolid::enforceTractionBoundaries
                     tracPatch.traction() - nPatch*tracPatch.pressure();
 #endif
             }
+        }
+        else if
+        (
+            isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidSpringDashpotFvPatchVectorField& springPatch =
+                refCast<const solidSpringDashpotFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+#ifdef OPENFOAM_NOT_EXTEND
+            traction.boundaryFieldRef()[patchI] =
+#else
+            traction.boundaryField()[patchI] =
+#endif
+                springPatch.springDashpotTraction
+                (
+                    nPatch, scalarField(nPatch.size(), 1.0)
+                );
         }
         else if
         (
@@ -1325,8 +1352,18 @@ label linGeomTotalDispSolid::formResidual
 
 #ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
-    // Note that "source()" is already multiplied by the volumes
-    residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+    // The fvOptions enter with the same sign as rho*g, as they are added to
+    // the right-hand side of the segregated momentum equation. The fvOptions
+    // matrix M represents Su + Sp*D, and "M & D" evaluates it per unit
+    // volume. Note that "M.source()" alone is -V*Su (fvMatrix stores explicit
+    // sources with a negative sign) and omits any implicit Sp*D term
+    {
+        const tmp<fvVectorMatrix> tfvOptionsEqn
+        (
+            fvOptions()(ds_, const_cast<volVectorField&>(D))
+        );
+        residual += mesh.V().field()*(tfvOptionsEqn() & D)().primitiveField();
+    }
 #else
     const tmp<volVectorField> tsource(fvOptionsSource());
     if (tsource.valid())
@@ -1519,6 +1556,16 @@ label linGeomTotalDispSolid::formJacobian
             transientJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(D);
         }
 
+#ifdef OPENFOAM_COM
+        // Add the linearisation of the implicit fvOptions terms (Sp*D) in the
+        // residual. Only the matrix coefficients are inserted, so the explicit
+        // Su part (held in the source) does not contribute. Note that an
+        // implicit part added with fvm::SuSp and a negative coefficient is
+        // held in the source and is omitted here, which only reduces the
+        // diagonal dominance of this approximate Jacobian
+        transientJ += fvOptions()(ds_, D);
+#endif
+
         foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         (
             transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
@@ -1537,6 +1584,16 @@ label linGeomTotalDispSolid::formJacobian
         {
             approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
         }
+
+#ifdef OPENFOAM_COM
+        // Add the linearisation of the implicit fvOptions terms (Sp*D) in the
+        // residual. Only the matrix coefficients are inserted, so the explicit
+        // Su part (held in the source) does not contribute. Note that an
+        // implicit part added with fvm::SuSp and a negative coefficient is
+        // held in the source and is omitted here, which only reduces the
+        // diagonal dominance of this approximate Jacobian
+        approxJ += fvOptions()(ds_, D);
+#endif
 
         // Optional: under-relaxation of the linear system
         approxJ.relax();

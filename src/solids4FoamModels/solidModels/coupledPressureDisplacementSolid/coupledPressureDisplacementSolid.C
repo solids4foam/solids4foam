@@ -1116,8 +1116,17 @@ bool coupledPressureDisplacementSolid::evolve()
             }
 
             surfaceVectorField nf = mesh().Sf()/mesh().magSf();
-            tGradDDn_ = ( (I-sqr(nf)) & (gradDDf_ & nf) );
-            nGradDDn_ = ((nf*nf) & fvc::snGrad(DD()));
+
+            // Named operands: a tmp operand with the type of the result would
+            // be reused as the storage of the inner product, which aliases an
+            // input of the loop and gives wrong results with some -O3 builds
+            // (see pimpleFluid::patchViscousForce)
+            const surfaceSymmTensorField nfPerp(I - sqr(nf));
+            const surfaceVectorField gradDDfn(gradDDf_ & nf);
+            const surfaceTensorField nfnf(nf*nf);
+            const surfaceVectorField snGradDD(fvc::snGrad(DD()));
+            tGradDDn_ = (nfPerp & gradDDfn);
+            nGradDDn_ = (nfnf & snGradDD);
 
             #include "calcTraction.H"
 

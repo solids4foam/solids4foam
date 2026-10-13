@@ -20,6 +20,7 @@ License
 #ifdef OPENFOAM_NOT_EXTEND
 
 #include "amiInterfaceToInterfaceMapping.H"
+#include "triangleWeights.H"
 #include "addToRunTimeSelectionTable.H"
 #include "FieldField.H"
 #include "pointIOField.H"
@@ -206,7 +207,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 const scalar A = mag(n);
                 n /= A;
 
@@ -216,9 +219,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 const scalar minEta = min(eta);
 
@@ -313,7 +319,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
                 ctr
             );
 
-            vector n = t.normal();
+            // Area normal on all versions: t.normal() is the unit normal
+            // in OpenFOAM.org, which would break the areal coordinates
+            vector n = triangleAreaNormal(t);
             n /= mag(n);
 
             // Intersection point
@@ -325,9 +333,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
             // zoneAPointWeights[pointI][1] = t.Ni(1, I);
             // zoneAPointWeights[pointI][2] = t.Ni(2, I);
 
-            zoneAPointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            zoneAPointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            zoneAPointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            zoneAPointWeights[pointI][0] = w[0];
+            zoneAPointWeights[pointI][1] = w[1];
+            zoneAPointWeights[pointI][2] = w[2];
         }
         else
         {
@@ -409,7 +420,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 const scalar A = mag(n);
                 n /= A;
 
@@ -419,9 +432,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 const scalar minEta = min(eta);
 
@@ -515,7 +531,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
                 ctr
             );
 
-            vector n = t.normal();
+            // Area normal on all versions: t.normal() is the unit normal
+            // in OpenFOAM.org, which would break the areal coordinates
+            vector n = triangleAreaNormal(t);
             n /= mag(n);
 
             // Intersection point
@@ -527,9 +545,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
             // zoneBPointWeights[pointI][1] = t.Ni(1, I);
             // zoneBPointWeights[pointI][2] = t.Ni(2, I);
 
-            zoneBPointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            zoneBPointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            zoneBPointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            zoneBPointWeights[pointI][0] = w[0];
+            zoneBPointWeights[pointI][1] = w[1];
+            zoneBPointWeights[pointI][2] = w[2];
         }
         else
         {

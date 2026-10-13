@@ -12,3 +12,9 @@ cleanCase fluid
 cleanCase solid
 rm -rf constant/fluid/polyMesh constant/solid/polyMesh
 rm -rf case.foam deflection.pdf postProcessing
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

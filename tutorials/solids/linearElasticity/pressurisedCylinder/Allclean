@@ -21,3 +21,9 @@ for file in $(find ./0 ./constant ./system -name '*.segregated')
 do
     ln -vnsf ${file##*/} ${file%.*}
 done
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

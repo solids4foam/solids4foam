@@ -68,8 +68,16 @@
     // Add the optional shear compression contribution
     if (scAlpha > 0)
     {
-        phic +=
-            scAlpha*mag(mesh.delta() & fvc::interpolate(symm(fvc::grad(U))));
+        // Named operands: a tmp vector field times a tmp symmTensor field
+        // would be reused as the storage of the inner product, which aliases
+        // an input of the loop and gives wrong results with some -O3 builds
+        // (see pimpleFluid::patchViscousForce)
+        const surfaceVectorField delta(mesh.delta());
+        const surfaceSymmTensorField symmGradUf
+        (
+            fvc::interpolate(symm(fvc::grad(U)))
+        );
+        phic += scAlpha*mag(delta & symmGradUf);
     }
 
 
