@@ -50,6 +50,7 @@ SourceFiles
 #include "dynamicFvMesh.H"
 #include "interfaceToInterfaceMapping.H"
 #include "fsiImmersedInterface.H"
+#include "fluidMeshMotionCoupler.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -310,6 +311,10 @@ class fluidSolidInterface
         mutable PtrList<vectorIOField>
         accumulatedFluidInterfacesDisplacementsList_;
 
+        //- Coupler passing the interface motion to the fluid mesh motion
+        //  solver
+        autoPtr<fluidMeshMotionCoupler> fluidMeshMotionPtr_;
+
     // Private Member Functions
 
         //- Calculate interface-to-interface list
@@ -338,6 +343,9 @@ class fluidSolidInterface
 
         //- Return accumulated interfaces displacements
         PtrList<vectorIOField>& accumulatedFluidInterfacesDisplacements();
+
+        //- Return the fluid mesh motion coupler, creating it on first use
+        fluidMeshMotionCoupler& fluidMeshMotion();
 
         //- Disallow default bitwise copy construct
         fluidSolidInterface(const fluidSolidInterface&);

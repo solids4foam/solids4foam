@@ -14,6 +14,9 @@ source solids4FoamScripts.sh
 # ./Allrun aitken parallel
 # ./Allrun iqnils highOrder
 # ./Allrun iqnils highOrder parallel
+# ./Allrun displacementLaplacian   # fluid mesh motion (default velocityLaplacian)
+# ./Allrun diffusionElastic        # solid model mesh motion, small strain
+# ./Allrun diffusionHyperElastic   # solid model mesh motion, finite strain
 
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
@@ -23,6 +26,7 @@ interfaceCondition=dirichletNeumann
 runMode=serial
 fvSolutionSuffix=""
 solidPropertiesSuffix=""
+meshMotion=velocityLaplacian
 
 for arg in "$@"
 do
@@ -43,9 +47,13 @@ do
         highOrder)
             solidPropertiesSuffix=".highOrder"
             ;;
+        velocityLaplacian|displacementLaplacian|diffusionElastic|diffusionHyperElastic)
+            meshMotion="$arg"
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]" \
+                 "[velocityLaplacian|displacementLaplacian|diffusionElastic|diffusionHyperElastic]"
             exit 1
             ;;
     esac
@@ -57,7 +65,18 @@ elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
     fvSolutionSuffix=".openfoamorg"
 fi
 
+# The displacement-based and solid model fluid mesh motion couplers are not
+# available in foam-extend, and the solid model mesh motion solver only in
+# OpenFOAM.com
+if [[ "${meshMotion}" != "velocityLaplacian" ]]; then
+    solids4Foam::caseDoesNotRunWithFoamExtend
+fi
+if [[ "${meshMotion}" == diffusion* ]]; then
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+fi
+
 echo "Using ${coupling} coupling setup"
+echo "Using ${meshMotion} fluid mesh motion"
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 if [[ "${coupling}" == "robin" ]]; then
@@ -70,6 +89,15 @@ ln -vnsf "controlDict.${solutionSetup}" system/controlDict
 ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
 ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+if [[ "${meshMotion}" == diffusion* ]]; then
+    ln -vnsf dynamicMeshDict.solidModel constant/fluid/dynamicMeshDict
+    ln -vnsf "solidProperties.${meshMotion}" \
+        constant/fluidMeshMotion/solidProperties
+    ln -vnsf "mechanicalProperties.${meshMotion}" \
+        constant/fluidMeshMotion/mechanicalProperties
+else
+    ln -vnsf "dynamicMeshDict.${meshMotion}" constant/fluid/dynamicMeshDict
+fi
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
@@ -78,11 +106,23 @@ solids4Foam::convertCaseFormat .
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
+# The solid model mesh motion solver is solved on a static copy of the fluid
+# mesh
+if [[ "${meshMotion}" == diffusion* ]]; then
+    rm -rf constant/fluidMeshMotion/polyMesh
+    cp -r constant/fluid/polyMesh constant/fluidMeshMotion/polyMesh
+fi
+
 # Run solver
 if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
+    if [[ "${meshMotion}" == diffusion* ]]; then
+        # Decomposed in the same way as the fluid mesh, which it copies
+        solids4Foam::runApplication -s fluidMeshMotion \
+            decomposePar -region fluidMeshMotion
+    fi
 
     if [[ "$WM_PROJECT" == "foam" ]]; then
         # foam-extend's processorPolyPatch face-matching check
@@ -98,6 +138,10 @@ if [[ "$runMode" == "parallel" ]]; then
 
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
+    if [[ "${meshMotion}" == diffusion* ]]; then
+        solids4Foam::runApplication -s fluidMeshMotion \
+            reconstructPar -region fluidMeshMotion
+    fi
 else
     # Run serial
     solids4Foam::runApplication solids4Foam

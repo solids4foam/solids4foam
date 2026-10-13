@@ -227,6 +227,18 @@ run_case() {
     )
 }
 
+run_mesh_motion_case() {
+    local case_dir="$1"
+    local mesh_motion="$2"
+
+    echo "Running IQNILS ${mesh_motion} fluid mesh motion regression case"
+    (
+        cd "${case_dir}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun iqnils "${mesh_motion}" > "${ALLRUN_LOGFILE}" 2>&1
+    )
+}
+
 run_high_order_case() {
     local case_dir="$1"
 
@@ -367,6 +379,16 @@ if [[ "${variant}" != "foamextend" ]]; then
     run_high_order_case "${high_order_case}"
 fi
 
+# The fluid mesh motion variants: the mesh motion should change the beam
+# response by much less than the tolerances, so they share the references.
+# Each Allrun declares a skip where its mesh motion is unavailable
+MESH_MOTIONS=(displacementLaplacian diffusionElastic diffusionHyperElastic)
+declare -A mesh_motion_cases
+for mesh_motion in "${MESH_MOTIONS[@]}"; do
+    mesh_motion_cases[${mesh_motion}]=$(prepare_case iqnils "${mesh_motion}")
+    run_mesh_motion_case "${mesh_motion_cases[${mesh_motion}]}" "${mesh_motion}"
+done
+
 echo
 
 failures=0
@@ -390,6 +412,12 @@ if [[ "${variant}" != "foamextend" ]]; then
 else
     echo "Skipping high-order regression case: unavailable on foam-extend"
 fi
+
+for mesh_motion in "${MESH_MOTIONS[@]}"; do
+    check_case "${mesh_motion}" "${mesh_motion_cases[${mesh_motion}]}" \
+        "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+        || failures=$((failures + $?))
+done
 
 echo
 if (( failures == 0 )); then

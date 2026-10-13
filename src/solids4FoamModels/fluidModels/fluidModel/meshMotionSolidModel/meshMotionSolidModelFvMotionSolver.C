@@ -27,6 +27,7 @@ License
 #include "fvcGrad.H"
 #include "surfaceInterpolate.H"
 #include "fvcLaplacian.H"
+#include "fvcAverage.H"
 #include "mapPolyMesh.H"
 #include "fvOptions.H"
 #include "motionInterpolation.H"
@@ -53,6 +54,136 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::dynamicFvMesh>
+Foam::meshMotionSolidModelFvMotionSolver::makeReferenceMesh() const
+{
+    const word regionName(coeffDict().lookup("regionName"));
+
+    if (regionName == fvMesh_.name())
+    {
+        return autoPtr<dynamicFvMesh>();
+    }
+
+    Info<< "Reading the mesh motion reference mesh for region "
+        << regionName << endl;
+
+    return dynamicFvMesh::New
+    (
+        IOobject
+        (
+            regionName,
+            fvMesh_.time().timeName(),
+            fvMesh_.time(),
+            IOobject::MUST_READ
+        )
+    );
+}
+
+
+Foam::autoPtr<Foam::volScalarField>
+Foam::meshMotionSolidModelFvMotionSolver::makeStiffnessScaleFactor() const
+{
+    if (!referenceMeshPtr_.valid() || !coeffDict().found("diffusivity"))
+    {
+        return autoPtr<volScalarField>();
+    }
+
+    const fvMesh& mesh = referenceMeshPtr_();
+
+    const scalar maxFactor =
+        coeffDict().lookupOrDefault<scalar>("maxFactor", 100);
+    const scalar minFactor =
+        coeffDict().lookupOrDefault<scalar>("minFactor", 0.1);
+
+    if (maxFactor < minFactor)
+    {
+        FatalErrorInFunction
+            << "maxFactor cannot be less than minFactor!" << exit(FatalError);
+    }
+
+    autoPtr<motionDiffusivity> diffusivityPtr
+    (
+        motionDiffusivity::New(mesh, coeffDict().lookup("diffusivity"))
+    );
+
+    // Limit the range of the face diffusivity and normalise it by its average
+    surfaceScalarField df("stiffnessScaleFactorf", diffusivityPtr()());
+    const dimensionedScalar avDf = average(df);
+
+    if (avDf.value() < SMALL)
+    {
+        FatalErrorInFunction
+            << "The average mesh motion diffusivity must be positive"
+            << exit(FatalError);
+    }
+
+    df = min(maxFactor*avDf, max(minFactor*avDf, df));
+    df /= avDf;
+
+    autoPtr<volScalarField> dPtr
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "stiffnessScaleFactor",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                Switch(coeffDict().lookupOrDefault<Switch>
+                (
+                    "writeStiffScaleFactor", false
+                ))
+              ? IOobject::AUTO_WRITE
+              : IOobject::NO_WRITE
+            ),
+            fvc::average(df),
+            "zeroGradient"
+        )
+    );
+
+    dPtr->correctBoundaryConditions();
+
+    Info<< "Stiffness scale factor: min " << gMin(dPtr->primitiveField())
+        << ", max " << gMax(dPtr->primitiveField()) << endl;
+
+    return dPtr;
+}
+
+
+void Foam::meshMotionSolidModelFvMotionSolver::checkReferenceMesh() const
+{
+    if (!referenceMeshPtr_.valid())
+    {
+        return;
+    }
+
+    const fvMesh& mesh = referenceMeshPtr_();
+
+    bool ok = (mesh.nPoints() == points0().size());
+    reduce(ok, andOp<bool>());
+
+    if (ok)
+    {
+        const scalar maxDiff = gMax(mag(mesh.points() - points0())());
+
+        ok = (maxDiff <= 1e-6*mag(mesh.bounds().span()));
+    }
+
+    if (!ok)
+    {
+        FatalErrorInFunction
+            << "The points of the mesh motion reference mesh "
+            << mesh.name() << " are not the reference points of the mesh "
+            << fvMesh_.name() << ": the reference mesh must be a copy of "
+            << "the initial mesh, decomposed in the same way in parallel"
+            << exit(FatalError);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
@@ -63,6 +194,8 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
 :
     displacementMotionSolver(mesh, dict, typeName),
     fvMotionSolver(mesh),
+    referenceMeshPtr_(makeReferenceMesh()),
+    stiffnessScaleFactorPtr_(makeStiffnessScaleFactor()),
     modelPtr_
     (
         solidModel::New
@@ -72,7 +205,9 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
         )
     ),
     solveEquations_(true)
-{}
+{
+    checkReferenceMesh();
+}
 
 
 Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
@@ -85,6 +220,8 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
 :
     displacementMotionSolver(mesh, dict, pointDisplacement, points0, typeName),
     fvMotionSolver(mesh),
+    referenceMeshPtr_(makeReferenceMesh()),
+    stiffnessScaleFactorPtr_(makeStiffnessScaleFactor()),
     modelPtr_
     (
         solidModel::New
@@ -95,6 +232,8 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
     ),
     solveEquations_(true)
 {
+    checkReferenceMesh();
+
     // Update pointD
     modelPtr_->pointD().primitiveFieldRef() =
         pointDisplacement.primitiveField();

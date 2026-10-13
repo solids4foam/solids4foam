@@ -16,6 +16,9 @@ elif [[ $WM_PROJECT_VERSION == v* ]]; then
 fi
 
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing
+rm -rf constant/fluidMeshMotion/polyMesh
+rm -f constant/fluidMeshMotion/solidProperties
+rm -f constant/fluidMeshMotion/mechanicalProperties
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
