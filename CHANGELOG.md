@@ -497,7 +497,8 @@ release. For complete commit-level details and contributor information, see the
   `nonLinearGeometryTotalLagrangianTotalDisplacement` now include the implicit
   part of `fvOptions` sources, e.g. a positive `implicit` coefficient of a
   `vectorSemiImplicitSource` on `D`, which was previously ignored, as it is
-  held in the matrix diagonal rather than its source (#283). The sign of the
+  held in the matrix diagonal rather than its source (#283). The matching
+  diagonal contribution is also added to the SNES Jacobian. The sign of the
   explicit part was already correct and is unchanged: `fvMatrix` stores an
   explicit source `Su` as `-V*Su`, so a body force through `fvOptions` gives
   the same displacement as the equivalent `g` with both the segregated and

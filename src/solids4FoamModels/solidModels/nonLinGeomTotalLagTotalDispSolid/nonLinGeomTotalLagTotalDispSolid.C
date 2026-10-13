@@ -1706,6 +1706,16 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             transientJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(D);
         }
 
+#ifdef OPENFOAM_COM
+        // Add the linearisation of the implicit fvOptions terms (Sp*D) in the
+        // residual. Only the matrix coefficients are inserted, so the explicit
+        // Su part (held in the source) does not contribute. Note that an
+        // implicit part added with fvm::SuSp and a negative coefficient is
+        // held in the source and is omitted here, which only reduces the
+        // diagonal dominance of this approximate Jacobian
+        transientJ += fvOptions()(ds_, D);
+#endif
+
         foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         (
             transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
@@ -1724,6 +1734,16 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         {
             approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
         }
+
+#ifdef OPENFOAM_COM
+        // Add the linearisation of the implicit fvOptions terms (Sp*D) in the
+        // residual. Only the matrix coefficients are inserted, so the explicit
+        // Su part (held in the source) does not contribute. Note that an
+        // implicit part added with fvm::SuSp and a negative coefficient is
+        // held in the source and is omitted here, which only reduces the
+        // diagonal dominance of this approximate Jacobian
+        approxJ += fvOptions()(ds_, D);
+#endif
 
         // Optional: under-relaxation of the linear system
         approxJ.relax();
