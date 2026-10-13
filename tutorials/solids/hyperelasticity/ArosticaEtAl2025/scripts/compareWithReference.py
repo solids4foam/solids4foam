@@ -7,11 +7,17 @@ The reference curves (verification/reference/<step>/<group>.csv) were
 converted from the pickles distributed with the cardiac-benchmark-toolkit
 (https://github.com/Reidmen/cardiac_benchmark_toolkit, MIT licence).
 
+Several groups submitted more than one solution (e.g. cheart.csv and
+cheart_p1.csv, for different element orders). All of them are plotted, but
+the median counts one solution per group, the file without a suffix, so that
+no group is weighted twice.
+
 Usage (from the case directory, after ./Allrun <step>):
-    python3 scripts/compareWithReference.py step1     # benchmark 1
-    python3 scripts/compareWithReference.py coarse    # benchmark 2
+    python3 ../scripts/compareWithReference.py step1     # benchmark 1
+    python3 ../scripts/compareWithReference.py coarse    # benchmark 2
 writes verification/<step>.png and prints, per component, the largest
 difference from the median of the reference solutions over t in [0, 1] s.
+Needs numpy, and matplotlib for the plot.
 """
 import glob
 import os
@@ -51,13 +57,20 @@ def main():
             t_ours.append(d[:, 0])
             labels.append(f"{p} {comp}")
 
+    # One solution per group for the median: the one without a suffix, or
+    # else the first
+    groups = {}
+    for name in sorted(refs, key=lambda n: ("_" in n, n)):
+        groups.setdefault(name.split("_")[0], name)
+
     t_ref = next(iter(refs.values()))[:, 0]
-    stack = np.stack([[np.interp(t_ref, r[:, 0], r[:, 1 + c]) for c in range(nc)]
-                      for r in refs.values()])
+    stack = np.stack([[np.interp(t_ref, refs[n][:, 0], refs[n][:, 1 + c])
+                       for c in range(nc)] for n in groups.values()])
     median = np.median(stack, axis=0)
     spread = stack.max(axis=0) - stack.min(axis=0)
 
-    print(f"{step}: solids4foam vs median of {len(refs)} reference solutions")
+    print(f"{step}: solids4foam vs the median of {len(groups)} groups' "
+          f"solutions ({len(refs)} submitted)")
     print(f"{'component':10s} {'max|diff| [mm]':>15s} {'ref spread [mm]':>16s}")
     for k in range(nc):
         mask = t_ref <= t_ours[k][-1] + 1e-12

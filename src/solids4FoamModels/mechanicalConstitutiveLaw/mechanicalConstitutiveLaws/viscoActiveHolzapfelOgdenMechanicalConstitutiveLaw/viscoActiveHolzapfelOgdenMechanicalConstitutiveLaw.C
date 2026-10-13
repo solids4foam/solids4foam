@@ -15,6 +15,9 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
+Author
+    Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw.H"
@@ -333,7 +336,7 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
                 << "The fibre or sheet direction has zero length at index "
                 << i << '.' << nl
                 << "This law needs both. Either supply f0 and s0 fields - "
-                << "setEllipsoidFibreField writes them - or set "
+                << "setFibreField (method ellipsoid) writes them - or set "
                 << "'uniformFibreField yes' and give 'f0' and 's0' in this "
                 << "material's dictionary."
                 << exit(FatalError);

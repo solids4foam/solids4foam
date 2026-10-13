@@ -30,8 +30,6 @@ ddtSchemes
 gradSchemes
 {
     default                 leastSquaresS4f;
-    // grad(t) is not used by setEllipsoidFibreField; kept as in LandEtAl2015
-    grad(t)                 pointCellsLeastSquares;
 }
 
 divSchemes

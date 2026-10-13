@@ -2,14 +2,17 @@
 cd "${0%/*}" || exit 1    # Run from this directory
 
 # Source tutorial clean functions
-. $WM_PROJECT_DIR/bin/tools/CleanFunctions
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
 
 cleanCase0
 
 # Remove the formulation links created by Allrun
 rm -f system/fvSolution constant/solidProperties
 
-rm -rf constant/polyMesh
-rm -f verification/coarse.png verification/fine.png log.compareWithReference
+# Remove the mesh, the downloaded toolkit data and the time series generated
+# by Allrun
+rm -rf constant/polyMesh data
+rm -f constant/activeStress constant/pressureLV constant/pressureRV
+rm -f verification/coarse.png verification/fine.png
 
 #------------------------------------------------------------------------------

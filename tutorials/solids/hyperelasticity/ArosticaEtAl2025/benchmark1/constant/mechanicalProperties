@@ -50,11 +50,11 @@ mechanical
         k               100;
 
         // Fibres and sheets from 0/f0 and 0/s0, written by
-        // setEllipsoidFibreField
+        // setFibreField (method ellipsoid)
         uniformFibreField no;
 
         // Active stress tau(t), the solution of eq. (5) with Table 3 (and
-        // sigma_0 of Table 5 in step 2), tabulated by scripts/makeTimeSeries.py
+        // sigma_0 of Table 5 in step 2), tabulated by ../scripts/makeTimeSeries.py
         activeStressSeries
         {
             "file|fileName" "$FOAM_CASE/constant/activeStress";

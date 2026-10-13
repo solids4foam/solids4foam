@@ -47,14 +47,14 @@ mechanical
         k               100;
 
         // Fibres and sheets from 0/f0 and 0/s0: the rule-based (BT-LDRB)
-        // fibres distributed with the benchmark, see scripts/convertBiVMesh.py
+        // fibres distributed with the benchmark, see ../scripts/convertBiVMesh.py
         uniformFibreField no;
 
         // Active stress tau(t), the solution of eq. (5) with Table 8,
-        // tabulated by scripts/makeTimeSeries.py
+        // tabulated by ../scripts/makeTimeSeries.py
         activeStressSeries
         {
-            "file|fileName" "$FOAM_CASE/constant/timeSeries/activeStress";
+            "file|fileName" "$FOAM_CASE/constant/activeStress";
             outOfBounds clamp;
         }
     }

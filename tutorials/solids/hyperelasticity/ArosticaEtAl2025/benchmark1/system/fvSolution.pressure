@@ -53,23 +53,9 @@ solvers
             ksp_converged_reason;
             ksp_max_it "300";
 
-            // pc_type hypre;
-            // pc_hypre_type boomeramg;
-            // pc_hypre_boomeramg_max_iter "1";
-            // pc_hypre_boomeramg_strong_threshold "0.6";
-            // pc_hypre_boomeramg_grid_sweeps_up "1";
-            // pc_hypre_boomeramg_grid_sweeps_down "1";
-            // pc_hypre_boomeramg_agg_nl "1";
-            // pc_hypre_boomeramg_agg_num_paths "1";
-            // pc_hypre_boomeramg_max_levels "25";
-            // pc_hypre_boomeramg_coarsen_type HMIS;
-            // pc_hypre_boomeramg_interp_type ext+i;
-            // pc_hypre_boomeramg_P_max "1";
-            // pc_hypre_boomeramg_truncfactor "0.3";
-
-            // Split preconditioner below for mixed (pressure-displacement) solver
-
-            // Fluid: nested velocity/pressure Schur (3-D: block_size 4)
+            // Mixed displacement-pressure system (3-D: block size 4):
+            // Schur-complement field split of the displacement (0,1,2)
+            // and pressure (3), each preconditioned with HYPRE BoomerAMG
             pc_type fieldsplit;
             pc_fieldsplit_type schur;
             pc_fieldsplit_schur_fact_type lower;
@@ -78,11 +64,8 @@ solvers
             pc_fieldsplit_0_fields "0,1,2";
             pc_fieldsplit_1_fields "3";
 
-            // Velocity sub-block: bjacobi + ILU(0) (or + AMG)
+            // Displacement block
             fieldsplit_0_ksp_type preonly;
-            //fieldsplit_0_pc_type bjacobi;
-            // fieldsplit_0_sub_pc_type ilu;
-            // fieldsplit_0_sub_pc_factor_levels "0";
             fieldsplit_0_pc_type hypre;
             fieldsplit_0_pc_hypre_type boomeramg;
             fieldsplit_0_pc_hypre_boomeramg_max_iter "1";
@@ -97,7 +80,7 @@ solvers
             fieldsplit_0_pc_hypre_boomeramg_P_max "1";
             fieldsplit_0_pc_hypre_boomeramg_truncfactor "0.3";
 
-            // Pressure Schur complement: HYPRE BoomerAMG
+            // Pressure Schur complement
             fieldsplit_1_ksp_type preonly;
             fieldsplit_1_pc_type hypre;
             fieldsplit_1_pc_hypre_type boomeramg;

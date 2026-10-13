@@ -30,7 +30,8 @@ ddtSchemes
 gradSchemes
 {
     default                 leastSquaresS4f;
-    // grad(t) is not used by setEllipsoidFibreField; kept as in LandEtAl2015
+    // For the non-orthogonal correction of the Laplace solve of t in
+    // setFibreField, which does not load the solids4foam gradient schemes
     grad(t)                 pointCellsLeastSquares;
 }
 

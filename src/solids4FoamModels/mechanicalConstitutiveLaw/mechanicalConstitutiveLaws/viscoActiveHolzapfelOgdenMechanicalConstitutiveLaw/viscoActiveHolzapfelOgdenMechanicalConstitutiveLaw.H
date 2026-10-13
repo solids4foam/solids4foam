@@ -28,7 +28,7 @@ Description
 
     with the passive energy
 
-        Psi_aniso = a/(2b) exp(b(I1bar - 3))
+        Psi_aniso = a/(2b) (exp(b(I1bar - 3)) - 1)
                   + sum_{i=f,s} a_i/(2b_i) H(I4i) (exp(b_i (I4i - 1)^2) - 1)
                   + a_fs/(2b_fs) (exp(b_fs I8fs^2) - 1)
                   + kappa/4 (J^2 - 1 - 2 ln J)
@@ -56,7 +56,8 @@ Description
     is passive.
 
     The fibre f0 and sheet s0 directions are prescribed state, read from the
-    f0 and s0 fields of the case (setEllipsoidFibreField writes both), or
+    f0 and s0 fields of the case (setFibreField, method ellipsoid, writes
+    both), or
     given uniform in this dictionary. Both are normalised here.
 
     The volumetric penalty dU/dJ is returned separately when asked, so the
@@ -100,6 +101,9 @@ Usage
     References:
     R. Arostica, D. Nolte, A. Brown, et al., "A software benchmark for cardiac
     elastodynamics", Comput. Methods Appl. Mech. Engrg. 435 (2025) 117485.
+
+Author
+    Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
 
 SourceFiles
     viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw.C

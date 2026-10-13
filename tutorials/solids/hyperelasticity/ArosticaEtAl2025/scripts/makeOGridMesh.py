@@ -28,13 +28,12 @@ Patches: endo, epi, base.
 
 Usage:
     python3 scripts/makeOGridMesh.py [level]     # 1..4, default 2
-Needs numpy.
+Needs only the Python 3 standard library.
 """
+import bisect
 import math
 import os
 import sys
-
-import numpy as np
 
 R_SHORT_ENDO, R_LONG_ENDO = 0.025, 0.090
 R_SHORT_EPI, R_LONG_EPI = 0.035, 0.097
@@ -50,30 +49,61 @@ LEVELS = {
     4: (64, 144, 20),
 }
 C_SQ = 0.18    # half-width of the apical square, in units of the meridian
-SMOOTH_ITERS = 0      # optional Laplacian smoothing sweeps of the apical grid
-SMOOTH_ROWS = 0.35    # fraction of the ring rows that may be smoothed
 TRANSITION = 0.45     # fraction of the ring over which square -> circle
 SHAPE_POWER = 1.0     # < 1 rounds the rows off the square sooner (less robust)
+
+
+def linspace(a, b, n):
+    return [a + (b - a) * i / (n - 1) for i in range(n)]
+
+
+def sub(a, b):
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def cross(a, b):
+    return (a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0])
+
+
+def dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def mean(P):
+    n = len(P)
+    return (sum(p[0] for p in P) / n, sum(p[1] for p in P) / n,
+            sum(p[2] for p in P) / n)
 
 
 class Meridian:
     """phi(s) for an ellipse meridian parametrised by normalised arc length."""
 
     def __init__(self, rs, rl, phib, n=20001):
-        phi = np.linspace(0.0, phib, n)
-        dx = rl * np.sin(phi)
-        dr = rs * np.cos(phi)
-        ds = np.sqrt(dx**2 + dr**2)
-        s = np.concatenate([[0.0], np.cumsum(0.5 * (ds[1:] + ds[:-1]) * np.diff(phi))])
-        self.s = s / s[-1]
+        phi = linspace(0.0, phib, n)
+        ds = [math.hypot(rl * math.sin(p), rs * math.cos(p)) for p in phi]
+        s = [0.0]
+        for i in range(1, n):
+            s.append(s[-1] + 0.5 * (ds[i] + ds[i - 1]) * (phi[i] - phi[i - 1]))
+        self.s = [x / s[-1] for x in s]
         self.phi = phi
         self.rs, self.rl = rs, rl
 
+    def phi_of(self, s):
+        """Linear interpolation of phi(s), as numpy.interp."""
+        if s <= self.s[0]:
+            return self.phi[0]
+        if s >= self.s[-1]:
+            return self.phi[-1]
+        i = bisect.bisect_right(self.s, s) - 1
+        w = (s - self.s[i]) / (self.s[i + 1] - self.s[i])
+        return self.phi[i] + w * (self.phi[i + 1] - self.phi[i])
+
     def point(self, s, theta):
-        phi = np.interp(s, self.s, self.phi)
-        x = -self.rl * np.cos(phi)
-        r = self.rs * np.sin(phi)
-        return np.stack([x, r * np.cos(theta), r * np.sin(theta)], axis=-1)
+        phi = self.phi_of(s)
+        r = self.rs * math.sin(phi)
+        return (-self.rl * math.cos(phi), r * math.cos(theta), r * math.sin(theta))
 
 
 def surface_params(nCap, nRing):
@@ -94,7 +124,7 @@ def surface_params(nCap, nRing):
         s = math.hypot(u, v)
         st.append((s, math.atan2(v, u) if s > 0 else 0.0))
 
-    X = np.linspace(-C_SQ, C_SQ, n + 1)
+    X = linspace(-C_SQ, C_SQ, n + 1)
     for i in range(n + 1):
         for j in range(n + 1):
             add(("c", i, j), X[i], X[j])
@@ -104,11 +134,21 @@ def surface_params(nCap, nRing):
         + [("c", i, n) for i in range(n, 0, -1)] \
         + [("c", 0, j) for j in range(n, 0, -1)] \
         + [("c", i, 0) for i in range(0, n)]
-    Q = np.array([[X[k[1]], X[k[2]]] for k in ring0])
+
+    # Angles of the square's boundary nodes, unwrapped to increase
+    # continuously, as numpy.unwrap
+    thq = []
+    for k in ring0:
+        th = math.atan2(X[k[2]], X[k[1]])
+        if thq:
+            while th - thq[-1] > math.pi:
+                th -= 2.0 * math.pi
+            while th - thq[-1] < -math.pi:
+                th += 2.0 * math.pi
+        thq.append(th)
+    thu = [thq[0] + 2.0 * math.pi * m / nAround for m in range(nAround)]
 
     rows = [ring0]
-    thq = np.unwrap(np.arctan2(Q[:, 1], Q[:, 0]))
-    thu = thq[0] + 2.0 * math.pi * np.arange(nAround) / nAround
     for k in range(1, nRing + 1):
         w = k / nRing
         # Smooth transition over the first TRANSITION of the ring: the rows
@@ -122,14 +162,13 @@ def surface_params(nCap, nRing):
         keys = []
         for m in range(nAround):
             th = thq[m] + b * (thu[m] - thq[m])
-            d = np.array([math.cos(th), math.sin(th)])
+            d = (math.cos(th), math.sin(th))
             if p > 200:
-                norm = np.abs(d).max()
+                norm = max(abs(d[0]), abs(d[1]))
             else:
-                norm = (np.abs(d) ** p).sum() ** (1.0 / p)
-            P = r * d / norm
+                norm = (abs(d[0]) ** p + abs(d[1]) ** p) ** (1.0 / p)
             key = ("r", k, m)
-            add(key, P[0], P[1])
+            add(key, r * d[0] / norm, r * d[1] / norm)
             keys.append(key)
         rows.append(keys)
 
@@ -147,31 +186,7 @@ def surface_params(nCap, nRing):
             quads.append([index[a], index[b], index[c], index[d]])
             if k == nRing - 1:
                 baseEdges.append((index[d], index[c]))
-    quads = np.array(quads)
 
-    # Smooth the algebraic grid: Laplacian smoothing of every node but those
-    # on the rim, in the (u, v) plane. This removes the kinks of the blend and
-    # leaves a smooth, nearly orthogonal O-grid
-    st = np.array(st)
-    uv = np.c_[st[:, 0] * np.cos(st[:, 1]), st[:, 0] * np.sin(st[:, 1])]
-    fixed = np.zeros(len(uv), bool)
-    # Only the apical region is smoothed: rows beyond SMOOTH_ROWS of the ring
-    # are already circles with uniform angles and are held fixed, which also
-    # keeps the meridional cell size uniform
-    for k in range(int(round(SMOOTH_ROWS * nRing)), nRing + 1):
-        fixed[[index[key] for key in rows[k]]] = True
-    edges = np.concatenate([quads[:, [0, 1]], quads[:, [1, 2]],
-                            quads[:, [2, 3]], quads[:, [3, 0]]])
-    edges = np.unique(np.sort(edges, axis=1), axis=0)
-    deg = np.bincount(edges.ravel(), minlength=len(uv)).astype(float)
-    for _ in range(SMOOTH_ITERS):
-        acc = np.zeros_like(uv)
-        np.add.at(acc, edges[:, 0], uv[edges[:, 1]])
-        np.add.at(acc, edges[:, 1], uv[edges[:, 0]])
-        new = acc / deg[:, None]
-        uv[~fixed] = uv[~fixed] + 0.8 * (new[~fixed] - uv[~fixed])
-
-    st = np.c_[np.hypot(uv[:, 0], uv[:, 1]), np.arctan2(uv[:, 1], uv[:, 0])]
     return st, quads, baseEdges
 
 
@@ -199,30 +214,30 @@ def build(level):
 
     endo = Meridian(R_SHORT_ENDO, R_LONG_ENDO, PHI_BASE_ENDO)
     epi = Meridian(R_SHORT_EPI, R_LONG_EPI, PHI_BASE_EPI)
-    pEndo = endo.point(st[:, 0], st[:, 1])
-    pEpi = epi.point(st[:, 0], st[:, 1])
+    pEndo = [endo.point(s, th) for s, th in st]
+    pEpi = [epi.point(s, th) for s, th in st]
 
-    tw = np.linspace(0.0, 1.0, nWall + 1)
-    pts = np.concatenate([(1 - t) * pEndo + t * pEpi for t in tw])
+    pts = []
+    for t in linspace(0.0, 1.0, nWall + 1):
+        pts.extend(tuple((1 - t) * a[i] + t * b[i] for i in range(3))
+                   for a, b in zip(pEndo, pEpi))
 
     def pid(layer, node):
         return layer * nS + node
 
-    # Hexes: bottom quad on layer l, top quad on layer l+1
+    # Hexes: bottom quad on layer l, top quad on layer l+1, oriented
+    # right-handed (positive volume): the bottom-face normal must point
+    # through the wall, towards the top face
     cells = []
     for l in range(nWall):
         for q in quads:
-            cells.append([pid(l, v) for v in q] + [pid(l + 1, v) for v in q])
-    cells = np.array(cells)
-
-    # Orient every hex right-handed (positive volume)
-    # Simple, robust test: signed volume from the bottom-face normal and the
-    # wall direction
-    p = pts[cells]
-    nb = np.cross(p[:, 2] - p[:, 0], p[:, 3] - p[:, 1])
-    up = p[:, 4:].mean(1) - p[:, :4].mean(1)
-    flip = np.einsum("ij,ij->i", nb, up) < 0
-    cells[flip] = cells[flip][:, [0, 3, 2, 1, 4, 7, 6, 5]]
+            c = [pid(l, v) for v in q] + [pid(l + 1, v) for v in q]
+            p = [pts[v] for v in c]
+            nb = cross(sub(p[2], p[0]), sub(p[3], p[1]))
+            up = sub(mean(p[4:]), mean(p[:4]))
+            if dot(nb, up) < 0:
+                c = [c[k] for k in (0, 3, 2, 1, 4, 7, 6, 5)]
+            cells.append(c)
 
     # Hex faces, outward for a right-handed hex (OpenFOAM's hex model)
     HF = [(0, 4, 7, 3), (1, 2, 6, 5), (0, 1, 5, 4),
@@ -230,7 +245,7 @@ def build(level):
     faceMap = {}
     for ci, c in enumerate(cells):
         for f in HF:
-            verts = [int(c[k]) for k in f]
+            verts = [c[k] for k in f]
             key = tuple(sorted(verts))
             if key in faceMap:
                 faceMap[key][1] = ci
@@ -263,33 +278,35 @@ def build(level):
 
 
 def check(pts, cells, internal, patches):
-    """Closedness, positive volumes and non-orthogonality, like checkMesh."""
+    """Positive volumes, outward boundary faces and non-orthogonality.
+
+    checkMesh, which Allrun runs next, checks the mesh fully; this only stops
+    a bad mesh from being written.
+    """
     nC = len(cells)
-    Sf_sum = np.zeros((nC, 3))
-    cc = pts[cells].mean(1)
+    cc = [mean([pts[v] for v in c]) for c in cells]
+    vol = [0.0] * nC
+    maxNonOrth = 0.0
+    sumNonOrth = 0.0
     allf = [(o, n, v) for o, n, v in internal] + \
         [(o, -1, v) for k in patches for o, v in patches[k]]
-    vol = np.zeros(nC)
-    nonOrth = []
     for o, n, v in allf:
-        P = pts[v]
-        fc = P.mean(0)
-        Sf = 0.5 * np.cross(P[2] - P[0], P[3] - P[1])
-        Sf_sum[o] += Sf
-        vol[o] += np.dot(Sf, fc - cc[o]) / 3.0
+        P = [pts[i] for i in v]
+        fc = mean(P)
+        Sf = tuple(0.5 * x for x in cross(sub(P[2], P[0]), sub(P[3], P[1])))
+        vol[o] += dot(Sf, sub(fc, cc[o])) / 3.0
         if n >= 0:
-            Sf_sum[n] -= Sf
-            vol[n] -= np.dot(Sf, fc - cc[n]) / 3.0
-            d = cc[n] - cc[o]
-            c = np.dot(d, Sf) / (np.linalg.norm(d) * np.linalg.norm(Sf))
-            nonOrth.append(math.degrees(math.acos(max(-1, min(1, c)))))
-        else:
-            if np.dot(Sf, fc - cc[o]) <= 0:
-                raise RuntimeError("Inward boundary face")
-    nonOrth = np.array(nonOrth)
-    return dict(cells=nC, minVol=vol.min(), maxVol=vol.max(), totVol=vol.sum(),
-                maxNonOrth=nonOrth.max(), meanNonOrth=nonOrth.mean(),
-                maxOpen=np.abs(Sf_sum).max(), nNeg=int((nonOrth > 90).sum()))
+            vol[n] -= dot(Sf, sub(fc, cc[n])) / 3.0
+            d = sub(cc[n], cc[o])
+            c = dot(d, Sf) / math.sqrt(dot(d, d) * dot(Sf, Sf))
+            a = math.degrees(math.acos(max(-1.0, min(1.0, c))))
+            maxNonOrth = max(maxNonOrth, a)
+            sumNonOrth += a
+        elif dot(Sf, sub(fc, cc[o])) <= 0:
+            raise RuntimeError("Inward boundary face")
+    return dict(cells=nC, minVol=min(vol), maxVol=max(vol), totVol=sum(vol),
+                maxNonOrth=maxNonOrth,
+                meanNonOrth=sumNonOrth / max(len(internal), 1))
 
 
 def write(pts, cells, internal, patches, root="constant/polyMesh"):

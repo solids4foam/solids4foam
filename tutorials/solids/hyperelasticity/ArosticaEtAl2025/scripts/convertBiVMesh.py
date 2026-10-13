@@ -4,28 +4,52 @@ Convert the biventricular mesh and fibres distributed with the Arostica et al.
 (2025) benchmark (cardiac-benchmark-toolkit, data/biv_mesh_and_fibers_*_p1)
 to an OpenFOAM polyMesh and cell-centred f0, s0, n0 fields.
 
-Inputs (from the toolkit):
+Inputs (from the toolkit, downloaded at a fixed commit and checked against
+their SHA-256 sums when a mesh name is given):
     bi_ventricular.h5      tetrahedra, nodes and facet markers
                            (10 base, 20 endo RV, 30 endo LV, 40 epi)
     fiber_directions.h5    nodal fibre, sheet and sheet-normal vectors (P1)
 Outputs:
     constant/polyMesh/{points,faces,owner,neighbour,boundary}
-    0.orig/f0, 0.orig/s0, 0.orig/n0   (cell and face values)
+    0/f0, 0/s0, 0/n0   (cell and face values)
 
 The nodal vectors are averaged to cells and faces and re-orthonormalised
 (f0 first, then s0 by Gram-Schmidt, n0 = f0 x s0), which is what a P1
 interpolation evaluated at the centroid gives, up to normalisation. The sheet
 s0 is the toolkit's "sheet" vector, as used by the reference implementation.
 
-Usage:
-    python3 convertBiVMesh.py <toolkit>/data/biv_mesh_and_fibers_coarse_p1 [caseDir]
+Usage, from the case directory:
+    python3 ../scripts/convertBiVMesh.py coarse|fine
+        downloads the toolkit's files into data/<mesh> (once) and converts
+    python3 ../scripts/convertBiVMesh.py <dir with the two .h5 files>
+        converts a local copy, e.g. of a clone of the toolkit
 Needs numpy and h5py.
 """
+import hashlib
 import os
 import sys
+import urllib.request
 
 import h5py
 import numpy as np
+
+# The toolkit's data, at a fixed commit, with the SHA-256 sums of the files
+TOOLKIT = ("https://raw.githubusercontent.com/Reidmen/cardiac_benchmark_toolkit/"
+           "e8d47553cfc83eb274eba3e177de33148e7f441c/data")
+DATA = {
+    "coarse": {
+        "bi_ventricular.h5":
+            "0711b37423ab4f87b9b8fe68e02dc8261e8df023621a61202756df008c8ddd53",
+        "fiber_directions.h5":
+            "8859c8bc10ec32aca97069f2bf513b31c2cacbecdfae7dfbdd3bdd99684d1d69",
+    },
+    "fine": {
+        "bi_ventricular.h5":
+            "230e0f7c67b03066035e34fd69f8d3cd572addd9ad99f1538c3c9e11fc3ff0ef",
+        "fiber_directions.h5":
+            "8f9f1ba8491986580a8ced7964a5eaa1b821ef2aa1201a976ed1e1764569765d",
+    },
+}
 
 MARKERS = {10: "base", 20: "endo_rv", 30: "endo_lv", 40: "epi"}
 ORDER = ["base", "endo_lv", "endo_rv", "epi"]
@@ -57,9 +81,38 @@ def orthonormal(f, s):
     return f, s, unit(np.cross(f, s))
 
 
+def sha256(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def download(mesh, case):
+    """Download the toolkit's files of a mesh into data/<mesh>, once."""
+    dest = os.path.join(case, "data", mesh)
+    os.makedirs(dest, exist_ok=True)
+    for name, digest in DATA[mesh].items():
+        path = os.path.join(dest, name)
+        if os.path.isfile(path) and sha256(path) == digest:
+            continue
+        url = f"{TOOLKIT}/biv_mesh_and_fibers_{mesh}_p1/{name}"
+        print(f"Downloading {url}")
+        urllib.request.urlretrieve(url, path)
+        if sha256(path) != digest:
+            os.remove(path)
+            sys.exit(f"{name}: SHA-256 mismatch, download rejected")
+    return dest
+
+
 def main():
-    src = sys.argv[1]
+    if len(sys.argv) < 2:
+        sys.exit(__doc__)
     case = sys.argv[2] if len(sys.argv) > 2 else "."
+    src = sys.argv[1]
+    if src in DATA:
+        src = download(src, case)
     with h5py.File(os.path.join(src, "bi_ventricular.h5"), "r") as h:
         X = h["Mesh/mesh/geometry"][:]
         T = h["Mesh/mesh/topology"][:].astype(np.int64)
@@ -146,7 +199,7 @@ def main():
 
     # Fibres at cells and boundary faces
     fC, sC, nC = orthonormal(fN[T].mean(1), sN[T].mean(1))
-    os.makedirs(os.path.join(case, "0.orig"), exist_ok=True)
+    os.makedirs(os.path.join(case, "0"), exist_ok=True)
     for name, vc, vN in (("f0", fC, fN), ("s0", sC, sN), ("n0", nC, None)):
         body = "dimensions      [0 0 0 0 0 0 0];\n\ninternalField   nonuniform List<vector>\n"
         body += f"{len(vc)}\n(\n" + "".join(
@@ -159,7 +212,7 @@ def main():
             body += f"{len(vf)}\n(\n" + "".join(
                 f"({v[0]:.8g} {v[1]:.8g} {v[2]:.8g})\n" for v in vf) + ")\n;\n    }\n"
         body += "}\n"
-        wr(name, "volVectorField", body, loc="0.orig")
+        wr(name, "volVectorField", body, loc="0")
 
     print(f"{len(T)} tetrahedra, {len(X)} points, {len(internal)} internal faces")
     print("patches: " + ", ".join(f"{k} {len(patches[k])}" for k in ORDER))

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate the time series used by the Arostica et al. (2025) benchmark 1:
+Generate the time series of the Arostica et al. (2025) benchmarks:
 
   * the active stress tau(t), eq. (5)-(6) of the paper (Bestel model), and
   * the endocardial pressure p(t), eq. (7)-(8).
@@ -8,56 +8,68 @@ Generate the time series used by the Arostica et al. (2025) benchmark 1:
 Both are scalar ODEs in time only, so they are integrated once here and handed
 to solids4foam as OpenFOAM interpolation tables:
 
-  constant/activeStress   ( (t tau) ... )   read by the cardiacHolzapfelOgden law
+  constant/activeStress   ( (t tau) ... )   read by the viscoActiveHolzapfelOgden
+                                            law
   constant/timeVsPressure ( (t p)   ... )   read by the solidTraction BC on endo
 
-Only numpy is needed. Each ODE is linear in its unknown with a time-dependent
+The Allrun scripts call it; only the Python 3 standard library is needed.
+Each ODE is linear in its unknown with a time-dependent
 coefficient,  y' = -c(t) y + s(t),  so over a small sub-step h with c and s
 frozen at the mid-point the exact update is
     y(t+h) = y_eq + (y(t) - y_eq) exp(-c h),   y_eq = s/c,
 which is unconditionally stable. With h = 1e-5 s it agrees with scipy's Radau
-(used by the reference implementation) to better than 1e-7 relative (a tightly toleranced Radau).
+(used by the reference implementation, tightly toleranced) to better than
+1e-7 relative.
 
 Usage:
     python3 makeTimeSeries.py                     # Table 3/4 defaults
-    python3 makeTimeSeries.py --sigma0 2e5 --out constant/activeStress.caseA
+    python3 makeTimeSeries.py --which active --sigma0 2e5 \
+        --out constant/activeStress
 """
 import argparse
+import bisect
 import math
-import numpy as np
 
 
 def S(dt, gamma, sign):
-    return 0.5 * (1.0 + sign * np.tanh(dt / gamma))
+    return 0.5 * (1.0 + sign * math.tanh(dt / gamma))
+
+
+def interp(x, xp, yp):
+    """Linear interpolation of (xp, yp) at x, as numpy.interp."""
+    if x <= xp[0]:
+        return yp[0]
+    if x >= xp[-1]:
+        return yp[-1]
+    i = bisect.bisect_right(xp, x) - 1
+    w = (x - xp[i]) / (xp[i + 1] - xp[i])
+    return yp[i] + w * (yp[i + 1] - yp[i])
 
 
 def integrate(c, s, t_end, h, t_out):
     """Integrate y' = -c(t) y + s(t), y(0) = 0, sampling at t_out."""
     n = int(round(t_end / h))
-    t = np.arange(n) * h + 0.5 * h          # mid-points of the sub-steps
-    cm = c(t)
-    sm = s(t)
-    y = np.empty(n + 1)
-    y[0] = 0.0
-    decay = np.exp(-cm * h)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        yeq = np.where(cm > 0, sm / cm, 0.0)
-    # y' = s when c == 0 (not reached for these parameters, kept for safety)
+    y = [0.0]
     for i in range(n):
-        if cm[i] > 0:
-            y[i + 1] = yeq[i] + (y[i] - yeq[i]) * decay[i]
+        tm = (i + 0.5) * h          # mid-point of the sub-step
+        cm = c(tm)
+        sm = s(tm)
+        if cm > 0:
+            yeq = sm / cm
+            y.append(yeq + (y[-1] - yeq) * math.exp(-cm * h))
         else:
-            y[i + 1] = y[i] + sm[i] * h
-    tt = np.arange(n + 1) * h
-    return np.interp(t_out, tt, y)
+            # y' = s when c == 0 (not reached for these parameters)
+            y.append(y[-1] + sm * h)
+    tt = [i * h for i in range(n + 1)]
+    return [interp(t, tt, y) for t in t_out]
 
 
 def active_stress(t_out, sigma0=1.5e5, t_sys=0.16, t_dias=0.484,
                   gamma=0.005, a_max=5.0, a_min=-30.0, t_end=1.0, h=1e-5):
     f = lambda t: S(t - t_sys, gamma, +1) * S(t - t_dias, gamma, -1)
     a = lambda t: a_max * f(t) + a_min * (1.0 - f(t))
-    c = lambda t: np.abs(a(t))
-    s = lambda t: sigma0 * np.maximum(a(t), 0.0)
+    c = lambda t: abs(a(t))
+    s = lambda t: sigma0 * max(a(t), 0.0)
     return integrate(c, s, t_end, h, t_out)
 
 
@@ -68,9 +80,8 @@ def pressure(t_out, sigma_pre=7000.0, sigma_mid=16000.0, alpha_pre=5.0,
     a = lambda t: a_max * f(t) + a_min * (1.0 - f(t))
     g = lambda t: S(t - t_dias_pre, gamma, -1)
     b = lambda t: a(t) + alpha_pre * g(t) + alpha_mid
-    c = lambda t: np.abs(b(t))
-    s = lambda t: sigma_mid * np.maximum(b(t), 0.0) \
-        + sigma_pre * np.maximum(g(t), 0.0)
+    c = lambda t: abs(b(t))
+    s = lambda t: sigma_mid * max(b(t), 0.0) + sigma_pre * max(g(t), 0.0)
     return integrate(c, s, t_end, h, t_out)
 
 
@@ -127,10 +138,11 @@ def main():
     p.add_argument("--out", default=None, help="output file")
     args = p.parse_args()
 
-    t = np.round(np.arange(0.0, 1.0 + 0.5 * args.dt, args.dt), 10)
+    nOut = int(round(1.0 / args.dt))
+    t = [round(i * args.dt, 10) for i in range(nOut + 1)]
 
     if args.which in ("active", "both"):
-        y = np.zeros_like(t) if args.zero else active_stress(
+        y = [0.0] * len(t) if args.zero else active_stress(
             t, sigma0=args.sigma0, t_sys=args.t_sys, t_dias=args.t_dias)
         out = args.out if (args.out and args.which == "active") \
             else "constant/activeStress"
@@ -138,16 +150,18 @@ def main():
                     "zero" if args.zero else
                     f"sigma0 = {args.sigma0:g} Pa, t_sys = {args.t_sys:g} s, "
                     f"t_dias = {args.t_dias:g} s")
-        print(f"{out}: max tau = {y.max():.2f} Pa at t = {t[y.argmax()]:.4f} s")
+        i = max(range(len(y)), key=y.__getitem__)
+        print(f"{out}: max tau = {y[i]:.2f} Pa at t = {t[i]:.4f} s")
 
     if args.which in ("pressure", "both"):
-        y = np.zeros_like(t) if args.zero else pressure(
+        y = [0.0] * len(t) if args.zero else pressure(
             t, **PRESSURE_PRESETS[args.pressure])
         out = args.out if (args.out and args.which == "pressure") \
             else "constant/timeVsPressure"
         write_table(out, t, y, "Endocardial pressure p(t), eq. (7)",
                     "zero" if args.zero else f"preset {args.pressure}")
-        print(f"{out}: max p = {y.max():.2f} Pa at t = {t[y.argmax()]:.4f} s")
+        i = max(range(len(y)), key=y.__getitem__)
+        print(f"{out}: max p = {y[i]:.2f} Pa at t = {t[i]:.4f} s")
 
 
 if __name__ == "__main__":

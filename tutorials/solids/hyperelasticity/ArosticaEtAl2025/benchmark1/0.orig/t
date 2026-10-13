@@ -18,7 +18,7 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // Transmural coordinate: 0 on the endocardium, 1 on the epicardium, solved
-// by setEllipsoidFibreField (Arostica et al. 2025, eq. 13)
+// by setFibreField (method ellipsoid) (Arostica et al. 2025, eq. 13)
 
 dimensions      [0 0 0 0 0 0 0];
 

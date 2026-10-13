@@ -52,7 +52,7 @@ boundaryField
         traction        uniform (0 0 0);
         pressureSeries
         {
-            "file|fileName" "$FOAM_CASE/constant/timeSeries/pressureLV";
+            "file|fileName" "$FOAM_CASE/constant/pressureLV";
             outOfBounds clamp;
         }
         value           uniform (0 0 0);
@@ -64,7 +64,7 @@ boundaryField
         traction        uniform (0 0 0);
         pressureSeries
         {
-            "file|fileName" "$FOAM_CASE/constant/timeSeries/pressureRV";
+            "file|fileName" "$FOAM_CASE/constant/pressureRV";
             outOfBounds clamp;
         }
         value           uniform (0 0 0);
