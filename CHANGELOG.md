@@ -559,6 +559,21 @@ release. For complete commit-level details and contributor information, see the
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
   the base coupling class.
+- The fluid models register their velocity and pressure gradients as
+  `grad(U)` and `grad(p)`, the names the gradient cache uses, so a case that
+  caches them, e.g. `cache { grad(U); }` in `fvSolution`, used the fluid model
+  fields as the cached gradients (#479). With OpenFOAM.com v2512, the cache
+  updates these in place, but with a limited gradient scheme their
+  `calculated` patches kept the unlimited boundary gradient, and the cache
+  took their initial zero values as up to date, so the first time step used a
+  zero velocity gradient. `pimpleFluid` therefore departed from `pimpleFoam`.
+  The fields now have `extrapolatedCalculated` patches (except with
+  foam-extend), as the fields the gradient schemes create do, and start out
+  of date. Earlier OpenFOAM.com versions, OpenFOAM.org and foam-extend delete
+  a stale cached gradient, which could crash `solids4Foam`; there, caching
+  `grad(U)` or `grad(p)` now stops with an error that asks for them to be
+  removed from the cache. Cases that do not cache these gradients are
+  unaffected.
 - A dynamic solid with `restart yes` now continues from a restart as the
   uninterrupted run would (#555). Three things differed. OpenFOAM reads the
   old-time levels below the first twice, and the copy kept fails to
