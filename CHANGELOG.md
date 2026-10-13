@@ -559,6 +559,21 @@ release. For complete commit-level details and contributor information, see the
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
   the base coupling class.
+- A dynamic solid with `restart yes` now continues from a restart as the
+  uninterrupted run would (#555). Three things differed. OpenFOAM reads the
+  old-time levels below the first twice, and the copy kept fails to
+  register, so a restarted run did not write `D_0_0`, `D_0_0_0` and `DD_0_0`
+  (OpenFOAM.com v2412 and later), or wrote them with the values read at the
+  restart (earlier versions, OpenFOAM.org and foam-extend). A second restart
+  then lost them, and `backward` `d2dt2` fell back to first order for a
+  step. The velocity `U` was created after the first time increment, where
+  there is no `U` to read, so the first step was predicted from zero
+  velocity. The acceleration `A` used by the `predictor` of the total and
+  updated Lagrangian models was not written; it is now written with
+  `restart yes`. For `cantileverVibration` with the total Lagrangian model on
+  OpenFOAM v2412, the first SNES residual after a restart was up to 30 times
+  that of the uninterrupted run, and a second restart was 17% off at the end
+  time; the restarted runs are now bit-identical to the uninterrupted one.
 - Boundary conditions now write the settings they read, so a run restarted
   from a written time uses the settings of the run it continues (#409).
   `fixedTemperature` lost its `temperatureSeries`, so a restarted run held
