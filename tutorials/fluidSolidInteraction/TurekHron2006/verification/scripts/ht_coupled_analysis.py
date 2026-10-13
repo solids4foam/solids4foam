@@ -92,7 +92,7 @@ def period_stats(t, y, bounds):
         m = (t >= a) & (t <= b)
         seg, ts = y[m], t[m]
         res.append((0.5 * (seg.max() + seg.min()), 0.5 * (seg.max() - seg.min()),
-                    np.trapz(seg, ts) / (ts[-1] - ts[0])))
+                    np.trapezoid(seg, ts) / (ts[-1] - ts[0])))
     return np.array(res)
 
 
@@ -107,9 +107,16 @@ def window_values(h: dict, bounds: np.ndarray) -> dict:
         t = h["t"] if q in ("ux", "uy") else h["tf" + ("_plate" if q.endswith("_plate") else "")]
         ps = period_stats(t, h[q], bounds)
         v[f"{q}_midrange"] = float(ps[:, 0].mean())
+        v[f"{q}_midrange_spread"] = float(ps[:, 0].max() - ps[:, 0].min())
         v[f"{q}_amplitude"] = float(ps[:, 1].mean())
         v[f"{q}_timemean"] = float(ps[:, 2].mean())
         v[f"{q}_amplitude_spread"] = float(ps[:, 1].max() - ps[:, 1].min())
+        # 4 ms centred moving average (attenuates the 5.5 Hz fundamental by
+        # < 0.1%): removes step-to-step coupling noise from the extrema
+        dt = float(np.median(np.diff(t)))
+        w = max(3, int(round(0.004 / dt)) | 1)
+        sm = np.convolve(h[q], np.ones(w) / w, mode="same")
+        v[f"{q}_amplitude_smoothed"] = float(period_stats(t, sm, bounds)[:, 1].mean())
     v["frequency"] = float((len(bounds) - 1) / (bounds[-1] - bounds[0]))
     return v
 
