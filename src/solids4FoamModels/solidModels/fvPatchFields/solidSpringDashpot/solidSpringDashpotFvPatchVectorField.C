@@ -26,6 +26,8 @@ License
 #include "nonLinGeomTotalLagTotalDispSolid.H"
 #include "compatibilityFunctions.H"
 #include "IStringStream.H"
+#include "patchCorrectionVectors.H"
+#include "fvcGrad.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -72,7 +74,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     cNormal_(p.size(), 0.0),
     cTangential_(p.size(), 0.0),
     traction_(p.size(), vector::zero),
-    pressure_(p.size(), 0.0)
+    pressure_(p.size(), 0.0),
+    DoldExtrap_(),
+    DoldExtrapTimeIndex_(-1)
 {}
 
 
@@ -89,7 +93,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     cNormal_(p.size(), 0.0),
     cTangential_(p.size(), 0.0),
     traction_(p.size(), vector::zero),
-    pressure_(p.size(), 0.0)
+    pressure_(p.size(), 0.0),
+    DoldExtrap_(),
+    DoldExtrapTimeIndex_(-1)
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
 
@@ -229,14 +235,18 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     cNormal_(mapper(pvf.cNormal_)),
     cTangential_(mapper(pvf.cTangential_)),
     traction_(mapper(pvf.traction_)),
-    pressure_(mapper(pvf.pressure_))
+    pressure_(mapper(pvf.pressure_)),
+    DoldExtrap_(),
+    DoldExtrapTimeIndex_(-1)
 #else
     kNormal_(pvf.kNormal_, mapper),
     kTangential_(pvf.kTangential_, mapper),
     cNormal_(pvf.cNormal_, mapper),
     cTangential_(pvf.cTangential_, mapper),
     traction_(pvf.traction_, mapper),
-    pressure_(pvf.pressure_, mapper)
+    pressure_(pvf.pressure_, mapper),
+    DoldExtrap_(),
+    DoldExtrapTimeIndex_(-1)
 #endif
 {}
 
@@ -253,7 +263,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     cNormal_(pvf.cNormal_),
     cTangential_(pvf.cTangential_),
     traction_(pvf.traction_),
-    pressure_(pvf.pressure_)
+    pressure_(pvf.pressure_),
+    DoldExtrap_(),
+    DoldExtrapTimeIndex_(-1)
 {}
 
 
@@ -269,10 +281,68 @@ tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
     const symmTensorField nn(sqr(n));
     const scalar rDeltaT = 1.0/db().time().deltaTValue();
 
-    const vectorField& DP = *this;
-    const volVectorField& Dold =
-        db().lookupObject<volVectorField>(internalFieldName(*this)).oldTime();
-    const vectorField& DoldP = Dold.boundaryField()[patch().index()];
+    // Boundary displacement extrapolated from the adjacent cell with the
+    // gradient, as for solidTraction with extrapolateValue, so the imposed
+    // traction is a function of the cell unknowns only. The patch value comes
+    // from the Robin closure, which uses the stress of the previous
+    // evaluation; in a PETSc SNES residual that lag makes the matrix-free
+    // Jacobian inconsistent. The old-time value is extrapolated in the same
+    // way below, so the dashpot velocity compares like with like
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
+    const label patchID = patch().index();
+    const vectorField k(patchCorrectionVectors(patch()));
+    const scalarField& deltaCoeffs = patch().deltaCoeffs();
+
+    const tensorField gradDP
+    (
+        solMod.gradD().boundaryField()[patchID].patchInternalField()
+    );
+    const vectorField DP
+    (
+        patchInternalField() + (k & gradDP) + (n & gradDP)/deltaCoeffs
+    );
+
+    // The old-time gradient is reconstructed here, once per time step, rather
+    // than taken from gradD().oldTime(), which holds zero on the first step
+    // unless the solid model read or reconstructed grad(D) at the start
+    if (DoldExtrapTimeIndex_ != db().time().timeIndex())
+    {
+        const volVectorField& Dold =
+            db().lookupObject<volVectorField>
+            (
+                internalFieldName(*this)
+            ).oldTime();
+
+        // Unregistered copy under the current-time name, as leastSquaresS4f
+        // selects its boundary faces by field name
+        const volVectorField DoldCopy
+        (
+            IOobject
+            (
+                internalFieldName(*this),
+                db().time().timeName(),
+                patch().boundaryMesh().mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            Dold
+        );
+
+        const volTensorField gradDold(fvc::grad(DoldCopy));
+        const tensorField gradDoldP
+        (
+            gradDold.boundaryField()[patchID].patchInternalField()
+        );
+
+        DoldExtrap_ =
+            Dold.boundaryField()[patchID].patchInternalField()
+          + (k & gradDoldP) + (n & gradDoldP)/deltaCoeffs;
+
+        DoldExtrapTimeIndex_ = db().time().timeIndex();
+    }
+
+    const vectorField& DoldP = DoldExtrap_;
 
     return tmp<vectorField>
     (
@@ -311,6 +381,8 @@ void solidSpringDashpotFvPatchVectorField::autoMap
     traction_.autoMap(m);
     pressure_.autoMap(m);
 #endif
+
+    DoldExtrapTimeIndex_ = -1;
 }
 
 
@@ -331,6 +403,8 @@ void solidSpringDashpotFvPatchVectorField::rmap
     cTangential_.rmap(rpvf.cTangential_, addr);
     traction_.rmap(rpvf.traction_, addr);
     pressure_.rmap(rpvf.pressure_, addr);
+
+    DoldExtrapTimeIndex_ = -1;
 }
 
 

@@ -1,0 +1,118 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Arostica et al. (2025) benchmark 2: elastodynamics of an idealised
+# biventricular geometry, with the rule-based fibres, LV and RV follower
+# pressures and spring-dashpot (pericardium/base) boundary conditions.
+#
+# Usage:
+#     ./Allrun [coarse|fine] [pressure|displacement] [parallel]
+#
+# coarse (default): 45 304 tetrahedra, fine: 121 133 tetrahedra (Table 6).
+# The meshes and fibres are those distributed with the benchmark: they are
+# downloaded from the cardiac-benchmark-toolkit, at a fixed commit, and
+# converted by ../scripts/convertBiVMesh.py, which needs python3 with numpy
+# and h5py. Without internet access, put the toolkit's
+# data/biv_mesh_and_fibers_<mesh>_p1/{bi_ventricular,fiber_directions}.h5 in
+# data/<mesh> first.
+#
+# Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
+#------------------------------------------------------------------------------
+cd "${0%/*}" || exit 1    # Run from this directory
+
+# Source tutorial run functions
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# The case is solved with PETSc SNES
+solids4Foam::requirePetscOrExitSilently
+
+# The case has only been run with OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# The mesh is converted, and the time series generated, with python3
+solids4Foam::requirePythonOrExitSilently numpy h5py
+
+# The Python scripts are shared by both benchmarks, in ../scripts, or where
+# ARO_SCRIPTS_DIR points (the regression test runs a copy of this case
+# elsewhere)
+SCRIPTS="${ARO_SCRIPTS_DIR:-../scripts}"
+if [[ ! -f "$SCRIPTS/makeTimeSeries.py" ]]
+then
+    echo "The ArosticaEtAl2025 scripts were not found in $SCRIPTS"
+    exit 1
+fi
+
+MESH="coarse"
+FORMULATION="pressure"
+PARALLEL="no"
+for arg in "$@"
+do
+    case "$arg" in
+        coarse|fine) MESH="$arg" ;;
+        pressure|displacement) FORMULATION="$arg" ;;
+        parallel) PARALLEL="yes" ;;
+        *) echo "Unknown argument: $arg"; exit 1 ;;
+    esac
+done
+echo "Biventricular mesh: $MESH"
+
+# Active stress tau(t) (Table 8) and the LV and RV pressures (Table 9): ODEs
+# in time only, tabulated once here
+{
+    python3 "$SCRIPTS/makeTimeSeries.py" --which active --sigma0 1.5e5 \
+        --t-sys 0.163 --t-dias 0.5 --out constant/activeStress \
+ && python3 "$SCRIPTS/makeTimeSeries.py" --which pressure --pressure biv_lv \
+        --out constant/pressureLV \
+ && python3 "$SCRIPTS/makeTimeSeries.py" --which pressure --pressure biv_rv \
+        --out constant/pressureRV
+} > log.makeTimeSeries 2>&1 \
+    || { echo "makeTimeSeries.py failed: see log.makeTimeSeries"; exit 1; }
+
+# Solid formulation: "pressure" (default), the mixed displacement-pressure
+# formulation, or "displacement", with the bulk modulus as a penalty in the
+# momentum equation. The selected fvSolution and solidProperties variants are
+# linked into place, as in LandEtAl2015/problem3
+echo "Formulation: $FORMULATION"
+
+# The mixed formulation's Jacobian has no processor-boundary (coupled patch)
+# coupling of the pressure to the displacement
+# (foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix: "patch.coupled(): D-in-p
+# not implemented"), so it only runs in serial
+if [[ "$FORMULATION" == "pressure" && "$PARALLEL" == "yes" ]]
+then
+    echo "The pressure formulation cannot currently run in parallel:"
+    echo "run it in serial, or use the displacement formulation in parallel."
+    exit 1
+fi
+for file in system/fvSolution.$FORMULATION constant/solidProperties.$FORMULATION
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
+
+# Restore 0 directory from 0.orig
+restore0Dir
+
+# Mesh (constant/polyMesh) and fibres (0/f0, 0/s0, 0/n0)
+rm -rf constant/polyMesh
+python3 "$SCRIPTS/convertBiVMesh.py" "$MESH" > log.convertBiVMesh 2>&1 \
+    || { echo "convertBiVMesh.py failed: see log.convertBiVMesh"; exit 1; }
+runApplication checkMesh
+
+# Run the solver
+if [[ "$PARALLEL" == "yes" ]]
+then
+    runApplication decomposePar
+    runParallel solids4Foam
+    runApplication reconstructPar
+else
+    runApplication solids4Foam
+fi
+
+# Compare with the benchmark participants (matplotlib, if available, for the
+# plot)
+python3 "$SCRIPTS/compareWithReference.py" "$MESH" | tee log.compareWithReference
+
+#------------------------------------------------------------------------------

@@ -1,0 +1,74 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      D;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    // Gamma_top: J T F^-T N + alpha_top u + beta_top du/dt = 0 (Table 7)
+    base
+    {
+        type            solidSpringDashpot;
+        kNormal         uniform 1e6;    // alpha_top [Pa/m]
+        kTangential     uniform 1e6;
+        cNormal         uniform 5e3;    // beta_top  [Pa s/m]
+        cTangential     uniform 5e3;
+        value           uniform (0 0 0);
+    }
+
+    // Gamma_epi: normal spring-dashpot (pericardium), tangentially free
+    epi
+    {
+        type            solidSpringDashpot;
+        kNormal         uniform 1e8;    // alpha_epi [Pa/m]
+        kTangential     uniform 0;
+        cNormal         uniform 5e3;    // beta_epi  [Pa s/m]
+        cTangential     uniform 0;
+        value           uniform (0 0 0);
+    }
+
+    // Gamma_endo-lv and Gamma_endo-rv: follower cavity pressures p_lv(t),
+    // p_rv(t), eq. (7) with Table 9
+    endo_lv
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressureSeries
+        {
+            "file|fileName" "$FOAM_CASE/constant/pressureLV";
+            outOfBounds clamp;
+        }
+        value           uniform (0 0 0);
+    }
+
+    endo_rv
+    {
+        type            solidTraction;
+        traction        uniform (0 0 0);
+        pressureSeries
+        {
+            "file|fileName" "$FOAM_CASE/constant/pressureRV";
+            outOfBounds clamp;
+        }
+        value           uniform (0 0 0);
+    }
+}
+
+// ************************************************************************* //

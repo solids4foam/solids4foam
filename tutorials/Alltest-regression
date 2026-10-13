@@ -126,6 +126,7 @@ REGRESSION_TESTS=(
     "solids/hyperelasticity/longWall"
     "solids/hyperelasticity/LandEtAl2015/problem2"
     "solids/hyperelasticity/LandEtAl2015/problem3"
+    "solids/hyperelasticity/ArosticaEtAl2025/benchmark1"
     "solids/hyperelasticity/ratCarotid"
     "solids/hyperelasticity/cantileverVibration"
     "solids/hyperelasticity/cooksMembrane"
