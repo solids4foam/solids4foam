@@ -32,9 +32,10 @@ The production case reproduces the stationary three-dimensional benchmark of
 use its `z <= 0` half. The undeformed solid is
 `[0.4, 0.5] x [0, 0.2] x [-0.2, 0.2] m`. Following the explicit boundary
 condition in section 7.2 of Richter (2012), the inlet profile is bi-parabolic
-with peak speed `0.3 m/s`. The same paragraph states an average speed of
-`0.2 m/s` and `Re=40`, although the area average of the printed profile is
-`4/9` of its peak. This source inconsistency is retained explicitly rather
+with peak speed `0.3 m/s`. The stated average speed (`0.15 m/s` in the
+published article, `0.2 m/s` and `Re=40` in the 2011 preprint) is
+inconsistent with it: the area average of the printed profile is `4/9` of its
+peak, `0.133 m/s`. This source inconsistency is retained explicitly rather
 than choosing the coefficient that best reproduces the reference table. The
 outlet uses the do-nothing/zero-traction condition, and the remaining outer
 walls are no-slip.

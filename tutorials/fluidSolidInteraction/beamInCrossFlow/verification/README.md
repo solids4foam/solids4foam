@@ -27,7 +27,14 @@ the commit that built it.
 
 ## Case-definition audit (Richter 2012, CMAME 223-224, section 7.2)
 
-Re-read from the primary source (https://d-nb.info/1188567608/34, pp. 18-20).
+Sources: the published article (Richter 2012, CMAME 223-224, 28-42,
+doi:10.1016/j.cma.2012.02.014; reference values in its Table 3) and the July
+2011 preprint (https://d-nb.info/1188567608/34, section 7.2, pp. 18-20;
+reference values in its Table 3 (preprint Table 6), convergence history in its Table 5). The
+geometry, material, boundary conditions and inlet polynomial are the same in
+both; they differ in the stated average inflow velocity (published 0.15;
+preprint 0.2 with `Re = 40`). Both state that the reference values were
+obtained by extrapolation from the finest three meshes.
 
 | Item | Richter | Here | Note |
 | --- | --- | --- | --- |
@@ -41,17 +48,20 @@ Re-read from the primary source (https://d-nb.info/1188567608/34, pp. 18-20).
 | Drag | `J_drag = int_Gamma_i n.(J sigma_f F^-T) e1 ds` on the computed half | pressure + viscous traction on the deformed half interface (`forces`) | same functional; Richter evaluates it as a residual on the base |
 | Problem | stationary monolithic ALE | transient-to-steady partitioned continuation | the steady state is shown to be independent of history and time step (below) |
 
-Inlet speed. The printed polynomial and the sentence after it both give a
-peak of 0.3 m/s. The next paragraph's "average inflow velocity of 0.2" and
-`Re = 40` are inconsistent with it: the area mean of the printed bi-parabolic
-profile is `(2/3)^2 0.3 = 0.133 m/s`; `0.2 = (2/3) 0.3` is the mean of a
-single (2-D) parabola, as in the FSI-1 benchmark that this section follows.
-We therefore read the "0.2" as a 2-D slip and use the printed profile
+Inlet speed. The printed polynomial and the sentence after it ("peak
+velocity vmax = 0.3") both give a peak of 0.3 m/s, and our
+`paraboloidInletVelocity` (maxVelocity 0.3 on `y in (0, 0.4)`,
+`z in (-0.4, 0)`) reproduces that polynomial exactly. The area mean of the
+printed bi-parabolic profile is `(2/3)^2 0.3 = 0.133 m/s`. Neither stated
+mean matches it: the preprint's 0.2 (with `Re = 40`) equals the mean of a
+single 2-D parabola of peak 0.3, as in the FSI-1 benchmark that this section
+follows; the published 0.15 matches neither. We use the printed profile
 (peak 0.3), as decided for this study. Caveat recorded for the comparison: an
-earlier solids4foam sequence with peak 0.2 m/s landed close to Richter's
-Table 6 (`u_x(A)` L3 5.915e-5 vs 5.924e-5, `F_x` 1.331 vs 1.327), so Richter's
-tabulated values may correspond to a peak of 0.2. Nothing here is tuned to
-Table 6; the comparison is made only after our own sequence is resolved.
+earlier solids4foam sequence with peak 0.2 m/s landed close to the reference
+values (`u_x(A)` L3 5.915e-5 vs 5.924e-5, `F_x` 1.331 vs 1.327), so they may
+correspond to a different inflow; Philip has asked Richter which inflow
+produced them. Nothing here is tuned to the reference values; the
+comparison is made only after our own sequence is resolved.
 
 Steady interpretation. Richter solves the stationary equations; the solid
 density does not enter. We march the transient equations (solid density
@@ -277,17 +287,22 @@ below 5 % of the L2-L3 increments.
 
 ## Comparison with Richter (2012), after the sequence above
 
-Richter Table 6 (half interface, symmetric half domain, as here): drag
-1.327 +- 0.01 N, `u_x(A)` 5.924e-5 +- 1e-7 m. For the implemented printed
-inlet (peak 0.3 m/s; area mean 0.133 m/s, `Re = 0.133 x 0.2 / 1e-3 = 27`
-with Richter's length scale) the sequence approaches 2.39 N and
-1.05e-4 m (L3: 2.38305 N, 1.04478e-4 m), i.e. about 1.8x the tabulated values; the discrepancy greatly
-exceeds the estimated numerical corrections (< 1 %). Earlier solids4foam
-calculations with peak 0.2 m/s (coarser solid family, `N_t = 4f`) gave
-1.3311 N and 5.915e-5 m at L3, close to Table 6. This suggests a possible
-inlet-definition mismatch in the source (the stated mean 0.2 m/s and
-`Re = 40` are inconsistent with the printed profile) but does not establish
-which inlet produced Table 6. No setting was tuned to Table 6.
+Richter (2012) Table 3 (preprint Table 3 (preprint Table 6)), for the half interface on the
+symmetric half domain as here: drag 1.327 +- 0.01 N, `u_x(A)`
+5.924e-5 +- 1e-7 m. For the implemented printed inlet (peak 0.3 m/s; area
+mean 0.133 m/s, `Re = 0.133 x 0.2 / 1e-3 = 27` with Richter's length scale)
+our sequence approaches 2.39 N and 1.05e-4 m (L3: 2.38305 N,
+1.04478e-4 m), about 1.8x the reference values. The discrepancy greatly
+exceeds our estimated numerical corrections (< 1 %), and it is not a
+mesh-convergence issue on Richter's side either: his own uniform sequence
+(preprint Table 5) converges cleanly, `u_x(A)` = 4.93, 5.57, 5.85, 5.908,
+5.920e-5 m. Earlier solids4foam calculations with peak 0.2 m/s (coarser
+solid family, `N_t = 4f`) gave 1.3311 N and 5.915e-5 m at L3, close to the
+reference values. This suggests that the reference values correspond to a
+different inflow than the printed profile, but does not establish which
+(both stated means, 0.2 and 0.15, are inconsistent with the printed
+profile's 0.133). The labelled 0.2 m/s diagnostic below tests this with the
+production setup. No setting was tuned to the reference values.
 
 ## Astra (GPT-6-Astra, xhigh) review, 2026-10-12
 
