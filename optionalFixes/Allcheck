@@ -108,8 +108,8 @@ else
     checkAndReport \
         "OpenFOAM-9" \
         "FixedList.C" \
-        "$FOAM_SRC/foam/containers/Lists/FixedList" \
-        "$FOAM_SRC/foam"
+        "$FOAM_SRC/OpenFOAM/containers/Lists/FixedList" \
+        "$FOAM_SRC/OpenFOAM"
     if [ $? -ne 0 ]; then result=1; fi
 
     # Fix time index storage in the storeOldTimes function

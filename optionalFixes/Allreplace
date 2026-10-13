@@ -90,8 +90,8 @@ else
     replaceFile \
         "OpenFOAM-9" \
         "FixedList.C" \
-        "$FOAM_SRC/foam/containers/Lists/FixedList" \
-        "$FOAM_SRC/foam"
+        "$FOAM_SRC/OpenFOAM/containers/Lists/FixedList" \
+        "$FOAM_SRC/OpenFOAM"
 
     # Fix time index storage in the storeOldTimes function
     replaceFile \
