@@ -72,7 +72,15 @@ stiffness, including `2μ` when `solvePressure` is used.
   `nonLinearGeometryTotalLagrangianTotalDisplacement` impose
   `-K·D - C·(D - D_old)/Δt + t - p n` directly on the boundary faces,
   through `springDashpotTraction()`, as they do for `solidTraction`. This is
-  used by the implicit segregated, explicit and PETSc SNES algorithms.
+  used by the implicit segregated, explicit and PETSc SNES algorithms. `D`
+  and `D_old` here are not the patch values but the cell values extrapolated
+  to the face with `grad(D)` and its old-time value, as `solidTraction` does
+  with `extrapolateValue`. The patch value comes from the Robin closure,
+  which lags by one evaluation, so with it the SNES residual is not a
+  function of the unknowns alone and the matrix-free Jacobian fails: Newton
+  diverged on the first step of the total Lagrangian `ArosticaEtAl2025`
+  benchmark. Extrapolating both time levels keeps the dashpot velocity
+  consistent.
 - **Least-squares gradient:** the `leastSquaresS4f` gradient scheme
   extrapolates to the faces of this condition, as it does for
   `solidTraction`, instead of using the boundary value. The boundary value
