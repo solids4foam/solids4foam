@@ -519,6 +519,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- On OpenFOAM.com, the PETSc SNES residuals of
+  `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now include the implicit
+  part of `fvOptions` sources, e.g. a positive `implicit` coefficient of a
+  `vectorSemiImplicitSource` on `D`, which was previously ignored, as it is
+  held in the matrix diagonal rather than its source (#283). The matching
+  diagonal contribution is also added to the SNES Jacobian. The sign of the
+  explicit part was already correct and is unchanged: `fvMatrix` stores an
+  explicit source `Su` as `-V*Su`, so a body force through `fvOptions` gives
+  the same displacement as the equivalent `g` with both the segregated and
+  SNES solution algorithms.
 - The explicit inertia term of the solid models now takes its scheme from
   `d2dt2Schemes`, as the implicit term does (#502). OpenFOAM's `fvc::d2dt2`
   looks up `ddtSchemes`, so when the two defaults differed, the PETSc SNES

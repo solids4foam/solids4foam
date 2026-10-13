@@ -1338,9 +1338,10 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh().V();
 
-    // Add optional fvOptions, e.g. MMS body force
-    // Note that "source()" is already multiplied by the volumes
-    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+    // fvOptions are not currently applied by this solid model in either the
+    // segregated or SNES path. If added, follow linGeomTotalDispSolid, where
+    // "residual += V*(M & D)" for the fvOptions matrix M: note that
+    // "residual -= M.source()" would give the explicit part only
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>
