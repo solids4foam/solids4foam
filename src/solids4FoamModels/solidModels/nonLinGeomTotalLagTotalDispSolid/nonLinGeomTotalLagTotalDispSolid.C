@@ -24,6 +24,7 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
@@ -382,6 +383,32 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                     forceP = tracP*magSfCurrentPatch;
                 }
             }
+        }
+        else if
+        (
+            isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidSpringDashpotFvPatchVectorField& springPatch =
+                refCast<const solidSpringDashpotFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const scalarField& magSfCurrentPatch =
+                magSfCurrent.boundaryField()[patchI];
+
+            // The spring and dashpot act per unit reference area
+            forceP =
+                magSfCurrentPatch
+               *springPatch.springDashpotTraction
+                (
+                    nCurrent.boundaryField()[patchI],
+                    D.mesh().boundary()[patchI].magSf()/magSfCurrentPatch
+                );
         }
         else if
         (

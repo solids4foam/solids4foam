@@ -8,6 +8,26 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
+  a fluid-solid coupling step is also converged if the maximum interface point
+  residual (the displacement-increment mismatch by default) is below this
+  absolute value in metres. It complements `requireAllResidualMeasures`, whose
+  relative-reduction measure can be unattainable near a steady state. It is
+  disabled by default. The log also notes when the legacy minimum test is
+  passed by one residual measure only (#552).
+- `solidSpringDashpot`, a spring-dashpot (Robin) displacement boundary
+  condition for elastic supports such as the pericardium or perivascular
+  tissue: the traction is proportional to the displacement and the velocity,
+  with separate normal and tangential coefficients that act per unit
+  reference area. The spring and dashpot are implicit, through
+  `solidDirectionMixed` with the exact matrix diagonal, and the linear-geometry
+  and total Lagrangian total-displacement models impose the spring-dashpot
+  traction on the boundary faces, including in their PETSc SNES residuals.
+  The coefficients can be scaled by a weight field. Its README gives the
+  formulation, literature values and verification, and the
+  `springSupportedBar` tutorial checks it against exact solutions. The
+  `cerebralAneurysm` tutorial now uses it to represent the brain tissue and
+  cerebrospinal fluid around the arterial wall.
 - Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
   applies the backward differentiation formula of order 1 to 6 twice, as the
   `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and
@@ -535,6 +555,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
+  cell whose face stencil does not span three directions, for example a
+  corner cell bounded by traction patches, the tensor's determinant can round
+  to exactly zero, and the division then raised a floating point exception
+  on foam-extend, where it stopped the `sphericalCavity` regression test on
+  CI (#417). The inverse is not used in such cells, which take the wider
+  point-cell stencil. A cell whose stencil is still rank-deficient after
+  widening now gets the pseudo-inverse of its tensor, which reproduces a
+  linear field in the directions the stencil spans and gives zero along the
+  others, and a cell with no admissible stencil at all is a fatal error.
+  `sphericalCavity` now runs and is regression tested on foam-extend.
 - On OpenFOAM.com, the PETSc SNES residuals of
   `linearGeometryTotalDisplacement` and
   `nonLinearGeometryTotalLagrangianTotalDisplacement` now include the implicit
@@ -570,15 +601,15 @@ release. For complete commit-level details and contributor information, see the
   `libfvConstraints`, without which a fluid case with an `fvConstraints` file
   crashed with a segmentation fault.
 - `HronTurekFsi3` (now `HronTurek`) no longer diverges once the plate
-  deformation is large. With the FSI2 parameters it failed at t = 6.4-6.9 s (#489), and with its own
-  FSI3 parameters shortly after its end time (#383). With a relaxed first
-  coupling iteration, the fluid saw the plate stop or reverse within each time
-  step, and the solid had to converge under a first-iteration fluid force of
-  about 250 times the converged one. With the new `predictor` default (see
-  Changed), the first-iteration force is close to the converged one. The FSI2
-  variant now runs to t = 15 s and FSI3 to t = 10 s. Between t = 2 and 6 s the
-  mean number of coupling iterations per time step drops from 8.6 to 4.4 for
-  FSI2 and from 13.0 to 9.0 for FSI3.
+  deformation is large. With the FSI2 parameters it failed at t = 6.4-6.9 s
+  (#489), and with its own FSI3 parameters shortly after its end time (#383).
+  With a relaxed first coupling iteration, the fluid saw the plate stop or
+  reverse within each time step, and the solid had to converge under a
+  first-iteration fluid force of about 250 times the converged one. With the new
+  `predictor` default (see Changed), the first-iteration force is close to the
+  converged one. The FSI2 variant now runs to t = 15 s and FSI3 to t = 10 s.
+  Between t = 2 and 6 s the mean number of coupling iterations per time step
+  drops from 8.6 to 4.4 for FSI2 and from 13.0 to 9.0 for FSI3.
 - `Aitken` coupling: the adaptive relaxation factor of the third iteration of
   each time step was computed from the factor the previous time step ended
   with, rather than from the fixed `relaxationFactor` applied in the second

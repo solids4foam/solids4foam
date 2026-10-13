@@ -143,15 +143,19 @@ Foam::tmp<Foam::pointField> Foam::triSurfaceMotion::newPoints()
     // Create rotation matrix
     const tensor rotMat = RodriguesRotation(rotationAxis_, currentAngle_);
 
+    // Named operands: a tmp field would be reused as the storage of the inner
+    // product, which aliases an input of the loop and gives wrong results
+    // with some -O3 builds (see pimpleFluid::patchViscousForce)
+    const pointField relPoints(origPoints_ - initialRotationOrigin_);
+    const pointField relFaceCentres(origFaceCentres_ - initialRotationOrigin_);
+
     // Calculate position of rotated points
     const pointField rotatedPoints =
-        (rotMat & (origPoints_ - initialRotationOrigin_))
-        + initialRotationOrigin_;
+        (rotMat & relPoints) + initialRotationOrigin_;
 
     // Calculate position of rotated faces
     const pointField rotatedFaces =
-        (rotMat & (origFaceCentres_ - initialRotationOrigin_))
-        + initialRotationOrigin_;
+        (rotMat & relFaceCentres) + initialRotationOrigin_;
 
     // Add total displacement due to rotation to the displacement due to
     // translation
