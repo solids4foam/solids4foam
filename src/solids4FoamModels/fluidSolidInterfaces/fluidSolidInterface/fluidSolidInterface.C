@@ -2435,8 +2435,9 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
                     << " < " << outerCorrAbsoluteTolerance_ << endl;
 
                 // The convergence tests compare the returned residual with
-                // outerCorrTolerance
-                residualInterfaceI = outerCorrTolerance_;
+                // outerCorrTolerance using <=; the factor keeps the accepted
+                // interface converged if a test uses < instead
+                residualInterfaceI = 0.99*outerCorrTolerance_;
             }
         }
 
