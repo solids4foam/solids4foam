@@ -30,7 +30,7 @@ the commit that built it.
 Sources: the published article (Richter 2012, CMAME 223-224, 28-42,
 doi:10.1016/j.cma.2012.02.014; reference values in its Table 3) and the July
 2011 preprint (https://d-nb.info/1188567608/34, section 7.2, pp. 18-20;
-reference values in its Table 3 (preprint Table 6), convergence history in its Table 5). The
+reference values in its Table 6, convergence history in its Table 5). The
 geometry, material, boundary conditions and inlet polynomial are the same in
 both; they differ in the stated average inflow velocity (published 0.15;
 preprint 0.2 with `Re = 40`). Both state that the reference values were
@@ -287,7 +287,7 @@ below 5 % of the L2-L3 increments.
 
 ## Comparison with Richter (2012), after the sequence above
 
-Richter (2012) Table 3 (preprint Table 3 (preprint Table 6)), for the half interface on the
+Richter (2012) Table 3 (preprint Table 6), for the half interface on the
 symmetric half domain as here: drag 1.327 +- 0.01 N, `u_x(A)`
 5.924e-5 +- 1e-7 m. For the implemented printed inlet (peak 0.3 m/s; area
 mean 0.133 m/s, `Re = 0.133 x 0.2 / 1e-3 = 27` with Richter's length scale)
