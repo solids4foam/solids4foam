@@ -50,23 +50,6 @@ checkAndReport()
 result=0
 if [ "$WM_PROJECT" = "foam" ]
 then
-    # Fix required for newer compilers
-    checkAndReport \
-        "foam-extend-4.1" \
-        "FixedList.C" \
-        "$FOAM_SRC/foam/containers/Lists/FixedList" \
-        "$FOAM_SRC/foam"
-    if [ $? -ne 0 ]; then result=1; fi
-
-    # This fixes the segmentation error that happens at the end of solver due to
-    # a mesh object being freed twice
-    checkAndReport \
-        "foam-extend-4.1" \
-        "meshObjectBase.H" \
-        "$FOAM_SRC/foam/meshes/MeshObject" \
-        "$FOAM_SRC/foam"
-    if [ $? -ne 0 ]; then result=1; fi
-
     # This fixes segmentation errors related to point fields when mesh
     # topological changes occur
     checkAndReport \
@@ -113,14 +96,6 @@ then
         "$FOAM_SRC/finiteVolume"
     if [ $? -ne 0 ]; then result=1; fi
 else
-    # Fix required for newer compilers
-    checkAndReport \
-        "OpenFOAM-9" \
-        "FixedList.C" \
-        "$FOAM_SRC/OpenFOAM/containers/Lists/FixedList" \
-        "$FOAM_SRC/OpenFOAM"
-    if [ $? -ne 0 ]; then result=1; fi
-
     # Fix time index storage in the storeOldTimes function
     checkAndReport \
         "OpenFOAM-9" \

@@ -11,9 +11,11 @@ in the `OpenFOAM-9`, `OpenFOAM.com` and `foam-extend-4.1` directories. Run
 from your installation, or `./Allreplace` to copy them into `$FOAM_SRC`, then
 rebuild the affected libraries.
 
-## OpenFOAM.org
+The replacement files are copies of OpenFOAM and foam-extend files and keep
+their original copyright and licence headers. A "Modified by solids4foam" note
+in each header describes the change.
 
-- `FixedList.C`: This fix is required for newer compilers.
+## OpenFOAM.org
 
 - `GeometricField.C`: this fix is required for consistent time discretisation.
   Some FSI cases may crash without this fix.
@@ -33,12 +35,6 @@ versions (v2312 to v2606).
   is the same as the upstream file, which is identical in v2312 to v2606.
 
 ## foam-extend
-
-- `FixedList.C`: This fix is required for newer compilers.
-
-- `meshObjectBase.H`: without this fix, all runs will end in a segmentation. The
-  solids4foam solver will work correctly; however, you may like to fix this if
-  you plan to catch the return valve from the solver.
 
 - `pointBoundaryMesh.C`: without this fix, cases involving topological mesh
   changes will have a segmentation fault. For example, when using
