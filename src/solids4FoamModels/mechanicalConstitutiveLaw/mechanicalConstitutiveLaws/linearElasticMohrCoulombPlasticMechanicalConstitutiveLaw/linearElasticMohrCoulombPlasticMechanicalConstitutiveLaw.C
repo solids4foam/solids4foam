@@ -437,6 +437,7 @@ linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
     lambda_("lambda", E_.dimensions(), 0.0),
     mu_(E_/(2.0*(1.0 + nu_))),
     K_("K", E_.dimensions(), 0.0),
+    thermalK_("thermalK", E_.dimensions(), 0.0),
     varPhi_(dict.lookup("frictionAngle")),
     c_(dict.lookup("cohesion")),
     varPsi_(dict.lookup("dilationAngle")),
@@ -467,6 +468,10 @@ linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
       : nu_*E_/((1.0 + nu_)*(1.0 - 2.0*nu_));
 
     K_ = lambda_ + (2.0/3.0)*mu_;
+
+    // The thermal stress needs the true plane stress bulk modulus: the
+    // modified K above would overstate it by (1 + 2*nu)/(1 + nu)
+    thermalK_ = planeStress ? E_/(3.0*(1.0 - nu_)) : K_;
 
     // The derived parameter k = (1 + sin(varPhi))/(1 - sin(varPhi)) tends to 1
     // as varPhi tends to zero, and the apex stress 2*c*sqrt(k)/(k - 1) then

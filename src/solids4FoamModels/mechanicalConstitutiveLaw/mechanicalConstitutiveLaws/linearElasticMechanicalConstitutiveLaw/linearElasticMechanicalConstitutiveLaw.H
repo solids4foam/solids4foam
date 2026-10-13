@@ -97,6 +97,10 @@ class linearElasticMechanicalConstitutiveLaw
         //- Bulk modulus
         dimensionedScalar kappa_;
 
+        //- Bulk modulus that scales the thermal stress: kappa_ except in
+        //  plane stress, where it is E/(3*(1 - nu))
+        dimensionedScalar thermalKappa_;
+
         //- Uniform initial stress, taken from the law's dictionary. A sigma0
         //  field, if the case supplies one, overrides this point by point,
         //  unless the dictionary gave a value, which is final
@@ -153,6 +157,12 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return kappa_;
+        }
+
+        //- Return the bulk modulus that scales the thermal stress
+        virtual dimensionedScalar thermalKappa() const override
+        {
+            return thermalKappa_;
         }
 
         //- Return Young's modulus.

@@ -26,8 +26,18 @@ Description
 
         sigma -= 3*K*alpha*(T - T0)*I
 
-    where K is the sub-law's bulk modulus, alpha the linear expansion
-    coefficient and T0 the stress-free reference temperature.
+    where K is the sub-law's thermalKappa(), alpha the linear expansion
+    coefficient and T0 the stress-free reference temperature. K is the bulk
+    modulus, E/(3*(1 - 2*nu)) for an isotropic material, except in plane
+    stress, where it is E/(3*(1 - nu)), so that the in-plane thermal stress is
+    E*alpha*(T - T0)/(1 - nu). The sub-law's kappa() cannot be used for this in
+    plane stress: it is modified for the mechanical stress and would overstate
+    the thermal stress by (1 + 2*nu)/(1 + nu).
+
+    In plane stress the out-of-plane components of the stress and strain are
+    not post-processed: they are not the zero stress and the free
+    out-of-plane strain, and should be ignored. The in-plane solution is
+    unaffected.
 
     The temperature is a live coupling input, declared through
     requiredScalarInputs() and gathered by the manager on every evaluation. It
@@ -139,6 +149,12 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return subLawPtr_->kappa();
+        }
+
+        //- And the bulk modulus that scales the thermal stress
+        virtual dimensionedScalar thermalKappa() const override
+        {
+            return subLawPtr_->thermalKappa();
         }
 
         //- A composite needs whatever its sub-law needs. Without this the

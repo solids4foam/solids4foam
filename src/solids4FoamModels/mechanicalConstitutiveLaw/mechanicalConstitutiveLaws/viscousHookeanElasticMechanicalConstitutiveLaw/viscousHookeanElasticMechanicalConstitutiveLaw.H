@@ -120,6 +120,10 @@ class viscousHookeanElasticMechanicalConstitutiveLaw
         //- Bulk modulus
         dimensionedScalar kappa_;
 
+        //- Bulk modulus that scales the thermal stress: kappa_ except in
+        //  plane stress, where it is EInfinity/(3*(1 - nu))
+        dimensionedScalar thermalKappa_;
+
         //- State field name of the i-th Maxwell arm
         static word arm(const label i);
 
@@ -171,6 +175,12 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return kappa_;
+        }
+
+        //- Return the bulk modulus that scales the thermal stress
+        virtual dimensionedScalar thermalKappa() const override
+        {
+            return thermalKappa_;
         }
 
     // Edit
