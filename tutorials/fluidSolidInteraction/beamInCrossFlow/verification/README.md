@@ -225,7 +225,7 @@ converged rigid-beam flow the FSI state is within 3.4e-4 (`u_x`) after 2 s,
 | L0 | 8,112 | 512 (8) | 8.13919e-5 | 1.95723e-6 | -2.03080e-6 | 2.15736 | 0.32694 | -0.25742 |
 | L1 | 64,896 | 4,096 (16) | 9.62607e-5 | 1.94057e-6 | -2.15035e-6 | 2.30568 | 0.33773 | -0.27647 |
 | L2 | 519,168 | 32,768 (32) | 1.024547e-4 | 1.92632e-6 | -2.20300e-6 | 2.36363 | 0.34428 | -0.28799 |
-| L3 (mean over t = 3.0-3.5 s, provisional) | 4,153,344 | 262,144 (64) | 1.04477e-4 | 1.91581e-6 | -2.21533e-6 | 2.38303 | 0.34575 | -0.29118 |
+| L3 (mean over t = 4.0-4.5 s) | 4,153,344 | 262,144 (64) | 1.044776e-4 | 1.91580e-6 | -2.21539e-6 | 2.38305 | 0.34577 | -0.29121 |
 
 `u_z` is reported for the computed `z <= 0` half (Richter's A is the mirror
 point, `u_z` changes sign); `F` is the force on the half interface.
@@ -235,9 +235,10 @@ L1-L3):
 
 | quantity | increments | orders | conditional Richardson value (L1-L3 order) | correction to L3 | p = 2 instead |
 | --- | --- | --- | ---: | ---: | ---: |
-| `u_x(A)` | 15.4 / 6.0 / 1.9 % | 1.26, 1.61 | 1.0546e-4 m | +0.94 % | 1.0515e-4 m |
-| `F_x` | 6.4 / 2.5 / 0.81 % | 1.36, 1.58 | 2.3928 N | +0.41 % | 2.3896 N |
-| `F_y` | 3.2 / 1.9 / 0.43 % | 0.72, 2.16 | - | - | - |
+| `u_x(A)` | 15.4 / 6.0 / 1.9 % | 1.26, 1.61 | 1.0546e-4 m | +0.94 % | 1.0515e-4 m (+0.65 %) |
+| `F_x` | 6.4 / 2.5 / 0.82 % | 1.36, 1.58 | 2.3929 N | +0.41 % | 2.3895 N (+0.27 %) |
+| `F_y` | 3.2 / 1.9 / 0.43 % | 0.72, 2.14 | - | - | - |
+| `F_z` | 6.9 / 4.0 / 1.1 % | 0.73, 1.84 | - | - | - |
 | `u_z(A)` | 5.6 / 2.4 / 0.56 % | 1.18, 2.09 | - | - | - |
 | `u_y(A)` | -0.86 / -0.74 / -0.55 % | 0.23, 0.44 | - | - | - |
 
@@ -256,18 +257,23 @@ per level, so it is part of the mesh-dependent discretisation trend.
 
 ### L3 late-time oscillation
 
-All levels show a ~8 Hz oscillation of the beam after the start (identical
-frequency at L2 and L3), consistent with a damped fluid-loaded first bending
-mode (dry cantilever estimate ~15 Hz, lowered by added mass). It decays by
-~4.7x per 0.5 s (computed damping ratio ~6 %, physical plus numerical):
-L2 amplitude 8e-5 (3.0-3.5 s), 1e-6 (5.5-6 s), 7e-10 (11.5-12 s). Restarts
-re-excite it (the L2 re-decomposition restart at t = 4 s raised it to 1.4e-4,
-after which it decayed again to the same mean, within 2e-7), so the reported
-values are window means after a documented settling time. At L3 the
-amplitude was 1e-4 in 3.0-3.5 s; segment 2 (t = 3-4.5 s, job 5336554) is
-queued to confirm the decay. It is not vortex shedding: the flow is laminar
-and steady (rigid-beam flows converge to 1e-7), and the frequency does not
-change with the mesh.
+All levels show a ~8 Hz oscillation of the beam after the start, with the
+same frequency at L2 (8.0 Hz) and L3 (7.9 Hz), consistent with a damped
+fluid-loaded first bending mode (dry cantilever estimate ~15 Hz, lowered by
+added mass); it is not vortex shedding (the rigid-beam flows are steady to
+1e-7 and the frequency does not change with the mesh). It decays
+geometrically, by a factor 2.1 per 0.25 s at L3 (computed damping ratio ~6 %,
+physical plus numerical). L3 half-amplitude of `u_x(A)` per 0.25 s window
+(linear trend removed): 4.6e-4 (2.50-2.75 s), 9.4e-5 (3.00-3.25), 2.0e-5
+(3.50-3.75), 4.2e-6 (4.00-4.25), 2.1e-6 (4.25-4.50); `F_x` 3.5e-4 to 1.6e-6.
+The plain restart of segment 2 at t = 3 s (same decomposition, `D_0_0`
+written) did not re-excite it; the L2 restart with re-decomposition at
+t = 4 s did (to 1.4e-4), after which it decayed again to the same mean. The
+L3 values are means over 4.0-4.5 s. Successive 0.25 s window means still
+change by +6e-7 (`u_x`), +7e-7 (`F_x`), +1.0e-5 (`F_y`) and -2e-5 (`F_z`)
+relative, a slow wake drift as at L2; the estimated remainders (rate x
+tau ~ 2 s) are ~2e-6 (`u_x`), ~3e-6 (`F_x`) and ~1e-4 (`F_y`, `F_z`), all
+below 5 % of the L2-L3 increments.
 
 ## Comparison with Richter (2012), after the sequence above
 
@@ -275,7 +281,7 @@ Richter Table 6 (half interface, symmetric half domain, as here): drag
 1.327 +- 0.01 N, `u_x(A)` 5.924e-5 +- 1e-7 m. For the implemented printed
 inlet (peak 0.3 m/s; area mean 0.133 m/s, `Re = 0.133 x 0.2 / 1e-3 = 27`
 with Richter's length scale) the sequence approaches 2.39 N and
-1.05e-4 m, i.e. 1.80x and 1.78x the tabulated values; the discrepancy greatly
+1.05e-4 m (L3: 2.38305 N, 1.04478e-4 m), i.e. about 1.8x the tabulated values; the discrepancy greatly
 exceeds the estimated numerical corrections (< 1 %). Earlier solids4foam
 calculations with peak 0.2 m/s (coarser solid family, `N_t = 4f`) gave
 1.3311 N and 5.915e-5 m at L3, close to Table 6. This suggests a possible
@@ -319,19 +325,21 @@ for Philip, not run): a coupled L3 dt/2 steady-sensitivity run (estimated
 
 ## Cost (physical cores = node-hours x 128)
 
-64.4 node-hours = 8,250 physical core-h for jobs up to L3 segment 1
-(5333947: 36.0 node-hours = 4,610 core-h). Earlier totals in this README
-and in reports were sacct CPUTimeRAW, which counts 256 logical CPUs per
-node and so doubled the physical figure. L3 segment 2: ~15 node-hours
-(~1,900 core-h) when it runs.
+73.0 node-hours = 9,350 physical core-h in total since 2026-10-11, of which
+L3 44.6 node-hours (segment 1, job 5333947: 36.0; segment 2, job 5336554:
+8.6; the failed quota attempt 5333773: 0.1). Segment 2 ran ~1.7x faster per
+simulated second than segment 1 (different nodes). Earlier totals in this
+README and in reports were sacct CPUTimeRAW, which counts 256 logical CPUs
+per node and so doubled the physical figure.
 
-## STATUS (2026-10-13)
+## STATUS (2026-10-13, campaign complete for L0-L3)
 
-L3 segment 2 (job 5336554, 3 nodes, t = 3 -> 4.5 s) is queued (expected start
-2026-10-14 09:12 CEST, ~5 h). When it ends: recompute the L3 window mean over
-the settled part (excluding the restart re-excitation) and the oscillation
-decay, update the tables above, `reference/campaign/production_sequence.csv`
-and the paper evidence branch. Segment-1 residuals are saved as
-`runs/P5_L3_init/fsiResiduals_segment1.dat`.
+All production and check runs are finished; no beam jobs are queued. Open
+items (decisions for Philip): a coupled L3 dt/2 steady-sensitivity run (Astra
+recommendation, roughly 50-60 node-hours); an absolute-floor coupling
+criterion in solids4foam (separate PR); clarification of the Richter inlet
+with the author. Run directories: `/project/home/p201287/philip/beam-richter-opus/runs`
+(L3 keeps its decomposed t = 4, 4.5 s state); archives in
+`/project/home/p201136/philip-beam-archive/beam-richter-opus/`.
 
 <!-- markdownlint-enable MD013 -->
