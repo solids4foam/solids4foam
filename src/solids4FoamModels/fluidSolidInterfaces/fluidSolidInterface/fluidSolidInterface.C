@@ -34,7 +34,6 @@ License
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
-#include "movingWallPressureFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
 #ifndef S4F_NO_RBF
     #include "RBFMeshMotionSolver.H"
@@ -2861,89 +2860,6 @@ void Foam::fluidSolidInterface::writeResidualLine(const scalar residualNorm)
     }
 
     residualFile() << endl;
-}
-
-
-void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
-{
-    forAll(fluid().globalPatches(), interfaceI)
-    {
-        if (immersedInterfaces_[interfaceI])
-        {
-            continue;
-        }
-
-        if
-        (
-            isA<movingWallPressureFvPatchScalarField>
-            (
-                fluid().solutionP().boundaryField()
-                [
-                    fluidPatchIndices()[interfaceI]
-                ]
-            )
-        )
-        {
-            Info<< "Setting acceleration at fluid side of the interface: "
-                << fluidMesh().boundary()
-                   [
-                       fluidPatchIndices()[interfaceI]
-                   ].name()
-                << endl;
-
-            // Take references to zones
-            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
-            const standAlonePatch& solidZone = this->solidZone(interfaceI);
-
-            const vectorField solidZoneAcceleration
-            (
-               solid().faceZoneAcceleration(interfaceI)
-            );
-
-            // Initialise the fluid zone acceleration field that is to be
-            // interpolated from the solid zone
-            vectorField fluidZoneAcceleration(fluidZone.size(), vector::zero);
-
-            // Transfer the field from the fluid interface to the solid
-            // interface
-            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
-            (
-                solidZone,                // from zone
-                fluidZone,                // to zone
-                solidZoneAcceleration,    // from field
-                fluidZoneAcceleration     // to field
-            );
-
-            const vectorField fluidPatchAcceleration
-            (
-                fluid().globalPatches()
-                [
-                   interfaceI
-                ].globalFaceToPatch(fluidZoneAcceleration)
-            );
-
-            vectorField& prevAcceleration =
-                const_cast<movingWallPressureFvPatchScalarField&>
-                (
-                    refCast<const movingWallPressureFvPatchScalarField>
-                    (
-                        fluid().solutionP().boundaryField()
-                        [
-                            fluidPatchIndices()[interfaceI]
-                        ]
-                    )
-                ).prevAcceleration();
-
-            if (coupled())
-            {
-                prevAcceleration = fluidPatchAcceleration;
-            }
-            else
-            {
-                prevAcceleration = vector::zero;
-            }
-        }
-    }
 }
 
 
