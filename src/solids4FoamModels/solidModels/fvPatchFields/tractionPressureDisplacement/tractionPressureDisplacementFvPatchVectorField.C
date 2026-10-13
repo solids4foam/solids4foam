@@ -140,10 +140,13 @@ dispCorr(const bool refConfig) const
     const tensorField invFm = inv(intFM(refConfig));
 
     // Disp incr gradient calculated at mean configuration
-    tensorField gradDDP =
-    (
-        invFm.T() & GradDD.patchInternalField()
-    );
+    // Named operands: a tmp operand with the type of the result would be reused
+    // as the storage of the inner product, which aliases an input of the loop
+    // and gives wrong results with some -O3 builds (see
+    // pimpleFluid::patchViscousForce)
+    const tensorField invFmT(invFm.T());
+    const tensorField gradDDPif(GradDD.patchInternalField());
+    tensorField gradDDP(invFmT & gradDDPif);
 
     DispCorr = (k & gradDDP);
 
@@ -174,10 +177,10 @@ patchInternalSnGrad(const bool refConfig) const
 
     const tensorField invFm = inv(intFM(refConfig));
 
-    tensorField gradDDP =
-    (
-        invFm.T() & pGradDD.patchInternalField()
-    );
+    // Named operands: see above
+    const tensorField invFmT(invFm.T());
+    const tensorField pGradDDPif(pGradDD.patchInternalField());
+    tensorField gradDDP(invFmT & pGradDDPif);
 
     pIntSnGrad = (n & gradDDP);
 
@@ -509,7 +512,11 @@ transformedGradient() const
     {
         const bool refConfig = false;
         const tensorField invFm = inv(FM(refConfig));
-        refDeltaN = mag(invFm & (n*deltaN));
+        // Named operand: a tmp operand with the type of the result would be
+        // reused as the storage of the inner product (see
+        // pimpleFluid::patchViscousForce)
+        const vectorField ndeltaN(n*deltaN);
+        refDeltaN = mag(invFm & ndeltaN);
     }
 
     transGradient = gradient()*refDeltaN/deltaN;

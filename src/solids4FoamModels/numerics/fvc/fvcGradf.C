@@ -292,10 +292,20 @@ tmp
             );
         const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
+        // Named operands: a tmp operand with the type of the result would be
+        // reused as the storage of the inner product, which aliases an input of
+        // the loop and gives wrong results with some -O3 builds (see
+        // pimpleFluid::patchViscousForce)
+        const surfaceTensorField nPerp(I - n*n);
+        const GeometricField<GradType, fvsPatchField, surfaceMesh> gradVff
+        (
+            linearInterpolate(gradVf)
+        );
+
 #ifdef OPENFOAM_NOT_EXTEND
-        tGrad.ref() = ((I - n*n) & linearInterpolate(gradVf));
+        tGrad.ref() = (nPerp & gradVff);
 #else
-        tGrad() = ((I - n*n) & linearInterpolate(gradVf));
+        tGrad() = (nPerp & gradVff);
 #endif
 
 #ifndef OPENFOAM_NOT_EXTEND
