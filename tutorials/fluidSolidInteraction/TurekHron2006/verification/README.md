@@ -1474,15 +1474,18 @@ Branch `verification/hronturek-production` (merge of `verification/hronturek-sec
 f19536dbb and the PR #554 branch `feature/fsi-displacement-mesh-motion` 9692c0e08; master
 renamed the tutorial to `TurekHron2006`, and the verification tree moved with it).
 
-### STATUS (work in progress)
+### STATUS
 
-| job | what | where | cores |
-|---|---|---|---:|
-| MeluXina 5327153 | 8x' ring+box replay, 752 896 cells, dt 1.25e-4, 25 to 30.2 s | `/project/home/p201136/philip-ht/rb_8x_fastp_mlx` | 128 |
-| xenosim 10880 | coupled 4x'/solid 8x, dt 5e-4, strict tol 1e-5, 0 to 7 s | `~/ht_prod/work/c_4x_dt5e-4_tol1e-5` | 24 |
-| xenosim 10881 | coupled 1x'/solid 2x, dt 5e-4, strict tol 1e-5 (restart of the pilot at 2.5 s) | `~/ht_prod/work/c_1x_dt5e-4_tol1e-5` | 8 |
-| xenosim 10885 | coupled 2x'/solid 4x, dt 5e-4, strict tol 1e-5 | `~/ht_prod/work/c_2x_dt5e-4_tol1e-5` | 16 |
-| xenosim 10886 | coupled 2x'/solid 4x, dt 1e-3, strict tol 1e-5 (temporal) | `~/ht_prod/work/c_2x_dt1e-3_tol1e-5` | 16 |
+All runs of the plan are complete except one cross run requested by Astra's final review:
+xenosim job 10992, fluid 2x' with solid 8x, dt 5e-4, tol 1e-5, 0 to 6 s
+(`~/ht_prod/work/c_2x_s8x_dt5e-4_tol1e-5`, 16 ranks). It separates the solid and fluid
+parts of the 2x'/s4x to 4x'/s8x change. To finish: run
+`ht_coupled_analysis.py` with `--case 2x_s8x_dt5e-4=c_2x_s8x_dt5e-4_tol1e-5` added to the
+command in "Reproduce" below, and compare with 2x_dt5e-4 (solid effect) and 4x_dt5e-4
+(fluid effect). Run directories: `~/ht_prod/work` (xenosim, coupled and replay cases),
+`~/ht_prod/mlx_results` (8x' replay data copied from
+`/project/home/p201136/philip-ht/rb_8x_fastp_mlx` on MeluXina), `~/ht_prod/ref` (exports);
+failed and aborted runs are kept in `~/ht_prod/work/failed`, `floor`, `timing*`.
 
 Decisions so far (details below when complete):
 
@@ -1709,3 +1712,51 @@ Reading:
 
 Cost (xenosim, wall time x ranks, from `run.out`): 1x' runs 330, 2x' runs 1 080, 4x' 800,
 pilots, timing and the aborted tolerance 1e-6 starts about 110 core-hours.
+
+### Astra (GPT-6-Astra, xhigh) advice
+
+`reference/production/astra_3_*` (design) and `astra_4_*` (interpretation).
+
+1. Design, before launch: use a fixed dt 5e-4 for the spatial sequence (matched halving
+   would mix errors that can cancel), with a temporal triplet at 2x' and a 4x' time check;
+   acceptance targets time < 0.2 D, iteration < 0.05 D, drift < 0.05 D per quantity, with
+   D the 2x' to 4x' difference; tolerance screening on 1x' and validation on 2x'; keep the
+   strict test but record r1, r2 and the iteration distribution; verify the inner-solver
+   floor by tightening the inner tolerances; check that restarts reproduce a continuous run;
+   quote orders and Richardson/GCI only for monotone sequences with differences above the
+   allowances. Followed, except: the 4x' time branch and the tolerance branches had to
+   become cold runs (restarts diverge, issue #555), so the 4x' time check was replaced by
+   the 2x' triplet and the coupling check stayed at 1x'; the floor check (PIMPLE 6
+   correctors) did not lower r1, as above.
+2. Interpretation: the displacement changes on 2x'/4x' are a refinement sensitivity, not
+   an error bound, and the spatial order is unresolved; the tol 1e-4 - 1e-5 difference is
+   a sensitivity, not a bound; report the steps accepted above tolerance (done); Richardson
+   and GCI for f and the lift amplitude only as conditional, provisional values along the
+   joint fluid-solid path; the replay cannot show the coupled response to its own
+   correction, and 77-82 N/m is a spread, not a bound; for Featflow claim a persistent
+   difference of the tested solutions only, with the benchmark definitions of the means
+   (used here) and the smoothing effect quantified (at most 0.3 N/m); recommended one more
+   run, fluid 2x' with solid 8x, to separate solid and fluid refinement (running).
+
+### Reproduce
+
+```bash
+python3 scripts/ht_coupled.py --tutorial <TurekHron2006> --level 4 --solid-level 8 \
+    --delta-t 5e-4 --end 6 --cores 24 --out <work>/c_4x_dt5e-4_tol1e-5
+scripts/run_coupled.sh <work>/c_4x_dt5e-4_tol1e-5      # with scripts/prod_env_build.sh
+python3 scripts/ht_coupled_analysis.py --t-end 6.0 --drift-from 4.5 --n-outer 30 \
+    --case 1x_dt5e-4=c_1x_dt5e-4_tol1e-5 --case 2x_dt5e-4=c_2x_dt5e-4_tol1e-5 \
+    --case 4x_dt5e-4=c_4x_dt5e-4_tol1e-5 --case 2x_dt1e-3=c_2x_dt1e-3_tol1e-5 \
+    --case 2x_dt2.5e-4=c_2x_dt2.5e-4_tol1e-5 --case 1x_dt1e-3=c_1x_dt1e-3_tol1e-5 \
+    --case 1x_dt5e-4_tol1e-4=c_1x_dt5e-4_tol1e-4 --case 1x_s4x_dt5e-4=c_1x_s4x_dt5e-4_tol1e-5 \
+    --json coupled.json --csv coupled_runs.csv
+python3 scripts/ht_coupled_summary.py coupled.json coupled_summary.csv
+python3 scripts/ht_coupled_plot.py coupled.json coupled_sequence.png
+```
+
+### Cost
+
+About 4 900 core-hours so far: MeluXina 1 860 (8x' replay and a 15-minute 4x' control),
+xenosim 3 030 (coupled 2 210, 8x' xenosim start 200, 4x' replay time check 250, pilots,
+timing and aborted starts about 110, plus the cancelled 1x' dt 2.5e-4, 45). The cross run
+adds about 600 (projected), for about 5 500 in total, within the approved 6 000.
