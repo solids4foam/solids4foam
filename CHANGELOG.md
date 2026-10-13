@@ -37,6 +37,9 @@ release. For complete commit-level details and contributor information, see the
   the momentum equation of both the segregated and PETSc SNES paths on
   OpenFOAM.com, with the same protected `fvOptionsSource()` hook as the linear
   geometry model for OpenFOAM.org and foam-extend.
+- The solid models page documents the `restart` switch: the fields it writes,
+  what happens when a run continues from a later time without it, and the
+  known restart limitations (#68).
 - A documentation page for each `mechanicalConstitutiveLaw`, next to its
   class, giving its entries and defaults, its state, its tangents, whether it
   supports the mixed displacement-pressure formulation, how it differs from
@@ -240,10 +243,25 @@ release. For complete commit-level details and contributor information, see the
   velocity profile, the flow rate, the wall displacement and the complex wave
   number with the exact linear solution for a thick elastic wall, under mesh
   and time-step refinement, and compares the IQN-ILS and Robin-Neumann
-  couplings.
+  couplings. The tube ends use `fluxConsistentPatches` (below), and the
+  old-time solid displacements carry exact boundary values; the time-step
+  study runs 50/100/200/400 steps per period.
+- `pimpleFluid` (OpenFOAM.com) has an opt-in PIMPLE entry,
+  `fluxConsistentPatches (<patches>);`, for patches that fix the pressure and
+  whose velocity condition fixes the boundary value, such as a mixed
+  condition imposing an exact normal gradient. On such a patch the pressure
+  equation otherwise gives an end flux that differs from the boundary
+  velocity flux by a term proportional to the time-step, which limits a
+  fixed-mesh time-step study to first order; with the entry the flux is
+  consistent to O(Δt h). It is empty by default, so no other case changes.
 
 ### Changed
 
+- The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
+  `verification/work/` and `verification/postProcessing/` outputs of the
+  opt-in studies, which can take hours to produce; `./Allclean all` removes
+  them too, in a tutorial directory or in `tutorials/`. Each `verification/`
+  directory has an `Allclean` for its generated cases and results (#542).
 - Renamed the `fluidSolidInteraction/HronTurekFsi3` tutorial to
   `fluidSolidInteraction/HronTurek`, which now covers all three Turek-Hron
   benchmarks: `./Allrun fsi1`, `./Allrun fsi2` or `./Allrun fsi3` (the
@@ -473,6 +491,15 @@ release. For complete commit-level details and contributor information, see the
   caller to justify its shape. An external driver calling
   `solidModel::newDeltaT()` no longer compiles, and adaptive time stepping
   driven by material state will need a new interface rather than this one.
+- The `prevAcceleration_` field of the `movingWallPressure` boundary
+  condition, with its `prevAcceleration()` accessors, and the public virtual
+  `fluidSolidInterface::updateMovingWallPressureAcceleration()` that the
+  coupling interfaces called to set it, are removed (#377). The condition
+  takes the wall acceleration from `newMovingWallVelocity` and never read the
+  field, so results are unchanged; each outer iteration no longer interpolates
+  the solid interface acceleration only to discard it, and the log no longer
+  prints "Setting acceleration at fluid side of the interface". The
+  `elasticWallPressure` acceleration update is unaffected.
 - `vertexCentredNonLinTotalLagGeometry` is no longer compiled, on any fork. The
   solver does not currently run: no tutorial selected it, so nothing exercised
   it, an attempt to give it one failed inside the PETSc solve, and its
@@ -542,10 +569,61 @@ release. For complete commit-level details and contributor information, see the
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
   the base coupling class.
-- `leastSquaresS4f`: the warning that cells remain rank-deficient after the
-  gradient stencil is widened to point neighbours is now issued once per
-  least-squares vectors object rather than on every mesh motion, where it was
-  repeated every time step with the updated Lagrangian solid models (#566).
+- The high-order least-squares reconstruction now rejects axisymmetric
+  (wedge) meshes when the solid model is constructed, with an error that
+  names the limitation, instead of stopping later with the misleading
+  "Empty direction should be vector::Z" (#512). Wedge meshes are still not
+  supported; planar 2-D meshes in the x-y plane and 3-D meshes are.
+- The fluid models register their velocity and pressure gradients as
+  `grad(U)` and `grad(p)`, the names the gradient cache uses, so a case that
+  caches them, e.g. `cache { grad(U); }` in `fvSolution`, used the fluid model
+  fields as the cached gradients (#479). With OpenFOAM.com v2512, the cache
+  updates these in place, but with a limited gradient scheme their
+  `calculated` patches kept the unlimited boundary gradient, and the cache
+  took their initial zero values as up to date, so the first time step used a
+  zero velocity gradient. `pimpleFluid` therefore departed from `pimpleFoam`.
+  The fields now have `extrapolatedCalculated` patches (except with
+  foam-extend), as the fields the gradient schemes create do, and start out
+  of date. Earlier OpenFOAM.com versions, OpenFOAM.org and foam-extend delete
+  a stale cached gradient, which could crash `solids4Foam`; there, caching
+  `grad(U)` or `grad(p)` now stops with an error that asks for them to be
+  removed from the cache. Cases that do not cache these gradients are
+  unaffected.
+- A dynamic solid with `restart yes` now continues from a restart as the
+  uninterrupted run would (#555). Three things differed. OpenFOAM reads the
+  old-time levels below the first twice, and the copy kept fails to
+  register, so a restarted run did not write `D_0_0`, `D_0_0_0` and `DD_0_0`
+  (OpenFOAM.com v2412 and later), or wrote them with the values read at the
+  restart (earlier versions, OpenFOAM.org and foam-extend). A second restart
+  then lost them, and `backward` `d2dt2` fell back to first order for a
+  step. The velocity `U` was created after the first time increment, where
+  there is no `U` to read, so the first step was predicted from zero
+  velocity. The acceleration `A` used by the `predictor` of the total and
+  updated Lagrangian models was not written; it is now written with
+  `restart yes`. For `cantileverVibration` with the total Lagrangian model on
+  OpenFOAM v2412, the first SNES residual after a restart was up to 30 times
+  that of the uninterrupted run, and a second restart was 17% off at the end
+  time; the restarted runs are now bit-identical to the uninterrupted one.
+- Boundary conditions now write the settings they read, so a run restarted
+  from a written time uses the settings of the run it continues (#409).
+  `fixedTemperature` lost its `temperatureSeries`, so a restarted run held
+  the temperature at its value at the restart time.
+  `fixedDisplacement` lost `enforcePointPatchField`, `fixedRotation` (finite
+  volume and point) lost `nonOrthogonalCorrections`, and the point
+  `solidForce` condition lost the `region` of its `forceField`. In
+  foam-extend, `solidRigidContact` wrote its `triSurfaces` entries without
+  the `triSurfaces` keyword, so a case using it could not be restarted at
+  all; `solidContact` and `solidRigidContact` lost
+  `quickReject`; `solidContact` lost `integralNormalGap`, and its point
+  distance switches when it has more than one shadow patch;
+  `tractionPressureDisplacement` lost `blockCoupled` and `frozenTraction`;
+  and `simpleCohesiveZone` lost its separation distances, read
+  `oldSeparationDistance` into the current separation distance, and did not
+  read back the `initiationTraction` it wrote.
+- A case with a `fixedRotation` condition, such as `rigidRotation`, can now
+  be restarted with OpenFOAM.com (#409). The condition read its nonuniform
+  `value` a second time, which fails once the base class has read it, and
+  rejected the old-time fields, such as `D_0`, read on restart.
 
 ## [v2.4] - 2026-08-24
 

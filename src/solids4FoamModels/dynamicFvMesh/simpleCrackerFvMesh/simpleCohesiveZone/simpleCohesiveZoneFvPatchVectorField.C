@@ -231,8 +231,14 @@ simpleCohesiveZoneFvPatchVectorField
 
     if (dict.found("oldSeparationDistance"))
     {
-        separationDistance_ =
+        oldSeparationDistance_ =
             scalarField("oldSeparationDistance", dict, p.size());
+    }
+
+    if (dict.found("initiationTraction"))
+    {
+        initiationTraction_ =
+            vectorField("initiationTraction", dict, p.size());
     }
 }
 
@@ -665,6 +671,10 @@ void simpleCohesiveZoneFvPatchVectorField::write(Ostream& os) const
     damageIndicator_.writeEntry("damageIndicator", os);
 
     crackIndicator_.writeEntry("crackIndicator", os);
+
+    separationDistance_.writeEntry("separationDistance", os);
+
+    oldSeparationDistance_.writeEntry("oldSeparationDistance", os);
 
     os.writeKeyword("relaxationFactor") << relaxationFactor_
         << token::END_STATEMENT << nl;
