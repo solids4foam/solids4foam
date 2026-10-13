@@ -45,6 +45,15 @@ $$1200\,\mathrm{kg\,m^{-3}}$$, Young's modulus of $$640\,\mathrm{kPa}$$ and
 Poisson's ratio of $$0.45$$. A uniform wall thickness of $$0.3\,\mathrm{mm}$$
 is discretised using three cells through the thickness.
 
+The brain tissue and cerebrospinal fluid around the artery support the outer
+wall. They are represented by elastic springs on the `outerWall` patch, using
+the `solidSpringDashpot` condition in `0/solid/D`, with a stiffness of
+$$10^7\,\mathrm{Pa\,m^{-1}}$$ in the normal and tangential directions and no
+damping: the value Shidhore et al. [4] use for tissue contact. Moireau et al.
+[5] discuss external tissue support in vascular fluid-solid interaction. To
+remove the support, set `kNormal` and `kTangential` to zero, or use a
+traction-free `solidTraction` condition on `outerWall`.
+
 ## Mesh Generation
 
 The vascular surface is converted from STL to the `.fms` format using
@@ -85,7 +94,8 @@ the exposed inner face of the extruded mesh is named `innerWall` (via
   good value is known for the geometry: this case previously used
   `constantHs 5e-4`, which converges at a comparable rate: over the first
   2000 time steps, i.e. through the initial transient and systole, it needs
-  2.62 FSI correctors per time step against 2.48 for `secant`. The case
+  2.62 FSI correctors per time step against 2.48 for `secant` (both measured
+  before the outer-wall spring support was added). The case
   permits up to 30 FSI correctors per time step.
   The `fixedRelaxation` coupling uses a relaxation factor of 1.0, i.e. no
   additional under-relaxation is applied, as the Robin condition already
@@ -93,6 +103,8 @@ the exposed inner face of the extruded mesh is named `innerWall` (via
   such unrelaxed iterations, and Aitken or IQN-ILS acceleration is not
   recommended with it.
 - **Interface:** `wall` in the fluid region and `innerWall` in the solid region.
+- **External support:** `solidSpringDashpot` springs on the solid
+  `outerWall`.
 - **Duration:** one cardiac cycle of $$1\,\mathrm{s}$$.
 
 The fixed time step is $$5\times10^{-5}\,\mathrm{s}$$, giving 20,000 time
@@ -100,7 +112,7 @@ steps over the cardiac cycle. As the time step is fixed, the Courant number
 follows the flow-rate waveform: over the cycle it peaks at 8.84 near peak
 systole ($$t\approx0.098\,\mathrm{s}$$), with a cycle-averaged value of 4.32.
 The implicit PIMPLE fluid solution and the FSI coupling remain stable at these
-Courant numbers, requiring an average of 1.8 FSI correctors per time step
+Courant numbers, requiring an average of 1.45 FSI correctors per time step
 (see Figure 6).
 
 The `endTime` in `system/controlDict` is currently `1`, which corresponds to
@@ -179,21 +191,26 @@ below show representative fields from the simulation.
 
 ![Velocity streamlines](images/velocity.webp)
 
-**Figure 3: Fluid velocity streamlines coloured by velocity magnitude.**
+**Figure 3: Fluid velocity streamlines coloured by velocity magnitude. From an
+earlier version of the case with a traction-free outer wall.**
 
 ![Fluid pressure](images/pressure.webp)
 
-**Figure 4: Pressure distribution in the fluid domain.**
+**Figure 4: Pressure distribution in the fluid domain. From an earlier version
+of the case with a traction-free outer wall.**
 
 ![Wall shear stress](images/wallShearStress.webp)
 
-**Figure 5: Wall shear stress distribution on the vascular wall.**
+**Figure 5: Wall shear stress distribution on the vascular wall. From an
+earlier version of the case with a traction-free outer wall.**
 
 {% include youtube.html id="gFhhHJvkhM4" %}
 
 **Video 1: Time evolution of the equivalent (von Mises) stress distribution
 in the arterial wall over a cardiac cycle. The deformation has been scaled
-by a factor of 5.**
+by a factor of 5. From an earlier version of the case with a traction-free
+outer wall; in the current case the outer wall is supported by
+`solidSpringDashpot` springs, which reduce the wall deformation.**
 
 The number of FSI (outer) iterations performed in each time step is recorded in
 `postProcessing/fsiResiduals.dat`. `Allrun` post-processes this file with
@@ -215,9 +232,9 @@ cardiac cycle.**
 
 The partitioned coupling is inexpensive once the initial transient has passed:
 11 iterations are needed in the first time step, after which the count settles
-to one or two iterations, averaging 1.3 over the cardiac cycle. In the measured
-run below, 77% of the time steps converged in a single FSI corrector and a
-further 19% in two. The limit of 30 FSI correctors per time step is never
+to one or two iterations, averaging 1.45 over the cardiac cycle. In the measured
+run below, 65% of the time steps converged in a single FSI corrector and a
+further 29% in two. The limit of 30 FSI correctors per time step is never
 reached.
 
 ## Running the Case
@@ -235,13 +252,14 @@ The case is configured for 16 subdomains by default
 `parallel` to run in serial.
 
 As a representative run time, the full cardiac cycle (20,000 time steps of
-$$5\times10^{-5}\,\mathrm{s}$$) completed in 5633 s of solver time
-(approximately 1 hour 34 minutes) using **8 cores**, i.e. with
+$$5\times10^{-5}\,\mathrm{s}$$) completed in 6514 s of solver time
+(approximately 1 hour 49 minutes) using **8 cores**, i.e. with
 `numberOfSubdomains` reduced from the default 16 to 8. The hardware was an
 Apple Mac Studio with an M1 Ultra chip (20 cores: 16 performance and 4
-efficiency) and 64 GB of unified memory, running macOS 26.5 and OpenFOAM
-v2412. This timing excludes mesh generation, which takes a few seconds, and
-the reconstruction of the parallel results.
+efficiency) and 64 GB of unified memory, running macOS 26.6 and OpenFOAM
+v2512, with other jobs sharing the machine. This timing excludes mesh
+generation, which takes a few seconds, and the reconstruction of the parallel
+results.
 
 Performance varies with hardware and through the cardiac cycle, as the cost per
 time step follows the FSI iteration count shown in Figure 6.
@@ -293,3 +311,10 @@ and the script skips the checks rather than reporting a failure.
    Newton-Krylov Method for Cell-Centred Finite Volume Solid Mechanics,"
    *International Journal for Numerical Methods in Engineering*, 127(3),
    e70268 (2026). <https://doi.org/10.1002/nme.70268>.
+4. T. C. Shidhore et al., "Comparative assessment of biomechanical parameters
+   in subjects with multiple cerebral aneurysms using fluid-structure
+   interaction simulations," *Journal of Biomechanical Engineering*, 145,
+   051003 (2023). <https://doi.org/10.1115/1.4056317>.
+5. P. Moireau et al., "External tissue support and fluid-structure simulation
+   in blood flows," *Biomechanics and Modeling in Mechanobiology*, 11, 1-18
+   (2012). <https://doi.org/10.1007/s10237-011-0289-z>.

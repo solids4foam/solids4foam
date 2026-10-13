@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    D
+    {
+        solver          petsc;
+        options
+        {
+            // Nonlinear solver: Jacobian-free Newton-Krylov
+            snes_type                       newtonls;
+            snes_linesearch_type            basic;
+            // Tight tolerances so that the discretisation error dominates
+            snes_rtol                       "1e-10";
+            snes_atol                       "1e-14";
+            snes_stol                       "1e-12";
+            snes_max_it                     "1000";
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+            // Linear solver
+            ksp_type                        lgmres;
+            ksp_rtol                        "1e-6";
+            ksp_converged_reason;
+            // Preconditioner: block Jacobi with LU, constructed once and reused
+            pc_type                         bjacobi;
+            sub_pc_type                     lu;
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner         "-2";
+        }
+    }
+}
+
+relaxationFactors
+{}
+
+// ************************************************************************* //

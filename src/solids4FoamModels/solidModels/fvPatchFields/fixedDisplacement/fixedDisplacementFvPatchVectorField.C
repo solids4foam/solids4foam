@@ -421,6 +421,9 @@ void fixedDisplacementFvPatchVectorField::write(Ostream& os) const
     os.writeKeyword("nonOrthogonalCorrections")
         << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
 
+    os.writeKeyword("enforcePointPatchField")
+        << enforcePointPatchField_ << token::END_STATEMENT << nl;
+
     if (dispSeries_.size())
     {
         os.writeKeyword("displacementSeries") << nl;
