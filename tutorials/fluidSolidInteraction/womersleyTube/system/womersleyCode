@@ -357,4 +357,34 @@ womersleyInitialPointDisplacement
     os  << word("nonuniform") << token::SPACE << value;
 #};
 
+// The exact displacement on a boundary patch of the initial or an old-time
+// displacement field, at the time level given by its womersleyTimeLevel
+// entry. Old-time fields are never re-evaluated, so their boundary values
+// must be set here: they enter the solid boundary acceleration that the
+// Robin condition imposes on the fluid in the first time-steps
+womersleyPatchDisplacement
+#{
+    const dictionary& top = dict.topDict();
+    const fvMesh& mesh =
+        refCast<const fvMesh>(static_cast<const IOdictionary&>(top).db());
+    const womersley::mode& m = womersley::lookup(mesh.time());
+    const scalar t =
+        mesh.time().value()
+      - readScalar(top.lookup("womersleyTimeLevel"))
+       *mesh.time().deltaTValue();
+    const label patchI = mesh.boundaryMesh().findPatchID(dict.dictName());
+    if (patchI < 0)
+    {
+        FatalErrorInFunction
+            << "No patch " << dict.dictName() << exit(FatalError);
+    }
+    const vectorField& Cf = mesh.boundaryMesh()[patchI].faceCentres();
+    vectorField value(Cf.size());
+    forAll(Cf, faceI)
+    {
+        value[faceI] = m.displacement(Cf[faceI], t);
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
 // ************************************************************************* //

@@ -13,3 +13,11 @@ cleanCase
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
+
+# Remove the regression test cases, and the verification study cases and
+# results, too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+    (cd verification && ./Allclean)
+fi
