@@ -134,7 +134,8 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         ),
         mesh,
         dimensionedVector("0", dimless/dimLength, vector::zero)
-    )
+    ),
+    rankDeficientWarned_(false)
 {
     calcLeastSquaresVectors();
 }
@@ -185,7 +186,8 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         ),
         mesh,
         dimensionedVector("zero", dimless/dimLength, vector::zero)
-    )
+    ),
+    rankDeficientWarned_(false)
 {
     calcLeastSquaresVectors();
 }
@@ -734,16 +736,26 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         // answer. A body one cell thick in some direction produces this in
         // serial - the striker in pipeCrush is a single row of cells - and a
         // point-cell stencil truncated at a processor boundary can produce it
-        // in parallel. Neither is new, so neither is fatal
-        WarningInFunction
-            << nStillSingular
-            << " cells remain rank-deficient after widening the gradient"
-            << " stencil to point neighbours." << nl
-            << "    Worst on this processor: cell " << worstCell
-            << ", smallest eigenvalue ratio " << worstRatio << nl
-            << "    Either the body is one cell thick in some direction or, in"
-            << " parallel, the point-cell stencil is truncated at a processor"
-            << " boundary." << endl;
+        // in parallel. Neither is new, so neither is fatal.
+        //
+        // The vectors are recomputed on every mesh motion, so the warning is
+        // issued once per object rather than once per time step
+        if (!rankDeficientWarned_)
+        {
+            WarningInFunction
+                << nStillSingular
+                << " cells remain rank-deficient after widening the gradient"
+                << " stencil to point neighbours." << nl
+                << "    Worst on this processor: cell " << worstCell
+                << ", smallest eigenvalue ratio " << worstRatio << nl
+                << "    Either the body is one cell thick in some direction"
+                << " or, in parallel, the point-cell stencil is truncated at"
+                << " a processor boundary." << nl
+                << "    This warning is issued once and is not repeated when"
+                << " the vectors are recomputed on mesh motion." << endl;
+
+            rankDeficientWarned_ = true;
+        }
     }
     else if (nStillSingular > 0)
     {

@@ -542,6 +542,10 @@ release. For complete commit-level details and contributor information, see the
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
   the base coupling class.
+- `leastSquaresS4f`: the warning that cells remain rank-deficient after the
+  gradient stencil is widened to point neighbours is now issued once per
+  least-squares vectors object rather than on every mesh motion, where it was
+  repeated every time step with the updated Lagrangian solid models (#566).
 
 ## [v2.4] - 2026-08-24
 

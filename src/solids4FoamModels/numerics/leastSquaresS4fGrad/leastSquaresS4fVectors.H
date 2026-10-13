@@ -71,6 +71,11 @@ class leastSquaresS4fVectors
         //  cell in wideStencil_
         mutable List<vectorList> wideVectors_;
 
+        //- Has the warning about cells that remain rank-deficient after
+        //  widening the stencil been issued; it is issued once, as the
+        //  vectors are recomputed on every mesh motion
+        mutable bool rankDeficientWarned_;
+
 
     // Private Member Functions
 
