@@ -225,7 +225,7 @@ converged rigid-beam flow the FSI state is within 3.4e-4 (`u_x`) after 2 s,
 | L0 | 8,112 | 512 (8) | 8.13919e-5 | 1.95723e-6 | -2.03080e-6 | 2.15736 | 0.32694 | -0.25742 |
 | L1 | 64,896 | 4,096 (16) | 9.62607e-5 | 1.94057e-6 | -2.15035e-6 | 2.30568 | 0.33773 | -0.27647 |
 | L2 | 519,168 | 32,768 (32) | 1.024547e-4 | 1.92632e-6 | -2.20300e-6 | 2.36363 | 0.34428 | -0.28799 |
-| L3 | 4,153,344 | 262,144 (64) | pending approval | | | | | |
+| L3 (t = 3.0-3.69 s mean, segment 1) | 4,153,344 | 262,144 (64) | 1.04477e-4 (+-4e-5 rel.) | 1.91581e-6 | -2.21533e-6 | 2.38303 (+-6e-5 rel.) | 0.34575 | -0.29118 |
 
 `u_z` is reported for the computed `z <= 0` half (Richter's A is the mirror
 point, `u_z` changes sign); `F` is the force on the half interface.
@@ -264,20 +264,21 @@ Prompt and full reply: `reference/campaign/astra/`. Main points and actions:
   be added; monotonicity alone is insufficient for GCI.
 - Reported L1 rest/rigid-start difference corrected to 1.6-3.2e-6 relative.
 
-## STATUS (2026-10-12 23:45 CEST)
+## STATUS (2026-10-13)
 
-Done: L0-L2 production and all checks (including L2 dt x2 and dt/2: 5333539,
-5333540). Obsolete processor directories of the finished runs were pruned
-after verified archives to
-`/project/home/p201136/philip-beam-archive/beam-richter-opus/` (logs and
-settings, all postProcessing data, decomposed L1/L2 steady states; md5 sums
-listed there). About 6,700 core-h used since 2026-10-11.
+L3 segment 1 (job 5333947, 3 nodes, 384 ranks) reached t = 3.69 s of 4 s
+before its 12 h walltime: 11,580 s wall per simulated second, 8.1-8.8 FSI
+iterations per step, no capped step. Charged 36 node-hours (4,608 physical
+core-h; sacct CPUTimeRAW counts 256 logical CPUs per node and reports 9,219
+h). My estimate (1,800-2,500 core-h) was about 2x too low. Last write: t = 3 s
+(all 384 processors hold `D_0_0`, `D_0_0_0`, `U_0`, `Uf_0`, so the v2412 build
+writes the old-old solid level; the solid velocity at t = 3 s is ~1e-8 m/s, so
+even an implied zero old velocity (issue #555) is harmless for the steady
+target). After t = 3 s the QoIs oscillate about their mean with relative
+amplitude ~4e-5 (`u_x`) and ~6e-5 (`F_x`), period ~0.4 s, i.e. far below 5 %
+of the L2-L3 increment (2.0 % and 0.8 %).
 
-L3 (approved by Philip): case `runs/P5_L3_init` reset after the first attempt
-(job 5333773) died in decomposePar on the p201287 file quota. To be submitted
-by the coordinator with `jobs/SUBMIT_L3_segment1.sh` (3 nodes, 384 ranks,
-0-4 s from the converged rigid L3 flow; ~37-50k files with purgeWrite 2).
-Next: analyse L3, orders L1-L3, Richter comparison, final Astra review, paper
-evidence update.
+Prepared (not submitted): `jobs/SUBMIT_L3_segment2.sh` continues from t = 3 to
+4.5 s (writeInterval 0.5 s), ~5 h, walltime 8 h, ~15 node-hours.
 
 <!-- markdownlint-enable MD013 -->
