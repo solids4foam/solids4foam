@@ -47,5 +47,8 @@ versions (v2312 to v2606).
 - `EulerDdtScheme.C`: This corrects the scheme for a moving mesh, for example,
   for the fluid domain in a fluid-solid interaction simulation.
 
+- `backwardDdtScheme.C`: this corrects the scheme for a moving mesh, for
+  example, for the fluid domain in a fluid-solid interaction simulation.
+
 - `GeometricField.C`: this fix is required for consistent time discretisation.
   Some FSI cases may crash without this fix.

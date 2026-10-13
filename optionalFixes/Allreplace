@@ -6,11 +6,12 @@ echo "optionalFixes/Allreplace"
 # This script replaces files that require fixes in the OpenFOAM installation.
 # To see the consequence of these fixes, visit www.solids4foam.com.
 
-# Function for the checking and reporting how to replace a file
+# Function for replacing a file
 # Arguments:
-#   $1  - File name
-#   $2  - Target path, without the file name and the slash at the end
-#   $3  - Path to library to be re-built
+#   $1  - Directory in optionalFixes containing the replacement file
+#   $2  - File name
+#   $3  - Target path, without the file name and the slash at the end
+#   $4  - Path to library to be re-built (not used here)
 #
 replaceFile()
 {
@@ -60,8 +61,7 @@ then
         "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
         "$FOAM_SRC/finiteVolume"
 
-    # This fixes consistent Rhie-Chow interpolation
-    # for Euler scheme
+    # This corrects the backward scheme for a moving mesh
     replaceFile \
         "foam-extend-4.1" \
         "backwardDdtScheme.C" \
@@ -100,7 +100,7 @@ else
         "$FOAM_SRC/OpenFOAM/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/OpenFOAM"
 
-    # Fix time index storage in the storeOldTimes function
+    # This corrects the backward scheme for a moving mesh
     replaceFile \
         "OpenFOAM-9" \
         "backwardDdtScheme.C" \
