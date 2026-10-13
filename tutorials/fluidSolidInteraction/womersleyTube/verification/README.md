@@ -339,6 +339,10 @@ $$10^{-6}$$ of the cell forces, before the relative tolerance is met, so the
 solid uses `stopOnPetscError false` and a relative step tolerance of
 $$10^{-6}$$; the coupling tolerance then decides convergence.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## References
 
 - J. R. Womersley, Oscillatory motion of a viscous liquid in a thin-walled

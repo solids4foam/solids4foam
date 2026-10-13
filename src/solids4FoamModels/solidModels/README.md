@@ -379,3 +379,76 @@ finite volume discretisation unless stated otherwise.
     displacement $$\Delta \boldsymbol{d}$$ (`DD`) and hydrostatic pressure
     $$\Delta p$$ (`Dp`) in a single system; _currently only available with
     foam-extend_.
+
+---
+
+## Restarting a Solid Model
+
+To continue a run from a later time (`startFrom latestTime;` in
+`system/controlDict`), the solid model may need more than the fields that are
+written by default. Ask for them with the `restart` switch in the solid
+model's coefficients dictionary in `constant/solidProperties`, from the start
+of the run:
+
+```c++
+solidModel     linearGeometryTotalDisplacement;
+
+linearGeometryTotalDisplacementCoeffs
+{
+    // Write all fields needed for a consistent restart (default: no)
+    restart    yes;
+}
+```
+
+With `restart yes`, `solidModel` additionally requests writing of the
+displacement increment `DD` and its old-time levels, the old-time displacement
+levels `D_0` and `D_0_0`, the point fields `pointD_0` and `pointDD`, and the
+gradients `grad(D)`, `grad(D)_0` and `grad(DD)`. Some solid models then rebuild
+their kinematics, such as `F` and `J`, from these fields when they are read
+back. With the default `restart no`, only the usual output, such as `D`,
+`pointD` and `sigma`, is requested. Depending on the OpenFOAM version, old-time
+levels such as `D_0` can still be written, but do not rely on this.
+
+Keep `restart yes` in the continued run as well: some solid models, such as
+the total and updated Lagrangian ones, only rebuild their kinematics from the
+restart fields when it is set. Setting it only when continuing does not
+recover fields that the earlier run did not write.
+
+When a run continues from a time other than the first, `solidModel` looks for
+`grad(D)_0` in the start time directory. If it is missing:
+
+- with `restart` not set at all, the run stops with "the fields a consistent
+  restart needs were never written". Rerun from the start with
+  `restart yes`, or set `restart no` to continue anyway;
+- with `restart no`, `solidModel` prints a warning and continues, subject to
+  the checks below. A material written in total strain, such as
+  `neoHookeanElastic`, can continue this way; an incremental material would
+  treat the strain of the whole run as the strain of one step.
+
+Two further checks can stop a continued run:
+
+- A material with history, such as a plasticity law, stops if `grad(D)_0` is
+  missing, whatever `restart` is set to. Its history variables are written at
+  every write time, but they are measured against the old-time displacement
+  gradient, so keep both when copying or cleaning time directories.
+- The incremental models that solve for `DD`
+  (`nonLinGeomUpdatedLagSolid` and `coupledPressureDisplacementSolid`) stop
+  if a `D` field is present at the start time and `restart` is off. As `D` is
+  written at every write time, these models need `restart yes` to continue a
+  run.
+
+Known limitations, at the time of writing:
+
+- With the `backward` `d2dt2` scheme, a restart with a different `deltaT` has
+  been reported to give different results from a continuous run
+  ([#490](https://github.com/solids4foam/solids4foam/issues/490)).
+- The old-old levels `D_0_0` and `DD_0_0` are requested, but were found to
+  be missing from the time directories written by a continued run (OpenFOAM
+  v2412, `backward` `d2dt2`), so a further restart from those times starts
+  the `backward` scheme from incomplete old-time data
+  ([#555](https://github.com/solids4foam/solids4foam/issues/555)).
+- `nonLinGeomUpdatedLagSolid` does not reproduce a continuous run exactly; see
+  its own documentation page.
+
+The `restart` switch belongs to the solid models; the fluid models have no
+equivalent switch.

@@ -128,14 +128,10 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
         rotationOrigin_ = vector(dict.lookup("rotationOrigin"));
     }
 
-    if (dict.found("value"))
-    {
-        fvPatchField<vector>::operator==
-        (
-            vectorField("value", dict, p.size())
-        );
-    }
-    else
+    // The value, when present, has been read by the base class: reading it
+    // again fails for a nonuniform value with OpenFOAM.com, whose compound
+    // tokens can be read only once, so a written time could not be read back
+    if (!dict.found("value"))
     {
         fvPatchField<vector>::operator==
         (
@@ -143,16 +139,22 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
         );
     }
 
-    if
-    (
+    // On restart, the old-time fields, e.g. D_0, are read with this condition
 #ifdef OPENFOAM_NOT_EXTEND
-        internalField().name() != "D"
-     && internalField().name() != "DD"
+    word fieldName = internalField().name();
 #else
-        dimensionedInternalField().name() != "D"
-     && dimensionedInternalField().name() != "DD"
+    word fieldName = dimensionedInternalField().name();
 #endif
+    while
+    (
+        fieldName.size() > 2
+     && fieldName.substr(fieldName.size() - 2) == "_0"
     )
+    {
+        fieldName.resize(fieldName.size() - 2);
+    }
+
+    if (fieldName != "D" && fieldName != "DD")
     {
         FatalErrorIn
         (
@@ -501,6 +503,9 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
 void fixedRotationFvPatchVectorField::write(Ostream& os) const
 {
     fixedValueFvPatchVectorField::write(os);
+
+    os.writeKeyword("nonOrthogonalCorrections")
+        << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
 
     if (angleSeries_.size())
     {
