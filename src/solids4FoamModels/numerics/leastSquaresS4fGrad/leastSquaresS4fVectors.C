@@ -163,8 +163,8 @@ namespace
 
             // Stop once the off-diagonal entries are negligible next to the
             // diagonal ones: a relative tolerance, since sqr(VSMALL)
-            // underflows to zero
-            if (offDiag == 0 || offDiag <= sqr(SMALL)*diag)
+            // underflows to zero. This also covers offDiag == 0, as diag >= 0
+            if (offDiag <= sqr(SMALL)*diag)
             {
                 break;
             }
