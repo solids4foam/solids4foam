@@ -30,26 +30,27 @@ EPS_MAX=0.021
 P_MIN=5.0e4
 P_MAX=9.0e4
 
-# The final D of the removed legacy mechanicalModel, as the max and mean
-# component magnitude of the field written to fourteen figures, from the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d), per fork. This is the
-# case that exercises the Mohr-Coulomb return mapping and the history it
-# carries, over thirty-eight steps, underneath the poro composite, and the
-# framework reproduced the legacy D field exactly, in every one of those
-# figures. These are
-# recorded numbers, though, and another compiler, CPU or MPI build moves an
-# iterative solution by round-off at the solver tolerance: CI measures up to
-# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
-# largest value, allows for that, and is ten times below the 1e-5 that a
-# 0.001% change in a material constant makes
+# The final D, as the max and mean component magnitude of the field written
+# to fourteen figures, per fork, with the leastSquares gradient on every fork:
+# before, OpenFOAM ran pointCellsLeastSquares, which gave a max of
+# 0.045900554625415, and foam-extend leastSquares, whose reference is
+# unchanged. The forks still differ by 2.5%, so the gradient scheme is not the
+# cause of that difference. This is the case that exercises the
+# Mohr-Coulomb return mapping and the history it carries, over thirty-eight
+# steps, underneath the poro composite. These are recorded numbers, though,
+# and another compiler, CPU or MPI build moves an iterative solution by
+# round-off at the solver tolerance: CI measures up to 3e-8 relative against
+# values recorded on macOS. The tolerance, 1e-6 of the largest value, allows
+# for that, and is ten times below the 1e-5 that a 0.001% change in a material
+# constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        REF_D_MAX=0.045900554625415
-        REF_D_MEAN=0.00582265661842307
+        REF_D_MAX=0.046220557292065
+        REF_D_MEAN=0.00586319120658158
         ;;
     org)
-        REF_D_MAX=0.045900554625415
-        REF_D_MEAN=0.00582265661842306
+        REF_D_MAX=0.046220557292065
+        REF_D_MEAN=0.00586319120658153
         ;;
     foamextend)
         REF_D_MAX=0.047361024905273

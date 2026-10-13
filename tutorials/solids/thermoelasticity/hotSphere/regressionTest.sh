@@ -23,12 +23,15 @@ solids4Foam::requireGnuSed
 # Regression tolerances
 # ------------------------------------------------------------
 
+# With the leastSquares gradient: OpenFOAM.com v2412 and OpenFOAM.org 9
+# give a max epsilonEq of 2.39e-4 and a max sigmaEq of 5.23e7, where
+# pointCellsLeastSquares gave 4.4e7; foam-extend 4.1 gives 2.03e-4 and 4.44e7
 T_MIN=339.5
 T_MAX=340.5
 EPS_MIN=1.5e-4
-EPS_MAX=2.5e-4
+EPS_MAX=2.6e-4
 SIGMA_MIN=3.8e7
-SIGMA_MAX=4.6e7
+SIGMA_MAX=5.6e7
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -126,11 +129,12 @@ FRAMEWORK_D_REL_TOL=1e-6
 COMPARISON_END_TIME=5
 
 # The final D, as the max and mean component magnitude of the field written
-# to fourteen figures, from the removed legacy mechanicalModel on the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d). OpenFOAM.com v2512's;
-# OpenFOAM.org 9 agrees to 2e-9. foam-extend is not compared, as below
-REF_D_MAX=0.00015702498751748
-REF_D_MEAN=7.86486280639836e-05
+# to fourteen figures, with the leastSquares gradient: before, OpenFOAM
+# ran pointCellsLeastSquares, which gave a max of 0.00015702498751748.
+# OpenFOAM.com v2412's; OpenFOAM.org 9 agrees to 5e-7. foam-extend is not
+# compared, as below
+REF_D_MAX=0.00015475202367676
+REF_D_MEAN=7.75003213379894e-05
 
 run_reference_comparison() {
     # Not on foam-extend, where the framework and the legacy model differed by

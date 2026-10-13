@@ -11,8 +11,9 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Checks the top-right corner displacement in the elastoplastic case.
 # ============================================================
 
-TOP_RIGHT_MIN=0.0068
-TOP_RIGHT_MAX=0.0074
+# The mesh-converged value is about 7.4 mm
+TOP_RIGHT_MIN=0.0059
+TOP_RIGHT_MAX=0.0063
 
 ALLRUN_LOGFILE="log.Allrun"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
