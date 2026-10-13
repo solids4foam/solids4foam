@@ -1502,7 +1502,7 @@ Decisions so far (details below when complete):
   at 2.74 s on one step at r1 = 1.4e-5 after 50 iterations. Production runs use strict tol
   1e-5, nOuterCorr 30 and `allowUnconvergedCoupling yes`; steps that reach 30 iterations
   are counted, with their residual.
-- **Restarts in the limit cycle are not usable.** Branches restarted from the 1x' run at
+- **Restarts in the limit cycle are not usable (solids4foam issue #555).** Branches restarted from the 1x' run at
   4.5 s (written with `restart yes`, binary, purgeWrite) diverge in the first step at
   every tolerance: the solid predictor residual is 3.4 against 5.3e-3 in the continuous
   run (`reference/production/restart_check_1x_4.5s.txt`); only `D`, `D_0` and no older
@@ -1586,7 +1586,124 @@ Reading:
   load lies between 77 and 82 N/m, and the trend at the finest level is downwards. No
   observed order, Richardson value or GCI is quoted for it.
 
-Cost: 1 730 core-hours on MeluXina (13.5 h on 128 cores) and about 210 on the abandoned
-xenosim start.
+Time step at 4x' (requested check): the 4x' replay rerun at dt 1.25e-4 (the 8x' step;
+xenosim, same binary and settings, `replay_4x_dt_runs.csv`) gives Q_in 79.14 against 79.27
+N/m, the lift fundamental (88.55, 130.16) against (88.86, 129.71), i.e. a phase change of
+0.18 degrees, lift amplitude +0.21 N/m, mean drag +0.07 N/m and W 0.046 against 0.042 J/m.
+Of the 4x' to 8x' change (Q_in -2.11 N/m, phase +4.6 degrees, lift amplitude +3.6 N/m, drag
++0.86 N/m) the time step accounts for 6%, 4%, 6% and 8%; the rest is spatial.
+
+Cost: 1 830 core-hours on MeluXina (14.3 h on 128 cores), about 200 on the abandoned
+xenosim start and about 250 for the 4x' time-step check.
 
 ![Replay families](reference/production/replay_families.png)
+
+### Task 2: coupled FSI3 with the corrected set-up
+
+Set-up (`scripts/ht_coupled.py`; build: this branch at 30d6e22f3, i.e. f19536dbb + PR #554,
+OpenFOAM v2512, GCC 11.4 `-O3`, xenosim, EPYC 9684X, one build for every coupled run):
+
+- fluid: ring+box family 1x'/2x'/4x' (11 764 / 47 056 / 188 224 cells), central convection,
+  `displacementLaplacian` driven by the interface through `pointDisplacement` (PR #554),
+  `movingWallPressure` on the flag; p by GAMG/DICGaussSeidel; all fluid tolerances 1e-9
+  absolute (non-final p solves relTol 0.01); PIMPLE 3/3/1;
+- solid: the tutorial's 105 x 6 plate refined with the fluid, 2x/4x/8x (210 x 12, 420 x 24,
+  840 x 48), St Venant-Kirchhoff, total Lagrangian, PETSc SNES with rtol 1e-9, stol 1e-12;
+- coupling: IQN-ILS, `requireAllResidualMeasures yes` (max of r1 and r2, issue #552),
+  `outerCorrTolerance 1e-5`, no reuse, `nOuterCorr 30` with `allowUnconvergedCoupling yes`
+  (see the floor diagnostic above: r1 stalls between 1e-7 and 5e-6 and occasionally above
+  1e-5; such steps are accepted and counted, not hidden);
+- protocol: the tutorial's (impulsive Um = 2 m/s, coupling from 2 s), cold starts from
+  t = 0 on every run (limit-cycle restarts diverge, issue #555);
+- time: fixed dt 5e-4 for the spatial sequence; dt 1e-3/5e-4/2.5e-4 at 2x' and 1e-3/5e-4
+  at 1x' (Astra's design, `astra_3_*`);
+- analysis (`scripts/ht_coupled_analysis.py`, `ht_coupled_summary.py`): the last five full
+  u_y periods before 6.0 s on every run (periods delimited by upward mean crossings of u_y;
+  the window ends between 5.83 and 6.0 s); per period (max+min)/2, (max-min)/2 and the time
+  mean, averaged over the five periods; forces on cylinder + flag per unit depth; force
+  amplitudes also after a 4 ms moving average (it changes them by at most 0.3 N/m at dt
+  5e-4); sliding windows one period apart from 4.5 s for the drift.
+
+Results (`reference/production/coupled.json`, `coupled_runs.csv`, `coupled_summary.csv`,
+`coupled_sequence.png`):
+
+| run | u_x time mean | u_x (max+min)/2 | u_x amp | u_y amp | f | drag (max+min)/2 | drag amp | lift (max+min)/2 | lift amp |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1x'/s2x, dt 5e-4 | -2.8346 | -2.8588 | 2.7544 | 34.621 | 5.5698 | 458.52 | 28.64 | 0.99 | 194.70 |
+| 2x'/s4x, dt 5e-4 | -3.0927 | -3.0818 | 2.9289 | 36.173 | 5.4969 | 461.40 | 30.24 | 2.18 | 174.14 |
+| 4x'/s8x, dt 5e-4 | -3.0868 | -3.0687 | 2.9027 | 36.122 | 5.4728 | 461.49 | 29.67 | 2.54 | 164.67 |
+| d21 | -0.2581 | -0.2229 | +0.1745 | +1.552 | -0.0730 | +2.88 | +1.61 | +1.19 | -20.56 |
+| d32 | +0.0059 | +0.0131 | -0.0261 | -0.051 | -0.0240 | +0.09 | -0.57 | +0.36 | -9.47 |
+| observed order | - | - | - | - | 1.60 | (5.0) | - | (1.7) | 1.12 |
+| 2x', dt 1e-3 | -3.0987 | -3.0831 | 2.9288 | 36.163 | 5.4942 | 461.27 | 30.11 | 1.99 | 174.03 |
+| 2x', dt 2.5e-4 | -3.0868 | -3.0789 | 2.9262 | 36.161 | 5.4975 | 461.44 | 30.26 | 2.09 | 174.16 |
+| 1x', dt 1e-3 | -2.8372 | -2.8561 | 2.7508 | 34.581 | 5.5657 | 458.11 | 28.25 | 1.08 | 194.53 |
+| 1x', tol 1e-4 | -2.8373 | -2.8616 | 2.7567 | 34.641 | 5.5703 | 458.60 | 28.63 | 1.02 | 194.84 |
+| 1x'/s4x | -2.8493 | -2.8718 | 2.7546 | 34.818 | 5.5377 | 458.66 | 27.38 | 1.08 | 176.63 |
+| Featflow (level 4, dt 2.5e-4) | | -2.88 | 2.72 | 34.99 | 5.46 | 460.5 | 27.74 | 2.50 | 153.91 |
+
+(mm, Hz, N/m; amplitudes of the forces are the smoothed values; "-" = the two differences
+change sign; brackets = an order is formally defined but the temporal sensitivity is close
+to |d32| (ratio 0.9) and it is not quoted.)
+
+Error control, per quantity, against D = |q(4x') - q(2x')| (`coupled_summary.csv`):
+
+- **Time.** At 2x' the dt sequence 1e-3/5e-4/2.5e-4 changes u_y amplitude by +0.010 then
+  -0.012 mm, u_x (max+min)/2 by +0.001 then +0.003 mm, f by +0.0027 then +0.0006 Hz (order
+  2.2), the drag mean by +0.13 then +0.04 N/m and the lift amplitude by +0.11 then +0.02 N/m.
+  With 4/3 of the last difference as the error at dt 5e-4: time/D = 0.31 (u_y amp), 0.30
+  (u_x mid), 0.13 (u_x amp), 1.3 (u_x time mean), 0.03 (f), 0.94 (drag mean), 0.04 (drag
+  amp) and 0.00 (lift amp). The temporal error is far below the 1x' to 2x' changes for every
+  quantity, and below the 2x' to 4x' change for f, the force amplitudes and u_x amplitude;
+  for the displacement means and u_y amplitude it is a third of that change or more.
+- **Coupling.** Tol 1e-4 against 1e-5 (cold 1x' runs) changes u_y amplitude by 0.019 mm,
+  u_x mid by 0.003 mm, f by 0.0005 Hz, the drag mean by 0.08 N/m, the lift amplitude by 0.15
+  N/m: relative to D 0.38, 0.21, 0.02, 0.9 and 0.02. This is a sensitivity, not a bound
+  for the 1e-5 error (Astra). Mean IQN-ILS iterations per step 10.6 (2x', 4x') to 11.4
+  (1x'), 13-16 at dt 1e-3, 10.1 at dt 2.5e-4. Steps accepted above the tolerance
+  (`coupling_tolerance_audit.txt`): 1.2% at 1x', 0.34% at 2x', 0.35% at 4x' (none inside
+  the 4x' window; largest r1 4.5e-4 during the coupling start-up), 3.4% at 1x' dt 1e-3,
+  19.6% at 2x' dt 1e-3 (r1 up to 7.9e-4; that run is the noisiest member of the temporal
+  triplet), none at 2x' dt 2.5e-4. Median r1 at acceptance 6e-6 to 8e-6, r2 ~1e-7.
+- **Stationarity.** Over sliding windows from 4.5 s every run drifts by +0.010 to +0.017
+  mm/s in u_y amplitude and by at most 0.0015 mm/s in u_x (max+min)/2; the window-to-window
+  range is 0.006-0.009 mm (u_y amp) and 0.0006-0.0015 mm (u_x mid). The drift is the same
+  on every level, so the common window removes it from the differences to well below D;
+  the limit cycle itself is still growing by about 0.05% per second.
+- **Solid.** At fluid 1x', solid 2x -> 4x changes u_y amplitude by +0.20 mm, f by -0.032
+  Hz, the lift amplitude by -18.1 N/m and the drag amplitude by -1.26 N/m: the lift
+  amplitude change along the matched path is mostly a solid effect (as in the earlier
+  solid-only study: -9.7% then -3.0% for solid 2x/4x/8x at standard fluid 2x).
+
+Reading:
+
+- **Displacements.** u_y amplitude and u_x (max+min)/2 change by 1.55 and 0.22 mm from 1x'
+  to 2x' and by -0.05 and +0.013 mm (0.14%, 0.4%) from 2x' to 4x'. The second changes are
+  of the size of the temporal and coupling sensitivities, so the spatial order is
+  **unresolved**; the sequence is flat at the level of a few tenths of a percent. This is a
+  measured refinement sensitivity, not a bound on the remaining error (Astra). The
+  original tutorial-setup sequence (u_y amplitude 29.9/34.2/36.2 mm, order about 1) does not
+  bear on the order of this one; the 4x' values of the two agree to 0.2% in u_y amplitude.
+- **Frequency and lift amplitude** converge monotonically with resolved differences, at
+  observed orders 1.60 and 1.12 along the joint fluid-solid path. Conditional on a single
+  power law (r = 2, Fs = 1.25): f -> 5.461 Hz, GCI 0.27%; lift amplitude -> 156.6 N/m, GCI
+  6.1%. These are provisional; three monotone points do not establish the asymptotic range.
+- **Drag and lift means** change by +0.09 and +0.36 N/m from 2x' to 4x', of the size of
+  their temporal and coupling sensitivities: converged at that level, order not quoted.
+  The drag amplitude is non-monotone (+1.61, -0.57 N/m).
+- **Replay against coupled.** The replay load still moves at 8x' (Q_in -2.7%, lift phase
+  +4.6 degrees), while the coupled displacements are flat from 2x' to 4x'. The replay
+  prescribes one trajectory; it does not show how the coupled response reacts to that
+  correction, and no coupled 8x' level exists. W rising from 0.04 to 0.08 J/m at fixed
+  motion shows that the energy transfer is still sensitive at fine levels.
+- **Featflow** (compared only now that the sequence is characterised; Featflow itself is
+  uncertain by 3-5%): at 4x' u_y amplitude +3.2%, u_x (max+min)/2 +6.6%, u_x amplitude
+  +6.7%, f +0.2%, drag (max+min)/2 +0.2%, drag amplitude +7%, lift (max+min)/2 2.54 against
+  2.50, lift amplitude +7% (+1.7% for the provisional extrapolated value). The corrected
+  set-up and the refinement have **not closed** the displacement difference: it is the same
+  as in the tutorial-setup 4x run (+3.5% u_y), and our own sequence no longer moves towards
+  Featflow. This is a persistent difference between the tested solutions, not an
+  established continuum discrepancy or a bias of the method.
+
+Cost (xenosim, wall time x ranks, from `run.out`): 1x' runs 330, 2x' runs 1 080, 4x' 800,
+pilots, timing and the aborted tolerance 1e-6 starts about 110 core-hours.

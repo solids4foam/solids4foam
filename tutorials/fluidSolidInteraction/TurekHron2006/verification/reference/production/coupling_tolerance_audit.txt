@@ -1,0 +1,8 @@
+c_1x_dt1e-3_tol1e-5          tol 1e-05 steps 4000 above 136 (3.40%) max 3.1e-04 | t>=5.05: 951 above 33 max 3.1e-04
+c_1x_dt5e-4_tol1e-5          tol 1e-05 steps 7000 above 82 (1.17%) max 1.0e-04 | t>=5.05: 1901 above 21 max 7.7e-05
+c_1x_s4x_dt5e-4_tol1e-5      tol 1e-05 steps 8000 above 105 (1.31%) max 9.5e-05 | t>=5.05: 1901 above 33 max 9.5e-05
+c_2x_dt1e-3_tol1e-5          tol 1e-05 steps 4000 above 783 (19.57%) max 7.9e-04 | t>=5.05: 951 above 227 max 4.7e-04
+c_2x_dt5e-4_tol1e-5          tol 1e-05 steps 8000 above 27 (0.34%) max 2.6e-04 | t>=5.05: 1901 above 7 max 6.8e-05
+c_2x_dt2.5e-4_tol1e-5        tol 1e-05 steps 16000 above 0 (0.00%) max 0.0e+00 | t>=5.05: 3801 above 0 max 0.0e+00
+c_4x_dt5e-4_tol1e-5          tol 1e-05 steps 8000 above 28 (0.35%) max 4.5e-04 | t>=5.05: 1901 above 0 max 0.0e+00
+c_1x_dt5e-4_tol1e-4          tol 0.0001 steps 8000 above 0 (0.00%) max 0.0e+00 | t>=5.05: 1901 above 0 max 0.0e+00

@@ -1,0 +1,24 @@
+== /home/philipc/ht_prod/work/rb_4x_fastp_dt1.25e-4
+  t_end 26.217  Q_in 61.920  Q_quad 24.479  lift1 171.92  drag -23.959
+  t_end 26.398  Q_in 81.421  Q_quad 2.224  lift1 149.93  drag -23.137
+  t_end 26.579  Q_in 78.250  Q_quad -8.044  lift1 127.43  drag -22.146
+  t_end 26.760  Q_in 76.197  Q_quad -0.162  lift1 147.75  drag -19.412
+  t_end 26.941  Q_in 81.420  Q_quad 5.372  lift1 163.71  drag -17.979
+  t_end 27.122  Q_in 84.040  Q_quad 2.231  lift1 159.86  drag -18.303
+  t_end 27.303  Q_in 82.328  Q_quad -0.382  lift1 153.53  drag -18.699
+  t_end 27.484  Q_in 80.195  Q_quad 0.563  lift1 154.76  drag -18.551
+  t_end 27.665  Q_in 79.686  Q_quad 1.586  lift1 156.95  drag -18.489
+  t_end 27.846  Q_in 79.711  Q_quad 1.633  lift1 157.29  drag -18.386
+  t_end 28.027  Q_in 79.580  Q_quad 1.482  lift1 157.07  drag -18.311
+  t_end 28.209  Q_in 79.399  Q_quad 1.519  lift1 157.12  drag -18.255
+  t_end 28.390  Q_in 79.288  Q_quad 1.591  lift1 157.28  drag -18.251
+  t_end 28.571  Q_in 79.236  Q_quad 1.606  lift1 157.36  drag -18.267
+  t_end 28.752  Q_in 79.207  Q_quad 1.622  lift1 157.38  drag -18.265
+  t_end 28.933  Q_in 79.184  Q_quad 1.625  lift1 157.39  drag -18.255
+  t_end 29.114  Q_in 79.167  Q_quad 1.618  lift1 157.40  drag -18.249
+  t_end 29.295  Q_in 79.157  Q_quad 1.635  lift1 157.42  drag -18.249
+  t_end 29.476  Q_in 79.151  Q_quad 1.638  lift1 157.42  drag -18.249
+  t_end 29.657  Q_in 79.146  Q_quad 1.624  lift1 157.42  drag -18.247
+  t_end 29.838  Q_in 79.144  Q_quad 1.639  lift1 157.43  drag -18.248
+  t_end 30.019  Q_in 79.142  Q_quad 1.640  lift1 157.43  drag -18.247
+  t_end 30.200  Q_in 79.141  Q_quad 1.639  lift1 157.43  drag -18.247

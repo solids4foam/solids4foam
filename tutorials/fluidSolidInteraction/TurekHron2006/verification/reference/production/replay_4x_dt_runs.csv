@@ -1,0 +1,4 @@
+case,variants,dt,t_end,Q_in,Q_quad,Q_in_p,Q_quad_p,lift1_re,lift1_im,lift1_amp,drag_mean,dQ_in_dt,ddrag_dt
+rb_4x_fastp,"linear,dispLap,pwall,fastp",0.00025,30.2,79.2693,1.59585,76.8083,-0.883428,88.8562,129.706,157.223,-18.3159,-0.0177067,-0.00104123
+rb_4x_fastp_dt1.25e-4,"linear,dispLap,pwall,fastp",0.000125,30.2,79.141,1.63943,76.6866,-0.851255,88.5528,130.162,157.429,-18.2471,-0.0186811,0.00143165
+rb_8x_fastp_mlx,"linear,dispLap,pwall,fastp",0.000125,30.2,77.1624,1.90904,74.7336,-0.738146,79.8793,139.616,160.852,-17.457,-0.0160596,0.00375988
