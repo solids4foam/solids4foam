@@ -37,6 +37,9 @@ release. For complete commit-level details and contributor information, see the
   the momentum equation of both the segregated and PETSc SNES paths on
   OpenFOAM.com, with the same protected `fvOptionsSource()` hook as the linear
   geometry model for OpenFOAM.org and foam-extend.
+- The solid models page documents the `restart` switch: the fields it writes,
+  what happens when a run continues from a later time without it, and the
+  known restart limitations (#68).
 - A documentation page for each `mechanicalConstitutiveLaw`, next to its
   class, giving its entries and defaults, its state, its tangents, whether it
   supports the mixed displacement-pressure formulation, how it differs from
@@ -244,6 +247,11 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
+  `verification/work/` and `verification/postProcessing/` outputs of the
+  opt-in studies, which can take hours to produce; `./Allclean all` removes
+  them too, in a tutorial directory or in `tutorials/`. Each `verification/`
+  directory has an `Allclean` for its generated cases and results (#542).
 - Renamed the `fluidSolidInteraction/HronTurekFsi3` tutorial to
   `fluidSolidInteraction/HronTurek`, which now covers all three Turek-Hron
   benchmarks: `./Allrun fsi1`, `./Allrun fsi2` or `./Allrun fsi3` (the
@@ -473,6 +481,15 @@ release. For complete commit-level details and contributor information, see the
   caller to justify its shape. An external driver calling
   `solidModel::newDeltaT()` no longer compiles, and adaptive time stepping
   driven by material state will need a new interface rather than this one.
+- The `prevAcceleration_` field of the `movingWallPressure` boundary
+  condition, with its `prevAcceleration()` accessors, and the public virtual
+  `fluidSolidInterface::updateMovingWallPressureAcceleration()` that the
+  coupling interfaces called to set it, are removed (#377). The condition
+  takes the wall acceleration from `newMovingWallVelocity` and never read the
+  field, so results are unchanged; each outer iteration no longer interpolates
+  the solid interface acceleration only to discard it, and the log no longer
+  prints "Setting acceleration at fluid side of the interface". The
+  `elasticWallPressure` acceleration update is unaffected.
 - `vertexCentredNonLinTotalLagGeometry` is no longer compiled, on any fork. The
   solver does not currently run: no tutorial selected it, so nothing exercised
   it, an attempt to give it one failed inside the PETSc solve, and its
@@ -557,6 +574,26 @@ release. For complete commit-level details and contributor information, see the
   OpenFOAM v2412, the first SNES residual after a restart was up to 30 times
   that of the uninterrupted run, and a second restart was 17% off at the end
   time; the restarted runs are now bit-identical to the uninterrupted one.
+- Boundary conditions now write the settings they read, so a run restarted
+  from a written time uses the settings of the run it continues (#409).
+  `fixedTemperature` lost its `temperatureSeries`, so a restarted run held
+  the temperature at its value at the restart time.
+  `fixedDisplacement` lost `enforcePointPatchField`, `fixedRotation` (finite
+  volume and point) lost `nonOrthogonalCorrections`, and the point
+  `solidForce` condition lost the `region` of its `forceField`. In
+  foam-extend, `solidRigidContact` wrote its `triSurfaces` entries without
+  the `triSurfaces` keyword, so a case using it could not be restarted at
+  all; `solidContact` and `solidRigidContact` lost
+  `quickReject`; `solidContact` lost `integralNormalGap`, and its point
+  distance switches when it has more than one shadow patch;
+  `tractionPressureDisplacement` lost `blockCoupled` and `frozenTraction`;
+  and `simpleCohesiveZone` lost its separation distances, read
+  `oldSeparationDistance` into the current separation distance, and did not
+  read back the `initiationTraction` it wrote.
+- A case with a `fixedRotation` condition, such as `rigidRotation`, can now
+  be restarted with OpenFOAM.com (#409). The condition read its nonuniform
+  `value` a second time, which fails once the base class has read it, and
+  rejected the old-time fields, such as `D_0`, read on restart.
 
 ## [v2.4] - 2026-08-24
 
