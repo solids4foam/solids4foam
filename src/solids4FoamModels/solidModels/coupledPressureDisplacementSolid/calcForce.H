@@ -60,7 +60,7 @@ else
     surfaceVectorField nGradDDn = (nfnf & snGradDD);
 
     surfaceVectorField linearForceIncrement =
-        impKf_*fvc::snGrad(DD())*mesh().magSf()
+        impKf_*snGradDD*mesh().magSf()
       + impKf_*nGradDDn*mesh().magSf()
       + impKf_*tGradDDn_*mesh().magSf()
       - fvc::interpolate(nuCoeff_)*Dpf_*mesh().Sf();

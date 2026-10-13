@@ -17,6 +17,7 @@ License
 
 Function
     Foam::triangleWeights
+    Foam::triangleAreaNormal
 
 Description
     Barycentric weights of a point in a triangle, with a degeneracy test
@@ -30,6 +31,10 @@ Description
     a three-point average of the vertices and the face centre. Here the test
     is relative: the triangle is degenerate when the squared sine of the angle
     between its edges from point a is below SMALL.
+
+    triangleAreaNormal returns the area-weighted normal of a triangle on every
+    OpenFOAM version: triangle::normal() is the unit normal in OpenFOAM.org
+    but the area normal in OpenFOAM.com and foam-extend.
 
 SourceFiles
     triangleWeights.H
@@ -46,6 +51,13 @@ SourceFiles
 
 namespace Foam
 {
+
+//- Area-weighted normal of the triangle t
+inline vector triangleAreaNormal(const triPointRef& t)
+{
+    return 0.5*((t.b() - t.a())^(t.c() - t.a()));
+}
+
 
 //- Barycentric weights (of a, b and c) of the point p in the triangle t
 inline FixedList<scalar, 3> triangleWeights
