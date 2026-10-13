@@ -1582,6 +1582,8 @@ Foam::solidModel::solidModel
                    [solidModel::solutionAlgorithm::PETSC_SNES]
                 << abort(FatalError);
         }
+
+        leastSquaresScheme::checkMeshSupported(mesh());
     }
 
     // Print out the relaxation factor

@@ -559,6 +559,11 @@ release. For complete commit-level details and contributor information, see the
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
   the base coupling class.
+- The high-order least-squares reconstruction now rejects axisymmetric
+  (wedge) meshes when the solid model is constructed, with an error that
+  names the limitation, instead of stopping later with the misleading
+  "Empty direction should be vector::Z" (#512). Wedge meshes are still not
+  supported; planar 2-D meshes in the x-y plane and 3-D meshes are.
 - The fluid models register their velocity and pressure gradients as
   `grad(U)` and `grad(p)`, the names the gradient cache uses, so a case that
   caches them, e.g. `cache { grad(U); }` in `fvSolution`, used the fluid model
