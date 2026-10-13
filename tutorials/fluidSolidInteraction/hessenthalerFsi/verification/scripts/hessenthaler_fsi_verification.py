@@ -515,6 +515,26 @@ def settling_estimate(rows: list[list[float]], column: int, end_time: float,
             "uncertainty": max(drift, 2.0 * se if math.isfinite(se) else 0.0)}
 
 
+def adopt_restart_monitor_files(case: Path) -> None:
+    """Use the monitor files of a restart from the time of an earlier write.
+
+    A restart from time t0 reuses postProcessing/.../t0/. The forces and
+    surfaceFieldValue objects then write X_t0.dat beside the interrupted
+    run's X.dat (the solids4foam monitors and probes append instead).
+    Keep the interrupted file as X.dat.killed and give the restarted one
+    the standard name.
+    """
+    for path in (case / "postProcessing").rglob("*.dat"):
+        directory, stem = path.parent, path.stem
+        suffix = f"_{directory.name}"
+        if not stem.endswith(suffix):
+            continue
+        original = directory / f"{stem[:-len(suffix)]}.dat"
+        if original.exists():
+            original.rename(original.with_name(original.name + ".killed"))
+        path.rename(original)
+
+
 def segment_write_interval(start: float, end: float,
                            longest: float = 5.0) -> float:
     """Largest write interval <= longest that divides end - start."""
@@ -1624,6 +1644,7 @@ def run_coupled(args: argparse.Namespace) -> bool:
         print(f"Restarting {name} on {cores} ranks", flush=True)
         run(mpirun(cores, ["solids4Foam"]), case, "log.solids4Foam")
         vmod.check_solver_log(case, name)
+        adopt_restart_monitor_files(case)
         (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2)
                                           + "\n")
     elif args.evaluate_only:
