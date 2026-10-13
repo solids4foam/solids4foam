@@ -19,43 +19,14 @@ Class
     solidSpringDashpotFvPatchVectorField
 
 Description
-    Spring-dashpot (Robin) traction condition for solid solvers, as used to
-    model the pericardium and the tissue above the base in cardiac mechanics
-    benchmarks (e.g. Arostica et al. 2025, eq. 1).
+    Spring-dashpot (Robin) boundary condition for solid solvers, with
+    separate normal and tangential stiffness and damping coefficients.
+    The spring and dashpot are treated implicitly through solidDirectionMixed.
 
-    The nominal traction (per unit undeformed area) is
+    Optionally, the coefficients are scaled by a weight volScalarField.
 
-        P.N = -(alpha u + beta du/dt)                    (normalOnly no)
-        P.N = -(alpha u.N + beta du/dt.N) N              (normalOnly yes)
-
-    where N is the reference unit normal, alpha the spring stiffness [Pa/m]
-    and beta the dashpot coefficient [Pa s/m]. With normalOnly the tangential
-    traction is zero.
-
-    It is a solidTraction condition whose traction is recomputed from the
-    displacement every time the coefficients are updated, so that the
-    residual a PETSc SNES solid model evaluates is a consistent function of
-    the unknowns. The boundary displacement is extrapolated from the adjacent
-    cell, using grad(D), in the same way as the SNES path evaluates traction
-    boundaries; the velocity is a backward difference over the time step.
-
-    useUndeformedArea is always on, because the traction is nominal.
-
-Usage
-    \verbatim
-    epi
-    {
-        type            solidSpringDashpot;
-        stiffness       1e8;     // alpha [Pa/m]
-        damping         5e3;     // beta  [Pa s/m]
-        normalOnly      yes;
-        value           uniform (0 0 0);
-    }
-    \endverbatim
-
-    A pressure may be added as for solidTraction (pressure, pressureSeries or
-    pressureField). traction, tractionSeries and tractionField are not
-    allowed: the traction is what this condition computes.
+Author
+    Simao Nieto de Castro, UCD.
 
 SourceFiles
     solidSpringDashpotFvPatchVectorField.C
@@ -65,7 +36,8 @@ SourceFiles
 #ifndef solidSpringDashpotFvPatchVectorField_H
 #define solidSpringDashpotFvPatchVectorField_H
 
-#include "solidTractionFvPatchVectorField.H"
+#include "fvPatchFields.H"
+#include "solidDirectionMixedFvPatchVectorField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -73,35 +45,32 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-            Class solidSpringDashpotFvPatchVectorField Declaration
+                 Class solidSpringDashpotFvPatchVectorField Declaration
 \*---------------------------------------------------------------------------*/
 
 class solidSpringDashpotFvPatchVectorField
 :
-    public solidTractionFvPatchVectorField
+    public solidDirectionMixedFvPatchVectorField
 {
+    // Private data
 
-    // Private Data
+        //- Normal spring stiffness per unit reference area [Pa/m]
+        scalarField kNormal_;
 
-        //- Spring stiffness alpha [Pa/m]
-        scalar stiffness_;
+        //- Tangential spring stiffness per unit reference area [Pa/m]
+        scalarField kTangential_;
 
-        //- Dashpot coefficient beta [Pa s/m]
-        scalar damping_;
+        //- Normal dashpot coefficient per unit reference area [Pa s/m]
+        scalarField cNormal_;
 
-        //- Act in the normal direction only
-        Switch normalOnly_;
+        //- Tangential dashpot coefficient per unit reference area [Pa s/m]
+        scalarField cTangential_;
 
+        //- Additional traction per unit current area [Pa]
+        vectorField traction_;
 
-    // Private Member Functions
-
-        //- The dictionary handed to solidTraction: a zero traction, which is
-        //  replaced on every update, and useUndeformedArea on
-        static dictionary tractionDict(const dictionary& dict);
-
-        //- Boundary displacement extrapolated from the adjacent cells
-        tmp<vectorField> extrapolatedDisplacement() const;
-
+        //- Additional pressure [Pa]
+        scalarField pressure_;
 
 public:
 
@@ -126,8 +95,8 @@ public:
             const dictionary&
         );
 
-        //- Construct by mapping given
-        //  solidSpringDashpotFvPatchVectorField onto a new patch
+        //- Construct by mapping given solidSpringDashpotFvPatchVectorField
+        //  onto a new patch
         solidSpringDashpotFvPatchVectorField
         (
             const solidSpringDashpotFvPatchVectorField&,
@@ -136,15 +105,13 @@ public:
             const fvPatchFieldMapper&
         );
 
+#if defined(OPENFOAM_ORG) || (OPENFOAM >= 2606)
         //- Construct as copy
         solidSpringDashpotFvPatchVectorField
         (
             const solidSpringDashpotFvPatchVectorField&
-#ifdef OPENFOAM_ORG
         ) = delete;
 #else
-        );
-
         //- Construct and return a clone
         virtual tmp<fvPatchVectorField> clone() const
         {
@@ -163,22 +130,62 @@ public:
         );
 
         //- Construct and return a clone setting internal field reference
-        virtual tmp<fvPatchVectorField> clone
+        virtual tmp<fvPatchField<vector> > clone
         (
             const DimensionedField<vector, volMesh>& iF
         ) const
         {
-            return tmp<fvPatchVectorField>
+            return tmp<fvPatchField<vector> >
             (
                 new solidSpringDashpotFvPatchVectorField(*this, iF)
             );
         }
 
+    // Destructor
+
+        virtual ~solidSpringDashpotFvPatchVectorField()
+        {}
+
 
     // Member functions
 
-        //- Update the coefficients associated with the patch field
-        virtual void updateCoeffs();
+        // Access
+
+            //- Spring-dashpot traction per unit current area from the current
+            //  boundary value, for solid models that impose boundary tractions
+            //  directly; nPressure is the normal for the pressure and
+            //  areaRatio the reference-to-current face area ratio
+            tmp<vectorField> springDashpotTraction
+            (
+                const vectorField& nPressure,
+                const scalarField& areaRatio
+            ) const;
+
+        // Mapping functions
+
+            //- Map (and resize as needed) from self given a mapping object
+            virtual void autoMap
+            (
+                const fvPatchFieldMapper&
+            );
+
+            //- Reverse map the given fvPatchField onto this fvPatchField
+            virtual void rmap
+            (
+                const fvPatchField<vector>&,
+                const labelList&
+            );
+
+
+        // Evaluation functions
+
+            //- Update the coefficients associated with the patch field
+            virtual void updateCoeffs();
+
+            //- Diagonal of the valueFraction, used for the implicit matrix
+            //  coefficient (the base class returns its square root)
+            virtual tmp<Field<vector> > snGradTransformDiag() const;
+
 
         //- Write
         virtual void write(Ostream&) const;

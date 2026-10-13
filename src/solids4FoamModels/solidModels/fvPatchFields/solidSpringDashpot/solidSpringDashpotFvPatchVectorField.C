@@ -19,139 +19,202 @@ License
 
 #include "solidSpringDashpotFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
+#include "transformField.H"
 #include "volFields.H"
+#include "lookupSolidModel.H"
+#include "linGeomTotalDispSolid.H"
+#include "nonLinGeomTotalLagTotalDispSolid.H"
+#include "compatibilityFunctions.H"
 #include "IStringStream.H"
-#include "patchCorrectionVectors.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * Local Functions  * * * * * * * * * * * * * //
 
-dictionary solidSpringDashpotFvPatchVectorField::tractionDict
-(
-    const dictionary& dict
-)
+namespace
 {
-    if (dict.found("tractionSeries") || dict.found("tractionField"))
-    {
-        FatalIOErrorInFunction(dict)
-            << "tractionSeries and tractionField are not allowed for a "
-            << typeName << " condition: the traction is what it computes."
-            << exit(FatalIOError);
-    }
 
-    dictionary d(dict);
-
-    // A written field carries the last computed traction; it is recomputed
-    // anyway, so it is discarded rather than refused, which keeps restarts
-    // and decomposed cases working
-    d.remove("traction");
-    d.remove("useUndeformedArea");
-
-    string extra("traction uniform (0 0 0); useUndeformedArea yes;");
-
-    if
+// Dictionary for the base class, which requires refValue, refGradient and
+// valueFraction; they are set in updateCoeffs here
+dictionary baseDict(const dictionary& dict)
+{
+    dictionary d
     (
-        !d.found("pressure")
-     && !d.found("pressureSeries")
-     && !d.found("pressureField")
-    )
-    {
-        extra += " pressure uniform 0;";
-    }
-
-    IStringStream is(extra);
-    d.merge(dictionary(is));
+        IStringStream
+        (
+            "refValue uniform (0 0 0);"
+            "refGradient uniform (0 0 0);"
+            "valueFraction uniform (0 0 0 0 0 0);"
+        )()
+    );
+    d.merge(dict);
 
     return d;
 }
 
-
-tmp<vectorField>
-solidSpringDashpotFvPatchVectorField::extrapolatedDisplacement() const
-{
-    const fvMesh& mesh = patch().boundaryMesh().mesh();
-
-#ifdef OPENFOAM_NOT_EXTEND
-    const word gradName("grad(" + internalField().name() + ")");
-#else
-    const word gradName("grad(" + dimensionedInternalField().name() + ")");
-#endif
-
-    tmp<vectorField> tDb(new vectorField(patchInternalField()));
-
-    // Before the solid model has created its gradient, e.g. while the fields
-    // are being read, the cell value is the best available
-    if (mesh.foundObject<volTensorField>(gradName))
-    {
-        const fvPatchField<tensor>& gradField =
-            patch().lookupPatchField<volTensorField, tensor>(gradName);
-
-        const tensorField gradP(gradField.patchInternalField());
-        const vectorField n(patch().nf());
-        const vectorField k(patchCorrectionVectors(patch()));
-
-        // Same extrapolation as solidTraction with extrapolateValue, which
-        // the PETSc SNES solid models switch on for traction boundaries
-#ifdef OPENFOAM_NOT_EXTEND
-        tDb.ref() +=
-#else
-        tDb() +=
-#endif
-            (k & gradP) + (n & gradP)/patch().deltaCoeffs();
-    }
-
-    return tDb;
-}
+} // End anonymous namespace
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-solidSpringDashpotFvPatchVectorField::
-solidSpringDashpotFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    solidTractionFvPatchVectorField(p, iF),
-    stiffness_(0),
-    damping_(0),
-    normalOnly_(false)
+    solidDirectionMixedFvPatchVectorField(p, iF),
+    kNormal_(p.size(), 0.0),
+    kTangential_(p.size(), 0.0),
+    cNormal_(p.size(), 0.0),
+    cTangential_(p.size(), 0.0),
+    traction_(p.size(), vector::zero),
+    pressure_(p.size(), 0.0)
 {}
 
 
-solidSpringDashpotFvPatchVectorField::
-solidSpringDashpotFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
     const dictionary& dict
 )
 :
-    solidTractionFvPatchVectorField(p, iF, tractionDict(dict)),
-    stiffness_(readScalar(dict.lookup("stiffness"))),
-    damping_(dict.lookupOrDefault<scalar>("damping", 0.0)),
-    normalOnly_(dict.lookupOrDefault<Switch>("normalOnly", false))
+    solidDirectionMixedFvPatchVectorField(p, iF, baseDict(dict)),
+    kNormal_("kNormal", dict, p.size()),
+    kTangential_(p.size(), 0.0),
+    cNormal_(p.size(), 0.0),
+    cTangential_(p.size(), 0.0),
+    traction_(p.size(), vector::zero),
+    pressure_(p.size(), 0.0)
 {
-    if (stiffness_ < 0 || damping_ < 0)
+    Info<< "Creating " << type() << " boundary condition" << endl;
+
+    // valueFraction below assumes the first-order boundary value
+    if (dict.lookupOrDefault<Switch>("secondOrder", false))
     {
-        FatalIOErrorInFunction(dict)
-            << "stiffness and damping must not be negative."
+        FatalIOErrorIn
+        (
+            "solidSpringDashpotFvPatchVectorField::"
+            "solidSpringDashpotFvPatchVectorField(...)",
+            dict
+        )   << "secondOrder is not supported on patch " << patch().name()
             << exit(FatalIOError);
     }
 
-    Info<< "    spring-dashpot: stiffness = " << stiffness_
-        << " Pa/m, damping = " << damping_ << " Pa s/m"
-        << (normalOnly_ ? ", normal direction only" : "") << endl;
+    if (dict.found("kTangential"))
+    {
+        kTangential_ = scalarField("kTangential", dict, p.size());
+    }
+
+    if (dict.found("cNormal"))
+    {
+        cNormal_ = scalarField("cNormal", dict, p.size());
+    }
+
+    if (dict.found("cTangential"))
+    {
+        cTangential_ = scalarField("cTangential", dict, p.size());
+    }
+
+    if (dict.found("traction"))
+    {
+        traction_ = vectorField("traction", dict, p.size());
+    }
+
+    if (dict.found("pressure"))
+    {
+        pressure_ = scalarField("pressure", dict, p.size());
+    }
+
+    if (dict.found("weightField"))
+    {
+        const fvMesh& mesh = patch().boundaryMesh().mesh();
+
+        const volScalarField weight
+        (
+            IOobject
+            (
+                word(dict.lookup("weightField")),
+                mesh.time().timeName(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh
+        );
+
+        Info<< "    coefficients weighted by " << weight.name() << endl;
+
+        const scalarField& w = weight.boundaryField()[patch().index()];
+
+        kNormal_ *= w;
+        kTangential_ *= w;
+        cNormal_ *= w;
+        cTangential_ *= w;
+    }
+
+    if
+    (
+        gMin(kNormal_) < 0 || gMin(kTangential_) < 0
+     || gMin(cNormal_) < 0 || gMin(cTangential_) < 0
+    )
+    {
+        FatalErrorIn
+        (
+            "solidSpringDashpotFvPatchVectorField::"
+            "solidSpringDashpotFvPatchVectorField(...)"
+        )   << "Spring and dashpot coefficients must be non-negative on patch "
+            << patch().name() << exit(FatalError);
+    }
+
+    // The dashpot velocity is (D - D.oldTime())/deltaT, so deltaT must be a
+    // physical time step
+    const word d2dt2Scheme
+    (
+        d2dt2SchemeCompat
+        (
+            patch().boundaryMesh().mesh(),
+            "d2dt2(" + internalFieldName(*this) + ")"
+        )
+    );
+
+    if
+    (
+        (gMax(cNormal_) > 0 || gMax(cTangential_) > 0)
+     && d2dt2Scheme == "steadyState"
+    )
+    {
+        WarningIn
+        (
+            "solidSpringDashpotFvPatchVectorField::"
+            "solidSpringDashpotFvPatchVectorField(...)"
+        )   << "Patch " << patch().name() << ": the dashpot uses "
+            << "(D - D.oldTime())/deltaT, which is a physical velocity only "
+            << "if deltaT is a physical time step. Set cNormal and "
+            << "cTangential to 0 for pseudo-time load stepping." << endl;
+    }
+
+    refValue() = vector::zero;
+    refGrad() = vector::zero;
+    valueFraction() = symmTensor::zero;
+
+    if (dict.found("value"))
+    {
+        Field<vector>::operator=(vectorField("value", dict, p.size()));
+    }
+    else
+    {
+        Field<vector>::operator=(patchInternalField());
+    }
 }
 
 
-solidSpringDashpotFvPatchVectorField::
-solidSpringDashpotFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
     const solidSpringDashpotFvPatchVectorField& pvf,
     const fvPatch& p,
@@ -159,102 +222,255 @@ solidSpringDashpotFvPatchVectorField
     const fvPatchFieldMapper& mapper
 )
 :
-    solidTractionFvPatchVectorField(pvf, p, iF, mapper),
-    stiffness_(pvf.stiffness_),
-    damping_(pvf.damping_),
-    normalOnly_(pvf.normalOnly_)
-{}
-
-
-#ifndef OPENFOAM_ORG
-solidSpringDashpotFvPatchVectorField::
-solidSpringDashpotFvPatchVectorField
-(
-    const solidSpringDashpotFvPatchVectorField& pvf
-)
-:
-    solidTractionFvPatchVectorField(pvf),
-    stiffness_(pvf.stiffness_),
-    damping_(pvf.damping_),
-    normalOnly_(pvf.normalOnly_)
-{}
+    solidDirectionMixedFvPatchVectorField(pvf, p, iF, mapper),
+#ifdef OPENFOAM_ORG
+    kNormal_(mapper(pvf.kNormal_)),
+    kTangential_(mapper(pvf.kTangential_)),
+    cNormal_(mapper(pvf.cNormal_)),
+    cTangential_(mapper(pvf.cTangential_)),
+    traction_(mapper(pvf.traction_)),
+    pressure_(mapper(pvf.pressure_))
+#else
+    kNormal_(pvf.kNormal_, mapper),
+    kTangential_(pvf.kTangential_, mapper),
+    cNormal_(pvf.cNormal_, mapper),
+    cTangential_(pvf.cTangential_, mapper),
+    traction_(pvf.traction_, mapper),
+    pressure_(pvf.pressure_, mapper)
 #endif
+{}
 
 
-solidSpringDashpotFvPatchVectorField::
-solidSpringDashpotFvPatchVectorField
+solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 (
     const solidSpringDashpotFvPatchVectorField& pvf,
     const DimensionedField<vector, volMesh>& iF
 )
 :
-    solidTractionFvPatchVectorField(pvf, iF),
-    stiffness_(pvf.stiffness_),
-    damping_(pvf.damping_),
-    normalOnly_(pvf.normalOnly_)
+    solidDirectionMixedFvPatchVectorField(pvf, iF),
+    kNormal_(pvf.kNormal_),
+    kTangential_(pvf.kTangential_),
+    cNormal_(pvf.cNormal_),
+    cTangential_(pvf.cTangential_),
+    traction_(pvf.traction_),
+    pressure_(pvf.pressure_)
 {}
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
+(
+    const vectorField& nPressure,
+    const scalarField& areaRatio
+) const
+{
+    const vectorField n(patch().nf());
+    const symmTensorField nn(sqr(n));
+    const scalar rDeltaT = 1.0/db().time().deltaTValue();
+
+    const vectorField& DP = *this;
+    const volVectorField& Dold =
+        db().lookupObject<volVectorField>(internalFieldName(*this)).oldTime();
+    const vectorField& DoldP = Dold.boundaryField()[patch().index()];
+
+    return tmp<vectorField>
+    (
+        new vectorField
+        (
+            traction_ - nPressure*pressure_
+          - areaRatio
+           *(
+                ((kNormal_*nn + kTangential_*(I - nn)) & DP)
+              + rDeltaT*((cNormal_*nn + cTangential_*(I - nn)) & (DP - DoldP))
+            )
+        )
+    );
+}
+
+
+void solidSpringDashpotFvPatchVectorField::autoMap
+(
+    const fvPatchFieldMapper& m
+)
+{
+    solidDirectionMixedFvPatchVectorField::autoMap(m);
+
+#ifdef OPENFOAM_ORG
+    m(kNormal_, kNormal_);
+    m(kTangential_, kTangential_);
+    m(cNormal_, cNormal_);
+    m(cTangential_, cTangential_);
+    m(traction_, traction_);
+    m(pressure_, pressure_);
+#else
+    kNormal_.autoMap(m);
+    kTangential_.autoMap(m);
+    cNormal_.autoMap(m);
+    cTangential_.autoMap(m);
+    traction_.autoMap(m);
+    pressure_.autoMap(m);
+#endif
+}
+
+
+void solidSpringDashpotFvPatchVectorField::rmap
+(
+    const fvPatchField<vector>& pvf,
+    const labelList& addr
+)
+{
+    solidDirectionMixedFvPatchVectorField::rmap(pvf, addr);
+
+    const solidSpringDashpotFvPatchVectorField& rpvf =
+        refCast<const solidSpringDashpotFvPatchVectorField>(pvf);
+
+    kNormal_.rmap(rpvf.kNormal_, addr);
+    kTangential_.rmap(rpvf.kTangential_, addr);
+    cNormal_.rmap(rpvf.cNormal_, addr);
+    cTangential_.rmap(rpvf.cTangential_, addr);
+    traction_.rmap(rpvf.traction_, addr);
+    pressure_.rmap(rpvf.pressure_, addr);
+}
+
+
 void solidSpringDashpotFvPatchVectorField::updateCoeffs()
 {
-    if (updated())
+    if (this->updated())
     {
         return;
     }
 
-    // Current and old-time boundary displacement
-    const vectorField Db(extrapolatedDisplacement());
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
 
-    const volVectorField& D =
-        db().lookupObject<volVectorField>
-        (
-#ifdef OPENFOAM_NOT_EXTEND
-            internalField().name()
-#else
-            dimensionedInternalField().name()
-#endif
-        );
-
-    const vectorField& Db0 = D.oldTime().boundaryField()[patch().index()];
-
-    const scalar dt = db().time().deltaTValue();
-
-    // Velocity by a backward difference; zero before the first time step
-    vectorField Ub(Db.size(), vector::zero);
-    if (dt > VSMALL && damping_ > 0)
+    // Only these solid models impose the spring-dashpot traction on the
+    // boundary faces (enforceTractionBoundaries); in other models the
+    // condition would be silently ignored or act on the wrong field
+    if
+    (
+        !isA<solidModels::linGeomTotalDispSolid>(solMod)
+     && !isA<solidModels::nonLinGeomTotalLagTotalDispSolid>(solMod)
+    )
     {
-        Ub = (Db - Db0)/dt;
+        FatalErrorIn("solidSpringDashpotFvPatchVectorField::updateCoeffs()")
+            << "solidSpringDashpot is supported only by the "
+            << solidModels::linGeomTotalDispSolid::typeName << " and "
+            << solidModels::nonLinGeomTotalLagTotalDispSolid::typeName
+            << " solid models, not by " << solMod.type() << " (patch "
+            << patch().name() << ")" << exit(FatalError);
     }
 
-    // Nominal traction of the spring and dashpot
-    if (normalOnly_)
+    // The high-order residual has no quadrature treatment of this condition,
+    // and the high-order Jacobian assembles it as a fixed-value patch
+    // (directionMixed::fixesValue() is true)
+    if (solMod.highOrderResidual() || solMod.highOrderJacobian())
     {
-        const vectorField N(patch().nf());
-
-        traction() = -N*(stiffness_*(N & Db) + damping_*(N & Ub));
+        FatalErrorIn("solidSpringDashpotFvPatchVectorField::updateCoeffs()")
+            << "solidSpringDashpot does not support the high-order residual "
+            << "or Jacobian of the PETSc SNES algorithm (patch "
+            << patch().name() << ")" << exit(FatalError);
     }
-    else
+
+    // Reference unit normal (mesh is not moved)
+    const vectorField n(patch().nf());
+    const symmTensorField nn(sqr(n));
+
+    // Reference-to-current area ratio, as K and C act per reference area
+    scalarField areaRatio(patch().size(), 1.0);
+
+    if (solMod.nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
-        traction() = -(stiffness_*Db + damping_*Ub);
+        const tensorField& Finv =
+            patch().lookupPatchField<volTensorField, tensor>("Finv");
+        const scalarField& J =
+            patch().lookupPatchField<volScalarField, scalar>("J");
+
+        areaRatio = patch().magSf()/mag(J*Finv.T() & patch().Sf());
     }
 
-    // solidTraction applies it, together with any pressure
-    solidTractionFvPatchVectorField::updateCoeffs();
+    const scalar rDeltaT = 1.0/db().time().deltaTValue();
+
+    // Old-time patch displacement
+    const volVectorField& Dold =
+        db().lookupObject<volVectorField>(internalFieldName(*this)).oldTime();
+    const vectorField& DoldP = Dold.boundaryField()[patch().index()];
+
+    // Explicit part of the dashpot traction, with dD/dt = (D - Dold)/dt
+    const vectorField tractionExp
+    (
+        traction_
+      + rDeltaT*areaRatio*((cNormal_*nn + cTangential_*(I - nn)) & DoldP)
+    );
+
+    const scalarField kEffNormal
+    (
+        areaRatio*(kNormal_ + rDeltaT*cNormal_)
+    );
+    const scalarField kEffTangential
+    (
+        areaRatio*(kTangential_ + rDeltaT*cTangential_)
+    );
+
+    // Gradient for the explicit traction
+    refGrad() =
+        solMod.tractionBoundarySnGrad(tractionExp, pressure_, patch());
+
+    // 1/impK, as tractionBoundarySnGrad is affine in the traction
+    const scalarField rImpK
+    (
+        n
+      & (
+            solMod.tractionBoundarySnGrad(tractionExp + n, pressure_, patch())
+          - refGrad()
+        )
+    );
+
+    // Implicit spring-dashpot: valueFraction = Keff/(Keff + impK*deltaCoeffs)
+    const scalarField& deltaCoeffs = patch().deltaCoeffs();
+
+    valueFraction() =
+        kEffNormal*rImpK/(kEffNormal*rImpK + deltaCoeffs)*nn
+      + kEffTangential*rImpK/(kEffTangential*rImpK + deltaCoeffs)*(I - nn);
+
+    refValue() = vector::zero;
+
+    solidDirectionMixedFvPatchVectorField::updateCoeffs();
+}
+
+
+tmp<Field<vector> >
+solidSpringDashpotFvPatchVectorField::snGradTransformDiag() const
+{
+    const symmTensorField& f = valueFraction();
+
+    vectorField diag(f.size());
+    diag.replace(vector::X, f.component(symmTensor::XX));
+    diag.replace(vector::Y, f.component(symmTensor::YY));
+    diag.replace(vector::Z, f.component(symmTensor::ZZ));
+
+    return tmp<Field<vector> >(new vectorField(diag));
 }
 
 
 void solidSpringDashpotFvPatchVectorField::write(Ostream& os) const
 {
-    solidTractionFvPatchVectorField::write(os);
+#ifdef OPENFOAM_ORG
+    writeEntry(os, "kNormal", kNormal_);
+    writeEntry(os, "kTangential", kTangential_);
+    writeEntry(os, "cNormal", cNormal_);
+    writeEntry(os, "cTangential", cTangential_);
+    writeEntry(os, "traction", traction_);
+    writeEntry(os, "pressure", pressure_);
+#else
+    kNormal_.writeEntry("kNormal", os);
+    kTangential_.writeEntry("kTangential", os);
+    cNormal_.writeEntry("cNormal", os);
+    cTangential_.writeEntry("cTangential", os);
+    traction_.writeEntry("traction", os);
+    pressure_.writeEntry("pressure", os);
+#endif
 
-    os.writeKeyword("stiffness")
-        << stiffness_ << token::END_STATEMENT << nl;
-    os.writeKeyword("damping")
-        << damping_ << token::END_STATEMENT << nl;
-    os.writeKeyword("normalOnly")
-        << normalOnly_ << token::END_STATEMENT << nl;
+    solidDirectionMixedFvPatchVectorField::write(os);
 }
 
 

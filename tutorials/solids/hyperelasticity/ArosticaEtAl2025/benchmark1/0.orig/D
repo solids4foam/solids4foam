@@ -27,9 +27,10 @@ boundaryField
     base
     {
         type            solidSpringDashpot;
-        stiffness       1e5;    // alpha_top [Pa/m], Table 1
-        damping         5e3;    // beta_top  [Pa s/m], Table 1
-        normalOnly      no;
+        kNormal         uniform 1e5;    // alpha_top [Pa/m], Table 1
+        kTangential     uniform 1e5;
+        cNormal         uniform 5e3;    // beta_top  [Pa s/m], Table 1
+        cTangential     uniform 5e3;
         value           uniform (0 0 0);
     }
 
@@ -38,9 +39,10 @@ boundaryField
     epi
     {
         type            solidSpringDashpot;
-        stiffness       1e8;    // alpha_epi [Pa/m], Table 1
-        damping         5e3;    // beta_epi  [Pa s/m], Table 1
-        normalOnly      yes;
+        kNormal         uniform 1e8;    // alpha_epi [Pa/m], Table 1
+        kTangential     uniform 0;
+        cNormal         uniform 5e3;    // beta_epi  [Pa s/m], Table 1
+        cTangential     uniform 0;
         value           uniform (0 0 0);
     }
 

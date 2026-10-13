@@ -133,14 +133,15 @@ written every step by two `solidPointDisplacement` function objects.
 - `viscoActiveHolzapfelOgden`
   (`src/solids4FoamModels/mechanicalConstitutiveLaw/mechanicalConstitutiveLaws`):
   the material law.
-- `solidSpringDashpot` (`src/solids4FoamModels/solidModels/fvPatchFields`): a
-  Robin traction condition, a `solidTraction` whose nominal traction is
-  −(α u + β u̇), optionally projected on the reference normal.
+- `solidSpringDashpot` (`src/solids4FoamModels/solidModels/fvPatchFields`):
+  the spring-dashpot (Robin) condition, nominal traction
+  −(K u + C u̇) with separate normal and tangential coefficients. Here
+  `kNormal = kTangential = α` and `cNormal = cTangential = β` on `base`,
+  and `kTangential = cTangential = 0` on `epi` (normal only).
 - `setEllipsoidFibreField` (`applications/utilities`): t̄, f0, s0 and n0 for
   the ellipsoid.
 
-Rebuild after pulling them in: `./Allwmake` at the top of the repository
-(the two sources are listed in `src/solids4FoamModels/Make/files.openfoam`).
+Rebuild after pulling them in: `./Allwmake` at the top of the repository.
 
 ## Running the Case
 

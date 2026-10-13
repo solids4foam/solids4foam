@@ -19,11 +19,21 @@ release. For complete commit-level details and contributor information, see the
   viscous term and a tabulated active stress along the fibres. It returns its
   volumetric penalty separately, so it can be used with the mixed
   displacement-pressure formulation.
-- The `solidSpringDashpot` boundary condition: a `solidTraction` whose
-  nominal traction is that of a spring and dashpot, in all directions or
-  normal to the reference surface only (pericardium-type Robin conditions).
 - The `setEllipsoidFibreField` utility: the transmural coordinate and the
   fibre, sheet and sheet-normal fields of a truncated ellipsoid.
+- `solidSpringDashpot`, a spring-dashpot (Robin) displacement boundary
+  condition for elastic supports such as the pericardium or perivascular
+  tissue: the traction is proportional to the displacement and the velocity,
+  with separate normal and tangential coefficients that act per unit
+  reference area. The spring and dashpot are implicit, through
+  `solidDirectionMixed` with the exact matrix diagonal, and the linear-geometry
+  and total Lagrangian total-displacement models impose the spring-dashpot
+  traction on the boundary faces, including in their PETSc SNES residuals.
+  The coefficients can be scaled by a weight field. Its README gives the
+  formulation, literature values and verification, and the
+  `springSupportedBar` tutorial checks it against exact solutions. The
+  `cerebralAneurysm` tutorial now uses it to represent the brain tissue and
+  cerebrospinal fluid around the arterial wall.
 - Added the `BDF` d2dt2 scheme, `default BDF 3;` in `d2dt2Schemes`, which
   applies the backward differentiation formula of order 1 to 6 twice, as the
   `backward` d2dt2 scheme applies BDF2. It requires a constant time-step, and
