@@ -532,6 +532,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
+  cell whose face stencil does not span three directions, for example a
+  corner cell bounded by traction patches, the tensor's determinant can round
+  to exactly zero, and the division then raised a floating point exception
+  on foam-extend, where it stopped the `sphericalCavity` regression test on
+  CI (#417). The inverse is not used in such cells, which take the wider
+  point-cell stencil. A cell whose stencil is still rank-deficient after
+  widening now gets the pseudo-inverse of its tensor, which reproduces a
+  linear field in the directions the stencil spans and gives zero along the
+  others, and a cell with no admissible stencil at all is a fatal error.
+  `sphericalCavity` now runs and is regression tested on foam-extend.
 - On OpenFOAM.com, the PETSc SNES residuals of
   `linearGeometryTotalDisplacement` and
   `nonLinearGeometryTotalLagrangianTotalDisplacement` now include the implicit
