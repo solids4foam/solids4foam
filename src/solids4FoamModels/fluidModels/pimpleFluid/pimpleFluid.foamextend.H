@@ -118,6 +118,9 @@ class pimpleFluid
         //- Correct phi after solving pressure equation
         void correctRobinFsiInterfaceFlux();
 
+        //- Return the temporal consistency (ddtCorr) flux correction
+        tmp<surfaceScalarField> ddtConsistentPhiCorr() const;
+
         //- Solve energy equation if requred
         void solveEnergyEq();
 

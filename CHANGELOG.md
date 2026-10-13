@@ -542,6 +542,17 @@ release. For complete commit-level details and contributor information, see the
   `meshObjectBase.H` only avoids a segmentation fault at the end of a
   foam-extend run, after the results are written. `Allcheck` no longer
   reports them, and `Allreplace` no longer copies them.
+- The `EulerDdtScheme.C` and `backwardDdtScheme.C` optional fixes are removed
+  for OpenFOAM.org, OpenFOAM.com and foam-extend, so no optional fixes remain
+  for OpenFOAM.com. The foam-extend ones are replaced by the `ddtCorr` flux
+  correction in `pimpleFluid` (see Fixed). The OpenFOAM.org and OpenFOAM.com
+  backward scheme fixes only changed the start-up of the scheme: on
+  OpenFOAM.org, Euler is used for the first `ddt(U)` of the first time step
+  but backward, with the old-old time level a copy of the old one, for later
+  calls in that step, e.g. with several outer correctors; on OpenFOAM.com, a
+  restart from a time without `U_0_0` uses backward with such a copy for one
+  time step. The foam-extend backward fix also changed `meshPhi`, which
+  differs from the foam-extend one only when the time-step changes.
 
 ### Fixed
 
@@ -628,6 +639,15 @@ release. For complete commit-level details and contributor information, see the
   `Allcheck` and `Allreplace` no longer select a directory by version (#519).
   Installations patched with the earlier file are reported by `Allcheck`
   (with `S4F_NO_FILE_FIXES=0`), and `Allreplace` updates them.
+- With foam-extend, `pimpleFluid` with `ddtCorr yes` added the whole old-time
+  face flux, from `fvc::ddtConsistentPhiCorr`, on installations without the
+  `EulerDdtScheme.C` and `backwardDdtScheme.C` optional fixes. That flux suits
+  the foam-extend solvers, which keep `ddt(U)` out of the momentum matrix used
+  for `H`, but `pimpleFluid` keeps it in, so the old-time flux was counted
+  twice. `pimpleFluid` now computes the correction itself: the difference
+  between the old face velocity flux and the flux of the interpolated old
+  cell velocity, for the Euler and backward ddt schemes, as the optional fixes
+  did. Other ddt schemes stop with an error when `ddtCorr` is on.
 - The files in `optionalFixes` had their OpenFOAM and foam-extend copyright
   and licence headers replaced by the solids4foam header. They now keep the
   upstream headers, with a note on what solids4foam changed, and the file

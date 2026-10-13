@@ -28,6 +28,7 @@ License
 #include "wedgeFvPatchFields.H"
 #include "slipFvPatchFields.H"
 #include "extrapolatedFvPatchFields.H"
+#include "zeroGradientFvPatchFields.H"
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
@@ -157,6 +158,134 @@ void pimpleFluid::updateRobinFsiInterface()
         }
     }
 }
+
+
+tmp<surfaceScalarField> pimpleFluid::ddtConsistentPhiCorr() const
+{
+    const word ddtScheme
+    (
+        mesh().schemesDict().ddtScheme("ddt(" + U().name() +')')
+    );
+
+    const bool backward =
+        (ddtScheme == fv::backwardDdtScheme<vector>::typeName);
+
+    if (!backward && ddtScheme != fv::EulerDdtScheme<vector>::typeName)
+    {
+        FatalErrorIn
+        (
+            "tmp<surfaceScalarField> pimpleFluid::ddtConsistentPhiCorr() const"
+        )   << "ddtCorr is only implemented for the "
+            << fv::EulerDdtScheme<vector>::typeName << " and "
+            << fv::backwardDdtScheme<vector>::typeName
+            << " ddt schemes, not " << ddtScheme
+            << abort(FatalError);
+    }
+
+    // Coefficients of the old and old-old time levels
+    scalar coefft0 = 1;
+    scalar coefft00 = 0;
+
+    // Use Euler while the old-old time level is missing, as in
+    // backwardDdtScheme::deltaT0_(vf)
+    if
+    (
+        backward
+     && U().oldTime().timeIndex() != U().oldTime().oldTime().timeIndex()
+    )
+    {
+        const scalar deltaT = runTime().deltaT().value();
+        const scalar deltaT0 = runTime().deltaT0().value();
+
+        const scalar coefft = 1 + deltaT/(deltaT + deltaT0);
+        coefft00 = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+        coefft0 = coefft + coefft00;
+    }
+
+    // Ratios of the old and old-old cell volumes to the current cell volumes
+    volScalarField V0oV
+    (
+        IOobject
+        (
+            "V0oV",
+            runTime().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("1", dimless, 1),
+        zeroGradientFvPatchScalarField::typeName
+    );
+
+    volScalarField V00oV
+    (
+        IOobject
+        (
+            "V00oV",
+            runTime().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("1", dimless, 1),
+        zeroGradientFvPatchScalarField::typeName
+    );
+
+    if (mesh().moving())
+    {
+        V0oV.internalField() = mesh().V0()/mesh().V();
+        V0oV.correctBoundaryConditions();
+
+        if (backward)
+        {
+            V00oV.internalField() = mesh().V00()/mesh().V();
+            V00oV.correctBoundaryConditions();
+        }
+    }
+
+    // The momentum equation includes the time derivative, so rAU*H already
+    // contains the old-time terms, and only the difference between the old
+    // face velocities and the interpolated old cell velocities is added
+    const surfaceScalarField phiCorr0
+    (
+        mesh().Sf()
+      & (
+            Uf_.oldTime()*fvc::interpolate(V0oV)
+          - fvc::interpolate(U().oldTime()*V0oV)
+        )
+    );
+
+    surfaceScalarField phiCorr(coefft0*phiCorr0);
+
+    if (backward)
+    {
+        // Evaluated while coefft00 is zero too, so that the old-old time
+        // levels are created on the first time step
+        const surfaceScalarField phiCorr00
+        (
+            mesh().Sf()
+          & (
+                Uf_.oldTime().oldTime()*fvc::interpolate(V00oV)
+              - fvc::interpolate(U().oldTime().oldTime()*V00oV)
+            )
+        );
+
+        phiCorr -= coefft00*phiCorr00;
+    }
+
+    forAll(phiCorr.boundaryField(), patchI)
+    {
+        if (U().boundaryField()[patchI].fixesValue())
+        {
+            phiCorr.boundaryField()[patchI] = 0.0;
+        }
+    }
+
+    return rAUf_*phiCorr/runTime().deltaT();
+}
+
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -489,7 +618,7 @@ bool pimpleFluid::evolve()
             // Correct phi for temporal consistency
             if (ddtCorr_)
             {
-                phi() += fvc::ddtConsistentPhiCorr(Uf_, U(), rAUf_);
+                phi() += ddtConsistentPhiCorr();
             }
 
             updateRobinFsiInterface();
