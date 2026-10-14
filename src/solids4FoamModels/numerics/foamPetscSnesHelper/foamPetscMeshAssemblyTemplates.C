@@ -52,6 +52,7 @@ label foamPetscMeshAssembly::InsertFvMatrixIntoPETScMatrix
 
     // Take a reference to the mesh
     const fvMesh& mesh = fvM.psi().mesh();
+    checkMesh(mesh);
 
     // Insert the diagonal
     if (fvM.hasDiag())

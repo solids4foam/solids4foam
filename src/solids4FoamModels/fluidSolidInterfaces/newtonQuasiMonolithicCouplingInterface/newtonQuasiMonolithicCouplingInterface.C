@@ -2646,6 +2646,14 @@ void newtonQuasiMonolithicCouplingInterface::resetCustomSolverState()
         KSPDestroy(&solidSubKSP_);
         solidSubKSP_ = nullptr;
     }
+
+    // Destroy the converted preconditioner matrix so it is rebuilt and given
+    // to the new SNES object
+    if (Pmat_ != nullptr)
+    {
+        MatDestroy(&Pmat_);
+        Pmat_ = nullptr;
+    }
 }
 
 

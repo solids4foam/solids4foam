@@ -181,6 +181,8 @@ const leastSquaresS4fVectors& foamPetscMeshAssembly::lsVectors
     const volScalarField& p
 ) const
 {
+    checkMesh(p.mesh());
+
     // Lookup and return vectors if they exist for this field
     // Otherwise create and return them
     const word lsName("leastSquaresVectors" + p.name());
@@ -599,6 +601,7 @@ label foamPetscMeshAssembly::InsertFvmGradIntoPETScMatrix
 {
     // Get reference to least square vectors
     const fvMesh& mesh = p.mesh();
+    checkMesh(mesh);
     const leastSquaresS4fVectors& lsv = lsVectors(p);
 
     const surfaceVectorField& ownLs = lsv.pVectors();
@@ -850,6 +853,7 @@ label foamPetscMeshAssembly::InsertFvcDivGradInterpolateIntoPETScMatrix
 ) const
 {
     const fvMesh& mesh = p.mesh();
+    checkMesh(mesh);
     const leastSquaresS4fVectors& lsv = lsVectors(p);
 
     const surfaceVectorField& ownLs = lsv.pVectors();
@@ -1093,6 +1097,7 @@ label foamPetscMeshAssembly::InsertFvmDivPhiUIntoPETScMatrix
 {
     // Take references for efficiency and brevity
     const fvMesh& mesh = U.mesh();
+    checkMesh(mesh);
     const scalarField& phiI = phi;
     const vectorField& UI = U;
     const vectorField& SfI = mesh.Sf();
@@ -1430,6 +1435,7 @@ label foamPetscMeshAssembly::InsertFvmDivUIntoPETScMatrix
 {
     // Take references for efficiency and brevity
     const fvMesh& mesh = p.mesh();
+    checkMesh(mesh);
     const scalar sign = scale;
 
     for (label cmptI = 0; cmptI < 3; ++cmptI)
@@ -1574,6 +1580,7 @@ label foamPetscMeshAssembly::InsertFvmGradPGaussIntoPETScMatrix
     // Gauss discretisation of (-V*div D) in the pressure equation and
     // (-V*grad p) in the momentum equation.
     const fvMesh& mesh = p.mesh();
+    checkMesh(mesh);
     const scalar sign = scale;
 
     for (label cmptI = 0; cmptI < 3; ++cmptI)

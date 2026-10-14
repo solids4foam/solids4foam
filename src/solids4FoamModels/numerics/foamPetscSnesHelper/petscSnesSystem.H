@@ -36,7 +36,7 @@ Author
     Philip Cardiff, UCD.
 
 SourceFiles
-    petscSnesSystem.H
+    None: the interface is defined in this header
 
 \*---------------------------------------------------------------------------*/
 

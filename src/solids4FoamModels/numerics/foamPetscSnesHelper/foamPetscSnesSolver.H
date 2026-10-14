@@ -296,7 +296,8 @@ public:
             }
 
             //- Rebuild the SNES object, the solution vector and the Jacobian
-            //  The system is told through resetCustomSolverState()
+            //  The system is told first, through resetCustomSolverState().
+            //  The solution backup is kept
             void resetSnes();
 
             //- Reset retry-sensitive SNES/KSP state while preserving the

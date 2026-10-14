@@ -78,6 +78,11 @@ public:
         //- Location of the solution unknowns
         typedef foamPetscMeshAssembly::solutionLocation solutionLocation;
 
+#ifdef OPENFOAM_COM
+        //- Solution location names
+        static const Enum<solutionLocation>& solutionLocationNames_;
+#endif
+
 
 private:
 
@@ -105,7 +110,7 @@ private:
         foamPetscMeshAssembly assembly_;
 
         //- Solver, created on first use
-        mutable autoPtr<foamPetscSnesSolver> solverPtr_;
+        autoPtr<foamPetscSnesSolver> solverPtr_;
 
 
     // Private Member Functions

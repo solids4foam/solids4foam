@@ -667,20 +667,22 @@ void foamPetscSnesSolver::resetSnes()
 {
     Info<< "Resetting SNES" << endl;
 
+    // Note: the solution backup is kept, as it has the layout of the new
+    // solution vector
     snes_.reset();
     x_.reset();
     A_.reset();
-    xBackup_.reset();
     contextPtr_.clear();
+
+    // Let the system clear any state derived from the previous SNES object
+    // before the new one is built
+    system_.resetCustomSolverState();
 
     if (initialiseSnes() != 0)
     {
         FatalErrorInFunction
             << "initialiseSnes failed" << abort(FatalError);
     }
-
-    // Let the system clear any state derived from the previous SNES object
-    system_.resetCustomSolverState();
 
     // Reset SNES internal state
     // SNESReset(foamPetscSnesSolver::snes());

@@ -59,6 +59,13 @@ namespace Foam
     };
 #endif
 
+#if defined(USE_PETSC) && defined(OPENFOAM_COM)
+    // The helper uses the names of the assembly
+    const Enum<foamPetscSnesHelper::solutionLocation>&
+    foamPetscSnesHelper::solutionLocationNames_ =
+        foamPetscMeshAssembly::solutionLocationNames_;
+#endif
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
