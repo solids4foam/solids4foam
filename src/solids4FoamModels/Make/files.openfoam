@@ -200,6 +200,8 @@ numerics/NewmarkBetaD2dt2Scheme/NewmarkBetaD2dt2Schemes.C
 numerics/boolIOList/boolIOList.C
 numerics/cellPointLeastSquaresVectors/cellPointLeastSquaresVectors.C
 numerics/deltaVectors/deltaVectors.C
+numerics/foamPetscSnesHelper/foamPetscMeshAssembly.C
+numerics/foamPetscSnesHelper/foamPetscSnesSolver.C
 numerics/foamPetscSnesHelper/foamPetscSnesHelper.C
 numerics/foamPetscSnesHelper/foamPetscSnesHelperEnums.C
 numerics/foamPetscSnesHelper/petscUtils.C

@@ -19,7 +19,7 @@ License
 
 #ifdef USE_PETSC
 
-#include "foamPetscSnesHelper.H"
+#include "foamPetscMeshAssembly.H"
 #include "processorFvPatch.H"
 
 namespace Foam
@@ -29,7 +29,7 @@ namespace Foam
 
 
 template <class Type>
-label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+label foamPetscMeshAssembly::InsertFvMatrixIntoPETScMatrix
 (
     fvMatrix<Type>& fvM,
     Mat jac,
@@ -84,7 +84,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
 
             // Get the global row index
             const label globalBlockRowI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+                foamPetscMeshAssembly::globalCells().toGlobal(blockRowI);
 
             // Insert block coefficient
             CHKERRQ
@@ -130,9 +130,9 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             const label blockColI = nei[faceI];
 
             const label globalBlockRowI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+                foamPetscMeshAssembly::globalCells().toGlobal(blockRowI);
             const label globalBlockColI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockColI);
+                foamPetscMeshAssembly::globalCells().toGlobal(blockColI);
 
             if (hasUpper)
             {
@@ -192,9 +192,9 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             const label blockColI = nei[faceI];
 
             const label globalBlockRowI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockRowI);
+                foamPetscMeshAssembly::globalCells().toGlobal(blockRowI);
             const label globalBlockColI =
-                foamPetscSnesHelper::globalCells().toGlobal(blockColI);
+                foamPetscMeshAssembly::globalCells().toGlobal(blockColI);
 
             // Insert lower coeff
             CHKERRQ
@@ -226,7 +226,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
             forAll(fp, faceI)
             {
                 const label globalBlockRowI =
-                    foamPetscSnesHelper::globalCells().toGlobal
+                    foamPetscMeshAssembly::globalCells().toGlobal
                     (
                         faceCells[faceI]
                     );
@@ -320,7 +320,7 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
 
 
 template <class Type>
-void foamPetscSnesHelper::ExtractFieldComponents
+void foamPetscMeshAssembly::ExtractFieldComponents
 (
     const PetscScalar *x,
     Field<Type>& vf,
@@ -381,7 +381,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
             "Function not implemented for solutionLocation::POINTS.\n"
             "Instead, use the alternative function:\n"
             "template <class Type>\n"
-            "void foamPetscSnesHelper::ExtractFieldComponents\n"
+            "void foamPetscMeshAssembly::ExtractFieldComponents\n"
             "(\n"
             "    const Vec x,\n"
             "    Field<Type>& vf,\n"
@@ -399,7 +399,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
 
 
 template <class Type>
-void foamPetscSnesHelper::ExtractFieldComponents
+void foamPetscMeshAssembly::ExtractFieldComponents
 (
     const Vec x,
     Field<Type>& vf,
@@ -583,7 +583,7 @@ void foamPetscSnesHelper::ExtractFieldComponents
 
 
 template <class Type>
-void foamPetscSnesHelper::InsertFieldComponents
+void foamPetscMeshAssembly::InsertFieldComponents
 (
     const Field<Type>& vf,
     PetscScalar *x,
@@ -669,7 +669,7 @@ void foamPetscSnesHelper::InsertFieldComponents
 
 
 template <class Type>
-void foamPetscSnesHelper::InsertFieldComponents
+void foamPetscMeshAssembly::InsertFieldComponents
 (
     const Field<Type>& vf,
     Vec x,
