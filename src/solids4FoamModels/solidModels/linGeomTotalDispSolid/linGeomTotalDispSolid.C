@@ -22,10 +22,6 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "solidTractionFvPatchVectorField.H"
-#include "solidSpringDashpotFvPatchVectorField.H"
-#include "fixedDisplacementZeroShearFvPatchVectorField.H"
-#include "symmetryFvPatchFields.H"
 #include "compatibilityFunctions.H"
 #include "hofvm.H"
 
@@ -165,139 +161,6 @@ void linGeomTotalDispSolid::replaceVolumetricStress(const volScalarField& p)
     //
     // In one place because there is more than one caller
     sigma() = sigma() - p*I;
-}
-
-
-void linGeomTotalDispSolid::enforceTractionBoundaries
-(
-    surfaceVectorField& traction,
-    const volVectorField& D,
-    const surfaceVectorField& n
-) const
-{
-    // Enforce traction conditions
-    forAll(D.boundaryField(), patchI)
-    {
-        if
-        (
-            isA<solidTractionFvPatchVectorField>
-            (
-                D.boundaryField()[patchI]
-            )
-        )
-        {
-            const solidTractionFvPatchVectorField& tracPatch =
-                refCast<const solidTractionFvPatchVectorField>
-                (
-                    D.boundaryField()[patchI]
-                );
-
-            const vectorField& nPatch = n.boundaryField()[patchI];
-
-            if (highOrderResidual())
-            {
-                // Face quadrature points weights
-                auto& faceQuadWeights = compactListListCRef
-                (
-                    displacementLeastSquares().quadrature().faceQuadWeights()
-                );
-
-                const surfaceScalarField& magSf = mesh().magSf();
-
-                // Get value at patch faces quadrature points
-                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
-                    tracPatch.evaluateQuadrature();
-
-                auto& quadratureValues = compactListListCRef
-                (
-                    patchQuadraturePointsValue()
-                );
-
-                forAll(mesh().boundaryMesh()[patchI], faceI)
-                {
-                    const label start = mesh().boundaryMesh()[patchI].start();
-
-                    // Get global face index
-                    const label faceID = faceI + start;
-
-                    // Get the number of quadrature points for this face
-                    const label nPoints = faceQuadWeights[faceID].size();
-
-                    // Loop over quadrature points and add their contribution
-                    boundaryFieldRef(traction)[patchI][faceI] = vector::zero;
-                    for (label pointI = 0; pointI < nPoints; ++pointI)
-                    {
-                        boundaryFieldRef(traction)[patchI][faceI] +=
-                            quadratureValues[faceI][pointI]
-                           *faceQuadWeights[faceID][pointI];
-                    }
-                    // Divide with area because we use physical weights
-                    boundaryFieldRef(traction)[patchI][faceI] *=
-                        (1.0/(magSf.boundaryField()[patchI][faceI]));
-                }
-            }
-            else
-            {
-#ifdef OPENFOAM_NOT_EXTEND
-                traction.boundaryFieldRef()[patchI] =
-                    tracPatch.traction() - nPatch*tracPatch.pressure();
-#else
-                traction.boundaryField()[patchI] =
-                    tracPatch.traction() - nPatch*tracPatch.pressure();
-#endif
-            }
-        }
-        else if
-        (
-            isA<solidSpringDashpotFvPatchVectorField>
-            (
-                D.boundaryField()[patchI]
-            )
-        )
-        {
-            const solidSpringDashpotFvPatchVectorField& springPatch =
-                refCast<const solidSpringDashpotFvPatchVectorField>
-                (
-                    D.boundaryField()[patchI]
-                );
-
-            const vectorField& nPatch = n.boundaryField()[patchI];
-
-#ifdef OPENFOAM_NOT_EXTEND
-            traction.boundaryFieldRef()[patchI] =
-#else
-            traction.boundaryField()[patchI] =
-#endif
-                springPatch.springDashpotTraction
-                (
-                    nPatch, scalarField(nPatch.size(), 1.0)
-                );
-        }
-        else if
-        (
-            isA<fixedDisplacementZeroShearFvPatchVectorField>
-            (
-                D.boundaryField()[patchI]
-            )
-         || isA<symmetryFvPatchVectorField>
-            (
-                D.boundaryField()[patchI]
-            )
-        )
-        {
-            // Unit normals
-            const vectorField& nPatch = n.boundaryField()[patchI];
-
-            // Set shear traction to zero
-#ifdef OPENFOAM_NOT_EXTEND
-            traction.boundaryFieldRef()[patchI] =
-                sqr(nPatch) & traction.boundaryField()[patchI];
-#else
-            traction.boundaryField()[patchI] =
-                sqr(nPatch) & traction.boundaryField()[patchI];
-#endif
-        }
-    }
 }
 
 
@@ -1003,34 +866,7 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
                 << " solution algorithms" << endl;
         }
 
-        // Set extrapolateValue to true for solidTraction boundaries
-        forAll(D().boundaryField(), patchI)
-        {
-            if
-            (
-                isA<solidTractionFvPatchVectorField>
-                (
-                    D().boundaryField()[patchI]
-                )
-            )
-            {
-                Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the D "
-                    << "field" << endl;
-
-                solidTractionFvPatchVectorField& tracPatch =
-                    refCast<solidTractionFvPatchVectorField>
-                    (
-#ifdef OPENFOAM_NOT_EXTEND
-                        D().boundaryFieldRef()[patchI]
-#else
-                        D().boundaryField()[patchI]
-#endif
-                    );
-
-                tracPatch.extrapolateValue() = true;
-            }
-        }
+        enableTractionBoundaryExtrapolation(D());
     }
 }
 
