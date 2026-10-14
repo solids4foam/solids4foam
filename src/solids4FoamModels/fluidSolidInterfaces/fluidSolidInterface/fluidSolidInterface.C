@@ -990,7 +990,11 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 
     // Check once here, rather than in each coupling, that the fluid sees the
     // interface motion
-    if (fsiPtr->movesFluidInterface())
+    if
+    (
+        fsiPtr->movesFluidInterface()
+     && !fsiPtr->imposesFluidInterfaceVelocity()
+    )
     {
         fsiPtr->checkFluidInterfaceVelocity();
     }

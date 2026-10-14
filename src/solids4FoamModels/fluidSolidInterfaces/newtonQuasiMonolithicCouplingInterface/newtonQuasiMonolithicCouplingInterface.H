@@ -423,6 +423,13 @@ public:
             //- Update the size of the time-step
             virtual void setDeltaT(Time& runTime);
 
+            //- The solid velocity is imposed on the fluid interface as part
+            //  of the monolithic system
+            virtual bool imposesFluidInterfaceVelocity() const
+            {
+                return true;
+            }
+
             //- Evolve the interface
             virtual bool evolve();
 

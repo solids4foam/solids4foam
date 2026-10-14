@@ -59,6 +59,10 @@ class nonLinGeomTotalLagVelocitySolid
 {
     // Private data
 
+        //- Use the linear-geometry traction formulation
+        //  Declared first as it is used when constructing impK_
+        const Switch linearGeometryFormulation_;
+
         //- Total deformation gradient
         volTensorField F_;
 
@@ -87,9 +91,6 @@ class nonLinGeomTotalLagVelocitySolid
         //- Time rate of pressure
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
-
-        //- Use the linear-geometry traction formulation
-        const Switch linearGeometryFormulation_;
 
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
@@ -143,6 +144,9 @@ class nonLinGeomTotalLagVelocitySolid
         //  using the mechanicalConstitutiveLaw framework
         void correctStress();
 
+        //- Construct impK from the mechanicalConstitutiveLaw framework
+        tmp<volScalarField> makeImpK() const;
+
         //- Make coefficient for velocity-based momentum stabilisation
         void makeVelocityMomentumStabilisationCoeff();
 
@@ -194,6 +198,11 @@ protected:
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
+            if (linearGeometryFormulation_)
+            {
+                return nonLinearGeometry::LINEAR_GEOMETRY;
+            }
+
             return nonLinearGeometry::TOTAL_LAGRANGIAN;
         }
 

@@ -120,6 +120,64 @@ void nonLinGeomTotalLagVelocitySolid::correctStress()
 }
 
 
+tmp<volScalarField> nonLinGeomTotalLagVelocitySolid::makeImpK() const
+{
+    // With the mixed displacement-pressure formulation the implicit stiffness
+    // is the deviatoric scalar tangent, as in nonLinGeomTotalLagTotalDispSolid
+    const tangentRequest req =
+        solvePressure()
+      ? tangentRequest::scalarDeviatoric
+      : tangentRequest::scalar;
+
+    if (linearGeometryFormulation_)
+    {
+        return lawImpK(mechanicalManager(), req);
+    }
+
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query at the current deformation gradient, which neither
+    // writes a stress nor disturbs history; F_, Finv_ and J_ are declared
+    // before impK_, so they are already built
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        req
+    );
+
+    return tImpK;
+}
+
+
 void nonLinGeomTotalLagVelocitySolid::makeVelocityMomentumStabilisationCoeff()
 {
     if (!velocityMomentumStabilisationCoeffPtr_.empty())
@@ -452,6 +510,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
+    linearGeometryFormulation_(linearGeometryFormulation),
     F_
     (
         IOobject
@@ -501,20 +560,10 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
         ),
         fvc::d2dt2(D())
     ),
-    impK_
-    (
-        lawImpK
-        (
-            mechanicalManager(),
-            solvePressure()
-          ? tangentRequest::scalarDeviatoric
-          : tangentRequest::scalar
-        )
-    ),
+    impK_(makeImpK()),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     dpdtPtr_(),
-    linearGeometryFormulation_(linearGeometryFormulation),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     velocityBasedMomentumStabilisation_
     (
@@ -1117,7 +1166,8 @@ label nonLinGeomTotalLagVelocitySolid::formJacobian
 
     if (dampingCoeff().value() > SMALL)
     {
-        approxJ -= dampingCoeff()*rho()*U;
+        // Implicit, so that the damping enters the Jacobian coefficients
+        approxJ -= fvm::Sp(dampingCoeff()*rho(), U);
     }
 
     // Optional: under-relaxation of the linear system

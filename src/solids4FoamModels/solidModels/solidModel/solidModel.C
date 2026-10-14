@@ -2644,15 +2644,86 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
 Foam::tmp<Foam::volScalarField> Foam::solidModel::shearModulus() const
 {
     // The deviatoric scalar tangent is (4/3)*mu
-    tmp<volScalarField> tmu
-    (
-        lawImpK
+    tmp<volScalarField> tmu;
+
+    if (nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
+    {
+        tmu =
+            lawImpK
+            (
+                mechanicalManager(),
+                tangentRequest::scalarDeviatoric,
+                "shearModulus"
+            );
+    }
+    else
+    {
+        // Finite-strain laws may not implement the small-strain tangent, so
+        // evaluate the finite-strain tangent in the undeformed configuration
+        tmu =
+            tmp<volScalarField>
+            (
+                new volScalarField
+                (
+                    IOobject
+                    (
+                        "shearModulus",
+                        mesh().time().timeName(),
+                        mesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    mesh(),
+                    dimensionedScalar("zero", dimForce/dimArea, 0),
+                    calculatedFvPatchScalarField::typeName
+                )
+            );
+
+        const volTensorField identity
         (
-            mechanicalManager(),
-            tangentRequest::scalarDeviatoric,
-            "shearModulus"
-        )
-    );
+            IOobject
+            (
+                "identityF",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, tensor::I)
+        );
+
+        const volScalarField one
+        (
+            IOobject
+            (
+                "identityJ",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("one", dimless, 1.0)
+        );
+
+        mechanicalManager().updateScalarTangentFiniteStrain
+        (
+            identity,
+            identity,
+            identity,
+            identity,
+            one,
+            one,
+            mesh().time().deltaTValue(),
+#ifdef OPENFOAM_NOT_EXTEND
+            tmu.ref(),
+#else
+            tmu(),
+#endif
+            tangentRequest::scalarDeviatoric
+        );
+    }
 
 #ifdef OPENFOAM_NOT_EXTEND
     tmu.ref() *= 0.75;
