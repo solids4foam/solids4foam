@@ -20,13 +20,4 @@ functions
         type                solidPointDisplacement;
         point               (0.45 0.15 -0.15);
     }
-    solidPressure
-    {
-        type                solidPressureMinMax;
-    }
-    fsiConvData
-    {
-        type                fsiConvergenceData;
-	region              fluid;
-    }
 }

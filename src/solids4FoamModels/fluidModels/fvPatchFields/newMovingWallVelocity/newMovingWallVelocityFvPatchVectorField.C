@@ -102,6 +102,29 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
 
     oldFc_ = Fc_;
     oldoldFc_ = Fc_;
+
+    if (dict.found("oldFaceCentres") && dict.found("oldOldFaceCentres"))
+    {
+        // Restore the face-centre histories written by write(). myTimeIndex_
+        // is already the current time index, so the histories are not shifted
+        // again for this time
+        oldFc_ = vectorField("oldFaceCentres", dict, p.size());
+        oldoldFc_ = vectorField("oldOldFaceCentres", dict, p.size());
+    }
+    else if (dict.found("oldFaceCentres") || dict.found("oldOldFaceCentres"))
+    {
+        WarningInFunction
+            << "Only one of oldFaceCentres and oldOldFaceCentres is given"
+            << " for patch " << p.name() << " of field "
+#ifdef OPENFOAM_NOT_EXTEND
+            << internalField().name()
+#else
+            << dimensionedInternalField().name()
+#endif
+            << ": both entries are required to restore the face-centre"
+            << " history" << nl
+            << "    The current face centres will be used instead" << endl;
+    }
 }
 
 
@@ -376,13 +399,14 @@ snGrad() const
             << "Did not find grad(" + UName + ")!" << endl;
     }
 
-    return
+    // Named operands: see pimpleFluid::patchViscousForce
+    const symmTensorField Pn(I - sqr(patch().nf()));
+    const vectorField dU
     (
-        (I - sqr(patch().nf()))
-      & (
-         *this - patchInternalField()
-         )*this->patch().deltaCoeffs()
+        (*this - patchInternalField())*this->patch().deltaCoeffs()
     );
+
+    return Pn & dU;
 }
 
 
@@ -475,8 +499,12 @@ void newMovingWallVelocityFvPatchVectorField::write(Ostream& os) const
     fvPatchVectorField::write(os);
 #ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
+    writeEntry(os, "oldFaceCentres", oldFc_);
+    writeEntry(os, "oldOldFaceCentres", oldoldFc_);
 #else
     writeEntry("value", os);
+    oldFc_.writeEntry("oldFaceCentres", os);
+    oldoldFc_.writeEntry("oldOldFaceCentres", os);
 #endif
 }
 

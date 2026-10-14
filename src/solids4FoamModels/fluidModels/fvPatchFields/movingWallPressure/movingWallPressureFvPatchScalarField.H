@@ -44,12 +44,6 @@ class movingWallPressureFvPatchScalarField
 :
     public fixedGradientFvPatchScalarField
 {
-    // Private data
-
-        //- Acceleration of the solid side of the interface
-        //  in the previous fsi iteration
-        vectorField prevAcceleration_;
-
 public:
 
     //- Runtime type information
@@ -126,18 +120,6 @@ public:
 
         //- Update the coefficients associated with the patch field
         virtual void updateCoeffs();
-
-        //- Get previous pressure patch field
-        const vectorField& prevAcceleration() const
-        {
-            return prevAcceleration_;
-        }
-
-        //- Get previous pressure patch field
-        vectorField& prevAcceleration()
-        {
-            return prevAcceleration_;
-        }
 
 //         //- Evaluate the patch field
 //         virtual void evaluate

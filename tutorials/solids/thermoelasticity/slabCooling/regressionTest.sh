@@ -5,6 +5,11 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
 
 # ============================================================
 # slabCooling regression test
@@ -40,6 +45,17 @@ if [[ "${variant}" != "openfoamcom" ]]; then
     SIGMA_MAX=1.05e3
 fi
 
+# The final D, as the max and mean component magnitude of its internal values
+# as written. thermoMechanicalLaw is a composite: it owns a sub-law, delegates
+# to it, and subtracts the thermal term, and the framework reproduced the
+# removed legacy mechanicalModel's D field exactly, in every figure written, on
+# every fork (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's,
+# the same as OpenFOAM.org 9's; foam-extend 4.1 gives a max 1.8e-3 smaller,
+# and the tolerance, 3e-3 of the largest value, covers that
+REF_D_MAX=0.0484734
+REF_D_MEAN=0.0120319022347934
+REF_D_REL_TOL=3e-3
+
 echo "============================================================"
 echo "slabCooling regression test"
 echo "Max sigmaEq < ${SIGMA_MAX} Pa"
@@ -67,6 +83,30 @@ prepare_case() {
 prepare_case
 ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
+
+check_against_reference() {
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the case constructed no mechanical constitutive law"
+        return 1
+    fi
+
+    local t end_time
+    t=$(solids4Foam::latestTime "${CASE_DIR}")
+    end_time=$(sed -n 's/^endTime[[:space:]]*\([^;]*\);.*/\1/p' \
+        "${CASE_DIR}/system/controlDict")
+
+    if [[ -z "${t}" || -z "${end_time}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${end_time})^2 <= 1e-20)}"
+    then
+        echo "FAIL: the case stopped at '${t}', not at the end time '${end_time}'"
+        return 1
+    fi
+
+    solids4Foam::checkFieldNorms "D" "${CASE_DIR}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
+}
 
 # ------------------------------------------------------------
 # Extract helpers
@@ -125,7 +165,10 @@ else
     failures=$((failures + 1))
 fi
 
-# Clean case again
+if ! check_against_reference; then
+    failures=$((failures + 1))
+fi
+
 ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 
 # ------------------------------------------------------------

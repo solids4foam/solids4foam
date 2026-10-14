@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -18,39 +18,10 @@ FoamFile
 
 solvers
 {
-    D // fluid mesh motion
-    {
-        solver    petsc;
-
-        options
-        {
-            snes_type newtonls;
-            snes_linesearch_type basic;
-            snes_rtol "1e-6";
-            snes_stol "1e-6";
-            snes_max_it "100";
-            snes_monitor;
-            snes_converged_reason;
-
-            snes_mf;
-            snes_mf_operator;
-
-            ksp_type lgmres;
-            ksp_gmres_restart "100";
-            ksp_converged_reason;
-
-            pc_type bjacobi;
-            sub_pc_type lu;
-
-            snes_lag_preconditioner_persists true;
-            snes_lag_preconditioner "-2";
-        }
-    }
-
     "p|pFinal"
     {
         solver          GAMG;
-        tolerance       1e-06;
+        tolerance       1e-08;
         relTol          0;
         minIter         1;
         maxIter         1000;
@@ -69,7 +40,7 @@ solvers
     cellMotionU
     {
         solver          GAMG;
-        tolerance       1e-06;
+        tolerance       1e-08;
         relTol          0;
         minIter         1;
         maxIter         100;
@@ -89,7 +60,7 @@ solvers
     {
         solver          PBiCG;
         preconditioner  DILU;
-        tolerance       1e-06;
+        tolerance       1e-08;
         relTol          0;
         minIter         1;
     }
@@ -97,10 +68,42 @@ solvers
 
 PIMPLE
 {
+    // A few under-relaxed outer correctors per FSI iteration keep the fluid
+    // response consistent between FSI iterations. With a single corrector,
+    // the IQN-ILS coupling stagnates on the refined meshes of the
+    // verification study, where the viscous number nu*deltaT/dx^2 is large.
+    // The consistent (SIMPLEC) formulation, without pressure relaxation,
+    // makes the outer correctors converge on OpenFOAM.org too, where
+    // without it the IQN-ILS coupling diverges in the first time step;
+    // foam-extend ignores it.
     momentumPredictor   on;
-    nOuterCorrectors    1;
+    consistent          yes;
+    nOuterCorrectors    5;
     nCorrectors         3;
     nNonOrthogonalCorrectors 1;
+
+    residualControl
+    {
+        "U|p"
+        {
+            tolerance   1e-7;
+            relTol      0;
+        }
+    }
+}
+
+relaxationFactors
+{
+    fields
+    {
+        p       1;
+        pFinal  1;
+    }
+    equations
+    {
+        U       0.9;
+        UFinal  1;
+    }
 }
 
 // ************************************************************************* //

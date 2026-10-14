@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Two formulations, both taking the stress from the mechanicalConstitutiveLaw
+# framework:
+#
+#   totalLagrangian (default) -
+#       nonLinearGeometryTotalLagrangianTotalDisplacement with solvePressure.
+#       Runs on any fork, and runs to completion.
+#
+#   pressureDisplacement - coupledPressureDisplacementSolid. foam-extend only,
+#       and it does not reach the end time: the nonlinear iteration stalls at a
+#       relative residual near 1 and the run stops at t = 0.3, when the
+#       deformation gradient inverts. That is longstanding rather than a
+#       regression - with the former legacy material model it stalled the
+#       same way and stopped at t = 0.68.
+APPROACH="totalLagrangian"
+for arg in "$@"; do
+    if [[ "$arg" == "pressureDisplacement" ]]; then
+        APPROACH="pressureDisplacement"
+    fi
+done
+echo "Using the $APPROACH formulation"
+
+if [[ "${APPROACH}" == "pressureDisplacement" ]]
+then
+    solids4Foam::caseOnlyRunsWithFoamExtend
+else
+    # The total Lagrangian formulation solves with PETSc SNES
+    solids4Foam::requirePetscOrExitSilently
+fi
+
+# A previous run may have left the active dictionaries as symlinks. Restore the
+# preprocessing dictionaries before running utilities.
+rm -f constant/solidProperties system/fvSchemes system/fvSolution
+cp constant/solidProperties.pressureDisplacement constant/solidProperties
+cp system/fvSchemes.preprocess system/fvSchemes
+cp system/fvSolution.pressureDisplacement system/fvSolution
+
+# Compile case-local utilities
+(cd src && bash ./Allwmake -s) || exit 1
+
+if ! command -v calcLocCoordinates &> /dev/null
+then
+    echo; echo "calcLocCoordinates was not found after compiling src"; echo
+    exit 1
+fi
+
+# Create mesh
+BLOCK_MESH_DICT_DIR=$(solids4Foam::blockMeshDictDir)
+mkdir -p "${BLOCK_MESH_DICT_DIR}"
+m4 -P system/blockMeshDict.m4 > "${BLOCK_MESH_DICT_DIR}"/blockMeshDict
+runApplication blockMesh
+
+# Create 0 folder. psi0 and psi1 are the local-coordinate seeds that
+# calcLocCoordinates needs; both formulations use them
+mkdir 0
+cp -r 0.orig/psi0 ./0
+cp -r 0.orig/psi1 ./0
+
+if [[ "${APPROACH}" == "pressureDisplacement" ]]
+then
+    cp -r 0.orig/Dp ./0
+    cp -r 0.orig/DD ./0
+    cp -r 0.orig/pointDD ./0
+else
+    cp -r 0.orig/D ./0
+    cp -r 0.orig/pointD ./0
+fi
+
+# Calculate local coordinate systems. This runs against the case's own
+# schemes, before the total Lagrangian ones are put in place: it needs a
+# gradient scheme that the solver's fvSchemes does not carry
+runApplication calcLocCoordinates
+
+if [[ "${APPROACH}" == "totalLagrangian" ]]; then
+    cp constant/solidProperties.totalLagrangian constant/solidProperties
+    cp system/fvSolution.totalLagrangian system/fvSolution
+    cp system/fvSchemes.totalLagrangian system/fvSchemes
+fi
+
+# Run solver
+if [[ "$1" == "parallel" ]]
+then
+    runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    runApplication reconstructPar
+else
+    runApplication solids4Foam
+fi
+
+# Plot inner radius history
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating innerRadius.png using gnuplot"
+    gnuplot pointHystory.gplt &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
+
+
+# ----------------------------------------------------------------- end-of-file

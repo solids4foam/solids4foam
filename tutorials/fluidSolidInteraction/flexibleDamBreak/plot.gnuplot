@@ -14,6 +14,6 @@ set xtic nomirror
 set ytic nomirror
 set mxtic 4
 set mytic 4
-plot "postProcessing/0/solidPointDisplacement_disp.dat" u ($1):($2) w l ls 1 title "solids4foam" \
+plot "postProcessing/0/solidPointDisplacement_displacement.dat" u ($1):($2) w l ls 1 title "solids4foam" \
         ,"referenceSolution/refSol.tsv" u ($1):($2) w l ls 2 title "Meduri et al. [2]" \
         ,"referenceSolution/refSol.tsv" u ($1):($3) w l ls 3 title "Ryzhakov et al. [3]"

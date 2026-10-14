@@ -30,6 +30,9 @@ Description
 
     An implicit Newton-Raphson algorithm is employed.
 
+    The stress at the dual mesh faces comes from the mechanicalConstitutiveLaw
+    framework.
+
 Author
     Philip Cardiff, UCD.
     Federico Mazzanti, UCD.
@@ -48,7 +51,8 @@ SourceFiles
 #include "pointFields.H"
 #include "uniformDimensionedFields.H"
 #include "GeometricField.H"
-#include "dualMechanicalModel.H"
+#include "mechanicalConstitutiveLawManager.H"
+#include "integrationPointTopologies.H"
 #include "globalPointIndices.H"
 #include "twoDPointCorrectorS4f.H"
 #ifdef OPENFOAM_COM
@@ -83,14 +87,17 @@ private:
 
     // Private Data
 
-        //- Mechanical model for dual mesh
-        autoPtr<dualMechanicalModel> dualMechanicalPtr_;
+        //- Integration-point topology for the internal dual mesh faces,
+        //  owned by the manager
+        mutable const integrationPointTopology* dualFaceTopologyPtr_;
 
-        //- Implicit stiffness used by segregated algorithm
-        //  Coefficient of the Laplacian term. Defined at the dual mesh faces.
-        //  The value of this term only affects convergence and not the answer
-        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        mutable autoPtr<surfaceScalarField> dualImpKfPtr_;
+        //- Integration-point topology for the boundary dual mesh faces whose
+        //  stress is evaluated, owned by the manager
+        mutable const integrationPointTopology* dualBoundaryFaceTopologyPtr_;
+
+        //- Dual mesh face index of each integration point of the boundary
+        //  dual-face topology
+        mutable labelList dualBoundaryFaces_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -204,11 +211,27 @@ private:
         }
 #endif
 
-        //- Make dualImpKf field
-        void makeDualImpKf() const;
+        //- Return the integration-point topology for the internal dual faces
+        const integrationPointTopology& dualFaceTopology() const;
 
-        //- Return dualImpK field
-        const surfaceScalarField& dualImpKf() const;
+        //- Return the integration-point topology for the boundary dual faces
+        //  whose stress is evaluated. The dual mesh face index of each of its
+        //  integration points is dualBoundaryFaces_
+        const integrationPointTopology& dualBoundaryFaceTopology() const;
+
+        //- Update the stress at the dual mesh faces from the displacement
+        //  gradient there
+        void correctDualStress
+        (
+            const surfaceTensorField& dualGradDf,
+            surfaceSymmTensorField& dualSigmaf
+        );
+
+        //- Update the primary mesh cell stress field from gradD
+        void correctCellStress();
+
+        //- Implicit stiffness at the primary mesh cells
+        tmp<volScalarField> impK() const;
 
         //- Predict displacement field using the velocity field
         void predict();

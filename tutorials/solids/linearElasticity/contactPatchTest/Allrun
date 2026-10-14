@@ -6,6 +6,10 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+echo
+echo "Compiling libraries..."
+(cd src && bash ./Allwmake -s)
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 

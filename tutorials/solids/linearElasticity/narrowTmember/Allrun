@@ -2,18 +2,10 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-# PETSc is required for this case
-if [[ -z "${PETSC_DIR:-}" ]]
-then
-    echo; echo "Skipping this case as PETSc is not installed"
-    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
-    exit 0
-fi
-
 # -------------------------------------------------------------------------
 # solids4Foam Allrun script
 # Allows selection of solution approach:
-#   petscSnes (default), segregated, unsCoupled, physicsPC
+#   petscSnes (default), segregated, unsCoupled
 # -------------------------------------------------------------------------
 
 usage() {
@@ -25,13 +17,11 @@ Where [approach] is one of:
   petscSnes       (default)
   segregated
   unsCoupled
-  physicsPC
 
 Examples:
   ./Allrun
   ./Allrun segregated
   ./Allrun unsCoupled
-  ./Allrun physicsPC
 EOF
 }
 
@@ -57,7 +47,7 @@ fi
 APPROACH="${1:-petscSnes}"
 
 case "$APPROACH" in
-    petscSnes|segregated|unsCoupled|physicsPC) ;;
+    petscSnes|segregated|unsCoupled) ;;
     *)
         echo "Error: Unknown approach '$APPROACH'"
         usage
@@ -79,13 +69,7 @@ link_files_for_suffix() {
 }
 
 require_petsc_or_exit_silently() {
-    if [[ -z "${PETSC_DIR:-}" ]]; then
-        echo
-        echo "Skipping this case as PETSc is not installed"
-        echo "Please set the PETSC_DIR variable"
-        echo
-        exit 0
-    fi
+    solids4Foam::requirePetscOrExitSilently
 }
 
 select_approach() {
@@ -98,11 +82,6 @@ select_approach() {
             echo "Using the unsCoupled approach"
             solids4Foam::caseOnlyRunsWithFoamExtend
             link_files_for_suffix "unsCoupled"
-            ;;
-        physicsPC)
-            echo "Using the physicsPC approach"
-            require_petsc_or_exit_silently
-            link_files_for_suffix "physicsPC"
             ;;
         petscSnes|*)
             echo "Using the petscSnes approach"

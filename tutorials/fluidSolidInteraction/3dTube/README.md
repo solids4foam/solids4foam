@@ -1,5 +1,5 @@
 ---
-sort: 4
+sort: 5
 ---
 
 # My fourth tutorial: `3dTube`
@@ -82,7 +82,7 @@ convergence, for example, see
 effects in strongly coupled fluid–solid interaction problems,” Engineering with
 Computers, 2019, doi: 10.1007/s00366-019-00880-4.](https://doi.org/10.1007/s00366-019-00880-4).
 
-In this tutorial, we will compare six variants of the approaches above:
+In this tutorial, we will compare seven variants of the approaches above:
 
 1. **Dirichlet-Neumann formulation with Aitken's acceleration and an
    incompressible fluid model**: We use the `pimpleFluid` fluid model.
@@ -95,7 +95,12 @@ In this tutorial, we will compare six variants of the approaches above:
 5. **Robin-Neumann formulation with an incompressible fluid**: Support for this
    approach is implemented in the `pimpleFluid` model, where we apply special
    interface boundary conditions: `elasticWallPressure` for the fluid pressure
-   field, and `elasticWallVelocity` for the fluid velocity field.
+   field, and `elasticWallVelocity` for the fluid velocity field. The Robin
+   coefficient is chosen automatically (`hsModel secant`, the default), and the
+   coupling uses unrelaxed fixed-point iterations (`fixedRelaxation` with
+   `relaxationFactor 1` in `constant/fsiProperties.robin`), for which the
+   Robin-Neumann approach is designed; Aitken or IQN-ILS acceleration is not
+   recommended with it.
 6. **Dirichlet-Neumann formulation with IQNILS acceleration and an
    incompressible fluid model using preCICE**: This approach is the same as
    approach 1, except the [preCICE](http://precice.org) coupling implementation
@@ -105,6 +110,13 @@ In this tutorial, we will compare six variants of the approaches above:
    solids4foam's `pimpleFluid` fluid model). Due to implementation differences,
    this preCICE IQNILS approach may perform differently than the built-in
    solids4foam approach.
+
+7. **Robin-Neumann formulation with weak (explicit) coupling**: The fluid setup
+   is the same as approach 5, but the interface is advanced once per time-step
+   with no outer iterations, using the `weakCoupling` interface. Weak coupling
+   is not expected to reproduce the strongly coupled result on this case; the
+   variant is included so that the `weakCoupling` code path is exercised with a
+   Robin pressure condition.
 
 In all approaches, the solid domain setup is the same, where an
 incremental small strain formulation is used (the `linearGeometry` solid model).
@@ -134,6 +146,7 @@ The tutorial case can be run using the included `Allrun` script, i.e.
 # ./Allrun # default behaviour is Robin-Neumann coupling
 # ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
+# ./Allrun weakCoupling
 
 # Select approach
 if [[ "$1" == "sonicLiquidFluid" ]]; then
@@ -165,18 +178,6 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-# Check fvSolution for foundation version
-if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
-then
-    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
-    then
-        echo "OpenFOAM.org specific: replacing 'residualControl' with"
-        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
-        sed -i "s/residualControl/outerCorrectorResidualControl/g" \
-            "${CASE_DIR}"/system/fluid/fvSolution
-    fi
-fi
-
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
@@ -205,7 +206,10 @@ As can be seen above, the `Allrun` script can be run with different values for
  weakly compressible fluid model (approaches 3 and 4) can be used by running the
  `Allrun` script with the argument `sonicLiquidFluid`, i.e. `./Allrun sonicLiquidFluid`.
  Once again, switching between approach 3 (Aitken's) and 4 (IQNILS) is controlled
- via the `fluidSolidInterface` setting in `constant/fsiProperties`.
+ via the `fluidSolidInterface` setting in `constant/fsiProperties`. Weak
+ coupling (approach 7) is selected with `./Allrun weakCoupling`, which uses the
+ same Robin-Neumann fluid setup as approach 5 but overrides
+ `constant/fsiProperties` with `constant/fsiProperties.weakCoupling`.
  Examining the `U` and `p` files in `0/fluid.robin/` shows that the Robin
  approach uses the custom conditions `elasticWallVelocity` and `elasticWallPressure`
  at the interface.
@@ -221,9 +225,12 @@ The `Allrun` script updates the case with links to the correct files to be used
   time.
 - `fsiConvergence.pdf`: this plots the number of FSI iterations per time step.
 
-The tutorial case for approach 6, which uses preCICE, is located at
-`solids4foam/tutorials/fluidSolidInteraction-preCICE/3dTube`; once again, the
-`Allrun` script runs the case.
+Approach 6 uses preCICE. solids4foam's preCICE cases are maintained in the
+[preCICE tutorials](https://precice.org/tutorials.html) rather than in this
+repository, and are exercised by `tests/precice`; see
+`tests/precice/README.md`. A standalone preCICE version of this case was
+distributed with solids4foam up to v2.4 and remains available as an archive
+from the solids4foam website.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
@@ -402,6 +409,32 @@ size for fluid-solid interaction simulations.
 
 **Table 1: Clock times for the Euler and backward with different time step
 sizes**
+
+## Verification Study
+
+The opt-in [`verification/`](verification/) directory runs the case through a
+mesh and time-step sweep with the second-order `backward` scheme and compares
+the radial displacement at point A with the finite volume results of Tuković
+et al. (2018, Trans. FAMENA 42(3)). A second study repeats the
+published first-order `Euler`, `Δt = 1e-4 s` discretisation and compares the
+point-A histories with the finite element results of Lozovskiy et al. (2019,
+Computers & Fluids 179) and Eken (2016). The pulse-wave speed is checked
+against a thick-wall estimate, and a coupling study compares the
+Robin-Neumann and IQN-ILS solutions:
+
+```bash
+cd verification
+./Allverify                      # Robin-Neumann mesh sweep, levels 1 and 2
+./Allverify --study literature   # the published Euler, dt = 1e-4 s setup
+./Allverify --study coupling     # Robin-Neumann vs IQN-ILS on the tutorial mesh
+```
+
+The published results are read from figures rather than tables. The
+first-order time scheme lowers the peak radial displacement by about a quarter
+at `Δt = 1e-4 s`, which is why the two families of published results differ. The
+study is separate from `regressionTest.sh` and is not run by the normal
+tutorial test suites. See the verification README for the mesh levels,
+options, acceptance criteria, reference quality and recorded results.
 
 ## Data Availability
 

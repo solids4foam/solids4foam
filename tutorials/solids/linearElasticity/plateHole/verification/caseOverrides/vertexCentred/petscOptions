@@ -1,0 +1,6 @@
+-ksp_type cg
+-sub_pc_type ilu
+-sub_pc_factor_levels 1
+-ksp_max_it 5000
+-ksp_atol 1e-12
+-ksp_rtol 1e-12

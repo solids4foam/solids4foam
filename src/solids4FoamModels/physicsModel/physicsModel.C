@@ -132,7 +132,7 @@ Foam::autoPtr<Foam::physicsModel> Foam::physicsModel::New
 
     Info<< "Selecting physicsModel " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = physicsModelConstructorTable(modelType);
 
     if (!ctorPtr)

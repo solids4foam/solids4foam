@@ -17,14 +17,16 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#if defined(USE_PETSC) && !defined(FOAMEXTEND)
+#ifdef USE_PETSC
 
 #include <algorithm>
 
 #include "hofvm.H"
+#include "multiplyCoeff.H"
 #include "fvc.H"
 #include "fvmD2dt2.H"
 #include "compatibilityFunctions.H"
+#include "deltaVectors.H"
 #include "surfaceFields.H"
 #include "petscErrorHandling.H"
 #include "emptyPolyPatch.H"
@@ -122,19 +124,19 @@ inline void addTensorCoeff
 
 Foam::tensor Foam::hofvm::laplacianCoeff
 (
-    const scalar& gammaMagSf,
+    const scalar& gamma,
     const scalar& quadWeight,
     const vector& gradInterpCoeff,
     const vector& faceNormal
 )
 {
-    return I*gammaMagSf*quadWeight*(gradInterpCoeff & faceNormal);
+    return I*gamma*quadWeight*(gradInterpCoeff & faceNormal);
 }
 
 
 Foam::tensor Foam::hofvm::laplacianTransposeCoeff
 (
-    const scalar& gammaMagSf,
+    const scalar& gamma,
     const scalar& quadWeight,
     const vector& gradInterpCoeff,
     const vector& faceNormal
@@ -143,7 +145,7 @@ Foam::tensor Foam::hofvm::laplacianTransposeCoeff
     const vector& c = gradInterpCoeff;
     const vector& n = faceNormal;
 
-    return gammaMagSf*quadWeight
+    return gamma*quadWeight
        *tensor
         (
             c.x()*n.x(), c.x()*n.y(), c.x()*n.z(),
@@ -155,7 +157,7 @@ Foam::tensor Foam::hofvm::laplacianTransposeCoeff
 
 Foam::tensor Foam::hofvm::laplacianTraceCoeff
 (
-    const scalar& gammaMagSf,
+    const scalar& gamma,
     const scalar& quadWeight,
     const vector& gradInterpCoeff,
     const vector& faceNormal
@@ -164,7 +166,7 @@ Foam::tensor Foam::hofvm::laplacianTraceCoeff
     const vector& c = gradInterpCoeff;
     const vector& n = faceNormal;
 
-    return gammaMagSf*quadWeight
+    return gamma*quadWeight
        *tensor
         (
             c.x()*n.x(), c.y()*n.x(), c.z()*n.x(),
@@ -189,41 +191,106 @@ static label hofvmLaplacianPETSc
 (
     Mat matrix,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
-    const volScalarField& diffusivity,
+    const volScalarField* diffusivityPtr,
     tensor (*calcCoeff)
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
     ),
+    const List<mat66>* materialTangentPtr,
     const label rowOffset,
     const label colOffset
 )
 {
     const fvMesh& mesh = D.mesh();
 
-    const movingLeastSquaresStencil& stencil = mls.stencilData();
+    if (bool(diffusivityPtr) == bool(materialTangentPtr))
+    {
+        FatalErrorInFunction
+            << "Supply exactly one of a scalar diffusivity and a material "
+            << "tangent."
+            << abort(FatalError);
+    }
+
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
-    const scalarField& magSfI = mesh.magSf().internalField();
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const label nScalarEqns = nDisplacementEqns(mesh);
 
     // Diffusion coefficient linearly interpolated to face centres.
     // If Gamma is not constant, next step is to interpolate diffusivity to
     // quad points using  hofvc::interpolate
-    const surfaceScalarField gamma(fvc::interpolate(diffusivity));
-    const scalarField& gammaI = gamma.internalField();
+    // Interpolated only on the scalar-coefficient path. With a full material
+    // tangent there is no scalar diffusivity to interpolate
+    autoPtr<surfaceScalarField> gammaPtr;
+    if (diffusivityPtr)
+    {
+        gammaPtr.set(new surfaceScalarField(fvc::interpolate(*diffusivityPtr)));
+    }
+
+    const scalarField* gammaIPtr =
+        diffusivityPtr ? &Foam::primitiveField(gammaPtr()) : nullptr;
+
+    // Coefficient at one quadrature point.
+    // Either one of the three isotropic kernels scaled by a scalar
+    // diffusivity, or the full material tangent contracted with the face area
+    // vector and the gradient interpolation coefficient. The two agree
+    // identically for an isotropic tangent: summing the laplacian, transpose
+    // and trace kernels gives w*(mu*(n.g)*I + mu*g_i*n_j + lambda*n_i*g_j),
+    // which is Sf_m C_mikl g_k delta_lj with Sf = w*n
+    auto coeffAt =
+        [&]
+        (
+            const label faceID,
+            const scalar gammaFace,
+            const scalar quadPointW,
+            const vector& gradInterpCoeff,
+            const vector& faceNormal
+        ) -> tensor
+        {
+            if (materialTangentPtr)
+            {
+                tensor c(tensor::zero);
+                multiplyCoeff
+                (
+                    c,
+                    quadPointW*faceNormal,
+                    (*materialTangentPtr)[faceID],
+                    gradInterpCoeff
+                );
+                return c;
+            }
+
+            return calcCoeff
+            (
+                gammaFace, quadPointW, gradInterpCoeff, faceNormal
+            );
+        };
 
     // Face quadrature points weights, stencils and gradient interpolation
     // coefficients
-    const CompactListList<scalar>& faceQuadWeights =
-        mls.quadrature().faceQuadWeights();
-    const CompactListList<label>& stencils = stencil.facesStencil();
-    const List<CompactListList<vector>>& gradCoeffs = mls.faceGradCoeffsData();
+    auto& faceQuadWeights = compactListListCRef
+    (
+        reconstruction.quadrature().faceQuadWeights()
+    );
+    auto& stencils = compactListListCRef
+    (
+        reconstruction.faceGradStencil()
+    );
+#ifdef FOAMEXTEND
+    List<CompactListList<vector>>& gradCoeffs =
+        const_cast<List<CompactListList<vector>>&>
+        (
+            reconstruction.faceGradCoeffs()
+        );
+#else
+    const List<CompactListList<vector>>& gradCoeffs =
+        reconstruction.faceGradCoeffs();
+#endif
 
     // Get the blockSize
     label blockSize = -1;
@@ -237,7 +304,10 @@ static label hofvmLaplacianPETSc
     forAll(owner, faceI)
     {
         const vector& faceNormal = n[faceI];
-        const scalar gammaMagSf = magSfI[faceI]*gammaI[faceI];
+        const scalar gammaFace =
+            gammaIPtr
+          ? (*gammaIPtr)[faceI]
+          : 0.0;
         const label ownCellID = owner[faceI];
         const label neiCellID = neighbour[faceI];
         const PetscInt globalOwnRow =
@@ -254,9 +324,10 @@ static label hofvmLaplacianPETSc
             {
                 const PetscInt globalCellID = stencil[cI];
                 const tensor coeff =
-                    calcCoeff
+                    coeffAt
                     (
-                        gammaMagSf,
+                        faceI,
+                        gammaFace,
                         quadPointW,
                         gradCoeffs[faceI][qpI][cI],
                         faceNormal
@@ -304,8 +375,10 @@ static label hofvmLaplacianPETSc
 
         if (isA<processorPolyPatch>(pp))
         {
-            const scalarField& pMagSf = mesh.magSf().boundaryField()[patchI];
-            const scalarField& pGamma = gamma.boundaryField()[patchI];
+            const scalarField* pGammaPtr =
+                diffusivityPtr
+              ? &gammaPtr().boundaryField()[patchI]
+              : nullptr;
             const vectorField patchNormal(mesh.boundary()[patchI].nf());
             const label start = pp.start();
 
@@ -316,7 +389,9 @@ static label hofvmLaplacianPETSc
                 const PetscInt globalOwnRow =
                     petscSnesHelper.globalCells().toGlobal(ownCellID);
                 const vector& faceNormal = patchNormal[faceI];
-                const scalar gammaMagSf = pMagSf[faceI]*pGamma[faceI];
+                // The scalar coefficient is unused on the material-tangent path
+                const scalar gammaFace =
+                    pGammaPtr ? (*pGammaPtr)[faceI] : 0.0;
                 const labelUList stencil = stencils[faceID];
 
                 forAll(faceQuadWeights[faceID], qpI)
@@ -327,9 +402,10 @@ static label hofvmLaplacianPETSc
                     {
                         const PetscInt globalCellID = stencil[cI];
                         const tensor coeff =
-                            calcCoeff
+                            coeffAt
                             (
-                                gammaMagSf,
+                                faceID,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
                                 faceNormal
@@ -363,8 +439,10 @@ static label hofvmLaplacianPETSc
                 << abort(FatalError);
         }
 
-        const scalarField& pMagSf = mesh.magSf().boundaryField()[patchI];
-        const scalarField& pGamma = gamma.boundaryField()[patchI];
+        const scalarField* pGammaPtr =
+            diffusivityPtr
+          ? &gammaPtr().boundaryField()[patchI]
+          : nullptr;
         const vectorField patchNormal(mesh.boundary()[patchI].nf());
         const label start = pp.start();
 
@@ -387,7 +465,9 @@ static label hofvmLaplacianPETSc
                 const vector& faceNormal = patchNormal[faceI];
                 const tensor R = I - 2.0*sqr(faceNormal);
 
-                const scalar gammaMagSf = pMagSf[faceI]*pGamma[faceI];
+                // The scalar coefficient is unused on the material-tangent path
+                const scalar gammaFace =
+                    pGammaPtr ? (*pGammaPtr)[faceI] : 0.0;
                 const labelUList stencil = stencils[faceID];
                 const label stencilSize = stencil.size();
 
@@ -400,18 +480,20 @@ static label hofvmLaplacianPETSc
                         const PetscInt globalCellID = stencil[cI];
 
                         const tensor coeff =
-                            calcCoeff
+                            coeffAt
                             (
-                                gammaMagSf,
+                                faceID,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
                                 faceNormal
                             );
 
                         const tensor mirrorCoeff =
-                            calcCoeff
+                            coeffAt
                             (
-                                gammaMagSf,
+                                faceID,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI + stencilSize],
                                 faceNormal
@@ -458,7 +540,9 @@ static label hofvmLaplacianPETSc
                 const PetscInt globalOwnRow =
                     petscSnesHelper.globalCells().toGlobal(ownCellID);
                 const vector& faceNormal = patchNormal[faceI];
-                const scalar gammaMagSf = pMagSf[faceI]*pGamma[faceI];
+                // The scalar coefficient is unused on the material-tangent path
+                const scalar gammaFace =
+                    pGammaPtr ? (*pGammaPtr)[faceI] : 0.0;
                 const labelUList stencil = stencils[faceID];
 
                 forAll(faceQuadWeights[faceID], qpI)
@@ -469,9 +553,10 @@ static label hofvmLaplacianPETSc
                     {
                         const PetscInt globalCellID = stencil[cI];
                         const tensor coeff =
-                            calcCoeff
+                            coeffAt
                             (
-                                gammaMagSf,
+                                faceID,
+                                gammaFace,
                                 quadPointW,
                                 gradCoeffs[faceID][qpI][cI],
                                 faceNormal
@@ -518,7 +603,7 @@ label Foam::hofvm::initialiseJacobian
 (
     Mat& jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const label blockSize,
     const bool createMat
@@ -548,7 +633,17 @@ label Foam::hofvm::initialiseJacobian
         AssertPETSc(MatSetFromOptions(jac));
     }
 
-    const CompactListList<label>& stencils = mls.stencilData().facesStencil();
+    auto& stencils = compactListListCRef
+    (
+        reconstruction.faceGradStencil()
+    );
+    auto& cellStencils = compactListListCRef
+    (
+        reconstruction.stencil().cellsStencil()
+    );
+    const globalIndex& reconstructionGlobalCells =
+        reconstruction.stencil().globalCells();
+
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
     List<labelHashSet> rowCols(blockn);
@@ -571,6 +666,32 @@ label Foam::hofvm::initialiseJacobian
         forAll(faceStencil, cI)
         {
             const label globalCellID = faceStencil[cI];
+            rowCols[ownCellID].insert(globalCellID);
+            rowCols[neiCellID].insert(globalCellID);
+        }
+
+        // Here we will insert cells that are being used by stabilisation
+        // Stabilisation is using cell centred stencils
+        const label globalOwnCellID =
+            reconstructionGlobalCells.toGlobal(ownCellID);
+        const label globalNeiCellID =
+            reconstructionGlobalCells.toGlobal(neiCellID);
+
+        rowCols[ownCellID].insert(globalOwnCellID);
+        rowCols[ownCellID].insert(globalNeiCellID);
+        rowCols[neiCellID].insert(globalOwnCellID);
+        rowCols[neiCellID].insert(globalNeiCellID);
+
+        forAll(cellStencils[ownCellID], cI)
+        {
+            const label globalCellID = cellStencils[ownCellID][cI];
+            rowCols[ownCellID].insert(globalCellID);
+            rowCols[neiCellID].insert(globalCellID);
+        }
+
+        forAll(cellStencils[neiCellID], cI)
+        {
+            const label globalCellID = cellStencils[neiCellID][cI];
             rowCols[ownCellID].insert(globalCellID);
             rowCols[neiCellID].insert(globalCellID);
         }
@@ -635,11 +756,22 @@ label Foam::hofvm::initialiseJacobian
                 {
                     rowCols[ownCellID].insert(faceStencil[cI]);
                 }
+
+                if (patchField.fixesValue())
+                {
+                    const labelUList cellStencil =
+                        cellStencils[ownCellID];
+
+                    forAll(cellStencil, cI)
+                    {
+                        rowCols[ownCellID].insert(cellStencil[cI]);
+                    }
+                }
             }
         }
     }
 
-#ifdef OPENFOAM_ORG
+#ifndef OPENFOAM_COM
     const label myProcNo = Pstream::myProcNo();
     const label gStart = petscSnesHelper.globalCells().offset(myProcNo);
     const label gEnd =
@@ -683,7 +815,24 @@ label Foam::hofvm::initialiseJacobian
 
     AssertPETSc(MatSetOption(jac, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
     AssertPETSc(MatSetOption(jac, MAT_KEEP_NONZERO_PATTERN, PETSC_TRUE));
-    AssertPETSc(MatSetOption(jac, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
+
+    PetscBool matIsAIJ = PETSC_FALSE;
+    AssertPETSc
+    (
+        PetscObjectTypeCompareAny
+        (
+            reinterpret_cast<PetscObject>(jac),
+            &matIsAIJ,
+            MATSEQAIJ,
+            MATMPIAIJ,
+            ""
+        )
+    );
+
+    if (matIsAIJ)
+    {
+        AssertPETSc(MatSetOption(jac, MAT_IGNORE_ZERO_ENTRIES, PETSC_TRUE));
+    }
 
     return 0;
 }
@@ -693,7 +842,7 @@ void Foam::hofvm::laplacianIntoPETScMatrix
 (
     Mat jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const label rowOffset,
@@ -704,10 +853,11 @@ void Foam::hofvm::laplacianIntoPETScMatrix
     (
         jac,
         petscSnesHelper,
-        mls,
+        reconstruction,
         D,
-        diffusivity,
+        &diffusivity,
         hofvm::laplacianCoeff,
+        nullptr,          // no material tangent on this path
         rowOffset,
         colOffset
     );
@@ -718,7 +868,7 @@ void Foam::hofvm::laplacianTransposeIntoPETScMatrix
 (
     Mat jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const label rowOffset,
@@ -729,10 +879,11 @@ void Foam::hofvm::laplacianTransposeIntoPETScMatrix
     (
         jac,
         petscSnesHelper,
-        mls,
+        reconstruction,
         D,
-        diffusivity,
+        &diffusivity,
         hofvm::laplacianTransposeCoeff,
+        nullptr,          // no material tangent on this path
         rowOffset,
         colOffset
     );
@@ -743,7 +894,7 @@ void Foam::hofvm::laplacianTraceIntoPETScMatrix
 (
     Mat jac,
     const foamPetscSnesHelper& petscSnesHelper,
-    const movingLeastSquares& mls,
+    const leastSquaresScheme& reconstruction,
     const volVectorField& D,
     const volScalarField& diffusivity,
     const label rowOffset,
@@ -754,13 +905,239 @@ void Foam::hofvm::laplacianTraceIntoPETScMatrix
     (
         jac,
         petscSnesHelper,
-        mls,
+        reconstruction,
         D,
-        diffusivity,
+        &diffusivity,
         hofvm::laplacianTraceCoeff,
+        nullptr,          // no material tangent on this path
         rowOffset,
         colOffset
     );
+}
+
+
+void Foam::hofvm::divSigmaIntoPETScMatrix
+(
+    Mat jac,
+    const foamPetscSnesHelper& petscSnesHelper,
+    const leastSquaresScheme& reconstruction,
+    const volVectorField& D,
+    const List<mat66>& materialTangent,
+    const label rowOffset,
+    const label colOffset
+)
+{
+    if (materialTangent.size() != D.mesh().nFaces())
+    {
+        FatalErrorInFunction
+            << "The material tangent must be indexed by mesh face and sized "
+            << D.mesh().nFaces() << ", but it has "
+            << materialTangent.size() << " entries."
+            << exit(FatalError);
+    }
+
+    hofvm::hofvmLaplacianPETSc
+    (
+        jac,
+        petscSnesHelper,
+        reconstruction,
+        D,
+        nullptr,          // no scalar diffusivity on this path
+        nullptr,          // and so no scalar coefficient kernel
+        &materialTangent,
+        rowOffset,
+        colOffset
+    );
+}
+
+
+void Foam::hofvm::insertAlphaStabIntoPETScMatrix
+(
+    Mat jac,
+    const foamPetscSnesHelper& petscSnesHelper,
+    const leastSquaresScheme& reconstruction,
+    const volVectorField& D,
+    const surfaceScalarField& diffusivity,
+    const scalar scaleFactor,
+    const label rowOffset,
+    const label colOffset
+)
+{
+    // Support for processor-face coefficient assembly will be added
+    if (Pstream::parRun())
+    {
+        return;
+    }
+
+     // Skip in the case of very small stabilisation factor
+    if ( mag(scaleFactor) < SMALL)
+    {
+        return;
+    }
+
+    // Preliminaries
+    const fvMesh& mesh = D.mesh();
+    const label nScalarEqns = nDisplacementEqns(mesh);
+    const labelUList& owner = mesh.owner();
+    const labelUList& neighbour = mesh.neighbour();
+    const vectorField& C = mesh.C();
+    const surfaceVectorField n(mesh.Sf()/mesh.magSf());
+    const vectorField& nI = n.internalField();
+    const vectorField deltaI(deltaVectors(mesh));
+    const scalarField& magSfI = mesh.magSf().internalField();
+    const scalarField& diffusivityI = diffusivity.internalField();
+
+    auto& cellStencils = compactListListCRef
+    (
+        reconstruction.stencil().cellsStencil()
+    );
+    const globalIndex& globalCells = reconstruction.stencil().globalCells();
+
+    // Get owner and neighbour side value reconstruction coefficients
+    auto& ownerCoeffs = compactListListCRef
+    (
+        reconstruction.ownerFaceCentreValueCoeffs()
+    );
+    auto& neighbourCoeffs = compactListListCRef
+    (
+        reconstruction.neighbourFaceCentreValueCoeffs()
+    );
+
+    label blockSize = -1;
+    AssertPETSc(MatGetBlockSize(jac, &blockSize));
+    List<PetscScalar> values(blockSize*blockSize, 0.0);
+
+    // Insert one reconstructed face value. Coefficients are ordered as the
+    // cell stencil followed by the reconstruction owner.
+    const auto insertReconstruction =
+    [&]
+    (
+        const label cellID,
+        const UList<scalar>& coeffs,
+        const scalar coeffScale,
+        const PetscInt globalRow,
+        const PetscInt* oppositeRow
+    )
+    {
+        const labelUList cellStencil = cellStencils[cellID];
+
+        forAll(coeffs, coeffI)
+        {
+            const PetscInt globalCellID =
+                coeffI < cellStencil.size()
+              ? cellStencil[coeffI]
+              : globalCells.toGlobal(cellID);
+            const tensor coeff = coeffScale*coeffs[coeffI]*I;
+
+            addTensorCoeff
+            (
+                jac,
+                values,
+                coeff,
+                globalRow,
+                globalCellID,
+                blockSize,
+                nScalarEqns,
+                rowOffset,
+                colOffset
+            );
+
+            if (oppositeRow != nullptr)
+            {
+                addTensorCoeff
+                (
+                    jac,
+                    values,
+                    -coeff,
+                    *oppositeRow,
+                    globalCellID,
+                    blockSize,
+                    nScalarEqns,
+                    rowOffset,
+                    colOffset
+                );
+            }
+        }
+    };
+
+    // Internal-face stabilisation is added to the owner cell and subtracted
+    // from the neighbour cell.
+    forAll(owner, faceI)
+    {
+        const label ownCellID = owner[faceI];
+        const label neiCellID = neighbour[faceI];
+        const PetscInt globalOwnRow =
+            petscSnesHelper.globalCells().toGlobal(ownCellID);
+        const PetscInt globalNeiRow =
+            petscSnesHelper.globalCells().toGlobal(neiCellID);
+        const scalar faceScale =
+            scaleFactor*diffusivityI[faceI]*magSfI[faceI]
+           /max(mag(nI[faceI] & deltaI[faceI]), VSMALL);
+
+        // Insert owner side
+        insertReconstruction
+        (
+            ownCellID,
+            ownerCoeffs[faceI],
+            -faceScale,
+            globalOwnRow,
+            &globalNeiRow
+        );
+        // Insert neighbour side
+        insertReconstruction
+        (
+            neiCellID,
+            neighbourCoeffs[faceI],
+            faceScale,
+            globalOwnRow,
+            &globalNeiRow
+        );
+    }
+
+    // On fixed-value boundaries, the prescribed face value is independent of
+    // the cell unknowns, so only the owner reconstruction is added.
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatchVectorField& patchField = D.boundaryField()[patchI];
+
+        // Only patch that have prescribed value has stabilisation included
+        if (!patchField.fixesValue())
+        {
+            continue;
+        }
+
+        const fvPatch& patch = mesh.boundary()[patchI];
+        const labelUList& faceCells = patch.faceCells();
+        const vectorField patchN(patch.nf());
+        const vectorField& patchCf = patch.Cf();
+        const scalarField& patchMagSf = mesh.magSf().boundaryField()[patchI];
+        const scalarField& patchDiffusivity =
+            diffusivity.boundaryField()[patchI];
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patch.patch().start() + patchFaceI;
+            const label ownCellID = faceCells[patchFaceI];
+            const PetscInt globalOwnRow =
+                petscSnesHelper.globalCells().toGlobal(ownCellID);
+            const vector d = patchCf[patchFaceI] - C[ownCellID];
+
+            const scalar faceScale =
+                scaleFactor*patchDiffusivity[patchFaceI]
+               *patchMagSf[patchFaceI]
+               /max(mag(patchN[patchFaceI] & d), VSMALL);
+
+            // Insert owner side
+            insertReconstruction
+            (
+                ownCellID,
+                ownerCoeffs[faceI],
+                -faceScale,
+                globalOwnRow,
+                nullptr
+            );
+        }
+    }
 }
 
 } // End namespace Foam

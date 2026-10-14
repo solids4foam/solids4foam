@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -27,7 +27,7 @@ AitkenCoeffs
     relaxationFactor 0.4;
     interfaceDeformationLimit 0;
     outerCorrTolerance 1e-6;
-    nOuterCorr 20;
+    nOuterCorr 50;
     coupled yes;
 }
 

@@ -1,0 +1,21 @@
+#!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
+: "${FOAM_LD_LIBRARY_PATH:=}"
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
+source solids4FoamScripts.sh
+
+# OpenFOAM v2512's CleanFunctions reads an unset variable, which set -u
+# would turn into an exit before anything is cleaned.
+set +u
+cleanCase
+set -u
+\rm -rf constant/polyMesh case.foam postProcessing
+
+# Restore the default (linearGeometry) case files
+cp -a caseOptions/linearGeometry/. .
+
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .

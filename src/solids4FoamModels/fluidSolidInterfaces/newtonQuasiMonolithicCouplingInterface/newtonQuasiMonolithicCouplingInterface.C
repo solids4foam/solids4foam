@@ -1662,8 +1662,8 @@ void newtonQuasiMonolithicCouplingInterface::restoreOldTimeState
     D = D.oldTime();
     D.correctBoundaryConditions();
 
-    solid().mechanical().grad(D, solid().gradD());
-    solid().mechanical().interpolate(D, solid().gradD(), solid().pointD());
+    solid().gradD() = fvc::grad(D);
+    solid().interpolatePointDisplacement(D, solid().gradD(), solid().pointD());
     solid().pointD().correctBoundaryConditions();
 
     solid().sigma() = solid().sigma().oldTime();
@@ -1863,7 +1863,7 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             (
                 1.0
                /(
-                   solid().mechanical().shearModulus()().primitiveField()
+                   solid().shearModulus()().primitiveField()
                   *runTime.deltaTValue()
                 )
             )
@@ -2211,10 +2211,10 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
           - (deltaT/2.0)*USolid.oldTime().oldTime();
 
         // Update displacement gradient
-        solid().mechanical().grad(D, solid().gradD());
+        solid().gradD() = fvc::grad(D);
 
         // Interpolate cell displacements to vertices
-        solid().mechanical().interpolate
+        solid().interpolatePointDisplacement
         (
             D, solid().gradD(), solid().pointD()
         );

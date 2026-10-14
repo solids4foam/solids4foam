@@ -1,0 +1,230 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+
+#include "MooneyRivlinElasticMechanicalConstitutiveLaw.H"
+#include "addToRunTimeSelectionTable.H"
+#include "Switch.H"
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
+namespace Foam
+{
+    defineTypeNameAndDebug(MooneyRivlinElasticMechanicalConstitutiveLaw, 0);
+    addToRunTimeSelectionTable
+    (
+        mechanicalConstitutiveLaw,
+        MooneyRivlinElasticMechanicalConstitutiveLaw,
+        mechanicalConstitutiveLaw
+    );
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::
+MooneyRivlinElasticMechanicalConstitutiveLaw
+(
+    const dictionary& dict
+)
+:
+    mechanicalConstitutiveLaw(dict),
+    rho_(dict.lookup("rho")),
+    c10_(dict.lookup("c10")),
+    c01_(dict.lookup("c01")),
+    c11_(dict.lookup("c11")),
+    E_("E", dimPressure, 0.0),
+    nu_("nu", dimless, 0.0),
+    lambda_("lambda", dimPressure, 0.0),
+    mu_("mu", dimPressure, 0.0),
+    kappa_("kappa", dimPressure, 0.0)
+{
+    if
+    (
+        c10_.dimensions() != dimPressure
+     || c01_.dimensions() != dimPressure
+     || c11_.dimensions() != dimPressure
+    )
+    {
+        FatalIOErrorInFunction(dict)
+            << "The Mooney-Rivlin coefficients c10, c01 and c11 must all have "
+            << "dimensions " << dimPressure
+            << exit(FatalIOError);
+    }
+
+    // Shear modulus, from the pure shear stress state
+    mu_ = 2.0*(c10_ + c01_);
+
+    // The bulk modulus is given directly or derived from nu.
+    //
+    // K is taken when it is present and nu is ignored, so that an existing
+    // case dictionary carrying both keeps working and keeps its meaning.
+    // Rejecting that combination would be tidier but would break such
+    // dictionaries, so it is warned about instead
+    const bool haveK = dict.found("K");
+    const bool haveNu = dict.found("nu");
+
+    if (!haveK && !haveNu)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Specify either the bulk modulus 'K' or Poisson's ratio 'nu'."
+            << exit(FatalIOError);
+    }
+
+    if (haveK && haveNu)
+    {
+        WarningInFunction
+            << "Both 'K' and 'nu' are given: K is used and nu is ignored."
+            << endl;
+    }
+
+    if (haveK)
+    {
+        kappa_ = dimensionedScalar(dict.lookup("K"));
+
+        if (kappa_.dimensions() != dimPressure)
+        {
+            FatalIOErrorInFunction(dict)
+                << "The bulk modulus K must have dimensions " << dimPressure
+                << exit(FatalIOError);
+        }
+    }
+    else
+    {
+        nu_ = dimensionedScalar(dict.lookup("nu"));
+
+        if (nu_.dimensions() != dimless)
+        {
+            FatalIOErrorInFunction(dict)
+                << "Poisson's ratio nu must be dimensionless. "
+                << "Got " << nu_.dimensions()
+                << exit(FatalIOError);
+        }
+
+        if (nu_.value() >= 0.5 - SMALL)
+        {
+            FatalIOErrorInFunction(dict)
+                << "Poisson's ratio nu = " << nu_.value()
+                << " is too close to 0.5: the bulk modulus derived from it "
+                << "would be ill-conditioned. Give K directly instead."
+                << exit(FatalIOError);
+        }
+
+        // E follows from the small-strain limit
+        E_ = 6.0*(c10_ + c01_);
+        kappa_ = E_/(3.0*(1.0 - 2.0*nu_));
+    }
+
+    // Retained for the scalar tangent, which is expressed through lambda
+    lambda_ = kappa_ - (2.0/3.0)*mu_;
+}
+
+// * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * * //
+
+void Foam::MooneyRivlinElasticMechanicalConstitutiveLaw::evaluate
+(
+    const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    mechanicalConstitutiveLawResponse& response
+) const
+{
+    UIndirectList<symmTensor>& sigma = response.stress();
+
+    const UIndirectList<tensor>& F = kin.F();
+    const UIndirectList<scalar>& J = kin.J();
+
+    // Whether the caller wants the isochoric stress and the volumetric
+    // response separately, as a mixed displacement-pressure formulation does
+    const bool wantsSplit = response.wantsVolumetricSplit();
+    UIndirectList<scalar>* volumetricPtr =
+        wantsSplit ? &response.volumetric() : nullptr;
+
+    const scalar c10 = c10_.value();
+    const scalar c01 = c01_.value();
+    const scalar c11 = c11_.value();
+    const scalar kappaVal = kappa_.value();
+
+    // Not merely a positivity check: the stress divides by J and forms
+    // inv(isoB), so a J this close to zero is already meaningless
+    // numerically
+    const scalar Jmin = sqrt(SMALL);
+
+    forAll(sigma, i)
+    {
+        const tensor& Fi = F[i];
+        const scalar Ji = J[i];
+
+        if (Ji <= Jmin)
+        {
+            FatalErrorInFunction
+                << "Deformation gradient determinant J = " << Ji
+                << " at index " << i << " is not usable: J must be positive "
+                << "and greater than " << Jmin << ", since the stress divides "
+                << "by J. A J this small means the deformation has already "
+                << "degenerated."
+                << exit(FatalError);
+        }
+
+        // Isochoric left Cauchy-Green tensor and its invariants
+        const symmTensor isoB(pow(Ji, -2.0/3.0)*symm(Fi & Fi.T()));
+        const symmTensor sqrB(symm(isoB & isoB));
+
+        const scalar I1 = tr(isoB);
+        const scalar I2 = 0.5*(sqr(I1) - tr(sqrB));
+
+        // Isochoric stress
+        const symmTensor s
+        (
+            2.0*(c10 + c11*(I2 - 3.0))*isoB
+          - 2.0*(c01 + c11*(I1 - 3.0))*inv(isoB)
+        );
+
+        // Hydrostatic stress, unsmoothed: see the note in the header. A
+        // Laplacian smoothing over the field belongs to the solid model, not
+        // here
+        const scalar p = 0.5*kappaVal*(sqr(Ji) - 1.0);
+
+        sigma[i] = (1.0/Ji)*(dev(s) + p*I);
+
+        // A caller that asked for the two apart gets them apart. dev(s)/J is
+        // trace free, so for this law the split and a deviatoric projection of
+        // the total agree; that is not true of every law, which is why the
+        // caller asks rather than projecting
+        if (wantsSplit)
+        {
+            (*volumetricPtr)[i] = p/Ji;
+            sigma[i] = (1.0/Ji)*dev(s);
+        }
+    }
+
+    // Scalar tangent, if asked for. The deviatoric one is the Laplacian
+    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D))
+    fillScalarTangent
+    (
+        response,
+        (4.0/3.0)*mu_.value() + kappa_.value(),
+        (4.0/3.0)*mu_.value()
+    );
+
+    // No analytical fourth-order tangent has been derived for this law
+    fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
+}
+
+
+// ************************************************************************* //

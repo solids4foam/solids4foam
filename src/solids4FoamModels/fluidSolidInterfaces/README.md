@@ -1,5 +1,5 @@
 ---
-sort: 2
+sort: 6
 ---
 
 # Fluid-solid coupling schemes: `fluidSolidInterfaces`
@@ -91,6 +91,9 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
   measures in the shared FSI convergence check to satisfy the tolerance.
   Legacy behavior uses the minimum of the available residual measures, which
   can stop earlier when only one measure has decayed.
+- `outerCorrAbsoluteTolerance`: optional absolute interface residual
+  tolerance in metres, used by the strong coupling schemes (see
+  [Absolute residual tolerance](#absolute-residual-tolerance)).
 - `qrSolveTolerance`: relative cutoff used to ignore nearly singular
   directions during the triangular back-substitution.
 - `reorthogonalizeCouplingColumns`: optionally apply a second
@@ -120,6 +123,52 @@ Implementation:
 
 ---
 
+## Immersed interfaces
+
+A solid interface patch may drive an immersed body of the fluid (the
+`immersedBoundaryForce` finite volume option of `src/immersedBoundary`,
+OpenFOAM.com only) instead of a fluid patch: the fluid mesh is then fixed and
+needs no motion solver or interface mapping. The fluid patch of the interface
+is `none`, and the `immersedInterfaces` dictionary, keyed by the solid patch
+name, gives the body, whose motion must be `fsiDriven`, and optionally the
+`closurePatches`: other patches of the solid (e.g. a clamped root) such that
+the union of the interface and closure patches is a closed surface with
+outward normals. In a two-dimensional fluid mesh the patches of the empty
+direction are not needed: the surface is extended through the mesh and
+capped in that direction.
+
+```c++
+solidPatch      plate;
+fluidPatch      none;
+
+immersedInterfaces
+{
+    plate
+    {
+        body            flag;          // body of the fluid fvOptions
+        closurePatches  (plateFix);    // optional
+    }
+}
+```
+
+The lists `solidPatches`/`fluidPatches` may mix immersed (`none`) and
+body-fitted interfaces. In each coupling iteration the immersed surface is
+moved to the solid interface displacement of the coupling scheme (relaxed or
+accelerated as for a fluid patch), with the velocity of the displacement
+increment over the time step, and the traction on the solid patch is the
+surface traction of the immersed boundary averaged over the quadrature
+points of each face. The log compares its total with the momentum exchange
+between the fluid and the body. The immersed interfaces work with
+`fixedRelaxation`, `Aitken` and `IQNILS`, and not with `weakCoupling`,
+`oneWayCoupling`, `thermal` or the Robin (`elasticWallPressure`) interface
+conditions. See the `fluids/immersedBoundary/immersedHronTurekFsi2` tutorial.
+
+Implementation: `fluidSolidInterface/fsiImmersedInterface.{H,C}` builds the
+surface and maps the tractions, and `fluidSolidInterface/fsiImmersedBoundary.H`
+is the header-only interface implemented by `immersedBoundaryForce`.
+
+---
+
 ## Notes
 
 - The partitioned schemes share the common `fluidSolidInterface` machinery for
@@ -128,7 +177,59 @@ Implementation:
   `weakCoupling` is the cheapest, `fixedRelaxation` and `Aitken` are simple
   strong-coupling options, and `IQNILS` is the most sophisticated partitioned
   acceleration scheme in this directory.
+- `fixedRelaxation`, `Aitken` and `IQNILS` start each time step from the
+  solid predictor (`predictSolid`, default `yes`): the solid is solved once
+  with the fluid force of the previous time step. With `predictor` (default
+  `yes`), the first iteration moves the fluid interface with the full
+  predicted solid displacement; later iterations are relaxed or accelerated as
+  usual. The interface displacement is an increment within the time step, so
+  with `predictor no` the first iteration moves the fluid interface by only
+  `relaxationFactor` times the solid's step, and the interface stops, or with
+  backward time differencing reverses, as seen by the fluid. On cases with a
+  strong added-mass effect and a small `relaxationFactor`, the resulting
+  first-iteration fluid force can be hundreds of times the converged one and
+  make the solid diverge (#489).
 - For `IQNILS`, increasing `couplingReuse` can improve convergence, but it is
   not guaranteed to make a case monotonically more robust. The best reuse level
   is case dependent and interacts with time-step size and the quality of the
   inner fluid and solid solves.
+
+---
+
+## Absolute residual tolerance
+
+The shared convergence check normalizes the interface residual in two ways:
+residual1, relative to the largest residual in the time step, and residual2,
+relative to the largest total interface displacement. The legacy default
+accepts a step when `min(residual1, residual2) < outerCorrTolerance`, which
+can stop after one iteration through residual2 while residual1 is still large
+in quasi-steady phases, so the coupling error accumulates (#552). The log
+prints a note when the legacy test is passed by one measure only.
+`requireAllResidualMeasures yes` uses the maximum instead, but near a steady
+state the residual is tiny from the first iteration, so the relative
+reduction residual1 can be unattainable and every step reaches `nOuterCorr`.
+
+`outerCorrAbsoluteTolerance` (default `0`, disabled) adds an absolute test: a
+step is also converged if the maximum point mismatch between the solid and
+fluid interface, `max |residual|` over the interface points in metres, is
+below the value. With the default `incrementalResiduals yes` this is the
+mismatch of the interface displacement increments, not the accumulated
+separation of the interfaces, so small accepted increments can still add up
+over many steps; with `incrementalResiduals no` it is the point separation of
+the interfaces. The test is in addition to the existing test (legacy or
+`requireAllResidualMeasures`), so it does not reopen the `min()` loophole. The
+maximum is used rather than an RMS because it bounds the local error and
+cannot hide a localised mismatch. The absolute residual is printed next to the
+relative residuals, and a line states when it accepts a step. On Robin
+interfaces the pressure and flux criteria still apply, and the accepted
+displacement residual enters the Robin convergence history clamped to
+`outerCorrTolerance`.
+
+```c++
+requireAllResidualMeasures yes;
+outerCorrAbsoluteTolerance 1e-9; // m
+```
+
+Choose a small fraction of the smallest interface cell size, or of the
+displacement accuracy you need, e.g. 1e-3 of the cell size or below. With the
+option unset the behaviour is unchanged.

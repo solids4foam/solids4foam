@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -44,7 +44,7 @@ pointSync false;
         name symmx;
         "patchInfo|dictionary"
         {
-            type symmetryPlane;
+            type symmetry;
         }
         constructFrom patches;
         patches ("auto8" "auto3");
@@ -80,7 +80,7 @@ pointSync false;
         name symmy;
         "patchInfo|dictionary"
         {
-            type symmetryPlane;
+            type symmetry;
         }
         constructFrom patches;
         patches ("auto6" "auto7");

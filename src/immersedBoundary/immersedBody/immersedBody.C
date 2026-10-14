@@ -1,0 +1,771 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+
+#include "immersedBody.H"
+#include "cutCellIso.H"
+#include "triPointRef.H"
+#include "barycentric2D.H"
+#include "treeBoundBox.H"
+#include "indexedOctree.H"
+#include "treeDataCell.H"
+#include "Map.H"
+#include "OSspecific.H"
+
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * //
+
+const Foam::Enum<Foam::immersedBody::occupancyMethod>
+Foam::immersedBody::occupancyNames_
+({
+    {signedDistance, "signedDistance"},
+    {vertexFraction, "vertexFraction"},
+    {cut, "cut"}
+});
+
+
+// * * * * * * * * * * * * * * * Static Functions  * * * * * * * * * * * * //
+
+Foam::scalar Foam::immersedBody::solvedWidth
+(
+    const vector& span,
+    const Vector<label>& solD
+)
+{
+    scalar width = GREAT;
+    for (direction d = 0; d < vector::nComponents; ++d)
+    {
+        if (solD[d] == 1)
+        {
+            width = min(width, span[d]);
+        }
+    }
+
+    return width;
+}
+
+
+Foam::scalar Foam::immersedBody::cellWidth
+(
+    const polyMesh& mesh,
+    const label celli
+)
+{
+    return solvedWidth
+    (
+        boundBox(mesh.points(), mesh.cellPoints()[celli], false).span(),
+        mesh.solutionD()
+    );
+}
+
+
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::triSurface Foam::immersedBody::readSurface
+(
+    const fvMesh& mesh,
+    const fileName& f
+)
+{
+    const IOobject surfaceIO
+    (
+        "immersedBodySurface",
+        mesh.time().constant(),
+        "triSurface",
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE,
+        false
+    );
+
+    // Resolve relative paths through the file handler, including distributed
+    // roots, with constant/triSurface as the base directory
+    const fileName file(triSurface::relativeFilePath(surfaceIO, f, true));
+
+    if (!isFile(file))
+    {
+        FatalErrorInFunction
+            << "Cannot find the immersed body surface " << file
+            << exit(FatalError);
+    }
+
+    return triSurface(file);
+}
+
+
+void Foam::immersedBody::setSurface()
+{
+    // The inside test requires a closed surface with outward normals
+    if (surface_.nInternalEdges() != surface_.nEdges())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_ << " is not closed: "
+            << surface_.nEdges() - surface_.nInternalEdges()
+            << " edges are not shared by two faces" << exit(FatalError);
+    }
+
+    scalar volume = 0;
+    forAll(surface_, facei)
+    {
+        const triPointRef tri(surface_[facei].tri(surface_.points()));
+        volume += (tri.centre() & tri.areaNormal())/3;
+    }
+
+    if (volume < 0)
+    {
+        FatalErrorInFunction
+            << "The normals of the surface of immersed body " << name_
+            << " point into the body: they must point out of it"
+            << exit(FatalError);
+    }
+
+    points0_ = surface_.points();
+
+    if (!CofRGiven_)
+    {
+        CofR0_ = average(points0_);
+    }
+
+    Info<< "    Immersed body " << name_ << ": " << surface_.size()
+        << " faces, bounding box " << boundBox(points0_, false) << endl;
+
+    searchPtr_.clear();
+    time_ = -GREAT;
+    configuration_ = -1;
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::immersedBody::immersedBody
+(
+    const word& name,
+    const dictionary& dict,
+    const fvMesh& mesh
+)
+:
+    name_(name),
+    mesh_(mesh),
+    surface_(),
+    points0_(),
+    searchPtr_(),
+    motionPtr_(),
+    CofR0_(dict.getOrDefault<point>("CofR", Zero)),
+    CofRGiven_(dict.found("CofR")),
+    signedDistance_
+    (
+        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
+     == signedDistance
+    ),
+    cut_
+    (
+        occupancyNames_.getOrDefault("occupancy", dict, signedDistance)
+     == cut
+    ),
+    time_(-GREAT),
+    configuration_(-1),
+    internalCells_(),
+    surfaceCells_(),
+    cellWidths_(mesh.nCells(), Zero)
+{
+    // The body is static unless a motion is given
+    dictionary motionDict;
+
+    if (dict.found("motion"))
+    {
+        motionDict = dict.subDict("motion");
+    }
+    else
+    {
+        motionDict.add("type", word("static"));
+    }
+
+    motionPtr_ = immersedBodyMotion::New(motionDict);
+
+    // A body without a surface file is given its surface by a fluid-solid
+    // interface (setReferenceSurface)
+    if (dict.found("surface"))
+    {
+        surface_ = readSurface(mesh, dict.get<fileName>("surface"));
+        setSurface();
+        move(mesh.time().value());
+    }
+    else
+    {
+        Info<< "    Immersed body " << name_ << ": no surface given, it "
+            << "is expected from a fluid-solid interface" << endl;
+    }
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::point Foam::immersedBody::CofR() const
+{
+    // A deforming body keeps its reference centre of rotation
+    if (!motionPtr_->rigid())
+    {
+        return CofR0_;
+    }
+
+    return motionPtr_->points(pointField(1, CofR0_), time_)()[0];
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::immersedBody::interpolateToNearest
+(
+    const pointField& x,
+    const vectorField& pf
+) const
+{
+    tmp<vectorField> tresult(new vectorField(x.size(), Zero));
+    vectorField& result = tresult.ref();
+
+    if (x.empty())
+    {
+        return tresult;
+    }
+
+    const boundBox bb(surface_.points(), false);
+    List<pointIndexHit> hits;
+    searchPtr_->findNearest
+    (
+        x,
+        scalarField(x.size(), magSqr(bb.span()) + GREAT*SMALL),
+        hits
+    );
+
+    const pointField& pts = surface_.points();
+    forAll(x, i)
+    {
+        if (!hits[i].hit())
+        {
+            continue;
+        }
+
+        const labelledTri& f = surface_[hits[i].index()];
+        const triPointRef tri(pts[f[0]], pts[f[1]], pts[f[2]]);
+        const barycentric2D b(tri.pointToBarycentric(hits[i].hitPoint()));
+
+        result[i] = b[0]*pf[f[0]] + b[1]*pf[f[1]] + b[2]*pf[f[2]];
+    }
+
+    return tresult;
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::immersedBody::velocity
+(
+    const pointField& x
+) const
+{
+    if (motionPtr_->rigid())
+    {
+        return motionPtr_->velocity(x, time_);
+    }
+
+    return interpolateToNearest(x, pointVelocities_);
+}
+
+
+Foam::vector Foam::immersedBody::acceleration
+(
+    const point& x,
+    const scalar dt
+) const
+{
+    const pointField pts(1, x);
+
+    if (motionPtr_->rigid())
+    {
+        const vector U0(motionPtr_->velocity(pts, time_)()[0]);
+        return
+        (
+            motionPtr_->velocity(pts + 0.5*dt*U0, time_ + 0.5*dt)()[0]
+          - motionPtr_->velocity(pts - 0.5*dt*U0, time_ - 0.5*dt)()[0]
+        )/dt;
+    }
+
+    // Deforming: central difference of the surface point velocities,
+    // interpolated with the current nearest point
+    const vectorField dUdt
+    (
+        (
+            motionPtr_->pointVelocities(points0_, time_ + 0.5*dt)
+          - motionPtr_->pointVelocities(points0_, time_ - 0.5*dt)
+        )/dt
+    );
+    return interpolateToNearest(pts, dUdt)()[0];
+}
+
+
+void Foam::immersedBody::setReferenceSurface
+(
+    const pointField& points,
+    const faceList& triangles
+)
+{
+    if (hasSurface())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_
+            << " has already been set" << abort(FatalError);
+    }
+
+    List<labelledTri> tris(triangles.size());
+    forAll(triangles, i)
+    {
+        const face& f = triangles[i];
+
+        if (f.size() != 3)
+        {
+            FatalErrorInFunction
+                << "Face " << i << " of the surface of immersed body "
+                << name_ << " has " << f.size() << " points: the faces "
+                << "must be triangles" << abort(FatalError);
+        }
+
+        tris[i] = labelledTri(f[0], f[1], f[2], 0);
+    }
+
+    surface_ = triSurface(tris, points);
+    setSurface();
+    move(mesh_.time().value());
+}
+
+
+void Foam::immersedBody::move(const scalar t)
+{
+    if (!hasSurface())
+    {
+        FatalErrorInFunction
+            << "The surface of immersed body " << name_ << " has not been "
+            << "set: give a surface file, or drive the body by a fluid-solid "
+            << "interface" << abort(FatalError);
+    }
+
+    const label configuration = motionPtr_->configuration();
+
+    if
+    (
+        searchPtr_
+     && (!moving() || (t == time_ && configuration == configuration_))
+    )
+    {
+        return;
+    }
+
+    surface_.movePoints(motionPtr_->points(points0_, t));
+    searchPtr_.reset(new triSurfaceSearch(surface_));
+    time_ = t;
+    configuration_ = configuration;
+
+    if (!motionPtr_->rigid())
+    {
+        pointVelocities_ = motionPtr_->pointVelocities(points0_, t);
+    }
+}
+
+
+void Foam::immersedBody::addOccupancy
+(
+    volScalarField& lambda,
+    const scalar threshold
+)
+{
+    // Cells whose bounding box overlaps the bounding box of the surface
+    treeBoundBox surfaceBb(surface_.points());
+    surfaceBb.grow(SMALL*mag(surfaceBb.span()));
+
+    // Grow the box by the largest size of these cells: a cell whose centre is
+    // within half a cell of the surface may be partially covered
+    {
+        const labelList cells0(mesh_.cellTree().findBox(surfaceBb));
+        const pointField& meshPoints = mesh_.points();
+
+        vector maxSpan(Zero);
+        for (const label celli : cells0)
+        {
+            maxSpan = max
+            (
+                maxSpan,
+                boundBox(meshPoints, mesh_.cellPoints()[celli], false).span()
+            );
+        }
+
+        reduce(maxSpan, maxOp<vector>());
+        surfaceBb.grow(maxSpan);
+    }
+
+    const labelList cells(mesh_.cellTree().findBox(surfaceBb));
+
+    const labelListList& cellPoints = mesh_.cellPoints();
+
+    // Cache cell widths while calculating occupancy, also for vertexFraction
+    vectorField spans(cells.size());
+    cellWidths_.setSize(mesh_.nCells(), Zero);
+    const Vector<label>& solD = mesh_.solutionD();
+    forAll(cells, i)
+    {
+        spans[i] =
+            boundBox(mesh_.points(), cellPoints[cells[i]], false).span();
+        cellWidths_[cells[i]] = solvedWidth(spans[i], solD);
+    }
+
+    // For the vertex fraction occupancy, test each point of these cells once
+    Map<label> pointToIndex;
+    boolList pointInside;
+
+    if (!signedDistance_ && !cut_)
+    {
+        pointToIndex.resize(4*cells.size());
+        DynamicList<label> points(4*cells.size());
+
+        forAll(cells, i)
+        {
+            for (const label pointi : cellPoints[cells[i]])
+            {
+                if (pointToIndex.insert(pointi, points.size()))
+                {
+                    points.append(pointi);
+                }
+            }
+        }
+
+        pointInside =
+            searchPtr_->calcInside(pointField(mesh_.points(), points));
+    }
+
+    // For the cut occupancy, the signed distance to the surface at the
+    // points of these cells, positive inside the body (the opposite sign to
+    // addPointDistances): the cut cells give the volume fraction where it is
+    // positive. The values at the other points are not used
+    scalarField pointDistance;
+    autoPtr<cutCellIso> cutCellPtr;
+
+    if (cut_)
+    {
+        pointDistance.setSize(mesh_.nPoints(), GREAT);
+        addPointDistances(pointDistance);
+        pointDistance.negate();
+
+        // calcSubCell clears the storage of the previous cell
+        cutCellPtr.reset(new cutCellIso(mesh_, pointDistance));
+    }
+
+    const boolList centreInside
+    (
+        searchPtr_->calcInside(pointField(mesh_.C(), cells))
+    );
+
+    // Signed distance occupancy: the distance of the cell centre to the
+    // surface, relative to the width of the cell normal to the surface
+    scalarField distanceLambda;
+
+    if (signedDistance_)
+    {
+        const pointField centres(mesh_.C(), cells);
+        // Search within each cell bounding box diagonal
+        scalarField searchDistSqr(cells.size());
+        forAll(cells, i)
+        {
+            searchDistSqr[i] = magSqr(spans[i]);
+        }
+
+        List<pointIndexHit> nearest;
+        searchPtr_->findNearest(centres, searchDistSqr, nearest);
+
+        const vectorField& faceNormals = surface_.faceNormals();
+
+        distanceLambda.setSize(cells.size());
+        forAll(cells, i)
+        {
+            if (nearest[i].hit())
+            {
+                const vector& n = faceNormals[nearest[i].index()];
+                const scalar width = normalWidth(n, spans[i]);
+                const scalar d = mag(nearest[i].hitPoint() - centres[i]);
+
+                distanceLambda[i] = 0.5 + (centreInside[i] ? d : -d)/width;
+            }
+            else
+            {
+                // Further from the surface than the cell size
+                distanceLambda[i] = (centreInside[i] ? 1 : 0);
+            }
+        }
+
+        distanceLambda = min(max(distanceLambda, scalar(0)), scalar(1));
+    }
+
+    // Occupancy: half the fraction of the cell vertices inside the surface,
+    // plus a half if the cell centre is inside the surface
+    DynamicList<label> internalCells(cells.size());
+    DynamicList<label> surfaceCells(cells.size());
+    scalarField& lambdaI = lambda.primitiveFieldRef();
+
+    forAll(cells, i)
+    {
+        const label celli = cells[i];
+        scalar cellLambda = 0;
+
+        if (signedDistance_)
+        {
+            cellLambda = distanceLambda[i];
+        }
+        else if (cut_)
+        {
+            // Volume fraction inside the surface
+            cutCellPtr->calcSubCell(celli, 0);
+            cellLambda = cutCellPtr->VolumeOfFluid();
+        }
+        else
+        {
+            const labelList& curPoints = cellPoints[celli];
+            const scalar pointWeight = 0.5/curPoints.size();
+
+            for (const label pointi : curPoints)
+            {
+                if (pointInside[pointToIndex[pointi]])
+                {
+                    cellLambda += pointWeight;
+                }
+            }
+
+            if (centreInside[i])
+            {
+                cellLambda += 0.5;
+            }
+        }
+
+        if (cellLambda > threshold)
+        {
+            if (cellLambda > 1 - threshold)
+            {
+                internalCells.append(celli);
+            }
+            else
+            {
+                surfaceCells.append(celli);
+            }
+        }
+
+        lambdaI[celli] = min(max(lambdaI[celli] + cellLambda, 0), 1);
+    }
+
+    internalCells_.transfer(internalCells);
+    surfaceCells_.transfer(surfaceCells);
+
+    DynamicList<label> insideCells(cells.size());
+    forAll(cells, i)
+    {
+        if (centreInside[i])
+        {
+            insideCells.append(cells[i]);
+        }
+    }
+    insideCells_.transfer(insideCells);
+}
+
+
+void Foam::immersedBody::addPointDistances(scalarField& f) const
+{
+    // Points of the cells whose bounding box overlaps the bounding box of
+    // the surface, grown by the largest size of these cells
+    treeBoundBox surfaceBb(surface_.points());
+    surfaceBb.grow(SMALL*mag(surfaceBb.span()));
+
+    const pointField& meshPoints = mesh_.points();
+    const labelListList& cellPoints = mesh_.cellPoints();
+
+    scalar maxSpanSqr = 0;
+    {
+        const labelList cells0(mesh_.cellTree().findBox(surfaceBb));
+
+        vector maxSpan(Zero);
+        for (const label celli : cells0)
+        {
+            maxSpan = max
+            (
+                maxSpan,
+                boundBox(meshPoints, cellPoints[celli], false).span()
+            );
+        }
+        surfaceBb.grow(maxSpan);
+        maxSpanSqr = magSqr(maxSpan);
+    }
+
+    const labelList cells(mesh_.cellTree().findBox(surfaceBb));
+
+    labelHashSet pointSet(8*cells.size());
+    for (const label celli : cells)
+    {
+        pointSet.insert(cellPoints[celli]);
+    }
+    const labelList points(pointSet.sortedToc());
+    const pointField pts(meshPoints, points);
+
+    const boolList inside(searchPtr_->calcInside(pts));
+
+    List<pointIndexHit> nearest;
+    searchPtr_->findNearest
+    (
+        pts,
+        scalarField(pts.size(), 4*maxSpanSqr),
+        nearest
+    );
+
+    forAll(points, i)
+    {
+        const scalar d =
+        (
+            nearest[i].hit()
+          ? mag(nearest[i].hitPoint() - pts[i])
+          : 2*Foam::sqrt(maxSpanSqr)
+        );
+
+        f[points[i]] = min(f[points[i]], (inside[i] ? -d : d));
+    }
+}
+
+
+void Foam::immersedBody::nearest
+(
+    const pointField& x,
+    const scalarField& searchDistSqr,
+    List<pointIndexHit>& hits,
+    vectorField& normals
+) const
+{
+    searchPtr_->findNearest(x, searchDistSqr, hits);
+
+    const vectorField& faceNormals = surface_.faceNormals();
+
+    normals.setSize(x.size());
+    forAll(hits, i)
+    {
+        normals[i] = (hits[i].hit() ? faceNormals[hits[i].index()] : Zero);
+    }
+}
+
+
+void Foam::immersedBody::setVelocity(volVectorField& Ui) const
+{
+    vectorField& UiI = Ui.primitiveFieldRef();
+
+    for (const labelList* cellsPtr : {&internalCells_, &surfaceCells_})
+    {
+        const labelList& cells = *cellsPtr;
+
+        const vectorField velocity
+        (
+            this->velocity(pointField(mesh_.C(), cells))
+        );
+
+        forAll(cells, i)
+        {
+            UiI[cells[i]] = velocity[i];
+        }
+    }
+}
+
+
+Foam::vector Foam::immersedBody::force
+(
+    const volVectorField& f,
+    const scalar rho
+) const
+{
+    const scalarField& V = mesh_.V();
+
+    vector F(Zero);
+
+    for (const labelList* cellsPtr : {&internalCells_, &surfaceCells_})
+    {
+        for (const label celli : *cellsPtr)
+        {
+            F -= f[celli]*V[celli];
+        }
+    }
+
+    reduce(F, sumOp<vector>());
+
+    return rho*F;
+}
+
+
+Foam::vector Foam::immersedBody::torque
+(
+    const volVectorField& f,
+    const scalar rho
+) const
+{
+    const scalarField& V = mesh_.V();
+    const vectorField& C = mesh_.C();
+    const point CofR(this->CofR());
+
+    vector T(Zero);
+
+    for (const labelList* cellsPtr : {&internalCells_, &surfaceCells_})
+    {
+        for (const label celli : *cellsPtr)
+        {
+            T -= ((C[celli] - CofR) ^ f[celli])*V[celli];
+        }
+    }
+
+    reduce(T, sumOp<vector>());
+
+    return rho*T;
+}
+
+
+Foam::vector Foam::immersedBody::momentum
+(
+    const volVectorField& U,
+    const volScalarField& lambda
+) const
+{
+    const scalarField& V = mesh_.V();
+
+    vector M(Zero);
+
+    for (const labelList* cellsPtr : {&internalCells_, &surfaceCells_})
+    {
+        for (const label celli : *cellsPtr)
+        {
+            M += lambda[celli]*U[celli]*V[celli];
+        }
+    }
+
+    reduce(M, sumOp<vector>());
+
+    return M;
+}
+
+
+void Foam::immersedBody::writeSurface(const fileName& file) const
+{
+    if (Pstream::master())
+    {
+        mkDir(file.path());
+        surface_.write(file);
+    }
+}
+
+
+// ************************************************************************* //

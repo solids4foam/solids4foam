@@ -1,3 +1,0 @@
-membraneRoofVelocityFvPatchVectorField.C
-
-LIB = $(FOAM_USER_LIBBIN)/libmembraneRoofVelocityFvPatchVectorField

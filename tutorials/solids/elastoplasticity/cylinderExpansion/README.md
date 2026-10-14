@@ -50,8 +50,8 @@ inner surface is given analytically as [2, 3]:
 
 $$
 \sigma_{rr}=\left(\dfrac{\sigma_Y}{\sqrt{3}}\right) \ln \left(
-\dfrac{\left(\dfrac{r_0}{a_0}\right)^2+\left(\dfrac{a}{a_0}\right)^2-1}{\left(\d
-frac{b_0}{a_0}\right)^2 + \left(\dfrac{a}{a_0}\right)^2 -1}  \right)
+\dfrac{\left(\dfrac{r_0}{a_0}\right)^2+\left(\dfrac{a}{a_0}\right)^2-1}{\left(
+\dfrac{b_0}{a_0}\right)^2 + \left(\dfrac{a}{a_0}\right)^2 -1}  \right)
 $$
 
 where $$a_0$$ is the initial inner radius, $$b_0$$ is the initial outer radius,

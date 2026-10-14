@@ -20,6 +20,10 @@ then
     exit 0
 fi
 
+echo
+echo "Compiling libraries..."
+(cd src && bash ./Allwmake -s)
+
 # Create volume mesh
 solids4Foam::runApplication blockMesh
 
@@ -28,4 +32,3 @@ solids4Foam::runApplication makeFaMesh
 
 # Run solver
 solids4Foam::runApplication solids4Foam
-

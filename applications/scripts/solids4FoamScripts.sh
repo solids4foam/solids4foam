@@ -18,16 +18,159 @@
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 # On macOS, ensure OpenFOAM libraries remain discoverable for child processes.
+# The ":-" defaults keep sourcing safe under "set -u" when no OpenFOAM
+# environment is loaded, and empty entries are not added to the path.
 case "$(uname -s)" in
 Darwin)
-    export DYLD_LIBRARY_PATH="${FOAM_LIBBIN}:${FOAM_USER_LIBBIN}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+    for LIB_DIR in "${FOAM_USER_LIBBIN:-}" "${FOAM_LIBBIN:-}"
+    do
+        if [[ -n ${LIB_DIR} ]]
+        then
+            export DYLD_LIBRARY_PATH="${LIB_DIR}${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+        fi
+    done
+    unset LIB_DIR
     ;;
 esac
 
+# Command used for GNU sed specific operations, e.g. in-place editing with
+# "-i" and no backup suffix. It is resolved lazily by
+# solids4Foam::requireGnuSed, but initialised here so that referencing it can
+# never fail under "set -u".
+SOLIDS4FOAM_SED="${SOLIDS4FOAM_SED:-}"
+export SOLIDS4FOAM_SED
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# Case format
+#
+#     Tutorial cases are stored in the OpenFOAM.com (ESI) format. At run time,
+#     solids4Foam::convertCaseFormat converts a case to the format required by
+#     the loaded OpenFOAM flavour; solids4Foam::restoreCaseFormat converts it
+#     back to the stored format.
+#
+#     Files that cannot be converted with a text substitution are stored twice,
+#     with the unsuffixed name always holding the OpenFOAM.com version, e.g.
+#     system/functions and system/functions.foamextend. During conversion the
+#     unsuffixed file is backed up with a .openfoam suffix and the flavour
+#     specific file is copied into its place; restoring moves the backup back.
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# foamFlavour
+#     Echoes the loaded OpenFOAM flavour: foamextend, com or org
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::foamFlavour()
+{
+    if [[ ${WM_PROJECT} == "foam" ]]
+    then
+        echo "foamextend"
+    elif [[ ${WM_PROJECT_VERSION} == *"v"* ]]
+    then
+        echo "com"
+    else
+        echo "org"
+    fi
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# blockMeshDictDir
+#     Echoes the directory blockMesh reads blockMeshDict from, for the loaded
+#     OpenFOAM flavour. Intended for cases that generate their blockMeshDict,
+#     e.g. with m4.
+# Arguments:
+#     1: optional region name
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::blockMeshDictDir()
+{
+    local REGION="${1:-}"
+
+    if [[ $(solids4Foam::foamFlavour) == "foamextend" ]]
+    then
+        if [[ -n ${REGION} ]]
+        then
+            echo "constant/${REGION}/polyMesh"
+        else
+            echo "constant/polyMesh"
+        fi
+    else
+        if [[ -n ${REGION} ]]
+        then
+            echo "system/${REGION}"
+        else
+            echo "system"
+        fi
+    fi
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requireGnuSed
+#     Resolves the GNU sed command once and stores it in SOLIDS4FOAM_SED, which
+#     every function requiring GNU sed then uses.
+#
+#     GNU sed exposed as "sed" is preferred, as is the case on Linux and on
+#     macOS when the Homebrew gnubin directory is first in the PATH; otherwise
+#     the Homebrew "gsed" command is used. Exits with a clear message if neither
+#     provides GNU sed.
+#
+#     The resolution is cached, so the function is cheap to call at the start of
+#     every function that needs GNU sed.
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requireGnuSed()
+{
+    # Return immediately if GNU sed has already been resolved
+    if [[ -n "${SOLIDS4FOAM_SED:-}" ]]
+    then
+        return 0
+    fi
+
+    local CANDIDATE
+
+    for CANDIDATE in sed gsed
+    do
+        if command -v "${CANDIDATE}" > /dev/null 2>&1 &&
+            "${CANDIDATE}" --version 2>/dev/null | grep -q "GNU sed"
+        then
+            SOLIDS4FOAM_SED="${CANDIDATE}"
+            export SOLIDS4FOAM_SED
+            echo "GNU sed detected: using '${SOLIDS4FOAM_SED}'"
+            return 0
+        fi
+    done
+
+    echo "Error: This script requires GNU sed, which was not found as 'sed'"
+    echo "or 'gsed'. On macOS, install it with 'brew install gnu-sed' and"
+    echo "either use the resulting 'gsed' command or place the GNU versions"
+    echo "first in the PATH, e.g. by adding"
+    echo "    export PATH=\"\$(brew --prefix gnu-sed)/libexec/gnubin:\$PATH\""
+    echo "to your shell profile."
+    exit 1
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# fieldDirs
+#     Echoes the initial field directories present in a case, e.g. 0 and 0.orig
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::fieldDirs()
+{
+    local CASE_DIR="$1"
+    local DIR
+
+    for DIR in "${CASE_DIR}"/0 "${CASE_DIR}"/0.orig "${CASE_DIR}"/0.org
+    do
+        if [[ -d ${DIR} ]]
+        then
+            echo "${DIR}"
+        fi
+    done
+}
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # convertCaseFormat
-#     Converts a case from foam extend format to OpenFOAM format. No changes are
-#     applied if foam extend is loaded.
+#     Converts a case from the stored OpenFOAM.com format to the format required
+#     by the loaded OpenFOAM flavour. No changes are applied when OpenFOAM.com
+#     is loaded.
 # Arguments:
 #     1: CASE_DIR
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -45,205 +188,22 @@ function solids4Foam::convertCaseFormat()
     fi
 
     # Give sensible names to the argument
-    CASE_DIR=$1
+    local CASE_DIR="$1"
 
-    # Exit if foam extend is loaded
-    if [[ $WM_PROJECT = "foam" ]]
-    then
-        echo "foam-extend loaded: no changes made"; echo
-        return 0
-    fi
-
-    # GNU sed must be used
-    if sed --version 2>/dev/null | grep -q "GNU sed"
-    then
-        echo "GNU sed detected"
-    else
-        echo "Error: This script requires GNU sed. Please install it (e.g.,"
-        echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
-        exit 1
-    fi
-
-    # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
-
-    if [[ -n $(find "${CASE_DIR}" -name blockMeshDict*) ]]
-    then
-        echo "Changing symmetryPlane to symmetry in blockMeshDict"; echo
-        find "${CASE_DIR}" -name blockMeshDict* | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
-    then
-        echo "Changing symmetryPlane to symmetry in boundary"; echo
-        find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
-    then
-        echo "Changing symmetryPlane to symmetry in createPatchDict"; echo
-        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetryPlane\symmetry\g'
-    fi
-
-    # Check all files in the 0 directory
-    for FILE in $(find "${CASE_DIR}/0" -type f)
-    do
-        if [[ -f "${FILE}" ]]
-        then
-            if grep -q "symmetryPlane;" "${FILE}"
-            then
-                echo "Changing symmetryPlane to symmetry in ${FILE}"; echo
-                sed -i 's\symmetryPlane;\symmetry;\g' "${FILE}"
-            fi
-        fi
-    done
-
-    # 2. If found, move the blockMeshDict to the system directory
-    if [[ -f "${CASE_DIR}"/constant/polyMesh/blockMeshDict ]]
-    then
-        echo "Moving constant/polyMesh/blockMeshDict to system"
-        \mv "${CASE_DIR}"/constant/polyMesh/blockMeshDict "${CASE_DIR}"/system/
-    fi
-    if [[ -f "${CASE_DIR}"/constant/solid/polyMesh/blockMeshDict ]]
-    then
-        echo "Moving constant/solid/polyMesh/blockMeshDict to system/solid"
-        \mv "${CASE_DIR}"/constant/solid/polyMesh/blockMeshDict "${CASE_DIR}"/system/solid
-    fi
-    if [[ -f "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict ]]
-    then
-        echo "Moving constant/fluid/polyMesh/blockMeshDict to system/fluid"
-        \mv "${CASE_DIR}"/constant/fluid/polyMesh/blockMeshDict "${CASE_DIR}"/system/fluid
-    fi
-
-    # faMeshDefinition - for now, only support OpenFOAM.com
-    # if [[ -f "${CASE_DIR}"/constant/faMesh/faMeshDefinition ]]
-    # then
-    #     echo "Moving constant/faMesh/faMeshDefinition to system/finite-area"
-    #     mkdir -p "${CASE_DIR}"/system/finite-area
-    #     \mv "${CASE_DIR}"/constant/faMesh/faMeshDefinition "${CASE_DIR}"/system/finite-area
-    # fi
-
-    # Replace the functions file
-    if [[ -f "${CASE_DIR}"/system/functions ]]
-    then
-        echo "Replacing system/functions with system/functions.openfoam"
-        \cp "${CASE_DIR}"/system/functions \
-            "${CASE_DIR}"/system/functions.foamextend
-        \cp -f "${CASE_DIR}"/system/functions.openfoam \
-            "${CASE_DIR}"/system/functions
-    fi
-
-    # 3. Rename turbulence model
-    if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
-    then
-        echo "Changing RASModel to RAS in turbulenceProperties"
-        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RASModel;/RAS;/g"
-    fi
-
-    # 4. Check for boundaryData
-    if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.openfoam ]]
-    then
-        echo "Moving constant/boundaryData to constant/boundaryData.foam-extend"
-        \mv "${CASE_DIR}"/constant/boundaryData "${CASE_DIR}"/constant/boundaryData.foam-extend
-
-        echo "Moving constant/boundaryData.openfoam to constant/boundaryData"
-        \mv "${CASE_DIR}"/constant/boundaryData.openfoam "${CASE_DIR}"/constant/boundaryData
-    fi
-
-    # 5. Check for sample for foundation version
-    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
-    then
-        if [[ -f "${CASE_DIR}"/system/sample ]]
-        then
-           echo "OpenFOAM.org specific: replacing 'uniform' with 'lineUniform' in system/sample"
-           sed -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
-
-           echo "OpenFOAM.org specific: replacing 'face' with 'lineFace' in system/sample"
-           sed -i "s/type.*face;/type lineFace;/g" "${CASE_DIR}"/system/sample
-        fi
-    fi
-
-    # 6. Check for timeVaryingUniformFixedValue
-    if [[ -n $(find "${CASE_DIR}" -name p) ]]
-    then
-        echo "Changing timeVaryingUniformFixedValue to uniformValue in p"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|//type.*uniformFixedValue;|type          uniformFixedValue;|g"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|type.*timeVaryingUniformFixedValue;|//type        timeVaryingUniformFixedValue;|g"
-    fi
-
-    # 7. Check for changeDictionaryDict.openfoam
-    if [[ -f "${CASE_DIR}/system/changeDictionaryDict.openfoam" ]]
-    then
-        echo "Moving ${CASE_DIR}/system/changeDictionaryDict to system/changeDictionaryDict.foamextend"
-        mv "${CASE_DIR}/system/changeDictionaryDict" "system/changeDictionaryDict.foamextend"
-        echo "Moving ${CASE_DIR}/system/changeDictionaryDict.openfoam to system/changeDictionaryDict"
-        mv "${CASE_DIR}/system/changeDictionaryDict.openfoam" "system/changeDictionaryDict"
-    fi
-
-    # 8. Check for createPatchDict.openfoam
-    if [[ -f "${CASE_DIR}/system/createPatchDict.openfoam" ]]
-    then
-        echo "Moving ${CASE_DIR}/system/createPatchDict to system/createPatchDict.foamextend"
-        mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.foamextend"
-        echo "Moving ${CASE_DIR}/system/createPatchDict.openfoam to system/createPatchDict"
-        mv "${CASE_DIR}/system/createPatchDict.openfoam" "system/createPatchDict"
-    fi
-
-    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
-    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
-    #    schemes consistent with boundary non-orthogonal correction
-    if [[ $WM_PROJECT != "foam" ]]
-    then
-        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
-        then
-            echo "OpenFOAM[.com/.org] specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/fvSchemes"
-            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/fvSchemes
-        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
-        then
-            echo "OpenFOAM[.com/.org] specific: replacing 'leastSquares' with 'pointCellsLeastSquares' in system/solid/fvSchemes"
-            sed -i "s/ leastSquares;/ pointCellsLeastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
-        fi
-    fi
-
-    # 10. Resolve force post-processing path from foam-extend
-    if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
-    then
-        if [[ $WM_PROJECT_VERSION == *"v"* ]]
-        then
-            echo "Modifying force.gnuplot in consistent with ESI version"
-            sed -i "s|forces.dat|force.dat|g" force.gnuplot
-        fi
-    fi
-
-    # 11. Resolve sample post-processing path from foam-extend
-    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
-    then
-        echo "Updating plot.gnuplot"
-        sed -i "s@postProcessing/sets/@postProcessing/sample/@g" plot.gnuplot
-    fi
-
-    # 12. Resolve sampleDict post-processing path from foam-extend
-    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
-    then
-        echo "Updating plot.gnuplot"
-        sed -i  "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" plot.gnuplot
-    fi
-
-    # 13. Replace mirrorMeshDict differences
-    if [[ -f "${CASE_DIR}"/system/mirrorMeshDict ]]
-    then
-        echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
-        echo "system/mirrorMeshDict with with 'point' and 'normal'"
-        sed -i -E 's/\bbasePoint\b/point/' system/mirrorMeshDict
-        sed -i -E 's/\bnormalVector\b/normal/' system/mirrorMeshDict
-    elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
-    then
-        echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector' in "
-        echo "system/solid/mirrorMeshDict with with 'point' and 'normal'"
-        sed -i -E 's/\bbasePoint\b/point/' system/solid/mirrorMeshDict
-        sed -i -E 's/\bnormalVector\b/normal/' system/solid/mirrorMeshDict
-    fi
+    case "$(solids4Foam::foamFlavour)" in
+    com)
+        echo "OpenFOAM.com loaded: cases are stored in this format"
+        echo "No changes made"; echo
+        ;;
+    org)
+        solids4Foam::requireGnuSed
+        solids4Foam::applyOpenFOAMOrgTweaks "${CASE_DIR}"
+        ;;
+    foamextend)
+        solids4Foam::requireGnuSed
+        solids4Foam::applyFoamExtendTweaks "${CASE_DIR}"
+        ;;
+    esac
 
     echo
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
@@ -253,104 +213,130 @@ function solids4Foam::convertCaseFormat()
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# convertCaseFormatFoamExtend
-#     Converts a case to the FOAM EXTEND format, regardless of what OpenFOAM
-#     version is loaded
+# restoreCaseFormat
+#     Restores a case to the stored OpenFOAM.com format, regardless of which
+#     OpenFOAM flavour is loaded. The operation is idempotent.
 # Arguments:
 #     1: CASE_DIR
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-function solids4Foam::convertCaseFormatFoamExtend()
+function solids4Foam::restoreCaseFormat()
 {
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo "| solids4Foam::convertCaseFormatFoamExtend start                      |"
+    echo "| solids4Foam::restoreCaseFormat start                                |"
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     echo
 
     # Check number of input parameters is correct
     if [[ $# -ne 1 ]]
     then
-        solids4Foam::err "convertCaseFormatFoamExtend: incorrect number of parameters"
+        solids4Foam::err "restoreCaseFormat: incorrect number of parameters"
     fi
 
     # Give sensible names to the argument
-    CASE_DIR=$1
+    local CASE_DIR="$1"
 
-    # GNU sed must be used
-    if sed --version 2>/dev/null | grep -q "GNU sed"
-    then
-        echo "GNU sed detected"
-    else
-        echo "Error: This script requires GNU sed. Please install it (e.g.,"
-        echo "via Homebrew: 'brew install gnu-sed') and use 'gsed' instead."
-        exit 1
-    fi
+    solids4Foam::requireGnuSed
 
-    # Un-do changes made in convertCaseFormat, if any
+    solids4Foam::undoFoamExtendTweaks "${CASE_DIR}"
+    solids4Foam::undoOpenFOAMOrgTweaks "${CASE_DIR}"
 
-    # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
+    echo
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo "| solids4Foam::restoreCaseFormat end                                  |"
+    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    echo
+}
 
-    if [[ -n $(find "${CASE_DIR}" -name blockMeshDict) ]]
-    then
-        echo "Changing symmetry to symmetryPlane in blockMeshDict"; echo
-        find "${CASE_DIR}" -name blockMeshDict | xargs sed -i 's\symmetry \symmetryPlane \g'
-    fi
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# convertCaseFormatFoamExtend
+#     Deprecated: retained so that existing user case scripts keep working.
+#     Use solids4Foam::restoreCaseFormat instead.
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::convertCaseFormatFoamExtend()
+{
+    echo "Note: solids4Foam::convertCaseFormatFoamExtend is deprecated as cases"
+    echo "      are now stored in the OpenFOAM.com format; please use"
+    echo "      solids4Foam::restoreCaseFormat instead"
+    echo
 
-    if [[ -n $(find "${CASE_DIR}" -name boundary) ]]
-    then
-    echo "Changing symmetry to symmetryPlane in boundary"; echo
-        find "${CASE_DIR}" -name boundary | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
+    solids4Foam::restoreCaseFormat "$@"
+}
 
-    if [[ -n $(find "${CASE_DIR}" -name createPatchDict) ]]
-    then
-    echo "Changing symmetry to symmetryPlane in createPatchDict"; echo
-        find "${CASE_DIR}" -name createPatchDict | xargs sed -i 's\symmetry;\symmetryPlane;\g'
-    fi
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# applyFoamExtendTweaks
+#     Converts a case from the stored OpenFOAM.com format to the foam extend
+#     format
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::applyFoamExtendTweaks()
+{
+    local CASE_DIR="$1"
+    local FILE
+    local DIR
 
-    for FILE in $(find "${CASE_DIR}/0" -type f)
+    # Ensure GNU sed is available and resolved into SOLIDS4FOAM_SED
+    solids4Foam::requireGnuSed
+
+    # 1. symmetry in OpenFOAM becomes symmetryPlane in foam extend
+    #    Patches are given as "symmetry;" in field files, boundary files and
+    #    createPatchDict, and as "symmetry <patchName>" in blockMeshDict
+
+    while IFS= read -r -d '' FILE
     do
-        if [[ -f "${FILE}" ]]
+        if grep -qE "symmetry;|^[[:space:]]*symmetry[[:space:]]" "${FILE}"
         then
+            echo "Changing symmetry to symmetryPlane in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i 's|symmetry;|symmetryPlane;|g' "${FILE}"
+            "${SOLIDS4FOAM_SED}" -i -E 's|^([[:space:]]*)symmetry([[:space:]]+)|\1symmetryPlane\2|' \
+                "${FILE}"
+        fi
+    done < <(find "${CASE_DIR}" \( -name 'blockMeshDict*' -o -name boundary \
+        -o -name createPatchDict \) -print0)
+
+    while IFS= read -r DIR
+    do
+        while IFS= read -r -d '' FILE
+        do
             if grep -q "symmetry;" "${FILE}"
             then
-                echo "Changing symmetry to symmetryPlane in ${FILE}"; echo
-                sed -i 's\symmetry;\symmetryPlane;\g' "${FILE}"
+                echo "Changing symmetry to symmetryPlane in ${FILE}"
+                "${SOLIDS4FOAM_SED}" -i 's|symmetry;|symmetryPlane;|g' "${FILE}"
             fi
+        done < <(find "${DIR}" -type f -print0)
+    done < <(solids4Foam::fieldDirs "${CASE_DIR}")
+
+    # 2. foam extend reads the blockMeshDict from constant/polyMesh
+    for DIR in "" solid fluid
+    do
+        if [[ -z ${DIR} ]]
+        then
+            local SRC="${CASE_DIR}/system/blockMeshDict"
+            local DST="${CASE_DIR}/constant/polyMesh"
+        else
+            local SRC="${CASE_DIR}/system/${DIR}/blockMeshDict"
+            local DST="${CASE_DIR}/constant/${DIR}/polyMesh"
+        fi
+
+        # Note: -f is false for a dangling symlink, so -L is also checked, as
+        # a case may link its blockMeshDict to a variant file
+        if [[ -f ${SRC} || -L ${SRC} ]]
+        then
+            echo "Moving ${SRC} to ${DST}"
+            mkdir -p "${DST}"
+            \mv "${SRC}" "${DST}"
         fi
     done
 
-    # 2. If found, move the blockMeshDict to the system directory
-    if [[ -f "${CASE_DIR}"/system/blockMeshDict ]]
-    then
-        echo "Moving system/blockMeshDict to constant/polyMesh"
-        mkdir -p "${CASE_DIR}"/constant/polyMesh
-        \mv "${CASE_DIR}"/system/blockMeshDict "${CASE_DIR}"/constant/polyMesh
-    fi
-    if [[ -f "${CASE_DIR}"/system/solid/blockMeshDict ]]
-    then
-        echo "Moving system/solid/blockMeshDict to constant/solid/polyMesh"
-        mkdir -p "${CASE_DIR}"/constant/solid/polyMesh
-        \mv "${CASE_DIR}"/system/solid/blockMeshDict "${CASE_DIR}"/constant/solid/polyMesh
-    fi
-    if [[ -f "${CASE_DIR}"/system/fluid/blockMeshDict ]]
-    then
-        echo "Moving system/fluid/blockMeshDict to constant/fluid/polyMesh"
-        mkdir -p "${CASE_DIR}"/constant/fluid/polyMesh
-        \mv "${CASE_DIR}"/system/fluid/blockMeshDict "${CASE_DIR}"/constant/fluid/polyMesh
-    fi
-
-    # faMeshDefinition
-    # if [[ -f "${CASE_DIR}"/system/finite-area/faMeshDefinition ]]
-    # then
-    #     echo "Moving system/finite-area/faMeshDefinition to constant/faMesh"
-    #     mkdir -p "${CASE_DIR}"/constant/polyMesh
-    #     \mv "${CASE_DIR}"/system/finite-area/faMeshDefinition "${CASE_DIR}"/constant/faMesh
-    # fi
-
+    # 2b. Use the foam extend functions file, if present
     if [[ -f "${CASE_DIR}"/system/functions.foamextend ]]
     then
-        echo "Replacing system/functions with system/functions.openfoam"
-        \mv -f "${CASE_DIR}"/system/functions.foamextend \
+        echo "Replacing system/functions with system/functions.foamextend"
+        \cp "${CASE_DIR}"/system/functions \
+            "${CASE_DIR}"/system/functions.openfoam
+        \cp -f "${CASE_DIR}"/system/functions.foamextend \
             "${CASE_DIR}"/system/functions
     fi
 
@@ -358,123 +344,441 @@ function solids4Foam::convertCaseFormatFoamExtend()
     if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
     then
         echo "Changing RAS to RASModel in turbulenceProperties"
-        find "${CASE_DIR}" -name turbulenceProperties | xargs sed -i "s/RAS;/RASModel;/g"
+        find "${CASE_DIR}" -name turbulenceProperties \
+            -exec "${SOLIDS4FOAM_SED}" -i "s/RAS;/RASModel;/g" {} +
     fi
 
-    # 4. Check for boundaryData
-    if [[ -d "${CASE_DIR}"/constant/boundaryData && -d "${CASE_DIR}"/constant/boundaryData.foam-extend ]]
+    # 4. Use the foam extend boundaryData, if present
+    if [[ -d "${CASE_DIR}"/constant/boundaryData.foamextend ]]
     then
         echo "Moving constant/boundaryData to constant/boundaryData.openfoam"
-        \mv "${CASE_DIR}"/constant/boundaryData "${CASE_DIR}"/constant/boundaryData.openfoam
+        \mv "${CASE_DIR}"/constant/boundaryData \
+            "${CASE_DIR}"/constant/boundaryData.openfoam
 
-        echo "Moving constant/boundaryData.foam-extend to constant/boundaryData"
-        \mv "${CASE_DIR}"/constant/boundaryData.foam-extend "${CASE_DIR}"/constant/boundaryData
+        echo "Moving constant/boundaryData.foamextend to constant/boundaryData"
+        \mv "${CASE_DIR}"/constant/boundaryData.foamextend \
+            "${CASE_DIR}"/constant/boundaryData
     fi
 
-    # 5. Check for sample
-    if [[ "${WM_PROJECT_VERSION}" != *"v"* ]]
-    then
-        if [[ -f "${CASE_DIR}"/system/sample ]]
-        then
-           echo "OpenFOAM.org specific: replacing 'lineUniform' with 'uniform' in system/sample"
-           sed -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
-
-           echo "OpenFOAM.org specific: replacing 'lineFace' with 'face' in system/sample"
-           sed -i "s/type.*lineFace;/type face;/g" "${CASE_DIR}"/system/sample
-        fi
-    fi
-
-    # 6. Check for timeVaryingUniformFixedValue
+    # 6. foam extend uses timeVaryingUniformFixedValue instead of
+    #    uniformFixedValue
     if [[ -n $(find "${CASE_DIR}" -name p) ]]
     then
-        echo "Changing uniformValue to timeVaryingUniformFixedValue in p"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|type.*uniformFixedValue;|//type          uniformFixedValue;|g"
-        find "${CASE_DIR}" -name p | \
-            xargs sed -i "s|//type.*timeVaryingUniformFixedValue;|type        timeVaryingUniformFixedValue;|g"
-
-        # Remove any //// that were introdued
-        find "${CASE_DIR}" -name p | xargs sed -i "s|////|//|g"
+        echo "Changing uniformFixedValue to timeVaryingUniformFixedValue in p"
+        # --follow-symlinks edits the target of a linked p, such as a case's
+        # p -> p.<variant>, instead of replacing the link with a copy
+        find "${CASE_DIR}" -name p \
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)type\(.*\)uniformFixedValue;|\1//type\2uniformFixedValue;|g" {} +
+        find "${CASE_DIR}" -name p \
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)//type\(.*\)timeVaryingUniformFixedValue;|\1type\2timeVaryingUniformFixedValue;|g" {} +
     fi
 
-    # 7. Check for changeDictionaryDict.openfoam
+    # 7. Use the foam extend changeDictionaryDict, if present
     if [[ -f "${CASE_DIR}/system/changeDictionaryDict.foamextend" ]]
     then
-        echo "Moving ${CASE_DIR}/system/changeDictionaryDict to system/changeDictionaryDict.openfoam"
-        mv "${CASE_DIR}/system/changeDictionaryDict" "system/changeDictionaryDict.openfoam"
-        echo "Moving ${CASE_DIR}/system/changeDictionaryDict.foamextend to system/changeDictionaryDict"
-        mv "${CASE_DIR}/system/changeDictionaryDict.foamextend" "system/changeDictionaryDict"
+        echo "Moving system/changeDictionaryDict to system/changeDictionaryDict.openfoam"
+        \mv "${CASE_DIR}/system/changeDictionaryDict" \
+            "${CASE_DIR}/system/changeDictionaryDict.openfoam"
+        echo "Moving system/changeDictionaryDict.foamextend to system/changeDictionaryDict"
+        \mv "${CASE_DIR}/system/changeDictionaryDict.foamextend" \
+            "${CASE_DIR}/system/changeDictionaryDict"
     fi
 
-    # 8. Check for createPatchDict.openfoam
+    # 8. Use the foam extend createPatchDict, if present
     if [[ -f "${CASE_DIR}/system/createPatchDict.foamextend" ]]
     then
-        echo "Moving ${CASE_DIR}/system/createPatchDict to system/createPatchDict.openfoam"
-        mv "${CASE_DIR}/system/createPatchDict" "system/createPatchDict.openfoam"
-        echo "Moving ${CASE_DIR}/system/createPatchDict.foamextend to system/createPatchDict"
-        mv "${CASE_DIR}/system/createPatchDict.foamextend" "system/createPatchDict"
+        echo "Moving system/createPatchDict to system/createPatchDict.openfoam"
+        \mv "${CASE_DIR}/system/createPatchDict" \
+            "${CASE_DIR}/system/createPatchDict.openfoam"
+        echo "Moving system/createPatchDict.foamextend to system/createPatchDict"
+        \mv "${CASE_DIR}/system/createPatchDict.foamextend" \
+            "${CASE_DIR}/system/createPatchDict"
+    fi
+
+    # 9. pointCellsLeastSquares is used as the gradScheme for the solid in
+    #    OpenFOAM, as it is consistent with boundary non-orthogonal correction;
+    #    foam extend uses leastSquares
+    if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+    then
+        echo "foam extend specific: replacing 'pointCellsLeastSquares' with"
+        echo "'leastSquares' in system/fvSchemes"
+        "${SOLIDS4FOAM_SED}" -i "s/ pointCellsLeastSquares;/ leastSquares;/g" \
+            "${CASE_DIR}"/system/fvSchemes
+    elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+    then
+        echo "foam extend specific: replacing 'pointCellsLeastSquares' with"
+        echo "'leastSquares' in system/solid/fvSchemes"
+        "${SOLIDS4FOAM_SED}" -i "s/ pointCellsLeastSquares;/ leastSquares;/g" \
+            "${CASE_DIR}"/system/solid/fvSchemes
+    fi
+
+    # 10. foam extend writes forces.dat rather than force.dat
+    solids4Foam::useForcesDat "${CASE_DIR}"
+
+    # 11. foam extend samples to postProcessing/sets
+    # 12. foam extend writes surfaces to postProcessing/surfaces
+    for FILE in $(find "${CASE_DIR}" -name plot.gnuplot)
+    do
+        echo "Updating ${FILE}"
+        "${SOLIDS4FOAM_SED}" -i "s@postProcessing/sample/@postProcessing/sets/@g" "${FILE}"
+        "${SOLIDS4FOAM_SED}" -i "s@postProcessing/sample.surfaces/@postProcessing/surfaces/@g" "${FILE}"
+    done
+
+    # 13. foam extend uses basePoint and normalVector in mirrorMeshDict
+    for FILE in "${CASE_DIR}"/system/mirrorMeshDict \
+        "${CASE_DIR}"/system/solid/mirrorMeshDict
+    do
+        if [[ -f ${FILE} ]]
+        then
+            echo "foam extend specific: replacing 'point' and 'normal' with"
+            echo "'basePoint' and 'normalVector' in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i -E 's/^([[:space:]]*)point([[:space:]])/\1basePoint\2/g' "${FILE}"
+            "${SOLIDS4FOAM_SED}" -i -E 's/^([[:space:]]*)normal([[:space:]])/\1normalVector\2/g' "${FILE}"
+        fi
+    done
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# undoFoamExtendTweaks
+#     Reverses applyFoamExtendTweaks, i.e. converts a case to the stored
+#     OpenFOAM.com format. The operation is idempotent and is applied regardless
+#     of which OpenFOAM flavour is loaded.
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::undoFoamExtendTweaks()
+{
+    local CASE_DIR="$1"
+    local FILE
+    local DIR
+
+    # Ensure GNU sed is available and resolved into SOLIDS4FOAM_SED
+    solids4Foam::requireGnuSed
+
+    # 1. symmetryPlane in foam extend becomes symmetry in OpenFOAM
+    while IFS= read -r -d '' FILE
+    do
+        if grep -q "symmetryPlane" "${FILE}"
+        then
+            echo "Changing symmetryPlane to symmetry in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i 's|symmetryPlane|symmetry|g' "${FILE}"
+        fi
+    done < <(find "${CASE_DIR}" \( -name 'blockMeshDict*' -o -name boundary \
+        -o -name createPatchDict \) -print0)
+
+    while IFS= read -r DIR
+    do
+        while IFS= read -r -d '' FILE
+        do
+            if grep -q "symmetryPlane;" "${FILE}"
+            then
+                echo "Changing symmetryPlane to symmetry in ${FILE}"
+                "${SOLIDS4FOAM_SED}" -i 's|symmetryPlane;|symmetry;|g' "${FILE}"
+            fi
+        done < <(find "${DIR}" -type f -print0)
+    done < <(solids4Foam::fieldDirs "${CASE_DIR}")
+
+    # 2. OpenFOAM reads the blockMeshDict from system
+    for DIR in "" solid fluid
+    do
+        if [[ -z ${DIR} ]]
+        then
+            local SRC="${CASE_DIR}/constant/polyMesh/blockMeshDict"
+            local DST="${CASE_DIR}/system"
+        else
+            local SRC="${CASE_DIR}/constant/${DIR}/polyMesh/blockMeshDict"
+            local DST="${CASE_DIR}/system/${DIR}"
+        fi
+
+        # Note: -f is false for a dangling symlink, so -L is also checked, as
+        # a case may link its blockMeshDict to a variant file
+        if [[ -f ${SRC} || -L ${SRC} ]]
+        then
+            mkdir -p "${DST}"
+
+            if [[ -f "${DST}/blockMeshDict" || -L "${DST}/blockMeshDict" ]]
+            then
+                echo "Removing generated ${SRC}; ${DST}/blockMeshDict exists"
+                \rm "${SRC}"
+            else
+                echo "Moving ${SRC} to ${DST}"
+                \mv "${SRC}" "${DST}"
+            fi
+
+            # Remove the polyMesh directory if the conversion created it
+            rmdir "$(dirname "${SRC}")" 2>/dev/null || true
+        fi
+    done
+
+    # 2b. Restore the OpenFOAM functions file, if it was replaced
+    if [[ -f "${CASE_DIR}"/system/functions.openfoam ]]
+    then
+        echo "Restoring system/functions from system/functions.openfoam"
+        \mv -f "${CASE_DIR}"/system/functions.openfoam \
+            "${CASE_DIR}"/system/functions
+    fi
+
+    # 3. Rename turbulence model
+    if [[ -n $(find "${CASE_DIR}" -name turbulenceProperties) ]]
+    then
+        echo "Changing RASModel to RAS in turbulenceProperties"
+        find "${CASE_DIR}" -name turbulenceProperties \
+            -exec "${SOLIDS4FOAM_SED}" -i "s/RASModel;/RAS;/g" {} +
+    fi
+
+    # 4. Restore the OpenFOAM boundaryData, if it was replaced
+    if [[ -d "${CASE_DIR}"/constant/boundaryData.openfoam ]]
+    then
+        echo "Moving constant/boundaryData to constant/boundaryData.foamextend"
+        \rm -rf "${CASE_DIR}"/constant/boundaryData.foamextend
+        \mv "${CASE_DIR}"/constant/boundaryData \
+            "${CASE_DIR}"/constant/boundaryData.foamextend
+
+        echo "Moving constant/boundaryData.openfoam to constant/boundaryData"
+        \mv "${CASE_DIR}"/constant/boundaryData.openfoam \
+            "${CASE_DIR}"/constant/boundaryData
+    fi
+
+    # 6. OpenFOAM uses uniformFixedValue instead of timeVaryingUniformFixedValue
+    if [[ -n $(find "${CASE_DIR}" -name p) ]]
+    then
+        echo "Changing timeVaryingUniformFixedValue to uniformFixedValue in p"
+        find "${CASE_DIR}" -name p \
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)//type\(.*\)uniformFixedValue;|\1type\2uniformFixedValue;|g" {} +
+        find "${CASE_DIR}" -name p \
+            -exec "${SOLIDS4FOAM_SED}" --follow-symlinks -i "s|^\([[:space:]]*\)type\(.*\)timeVaryingUniformFixedValue;|\1//type\2timeVaryingUniformFixedValue;|g" {} +
+    fi
+
+    # 7. Restore the OpenFOAM changeDictionaryDict, if it was replaced
+    if [[ -f "${CASE_DIR}/system/changeDictionaryDict.openfoam" ]]
+    then
+        echo "Moving system/changeDictionaryDict to system/changeDictionaryDict.foamextend"
+        \mv "${CASE_DIR}/system/changeDictionaryDict" \
+            "${CASE_DIR}/system/changeDictionaryDict.foamextend"
+        echo "Moving system/changeDictionaryDict.openfoam to system/changeDictionaryDict"
+        \mv "${CASE_DIR}/system/changeDictionaryDict.openfoam" \
+            "${CASE_DIR}/system/changeDictionaryDict"
+    fi
+
+    # 8. Restore the OpenFOAM createPatchDict, if it was replaced
+    if [[ -f "${CASE_DIR}/system/createPatchDict.openfoam" ]]
+    then
+        echo "Moving system/createPatchDict to system/createPatchDict.foamextend"
+        \mv "${CASE_DIR}/system/createPatchDict" \
+            "${CASE_DIR}/system/createPatchDict.foamextend"
+        echo "Moving system/createPatchDict.openfoam to system/createPatchDict"
+        \mv "${CASE_DIR}/system/createPatchDict.openfoam" \
+            "${CASE_DIR}/system/createPatchDict"
     fi
 
     # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
-    #    the gradScheme for the solid in OpenFOAM.com, as these are the only
+    #    as the gradScheme for the solid in OpenFOAM, as these are the only
     #    schemes consistent with boundary non-orthogonal correction
-    if [[ $WM_PROJECT != "foam" ]]
+    if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
     then
-        if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
+        echo "OpenFOAM specific: replacing 'leastSquares' with"
+        echo "'pointCellsLeastSquares' in system/fvSchemes"
+        "${SOLIDS4FOAM_SED}" -i "s/ leastSquares;/ pointCellsLeastSquares;/g" \
+            "${CASE_DIR}"/system/fvSchemes
+    elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
+    then
+        echo "OpenFOAM specific: replacing 'leastSquares' with"
+        echo "'pointCellsLeastSquares' in system/solid/fvSchemes"
+        "${SOLIDS4FOAM_SED}" -i "s/ leastSquares;/ pointCellsLeastSquares;/g" \
+            "${CASE_DIR}"/system/solid/fvSchemes
+    fi
+
+    # 10. OpenFOAM.com writes force.dat rather than forces.dat
+    solids4Foam::useForceDat "${CASE_DIR}"
+
+    # 11. OpenFOAM samples to postProcessing/sample
+    # 12. OpenFOAM writes surfaces to postProcessing/sample.surfaces
+    for FILE in $(find "${CASE_DIR}" -name plot.gnuplot)
+    do
+        echo "Updating ${FILE}"
+        "${SOLIDS4FOAM_SED}" -i "s@postProcessing/sets/@postProcessing/sample/@g" "${FILE}"
+        "${SOLIDS4FOAM_SED}" -i "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" "${FILE}"
+    done
+
+    # 13. OpenFOAM uses point and normal in mirrorMeshDict
+    for FILE in "${CASE_DIR}"/system/mirrorMeshDict \
+        "${CASE_DIR}"/system/solid/mirrorMeshDict
+    do
+        if [[ -f ${FILE} ]]
         then
-            echo "OpenFOAM[.com/.org] specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/fvSchemes"
-            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/fvSchemes
-        elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
-        then
-            echo "OpenFOAM[.com/.org] specific: replacing 'pointCellsLeastSquares' with 'leastSquares' in system/solid/fvSchemes"
-            sed -i "s/ pointCellsLeastSquares;/ leastSquares;/g" "${CASE_DIR}"/system/solid/fvSchemes
+            echo "OpenFOAM specific: replacing 'basePoint' and 'normalVector'"
+            echo "with 'point' and 'normal' in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i -E 's/\bbasePoint\b/point/g' "${FILE}"
+            "${SOLIDS4FOAM_SED}" -i -E 's/\bnormalVector\b/normal/g' "${FILE}"
         fi
+    done
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# applyOpenFOAMOrgTweaks
+#     Converts a case from the stored OpenFOAM.com format to the OpenFOAM.org
+#     format
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::applyOpenFOAMOrgTweaks()
+{
+    local CASE_DIR="$1"
+
+    # Ensure GNU sed is available and resolved into SOLIDS4FOAM_SED
+    solids4Foam::requireGnuSed
+
+    # 5. OpenFOAM.org renamed the uniform and face sampledSet types
+    if [[ -f "${CASE_DIR}"/system/sample ]]
+    then
+        echo "OpenFOAM.org specific: replacing 'uniform' with 'lineUniform' in"
+        echo "system/sample"
+        "${SOLIDS4FOAM_SED}" -i "s/type.*uniform;/type lineUniform;/g" "${CASE_DIR}"/system/sample
+
+        echo "OpenFOAM.org specific: replacing 'face' with 'lineFace' in"
+        echo "system/sample"
+        "${SOLIDS4FOAM_SED}" -i "s/type.*face;/type lineFace;/g" "${CASE_DIR}"/system/sample
     fi
 
-    # 10. Resolve force post-processing path for foam-extend
-    if  [[ -n $(find "${CASE_DIR}" -name force.gnuplot) ]]
-    then
-        if [[ $WM_PROJECT_VERSION == *"v"* ]]
+    # 10. OpenFOAM.org writes forces.dat rather than force.dat
+    solids4Foam::useForcesDat "${CASE_DIR}"
+
+    # 14. OpenFOAM.org reads the PIMPLE outer-corrector convergence controls
+    #     from outerCorrectorResidualControl: its residualControl, with a
+    #     single tolerance per field, is the criterion for ending the run.
+    #     Only a residualControl with the OpenFOAM.com sub-dictionaries
+    #     (tolerance and relTol) is renamed, so a case may still give the
+    #     OpenFOAM.org form. Symlinked fvSolution files are edited in place
+    #     so the links are kept
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && awk '
+            /^PIMPLE/ { inPimple = 1; next }
+            inPimple && /^}/ { inPimple = 0 }
+            inPimple && /^[[:space:]]*residualControl([[:space:]]|$)/ \
+            {
+                inControl = 1; depth = 0; next
+            }
+            inControl \
+            {
+                nOpen = gsub(/\{/, "{"); nClose = gsub(/\}/, "}")
+                if (depth == 1 && nOpen > 0) { found = 1 }
+                depth += nOpen - nClose
+                if (depth <= 0 && nClose > 0) { inControl = 0 }
+            }
+            END { exit !found }
+        ' "${FILE}"
         then
-            echo "Reverting force.gnuplot from ESI version to foam-extend or .org "
-            sed -i "s|force.dat|forces.dat|g" force.gnuplot
+            echo "OpenFOAM.org specific: replacing 'residualControl' with"
+            echo "'outerCorrectorResidualControl' in the PIMPLE dictionary of"
+            echo "${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                '/^PIMPLE\b/,/^}/ s/^([[:space:]]*)residualControl\b/\1outerCorrectorResidualControl/' \
+                "${FILE}"
         fi
+    done
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# undoOpenFOAMOrgTweaks
+#     Reverses applyOpenFOAMOrgTweaks. The operation is idempotent and is
+#     applied regardless of which OpenFOAM flavour is loaded.
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::undoOpenFOAMOrgTweaks()
+{
+    local CASE_DIR="$1"
+
+    # Ensure GNU sed is available and resolved into SOLIDS4FOAM_SED
+    solids4Foam::requireGnuSed
+
+    # 5. OpenFOAM.org renamed the uniform and face sampledSet types
+    if [[ -f "${CASE_DIR}"/system/sample ]]
+    then
+        echo "Replacing 'lineUniform' with 'uniform' in system/sample"
+        "${SOLIDS4FOAM_SED}" -i "s/type.*lineUniform;/type uniform;/g" "${CASE_DIR}"/system/sample
+
+        echo "Replacing 'lineFace' with 'face' in system/sample"
+        "${SOLIDS4FOAM_SED}" -i "s/type.*lineFace;/type face;/g" "${CASE_DIR}"/system/sample
     fi
 
-    # 11. Resolve sample post-processing path for foam-extend
-    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
-    then
-        echo "Updating plot.gnuplot"
-        sed -i "s@postProcessing/sample/@postProcessing/sets/@g" plot.gnuplot
-    fi
+    # 10. OpenFOAM.com writes force.dat rather than forces.dat
+    solids4Foam::useForceDat "${CASE_DIR}"
 
-    # 12. Resolve sampleDict post-processing path for foam-extend
-    if  [[ -n $(find "${CASE_DIR}" -name plot.gnuplot) ]]
-    then
-        echo "Updating plot.gnuplot"
-        sed -i "s|postProcessing/sample.surfaces/|postProcessing/surfaces/|g" plot.gnuplot
-    fi
+    # 14. OpenFOAM.com reads the PIMPLE outer-corrector convergence controls
+    #     from residualControl
+    local FILE
+    for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution
+    do
+        if [[ -f ${FILE} ]] \
+        && grep -qE '^[[:space:]]*outerCorrectorResidualControl\b' "${FILE}"
+        then
+            echo "Replacing 'outerCorrectorResidualControl' with"
+            echo "'residualControl' in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i --follow-symlinks -E \
+                's/^([[:space:]]*)outerCorrectorResidualControl\b/\1residualControl/' \
+                "${FILE}"
+        fi
+    done
+}
 
-    # 13. Replace mirrorMeshDict differences
-    if [[ -f "${CASE_DIR}"/system/mirrorMeshDict ]]
-    then
-        echo "OpenFOAM specific: replacing 'point' and 'normal' in "
-        echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
-        sed -i -E 's/\bpoint\b/basePoint/' system/mirrorMeshDict
-        sed -i -E 's/\b(normal)\b/\1Vector/' system/mirrorMeshDict
-    elif [[ -f "${CASE_DIR}"/system/solid/mirrorMeshDict ]]
-    then
-        echo "OpenFOAM specific: replacing 'point' and 'normal' in "
-        echo "system/mirrorMeshDict with with 'basePoint' and 'normalVector'"
-        sed -i -E 's/\bpoint\b/basePoint/' system/solid/mirrorMeshDict
-        sed -i -E 's/\b(normal)\b/\1Vector/' system/solid/mirrorMeshDict
-    fi
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# useForcesDat, useForceDat
+#     Set the forces functionObject output expected by the gnuplot scripts.
+#
+#     OpenFOAM.com writes force.dat, with the total force in columns 2 to 4,
+#     followed by the pressure and viscous contributions, so the total force is
+#     plotted directly as ($2) and ($3).
+#
+#     foam extend and OpenFOAM.org write forces.dat, with only the pressure and
+#     viscous contributions, followed by the moments, so the total force is
+#     plotted as their sum, ($2+$5) and ($3+$6).
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::useForcesDat()
+{
+    local CASE_DIR="$1"
+    local FILE
 
-    echo
-    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo "| solids4Foam::convertCaseFormatFoamExtend end                        |"
-    echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    echo
+    # Ensure GNU sed is available and resolved into SOLIDS4FOAM_SED
+    solids4Foam::requireGnuSed
+
+    # Convert the OpenFOAM.com filename and total-force columns to the
+    # foam-extend/OpenFOAM.org filename and pressure-plus-viscous columns
+    for FILE in $(find "${CASE_DIR}" -name force.gnuplot)
+    do
+        echo "Changing force.dat to forces.dat in ${FILE}"
+        "${SOLIDS4FOAM_SED}" -i "s|force\.dat|forces.dat|g" "${FILE}"
+
+        echo "Summing the pressure and viscous forces in ${FILE}"
+        "${SOLIDS4FOAM_SED}" -i 's|(\$2)|($2+$5)|g' "${FILE}"
+        "${SOLIDS4FOAM_SED}" -i 's|(\$3)|($3+$6)|g' "${FILE}"
+    done
+}
+
+function solids4Foam::useForceDat()
+{
+    local CASE_DIR="$1"
+    local FILE
+
+    # Ensure GNU sed is available and resolved into SOLIDS4FOAM_SED
+    solids4Foam::requireGnuSed
+
+    # Reverse useForcesDat: restore the OpenFOAM.com filename and total-force
+    # columns from the foam-extend/OpenFOAM.org form
+    for FILE in $(find "${CASE_DIR}" -name force.gnuplot)
+    do
+        echo "Changing forces.dat to force.dat in ${FILE}"
+        "${SOLIDS4FOAM_SED}" -i "s|forces\.dat|force.dat|g" "${FILE}"
+
+        echo "Using the total force in ${FILE}"
+        "${SOLIDS4FOAM_SED}" -i 's|(\$2+\$5)|($2)|g' "${FILE}"
+        "${SOLIDS4FOAM_SED}" -i 's|(\$3+\$6)|($3)|g' "${FILE}"
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -561,10 +865,34 @@ function solids4Foam::caseDoesNotRunWithOpenFOAMOrg()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requirePetscOrExitSilently
+#     Exit cleanly (exit 0) if PETSc is not available, i.e. PETSC_DIR is unset.
+#     Used by tutorials whose (selected) solution approach requires PETSc. This
+#     function is intentionally unaware of case-specific approach names: the
+#     caller decides whether the current approach needs PETSc before calling it.
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requirePetscOrExitSilently()
+{
+    if [[ -z "${PETSC_DIR:-}" ]]
+    then
+        echo
+        echo "Skipping this case as PETSc is not installed"
+        echo "If you would like to run this case, solids4foam should be rebuilt with PETSc"
+        echo "(set the PETSC_DIR variable and rebuild solids4foam)"
+        echo
+        exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # regressionCaseSkipped
 #     Return success when an Allrun log contains a known case-skip message.
 #     Regression scripts use this to exit cleanly when a tutorial is not
-#     intended to run in the current OpenFOAM flavour.
+#     intended to run in the current OpenFOAM flavour, or when a required
+#     dependency (PETSc, or a command such as cartesianMesh) is unavailable.
 # Arguments:
 #     1: LOG_FILE
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -577,11 +905,204 @@ function solids4Foam::regressionCaseSkipped()
         return 1
     fi
 
-    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed" "${LOG_FILE}"
+    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed|command not found, which is required for this case" "${LOG_FILE}"
     then
         return 0
     fi
 
+    return 1
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requireTestApp
+#     Check that a test application a regression script runs is in PATH.
+#     Returns 0 if it is. If it is not, a local build may simply not have
+#     built it, so it prints SKIP and returns 1. In CI, where Allwmake always
+#     builds the test applications, a missing one means the check it serves
+#     would pass without running, so it prints FAIL and returns 2
+# Arguments:
+#     1: APPLICATION
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requireTestApp()
+{
+    local APPLICATION=$1
+
+    if command -v "${APPLICATION}" > /dev/null 2>&1
+    then
+        return 0
+    fi
+
+    if [[ "${CI:-}" == "true" || "${GITHUB_ACTIONS:-}" == "true" ]]
+    then
+        echo "FAIL: ${APPLICATION} not found in PATH, which a CI run must"
+        echo "      not skip: it is built by Allwmake"
+        return 2
+    fi
+
+    echo "SKIP: ${APPLICATION} not found in PATH"
+    return 1
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# latestTime
+#     Print the latest time directory of a case other than 0, or nothing if the
+#     case has none, as foamListTimes -latestTime does. foam-extend has no
+#     foamListTimes. Always succeeds, so it is safe under set -eo pipefail
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::latestTime()
+{
+    local CASE_DIR=$1
+    local dir name latest
+
+    # As foamListTimes reads them: directories that are not hidden and whose
+    # names read as numbers, negative ones included. The latest is taken
+    # first and dropped if it is 0, so a case whose latest time is 0 has none
+    latest=$(
+        for dir in "${CASE_DIR}"/*
+        do
+            [[ -d "${dir}" ]] || continue
+            name="${dir##*/}"
+            [[ "${name}" =~ ^[-+]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][-+]?[0-9]+)?$ ]] \
+                || continue
+            echo "${name}"
+        done \
+            | sort -g \
+            | tail -n 1 \
+            || true
+    )
+
+    if [[ -n "${latest}" ]] && awk "BEGIN {exit !(${latest} + 0 != 0)}"
+    then
+        echo "${latest}"
+    fi
+
+    return 0
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# internalFieldValues
+#     Print every component of a field file's internal values, one per line, in
+#     the order written. Reads the uniform, nonuniform and N{value} forms. The
+#     boundary values and the header are not read. Returns 1, with a message
+#     on stderr, when the file has no internalField or it holds no values
+# Arguments:
+#     1: FIELD_FILE
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::internalFieldValues()
+{
+    local FIELD_FILE=$1
+
+    awk -v file="${FIELD_FILE}" '
+        { text = text " " $0 }
+        END {
+            i = index(text, "internalField")
+            if (i == 0) {
+                print "no internalField in " file > "/dev/stderr"
+                exit 1
+            }
+
+            # Everything up to the semicolon that closes the entry: a list
+            # body holds none
+            body = substr(text, i + length("internalField"))
+            body = substr(body, 1, index(body, ";") - 1)
+
+            # The keyword, the list type and, for a nonuniform list, the count
+            # in front of it
+            if (sub(/^[ \t]*nonuniform/, "", body)) {
+                sub(/^[ \t]*List<[^>]*>/, "", body)
+                sub(/^[ \t]*[0-9]+/, "", body)
+            } else {
+                sub(/^[ \t]*uniform/, "", body)
+            }
+
+            gsub(/[(){}]/, " ", body)
+            n = split(body, values, " ")
+            if (n == 0) {
+                print "empty internalField in " file > "/dev/stderr"
+                exit 1
+            }
+            for (k = 1; k <= n; k++) {
+                print values[k]
+            }
+        }
+    ' "${FIELD_FILE}"
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# internalFieldNorms
+#     Print the largest magnitude of any component of a field file's internal
+#     values, and the mean magnitude, as "max<TAB>mean". Returns 1 when the
+#     values cannot be read
+# Arguments:
+#     1: FIELD_FILE
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::internalFieldNorms()
+{
+    local FIELD_FILE=$1
+    local VALUES
+
+    VALUES=$(solids4Foam::internalFieldValues "${FIELD_FILE}") || return 1
+
+    awk '
+        { v = ($1 < 0 ? -$1 : $1); if (v > max) max = v; sum += v; n++ }
+        END { printf "%.15g\t%.15g\n", max, sum/n }
+    ' <<< "${VALUES}"
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# checkFieldNorms
+#     Compare a field file's internal values with a reference, through the
+#     norms of internalFieldNorms. Both differences are bounded by the largest
+#     pointwise difference, so a field that agrees with the reference to TOL
+#     times its largest value passes, and one that does not is caught by at
+#     least one of the two in all but contrived cases. Prints PASS or FAIL and
+#     returns 0 or 1
+# Arguments:
+#     1: LABEL
+#     2: FIELD_FILE
+#     3: REF_MAX
+#     4: REF_MEAN
+#     5: TOL, relative to REF_MAX
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::checkFieldNorms()
+{
+    local LABEL=$1
+    local FIELD_FILE=$2
+    local REF_MAX=$3
+    local REF_MEAN=$4
+    local TOL=$5
+    local NORMS FIELD_MAX FIELD_MEAN
+
+    if [[ ! -f "${FIELD_FILE}" ]] \
+        || ! NORMS=$(solids4Foam::internalFieldNorms "${FIELD_FILE}")
+    then
+        echo "FAIL: ${LABEL}: no field to compare with the reference"
+        return 1
+    fi
+
+    read -r FIELD_MAX FIELD_MEAN <<< "${NORMS}"
+
+    if awk "BEGIN {
+            a = ${FIELD_MAX} - ${REF_MAX}; if (a < 0) a = -a
+            b = ${FIELD_MEAN} - ${REF_MEAN}; if (b < 0) b = -b
+            exit !(${FIELD_MAX} > 0 && a <= ${TOL}*${REF_MAX} \
+                && b <= ${TOL}*${REF_MAX})
+        }"
+    then
+        printf "PASS: %s matches the reference: max %.15g (%.15g), mean %.15g (%.15g)\n" \
+            "${LABEL}" "${FIELD_MAX}" "${REF_MAX}" "${FIELD_MEAN}" "${REF_MEAN}"
+        return 0
+    fi
+
+    printf "FAIL: %s differs from the reference: max %.15g (%.15g), mean %.15g (%.15g), tolerance %s\n" \
+        "${LABEL}" "${FIELD_MAX}" "${REF_MAX}" "${FIELD_MEAN}" "${REF_MEAN}" "${TOL}"
     return 1
 }
 
@@ -667,11 +1188,21 @@ function solids4Foam::runApplication()
              "remove log file '$logFile' to re-run"
     else
         echo "Running $appRun on $PWD"
+        local rc=0
         if [ "$logMode" = append ]
         then
-            $appRun $appArgs "$@" >> $logFile 2>&1 || echo "ERROR" >> $logFile
+            $appRun $appArgs "$@" >> $logFile 2>&1 || rc=$?
         else
-            $appRun $appArgs "$@" > $logFile 2>&1 || echo "ERROR" >> $logFile
+            $appRun $appArgs "$@" > $logFile 2>&1 || rc=$?
+        fi
+
+        if [ "$rc" -ne 0 ]
+        then
+            # Keep the ERROR marker that existing scripts grep for
+            echo "ERROR" >> $logFile
+            echo "Error: $appName failed with exit code $rc;" \
+                 "see $PWD/$logFile" 1>&2
+            return "$rc"
         fi
     fi
 }
@@ -711,13 +1242,13 @@ function solids4Foam::getNumberOfProcessors()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 function solids4Foam::runParallel()
 {
-    local appName appRun logFile logMode nProcs
+    local appName="" appRun="" logFile="" logMode="" nProcs=""
 
     # Any additional parsed arguments (eg, decomposeParDict)
     local appArgs="-parallel"
 
     local mpirun="mpirun"
-    if [ "$FOAM_MPI" = msmpi ]
+    if [ "${FOAM_MPI:-}" = msmpi ]
     then
         mpirun="mpiexec"
     fi
@@ -847,18 +1378,19 @@ function solids4Foam::runSolidModel()
 
     if [ ! -f "${DICTS_DIR}/0/${DISP}" ]; then
         # The DISP field is not present. Check if we can copy a field that is
-        # present
+        # present; renaming the field requires GNU sed
+        solids4Foam::requireGnuSed
 
         if [ "${DISP}" = "D" ] && [ -f "${CASE_DIR}/0/DD" ]; then
             echo "Renaming ${CASE_DIR}/0/DD to ${CASE_DIR}/0/D"
             \mv "${CASE_DIR}/0/DD" "${CASE_DIR}/0/D"
-            sed -i "s/object.*DD;/object D;/g" "${CASE_DIR}/0/D"
+            "${SOLIDS4FOAM_SED}" -i "s/object.*DD;/object D;/g" "${CASE_DIR}/0/D"
         fi
 
         if [ "${DISP}" = "DD" ] && [ -f "${CASE_DIR}/0/D" ]; then
             echo "Renaming ${CASE_DIR}/0/D to ${CASE_DIR}/0/DD"
             \mv "${CASE_DIR}/0/D" "${CASE_DIR}/0/DD"
-            sed -i "s/object.*D;/object DD;/g" "${CASE_DIR}/0/DD"
+            "${SOLIDS4FOAM_SED}" -i "s/object.*D;/object DD;/g" "${CASE_DIR}/0/DD"
         fi
 
         if [ "${DISP}" != "D" ] && [ "${DISP}" != "DD" ]; then

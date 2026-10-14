@@ -139,6 +139,10 @@ class nonLinGeomTotalLagVelocitySolid
         //  previous time-steps
         void predict();
 
+        //- Update the cell-centred stress from the current kinematics
+        //  using the mechanicalConstitutiveLaw framework
+        void correctStress();
+
         //- Make coefficient for velocity-based momentum stabilisation
         void makeVelocityMomentumStabilisationCoeff();
 

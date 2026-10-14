@@ -971,6 +971,7 @@ label foamPetscSnesHelper::initialiseJacobian
         MatCreate(PETSC_COMM_WORLD, &jac);
         MatSetFromOptions(jac);
         MatSetSizes(jac, n, n, N, N);
+
         MatSetType(jac, MATMPIAIJ);
     }
 
@@ -1136,6 +1137,16 @@ label foamPetscSnesHelper::initialiseJacobian
     }
 
     // Allocate parallel matrix
+    // Note: MatXAIJSetPreallocation is used rather than a type-specific
+    // routine, e.g. MatMPIBAIJSetPreallocation, because the type-specific
+    // routines dispatch through PetscTryMethod and so silently do nothing when
+    // the matrix is of another type, leaving the matrix un-preallocated:
+    // PETSc-3.19 and newer then quietly call MatSetUp, whereas older versions
+    // give a "wrong state" error in debug builds and segfault in optimised
+    // builds. MatXAIJSetPreallocation takes the same block-row counts and
+    // dispatches to whichever type the matrix actually has, so the matrix is
+    // preallocated whether it is AIJ, BAIJ or SBAIJ, e.g. if the user
+    // overrides the type with -mat_type
     AssertPETSc
     (
         MatXAIJSetPreallocation

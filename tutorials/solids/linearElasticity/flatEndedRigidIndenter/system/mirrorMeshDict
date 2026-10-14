@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -20,8 +20,8 @@ planeType           pointAndNormal;
 
 pointAndNormalDict
 {
-    basePoint       (0 0 0);
-    normalVector   (-1 0 0);
+    point       (0 0 0);
+    normal   (-1 0 0);
 }
 
 planeTolerance      1e-6;

@@ -28,8 +28,12 @@ Description
 
         - tmpRef()           : access the underlying object of a tmp<T>
         - autoPtrRef()       : access the underlying object of a autoPtr<T>
+        - compactListListCRef(): access CompactListList rows for read-only use
         - boundaryFieldRef() : obtain a modifiable boundary field reference
         - makeList<T>()      : construct a List<T> from an initializer_list
+        - forAllIters()      : iterate a container without naming its type
+        - forAllConstIters() : as above, with const access
+        - fvcD2dt2Compat()   : fvc::d2dt2 using the d2dt2Schemes entry
 
       Usage example:
           #include "compatibilityFunctions.H"
@@ -48,8 +52,42 @@ Author
 
 #include "tmp.H"
 #include "autoPtr.H"
+#include "CompactListList.H"
 #include "GeometricFields.H"
 #include "fvm.H"
+#include "d2dt2Scheme.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// OpenFOAM.com provides forAllIters()/forAllConstIters(), which deduce the
+// container type, whereas foam-extend and OpenFOAM.org offer only the
+// three-argument forAllIter()/forAllConstIter(), where the container type must
+// be spelled out. Spelling it out is noisy for the nested template types used
+// for state storage, e.g.
+//
+//     forAllConstIter(HashTable<autoPtr<Field<symmTensor>>>, table, iter)
+//
+// so the two-argument forms are defined here for the forks that lack them,
+// giving one portable spelling across all of them
+#ifndef OPENFOAM_COM
+
+    #define forAllIters(container,iter)                                        \
+        for                                                                    \
+        (                                                                      \
+            auto iter = (container).begin();                                   \
+            iter != (container).end();                                         \
+            ++iter                                                             \
+        )
+
+    #define forAllConstIters(container,iter)                                   \
+        for                                                                    \
+        (                                                                      \
+            auto iter = (container).cbegin();                                  \
+            iter != (container).cend();                                        \
+            ++iter                                                             \
+        )
+
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -90,13 +128,48 @@ namespace Foam
     }
 
     // const
+    //
+    // No fork split here, unlike the non-const overload above:
+    // OpenFOAM.com's autoPtr::ref() is not const, so it cannot serve a const
+    // autoPtr at all. operator()() is const on every supported fork - com
+    // autoPtr.H:261, foam-extend autoPtr.H:118 - and foam-extend comments
+    // operator* out, so this is the one spelling that works everywhere
     template<class T>
     inline const T& autoPtrRef(const autoPtr<T>& t)
     {
-#ifdef OPENFOAM_COM
-        return t.ref(); // com
+        return t();
+    }
+
+    //- Return a reference for read-only CompactListList traversal
+    //
+    //  OpenFOAM.org and OpenFOAM.com return a const reference, as indicated
+    //  by the CRef suffix. foam-extend's const CompactListList::operator[]
+    //  does not compile with modern Clang, although its non-const operator[]
+    //  does. The foam-extend branch therefore casts away constness solely to
+    //  select the working overload.
+    //
+    //  Always bind the result using auto&, so it remains const on variants
+    //  that support const row access. Never modify the list through the
+    //  returned reference: doing so may change cached data and is undefined
+    //  behaviour when the original object is genuinely const.
+    //
+    //  Example:
+    //      auto& rows = compactListListCRef(list);
+    //      const label value = rows[rowI][columnI];
+    template<class T>
+#ifdef FOAMEXTEND
+    inline CompactListList<T>& compactListListCRef
 #else
-        return t();     // foam-extend/org
+    inline const CompactListList<T>& compactListListCRef
+#endif
+    (
+        const CompactListList<T>& list
+    )
+    {
+#ifdef FOAMEXTEND
+        return const_cast<CompactListList<T>&>(list);
+#else
+        return list;
 #endif
     }
 
@@ -131,7 +204,8 @@ namespace Foam
     // Non-const field → modifiable Boundary&
     template<class Type, template<class> class PatchField, class GeoMesh>
 #ifdef FOAMEXTEND
-    inline typename GeometricField<Type, PatchField, GeoMesh>::GeometricBoundaryField&
+    inline typename
+    GeometricField<Type, PatchField, GeoMesh>::GeometricBoundaryField&
 #else
     inline typename GeometricField<Type, PatchField, GeoMesh>::Boundary&
 #endif
@@ -175,6 +249,62 @@ namespace Foam
     #else
         return Foam::fvm::ddt(D);
     #endif
+    }
+
+    // Return the d2dt2 scheme for the given name
+    inline ITstream& d2dt2SchemeCompat(const fvMesh& mesh, const word& name)
+    {
+    #ifdef OPENFOAM_NOT_EXTEND
+        return mesh.d2dt2Scheme(name);
+    #else
+        return mesh.schemesDict().d2dt2Scheme(name);
+    #endif
+    }
+
+    // Explicit second time derivative using the d2dt2Schemes entry.
+    // fvc::d2dt2 looks its scheme up in ddtSchemes, whereas fvm::d2dt2 uses
+    // d2dt2Schemes, in all OpenFOAM variants; so this function is used in
+    // place of fvc::d2dt2 for the inertia terms of the momentum equation,
+    // keeping their explicit and implicit forms consistent (#502)
+    template<class Type>
+    inline tmp<GeometricField<Type, fvPatchField, volMesh>> fvcD2dt2Compat
+    (
+        const GeometricField<Type, fvPatchField, volMesh>& vf
+    )
+    {
+        tmp<fv::d2dt2Scheme<Type>> tscheme
+        (
+            fv::d2dt2Scheme<Type>::New
+            (
+                vf.mesh(),
+                d2dt2SchemeCompat(vf.mesh(), "d2dt2(" + vf.name() + ')')
+            )
+        );
+
+        return tmpRef(tscheme).fvcD2dt2(vf);
+    }
+
+    // As above, for the (rho, vf) form
+    template<class Type>
+    inline tmp<GeometricField<Type, fvPatchField, volMesh>> fvcD2dt2Compat
+    (
+        const volScalarField& rho,
+        const GeometricField<Type, fvPatchField, volMesh>& vf
+    )
+    {
+        tmp<fv::d2dt2Scheme<Type>> tscheme
+        (
+            fv::d2dt2Scheme<Type>::New
+            (
+                vf.mesh(),
+                d2dt2SchemeCompat
+                (
+                    vf.mesh(), "d2dt2(" + rho.name() + ',' + vf.name() + ')'
+                )
+            )
+        );
+
+        return tmpRef(tscheme).fvcD2dt2(rho, vf);
     }
 
     // Provide OpenFOAM.com ends_with function

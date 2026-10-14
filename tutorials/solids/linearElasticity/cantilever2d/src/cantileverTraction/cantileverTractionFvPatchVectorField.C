@@ -23,6 +23,8 @@ InClass
 #include "cantileverTractionFvPatchVectorField.H"
 #include "addToRunTimeSelectionTable.H"
 #include "GeometricFields.H"
+#include "lookupSolidModel.H"
+#include "compatibilityFunctions.H"
 
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
@@ -165,6 +167,55 @@ void Foam::cantileverTractionFvPatchVectorField::updateCoeffs()
 }
 
 
+Foam::autoPtr<Foam::CompactListList<Foam::vector>>
+Foam::cantileverTractionFvPatchVectorField::evaluateQuadrature
+() const
+{
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // faceQuadPoints is list for the  whole mesh
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
+
+    // faceQuadPoints is list for whole mesh.
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI] = faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
+
+    // Loop over faces
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        // Get the number of quadrature points for this face
+        const label nPoints = faceQuadPoints[globalFaceID].size();
+
+        // Assign the values to face quadrature points
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            const point quadPoint = faceQuadPoints[globalFaceID][pointI];
+            quadPointsValue[faceI][pointI] =
+                analyticalSol_.traction(quadPoint);
+        }
+    }
+
+    return tQuadPointsValue;
+}
 
 
 void Foam::cantileverTractionFvPatchVectorField::write(Ostream& os) const

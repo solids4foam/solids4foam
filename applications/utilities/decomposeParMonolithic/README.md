@@ -1,3 +1,7 @@
+---
+sort: 3
+---
+
 # `decomposeParMonolithic`
 
 Coupled multi-region decomposition utility for monolithic FSI cases.

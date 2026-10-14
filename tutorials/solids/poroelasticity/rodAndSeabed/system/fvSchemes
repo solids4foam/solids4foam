@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -24,13 +24,13 @@ d2dt2Schemes
 ddtSchemes
 {
     default            none;
-    ddt(p)             Euler;
+    ddt(porePressure)             Euler;
     ddt(D)             Euler;
 }
 
 gradSchemes
 {
-    default            leastSquares;
+    default            pointCellsLeastSquares;
 }
 
 divSchemes
@@ -43,7 +43,7 @@ laplacianSchemes
     default            none;
     laplacian(DD,D)    Gauss linear corrected;
     laplacian(DDD,DD)  Gauss linear corrected;
-    laplacian(p)       Gauss linear corrected;
+    laplacian(porePressure)       Gauss linear corrected;
 }
 
 snGradSchemes

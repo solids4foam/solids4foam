@@ -7,20 +7,17 @@ authors:
     orcid: "https://orcid.org/0000-0002-4824-427X"
   - family-names: "Batistić"
     given-names: "Ivan"
-    affiliation:
-      - "University of Zagreb"
-      - "University College Dublin"
+    affiliation: "University of Zagreb; University College Dublin"
     orcid: "https://orcid.org/0000-0002-6104-0415"
   - family-names: "Tuković"
     given-names: "Željko"
     affiliation: "University of Zagreb"
     orcid: "https://orcid.org/0000-0001-8719-0983"
 title: "solids4foam: A toolbox for performing solid mechanics and fluid-solid interaction simulations in OpenFOAM"
-version: "2.2"
-doi: "10.21105/joss.07407"
-date-released: "2025-04-02"
+version: "2.4"
+date-released: "2026-08-24"
 license: "GPL-3.0-or-later"
-repository: "https://github.com/solids4foam/solids4foam"
+repository-code: "https://github.com/solids4foam/solids4foam"
 keywords:
   - solid mechanics
   - fluid-solid interaction

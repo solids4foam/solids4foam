@@ -1,0 +1,39 @@
+{
+  "displacement_curve": "TukovicDisplacements.csv",
+  "force_curve": "TukovicForces.csv",
+  "force_reference_thickness_m": 0.05,
+  "tutorial_thickness_m": 1.0,
+  "default_levels": [
+    1,
+    2,
+    3
+  ],
+  "default_variants": [
+    "aitken"
+  ],
+  "base_delta_x_m": 0.1,
+  "monitor_point": [
+    4.0,
+    -1.0,
+    0.5
+  ],
+  "variants": {
+    "aitken": {
+      "coupling": "Aitken"
+    },
+    "iqnils": {
+      "coupling": "IQNILS"
+    }
+  },
+  "steady_state": {
+    "end_time": 200,
+    "delta_t": 0.5,
+    "window_fraction": 0.1,
+    "relative_tolerance": 0.0001
+  },
+  "acceptance": {
+    "displacement_relative_error_tolerance": 0.1,
+    "force_relative_error_tolerance": 0.05,
+    "minimum_net_order": 0.0
+  }
+}

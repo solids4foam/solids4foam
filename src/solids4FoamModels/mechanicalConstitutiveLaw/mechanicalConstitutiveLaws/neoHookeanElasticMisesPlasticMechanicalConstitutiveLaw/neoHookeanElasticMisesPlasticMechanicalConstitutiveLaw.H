@@ -1,0 +1,314 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
+
+Description
+    Finite-strain elasto-plastic constitutive law with compressible
+    neo-Hookean elasticity and isotropic J2 (von Mises) plasticity.
+
+    The formulation is the multiplicative one of Simo & Hughes (1998): the
+    isochoric elastic left Cauchy-Green tensor bEbar is carried as history and
+    updated by an exponential-map radial return in the intermediate
+    configuration,
+
+        relFbar    = relJ^(-1/3) relF,     relF = F F0^-1,   relJ = J/J0
+        bEbarTrial = relFbar bEbar0 relFbar^T
+        sTrial     = mu dev(bEbarTrial)
+        fTrial     = |sTrial| - sqrt(2/3) J sigmaY
+
+    with, on yielding, s = sTrial - 2 mu DEpsilonP and the Cauchy stress
+
+        sigma = ( p I + s ) / J,    p = K (J^2 - 1)/2.
+
+    Both perfect plasticity and isotropic hardening are supported through a
+    yield-stress versus equivalent plastic strain curve. A two-point curve is
+    treated as linear hardening with a closed-form return; three or more points
+    are treated as nonlinear and solved with a local Newton iteration.
+
+    Note on the hydrostatic stress. The optional Laplacian smoothing of the
+    hydrostatic stress over the whole field (solvePressureEqn) is deliberately
+    not done here, as for MooneyRivlinElastic: a mechanicalConstitutiveLaw is
+    a pure function of
+    integration-point kinematics and old-time state, and pressure smoothing
+    stabilises the discretisation rather than describing the material, so it
+    belongs to the solid model, which does it when the law entry sets
+    solvePressureEqn (see solidModel::smoothHydrostaticStress()). Both that
+    and the mixed displacement-pressure formulation (solvePressure) ask this
+    law for its isochoric stress s/J and its volumetric response p/J
+    separately: J2 plasticity is isochoric, so the return mapping touches s
+    alone and p is purely elastic.
+
+    The plastic strain increment is not under-relaxed between outer
+    iterations: that is solver-loop behaviour, with no place in a law.
+
+    This class implements only the constitutive response at a collection
+    of integration points. Storage and management of history variables
+    (bEbar, equivalent plastic strain, yield stress) are handled via
+    mechanicalConstitutiveLawState objects owned by the
+    mechanicalConstitutiveLawManager.
+
+    Elastic parameters may be specified as:
+      - Young's modulus (E) and Poisson's ratio (nu), or
+      - Shear modulus (mu) and bulk modulus (K).
+
+    References:
+      - J.C. Simo & T.J.R. Hughes, Computational Inelasticity, Springer, 1998.
+      - M.B. Rubin & A. Attia, Int. J. Numer. Meth. Eng., 39:309-320, 1996.
+      - M. Hollenstein, M. Jabareen & M.B. Rubin, Comput. Mech., 52:649-667,
+        2013.
+
+SourceFiles
+    neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw.C
+
+Author
+    Philip Cardiff, UCD.
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw_H
+#define neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw_H
+
+#include "mechanicalConstitutiveLaw.H"
+#include "dimensionedScalar.H"
+#include "interpolationTable.H"
+#include "Switch.H"
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+   Class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw Declaration
+\*---------------------------------------------------------------------------*/
+
+class neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
+:
+    public mechanicalConstitutiveLaw
+{
+    // Private Data
+
+        //- Density
+        const dimensionedScalar rho_;
+
+        //- Young's modulus
+        //  Set in the constructor body, since the material may be given as
+        //  mu and K instead
+        dimensionedScalar E_;
+
+        //- Poisson's ratio
+        dimensionedScalar nu_;
+
+        //- Second Lamé parameter (shear modulus)
+        dimensionedScalar mu_;
+
+        //- Bulk modulus
+        dimensionedScalar kappa_;
+
+        //- Table of plastic strain versus post-yield stress
+        interpolationTable<scalar> stressPlasticStrainSeries_;
+
+        //- True if plasticity law is nonlinear (table > 2 points)
+        const bool nonLinearPlasticity_;
+
+        //- Linear hardening modulus (used only for linear plasticity)
+        scalar Hp_;
+
+        //- Newton loop tolerance
+        const scalar loopTol_;
+
+        //- Maximum Newton iterations
+        const label maxNewtonIter_;
+
+        //- Finite-difference step for numerical derivatives
+        const scalar finiteDiff_;
+
+        //- Enforce det(bEbar) == 1 when updating bEbar, by solving a cubic
+        //  for its spherical part rather than taking the trial value
+        const Switch updateBEbarConsistent_;
+
+    // Private Member Functions
+
+        //- Kirchhoff yield stress as a function of equivalent plastic strain.
+        //  The curve is given as Cauchy stress against true strain, so it is
+        //  scaled by J to give the Kirchhoff yield stress the return mapping
+        //  is expressed in
+        inline scalar yieldStress
+        (
+            const scalar epsilonPEq,
+            const scalar J
+        ) const;
+
+        //- Yield function value
+        inline scalar yieldFunction
+        (
+            const scalar epsilonPEqOld,
+            const scalar magSTrial,
+            const scalar dLambda,
+            const scalar muBar,
+            const scalar J
+        ) const;
+
+        //- Newton iteration for plastic multiplier
+        inline void newtonLoop
+        (
+            scalar& dLambda,
+            scalar& curSigmaY,
+            const scalar epsilonPEqOld,
+            const scalar magSTrial,
+            const scalar muBar,
+            const scalar J,
+            const scalar maxMagDEpsilon
+        ) const;
+
+        //- Spherical part of bEbar that enforces det(bEbar) == 1, found by
+        //  solving a cubic. Taking the trial value instead, as in Simo &
+        //  Hughes, does not preserve the determinant
+        inline scalar IbarConsistent(const symmTensor& devBEbar) const;
+
+        //- No copy construct
+        neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
+        (
+            const neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw&
+        ) = delete;
+
+        //- No copy assignment
+        void operator=
+        (
+            const neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw&
+        ) = delete;
+
+
+public:
+
+    //- Runtime type information
+    TypeName("neoHookeanElasticMisesPlastic");
+
+    // Constructors
+
+        //- Construct from dictionary
+        explicit neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw
+        (
+            const dictionary& dict
+        );
+
+
+    //- Destructor
+    virtual ~neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw() = default;
+
+
+    // Member Functions
+
+    // Access
+
+        //- Return the density
+        virtual dimensionedScalar rho() const override
+        {
+            return rho_;
+        }
+
+        //- Return the bulk modulus
+        virtual dimensionedScalar kappa() const override
+        {
+            return kappa_;
+        }
+
+        //- This law separates its isochoric and volumetric responses. The
+        //  stress is (p I + s)/J with p = K (J^2 - 1)/2, and J2 plasticity is
+        //  isochoric: the return mapping acts on the deviatoric Kirchhoff
+        //  stress s alone and leaves p purely elastic. So s/J is the
+        //  isochoric stress and p/J is dU/dJ for
+        //  U(J) = 0.25*K*(J^2 - 1 - 2*log(J)), exactly as the total is built
+        virtual bool providesVolumetricSplit() const override
+        {
+            return true;
+        }
+
+        //- But the isochoric stress is not a function of the isochoric
+        //  deformation alone once the material yields: the yield surface is
+        //  the Cauchy yield stress scaled by J, so the radius the return
+        //  mapping brings the Kirchhoff stress s back to changes with a
+        //  superposed dilation. It is invariant only while every point is
+        //  elastic, which is not a property worth claiming
+        virtual bool isochoricStressIsDilationInvariant() const override
+        {
+            return false;
+        }
+
+    // Edit
+
+        //- Initialise constitutive state variables
+        virtual void declareState
+        (
+            mechanicalConstitutiveLawStateSpec& spec
+        ) const override;
+
+        //- Finite-strain constitutive evaluation.
+        //  There is deliberately no small-strain overload: this law is
+        //  formulated multiplicatively and has no small-strain form
+        //- Largest trial elastic strain over this law's points, which the
+        //  manager reduces and hands back as the convergence scale
+        virtual scalar localConvergenceScale
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawState& state
+        ) const;
+
+        //- The convergence scale above is used
+        virtual bool usesConvergenceScale() const override
+        {
+            return true;
+        }
+
+        virtual void evaluate
+        (
+            const finiteStrainMechanicalConstitutiveLawKinematics& kin,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            mechanicalConstitutiveLawResponse& response
+        ) const override;
+
+        //- Optional hook called once at the end of each time step.
+        virtual void endTimeStep
+        (
+            const mechanicalConstitutiveLawState& state,
+            const scalar time,
+            const label timeIndex,
+            DynamicList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+        ) const override;
+
+        //- Say what was found, once the manager has reduced it
+        virtual void reportDiagnostics
+        (
+            const UList<mechanicalConstitutiveLawDiagnostic>& diagnostics
+        ) const override;
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

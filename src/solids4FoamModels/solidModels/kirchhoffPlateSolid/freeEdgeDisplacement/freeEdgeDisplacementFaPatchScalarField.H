@@ -86,6 +86,13 @@ public:
             const faPatchFieldMapper&
         );
 
+#if (OPENFOAM >= 2606)
+        //- No copy construct without an internal field
+        freeEdgeDisplacementFaPatchScalarField
+        (
+            const freeEdgeDisplacementFaPatchScalarField&
+        ) = delete;
+#else
         //- Construct as copy
         freeEdgeDisplacementFaPatchScalarField
         (
@@ -100,6 +107,7 @@ public:
                 new freeEdgeDisplacementFaPatchScalarField(*this)
             );
         }
+#endif
 
         //- Construct as copy setting internal field reference
         freeEdgeDisplacementFaPatchScalarField

@@ -229,7 +229,7 @@ void solidForceFvPatchVectorField::updateCoeffs()
     // Check if it is a linear or nonlinear geometry case
     if (solMod.nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
     {
-        traction() = force_/patch().magSf();
+        setTraction(force_/patch().magSf());
     }
     else if (solMod.nonLinGeom() == nonLinearGeometry::TOTAL_LAGRANGIAN)
     {
@@ -247,7 +247,7 @@ void solidForceFvPatchVectorField::updateCoeffs()
         // Calculate area vectors in the deformed configuration
         const scalarField patchDeformMagSf(mag(J*Finv.T() & patchSf));
 
-        traction() = force_/patchDeformMagSf;
+        setTraction(force_/patchDeformMagSf);
     }
     else if (solMod.nonLinGeom() == nonLinearGeometry::UPDATED_LAGRANGIAN)
     {
@@ -268,7 +268,7 @@ void solidForceFvPatchVectorField::updateCoeffs()
             mag(relJ*relFinv.T() & patchSf)
         );
 
-        traction() = force_/patchDeformMagSf;
+        setTraction(force_/patchDeformMagSf);
     }
     else
     {

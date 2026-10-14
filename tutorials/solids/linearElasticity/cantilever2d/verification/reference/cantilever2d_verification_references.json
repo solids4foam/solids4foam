@@ -1,0 +1,22 @@
+{
+  "default_levels": [1, 2, 3, 4],
+  "default_variants": ["petscSnes"],
+  "tutorial_level": 4,
+  "variants": {
+    "petscSnes": {"approach": "petscSnes"},
+    "vertexCentred": {"approach": "vertexCentred"},
+    "highOrder": {"approach": "highOrder"},
+    "segregated": {"approach": "segregated"}
+  },
+  "scales": {
+    "comment": "Timoshenko peak tip deflection and peak bending stress for P 0.1e6, E 200e9, nu 0.3, L 2, D 0.1",
+    "displacement_m": 0.0160275,
+    "stress_Pa": 1.2e8
+  },
+  "acceptance": {
+    "relative_displacement_l2_tolerance": 0.01,
+    "relative_stress_l2_tolerance": 0.01,
+    "minimum_net_order": 1.4,
+    "roundoff_floor": 1e-8
+  }
+}

@@ -3,6 +3,9 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 # Example usage
 # ./Allrun
 # ./Allrun aitken
@@ -11,12 +14,7 @@
 # ./Allrun aitken parallel
 
 # PETSc is required for this case
-if [[ -z "${PETSC_DIR:-}" ]]
-then
-    echo; echo "Skipping this case as PETSc is not installed"
-    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
-    exit 0
-fi
+solids4Foam::requirePetscOrExitSilently
 
 couplingMethod=IQNILS
 runParallel=no
@@ -66,9 +64,6 @@ done
 
 echo "Using ${couplingMethod} fluidSolidInterface coupling"
 [[ "$runParallel" == "yes" ]] && echo "Running in parallel"
-
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

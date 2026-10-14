@@ -55,6 +55,7 @@ SourceFiles
 #define poroLinGeomSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #endif
@@ -119,6 +120,15 @@ class poroLinGeomSolid
         dimensionedScalar rKprime_;
 
     // Private Member Functions
+
+        //- Update the stress
+        void correctStress();
+
+        //- Construct impK from the framework
+        tmp<volScalarField> makeImpK() const;
+
+        //- Construct impKf to match impK
+        tmp<surfaceScalarField> makeImpKf() const;
 
         //- Check if the momentum and pressure equations are converged
         bool converged

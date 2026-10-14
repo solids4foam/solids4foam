@@ -1,0 +1,46 @@
+name: Docker promote to latest (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "solids4foam release version of the image to promote (e.g. v2.3)"
+        required: true
+        type: string
+      variant:
+        description: "OpenFOAM variant of the image to promote"
+        required: true
+        type: choice
+        options:
+          - openfoam-v2512
+          - openfoam-v2412
+          - openfoam-v2312
+          - openfoam-9
+          - foam-extend-4.1
+
+jobs:
+  promote:
+    runs-on: ubuntu-22.04
+
+    env:
+      REPO: solids4foam/solids4foam
+      SOURCE_TAG: ${{ inputs.version }}-${{ inputs.variant }}
+
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check source image exists
+        run: docker buildx imagetools inspect "${REPO}:${SOURCE_TAG}"
+
+      - name: Point 'latest' at the chosen image
+        run: |
+          docker buildx imagetools create \
+            --tag "${REPO}:latest" \
+            "${REPO}:${SOURCE_TAG}"

@@ -1,3 +1,7 @@
+---
+sort: 1
+---
+
 # linGeomTotalDispSolid
 
 This page documents the linear-geometry total-displacement solid model.
@@ -33,15 +37,15 @@ can be treated as undeformed for the governing equations.
 
 ### Supported solution algorithms
 
-The `solutionAlgorithm` entry in `solidModelCoeffs` selects how the equations
-are solved:
+The `solutionAlgorithm` entry in the coefficients sub-dictionary selects how
+the equations are solved:
 
 | Value | Meaning | Notes |
 | --- | --- | --- |
 | `implicitSegregated` | Default segregated solve | Recommended |
 | `PETScSNES` | Nonlinear solve via PETSc SNES | Requires PETSc |
 | `explicit` | Explicit time integration | Time-step limited by stability |
-| `implicitCoupled` | Not implemented for this model | Do not use |
+| `implicitCoupled` | Not implemented here | Do not select this value |
 
 The runtime type name for this class is `linearGeometryTotalDisplacement`.
 
@@ -60,7 +64,6 @@ The following `solidModel` options are particularly relevant here:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `writeResidualField` | `false` | Writes a residual field during output |
@@ -110,7 +113,7 @@ Minimal example for `constant/solidProperties`:
 ```text
 solidModel        linearGeometryTotalDisplacement;
 
-solidModelCoeffs
+linearGeometryTotalDisplacementCoeffs
 {
     solutionAlgorithm   implicitSegregated;
 
@@ -121,7 +124,6 @@ solidModelCoeffs
     nCorrectors         10000;
     solutionTolerance   1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance   1e-05;
     infoFrequency       100;
 
     restart             false;
@@ -161,7 +163,7 @@ If `solvePressure` is enabled, add:
 
 If `solutionAlgorithm` is `PETScSNES`, also ensure the case provides the PETSc
 options file expected by `optionsFile` (default name: `petscOptions`), unless
-you override that name in `solidModelCoeffs`.
+you override that name in the coefficients sub-dictionary.
 
 ### Required fields and boundary conditions
 
@@ -195,6 +197,7 @@ Here `oldTime()` means the value stored at the previous time step.
 The following boundary-condition types are treated specially by the solver:
 
 - `solidTraction` patch fields;
+- `solidSpringDashpot` patch fields;
 - `fixedDisplacementZeroShear` patch fields;
 - `symmetry` patch fields.
 
@@ -228,7 +231,7 @@ family. The key design choices are:
 
 - `D` is the primary solution variable;
 - the geometry is fixed in the governing equations;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver can run in three distinct modes: segregated implicit, PETSc SNES,
   and explicit.
 
@@ -296,96 +299,11 @@ stored in `impK_` and `impKf_`.
 
 The PETSc path uses a compact approximate Jacobian consistent with the
 segregated discretisation, and `precondition()` is available for a physics-based
-preconditioner (see below).
+preconditioner.
 
 The pressure-coupled branch adds one scalar unknown per cell, so the block size
 is `2/3` for displacement only and `3/4` when pressure is included, depending on
 the dimensionality.
-
-#### Physics preconditioner
-
-`precondition(y, x)` implements the custom model-side path used by
-`pc_type physics` with `pc_physics_type model`:
-
-1. Create a temporary correction field `dD`.
-2. Extract the momentum components of the incoming PETSc vector into an
-   OpenFOAM source field.
-3. Assemble and solve an approximate momentum correction equation for `dD`
-   using `mesh.solverDict("dD")`. The equation includes the Laplacian
-   (`impKf`), transient (`d2dt2`), and optional damping terms, matching
-   the diagonal block assembled in `formJacobian`.
-4. When `solvePressure` is enabled, extract the pressure RHS, assemble and
-   solve the pressure correction equation for `dp` using
-   `mesh.solverDict("dp")`, and correct `dD` with `rAD*grad(dp)`.
-5. Insert `dD` (and `dp`) back into the PETSc output vector.
-
-The preconditioner intentionally stays cheap; it is designed to be a useful
-physics-based approximation rather than a full exact inverse. The inner
-solver uses a single GAMG V-cycle (1 iteration, zero tolerance).
-
-Because the correction field `dD` uses `zeroGradient` boundary conditions
-(solid-specific BCs like `solidTraction` cannot be reused as they look up
-cached gradient fields), the preconditioner is not an exact inverse of the
-assembled Jacobian even when fully converged. This is consistent with the
-assembled Jacobian itself being only an approximation to the matrix-free
-operator.
-
-If `gradSchemes` uses `default none`, an explicit `grad(dD)` entry is
-required (e.g. `Gauss linear`). Cases with a permissive default (e.g.
-`default leastSquaresS4f`) do not need an extra entry.
-
-Example PETSc options (`fvSolution`):
-
-```c++
-solvers
-{
-    D
-    {
-        solver          petsc;
-
-        options
-        {
-            snes_type newtonls;
-            snes_monitor;
-            snes_converged_reason;
-            snes_mf;
-            snes_mf_operator;
-
-            ksp_type fgmres;
-            ksp_gmres_restart "100";
-            ksp_converged_reason;
-
-            pc_type physics;
-            pc_physics_type model;
-        }
-    }
-
-    dD
-    {
-        solver          GAMG;
-        tolerance       0;
-        relTol          0;
-        minIter         1;
-        maxIter         1;
-        smoother        GaussSeidel;
-        nPreSweeps      0;
-        nPostSweeps     1;
-        nFinestSweeps   1;
-        scaleCorrection true;
-        directSolveCoarsest false;
-        cacheAgglomeration true;
-        nCellsInCoarsestLevel 20;
-        agglomerator    faceAreaPair;
-        mergeLevels     1;
-    }
-}
-```
-
-`fgmres` (flexible GMRES) is required because the physics PC is variable
-(the inner solves are approximate). A single GAMG V-cycle for `dD` provides
-a good balance between cost and effectiveness. The `laplacianSchemes` entry
-must cover `laplacian(DD,D)` for the correction field — typically satisfied
-by the existing `default`.
 
 #### Explicit path
 
@@ -406,6 +324,8 @@ standard solids4foam displacement/traction patch types and applies model-specifi
 rules:
 
 - `solidTraction`: uses the patch traction and subtracts the pressure term;
+- `solidSpringDashpot`: uses the spring-dashpot traction of the current
+  boundary displacement, plus the patch traction and pressure;
 - `fixedDisplacementZeroShear` and `symmetry`: remove the tangential traction
   component by projection onto the normal direction.
 

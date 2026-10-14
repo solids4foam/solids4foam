@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -17,23 +17,23 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// The solid region does not run a standalone PETSc SNES solve in monolithic
-// coupling, so no PETSc options are required here.
-
 solvers
 {
+    "D|DD"
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-12;
+        relTol          0.1;
+    }
 }
 
-// relaxationFactors
-// {
-//     equations
-//     {
-//         //"D|DD"   0.999;
-//     }
-//     fields
-//     {
-//         "DD|D" 0.9;
-//     }
-// }
+relaxationFactors
+{
+    equations
+    {
+        "D|DD"          1;
+    }
+}
 
 // ************************************************************************* //

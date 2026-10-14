@@ -37,6 +37,9 @@ SourceFiles
 #define linGeomTotalDispSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
+#include "integrationPointTopologies.H"
+#include "mat66.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "pointFields.H"
@@ -66,6 +69,10 @@ class linGeomTotalDispSolid
 {
     // Private data
 
+        //- Material tangent at mesh faces, for the high-order Jacobian.
+        //  Held here so it is allocated once rather than per assembly
+        mutable List<mat66> faceMaterialTangent_;
+
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
@@ -83,60 +90,23 @@ class linGeomTotalDispSolid
         //  Used in the pressure Jacobian when solvePressure is enabled
         const volScalarField rKappa_;
 
+        //- The laws' own volumetric response, K*tr(epsilon)
+        //  Only built when solvePressure is enabled on the constitutive-law
+        //  framework. Asking for it is what leaves the stress without its
+        //  volumetric part, which is the part the solved pressure supplies;
+        //  the value is what checkVolumetricClosure compares against the
+        //  relation the pressure equation was written for
+        mutable autoPtr<volScalarField> volumetricResponsePtr_;
+
+        //- Set once that comparison has been made
+        mutable bool volumetricClosureChecked_ = false;
+
         //- Acceleration field
         //  Only used by the explicit solution scheme
         volVectorField A_;
 
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
-
-        //- Cached face unit-normal vectors (= mesh.Sf()/mesh.magSf()).
-        //  Purely geometric: independent of D and p. Rebuilt only when
-        //  the mesh has moved between timesteps
-        mutable autoPtr<surfaceVectorField> nfPtr_;
-
-        //- Time index when nfPtr_ was last refreshed (-1 = never built).
-        //  Used to detect mesh motion between timesteps
-        mutable label nfTimeIndex_;
-
-        //- Time index when solidModel::rAUf() was last computed
-        //  (-1 = never built)
-        mutable label rAUfTimeIndex_;
-
-        //- deltaT for which solidModel::rAUf() was last computed.
-        //  rAUf depends only on impKf_, rho, mesh and deltaT (not on
-        //  the values of D or p), so it is safe to reuse across PETSc
-        //  matrix-free residual evaluations within a Newton solve
-        mutable scalar rAUfDeltaT_;
-
-        //- Store pressure in the PETSc solution vector as p/pScale
-        const Switch scaleMixedPetScFields_;
-
-        //- Scale type used for the PETSc pressure unknown
-        const word pressureUnknownScaleType_;
-
-        //- Pressure scale used for pHat = p/pressureUnknownScale_
-        scalar pressureUnknownScale_;
-
-        //- User-facing dimensionless scale factor applied to the
-        //  pressure-equation residual and Jacobian rows relative to
-        //  the momentum equations
-        const scalar pressureScaleFactor_;
-
-        //- If true, multiply pressureScaleFactor_ by a representative
-        //  2*mu so that the pressure-equation residual has units
-        //  comparable to the momentum equation
-        const Switch pressureScaleByTwoMu_;
-
-        //- Representative value of 2*mu used as the physical scale of
-        //  the pressure equation. Computed once at construction
-        scalar twoMuRef_;
-
-        //- Effective scale applied to the pressure residual and the
-        //  pressure-row Jacobian entries.
-        //  pressureEqnScale_ = pressureScaleFactor_
-        //                       * (pressureScaleByTwoMu_ ? twoMuRef_ : 1)
-        scalar pressureEqnScale_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -146,39 +116,48 @@ class linGeomTotalDispSolid
 
     // Private Member Functions
 
+        //- Return the implicit stiffness, from the constitutive law framework
+        tmp<volScalarField> makeImpK() const;
+
+        //- Return the reciprocal of the bulk modulus, from the constitutive
+        //  law framework
+        tmp<volScalarField> makeRKappa() const;
+
+        //- Update the stress at the face quadrature points of the high-order
+        //  discretisation.
+        //  The high-order discretisation does not exist on foam-extend
+        void correctStressQuad();
+
+        //- Somewhere for the laws to put their volumetric response
+        volScalarField& volumetricResponse() const;
+
+        //- Refuse a law whose volumetric response is not the one the
+        //  pressure equation was written for
+        void checkVolumetricClosure() const;
+
+        //- Replace the volumetric part of the stress with the solved pressure
+        void replaceVolumetricStress(const volScalarField& p);
+
+        //- Update the cell-centred stress
+        void correctStress();
+
+        //- This model smooths the hydrostatic stress on request, in
+        //  correctStress(), in its implicit segregated algorithm
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return true;
+        }
+
+        //- Return the material tangent at mesh faces, indexed by face, for
+        //  the high-order Jacobian
+        const List<mat66>& faceMaterialTangent
+        (
+            const tangentRequest req
+        ) const;
+
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
         void predict();
-
-        //- Return the cached face unit-normal field (Sf()/magSf()).
-        //  Built lazily and refreshed only when the mesh has moved
-        //  between timesteps. Independent of D and p, so safe under
-        //  PETSc matrix-free perturbation
-        const surfaceVectorField& nf() const;
-
-        //- Update solidModel::rAUf() if the mesh or deltaT changed
-        //  since it was last computed. The result depends only on
-        //  impKf_, rho, mesh and deltaT (not on the values of D or p),
-        //  so it can safely be reused across MFFD residual evaluations
-        //  within a single Newton solve. Does nothing when
-        //  solvePressure() is disabled
-        void updateRAUfIfStale();
-
-#ifdef USE_PETSC
-        //- Copy the PETSc solution vector x into the D field (and p
-        //  when solvePressure() is active), applying the pressure
-        //  unknown scale (p = pressureUnknownScale_ * pHat) and
-        //  correcting boundary conditions. Centralises the mapping
-        //  used by formResidual, formJacobian and evolveSnes.
-        //  Vec is a pointer type, so it is taken by value
-        void unpackSolution(const Vec x);
-
-        //- Copy the current D field (and, when solvePressure() is
-        //  active, p) into the PETSc solution vector x, applying the
-        //  inverse pressure unknown scale (pHat = p/pressureUnknownScale_).
-        //  Vec is a pointer type, so it is taken by value
-        void packSolution(Vec x);
-#endif
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
@@ -199,7 +178,6 @@ class linGeomTotalDispSolid
 
         //- Evolve the solid solver using the explicit approach
         bool evolveExplicit();
-
         //- Disallow default bitwise copy construct
         linGeomTotalDispSolid(const linGeomTotalDispSolid&);
 
@@ -210,6 +188,11 @@ class linGeomTotalDispSolid
 protected:
 
     // Protected member functions
+
+#ifndef OPENFOAM_COM
+        //- Return optional source per unit volume; empty (no source) by default
+        virtual tmp<volVectorField> fvOptionsSource() const;
+#endif
 
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const

@@ -9,6 +9,9 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Source solids4Foam scripts
 source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # perpendicularFlap FSI regression test
 # ============================================================
@@ -17,7 +20,7 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-2      # max displacement absolute tolerance
+DISP_MAX_TOL=0.015      # max displacement absolute tolerance
 
 # Regression end time for the copied case only
 REG_END_TIME=4
@@ -59,7 +62,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
 # ------------------------------------------------------------

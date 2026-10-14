@@ -21,6 +21,17 @@ Class
 Description
     Virtual base class for solid mechanics models
 
+    Restarting: set "restart yes;" in the solid model's coefficients
+    dictionary, from the start of the run, to request writing of the fields a
+    run continued from a later time needs: DD and its old-time levels, D_0,
+    D_0_0, pointD_0, pointDD, grad(D), grad(D)_0 and grad(DD). The default is
+    "no"; keep it "yes" in the continued run too. When a run continues from a
+    time without grad(D)_0, this class stops if "restart" is not set at all,
+    and warns if it is "no"; a material with history then still stops. The
+    incremental (DD) models also stop with "restart no" when D is present at
+    the start time. See the "Restarting a Solid Model" section of
+    solidModels/README.md.
+
 Author
     Zeljko Tukovic, FSB Zagreb.
     Philip Cardiff, UCD.
@@ -41,7 +52,6 @@ SourceFiles
 #include "autoPtr.H"
 #include "runTimeSelectionTables.H"
 #include "thermalModel.H"
-#include "mechanicalModel.H"
 #include "nonLinearGeometry.H"
 #include "uniformDimensionedFields.H"
 #include "globalPolyPatch.H"
@@ -54,8 +64,14 @@ SourceFiles
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
+#include "mechanicalConstitutiveLawTangentRequest.H"
 #include "stabilisationModel.H"
 #include "CompactListList.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "enhancedVolPointInterpolation.H"
+#else
+    #include "newLeastSquaresVolPointInterpolation.H"
+#endif
 #ifdef OPENFOAM_COM
     #include "Enum.H"
     #include "fvOptions.H"
@@ -63,14 +79,15 @@ SourceFiles
     #include "NamedEnum.H"
 #endif
 
-#ifndef FOAMEXTEND
-    #include "movingLeastSquares.H"
-#endif
+#include "leastSquaresReconstruction.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
+
+// Forward declaration
+class mechanicalConstitutiveLawManager;
 
 /*---------------------------------------------------------------------------* \
                            Class solidModel Declaration
@@ -126,17 +143,6 @@ private:
         //- Thermal model
         mutable autoPtr<thermalModel> thermalPtr_;
 
-        //- Mechanical model
-        mutable autoPtr<mechanicalModel> mechanicalPtr_;
-
-#ifndef FOAMEXTEND
-        //- Moving Least Square operator for the displacement field
-        mutable autoPtr<movingLeastSquares> displacementMLSPtr_;
-
-        //- Moving Least Square operator for the pressure field
-        mutable autoPtr<movingLeastSquares> pressureMLSPtr_;
-#endif
-
         //- Boundary flag fields used by the leastSquaresS4f gradient scheme
         //  D field
         boolIOList useBoundaryFaceValuesD_;
@@ -185,6 +191,27 @@ private:
         //  In use by high-order discretisation
         mutable autoPtr<CompactListList<tensor>> gradDQuadPtr_;
 
+        //- Gradient of total displacement at face quadrature points, at the
+        //  previous time step.
+        //  A history-dependent law evaluated at quadrature points needs this,
+        //  and the current field is rebuilt each call, so this is reconstructed
+        //  from D.oldTime() on first use and copied at the end of every step
+        mutable autoPtr<CompactListList<tensor>> gradDQuad0Ptr_;
+
+        //- Copy one compact list-list onto another.
+        //  OpenFOAM.org gives CompactListList no copy constructor and no copy
+        //  assignment. setSize() must be used rather than assigning offsets:
+        //  OpenFOAM.org also stores the row count separately
+        static void copyQuadGradient
+        (
+            const CompactListList<tensor>& src,
+            CompactListList<tensor>& dst
+        )
+        {
+            dst.setSize(src.sizes());
+            dst.m() = src.m();
+        }
+
         //- Gradient of the displacement increment
         volTensorField gradDD_;
 
@@ -227,9 +254,6 @@ private:
         //- Solution tighter tolerance
         const scalar alternativeTol_;
 
-        //- Material law tolerance
-        const scalar materialTol_;
-
         //- Write frequency for residuals information
         const int infoFrequency_;
 
@@ -250,7 +274,7 @@ private:
         Switch enforceLinear_;
 
         //- Under-relaxation method
-        //  It can be 'fixed', 'Aitken' or 'QuasiNewton'
+        //  It can be 'fixed' or 'Aitken'
         const word relaxationMethod_;
 
         //- Aitken's under-relaxation factor field
@@ -258,24 +282,6 @@ private:
 
         //- Aitken's residual field
         volVectorField aitkenResidual_;
-
-        //- Restart frequency for the Quasi-Newton method
-        const int QuasiNewtonRestartFreq_;
-
-        //- Quasi-Newton method input vector field
-        DynamicList<vectorField> QuasiNewtonV_;
-
-        //- Quasi-Newton method output vector field
-        DynamicList<vectorField> QuasiNewtonW_;
-
-        //- Quasi-Newton method time indices for the input-ouput fields
-        DynamicList<scalar> QuasiNewtonT_;
-
-        //- Reference D field used for Quasi-Newton method
-        volVectorField DRef_;
-
-        //- Reference D (without relaxation) field used for Quasi-Newton method
-        volVectorField unrelaxedDRef_;
 
         //- Ptr list of global poly patches
         //  This is a copy of a patch which is reconstructed in full on each
@@ -287,9 +293,34 @@ private:
         //- Optional: set displacement at internal cells
         mutable autoPtr<setCellDisplacements> setCellDispsPtr_;
 
-        //- Optional: restart flag
-        //  Write out all fields required for a consistent restart
+        //- The mechanicalConstitutiveLaw framework, built on first use
+        mutable autoPtr<mechanicalConstitutiveLawManager> mechanicalManagerPtr_;
+
+        //- constant/mechanicalProperties, built on first use
+        mutable autoPtr<IOdictionary> mechanicalPropertiesPtr_;
+
+        //- Whether the Jacobian tangent request has been resolved
+        mutable bool jacobianTangentCached_;
+
+        //- Cached Jacobian tangent request
+        mutable tangentRequest jacobianTangent_;
+
+        //- Whether the case said anything about restart at all.
+        //  Read before restart_ below, because looking that up adds it to the
+        //  dictionary and the silence cannot be recovered afterwards. Silence
+        //  and a deliberate 'no' are different things: one is a user who has
+        //  not thought about restarting, and the other is one who has
+        const Switch restartSpecified_;
+
+        //- Optional: restart flag (default: no)
+        //  Write out all fields required for a consistent restart; see the
+        //  class description for the fields and the checks on continuing
         const Switch restart_;
+
+        //- Whether a continued run has the kinematic history, the old-time
+        //  displacement gradient, that a constitutive history is measured
+        //  against. True for a run from the start, which has none to restore
+        bool restartKinematicsAvailable_;
 
         //- Store rho*d2d2t(D) for efficiency
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
@@ -313,6 +344,34 @@ private:
         //  Hydrostatic component of the stress tensor: p = -hyd(sigma)
         mutable autoPtr<volScalarField> pPtr_;
 
+        // Hydrostatic stress smoothing (solvePressureEqn). See
+        // smoothHydrostaticStress()
+
+            //- Whether the law entries have been read for the setting
+            mutable bool hydrostaticSmoothingRead_;
+
+            //- Whether the law entries ask for the smoothing
+            mutable bool hydrostaticSmoothingRequested_;
+
+            //- Whether the request has been checked against the solid model
+            mutable bool hydrostaticSmoothingChecked_;
+
+            //- Scale factor on the smoothing diffusivity
+            mutable scalar pressureSmoothingScaleFactor_;
+
+            //- Smoothed hydrostatic stress, J times the mean Cauchy stress.
+            //  A case's solver and relaxation entries for it use this name
+            autoPtr<volScalarField> sigmaHydPtr_;
+
+            //- Which sigmaHyd patches the leastSquaresS4f gradient uses: none
+            autoPtr<boolIOList> useBoundaryFaceValuesSigmaHydPtr_;
+
+            //- Gradient of sigmaHyd, lagged by one outer iteration
+            autoPtr<volVectorField> gradSigmaHydPtr_;
+
+            //- The law's volumetric response, dU/dJ, before smoothing
+            autoPtr<volScalarField> smoothingVolumetricResponsePtr_;
+
 #ifdef OPENFOAM_COM
         //- fvOptions
         fv::options& fvOptions_;
@@ -327,8 +386,13 @@ private:
         //- Make the thermal model
         void makeThermalModel() const;
 
-        //- Make the mechanical model
-        void makeMechanicalModel() const;
+        //- Make the mechanicalProperties dictionary
+        void makeMechanicalProperties() const;
+
+        //- Refuse 'useMechanicalConstitutiveLawManager no', whose legacy
+        //  mechanical model has been removed, and note the entries that only
+        //  that model used and that are now ignored
+        void checkRemovedMechanicalModelEntries() const;
 
         //- Make the rho field
         void makeRho() const;
@@ -339,21 +403,17 @@ private:
         //- Make the p field
         void makeP() const;
 
-#ifndef FOAMEXTEND
+        //- Read the hydrostatic smoothing setting from the law entries
+        void readHydrostaticSmoothing() const;
+
         //- Make the sigma at face quadrature points field
         void makeSigmaQuad() const;
 
         //- Make the gradD at face quadrature points field
         void makeGradDQuad() const;
 
-        //- Make the displacement Moving Least Squares object
-        void makeDisplacementMLS() const;
-
-        //- Make the pressure Moving Least Squares object
-        void makePressureMLS() const;
-#endif
-
-        //- Return root high-order coefficients dictionary
+        //- Return root high-order coefficients dictionary, or an empty
+        //  dictionary when highOrderCoeffs is absent
         const dictionary& highOrderCoeffsDict() const;
 
         //- Return high-order coefficients for displacement
@@ -388,19 +448,161 @@ private:
 
 protected:
 
+        //- The mechanicalConstitutiveLaw framework, constructed on first use
+        mechanicalConstitutiveLawManager& mechanicalManager() const;
+
+        //- constant/mechanicalProperties, constructed on first use
+        const IOdictionary& mechanicalProperties() const;
+
+        //- Correct point displacement boundary conditions, symmetry planes and
+        //  empty directions after interpolation.
+        //
+        //  Protected because a solid model that does its own point
+        //  interpolation has to finish it the same way. It also applies the
+        //  two-dimensional correction
+        void correctPointDisplacement(pointVectorField& pointD) const;
+
+        //- Initial density, from the mechanicalConstitutiveLaw framework.
+        //
+        //  For the models that build their own rho field in the constructor
+        //  initialiser list, where solidModel::rho() is not yet what they want
+        tmp<volScalarField> initialRho() const;
+
+        //- Displacement gradient at the face quadrature points.
+        //
+        //  hofvc::fGrad() for one material; not implemented for more than one
+        void gradQuad
+        (
+            const volVectorField& D,
+            CompactListList<tensor>& gradDQuad
+        ) const;
+
+        //- Refuse a multi-material run whose gradient scheme is not
+        //  material-aware.
+        //
+        //  A solid model takes its displacement gradient straight from
+        //  fvc::grad() on the primary mesh. Across a material interface, where
+        //  the displacement is continuous but its gradient jumps, that is
+        //  valid only if a cell's stencil stays within its own material: a
+        //  material-aware least-squares gradient does that, by drawing a
+        //  cell's stencil only from cells of its own material, and
+        //  leastSquaresS4f provides that guarantee
+        void checkFrameworkGradScheme(const word& fieldName) const;
+
+        //- Copy the quadrature gradient into its old-time store, at the end
+        //  of the time step, while the current field holds the converged
+        //  value. It is rebuilt on each evaluation, so there is nothing else
+        //  to take it from.
+        //
+        //  Separate from updateTotalFields() so that a model overriding that
+        //  can still roll the history over: the two do unrelated work, and a
+        //  model wanting one does not necessarily want the other
+        void rollOverQuadratureHistory();
+
+        //- Does the case ask for the hydrostatic stress to be smoothed?
+        //  That is solvePressureEqn, read from the law entry in
+        //  mechanicalProperties
+        bool hydrostaticSmoothingRequested() const;
+
+        //- Can this solid model smooth the hydrostatic stress? Only one that
+        //  asks for its stress as isochoric stress plus volumetric response
+        //  when smoothHydrostaticStress() says so, and registers its momentum
+        //  diagonal as DEqnA, can. Checked by New(), so that a model which
+        //  cannot refuses the request rather than ignoring it
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return false;
+        }
+
+        //- Is the hydrostatic stress to be smoothed on this run?
+        //
+        //  solvePressureEqn replaces the explicit hydrostatic stress with the
+        //  solution of
+        //
+        //      sigmaHyd - lap(rDAf, sigmaHyd)
+        //    = sigmaHydExplicit - div(rDAf*interpolate(grad(sigmaHyd)) & Sf)
+        //
+        //  with rDAf = scale*interpolate(impK/DEqnA) and grad(sigmaHyd) lagged
+        //  by one outer iteration. The two Laplacians differ only by the
+        //  compact-minus-wide-stencil difference, so this damps the
+        //  checkerboard a segregated solve of a nearly incompressible
+        //  material leaves in its hydrostatic stress. It depends on the
+        //  momentum matrix and so is a solid-model stabilisation, not part of
+        //  the material, and a law does not do it.
+        //
+        //  When this answers yes, the solid model asks for the split stress
+        //  into smoothingVolumetricResponse() and then calls
+        //  addSmoothedHydrostaticStress(). Checked once: refuses the mixed
+        //  formulation (which solves for the pressure itself), any
+        //  algorithm but the implicit segregated one, and a law that cannot
+        //  separate its volumetric response
+        bool smoothHydrostaticStress() const;
+
+        //- Storage for the law's volumetric response on the smoothing path
+        volScalarField& smoothingVolumetricResponse();
+
+        //- Smooth the hydrostatic stress and add it to sigma, which on entry
+        //  holds the isochoric stress, with smoothingVolumetricResponse()
+        //  holding the volumetric response.
+        //
+        //  The quantity smoothed is J times the volumetric response, the
+        //  hydrostatic Kirchhoff stress, and the result is divided by J
+        //  again; JPtr is null for small strain. impK is the solid model's
+        //  implicit stiffness. Only the cell-centred stress is smoothed: the
+        //  face stress takes its hydrostatic part explicitly
+        void addSmoothedHydrostaticStress
+        (
+            volSymmTensorField& sigma,
+            const volScalarField& impK,
+            const volScalarField* JPtr
+        );
+
+        //- The implicit stiffness taken from the mechanicalConstitutiveLaw
+        //  framework.
+        //
+        //  Shared by the solid models, because the field is registered under
+        //  "impK" and looked up by that name by the contact and cohesive zone
+        //  models, so its name, dimensions and boundary types are not free
+        tmp<volScalarField> lawImpK
+        (
+            mechanicalConstitutiveLawManager& manager,
+            const tangentRequest req,
+            const word& fieldName = "impK"
+        ) const;
+
+        //- Deformation gradient at the quadrature points, F = I + gradD.T(),
+        //  from a total displacement gradient there. Sized and offset to
+        //  match the gradient, so every list handed to the constitutive
+        //  framework shares one row structure, as it requires
+        static void quadDeformationGradient
+        (
+            const CompactListList<tensor>& gradD,
+            autoPtr<CompactListList<tensor>>& FPtr
+        );
+
+        //- Inverse and determinant of a deformation gradient at the
+        //  quadrature points
+        static void quadInverseAndJacobian
+        (
+            const CompactListList<tensor>& F,
+            autoPtr<CompactListList<tensor>>& FinvPtr,
+            autoPtr<CompactListList<scalar>>& JPtr
+        );
+
+
     // Protected member functions
 
-        //- Create a stabilisation model
+        //- Create a stabilisation model from the given stabilisation sub-dict
         autoPtr<stabilisationModel> createStabilisation
         (
             const word& name,
             const dimensionSet& dims
         );
 
-        //- Reset the momentum stabilisation model
+        //- Reset the momentum stabilisation model with the given dimensions
         void resetMomentumStabilisation(const dimensionSet& dims);
 
-        //- Reset the pressure stabilisation model
+        //- Reset the pressure stabilisation model with the given dimensions
         void resetPressureStabilisation(const dimensionSet& dims);
 
         //- Make the dual mesh from the mesh
@@ -455,12 +657,6 @@ protected:
         scalar alternativeTol() const
         {
             return alternativeTol_;
-        }
-
-        //- Return material law tolerance
-        scalar materialTol() const
-        {
-            return materialTol_;
         }
 
         //- Return write frequency for residuals information
@@ -633,6 +829,22 @@ public:
                  && highOrderJacobian_;
             }
 
+            //- Requested fidelity of the material tangent used to build the
+            //  Jacobian, from the 'jacobianTangent' entry of the solid model
+            //  coefficients dictionary.
+            //  Each solid model supplies its own default, because today's
+            //  defaults differ: the cell-centred models want a scalar tangent,
+            //  the vertex-centred ones a fourth-order one. Existing cases
+            //  therefore keep their behaviour without dictionary changes.
+            //  This entry is orthogonal to highOrderJacobian(), which selects
+            //  a different discrete operator rather than a tangent fidelity.
+            //  The deprecated 'approximateJacobian' switch is still read, and
+            //  maps yes to scalar and no to fourthOrder
+            tangentRequest jacobianTangent
+            (
+                const tangentRequest deflt
+            ) const;
+
             //- Is it a new time step? This function return true the first time
             //  it is called in a time step
             bool newTimeStep() const;
@@ -646,11 +858,12 @@ public:
             //- Return const reference to the thermal model
             const thermalModel& thermal() const;
 
-            //- Return non-const reference to the mechanical model
-            mechanicalModel& mechanical();
-
-            //- Return const reference to the mechanical model
-            const mechanicalModel& mechanical() const;
+            //- Return the volume-to-point interpolation for this mesh
+#ifdef OPENFOAM_NOT_EXTEND
+            const enhancedVolPointInterpolation& volToPoint() const;
+#else
+            const newLeastSquaresVolPointInterpolation& volToPoint() const;
+#endif
 
             //- Return non-const reference to D
             virtual volVectorField& D()
@@ -743,7 +956,6 @@ public:
                 return gradD_;
             }
 
-#ifndef FOAMEXTEND
             //- Return non-const reference to gradD at face quadrature points
             virtual CompactListList<tensor>& gradDQuad()
             {
@@ -755,6 +967,10 @@ public:
                 return autoPtrRef(gradDQuadPtr_);
             }
 
+            //- Gradient of total displacement at face quadrature points at
+            //  the previous time step
+            virtual const CompactListList<tensor>& gradDQuad0() const;
+
             //- Return const reference to gradD at face quadrature points
             virtual const CompactListList<tensor>& gradDQuad() const
             {
@@ -765,7 +981,6 @@ public:
 
                 return autoPtrRef(gradDQuadPtr_);
             }
-#endif
 
             //- Return non-const reference to gradDD
             virtual volTensorField& gradDD()
@@ -791,7 +1006,6 @@ public:
                 return sigma_;
             }
 
-#ifndef FOAMEXTEND
             //- Return non-const reference to sigma at face quarature points
             virtual CompactListList<symmTensor>& sigmaQuad()
             {
@@ -813,7 +1027,6 @@ public:
 
                 return autoPtrRef(sigmaQuadPtr_);
             }
-#endif
 
             //- Return nonlinear geometry enumerator
             virtual nonLinearGeometry::nonLinearType nonLinGeom() const = 0;
@@ -845,27 +1058,14 @@ public:
             {
                 return twoD_;
             }
-#ifndef FOAMEXTEND
-            //- Return displacement moving least squares interpolation
-            const movingLeastSquares& displacementMLS() const
-            {
-                if (displacementMLSPtr_.empty())
-                {
-                    makeDisplacementMLS();
-                }
-                return autoPtrRef(displacementMLSPtr_);
-            }
+            //- Return the displacement least-squares reconstruction scheme
+            //  for the high order discretisation
+            const leastSquaresScheme& displacementLeastSquares() const;
 
-            //- Return pressure moving least squares interpolation
-            const movingLeastSquares& pressureMLS() const
-            {
-                if (pressureMLSPtr_.empty())
-                {
-                    makePressureMLS();
-                }
-                return autoPtrRef(pressureMLSPtr_);
-            }
-#endif
+            //- Return the pressure least-squares reconstruction scheme
+            //  for the high order discretisation
+            const leastSquaresScheme& pressureLeastSquares() const;
+
             //- Face zone point displacement increment
             virtual tmp<vectorField> faceZonePointDisplacementIncrement
             (
@@ -968,13 +1168,57 @@ public:
             //- Clear global poly patches
             void clearGlobalPatches() const;
 
+            //- Synchronise global patches with the deformed solid points
+            //  The deformed patch points are the mesh patch points displaced
+            //  by pointDorPointDD(), which is the displacement increment for
+            //  moving mesh (updated Lagrangian) approaches and the total
+            //  displacement for the others.  This is the same expression
+            //  makeGlobalPatches() uses to build the zone in the first place
+            //
+            //  For a moving mesh this is only correct while the mesh still
+            //  holds the points that pointDD is measured from, that is before
+            //  moveMesh() is called for the current time step.  Calling it
+            //  after the mesh has been moved, but before pointDD is reset,
+            //  would add the same increment a second time
+            //
+            //  All current callers satisfy this: the only caller is
+            //  fluidSolidInterface::updateResidual(), and every coupling
+            //  scheme calls that before solid().updateTotalFields(), which is
+            //  where the mesh is moved
+            //
+            //  Note: this is a collective operation in parallel
+            void syncGlobalPatches() const;
+
         // Edit
+
+            //- Return the initial shear modulus from the
+            //  mechanicalConstitutiveLaw framework, i.e. 3/4 of the
+            //  deviatoric scalar tangent at zero strain
+            tmp<volScalarField> shearModulus() const;
+
+            //- Interpolate displacement to points on the primary mesh
+            //  Public so that coupling algorithms which update the solid
+            //  displacement directly, e.g. monolithic FSI, can keep the
+            //  point displacement consistent
+            void interpolatePointDisplacement
+            (
+                const volVectorField& D,
+                const volTensorField& gradD,
+                pointVectorField& pointD
+            );
 
             //- Set traction at specified patch
             virtual void setTraction
             (
                 fvPatchVectorField& tractionPatch,
                 const vectorField& traction
+            );
+
+            //- Set traction component at specified patch quadrature points
+            virtual void setTractionQuadrature
+            (
+                fvPatchVectorField& tractionPatch,
+                const CompactListList<vector>& traction
             );
 
             //- Set traction at specified patch
@@ -1026,8 +1270,8 @@ public:
             //- Let the material model recalculate the density
             virtual void recalculateRho();
 
-            //- Clear Moving Least Squares interpolator
-            virtual void clearMovingLeastSquaresData();
+            //- Clear least-squares reconstruction data
+            virtual void clearLeastSquaresData();
 
             //- Check if solid model is diverging using the Jacobian field
             virtual Switch& checkEnforceLinear(const volScalarField& J);
@@ -1060,10 +1304,13 @@ public:
             //- Write fields
             virtual void writeFields(const Time& runTime);
 
-            //- Return the desired new time-step size
-            virtual scalar newDeltaT();
-
             //- Move the mesh by the provided point displacement field
+            //  Note: any global patches must be synchronised before this is
+            //  called.  syncGlobalPatches() displaces the mesh points by
+            //  pointDD, so once the mesh itself has been moved by pointDD the
+            //  same increment would be counted twice.  In fluid-solid
+            //  interaction this is reached from updateTotalFields(), after
+            //  the coupling loop has finished
             virtual void moveMesh
             (
                 const pointField& oldPoints,
@@ -1072,6 +1319,17 @@ public:
 
             //- End of the program
             virtual void end();
+
+        // Coupling
+
+            //- Return a coupling field by name.
+            //  Used by electro-mechanical coupling to extract fields such as
+            //  the deformation gradient from the solid model.
+            //  Default implementation triggers a FatalError.
+            virtual tmp<volTensorField> couplingField
+            (
+                const word& fieldName
+            ) const;
 
             //- Write function must be defined for regIOobjects
             virtual bool writeData(Ostream&) const

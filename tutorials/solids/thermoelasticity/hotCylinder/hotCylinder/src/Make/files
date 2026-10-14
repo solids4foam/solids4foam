@@ -1,0 +1,3 @@
+hotCylinderAnalyticalSolution/hotCylinderAnalyticalSolution.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libhotCylinderAnalytical

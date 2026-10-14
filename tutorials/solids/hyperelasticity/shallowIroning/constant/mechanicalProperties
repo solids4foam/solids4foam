@@ -1,0 +1,41 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress     no;
+
+// The upper rounded block ("slab" cell zone) is ten times stiffer than the
+// lower foundation ("foundation" cell zone)
+mechanical
+(
+    slab
+    {
+        type        neoHookeanElastic;
+        rho         rho [ 1 -3 0 0 0 0 0 ] 7800;
+        E           E [ 1 -1 -2 0 0 0 0 ] 6.896e+9;
+        nu          nu [ 0 0 0 0 0 0 0 ] 0.32;
+    }
+    foundation
+    {
+        type        neoHookeanElastic;
+        rho         rho [ 1 -3 0 0 0 0 0 ] 7800;
+        E           E [ 1 -1 -2 0 0 0 0 ] 6.896e+8;
+        nu          nu [ 0 0 0 0 0 0 0 ] 0.32;
+    }
+);
+
+// ************************************************************************* //

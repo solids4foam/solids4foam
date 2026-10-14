@@ -1,3 +1,7 @@
+---
+sort: 1
+---
+
 # Stabilisation Models
 
 This directory contains runtime-selectable stabilisation models used by
@@ -7,7 +11,7 @@ oscillations in scalar and vector fields.
 ## Design Overview
 
 The common base class is
-[`stabilisationModel`](./stabilisationModel/stabilisationModel.H).
+[`stabilisationModel`](https://github.com/solids4foam/solids4foam/blob/development/src/solids4FoamModels/numerics/stabilisationModels/stabilisationModel/stabilisationModel.H).
 
 Each concrete stabilisation model is responsible for:
 
@@ -55,7 +59,7 @@ The currently available model types in this directory are:
   volumetric strain (see below)
 
 `RhieChow` is implemented as a helper under
-[`diffStencilLaplacianStab/RhieChowStab`](./diffStencilLaplacianStab/RhieChowStab).
+[`diffStencilLaplacianStab/RhieChowStab`](https://github.com/solids4foam/solids4foam/blob/development/src/solids4FoamModels/numerics/stabilisationModels/diffStencilLaplacianStab/RhieChowStab).
 
 ## Usage Pattern
 
@@ -71,7 +75,7 @@ The intended solver-side usage is:
    `vectorJacobian(...)` to obtain an approximate implicit contribution.
 
 For example, in
-[`linGeomTotalDispSolid.C`](../../solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C),
+[`linGeomTotalDispSolid.C`](https://github.com/solids4foam/solids4foam/blob/development/src/solids4FoamModels/solidModels/linGeomTotalDispSolid/linGeomTotalDispSolid.C),
 the momentum stabilisation is updated before its face contribution is added to
 the traction.
 
@@ -185,13 +189,15 @@ strain `tr(gradD)` rather than spatial oscillations.  The face stabilisation
 vector is:
 
 ```text
-faceVector_f = scaleFactor * C(mode) * [tr(gradD_f_future) - tr(gradD_f_old)] * n_f
+faceVector_f =
+    scaleFactor * C(mode)
+  * [tr(gradD_f_future) - tr(gradD_f_old)] * n_f
 ```
 
-Four modes are available, selected via the `mode` entry:
+Five modes are available, selected via the `mode` entry:
 
 | mode | C(mode) | Vanishes as |
-|---|---|---|
+| --- | --- | --- |
 | `physicalDamping` | `tau/deltaT` | never — permanent physical damping |
 | `firstOrderTemporal` | `1` | O(deltaT) |
 | `secondOrderTemporal` | `deltaT` | O(deltaT^2) |

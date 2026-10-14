@@ -14,6 +14,7 @@ Prepared by Philip Cardiff
   bending.
 - Compare the performance of cell-centred and vertex-centred discretisatins and
   segregated and coupled solution algorithms for bending dominated scenarios.
+- Demonstrate how to set up a high-order cell-centred discretisation.
 - Demonstrates the slow convergence of the solution algorithm for high aspect
   ratio geometry undergoing bending.
 
@@ -24,9 +25,9 @@ The test case geometry consists of a rectangular beam $$L \times D$$ m, where
  Poisson’s ratio ($$\nu$$) of 0.3. A uniform quadrilateral mesh with $$5\,120$$
  cells is employed. The beam is fixed on the left boundary and a load of
  $$100$$ kN is applied to the right. There are no body forces. The problem is
- solved as static, using one loading increment. From Timoshenko beam theory [1],
- the analytical solution for the $$x$$ and $$y$$ components of the displacement
- field are given as:
+ solved as static with a plane-stress assumption, using one loading increment.
+ From Timoshenko beam theory [1], the analytical solution for the $$x$$ and
+ $$y$$ components of the displacement field are given as:
 
 $$
 u_x = -\frac{P y}{6 E I}
@@ -77,28 +78,42 @@ functions
 ```
 
 In solids4foam, there are several solid models which can solve this problem;
- here, four approaches are considered:
+ here, five approaches are considered:
 
 1. A **cell-centred** finite volume approach with a **Jacobian-free Newton-Krylov**
-   solution algorithm [2]. This is the default approach in the case. Select it by
-   specifying `solidModel linearGeometryTotalDisplacement;` in
-   `constant/solidProperties` and `solutionAlgorithm PETScSNES;` in
-   `linearGeometryTotalDisplacementCoeffs`.
+   solution algorithm [2]. This is the default approach in the case, and is
+   selected by specifying `solidModel linearGeometryTotalDisplacement;` in `constant/solidProperties`,
+   with `solutionAlgorithm PETScSNES;` in `linearGeometryTotalDisplacementCoeffs`.
 2. A **cell-centred** finite volume approach with a **segregated** solution
-   algorithm. This approach uses the same discretisation as approach 1 but solves
-   the governing equations with the more common segregated algorithm.
-   Select it by specifying `solidModel linearGeometryTotalDisplacement;` in
-   `constant/solidProperties` and `solutionAlgorithm implicitSegregated;` in
+   algorithm. This approach employs the same discretisation as in approach 1, but
+   solves the governing equations using the more common (in OpenFOAM) segregated
+   algorithm. This approach is selected by specifying `solidModel linearGeometryTotalDisplacement;`
+   in `constant/solidProperties`, with `solutionAlgorithm implicitSegregated;` in
    `linearGeometryTotalDisplacementCoeffs`.
 3. A **vertex-centred** finite volume approach with an **exact Jacobian coupled**
-   solution algorithm [3]. Select this option by setting
-   `solidModel vertexCentredLinearGeometry;` in `constant/solidProperties`, with
-   `solutionAlgorithm PETScSNES;` and `approximateJacobian no;` in
-   `vertexCentredLinearGeometryCoeffs`.
+   solution algorithm [3]. This approach is selected by specifying `solidModel vertexCentredLinearGeometry;`
+   in `constant/solidProperties`, with `solutionAlgorithm PETScSNES;` and
+   `approximateJacobian no;` in `vertexCentredLinearGeometryCoeffs`.
 4. A **cell-centred** finite volume approach with an **exact Jacobian coupled**
-   solution algorithm [4]. This approach is selected by specifying
-   `solidModel coupledUnsLinearGeometryLinearElastic;` in
-   `constant/solidProperties`.
+   solution algorithm [4].  This approach is selected by specifying `solidModel coupledUnsLinearGeometryLinearElastic;`
+   in `constant/solidProperties`.
+5. A **cell-centred high-order** finite volume approach with a **Jacobian-free Newton-Krylov**
+   solution algorithm. This approach uses the `linearGeometryTotalDisplacement`
+   solid model with `solutionAlgorithm PETScSNES;` and a high-order residual calculation
+   [5]. It is selected by specifying `solidModel linearGeometryTotalDisplacement;`
+   in `constant/solidProperties`, with `highOrderResidual true;` in the
+   `highOrderCoeffs` sub-dictionary. When `highOrderJacobian false;` is used,
+   the solver uses the same second-order Laplacian as approach 1 as a physical
+   preconditioner. Alternatively, `highOrderJacobian true;` can be used to
+   assemble the high-order Jacobian; this affects the timing but not the
+   accuracy. The `highOrder` Allrun option retains the Jacobian-free
+   Newton-Krylov solver settings and uses the assembled matrix as a physical
+   preconditioner. The `highOrderJacobian` option is a regression-only test:
+   it removes the matrix-free options, sets `snes_type ksponly;`, and solves
+   the problem with the assembled high-order Jacobian. This Jacobian includes
+   the stabilisation contribution, which improves convergence on irregular
+   meshes; see [5]. This extends the discretisation presented in [6], which
+   was formulated without stabilisation.
 
 ```note
 Approach 4 uses simplified uniform displacement (left) and uniform traction
@@ -111,8 +126,9 @@ Approach 4 uses simplified uniform displacement (left) and uniform traction
 ## Running the Case
 
 The tutorial case is located at `solids4foam/tutorials/solids/linearElasticity/cantilever2d`.
-The case can be run using the included `Allrun` script, i.e. `> ./Allrun`. The
-script optionally takes an argument that selects the solution approach:
+ The case can be run using the included `Allrun` script, i.e. `> ./Allrun`.  In
+ this case, the `Allrun` script optionally takes an argument which specifies
+ which specifies the solution approach:
 
 ```bash
 ./Allrun                # Defaults to approach 1 (petscSnes)
@@ -120,12 +136,13 @@ script optionally takes an argument that selects the solution approach:
 ./Allrun segregated     # Approach 2
 ./Allrun vertexCentred  # Approach 3
 ./Allrun unsCoupled     # Approach 4
+./Allrun highOrder      # Approach 5
 ```
 
 The `Allrun` script starts by updating the files in the case to match the
-selected approach; the following files are updated: `0/D`, `0/pointD`,
-`constant/solidProperties`, `system/fvSchemes`, and `system/fvSolution`. The
-mesh is then created with `blockMesh` before running the solver `solids4Foam`.
+ selected approach; the following files are updated: `0/D`, `0/pointD`, `constant/solidProperties`,
+ `system/fvSchemes`, and `system/fvSolution`. Subsequently, the mesh is
+ created with `blockMesh`, following by running the solver `solids4Foam`.
 
 ---
 
@@ -155,6 +172,31 @@ Table 1 lists the wall-clock times rounded to the nearest second for the
 | 2        | 5120           | 123         |
 | 3        | 5120           | 1           |
 | 4        | 5120           | -           |
+| 5        | 5120           | 1           |
+
+---
+
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory adds the
+order-of-accuracy sweep described above. It scales the axial and
+through-thickness divisions by powers of two from $$40 \times 2$$ to $$320
+\times 16$$ cells and reads the displacement and stress error norms that the
+`cantileverAnalyticalSolution` function object already writes to the solver
+log:
+
+```bash
+cd verification
+./Allverify
+```
+
+For the default `petscSnes` approach, the relative displacement L2 error falls
+from $$0.170$$ to $$0.00604$$ over that family, a net order of $$1.61$$ that is
+still approaching second order (the last refinement gives $$1.88$$), and the
+whole sweep takes about 100 seconds. The `vertexCentred` approach is cleanly
+second order, and the `highOrder` approach reproduces the cubic Timoshenko
+solution to machine precision. The study is separate from `regressionTest.sh`
+and is not run by the normal tutorial tests.
 
 ---
 
@@ -165,8 +207,9 @@ Table 1 lists the wall-clock times rounded to the nearest second for the
  44, 2008, 595–601, 10.1016/j.finel.2008.01.010.](http://www.doi.org/10.1016/j.finel.2008.01.010)
 
 [2] [P. Cardiff, D. Armfield, Ž. Tuković, I. Batistić, A Jacobian-free Newton–Krylov
- method for cell-centred finite volume solid mechanics. *arXiv preprint arXiv:2502.17217*,
- 2025.](https://arxiv.org/abs/2502.17217)
+ method for cell-centred finite volume solid mechanics. *International Journal for
+ Numerical Methods in Engineering*, 127, e70268, 2026,
+ 10.1002/nme.70268.](https://doi.org/10.1002/nme.70268)
 
 [3] [F. Mazzanti, P. Cardiff, Performance of a vertex-centred block-coupled finite
  volume methodology for small-strain static elastoplasticity. *Computers and Mathematics
@@ -175,3 +218,11 @@ Table 1 lists the wall-clock times rounded to the nearest second for the
 [4] [P. Cardiff, Ž. Tuković, H. Jasak, A. Ivanković, A block-coupled finite volume
  methodology for linear elasticity and unstructured meshes. *Computers and Structures*,
  175, 2016, 100–122, 10.1016/j.compstruc.2016.07.004.](https://doi.org/10.1016/j.compstruc.2016.07.004)
+
+[5] [IBatistić, Ivan, Pablo Castrillo, and Philip Cardiff. High-order cell-centred
+finite-volume solid mechanics using a Jacobian-free Newton-Krylov method,
+Journal of computational physics, (2026): 115056](https://doi.org/10.1016/j.jcp.2026.115056)
+
+[6] [P. Castrillo, A. Canelas, E. Schillaci, J. Rigola, A. Oliva, High-order finite
+ volume method for linear elasticity on unstructured meshes. *Computers & Structures*,
+ 268, 106829, 2022, 10.1016/j.compstruc.2022.106829.](https://doi.org/10.1016/j.compstruc.2022.106829)

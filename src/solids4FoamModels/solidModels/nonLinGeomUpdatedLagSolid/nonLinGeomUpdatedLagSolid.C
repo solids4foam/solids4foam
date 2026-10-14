@@ -28,6 +28,7 @@ License
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
+#include "hofvm.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -61,7 +62,7 @@ void nonLinGeomUpdatedLagSolid::predict()
     DD() = U()*runTime().deltaT() + 0.5*sqr(runTime().deltaT())*A_;
 
     // Update gradient of displacement increment
-    mechanical().grad(DD(), gradDD());
+    gradDD() = fvc::grad(DD());
 
     // Relative deformation gradient
     relF_ = I + gradDD().T();
@@ -79,7 +80,103 @@ void nonLinGeomUpdatedLagSolid::predict()
     J_ = relJ_*J_.oldTime();
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
+}
+
+
+void nonLinGeomUpdatedLagSolid::makeQuadratureKinematics() const
+{
+    if (!FQuadOldPtr_.empty() || !gradDTotalQuadPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "pointer already set!" << abort(FatalError);
+    }
+
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
+
+    labelList rowSizes(faceQuadPts.size(), 0);
+    forAll(faceQuadPts, faceI)
+    {
+        rowSizes[faceI] = faceQuadPts[faceI].size();
+    }
+
+    FQuadOldPtr_.set(new CompactListList<tensor>(rowSizes));
+    gradDTotalQuadPtr_.set(new CompactListList<tensor>(rowSizes));
+
+    CompactListList<tensor>& FQuadOld = FQuadOldPtr_();
+    CompactListList<tensor>& gradDTotalQuad = gradDTotalQuadPtr_();
+
+    forAll(FQuadOld, faceI)
+    {
+        forAll(FQuadOld[faceI], qpI)
+        {
+            FQuadOld[faceI][qpI] = I;
+            gradDTotalQuad[faceI][qpI] = tensor::zero;
+        }
+    }
+}
+
+
+void nonLinGeomUpdatedLagSolid::updateQuadratureKinematics() const
+{
+    if (FQuadOldPtr_.empty())
+    {
+        makeQuadratureKinematics();
+    }
+
+    // Displacement increment gradient at the face quadrature points, i.e. the
+    // gradient relative to the configuration at the start of the time step
+    auto& gradDDQuad = compactListListCRef(gradDQuad());
+
+    auto& FQuadOld = compactListListCRef(FQuadOldPtr_());
+    CompactListList<tensor>& gradDTotalQuad = gradDTotalQuadPtr_();
+
+    forAll(gradDTotalQuad, faceI)
+    {
+        const UList<tensor> faceGradDDQuad = gradDDQuad[faceI];
+        const UList<tensor> faceFQuadOld = FQuadOld[faceI];
+        UList<tensor> faceGradDTotalQuad = gradDTotalQuad[faceI];
+
+        forAll(faceGradDTotalQuad, qpI)
+        {
+            // Relative deformation gradient
+            const tensor relF(I + faceGradDDQuad[qpI].T());
+
+            // Total deformation gradient
+            const tensor F(relF & faceFQuadOld[qpI]);
+
+            // The mechanical law reconstructs the total deformation gradient
+            // as F = I + gradD.T(), so we pass the equivalent total
+            // displacement gradient
+            faceGradDTotalQuad[qpI] = (F - I).T();
+        }
+    }
+}
+
+
+void nonLinGeomUpdatedLagSolid::storeQuadratureKinematicsOldTime() const
+{
+    if (FQuadOldPtr_.empty())
+    {
+        makeQuadratureKinematics();
+    }
+
+    auto& gradDTotalQuad = compactListListCRef(gradDTotalQuadPtr_());
+    CompactListList<tensor>& FQuadOld = FQuadOldPtr_();
+
+    forAll(FQuadOld, faceI)
+    {
+        const UList<tensor> faceGradDTotalQuad = gradDTotalQuad[faceI];
+        UList<tensor> faceFQuadOld = FQuadOld[faceI];
+
+        forAll(faceFQuadOld, qpI)
+        {
+            faceFQuadOld[qpI] = I + faceGradDTotalQuad[qpI].T();
+        }
+    }
 }
 
 
@@ -112,8 +209,55 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
 
             const vectorField& nPatch = nCurrent.boundaryField()[patchI];
 
-            // traction.boundaryFieldRef()[patchI] =
-            //     tracPatch.traction() - nPatch*tracPatch.pressure();
+            // Specified traction at the patch faces
+            vectorField tracP(nPatch.size(), vector::zero);
+
+            if (highOrderResidual())
+            {
+                // Face quadrature points weights
+                auto& faceQuadWeights = compactListListCRef
+                (
+                    displacementLeastSquares().quadrature().faceQuadWeights()
+                );
+
+                const surfaceScalarField& magSf = mesh().magSf();
+
+                // Get value at patch faces quadrature points
+                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                    tracPatch.evaluateQuadrature();
+
+                auto& quadratureValues = compactListListCRef
+                (
+                    patchQuadraturePointsValue()
+                );
+
+                forAll(mesh().boundaryMesh()[patchI], faceI)
+                {
+                    const label start = mesh().boundaryMesh()[patchI].start();
+
+                    // Get global face index
+                    const label faceID = faceI + start;
+
+                    // Get the number of quadrature points for this face
+                    const label nPoints = faceQuadWeights[faceID].size();
+
+                    // Loop over quadrature points and add their contribution
+                    for (label pointI = 0; pointI < nPoints; ++pointI)
+                    {
+                        tracP[faceI] +=
+                            quadratureValues[faceI][pointI]
+                           *faceQuadWeights[faceID][pointI];
+                    }
+                    // Divide with area because we use physical weights
+                    tracP[faceI] *=
+                        (1.0/(magSf.boundaryField()[patchI][faceI]));
+                }
+            }
+            else
+            {
+                tracP = tracPatch.traction() - nPatch*tracPatch.pressure();
+            }
+
             if (tracPatch.useUndeformedArea())
             {
                 notImplemented("Not implemented for updated Lagrangian");
@@ -121,20 +265,14 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
                 // const scalarField& magSfPatch =
                 //     D.mesh().boundary()[patchI].magSf();
 
-                // forceP =
-                //     (
-                //         tracPatch.traction() - nPatch*tracPatch.pressure()
-                //     )*magSfPatch;
+                // forceP = tracP*magSfPatch;
             }
             else
             {
                 const scalarField& magSfCurrentPatch =
                     magSfCurrent.boundaryField()[patchI];
 
-                forceP =
-                    (
-                        tracPatch.traction() - nPatch*tracPatch.pressure()
-                    )*magSfCurrentPatch;
+                forceP = tracP*magSfCurrentPatch;
             }
         }
         else if
@@ -231,7 +369,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         fvVectorMatrix DDEqn
         (
             fvm::d2dt2(rho_, DD())
-          + fvc::d2dt2(rho_, D().oldTime())
+          + fvcD2dt2Compat(rho_, D().oldTime())
          == tRhsEqn
         );
 
@@ -251,7 +389,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         D() = D().oldTime() + DD();
 
         // Update gradient of displacement increment
-        mechanical().grad(DD(), gradDD());
+        gradDD() = fvc::grad(DD());
 
         // Relative deformation gradient
         relF_ = I + gradDD().T();
@@ -274,7 +412,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         const volScalarField DEqnA("DEqnA", DDEqn.A());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
     }
     while
     (
@@ -300,7 +438,7 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
     gradD() = fvc::grad(D());
 
     // Interpolate cell displacement increments to vertices
-    mechanical().interpolate(DD(), gradDD(), pointDD());
+    interpolatePointDisplacement(DD(), gradDD(), pointDD());
 
     // Total displacement at points
     pointD() = pointD().oldTime() + pointDD();
@@ -370,10 +508,28 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
     // Total displacement
     D() = D().oldTime() + DD();
 
-    // Interpolate cell displacements to vertices
-    mechanical().interpolate(DD(), gradDD(), pointDD());
-    pointDD().correctBoundaryConditions();
+    if (highOrderResidual())
+    {
+        // Update the kinematic fields using the high-order gradient
+        gradDD() = displacementLeastSquares().grad(DD());
+        relF_ = I + gradDD().T();
+        relFinv_ = inv(relF_);
+        relJ_ = det(relF_);
+        F_ = relF_ & F_.oldTime();
+        J_ = relJ_*J_.oldTime();
 
+        // Update the total deformation gradient at the face quadrature points
+        // so that it is consistent with the converged solution
+        gradQuad(DD(), gradDQuad());
+        updateQuadratureKinematics();
+
+        // Calculate the cell centre stress using run-time selectable
+        // mechanical law
+        correctStress();
+    }
+
+    // Interpolate cell displacements to vertices
+    interpolatePointDisplacement(DD(), gradDD(), pointDD());
     // Total point displacement
     pointD() = pointD().oldTime() + pointDD();;
 
@@ -393,6 +549,181 @@ bool nonLinGeomUpdatedLagSolid::evolveSnes()
 #endif
 
     return true;
+}
+
+
+// The high-order face quadrature does not exist on foam-extend
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
+{
+    // The caller has just accumulated the total displacement gradient at the
+    // quadrature points, so the current kinematics follow from it.
+    //
+    // The old time is FQuadOldPtr_ itself, which the solver stores at the end
+    // of each step from the converged total gradient. It is deliberately not
+    // derived from anything here: this solver keeps updating its kinematics
+    // after the last stress evaluation of a step, so anything derived
+    // mid-iteration would give a history-dependent law the wrong reference,
+    // which is the same trap as Finv0 at the cell centres
+    quadDeformationGradient(gradDTotalQuadPtr_(), FQuadPtr_);
+    quadInverseAndJacobian(FQuadPtr_(), FinvQuadPtr_, JQuadPtr_);
+
+    quadInverseAndJacobian(FQuadOldPtr_(), FinvQuad0Ptr_, JQuad0Ptr_);
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        FQuadPtr_(),
+        FQuadOldPtr_(),
+        FinvQuadPtr_(),
+        FinvQuad0Ptr_(),
+        JQuadPtr_(),
+        JQuad0Ptr_(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+
+
+void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStress()
+{
+    // Derive the previous inverse from F_.oldTime() so that it corresponds to
+    // the converged previous configuration. A separately stored old time of
+    // inv(F_) can capture a mid-iteration value because F_ is updated again at
+    // the end of the time step
+    if (FinvPtr_.empty())
+    {
+        FinvPtr_.set
+        (
+            new volTensorField
+            (
+                IOobject
+                (
+                    "Finv",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                inv(F_)
+            )
+        );
+    }
+
+    volTensorField& Finv = FinvPtr_();
+    Finv = inv(F_);
+
+    const volTensorField Finv0(inv(F_.oldTime()));
+
+    // The hydrostatic stress smoothing (solvePressureEqn): the law gives its
+    // stress in two parts, and the volumetric part is smoothed before it is
+    // added back
+    if (smoothHydrostaticStress())
+    {
+        mechanicalManager().updateStressFiniteStrainSplit
+        (
+            F_,
+            F_.oldTime(),
+            Finv,
+            Finv0,
+            J_,
+            J_.oldTime(),
+            mesh().time().deltaTValue(),
+            sigma(),
+            smoothingVolumetricResponse()
+        );
+
+        addSmoothedHydrostaticStress(sigma(), impK_, &J_);
+
+        return;
+    }
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv,
+        Finv0,
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpK() const
+{
+    // The name, dimensions and boundary types are not free: the field is
+    // registered under "impK" and looked up by that name by the contact and
+    // cohesive zone models
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query, so it neither writes a stress nor disturbs history.
+    // Evaluated at the total deformation gradient, which is the identity on a
+    // cold start and the restart value otherwise; impK is frozen at
+    // construction.
+    //
+    // The total F is used rather than the relative one even though this is an
+    // updated Lagrangian solver. impK is a material stiffness scale, not an
+    // increment, and it is the total configuration that the material is in.
+    // This is a construction-time call, so the temporary inverse below is
+    // formed once and then released.
+    //
+    // Finv.oldTime() is a snapshot of inv(F_) rather than inv(F_.oldTime()).
+    // At construction the two are the same field - F_ is either the identity
+    // or the restart value, and its old time is initialised from it - so this
+    // is correct here, and this function is only ever called from the
+    // constructor
+    const volTensorField Finv(inv(F_));
+
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv,
+        Finv.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        tangentRequest::scalar
+    );
+
+    Info<< "Implicit stiffness from the mechanicalConstitutiveLaw framework"
+        << endl;
+
+    return tImpK;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::solidModels::nonLinGeomUpdatedLagSolid::makeImpKf() const
+{
+    // Interpolate impK rather than building a second, independent field: the
+    // two must describe the same material for the Laplacian term to telescope
+    return fvc::interpolate(impK_);
 }
 
 
@@ -491,7 +822,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
         ),
-        mechanical().rho()
+        initialRho()
     ),
     A_
     (
@@ -506,8 +837,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         mesh(),
         dimensionedVector("zero", dimVelocity/dimTime, vector::zero)
     ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    impK_(makeImpK()),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_),
     rKappaPtr_(),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
@@ -520,15 +851,44 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 {
     DDisRequired();
 
+    // Refused here, at construction, rather than at the first residual
+    // evaluation, so that a case asking for it stops before it runs.
+    // The mixed formulation has not been ported to this model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
+    // stress and its volumetric response apart, and replaces the second with
+    // the solved pressure; this one asks for a total stress and takes dev()
+    // of it, which is the same thing only where what remains is trace free.
+    // Refused rather than solved approximately: the difference is a different
+    // material rather than a visible error
+    if (solvePressure())
+    {
+        FatalErrorInFunction
+            << "solvePressure is not supported by this solid model." << nl
+            << nl
+            << "    The mixed formulation replaces the law's volumetric "
+            << "response with a solved pressure. This model still recovers "
+            << "that part by taking dev() of the total stress, which is "
+            << "correct only where everything the pressure must not replace "
+            << "is trace free - true of an isotropic hyperelastic law and "
+            << "false of, for instance, an active tension along a fibre "
+            << "direction." << nl << nl
+            << "    Use nonLinearGeometryTotalLagrangianTotalDisplacement, "
+            << "which asks the law for the two apart, or disable "
+            << "solvePressure."
+            << abort(FatalError);
+    }
+
+    // A multi-material run needs a material-aware gradient
+    checkFrameworkGradScheme(DD().name());
+
     // Force all required old-time fields to be created
     fvm::d2dt2(rho_, DD());
-    fvc::d2dt2(rho_, D().oldTime());
+    fvcD2dt2Compat(rho_, D().oldTime());
 
     if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
     {
         // It is important to call the stress calculation procedure during the
         // constructor to allow it to correctly initialise fields
-        mechanical().correct(sigma());
+        correctStress();
     }
 
     if (solvePressure())
@@ -572,7 +932,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
     DD().correctBoundaryConditions();
     if (restart())
     {
-        mechanical().grad(DD(), gradDD());
+        gradDD() = fvc::grad(DD());
         relF_ = I + gradDD().T();
         relFinv_ = inv(relF_);
         relJ_ = det(relF_);
@@ -580,8 +940,12 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         F_.storeOldTime();
         J_.storeOldTime();
 
-        // Let the mechanical law know
-        mechanical().setRestart();
+        // The predictor uses the acceleration of the last step: write it, so
+        // that a restart predicts the same first step as the original run
+        A_.writeOpt() = IOobject::AUTO_WRITE;
+
+        // The framework restores its own constitutive state through the
+        // registered state fields, so there is nothing to tell it here
     }
 
     // Check the gradScheme
@@ -600,7 +964,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         {
             FatalErrorIn(type() + "::" + type())
                 << "The `leastSquaresS4f` gradScheme should be used for "
-                << "`grad(D)` when using the "
+                << "`grad(DD)` when using the "
                 << solidModel::solutionAlgorithmNames_
                    [
                        solidModel::solutionAlgorithm::PETSC_SNES
@@ -620,7 +984,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
             )
             {
                 Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the D "
+                    << mesh().boundary()[patchI].name() << " patch of the DD "
                     << "field" << endl;
 
                 solidTractionFvPatchVectorField& tracPatch =
@@ -644,7 +1008,8 @@ void nonLinGeomUpdatedLagSolid::makeRKappa() const
             << "Pointer already set!" << abort(FatalError);
     }
 
-    rKappaPtr_.set(new volScalarField(1.0/mechanical().bulkModulus()));
+    // From the framework, as in nonLinGeomTotalLagTotalDispSolid
+    rKappaPtr_.set(new volScalarField(1.0/mechanicalManager().kappa()));
 }
 
 
@@ -711,6 +1076,26 @@ bool nonLinGeomUpdatedLagSolid::evolve()
 
 label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
 {
+    if (highOrderJacobian())
+    {
+        // Note: the non-zero structure is preallocated from the moving least
+        // squares stencils on the initial mesh. As this solid model moves the
+        // mesh, the stencils are re-calculated each time step (see
+        // updateTotalFields) and, if they change, PETSc will report a new
+        // non-zero allocation error. This has been verified for rigid motion,
+        // where the stencils are unchanged by construction; a case with
+        // sufficient mesh deformation to re-order a stencil would require the
+        // Jacobian to be re-created after mesh motion
+        return hofvm::initialiseJacobian
+        (
+            jac,
+            *this,
+            displacementLeastSquares(),
+            DD(),
+            blockSize_
+        );
+    }
+
     // Initialise based on compact stencil fvMesh
     return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
 }
@@ -748,8 +1133,27 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // Update total displacement
     D() = D().oldTime() + DD;
 
-    // Update displacement increment gradient
-    mechanical().grad(DD, gradDD());
+    if (solvePressure() && highOrderResidual())
+    {
+        FatalErrorInFunction
+            << "solvePressure must be disabled when using high order "
+            << "residual calculation. Mixed approach not yet supported!"
+            << abort(FatalError);
+    }
+
+    if (highOrderResidual())
+    {
+        // Update cell-centre displacement increment gradient
+        gradDD() = displacementLeastSquares().grad(DD);
+
+        // Update displacement increment gradient at the face quadrature points
+        gradQuad(DD, gradDQuad());
+    }
+    else
+    {
+        // Update displacement increment gradient
+        gradDD() = fvc::grad(DD);
+    }
 
     // Relative deformation gradient
     relF_ = I + gradDD().T();
@@ -771,8 +1175,26 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // hydrostatic pressure
     //const volScalarField DEqnA("DEqnA", DDEqn.A());
 
-    // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    if (highOrderResidual())
+    {
+        // Accumulate the total deformation gradient at the face quadrature
+        // points, as the mechanical law expects the total displacement gradient
+        updateQuadratureKinematics();
+
+        // Calculate sigma at the face quadrature points
+        correctStressQuad();
+
+        // Calculate the cell-centre stress using run-time selectable
+        // mechanical law
+        // The residual uses the quadrature point stress, but the cell-centre
+        // stress is still required by tractionBoundarySnGrad
+        correctStress();
+    }
+    else
+    {
+        // Calculate the stress using run-time selectable mechanical law
+        correctStress();
+    }
 
     if (solvePressure())
     {
@@ -787,7 +1209,19 @@ label nonLinGeomUpdatedLagSolid::formResidual
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
-        // Replace the pressure component of stress
+        // Replace the pressure component of stress.
+        //
+        // The projection, not the declared split. This model has not had the
+        // work nonLinGeomTotalLagTotalDispSolid had: it asks the framework
+        // for a total stress and takes dev() of it, which is right only where
+        // what remains is trace free. That holds for an isotropic
+        // hyperelastic law and fails for anything else - an active tension
+        // along a fibre direction, say, whose spherical part the projection
+        // discards and the pressure does not restore. The combination is
+        // refused where the residual is formed - not at construction, as
+        // an earlier version of this comment said - rather than solved
+        // approximately; see
+        // DESIGN-state-io.md section 26
         sigma() = dev(sigma()) - p*I;
 
         // Calculate the pressure gradient
@@ -846,14 +1280,35 @@ label nonLinGeomUpdatedLagSolid::formResidual
     //surfaceVectorField traction(n & fvc::interpolate(sigma()));
     surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
 
+    if (highOrderResidual())
+    {
+        // Replace the Cauchy traction (force per unit deformed area) with the
+        // relative nominal traction (force per unit area in the configuration
+        // at the start of the time step, i.e. the current mesh), calculated by
+        // integrating the first Piola-Kirchhoff stress over the face
+        // quadrature points
+        // Note: gradDQuad() holds the displacement increment gradient, so the
+        // deformation gradient assembled within surfaceIntegrate is the
+        // relative deformation gradient, as required here
+        traction = hofvc::surfaceIntegrate(sigmaQuad(), gradDQuad(), mesh());
+    }
+
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the stabilisation
     // is set to zero on traction boundaries
+    // Note: in the high-order case, the stabilisation is referred to the
+    // configuration at the start of the time step; it vanishes on convergence,
+    // so this does not change the converged answer
     momentumStabilisation().updateVector(DD, &gradDD());
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Calculate the force at the faces
-    surfaceVectorField force(magSfCurrent*traction);
+    surfaceVectorField force
+    (
+        highOrderResidual()
+      ? mesh().magSf()*traction
+      : magSfCurrent*traction
+    );
 
     // Enforce traction boundary conditions
     enforceTractionBoundaries(force, DD, nCurrent, magSfCurrent);
@@ -864,19 +1319,29 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // where, here, we roll the stabilisationTerm into the div(sigma)
     vectorField residual
     (
-        fvc::div(magSfCurrent*traction)
+        fvc::div(force)
       + rho()
        *(
-           g() - fvc::d2dt2(D()) - dampingCoeff()*fvc::ddt(D())
+           g() - dampingCoeff()*fvc::ddt(D())
         )
     );
+
+    if (highOrderResidual())
+    {
+        residual -= rho()*hofvc::d2dt2(D());
+    }
+    else
+    {
+        residual -= rho()*fvcD2dt2Compat(D());
+    }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh().V();
 
-    // Add optional fvOptions, e.g. MMS body force
-    // Note that "source()" is already multiplied by the volumes
-    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+    // fvOptions are not currently applied by this solid model in either the
+    // segregated or SNES path. If added, follow linGeomTotalDispSolid, where
+    // "residual += V*(M & D)" for the fvOptions matrix M: note that
+    // "residual -= M.source()" would give the explicit part only
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>
@@ -982,26 +1447,107 @@ label nonLinGeomUpdatedLagSolid::formJacobian
         );
     }
 
-    // Calculate a segregated approximation of the Jacobian
-    fvVectorMatrix approxJ
-    (
-        momentumStabilisation().vectorJacobian(DD, &impKf_)
-      - rho()*fvm::d2dt2(DD)
-    );
-
-    if (dampingCoeff().value() > SMALL)
+    if (highOrderJacobian())
     {
-        approxJ -= dampingCoeff()*rho()*fvm::ddt(DD);
+        // Note: unlike the fallback fvVectorMatrix approxJ path below, we do
+        // not currently apply matrix under-relaxation to the high-order
+        // Jacobian assembled directly into PETSc. If this becomes important
+        // for robustness, an equivalent relaxation step may need to be added.
+        // This K is combined with impK_ to recover a shear modulus, so it
+        // must come from the framework too
+        tmp<volScalarField> tK
+        (
+            new volScalarField(mechanicalManager().kappa())
+        );
+        const volScalarField& K = tK();
+
+        tmp<volScalarField> tMu = (impK_ - K)*(3.0/4.0);
+        const volScalarField& mu = tMu();
+
+        tmp<volScalarField> tLambda = impK_ - 2.0*mu;
+        const volScalarField& lambda = tLambda();
+
+        const leastSquaresScheme& reconstruction =
+            displacementLeastSquares();
+
+        hofvm::laplacianIntoPETScMatrix
+        (
+            jac,
+            *this,
+            reconstruction,
+            DD,
+            mu
+        );
+
+        hofvm::laplacianTransposeIntoPETScMatrix
+        (
+            jac,
+            *this,
+            reconstruction,
+            DD,
+            mu
+        );
+
+        hofvm::laplacianTraceIntoPETScMatrix
+        (
+            jac,
+            *this,
+            reconstruction,
+            DD,
+            lambda
+        );
+
+        if (momentumStabilisation().supportsHighOrderResidual())
+        {
+            hofvm::insertAlphaStabIntoPETScMatrix
+            (
+                jac,
+                *this,
+                reconstruction,
+                DD,
+                impKf_,
+                momentumStabilisation().scaleFactor()
+            );
+        }
+
+        fvVectorMatrix transientJ
+        (
+          - rho()*hofvm::d2dt2(DD)
+        );
+
+        if (dampingCoeff().value() > SMALL)
+        {
+            transientJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(DD);
+        }
+
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+        (
+            transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+        );
     }
+    else
+    {
+        // Calculate a segregated approximation of the Jacobian
+        fvVectorMatrix approxJ
+        (
+            momentumStabilisation().vectorJacobian(DD, &impKf_)
+          - rho()*fvm::d2dt2(DD)
+        );
 
-    // Optional: under-relaxation of the linear system
-    approxJ.relax();
+        if (dampingCoeff().value() > SMALL)
+        {
+            approxJ -= dampingCoeff()*rho()*fvm::ddt(DD);
+        }
 
-    // Convert fvMatrix matrix to PETSc matrix
-    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-    (
-        approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
-    );
+        // Optional: under-relaxation of the linear system
+        approxJ.relax();
+
+        // Convert fvMatrix matrix to PETSc matrix
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+        (
+            approxJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
+        );
+    }
 
     return 0;
 }
@@ -1065,7 +1611,7 @@ tmp<vectorField> nonLinGeomUpdatedLagSolid::tractionBoundarySnGrad
 
     // // Calculate the deformed points
     // const pointField deformedPoints =
-    //     mechanical().volToPoint().interpolate
+    //     volToPoint().interpolate
     //     (
     //         mesh().boundaryMesh()[patchID],
     //         DD_
@@ -1098,6 +1644,13 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
     // Density
     rho_ = rho_.oldTime()/relJ_;
 
+    if (highOrderResidual())
+    {
+        // Store the total deformation gradient at the face quadrature points:
+        // it is the reference for the accumulation in the next time step
+        storeQuadratureKinematicsOldTime();
+    }
+
     // Move the mesh to the deformed configuration
 #ifdef OPENFOAM_NOT_EXTEND
     const vectorField oldPoints = mesh().points();
@@ -1106,6 +1659,37 @@ void nonLinGeomUpdatedLagSolid::updateTotalFields()
 #endif
     moveMesh(oldPoints, pointDD());
 
+    if (highOrderResidual() || highOrderJacobian())
+    {
+        // The least-squares stencils, quadrature points and reconstruction
+        // coefficients are all geometric, so they are re-calculated here on
+        // the moved mesh
+        //
+        // This is the first solid model with a moving mesh to use the
+        // high-order approach, so it is the first to face the choice between:
+        //   1. building the stencils once on the initial mesh and re-using
+        //      them, which is cheaper and keeps the Jacobian sparsity pattern
+        //      fixed, but lets the stencils become progressively less
+        //      appropriate as the mesh deforms; and
+        //   2. re-calculating them after every mesh motion, as done here,
+        //      which keeps the stencils consistent with the current mesh at
+        //      the cost of rebuilding them each time step.
+        //
+        // Option 2 is used here because it is the conservative choice: the
+        // stencil always matches the mesh it is used on. Note that for a rigid
+        // motion the two options are equivalent, since the stencil is
+        // distance-sorted and a rigid motion preserves all distances.
+        //
+        // The distinction is expected to matter more when this approach is
+        // extended to fluids, where the mesh may deform far more than in a
+        // typical solid case
+        //
+        // Note: FQuadOldPtr_ and gradDTotalQuadPtr_ are deliberately not
+        // cleared, as the quadrature points move with the material
+        clearLeastSquaresData();
+    }
+
+    // Roll over the constitutive state and the quadrature history
     solidModel::updateTotalFields();
 }
 

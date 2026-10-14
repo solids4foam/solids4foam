@@ -3,117 +3,76 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# PETSc is required for this case
-if [[ -z "${PETSC_DIR:-}" ]]
-then
-    echo; echo "Skipping this case as PETSc is not installed"
-    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
-    exit 0
-fi
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
 
-# Example usage:
-# ./Allrun                              -> [default] partitioned (IQNILS), serial
-# ./Allrun aitken                       -> partitioned (Aitken), serial
-# ./Allrun iqnils                       -> partitioned (IQNILS), serial
-# ./Allrun monolithic                   -> monolithic (Newton/PETSc), serial
-# ./Allrun monolithic parallel          -> monolithic (Newton/PETSc), parallel
-# ./Allrun monolithic schurTuned        -> monolithic, tuned Schur fieldsplit
-# ./Allrun monolithic physicsPC         -> monolithic, SIMPLE-type physics PC
-# ./Allrun aitken parallel              -> partitioned (Aitken), parallel
+# Example usage
+# ./Allrun            # default behaviour is the tuned IQNILS setup
+# ./Allrun aitken
+# ./Allrun robin
+# ./Allrun parallel
+# ./Allrun aitken parallel
+# ./Allrun iqnils highOrder
+# ./Allrun iqnils highOrder parallel
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
 
 coupling=iqnils
+interfaceCondition=dirichletNeumann
 runMode=serial
 fvSolutionSuffix=""
-SOLVER="partitioned"
-MONO_VARIANT=""
+solidPropertiesSuffix=""
 
 for arg in "$@"
 do
     case "$arg" in
         aitken|Aitken)
             coupling=aitken
-            SOLVER="partitioned"
             ;;
         iqnils|IQNILS)
             coupling=iqnils
-            SOLVER="partitioned"
             ;;
-        monolithic)
-            SOLVER="monolithic"
-            ;;
-        schurTuned)
-            MONO_VARIANT="schurTuned"
-            ;;
-        physicsPC)
-            MONO_VARIANT="physicsPC"
+        robin|Robin)
+            coupling=robin
+            interfaceCondition=robin
             ;;
         parallel)
             runMode=parallel
             ;;
+        highOrder)
+            solidPropertiesSuffix=".highOrder"
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|monolithic] [schurTuned|physicsPC] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]"
             exit 1
             ;;
     esac
 done
 
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
-
-if [[ "$SOLVER" == "monolithic" ]]; then
-    solids4Foam::caseDoesNotRunWithFoamExtend
-    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
-    echo "Using the monolithic Newton/PETSc approach"
-    solids4Foam::convertCaseFormat .
-    for file in $(find ./0 ./constant ./system -name '*.monolithic')
-    do
-        ln -vnsf ${file##*/} ${file%.*}
-    done
-
-    # Override fvSolution with a variant if requested
-    if [[ -n "$MONO_VARIANT" ]]; then
-        variant="system/fvSolution.monolithic.${MONO_VARIANT}"
-        if [[ -f "$variant" ]]; then
-            ln -vnsf "fvSolution.monolithic.${MONO_VARIANT}" system/fvSolution
-            echo "Using monolithic variant: ${MONO_VARIANT}"
-        else
-            echo "Warning: ${variant} not found, using default fvSolution"
-        fi
-    fi
-else
-    # Dirichlet-Neumann partitioned approach
-    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-        fvSolutionSuffix=".foamextend"
-    elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-        fvSolutionSuffix=".openfoamorg"
-    fi
-
-    echo "Using ${coupling} coupling setup"
-
-    # Remove monolithic-only files that may have been copied in from a dirty
-    # case tree after a previous monolithic run.
-    rm -f \
-        0/fluid/D \
-        0/fluid/pointD \
-        0/fluid/pointDisplacement \
-        0/solid/U \
-        constant/fluid/mechanicalProperties \
-        constant/fluid/solidProperties
-
-    # Create all .partitioned symlinks
-    for file in $(find ./0 ./constant ./system -name '*.partitioned')
-    do
-        ln -vnsf "${file##*/}" "${file%.partitioned}"
-    done
-
-    # Override fvSolution to use coupling-specific version (iqnils or aitken)
-    ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
-    ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-    ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
-
-    solids4Foam::convertCaseFormat .
+if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
+    fvSolutionSuffix=".foamextend"
+elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    fvSolutionSuffix=".openfoamorg"
 fi
+
+echo "Using ${coupling} coupling setup"
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+if [[ "${coupling}" == "robin" ]]; then
+    solutionSetup=iqnils
+else
+    solutionSetup=${coupling}
+fi
+ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
+ln -vnsf "controlDict.${solutionSetup}" system/controlDict
+ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
@@ -124,7 +83,19 @@ if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
-    solids4Foam::runParallel solids4Foam
+
+    if [[ "$WM_PROJECT" == "foam" ]]; then
+        # foam-extend's processorPolyPatch face-matching check
+        # (patchFaceMatchTol, default 1e-3) can trip partway through this
+        # case: the parallel mesh-motion point interpolation is not exactly
+        # reproducible across processor boundaries, and the mismatch grows
+        # with the beam's oscillation amplitude until it exceeds the default
+        # tolerance. Loosen it for foam-extend only.
+        solids4Foam::runParallel solids4Foam -Tolerances patchFaceMatchTol=0.05
+    else
+        solids4Foam::runParallel solids4Foam
+    fi
+
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
@@ -137,7 +108,7 @@ if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
     gnuplot deflection.gnuplot &> /dev/null
-    if [ $(find . -name force.dat | wc -l) -eq 1 ]
+    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
         gnuplot force.gnuplot &> /dev/null

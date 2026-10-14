@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # thermalCavity regression test
 # Uses the fsiConvergenceData output as a cheap convergence check.
@@ -21,6 +24,13 @@ fi
 # ------------------------------------------------------------
 
 N_FSI_CORRECTORS_MAX=50
+
+# The final nFsiCorrectors of the removed legacy mechanicalModel, from the last
+# commit that had it (mcl-stage8-coverage, c3a92b3d), the same on every fork.
+# thermalSolid asks the constitutive implementation only for the density, so
+# the same rho drives the same conjugate heat transfer and the same coupling
+# iteration count: the framework reproduced it exactly, and must
+REF_N_FSI_CORRECTORS=3
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -33,30 +43,32 @@ echo "============================================================"
 echo
 
 prepare_case() {
-    rm -rf "${CASE_DIR}"
-    mkdir -p "${CASE_DIR}"
+    local d="${1:-${CASE_DIR}}"
+    rm -rf "${d}"
+    mkdir -p "${d}"
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
         if [[ "${base_item}" == "regressionTests" ]]; then
             continue
         fi
-        cp -a "${item}" "${CASE_DIR}/"
+        cp -a "${item}" "${d}/"
     done
 }
 
 shorten_case() {
-    local controlDict="${CASE_DIR}/system/controlDict"
-    sed -i.bak 's/^endTime[[:space:]]\+10;/endTime         0.1;/' "${controlDict}"
+    local controlDict="${1:-${CASE_DIR}}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+10;/endTime         0.1;/' "${controlDict}"
     rm -f "${controlDict}.bak"
 }
 
 find_fsi_data() {
+    local root="${1:-${CASE_DIR}}"
     local candidate
     for candidate in \
-        "${CASE_DIR}/postProcessing/0/fsiConvergenceData.dat" \
-        "${CASE_DIR}/postProcessing/fluid/0/fsiConvergenceData.dat" \
-        "${CASE_DIR}/postProcessing/solid/0/fsiConvergenceData.dat"
+        "${root}/postProcessing/0/fsiConvergenceData.dat" \
+        "${root}/postProcessing/fluid/0/fsiConvergenceData.dat" \
+        "${root}/postProcessing/solid/0/fsiConvergenceData.dat"
     do
         if [[ -f "${candidate}" ]]; then
             echo "${candidate}"
@@ -64,8 +76,8 @@ find_fsi_data() {
         fi
     done
 
-    find "${CASE_DIR}/postProcessing" -name 'fsiConvergenceData.dat' -print 2>/dev/null \
-        | tail -n 1
+    find "${root}/postProcessing" -name 'fsiConvergenceData.dat' \
+        -print 2>/dev/null | tail -n 1
 }
 
 # ------------------------------------------------------------
@@ -85,8 +97,8 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    prepare_case
-    shorten_case
+    prepare_case "${CASE_DIR}"
+    shorten_case "${CASE_DIR}"
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
     echo "Running in check-only mode: skipping Allclean and Allrun"
@@ -124,6 +136,30 @@ if awk "BEGIN {exit !(${n_fsi_correctors} < ${N_FSI_CORRECTORS_MAX})}"; then
     printf "PASS: nFsiCorrectors = %.6g\n" "${n_fsi_correctors}"
 else
     printf "FAIL: nFsiCorrectors = %.6g\n" "${n_fsi_correctors}"
+    failures=$((failures + 1))
+fi
+
+# ------------------------------------------------------------
+# Against the legacy answer
+# ------------------------------------------------------------
+
+main_log=$(find "${CASE_DIR}" -name "${SOLVER_LOGFILE}" | tail -n 1)
+
+if [[ -n "${main_log}" ]] \
+    && grep -q "Selecting mechanical constitutive law" "${main_log}"
+then
+    echo "PASS: the solid took its density from the framework"
+else
+    echo "FAIL: the solver log shows no mechanical constitutive law"
+    failures=$((failures + 1))
+fi
+
+if [[ "${n_fsi_correctors}" == "${REF_N_FSI_CORRECTORS}" ]]; then
+    printf "PASS: nFsiCorrectors = %s, as the reference\n" \
+        "${n_fsi_correctors}"
+else
+    printf "FAIL: nFsiCorrectors differ (%s, reference %s)\n" \
+        "${n_fsi_correctors}" "${REF_N_FSI_CORRECTORS}"
     failures=$((failures + 1))
 fi
 

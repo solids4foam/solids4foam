@@ -3,59 +3,12 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# Example usage:
-# ./Allrun                              -> partitioned (Aitken), serial
-# ./Allrun parallel                     -> partitioned (Aitken), parallel
-# ./Allrun monolithic                   -> monolithic (Newton/PETSc), serial
-# ./Allrun monolithic parallel          -> monolithic (Newton/PETSc), parallel
-# ./Allrun monolithic schurTuned        -> monolithic, tuned Schur fieldsplit
-# ./Allrun monolithic physicsPC         -> monolithic, SIMPLE-type physics PC
-
-# Parse arguments (order-independent)
-SOLVER="partitioned"
-PARALLEL=false
-MONO_VARIANT=""
-for arg in "$@"; do
-    if [[ "$arg" == "monolithic" ]]; then SOLVER="monolithic"; fi
-    if [[ "$arg" == "parallel" ]];   then PARALLEL=true;       fi
-    if [[ "$arg" == "schurTuned" ]]; then MONO_VARIANT="schurTuned"; fi
-    if [[ "$arg" == "physicsPC" ]];  then MONO_VARIANT="physicsPC";  fi
-done
-
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-if [[ "$SOLVER" == "monolithic" ]]; then
-    solids4Foam::caseDoesNotRunWithFoamExtend
-    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
-    echo "Using the monolithic Newton/PETSc approach"
-    for file in $(find ./0 ./constant ./system -name '*.monolithic')
-    do
-        ln -vnsf ${file##*/} ${file%.*}
-    done
+# Check case version is correct
+solids4Foam::convertCaseFormat .
 
-    # Override fvSolution with a variant if requested
-    if [[ -n "$MONO_VARIANT" ]]; then
-        variant="system/fvSolution.monolithic.${MONO_VARIANT}"
-        if [[ -f "$variant" ]]; then
-            ln -vnsf "fvSolution.monolithic.${MONO_VARIANT}" system/fvSolution
-            echo "Using monolithic variant: ${MONO_VARIANT}"
-        else
-            echo "Warning: ${variant} not found, using default fvSolution"
-        fi
-    fi
-else
-    # Dirichlet-Neumann partitioned approach
-    echo "Using the partitioned Aitken approach"
-    solids4Foam::convertCaseFormat .
-    for file in $(find ./0 ./constant ./system -name '*.partitioned')
-    do
-        ln -vnsf ${file##*/} ${file%.*}
-    done
-fi
-
-# Inlet velocity profile symlink: needed by U.partitioned (read by both solver
-# modes during decomposePar), and used as the actual BC in partitioned mode
 if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT != *"v"* ]]
 then
     cd 0/fluid/ && ln -sf inlet.fixedProfile velocityInletProfile && cd ../..
@@ -68,13 +21,15 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if $PARALLEL; then
+if [[ "$1" == "parallel" ]]; then
+    # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
     solids4Foam::runParallel solids4Foam
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
+    # Run serial
     solids4Foam::runApplication solids4Foam
 fi
 
@@ -82,13 +37,11 @@ fi
 if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
-    gnuplot deflection.gnuplot &> /dev/null \
-        || echo "Could not generate deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
     if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
-        gnuplot force.gnuplot &> /dev/null \
-            || echo "Could not generate force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
     fi
 else
     echo "Please install gnuplot if you would like to generate the plots"

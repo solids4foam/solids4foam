@@ -166,6 +166,10 @@ public:
             //- Update the coefficients associated with the patch field
             virtual void updateCoeffs();
 
+            //- Return face quadrature values
+            //  Used for high order solvers
+            virtual autoPtr<CompactListList<vector>>
+            evaluateQuadrature() const;
 
         // Member functions
 

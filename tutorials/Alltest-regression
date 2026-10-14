@@ -40,34 +40,11 @@ Run the regression tests in parallel.
 EOF
 }
 
-function get_num_cores()
+get_num_cores()
 {
-    # Linux: physical cores
-    if command -v lscpu > /dev/null 2>&1
-    then
-        cores=$(lscpu | awk '/^Core\(s\) per socket:/ {c=$4} /^Socket\(s\):/ {s=$2} END {if (c && s) print c*s}')
-        if [ -n "$cores" ]; then
-            echo "$cores"
-            return
-        fi
-    fi
-
-    # macOS / BSD: physical cores
-    if command -v sysctl > /dev/null 2>&1
-    then
-        cores=$(sysctl -n hw.physicalcpu 2>/dev/null)
-        if [ -n "$cores" ]; then
-            echo "$cores"
-            return
-        fi
-    fi
-
-    # Fallback: logical CPUs
-    if command -v nproc > /dev/null 2>&1
-    then
+    if command -v nproc >/dev/null 2>&1; then
         nproc
-    elif command -v getconf > /dev/null 2>&1
-    then
+    elif command -v getconf >/dev/null 2>&1; then
         getconf _NPROCESSORS_ONLN
     else
         sysctl -n hw.ncpu
@@ -118,35 +95,51 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     export -f solids4Foam::regressionCaseSkipped
 fi
 
-clean_copied_case_artifacts()
-{
-    local dir="$1"
-
-    find "$dir" -type f -name "log.*" -delete
-    find "$dir" -type d \( -name postProcessing -o -name dynamicCode -o -name "processor*" \) -prune -exec rm -rf {} +
-}
-
 # Create regression root directory
 rm -rf "${REG_ROOT}"
 mkdir -p "${REG_ROOT}"
 
 # List of regression test directories (relative to tutorials/)
+#
+# Every tutorial with a regressionTest.sh is listed, except two whose scripts
+# are run by hand:
+#   fluidSolidInteraction/cerebralAneurysm, which meshes with cfMesh's
+#     cartesianMesh and fails, rather than skipping, where that cannot run
+#   solids/poroelasticity/suctionCaission, which takes about eleven minutes,
+#     and whose stress band holds on OpenFOAM.com and OpenFOAM.org but not on
+#     foam-extend, where the case reads 7.2e5 against [1.5e6, 2.2e6], as the
+#     removed legacy model also did
 REGRESSION_TESTS=(
     "solids/elastoplasticity/perforatedPlate"
     "solids/elastoplasticity/cooksMembrane"
     "solids/elastoplasticity/curvedBeams"
     "solids/elastoplasticity/cylinderExpansion"
     "solids/elastoplasticity/neckingBar"
+    "solids/fracture/crackingBeams"
+    "solids/fracture/crackingPlateHole"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
     "solids/hyperelasticity/rigidRotation/rotatingBlock"
     "solids/hyperelasticity/rigidRotation/rotatingCylinder"
     "solids/hyperelasticity/cylindricalPressureVessel"
     "solids/hyperelasticity/cylinderCrush"
+    "solids/hyperelasticity/blockPunch"
     "solids/hyperelasticity/longWall"
+    "solids/hyperelasticity/LandEtAl2015/problem2"
+    "solids/hyperelasticity/LandEtAl2015/problem3"
+    "solids/hyperelasticity/ratCarotid"
+    "solids/hyperelasticity/cantileverVibration"
+    "solids/hyperelasticity/cooksMembrane"
+    "solids/hyperelasticity/manufacturedSolution"
+    "solids/hyperelasticity/compressedSpheres"
+    "solids/hyperelasticity/twistingHemisphere"
+    "solids/hyperelasticity/rubberSealing"
+    "solids/hyperelasticity/shallowIroning"
     "solids/beamsPlatesShells/squarePlate"
     "solids/linearElasticity/cantilever2d"
     "solids/linearElasticity/curvedCantilever"
     "solids/linearElasticity/cooksMembrane"
+    "solids/linearElasticity/ellipticPlate"
+    "solids/linearElasticity/manufacturedSolution"
     "solids/linearElasticity/plateHole"
     "solids/linearElasticity/contactPatchTest"
     "solids/linearElasticity/narrowTmember"
@@ -155,25 +148,46 @@ REGRESSION_TESTS=(
     "solids/linearElasticity/pressurisedCylinder"
     "solids/linearElasticity/slidingFrictionBall"
     "solids/linearElasticity/sphericalCavity"
+    "solids/linearElasticity/springSupportedBar"
     "solids/linearElasticity/punch"
+    "solids/linearElasticity/wobblyNewton"
     "solids/multiMaterial/layeredPipe"
     "solids/poroelasticity/rodAndSeabed"
+    "solids/poroelasticity/stripFooting"
     "solids/thermoelasticity/hotSphere"
     "solids/thermoelasticity/slabCooling"
     "solids/thermoelasticity/hotCylinder/hotCylinder"
+    "solids/thermoelasticity/hotCylinder/hotCylinderPredefinedTFieldMultipleMaterials"
     "solids/viscoelasticity/viscoTube"
     "fluids/decayingTaylorGreenVortex"
     "fluids/cylinderInChannel"
+    "fluids/poiseuilleChannel"
+    "fluids/immersedBoundary/staticCylinderInChannel"
+    "fluids/immersedBoundary/oscillatingCylinderInChannel"
+    "fluids/immersedBoundary/translatingCylinderInChannel"
+    "fluids/immersedBoundary/oscillatingWallStokesLayer"
+    "fluids/immersedBoundary/immersedTaylorCouette"
+    "fluids/immersedBoundary/bendingBeamInChannel"
+    "fluids/immersedBoundary/heartValveInDuct"
+    "fluids/immersedBoundary/immersedHronTurekFsi2"
     "thermoFluidSolidInteraction/thermalCavity"
     "thermoFluidSolidInteraction/hotTJunction"
     "fluidSolidInteraction/3dTube"
     "fluidSolidInteraction/beamInCrossFlow"
     "fluidSolidInteraction/blobInTreacle"
     "fluidSolidInteraction/cavityFlexibleBottom"
+    "fluidSolidInteraction/collapsibleChannel"
     "fluidSolidInteraction/flexibleDamBreak"
     "fluidSolidInteraction/perpendicularFlap"
-    "fluidSolidInteraction/HronTurekFsi3"
+    "fluidSolidInteraction/TurekHron2006"
+    "fluidSolidInteraction/mokLidDrivenCavity"
     "fluidSolidInteraction/fillingElasticContainer"
+    "fluidSolidInteraction/hessenthalerFsi"
+    "fluidSolidInteraction/membraneRoof"
+    "fluidSolidInteraction/ringAddedMass"
+    "fluidSolidInteraction/womersleyTube"
+    # Not tutorials: a test application's case, run the same way
+    "../applications/test/mechanicalConstitutiveLawChecks/case"
 )
 
 failures=0
@@ -193,9 +207,12 @@ run_regression_test()
 {
     local testCase="$1"
     local srcCase="${ROOT_DIR}/${testCase}"
-    local dstCase="${REG_ROOT}/${testCase}"
-    local logFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
-    local statusFile="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    # A test outside tutorials is named from here, as ../applications/...,
+    # and is copied into the regression tree without the leading ../, which
+    # would otherwise put the copy on top of the source and delete it
+    local dstCase="${REG_ROOT}/${testCase#../}"
+    local logFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').log"
+    local statusFile="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').status"
     local status=0
 
     echo
@@ -208,7 +225,6 @@ run_regression_test()
         rm -rf "${dstCase}"
         mkdir -p "$(dirname "${dstCase}")"
         cp -a "${srcCase}" "${dstCase}"
-        clean_copied_case_artifacts "${dstCase}"
 
         cd "${dstCase}"
 
@@ -263,8 +279,8 @@ done
 wait
 
 for testCase in "${REGRESSION_TESTS[@]}"; do
-    LOG_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').log"
-    STATUS_FILE="${REG_ROOT}/$(echo "${testCase}" | tr '/' '_').status"
+    LOG_FILE="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').log"
+    STATUS_FILE="${REG_ROOT}/$(echo "${testCase#../}" | tr '/' '_').status"
 
     echo
     echo "------------------------------------------------------------"

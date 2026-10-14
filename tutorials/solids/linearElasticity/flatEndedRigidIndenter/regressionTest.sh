@@ -42,9 +42,6 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
-
-    # Remove any pre-existing log files so Allrun re-executes the applications.
-    find "${CASE_DIR}" -maxdepth 1 -name 'log.*' -delete
 }
 
 # ------------------------------------------------------------

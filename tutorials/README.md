@@ -14,8 +14,12 @@ The tutorials are organised into the following subdirectories:
 - `solids/` – solid mechanics cases
 - `fluids/` – fluid mechanics cases
 - `fluidSolidInteraction/` – monolithic FSI cases
-- `fluidSolidInteraction-preCICE/` – partitioned FSI cases using preCICE
 - `thermoFluidSolidInteraction/` – thermo-mechanical and coupled problems
+
+Partitioned FSI cases coupled through [preCICE](https://precice.org) are
+maintained in the [preCICE tutorials](https://precice.org/tutorials.html)
+rather than here. They are run against the current source by `tests/precice`;
+see `tests/precice/README.md`.
 
 ---
 
@@ -50,7 +54,18 @@ This script is primarily intended for **interactive use** by users.
 ### `Allclean`
 
 Cleans the tutorial directories by removing generated meshes, time directories,
-and log files, returning cases to a clean state.
+and log files, returning cases to a clean state. The cases created by
+`regressionTest.sh` under `regressionTests/`, and the cases and results of an
+opt-in `verification/` study under `verification/work/` and
+`verification/postProcessing/`, are kept, because they can take hours to
+produce. Pass `all` to remove them too:
+
+```bash
+./Allclean all
+```
+
+The same flag works in each tutorial directory, where `./Allclean all` removes
+its `regressionTests/` and runs its `verification/Allclean`, if it has one.
 
 ---
 
@@ -100,6 +115,16 @@ Regression tests are:
 
 Not all tutorials are covered by regression tests; coverage is expected to grow
 incrementally over time.
+
+### Opt-in Validation and Convergence Studies
+
+Selected tutorials may also provide an opt-in `verification/` directory for
+expensive mesh/time refinement studies against analytical or published
+benchmarks. These are deliberately not included in `Alltest` or
+`Alltest-regression`. For example, `fluidSolidInteraction/beamInCrossFlow`
+provides `verification/Allverify`; see its local README for usage and resource
+requirements. Each `verification/` directory also has an `Allclean` that
+removes its generated cases and results.
 
 ---
 

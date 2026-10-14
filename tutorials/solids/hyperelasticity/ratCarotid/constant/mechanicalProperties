@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress no;
+
+mechanical
+(
+    pipe
+    {
+        type HolzapfelGasserOgdenElastic;
+        rho             rho [1 -3 0 0 0 0 0]  1200;
+
+        // The shear modulus, given directly rather than as E and nu:
+        // E = 132.69e3 with nu = 0.5 is mu = E/(2*(1 + nu)) = 44.23e3
+        mu              mu  [1 -1 -2 0 0 0 0] 44.23e3;
+
+        // HGO parameters
+        fibreAngle fibreAngle [0  0  0 0 0 0 0] 39.76;   // In respect to
+                                                         // circum dir
+        k1                 k1 [1 -1 -2 0 0 0 0] 0.206e3;
+        k2                 k2 [0  0  0 0 0 0 0] 1.465;
+
+        // The penalty on volume change, as the other hyperelastic laws carry.
+        // The solid model solves for the pressure and puts it in place of
+        // this volumetric response; a thousand times the shear modulus
+        // approaches the incompressible limit the material is written for
+        bulkModulus bulkModulus [1 -1 -2 0 0 0 0] 44.23e6;
+    }
+);
+
+// ************************************************************************* //

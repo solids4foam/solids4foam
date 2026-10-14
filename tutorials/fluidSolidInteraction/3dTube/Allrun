@@ -3,18 +3,17 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 # Example usage
 # ./Allrun # default behaviour is Robin-Neumann coupling
 # ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
+# ./Allrun weakCoupling
 
 # This case requires PETSc to be installed
-if [ -z "${PETSC_DIR}" ];
-then
-    echo; echo "Skipping this case as PETSc is not installed"
-    echo "Please set the PETSC_DIR variable"; echo
-    exit 0
-fi
+solids4Foam::requirePetscOrExitSilently
 
 # Select approach
 if [[ "$1" == "sonicLiquidFluid" ]]; then
@@ -24,6 +23,15 @@ if [[ "$1" == "sonicLiquidFluid" ]]; then
     do
         ln -vnsf ${file##*/} ${file%.*}
     done
+elif [[ "$1" == "weakCoupling" ]]; then
+    # Weak (explicit) coupling, with the Robin-Neumann fluid setup
+    echo "Using the weak coupling approach"
+    for file in $(find ./0 ./constant ./system -name '*.robin')
+    do
+        ln -vnsf ${file##*/} ${file%.*}
+    done
+    # Override the interface with the weak coupling variant
+    ln -vnsf fsiProperties.weakCoupling constant/fsiProperties
 elif [[ "$1" == "dirichletNeumann" ]]; then
     # Dirichlet-Neumann pimpleFluid approach
     echo "Using the Dirichlet-Neumann pimpleFluid approach"
@@ -40,23 +48,8 @@ else
     done
 fi
 
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
-
 # Check case version is correct
 solids4Foam::convertCaseFormat .
-
-# Check fvSolution for foundation version
-if [[ $WM_PROJECT = "OpenFOAM" ]] && [[ $WM_PROJECT_VERSION != *"v"* ]]
-then
-    if [[ -f "${CASE_DIR}"/system/fluid/fvSolution ]]
-    then
-        echo "OpenFOAM.org specific: replacing 'residualControl' with"
-        echo " 'outerCorrectorResidualControl' in system/fluid/fvSolution"
-        sed -i "s/residualControl/outerCorrectorResidualControl/g" \
-            "${CASE_DIR}"/system/fluid/fvSolution
-    fi
-fi
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid

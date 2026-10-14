@@ -1,0 +1,21 @@
+# Vertical displacement of the reference point (48, 52) mm, the mid-point of
+# the loaded edge, of the compressible neo-Hookean Cook's membrane, from the
+# results table of
+#
+#   J-P. V. Pelteret and A. McBride, The deal.II code gallery: Quasi-Static
+#   Finite-Strain Compressible Elasticity, 2016, doi:10.5281/zenodo.1228964
+#   https://dealii.org/developer/doxygen/deal.II/code_gallery_Quasi_static_Finite_strain_Compressible_Elasticity.html
+#
+# Copied from the solid-benchmarks repository,
+# hyperElasticity/cooksMembrane/plotScripts/deal.II.dat, where the benchmark
+# case was prepared by Ivan Batistić.
+#
+# Column 1: number of elements per edge
+# Column 2: vertical displacement with Q1 (bilinear) elements (mm)
+# Column 3: vertical displacement with Q2 (biquadratic) elements (mm)
+2 8.638 14.30
+4 12.07 14.65
+8 13.86 14.71
+16 14.49 14.73
+32 14.67 14.74
+64 14.72 14.74

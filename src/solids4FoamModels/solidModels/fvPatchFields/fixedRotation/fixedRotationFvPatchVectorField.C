@@ -25,6 +25,7 @@ License
 #include "RodriguesRotation.H"
 #include "fixedValuePointPatchFields.H"
 #include "patchCorrectionVectors.H"
+#include "lookupSolidModel.H"
 #include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -127,14 +128,10 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
         rotationOrigin_ = vector(dict.lookup("rotationOrigin"));
     }
 
-    if (dict.found("value"))
-    {
-        fvPatchField<vector>::operator==
-        (
-            vectorField("value", dict, p.size())
-        );
-    }
-    else
+    // The value, when present, has been read by the base class: reading it
+    // again fails for a nonuniform value with OpenFOAM.com, whose compound
+    // tokens can be read only once, so a written time could not be read back
+    if (!dict.found("value"))
     {
         fvPatchField<vector>::operator==
         (
@@ -142,16 +139,22 @@ fixedRotationFvPatchVectorField::fixedRotationFvPatchVectorField
         );
     }
 
-    if
-    (
+    // On restart, the old-time fields, e.g. D_0, are read with this condition
 #ifdef OPENFOAM_NOT_EXTEND
-        internalField().name() != "D"
-     && internalField().name() != "DD"
+    word fieldName = internalField().name();
 #else
-        dimensionedInternalField().name() != "D"
-     && dimensionedInternalField().name() != "DD"
+    word fieldName = dimensionedInternalField().name();
 #endif
+    while
+    (
+        fieldName.size() > 2
+     && fieldName.substr(fieldName.size() - 2) == "_0"
     )
+    {
+        fieldName.resize(fieldName.size() - 2);
+    }
+
+    if (fieldName != "D" && fieldName != "DD")
     {
         FatalErrorIn
         (
@@ -254,10 +257,11 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
     // Rotation tensor
     const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle_);
 
-    vectorField newFaceCentres
-    (
-        (rotMat & (origFaceCentres_ - rotationOrigin_)) + rotationOrigin_
-    );
+    // Named operand: a tmp field would be reused as the storage of the inner
+    // product, which aliases an input of the loop and gives wrong results
+    // with some -O3 builds (see pimpleFluid::patchViscousForce)
+    const vectorField relFaceCentres(origFaceCentres_ - rotationOrigin_);
+    vectorField newFaceCentres((rotMat & relFaceCentres) + rotationOrigin_);
 
     vectorField disp(newFaceCentres - origFaceCentres_);
 
@@ -325,10 +329,14 @@ void fixedRotationFvPatchVectorField::updateCoeffs()
                     boundaryFieldRef(pointDField)[patch().index()]
                 );
 
+            // Named operand: see above
+            const vectorField relPatchPoints
+            (
+                origPatchPoints_ - rotationOrigin_
+            );
             const vectorField newPatchPoints
             (
-                (rotMat & (origPatchPoints_ - rotationOrigin_))
-              + rotationOrigin_
+                (rotMat & relPatchPoints) + rotationOrigin_
             );
 
             vectorField pointDisp(newPatchPoints - origPatchPoints_);
@@ -397,9 +405,112 @@ gradientBoundaryCoeffs() const
 }
 
 
+autoPtr<CompactListList<vector>>
+fixedRotationFvPatchVectorField::evaluateQuadrature() const
+{
+    // When the displacement increment is the primary unknown, the mesh has
+    // already been moved by the accumulated displacement, so the quadrature
+    // points lie in the configuration at the start of the time step and only
+    // the increment of the rigid rotation is applied below
+    const bool incremental = (internalFieldName(*this) == "DD");
+
+    if (incremental && (!angleSeries_.size() || originSeries_.size()))
+    {
+        notImplemented
+        (
+            type() + "::evaluateQuadrature()\n"
+            "When the displacement increment is the primary unknown, "
+            "quadrature-point evaluation requires a 'rotationAngleSeries' and "
+            "a fixed 'rotationOrigin'"
+        );
+    }
+
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    // faceQuadPoints is a list for the whole mesh
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
+
+    labelList nQpPerFace(this->size(), 0);
+    const label start = this->patch().patch().start();
+    forAll(nQpPerFace, faceI)
+    {
+        const label globalFaceID = faceI + start;
+        nQpPerFace[faceI] = faceQuadPoints[globalFaceID].size();
+    }
+
+    autoPtr<CompactListList<vector>> tQuadPointsValue
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    // Get a reference to the actual data for easier access
+    CompactListList<vector>& quadPointsValue = autoPtrRef(tQuadPointsValue);
+
+    // Rotation angle applied to the current quadrature point positions
+    // Note: rotationAngle_ and rotationOrigin_ are updated by updateCoeffs
+    scalar rotationAngle = rotationAngle_;
+
+    // Optional superimposed translation
+    vector translation = vector::zero;
+    if (dispSeries_.size())
+    {
+        translation = dispSeries_(this->db().time().timeOutputValue());
+    }
+
+    if (incremental)
+    {
+        // Rotations about a common axis and origin commute, so the increment of
+        // displacement of a point p in the current configuration is given by
+        // the increment of rotation applied about the same origin
+        const scalar oldTimeValue =
+            this->db().time().timeOutputValue()
+          - this->db().time().deltaTValue();
+
+        rotationAngle -= angleSeries_(oldTimeValue);
+
+        if (dispSeries_.size())
+        {
+            translation -= dispSeries_(oldTimeValue);
+        }
+    }
+
+    // Rotation tensor
+    const tensor rotMat = RodriguesRotation(rotationAxis_, rotationAngle);
+
+    forAll(*this, faceI)
+    {
+        const label globalFaceID = faceI + start;
+
+        const UList<point>& quadPoints = faceQuadPoints[globalFaceID];
+
+        // The displacement due to a rigid rotation varies linearly in space,
+        // so it is evaluated exactly at each quadrature point
+        forAll(quadPoints, pointI)
+        {
+            const point& p = quadPoints[pointI];
+
+            quadPointsValue[faceI][pointI] =
+                (rotMat & (p - rotationOrigin_))
+              + rotationOrigin_
+              - p
+              + translation;
+        }
+    }
+
+    return tQuadPointsValue;
+}
+
+
 void fixedRotationFvPatchVectorField::write(Ostream& os) const
 {
     fixedValueFvPatchVectorField::write(os);
+
+    os.writeKeyword("nonOrthogonalCorrections")
+        << nonOrthogonalCorrections_ << token::END_STATEMENT << nl;
 
     if (angleSeries_.size())
     {

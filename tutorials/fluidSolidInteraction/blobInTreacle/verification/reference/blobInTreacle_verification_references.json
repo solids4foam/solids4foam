@@ -1,0 +1,36 @@
+{
+  "liu": {
+    "source": "Liu, arXiv:1401.0082, case (I), Figs. 5.1 to 5.3; the preprint of Liu, Jaiman and Gurugubelli (2014), J. Comput. Phys. 270:687-710, Sect. 5.1",
+    "top_point_steady_m": [0.1297, -0.0117],
+    "top_point_note": "t = 10 s displacement of the solid mesh vertex at (1.5043, -0.0006), matched triangle by triangle between the reference mesh of Fig. 5.1 and the deformed meshes of Fig. 5.2; the domain-decomposition and combined-field results agree to 1e-4 m",
+    "interface_t1": "LiuInterface_t1.csv",
+    "interface_steady": "LiuInterface_t10.csv"
+  },
+  "mesh": {
+    "factors": [0.5, 1, 2, 4],
+    "quick_factors": [0.5, 1],
+    "delta_t": {"default": 0.01, "4": 0.005},
+    "end_time": 3,
+    "steady_window": 0.5,
+    "steady_tolerance": 1e-3,
+    "acceptance": {
+      "minimum_order": 1.5,
+      "finest_vs_extrapolated_tolerance": 0.01,
+      "top_dx_tolerance": 0.10,
+      "top_dy_tolerance": 0.25,
+      "shape_t1_max_tolerance": 0.05,
+      "shape_steady_max_tolerance": 0.10
+    }
+  },
+  "time": {
+    "delta_t": [0.25, 0.125, 0.0625, 0.03125],
+    "quick_delta_t": [0.25, 0.125],
+    "end_time": 1,
+    "acceptance": {
+      "order_pairs": 2,
+      "minimum_order": 1.6,
+      "maximum_order": 3.0,
+      "finest_change_tolerance": 1e-3
+    }
+  }
+}

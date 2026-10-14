@@ -41,7 +41,9 @@ SourceFiles
 #define nonLinGeomTotalLagTotalDispSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "foamPetscSnesHelper.H"
+#include "hofvc.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -97,14 +99,59 @@ class nonLinGeomTotalLagTotalDispSolid
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
+        //- Set once the law's volumetric response has been checked against
+        //  the closure the pressure equation assumes
+        mutable bool volumetricClosureChecked_ = false;
+
+        //- The law's own volumetric response, dU/dJ
+        //  Only built when solvePressure is enabled on the constitutive-law
+        //  framework. Asking for it is what leaves the stress without its
+        //  volumetric part, which is the part the solved pressure supplies;
+        //  the value itself is what checkVolumetricClosure compares against
+        //  the volumetric energy the pressure equation was written for
+        mutable autoPtr<volScalarField> volumetricResponsePtr_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Field to provide fvOptions with the correct dimensions
+        volScalarField ds_;
+
 
     // Private Member Functions
+
+        //- Update the cell-centred stress
+        void correctStress();
+
+        //- This model smooths the hydrostatic stress on request, in
+        //  correctStress(), in its implicit segregated algorithm
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return true;
+        }
+
+        //- Update the stress at the face quadrature points.
+        //  The high-order face quadrature does not exist on foam-extend
+        void correctStressQuad();
+
+        //- Finite-strain kinematics at the face quadrature points, held here
+        //  rather than rebuilt per call because they are as large as the
+        //  quadrature stress itself
+        mutable autoPtr<CompactListList<tensor>> FQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FQuad0Ptr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
+
+        //- Construct impK from the framework
+        tmp<volScalarField> makeImpK() const;
+
+        //- Calculate the current face-area vectors
+        tmp<surfaceVectorField> currentSf() const;
 
         //- Predict the fields for the next time-step based on the
         //  previous time-steps
@@ -115,6 +162,18 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
+
+        //- Refuse a law whose volumetric response is not the one the
+        //  pressure equation was written for
+        void checkVolumetricClosure() const;
+
+        //- Replace the volumetric part of the stress with the solved
+        //  pressure. Both the residual and the linear predictor do this and
+        //  they have to agree, so it lives here rather than at each of them
+        void replaceVolumetricStress(const volScalarField& p);
+
+        //- Somewhere for the law to put its volumetric response
+        volScalarField& volumetricResponse() const;
 
         //- Enforce traction boundary conditions on the provided traction field
         void enforceTractionBoundaries
@@ -133,7 +192,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
-
         //- Disallow default bitwise copy construct
         nonLinGeomTotalLagTotalDispSolid
         (
@@ -147,6 +205,12 @@ class nonLinGeomTotalLagTotalDispSolid
 protected:
 
     // Protected member functions
+
+#ifndef OPENFOAM_COM
+        //- Return optional source per unit reference volume; empty (no
+        //  source) by default
+        virtual tmp<volVectorField> fvOptionsSource() const;
+#endif
 
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const

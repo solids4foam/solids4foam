@@ -24,6 +24,7 @@ License
 #include "fvm.H"
 #include "constrainHbyA.H"
 #include "constrainPressure.H"
+#include "localMin.H"
 #include "findRefCell.H"
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
@@ -54,6 +55,13 @@ void pimpleFluid::updateRobinFsiInterface
     surfaceScalarField& phiHbyA
 )
 {
+    // Mesh flux subtracted from the absolute flux by fvc::makeRelative
+    tmp<surfaceScalarField> tmeshPhi;
+    if (robinKinematicConsistency_ && mesh().moving())
+    {
+        tmeshPhi = fvc::meshPhi(U());
+    }
+
     forAll(p().boundaryField(), patchI)
     {
         if
@@ -85,62 +93,90 @@ void pimpleFluid::updateRobinFsiInterface
                 mesh().ddtScheme("ddt(" + U().name() +')')
             );
 
+            // The interface flux is the old interface velocity plus the
+            // Robin (pressure gradient) acceleration term added by the
+            // pressure equation. The old velocity is the old wall velocity
+            // (set by elasticWallVelocity from the mesh motion) or the old
+            // fluid face velocity
+            const vectorField& Sf = mesh().Sf().boundaryField()[patchI];
+            const vectorField U0
+            (
+                robinFluxFromWallVelocity_
+              ? vectorField(U().oldTime().boundaryField()[patchI])
+              : vectorField(Uf_().oldTime().boundaryField()[patchI])
+            );
+
+            const bool backward =
+                ddtScheme == fv::backwardDdtScheme<vector>::typeName;
+
             if
             (
-                ddtScheme
-             == fv::EulerDdtScheme<vector>::typeName
+                ddtScheme == fv::EulerDdtScheme<vector>::typeName
+             || (backward && runTime().timeIndex() == 1)
             )
             {
-                phiHbyA.boundaryFieldRef()[patchI] =
-                (
-                    Uf_().oldTime().boundaryField()[patchI] &
-                    mesh().Sf().boundaryField()[patchI]
-                );
+                phiHbyA.boundaryFieldRef()[patchI] = (U0 & Sf);
 
                 rAU_.boundaryFieldRef()[patchI] =
                     runTime().deltaT().value();
             }
-            else if
-            (
-                ddtScheme
-             == fv::backwardDdtScheme<vector>::typeName
-            )
+            else if (backward)
             {
-                if(runTime().timeIndex() == 1)
-                {
-                    phiHbyA.boundaryFieldRef()[patchI] =
+                const vectorField U00
+                (
+                    robinFluxFromWallVelocity_
+                  ? vectorField
                     (
-                        Uf_().oldTime().boundaryField()[patchI] &
-                        mesh().Sf().boundaryField()[patchI]
-                    );
+                        U().oldTime().oldTime().boundaryField()[patchI]
+                    )
+                  : vectorField
+                    (
+                        Uf_().oldTime().oldTime().boundaryField()[patchI]
+                    )
+                );
 
-                    rAU_.boundaryFieldRef()[patchI] =
-                        runTime().deltaT().value();
-                }
-                else
-                {
-                    scalar deltaT = runTime().deltaT().value();
-                    scalar deltaT0 = runTime().deltaT0().value();
+                scalar deltaT = runTime().deltaT().value();
+                scalar deltaT0 = runTime().deltaT0().value();
 
-                    scalar Cn = 1 + deltaT/(deltaT + deltaT0);
-                    scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
-                    scalar Co = Cn + Coo;
+                scalar Cn = 1 + deltaT/(deltaT + deltaT0);
+                scalar Coo = deltaT*deltaT/(deltaT0*(deltaT + deltaT0));
+                scalar Co = Cn + Coo;
 
-                    phiHbyA.boundaryFieldRef()[patchI] =
-                        (Co/Cn)*
-                        (
-                            Uf_().oldTime().boundaryField()[patchI] &
-                            mesh().Sf().boundaryField()[patchI]
-                        )
-                      - (Coo/Cn)*
-                        (
-                            Uf_().oldTime().oldTime().boundaryField()[patchI] &
-                            mesh().Sf().boundaryField()[patchI]
-                        );
+                phiHbyA.boundaryFieldRef()[patchI] =
+                    (Co/Cn)*(U0 & Sf) - (Coo/Cn)*(U00 & Sf);
 
-                    rAU_.boundaryFieldRef()[patchI] = deltaT/Cn;
-                }
+                rAU_.boundaryFieldRef()[patchI] = deltaT/Cn;
             }
+
+            // Kinematic consistency: the pressure equation gives the
+            // interface flux phiHbyA + rAU*a_n*|Sf|, where a_n is the normal
+            // acceleration imposed by the Robin condition, which equals the
+            // solid acceleration a_s at convergence. Replacing the old-
+            // velocity flux by meshPhi - rAU*a_s*|Sf| makes the converged
+            // flux equal to the mesh flux (no leakage through the moving
+            // wall), without changing the Robin condition itself
+            elasticWallPressureFvPatchScalarField& pRobin =
+                refCast<elasticWallPressureFvPatchScalarField>
+                (
+                    p().boundaryFieldRef()[patchI]
+                );
+
+            // Only if the mesh follows the solid: with under-relaxation or
+            // interface acceleration the mesh lags the solid during the
+            // iterations and must not enter the flux
+            const bool consistent =
+                tmeshPhi.valid() && pRobin.fluidMeshFollowsSolid();
+
+            if (consistent)
+            {
+                phiHbyA.boundaryFieldRef()[patchI] =
+                    tmeshPhi().boundaryField()[patchI]
+                  - rAU_.boundaryField()[patchI]
+                   *pRobin.prevNormalAcceleration()
+                   *mesh().magSf().boundaryField()[patchI];
+            }
+
+            pRobin.setKinematicConsistency(consistent);
         }
         else if
         (
@@ -155,6 +191,42 @@ void pimpleFluid::updateRobinFsiInterface
                *p().boundaryField()[patchI].snGrad()
                *mesh().magSf().boundaryField()[patchI];
         }
+    }
+}
+
+
+void pimpleFluid::correctFluxConsistentPatches
+(
+    surfaceScalarField& phiHbyA,
+    const volScalarField& rAtU
+) const
+{
+    // On a patch that fixes the velocity, constrainHbyA sets HbyA_b = U_b, so
+    // with the pressure also fixed the pressure equation gives
+    // phi_b = U_b.S_f - rAtU_b snGrad(p)|S_f|, which differs from the
+    // boundary velocity flux by a term proportional to the time-step. Here
+    // HbyA_b carries the pressure gradient of the boundary cell, as HbyA does
+    // in the cell, HbyA_b = U_b + rAtU_b grad(p)_P, so that
+    // phi_b = U_b.S_f + rAtU_b (grad(p)_P.S_f - snGrad(p)|S_f|): the
+    // boundary velocity flux to O(rAtU h d2p/dn2) (grad(p)_P.n - snGrad(p)
+    // = -(h/4) d2p/dn2 for a fixed-value pressure): an O(deltaT h) term,
+    // formally first order in time at a fixed mesh. The fixed pressure stays
+    // implicit in the pressure equation
+    forAll(fluxConsistentPatches_, i)
+    {
+        const label patchI = fluxConsistentPatches_[i];
+
+        const vectorField gradpP
+        (
+            gradp().boundaryField()[patchI].patchInternalField()
+        );
+
+        phiHbyA.boundaryFieldRef()[patchI] =
+            (
+                U().boundaryField()[patchI]
+              + rAtU.boundaryField()[patchI]*gradpP
+            )
+          & mesh().Sf().boundaryField()[patchI];
     }
 }
 
@@ -203,6 +275,15 @@ pimpleFluid::pimpleFluid
     (
         pimple().dict().lookupOrDefault("moveMeshOuterCorrectors", false)
     ),
+    robinFluxFromWallVelocity_
+    (
+        pimple().dict().lookupOrDefault("robinFluxFromWallVelocity", true)
+    ),
+    robinKinematicConsistency_
+    (
+        pimple().dict().lookupOrDefault("robinKinematicConsistency", true)
+    ),
+    fluxConsistentPatches_(),
     cumulativeContErr_(0),
     solveEnergyEq_
     (
@@ -216,6 +297,44 @@ pimpleFluid::pimpleFluid
     lambdaEffPtr_()
 {
     setRefCell(p(), pimple().dict(), pRefCell_, pRefValue_);
+
+    if (pimple().dict().found("fluxConsistentPatches"))
+    {
+        const wordReList patchNames
+        (
+            pimple().dict().lookup("fluxConsistentPatches")
+        );
+
+        fluxConsistentPatches_ =
+            mesh().boundaryMesh().patchSet(patchNames).sortedToc();
+
+        forAll(fluxConsistentPatches_, i)
+        {
+            const label patchI = fluxConsistentPatches_[i];
+
+            if
+            (
+                U().boundaryField()[patchI].assignable()
+             || !p().boundaryField()[patchI].fixesValue()
+            )
+            {
+                FatalErrorInFunction
+                    << "fluxConsistentPatches: patch "
+                    << mesh().boundary()[patchI].name()
+                    << " needs a velocity condition that fixes the boundary"
+                    << " value (fixedValue or mixed) and a fixed pressure"
+                    << abort(FatalError);
+            }
+        }
+
+        Info<< "Flux-consistent pressure/velocity patches: "
+            << UIndirectList<word>
+               (
+                   mesh().boundaryMesh().names(), fluxConsistentPatches_
+               )
+            << endl;
+    }
+
     mesh().setFluxRequired(p().name());
     turbulence_->validate();
 
@@ -310,9 +429,14 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+    // Named normal: a tmp normal field would be reused as the storage of
+    // the inner product, which aliases an input of the loop and gives
+    // wrong results with some -O3 builds (see the 3dTube verification)
+    const vectorField nf(mesh().boundary()[patchID].nf());
+
     tvF.ref() = rho_.value()
        *(
-            mesh().boundary()[patchID].nf()
+            nf
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
 
@@ -357,9 +481,6 @@ bool pimpleFluid::evolve()
     {
         if (pimple.firstIter() || moveMeshOuterCorrectors)
         {
-            // fvModels not added yet
-            // fvModels.preUpdateMesh();
-
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
             if (fluidModel::fsiMeshUpdate())
@@ -408,19 +529,20 @@ bool pimpleFluid::evolve()
           + fvm::div(phi, U)
           + turbulence_->divDevReff(U)
           - boussinesqMomentumSource()
+         ==
+            options()(U)
         );
         fvVectorMatrix& UEqn = tUEqn.ref();
 
         UEqn.relax();
 
-        // fvOptions not implemented yet
-        // fvOptions.constrain(UEqn);
+        options().constrain(UEqn);
 
         if (pimple.momentumPredictor())
         {
             solve(UEqn == -fvc::grad(p));
-            // fvOptions not implemented yet
-            // fvOptions.correct(U);
+
+            options().correct(U);
         }
 
         // --- Pressure corrector loop
@@ -473,9 +595,93 @@ bool pimpleFluid::evolve()
                 HbyA -= (rAU_ - rAtU())*fvc::grad(p);
             }
 
+            correctFluxConsistentPatches(phiHbyA, rAtU());
+
             if (pimple.nCorrPISO() <= 1)
             {
                 tUEqn.clear();
+            }
+
+            // Pressure diffusivity on the faces, and the cells where
+            // continuity is not imposed, with immersed boundaries
+            tmp<surfaceScalarField> rAtUf;
+            tmp<volScalarField> fluidCells;
+            tmp<volScalarField> divPhiHbyA;
+
+            // Immersed boundaries (immersedBoundaryForce with
+            // apertureCoupling): on the faces cut by a body, the flux is the
+            // fluid fraction of the face area (aperture) times the flux, plus
+            // the flux of the body velocity through the solid part of the
+            // face, and the diffusivity is blended with that of the
+            // penalised cells, so that the pressure equation changes
+            // continuously as the body moves
+            if
+            (
+                mesh.foundObject<surfaceScalarField>
+                (
+                    "immersedBoundaryAperture"
+                )
+            )
+            {
+                const surfaceScalarField& alpha =
+                    mesh.lookupObject<surfaceScalarField>
+                    (
+                        "immersedBoundaryAperture"
+                    );
+                const surfaceScalarField& wallFlux =
+                    mesh.lookupObject<surfaceScalarField>
+                    (
+                        "immersedBoundaryWallFlux"
+                    );
+
+                phiHbyA = alpha*phiHbyA + wallFlux;
+                rAtUf =
+                    alpha*fvc::interpolate(rAtU())
+                  + (1 - alpha)*localMin<scalar>(mesh).interpolate(rAtU());
+
+                // Continuity is not imposed in the cells entirely inside a
+                // body, where the flux of the velocity of a deforming body
+                // need not be zero
+                if
+                (
+                    mesh.foundObject<volScalarField>
+                    (
+                        "immersedBoundarySolidCells"
+                    )
+                )
+                {
+                    const volScalarField& solid =
+                        mesh.lookupObject<volScalarField>
+                        (
+                            "immersedBoundarySolidCells"
+                        );
+                    fluidCells = 1 - solid;
+
+                    // Without a fixed pressure boundary, the divergence in
+                    // these cells is replaced by its mean over them, so that
+                    // the sum over the domain, and the compatibility of the
+                    // pressure equation, are unchanged
+                    divPhiHbyA = fvc::div(phiHbyA);
+                    const scalarField& V = mesh.V();
+                    const scalar solidVolume = gSum(solid.primitiveField()*V);
+                    const scalar solidSource =
+                        gSum
+                        (
+                            solid.primitiveField()
+                           *divPhiHbyA().primitiveField()*V
+                        );
+                    divPhiHbyA.ref() *= fluidCells();
+                    if (p.needReference() && solidVolume > VSMALL)
+                    {
+                        divPhiHbyA.ref() +=
+                            solid
+                           *dimensionedScalar
+                            (
+                                divPhiHbyA().dimensions(),
+                                solidSource/solidVolume
+                            );
+                    }
+                }
             }
 
             // Update the pressure BCs to ensure flux consistency
@@ -487,7 +693,11 @@ bool pimpleFluid::evolve()
             {
                 fvScalarMatrix pEqn
                 (
-                    fvm::laplacian(rAtU(), p) == fvc::div(phiHbyA)
+                    divPhiHbyA.valid()
+                  ? fvm::laplacian(rAtUf(), p) == divPhiHbyA()
+                  : rAtUf.valid()
+                  ? fvm::laplacian(rAtUf(), p) == fvc::div(phiHbyA)
+                  : fvm::laplacian(rAtU(), p) == fvc::div(phiHbyA)
                 );
 
                 pEqn.setReference(pRefCell_, pRefValue_);
@@ -500,7 +710,28 @@ bool pimpleFluid::evolve()
                 }
             }
 
-            #include "continuityErrs.H"
+            if (fluidCells.valid())
+            {
+                // Continuity errors, excluding the cells inside the bodies
+                const volScalarField contErr(fluidCells()*fvc::div(phi));
+
+                const scalar sumLocalContErr =
+                    runTime.deltaTValue()
+                   *mag(contErr)().weightedAverage(mesh.V()).value();
+
+                const scalar globalContErr =
+                    runTime.deltaTValue()
+                   *contErr.weightedAverage(mesh.V()).value();
+                cumulativeContErr += globalContErr;
+
+                Info<< "time step continuity errors : sum local = "
+                    << sumLocalContErr << ", global = " << globalContErr
+                    << ", cumulative = " << cumulativeContErr << endl;
+            }
+            else
+            {
+                #include "continuityErrs.H"
+            }
 
             // Explicitly relax pressure for momentum corrector
             p.relax();
@@ -509,7 +740,7 @@ bool pimpleFluid::evolve()
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-         // fvOptions.correct(U);
+            options().correct(U);
 
             gradU() = fvc::grad(U);
         }
@@ -554,6 +785,21 @@ void pimpleFluid::solveEnergyEq()
         // Store fields for under-relaxation and residual calculation
         TPtr_().storePrevIter();
 
+        volScalarField rhoCp
+        (
+            IOobject
+            (
+                "rhoCp",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            rho_*Cp
+        );
+
         fvScalarMatrix TEqn
         (
             rho_*Cp*
@@ -562,16 +808,22 @@ void pimpleFluid::solveEnergyEq()
               + fvm::div(phi(), TPtr_())
             )
           - fvm::laplacian(lambdaEffPtr_(), TPtr_())
+         ==
+            options()(rhoCp, TPtr_())
         );
 
         // Under-relaxation the linear system
         TEqn.relax();
+
+        options().constrain(TEqn);
 
         // Solve the linear system
         TEqn.solve();
 
         // Under-relax the field
         TPtr_().relax();
+
+        options().correct(TPtr_());
     }
 }
 

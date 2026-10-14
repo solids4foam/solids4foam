@@ -31,13 +31,14 @@ Author
 #ifndef hofvm_H
 #define hofvm_H
 
-#if defined(USE_PETSC) && !defined(FOAMEXTEND)
+#ifdef USE_PETSC
 
 #include <petscsnes.h>
 #include "tensor.H"
 #include "fvMatrices.H"
 #include "volFields.H"
-#include "movingLeastSquares.H"
+#include "leastSquaresScheme.H"
+#include "mat66.H"
 #include "foamPetscSnesHelper.H"
 
 namespace Foam
@@ -49,7 +50,7 @@ namespace hofvm
     //- Laplacian coefficient
     tensor laplacianCoeff
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
@@ -58,7 +59,7 @@ namespace hofvm
     //- Laplacian transpose coefficient
     tensor laplacianTransposeCoeff
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
@@ -67,7 +68,7 @@ namespace hofvm
     //- Laplacian trace coefficient
     tensor laplacianTraceCoeff
     (
-        const scalar& gammaMagSf,
+        const scalar& gamma,
         const scalar& quadWeight,
         const vector& gradInterpCoeff,
         const vector& faceNormal
@@ -84,7 +85,7 @@ namespace hofvm
     (
         Mat& jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const label blockSize,
         const bool createMat = true
@@ -95,7 +96,7 @@ namespace hofvm
     (
         Mat jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const volScalarField& diffusivity,
         const label rowOffset = 0,
@@ -107,7 +108,7 @@ namespace hofvm
     (
         Mat jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const volScalarField& diffusivity,
         const label rowOffset = 0,
@@ -115,13 +116,47 @@ namespace hofvm
     );
 
     // Add coefficients to the matrix for the Laplacian trace
+    //- Add the linearisation of div(sigma) to the PETSc matrix using a full
+    //  fourth-order material tangent, rather than the three isotropic kernels
+    //  driven by a back-derived mu and lambda.
+    //  materialTangent must be indexed by mesh face index and sized
+    //  mesh.nFaces(): internal faces first, then boundary faces in patch
+    //  order, which is the standard OpenFOAM face numbering.
+    //  For an isotropic tangent this is identical to summing
+    //  laplacianIntoPETScMatrix, laplacianTransposeIntoPETScMatrix and
+    //  laplacianTraceIntoPETScMatrix with the corresponding mu and lambda
+    void divSigmaIntoPETScMatrix
+    (
+        Mat jac,
+        const foamPetscSnesHelper& petscSnesHelper,
+        const leastSquaresScheme& reconstruction,
+        const volVectorField& D,
+        const List<mat66>& materialTangent,
+        const label rowOffset = 0,
+        const label colOffset = 0
+    );
+
     void laplacianTraceIntoPETScMatrix
     (
         Mat jac,
         const foamPetscSnesHelper& petscSnesHelper,
-        const movingLeastSquares& mls,
+        const leastSquaresScheme& reconstruction,
         const volVectorField& D,
         const volScalarField& diffusivity,
+        const label rowOffset = 0,
+        const label colOffset = 0
+    );
+
+    //- Add the high-order alpha-stabilisation derivative to the PETSc matrix
+    //  Serial implementation; for now no contribution is inserted in parallel
+    void insertAlphaStabIntoPETScMatrix
+    (
+        Mat jac,
+        const foamPetscSnesHelper& petscSnesHelper,
+        const leastSquaresScheme& reconstruction,
+        const volVectorField& D,
+        const surfaceScalarField& diffusivity,
+        const scalar scaleFactor,
         const label rowOffset = 0,
         const label colOffset = 0
     );
