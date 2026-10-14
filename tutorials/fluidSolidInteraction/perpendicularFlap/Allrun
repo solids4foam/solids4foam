@@ -12,6 +12,8 @@ source solids4FoamScripts.sh
 # ./Allrun iqnils
 # ./Allrun parallel
 # ./Allrun aitken parallel
+# ./Allrun monolithic
+# ./Allrun monolithic parallel
 
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
@@ -28,11 +30,15 @@ Usage:
   ./Allrun iqnils       # run the IQNILS scheme
   ./Allrun parallel     # run the case in parallel
   ./Allrun aitken parallel
+  ./Allrun monolithic   # quasi-monolithic Newton coupling (OpenFOAM.com)
+  ./Allrun monolithic parallel
 EOF
 }
 
 restore_default()
 {
+    # The monolithic fsiProperties is a link to a variant file
+    [[ "$couplingMethod" == "monolithic" ]] && return 0
     sed -i "s/^fluidSolidInterface .*/fluidSolidInterface IQNILS;/" constant/fsiProperties || true
 }
 trap restore_default EXIT
@@ -46,6 +52,9 @@ do
             ;;
         iqnils)
             couplingMethod=IQNILS
+            ;;
+        monolithic)
+            couplingMethod=monolithic
             ;;
         parallel)
             runParallel=yes
@@ -65,11 +74,25 @@ done
 echo "Using ${couplingMethod} fluidSolidInterface coupling"
 [[ "$runParallel" == "yes" ]] && echo "Running in parallel"
 
+if [[ "$couplingMethod" == "monolithic" ]]
+then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com; its files are stored as *.monolithic variants
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    solids4Foam::selectCaseVariant . monolithic
+else
+    solids4Foam::restoreCaseVariant .
+fi
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
 # Set the requested coupling method before running the solvers
-sed -i "s/^fluidSolidInterface .*/fluidSolidInterface ${couplingMethod};/" constant/fsiProperties
+if [[ "$couplingMethod" != "monolithic" ]]
+then
+    sed -i "s/^fluidSolidInterface .*/fluidSolidInterface ${couplingMethod};/" constant/fsiProperties
+fi
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
