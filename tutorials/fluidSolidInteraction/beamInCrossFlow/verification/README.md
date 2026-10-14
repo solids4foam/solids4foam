@@ -29,7 +29,7 @@ the commit that built it.
 
 Sources: the published article (Richter 2012, CMAME 223-224, 28-42,
 doi:10.1016/j.cma.2012.02.014; reference values in its Table 3) and the July
-2011 preprint (https://d-nb.info/1188567608/34, section 7.2, pp. 18-20;
+2011 preprint (<https://d-nb.info/1188567608/34>, section 7.2, pp. 18-20;
 reference values in its Table 6, convergence history in its Table 5). The
 geometry, material, boundary conditions and inlet polynomial are the same in
 both; they differ in the stated average inflow velocity (published 0.15;
@@ -53,15 +53,26 @@ velocity vmax = 0.3") both give a peak of 0.3 m/s, and our
 `paraboloidInletVelocity` (maxVelocity 0.3 on `y in (0, 0.4)`,
 `z in (-0.4, 0)`) reproduces that polynomial exactly. The area mean of the
 printed bi-parabolic profile is `(2/3)^2 0.3 = 0.133 m/s`. Neither stated
-mean matches it: the preprint's 0.2 (with `Re = 40`) equals the mean of a
-single 2-D parabola of peak 0.3, as in the FSI-1 benchmark that this section
-follows; the published 0.15 matches neither. We use the printed profile
-(peak 0.3), as decided for this study. Caveat recorded for the comparison: an
-earlier solids4foam sequence with peak 0.2 m/s landed close to the reference
-values (`u_x(A)` L3 5.915e-5 vs 5.924e-5, `F_x` 1.331 vs 1.327), so they may
-correspond to a different inflow; Philip has asked Richter which inflow
-produced them. Nothing here is tuned to the reference values; the
-comparison is made only after our own sequence is resolved.
+mean matches it: the published 0.15 (with `Re ~ 25`) and the preprint's 0.2
+(with `Re = 40`) are both inconsistent with a 0.3 peak. The published
+definition is therefore internally inconsistent: the stated peak and the
+stated average cannot both hold (a 0.15 mean would need a 0.3375 peak). We
+use the printed profile (peak 0.3) as the primary definition. A labelled
+0.2 m/s diagnostic (below) tests which inflow the reference values belong
+to; clarification is being sought from the author. Nothing here is tuned to
+the reference values; the comparison is made only after our own sequence is
+resolved.
+
+Related study. Tukovic et al. (2018, Trans. FAMENA 42(3):1-31,
+doi:10.21278/TOF.42301, section 4.5) computed this case with a peak inlet
+velocity of 0.2 m/s ("Re = 40 with respect to the plate height h = 0.2 m")
+on one polyhedral mesh (273,539 fluid and 6,661 solid cells). They report
+`u_x(A)` = 5.93e-5 m and `F_x` = 1.31 N against the benchmark 5.95e-5 m and
+1.33 N. Their Fig. 27 labels `A = (0.45, 0.15, 0.15)` an interface point,
+which holds only if the plate occupies `x = 0.45-0.55` (as in the earlier
+solids4foam tutorial) rather than Richter's `0.4-0.5`; their
+`u_y(A) = 2.40e-5` m, about 12x ours, is consistent with a face point. This
+is a single-mesh, same-code-lineage result, not convergence evidence.
 
 Steady interpretation. Richter solves the stationary equations; the solid
 density does not enter. We march the transient equations (solid density
@@ -213,7 +224,15 @@ path.
 | FSI L2 `u_x(A)` | -2.3e-4 | +3.9e-4 | restarted from steady |
 | FSI L2 `F_x` | -1.4e-4 | +2.4e-4 | restarted from steady |
 
-The dt effect falls by 6-10x per level for the rigid beam and by 3.6-4.2x from L1 to L2 for the FSI (so ~5e-5 expected at L3, ~2 % of the expected L2-L3 increment), consistent with a Rhie-Chow
+FSI L3 (job 5337651, continued from the converged L3 state at t = 4.5 s with
+dt = 0.003125 to t = 7 s, `runs/b3_L3_dt003125`): `u_x(A)` +8.35e-5 and `F_x`
++5.20e-5 relative. The switch transient (amplitude halving every ~0.25 s:
+`F_x` 3.1e-4 in 4.50-4.75 s to 4.1e-7 in 6.75-7.00 s) has settled by
+~5.5 s; the 0.25 s window means are constant to 1e-7 from 5.5 s on.
+
+The dt effect falls by 6-10x per level for the rigid beam and by ~4-5x per
+level for the FSI (dt/2: `u_x(A)` 1.4e-3, 3.9e-4, 8.35e-5 at L1, L2, L3); at
+L3 it is ~1/20 of the L2-L3 increment (1.9 %), consistent with a Rhie-Chow
 term that vanishes with h at fixed dt, and grows as dt decreases (as the
 `rAU`-weighted pressure smoothing weakens). dt = 0.00625 s is therefore held
 fixed at all levels; the FSI dt effect is ~5x the rigid one because, on the
@@ -287,9 +306,9 @@ below 5 % of the L2-L3 increments.
 
 ## Comparison with Richter (2012), after the sequence above
 
-Richter (2012) Table 3 (preprint Table 6), for the half interface on the
-symmetric half domain as here: drag 1.327 +- 0.01 N, `u_x(A)`
-5.924e-5 +- 1e-7 m. For the implemented printed inlet (peak 0.3 m/s; area
+Richter (2012) Table 3, for the half interface on the symmetric half domain
+as here: drag 1.33 and `u_x(A)` 5.95e-5 m, each with accuracy 1 % (the
+preprint's Table 6 gave 1.327 +- 0.01 and 5.924e-5 +- 1e-7). For the implemented printed inlet (peak 0.3 m/s; area
 mean 0.133 m/s, `Re = 0.133 x 0.2 / 1e-3 = 27` with Richter's length scale)
 our sequence approaches 2.39 N and 1.05e-4 m (L3: 2.38305 N,
 1.04478e-4 m), about 1.8x the reference values. The discrepancy greatly
@@ -303,6 +322,38 @@ different inflow than the printed profile, but does not establish which
 (both stated means, 0.2 and 0.15, are inconsistent with the printed
 profile's 0.133). The labelled 0.2 m/s diagnostic below tests this with the
 production setup. No setting was tuned to the reference values.
+
+### Diagnostic of the reference values: peak inlet 0.2 m/s (not a benchmark variant)
+
+Production setup unchanged (same mesh family `m = 2`, strict coupling 1e-5,
+PIMPLE 3, dt = 0.00625, tight solver tolerances, start from rest with the
+1 s ramp) except `maxVelocity 0.2`; `runs/R02_L{0,1,2}_rest`, jobs 5337652
+(L0, L1) and 5337653 (L2). Values are means over the last 0.5 s (t = 24 s for
+L0, 20 s for L1 and L2); the drift over the preceding second is below 7e-7
+relative.
+
+| level | `u_x(A)` (m) | `F_x` (N) |
+| --- | ---: | ---: |
+| L0 | 4.61683e-5 | 1.19882 |
+| L1 | 5.47934e-5 | 1.28437 |
+| L2 | 5.83121e-5 | 1.31658 |
+
+Observed orders (L0-L2): `u_x` 1.29, `F_x` 1.41, as for the primary sequence
+on L0-L2 (1.26, 1.36). With `p = 2` the extrapolated values are 5.9485e-5 m
+and 1.3273 N. Applying the primary sequence's L2-L3/L1-L2 increment ratio
+(about 1/3 for both quantities) instead gives an estimated L3 of 5.946e-5 m
+and 1.3274 N (an estimate, no L3 run). Richter's values are 5.95e-5 m and
+1.33 (published) or 5.924e-5 m and 1.327 (preprint). A 0.2 m/s peak at
+Richter's geometry therefore reproduces the reference values to about
+0.2-0.4 %, while the printed 0.3 m/s peak gives about 1.8x. This strongly
+suggests that the reference values correspond to a 0.2 m/s velocity scale
+(Re = 40 with the plate height, as in the preprint and in Tukovic et al.
+2018), but it does not establish it; the primary sequence keeps the printed
+definition until the author confirms.
+The lift at L2, `F_y` = 0.1051 N, is also close to Tukovic et al.'s 0.1055 N
+at 0.2 m/s (their `u_y(A)` refers to a different point, see the audit).
+Data: `reference/campaign/followup_20261013/` (`r02_diagnostic.csv`,
+`l3_dt2_windows.csv`).
 
 ## Astra (GPT-6-Astra, xhigh) review, 2026-10-12
 
@@ -340,20 +391,25 @@ for Philip, not run): a coupled L3 dt/2 steady-sensitivity run (estimated
 
 ## Cost (physical cores = node-hours x 128)
 
-73.0 node-hours = 9,350 physical core-h in total since 2026-10-11, of which
+Follow-up runs (2026-10-13): L3 dt/2 (5337651, 3 nodes, 7.0 h) 21.1
+node-hours; 0.2 m/s diagnostic (5337652, 1 node, 2.7 h; 5337653, 1 node,
+7.7 h) 10.5 node-hours; together 31.6 node-hours = 4,040 physical core-h.
+
+Before that: 73.0 node-hours = 9,350 physical core-h since 2026-10-11, of which
 L3 44.6 node-hours (segment 1, job 5333947: 36.0; segment 2, job 5336554:
 8.6; the failed quota attempt 5333773: 0.1). Segment 2 ran ~1.7x faster per
 simulated second than segment 1 (different nodes). Earlier totals in this
 README and in reports were sacct CPUTimeRAW, which counts 256 logical CPUs
 per node and so doubled the physical figure.
 
-## STATUS (2026-10-13, campaign complete for L0-L3)
+## STATUS (2026-10-14, campaign complete for L0-L3)
 
-All production and check runs are finished; no beam jobs are queued. Open
-items (decisions for Philip): a coupled L3 dt/2 steady-sensitivity run (Astra
-recommendation, roughly 50-60 node-hours); an absolute-floor coupling
-criterion in solids4foam (separate PR); clarification of the Richter inlet
-with the author. Run directories: `/project/home/p201287/philip/beam-richter-opus/runs`
+All production and check runs are finished, including the L3 dt/2 check and
+the 0.2 m/s reference diagnostic; no beam jobs are queued. The absolute-floor
+coupling criterion is in solids4foam (PR #567, merged). Open: clarification
+of the inflow behind Richter's reference values with the author. If a 0.2 m/s
+peak is confirmed, the definitive sequence (L0-L3 and the dt and coupling
+checks) is rerun at 0.2 m/s; L0-L2 above already use the production setup. Run directories: `/project/home/p201287/philip/beam-richter-opus/runs`
 (L3 keeps its decomposed t = 4, 4.5 s state); archives in
 `/project/home/p201136/philip-beam-archive/beam-richter-opus/`.
 
