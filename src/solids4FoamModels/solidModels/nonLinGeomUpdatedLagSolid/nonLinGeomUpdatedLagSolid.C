@@ -255,7 +255,7 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
             }
             else
             {
-                tracP = tracPatch.traction() - nPatch*tracPatch.pressure();
+                tracP = tracPatch.boundaryTraction(nPatch);
             }
 
             if (tracPatch.useUndeformedArea())
@@ -972,30 +972,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
                 << " solution algorithm" << abort(FatalError);
         }
 
-        // Set extrapolateValue to true for solidTraction boundaries
-        forAll(DD().boundaryField(), patchI)
-        {
-            if
-            (
-                isA<solidTractionFvPatchVectorField>
-                (
-                    DD().boundaryField()[patchI]
-                )
-            )
-            {
-                Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the DD "
-                    << "field" << endl;
-
-                solidTractionFvPatchVectorField& tracPatch =
-                    refCast<solidTractionFvPatchVectorField>
-                    (
-                        boundaryFieldRef(DD())[patchI]
-                    );
-
-                tracPatch.extrapolateValue() = true;
-            }
-        }
+        enableTractionBoundaryExtrapolation(DD());
     }
 }
 

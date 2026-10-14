@@ -25,7 +25,10 @@ License
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "normalDisplacementZeroShearFvPatchVectorField.H"
 #include "solidSpringDashpotFvPatchVectorField.H"
+#include "symmetryFvPatchFields.H"
+#include "slipFvPatchFields.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -1705,6 +1708,165 @@ Foam::solidModel::~solidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::solidModel::enforceTractionBoundaries
+(
+    surfaceVectorField& traction,
+    const volVectorField& D,
+    const surfaceVectorField& n
+) const
+{
+    forAll(D.boundaryField(), patchI)
+    {
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidTractionFvPatchVectorField& tracPatch =
+                refCast<const solidTractionFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+            if (highOrderResidual())
+            {
+                auto& faceQuadWeights = compactListListCRef
+                (
+                    displacementLeastSquares().quadrature().faceQuadWeights()
+                );
+
+                const surfaceScalarField& magSf = mesh().magSf();
+                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                    tracPatch.evaluateQuadrature();
+                auto& quadratureValues = compactListListCRef
+                (
+                    patchQuadraturePointsValue()
+                );
+
+                forAll(mesh().boundaryMesh()[patchI], faceI)
+                {
+                    const label start = mesh().boundaryMesh()[patchI].start();
+                    const label faceID = faceI + start;
+                    const label nPoints = faceQuadWeights[faceID].size();
+
+                    boundaryFieldRef(traction)[patchI][faceI] = vector::zero;
+                    for (label pointI = 0; pointI < nPoints; ++pointI)
+                    {
+                        boundaryFieldRef(traction)[patchI][faceI] +=
+                            quadratureValues[faceI][pointI]
+                           *faceQuadWeights[faceID][pointI];
+                    }
+
+                    boundaryFieldRef(traction)[patchI][faceI] /=
+                        magSf.boundaryField()[patchI][faceI];
+                }
+            }
+            else
+            {
+#ifdef OPENFOAM_NOT_EXTEND
+                traction.boundaryFieldRef()[patchI] =
+#else
+                traction.boundaryField()[patchI] =
+#endif
+                    tracPatch.boundaryTraction(nPatch);
+            }
+        }
+        else if
+        (
+            isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidSpringDashpotFvPatchVectorField& springPatch =
+                refCast<const solidSpringDashpotFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+#ifdef OPENFOAM_NOT_EXTEND
+            traction.boundaryFieldRef()[patchI] =
+#else
+            traction.boundaryField()[patchI] =
+#endif
+                springPatch.springDashpotTraction
+                (
+                    nPatch, scalarField(nPatch.size(), 1.0)
+                );
+        }
+        else if
+        (
+            isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<normalDisplacementZeroShearFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<symmetryFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<slipFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+#ifdef OPENFOAM_NOT_EXTEND
+            traction.boundaryFieldRef()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+#else
+            traction.boundaryField()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+#endif
+        }
+    }
+}
+
+
+void Foam::solidModel::enableTractionBoundaryExtrapolation
+(
+    volVectorField& D
+) const
+{
+    forAll(D.boundaryField(), patchI)
+    {
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            solidTractionFvPatchVectorField& tracPatch =
+                refCast<solidTractionFvPatchVectorField>
+                (
+                    boundaryFieldRef(D)[patchI]
+                );
+
+            Info<< "    Setting `extrapolateValue` to `true` on the "
+                << mesh().boundary()[patchI].name() << " patch of the "
+                << D.name() << " field" << endl;
+
+            tracPatch.enableExtrapolation();
+        }
+    }
+}
+
 
 const Foam::volScalarField& Foam::solidModel::rho() const
 {

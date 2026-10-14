@@ -467,6 +467,18 @@ protected:
             pointVectorField& pointD
         );
 
+        //- Enforce small-strain traction boundary conditions on the complete
+        //  mechanical face traction
+        void enforceTractionBoundaries
+        (
+            surfaceVectorField& traction,
+            const volVectorField& D,
+            const surfaceVectorField& n
+        ) const;
+
+        //- Extrapolate solidTraction patch values from adjacent cells
+        void enableTractionBoundaryExtrapolation(volVectorField& D) const;
+
         //- Initial density, from the mechanicalConstitutiveLaw framework.
         //
         //  For the models that build their own rho field in the constructor
