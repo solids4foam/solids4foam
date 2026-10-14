@@ -165,6 +165,9 @@ prepare_case() {
     if [[ "${coupling}" == "robin" ]]; then
         solution_setup="iqnils"
         interface_condition="robin"
+    elif [[ "${coupling}" == "monolithic" ]]; then
+        # The monolithic variant shares the IQNILS controlDict
+        solution_setup="iqnils"
     fi
 
     rm -rf "${case_dir}"
@@ -367,6 +370,12 @@ if [[ "${variant}" != "foamextend" ]]; then
     run_high_order_case "${high_order_case}"
 fi
 
+# The quasi-monolithic Newton coupling is only implemented for OpenFOAM.com
+if [[ "${variant}" == "openfoamcom" ]]; then
+    monolithic_case=$(prepare_case monolithic)
+    run_case "${monolithic_case}" monolithic
+fi
+
 echo
 
 failures=0
@@ -389,6 +398,14 @@ if [[ "${variant}" != "foamextend" ]]; then
         || failures=$((failures + $?))
 else
     echo "Skipping high-order regression case: unavailable on foam-extend"
+fi
+
+if [[ "${variant}" == "openfoamcom" ]]; then
+    check_case monolithic "${monolithic_case}" \
+        "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+        || failures=$((failures + $?))
+else
+    echo "Skipping monolithic regression case: only available on OpenFOAM.com"
 fi
 
 echo

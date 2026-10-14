@@ -6,6 +6,44 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# Example usage
+# ./Allrun                      # partitioned (IQNILS), serial
+# ./Allrun parallel             # partitioned (IQNILS), parallel
+# ./Allrun monolithic           # quasi-monolithic Newton (PETSc), serial
+# ./Allrun monolithic parallel  # quasi-monolithic Newton (PETSc), parallel
+
+coupling=partitioned
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        monolithic|Monolithic)
+            coupling=monolithic
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [monolithic] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach requires PETSc and is only
+    # implemented for OpenFOAM.com; its files are stored as *.monolithic
+    # variants
+    solids4Foam::requirePetscOrExitSilently
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    solids4Foam::selectCaseVariant . monolithic
+else
+    solids4Foam::restoreCaseVariant .
+fi
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
@@ -14,7 +52,7 @@ solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
 # Run solver
-if [[ "$1" == "parallel" ]]; then
+if [[ "${runMode}" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid

@@ -781,6 +781,98 @@ function solids4Foam::useForceDat()
     done
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# selectCaseVariant
+#     Selects a variant of a case, e.g. a monolithic FSI setup stored alongside
+#     the default partitioned setup. Every file named <file>.<VARIANT> in the
+#     initial field, constant and system directories is linked to <file>. A
+#     <file> or link that is replaced is kept as <file>.default, and the links
+#     made are recorded so that restoreCaseVariant can undo them.
+# Arguments:
+#     1: CASE_DIR
+#     2: VARIANT
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::selectCaseVariant()
+{
+    # Check number of input parameters is correct
+    if [[ $# -ne 2 ]]
+    then
+        solids4Foam::err "selectCaseVariant: incorrect number of parameters"
+    fi
+
+    local CASE_DIR="$1"
+    local VARIANT="$2"
+    local RECORD="${CASE_DIR}/.solids4FoamCaseVariant"
+    local FILE
+    local BASE
+    local DIR
+
+    # Start from the stored case
+    solids4Foam::restoreCaseVariant "${CASE_DIR}"
+
+    while IFS= read -r DIR
+    do
+        while IFS= read -r -d '' FILE
+        do
+            BASE="${FILE%."${VARIANT}"}"
+
+            # Keep the file or link being replaced
+            if [[ -e ${BASE} || -L ${BASE} ]]
+            then
+                \mv "${BASE}" "${BASE}.default"
+            fi
+
+            echo "Using ${FILE##*/} for ${BASE#"${CASE_DIR}"/}"
+            ln -nsf "${FILE##*/}" "${BASE}"
+            echo "${BASE}" >> "${RECORD}"
+        done < <(find "${DIR}" -name "*.${VARIANT}" -print0)
+    done < <(
+        solids4Foam::fieldDirs "${CASE_DIR}"
+        echo "${CASE_DIR}/constant"
+        echo "${CASE_DIR}/system"
+    )
+}
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# restoreCaseVariant
+#     Undoes selectCaseVariant: removes the links it made and restores the
+#     files it replaced. The operation is idempotent.
+# Arguments:
+#     1: CASE_DIR
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::restoreCaseVariant()
+{
+    # Check number of input parameters is correct
+    if [[ $# -ne 1 ]]
+    then
+        solids4Foam::err "restoreCaseVariant: incorrect number of parameters"
+    fi
+
+    local CASE_DIR="$1"
+    local RECORD="${CASE_DIR}/.solids4FoamCaseVariant"
+    local BASE
+
+    if [[ ! -f ${RECORD} ]]
+    then
+        return 0
+    fi
+
+    while IFS= read -r BASE
+    do
+        if [[ -L ${BASE} ]]
+        then
+            rm -f "${BASE}"
+        fi
+
+        if [[ -e "${BASE}.default" || -L "${BASE}.default" ]]
+        then
+            \mv "${BASE}.default" "${BASE}"
+        fi
+    done < "${RECORD}"
+
+    rm -f "${RECORD}"
+}
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # Print error message to stderr
 # Arguments:

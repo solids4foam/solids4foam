@@ -14,6 +14,8 @@ source solids4FoamScripts.sh
 # ./Allrun aitken parallel
 # ./Allrun iqnils highOrder
 # ./Allrun iqnils highOrder parallel
+# ./Allrun monolithic
+# ./Allrun monolithic parallel
 
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
@@ -37,6 +39,9 @@ do
             coupling=robin
             interfaceCondition=robin
             ;;
+        monolithic|Monolithic)
+            coupling=monolithic
+            ;;
         parallel)
             runMode=parallel
             ;;
@@ -45,7 +50,7 @@ do
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|robin|monolithic] [highOrder] [parallel]"
             exit 1
             ;;
     esac
@@ -59,17 +64,33 @@ fi
 
 echo "Using ${coupling} coupling setup"
 
-ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-if [[ "${coupling}" == "robin" ]]; then
-    solutionSetup=iqnils
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com; its files are stored as *.monolithic variants
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    if [[ -n "${solidPropertiesSuffix}" ]]; then
+        echo "The highOrder option is not available with monolithic coupling"
+        exit 1
+    fi
+    ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+    ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+    ln -vnsf "controlDict.iqnils" system/controlDict
+    solids4Foam::selectCaseVariant . monolithic
 else
-    solutionSetup=${coupling}
+    solids4Foam::restoreCaseVariant .
+    ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+    if [[ "${coupling}" == "robin" ]]; then
+        solutionSetup=iqnils
+    else
+        solutionSetup=${coupling}
+    fi
+    ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
+    ln -vnsf "controlDict.${solutionSetup}" system/controlDict
+    ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
+    ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+    ln -vnsf "p.${interfaceCondition}" 0/fluid/p
 fi
-ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
-ln -vnsf "controlDict.${solutionSetup}" system/controlDict
-ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
-ln -vnsf "U.${interfaceCondition}" 0/fluid/U
-ln -vnsf "p.${interfaceCondition}" 0/fluid/p
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

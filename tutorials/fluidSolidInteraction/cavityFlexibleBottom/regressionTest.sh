@@ -4,7 +4,6 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-CASE_DIR="${REGRESSION_ROOT}/main"
 
 # ============================================================
 # cavityFlexibleBottom FSI regression test
@@ -28,6 +27,10 @@ FORCE_AVG_SAMPLES=40
 REF_MAX_DISP=-0.2024
 REF_MEAN_FORCE=-5.150
 
+# The quasi-monolithic Newton coupling, which needs OpenFOAM.com and PETSc, is
+# checked against the same references: its damped solid settles to the same
+# steady state, to 7e-4 in displacement and 0.03 in mean force
+
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -36,11 +39,13 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
 echo "============================================================"
-echo "Beam-in-cross-flow FSI regression test"
+echo "cavityFlexibleBottom FSI regression test"
 echo "Max displacement difference < ${DISP_MAX_TOL}"
 echo "Mean force difference       < ${FORCE_MEAN_TOL}"
 echo "============================================================"
 echo
+
+# The helpers below act on CASE_DIR, which run_and_check sets for each arm
 
 prepare_case() {
     rm -rf "${CASE_DIR}"
@@ -54,47 +59,6 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 }
-
-# ------------------------------------------------------------
-# Clean & run case
-# ------------------------------------------------------------
-
-CHECK_ONLY=false
-
-for arg in "$@"; do
-    case "$arg" in
-        --check-only|--no-run)
-            CHECK_ONLY=true
-            ;;
-        *)
-            ;;
-    esac
-done
-
-if [ "$CHECK_ONLY" = false ]; then
-    prepare_case
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
-else
-    echo "Running in check-only mode: skipping Allclean and Allrun"
-fi
-
-# OpenFOAM variant compatibility
-mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"
-(
-    cd "${CASE_DIR}/postProcessing/fluid/forces/0"
-
-    # foam-extend writes forces to a 'forces' sub-directory so we will create a
-    # link
-    if [[ ! -e force.dat && -f ../../../../forces/0/forces.dat ]]; then
-        ln -s ../../../../forces/0/forces.dat force.dat
-    fi
-
-    # OpenFOAM.org creates forces.dat instead of force.dat
-    if [[ ! -e force.dat && -f forces.dat ]]; then
-        ln -s forces.dat force.dat
-    fi
-)
 
 # ------------------------------------------------------------
 # Extract helpers
@@ -139,45 +103,109 @@ abs() {
 }
 
 # ------------------------------------------------------------
-# Extract values
+# Run and check one arm
+# Arguments: arm name and Allrun arguments
 # ------------------------------------------------------------
 
-max_disp=$(extract_vertical_displacement)
-mean_force=$(extract_mean_force_tail)
+run_and_check() {
+    local ARM="$1"
+    local ALLRUN_ARGS="$2"
+    local CASE_DIR="${REGRESSION_ROOT}/${ARM}"
 
-if [[ -z "${max_disp}" || -z "${mean_force}" ]]; then
-    echo "FAIL: Could not extract regression quantities"
-    exit 1
-fi
+    echo "Running the ${ARM} arm"
 
-disp_diff=$(awk "BEGIN {print ${max_disp} - ${REF_MAX_DISP}}")
-disp_diff_abs=$(abs "${disp_diff}")
+    if [ "$CHECK_ONLY" = false ]; then
+        prepare_case
+        ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+        ( cd "${CASE_DIR}" && ./Allrun ${ALLRUN_ARGS} > "${ALLRUN_LOGFILE}" 2>&1 )
+    else
+        echo "Running in check-only mode: skipping Allclean and Allrun"
+    fi
 
-force_diff=$(awk "BEGIN {print ${mean_force} - ${REF_MEAN_FORCE}}")
-force_diff_abs=$(abs "${force_diff}")
+    # OpenFOAM variant compatibility
+    mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"
+    (
+        cd "${CASE_DIR}/postProcessing/fluid/forces/0"
+
+        # foam-extend writes forces to a 'forces' sub-directory so we will create a
+        # link
+        if [[ ! -e force.dat && -f ../../../../forces/0/forces.dat ]]; then
+            ln -s ../../../../forces/0/forces.dat force.dat
+        fi
+
+        # OpenFOAM.org creates forces.dat instead of force.dat
+        if [[ ! -e force.dat && -f forces.dat ]]; then
+            ln -s forces.dat force.dat
+        fi
+    )
+
+    # ------------------------------------------------------------
+    # Extract values
+    # ------------------------------------------------------------
+
+    max_disp=$(extract_vertical_displacement)
+    mean_force=$(extract_mean_force_tail)
+
+    if [[ -z "${max_disp}" || -z "${mean_force}" ]]; then
+        echo "FAIL [${ARM}]: Could not extract regression quantities"
+        failures=$((failures + 1))
+        return
+    fi
+
+    disp_diff=$(awk "BEGIN {print ${max_disp} - ${REF_MAX_DISP}}")
+    disp_diff_abs=$(abs "${disp_diff}")
+
+    force_diff=$(awk "BEGIN {print ${mean_force} - ${REF_MEAN_FORCE}}")
+    force_diff_abs=$(abs "${force_diff}")
+
+    # ------------------------------------------------------------
+    # Checks
+    # ------------------------------------------------------------
+
+    if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
+        printf "PASS [%s]: max displacement = %.6g (Δ = %.3g)\n" \
+            "${ARM}" "${max_disp}" "${disp_diff_abs}"
+    else
+        printf "FAIL [%s]: max displacement = %.6g (Δ = %.3g)\n" \
+            "${ARM}" "${max_disp}" "${disp_diff_abs}"
+        failures=$((failures + 1))
+    fi
+
+    if awk "BEGIN {exit !(${force_diff_abs} < ${FORCE_MEAN_TOL})}"; then
+        printf "PASS [%s]: mean force = %.6g (Δ = %.3g)\n" \
+            "${ARM}" "${mean_force}" "${force_diff_abs}"
+    else
+        printf "FAIL [%s]: mean force = %.6g (Δ = %.3g)\n" \
+            "${ARM}" "${mean_force}" "${force_diff_abs}"
+        failures=$((failures + 1))
+    fi
+}
 
 # ------------------------------------------------------------
-# Checks
+# Clean & run case
 # ------------------------------------------------------------
+
+CHECK_ONLY=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --check-only|--no-run)
+            CHECK_ONLY=true
+            ;;
+        *)
+            ;;
+    esac
+done
 
 failures=0
 
-if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
-    printf "PASS: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
-else
-    printf "FAIL: max displacement = %.6g (Δ = %.3g)\n" \
-        "${max_disp}" "${disp_diff_abs}"
-    failures=$((failures + 1))
-fi
+run_and_check partitioned ""
 
-if awk "BEGIN {exit !(${force_diff_abs} < ${FORCE_MEAN_TOL})}"; then
-    printf "PASS: mean force = %.6g (Δ = %.3g)\n" \
-        "${mean_force}" "${force_diff_abs}"
+# The quasi-monolithic coupling needs OpenFOAM.com and PETSc
+if [[ "${WM_PROJECT_VERSION:-}" == v* && -n "${PETSC_DIR:-}" ]]; then
+    run_and_check monolithic monolithic
 else
-    printf "FAIL: mean force = %.6g (Δ = %.3g)\n" \
-        "${mean_force}" "${force_diff_abs}"
-    failures=$((failures + 1))
+    echo "Skipping the monolithic arm: it needs OpenFOAM.com and PETSc"
 fi
 
 echo
