@@ -29,6 +29,10 @@ if awk -v l="$last" -v e="$end" 'BEGIN{exit !(l >= e - 1e-9)}'; then
     echo "job $SLURM_JOB_ID: already at $last (endTime $end), nothing to do $(date -Is)" >> run.out; exit 0
 fi
 sed -i 's/^stopAt .*/stopAt          endTime;/' system/controlDict
+# purgeWrite does not purge the writes of earlier segments: keep 0 and the latest two times
+old=$(ls processor0 | grep -E '^[0-9][0-9.e+-]*$' | sort -g | grep -vx 0 | head -n -2)
+for t in $old; do rm -rf processor*/"$t"; done
+[ -n "$old" ] && echo "removed earlier writes: $(echo $old)" >> run.out
 # fsiResiduals.dat is rewritten from the start on every run: keep the previous segments'
 [ -f postProcessing/fsiResiduals.dat ] && mv postProcessing/fsiResiduals.dat "postProcessing/fsiResiduals.dat.upto_$last"
 log=log.solids4Foam.$SLURM_JOB_ID
