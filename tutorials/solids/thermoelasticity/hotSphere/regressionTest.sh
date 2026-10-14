@@ -23,12 +23,15 @@ solids4Foam::requireGnuSed
 # Regression tolerances
 # ------------------------------------------------------------
 
+# With the leastSquares gradient: OpenFOAM.com v2412 and OpenFOAM.org 9
+# give a max epsilonEq of 2.39e-4 and a max sigmaEq of 5.23e7, where
+# pointCellsLeastSquares gave 4.4e7; foam-extend 4.1 gives 2.03e-4 and 4.44e7
 T_MIN=339.5
 T_MAX=340.5
 EPS_MIN=1.5e-4
-EPS_MAX=2.5e-4
+EPS_MAX=2.6e-4
 SIGMA_MIN=3.8e7
-SIGMA_MAX=4.6e7
+SIGMA_MAX=5.6e7
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -107,51 +110,26 @@ extract_max_sigma() {
         | awk '{print $NF}'
 }
 
-# Run the case to its full end time, and hold it to the answer of the removed
-# legacy mechanicalModel.
-#
-# This case runs several time steps, so unlike slabCooling it exercises the
-# framework rolling its constitutive state over between them.
-#
-# The comparison is to a tolerance rather than exact. The framework and the
-# legacy model solved the same problem but reached it by slightly different
-# iteration paths, because the implicit stiffness that steers the iteration is
-# built differently: the framework interpolates its cell tangent to the faces
-# where the legacy model formed a face value directly. The converged answers
-# therefore agreed only to the solution tolerance, and the difference shrank
-# with it - at solutionTolerance 1e-6 it was around 1e-7 of the displacement,
-# and tightening to 1e-10 took it to 1e-8. The threshold here is well above
-# that and far below anything physical
-FRAMEWORK_D_REL_TOL=1e-6
+# Run the case to its full end time and hold its D field to a recorded
+# reference, to the max and mean component magnitude written to fourteen
+# figures. This is the only tight check in this test: the bands above are
+# loose. The reference is OpenFOAM.com v2412's; OpenFOAM.org 9 differs by
+# round-off at the solver tolerance, 5e-7 below on macOS and 1.2e-6 above in
+# CI, and the tolerance, 1e-5 of the largest value, covers that
+REF_D_REL_TOL=1e-5
 COMPARISON_END_TIME=5
 
-# The final D, as the max and mean component magnitude of the field written
-# to fourteen figures, from the removed legacy mechanicalModel on the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d). OpenFOAM.com v2512's;
-# OpenFOAM.org 9 agrees to 2e-9. foam-extend is not compared, as below
-REF_D_MAX=0.00015702498751748
-REF_D_MEAN=7.86486280639836e-05
+# With the leastSquares gradient; pointCellsLeastSquares gave a max of
+# 0.00015702498751748 before
+REF_D_MAX=0.00015475202367676
+REF_D_MEAN=7.75003213379894e-05
 
 run_reference_comparison() {
-    # Not on foam-extend, where the framework and the legacy model differed by
-    # 0.6 % in D, and the framework's answer is the one kept. They matched to
-    # 1e-13 for two correctors and part of the third, and differed only in the
-    # stress on the three symmetryPlane patches. The framework corrects the
-    # stress's boundary conditions after evaluating it; the legacy law did not.
-    # On foam-extend's symmetryPlane that correction replaces the law's
-    # boundary value with the symmetry transform of the adjacent cell's
-    # stress, which has zero shear traction on the plane, as symmetry
-    # requires. Correcting the legacy stress too reproduced the framework's
-    # answer to 2e-8.
-    #
-    # The transform was checked because older OpenFOAM versions were thought to
-    # get it wrong for tensors: 0.5*(x + transform(I - 2nn, x)) matches a
-    # hand-written reference to 4e-16 for symmTensor and tensor, with zero shear
-    # traction and all other components kept, on v1912-v2606, OpenFOAM.org 8-13
-    # and foam-extend 4.1 and 5.0. So the legacy answer there is the one known
-    # to be wrong, and there is nothing to hold the framework to
+    # Not on foam-extend, whose symmetryPlane treatment gives a different
+    # answer: 2.03e-4 against 2.39e-4 in the max epsilonEq, 4.44e7 against
+    # 5.23e7 in the max sigmaEq, with the same gradient scheme
     if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-        echo "SKIP: reference comparison (known foam-extend symmetryPlane difference)"
+        echo "SKIP: reference comparison (foam-extend symmetryPlane difference)"
         return 0
     fi
 
@@ -170,9 +148,7 @@ run_reference_comparison() {
     done
 
     # Write enough digits for the comparison to be about the solution rather
-    # than about the file format. At the default six significant figures the
-    # two differ by around 3e-6 simply because that is the last digit written,
-    # which would tell us nothing
+    # than about the file format
     if grep -q "^writePrecision" "${dir}/system/controlDict"; then
         "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
             "${dir}/system/controlDict"
@@ -211,7 +187,7 @@ run_reference_comparison() {
     fi
 
     solids4Foam::checkFieldNorms "D at t = ${t}" "${dir}/${t}/D" \
-        "${REF_D_MAX}" "${REF_D_MEAN}" "${FRAMEWORK_D_REL_TOL}"
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 # ------------------------------------------------------------

@@ -109,9 +109,8 @@ The tutorial case is located at
 `solids4foam/tutorials/solids/elastoplasticity/pipeCrush`. The case can be run
 using the included `Allrun` script, i.e. `> ./Allrun`.
 
-The `Allrun` script first adjusts the gradient scheme for the selected
-OpenFOAM variant when required. It then creates the mesh using `blockMesh` and
-runs the `solids4Foam` solver.
+The `Allrun` script creates the mesh using `blockMesh` and runs the
+`solids4Foam` solver.
 
 ---
 

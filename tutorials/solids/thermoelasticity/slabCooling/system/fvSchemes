@@ -29,7 +29,10 @@ ddtSchemes
 
 gradSchemes
 {
-    default                pointCellsLeastSquares;
+    // leastSquaresS4f is not used here: it does not correct the normal
+    // component of the boundary gradient, on which the traction condition
+    // of this solid model depends
+    default                leastSquares;
 }
 
 divSchemes

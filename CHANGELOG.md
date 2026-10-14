@@ -277,6 +277,22 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
+  `leastSquaresS4f`, which is implemented in solids4foam and so is the same
+  scheme in all OpenFOAM variants. The case conversion script no longer
+  replaces `pointCellsLeastSquares` with `leastSquares` on foam-extend, which
+  made foam-extend solve a different discretisation from OpenFOAM.com and
+  OpenFOAM.org in those tutorials (#549). A user case that still uses
+  `pointCellsLeastSquares` should switch to `leastSquaresS4f` to run on
+  foam-extend. The regression references of these tutorials were re-recorded,
+  and `blockPunch` now compares the cell displacement field rather than the
+  point-A displacement, which depends on the fork's volume-to-point
+  interpolation. The thermal and poroelastic tutorials (`hotCylinder`,
+  `hotSphere`, `slabCooling`, `rodAndSeabed`, `stripFooting`,
+  `suctionCaission`) use `leastSquares` instead, as `leastSquaresS4f` does
+  not correct the normal component of the boundary gradient on which the
+  traction condition of these solid models depends, and the tutorials that run
+  only on foam-extend keep `leastSquares`, which they used before.
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes

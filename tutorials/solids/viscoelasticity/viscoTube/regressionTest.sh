@@ -27,16 +27,16 @@ EPS_MAX=1e-3
 SIGMA_MIN=1e6
 SIGMA_MAX=1e8
 
-# The final extrema, logged to fourteen figures. The framework matched the
-# removed legacy mechanicalModel's to the eight digits compared, on every fork
-# (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's, the same as
-# OpenFOAM.org 9's; foam-extend 4.1 gives both 1.9e-3 larger, and the
-# tolerance, 3e-3 relative, covers that. The Maxwell arms are history, so a
-# relaxation error accumulates over the run and shows here in a way the unit
-# checks, which compare two trial states from one rest state, cannot see
-REF_EPS=0.00019987366
-REF_SIG=11480085
-REF_REL_TOL=3e-3
+# The final extrema, logged to fourteen figures, with the leastSquaresS4f
+# gradient, which is the same scheme on every fork. These are
+# OpenFOAM.com v2412's, the same as OpenFOAM.org 9's; foam-extend 4.1 gives
+# both 5e-6 larger, and the tolerance, 1e-4 relative, covers that. The Maxwell
+# arms are history, so a relaxation error accumulates over the run and shows
+# here in a way the unit checks, which compare two trial states from one rest
+# state, cannot see
+REF_EPS=0.00020239282
+REF_SIG=11623597
+REF_REL_TOL=1e-4
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
