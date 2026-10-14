@@ -17,6 +17,8 @@ License
 
 \*----------------------------------------------------------------------------*/
 
+#ifdef OPENFOAM_COM
+
 #include "fsiSteadyStateControl.H"
 #include "addToRunTimeSelectionTable.H"
 #include "pointFields.H"
@@ -492,5 +494,7 @@ bool Foam::fsiSteadyStateControl::write()
     return true;
 }
 #endif
+
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

@@ -1091,11 +1091,19 @@ void newtonIcoFluid::packSolution(Vec x)
 
 void newtonIcoFluid::relaxVelocityEqn(fvVectorMatrix& UEqn) const
 {
-    scalar alpha = 0.0;
-    if (!mesh().relaxEquation("U", alpha))
+#ifdef FOAMEXTEND
+    const Foam::solution& sol = mesh().solutionDict();
+#else
+    const Foam::solution& sol = mesh();
+#endif
+
+    if (!sol.relaxEquation("U"))
     {
         return;
     }
+
+    const scalar alpha = sol.equationRelaxationFactor("U");
+
     if (alpha <= 0.0 || alpha >= 1.0 - SMALL)
     {
         return;
