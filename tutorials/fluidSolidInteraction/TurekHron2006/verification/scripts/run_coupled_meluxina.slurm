@@ -13,8 +13,14 @@
 # end time sets stopAt writeNow, so that the segment ends on a complete write
 # (restart yes: D_0_0, D_0_0_0, DD_0_0, A and U are written, PR #562). A segment that
 # finds the case at endTime exits at once.
+# With SETUP="<fluid level> <solid level> <ranks> [ht_coupled.py args]" a missing case is first
+# built with setup_meluxina_case.sh (modules are only available inside jobs).
 source /project/home/p201136/philip-ht/env-ht8.sh
 case=$(readlink -f "$1"); margin=${2:-40}
+if [ ! -d "$case" ] && [ -n "$SETUP" ]; then
+    mkdir -p "$(dirname "$case")"; cd "$(dirname "$case")"
+    bash /project/home/p201136/philip-ht/setup_meluxina_case.sh "$case" $SETUP > "setup_$(basename "$case").log" 2>&1 || exit 1
+fi
 cd "$case" || exit 1
 n=$(awk '$1=="cores"{print $2}' coupled_setup.txt)
 end=$(awk '$1=="endTime"{gsub(";","",$2); print $2}' system/controlDict)

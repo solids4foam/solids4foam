@@ -7,11 +7,13 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --time=48:00:00
 # Platform control and restart check on one MeluXina node (production build 769640289):
-#   <dir>/ctl_1x  coupled 1x'/s2x, cold 0-6 s, writes every 0.25 s kept (purgeWrite 0)
-#   <dir>/ctl_2x  coupled 2x'/s4x, cold 0-6 s
-#   <dir>/rst_r4.5   restart of ctl_1x from its 4.5 s write, run to 5.0 s (writes 4.75, 5.0)
+#   <dir>/ctl_1x  coupled 1x'/s2x, cold 0-6 s (rank count of the xenosim run)
+#   <dir>/ctl_2x  coupled 2x'/s4x, cold 0-6 s (rank count of the xenosim run)
+#   <dir>/rst_1x  coupled 1x'/s2x, cold 0-5 s, writes every 0.25 s kept (purgeWrite 0): the
+#                 continuous run of the restart check
+#   <dir>/rst_r4.5   restart of rst_1x from its 4.5 s write, run to 5.0 s (writes 4.75, 5.0)
 #   <dir>/rst_r4.75  restart of rst_r4.5 from its 4.75 s write (a restart of a restart), to 5.0 s
-# The restarts use the same rank count as ctl_1x and branch as soon as the parent has written.
+# The restarts use the rank count of rst_1x and branch as soon as the parent has written.
 #   sbatch -J ht_ctl -o <dir>/slurm-%j.out run_control_meluxina.slurm <dir> [extra case ...]
 # Extra cases (ht_coupled.py dirs) run concurrently to their endTime.
 source /project/home/p201136/philip-ht/env-ht8.sh
@@ -36,10 +38,10 @@ branch() {  # branch <parent> <time> <new case> <endTime>
     sed -i "s/^endTime .*/endTime         $e;/; s/^purgeWrite .*/purgeWrite      0;/" "$c/system/controlDict"
     echo "branched from $p at $t $(date -Is)" > "$c/run.out"
 }
-start "$dir/ctl_1x"; start "$dir/ctl_2x"
+start "$dir/rst_1x"; start "$dir/ctl_1x"; start "$dir/ctl_2x"
 for c in "$@"; do start "$(readlink -f "$c")"; done
-if waitfor "$dir/ctl_1x" 4.5005; then
-    branch "$dir/ctl_1x" 4.5 "$dir/rst_r4.5" 5; start "$dir/rst_r4.5"
+if waitfor "$dir/rst_1x" 4.5005; then
+    branch "$dir/rst_1x" 4.5 "$dir/rst_r4.5" 5; start "$dir/rst_r4.5"
     if waitfor "$dir/rst_r4.5" 4.7505; then
         branch "$dir/rst_r4.5" 4.75 "$dir/rst_r4.75" 5; start "$dir/rst_r4.75"
     fi
