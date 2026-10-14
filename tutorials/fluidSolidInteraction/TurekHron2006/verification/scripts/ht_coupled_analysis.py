@@ -122,9 +122,17 @@ def window_values(h: dict, bounds: np.ndarray) -> dict:
 
 
 def coupling(case: Path, t0: float, t1: float, n_outer: int) -> dict:
-    res = case / "postProcessing/fsiResiduals.dat"
+    # a restarted run rewrites fsiResiduals.dat; the segment runner keeps the earlier
+    # file as fsiResiduals.dat.upto_<time>: read those in time order, the current file
+    # last, so that a step repeated after a restart takes its latest value
+    pp = case / "postProcessing"
+    files = sorted(pp.glob("fsiResiduals.dat.upto_*"), key=lambda f: float(f.name.split("upto_")[1]))
+    lines = []
+    for res in files + [pp / "fsiResiduals.dat"]:
+        if res.is_file():
+            lines += res.read_text().splitlines()[1:]
     last = {}
-    for line in res.read_text().splitlines()[1:]:
+    for line in lines:
         p = line.split()
         if len(p) >= 3:
             try:

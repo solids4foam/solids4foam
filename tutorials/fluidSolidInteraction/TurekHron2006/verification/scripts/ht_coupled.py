@@ -103,6 +103,9 @@ def main() -> int:
     ap.add_argument("--delta-t", type=float, required=True)
     ap.add_argument("--end", type=float, default=7.0)
     ap.add_argument("--write-every", type=float, default=0.25, help="checkpoint interval (s)")
+    ap.add_argument("--purge-write", type=int, default=3, help="purgeWrite (0 keeps every write)")
+    ap.add_argument("--coupling-start", type=float, default=2.0,
+                    help="couplingStartTime (2.0 = the FSI3 protocol; other values for timing runs only)")
     ap.add_argument("--fsi-tol", type=float, default=1e-5)
     ap.add_argument("--n-outer", type=int, default=30)
     ap.add_argument("--no-allow-unconverged", dest="allow_unconverged", action="store_false",
@@ -189,7 +192,7 @@ def main() -> int:
     def fsi(t: str) -> str:
         t = sub1(t, r"^(\s*outerCorrTolerance\s+)[^;]*;", rf"\g<1>{a.fsi_tol:g};", "fsi tol", regex=True)
         t = sub1(t, r"^(\s*nOuterCorr\s+)[^;]*;", rf"\g<1>{a.n_outer};", "nOuterCorr", regex=True)
-        t = sub1(t, r"^(\s*couplingStartTime\s+)[^;]*;", r"\g<1>2.0;", "couplingStartTime", regex=True)
+        t = sub1(t, r"^(\s*couplingStartTime\s+)[^;]*;", rf"\g<1>{a.coupling_start:g};", "couplingStartTime", regex=True)
         return sub1(t, r"^(\s*writeResidualsToFile\s+yes;)",
                     r"\1\n\n    // Strict convergence test (issue #552): both residual measures\n"
                     r"    requireAllResidualMeasures yes;"
@@ -208,7 +211,7 @@ def main() -> int:
         t = sub1(t, r"^deltaT .*$", f"deltaT          {a.delta_t:g};", "deltaT", regex=True)
         t = sub1(t, r"^endTime .*$", f"endTime         {a.end:g};", "endTime", regex=True)
         t = sub1(t, r"^writeInterval .*$", f"writeInterval   {nwrite};", "writeInterval", regex=True)
-        t = sub1(t, r"^purgeWrite .*$", "purgeWrite      3;", "purgeWrite", regex=True)
+        t = sub1(t, r"^purgeWrite .*$", f"purgeWrite      {a.purge_write};", "purgeWrite", regex=True)
         t = sub1(t, r"^writeFormat .*$", "writeFormat     binary;", "writeFormat", regex=True)
         t = sub1(t, r"^writePrecision .*$", "writePrecision  12;", "writePrecision", regex=True)
         return sub1(t, r"^timePrecision .*$", "timePrecision   8;", "timePrecision", regex=True)
