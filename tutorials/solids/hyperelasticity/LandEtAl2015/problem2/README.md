@@ -13,6 +13,8 @@ sort: 5
 - Show two solution approaches available in solids4foam:
   - PETSc SNES (default), as used in [1].
   - Block-coupled pressure-displacement (foam-extend), as used in [2].
+- Verify the `isotropicFungElastic` law against the equivalent isotropic
+  Guccione law.
 
 ---
 
@@ -24,7 +26,7 @@ ventricle under an internal endocardial pressure that ramps linearly from
 nearly-incompressible Guccione passive law; for the pressure-displacement
 approach, an isotropic Guccione form is used (`cf = ct = cfs = 1`).
 
-Two solution approaches are provided:
+Three options are provided:
 
 - `petsc` (default): solved with the
   `nonLinearGeometryTotalLagrangianTotalDisplacement` solid model and the
@@ -35,6 +37,10 @@ Two solution approaches are provided:
   `coupledPressureDisplacementSolid` block-coupled solid model on a
   symmetric (one-quarter) tetrahedral mesh imported from a Fluent `.msh`
   file.
+- `isotropicFung`: the `petsc` case with the material described by the
+  `isotropicFungElastic` law instead, with `c = 10 kPa` and `a = 1`. With
+  `c = k` and `a = cf = ct = cfs` the two laws are identical, so this option
+  should reproduce the `petsc` results.
 
 ---
 
@@ -49,20 +55,28 @@ can be run using the included `Allrun` script:
 ```
 
 The default option uses the PETSc SNES approach. The script also supports
-the pressure-displacement solution option:
+the pressure-displacement solution option and the `isotropicFungElastic`
+material option:
 
 ```bash
 ./Allrun petsc
 ./Allrun pressureDisplacement
+./Allrun isotropicFung
 ```
 
-The default `petsc` case requires OpenFOAM.com with PETSc enabled. The
-`pressureDisplacement` option is foam-extend-only.
+The default `petsc` case and the `isotropicFung` option require OpenFOAM.com
+with PETSc enabled. The `pressureDisplacement` option is foam-extend-only.
 
 The default approach can also be run in parallel using:
 
 ```bash
 ./Allrun parallel
+```
+
+and the `isotropicFung` option using:
+
+```bash
+./Allrun isotropicFung parallel
 ```
 
 ## Verification and Convergence Study

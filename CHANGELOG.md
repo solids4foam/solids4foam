@@ -81,6 +81,17 @@ release. For complete commit-level details and contributor information, see the
   contact penalty models, the cohesive zone models and `elasticWallPressure`
   all depend on, and `cantilever2d`'s `unsCoupled` case is the first
   regression coverage of `coupledUnsLinearGeometryLinearElastic`.
+- The `isotropicFungElastic` mechanical constitutive law: an isotropic
+  Fung-type exponential hyperelastic law for soft tissue,
+  `W = 0.5*c*(exp(a*tr(Ebar & Ebar)) - 1)` on the isochoric strain plus a
+  volumetric penalty, with no fibre direction. It is identical to
+  `GuccioneElastic` with `k = c` and `cf = ct = cfs = a`. The
+  `LandEtAl2015/problem2` tutorial runs it with `./Allrun isotropicFung`,
+  which reproduces the default Guccione case, and it is in the
+  `mechanicalConstitutiveLawChecks` law checks. It is not the removed legacy
+  law of the same name, which was the Demiray law, whose exponent is linear
+  in strain: a legacy dictionary, with `c1` and `c2`, stops with an error
+  rather than being read as this law (#457).
 - `cantilever2d` regression cases for `vertexCentredLinearGeometry`, which no
   regression case ran before, on the PETSc SNES path and a short run of the
   explicit path, which no tutorial exercises.
