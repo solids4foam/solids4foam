@@ -1476,13 +1476,10 @@ renamed the tutorial to `TurekHron2006`, and the verification tree moved with it
 
 ### STATUS
 
-All runs of the plan are complete except one cross run requested by Astra's final review:
-xenosim job 10992, fluid 2x' with solid 8x, dt 5e-4, tol 1e-5, 0 to 6 s
-(`~/ht_prod/work/c_2x_s8x_dt5e-4_tol1e-5`, 16 ranks). It separates the solid and fluid
-parts of the 2x'/s4x to 4x'/s8x change. To finish: run
-`ht_coupled_analysis.py` with `--case 2x_s8x_dt5e-4=c_2x_s8x_dt5e-4_tol1e-5` added to the
-command in "Reproduce" below, and compare with 2x_dt5e-4 (solid effect) and 4x_dt5e-4
-(fluid effect). Run directories: `~/ht_prod/work` (xenosim, coupled and replay cases),
+All runs of the plan are complete, including the cross run requested by Astra's final
+review (xenosim job 10992, fluid 2x' with solid 8x, dt 5e-4, tol 1e-5, 0 to 6 s,
+`~/ht_prod/work/c_2x_s8x_dt5e-4_tol1e-5`; results under "Solid and fluid shares" below and
+in `reference/production/cross_run.{csv,json}`). Run directories: `~/ht_prod/work` (xenosim, coupled and replay cases),
 `~/ht_prod/mlx_results` (8x' replay data copied from
 `/project/home/p201136/philip-ht/rb_8x_fastp_mlx` on MeluXina), `~/ht_prod/ref` (exports);
 failed and aborted runs are kept in `~/ht_prod/work/failed`, `floor`, `timing*`.
@@ -1693,6 +1690,9 @@ Reading:
   observed orders 1.60 and 1.12 along the joint fluid-solid path. Conditional on a single
   power law (r = 2, Fs = 1.25): f -> 5.461 Hz, GCI 0.27%; lift amplitude -> 156.6 N/m, GCI
   6.1%. These are provisional; three monotone points do not establish the asymptotic range.
+  The cross run below shows that the lift-amplitude change is mostly solid-driven and the
+  solid is not converged for it, so the lift-amplitude extrapolation is **withdrawn**; the
+  frequency value stays provisional.
 - **Drag and lift means** change by +0.09 and +0.36 N/m from 2x' to 4x', of the size of
   their temporal and coupling sensitivities: converged at that level, order not quoted.
   The drag amplitude is non-monotone (+1.61, -0.57 N/m).
@@ -1701,6 +1701,25 @@ Reading:
   prescribes one trajectory; it does not show how the coupled response reacts to that
   correction, and no coupled 8x' level exists. W rising from 0.04 to 0.08 J/m at fixed
   motion shows that the energy transfer is still sensitive at fine levels.
+- **Solid and fluid shares (cross run, 2x'/s8x).** Same window (five periods ending at
+  6.0 s), `reference/production/cross_run.csv`. Change from 2x'/s4x to 4x'/s8x, split into
+  the solid part (s4x to s8x at fluid 2x') and the fluid part (2x' to 4x' at solid 8x):
+
+  | quantity | 2x'/s4x | 2x'/s8x | 4x'/s8x | total | solid | fluid |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | lift amplitude (N/m) | 174.41 | 169.10 | 164.93 | -9.49 | -5.31 | -4.17 |
+  | frequency (Hz) | 5.4969 | 5.4886 | 5.4728 | -0.0241 | -0.0083 | -0.0158 |
+  | drag amplitude (N/m) | 30.367 | 29.968 | 29.789 | -0.578 | -0.399 | -0.179 |
+  | u_y amplitude (mm) | 36.173 | 36.218 | 36.122 | -0.051 | +0.045 | -0.096 |
+  | u_x (max+min)/2 (mm) | -3.0818 | -3.0844 | -3.0687 | +0.013 | -0.003 | +0.016 |
+
+  The force amplitudes are dominated by the solid: s4x to s8x alone moves the lift
+  amplitude by -3.0% and the drag amplitude by -1.3%, so they are not converged in the
+  solid, and no single joint-path order or extrapolation is valid for them. The frequency
+  change is two-thirds fluid. Both shares of the displacement changes are of the size of
+  the time and coupling sensitivities (u_y amplitude 0.016 and 0.019 mm), consistent with
+  displacements converged to that level. Coupling: 10.7 iterations per step, no step at the
+  iteration cap.
 - **Featflow** (compared only now that the sequence is characterised; Featflow itself is
   uncertain by 3-5%): at 4x' u_y amplitude +3.2%, u_x (max+min)/2 +6.6%, u_x amplitude
   +6.7%, f +0.2%, drag (max+min)/2 +0.2%, drag amplitude +7%, lift (max+min)/2 2.54 against
@@ -1759,4 +1778,5 @@ python3 scripts/ht_coupled_plot.py coupled.json coupled_sequence.png
 About 4 900 core-hours so far: MeluXina 1 860 (8x' replay and a 15-minute 4x' control),
 xenosim 3 030 (coupled 2 210, 8x' xenosim start 200, 4x' replay time check 250, pilots,
 timing and aborted starts about 110, plus the cancelled 1x' dt 2.5e-4, 45). The cross run
-adds about 600 (projected), for about 5 500 in total, within the approved 6 000.
+added about 420 (26.2 h on 16 ranks), for about 5 340 in total, within the approved
+6 000.
