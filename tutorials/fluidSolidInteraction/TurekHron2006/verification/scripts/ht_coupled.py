@@ -114,6 +114,9 @@ def main() -> int:
     ap.add_argument("--p-solver", choices=("dic", "gs"), default="dic")
     ap.add_argument("--solid-rtol", type=float, default=1e-9, help="PETSc snes_rtol (tutorial 1e-6)")
     ap.add_argument("--solid-stol", type=float, default=1e-12, help="PETSc snes_stol (tutorial 1e-6)")
+    ap.add_argument("--solid-pc", choices=("lu", "hypre"), default="lu",
+                    help="solid PETSc preconditioner: bjacobi/LU (tutorial) or hypre BoomerAMG "
+                         "(the tutorial's commented settings); tolerances unchanged")
     ap.add_argument("--cores", type=int, default=1)
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
@@ -182,7 +185,13 @@ def main() -> int:
     # sets a floor of the interface residual)
     def solid(t: str) -> str:
         t = sub1(t, 'snes_rtol "1e-6";', f'snes_rtol "{a.solid_rtol:g}";', "snes_rtol")
-        return sub1(t, 'snes_stol "1e-6";', f'snes_stol "{a.solid_stol:g}";', "snes_stol")
+        t = sub1(t, 'snes_stol "1e-6";', f'snes_stol "{a.solid_stol:g}";', "snes_stol")
+        if a.solid_pc == "hypre":
+            t = sub1(t, "            pc_type bjacobi;\n            sub_pc_type lu;\n", "", "solid pc")
+            t, n = re.subn(r"(?m)^(\s*)// (pc_type hypre;|pc_hypre_\w+ [^;]*;)$", r"\1\2", t)
+            if n != 13:
+                raise SystemExit(f"solid fvSolution: expected 13 hypre lines, found {n}")
+        return t
     edit(case / "system/solid/fvSolution", solid)
     # Write the old-time solid fields so that a checkpoint restart is exact
     edit(case / "constant/solid/solidProperties",

@@ -26,6 +26,6 @@ PY
 fi
 n=$(awk '$1=="cores"{print $2}' "$c/coupled_setup.txt")
 echo "branched from $p at $t (pc ${pc:-unchanged}) $(date -Is); step of job $jobid n=$n" > "$c/run.out"
-cd "$c" && nohup srun --jobid="$jobid" --exact -n "$n" --cpu-bind=cores bash -lc \
+cd "$c" && setsid nohup srun --jobid="$jobid" --exact -n "$n" --cpu-bind=cores bash -lc \
     "source /project/home/p201136/philip-ht/env-ht8.sh; exec solids4Foam -parallel" \
     > log.solids4Foam.step 2>&1 &
