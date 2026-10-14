@@ -1032,6 +1032,10 @@ public:
                 return twoDCorrector_;
             }
 
+            //- Apply the 2-D point correction to the given points, unless
+            //  this processor holds no points of this region
+            void twoDCorrectPoints(vectorField& points) const;
+
             //- Is the model two-dimensional
             const bool& twoD() const
             {
