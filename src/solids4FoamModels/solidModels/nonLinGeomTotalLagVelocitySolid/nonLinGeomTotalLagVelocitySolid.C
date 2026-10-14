@@ -187,7 +187,9 @@ void nonLinGeomTotalLagVelocitySolid::makeVelocityMomentumStabilisationCoeff()
     }
 
     surfaceScalarField cSqrtRho(sqrt(impKf_*fvc::interpolate(rho())));
+#ifdef OPENFOAM_COM
     cSqrtRho.setOriented(false);
+#endif
 
     velocityMomentumStabilisationCoeffPtr_.set
     (
@@ -204,7 +206,9 @@ void nonLinGeomTotalLagVelocitySolid::makeVelocityMomentumStabilisationCoeff()
             cSqrtRho/mesh().deltaCoeffs()
         )
     );
+#ifdef OPENFOAM_COM
     velocityMomentumStabilisationCoeffPtr_().setOriented(false);
+#endif
 }
 
 
