@@ -876,7 +876,7 @@ bool vertexCentredLinGeomSolid::evolveExplicit()
 
     if (solidModel::twoD())
     {
-        solidModel::twoDCorrector().correctPoints(pointD());
+        solidModel::twoDCorrectPoints(pointD());
 
         // Remove displacement in the empty directions
         forAll(mesh().geometricD(), dirI)
