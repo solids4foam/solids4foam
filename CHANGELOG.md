@@ -666,6 +666,16 @@ release. For complete commit-level details and contributor information, see the
   be restarted with OpenFOAM.com (#409). The condition read its nonuniform
   `value` a second time, which fails once the base class has read it, and
   rejected the old-time fields, such as `D_0`, read on restart.
+- The thermal stress of `thermoMechanicalLaw` is now correct in plane stress
+  (#137): it was `(1 + 2*nu)/(1 + nu)` times too large, about 23% for
+  `nu = 0.3`, because it used the sub-law's bulk modulus, which is modified in
+  plane stress for the mechanical stress. A new `thermalKappa()` gives the
+  bulk modulus for the thermal stress, `E/(3*(1 - nu))` in plane stress, in
+  `linearElastic`, `linearElasticMohrCoulombPlastic` and
+  `viscousHookeanElastic`. Plane strain, axisymmetric and 3-D results are
+  unchanged. The new `heatedPlatePlaneStress` tutorial checks the
+  displacement of a free plate and the stress of a clamped one against the
+  analytical solution.
 
 ## [v2.4] - 2026-08-24
 

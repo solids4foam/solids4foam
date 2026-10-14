@@ -233,6 +233,18 @@ public:
             return dimensionedScalar("kappa", dimPressure, 0.0);
         }
 
+        //- Return the bulk modulus K that scales the thermal stress,
+        //  3*K*alpha*(T - T0), of a thermal expansion alpha*(T - T0).
+        //  This is kappa() except in plane stress, where a law that offers a
+        //  plane stress reduction modifies lambda (and so kappa) to keep the
+        //  in-plane mechanical stress exact: the thermal term then needs
+        //  K = E/(3*(1 - nu)) instead, which no modified kappa gives
+        //  Default: kappa()
+        virtual dimensionedScalar thermalKappa() const
+        {
+            return kappa();
+        }
+
     // Edit
 
         //- Declare the state fields this law uses.

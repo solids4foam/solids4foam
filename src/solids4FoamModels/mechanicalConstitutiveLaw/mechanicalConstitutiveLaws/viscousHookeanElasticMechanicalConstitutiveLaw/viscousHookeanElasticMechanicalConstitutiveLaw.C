@@ -96,7 +96,8 @@ viscousHookeanElasticMechanicalConstitutiveLaw
     ),
     lambda_("lambda", dimPressure, 0.0),
     mu_("mu", dimPressure, 0.0),
-    kappa_("kappa", dimPressure, 0.0)
+    kappa_("kappa", dimPressure, 0.0),
+    thermalKappa_("thermalKappa", dimPressure, 0.0)
 {
     if (EInf_.dimensions() != dimPressure)
     {
@@ -190,6 +191,18 @@ viscousHookeanElasticMechanicalConstitutiveLaw
     }
 
     kappa_ = lambda_ + (2.0/3.0)*gammaInf_*mu_;
+
+    // The thermal stress needs the true plane stress (long-term) bulk
+    // modulus: the modified kappa above would overstate it by
+    // (1 + 2*nu)/(1 + nu)
+    if (planeStress)
+    {
+        thermalKappa_ = EInf_/(3.0*(1.0 - nu_));
+    }
+    else
+    {
+        thermalKappa_ = kappa_;
+    }
 }
 
 

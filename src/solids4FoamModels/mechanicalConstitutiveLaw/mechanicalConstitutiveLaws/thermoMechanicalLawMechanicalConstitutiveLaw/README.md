@@ -34,6 +34,14 @@ coefficient, `T` the temperature and `T0` the stress-free reference
 temperature. `K` is taken as a single value for the material, so the sub-law
 must provide a bulk modulus; for a plastic sub-law it is the elastic one.
 
+In plane stress (`planeStress yes;`), `K` is `E/(3*(1 - nu))` rather than the
+modified bulk modulus the sub-law uses for its mechanical stress, so the
+in-plane thermal stress is `E*alpha*(T - T0)/(1 - nu)`. The sub-laws with a
+plane stress reduction (`linearElastic`, `linearElasticMohrCoulombPlastic`
+and `viscousHookeanElastic`) provide it. The out-of-plane stress and strain
+are not post-processed in plane stress and should be ignored: they are not
+the zero stress and the free out-of-plane strain.
+
 The density and the bulk modulus are those of the sub-law. `rho` given on
 this law is passed down to the sub-law when its own dictionary has none, so
 it can be given once, on the outer dictionary.

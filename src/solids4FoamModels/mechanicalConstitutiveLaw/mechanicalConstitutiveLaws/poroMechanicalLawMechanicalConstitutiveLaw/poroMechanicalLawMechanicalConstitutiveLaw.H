@@ -139,6 +139,12 @@ public:
             return subLawPtr_->kappa();
         }
 
+        //- And the bulk modulus that scales a thermal stress
+        virtual dimensionedScalar thermalKappa() const override
+        {
+            return subLawPtr_->thermalKappa();
+        }
+
         //- The pore pressure, gathered on every evaluation
         //- This law seeds its effective stress from the stress already
         //  standing at its points, so it needs that as an input

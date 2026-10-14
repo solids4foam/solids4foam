@@ -52,6 +52,7 @@ linearElasticMechanicalConstitutiveLaw
     lambda_("lambda", E_.dimensions(), 0.0),
     mu_("mu", E_.dimensions(), 0.0),
     kappa_("kappa", E_.dimensions(), 0.0),
+    thermalKappa_("thermalKappa", E_.dimensions(), 0.0),
     sigma0_(symmTensor::zero),
     sigma0FromDict_(false)
 {
@@ -143,6 +144,17 @@ linearElasticMechanicalConstitutiveLaw
     // Note: for the three-dimensional case, this is equivalent to
     // E/(3*(1 - 2*nu))
     kappa_ = lambda_ + (2.0/3.0)*mu_;
+
+    // The thermal stress needs the true plane stress bulk modulus: the
+    // modified kappa above would overstate it by (1 + 2*nu)/(1 + nu)
+    if (planeStress)
+    {
+        thermalKappa_ = E_/(3.0*(1.0 - nu_));
+    }
+    else
+    {
+        thermalKappa_ = kappa_;
+    }
 
     // A uniform initial stress may be given here; a case that needs one that
     // varies in space supplies a sigma0 field instead, which the manager reads
