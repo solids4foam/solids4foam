@@ -301,7 +301,8 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
                     tracPatch.tractionRateHistory().old();
 
                 const scalar deltaT = mesh.time().deltaTValue();
-                tracRate = (3.0*trac - 4*tracOld + tracOldOld)/deltaT;
+                // Second-order backward difference of the traction
+                tracRate = (3.0*trac - 4*tracOld + tracOldOld)/(2.0*deltaT);
 
                 const vectorField tracFuture
                 (
