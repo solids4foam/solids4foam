@@ -18,7 +18,9 @@ fi
 rm -rf case.foam residuals deflection.pdf postProcessing dynamicCode
 (cd src && wclean libso)
 
-# Restore the default variants that Allrun relinks
+# Restore the default (partitioned) variant and the default links that Allrun
+# relinks
+solids4Foam::restoreCaseVariant .
 ln -nsf fsiProperties.iqnils constant/fsiProperties
 ln -nsf solidProperties.highOrder constant/solid/solidProperties
 
