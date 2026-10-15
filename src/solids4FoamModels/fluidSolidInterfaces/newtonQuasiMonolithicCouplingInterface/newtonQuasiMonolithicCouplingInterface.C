@@ -2003,7 +2003,9 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     fluid().p().storeOldTime();
     solid().U().storeOldTime();
     solid().U().oldTime().storeOldTime();
-    solid().D().storeOldTime();
+    // The solid needs D and its old-time and old-old-time values; allocate
+    // them without shifting a history that was read on a restart
+    solid().D().oldTime().oldTime();
     motionSolid().D().storeOldTime();
     solid().sigma().storeOldTime();
 }
@@ -2204,8 +2206,11 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         D.correctBoundaryConditions();
         DMotion.correctBoundaryConditions();
 
-        //    (a) Explicitly update the solid displacement field D[n]:
+        //    (a) Explicitly predict the solid displacement field D[n], which
+        //        moves the fluid mesh:
         //          D[n] = D[n-1] + (3*dt/2)*USolid[n-1] - (dt/2)*USolid[n-2]
+        //        After the solve, the solid sets D[n] from the converged
+        //        velocity with the backward scheme
         D = D.oldTime()
           + (3.0*deltaT/2.0)*USolid.oldTime()
           - (deltaT/2.0)*USolid.oldTime().oldTime();
@@ -2442,6 +2447,13 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     }
     reportInterfaceFluxDiagnostics();
     updateInterfaceMeshPhiHistory();
+
+    // Set the solid displacement from the converged velocity: during the
+    // solve, D held the predicted displacement that moved the fluid mesh
+    refCast<solidModels::nonLinGeomTotalLagVelocitySolid>
+    (
+        solid()
+    ).updateDisplacement();
 
     return true;
 }

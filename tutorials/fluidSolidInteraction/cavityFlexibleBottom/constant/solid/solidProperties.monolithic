@@ -23,9 +23,6 @@ nonLinearGeometryTotalLagrangianVelocityCoeffs
     // Velocity-proportional damping, which vanishes at steady state
     dampingCoeff [0 0 -1 0 0 0 0] 0.1;
 
-    // Disable temporal extrapolation of traction boundaries
-    extrapolateTractionBoundaries no;
-
     stabilisation
     {
         momentum

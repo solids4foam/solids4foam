@@ -27,10 +27,10 @@ REF_DISP_END=0.117303
 REF_FORCE_END=15.8338
 
 # Reference values for the quasi-monolithic Newton coupling, which needs
-# OpenFOAM.com and PETSc: OpenFOAM v2512, serial, macOS. Its solid time
-# integration differs from the partitioned solid model, so it agrees with the
-# partitioned references above to 1.3% at t = 1 s and to 0.8% at the end time
-MONO_REF_DISP_T1=0.0558181
+# OpenFOAM.com and PETSc: OpenFOAM v2512, serial, macOS. They agree with the
+# partitioned references above to 0.15% at t = 1 s and to 0.8% at the end
+# time
+MONO_REF_DISP_T1=0.0566372
 MONO_REF_DISP_END=0.116404
 MONO_REF_FORCE_END=15.9150
 
