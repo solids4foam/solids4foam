@@ -824,7 +824,10 @@ function solids4Foam::selectCaseVariant()
 
             echo "Using ${FILE##*/} for ${BASE#"${CASE_DIR}"/}"
             ln -nsf "${FILE##*/}" "${BASE}"
-            echo "${BASE}" >> "${RECORD}"
+
+            # Record the path relative to the case, so that the case can be
+            # restored from any directory, or after it has been copied
+            echo "${BASE#"${CASE_DIR}"/}" >> "${RECORD}"
         done < <(find "${DIR}" -name "*.${VARIANT}" -print0)
     done < <(
         solids4Foam::fieldDirs "${CASE_DIR}"
@@ -859,6 +862,8 @@ function solids4Foam::restoreCaseVariant()
 
     while IFS= read -r BASE
     do
+        BASE="${CASE_DIR}/${BASE}"
+
         if [[ -L ${BASE} ]]
         then
             rm -f "${BASE}"

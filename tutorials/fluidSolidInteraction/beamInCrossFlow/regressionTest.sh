@@ -184,6 +184,12 @@ prepare_case() {
         cp -a "${item}" "${case_dir}/"
     done
 
+    # Copy the record of a selected case variant too, so that the Allrun of
+    # the copy can restore the default variant
+    if [[ -f "${SCRIPT_DIR}/.solids4FoamCaseVariant" ]]; then
+        cp -a "${SCRIPT_DIR}/.solids4FoamCaseVariant" "${case_dir}/"
+    fi
+
     (
         cd "${case_dir}"
 
