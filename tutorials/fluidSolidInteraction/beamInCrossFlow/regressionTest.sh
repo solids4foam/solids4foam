@@ -364,12 +364,12 @@ REF_FINAL_FORCE=4.799864
 
 # Reference values for the quasi-monolithic Newton coupling: OpenFOAM v2512,
 # serial, macOS. Its fluid and solid set-up differs from the partitioned one,
-# and its tip displacement and force are about 4-5% higher than the
+# and its tip displacement and force are about 5-6% higher than the
 # partitioned references above; the difference persists under time-step
 # refinement and at the steady state
-MONO_REF_MAX_DISP=0.0273469
-MONO_REF_FINAL_DISP=0.0262818
-MONO_REF_FINAL_FORCE=5.00288
+MONO_REF_MAX_DISP=0.0278002
+MONO_REF_FINAL_DISP=0.0268037
+MONO_REF_FINAL_FORCE=5.08325
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken

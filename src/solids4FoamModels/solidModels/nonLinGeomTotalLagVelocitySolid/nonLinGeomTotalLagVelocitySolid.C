@@ -374,6 +374,23 @@ bool nonLinGeomTotalLagVelocitySolid::evolveSnes()
     D().correctBoundaryConditions();
     U().correctBoundaryConditions();
 
+    // Seed the SNES solution vector from the current velocity on every time
+    // step, so that the initial velocity is not overwritten by a stale
+    // solution vector
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        U().primitiveFieldRef(),
+#else
+        U().internalField(),
+#endif
+        foamPetscSnesHelper::solution(),
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
     // Solve the nonlinear system and check the convergence
     foamPetscSnesHelper::solve();
 

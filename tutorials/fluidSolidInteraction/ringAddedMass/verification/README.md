@@ -324,7 +324,7 @@ refinement-factor-2 mesh, together with the IQN-ILS coupling and the dry ring.
 The monolithic velocity solid has the standard residual only, so every run of
 this study uses the standard solid, and the comparison is through the wet/dry
 ratio, which removes the solid error (see above). It is not part of
-`--study all`. Recorded with OpenFOAM v2512 on macOS (Apple M-series), 14
+`--study all`. Recorded with OpenFOAM v2512 on macOS (Apple M-series), 10
 serial runs at a time; the 21 runs took about 2 minutes, and the times below
 are therefore only indicative:
 
@@ -333,60 +333,72 @@ are therefore only indicative:
 | weak | IQN-ILS | 25 | 2.53346 | +0.015% | 2.70% | 3.01 | 18 |
 | weak | IQN-ILS | 50 | 2.57483 | +0.010% | 0.47% | 3.00 | 29 |
 | weak | IQN-ILS | 100 | 2.58588 | +0.004% | 0.16% | 2.98 | 51 |
-| weak | monolithic | 25 | 2.53304 | -0.001% | 2.74% | 2.00 | 23 |
-| weak | monolithic | 50 | 2.57425 | -0.012% | 0.51% | 2.00 | 44 |
-| weak | monolithic | 100 | 2.58524 | -0.021% | 0.17% | 2.00 | 83 |
+| weak | monolithic | 25 | 2.53306 | -0.000% | 2.57% | 2.00 | 23 |
+| weak | monolithic | 50 | 2.57455 | -0.000% | 0.36% | 2.00 | 46 |
+| weak | monolithic | 100 | 2.58578 | -0.000% | 0.045% | 2.00 | 86 |
 | moderate | IQN-ILS | 25 | 1.87813 | +0.075% | 3.27% | 3.57 | 25 |
 | moderate | IQN-ILS | 50 | 1.90853 | +0.056% | 0.98% | 3.92 | 44 |
-| moderate | IQN-ILS | 100 | 1.91612 | +0.018% | 0.65% | 3.98 | 74 |
-| moderate | monolithic | 25 | 1.87657 | -0.008% | 3.51% | 2.00 | 24 |
-| moderate | monolithic | 50 | 1.90619 | -0.067% | 1.18% | 2.00 | 46 |
-| moderate | monolithic | 100 | 1.91354 | -0.117% | 0.71% | 2.00 | 85 |
-| strong | IQN-ILS | 25 | 0.80042 | +0.126% | 3.77% | 3.86 | 30 |
-| strong | IQN-ILS | 50 | 0.81333 | +0.101% | 1.50% | 4.63 | 65 |
-| strong | IQN-ILS | 100 | 0.81632 | +0.033% | 1.15% | 4.92 | 118 |
-| strong | monolithic | 25 | 0.79928 | -0.016% | 4.28% | 2.00 | 25 |
-| strong | monolithic | 50 | 0.81151 | -0.122% | 1.85% | 2.00 | 47 |
-| strong | monolithic | 100 | 0.81431 | -0.213% | 1.26% | 2.00 | 86 |
+| moderate | IQN-ILS | 100 | 1.91612 | +0.018% | 0.65% | 3.98 | 73 |
+| moderate | monolithic | 25 | 1.87666 | -0.003% | 2.56% | 2.00 | 24 |
+| moderate | monolithic | 50 | 1.90741 | -0.003% | 0.35% | 2.00 | 47 |
+| moderate | monolithic | 100 | 1.91574 | -0.002% | 0.040% | 2.00 | 89 |
+| strong | IQN-ILS | 25 | 0.80042 | +0.126% | 3.77% | 3.86 | 29 |
+| strong | IQN-ILS | 50 | 0.81333 | +0.101% | 1.50% | 4.63 | 64 |
+| strong | IQN-ILS | 100 | 0.81632 | +0.033% | 1.15% | 4.92 | 120 |
+| strong | monolithic | 25 | 0.79936 | -0.007% | 2.57% | 2.00 | 26 |
+| strong | monolithic | 50 | 0.81246 | -0.005% | 0.36% | 2.00 | 48 |
+| strong | monolithic | 100 | 0.81602 | -0.004% | 0.049% | 2.00 | 91 |
 
 Ratio is the error of the wet/dry ratio against the exact value, and Iter. the
 mean coupling (IQN-ILS) or Newton (monolithic) iterations per time-step. The
 monolithic coupling converges in two Newton iterations per step at every
-level, as the problem is linear.
+level, as the problem is linear. Every check of the study passes.
 
-- **Time step.** The monolithic frequency converges at orders 1.91, 2.01 and
-  2.13 (weak, moderate, strong), and its amplitude loss at orders 2.71, 2.33
-  and 2.05, to the same level as the IQN-ILS loss (0.17%, 0.71% and 1.26%
-  against 0.16%, 0.65% and 1.15% per period at 100 steps per period).
-- **Mesh.** The remaining amplitude loss is a spatial error, as for IQN-ILS:
-  at 100 steps per period it is 1.37%, 0.71% and 0.39% (moderate) and 2.41%,
-  1.26% and 0.69% (strong) on the refinement-factor-1, 2 and 4 meshes. The
-  monolithic wet/dry ratio error also converges under mesh refinement,
-  -0.194%, -0.117% and -0.063% (moderate) and -0.355%, -0.213% and -0.115%
-  (strong), but only at about first order, whereas the IQN-ILS one converges
-  at about second order (+0.069%, +0.018% and +0.005%; +0.122%, +0.033% and
-  +0.009%). This points to a first-order spatial error in the interface
-  treatment of the monolithic fluid, which grows with the added mass (recorded
-  separately; not part of the study).
+- **Time step.** The monolithic frequency converges at order 1.88-1.89, and
+  its wet/dry ratio is within 0.007% of the exact value at every level and
+  time-step. Its amplitude loss, 2.57%, 0.36% and 0.045% per period at 25, 50
+  and 100 steps per period at every level (order 2.8), is that of the dry
+  ring, 2.57%, 0.36% and 0.046%, i.e. the dissipation of the backward scheme in
+  the solid: the coupling adds none. The IQN-ILS coupling adds a loss that
+  grows with the added mass, up to 1.15% per period at the strong level.
+- **Mesh.** At 100 steps per period, the monolithic ratio error is -0.016%,
+  -0.002% and -0.0001% (moderate) and -0.031%, -0.004% and -0.0004% (strong)
+  on the refinement-factor-1, 2 and 4 meshes, an observed order of about 3,
+  against +0.069%, +0.018% and +0.005% and +0.122%, +0.033% and +0.009% for
+  IQN-ILS (recorded separately; not part of the study).
 
-The study therefore fails its frequency and ratio checks at the moderate and
-strong levels on this mesh, and passes its damping checks.
+#### Defects found by this study
 
-#### Defect found by this study
+The study found two defects in the quasi-monolithic coupling, both now
+corrected.
 
-The first version of this study found that the monolithic solution lost 2.0%,
-10.6% and 18.3% of its amplitude per period at 100 steps per period (weak,
-moderate, strong). The loss grew with the added mass, fell only at first order
-in the time-step and hardly depended on the mesh. The velocity solid averaged
-the stress at the old and the extrapolated future time, but the old-time half
-of the interface force was the traction from two time-steps before, so that the
-interface force lagged by one time-step: a damping force of
-$$m_a \omega^2 \Delta t$$ times the velocity, which gives a loss of
-$$\pi (m_a/M) \omega \Delta t$$ per period, 1.8%, 9.9% and 17.9% here. With the
-lag removed, the centred scheme dissipated nothing at any frequency, and a
-high-frequency mode grew in `blobInTreacle`. The velocity solid now uses the
-backward (BDF2) scheme for the displacement, consistent with `ddt(U)`, and
-evaluates the stress and the interface traction once, at the new time.
+- **One-step lag of the interface force (time).** The first version lost
+  2.0%, 10.6% and 18.3% of the amplitude per period at 100 steps per period
+  (weak, moderate, strong), a loss that grew with the added mass, fell only at
+  first order in the time-step and hardly depended on the mesh. The velocity
+  solid averaged the stress at the old and the extrapolated future time, but
+  the old-time half of the interface force was the traction from two
+  time-steps before, so that the interface force lagged by one time-step: a
+  damping force of $$m_a \omega^2 \Delta t$$ times the velocity, which gives a
+  loss of $$\pi (m_a/M) \omega \Delta t$$ per period, 1.8%, 9.9% and 17.9%
+  here. With the lag removed, the centred scheme dissipated nothing at any
+  frequency, and a high-frequency mode grew in `blobInTreacle`. The velocity
+  solid now uses the backward (BDF2) scheme for the displacement, consistent
+  with `ddt(U)`, and evaluates the stress and the interface traction once, at
+  the new time.
+- **Zero-gradient interface pressure (space).** With the BDF2 solid, the
+  amplitude loss matched IQN-ILS, but the wet/dry ratio error converged only
+  at first order in the mesh, -0.194%, -0.117% and -0.063% (moderate) and
+  -0.355%, -0.213% and -0.115% (strong), too large an added mass by about a
+  quarter of a fluid cell. A `zeroGradient` pressure on the interface halves
+  the normal pressure gradient that the least-squares gradient gives in the
+  cells next to the moving wall, and makes the cell-centre pressure the
+  interface pressure; the two first-order errors partly cancel. The
+  monolithic variants now use a `fixedGradient` pressure on the interface,
+  whose gradient the coupling sets from the normal momentum equation at the
+  no-slip wall, $$\partial p/\partial n = n \cdot (\nu \nabla^2 U - a)$$, with
+  $$a$$ the acceleration of the interface, and the interface velocity passed
+  to the fluid is extrapolated from the solid cell centres.
 
 ## References
 

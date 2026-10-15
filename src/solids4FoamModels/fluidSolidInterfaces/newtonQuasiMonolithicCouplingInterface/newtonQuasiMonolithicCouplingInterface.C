@@ -25,6 +25,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "directMapInterfaceToInterfaceMapping.H"
 #include "fixedValueFvPatchFields.H"
+#include "fixedGradientFvPatchFields.H"
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "newtonIcoFluid.H"
@@ -1202,6 +1203,46 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
 }
 
 
+void newtonQuasiMonolithicCouplingInterface::setInterfacePressureGradient()
+{
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+    fvPatchScalarField& pPatch = boundaryFieldRef(fluid().p())[fluidPatchID];
+
+    if (!isA<fixedGradientFvPatchScalarField>(pPatch))
+    {
+        return;
+    }
+
+    // Acceleration of the interface faces, with the fluid's ddt scheme
+    const volVectorField& U = fluid().U();
+    const vectorField interfaceAcceleration
+    (
+        fvc::ddt(U)().boundaryField()[fluidPatchID]
+    );
+
+    // Viscous term in the cells next to the interface, as in the momentum
+    // residual
+    const vectorField interfaceViscousTerm
+    (
+        fvc::laplacian
+        (
+            refCast<fluidModels::newtonIcoFluid>(fluid()).turbulence().nuEff(),
+            U
+        )().boundaryField()[fluidPatchID].patchInternalField()
+    );
+
+    // Unit normals pointing out of the fluid
+    const vectorField n(fluidMesh().boundary()[fluidPatchID].nf());
+
+    refCast<fixedGradientFvPatchScalarField>(pPatch).gradient() =
+        n & (interfaceViscousTerm - interfaceAcceleration);
+
+    // Update the interface pressure, which gives the solid traction, so that
+    // the residual is a function of the current solution only
+    pPatch.evaluate();
+}
+
+
 void newtonQuasiMonolithicCouplingInterface::setLiuInterfaceVelocity()
 {
     // Set the fluid interface velocity using Liu (2014) Eq.31:
@@ -1505,8 +1546,20 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     {
         const fvPatchVectorField& solidPatchD =
             solid().D().boundaryField()[solidPatchID];
-        const fvPatchVectorField& solidPatchU =
-            solid().U().boundaryField()[solidPatchID];
+
+        // The solid velocity on the interface is extrapolated from the
+        // adjacent cell centres with the cell gradient, as the solidTraction
+        // condition does for D; the boundary value of the velocity is the
+        // cell value, which would give a first-order interface velocity
+        const volTensorField gradU(fvc::grad(solid().U()));
+        const vectorField solidPatchU
+        (
+            solid().U().boundaryField()[solidPatchID].patchInternalField()
+          + (
+                solidMesh().boundary()[solidPatchID].delta()
+              & gradU.boundaryField()[solidPatchID].patchInternalField()
+            )
+        );
 
         // Broadcast to zone level
         const vectorField zoneSolidD
@@ -1964,6 +2017,39 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             << "The fluid mesh motion solver must be "
             << meshMotionSolidModelFvMotionSolver::typeName
             << exit(FatalError);
+    }
+
+    const bool interfacePressureGradient =
+        isA<fixedGradientFvPatchScalarField>
+        (
+            fluid().p().boundaryField()
+            [
+                fluidSolidInterface::fluidPatchIndices()[0]
+            ]
+        );
+
+    if (interfacePressureGradient)
+    {
+        Info<< "The fluid interface pressure gradient is set from the normal "
+            << "momentum equation at the interface" << endl;
+
+        if (liuInterfaceCondition_)
+        {
+            FatalErrorInFunction
+                << "A fixedGradient interface pressure, which is set from the "
+                << "interface acceleration, cannot be combined with "
+                << "liuInterfaceCondition, whose interface velocity is not "
+                << "the velocity of the interface" << exit(FatalError);
+        }
+    }
+    else
+    {
+        WarningInFunction
+            << "The fluid pressure condition on the interface is not "
+            << "fixedGradient, so the interface pressure and the added mass "
+            << "are only first-order accurate in space. Use a fixedGradient "
+            << "condition, whose gradient the coupling sets from the normal "
+            << "momentum equation" << endl;
     }
 
     if (!validInterfaceFluxMode(quasiMonolithicInterfaceFluxMode_))
@@ -2445,6 +2531,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     {
         mapInterfaceMotionUToFluidU();
     }
+    setInterfacePressureGradient();
     reportInterfaceFluxDiagnostics();
     updateInterfaceMeshPhiHistory();
 
@@ -2686,12 +2773,23 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         twoD
     );
 
-    // 1b. When passViscousStress is enabled, update the fluid interface
-    //     velocity from the current USolid BEFORE computing the viscous
-    //     traction. Without this, patchViscousForce computes grad(U) using the
-    //     stale fixedValue boundary from the previous SNES iteration, making
-    //     the residual an inconsistent function of x.
-    if (passViscousStress_)
+    // 1b. When passViscousStress is enabled, or the interface pressure
+    //     gradient is set from the interface acceleration, update the fluid
+    //     interface velocity from the current USolid BEFORE computing the
+    //     traction. Without this, the traction uses the stale interface
+    //     velocity from the previous SNES iteration, making the residual an
+    //     inconsistent function of x.
+    const bool mapInterfaceBeforeTraction =
+        passViscousStress_
+     || isA<fixedGradientFvPatchScalarField>
+        (
+            fluid().p().boundaryField()
+            [
+                fluidSolidInterface::fluidPatchIndices()[0]
+            ]
+        );
+
+    if (mapInterfaceBeforeTraction)
     {
         mapInterfaceSolidToMeshMotion();
 
@@ -2703,6 +2801,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         {
             mapInterfaceMotionUToFluidU();
         }
+        setInterfacePressureGradient();
     }
 
     // 2. Map the fluid interface traction to the solid interface
@@ -2836,15 +2935,20 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     //      U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
     //    This is O(dt^2) accurate and ensures energy stability at the FSI
     //    interface for the BDF2/trapezoidal temporal discretisation.
-    mapInterfaceSolidToMeshMotion();
+    //    This was already done in step 1b, from the same solution, if
+    //    mapInterfaceBeforeTraction
+    if (!mapInterfaceBeforeTraction)
+    {
+        mapInterfaceSolidToMeshMotion();
 
-    if (liuInterfaceCondition_)
-    {
-        setLiuInterfaceVelocity();
-    }
-    else
-    {
-        mapInterfaceMotionUToFluidU();
+        if (liuInterfaceCondition_)
+        {
+            setLiuInterfaceVelocity();
+        }
+        else
+        {
+            mapInterfaceMotionUToFluidU();
+        }
     }
 
     // 5. Update the fluid residual, which now has the correct interface

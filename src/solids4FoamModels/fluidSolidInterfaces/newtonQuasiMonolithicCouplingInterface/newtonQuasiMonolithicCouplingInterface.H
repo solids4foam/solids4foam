@@ -294,6 +294,16 @@ class newtonQuasiMonolithicCouplingInterface
         //- Map the velocity from the mesh motion to the fluid interface
         void mapInterfaceMotionUToFluidU();
 
+        //- Set the normal gradient of the (kinematic) fluid pressure on the
+        //  interface from the normal momentum equation, if the pressure
+        //  condition there is fixedGradient: at a no-slip wall the fluid
+        //  moves with the wall, so
+        //      dp/dn = n & (-dU/dt + laplacian(nuEff, U))
+        //  where dU/dt is the acceleration of the interface. A
+        //  zeroGradient pressure instead gives a first-order error in the
+        //  interface pressure and the added mass
+        void setInterfacePressureGradient();
+
         //- Set the fluid interface velocity using Liu (2014) Eq.31
         //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
         //  This replaces mapInterfaceMotionUToFluidU() when
