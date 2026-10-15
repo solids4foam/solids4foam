@@ -1732,6 +1732,56 @@ Reading:
 Cost (xenosim, wall time x ranks, from `run.out`): 1x' runs 330, 2x' runs 1 080, 4x' 800,
 pilots, timing and the aborted tolerance 1e-6 starts about 110 core-hours.
 
+### Task 3: coupled 8x' on MeluXina (preparation)
+
+Build: this branch at 769640289 (= 30d6e22f3 + PR #562, the restart fix for issue #555,
+cherry-picked from 541f5b008; no other source change), OpenFOAM v2512 source build, GCC 13.3
+(foss-2024a, `-O2 -march=znver2`, the Opt flags of that build), PETSc 3.22.0, EPYC 7H12;
+`scripts/prod_env_meluxina.sh`. Scripts: `setup_meluxina_case.sh`, `run_coupled_meluxina.slurm`
+(48 h or 6-day segments, `stopAt writeNow` 40 min before the limit, continuation from the
+latest write, earlier writes pruned, `fsiResiduals.dat` kept per segment and merged by
+`ht_coupled_analysis.py`), `submit_8x_meluxina.sh`, `control_job_meluxina.slurm`,
+`ht_branch_compare.py`.
+
+Timing (8x'/s16x, 128 ranks, one node; per FSI iteration in the 30-iteration start-up steps):
+solid 2.85 s with bjacobi/LU (330 Krylov iterations per solve), 0.9 s with hypre BoomerAMG
+(76), 3.7 s with ASM/ILU(1); fluid 4.4 s; uncoupled steps 4.5 s. The fluid strong-scales to
+about 3k cells per rank (2x' on 16/32/48 ranks: 9.9/11.3/19.1 s per step), so a second node
+does not pay. The 8x' run uses hypre (option B), tolerances unchanged.
+
+Solid preconditioner equivalence (1x'/s2x, 16 ranks, both branches restarted from the same
+4.5 s write, 4.5 to 5.0 s, `mlx_cmp_pc.json`): tip u_y differs by at most 3.8e-7 m
+(1.1e-5 of the amplitude; rms 1.3e-7 m, drift 9e-11 m/s), lift by rms 0.09 N/m (max 1.1);
+the first 74 steps agree to 1e-11 (relative) and the later differences are the coupling
+noise at tol 1e-5 amplifying round-off. Window values (two periods ending before 5.0 s,
+`mlx_q_r45.*`): u_y amplitude 34.61809 / 34.61807 mm, f 5.56820 / 5.56819 Hz, lift
+amplitude 194.755 / 194.756 N/m, drag amplitude 28.682 / 28.679 N/m (LU / hypre). IQN-ILS
+11.82 / 11.77 iterations per step, 21 / 21 steps at the cap, solid SNES norm at acceptance
+(median) 1.0e-11 / 9.9e-12. Equivalent at the level of the coupling tolerance.
+
+Restart check (1x'/s2x, continuous run to 5 s, R1 restarted at 4.5 s, R2 restarted from R1's
+4.75 s write; `mlx_cmp_r1.json`, `mlx_cmp_r2.json`, `mlx_restart_first_steps.txt`): with
+PR #562 a restarted run writes `D_0_0`, `D_0_0_0`, `DD_0_0`, `A` and `U` (checked in R1's 4.75 s
+write), and the first solid predictor norm is 1.10e-2 (R1) and 1.75e-2 (R2) against 5.9e-3
+and 4.7e-3 continuous (before the fix: 3.4 against 5.3e-3, and the run diverged). The
+restart is not exact on the fluid side: the traction passed to the solid in the first
+restarted step differs by 2-10% because `movingWallPressure` is read back with a zero
+gradient (its constructor ignores the written value and gradient), and the fluid does not
+write `U_0_0` (backward `ddt(U)` and the wall acceleration of `newMovingWallVelocity` start
+from `U_0_0 = U_0`; `V00` from `V0`). The perturbation does not grow: over 4.5 to 5.0 s tip
+u_y differs by at most 7.0e-7 m (2.0e-5 of the amplitude, drift -2.4e-7 m/s), R2 against the
+continuous run by 6.4e-7 m (no accumulation over two restarts), lift by rms 0.11-0.14 N/m:
+the same size as the preconditioner switch, and window values equal to 2e-5 mm (u_y
+amplitude) and 0.001 N/m (lift amplitude). Restarts are therefore usable for the 8x'
+segments at the coupling-noise level, but not bit-reproducible.
+
+Platform control, 1x'/s2x (8 ranks, MeluXina against xenosim, cold to 6 s, the standard window,
+`mlx_platform_1x.*`): u_y amplitude 34.6213 / 34.6213 mm (difference 2e-5 mm), u_x
+(max+min)/2 -2.85883 / -2.85882 mm, f 5.56983 / 5.56983 Hz, drag (max+min)/2 458.521 / 458.521,
+lift amplitude 194.698 / 194.701 N/m, lift (max+min)/2 0.986 / 0.971 N/m. The xenosim run had
+been restarted at 2.5 s (pre-fix binary), so this also shows that run settled on the same
+limit cycle. 2x'/s4x control: running.
+
 ### Astra (GPT-6-Astra, xhigh) advice
 
 `reference/production/astra_3_*` (design) and `astra_4_*` (interpretation).

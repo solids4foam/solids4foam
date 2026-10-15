@@ -1,0 +1,35 @@
+== rst_1x, first step after 4.5
+Total force on solid interface 0: (-0.434072094453 2.5605533734 -2.35287824089e-15)
+  0 SNES Function norm 5.878573162143e-03
+  1 SNES Function norm 1.030322937268e-06
+  2 SNES Function norm 1.438859591418e-11
+  3 SNES Function norm 8.144289001016e-12
+FSI relative residual1 norm for interface 0: 1
+== rst_r4.5, first step after 4.5
+Total force on solid interface 0: (-0.420316176907 2.50858584191 -2.35285794875e-15)
+  0 SNES Function norm 1.103543247328e-02
+  1 SNES Function norm 1.562916809535e-06
+  2 SNES Function norm 2.886042355857e-11
+  3 SNES Function norm 8.418991174927e-12
+FSI relative residual1 norm for interface 0: 1
+== rst_r4.75, first step after 4.75
+Total force on solid interface 0: (-0.421749438057 -2.73529755573 -3.48538556593e-16)
+  0 SNES Function norm 1.753929287657e-02
+  1 SNES Function norm 2.500175098508e-06
+  2 SNES Function norm 5.902576241433e-11
+  3 SNES Function norm 1.237358206373e-11
+FSI relative residual1 norm for interface 0: 1
+== eq_hypre_r4.5, first step after 4.5
+Total force on solid interface 0: (-0.420316176907 2.50858584191 -2.35285794875e-15)
+  0 SNES Function norm 1.103543247328e-02
+  1 SNES Function norm 3.394797342114e-06
+  2 SNES Function norm 4.201054749129e-11
+  3 SNES Function norm 8.483817521113e-12
+FSI relative residual1 norm for interface 0: 1
+== rst_1x, first step after 4.75
+Total force on solid interface 0: (-0.467115296579 -2.6719648947 3.02122960292e-15)
+  0 SNES Function norm 4.709619595133e-03
+  1 SNES Function norm 2.504899906227e-07
+  2 SNES Function norm 1.410983200075e-11
+  3 SNES Function norm 1.238424232341e-11
+FSI relative residual1 norm for interface 0: 1
