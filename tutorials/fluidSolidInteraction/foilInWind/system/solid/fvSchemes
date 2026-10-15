@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -12,14 +12,47 @@ FoamFile
     version     2.0;
     format      ascii;
     class       dictionary;
-    object      decomposeParDict;
+    location    "system";
+    object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// Note: this decomposeParDict is not used but it must be present to keep
-// argList happy. Use instead the decomposeParDicts in system/fluid and
-// system/solid
+d2dt2Schemes
+{
+    default                 backward;
+}
 
-numberOfSubdomains 4;
+ddtSchemes
+{
+    default                 backward;
+}
+
+gradSchemes
+{
+    default                 leastSquaresS4f;
+}
+
+divSchemes
+{
+    default                 Gauss linear;
+}
+
+laplacianSchemes
+{
+    default                 Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default                 corrected;
+}
+
+interpolationSchemes
+{
+    default            linear;
+    interpolate(impK)  linear;
+    interpolate(grad(D)) linear;
+    interpolate(grad(DD)) linear;
+}
 
 // ************************************************************************* //

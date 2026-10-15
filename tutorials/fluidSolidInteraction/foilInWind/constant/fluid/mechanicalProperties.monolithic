@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -22,14 +22,10 @@ mechanical
 (
     rubber
     {
-        type        diffusionElastic;
-        //type        diffusionHyperElastic;
+        type        linearElastic;
         rho         rho [1 -3 0 0 0 0 0] 1;
         mu          mu [1 -1 -2 0 0 0 0] 1;
-        "K|kappa"   K [1 -1 -2 0 0 0 0]  3;
-        diffusivity quadratic inverseDistance (interface);
-        regionName fluid;
-        writeStiffScaleFactor no;
+        K           K [1 -1 -2 0 0 0 0]  3;
     }
 );
 

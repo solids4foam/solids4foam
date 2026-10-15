@@ -3,119 +3,87 @@
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
-# PETSc is required for this case
-if [[ -z "${PETSC_DIR:-}" ]]
-then
-    echo; echo "Skipping this case as PETSc is not installed"
-    echo "Please set the PETSC_DIR variable and rebuild solids4foam"; echo
-    exit 0
-fi
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
 
-# Example usage:
-# ./Allrun                     -> partitioned (IQNILS), serial
-# ./Allrun aitken              -> partitioned (Aitken), serial
-# ./Allrun monolithic          -> monolithic (Newton/PETSc), serial
-# ./Allrun monolithic parallel -> monolithic (Newton/PETSc), parallel
-# ./Allrun aitken parallel     -> partitioned (Aitken), parallel
+# The fluid mesh is refined with setSet and refineMesh, and the flow is
+# initialised with potentialFoam, which have only been set up for OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# PETSc is required for the solid solver
+solids4Foam::requirePetscOrExitSilently
+
+# Example usage
+# ./Allrun                      # partitioned IQNILS, serial
+# ./Allrun parallel             # partitioned IQNILS, parallel
+# ./Allrun aitken               # partitioned Aitken, serial
+# ./Allrun aitken parallel      # partitioned Aitken, parallel
+# ./Allrun monolithic           # quasi-monolithic Newton, serial
+# ./Allrun monolithic parallel  # quasi-monolithic Newton, parallel
 
 coupling=iqnils
 runMode=serial
-fvSolutionSuffix=""
-SOLVER="partitioned"
 
 for arg in "$@"
 do
     case "$arg" in
         aitken|Aitken)
             coupling=aitken
-            SOLVER="partitioned"
             ;;
         iqnils|IQNILS)
             coupling=iqnils
-            SOLVER="partitioned"
             ;;
-        monolithic)
-            SOLVER="monolithic"
+        monolithic|Monolithic)
+            coupling=monolithic
             ;;
         parallel)
             runMode=parallel
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|monolithic] [parallel]"
+            echo "Usage: ./Allrun [iqnils|aitken|monolithic] [parallel]"
             exit 1
             ;;
     esac
 done
 
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
+echo "Using ${coupling} coupling setup"
 
-# Restore 0 directory
+# Restore 0 directory, as potentialFoam overwrites the fluid velocity
 restore0Dir
 
-if [[ "$SOLVER" == "monolithic" ]]; then
-    solids4Foam::caseDoesNotRunWithFoamExtend
-    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
-    echo "Using the monolithic Newton/PETSc approach"
-    solids4Foam::convertCaseFormat .
-    for file in $(find ./0 ./constant ./system -name '*.monolithic')
-    do
-        ln -vnsf ${file##*/} ${file%.*}
-    done
+# The Aitken and quasi-monolithic files are stored as *.aitken and
+# *.monolithic variants
+if [[ "${coupling}" == "iqnils" ]]; then
+    solids4Foam::restoreCaseVariant .
 else
-    # Dirichlet-Neumann partitioned approach
-    if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-        fvSolutionSuffix=".foamextend"
-    elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-        fvSolutionSuffix=".openfoamorg"
-    fi
-
-    echo "Using ${coupling} coupling setup"
-
-    # Remove monolithic-only files that may have been copied in from a dirty
-    # case tree after a previous monolithic run.
-    rm -f \
-        0/fluid/D \
-        0/fluid/pointD \
-        0/fluid/pointDisplacement \
-        0/solid/U \
-        constant/fluid/mechanicalProperties \
-        constant/fluid/solidProperties
-
-    # Create all .partitioned symlinks
-    for file in $(find ./0 ./constant ./system -name '*.partitioned')
-    do
-        ln -vnsf "${file##*/}" "${file%.partitioned}"
-    done
-
-    # Override fvSolution to use coupling-specific version (iqnils or aitken)
-    ln -vnsf "fvSolution.${coupling}${fvSolutionSuffix}" system/fluid/fvSolution
-    ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-    ln -vnsf "solidProperties.${coupling}" constant/solid/solidProperties
-
-    solids4Foam::convertCaseFormat .
+    solids4Foam::selectCaseVariant . "${coupling}"
 fi
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
 
 # Create meshes
 solids4Foam::runApplication -s solid blockMesh -region solid
 solids4Foam::runApplication -s fluid blockMesh -region fluid
 
-# Refine fluid mesh
-solids4Foam::runApplication setSet -batch setSet.batch -region fluid
-solids4Foam::runApplication refineMesh -region fluid -overwrite
+# Refine the fluid mesh around the flag, so that it conforms to the solid mesh
+solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
+solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
 
-# Run potentialFoam
-solids4Foam::runApplication potentialFoam -region fluid
+# Initialise the fluid velocity with a potential flow solution; the
+# solids4foam library is loaded for the flag velocity boundary condition
+solids4Foam::runApplication potentialFoam -region fluid -lib solids4FoamModels
 
 # Run solver
-if [[ "$runMode" == "parallel" ]]; then
+if [[ "${runMode}" == "parallel" ]]; then
     # Run parallel
-    if [[ "$SOLVER" == "monolithic" ]]; then
-        # Monolithic: coupled decomposition across fluid+solid
+    if [[ "${coupling}" == "monolithic" ]]; then
+        # Decompose the fluid and solid regions together as one graph, so that
+        # some ranks can own only fluid cells; see system/decomposeParDict
         solids4Foam::runApplication decomposeParMonolithic -force
     else
-        # Partitioned: independent decomposition per region
         solids4Foam::runApplication -s fluid decomposePar -region fluid
         solids4Foam::runApplication -s solid decomposePar -region solid
     fi
@@ -132,7 +100,7 @@ if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
     gnuplot deflection.gnuplot &> /dev/null
-    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    if [ $(find . -name force.dat | wc -l) -eq 1 ]
     then
         echo "Generating force.pdf using gnuplot"
         gnuplot force.gnuplot &> /dev/null

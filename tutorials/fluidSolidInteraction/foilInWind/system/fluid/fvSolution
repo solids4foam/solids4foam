@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -18,7 +18,7 @@ FoamFile
 
 solvers
 {
-    "p|pFinal"
+    "p|pFinal|Phi"
     {
         solver          GAMG;
         tolerance       1e-06;
@@ -69,8 +69,8 @@ solvers
 PIMPLE
 {
     momentumPredictor   on;
-    nOuterCorrectors    1;
-    nCorrectors         3;
+    nOuterCorrectors    30;
+    nCorrectors         5;
     nNonOrthogonalCorrectors 1;
 
     residualControl
@@ -86,6 +86,23 @@ PIMPLE
             relTol    1e-5;
             tolerance 1e-5;
         }
+    }
+}
+
+potentialFlow
+{
+    nNonOrthogonalCorrectors 10;
+}
+
+relaxationFactors
+{
+    equations
+    {
+        U    1.0;
+    }
+    fields
+    {
+        p    0.7;
     }
 }
 
