@@ -149,9 +149,15 @@ def fluid_sizes(level: str) -> dict[str, float]:
             for key, value in FLUID_F1_SIZES.items()}
 
 
-def write_mesh_dict(case: Path, level: str) -> Path:
-    """Write system/meshDict.<level> from the tutorial's coarse meshDict."""
+def write_mesh_dict(case: Path, level: str, wall: str = "") -> Path:
+    """Write system/meshDict.<level> from the tutorial's coarse meshDict.
+
+    wall, a fluid level, takes the wall cell size (boundaryCellSize) from
+    that level instead: a diagnostic of the wall-resolution error.
+    """
     sizes = fluid_sizes(level)
+    if wall:
+        sizes["boundaryCellSize"] = fluid_sizes(wall)["boundaryCellSize"]
     text = (TUTORIAL / "system" / "meshDict.coarse").read_text()
     replacements = (
         (r"^(maxCellSize\s+)[^;]+;", sizes["maxCellSize"]),
@@ -815,7 +821,7 @@ DEFAULT_SPEC = {
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
     "solidtol": "default", "coupled": "yes", "fsitest": "default",
-    "reuse": -1.0,
+    "reuse": -1.0, "wall": "",
 }
 
 
@@ -846,6 +852,8 @@ def parse_spec(text: str) -> dict:
         fail("fluidtol must be default or tight")
     if spec["fsitest"] not in ("default", "strict"):
         fail("fsitest must be default or strict")
+    if spec["wall"] and spec["wall"] not in FLUID_LEVELS:
+        fail("wall must be a fluid level, e.g. wall=F3")
     return spec
 
 
@@ -878,6 +886,8 @@ def spec_name(spec: dict) -> str:
         name += f"_fsi{spec['fsitest']}"
     if spec["reuse"] >= 0:
         name += f"_reuse{spec['reuse']:g}"
+    if spec["wall"]:
+        name += f"_wall{spec['wall']}"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -932,7 +942,7 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
 
     # Fluid mesh
     if spec["fluid"] in FLUID_LEVELS:
-        write_mesh_dict(case, spec["fluid"])
+        write_mesh_dict(case, spec["fluid"], spec["wall"])
         info["fluid_sizes_m"] = fluid_sizes(spec["fluid"])
 
     # Solid mesh and centreline monitors on its nodes
