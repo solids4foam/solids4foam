@@ -141,6 +141,7 @@ Useful options:
 ./Allverify --study main         # high-order solid mesh and time-step studies only
 ./Allverify --study solid        # standard against high-order solid
 ./Allverify --study coupling     # IQN-ILS against Robin-Neumann
+./Allverify --study monolithic   # quasi-monolithic Newton against IQN-ILS
 ./Allverify --levels moderate    # one added-mass level
 ./Allverify --reuse              # reuse completed runs with matching settings
 ./Allverify --cores 32           # number of serial runs at the same time
@@ -212,6 +213,10 @@ assumptions, and are stored in the reference JSON.
   vibration must not grow, so no run may gain more than 0.2% per period,
   which allows for the measurement noise of an undamped run.
 - **Robin-Neumann and IQN-ILS frequencies agree to 0.1%.**
+- **Monolithic study:** at 100 steps per period, the monolithic and IQN-ILS
+  frequencies (standard solid) agree to 0.1%, the monolithic wet/dry ratio is
+  within 0.1% of the exact value, and the monolithic amplitude loss is below
+  2% per period.
 
 A `--quick` run only checks that the coarse dry and moderate wet frequencies
 are within 1% of the exact values.
@@ -310,6 +315,72 @@ iterations at every level, and its advantage grows with the added mass
 (4.9 against 12.3 per step at the strong level). The Robin-Neumann solution
 is almost undamped, whereas the IQN-ILS one shows the mesh-dependent damping
 described above.
+
+### Quasi-monolithic Newton against IQN-ILS
+
+`./Allverify --study monolithic` runs the quasi-monolithic Newton coupling
+(`./Allrun monolithic`, OpenFOAM.com only) under time-step refinement on the
+refinement-factor-2 mesh, together with the IQN-ILS coupling and the dry ring.
+The monolithic velocity solid has the standard residual only, so every run of
+this study uses the standard solid, and the comparison is through the wet/dry
+ratio, which removes the solid error (see above). It is not part of
+`--study all`. Recorded with OpenFOAM v2512 on macOS (Apple M-series), 14
+serial runs at a time; the 21 runs took about 2 minutes, and the times below
+are therefore only indicative:
+
+| Level | Coupling | Steps | ω (rad/s) | Ratio | Loss | Iter. | Time (s) |
+|---|---|---:|---:|---:|---:|---:|---:|
+| weak | IQN-ILS | 25 | 2.53346 | +0.015% | 2.70% | 3.01 | 18 |
+| weak | IQN-ILS | 50 | 2.57483 | +0.010% | 0.47% | 3.00 | 29 |
+| weak | IQN-ILS | 100 | 2.58588 | +0.004% | 0.16% | 2.98 | 51 |
+| weak | monolithic | 25 | 2.55897 | +1.022% | 7.01% | 2.00 | 24 |
+| weak | monolithic | 50 | 2.58163 | +0.275% | 3.84% | 2.00 | 47 |
+| weak | monolithic | 100 | 2.58714 | +0.052% | 2.01% | 2.00 | 90 |
+| moderate | IQN-ILS | 25 | 1.87813 | +0.075% | 3.27% | 3.57 | 25 |
+| moderate | IQN-ILS | 50 | 1.90853 | +0.056% | 0.98% | 3.92 | 44 |
+| moderate | IQN-ILS | 100 | 1.91612 | +0.018% | 0.65% | 3.98 | 74 |
+| moderate | monolithic | 25 | 1.90351 | +1.428% | 34.28% | 2.00 | 26 |
+| moderate | monolithic | 50 | 1.91340 | +0.312% | 19.57% | 2.00 | 49 |
+| moderate | monolithic | 100 | 1.91536 | -0.021% | 10.59% | 2.00 | 92 |
+| strong | IQN-ILS | 25 | 0.80042 | +0.126% | 3.77% | 3.86 | 30 |
+| strong | IQN-ILS | 50 | 0.81333 | +0.101% | 1.50% | 4.63 | 65 |
+| strong | IQN-ILS | 100 | 0.81632 | +0.033% | 1.15% | 4.92 | 118 |
+| strong | monolithic | 25 | 0.80185 | +0.305% | 54.12% | 2.00 | 27 |
+| strong | monolithic | 50 | 0.81214 | -0.044% | 32.71% | 2.00 | 55 |
+| strong | monolithic | 100 | 0.81436 | -0.207% | 18.25% | 2.00 | 101 |
+
+Ratio is the error of the wet/dry ratio against the exact value, and Iter. the
+mean coupling (IQN-ILS) or Newton (monolithic) iterations per time-step. The
+monolithic coupling converges in two Newton iterations per step at every
+level, as the problem is linear.
+
+- **Frequency.** The monolithic frequency converges in time at orders 2.04,
+  2.34 and 2.22 (weak, moderate, strong), and at 100 steps per period agrees
+  with IQN-ILS to +0.05%, -0.04% and -0.24%. The monolithic wet/dry ratio is
+  within 0.06% of the exact value at the weak and moderate levels, but at the
+  strong level its error moves away from zero under time-step refinement
+  (+0.31%, -0.04%, -0.21%), whereas the IQN-ILS one decreases (+0.13%,
+  +0.10%, +0.03%). With the damping of the monolithic runs, the damped
+  frequency measured from the zero crossings is up to 0.05% below the
+  undamped one.
+- **Damping.** The monolithic solution loses far more amplitude than the
+  partitioned one, and the loss grows with the added mass: 2.0%, 10.6% and
+  18.3% per period at 100 steps per period, against 0.16%, 0.65% and 1.15%
+  for IQN-ILS. It falls only at first order under time-step refinement
+  (observed orders 0.80, 0.71 and 0.57 from 25 to 100 steps per period,
+  with successive ratios approaching 2), whereas the IQN-ILS loss falls at
+  orders 2.7–2.8. Unlike the IQN-ILS loss, it hardly depends on the mesh:
+  at the moderate level and 100 steps per period it is 12.45%, 10.59% and
+  9.90% per period on the refinement-factor-1, 2 and 4 meshes, against
+  1.22%, 0.65% and 0.36% for IQN-ILS (recorded separately; not part of the
+  study).
+  A first-order, added-mass-proportional dissipation points to an
+  inconsistency in the time discretisation of the interface coupling of the
+  monolithic scheme rather than to the fluid or solid discretisations, which
+  are shared with the partitioned runs.
+
+The monolithic study therefore fails its damping checks at every level, and
+its frequency and ratio checks at the strong level.
 
 ## References
 
