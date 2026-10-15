@@ -363,9 +363,12 @@ level, as the problem is linear. Every check of the study passes.
   grows with the added mass, up to 1.15% per period at the strong level.
 - **Mesh.** At 100 steps per period, the monolithic ratio error is -0.016%,
   -0.002% and -0.0001% (moderate) and -0.031%, -0.004% and -0.0004% (strong)
-  on the refinement-factor-1, 2 and 4 meshes, an observed order of about 3,
-  against +0.069%, +0.018% and +0.005% and +0.122%, +0.033% and +0.009% for
-  IQN-ILS (recorded separately; not part of the study).
+  on the refinement-factor-1, 2 and 4 meshes. The errors fall faster than
+  the formal second order (an apparent order of about 3), as the finest
+  values approach the precision of the frequency measurement; this shows the
+  first-order error is removed, not third-order accuracy. The IQN-ILS errors
+  are +0.069%, +0.018% and +0.005% and +0.122%, +0.033% and +0.009%
+  (recorded separately; not part of the study).
 
 #### Defects found by this study
 
