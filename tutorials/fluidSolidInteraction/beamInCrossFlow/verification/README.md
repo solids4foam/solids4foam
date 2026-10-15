@@ -323,7 +323,7 @@ different inflow than the printed profile, but does not establish which
 profile's 0.133). The labelled 0.2 m/s diagnostic below tests this with the
 production setup. No setting was tuned to the reference values.
 
-### Diagnostic of the reference values: peak inlet 0.2 m/s (not a benchmark variant)
+### 0.2 m/s sequence (anticipating author confirmation)
 
 Production setup unchanged (same mesh family `m = 2`, strict coupling 1e-5,
 PIMPLE 3, dt = 0.00625, tight solver tolerances, start from rest with the
@@ -354,6 +354,70 @@ The lift at L2, `F_y` = 0.1051 N, is also close to Tukovic et al.'s 0.1055 N
 at 0.2 m/s (their `u_y(A)` refers to a different point, see the audit).
 Data: `reference/campaign/followup_20261013/` (`r02_diagnostic.csv`,
 `l3_dt2_windows.csv`).
+
+#### L3 at 0.2 m/s and the full L0-L3 sequence (2026-10-15)
+
+Kept as a labelled sequence until the author confirms which inflow produced
+the reference values; the printed 0.3 m/s definition remains primary.
+
+- Rigid-beam flows at 0.2 m/s, L0-L3 (job 5339752, from rest to 24 s, steady
+  to `|dF_x|/F_x` < 7.2e-7 over the last 2 s): `F_x` 1.200004, 1.283251,
+  1.314469, 1.324974 N (orders 1.42, 1.57; at 0.3 m/s 1.36, 1.55).
+- L3 FSI (job 5339753, `runs/R02_L3_init`, 3 nodes, 14.8 h) from the
+  converged rigid L3 flow, as the primary L3, one segment 0-5 s with no
+  restart (so the pre-#562 restart issue does not arise). The damped beam mode
+  decays by ~2.2x per 0.25 s (`F_x` half-amplitude 1.1e-4 in 3.00-3.25 s to
+  6.4e-7 in 4.75-5.00 s); means over 4.5-5.0 s, drift below 3e-6 relative per
+  second for `u_x` and `F_x`.
+- History independence (jobs 5339754, 5339755): rigid-flow start against start
+  from rest at L0-L2 differ by at most 1.3e-6 in `u_x` and `F_x` (2.5e-5 in
+  `F_y`, 6e-6 in `u_y`).
+
+| level | `u_x(A)` (m) | `F_x` (N) | `F_y` (N) | `u_z(A)` (m) |
+| --- | ---: | ---: | ---: | ---: |
+| L0 | 4.61683e-5 | 1.19882 | 0.099031 | -8.1618e-7 |
+| L1 | 5.47934e-5 | 1.28437 | 0.102773 | -8.6708e-7 |
+| L2 | 5.83121e-5 | 1.31657 | 0.105056 | -8.8809e-7 |
+| L3 | 5.94427e-5 | 1.32723 | 0.105227 | -8.9244e-7 |
+
+Observed orders (L0-L2, L1-L3): `u_x` 1.29, 1.64; `F_x` 1.41, 1.60, the same
+as the primary 0.3 m/s sequence (1.26, 1.61; 1.36, 1.58): monotone, orders
+increasing towards 2, asymptotic regime suggested but not demonstrated.
+`u_z` 1.28, 2.27 and `F_z` 0.48, 2.03; `F_y` (0.71, 3.7) and `u_y`
+(non-monotone, changes of 0.6 %) have no usable order. Conditional Richardson
+values from L1-L3: `u_x` 5.998e-5 m (observed order) or 5.982e-5 m (`p = 2`),
+`F_x` 1.3325 or 1.3308 N, i.e. 0.6-0.9 % and 0.3-0.4 % above L3.
+Data: `reference/campaign/r02_sequence_20261015/r02_sequence.csv`.
+
+Comparison, made only after the sequence above was characterised: Richter's
+published Table 3 gives 5.95e-5 m and 1.33 (accuracy 1 %), the preprint
+5.924e-5 m and 1.327. The 0.2 m/s L3 lies within 0.1 % (`u_x`) and 0.2 %
+(`F_x`) of the published values, and the conditional extrapolations lie 0.5-
+0.8 % above them, inside Richter's stated accuracy. `F_y` at L3 (0.10523 N) is
+within 0.3 % of Tukovic et al.'s 0.1055 N. With the printed 0.3 m/s peak the
+values are about 1.8x larger. The reference values are therefore consistent,
+to within their stated accuracy, with a 0.2 m/s peak at Richter's geometry and
+not with the printed 0.3 m/s; whether this is what Richter computed awaits his
+confirmation.
+
+#### L4 assessment (estimate, not run)
+
+- Size: about 33.2M fluid and 2.1M solid cells (`N_t = 128`); about 3,072
+  ranks (24 nodes) at the L3 load per rank; memory is not limiting (L3 used
+  ~0.28 GB per rank).
+- Stability: the L3 FSI Courant number reaches 2.0, so L4 at dt = 0.00625
+  would reach ~4; a rigid L3 run with `m = 4` was unstable near 3. L4 may need
+  dt/2, which would break the fixed-dt protocol of L0-L3 (the dt effect
+  itself is ~8e-5 at L3).
+- Cost: 63-175 s/step estimated; 800 steps = 14-39 h on 24 nodes, i.e.
+  340-930 node-h (44k-120k physical core-h) per inlet, plus ~10 node-h for a
+  rigid L4 precursor.
+- Files: ~265k with uncollated output and purgeWrite 2, against a project
+  quota of 1M; collated output would be needed.
+- Recommendation: L4 would test the asymptotic range (orders 1.6 on L1-L3),
+  which neither Richter nor this study has shown at this resolution; it should
+  follow a short multi-node feasibility test (Courant stability at dt =
+  0.00625, rate, collated output), and only once the inflow is confirmed.
 
 ## Astra (GPT-6-Astra, xhigh) review, 2026-10-12
 
@@ -391,6 +455,9 @@ for Philip, not run): a coupled L3 dt/2 steady-sensitivity run (estimated
 
 ## Cost (physical cores = node-hours x 128)
 
+0.2 m/s sequence (2026-10-14/15): rigid L0-L3 1.4, L3 FSI 44.3, history
+checks 7.5 node-hours; together 53.2 node-hours = 6,810 physical core-h.
+
 Follow-up runs (2026-10-13): L3 dt/2 (5337651, 3 nodes, 7.0 h) 21.1
 node-hours; 0.2 m/s diagnostic (5337652, 1 node, 2.7 h; 5337653, 1 node,
 7.7 h) 10.5 node-hours; together 31.6 node-hours = 4,040 physical core-h.
@@ -402,7 +469,7 @@ simulated second than segment 1 (different nodes). Earlier totals in this
 README and in reports were sacct CPUTimeRAW, which counts 256 logical CPUs
 per node and so doubled the physical figure.
 
-## STATUS (2026-10-14, campaign complete for L0-L3)
+## STATUS (2026-10-15, L0-L3 complete at 0.3 m/s and at 0.2 m/s)
 
 All production and check runs are finished, including the L3 dt/2 check and
 the 0.2 m/s reference diagnostic; no beam jobs are queued. The absolute-floor
