@@ -8,6 +8,22 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The quasi-monolithic Newton fluid-solid coupling
+  (`fluidSolidInterface NewtonQuasiMonolithic`, OpenFOAM.com with PETSc),
+  which solves the fluid velocity and pressure (`newtonIcoFluid`) and the
+  solid velocity together with PETSc SNES in every time step, following
+  Jaiman and Joshi (2022). It needs a conformal interface (`directMap`) and
+  runs in parallel, also with `decomposeParMonolithic`. It comes with the
+  velocity-based solid models `nonLinearGeometryTotalLagrangianVelocity` and
+  `linearGeometryVelocity`, and the `fsiSteadyStateControl` function object.
+  `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,
+  `cavityFlexibleBottom`, `membraneRoof`, `perpendicularFlap`,
+  `ringAddedMass`, `3dTube`, `mokLidDrivenCavity` and `foilInWind`
+  tutorials, whose files are stored as `*.monolithic` variants selected with
+  `solids4Foam::selectCaseVariant`. The regression tests of
+  `beamInCrossFlow`, `blobInTreacle` and `cavityFlexibleBottom` have a
+  monolithic arm.
+- The `foilInWind` tutorial, a flexible flag behind a block in a wind flow.
 - Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
   a fluid-solid coupling step is also converged if the maximum interface point
   residual (the displacement-increment mismatch by default) is below this
@@ -539,6 +555,18 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The PETSc SNES Jacobian of the least-squares pressure gradient now uses the
+  owner-cell coefficient across processor boundaries and the boundary
+  condition's value coefficients on boundary faces, and the divergence
+  Jacobian is implemented across processor boundaries.
+- The PETSc SNES solution vector of `linearGeometryTotalDisplacement` is seeded
+  from the displacement (and pressure) on every time step, so that initial
+  conditions and restarts are no longer overwritten by a stale solution.
+- Restarting or decomposing a case whose solid region has no cells on some
+  processors no longer stops in `mechanicalConstitutiveLawStateIO`.
+- The `womersleyTube` patch displacement read the face centres through a
+  dangling reference, which gave NaN or a floating point exception with
+  Clang.
 - `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
   cell whose face stencil does not span three directions, for example a
   corner cell bounded by traction patches, the tensor's determinant can round
