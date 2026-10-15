@@ -19,11 +19,13 @@ release. For complete commit-level details and contributor information, see the
   The velocity solid models integrate the displacement with the backward
   (BDF2) scheme of `ddt(U)` and evaluate the stress and the interface
   traction once, at the new time, which is second order in time and damps
-  high-frequency modes. A `fixedGradient` fluid pressure on the interface,
-  as in the monolithic tutorial variants, has its gradient set from the
-  normal momentum equation at the moving wall, which makes the interface
-  pressure and the added mass second-order accurate in space (a
-  `zeroGradient` pressure is first order, and gives a warning);
+  high-frequency modes. In `newtonIcoFluid`, a `fixedGradient` pressure on a
+  wall with fixed velocity, such as the interface in the monolithic tutorial
+  variants, has its gradient set from the normal momentum equation at the
+  wall, which makes the interface pressure and the added mass second-order
+  accurate in space (a `zeroGradient` interface pressure is first order, and
+  gives a warning), and the viscous interface traction uses a second-order
+  wall-normal velocity gradient;
   `ringAddedMass/verification/Allverify --study monolithic` verifies the
   coupling against the exact added-mass solution.
   `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,

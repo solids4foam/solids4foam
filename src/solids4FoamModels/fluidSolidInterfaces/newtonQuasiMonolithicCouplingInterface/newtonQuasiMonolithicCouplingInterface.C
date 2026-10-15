@@ -1205,41 +1205,12 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
 
 void newtonQuasiMonolithicCouplingInterface::setInterfacePressureGradient()
 {
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    fvPatchScalarField& pPatch = boundaryFieldRef(fluid().p())[fluidPatchID];
-
-    if (!isA<fixedGradientFvPatchScalarField>(pPatch))
-    {
-        return;
-    }
-
-    // Acceleration of the interface faces, with the fluid's ddt scheme
-    const volVectorField& U = fluid().U();
-    const vectorField interfaceAcceleration
-    (
-        fvc::ddt(U)().boundaryField()[fluidPatchID]
-    );
-
-    // Viscous term in the cells next to the interface, as in the momentum
-    // residual
-    const vectorField interfaceViscousTerm
-    (
-        fvc::laplacian
-        (
-            refCast<fluidModels::newtonIcoFluid>(fluid()).turbulence().nuEff(),
-            U
-        )().boundaryField()[fluidPatchID].patchInternalField()
-    );
-
-    // Unit normals pointing out of the fluid
-    const vectorField n(fluidMesh().boundary()[fluidPatchID].nf());
-
-    refCast<fixedGradientFvPatchScalarField>(pPatch).gradient() =
-        n & (interfaceViscousTerm - interfaceAcceleration);
-
-    // Update the interface pressure, which gives the solid traction, so that
-    // the residual is a function of the current solution only
-    pPatch.evaluate();
+    // The fluid sets the gradient on its fixedGradient pressure patches with
+    // fixed velocity, including the interface, from the current interface
+    // velocity, and updates the interface pressure that gives the solid
+    // traction
+    refCast<fluidModels::newtonIcoFluid>(fluid())
+        .updatePressureGradientBoundaries();
 }
 
 

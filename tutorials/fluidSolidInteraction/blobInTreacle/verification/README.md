@@ -192,6 +192,33 @@ Because the published data are limited to self-convergence norms and the
 coarse-mesh figures of the preprint, an independent reference solution, e.g.
 from COMSOL, LS-DYNA or ANSYS, would be valuable; one is being arranged.
 
+## Quasi-monolithic coupling
+
+The driver runs the partitioned coupling only. For the quasi-monolithic
+Newton coupling (`./Allrun monolithic`, OpenFOAM.com only), the tutorial was
+run separately on levels x1, x2 and x4 to `t = 3 s`, with the same time steps
+as the mesh study, alongside the partitioned coupling on the same machine
+(OpenFOAM v2512, macOS, serial). Steady `u_x` of the top point (m):
+
+| Coupling | x1 | x2 | x4 | Observed order | Extrapolated |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Partitioned | 0.117301 | 0.119696 | 0.120224 | 2.2 | 0.12037 |
+| Monolithic, 1st-order shear | 0.115467 | 0.118301 | 0.119376 | 1.4 | 0.12003 |
+| Monolithic | 0.119577 | 0.120385 | 0.120412 | – | 0.12041 |
+
+The x4 partitioned value differs from the one in the reference results above,
+recorded on Linux, by 0.06%. In this viscous case the interface traction is
+dominated by the wall shear. The viscous stress takes its wall-normal velocity
+gradient from the one-sided difference between the wall and the first cell
+centre, which is first order; the monolithic coupling's slow convergence came
+from this. Its interface traction now uses a quadratic through the wall, the
+first cell and the cell beyond it, which is second order, and its steady `u_x`
+changes by 0.02% from x2 to x4 and agrees with the extrapolated partitioned
+value to 0.04%. The apparent order is not meaningful, as the change from x2
+to x4 is close to the steady-state spread of the runs. The partitioned
+coupling still passes a first-order wall shear to the solid, which is part of
+its larger mesh dependence.
+
 ## References
 
 J. Liu, R.K. Jaiman, P.S. Gurugubelli, A stable second-order scheme for
