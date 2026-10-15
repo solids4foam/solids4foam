@@ -1780,7 +1780,41 @@ Platform control, 1x'/s2x (8 ranks, MeluXina against xenosim, cold to 6 s, the s
 (max+min)/2 -2.85883 / -2.85882 mm, f 5.56983 / 5.56983 Hz, drag (max+min)/2 458.521 / 458.521,
 lift amplitude 194.698 / 194.701 N/m, lift (max+min)/2 0.986 / 0.971 N/m. The xenosim run had
 been restarted at 2.5 s (pre-fix binary), so this also shows that run settled on the same
-limit cycle. 2x'/s4x control: running.
+limit cycle.
+
+Platform control, 2x'/s4x (16 ranks, MeluXina against the uninterrupted xenosim run, cold to
+6 s, window 5.086-5.996 s on both, `mlx_platform_2x.*`): u_y amplitude 36.1731 / 36.1730 mm
+(difference 8e-5 mm, 2e-6 relative), u_x (max+min)/2 -3.08175 / -3.08174 mm, u_x time mean
+-3.09272 / -3.09271 mm, f 5.49687 / 5.49687 Hz, drag (max+min)/2 461.398 / 461.395, drag
+amplitude 30.242 / 30.236, lift amplitude 174.142 / 174.143, lift (max+min)/2 2.181 / 2.194 N/m;
+10.71 / 10.74 IQN-ILS iterations per step. The platform (GCC 11.4 -O3 on EPYC 9684X against
+GCC 13.3 -O2 on EPYC 7H12) changes the coupled QoIs by at most 2e-4 relative (drag amplitude),
+far below every refinement difference; mixing platforms in the sequence is immaterial.
+
+**8x' at dt 5e-4 is unstable (finding).** The first 8x'/s16x run (dt 5e-4, as 1x'-4x'; MeluXina
+jobs 5342695/5342696, cancelled; case kept as evidence in
+`/project/home/p201136/philip-ht/c_8x_s16x_dt5e-4_tol1e-5_hypre`,
+`mlx_8x_dt5e-4_instability.txt`): the mean Courant number doubles per level as expected (0.17,
+0.34, 0.69 at 2x', 4x', 8x'), but the maximum swings between 8 and 34 from 0.03 s on (2x' 1.25,
+4x' 2.6; the 8x' replay at dt 1.25e-4 has 1.39, i.e. about 5.6 at dt 5e-4). With central
+convection and three PIMPLE outer correctors without relaxation the 8x' fluid does not converge
+within a step (Ux initial residual 4.7e-3, 4.8e-3, 4.5e-3 over the three correctors; p restarts
+near 0.96 in every corrector, against 2e-7 to 9e-9 at 4x'), so the fluid response depends on
+the coupling-iteration history and IQN-ILS stalls at relative residuals of about 1e-2: 7 of the
+first 7 coupled steps reached the cap (every xenosim level converged its first coupled steps in
+13 iterations to about 3e-6). The fixed-dt sequence therefore ends at 4x'. The 8x' level is run
+at dt 2.5e-4, on the constant-Courant path 2x' dt 1e-3, 4x' dt 5e-4, 8x' dt 2.5e-4 (nominal max
+Co about 2.7 on each), whose dt contribution is bounded by the 2x' time triplet.
+
+Health gate (`scripts/ht_health_gate.sh`, run every 5 min by `run_coupled_meluxina.slurm`): stop
+the run, write `HEALTH_ABORT` and cancel the dependent segments if (1) after 0.05 s at least 20
+of the last 100 steps have max Co > 5, (2) more than 3 of the first 20 coupled steps reach
+nOuterCorr, or (3) the median final IQN-ILS residual of the last 20 coupled steps exceeds 1e-4.
+Calibration: the healthy xenosim runs (1x' dt 1e-3, 2x' dt 1e-3, 2x'/s8x, 4x') pass at every
+stage (max Co at most 3.84 over all 4x' steps, no capped start-up step, median residual 4e-6 to
+9e-6); the dt-5e-4 8x' run aborts on rule 1 by 0.15 s and on rule 2 at the coupling start. An
+end-to-end test (1x', threshold lowered to Co 0.5) stopped the solver, wrote the message to the
+log, `run.out` and `health.log`, and cancelled the dependent job.
 
 ### Astra (GPT-6-Astra, xhigh) advice
 

@@ -22,6 +22,9 @@ if [ ! -d "$case" ] && [ -n "$SETUP" ]; then
     bash /project/home/p201136/philip-ht/setup_meluxina_case.sh "$case" $SETUP > "setup_$(basename "$case").log" 2>&1 || exit 1
 fi
 cd "$case" || exit 1
+if [ -f HEALTH_ABORT ]; then
+    echo "job $SLURM_JOB_ID: HEALTH_ABORT present ($(cat HEALTH_ABORT)), not continuing $(date -Is)" >> run.out; exit 1
+fi
 n=$(awk '$1=="cores"{print $2}' coupled_setup.txt)
 end=$(awk '$1=="endTime"{gsub(";","",$2); print $2}' system/controlDict)
 last=$(ls processor0 | grep -E '^[0-9][0-9.e+-]*$' | sort -g | tail -1)
@@ -42,9 +45,27 @@ log=log.solids4Foam.$SLURM_JOB_ID
 srun -n "$n" --cpu-bind=cores solids4Foam -parallel > "$log" 2>&1 &
 pid=$!
 jobend=$(date -d "$(scontrol show job "$SLURM_JOB_ID" | grep -oP 'EndTime=\K\S+')" +%s)
-stopat=$((jobend - margin * 60)); stopped=
+stopat=$((jobend - margin * 60)); stopped=; k=0
+gate=/project/home/p201136/philip-ht/ht_health_gate.sh
 while kill -0 $pid 2>/dev/null; do
-    sleep 60
+    sleep 60; k=$((k + 1))
+    # Health gate every 5 min (ht_health_gate.sh): Courant in the uncoupled and coupled phases,
+    # capped steps at the coupling start, coupling residual floor. On ABORT the solver is
+    # stopped, HEALTH_ABORT is written and the dependent segments are cancelled.
+    if [ $((k % 5)) -eq 0 ] && [ -z "$NO_HEALTH_GATE" ]; then
+        g=$(bash "$gate" "$case" "$log" 2>&1)
+        echo "$(date -Is) $g" >> health.log
+        if [ "${g%% *}" = ABORT ]; then
+            echo "$g (job $SLURM_JOB_ID, $(date -Is))" > HEALTH_ABORT
+            echo "HEALTH GATE $g $(date -Is)" >> run.out
+            kill $pid; sleep 30; kill -9 $pid 2>/dev/null; wait $pid 2>/dev/null
+            { echo; echo "HEALTH GATE: $g"; echo "HEALTH GATE: solver stopped by run_coupled_meluxina.slurm"; } >> "$log"
+            for j in $(squeue -h -u "$USER" -o "%i %E" | awk -v me="$SLURM_JOB_ID" '$2 ~ ("after(any|ok|notok)?:" me "([^0-9]|$)") {print $1}'); do
+                scancel "$j" && echo "cancelled dependent job $j" >> run.out
+            done
+            break
+        fi
+    fi
     if [ -z "$stopped" ] && [ "$(date +%s)" -ge "$stopat" ]; then
         sed -i 's/^stopAt .*/stopAt          writeNow;/' system/controlDict
         stopped=1; echo "stopAt writeNow set $(date -Is)" >> run.out
