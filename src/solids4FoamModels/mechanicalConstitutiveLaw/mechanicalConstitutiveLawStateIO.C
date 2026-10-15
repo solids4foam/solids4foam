@@ -284,6 +284,14 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::toSerialEntities
         return labelList(localEntities);
     }
 
+    // A processor can hold no cells of this region, e.g. with a coupled
+    // decomposition of a fluid-solid case; its addressing is then empty and
+    // it has no entries to relate
+    if (localEntities.empty())
+    {
+        return labelList();
+    }
+
     const labelList cellAddr(cellProcAddressing(mesh));
     const labelList faceAddr(faceProcAddressing(mesh));
 
