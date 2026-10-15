@@ -18,8 +18,9 @@ fi
 rm -rf case.foam postProcessing residuals
 rm -rf radialDisplacement.pdf fsiConvergence.pdf axialDisplacement.pdf
 
-# Restore the stored case format
+# Restore the stored case format and the default (partitioned) variant
 solids4Foam::restoreCaseFormat .
+solids4Foam::restoreCaseVariant .
 
 # Link files back to default with pimpleFluid
 for file in $(find ./0 ./constant ./system -name '*.robin')
