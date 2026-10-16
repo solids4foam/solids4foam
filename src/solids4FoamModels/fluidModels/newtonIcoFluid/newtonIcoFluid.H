@@ -100,6 +100,38 @@ class newtonIcoFluid
         //- Pressure stabilisation model
         autoPtr<stabilisationModel> pressureStabilisationPtr_;
 
+        //- Scale factor applied to the pressure-equation residual and
+        //  Jacobian rows relative to the momentum equations
+        const scalar pressureScaleFactor_;
+
+        //- Store pressure in the PETSc solution vector as p/pScale.
+        //  When disabled (default) the PETSc Vec stores physical
+        //  pressure unchanged
+        const Switch scaleMixedPetScFields_;
+
+        //- Scale type used for the PETSc pressure unknown.
+        //  Valid options: "none", "user"/"scalar", "dynamicHead"
+        const word pressureUnknownScaleType_;
+
+        //- Pressure scale used for pHat = p/pressureUnknownScale_.
+        //  Defaults to 1 (no-op); intended to give matrix-free SNES
+        //  (-snes_mf_operator) comparable velocity and pressure
+        //  magnitudes in the PETSc Vec
+        scalar pressureUnknownScale_;
+
+        //- Effective scale applied to the pressure-equation residual
+        //  and the pressure-row Jacobian entries.
+        //  Equals pressureScaleFactor_ today; introduced for symmetry
+        //  with the solid-side scaling pattern
+        scalar pressureEqnScale_;
+
+        //- Optional pressure stabilisation gamma with selected patch fluxes
+        //  zeroed
+        autoPtr<surfaceScalarField> pressureStabilisationGammaPtr_;
+
+        //- Patch IDs where pressure-stabilisation boundary flux is suppressed
+        labelList zeroPressureStabilisationFluxPatchIDs_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -122,6 +154,13 @@ class newtonIcoFluid
         //- Correct phi function
         void correctPhi();
 
+        //- Restore the flow fields and mesh after a failed PETSc solve
+        void restoreOldTimeState
+        (
+            const pointField& oldPoints,
+            const bool meshMoved
+        );
+
         //- Solve pressure equation
         void solvePEqn
         (
@@ -129,6 +168,28 @@ class newtonIcoFluid
             const fvVectorMatrix& ddtUEqn,
             const fvVectorMatrix& HUEqn
         );
+
+        //- Return pressure-stabilisation gamma with selected patch fluxes
+        //  zeroed
+        const surfaceScalarField& pressureStabilisationGamma();
+
+#ifdef USE_PETSC
+        //- Copy the PETSc solution vector x into the U and p fields,
+        //  applying the pressure unknown scale
+        //  (p = pressureUnknownScale_ * pHat) and correcting boundary
+        //  conditions. Vec is a pointer type, so it is taken by value
+        void unpackSolution(const Vec x);
+
+        //- Copy the current U and p fields into the PETSc solution
+        //  vector x, applying the inverse pressure unknown scale
+        //  (pHat = p/pressureUnknownScale_).
+        //  Vec is a pointer type, so it is taken by value
+        void packSolution(Vec x);
+
+        //- Apply equation under-relaxation to the velocity equation
+        //  using an implicit diagonal source term
+        void relaxVelocityEqn(fvVectorMatrix& UEqn) const;
+#endif
 
         //- Disallow default bitwise copy construct
         newtonIcoFluid(const newtonIcoFluid&);
@@ -214,6 +275,24 @@ public:
                 return pressureStabilisationPtr_();
             }
 
+            //- Return the pressure-equation scaling factor
+            scalar pressureScaleFactor() const
+            {
+                return pressureScaleFactor_;
+            }
+
+            //- Return the PETSc pressure unknown scale, i.e. the scale s
+            //  in pHat = p / s used to store pressure in the SNES vector.
+            //  Equals 1 (no-op) unless scaleMixedPetScFields is enabled
+            scalar pressureUnknownScale() const
+            {
+                return pressureUnknownScale_;
+            }
+
+            //- Suppress pressure-stabilisation boundary flux on a patch
+            void addZeroPressureStabilisationFluxPatch(const label patchID);
+
+
 
         // Edit
 
@@ -242,16 +321,18 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
-            );
+            )
+            {
+                return formResidual(f, x, false);
+            }
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
-            //  array) vector, given a reference configuration (solid model
-            //  representing the fluid domain motion)
+            //  array) vector, with optional flux extrapolation
             virtual label formResidual
             (
                 Vec f,         // Residual
-                const Vec x,    // Solution
-                const solidModel& motion
+                const Vec x,   // Solution
+                const bool extrapolatedFlux
             );
 
             //- Form the Jacobian of the governing equation
@@ -259,7 +340,30 @@ public:
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
+            )
+            {
+                return formJacobian(jac, x, false);
+            }
+
+            //- Form the Jacobian of the governing equation, with optional
+            //  flux extrapolation
+            virtual label formJacobian
+            (
+                Mat jac,                    // Jacobian
+                const Vec x,                // Solution
+                const bool extrapolatedFlux
             );
+
+            //- Apply a SIMPLE-type segregated preconditioner
+            //  Approximately solves y = M^{-1} x using one SIMPLE iteration
+            //  when PETSc uses the `physics` preconditioner
+            virtual label precondition
+            (
+                Vec y,         // Output: y = M^{-1} x
+                const Vec x    // Input: vector to be preconditioned
+            );
+
+
 #endif // USE_PETSC
 };
 

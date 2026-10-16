@@ -496,20 +496,36 @@ bool linGeomTotalDispSolid::evolveSnes()
     if (predictor_ && newTimeStep())
     {
         predict();
+    }
 
-        // Map the D field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<vector>
+    // Seed the SNES solution vector from the current fields on every time
+    // step, so that initial conditions, restarts and externally set fields
+    // (e.g. FSI mesh motion) are not overwritten by a stale solution vector
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        D().primitiveFieldRef(),
+#else
+        D().internalField(),
+#endif
+        foamPetscSnesHelper::solution(),
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    if (solvePressure())
+    {
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
 #ifdef OPENFOAM_NOT_EXTEND
-            D().primitiveFieldRef(),
+            p().primitiveFieldRef(),
 #else
-            D().internalField(),
+            p().internalField(),
 #endif
             foamPetscSnesHelper::solution(),
-            0, // Location of first component
-            solidModel::twoD()
-          ? makeList<label>({0,1})
-          : makeList<label>({0,1,2})
+            blockSize_ - 1 // Location of p component
         );
     }
 

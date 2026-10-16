@@ -60,7 +60,7 @@ SourceFiles
 #include "fvMatricesFwd.H"
 #include "PackedBoolList.H"
 #include "meshDual.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "checkConvergence.H"
 #include "boolIOList.H"
 #include "compatibilityFunctions.H"
@@ -326,7 +326,7 @@ private:
         mutable autoPtr<volVectorField> rhoD2dt2DPtr_;
 
         //- TwoD point corrector object
-        twoDPointCorrector twoDCorrector_;
+        twoDPointCorrectorS4f twoDCorrector_;
 
         //- Flag indicating if the case is 2-D or 3-D
         const bool twoD_;
@@ -422,6 +422,9 @@ private:
         //- Return high-order coefficients for pressure
         const dictionary& pressureHighOrderCoeffs() const;
 
+        //- Return stabilisation dictionary, creating default entries if needed
+        dictionary& stabilisationDict();
+
         //- For calculating the position of the patch/face zone in the deformed
         //  configuration, we need to move the mesh by the point displacement
         //  field. For moving mesh approach (updated Lagrangian) we need the
@@ -458,14 +461,6 @@ protected:
         //  interpolation has to finish it the same way. It also applies the
         //  two-dimensional correction
         void correctPointDisplacement(pointVectorField& pointD) const;
-
-        //- Interpolate displacement to points on the primary mesh
-        void interpolatePointDisplacement
-        (
-            const volVectorField& D,
-            const volTensorField& gradD,
-            pointVectorField& pointD
-        );
 
         //- Initial density, from the mechanicalConstitutiveLaw framework.
         //
@@ -571,7 +566,8 @@ protected:
         tmp<volScalarField> lawImpK
         (
             mechanicalConstitutiveLawManager& manager,
-            const tangentRequest req
+            const tangentRequest req,
+            const word& fieldName = "impK"
         ) const;
 
         //- Deformation gradient at the quadrature points, F = I + gradD.T(),
@@ -595,6 +591,19 @@ protected:
 
 
     // Protected member functions
+
+        //- Create a stabilisation model from the given stabilisation sub-dict
+        autoPtr<stabilisationModel> createStabilisation
+        (
+            const word& name,
+            const dimensionSet& dims
+        );
+
+        //- Reset the momentum stabilisation model with the given dimensions
+        void resetMomentumStabilisation(const dimensionSet& dims);
+
+        //- Reset the pressure stabilisation model with the given dimensions
+        void resetPressureStabilisation(const dimensionSet& dims);
 
         //- Make the dual mesh from the mesh
         void makeDualMesh() const;
@@ -1039,7 +1048,7 @@ public:
             virtual volVectorField& solutionD() = 0;
 
             //- Const-reference to the twoD point corrector object
-            const twoDPointCorrector& twoDCorrector() const
+            const twoDPointCorrectorS4f& twoDCorrector() const
             {
                 return twoDCorrector_;
             }
@@ -1181,6 +1190,22 @@ public:
             void syncGlobalPatches() const;
 
         // Edit
+
+            //- Return the initial shear modulus from the
+            //  mechanicalConstitutiveLaw framework, i.e. 3/4 of the
+            //  deviatoric scalar tangent at zero strain
+            tmp<volScalarField> shearModulus() const;
+
+            //- Interpolate displacement to points on the primary mesh
+            //  Public so that coupling algorithms which update the solid
+            //  displacement directly, e.g. monolithic FSI, can keep the
+            //  point displacement consistent
+            void interpolatePointDisplacement
+            (
+                const volVectorField& D,
+                const volTensorField& gradD,
+                pointVectorField& pointD
+            );
 
             //- Set traction at specified patch
             virtual void setTraction

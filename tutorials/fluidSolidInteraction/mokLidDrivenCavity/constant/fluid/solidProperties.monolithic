@@ -1,0 +1,30 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Linear elastic mesh motion, the analogue of the partitioned uniform
+// diffusivity: with a neoHookeanElastic mesh motion law, J < 0 is reached
+// in the cells above the membrane at about t = 9 s
+solidModel    linearGeometryTotalDisplacement;
+// solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+"linearGeometryTotalDisplacementCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
+{
+    solutionAlgorithm    PETScSNES;
+}
+
+// ************************************************************************* //

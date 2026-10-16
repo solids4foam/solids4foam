@@ -182,6 +182,25 @@ modes is less than 1% of its norm. Without this filter, nearly dependent modes
 are retained once the solution approaches a steady state, and the FSI residual
 can stall just above `outerCorrTolerance` until `nOuterCorr` is reached.
 
+### Quasi-monolithic variant
+
+`./Allrun monolithic` (optionally with `parallel`) runs the case with the
+quasi-monolithic Newton coupling (`fluidSolidInterface NewtonQuasiMonolithic`),
+which needs OpenFOAM.com and PETSc. The fluid velocity and pressure
+(`newtonIcoFluid`) and the solid velocity are solved together with PETSc SNES
+in every time step, so there are no FSI sub-iterations; the fluid mesh motion
+is a separate solid model in the fluid region. The files of this variant are
+stored beside the partitioned ones as `*.monolithic` files, which `Allrun`
+links in and `Allclean` removes again.
+
+The solid model is `nonLinearGeometryTotalLagrangianVelocity`, which uses the
+same St Venant-Kirchhoff law as the partitioned setup but a different time
+integration. Up to `t = 4 s` with `deltaT = 0.05 s` it gives a maximum tip `Dx`
+of `2.69e-2 m` against `2.63e-2 m` for IQNILS, and a final tip `Dx` of
+`1.066e-2 m` against `0.991e-2 m`, which is within the scatter of the
+partitioned variants. The regression test runs this variant as a fourth arm
+on OpenFOAM.com, checked against the same references.
+
 ## Regression Test
 
 The case also includes a `regressionTest.sh` script which runs short regression
