@@ -24,8 +24,9 @@ release. For complete commit-level details and contributor information, see the
   variants, has its gradient set from the normal momentum equation at the
   wall, which makes the interface pressure and the added mass second-order
   accurate in space (a `zeroGradient` interface pressure is first order, and
-  gives a warning), and the viscous interface traction uses a second-order
-  wall-normal velocity gradient;
+  gives a warning), and the viscous interface traction is the wall flux of
+  the momentum equation's viscous term, `nuEff*snGrad(U)`, so that the force
+  on the solid is the momentum the fluid loses;
   `ringAddedMass/verification/Allverify --study monolithic` verifies the
   coupling against the exact added-mass solution.
   `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,

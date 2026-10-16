@@ -1205,12 +1205,14 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
 
 void newtonQuasiMonolithicCouplingInterface::setInterfacePressureGradient()
 {
-    // The fluid sets the gradient on its fixedGradient pressure patches with
-    // fixed velocity, including the interface, from the current interface
-    // velocity, and updates the interface pressure that gives the solid
-    // traction
+    // The fluid sets the gradient of a fixedGradient interface pressure from
+    // the current interface velocity, and updates the interface pressure that
+    // gives the solid traction
     refCast<fluidModels::newtonIcoFluid>(fluid())
-        .updatePressureGradientBoundaries();
+        .updatePressureGradientBoundary
+        (
+            fluidSolidInterface::fluidPatchIndices()[0]
+        );
 }
 
 
@@ -1527,7 +1529,10 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
         (
             solid().U().boundaryField()[solidPatchID].patchInternalField()
           + (
-                solidMesh().boundary()[solidPatchID].delta()
+                (
+                    solidMesh().boundary()[solidPatchID].Cf()
+                  - solidMesh().boundary()[solidPatchID].Cn()
+                )
               & gradU.boundaryField()[solidPatchID].patchInternalField()
             )
         );

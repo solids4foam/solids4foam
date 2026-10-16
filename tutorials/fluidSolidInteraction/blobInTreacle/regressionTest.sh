@@ -27,14 +27,13 @@ REF_DISP_END=0.117303
 REF_FORCE_END=15.8338
 
 # Reference values for the quasi-monolithic Newton coupling, which needs
-# OpenFOAM.com and PETSc: OpenFOAM v2512, serial, macOS. On this mesh the
-# monolithic final displacement is 1.9% above the partitioned one above, but
-# closer to the mesh-converged value: under refinement both converge to
-# within 0.05% of each other, the monolithic one from 0.7% below on this
-# mesh and the partitioned one from 2.5% below
-MONO_REF_DISP_T1=0.057578
-MONO_REF_DISP_END=0.119578
-MONO_REF_FORCE_END=15.7858
+# OpenFOAM.com and PETSc: OpenFOAM v2512, serial, macOS. They agree with the
+# partitioned references above to 0.5% at t = 1 s and to 0.1% at the end
+# time; under mesh refinement both converge at second order to steady
+# displacements within 0.12% of each other
+MONO_REF_DISP_T1=0.0568213
+MONO_REF_DISP_END=0.11743
+MONO_REF_FORCE_END=15.7791
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"

@@ -24,6 +24,7 @@ License
 #include "findRefCell.H"
 #include "fixedValueFvPatchFields.H"
 #include "fixedGradientFvPatchFields.H"
+#include "wallFvPatch.H"
 #include "compatibilityFunctions.H"
 
 
@@ -523,95 +524,18 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-    // Named normal: a tmp normal field would be reused as the storage of
-    // the inner product, which aliases an input of the loop and gives
-    // wrong results with some -O3 builds (see the 3dTube verification)
-    const vectorField nf(mesh().boundary()[patchID].nf());
+    // The viscous force is the boundary flux of the momentum residual's
+    // viscous term, laplacian(nuEff, U), i.e. nuEff*snGrad(U), so that the
+    // force on the solid is the momentum the fluid loses. At an
+    // incompressible no-slip wall this is also the viscous traction. The
+    // full n & devReff would add the transpose and trace parts of the
+    // boundary velocity gradient, whose tangential components are the
+    // adjacent cell values, a first-order error that the residual does not
+    // contain
+    const scalarField nuEff(turbulence_->nuEff()().boundaryField()[patchID]);
+    const vectorField snGradU(U().boundaryField()[patchID].snGrad());
 
-    tmpRef(tvF) = rho_.value()
-       *(
-            nf
-#ifdef OPENFOAM_ORG
-          & (-turbulence_->devTau()().boundaryField()[patchID])
-#else
-          & (-turbulence_->devReff()().boundaryField()[patchID])
-#endif
-        );
-
-    // The wall-normal velocity gradient in the viscous stress is the
-    // one-sided difference (U_b - U_P)*deltaCoeffs, which is first order in
-    // the wall shear. At walls with fixed velocity, a quadratic through the
-    // wall value, the owner cell and the cell beyond it along the normal
-    // gives a second-order gradient:
-    //     G2 = A + d/(L + d)*(A - g)
-    // with A = (U_P - U_b)/d, g = (U_N - U_P)/L, and d and L the normal
-    // distances from the wall to P and from P to N. The correction is
-    // proportional to the velocity differences, so it stays proportional to
-    // nu when the boundary layer is not resolved
-    if (U().boundaryField()[patchID].fixesValue())
-    {
-        const fvMesh& mesh = this->mesh();
-        const labelList& faceCells = mesh.boundary()[patchID].faceCells();
-        const vectorField& Cf = mesh.boundary()[patchID].Cf();
-        const vectorField& C = mesh.C();
-        const surfaceVectorField& Sf = mesh.Sf();
-        const labelList& own = mesh.owner();
-        const labelList& nei = mesh.neighbour();
-        const cellList& cells = mesh.cells();
-        const vectorField& UI = U();
-        const vectorField& Ub = U().boundaryField()[patchID];
-        const scalarField nuEffb
-        (
-            turbulence_->nuEff()().boundaryField()[patchID]
-        );
-
-        forAll(faceCells, faceI)
-        {
-            const label cellP = faceCells[faceI];
-            const vector& n = nf[faceI];
-
-            // The internal face of P most nearly opposite the wall
-            label cellN = -1;
-            scalar maxCos = 0.5;
-            forAll(cells[cellP], cfI)
-            {
-                const label faceK = cells[cellP][cfI];
-                if (!mesh.isInternalFace(faceK))
-                {
-                    continue;
-                }
-
-                const vector nK = Sf[faceK]/mag(Sf[faceK]);
-                const scalar cosK = (own[faceK] == cellP) ? -(n & nK) : (n & nK);
-                if (cosK > maxCos)
-                {
-                    maxCos = cosK;
-                    cellN = (own[faceK] == cellP) ? nei[faceK] : own[faceK];
-                }
-            }
-
-            if (cellN == -1)
-            {
-                continue;
-            }
-
-            const scalar d = n & (Cf[faceI] - C[cellP]);
-            const scalar L = n & (C[cellP] - C[cellN]);
-            if (d < SMALL || L < SMALL)
-            {
-                continue;
-            }
-
-            const vector A = (UI[cellP] - Ub[faceI])/d;
-            const vector g = (UI[cellN] - UI[cellP])/L;
-            const vector delta = d/(L + d)*(A - g);
-
-            // Change of n & dev(twoSymm(gradU)) for the change -n*delta of
-            // the wall-normal gradient (n points out of the fluid)
-            tmpRef(tvF)[faceI] -=
-                rho_.value()*nuEffb[faceI]*(delta + (n*(n & delta))/3.0);
-        }
-    }
+    tmpRef(tvF) = rho_.value()*nuEff*snGradU;
 
     return tvF;
 }
@@ -1203,56 +1127,56 @@ label newtonIcoFluid::initialiseSolution(Vec& x)
 }
 
 
-void newtonIcoFluid::updatePressureGradientBoundaries()
+void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
 {
     volScalarField& p = this->p();
     const volVectorField& U = this->U();
 
-    labelHashSet patches;
-    forAll(p.boundaryField(), patchI)
-    {
-        if
-        (
-            isA<fixedGradientFvPatchScalarField>(p.boundaryField()[patchI])
-         && U.boundaryField()[patchI].fixesValue()
-        )
-        {
-            patches.insert(patchI);
-        }
-    }
-
-    if (patches.empty())
+    if
+    (
+        !isA<fixedGradientFvPatchScalarField>(p.boundaryField()[patchI])
+     || !isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI])
+    )
     {
         return;
     }
 
     // Acceleration of the boundary faces, with the ddt scheme of U
-    const volVectorField ddtU(fvc::ddt(U));
-
-    // Viscous term, as in the momentum residual
-    const volVectorField laplacianU
+    const vectorField acceleration
     (
-        fvc::laplacian(turbulence_->nuEff(), U)
+        fvc::ddt(U)().boundaryField()[patchI]
     );
 
-    forAllConstIter(labelHashSet, patches, iter)
-    {
-        const label patchI = iter.key();
-
-        // Unit normals pointing out of the fluid
-        const vectorField n(mesh().boundary()[patchI].nf());
-
-        const vectorField viscousTerm
+    // Viscous term in the cells next to the boundary, as in the momentum
+    // residual
+    const vectorField viscousTerm
+    (
+        fvc::laplacian
         (
-            laplacianU.boundaryField()[patchI].patchInternalField()
-        );
+            turbulence_->nuEff(), U
+        )().boundaryField()[patchI].patchInternalField()
+    );
 
-        fvPatchScalarField& pPatch = boundaryFieldRef(p)[patchI];
+    // Unit normals pointing out of the fluid
+    const vectorField n(mesh().boundary()[patchI].nf());
 
-        refCast<fixedGradientFvPatchScalarField>(pPatch).gradient() =
-            n & (viscousTerm - ddtU.boundaryField()[patchI]);
+    fvPatchScalarField& pPatch = boundaryFieldRef(p)[patchI];
 
-        pPatch.evaluate();
+    refCast<fixedGradientFvPatchScalarField>(pPatch).gradient() =
+        n & (viscousTerm - acceleration);
+
+    pPatch.evaluate();
+}
+
+
+void newtonIcoFluid::updatePressureGradientBoundaries()
+{
+    forAll(mesh().boundary(), patchI)
+    {
+        if (isA<wallFvPatch>(mesh().boundary()[patchI]))
+        {
+            updatePressureGradientBoundary(patchI);
+        }
     }
 }
 
