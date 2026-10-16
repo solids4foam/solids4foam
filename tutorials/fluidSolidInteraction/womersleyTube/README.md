@@ -110,6 +110,9 @@ tolerances of the solvers.
 - **Coupling.** IQN-ILS with the predictor (`constant/fsiProperties.iqnils`),
   or Robin-Neumann with `elasticWallPressure`, `elasticWallVelocity` and a
   fixed relaxation factor of 1 (`./Allrun robin`).
+  The quasi-monolithic Newton coupling (`./Allrun monolithic`) solves the
+  fluid (`newtonIcoFluid`) and the wall (`linearGeometryVelocity`) together;
+  its files are the `*.monolithic` variants.
 - **Time integration.** Second-order backward differencing (`backward`) in
   both regions, with 100 time-steps per period. The case runs two periods.
 
@@ -121,12 +124,14 @@ tolerances of the solvers.
 ./Allrun              # IQN-ILS
 ./Allrun robin        # Robin-Neumann coupling
 ./Allrun robin parallel
+./Allrun monolithic   # quasi-monolithic Newton coupling
 ```
 
 The tutorial requires solids4foam to be built with PETSc, and runs with
 OpenFOAM.com (the coded conditions and the sampling are not available in
 foam-extend, and the sampling syntax differs in OpenFOAM.org). It takes about
-4 minutes in serial with IQN-ILS and half that with Robin-Neumann. Run
+4 minutes in serial with IQN-ILS, half that with Robin-Neumann and about
+1 minute with the quasi-monolithic coupling. Run
 `./Allclean` before switching to another variant, as `Allrun` does not rerun
 a solver whose log exists.
 

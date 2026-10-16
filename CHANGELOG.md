@@ -28,11 +28,16 @@ release. For complete commit-level details and contributor information, see the
   the momentum equation's viscous term, `nuEff*snGrad(U)`, so that the force
   on the solid is the momentum the fluid loses;
   `ringAddedMass/verification/Allverify --study monolithic` verifies the
-  coupling against the exact added-mass solution.
+  coupling against the exact added-mass solution. The velocity solid models
+  work on axisymmetric (wedge) meshes, and the coupling accepts a solid that
+  starts deformed, which the fluid mesh then follows relative to its initial
+  displacement; `womersleyTube/verification/Allverify --monolithic` verifies
+  both against the exact pulsatile flow in an elastic tube.
   `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,
-  `cavityFlexibleBottom`, `membraneRoof`, `perpendicularFlap`,
-  `ringAddedMass`, `3dTube`, `mokLidDrivenCavity` and `foilInWind`
-  tutorials, whose files are stored as `*.monolithic` variants selected with
+  `cavityFlexibleBottom`, `collapsibleChannel`, `membraneRoof`,
+  `perpendicularFlap`, `ringAddedMass`, `3dTube`, `mokLidDrivenCavity`,
+  `womersleyTube` and `foilInWind` tutorials, whose files are stored as
+  `*.monolithic` variants selected with
   `solids4Foam::selectCaseVariant`. The regression tests of
   `beamInCrossFlow`, `blobInTreacle` and `cavityFlexibleBottom` have a
   monolithic arm.
