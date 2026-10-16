@@ -19,27 +19,35 @@ Class
     foamPetscSnesHelper
 
 Description
-    Helper class and functions for interacting with the PETSc nonlinear
-    solver (SNES).
+    Helper class for models that are solved with the PETSc nonlinear solver
+    (SNES).
 
-    Solid models can use this SNES interface by deriving from this class and
-    defining two virtual functions:
-
-    1. residualMomentum
-       This should return the momentum equation imbalance (residual) for
-       the given displacement field
-    2. JacobianMomentum
+    A model uses this SNES interface by deriving from this class and defining
+    the functions of the petscSnesSystem interface, principally:
+    1. formResidual
+       This should return the residual (imbalance) of the governing equations
+       for the given solution vector
+    2. formJacobian
        This should return the Jacobian (or an approximation of it) of the
-       residual with respect to the displacement field.
+       residual with respect to the solution vector.
        A Newton-Krylov method can work well with a compact stencil
        approximation of the Jacobian, e.g. fvm::laplacian.
+
+    The helper combines two components, which can also be used on their own:
+    - a foamPetscMeshAssembly, which numbers the unknowns of the model mesh
+      and assembles fvMatrix and other operator coefficients into PETSc
+      matrices and vectors;
+    - a foamPetscSnesSolver, which holds the PETSc SNES objects and solves the
+      system. It is created on first use, so a model whose residual and
+      Jacobian are only used as blocks of a larger system, e.g. by the
+      monolithic fluid-solid interaction coupling, holds no SNES objects.
 
 Author
     Philip Cardiff, UCD.
 
 SourceFiles
     foamPetscSnesHelper.C
-    foamPetscSnesHelperTemplates.C
+    foamPetscSnesHelperEnums.C
 
 \*---------------------------------------------------------------------------*/
 
@@ -48,80 +56,39 @@ SourceFiles
 
 #ifdef USE_PETSC
 
-#include <petscsnes.h>
-#include <petscksp.h>
-
-#include "PetscHandles.H"
-#include "globalIndex.H"
-#include "globalPointIndices.H"
-#include "volFields.H"
-#include "fvMatrices.H"
-#include "leastSquaresS4fVectors.H"
-
-
-// * * * * * * * * * * * * * * External Structs  * * * * * * * * * * * * * * //
-
-// Forward declaration of the Foam::foamPetscSnesHelper class
-namespace Foam
-{
-    class foamPetscSnesHelper;
-    class IOdictionary;
-}
-
-// User data "context" for PETSc functions
-typedef struct appCtxfoamPetscSnesHelper
-{
-    // Reference to the solid model object
-    Foam::foamPetscSnesHelper& solMod_;
-
-    // Constructor
-    appCtxfoamPetscSnesHelper
-    (
-        Foam::foamPetscSnesHelper& solMod
-    )
-    :
-        solMod_(solMod)
-    {}
-} appCtxfoamPetscSnesHelper;
-
-
-namespace Foam
-{
+#include "petscSnesSystem.H"
+#include "foamPetscMeshAssembly.H"
+#include "foamPetscSnesSolver.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+namespace Foam
+{
 
-/*---------------------------------------------------------------------------* \
+/*---------------------------------------------------------------------------*\
                      Class foamPetscSnesHelper Declaration
 \*---------------------------------------------------------------------------*/
 
 class foamPetscSnesHelper
+:
+    public petscSnesSystem
 {
 public:
 
         //- Location of the solution unknowns
-        enum solutionLocation
-        {
-            CELLS,
-            POINTS,
-            NONE
-        };
+        typedef foamPetscMeshAssembly::solutionLocation solutionLocation;
 
-        //- Solution location names
 #ifdef OPENFOAM_COM
-        static const Enum<solutionLocation> solutionLocationNames_;
-#else
-        static const NamedEnum<solutionLocation, 3> solutionLocationNames_;
+        //- Solution location names
+        static const Enum<solutionLocation>& solutionLocationNames_;
 #endif
+
 
 private:
 
     // Private data
 
-        //- Location of the solution unknowns, e.g. cells or points
-        const solutionLocation location_;
-
-        //- Was PETSc initialised?
+        //- Was PETSc initialised, i.e. can this system be solved?
         const Switch initialised_;
 
         //- Name of the solution field used to look up PETSc options
@@ -131,94 +98,22 @@ private:
         //  this solver
         const fileName optionsFile_;
 
-        //- Mesh used for local-to-global maps and default fvSolution lookup
-        const fvMesh& mesh_;
-
         //- Optional explicit location of the fvSolution dictionary to use
         //  when looking up PETSc options. If empty, use the mesh fvSolution
         const fileName fvSolutionLocation_;
 
-        //- Store the options database
-        //  We re-set the options database before each call to solve
-        PetscOptions options_;
-
-        //- Flag indicating if the PETSc options database has been populated
-        bool optionsLoaded_;
-
         //- Flag to set whether the solver stops when PETSc SNES returns an
         //  error
-        Switch stopOnPetscError_;
+        const Switch stopOnPetscError_;
 
-        //- Flag to track if SNES diverged
-        bool diverged_;
+        //- Assembly of the mesh discretisation into PETSc objects
+        foamPetscMeshAssembly assembly_;
 
-        //- Force stale lagged Jacobian/preconditioner state to rebuild
-        bool forceSnesSolverStateRebuild_;
+        //- Solver, created on first use
+        autoPtr<foamPetscSnesSolver> solverPtr_;
 
-        //- Pointer to the PETSc SNES object
-        //  Note that SNES is a pointer type
-        SnesHandle snes_;
-
-        //- Pointer to the PETSc solution vector
-        //  Note that Vec is a pointer type
-        VecHandle x_;
-
-        //- Pointer to a backup of the PETSc solution vector
-        VecHandle xBackup_;
-
-        //- Pointer to the PETSc matrix
-        //  Note that Mat is a pointer type
-        MatHandle A_;
-
-        //- PETSc user context
-        autoPtr<appCtxfoamPetscSnesHelper> snesUserPtr_;
-
-        //- Helper object for converting between local (on processor) and global
-        //  cell indices
-        autoPtr<globalIndex> globalCellsPtr_;
-
-        //- Helper object for converting between local (on processor) and global
-        //  point indices
-        autoPtr<globalPointIndices> globalPointsPtr_;
-
-        //- Global cell IDs for the neighbouring processor patch cells
-        mutable PtrList<labelList> neiProcGlobalIDs_;
-
-        //- Cell volumes for the neighbouring processor patch cells
-        mutable PtrList<scalarField> neiProcVolumes_;
-
-        //- A flag indicating if the solve function has been called
-        bool snesHasRun_;
 
     // Private Member Functions
-
-        //- Make the neighbour processor patch fields for the given mesh
-        void makeNeiProcFields(const fvMesh& mesh) const;
-
-        //- Return a reference to neiProcGlobalIDs for the given mesh
-        const PtrList<labelList>& neiProcGlobalIDs(const fvMesh& mesh) const;
-
-        //- Return a reference to neiProcGlobalIDs for the given mesh
-        const PtrList<scalarField>& neiProcVolumes(const fvMesh& mesh) const;
-
-        //- Return a reference to the least squares vectors
-        const leastSquaresS4fVectors& lsVectors(const volScalarField& p) const;
-
-        //- Return an explicit fvSolution dictionary override if requested
-        autoPtr<IOdictionary> makeSolutionDictOverride() const;
-
-        //- Populate the PETSc options database from the given fvSolution dict
-        bool populateOptionsFromDict
-        (
-            const dictionary& solutionDict,
-            const fileName& solutionDictPath
-        );
-
-        //- Populate the PETSc options database on first use
-        void loadOptions();
-
-        //- Initialise the snes object
-        virtual label initialiseSnes();
 
         //- Disallow default bitwise copy construct
         foamPetscSnesHelper(const foamPetscSnesHelper&);
@@ -232,9 +127,10 @@ public:
     //- Runtime type information
     TypeName("foamPetscSnesHelper");
 
+
     // Constructors
 
-        //- Construct from nBlocks and blockSize
+        //- Construct from components
         //
         //  Parameters:
         //    solution field name - Name of the solution field used to look up
@@ -248,7 +144,8 @@ public:
         //                          mapping
         //    stopOnPetscError    - Optional: Give a FatalError when PETSc
         //                          returns an error
-        //    initialise          - Optional: Initialise PETSc
+        //    initialise          - Optional: Initialise PETSc so that the
+        //                          system can be solved with solve()
         //    fvSolutionLocation  - Optional: explicit location of the
         //                          fvSolution dictionary used to look up PETSc
         //                          options. If unset, use the mesh fvSolution
@@ -264,55 +161,43 @@ public:
         );
 
 
-    // Destructor
-
-        virtual ~foamPetscSnesHelper();
+    //- Destructor
+    virtual ~foamPetscSnesHelper();
 
 
     // Member Functions
 
         // Access
 
+            //- Return the assembly component
+            const foamPetscMeshAssembly& assembly() const
+            {
+                return assembly_;
+            }
+
+            //- Return the solver component, creating it on first use
+            foamPetscSnesSolver& solver();
+
             //- Non-const access to the PETSc solution vector
             Vec solution()
             {
-                if (!x_.v)
-                {
-                    // Initialise snes object
-                    if (initialiseSnes() != 0)
-                    {
-                        FatalErrorInFunction
-                        << "initialiseSnes failed" << abort(FatalError);
-                    }
-                }
-
-                return x_.v;
+                return solver().solution();
             }
 
             //- Non-const access to the PETSc solution backup vector
             Vec solutionBackup()
             {
-                if (!xBackup_.v)
-                {
-                    // Initialise based on x
-                    // Note: we call solution() rather than accessing x_.v
-                    // directly, as x_ is lazily created by solution(); this
-                    // way, the backup vector can be created before the first
-                    // call to solve()
-                    VecDuplicate(solution(), xBackup_.put());
-                }
-
-                return xBackup_.v;
+                return solver().solutionBackup();
             }
 
             //- Return a reference to the snes object
             SNES& snes()
             {
-                return snes_.s;
+                return solver().snes();
             }
 
             //- Return the stopOnPetscError flag
-            const Switch stopOnPetscError() const
+            Switch stopOnPetscError() const
             {
                 return stopOnPetscError_;
             }
@@ -320,148 +205,91 @@ public:
             //- Return non-const access to the diverged flag
             bool& diverged()
             {
-                return diverged_;
+                return solver().diverged();
             }
 
             //- Const access to the global index object
             const globalIndex& globalCells() const
             {
-                if (globalCellsPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not set" << exit(FatalError);
-                }
-
-                return globalCellsPtr_();
+                return assembly_.globalCells();
             }
 
             //- Const access to the global point object
             const globalPointIndices& globalPoints() const
             {
-                if (globalPointsPtr_.empty())
-                {
-                    FatalErrorInFunction
-                        << "Pointer not set" << exit(FatalError);
-                }
+                return assembly_.globalPoints();
+            }
 
-                return globalPointsPtr_();
+            //- Return true if the solve function has been called
+            bool snesHasRun() const
+            {
+                return solverPtr_.valid() && solverPtr_->snesHasRun();
             }
 
 
         // Edit
 
-            //- Called after the PETSc options are pushed, before SNESSolve()
-            virtual void customiseSolver()
-            {}
-
-            //- Called after resetting the SNES/KSP/PC setup
-            virtual void resetCustomSolverState()
-            {}
-
             //- Store the solution to the solution backup
             void storeSolutionBackup()
             {
-                // Note: the solution vector is lazily created, so we take a
-                // copy of it before calling solutionBackup(); the evaluation
-                // order of function arguments is unspecified in C++, so
-                // passing solution() and solutionBackup() directly to VecCopy
-                // would not guarantee that x is created first
-                Vec x = solution();
-
-                VecCopy(x, solutionBackup());
+                solver().storeSolutionBackup();
             }
 
             //- Reset the solution and snes object
-            void resetSnes();
+            void resetSnes()
+            {
+                solver().resetSnes();
+            }
 
             //- Reset retry-sensitive SNES/KSP state while preserving the
             //  solution vector
-            void resetSnesSolverState();
+            void resetSnesSolverState()
+            {
+                if (solverPtr_.valid())
+                {
+                    solverPtr_->resetSnesSolverState();
+                }
+            }
 
-            //- Initialise the Jacobian matrix
-            //  This procedure should set the size and non-zero structure of
-            //  the matrix
-            //  We pass a reference ot the matrix pointer so the pointer can be
-            //  assigned
-            virtual label initialiseJacobian(Mat& jac) = 0;
+            //- Call the PETSc SNES solve function and check its convergence
+            //  See foamPetscSnesSolver::solve
+            int solve(const bool returnOnSnesError = false)
+            {
+                return solver().solve(returnOnSnesError);
+            }
 
-            //- Initialise Joacobian based on compact stencil of the given mesh with the
-            //  given blockSize (number of scalar equations per cell)
+            // The petscSnesSystem functions initialiseJacobian(Mat&),
+            // initialiseSolution(Vec&), formResidual and formJacobian are
+            // defined by the derived class
+            using petscSnesSystem::initialiseJacobian;
+            using petscSnesSystem::initialiseSolution;
+
+            //- Initialise a Jacobian based on the compact stencil of the mesh
+            //  with the given blockSize (number of scalar equations per cell)
+            //  The mesh must be the mesh of this helper
             label initialiseJacobian
             (
                 Mat& jac,
                 const fvMesh& mesh,
                 const label blockSize,
                 const bool createMat = true  // MatCreate or similar should be called
-            );
+            ) const;
 
-            //- Initialise the solution vector
-            //  This procedure should set the size of the solution vector
-            virtual label initialiseSolution(Vec& x) = 0;
-
-            //- Initialise the solution vector based on the given mesh and
-            //  blockSize
+            //- Initialise the solution vector based on the mesh and blockSize
+            //  The mesh must be the mesh of this helper
             label initialiseSolution
             (
                 Vec& x,
                 const fvMesh& mesh,
                 const label blockSize,
                 const bool createVec = true  // VecCreate or similar should be called
-            );
+            ) const;
 
-            //- Calculate the residual of the governing equations
-            //  A non-zero return value indicates an error
-            virtual label formResidual
-            (
-                Vec f,         // Residual
-                const Vec x    // Solution
-            ) = 0;
 
-            //- Form the Jacobian
-            //  This Jacobian is the derivative of residual with respect
-            //  to the solution vector. This can also be an approximation of
-            //  the true Jacobian, e.g. a compact molecule Laplacian. A non-zero
-            //  return value indicates an error
-            virtual label formJacobian
-            (
-                Mat jac,       // Jacobian
-                const Vec x    // Solution
-            ) = 0;
+        // Assembly
+        // See foamPetscMeshAssembly for the descriptions of these functions
 
-            //- Apply a physics-based preconditioner
-            //  This should (approximately) solve y = M^{-1} x, where M is an
-            //  approximation of the solid model's Jacobian. This is used inside
-            //  the `-pc_type physics` preconditioner.
-            //  For example, we may use an approximate segregated solver as a
-            //  preconditioner for a Jacobian-free Newton-Krylov solver
-            //  A non-zero return value indicates an error
-            virtual label precondition
-            (
-                Vec y,         // Output: y = M^{-1} x
-                const Vec x    // Input: vector to be preconditioned
-            )
-            {
-                notImplemented
-                (
-                    "`label precondition(...)` is not implemented for this "
-                    "solid model. The `physics` preconditioner can only be used"
-                    " if the chosen solidModel implements this function"
-                );
-
-                return 0;
-            }
-
-            //- Inserts the OpenFOAM fvMatrix 'fvM' into the PETSc matrix 'jac'.
-            //  Converts the finite volume matrix into block coefficients using
-            //  the specified row and column offsets (rowOffset, colOffset)
-            //  within each block.
-            //  nScalarEqns indicates the number of scalar equations to add, e.g.
-            //  3 for a 3-D vector equation, 2 for 2-D vector equation, 1 for a
-            //  scalar equation
-            //  A non-zero return value indicates an error.
-            //  Note: fvM should be const but OF9 does not have required const
-            //  access functions
-            template <class Type>
+            template<class Type>
             label InsertFvMatrixIntoPETScMatrix
             (
                 fvMatrix<Type>& fvM,
@@ -469,12 +297,14 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns
-            ) const;
+            ) const
+            {
+                return assembly_.InsertFvMatrixIntoPETScMatrix
+                (
+                    fvM, jac, rowOffset, colOffset, nScalarEqns
+                );
+            }
 
-            //- Inserts least squares gradient into a PETSc matrix at location
-            //  (rowOffset, colOffset) within the block
-            //  Only implemented for the gradient of a scalar, e.g. grad(p)
-            //  If "flipSign" is true, -grad(p) is inserted rather than grad(p)
             label InsertFvmGradIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -483,11 +313,14 @@ public:
                 const label colOffset,
                 const label nScalarEqns,
                 const scalar scale = -1.0
-            ) const;
+            ) const
+            {
+                return assembly_.InsertFvmGradIntoPETScMatrix
+                (
+                    p, jac, rowOffset, colOffset, nScalarEqns, scale
+                );
+            }
 
-            //- Insert V*div(gamma*SfHat & interpolate(grad(p))) into a PETSc
-            //  matrix. This is the least-squares gradient-interpolation part of
-            //  the diff-stencil pressure stabilisation.
             label InsertFvcDivGradInterpolateIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -496,12 +329,14 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const scalar scale = 1.0
-            ) const;
+            ) const
+            {
+                return assembly_.InsertFvcDivGradInterpolateIntoPETScMatrix
+                (
+                    p, gamma, jac, rowOffset, colOffset, scale
+                );
+            }
 
-            //- Insert the missing tensor part of the linearisation of
-            //  div(phi,U) into a PETSc matrix, where phi = Sf & Uf.
-            //  The caller must insert the segregated fvm::div(phi,U)
-            //  contribution separately. An upwind discretisation is assumed.
             label InsertFvmDivPhiUIntoPETScMatrix
             (
                 const volVectorField& U,
@@ -511,16 +346,14 @@ public:
                 const label colOffset,
                 const label nScalarEqns,
                 const scalar scale = -1.0
-            ) const;
+            ) const
+            {
+                return assembly_.InsertFvmDivPhiUIntoPETScMatrix
+                (
+                    U, phi, jac, rowOffset, colOffset, nScalarEqns, scale
+                );
+            }
 
-            //- Insert div(U) into the scalar p equation of a PETSc matrix.
-            //  The inserted matrix is `scale * V * div(U)`. Callers
-            //  needing `-V * div(U)` should pass `scale = -1.0`, or
-            //  `-alpha` if they additionally want to row-scale by `alpha`
-            //  (e.g. for a non-dimensionalised pressure residual).
-            //  Includes proper processor-patch coupling and a Dirichlet
-            //  boundary correction that undoes the implicit zeroGradient
-            //  assumption baked into negSumDiag at boundary cells.
             label InsertFvmDivUIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -530,16 +363,14 @@ public:
                 const label colOffset,
                 const label nScalarEqns,
                 const scalar scale = 1.0
-            ) const;
+            ) const
+            {
+                return assembly_.InsertFvmDivUIntoPETScMatrix
+                (
+                    p, U, jac, rowOffset, colOffset, nScalarEqns, scale
+                );
+            }
 
-            //- Insert the Gauss-style grad(p) into the vector D equation
-            //  of a PETSc matrix. The inserted matrix is
-            //  `scale * V * grad(p)`. Callers needing `-V*grad(p)`
-            //  should pass `scale = -1.0`. This is the structural
-            //  transpose of `InsertFvmDivUIntoPETScMatrix` (same per-face
-            //  coefficient pattern, inserted at block position
-            //  (rowOffset + cmptI, colOffset) instead of
-            //  (rowOffset, colOffset + cmptI)).
             label InsertFvmGradPGaussIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -548,31 +379,15 @@ public:
                 const label colOffset,
                 const label nScalarEqns,
                 const scalar scale = 1.0
-            ) const;
+            ) const
+            {
+                return assembly_.InsertFvmGradPGaussIntoPETScMatrix
+                (
+                    p, jac, rowOffset, colOffset, nScalarEqns, scale
+                );
+            }
 
-            //- Extract a subset of components a raw scalar array 'x' into the
-            //  OpenFOAM field 'vf'. The array 'x' is organized in blocks of
-            //  'xBlockSize' scalars per block, and extraction begins at the
-            //  specified 'offset'. For each element in 'vf', the function
-            //  inserts  the components specified in 'compIndices'. If
-            //  'compIndices' is empty, it copies all available components
-            //  (i.e., the first pTraits<Type>::nComponents scalars), assuming
-            //  that 'vf' is stored contiguously.
-            //
-            //  Parameters:
-            //    vf          - The OpenFOAM field (e.g., Field<scalar>,
-            //                  Field<vector>, Field<tensor>) into which the
-            //                  components will be inserted.
-            //    x           - Pointer to the raw scalar array from where the
-            //                  components will be extracted.
-            //    offset      - Starting index within each block in 'x' where
-            //                  extraction begins.
-            //    xBlockSize  - The total number of scalar values stored per
-            //                  block in 'x' (i.e., the stride).
-            //    compIndices - (Optional) List of component indices specifying
-            //                  which scalars from each element of 'vf' should
-            //                  be inserted. If empty, all components are copied.
-            template <class Type>
+            template<class Type>
             void ExtractFieldComponents
             (
                 const PetscScalar *x,
@@ -580,46 +395,27 @@ public:
                 const label offset,
                 const label xBlockSize,
                 const labelList& compIndices = labelList()
-            ) const;
+            ) const
+            {
+                assembly_.ExtractFieldComponents
+                (
+                    x, vf, offset, xBlockSize, compIndices
+                );
+            }
 
-            //- Same as above, but takes a PETSc "Vec x" instead of a raw
-            //  PetscScalar array pointer. The xBlockSize is looked up
-            //  from "Vec x"
-            //  Do NOT use this function if x has a non-constant block size
-            //  Use the version of this function above, where the block size
-            //  is explicitly passed
-            template <class Type>
+            template<class Type>
             void ExtractFieldComponents
             (
                 const Vec x,
                 Field<Type>& vf,
                 const label offset,
                 const labelList& compIndices = labelList()
-            ) const;
+            ) const
+            {
+                assembly_.ExtractFieldComponents(x, vf, offset, compIndices);
+            }
 
-            //- Inserts a subset of components from the OpenFOAM field 'vf' into
-            //  a raw scalar array 'x'. The array 'x' is organized in blocks of
-            //  'blockSize' scalars per cell, and insertion begins at the
-            //  specified 'offset'. For each element in 'vf', the function
-            //  copies the components specified in 'compIndices'. If
-            //  'compIndices' is empty, it copies all available components
-            //  (i.e., the first pTraits<Type>::nComponents scalars), assuming
-            //  that 'vf' is stored contiguously.
-            //
-            //  Parameters:
-            //    vf          - The OpenFOAM field (e.g., Field<scalar>,
-            //                  Field<vector>, Field<tensor>) from which the
-            //                  components are extracted.
-            //    x           - Pointer to the raw scalar array where the
-            //                  components will be inserted.
-            //    offset      - Starting index within each block in 'x' where
-            //                  insertion begins.
-            //    xBlockSize  - The total number of scalar values stored per
-            //                  block in 'x' (i.e., the stride).
-            //    compIndices - (Optional) List of component indices specifying
-            //                  which scalars from each element of 'vf' should
-            //                  be copied. If empty, all components are copied.
-            template <class Type>
+            template<class Type>
             void InsertFieldComponents
             (
                 const Field<Type>& vf,
@@ -627,34 +423,24 @@ public:
                 const label offset,
                 const label xBlockSize,
                 const labelList& compIndices = labelList()
-            ) const;
+            ) const
+            {
+                assembly_.InsertFieldComponents
+                (
+                    vf, x, offset, xBlockSize, compIndices
+                );
+            }
 
-            //- Same as above, but takes a PETSc "Vec x" instead of a raw
-            //  PetscScalar array pointer. The xBlockSize is looked up
-            //  from "Vec x"
-            //  Do NOT use this function if x has a non-constant block size
-            //  Use the version of this function above, where the block size
-            //  is explicitly passed
-            template <class Type>
+            template<class Type>
             void InsertFieldComponents
             (
                 const Field<Type>& vf,
                 Vec x,
                 const label offset,
                 const labelList& compIndices = labelList()
-            ) const;
-
-            //- Call the PETSc SNES solve function and check its convergence
-            //  Give a warning or fatal error if convergence was not reached
-            //  If returnOnSnesError = true, a PETSc error code is returned;
-            //  otherwise, a fatal error is thrown within this function when
-            //  the SNES solver fails
-            int solve(const bool returnOnSnesError = false);
-
-            //- Return true if the solve function has been called
-            bool snesHasRun() const
+            ) const
             {
-                return snesHasRun_;
+                assembly_.InsertFieldComponents(vf, x, offset, compIndices);
             }
 };
 
@@ -662,12 +448,6 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
-
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-#ifdef NoRepository
-#   include "foamPetscSnesHelperTemplates.C"
-#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

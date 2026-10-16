@@ -198,6 +198,32 @@ void newtonQuasiMonolithicCouplingInterface::makeIsFluidIsMotionIsSolid() const
 }
 
 
+foamPetscSnesSolver& newtonQuasiMonolithicCouplingInterface::solver()
+{
+    if (solverPtr_.empty())
+    {
+        FatalErrorInFunction
+            << "Solver not created" << abort(FatalError);
+    }
+
+    return solverPtr_();
+}
+
+
+const foamPetscMeshAssembly&
+newtonQuasiMonolithicCouplingInterface::fluidAssembly() const
+{
+    return refCast<const foamPetscSnesHelper>(fluid()).assembly();
+}
+
+
+const foamPetscMeshAssembly&
+newtonQuasiMonolithicCouplingInterface::solidAssembly() const
+{
+    return refCast<const foamPetscSnesHelper>(solid()).assembly();
+}
+
+
 foamPetscSnesHelper& newtonQuasiMonolithicCouplingInterface::motion()
 {
     // meshMotionSolidModelFvMotionSolver is the only currently supported
@@ -448,7 +474,7 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
     const labelList& solidFaceCells = solidPatchRef.faceCells();
 
     const globalIndex& solidGlobalCells =
-        refCast<const foamPetscSnesHelper>(solid()).globalCells();
+        solidAssembly().globalCells();
 
     // Local field: global cell ID for each local solid interface face
     scalarField localSolidGlobalCellIDs(solidPatchRef.size(), 0);
@@ -584,7 +610,7 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
     const labelList& fluidFaceCells = fluidPatchRef.faceCells();
 
     const globalIndex& fluidGlobalCells =
-        refCast<const foamPetscSnesHelper>(fluid()).globalCells();
+        fluidAssembly().globalCells();
 
     // Local field: global cell ID for each local fluid interface face
     scalarField localFluidGlobalCellIDs(fluidPatchRef.size(), 0);
@@ -676,9 +702,9 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
 
     // Global cells for the fluid and solid regions
     const globalIndex& fluidGlobalCells =
-        refCast<foamPetscSnesHelper>(fluid()).globalCells();
+        fluidAssembly().globalCells();
     const globalIndex& solidGlobalCells =
-        refCast<foamPetscSnesHelper>(solid()).globalCells();
+        solidAssembly().globalCells();
 
     // The fluid interface is a prescribed velocity (fixedValue) condition
     // where we assume the fluid wall velocity is equal to the mesh velocity of
@@ -1003,7 +1029,7 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
 
     // Build zone-level global fluid cell IDs for parallel face mapping
     const globalIndex& fluidGlobalCells =
-        refCast<foamPetscSnesHelper>(fluid()).globalCells();
+        fluidAssembly().globalCells();
 
     scalarField localFluidGlobalCellIDs(fluidPatch.size(), 0);
     forAll(fluidPatch, faceI)
@@ -1067,7 +1093,7 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
     }
 
     const globalIndex& solidGlobalCells =
-        refCast<foamPetscSnesHelper>(solid()).globalCells();
+        solidAssembly().globalCells();
 
     forAll(solidPatch, solidFaceI)
     {
@@ -1705,7 +1731,7 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
     VecGetArrayRead(solution, &xx);
 
     // Retrieve the fluid velocity
-    foamPetscSnesHelper::ExtractFieldComponents
+    fluidAssembly().ExtractFieldComponents
     (
         xx,
         primitiveFieldRef(UFluid),
@@ -1718,7 +1744,7 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
     // Retrieve the fluid pressure. The PETSc Vec stores pHat = p/scale
     // when newtonIcoFluid's pressure unknown scaling is active, so undo
     // it here to recover the physical pressure field
-    foamPetscSnesHelper::ExtractFieldComponents
+    fluidAssembly().ExtractFieldComponents
     (
         xx,
         primitiveFieldRef(p),
@@ -1736,7 +1762,7 @@ void newtonQuasiMonolithicCouplingInterface::retrieveSolution
 
     // Retrieve the solid velocity
     const label solidFirstEqnID = UFluid.size()*fluidBlockSize;
-    foamPetscSnesHelper::ExtractFieldComponents
+    solidAssembly().ExtractFieldComponents
     (
         &xx[solidFirstEqnID],
         primitiveFieldRef(USolid),
@@ -1768,7 +1794,7 @@ void newtonQuasiMonolithicCouplingInterface::seedSolution
 
     // Insert the fluid velocity. The vol*Field implicitly slices to
     // Field<Type>& (its internal field) for the const-ref argument
-    foamPetscSnesHelper::InsertFieldComponents<vector>
+    fluidAssembly().InsertFieldComponents<vector>
     (
         UFluid,
         xx,
@@ -1786,7 +1812,7 @@ void newtonQuasiMonolithicCouplingInterface::seedSolution
     {
         scalarField pHat(p);
         pHat /= pressureUnknownScale;
-        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        fluidAssembly().InsertFieldComponents<scalar>
         (
             pHat,
             xx,
@@ -1796,7 +1822,7 @@ void newtonQuasiMonolithicCouplingInterface::seedSolution
     }
     else
     {
-        foamPetscSnesHelper::InsertFieldComponents<scalar>
+        fluidAssembly().InsertFieldComponents<scalar>
         (
             p,
             xx,
@@ -1807,7 +1833,7 @@ void newtonQuasiMonolithicCouplingInterface::seedSolution
 
     // Insert the solid velocity at the per-process solid offset
     const label solidFirstEqnID = UFluid.size()*fluidBlockSize;
-    foamPetscSnesHelper::InsertFieldComponents<vector>
+    solidAssembly().InsertFieldComponents<vector>
     (
         USolid,
         &xx[solidFirstEqnID],
@@ -1830,22 +1856,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
 )
 :
     fluidSolidInterface(typeName, runTime, region),
-    foamPetscSnesHelper
-    (
-        "UpU",
-        fileName
-        (
-            fsiProperties().lookupOrDefault<fileName>
-            (
-                "optionsFile", "petscOptions"
-            )
-        ),
-        fluid().mesh(), // Used by helper utilities; fvSolution is overridden
-        solutionLocation::CELLS, // Used by helper functions
-        fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
-        true, // Will PETSc be used
-        runTime.system()
-    ),
     fluidSystemScaleFactor_
     (
         fsiProperties().lookupOrDefault<scalar>
@@ -1923,7 +1933,7 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     isFluidPressure_(nullptr),
     isSolid_(nullptr),
     configuredNestedFluidSplit_(false),
-    nestMat_(nullptr),
+    solverPtr_(),
     Pmat_(nullptr),
     solidSubKSP_(nullptr),
     tsLogPtr_()
@@ -2006,6 +2016,28 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     solid().D().storeOldTime();
     motionSolid().D().storeOldTime();
     solid().sigma().storeOldTime();
+
+    // Create the solver of the monolithic system. The PETSc options are read
+    // from the solvers/UpU sub-dictionary of system/fvSolution, or from the
+    // options file
+    solverPtr_.set
+    (
+        new foamPetscSnesSolver
+        (
+            *this,
+            "UpU",
+            fileName
+            (
+                fsiProperties().lookupOrDefault<fileName>
+                (
+                    "optionsFile", "petscOptions"
+                )
+            ),
+            fluid().mesh(),
+            fsiProperties().lookupOrDefault<Switch>("stopOnPetscError", true),
+            runTime.system()
+        )
+    );
 }
 
 
@@ -2016,7 +2048,7 @@ void newtonQuasiMonolithicCouplingInterface::setDeltaT(Time& runTime)
     if
     (
         runTime.controlDict().getOrDefault("adjustTimeStep", false)
-     && foamPetscSnesHelper::snesHasRun()
+     && solver().snesHasRun()
     )
     {
         const scalar maxDeltaT =
@@ -2033,10 +2065,10 @@ void newtonQuasiMonolithicCouplingInterface::setDeltaT(Time& runTime)
             runTime.controlDict().getOrDefault("logTimeStepAdjustments", true);
 
         PetscInt numIter;
-        SNESGetIterationNumber(foamPetscSnesHelper::snes(), &numIter);
+        SNESGetIterationNumber(solver().snes(), &numIter);
 
         SNESConvergedReason reason;
-        SNESGetConvergedReason(foamPetscSnesHelper::snes(), &reason);
+        SNESGetConvergedReason(solver().snes(), &reason);
 
         const scalar currentDeltaT = runTime.deltaTValue();
         scalar newDeltaT = currentDeltaT;
@@ -2335,7 +2367,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         //        linear linearised mesh flux from step (d)
 
         // Keep the pre-solve state so a failed SNES solve can be retried.
-        foamPetscSnesHelper::storeSolutionBackup();
+        solver().storeSolutionBackup();
 
         // Seed the global PETSc Vec from the current fluid U, fluid p
         // and solid U fields. Without this, the first SNES residual
@@ -2346,7 +2378,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         // pressure boundary differs from zero
         seedSolution
         (
-            foamPetscSnesHelper::solution(),
+            solver().solution(),
             UFluid, p, USolid,
             fluidBlockSize, solidBlockSize,
             twoD
@@ -2359,7 +2391,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         // selected with this in mind.
         Info<< "Solving the monolithic momentum-continuity system for Up using "
             << "PETSc SNES" << endl;
-        const int solveStatus = foamPetscSnesHelper::solve(true);
+        const int solveStatus = solver().solve(true);
 
         if (solveStatus >= 0)
         {
@@ -2368,8 +2400,8 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
 
         VecCopy
         (
-            foamPetscSnesHelper::solutionBackup(),
-            foamPetscSnesHelper::solution()
+            solver().solutionBackup(),
+            solver().solution()
         );
 
         restoreOldTimeState(oldFluidPoints);
@@ -2413,7 +2445,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
                 << abort(FatalError);
         }
 
-        foamPetscSnesHelper::resetSnesSolverState();
+        solver().resetSnesSolverState();
 
         ++time;
 
@@ -2425,7 +2457,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     // Retrieve the solution from PETSc and copy into UFluid, p, and USolid
     retrieveSolution
     (
-        foamPetscSnesHelper::solution(),
+        solver().solution(),
         UFluid, p, USolid,
         fluidBlockSize, solidBlockSize,
         twoD
@@ -2497,21 +2529,15 @@ label newtonQuasiMonolithicCouplingInterface::initialiseJacobian(Mat& jac)
     //  - Ass: solid equations (momentum)
 
     // Aff
-    // Use the region helper: globalCells() and processor-neighbour caches are
-    // mesh-specific.
-    refCast<foamPetscSnesHelper>(fluid()).initialiseJacobian
-    (
-        subMats[0][0], fluid().mesh(), fluidBlockSize, false
-    );
+    // Use the region assembly: the global numbering and processor-neighbour
+    // data are mesh-specific
+    fluidAssembly().initialiseJacobian(subMats[0][0], fluidBlockSize, false);
     PetscObjectSetName((PetscObject)subMats[0][0], "Aff");
 
     // Ass
-    // Use the region helper: globalCells() and processor-neighbour caches are
-    // mesh-specific.
-    refCast<foamPetscSnesHelper>(solid()).initialiseJacobian
-    (
-        subMats[1][1], solid().mesh(), solidBlockSize, false
-    );
+    // Use the region assembly: the global numbering and processor-neighbour
+    // data are mesh-specific
+    solidAssembly().initialiseJacobian(subMats[1][1], solidBlockSize, false);
     PetscObjectSetName((PetscObject)subMats[1][1], "Ass");
 
     // Initialise the diagonal submatrices:
@@ -2584,10 +2610,10 @@ label newtonQuasiMonolithicCouplingInterface::initialiseSolution(Vec& x)
 }
 
 
-void newtonQuasiMonolithicCouplingInterface::customiseSolver()
+void newtonQuasiMonolithicCouplingInterface::customiseSolver(SNES snes)
 {
     KSP ksp; PC pc; const char* pct = nullptr;
-    SNESGetKSP(snes(), &ksp);
+    SNESGetKSP(snes, &ksp);
     KSPGetPC(ksp, &pc);
     PCGetType(pc, &pct);
 
@@ -2619,6 +2645,14 @@ void newtonQuasiMonolithicCouplingInterface::resetCustomSolverState()
     {
         KSPDestroy(&solidSubKSP_);
         solidSubKSP_ = nullptr;
+    }
+
+    // Destroy the converted preconditioner matrix so it is rebuilt and given
+    // to the new SNES object
+    if (Pmat_ != nullptr)
+    {
+        MatDestroy(&Pmat_);
+        Pmat_ = nullptr;
     }
 }
 
@@ -2936,21 +2970,13 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
 
-    // Determine the assembly matrix: always the MatNest.
-    // On the first call, jac IS the MatNest and we store a pointer to it.
-    // On subsequent calls (when Pmat_ is active), jac may be the converted
-    // MPIAIJ, so we use the stored nestMat_ for assembly.
-    Mat assemblyMat = jac;
-    if (nestMat_ != nullptr)
+    // Determine the assembly matrix: always the MatNest held by the solver.
+    // When Pmat_ is active, jac may be the converted MPIAIJ, in which case
+    // the MatNest has not been zeroed by the solver callback
+    Mat assemblyMat = solver().jacobian();
+    if (assemblyMat != jac)
     {
-        // Use the stored MatNest for assembly
-        assemblyMat = nestMat_;
         MatZeroEntries(assemblyMat);
-    }
-    else
-    {
-        // First call: store the MatNest pointer
-        nestMat_ = jac;
     }
 
     // Get access to the sub-matrices from the MatNest
@@ -3054,12 +3080,12 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
             (
                 SNESGetJacobian
                 (
-                    snes(), &currentJac, nullptr, &jacFunc, &jacCtx
+                    solver().snes(), &currentJac, nullptr, &jacFunc, &jacCtx
                 )
             );
             CHKERRQ
             (
-                SNESSetJacobian(snes(), currentJac, Pmat_, jacFunc, jacCtx)
+                SNESSetJacobian(solver().snes(), currentJac, Pmat_, jacFunc, jacCtx)
             );
         }
         else
@@ -3082,7 +3108,7 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         PC pc;
         const char* pct = nullptr;
 
-        SNESGetKSP(snes(), &ksp);
+        SNESGetKSP(solver().snes(), &ksp);
         KSPGetPC(ksp, &pc);
         PCGetType(pc, &pct);
 
@@ -3102,7 +3128,7 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
             // SNES processes the returned matrices).
             {
                 Mat amat;
-                SNESGetJacobian(snes(), &amat, nullptr, nullptr, nullptr);
+                SNESGetJacobian(solver().snes(), &amat, nullptr, nullptr, nullptr);
                 Mat pmat = (Pstream::parRun() && Pmat_ != nullptr)
                     ? Pmat_ : assemblyMat;
                 KSPSetOperators(ksp, amat, pmat);
@@ -3125,7 +3151,7 @@ label newtonQuasiMonolithicCouplingInterface::formJacobian
         PC pc;
         const char* pct = nullptr;
 
-        SNESGetKSP(snes(), &ksp);
+        SNESGetKSP(solver().snes(), &ksp);
         KSPGetPC(ksp, &pc);
         PCGetType(pc, &pct);
 
@@ -3245,7 +3271,7 @@ label newtonQuasiMonolithicCouplingInterface::precondition
 
         // Get the solid-solid sub-matrix from the MatNest
         Mat Ass = nullptr;
-        MatNestGetSubMat(nestMat_, 1, 1, &Ass);
+        MatNestGetSubMat(solver().jacobian(), 1, 1, &Ass);
 
         // Create or update the solid sub-KSP
         const bool firstSolidKSP = (solidSubKSP_ == nullptr);
