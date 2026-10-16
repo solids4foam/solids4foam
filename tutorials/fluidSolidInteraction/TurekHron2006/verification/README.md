@@ -284,7 +284,12 @@ negligible against the tolerances below.
   on the 2x mesh or `3%` on the 4x mesh. The tolerances follow from the
   recorded errors below. `u_y` converges at an observed order of about 1.6,
   so its error falls by a factor of about three per level. The 4x tolerance
-  is an extrapolation, because the 4x level has not yet been run.
+  is an extrapolation, because the 4x level has not yet been run. The
+  tolerances belong to the plate resolution, not to the refinement factor:
+  the driver applies those of the tutorial level whose solid mesh the run's
+  matches. The conformal meshes of `--coupling monolithic` have a quarter of
+  the tutorial's solid cells at each factor, so their 4x level is checked
+  against the 2x tolerances.
 - `u_x(A)` (`23 μm`, the axial stretch of the plate) and the lift (`0.76 N/m`,
   set by the small asymmetry of the cylinder position) are reported with a
   `3%` indicative tolerance but do not fail the study. They are small
