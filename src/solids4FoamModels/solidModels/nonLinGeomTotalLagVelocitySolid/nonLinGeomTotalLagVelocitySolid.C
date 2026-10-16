@@ -251,25 +251,21 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
                     D.boundaryField()[patchI]
                 );
 
-            // For now, disallow use of the "pressure" field
-            if (gMax(mag(tracPatch.pressure())) > SMALL)
-            {
-                FatalErrorInFunction
-                    << "The 'pressure' on traction patches is not yet "
-                    << "implemented; it must be zero" << exit(FatalError);
-            }
-
-            // The current traction (set by the boundary condition or the FSI
-            // coupling) is applied at the new time, as is the stress
+            // The current traction and pressure (set by the boundary
+            // condition or the FSI coupling) are applied at the new time, as
+            // is the stress; the pressure follows the deformed normal
             const vectorField& trac = tracPatch.traction();
+            const scalarField& pressure = tracPatch.pressure();
+            const vectorField& nPatch = nCurrent.boundaryField()[patchI];
+            const vectorField totalTraction(trac - nPatch*pressure);
 
             if (tracPatch.useUndeformedArea())
             {
-                forceP = trac*D.mesh().boundary()[patchI].magSf();
+                forceP = totalTraction*D.mesh().boundary()[patchI].magSf();
             }
             else
             {
-                forceP = trac*magSfCurrent.boundaryField()[patchI];
+                forceP = totalTraction*magSfCurrent.boundaryField()[patchI];
             }
         }
         else if
