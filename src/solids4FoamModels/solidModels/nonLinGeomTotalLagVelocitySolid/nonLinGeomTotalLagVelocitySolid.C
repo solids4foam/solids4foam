@@ -350,9 +350,15 @@ void nonLinGeomTotalLagVelocitySolid::updateDImplicit
         )/coefft;
 
     // Impose the prescribed displacements, as D holds them at the new time
-    forAll(useBoundaryFaceValuesDImplicit_, patchI)
+    forAll(D().boundaryField(), patchI)
     {
-        if (useBoundaryFaceValuesDImplicit_[patchI])
+        if
+        (
+            isA<fixedValueFvPatchVectorField>
+            (
+                D().boundaryField()[patchI]
+            )
+        )
         {
             boundaryFieldRef(DImplicit_)[patchI] =
                 D().boundaryField()[patchI];
@@ -618,20 +624,16 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     // Ensure U is created (and possibly read)
     U();
 
-    // Use boundary face values only on fixed-displacement patches
+    // The gradients of DImplicit and U use the same boundary faces as that of
+    // D, which include constraint patches such as wedges, whose face values
+    // carry the hoop strain
+    const boolIOList& useBoundaryFaceValuesD =
+        mesh().lookupObject<boolIOList>("useBoundaryFaceValues_D");
     forAll(useBoundaryFaceValuesDImplicit_, patchI)
     {
-        if
-        (
-            isA<fixedDisplacementFvPatchVectorField>
-            (
-                D().boundaryField()[patchI]
-            )
-        )
-        {
-            useBoundaryFaceValuesDImplicit_[patchI] = true;
-            useBoundaryFaceValuesU_[patchI] = true;
-        }
+        useBoundaryFaceValuesDImplicit_[patchI] =
+            useBoundaryFaceValuesD[patchI];
+        useBoundaryFaceValuesU_[patchI] = useBoundaryFaceValuesD[patchI];
     }
 
     // Force all required old-time fields to be created
