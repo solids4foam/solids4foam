@@ -8,8 +8,12 @@ source solids4FoamScripts.sh
 
 cleanCase
 rm -rf processor* force.pdf case.foam constant/polyMesh
-cp -f constant/fluidProperties.pimpleFluid constant/fluidProperties
-cp -f system/fvSolution.pimpleFluid system/fvSolution
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

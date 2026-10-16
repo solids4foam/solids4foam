@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Opt-in formulation verification driver for the contact patch test.
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for contact patch verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "${SCRIPT_DIR}/scripts/contact_patch_test_verification.py" \
+    --verification-dir "${SCRIPT_DIR}" "$@"

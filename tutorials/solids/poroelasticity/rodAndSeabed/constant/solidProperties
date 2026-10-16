@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -29,9 +29,6 @@ poroLinearGeometryCoeffs
 
     // Alternative solution tolerance for displacement
     alternativeTolerance 1e-07;
-
-    // Material law solution tolerance
-    materialTolerance 1e-05;
 
     // Write frequency for the residuals
     infoFrequency   10;

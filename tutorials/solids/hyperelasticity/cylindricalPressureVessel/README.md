@@ -42,6 +42,27 @@ presented here, we employed the
 Lagrangian approaches available that solves for the _total_ displacement, which
 is why you have to use the `D` file in the directory `0/`.
 
+The default case uses a displacement-based formulation. The tutorial also
+includes pressure-displacement variants based on the block-coupled mixed
+formulation of Horvat et al.:
+[A Block-Coupled Finite Volume Method for Incompressible Hyperelastic
+Solids](https://www.mdpi.com/2076-3417/15/23/12660).
+
+The variants can be selected from the `Allrun` script:
+
+```bash
+./Allrun
+./Allrun displacement
+./Allrun pressureDisplacement
+./Allrun pressureDisplacementLinear
+./Allrun pressureDisplacementUnsteady
+```
+
+The pressure-displacement variants use the `Dp` and `DD` primary fields, where
+`Dp` is the pressure increment and `DD` is the displacement increment. The
+unsteady pressure-displacement case also includes the `pointDD` field for the
+point displacement increment.
+
 ---
 
 ## Expected Results

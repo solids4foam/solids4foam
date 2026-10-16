@@ -60,6 +60,18 @@ namespace hofvc
         const fvMesh& mesh
     );
 
+    //- Surface integration of the first Piola-Kirchhoff stress using quadrature
+    //  points and their weights
+    //  The Cauchy stress and the displacement gradient at the quadrature points
+    //  are given, and the integration results with the nominal traction, i.e.
+    //  the force per unit undeformed area
+    tmp<surfaceVectorField> surfaceIntegrate
+    (
+        const CompactListList<symmTensor>& quadSigma,
+        const CompactListList<tensor>& quadGradD,
+        const fvMesh& mesh
+    );
+
     tmp<volVectorField> d2dt2
     (
         const volVectorField& D

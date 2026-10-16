@@ -1,0 +1,3 @@
+curvedCantileverAnalyticalSolution/curvedCantileverAnalyticalSolution.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libcurvedCantileverAnalytical

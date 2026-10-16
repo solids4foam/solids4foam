@@ -3,245 +3,160 @@ set -euo pipefail
 IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
-SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
-
-if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
-    source "${SOLIDS4FOAM_SCRIPTS}"
-fi
 
 # ============================================================
 # membraneRoof FSI regression test
 # ============================================================
 
-# ------------------------------------------------------------
+# Shortened regression horizon: the first 40 time-steps of the inlet ramp.
+# A full run takes about 31 min on 6 processes.
+REG_END_TIME=0.2
+
 # Regression tolerances
-# ------------------------------------------------------------
+DISP_TOL=1e-4
+FY_TOL=20
 
-REGRESSION_END_TIME=2
-
-REF_FINAL_DY=-0.39024
-REF_FINAL_FORCE_Y=-204924.3
-
-DY_TOL=0.01
-FORCE_Y_TOL=5000
+# Reference values at REG_END_TIME: vertical displacement of the roof centre
+# and the total vertical force on the fluid side of the roof, from a serial
+# OpenFOAM-v2412 run on Linux. A 6-process OpenFOAM-v2412 run on macOS differs
+# by 9.3e-6 m and 8.4 N.
+REF_UY=-0.0685211
+REF_FY=-30483.9
 
 ALLRUN_LOGFILE="log.Allrun"
-ALLWMAKE_LOGFILE="log.Allwmake"
 DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
+FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
 echo "============================================================"
 echo "membraneRoof FSI regression test"
-echo "Regression end time          = ${REGRESSION_END_TIME}"
-echo "Final point Dy difference    < ${DY_TOL}"
-echo "Final membrane Fy difference < ${FORCE_Y_TOL}"
+echo "Regression end time         = ${REG_END_TIME}"
+echo "Roof centre Uy tolerance    < ${DISP_TOL}"
+echo "Final Fy tolerance          < ${FY_TOL}"
 echo "============================================================"
 echo
-
-CHECK_ONLY=false
-
-for arg in "$@"; do
-    case "$arg" in
-        --check-only|--no-run)
-            CHECK_ONLY=true
-            ;;
-        *)
-            ;;
-    esac
-done
-
-abs() {
-    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
-}
-
-patch_end_time() {
-    local control_dict="$1"
-    local tmp_file="${control_dict}.tmp"
-
-    awk -v endTime="${REGRESSION_END_TIME}" '
-    /^[[:space:]]*endTime[[:space:]]+/ {
-        print "endTime         " endTime ";"
-        next
-    }
-    { print }
-    ' "${control_dict}" > "${tmp_file}"
-
-    mv "${tmp_file}" "${control_dict}"
-}
 
 prepare_case() {
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
 
     for item in "${SCRIPT_DIR}"/*; do
-        local base_item
         base_item=$(basename "${item}")
-
         if [[ "${base_item}" == "regressionTests" ]]; then
             continue
         fi
-
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    patch_end_time "${CASE_DIR}/system/controlDict"
+    # Set the end time with awk rather than sed -i, which differs between GNU
+    # and BSD sed
+    local controlDict="${CASE_DIR}/system/controlDict"
+    awk -v endTime="${REG_END_TIME}" '
+        /^endTime[[:space:]]/ { $0 = "endTime         " endTime ";" }
+        { print }
+    ' "${controlDict}" > "${controlDict}.tmp"
+    mv "${controlDict}.tmp" "${controlDict}"
 }
 
-find_force_file() {
-    local case_dir="$1"
-    local candidate
-
-    for candidate in \
-        "${case_dir}/postProcessing/fluid/forces/0/force.dat" \
-        "${case_dir}/postProcessing/fluid/forces/0/forces.dat" \
-        "${case_dir}/postProcessing/forces/0/force.dat" \
-        "${case_dir}/postProcessing/forces/0/forces.dat"
-    do
-        if [[ -f "${candidate}" ]]; then
-            echo "${candidate}"
-            return 0
-        fi
-    done
-
-    return 1
-}
-
-extract_final_dy() {
-    local case_dir="$1"
-
-    awk -v fieldName="Dy" '
-    /^#/ {
-        for (i = 1; i <= NF; i++) {
-            if ($i == fieldName) {
-                col = i - 1
-            }
-        }
-        next
-    }
-    ($1 + 0) == $1 {
-        if (col <= 0) {
-            col = 3
-        }
-        val = $col
-    }
-    END {
-        if (val != "") print val
-    }' "${case_dir}/${DISP_FILE}"
-}
-
-extract_final_force_y() {
-    local case_dir="$1"
-    local force_file
-
-    force_file=$(find_force_file "${case_dir}") || return 1
-
-    awk -v fieldName="total_y" '
-    /^#/ {
-        for (i = 1; i <= NF; i++) {
-            if ($i == fieldName) {
-                col = i - 1
-            }
-        }
-        next
-    }
-    ($1 + 0) == $1 {
-        if (col <= 0) {
-            col = 3
-        }
-        val = $col
-    }
-    END {
-        if (val != "") print val
-    }' "${force_file}"
-}
-
-check_results() {
-    local case_dir="$1"
-    local failures=0
-
-    if [[ ! -f "${case_dir}/${DISP_FILE}" ]]; then
-        echo "FAIL: Could not find ${DISP_FILE}"
-        return 1
-    fi
-
-    local final_dy
-    final_dy=$(extract_final_dy "${case_dir}")
-
-    local final_force_y
-    final_force_y=$(extract_final_force_y "${case_dir}")
-
-    if [[ -z "${final_dy}" || -z "${final_force_y}" ]]; then
-        echo "FAIL: Could not extract regression quantities"
-        return 1
-    fi
-
-    local dy_diff
-    dy_diff=$(awk "BEGIN {print ${final_dy} - ${REF_FINAL_DY}}")
-    local dy_diff_abs
-    dy_diff_abs=$(abs "${dy_diff}")
-
-    local force_y_diff
-    force_y_diff=$(awk "BEGIN {print ${final_force_y} - ${REF_FINAL_FORCE_Y}}")
-    local force_y_diff_abs
-    force_y_diff_abs=$(abs "${force_y_diff}")
-
-    if awk "BEGIN {exit !(${dy_diff_abs} < ${DY_TOL})}"; then
-        printf "PASS: final Dy = %.6g (Δ = %.3g)\n" "${final_dy}" "${dy_diff_abs}"
-    else
-        printf "FAIL: final Dy = %.6g (Δ = %.3g)\n" "${final_dy}" "${dy_diff_abs}"
-        failures=$((failures + 1))
-    fi
-
-    if awk "BEGIN {exit !(${force_y_diff_abs} < ${FORCE_Y_TOL})}"; then
-        printf "PASS: final Fy = %.6g (Δ = %.3g)\n" \
-            "${final_force_y}" "${force_y_diff_abs}"
-    else
-        printf "FAIL: final Fy = %.6g (Δ = %.3g)\n" \
-            "${final_force_y}" "${force_y_diff_abs}"
-        failures=$((failures + 1))
-    fi
-
-    return "${failures}"
-}
-
-if [[ "${CHECK_ONLY}" == false ]]; then
-    prepare_case
-
-    run_status=0
-
-    set +e
+run_case() {
     (
         cd "${CASE_DIR}"
         ./Allclean > /dev/null 2>&1 || true
-        (
-            cd src
-            ./Allwmake > "../${ALLWMAKE_LOGFILE}" 2>&1
-        )
         ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
     )
-    run_status=$?
-    set -e
+}
 
-    if declare -F "solids4Foam::regressionCaseSkipped" > /dev/null \
-        && solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"
-    then
-        echo "Skipping regression checks because the tutorial skipped in this environment"
-        exit 0
-    fi
+abs() {
+    awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
+}
 
-    if (( run_status != 0 )); then
-        echo "FAIL: ./Allrun failed in ${CASE_DIR}"
-        echo "Check ${CASE_DIR}/${ALLWMAKE_LOGFILE}, ${CASE_DIR}/${ALLRUN_LOGFILE}, and ${CASE_DIR}/log.solids4Foam"
-        exit 1
-    fi
-else
-    echo "Running in check-only mode: skipping Allclean and Allrun"
-    CASE_DIR="${SCRIPT_DIR}"
+latest_numeric_time() {
+    local file="$1"
+    awk '
+        ($1 + 0) == $1 { time = $1 }
+        END {
+            if (time != "") print time
+        }
+    ' "$file"
+}
+
+extract_final_uy() {
+    awk '
+    ($1 + 0) == $1 {
+        uy = $3
+    }
+    END {
+        if (uy != "") print uy
+    }' "${CASE_DIR}/${DISP_FILE}"
+}
+
+extract_final_fy() {
+    # OpenFOAM.com writes the time and the total force first
+    awk '
+    ($1 + 0) == $1 {
+        gsub(/[()]/, "", $0)
+        fy = $3
+    }
+    END {
+        if (fy != "") print fy
+    }' "${CASE_DIR}/${FORCE_FILE}"
+}
+
+prepare_case
+run_case
+
+# A skip is only valid if the tutorial declared one in the Allrun log. Anything
+# else that leaves the expected output missing or incomplete is a failure.
+if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+    echo "Skipping regression checks because the tutorial skipped in this environment"
+    exit 0
 fi
 
+for file in "${DISP_FILE}" "${FORCE_FILE}"; do
+    if [[ ! -f "${CASE_DIR}/${file}" ]]; then
+        echo "FAIL: ${file} is missing and the tutorial did not declare a skip"
+        echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+        exit 1
+    fi
+
+    last_time=$(latest_numeric_time "${CASE_DIR}/${file}" || true)
+
+    if [[ -z "${last_time}" ]] || \
+        ! awk "BEGIN {exit !(${last_time} + 0 >= ${REG_END_TIME})}"; then
+        echo "FAIL: ${file} stops at t = ${last_time:-none}, short of the"
+        echo "      requested end time ${REG_END_TIME}: the case did not complete"
+        exit 1
+    fi
+done
+
+final_uy=$(extract_final_uy)
+final_fy=$(extract_final_fy)
+
+if [[ -z "${final_uy}" || -z "${final_fy}" ]]; then
+    echo "FAIL: Could not extract regression quantities"
+    exit 1
+fi
+
+uy_diff_abs=$(abs "$(awk "BEGIN {print ${final_uy} - ${REF_UY}}")")
+fy_diff_abs=$(abs "$(awk "BEGIN {print ${final_fy} - ${REF_FY}}")")
+
 failures=0
-check_results "${CASE_DIR}" || failures=$((failures + $?))
+
+if awk "BEGIN {exit !(${uy_diff_abs} < ${DISP_TOL})}"; then
+    printf "PASS: final roof centre Uy = %.6g (Δ = %.3g)\n" "${final_uy}" "${uy_diff_abs}"
+else
+    printf "FAIL: final roof centre Uy = %.6g (Δ = %.3g)\n" "${final_uy}" "${uy_diff_abs}"
+    failures=$((failures + 1))
+fi
+
+if awk "BEGIN {exit !(${fy_diff_abs} < ${FY_TOL})}"; then
+    printf "PASS: final Fy = %.6g (Δ = %.3g)\n" "${final_fy}" "${fy_diff_abs}"
+else
+    printf "FAIL: final Fy = %.6g (Δ = %.3g)\n" "${final_fy}" "${fy_diff_abs}"
+    failures=$((failures + 1))
+fi
 
 echo
 if (( failures == 0 )); then

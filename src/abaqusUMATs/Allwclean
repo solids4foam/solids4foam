@@ -1,7 +1,0 @@
-#!/bin/bash
-cd "${0%/*}" || exit  # Run from this directory
-
-wclean lib
-
-echo "Removing abaqusUmatLinearElastic.o from $FOAM_USER_LIBBIN"
-\rm -f "$FOAM_USER_LIBBIN"/abaqusUmatLinearElastic.o

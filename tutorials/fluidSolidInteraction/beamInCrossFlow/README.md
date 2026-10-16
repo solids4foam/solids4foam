@@ -1,11 +1,11 @@
 ---
-sort: 3
+sort: 4
 ---
 
 # My third tutorial: `beamInCrossFlow`
 
 You can find the files for this tutorial under
-[`tutorials/fluidSolidInteraction/beamInCrossFlow`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow).
+[`tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils).
 
 ---
 
@@ -49,7 +49,8 @@ This case can be analysed in two forms:
 The `beamInCrossFlow` case in solids4foam is set up in the modified form;
  however, it is straight-forward to return the case to its original form by
  setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
- and setting `E` to `10e3` in `constant/solid/mechanicalProperties`.
+ setting `E` to `1.4e6` in `constant/solid/mechanicalProperties`, and running
+ past `t = 4 s` until the solution is steady.
 ```
 
 The fluid is described by incompressible Newtonian isothermal laminar flow,
@@ -69,7 +70,7 @@ $$
 
 For the solid, we assume finite strains (though a small strain assumption would
 be OK in the the original form of the case) with the material behaviour
-described by the neo-Hookean hyperelastic law:
+described by the St Venant-Kirchhoff hyperelastic law:
 
 $$
 \rho \frac{\partial^2 \boldsymbol{u}}{\partial t^2} =
@@ -77,10 +78,12 @@ $$
 $$
 
 $$
-\boldsymbol{\sigma} = \frac{1}{J}
-\left[ \frac{K}{2} (J^2 - 1) \mathbf{I}
-+ \mu J^{-\frac{2}{3}} \mathrm{dev} \left[ \mathbf{F}
-\cdot \mathbf{F}^T \right] \right]
+\boldsymbol{E} = \frac{1}{2}(\boldsymbol{F}^T\boldsymbol{F} - \mathbf{I})
+\qquad
+\boldsymbol{S} = 2\mu\boldsymbol{E}
++ \lambda\mathrm{tr}(\boldsymbol{E})\mathbf{I}
+\qquad
+\boldsymbol{\sigma} = \frac{1}{J}\boldsymbol{F}\boldsymbol{S}\boldsymbol{F}^T
 $$
 
 $$
@@ -106,11 +109,9 @@ $$
 = \boldsymbol{n}^{[i]} \cdot \boldsymbol{\sigma}_{\mathrm{solid}}^{[i]}
 $$
 
-Two approaches are available for enforcing these interface conditions:
-
-**Partitioned (Aitken)**: the fluid and solid regions are solved separately
-using a strongly-coupled Dirichlet-Neumann coupling algorithm with Aitken
-under-relaxation:
+A partitioned approach is adopted for enforcing these interface conditions where
+the fluid and solid regions are solved separately. A strongly-coupled
+Dirichlet-Neumann coupling algorithm is used:
 
 ```pseudocode
 for all time-steps
@@ -124,11 +125,6 @@ for all time-steps
     while not converged
 end
 ```
-
-**Monolithic (Newton/PETSc)**: the fluid and solid are assembled into a single
-coupled nonlinear system and solved simultaneously using a Newton method with
-PETSc. A physics-based field-split preconditioner is used to efficiently solve
-the coupled system.
 
 ---
 
@@ -154,23 +150,21 @@ ground, wall and outlet.
 
 ## Running the Case
 
-The tutorial case can be run using the included `Allrun` script. The case
-supports a **partitioned** (IQNILS or Aitken) and a **monolithic** (Newton/PETSc)
-FSI coupling approach, either in serial or parallel:
-
-```bash
-./Allrun                     # partitioned (IQNILS), serial
-./Allrun aitken              # partitioned (Aitken), serial
-./Allrun monolithic          # monolithic (Newton/PETSc), serial
-./Allrun monolithic parallel # monolithic (Newton/PETSc), parallel
-./Allrun aitken parallel     # partitioned (Aitken), parallel
-```
-
-The monolithic approach requires PETSc and does not run with foam-extend.
+The tutorial case can be run using the included `Allrun` script. The tuned
+IQNILS setup is the default, i.e. `./Allrun`. The original Aitken setup can be
+selected with `./Allrun aitken`, and the Robin-Neumann variant with
+`./Allrun robin`; each option can be combined with `parallel`. The Robin variant
+uses `elasticWallPressure`, `elasticWallVelocity`, and fixed displacement
+relaxation with a factor of 1. The high-order total-Lagrangian solid
+configuration can be run with `./Allrun iqnils highOrder`; it can also be
+combined with `parallel`. This mode
+selects `solidProperties.iqnils.highOrder`, enables the high-order MLS
+residual, and uses the existing face-based IQNILS traction transfer with a
+piecewise-constant traction at every solid face quadrature point.
 
 For a higher-level overview of the available FSI coupling schemes and the main
 `fluidSolidInterface` options, see the
-[`fluidSolidInterfaces` README](../../../src/solids4FoamModels/fluidSolidInterfaces/README.md).
+[fluid-solid interfaces documentation](https://www.solids4foam.com/documentation/fluid-solid-interfaces/).
 
 For the current settings, a fair comparison over the strongly-coupled transient
 window up to `t = 1.0 s`, using the same time step, PETSc-based solid solve,
@@ -182,19 +176,91 @@ solid predictor, fluid residual control and shared FSI settings, gives:
 So for this like-for-like setup, IQNILS is both faster and requires fewer FSI
 iterations than Aitken.
 
+The IQNILS setup sets `relMinSignificant 1e-2` in `constant/fsiProperties.iqnils`,
+which drops a secant mode when the part of it that is orthogonal to the newer
+modes is less than 1% of its norm. Without this filter, nearly dependent modes
+are retained once the solution approaches a steady state, and the FSI residual
+can stall just above `outerCorrTolerance` until `nOuterCorr` is reached.
+
+### Quasi-monolithic variant
+
+`./Allrun monolithic` (optionally with `parallel`) runs the case with the
+quasi-monolithic Newton coupling (`fluidSolidInterface NewtonQuasiMonolithic`),
+which needs OpenFOAM.com and PETSc. The fluid velocity and pressure
+(`newtonIcoFluid`) and the solid velocity are solved together with PETSc SNES
+in every time step, so there are no FSI sub-iterations; the fluid mesh motion
+is a separate solid model in the fluid region. The files of this variant are
+stored beside the partitioned ones as `*.monolithic` files, which `Allrun`
+links in and `Allclean` removes again.
+
+The solid model is `nonLinearGeometryTotalLagrangianVelocity`, which uses the
+same St Venant-Kirchhoff law as the partitioned setup but a different time
+integration. Up to `t = 4 s` with `deltaT = 0.05 s` it gives a maximum tip `Dx`
+of `2.69e-2 m` against `2.63e-2 m` for IQNILS, and a final tip `Dx` of
+`1.066e-2 m` against `0.991e-2 m`, which is within the scatter of the
+partitioned variants. The regression test runs this variant as a fourth arm
+on OpenFOAM.com, checked against the same references.
+
 ## Regression Test
 
 The case also includes a `regressionTest.sh` script which runs short regression
-checks for both coupling options:
+checks for the Aitken, IQNILS, and Robin coupling options:
 
 - `./regressionTest.sh`
 
-For efficiency, the script runs both the `aitken` and `iqnils` variants in
+For efficiency, the script runs the `aitken`, `iqnils`, and `robin` variants in
 local regression copies under `beamInCrossFlow/regressionTests/`, with the end
 time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
-then.
+then. It also runs the `iqnils highOrder` variant and checks that it reaches the
+shortened end time. On supported OpenFOAM versions, the high-order result is
+checked against the same displacement and force references as the lower-order
+variants; the displacement tolerance is widened to allow the expected
+discretisation difference. The high-order variant is skipped on foam-extend.
 
-The script checks that both variants converge to the same solution, within
+For an `elasticWallPressure` interface, FSI convergence also considers the
+normalized interface-pressure change (`robinPressureTolerance`, default
+`10*outerCorrTolerance`) and the kinematic residual (`robinFluxTolerance`,
+default `10*outerCorrTolerance`): the interface flux relative to the mesh
+motion, i.e. the leakage through the moving wall, normalized by the largest
+boundary throughput plus interface motion flux in the time step. The pressure
+change is normalized by the largest interface-pressure norm in the time step.
+
+If the flow is at or near rest, e.g. a closed or pressurised cavity without
+throughput or interface motion, these scales vanish and the leakage floor of
+the inner solvers can keep the relative residuals above their tolerances. The
+optional `robinFluxReferenceVelocity` (a characteristic flow velocity, default
+0, i.e. off) then bounds the flux scale from below by this velocity times the
+Robin interface area, and `robinPressureReference` (a characteristic pressure,
+in the units of the fluid pressure, default 0) bounds the pressure scale. They
+only take effect when the flow's own scale is smaller, which the log reports as
+`(reference flux scale)` or `(reference pressure scale)`; a value much larger
+than the expected flow loosens the checks. If the iterations reach
+`nOuterCorr` with a Robin residual that has no reference scale above its
+tolerance, the log suggests setting them.
+
+The fluid models build the Robin target acceleration from the fluid mesh
+motion (`robinKinematicConsistency`, default on, in the fluid `PIMPLE`
+dictionary), so the converged interface flux equals the mesh flux and the
+leakage is an iteration error that vanishes as the iterations converge, as for
+a Dirichlet velocity condition. Without it, the leakage has a discretisation
+floor and is only reported.
+
+With the default `robinConvergence residual`, the latest displacement,
+pressure-change and (if kinematically consistent) leakage residuals must
+satisfy their tolerances. A step whose residuals stall, i.e. whose mean
+contraction rate over the last `robinStallIterations` (4) iterations in which
+the solid solution changed lies between `robinStallRate` (0.97) and its
+inverse, is accepted if the residuals are within `robinStallToleranceFactor`
+(10) times their tolerances, which avoids iterations that only reproduce
+inner-solver noise. `robinConvergence iterationError` additionally estimates
+the remaining iteration error as `R*rho/(1 - rho)` from the observed
+contraction rate `rho`, requires it for slowly contracting iterations (rate
+above `robinSlowRate`, 0.9) and stops as soon as it satisfies the tolerances.
+Before `couplingStartTime` only the displacement residual is used. The
+pressure and leakage-flux residuals and the convergence state are appended to
+`postProcessing/fsiResiduals.dat`.
+
+The script checks that all three variants converge to the same solution, within
 loose tolerances, by comparing:
 
 - the maximum tip `Dx`,
@@ -204,13 +270,210 @@ loose tolerances, by comparing:
 This is intended as a practical regression test for the case setup and the FSI
 coupling implementations, rather than as a strict bitwise comparison.
 
-After the solver has finished, `force.pdf` and `deflection.pdf` plots are
-generated if the `gnuplot` program is installed.
+## Verification and convergence studies
+
+The opt-in [`verification/`](verification/) directory complements the fast
+regression test with isolated mesh-convergence studies and published
+benchmark comparisons. These studies are not part of normal CI. See its README
+for commands and expected runtime.
+
+The `Allrun` script is shown below:
+
+```bash
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Example usage
+# ./Allrun            # default behaviour is the tuned IQNILS setup
+# ./Allrun aitken
+# ./Allrun robin
+# ./Allrun parallel
+# ./Allrun aitken parallel
+# ./Allrun iqnils highOrder
+# ./Allrun iqnils highOrder parallel
+
+coupling=iqnils
+interfaceCondition=dirichletNeumann
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            ;;
+        robin|Robin)
+            coupling=robin
+            interfaceCondition=robin
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [aitken|iqnils|robin] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling setup"
+
+ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+if [[ "${coupling}" == "robin" ]]; then
+    solutionSetup=iqnils
+else
+    solutionSetup=${coupling}
+fi
+ln -vnsf "solidProperties.${solutionSetup}" constant/solid/solidProperties
+ln -vnsf "controlDict.${solutionSetup}" system/controlDict
+ln -vnsf "fvSolution.${solutionSetup}" system/fluid/fvSolution
+ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+if [[ "$runMode" == "parallel" ]]; then
+    # Run parallel
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+    echo "Generating force.pdf using gnuplot"
+    gnuplot force.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
+```
+
+where the `solids4Foam::convertCaseFormat .` script makes minor changes to the
+case to make it compatible with your version of OpenFOAM/foam-extend. As can be
+seen, if the argument "parallel" is passed to the `Allrun` script (i.e.
+`> ./Allrun parallel`) it will run the case in parallel. After the solver has
+finished, `force.pdf` and `deflection.pdf` plots are generated if the `gnuplot`
+program is installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
 `Allrun` script, i.e. `./Allclean`.
 ```
+
+---
+
+## Multi-Material Variant
+
+The beam can be made of more than one material, e.g. a stiff root with a
+flexible tip. Nothing changes on the fluid side or in the FSI coupling: the
+solid region is simply given a cell zone for each material. The three changes
+below convert this tutorial into a two-material case.
+
+**1. Define the materials.** In `constant/solid/mechanicalProperties`, replace
+the single `rubber` entry with one entry per material:
+
+```c++
+mechanical
+(
+    stiff
+    {
+        type        StVenantKirchhoffElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1000;
+        E           E [1 -1 -2 0 0 0 0] 1.4e6;
+        nu          nu [0 0 0 0 0 0 0] 0.4;
+    }
+
+    flexible
+    {
+        type        StVenantKirchhoffElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1000;
+        E           E [1 -1 -2 0 0 0 0] 1e4;
+        nu          nu [0 0 0 0 0 0 0] 0.4;
+    }
+);
+```
+
+**2. Define the cell sets.** Create a file called `batch.setSet` in the case
+directory, which places the lower half of the beam ($$y < 0.1$$ m) in the
+`stiff` set and the upper half in the `flexible` set:
+
+```plaintext
+cellSet stiff new boxToCell (0.45 0 -0.2) (0.55 0.1 0)
+cellSet flexible new boxToCell (0.45 0.1 -0.2) (0.55 0.2 0)
+```
+
+**3. Create the cell zones.** In the `Allrun` script, convert the sets to cell
+zones in the solid region after the meshes have been created, i.e. after the
+two `blockMesh` lines:
+
+```bash
+# Create the material cellZones in the solid region
+solids4Foam::runApplication -s solid setSet -region solid -batch batch.setSet
+solids4Foam::runApplication -s solid setsToZones -region solid
+```
+
+```note
+For multi-material cases, solids4foam expects to find a cellZone for each
+material defined in `mechanicalProperties`, where the cellZone name is the same
+as the material name.
+```
+
+Two further points apply to any multi-material case:
+
+- The gradient of the displacement must be calculated with the material-aware
+  `leastSquaresS4f` scheme, which keeps each cell's stencil within its own
+  material. This tutorial already uses it in `system/solid/fvSchemes`.
+- The materials share one solid mesh, so the FSI interface patch can span
+  several materials, as it does here.
+
+The case is then run as before, i.e. `./Allrun`, or `./Allrun parallel` to run
+in parallel. The `aitken` and `robin` options also work.
+
+```note
+The `highOrder` option cannot be used with more than one material: the
+high-order face quadrature gradient is not yet implemented for multi-material
+cases, and the solver stops with a message saying so.
+```
+
+The table below gives the $$x$$ displacement of the beam tip (the point
+monitored in `postProcessing/0/solidPointDisplacement_displacement.dat`) at
+`t = 4 s`, calculated with OpenFOAM-v2512. As expected, the two-material
+results lie between those of the two single-material beams, and the beam is
+much stiffer when the stiff material is at the root, where the bending moment
+is greatest.
+
+| Beam                                          | Tip $$x$$ displacement (m) |
+| --------------------------------------------- | -------------------------- |
+| Flexible throughout (the unmodified tutorial) | `9.90e-3`                  |
+| Flexible root, stiff tip                      | `7.94e-3`                  |
+| Stiff root, flexible tip (as described above) | `1.26e-3`                  |
+| Stiff throughout                              | `6.97e-5`                  |
+
+The serial and parallel (four processors) results for the stiff-root case
+agree to five significant figures.
 
 ---
 
@@ -330,9 +593,9 @@ Total force (fluid) = (-0.147015 0.378642 -0.38067)
 Total force (solid) = (0.146715 -0.378943 0.380941)
 Evolving solid solver
 Solving the updated Lagrangian form of the momentum equation for DD
-    Corr, res, relRes, matRes, iters
+    Corr, res, relRes, iters
     Both residuals have converged
-    2, 5.23068e-07, 7.10068e-07, 0, 2
+    2, 5.23068e-07, 7.10068e-07, 2
 
 Current fsi relative residual norm: 5.70921e-07
 Alternative fsi residual: 5.70555e-07
@@ -495,7 +758,7 @@ bool AitkenCouplingInterface::evolve()
         // Calculate the FSI residual
         residualNorm = updateResidual();
     }
-    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
+    while (!couplingConverged(residualNorm) && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
 

@@ -1,0 +1,63 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    "outlet[1-2]"
+    {
+        type            windkesselPressure;
+        // R is the distal resistance (Rd) and Rch is the proximal
+        // (characteristic) resistance (Rp); both in Pa.s/m^3
+        R               1.90e8;
+        Rch             5.6e7;
+        C               1.75e-14;   // (m^3/Pa)
+        rho             1050;       // kg/m^3
+        value           uniform 0;
+    }
+    "outlet[3-4]"
+    {
+        type            windkesselPressure;
+        // R is the distal resistance (Rd) and Rch is the proximal
+        // (characteristic) resistance (Rp); both in Pa.s/m^3
+        R               1.35e8;
+        Rch             7.3e7;
+        C               1.22e-14;   // (m^3/Pa)
+        rho             1050;       // kg/m^3
+        value           uniform 0;
+    }
+    "inlet[1-2]"
+    {
+        type        zeroGradient;
+    }
+    "wall"
+    {
+        // Robin-Neumann condition approach. The Robin coefficient rho_s*hs
+        // is set by the secant hsModel (the default), which seeds hs from
+        // the local wall thickness and then rescales it from the solid and
+        // fluid interface impedances measured between FSI iterations
+        type        elasticWallPressure;
+        hsModel     secant;
+        value       uniform 0;
+    }
+}
+
+// ************************************************************************* //

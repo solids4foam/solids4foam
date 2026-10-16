@@ -21,6 +21,12 @@ Class
 Description
     Virtual base class for fluid-solid interface coupling.
 
+    Each interface pairs a solid patch with a fluid patch, or, with
+    fluidPatch none, with an immersed body of the fluid (see
+    fsiImmersedInterface), which the solid patch drives and from which it
+    takes the traction; an immersed interface needs no mapping and does not
+    move the fluid mesh.
+
 Author
     Zeljko Tukovic, FSB Zagreb.
     Philip Cardiff, UCD.
@@ -43,6 +49,7 @@ SourceFiles
 #include "solidModel.H"
 #include "dynamicFvMesh.H"
 #include "interfaceToInterfaceMapping.H"
+#include "fsiImmersedInterface.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -88,13 +95,28 @@ class fluidSolidInterface
         //- Mapping objects for passing fields between the pairs of solid and
         //  fluid interfaces
         //  e.g. this could be RBF or GGI or a direct map or other
+        //  Unset for the immersed interfaces
         mutable PtrList<interfaceToInterfaceMapping> interfaceToInterfaceList_;
+
+        //- Is each interface immersed: the solid interface patch drives an
+        //  immersed body of the fluid (fluidPatch none), and there is no
+        //  fluid patch and no mapping
+        List<bool> immersedInterfaces_;
+
+        //- Immersed interfaces, unset for the interfaces with a fluid patch
+        PtrList<fsiImmersedInterface> immersedInterfaceList_;
+
+        //- Global patches of the closure patches of the immersed interfaces
+        PtrList<PtrList<globalPolyPatch>> immersedClosurePatches_;
 
         //- Outer correction loop stoping tolerance
         const scalar outerCorrTolerance_;
 
         //- Maximal number of outer correctors
         const label nOuterCorr_;
+
+        //- Allow unconverged coupling steps to be accepted
+        const Switch allowUnconvergedCoupling_;
 
         //- Optional additional mesh correction step after FSI loop
         const Switch additionalMeshCorrection_;
@@ -105,7 +127,15 @@ class fluidSolidInterface
         //- Optional: enable coupling after specified time
         const scalar couplingStartTime_;
 
-        //- Predictor on/off
+        //- Predictor on/off: move the fluid interface with the full solid
+        //  predictor displacement, rather than the relaxed one, in the first
+        //  FSI iteration of each time-step. The interface displacement is an
+        //  increment within the time-step, so a relaxed first iteration makes
+        //  the interface stop, or with backward time differencing reverse, as
+        //  seen by the fluid, and on cases with a strong added-mass effect the
+        //  resulting fluid force can make the solid diverge (#489). It
+        //  requires the solid predictor (predictSolid), without which the
+        //  first residual is zero. Defaults to on
         const Switch predictor_;
 
         //- Current time step index
@@ -154,6 +184,110 @@ class fluidSolidInterface
         //  using the legacy minimum-based combination
         const Switch requireAllResidualMeasures_;
 
+        //- Optional absolute interface residual tolerance [m]: a step is also
+        //  converged if the maximum point residual (displacement-increment
+        //  mismatch if incrementalResiduals) is below it. Disabled if not
+        //  positive.
+        const scalar outerCorrAbsoluteTolerance_;
+
+        //- Pressure-change tolerance for Robin interfaces: the normalised
+        //  change in interface pressure between FSI iterations. The default
+        //  is 10*outerCorrTolerance, as for the kinematic residual below;
+        //  the pressure change is normalised by the largest interface
+        //  pressure norm in the time step, so on cases with a large mean
+        //  interface pressure the relative residual bottoms out at the
+        //  floors of the inner solvers
+        const scalar robinPressureTolerance_;
+
+        //- Tolerance for the Robin kinematic residual: the interface flux
+        //  relative to the mesh motion (leakage), normalised by the
+        //  throughput plus the interface motion flux (at least the optional
+        //  reference flux, see robinFluxReferenceVelocity_); it is only
+        //  tested if the Robin condition is kinematically consistent with the
+        //  mesh motion, otherwise it is reported
+        const scalar robinFluxTolerance_;
+
+        //- Robin convergence test: residual (default) requires the latest
+        //  displacement, pressure-change and kinematic residuals to satisfy
+        //  their tolerances; iterationError also estimates the remaining
+        //  iteration error from the observed contraction rates, requires it
+        //  for slowly contracting iterations, stops early for quickly
+        //  contracting ones and accepts stalled iterations close to the
+        //  tolerances
+        const word robinConvergence_;
+
+        //- Contraction rate at or above which a residual below its
+        //  tolerance must also satisfy the iteration-error estimate
+        const scalar robinSlowRate_;
+
+        //- Contraction rate at or above which the iterations are stalled
+        const scalar robinStallRate_;
+
+        //- Number of successive contraction rates used to detect a stall
+        const label robinStallIterations_;
+
+        //- A stall is accepted as converged if the residuals are within this
+        //  factor of their tolerances (inner-solver floors); otherwise the
+        //  iterations continue
+        const scalar robinStallToleranceFactor_;
+
+        //- Optional reference velocity for the Robin kinematic residual: the
+        //  leakage is normalised by at least this velocity times the Robin
+        //  interface area, so that a flow at or near rest (no throughput and
+        //  no interface motion) does not leave the residual without a scale;
+        //  0 (default) disables the floor
+        const scalar robinFluxReferenceVelocity_;
+
+        //- Optional reference pressure for the Robin pressure residual (in
+        //  the units of the fluid solution pressure): the pressure change is
+        //  normalised by at least this pressure; 0 (default) disables the
+        //  floor
+        const scalar robinPressureReference_;
+
+        //- Robin-condition flag for each interface
+        List<bool> robinInterfaces_;
+
+        //- Pressure at the previous FSI iteration on each Robin interface
+        List<scalarField> robinPressurePrev_;
+
+        //- Largest pressure norm in the current time step per interface
+        List<scalar> maxRobinPressureNorm_;
+
+        //- Current maximum normalized Robin pressure residual
+        scalar robinPressureResidual_;
+
+        //- Current maximum normalized Robin leakage-flux residual
+        scalar robinFluxResidual_;
+
+        //- Largest boundary-throughput plus interface-motion flux in the
+        //  current time step
+        scalar maxRobinKinematicNorm_;
+
+        //- Residual histories of the current time step: displacement,
+        //  pressure and kinematic residuals
+        DynamicList<scalar> robinDispHistory_;
+        DynamicList<scalar> robinPressureHistory_;
+        DynamicList<scalar> robinFluxHistory_;
+
+        //- Robin convergence state of the latest FSI iteration: 0 not
+        //  converged, 1 converged, 2 stalled within the stall tolerance
+        label robinConvergenceState_;
+
+        //- Are all Robin conditions kinematically consistent with the mesh
+        //  motion (then the leakage is used as a kinematic residual)
+        bool robinKinematicConsistency_;
+
+        //- Has the warning about relaxed Robin coupling been issued
+        bool robinRelaxationWarned_;
+
+        //- Have the fields been initialised once, i.e. is the base-class
+        //  constructor, which calls initializeFields() before the derived
+        //  coupling interface exists, finished
+        bool fieldsInitialized_;
+
+        //- Has the hint about the Robin reference scales been issued
+        bool robinReferenceHintIssued_;
+
         //- List of current FSI residuals
         List<vectorField> residuals_;
 
@@ -187,6 +321,24 @@ class fluidSolidInterface
         //- Calculate interface-to-interface list
         void calcInterfaceToInterfaceList() const;
 
+        //- Create the immersed interfaces from the immersedInterfaces
+        //  dictionary
+        void makeImmersedInterfaces();
+
+        //- Points of a solid global patch at the start of the time step:
+        //  the mesh patch points, plus the old total displacement for a
+        //  solid that does not move its mesh; or the current points, with
+        //  the current total displacement
+        tmp<pointField> solidZonePointsOld
+        (
+            const globalPolyPatch& gp,
+            const bool current = false
+        ) const;
+
+        //- Set the points at the start of the time step of the immersed
+        //  interfaces
+        void updateImmersedInterfacePoints0();
+
         //- Accumulated fluid interfaces displacements
         void calcAccumulatedFluidInterfacesDisplacements() const;
 
@@ -209,11 +361,48 @@ protected:
         //  it is called in a time step
         bool newTimeStep() const;
 
+        //- Stop if the fluid velocity on a coupled interface patch is a
+        //  static condition (fixedValue or noSlip), which ignores the
+        //  interface motion. Called by the selector for the couplings that
+        //  move the fluid interface with the solid
+        void checkFluidInterfaceVelocity();
+
         //- Return sub-dictionary
         dictionary& fsiProperties()
         {
             return fsiProperties_;
         }
+
+        //- Return true if the current residuals satisfy all active criteria
+        bool couplingConverged(const scalar displacementResidual) const;
+
+        //- Return the current normalized Robin pressure residual
+        scalar robinPressureResidual() const
+        {
+            return robinPressureResidual_;
+        }
+
+        //- Return the current normalized Robin leakage-flux residual
+        scalar robinFluxResidual() const
+        {
+            return robinFluxResidual_;
+        }
+
+        //- Return the Robin convergence state of the latest iteration
+        label robinConvergenceState() const
+        {
+            return robinConvergenceState_;
+        }
+
+        //- Write the residuals of the latest FSI iteration to the residual
+        //  file (master only)
+        void writeResidualLine(const scalar residualNorm);
+
+        //- Evaluate the Robin convergence state from the residual histories
+        void evaluateRobinConvergence();
+
+        //- Return true if any interface uses a Robin pressure condition
+        bool hasRobinInterface() const;
 
 public:
 
@@ -348,6 +537,42 @@ public:
                 return nGlobalPatches_;
             }
 
+            //- Return the number of fluid-solid interfaces
+            label nInterfaces() const
+            {
+                return nGlobalPatches_;
+            }
+
+            //- Is the interface immersed (no fluid patch)?
+            bool immersedInterface(const label interfaceI) const
+            {
+                return immersedInterfaces_[interfaceI];
+            }
+
+            //- Is any interface immersed?
+            bool anyImmersedInterface() const;
+
+            //- Return the fluid zone (global patch) of an interface; for an
+            //  immersed interface, the solid zone, which the immersed
+            //  surface follows point by point
+            const standAlonePatch& fluidZone(const label interfaceI) const;
+
+            //- Return the solid zone (global patch) of an interface
+            const standAlonePatch& solidZone(const label interfaceI) const;
+
+            //- Return the name of the fluid side of an interface, for
+            //  reports: the fluid patch name, or the immersed body name
+            word fluidInterfaceName(const label interfaceI) const;
+
+            //- Return the total traction (viscous and pressure) exerted by
+            //  the fluid on the faces of the fluid zone of an interface; for
+            //  an immersed interface, minus the traction on the solid faces
+            //  from the immersed boundary
+            virtual tmp<vectorField> fluidZoneTraction
+            (
+                const label interfaceI
+            ) const;
+
             //- Return outer corrector loop tolerance
             scalar outerCorrTolerance() const
             {
@@ -358,6 +583,12 @@ public:
             label nOuterCorr() const
             {
                 return nOuterCorr_;
+            }
+
+            //- Allow unconverged coupling steps to be accepted
+            const Switch& allowUnconvergedCoupling() const
+            {
+                return allowUnconvergedCoupling_;
             }
 
             //- Return reference to writeResidualToFile switch
@@ -551,13 +782,36 @@ public:
             //- Update interface force
             virtual scalar updateResidual();
 
-            //- Update movingWallPressure boundary condition acceleration, if
-            //  found
-            virtual void updateMovingWallPressureAcceleration();
-
             //- Update elasticWallPressure boundary condition acceleration, if
             //  found
             virtual void updateElasticWallPressureAcceleration();
+
+            //- Is the fluid interface moved to the solid interface in every
+            //  FSI iteration (no under-relaxation or acceleration of the
+            //  interface displacement)? The Robin interface flux is then made
+            //  consistent with the mesh motion; with a relaxed interface the
+            //  mesh motion lags the solid and must not enter the flux
+            virtual bool fluidMeshFollowsSolid() const
+            {
+                return false;
+            }
+
+            //- Does the coupling move the fluid interface with the solid? If
+            //  so, the selector checks that the fluid velocity condition on
+            //  the interface follows the motion
+            virtual bool movesFluidInterface() const
+            {
+                return true;
+            }
+
+            //- Does the coupling itself set the fluid velocity on the
+            //  interface to the solid velocity, e.g. as part of a monolithic
+            //  system? If so, the fluid interface velocity condition is
+            //  expected to be fixedValue and is not checked
+            virtual bool imposesFluidInterfaceVelocity() const
+            {
+                return false;
+            }
 
             //- Sync the fluidZonePointsDispl field across processors
             virtual void syncFluidZonePointsDispl

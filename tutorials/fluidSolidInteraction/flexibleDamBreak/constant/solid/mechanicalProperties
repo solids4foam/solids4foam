@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -23,7 +23,7 @@ mechanical
     flexibleMaterial
     {
         type        neoHookeanElastic;
-        rho         rho [1 -3 0 0 0 0 0] 2700;
+        rho         rho [1 -3 0 0 0 0 0] 2500;
         E           E [1 -1 -2 0 0 0 0] 1e6;
         nu          nu [0 0 0 0 0 0 0] 0;
     }

@@ -15,18 +15,33 @@
 #------------------------------------------------------------------------------
 
 
-echo "Cleaning backup and test files"
-
-find . -type f \( -name "*~" -o -name "*.bak" \) -delete
-find . -type f \( -name 'core' -o -name 'core.[1-9]*' \) -delete
-find . -type f \( -name '*.pvs' -o -name '*.foam' \) -delete
-
-find . -depth -type d -name regressionTests -exec rm -rf {} +
-
-rm -f logs testLoopReport
+echo "Cleaning backup files"
+find . -type f \( -name "*~" -o -name "*.bak" \) -exec rm {} \;
+find . \( -name 'core' -o -name 'core.[1-9]*' \) -exec rm {} \;
+find . \( -name '*.pvs' -o -name '*.foam' \) -exec rm {} \;
+rm logs > /dev/null 2>&1
+rm testLoopReport > /dev/null 2>&1
 
 echo ""
 
 foamCleanTutorials -self
+
+# With "all", also remove the regression test cases and the verification study
+# cases and results of every tutorial
+if [ "${1:-}" = "all" ]
+then
+    echo ""
+    echo "Removing the regression test and verification outputs"
+    # Only tutorials with a regressionTest.sh create these outputs, and every
+    # tutorial with a verification study has one; skip the generated cases,
+    # which hold copies of the tutorial scripts
+    for script in $(find . -mindepth 2 \( -name regressionTests -o -name work \) \
+                        -prune -o -name regressionTest.sh -type f -print)
+    do
+        dir="$(dirname "$script")"
+        (cd "$dir" && ./Allclean all > /dev/null 2>&1) \
+            || echo "    Allclean all failed in $dir"
+    done
+fi
 
 # ----------------------------------------------------------------- end-of-file

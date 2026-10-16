@@ -22,6 +22,7 @@ License
 #include "volFields.H"
 #include "lookupSolidModel.H"
 #include "patchCorrectionVectors.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -42,6 +43,7 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(false),
     traction_(p.size(), vector::zero),
     tractionRatePtr_(),
+    tractionQuadraturePtr_(),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
@@ -77,6 +79,7 @@ solidTractionFvPatchVectorField
     ),
     traction_(p.size(), vector::zero),
     tractionRatePtr_(),
+    tractionQuadraturePtr_(),
     pressure_(p.size(), 0.0),
     tractionSeries_(),
     pressureSeries_(),
@@ -237,6 +240,7 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_, mapper),
     tractionRatePtr_(),
+    tractionQuadraturePtr_(),
 #ifdef OPENFOAM_ORG
     pressure_(mapper(pvf.pressure_)),
 #else
@@ -265,6 +269,7 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     tractionRatePtr_(),
+    tractionQuadraturePtr_(),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
@@ -290,6 +295,7 @@ solidTractionFvPatchVectorField
     useUndeformedArea_(pvf.useUndeformedArea_),
     traction_(pvf.traction_),
     tractionRatePtr_(),
+    tractionQuadraturePtr_(),
     pressure_(pvf.pressure_),
     tractionSeries_(pvf.tractionSeries_),
     pressureSeries_(pvf.pressureSeries_),
@@ -305,6 +311,96 @@ solidTractionFvPatchVectorField
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void solidTractionFvPatchVectorField::setTraction
+(
+    const vectorField& traction
+)
+{
+    if (traction.size() != size())
+    {
+        FatalErrorInFunction
+            << "Expected " << size() << " face traction values but received "
+            << traction.size() << abort(FatalError);
+    }
+
+    traction_ = traction;
+    tractionQuadraturePtr_.clear();
+}
+
+void solidTractionFvPatchVectorField::setTractionQuadrature
+(
+    const CompactListList<vector>& tractionQuadrature
+)
+{
+    const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
+    auto& faceQuadWeights = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadWeights()
+    );
+    auto& tractionQuadratureRef = compactListListCRef(tractionQuadrature);
+    const label start = patch().patch().start();
+
+    if (tractionQuadrature.size() != size())
+    {
+        FatalErrorInFunction
+            << "Expected quadrature values for " << size() << " patch faces but "
+            << "received " << tractionQuadrature.size() << abort(FatalError);
+    }
+
+    traction_.setSize(size());
+    forAll(traction_, faceI)
+    {
+        const label faceID = start + faceI;
+        const label nPoints = faceQuadPoints[faceID].size();
+
+        if (tractionQuadratureRef[faceI].size() != nPoints)
+        {
+            FatalErrorInFunction
+                << "Expected " << nPoints << " quadrature values for patch face "
+                << faceI << " but received "
+                << tractionQuadratureRef[faceI].size()
+                << abort(FatalError);
+        }
+
+        scalar weightSum = 0;
+        traction_[faceI] = vector::zero;
+        for (label pointI = 0; pointI < nPoints; ++pointI)
+        {
+            const scalar weight = faceQuadWeights[faceID][pointI];
+            traction_[faceI] += weight*tractionQuadratureRef[faceI][pointI];
+            weightSum += weight;
+        }
+        traction_[faceI] /= weightSum;
+    }
+
+    // CompactListList is non-copyable in OpenFOAM-9, so make an explicit
+    // layout-preserving copy of the supplied quadrature tractions.
+    labelList nQpPerFace(size(), 0);
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = tractionQuadratureRef[faceI].size();
+    }
+
+    tractionQuadraturePtr_.set
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+
+    forAll(tractionQuadraturePtr_(), faceI)
+    {
+        forAll(tractionQuadraturePtr_()[faceI], pointI)
+        {
+            tractionQuadraturePtr_()[faceI][pointI] =
+                tractionQuadratureRef[faceI][pointI];
+        }
+    }
+}
+
+
 void solidTractionFvPatchVectorField::autoMap
 (
     const fvPatchFieldMapper& m
@@ -319,6 +415,8 @@ void solidTractionFvPatchVectorField::autoMap
     traction_.autoMap(m);
     pressure_.autoMap(m);
 #endif
+
+    tractionQuadraturePtr_.clear();
 }
 
 
@@ -336,6 +434,8 @@ void solidTractionFvPatchVectorField::rmap
 
     traction_.rmap(rpvf.traction_, addr);
     pressure_.rmap(rpvf.pressure_, addr);
+
+    tractionQuadraturePtr_.clear();
 }
 
 
@@ -381,11 +481,17 @@ void solidTractionFvPatchVectorField::updateCoeffs()
 
     if (tractionFieldPtr_.valid())
     {
-        traction_ = tractionFieldPtr_().boundaryField()[patch().index()];
+        setTraction(tractionFieldPtr_().boundaryField()[patch().index()]);
     }
     else if (tractionSeries_.size())
     {
-        traction_ = tractionSeries_(this->db().time().timeOutputValue());
+        setTraction
+        (
+            vectorField
+            (
+                size(), tractionSeries_(this->db().time().timeOutputValue())
+            )
+        );
     }
 
     if (pressureFieldPtr_.valid())
@@ -502,7 +608,6 @@ void solidTractionFvPatchVectorField::evaluate
     fvPatchField<vector>::evaluate();
 }
 
-#ifndef FOAMEXTEND
 autoPtr<CompactListList<vector>>
 solidTractionFvPatchVectorField::evaluateQuadrature() const
 {
@@ -531,15 +636,6 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
         }
     }
 
-    if (tractionFieldPtr_.valid())
-    {
-        traction_ = tractionFieldPtr_().boundaryField()[patch().index()];
-    }
-    else if (tractionSeries_.size())
-    {
-        traction_ = tractionSeries_(this->db().time().timeOutputValue());
-    }
-
     if (pressureFieldPtr_.valid())
     {
         pressure_ = pressureFieldPtr_().boundaryField()[patch().index()];
@@ -549,53 +645,79 @@ solidTractionFvPatchVectorField::evaluateQuadrature() const
         pressure_ = pressureSeries_(this->db().time().timeOutputValue());
     }
 
-    // Face unit normals
-    const vectorField n(patch().nf());
-
-    // Patch traction
-    const vectorField traction(traction_ - n*pressure_);
+    if (tractionFieldPtr_.valid())
+    {
+        const_cast<solidTractionFvPatchVectorField&>(*this).setTraction
+        (
+            tractionFieldPtr_().boundaryField()[patch().index()]
+        );
+    }
+    else if (tractionSeries_.size())
+    {
+        const_cast<solidTractionFvPatchVectorField&>(*this).setTraction
+        (
+            vectorField
+            (
+                size(), tractionSeries_(this->db().time().timeOutputValue())
+            )
+        );
+    }
 
     const fvMesh& mesh = patch().boundaryMesh().mesh();
     const solidModel& solMod = lookupSolidModel(mesh);
 
-    // faceQuadPoints is list for the  whole mesh
-    const CompactListList<point>& faceQuadPoints =
-        solMod.displacementMLS().quadrature().faceQuadPoints();
+    // faceQuadPoints is list for the whole mesh
+    auto& faceQuadPoints = compactListListCRef
+    (
+        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
-    labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().start();
-    forAll(nQpPerFace, faceI)
+    const label start = patch().patch().start();
+    if (!tractionQuadraturePtr_.valid())
     {
-        const label globalFaceID = faceI + start;
-        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
+        labelList nQpPerFace(this->size(), 0);
+        forAll(nQpPerFace, faceI)
+        {
+            nQpPerFace[faceI] = faceQuadPoints[faceI + start].size();
+        }
+
+        tractionQuadraturePtr_.set
+        (
+            new CompactListList<vector>(nQpPerFace)
+        );
+
+        forAll(tractionQuadraturePtr_(), faceI)
+        {
+            tractionQuadraturePtr_()[faceI] = traction_[faceI];
+        }
     }
 
-    autoPtr<CompactListList<vector>> tQuadPointsValue
+    // CompactListList is non-copyable in OpenFOAM-9, so make an explicit
+    // layout-preserving copy before applying the pressure contribution.
+    labelList nQpPerFace(size(), 0);
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = tractionQuadraturePtr_()[faceI].size();
+    }
+
+    autoPtr<CompactListList<vector>> tractionValues
     (
         new CompactListList<vector>(nQpPerFace)
     );
 
-    // Get a reference to the actual data for easier access
-    CompactListList<vector>& quadPointsValue = tQuadPointsValue();
-
-    forAll(*this, faceI)
+    CompactListList<vector>& values = tractionValues();
+    const vectorField n(patch().nf());
+    forAll(values, faceI)
     {
-        const label globalFaceID = faceI + start;
-
-        // Get the number of quadrature points for this face
-        const label nPoints = faceQuadPoints[globalFaceID].size();
-
-        // Assign the same value to all quadrature points on this face
-        // We assume constant distribution of traction!
-        for (label pointI = 0; pointI < nPoints; ++pointI)
+        forAll(values[faceI], pointI)
         {
-            quadPointsValue[faceI][pointI] = traction[faceI];
+            values[faceI][pointI] = tractionQuadraturePtr_()[faceI][pointI]
+                - n[faceI]*pressure_[faceI];
         }
     }
 
-    return tQuadPointsValue;
+    return tractionValues;
 }
-#endif
 
 void solidTractionFvPatchVectorField::write(Ostream& os) const
 {

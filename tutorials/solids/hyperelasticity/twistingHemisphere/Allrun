@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Check version
+solids4Foam::caseOnlyRunsWithFoamExtend
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Unpack the coarse mesh (2 349 cells)
+echo "Unpacking constant/polyMesh_coarse.tar.xz"
+\rm -rf constant/polyMesh
+tar -xJf constant/polyMesh_coarse.tar.xz -C constant
+
+# The coarse mesh is stored with L = 0.002; scale it to L = 2, the length
+# unit used by the boundary conditions and the reference data
+solids4Foam::runApplication transformPoints -scale "(1000 1000 1000)"
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating force.png and torque.png using gnuplot"
+    gnuplot plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

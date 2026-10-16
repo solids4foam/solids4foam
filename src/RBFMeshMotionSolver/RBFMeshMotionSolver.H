@@ -94,6 +94,8 @@ namespace Foam
             int nbPoints;
             bool faceCellCenters;
             bool cpu;
+            //- True when setMotion has supplied the current incremental motion
+            bool motionCentersSet_;
 
         public:
             // Runtime type information

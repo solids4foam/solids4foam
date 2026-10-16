@@ -29,6 +29,23 @@ License
 namespace Foam
 {
 
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+void elasticWallVelocityFvPatchVectorField::setCurrentFaceCentres()
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    const pointField& points = internalField().mesh().points();
+#else
+    const pointField& points = dimensionedInternalField().mesh().allPoints();
+#endif
+
+    forAll(Fc_, i)
+    {
+        Fc_[i] = patch().patch()[i].centre(points);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
@@ -46,7 +63,13 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
     oldOldFc_(p.patch().size(),vector::zero)
-{}
+{
+    // The face-centre histories are written by write(): initialise them from
+    // the current patch geometry so that a zero history is never written
+    setCurrentFaceCentres();
+    oldFc_ = Fc_;
+    oldOldFc_ = Fc_;
+}
 
 
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
@@ -62,7 +85,49 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
     oldOldFc_(p.patch().size(),vector::zero)
-{}
+{
+    // Initialise the histories from the current patch geometry: this is the
+    // fallback used when the source histories cannot be mapped
+    setCurrentFaceCentres();
+    oldFc_ = Fc_;
+    oldOldFc_ = Fc_;
+
+    // Map the face-centre histories from the source patch when every face has a
+    // source face, as is the case for decomposePar and reconstructPar;
+    // otherwise the fallback above is retained. Note: the histories are written
+    // by write(), so they must not be left as zero, as this would give a
+    // spurious wall velocity of the order of the face-centre position divided
+    // by the time-step
+#ifdef OPENFOAM_ORG
+    if (!mapper.hasUnmapped())
+    {
+        mapper(oldFc_, ptf.oldFc_);
+        mapper(oldOldFc_, ptf.oldOldFc_);
+    }
+#else
+    if (mapper.direct())
+    {
+        const auto& addr = mapper.directAddressing();
+        const label nSourceFaces = ptf.oldFc_.size();
+
+        if (addr.size() == Fc_.size() && ptf.oldOldFc_.size() == nSourceFaces)
+        {
+            forAll(addr, i)
+            {
+                const label sourceFaceI = addr[i];
+
+                // Unmapped faces are flagged with a negative index and keep the
+                // fallback set above
+                if (sourceFaceI >= 0 && sourceFaceI < nSourceFaces)
+                {
+                    oldFc_[i] = ptf.oldFc_[sourceFaceI];
+                    oldOldFc_[i] = ptf.oldOldFc_[sourceFaceI];
+                }
+            }
+        }
+    }
+#endif
+}
 
 
 elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
@@ -83,19 +148,43 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 
 #ifdef OPENFOAM_NOT_EXTEND
     const fvMesh& mesh = internalField().mesh();
-    const pointField& points = mesh.points();
 #else
     const fvMesh& mesh = dimensionedInternalField().mesh();
-    const pointField& points = mesh.allPoints();
 #endif
 
-    forAll(Fc_, i)
-    {
-        Fc_[i] = patch().patch()[i].centre(points);
-    }
+    setCurrentFaceCentres();
 
-    oldFc_ = Fc_;
-    oldOldFc_ = Fc_;
+    if (dict.found("oldFaceCentres") && dict.found("oldOldFaceCentres"))
+    {
+        // Restore the face-centre histories written by write(): the current
+        // time index is also restored, as the histories have already been
+        // shifted for the current time
+        oldFc_ = vectorField("oldFaceCentres", dict, p.size());
+        oldOldFc_ = vectorField("oldOldFaceCentres", dict, p.size());
+        timeIndex_ = mesh.time().timeIndex();
+    }
+    else
+    {
+        if (dict.found("oldFaceCentres") || dict.found("oldOldFaceCentres"))
+        {
+            WarningInFunction
+                << "Only one of oldFaceCentres and oldOldFaceCentres is given"
+                << " for patch " << p.name() << " of field "
+#ifdef OPENFOAM_NOT_EXTEND
+                << internalField().name()
+#else
+                << dimensionedInternalField().name()
+#endif
+                << ": both entries are required to restore the face-centre"
+                << " history" << nl
+                << "    The current face centres will be used instead" << endl;
+        }
+
+        // Fields written before the histories were stored, or written by a
+        // utility that cannot map them: assume a stationary interface
+        oldFc_ = Fc_;
+        oldOldFc_ = Fc_;
+    }
 }
 
 
@@ -467,8 +556,12 @@ void elasticWallVelocityFvPatchVectorField::write(Ostream& os) const
     fvPatchVectorField::write(os);
 #ifdef OPENFOAM_ORG
     writeEntry(os, "value", *this);
+    writeEntry(os, "oldFaceCentres", oldFc_);
+    writeEntry(os, "oldOldFaceCentres", oldOldFc_);
 #else
     writeEntry("value", os);
+    oldFc_.writeEntry("oldFaceCentres", os);
+    oldOldFc_.writeEntry("oldOldFaceCentres", os);
 #endif
 }
 

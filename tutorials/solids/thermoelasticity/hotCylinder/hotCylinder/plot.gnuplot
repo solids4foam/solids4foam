@@ -12,8 +12,8 @@ set datafile separator " "
 set style line 1 linecolor rgb 'red' linetype 6 linewidth 2 ps 2
 set style line 2 linecolor rgb 'black' linetype 6 linewidth 2 ps 2
 
-path2="postProcessing/sets/1000/line_sigma\:Transformed.xy"
-path1="postProcessing/sets/1000/line_analyticalRadialStress_analyticalHoopStress_T_analyticalT.xy"
+path2="postProcessing/sample/1000/line_sigma\:Transformed.xy"
+path1="postProcessing/sample/1000/line_analyticalRadialStress_analyticalHoopStress_T_analyticalT.xy"
 
 set output 'sigmaR.png'
 set yrange [0:-15]

@@ -20,8 +20,12 @@ License
 #ifdef OPENFOAM_NOT_EXTEND
 
 #include "amiInterfaceToInterfaceMapping.H"
+#include "triangleWeights.H"
 #include "addToRunTimeSelectionTable.H"
 #include "FieldField.H"
+#include "pointIOField.H"
+#include "polyMesh.H"
+#include "Time.H"
 #include "triPointRef.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -60,8 +64,8 @@ void amiInterfaceToInterfaceMapping::makeInterpolator() const
     (
         new amiZoneInterpolation
         (
-            zoneA(),
-            zoneB(),
+            zoneARef(),
+            zoneBRef(),
             faceAreaIntersect::tmMesh, // triMode
             true,   // requireMatch
             //amiZoneInterpolation::imFaceAreaWeight, // interpolationMethodNames
@@ -143,7 +147,7 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
     zoneAPointAddressingPtr_ =
         new List<labelPair>
         (
-            zoneA().nPoints(), labelPair(-1,-1)
+            zoneARef().nPoints(), labelPair(-1,-1)
         );
     List<labelPair>& zoneAPointAddr = *zoneAPointAddressingPtr_;
 
@@ -155,10 +159,10 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
     // scalarField& zoneAPointDist = *zoneAPointDistancePtr_;
 
     const labelListList& zoneAFaceAddr = interpolator().srcAddress();
-    const labelListList& pointFaces = zoneA().pointFaces();
-    const faceList& zoneBFaces = zoneB().localFaces();
-    const pointField& zoneBPoints = zoneB().localPoints();
-    const pointField& zoneAPoints = zoneA().localPoints();
+    const labelListList& pointFaces = zoneARef().pointFaces();
+    const faceList& zoneBFaces = zoneBRef().localFaces();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
+    const pointField& zoneAPoints = zoneARef().localPoints();
 
     forAll(zoneAPointAddr, pointI)
     {
@@ -203,7 +207,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 const scalar A = mag(n);
                 n /= A;
 
@@ -213,9 +219,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 const scalar minEta = min(eta);
 
@@ -242,9 +251,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointAddressing() const
 
     // Check orientation
 
-    const pointField& zoneAPointNormals = zoneA().pointNormals();
+    const pointField& zoneAPointNormals = zoneARef().pointNormals();
 
-    const vectorField& zoneBFaceNormals = zoneB().faceNormals();
+    const vectorField& zoneBFaceNormals = zoneBRef().faceNormals();
 
     scalarField orientation(zoneAPointAddr.size(), 0);
 
@@ -285,12 +294,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
     //     new FieldField<Field, scalar>(zoneA().nPoints());
     // FieldField<Field, scalar>& zoneAPointWeights = *zoneAPointWeightsPtr_;
     zoneAPointWeightsPtr_ =
-        new FieldField<Field, scalar>(zoneA().nPoints());
+        new FieldField<Field, scalar>(zoneARef().nPoints());
     FieldField<Field, scalar>& zoneAPointWeights = *zoneAPointWeightsPtr_;
 
-    const faceList& zoneBFaces = zoneB().localFaces();
-    const pointField& zoneBPoints = zoneB().localPoints();
-    const pointField& zoneAPoints = zoneA().localPoints();
+    const faceList& zoneBFaces = zoneBRef().localFaces();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
+    const pointField& zoneAPoints = zoneARef().localPoints();
 
     const List<labelPair>& addr = this->zoneAPointAddr();
 
@@ -310,7 +319,9 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
                 ctr
             );
 
-            vector n = t.normal();
+            // Area normal on all versions: t.normal() is the unit normal
+            // in OpenFOAM.org, which would break the areal coordinates
+            vector n = triangleAreaNormal(t);
             n /= mag(n);
 
             // Intersection point
@@ -322,9 +333,12 @@ void amiInterfaceToInterfaceMapping::calcZoneAPointWeights() const
             // zoneAPointWeights[pointI][1] = t.Ni(1, I);
             // zoneAPointWeights[pointI][2] = t.Ni(2, I);
 
-            zoneAPointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            zoneAPointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            zoneAPointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            zoneAPointWeights[pointI][0] = w[0];
+            zoneAPointWeights[pointI][1] = w[1];
+            zoneAPointWeights[pointI][2] = w[2];
         }
         else
         {
@@ -346,7 +360,7 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
     zoneBPointAddressingPtr_ =
         new List<labelPair>
         (
-            zoneB().nPoints(), labelPair(-1,-1)
+            zoneBRef().nPoints(), labelPair(-1,-1)
         );
     List<labelPair>& zoneBPointAddr = *zoneBPointAddressingPtr_;
 
@@ -358,10 +372,10 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
     // scalarField& zoneBPointDist = *zoneBPointDistancePtr_;
 
     const labelListList& zoneBFaceAddr = interpolator().tgtAddress();
-    const labelListList& pointFaces = zoneB().pointFaces();
-    const faceList& zoneAFaces = zoneA().localFaces();
-    const pointField& zoneAPoints = zoneA().localPoints();
-    const pointField& zoneBPoints = zoneB().localPoints();
+    const labelListList& pointFaces = zoneBRef().pointFaces();
+    const faceList& zoneAFaces = zoneARef().localFaces();
+    const pointField& zoneAPoints = zoneARef().localPoints();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
 
     forAll(zoneBPointAddr, pointI)
     {
@@ -406,7 +420,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
                     ctr
                 );
 
-                vector n = t.normal();
+                // Area normal on all versions: t.normal() is the unit normal
+                // in OpenFOAM.org, which would break the areal coordinates
+                vector n = triangleAreaNormal(t);
                 const scalar A = mag(n);
                 n /= A;
 
@@ -416,9 +432,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
                 // Areal coordinates
                 scalarField eta(3, 0);
 
-                eta[0] = (triPointRef(I, t.b(), t.c()).normal() & n)/A;
-                eta[1] = (triPointRef(I, t.c(), t.a()).normal() & n)/A;
-                eta[2] = (triPointRef(I, t.a(), t.b()).normal() & n)/A;
+                eta[0] =
+                    (triangleAreaNormal(triPointRef(I, t.b(), t.c())) & n)/A;
+                eta[1] =
+                    (triangleAreaNormal(triPointRef(I, t.c(), t.a())) & n)/A;
+                eta[2] =
+                    (triangleAreaNormal(triPointRef(I, t.a(), t.b())) & n)/A;
 
                 const scalar minEta = min(eta);
 
@@ -445,9 +464,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointAddressing() const
 
     // Check orientation
 
-    const pointField& zoneBPointNormals = zoneB().pointNormals();
+    const pointField& zoneBPointNormals = zoneBRef().pointNormals();
 
-    const vectorField& zoneAFaceNormals = zoneA().faceNormals();
+    const vectorField& zoneAFaceNormals = zoneARef().faceNormals();
 
     scalarField orientation(zoneBPointAddr.size(), 0);
 
@@ -488,12 +507,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
     //     new FieldField<Field, scalar>(zoneB().nPoints());
     // FieldField<Field, scalar>& zoneBPointWeights = *zoneBPointWeightsPtr_;
     zoneBPointWeightsPtr_ =
-        new FieldField<Field, scalar>(zoneB().nPoints());
+        new FieldField<Field, scalar>(zoneBRef().nPoints());
     FieldField<Field, scalar>& zoneBPointWeights = *zoneBPointWeightsPtr_;
 
-    const faceList& zoneAFaces = zoneA().localFaces();
-    const pointField& zoneAPoints = zoneA().localPoints();
-    const pointField& zoneBPoints = zoneB().localPoints();
+    const faceList& zoneAFaces = zoneARef().localFaces();
+    const pointField& zoneAPoints = zoneARef().localPoints();
+    const pointField& zoneBPoints = zoneBRef().localPoints();
     const List<labelPair>& addr = this->zoneBPointAddr();
 
     forAll(zoneBPointWeights, pointI)
@@ -512,7 +531,9 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
                 ctr
             );
 
-            vector n = t.normal();
+            // Area normal on all versions: t.normal() is the unit normal
+            // in OpenFOAM.org, which would break the areal coordinates
+            vector n = triangleAreaNormal(t);
             n /= mag(n);
 
             // Intersection point
@@ -524,9 +545,12 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
             // zoneBPointWeights[pointI][1] = t.Ni(1, I);
             // zoneBPointWeights[pointI][2] = t.Ni(2, I);
 
-            zoneBPointWeights[pointI][0] = t.pointToBarycentric(I).a();
-            zoneBPointWeights[pointI][1] = t.pointToBarycentric(I).b();
-            zoneBPointWeights[pointI][2] = t.pointToBarycentric(I).c();
+            // Scale-invariant weights: triangle::pointToBarycentric takes
+            // interface triangles finer than about 0.3 mm as degenerate
+            const FixedList<scalar, 3> w(triangleWeights(t, I));
+            zoneBPointWeights[pointI][0] = w[0];
+            zoneBPointWeights[pointI][1] = w[1];
+            zoneBPointWeights[pointI][2] = w[2];
         }
         else
         {

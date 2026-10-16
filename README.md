@@ -11,7 +11,7 @@ interactions in OpenFOAM.
 
 ## Where do I start?
 
-Please visit the [solids4foam website](https://solids4foam.github.io).
+Please visit the [solids4foam website](https://www.solids4foam.com).
 
 ## Disclaimer
 

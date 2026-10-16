@@ -18,6 +18,9 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "twoDPointCorrectorS4f.H"
+
+#ifdef OPENFOAM_COM
+
 #include "polyMesh.H"
 #include "wedgePolyPatch.H"
 #include "emptyPolyPatch.H"
@@ -404,5 +407,6 @@ bool Foam::twoDPointCorrectorS4f::movePoints()
     return true;
 }
 
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

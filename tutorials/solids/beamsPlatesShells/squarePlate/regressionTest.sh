@@ -19,6 +19,17 @@ fi
 WF_MIN=6.8e-4
 WF_MAX=7.0e-4
 
+# The answer of the removed legacy mechanicalModel, from the last commit that
+# had it (mcl-stage8-coverage, c3a92b3d), on OpenFOAM.com v2512, the one fork
+# this case runs on. kirchhoffPlate reads rho, E and nu from its single
+# linearElastic material rather than asking for a stress, and the deflection is
+# linear in those constants, so the framework reproduced this in every written
+# digit. The value is written to six figures, so a round-off difference on
+# another machine can move its last digit; the tolerance, 1e-5 relative, is
+# a few units in that digit, and a 0.001% change in E or nu still reaches it
+REF_MAX_WVF=0.000691225
+REF_REL_TOL=1e-5
+
 ALLRUN_LOGFILE="log.Allrun"
 
 echo "============================================================"
@@ -28,15 +39,16 @@ echo "============================================================"
 echo
 
 prepare_case() {
-    rm -rf "${CASE_DIR}"
-    mkdir -p "${CASE_DIR}"
+    local d="$1"
+    rm -rf "${d}"
+    mkdir -p "${d}"
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
         if [[ "${base_item}" == "regressionTests" ]]; then
             continue
         fi
-        cp -a "${item}" "${CASE_DIR}/"
+        cp -a "${item}" "${d}/"
     done
 }
 
@@ -53,7 +65,7 @@ for arg in "$@"; do
 done
 
 if [ "$CHECK_ONLY" = false ]; then
-    prepare_case
+    prepare_case "${CASE_DIR}"
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 else
@@ -94,6 +106,37 @@ if awk "BEGIN {exit !(${max_wvf} >= ${WF_MIN} && ${max_wvf} <= ${WF_MAX})}"; the
     printf "PASS: Max wVf = %.6g\n" "${max_wvf}"
 else
     printf "FAIL: Max wVf = %.6g\n" "${max_wvf}"
+    failures=$((failures + 1))
+fi
+
+# ------------------------------------------------------------
+# Against the legacy answer
+#
+# kirchhoffPlate takes rho, E and nu from the mechanicalConstitutiveLaw
+# framework, so this checks that it reads the same constants there as it did
+# from the legacy model: the same constants give the same number, not merely
+# one inside the band
+# ------------------------------------------------------------
+
+solver_log=$(find "${CASE_DIR}" -name 'log.solids4Foam' | tail -n 1)
+
+if [[ -n "${solver_log}" ]] \
+    && grep -q "Selecting mechanical constitutive law" "${solver_log}"
+then
+    echo "PASS: the material came from the framework"
+else
+    echo "FAIL: the solver log shows no mechanical constitutive law"
+    failures=$((failures + 1))
+fi
+
+if awk "BEGIN {d = ${max_wvf} - ${REF_MAX_WVF}; if (d < 0) d = -d;
+               exit !(d <= ${REF_REL_TOL} * ${REF_MAX_WVF})}"
+then
+    printf "PASS: Max wVf matches the reference (%.8g vs %.8g)\n" \
+        "${max_wvf}" "${REF_MAX_WVF}"
+else
+    printf "FAIL: Max wVf differs from the reference (%.8g vs %.8g)\n" \
+        "${max_wvf}" "${REF_MAX_WVF}"
     failures=$((failures + 1))
 fi
 

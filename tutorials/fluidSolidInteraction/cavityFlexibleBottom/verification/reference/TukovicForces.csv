@@ -1,0 +1,11 @@
+# Steady vertical fluid force on the interface versus the mesh spacing
+# DeltaX, from the same mesh study. The published values are for an
+# out-of-plane thickness of 0.05 m; the tutorial is one metre thick, so the
+# verification driver compares against 20 times these values.
+#
+# Column 1: DeltaX (m)
+# Column 2: steady Fy (N, for a width of 0.05 m)
+0.012507433102081265, -0.26272307692307695
+0.025064420218037658, -0.26246153846153847
+0.05003964321110009, -0.26143846153846156
+0.10012884043607533, -0.2580076923076923

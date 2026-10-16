@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    solutionAlgorithm PETScSNES;
+    predictor yes;
+
+    highOrderCoeffs
+    {
+        highOrderResidual true;
+        displacement
+        {
+            polynomialOrder 3;
+            faceStencilExtraCells 15;
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+        pressure
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.5;
+        }
+    }
+}
+
+// ************************************************************************* //

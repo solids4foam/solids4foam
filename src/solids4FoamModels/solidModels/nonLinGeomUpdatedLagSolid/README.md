@@ -1,3 +1,7 @@
+---
+sort: 3
+---
+
 # nonLinGeomUpdatedLagSolid
 
 This page documents the nonlinear updated-Lagrangian incremental-displacement
@@ -38,8 +42,8 @@ is not valid and mesh motion between time steps is part of the formulation.
 
 ### Supported solution algorithms
 
-The `solutionAlgorithm` entry in `solidModelCoeffs` selects how the equations
-are solved:
+The `solutionAlgorithm` entry in the coefficients sub-dictionary selects how
+the equations are solved:
 
 | Value | Meaning | Notes |
 | --- | --- | --- |
@@ -65,33 +69,27 @@ The following `solidModel` options are particularly relevant here:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `writeResidualField` | `false` | Writes a residual field during output |
 | `residualFile` | `false` | Writes `residual.dat` in the case directory |
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
-| `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+| `solvePressure` | `false` | Not supported; refused at construction |
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with
 `scaleFactor 0.1` for both momentum and pressure.
 
-### Pressure coupling special case
+### Pressure coupling
 
-This model can also solve for pressure by enabling:
-
-```text
-solvePressure true;
-```
-
-This is a special case and is only supported when `solutionAlgorithm` is
-`PETScSNES`. When pressure solving is enabled:
-
-- the PETSc solution vector includes `p` as an extra unknown;
-- the pressure stabilisation sub-model is used;
-- the code enforces the `PETScSNES` path at construction time.
+The mixed displacement-pressure formulation (`solvePressure`) is not
+supported by this model, and a case that sets it stops at construction. This
+model obtains the volumetric part by taking `dev()` of the total stress, which
+is exact only where everything the solved pressure must not replace is trace
+free. Use `nonLinearGeometryTotalLagrangianTotalDisplacement` for a mixed
+formulation. For a segregated solve of a nearly incompressible material, the
+hydrostatic stress smoothing (`solvePressureEqn`) is available instead.
 
 ### Recommended dictionary setup
 
@@ -100,7 +98,7 @@ Minimal example for `constant/solidProperties`:
 ```text
 solidModel        nonLinearGeometryUpdatedLagrangian;
 
-solidModelCoeffs
+nonLinearGeometryUpdatedLagrangianCoeffs
 {
     solutionAlgorithm    implicitSegregated;
 
@@ -111,7 +109,6 @@ solidModelCoeffs
     nCorrectors          10000;
     solutionTolerance    1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance    1e-05;
     infoFrequency        100;
 
     restart              false;
@@ -137,15 +134,9 @@ solidModelCoeffs
 }
 ```
 
-If `solvePressure` is enabled, add:
-
-```text
-    solvePressure         true;
-```
-
 If `solutionAlgorithm` is `PETScSNES`, also ensure the case provides the PETSc
 options file expected by `optionsFile` (default name: `petscOptions`), unless
-you override that name in `solidModelCoeffs`.
+you override that name in the coefficients sub-dictionary.
 
 ### Required fields and boundary conditions
 
@@ -180,7 +171,6 @@ The main fields you will typically see in the output are:
 - `A`: acceleration field.
 - `sigma`: symmetric stress tensor field.
 - `rho`: updated-configuration density field.
-- `p`: pressure field, only when `solvePressure` is enabled.
 
 Here `oldTime()` means the value stored at the previous time step.
 
@@ -230,7 +220,7 @@ choices are:
 - `D` is reconstructed from `DD`;
 - `F`, `relF`, `relFinv`, `relJ`, and `J` are updated from `grad(DD)`;
 - the model is marked as incremental and moving-mesh;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver supports segregated implicit and PETSc SNES paths only.
 
 The class inherits from `solidModel` and `foamPetscSnesHelper`.
@@ -248,8 +238,7 @@ The constructor performs the following setup:
 4. Reads optional settings such as `predictor`, `solvePressure`,
    `dampingCoeff`, and the PETSc options file name.
 5. Forces creation of old-time fields for consistent restart behaviour.
-6. Creates `p` and validates that `solvePressure` is only used with
-   `PETScSNES`.
+6. Refuses `solvePressure`, which this model does not support.
 7. Rebuilds `relF`, `relFinv`, `relJ`, `F`, and `J` when `restart` is enabled.
 8. Enforces `leastSquaresS4f` for `grad(DD)` when PETSc SNES is used.
 9. Enables `extrapolateValue` on `solidTraction` patch fields for the PETSc
@@ -287,7 +276,6 @@ Any other algorithm value is treated as unsupported for this class.
   solution vector;
 - solves the nonlinear system through `foamPetscSnesHelper`;
 - extracts the solution back into `DD`;
-- optionally extracts `p` when `solvePressure` is enabled;
 - recomputes `D`, `gradDD`, `pointDD`, `pointD`, `U`, `A`, `F`, `relF`,
   `relFinv`, `relJ`, and `J`.
 
@@ -318,3 +306,27 @@ If you extend this model, the main places to consider are:
 Keep the updated-configuration interpretation in mind when making changes:
 the solver updates kinematic quantities relative to the last time step and
 moves the mesh each step.
+
+### Known limitation: restart is not exact
+
+This model does not reproduce an uninterrupted run exactly when a run is
+stopped and continued, even with `restart yes` set and every field it writes
+read back.
+
+Measured on the `neckingBar` tutorial, stopping halfway and continuing: the
+axial loading force differs by about 1e-5 relative, and a force component that
+is otherwise zero returns as a small non-zero value. The size was the same with
+the former `mechanicalModel` material implementation as with the
+`mechanicalConstitutiveLaw` framework, so this is the solid model's rather
+than the material's.
+
+The cause has not been established. The likely place to look is what the
+updated configuration needs carried across a restart beyond the fields
+currently written: the mesh is moved every step and kinematic quantities are
+measured relative to the last one, so anything relative that is rebuilt from
+scratch on restart rather than read is a candidate.
+
+The regression test for this tutorial therefore holds the restart comparison to
+1e-4 rather than the 1e-6 used by the small-strain cases, and relies on a
+separate check - that deleting the constitutive history stops the run - to
+catch a lost state rather than on the tolerance.

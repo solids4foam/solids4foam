@@ -11,6 +11,7 @@ fi
 
 wmake $optAll $targetType solvers
 wmake $optAll $targetType utilities
+wmake $optAll $targetType test
 wmake $optAll $targetType scripts
 
 #------------------------------------------------------------------------------

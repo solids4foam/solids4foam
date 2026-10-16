@@ -40,6 +40,7 @@ SourceFiles
 
 #include "solidModel.H"
 #include "thermalModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "SolverPerformance.H"
 #endif
@@ -96,6 +97,15 @@ class thermalLinGeomSolid
         const volScalarField rImpK_;
 
     // Private Member Functions
+
+        //- Update the stress
+        void correctStress();
+
+        //- Construct impK from the framework
+        tmp<volScalarField> makeImpK() const;
+
+        //- Construct impKf to match impK
+        tmp<surfaceScalarField> makeImpKf() const;
 
         //- Check if the momentum equation is converged
         bool converged

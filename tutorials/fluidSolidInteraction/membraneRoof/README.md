@@ -1,175 +1,294 @@
-# Flow over a rectangular building with a flexible membrane roof: `membraneRoof`
+---
+sort: 10
+---
 
-Prepared by Ivan Batistić, Philip Cardiff
+# Wind flow over a building with a membrane roof: `membraneRoof`
+
+Prepared by Ivan Batistić and Philip Cardiff
 
 ## Tutorial Aims
 
-- Demonstrate a three-dimensional fluid-structure interaction benchmark with a
-  very slender membrane roof.
-- Show the partitioned Dirichlet-Neumann coupling and the monolithic
-  fluid-solid interaction solver.
+- Demonstrates a three-dimensional fluid-solid interaction case with an
+  extremely slender structure: a membrane roof with a length-to-thickness
+  ratio of 1000.
+- Demonstrates a time- and space-varying inlet velocity prescribed with the
+  built-in `expression` `PatchFunction1`, with no compiled library.
 
 ## Case Overview
 
-This tutorial studies a rectangular building covered by a flexible
-$10 \times 10$ m membrane roof and exposed to an incoming
-three-dimensional flow; see Figure 1.
-The setup follows the membrane-roof example described in Section 5.1 of the
-paper by von Scheven and Ramm [1], which extends the earlier
-two-dimensional benchmark from [2]. With a roof length of $10$ m, the
-length-to-thickness ratio is $1000$, so the structure is extremely
-slender.
+A $$10 \times 10 \times 5$$ m building stands on the ground in a
+$$150 \times 75 \times 100$$ m ($$x \times y \times z$$) air domain (Figure 1).
+Its flat roof is a $$0.01$$ m thick membrane whose four edge faces are fixed;
+the references pin the edges of a shell. Wind
+enters at $$x = 0$$, flows over the building, and loads the roof through the
+pressure and viscous tractions on its upper surface. The building interior is
+not modelled, so the underside of the roof is traction-free.
 
-![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-geometry.png)
+The case follows the membrane-roof example of von Scheven and Ramm [1, Sect.
+5.1]. The same simulation is described in more detail in von Scheven's thesis
+[2, Sect. 6.2], which also plots the roof-centre displacement history used
+below. The vertical axis of the references is $$z$$; in this case it is $$y$$.
 
-**Figure 1:** Geometry and boundary conditions for the membrane-roof benchmark.
+![Membrane roof geometry and boundary conditions](./images/membraneRoof-geometry.png)
 
-The physical parameters of the problem are:
+**Figure 1:** Geometry and boundary conditions. The case `y` axis is the
+vertical `z` axis of the references.
 
-- **Geometry**
-  - Building base: $10 \times 10$ m
-  - Building height: $5$ m
-  - Overall domain size ($L \times W \times H$): $150 \times 100 \times 75$ m
-  - Membrane thickness: $0.01$ m
-  - Gravity ($g$): $0$ $\mathrm{m/s}^2$
-- **Solid**
-  - St. Venant-Kirchhoff material model
-  - Density ($\rho_s$): $1000$ $\mathrm{kg/m}^3$
-  - Young’s modulus ($E_s$): $1\cdot10^9$ Pa
-  - Poisson’s ratio ($\nu_s$): $0$
-- **Fluid**
-  - Laminar flow
-  - Density ($\rho_f$): $1.25$ $\mathrm{kg/m}^3$
-  - Kinematic viscosity ($\nu_f$): $0.08$ $\mathrm{m}^2$/s
+The inlet velocity follows a power law in height and is ramped sinusoidally
+from rest over the first $$5$$ s [1, Eq. 28-29]:
 
-As in the reference paper [1], the case is solved using $600$ uniform
-time steps of $\Delta t = 0.02$ s.
-The published study reports that the maximum inlet speed is $71.26$ m/s,
-reached at $z = 75$ m and $t = 5$ s, corresponding to
-$Re \approx 8900$ when the roof length is used as the characteristic
-length.
+$$
+u_x(y, t) = 100 \, \hat{u}_t(t) \left( \frac{y}{350} \right)^{0.22}
+\mathrm{m/s}, \qquad
+\hat{u}_t(t) = \frac{1}{2} \left[ \sin\left( \pi \left( \frac{\min(t, 5)}{5}
+- \frac{1}{2} \right) \right) + 1 \right]
+$$
 
-At the inlet boundary ($x = 0$), the paper prescribes the streamwise
-velocity $u_x(z, t) = 100 \hat{u}_t(t) \hat{u}_z(z).$
+This is prescribed in `0/fluid/U` with a `uniformFixedValue` condition and an
+`expression` `PatchFunction1`, where `arg()` is the time and `pos()` the face
+centre. The maximum inlet speed, $$71.26$$ m/s at the top of the domain, is
+reached at $$t = 5$$ s. Based on the roof length, the Reynolds number is about
+$$8900$$. The ground and the building walls are no-slip, the top and the two
+sides are slip walls, and the outlet has a zero pressure. The flow is laminar.
 
-The spatial and temporal factors are given by (see Figure 2):
+### Table 1: Physical parameters
 
-- $\hat{u}_z(z) = (z/350)^{0.22}$
-- $\hat{u}_t(t) = 0.5 [ sin(\pi (t/5 - 0.5)) + 1 ]$ for $t < 5$ s and
-  $\hat{u}_t(t) = 1$ for $t >= 5$ s
+| Parameter | Value | Units |
+| :-- | :--: | :--: |
+| Fluid density, $$\rho_F$$ | 1.25 | kg/m$$^3$$ |
+| Fluid kinematic viscosity, $$\nu_F$$ | 0.08 | m$$^2$$/s |
+| Solid density, $$\rho_S$$ | 1000 | kg/m$$^3$$ |
+| Solid Young's modulus, $$E_S$$ | $$10^9$$ | Pa |
+| Solid Poisson's ratio, $$\nu_S$$ | 0 | |
+| Roof thickness, $$t$$ | 0.01 | m |
+| Time step, $$\Delta t$$ | 0.005 | s |
+| End time | 12 | s |
 
-![Spatial (left) and temporal (right) parts of the inlet velocity profile](./images/membraneRoof-inlet.png)
+The roof is a St. Venant-Kirchhoff solid, solved with the standard
+total-Lagrangian finite volume solid model and PETSc, with a hypre BoomerAMG
+preconditioner; the references use a 7-parameter shell. The partitioned
+coupling uses IQN-ILS with a predictor, and the fluid mesh motion uses a
+uniform diffusivity. The coupling tolerance (`outerCorrTolerance`) is
+$$10^{-5}$$, relative to the interface displacement: after the ramp, a
+tolerance of $$10^{-6}$$ stagnates at the level of the inner fluid and solid
+solver tolerances.
 
-**Figure 2:** Spatial and temporal variations of the inflow boundary condition.
+The time schemes are chosen to add little numerical damping to the roof
+oscillation, whose period is about $$0.2$$ s: the second-order `backward`
+scheme in the fluid and the solid, the low-dissipation `LUST` convection
+scheme in the fluid, and $$\Delta t = 0.005$$ s, i.e. about 40 steps per
+period. The first-order `Euler` scheme in the fluid, or in the solid, and a
+limited `linearUpwind` convection scheme damp the oscillation out (see
+[Roof oscillation](#roof-oscillation)).
 
-The inlet condition is implemented as a tutorial-local library in
-`src/membraneRoofVelocityFvPatchVectorField`
-and loaded through `system/controlDict`. This avoids `codedFixedValue`, which
-is not portable across all supported OpenFOAM forks.
+### Gravity
 
-The library is compiled automatically by `./Allrun` through `src/Allwmake`.
+Gravity is switched off. The thesis [2] states that the self-weight of the
+roof is included, but not how it is applied. Applying the self-weight
+($$\rho_S g t \approx 98$$ Pa) from $$t = 0$$ lowers the roof centre by about
+$$0.01$$-$$0.02$$ m throughout the run (Figure 3) and changes the roof
+oscillation period by about $$2\%$$, which is small compared with the
+differences from the reference.
 
-In this tutorial mesh, the coordinate corresponding to the paper's vertical
-`z` direction is the case `y` direction. For this reason, the compiled inlet
-boundary condition evaluates the profile using the patch-face `y` coordinate,
-rather than the case `z` coordinate.
+## Mesh and Running
 
-## Mesh Generation
+The vertex numbering for `system/fluid/blockMeshDict` is shown below. The
+schematic uses the case axes and the 75 m domain height; dimensions are in
+metres. The [editable SVG](./images/membraneRoof-blockMeshDict.svg) is retained
+alongside the image.
 
-The tutorial uses a coarser mesh intended for routine testing and demonstration.
-The fluid mesh consists of $28 028$ cells, and the solid mesh consists
-of $1 536$ cells.
+![Fluid blockMesh vertex numbering](./images/membraneRoof-blockMeshDict.png)
 
-For the fluid region, the mesh is generated with `blockMesh` and then refined
-locally above and around the roof using `setSet` and `refineMesh`. The `setSet`
-command creates the `cellsToRefine` cell set from the selection specified in
-`setSet.batch`, while `refineMesh`, using `system/fluid/refineMeshDict`,
-uniformly splits each selected cell into eight cells; see Figure 4.
-Figure 3 shows the block-structured layout used to generate the base fluid mesh.
+The fluid mesh is created with `blockMesh` and refined once, in all directions,
+above and around the roof, with `setSet` and `refineMesh`, giving
+$$28\,752$$ cells. The solid mesh has $$16 \times 2 \times 16$$ cells, i.e. 2
+cells through the roof thickness: with 6 cells through the thickness the
+roof-centre displacement changes by less than $$1$$ mm, at twice the cost.
+This through-thickness comparison alone does not establish in-plane mesh
+convergence or equivalence to the reference shell formulation.
 
-![Base blockMesh layout used for the fluid region](./images/membraneRoof-blockMeshDict.png)
+The solid dictionary uses `scale 1` and vertical coordinates 4.99 and 5 m,
+giving a thickness of 0.01 m, consistent with [2, Sect. 6.2.2]. Generating the
+solid mesh with OpenFOAM-v2512 confirms these bounds, 512 cells and a total
+volume of 1 m$$^3$$ (1000 kg at the specified density). The earlier
+`feature-petsc-snes-quasi-monolithic` case also uses those coordinates despite
+its stale comment stating 0.1 m. This checks the case definitions; the meshes
+and configurations behind the historical plots still need a
+[provenance audit](https://github.com/solids4foam/solids4foam/issues/524).
 
-**Figure 3:** Base `blockMesh` layout for the fluid region.
-
-![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-refinement.png)
-
-**Figure 4:** Base `blockMesh` mesh (left) and mesh after refinement
-using `refineMesh` utility (right).
-
-## Running the Case
-
-From the case directory, run
-
-```bash
-./Allrun                      # partitioned (Aitken), serial
-./Allrun monolithic           # monolithic (Newton/PETSc), serial
-./Allrun monolithic parallel  # monolithic (Newton/PETSc), parallel
-./Allrun parallel             # partitioned (Aitken), parallel
-```
-
-```note
-The monolithic approach requires OpenFOAM.com (ESI) and a PETSc installation
-with `PETSC_DIR` set. It does not run with foam-extend or OpenFOAM.org.
-```
-
-The `Allrun` script will:
-
-1. Compile the local inlet boundary-condition library.
-2. Link the partitioned or monolithic case files.
-3. Generate the fluid and solid meshes.
-4. Refine the fluid mesh.
-5. Run `solids4Foam`.
-6. Generate deflection and force plots with gnuplot (if available).
-
-To clean the generated files, use
+Run the case with
 
 ```bash
-./Allclean
+./Allrun parallel
 ```
 
-```note
-For more information about the monolithic approach, as well as the
-Aitken and IQNILS approaches, see the other FSI tutorials.
-```
+which uses 6 processes, or `./Allrun` for a serial run. The case needs
+a supported OpenFOAM.com version, for the expression inlet, and a solids4foam
+build with PETSc, for the solid solver; with other OpenFOAM variants, or without
+PETSc, `Allrun` exits without running. The hypre BoomerAMG preconditioner
+needs PETSc built with hypre; without it, use the LU preconditioner commented
+in `system/solid/fvSolution`, which is fine in serial or on a few processes.
+`Allrun` also writes `deflection.pdf` with gnuplot, comparing the roof-centre
+displacement with the reference.
+
+### Quasi-monolithic variant
+
+`./Allrun monolithic` (optionally with `parallel`) runs the case with the
+quasi-monolithic Newton coupling (`fluidSolidInterface NewtonQuasiMonolithic`),
+where the fluid velocity and pressure and the solid velocity are solved
+together with PETSc SNES in every time step; the fluid mesh motion is a
+separate `neoHookeanElastic` solid model in the fluid region. Its files are
+stored as `*.monolithic` variants, which `Allrun` links in and `Allclean`
+removes. The roof is the `nonLinearGeometryTotalLagrangianVelocity` solid model
+with the same St Venant-Kirchhoff law.
+
+On the default mesh, the mean roof-centre displacement between $$1$$ and $$4$$
+s is $$-0.37$$ m, against $$-0.25$$ m for the partitioned coupling, $$-0.35$$ m
+for the partitioned coupling on the finer mesh, and $$-0.36$$ m for the
+reference; the roof oscillates between $$-0.41$$ and $$-0.27$$ m and crosses
+zero at $$t = 4.6$$ s. The velocity solid integrates nearly without numerical
+damping, which is consistent with the sensitivity of the partitioned result to
+the damping of the time schemes described below. A serial monolithic run takes
+about five times as long per time step as the partitioned run.
 
 ## Results
 
-The solution shows vortex shedding around the building and a transition
-of the membrane roof shape from concave to convex.
-
-One useful quantity of interest is the membrane displacement at the roof centre point.
-In this case it is recorded by the `solidPointDisplacement` function object in
-`system/controlDict`.
-
-```c++
-    pointDisp
-    {
-        type                solidPointDisplacement;
-        point               (50 5 0);
-    }
+```warning
+This is a qualitative comparison, not a verification. The reference is a
+single simulation, on one mesh and one time step, with no convergence study and
+no independent solution. After the ramp the reference response is irregular
+and breaks symmetry, and the authors note that small changes in the data lead
+to a completely different response [1].
 ```
 
-![Fluid and solid geometry together with the boundary-condition layout](./images/membraneRoof-deflection.png)
+Figure 2 compares the vertical displacement of the roof centre, point
+`(50 5 0)`, with the thesis history [2, Fig. 6.7]. The reference curve was read
+from the vector paths of the thesis PDF, so it reproduces the plotted curve
+exactly; it is stored in `reference/vonScheven2009_dz.dat`.
 
-**Figure 5:** Deflection of the roof centre point $(50, 5, 0)$.
+![Roof centre vertical displacement compared with von Scheven (2009)](./images/membraneRoof-deflection.png)
 
-Other useful outputs to check are the interface forces from the `forces`
-function object and the number of fluid-structure coupling iterations
-per time step, which are also reported using function objects in
-`system/controlDict`. These are plotted using a gnuplot script that
-generates `deflection.pdf`, `force.pdf`, and `iterations.pdf`.
+**Figure 2:** Vertical displacement of the roof centre compared with von
+Scheven [2, Fig. 6.7].
 
-The regression script (`regressionTest.sh`) tracks the tip displacement in
-`postProcessing/0/solidPointDisplacement_displacement.dat` and the total fluid
-force in `postProcessing/fluid/forces/0/force.dat` at the final time ($t = 12$ s).
+Only the first $$5$$ s, the inlet ramp, is a meaningful comparison. There, both
+solutions show the same behaviour: the positive pressure on the roof while the
+flow accelerates pushes it down into a concave shape, and as the inlet speed
+approaches its maximum the roof is lifted by suction into a convex shape,
+crossing zero at $$t = 4.5$$ s, against $$5.0$$ s in the reference. The mean
+displacement between $$1$$ and $$4$$ s is $$-0.25$$ m, against $$-0.36$$ m for
+the reference. The computed roof oscillates about this mean with a
+period of about $$0.19$$ s, with a peak-to-peak amplitude of only about
+$$0.02$$ m on this coarse mesh, whereas the reference oscillates between about
+$$-0.18$$ and $$-0.55$$ m with a period of about $$0.48$$ s. After the ramp the
+reference roof oscillates irregularly, with repeated snap-through, while the
+computed roof settles to a convex shape with a small oscillation; a comparison
+of individual peaks after $$5$$ s would not be meaningful for the reasons given
+above.
+
+The results in Figure 2 were produced with the tutorial settings (mesh as
+above, $$\Delta t = 0.005$$ s) using OpenFOAM-v2412 on 6 processes of an Apple
+M1 Ultra, in 31 min. The coupling took 6.2 iterations per time step on
+average.
+
+```note
+The finer mesh 2 of Figure 3 (58 min on 32 processes) brings the mean
+roof-centre displacement between 1 and 4 s to $$-0.35$$ m, against $$-0.36$$ m
+for the reference and $$-0.25$$ m for the default mesh. Neither mesh
+reproduces the reference oscillation. The cause of the discrepancy remains
+unresolved; the study below describes the sensitivities examined so far.
+```
+
+### Roof oscillation
+
+Table 2 summarises a study of the roof oscillation during the ramp, run to
+$$t = 5$$ s on the default mesh with one extra level of local refinement
+around the leading edge and the roof ($$49\,668$$ fluid cells, cells of
+$$0.31$$ m at the roof, $$32 \times 2 \times 32$$ roof cells). The
+oscillation is the displacement minus its $$0.6$$ s moving mean, between $$1$$
+and $$4.5$$ s. The first column gives the time schemes of the solid and the
+fluid; the row with $$\Delta t = 0.005$$ s and `LUST` uses the schemes and
+time step of the tutorial.
+
+#### Table 2: Roof-centre oscillation during the ramp
+
+| Solid, fluid | Convection | $$\Delta t$$ [s] | Peak to peak [m] | Period [s] |
+| :-- | :-- | --: | --: | --: |
+| Reference [2] | | 0.02 | 0.37 | 0.48 |
+| `backward`, `Euler` | limited `linearUpwind` | 0.02 | 0.026 | 0.2, decaying |
+| `backward`, `Euler` | limited `linearUpwind` | 0.005 | 0.057 | 0.2, decaying |
+| `backward`, `backward` | `LUST` | 0.02 | 0.050 | 0.20 |
+| `backward`, `backward` | `LUST` | 0.01 | 0.077 | 0.22 |
+| `backward`, `backward` | `LUST` | 0.005 | 0.091 | 0.20 |
+| `backward`, `backward` | `LUST` | 0.0025 | 0.089 | 0.20 |
+
+Numerical damping, from the first-order `Euler` scheme and the limited
+convection scheme in the fluid, is why the previous settings of this tutorial
+damped the roof oscillation out. On this mesh, with the schemes and time step
+of the tutorial, the oscillation is sustained and converged in the time step,
+with a period of about $$0.20$$ s in this simulation. Its amplitude is
+still about four times smaller than that of the reference, and its period is
+less than half; on the default mesh the amplitude is smaller still, about
+$$0.02$$ m peak to peak.
+
+The reference oscillates at about $$0.48$$ s (about $$2.1$$ Hz) in both the
+roof-centre displacement and the pressure [2, Figs. 6.6 and 6.7]. In the dry
+tests of the present roof model, a suddenly applied pressure gives periods
+of 0.25, 0.17 and 0.11 s for 500, 1500 and 4500 Pa, approximately following
+$$p^{-1/3}$$ scaling. These observations do not establish that the coupled
+reference response is incompatible with the published properties.
+
+The reference uses seven-parameter shell elements with edge translations
+fixed and rotations permitted [2, Sects. 6.2.2-6.2.3]. The present model uses
+three-dimensional continuum cells with the entire edge faces fixed. Applying
+self-weight, or fixing only the lower half of the roof edges, changed the
+period by about $$2\%$$ or less in the reported tests; the latter condition
+is only an approximation to a pinned shell edge.
+
+The present model does not reproduce the reference oscillation, including on
+the meshes tested up to $$369\,000$$ fluid cells. The cause remains unresolved;
+structural formulation, boundary conditions, fluid loading and numerical
+discretisation require further comparison. A useful next step is a comparison
+of shell and solid structure-only models with matched static
+pressure-deflection curves, followed by small oscillations about the same
+loaded equilibrium and spatial and temporal refinement. This investigation is
+tracked in [issue #526](https://github.com/solids4foam/solids4foam/issues/526).
+
+### Sensitivity
+
+Figure 3, computed with the previous, more dissipative settings of this
+tutorial (`Euler` in the fluid, limited `linearUpwind` convection and
+$$\Delta t = 0.02$$ s), shows the sensitivity of the mean response. It repeats
+the comparison with half the time step and with the
+self-weight applied from $$t = 0$$ (both with 6 cells through the roof
+thickness), and on a finer mesh with twice as many cells in each direction in
+the fluid ($$220\,804$$ cells) and in the two in-plane directions of the roof
+($$32 \times 2 \times 32$$ cells). Halving the time step changes the result
+very little. The finer mesh lowers the roof by about $$0.1$$ m during the ramp,
+bringing the mean displacement between $$1$$ and $$4$$ s to $$-0.35$$ m,
+against $$-0.36$$ m for the reference and $$-0.25$$ m for the tutorial mesh,
+and it shows a first dip near $$t = 0.4$$ s. It still settles to a nearly
+steady shape after the ramp. With these dissipative settings neither mesh
+reproduces the reference oscillation; with the current settings the roof
+oscillates with a shorter period, and the unresolved discrepancy is discussed
+in [Roof oscillation](#roof-oscillation). The finer mesh took 58 min on 32
+processes of an AMD EPYC 9684X.
+
+![Sensitivity of the roof centre displacement to the time step, self-weight and mesh](./images/membraneRoof-sensitivity.png)
+
+**Figure 3:** Sensitivity of the roof-centre displacement to the time step,
+the self-weight and the mesh.
+
+The regression test (`regressionTest.sh`) runs the first $$0.2$$ s (40 time
+steps) and checks the roof-centre displacement and the vertical force on the
+roof.
 
 ## References
 
-[1] [M. von Scheven and E. Ramm, "Strong coupling schemes for interaction of
-thin-walled structures and incompressible flows," *International Journal for
-Numerical Methods in Engineering*, 87(1-5), 2011, pp. 214-231](
-https://doi.org/10.1002/nme.3033)
+[1] [M. von Scheven and E. Ramm, Strong coupling schemes for interaction of
+thin-walled structures and incompressible flows, International Journal for
+Numerical Methods in Engineering, 87, 2011, 214-231.](https://doi.org/10.1002/nme.3033)
 
-[2] [P. Le Tallec and J. Mouro, "Fluid structure interaction with large
-structural displacements," *Computer Methods in Applied Mechanics and
-Engineering*, 190(24-25), 2001, pp. 3039-3067.](https://www.sciencedirect.com/science/article/abs/pii/S0045782500003819)
+[2] [M. von Scheven, Effiziente Algorithmen für die
+Fluid-Struktur-Wechselwirkung, PhD thesis, Institut für Baustatik und
+Baudynamik, Universität Stuttgart, 2009.](https://elib.uni-stuttgart.de/items/4428aaea-8eb0-434f-bc64-1ca208a83ef0)

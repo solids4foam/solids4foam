@@ -60,9 +60,12 @@ $$
 =-\frac{P}{N}\left(r+\frac{a^2b^2}{r^3}-\frac{a^2+b^2}{r}\right)\cos (\theta).
 $$
 
+where $a$ is beam inner radius, $b$ is beam outer radius and $P$ is applied
+shear force.
+
 The analytical solution is generated alongside solution fields using the
-function object located in the `system/controlDict`, where one needs to input
-geometry and material data:
+`curvedCantileverAnalyticalSolution` function object located in the
+`system/controlDict`, where one needs to input geometry and material data:
 
 ```c++
   functions
@@ -89,6 +92,9 @@ geometry and material data:
   }
 ```
 
+The function object writes the analytical stress tensor field `analyticalStress`
+in the time directories.
+
 Figures 2 and 3 show $$\sigma_{xx}$$, $$\sigma_{xy}$$ and $$\sigma_{yy}$$ stress
 distributions along the line $$\theta=45^{\circ}$$ for computational meshes
 consisting of $$100\times100$$ and $$200\times50$$ cells. One can see that with
@@ -113,10 +119,11 @@ Figure 3: Stress distribution for mesh consisting of 200x50 cells
 The tutorial case is located at
 `solids4foam/tutorials/solids/linearElasticity/curvedCantilever`. The case can
 be run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
-`Allrun` consists of creating the mesh using `blockMesh` (`> ./blockMesh`)
-followed by running the `solids4foam` solver (`> ./solids4Foam`) and
-`> ./sample` utility. Optionally, if `gnuplot` is installed, the stress
-distribution is plotted in the `sigmaAtTheta45deg.png` file.
+`Allrun` script compiles the tutorial-local library in the `src` directory,
+creates the mesh using `blockMesh` (`> ./blockMesh`), runs the `solids4foam`
+solver (`> ./solids4Foam`), and then runs the `> ./sample` utility. Optionally,
+if `gnuplot` is installed, the stress distribution is plotted in the
+`sigmaAtTheta45deg.png` file.
 
 ```warning
 The coupled version of this case, which uses the
@@ -125,6 +132,25 @@ solids4foam built on foam-extend. To modify the case to run with the segregated
 `linearGeometryTotalDisplacement` solid model, follow the instructions in
 `tutorials/solids/linearElasticity/narrowTmember/README.md` file.
 ```
+
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory adds the mesh-convergence
+sweep described above. It scales the circumferential and radial divisions by
+powers of two from $$50 \times 5$$ to $$400 \times 40$$ cells and measures the
+error of the sampled stress against the analytical solution on the same
+$$\theta = 45^\circ$$ line:
+
+```bash
+cd verification
+./Allverify
+```
+
+The relative L2 error falls from $$0.252$$ to $$0.0066$$ over that family, a
+net order of $$1.75$$, and the whole sweep takes about 35 seconds. The study is
+separate from `regressionTest.sh` and is not run by the normal tutorial test
+suites. See the verification README for the mesh levels, options, and
+acceptance criteria.
 
 ---
 

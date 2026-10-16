@@ -92,6 +92,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     nbPoints(0),
     faceCellCenters(true),
     cpu(false),
+    motionCentersSet_(false),
     corrector(false),
     k(0)
 {
@@ -209,12 +210,31 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     assert(rbfFunction);
 
     bool polynomialTerm = dict.lookupOrDefault("polynomial", false);
-    bool cpu = dict.lookupOrDefault("cpu", false);
-    this->cpu = dict.lookupOrDefault("fullCPU", false);
-    std::shared_ptr<rbf::RBFInterpolation> rbfInterpolator(new rbf::RBFInterpolation(rbfFunction, polynomialTerm, cpu));
 
-    if (this->cpu == true)
-        assert(cpu == true);
+    // The "cpu" option selects the memory-lean formulation, where the
+    // factorisation of the interpolation matrix is stored and back-substituted
+    // at each interpolation, instead of storing the explicit (dense)
+    // interpolation matrix.
+    // The "fullCPU" option additionally discards the factorisation after every
+    // mesh motion update, forcing the control point positions and the
+    // factorisation to be recomputed from the current (deformed) mesh. This is
+    // only meaningful for the "cpu" formulation, hence "fullCPU" implies "cpu".
+    this->cpu = dict.lookupOrDefault("fullCPU", false);
+    bool cpu = dict.lookupOrDefault("cpu", false);
+
+    if (this->cpu && !cpu)
+    {
+        if (dict.found("cpu"))
+        {
+            WarningInFunction
+                << "cpu is disabled but fullCPU is enabled: "
+                << "enabling cpu, as required by fullCPU" << endl;
+        }
+
+        cpu = true;
+    }
+
+    std::shared_ptr<rbf::RBFInterpolation> rbfInterpolator(new rbf::RBFInterpolation(rbfFunction, polynomialTerm, cpu));
 
     const bool coarsening =
         readBool(coeffDict.subDict("coarsening").lookup("enabled"));
@@ -291,6 +311,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     Info << "    interpolation function = " << function << endl;
     Info << "    interpolation polynomial term = " << polynomialTerm << endl;
     Info << "    interpolation cpu formulation = " << cpu << endl;
+    Info << "    interpolation full cpu formulation = " << this->cpu << endl;
     Info << "    coarsening = " << coarsening << endl;
     Info << "        coarsening tolerance = " << tol << endl;
     Info << "        coarsening reselection tolerance = " << tolLivePointSelection << endl;
@@ -364,6 +385,7 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
     }
 
     motionCenters = motion;
+    motionCentersSet_ = true;
 }
 
 void RBFMeshMotionSolver::updateMesh(const mapPolyMesh &)
@@ -375,16 +397,23 @@ void RBFMeshMotionSolver::solve()
 {
     assert(motionCenters.size() == mesh().boundaryMesh().size());
 
-    // Copy motionCentersField to motionCenters
-    forAll(accumulatedMotionCentersField_.boundaryField(), patchI)
+    if (!motionCentersSet_)
     {
-        motionCenters[patchI] =
-            accumulatedMotionCentersField_.boundaryField()[patchI]
-          - accumulatedMotionCentersField_.prevIter().boundaryField()[patchI];
+        // Copy motionCentersField to motionCenters
+        forAll(accumulatedMotionCentersField_.boundaryField(), patchI)
+        {
+            motionCenters[patchI] =
+                accumulatedMotionCentersField_.boundaryField()[patchI]
+              - accumulatedMotionCentersField_.prevIter().boundaryField()
+                [
+                    patchI
+                ];
+        }
     }
 
     // Update previous field
     accumulatedMotionCentersField_.storePrevIter();
+    motionCentersSet_ = false;
 
 
     /*

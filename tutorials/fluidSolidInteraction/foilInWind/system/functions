@@ -13,11 +13,12 @@ functions
         "rhoName|rho"       rhoInf;
         log                 false;
         rhoInf              1.18;
-        CofR                (0.5 0.1 0);
+        CofR                (0.06 0.055 0.055);
     }
-    // displacement
-    // {
-    //     type                solidPointDisplacement;
-    //     point               (0.45 0.15 -0.15);
-    // }
+    displacement
+    {
+        // Mid-span point on the trailing edge of the flag
+        type                solidPointDisplacement;
+        point               (0.1 0.055 0.055);
+    }
 }

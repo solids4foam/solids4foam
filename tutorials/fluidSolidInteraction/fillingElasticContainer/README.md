@@ -1,5 +1,5 @@
 ---
-sort: 5
+sort: 6
 ---
 
 # Filling an elastic container with a viscous fluid: `fillingElasticContainer`
@@ -59,24 +59,23 @@ The adopted material parameters are given below:
 
 ### Table 1: Problem Physical Parameters
 
-- **Geometry**
-  - Rigid container top side: 4.87 m
-  - Rigid container bottom side (`b`): 1.30 m
-  - Rigid container height (`h`): 2.50 m
-  - Elastic container straight side (`H`): 3.75 m
-  - Elastic container cap radius (`R`): 2.25 m
-  - Elastic container thickness (`s`): 0.20 m
-  - Gravity (`g`): 9.81 m/s$$^2$$
-- **Solid**
-  - Density (`\rho_s`): 20 kg/m$$^3$$
-  - Young’s modulus (`E_s`): 2.1e7 Pa
-  - Poisson’s ratio (`\nu_s`): 0.3
-- **Fluid**
-  - Phase 1 density (`\rho_{f_1}`): 1000 kg/m$$^3$$
-  - Phase 1 dynamic viscosity (`\mu_{f_1}`): 100 Pa s
-  - Phase 2 density (`\rho_{f_2}`): 1 kg/m$$^3$$
-  - Phase 2 dynamic viscosity (`\mu_{f_2}`): 1.48e-5 Pa s
-  - Surface tension coefficient (`\sigma`): 0 N/m
+| Category | Parameter | Value | Units |
+| :---: | :--- | :---: | :---: |
+| Geometry | Rigid container top side | 4.87 | m |
+| | Rigid container bottom side, $$b$$ | 1.30 | m |
+| | Rigid container height, $$h$$ | 2.50 | m |
+| | Elastic container straight side, $$H$$ | 3.75 | m |
+| | Elastic container cap radius, $$R$$ | 2.25 | m |
+| | Elastic container thickness, $$s$$ | 0.20 | m |
+| | Gravity, $$g$$ | 9.81 | m/s$$^2$$ |
+| Solid | Density, $$\rho_s$$ | 20 | kg/m$$^3$$ |
+| | Young’s modulus, $$E_s$$ | $$2.1\times10^7$$ | Pa |
+| | Poisson’s ratio, $$\nu_s$$ | 0.3 | |
+| Fluid | Phase 1 density, $$\rho_{f_1}$$ | 1000 | kg/m$$^3$$ |
+| | Phase 1 dynamic viscosity, $$\mu_{f_1}$$ | 100 | Pa·s |
+| | Phase 2 density, $$\rho_{f_2}$$ | 1 | kg/m$$^3$$ |
+| | Phase 2 dynamic viscosity, $$\mu_{f_2}$$ | $$1.48\times10^{-5}$$ | Pa·s |
+| | Surface tension coefficient, $$\sigma$$ | 0 | N/m |
 
 ---
 
@@ -86,7 +85,10 @@ The adopted material parameters are given below:
   Lagrangian-Eulerian volume of fluid formulation (`interFoam`)
 - **Solid:** nonlinear hyperelastic total Lagrangian solid formulation with
   Jacobian-free Newton-Krylov solution algorithm [5]
-- **Coupling:** partitioned FSI framework with Robin-Neumann coupling [4]
+- **Coupling:** partitioned FSI framework with Robin-Neumann coupling [4],
+  using the `elasticWallPressure` condition with its default automatic Robin
+  coefficient (`hsModel secant`) and unrelaxed fixed-point iterations
+  (`fixedRelaxation` with `relaxationFactor 1`)
 - **Time integration:** transient
 
 Compared to the original single-phase benchmarks, the inclusion of air introduces
@@ -108,8 +110,20 @@ This case therefore serves both as:
 From the case directory:
 
 ```bash
-./Allrun
+./Allrun          # Robin-Neumann coupling with fixed relaxation 1 (default)
+./Allrun aitken   # Robin-Neumann coupling with Aitken relaxation
+./Allrun iqnils   # Robin-Neumann coupling accelerated with IQN-ILS
 ```
+
+Each mode links `constant/fsiProperties` to `constant/fsiProperties.<mode>`.
+
+The Robin-Neumann coupling is designed for unrelaxed fixed-point iterations
+(`constant/fsiProperties.robin`). With IQN-ILS (or Aitken, or a relaxation
+factor below 1) the fluid mesh lags the solid within the FSI iterations, so the
+interface flux cannot be made consistent with the mesh motion; the solver warns
+and only reports the interface leakage. In this case the default settings need
+about 6 FSI iterations per time step on average, and the IQN-ILS variant about
+9.
 
 To clean the case:
 
@@ -166,7 +180,8 @@ The displacement vs time are shown in Figure 2, where the results from two
 **Figure 2: Displacement of the container apex point vs time.**
 
 Figure 3 shows the number of fluid-solid interaction coupling iteration per time
- step (mesh with $$2\,000$$ fluid and $$400$$ solid cells), showing that the
+ step (mesh with $$2\,000$$ fluid and $$400$$ solid cells, produced with an
+ earlier version of the case), showing that the
  adopted partitioned Robin-Neumann coupling approach requires between 3 and 6
  iterations in all time steps apart from 11 in the first time step: this
  highlights the robustness and efficiency of the Robin-Neumann coupling approach

@@ -109,13 +109,10 @@ bool poroLinGeomSolid::converged
             )
         );
 
-    // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
-
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol())
+    // force at least 1 outer iteration
+    if (iCorr > 1)
     {
         if
         (
@@ -155,7 +152,7 @@ bool poroLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, resD, resP, relResD, relResP, matRes, iters" << endl;
+        Info<< "    Corr, resD, resP, relResD, relResP, iters" << endl;
     }
     else if (iCorr % infoFrequency() == 0 || converged)
     {
@@ -164,7 +161,6 @@ bool poroLinGeomSolid::converged
             << ", " << solverPerfp.initialResidual()
             << ", " << residualD
             << ", " << residualp
-            << ", " << materialResidual
             << ", " << solverPerfD.nIterations() << endl;
 
         if (converged)
@@ -192,14 +188,18 @@ poroLinGeomSolid::poroLinGeomSolid
 )
 :
     solidModel(typeName, runTime, region),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    impK_(makeImpK()),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_),
     p_
     (
         IOobject
         (
-            "p",
+            // porePressure, not p: a solid model solving a mixed
+            // displacement-pressure formulation registers its own pressure as
+            // "p", and one field cannot be both. They are different pressures
+            // and they now have different names
+            "porePressure",
             runTime.timeName(),
             mesh(),
             IOobject::MUST_READ,
@@ -211,7 +211,7 @@ poroLinGeomSolid::poroLinGeomSolid
     (
         IOobject
         (
-            "grad(p)",
+            "grad(" + p_.name() + ")",
             runTime.timeName(),
             mesh(),
             IOobject::NO_READ,
@@ -234,10 +234,44 @@ poroLinGeomSolid::poroLinGeomSolid
 {
     // Store old time of p
     p_.oldTime();
+
+    // A multi-material run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void poroLinGeomSolid::correctStress()
+{
+    // The framework is a pure function of the displacement gradient and the
+    // old-time state, so the gradient is passed explicitly rather than looked
+    // up from the registry, and the old-time state is rolled over by the
+    // manager rather than by a separate call
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField> poroLinGeomSolid::makeImpK() const
+{
+    return lawImpK(mechanicalManager(), tangentRequest::scalar);
+}
+
+
+Foam::tmp<Foam::surfaceScalarField> poroLinGeomSolid::makeImpKf() const
+{
+    // The framework has no separate face tangent: the face value is the
+    // interpolate of the cell one
+    return fvc::interpolate(makeImpK()());
+}
+
 
 
 bool poroLinGeomSolid::evolve()
@@ -327,7 +361,7 @@ bool poroLinGeomSolid::evolve()
         DD() = D() - D().oldTime();
 
         // Update gradient of displacement
-        mechanical().grad(D(), gradD());
+        gradD() = fvc::grad(D());
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
@@ -336,14 +370,14 @@ bool poroLinGeomSolid::evolve()
         U() = fvc::ddt(D());
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 
         // Update impKf to improve convergence
         // Note: impK and rImpK are not updated as they are used for traction
         // boundaries
         if (iCorr % 10 == 0)
         {
-            impKf_ = mechanical().impKf();
+            impKf_ = makeImpKf();
         }
     }
     while
@@ -353,7 +387,7 @@ bool poroLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

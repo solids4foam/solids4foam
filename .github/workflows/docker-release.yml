@@ -16,6 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         image:
+          - { name: "openfoam-v2512", file: ".docker/Dockerfile.openfoamv2512" }
           - { name: "openfoam-v2412", file: ".docker/Dockerfile.openfoamv2412" }
           - { name: "openfoam-v2312", file: ".docker/Dockerfile.openfoamv2312" }
           - { name: "openfoam-9",     file: ".docker/Dockerfile.openfoam9" }

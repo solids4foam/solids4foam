@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Source tutorial clean functions
+# Source solids4Foam scripts
+rm *~
+rm *.eps

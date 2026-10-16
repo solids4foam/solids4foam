@@ -103,6 +103,13 @@ public:
                 return relaxationFactor_;
             }
 
+            //- Without under-relaxation the fluid interface is moved to the
+            //  solid interface in every FSI iteration
+            virtual bool fluidMeshFollowsSolid() const
+            {
+                return mag(relaxationFactor_ - 1) <= SMALL;
+            }
+
         // Edit
 
             //- Evolve the interface

@@ -18,12 +18,14 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
 #include "twoDPointCorrectorS4f.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -34,6 +36,15 @@ License
 #include "meshTools.H"
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
+#include "NewmarkBetaD2dt2Scheme.H"
+#include "hofvc.H"
+#include "fvm.H"
+#include "fvc.H"
+#include "fvMatrices.H"
+#include "zeroGradientFvPatchFields.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "enhancedVolPointInterpolation.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -124,7 +135,7 @@ void Foam::solidModel::makeRAUf() const
                 IOobject::NO_WRITE
             ),
             mesh(),
-            dimensionedScalar("0", dimArea/dimPressure, 0.0)
+            dimensionedScalar("0", dimPressure, 0.0)
         )
     );
 }
@@ -296,18 +307,80 @@ void Foam::solidModel::makeThermalModel() const
 }
 
 
-void Foam::solidModel::makeMechanicalModel() const
+void Foam::solidModel::makeMechanicalProperties() const
 {
-    if (!mechanicalPtr_.empty())
+    if (!mechanicalPropertiesPtr_.empty())
     {
-        FatalErrorIn("void Foam::solidModel::makeMechanicalModel() const")
+        FatalErrorInFunction
             << "pointer already set!" << abort(FatalError);
     }
 
-    mechanicalPtr_.set
+    mechanicalPropertiesPtr_.set
     (
-        new mechanicalModel(mesh(), nonLinGeom(), incremental())
+        new IOdictionary
+        (
+            IOobject
+            (
+                "mechanicalProperties",
+                mesh().time().constant(),
+                mesh(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        )
     );
+}
+
+
+void Foam::solidModel::checkRemovedMechanicalModelEntries() const
+{
+    // The legacy laws under-relaxed their plastic strain increment, so the
+    // constitutive update lagged the displacement between outer iterations and
+    // its own convergence was tested against materialTolerance. A
+    // mechanicalConstitutiveLaw is a pure function of the kinematics and the
+    // old-time state, so there is nothing for a material residual to measure,
+    // and convergence is governed by the displacement residuals alone
+    if (solidModelDict().found("materialTolerance"))
+    {
+        Info<< "    'materialTolerance' is ignored and can be removed: the "
+            << "mechanicalConstitutiveLaw framework has no material residual"
+            << endl;
+    }
+
+    // The switch chose between the mechanicalConstitutiveLaw framework and the
+    // legacy mechanicalModel. The legacy model has been removed, so a case
+    // that asks for it must stop rather than silently run on the framework
+    // and give different results; one that asks for the framework gets what
+    // it asked for, and is only told that the entry is no longer needed
+    const word key("useMechanicalConstitutiveLawManager");
+
+    if (!solidModelDict().found(key))
+    {
+        return;
+    }
+
+    if (Switch(solidModelDict().lookup(key)))
+    {
+        Info<< "    '" << key << " yes' is obsolete and can be removed: the "
+            << "mechanicalConstitutiveLaw framework is the only mechanical "
+            << "model" << endl;
+
+        return;
+    }
+
+    FatalIOErrorInFunction(solidModelDict())
+        << "'" << key << " no' selects the legacy mechanicalModel, which has "
+        << "been removed from solids4foam." << nl << nl
+        << "    The mechanicalConstitutiveLaw framework is now the only "
+        << "mechanical model. It reads the same constant/mechanicalProperties, "
+        << "and a law it does not provide stops the run at construction. "
+        << "Remove '" << key
+        << "' from " << type_ << "Coeffs in constant/solidProperties to run "
+        << "on it, and check the results: they are not guaranteed to match "
+        << "the legacy model's." << nl
+        << "    To reproduce a result from the legacy model, use a solids4foam "
+        << "release that still contains it."
+        << exit(FatalIOError);
 }
 
 
@@ -319,10 +392,9 @@ void Foam::solidModel::makeRho() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    rhoPtr_.set
-    (
-        new volScalarField(mechanical().rho())
-    );
+    // Built from a tmp, so the field takes over the tmp's registration as
+    // "rho"
+    rhoPtr_.set(new volScalarField(initialRho()));
 }
 
 
@@ -404,6 +476,49 @@ namespace
 
         return includePatchInStencils;
     }
+
+    // Make the registry hold the old-time levels of a field that are in use.
+    // On a restart, OpenFOAM reads each level below the first twice: once
+    // when the level above it is read-constructed, and again when that
+    // level's readOldTimeIfPresent() replaces it. The replacement is created
+    // while the first copy is still registered, so it fails to register.
+    // OpenFOAM.com v2412 and later then delete the first copy, leaving the
+    // level in use unregistered and never written again, so a later restart
+    // from this run finds no D_0_0 and backward d2dt2 falls back to first
+    // order. Earlier OpenFOAM.com versions, OpenFOAM.org and foam-extend leak
+    // the first copy instead, which stays registered and is written with the
+    // values it was read with
+    template<class GeoField>
+    void registerOldTimeLevels(const GeoField& field)
+    {
+        const Foam::label nOldTimes = field.nOldTimes();
+
+        const GeoField* levelPtr = &field;
+
+        for (Foam::label levelI = 0; levelI < nOldTimes; ++levelI)
+        {
+            levelPtr = &levelPtr->oldTime();
+            GeoField& level = const_cast<GeoField&>(*levelPtr);
+
+            const Foam::objectRegistry& db = level.db();
+
+            if (db.foundObject<GeoField>(level.name()))
+            {
+                const GeoField& registered =
+                    db.lookupObject<GeoField>(level.name());
+
+                if (&registered == &level)
+                {
+                    continue;
+                }
+
+                // A stale copy holds the name: release it
+                const_cast<GeoField&>(registered).checkOut();
+            }
+
+            level.checkIn();
+        }
+    }
 }
 
 
@@ -411,9 +526,7 @@ const Foam::dictionary& Foam::solidModel::highOrderCoeffsDict() const
 {
     if (!solidModelDict().found("highOrderCoeffs"))
     {
-        FatalErrorInFunction
-            << "The solid model dictionary does not contain 'highOrderCoeffs'."
-            << abort(FatalError);
+        return dictionary::null;
     }
 
     return solidModelDict().subDict("highOrderCoeffs");
@@ -492,43 +605,36 @@ Foam::dictionary& Foam::solidModel::stabilisationDict()
     return stabDict;
 }
 
-#ifndef FOAMEXTEND
-void Foam::solidModel::makeDisplacementMLS() const
-{
-    if (!displacementMLSPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "pointer already set!" << abort(FatalError);
-    }
 
-    displacementMLSPtr_.set
+const Foam::leastSquaresScheme&
+Foam::solidModel::displacementLeastSquares() const
+{
+    // Note: the mask is taken from the primary solution field: for incremental
+    // solid models this is DD, as it is that field which carries the boundary
+    // conditions
+    const leastSquaresReconstruction& reconstructions =
+        leastSquaresReconstruction::New(mesh());
+
+    return reconstructions.scheme
     (
-        new movingLeastSquares
-        (
-            mesh(),
-            fixedValuePatchMask(D()),
-            displacementHighOrderCoeffs()
-        )
+        "displacement",
+        fixedValuePatchMask(incremental() ? DD_ : D_),
+        displacementHighOrderCoeffs()
     );
 }
 
 
-void Foam::solidModel::makePressureMLS() const
+const Foam::leastSquaresScheme&
+Foam::solidModel::pressureLeastSquares() const
 {
-    if (!pressureMLSPtr_.empty())
-    {
-        FatalErrorInFunction
-            << "pointer already set!" << abort(FatalError);
-    }
+    const leastSquaresReconstruction& reconstructions =
+        leastSquaresReconstruction::New(mesh());
 
-    pressureMLSPtr_.set
+    return reconstructions.scheme
     (
-        new movingLeastSquares
-        (
-            mesh(),
-            fixedValuePatchMask(p()),
-            pressureHighOrderCoeffs()
-        )
+        "pressure",
+        fixedValuePatchMask(p()),
+        pressureHighOrderCoeffs()
     );
 }
 
@@ -541,8 +647,10 @@ void Foam::solidModel::makeSigmaQuad() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -561,10 +669,8 @@ void Foam::solidModel::makeSigmaQuad() const
         }
     }
 }
-#endif
 
 
-#ifndef FOAMEXTEND
 void Foam::solidModel::makeGradDQuad() const
 {
     if (!gradDQuadPtr_.empty())
@@ -573,8 +679,10 @@ void Foam::solidModel::makeGradDQuad() const
             << "pointer already set!" << abort(FatalError);
     }
 
-    const CompactListList<point>& faceQuadPts =
-        displacementMLS().quadrature().faceQuadPoints();
+    auto& faceQuadPts = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadPoints()
+    );
 
     labelList rowSizes(faceQuadPts.size(), 0);
     forAll(faceQuadPts, faceI)
@@ -593,7 +701,83 @@ void Foam::solidModel::makeGradDQuad() const
         }
     }
 }
+
+
+const Foam::CompactListList<Foam::tensor>&
+Foam::solidModel::gradDQuad0() const
+{
+    if (gradDQuad0Ptr_.empty())
+    {
+#ifdef OPENFOAM_NOT_EXTEND
+        if (gradDQuadPtr_.empty())
+        {
+            makeGradDQuad();
+        }
+
+        // Build the previous-time store from the previous-time displacement,
+        // rather than copying the current gradient into it: on a restart the
+        // current gradient is not the previous step's
+        gradDQuad0Ptr_.set
+        (
+            new CompactListList<tensor>(gradDQuadPtr_().sizes())
+        );
+        hofvc::fGrad(D_.oldTime(), gradDQuad0Ptr_());
+#else
+        gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
 #endif
+    }
+
+    return autoPtrRef(gradDQuad0Ptr_);
+}
+
+
+void Foam::solidModel::correctPointDisplacement
+(
+    pointVectorField& pointD
+) const
+{
+    pointD.correctBoundaryConditions();
+
+    const polyMesh& pMesh = pointD.mesh().mesh();
+    vectorField& pointDI = pointD;
+
+    forAll(pMesh.boundaryMesh(), patchI)
+    {
+        if (isA<symmetryPolyPatch>(pMesh.boundaryMesh()[patchI]))
+        {
+            const polyPatch& patch = pMesh.boundaryMesh()[patchI];
+
+            if (returnReduce(patch.size(), sumOp<int>()) == 0)
+            {
+                continue;
+            }
+
+            const labelList& meshPoints = patch.meshPoints();
+            const vector avgN = gAverage(patch.pointNormals());
+
+            forAll(meshPoints, pointI)
+            {
+                vector& pointValue = pointDI[meshPoints[pointI]];
+
+                if (mag(avgN.x()) > 0.95)
+                {
+                    pointValue.x() = 0;
+                }
+                else if (mag(avgN.y()) > 0.95)
+                {
+                    pointValue.y() = 0;
+                }
+                else if (mag(avgN.z()) > 0.95)
+                {
+                    pointValue.z() = 0;
+                }
+            }
+        }
+    }
+
+    twoDCorrector_.correctPoints(pointDI);
+}
 
 
 const Foam::pointVectorField& Foam::solidModel::pointDorPointDD() const
@@ -660,12 +844,10 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::solidModel::createStabilisation
     const dimensionSet& dims
 )
 {
-    dictionary& stabDict = stabilisationDict();
-
     return stabilisationModel::New
     (
         mesh(),
-        stabDict.subDict(name),
+        stabilisationDict().subDict(name),
         dims
     );
 }
@@ -675,16 +857,19 @@ void Foam::solidModel::resetMomentumStabilisation(const dimensionSet& dims)
 {
     momentumStabilisationPtr_ = createStabilisation("momentum", dims);
 
-    // Only stabilisation models that support high-order residual calculation
-    // are allowed when highOrderResidual is enabled
-    if (highOrderResidual() && !momentumStabilisation().supportsHighOrderResidual())
+    // Only stabilisation models that support high-order residual/Jacobian
+    // calculation are allowed when high-order is enabled
+    if
+    (
+        (highOrderResidual() || highOrderJacobian())
+     && !momentumStabilisationPtr_->supportsHighOrderResidual()
+    )
     {
         FatalErrorInFunction
-            << "Only stabilisation models that support high-order residual "
-            << "calculation can be used with highOrderResidual = true. "
-            << "Model type " << momentumStabilisation().type()
-            << " does not support it."
-            << abort(FatalError);
+            << "Momentum stabilisation type "
+            << momentumStabilisationPtr_->type()
+            << " does not support high-order residual or Jacobian "
+            << "calculation" << abort(FatalError);
     }
 }
 
@@ -783,14 +968,10 @@ void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
     // Hack to avoid expensive copy of residuals
 #ifdef OPENFOAM_COM
-    #if (OPENFOAM >= 2312)
-        const_cast<dictionary&>
-        (
-            D.mesh().data().solverPerformanceDict()
-        ).clear();
-    #else
-        const_cast<dictionary&>(D.mesh().solverPerformanceDict()).clear();
-    #endif
+    const_cast<dictionary&>
+    (
+        D.mesh().data().solverPerformanceDict()
+    ).clear();
 #endif
 
     if (relaxationMethod_ == "fixed")
@@ -1012,11 +1193,6 @@ Foam::solidModel::solidModel
       : solutionAlgorithm::IMPLICIT_SEGREGATED
     ),
     thermalPtr_(),
-    mechanicalPtr_(),
-#ifndef FOAMEXTEND
-    displacementMLSPtr_(),
-    pressureMLSPtr_(),
-#endif
     useBoundaryFaceValuesD_
     (
         IOobject
@@ -1186,10 +1362,6 @@ Foam::solidModel::solidModel
             "alternativeTolerance", 1e-07
         )
     ),
-    materialTol_
-    (
-        solidModelDict().lookupOrAddDefault<scalar>("materialTolerance", 1e-05)
-    ),
     infoFrequency_
     (
         solidModelDict().lookupOrAddDefault<int>("infoFrequency", 100)
@@ -1232,45 +1404,17 @@ Foam::solidModel::solidModel
         *meshPtr_,
         dimensionedVector("zero", dimLength, vector::zero)
     ),
-    QuasiNewtonRestartFreq_
-    (
-        solidModelDict().lookupOrAddDefault<int>("QuasiNewtonRestartFrequency", 25)
-    ),
-    QuasiNewtonV_(QuasiNewtonRestartFreq_ + 2),
-    QuasiNewtonW_(QuasiNewtonRestartFreq_ + 2),
-    QuasiNewtonT_(QuasiNewtonRestartFreq_ + 2),
-    DRef_
-    (
-        IOobject
-        (
-            "DRef",
-            runTime.constant(),
-            *meshPtr_,
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        *meshPtr_,
-        dimensionedVector("zero", dimLength, vector::zero)
-    ),
-    unrelaxedDRef_
-    (
-        IOobject
-        (
-            "unrelaxedDRef",
-            runTime.constant(),
-            *meshPtr_,
-            IOobject::READ_IF_PRESENT,
-            IOobject::NO_WRITE
-        ),
-        *meshPtr_,
-        dimensionedVector("zero", dimLength, vector::zero)
-    ),
     globalPatchesPtrList_(),
     setCellDispsPtr_(),
+    mechanicalManagerPtr_(),
+    jacobianTangentCached_(false),
+    jacobianTangent_(tangentRequest::none),
+    restartSpecified_(solidModelDict().found("restart")),
     restart_
     (
         solidModelDict().lookupOrAddDefault<Switch>("restart", false)
     ),
+    restartKinematicsAvailable_(true),
     rhoD2dt2DPtr_(),
     twoDCorrector_(mesh()),
     twoD_(mesh().nGeometricD() == 2),
@@ -1280,12 +1424,33 @@ Foam::solidModel::solidModel
     ),
     highOrderJacobian_(false),
     highOrderResidual_(false),
-    pPtr_()
+    pPtr_(),
+    hydrostaticSmoothingRead_(false),
+    hydrostaticSmoothingRequested_(false),
+    hydrostaticSmoothingChecked_(false),
+    pressureSmoothingScaleFactor_(100.0),
+    sigmaHydPtr_(),
+    useBoundaryFaceValuesSigmaHydPtr_(),
+    gradSigmaHydPtr_(),
+    smoothingVolumetricResponsePtr_()
 #ifdef OPENFOAM_COM
     ,
     fvOptions_(fv::options::New(*meshPtr_))
 #endif
 {
+    // As far as the finite volume discretisation is concerned, the solid mesh
+    // is not a "moving mesh": the solid models which do update the mesh, e.g.
+    // the updated Lagrangian ones, explicitly clear the moving flag after each
+    // mesh motion, as the mesh motion is not a flow of material through the
+    // faces.
+    // On a restart, however, the fvMesh constructor marks the mesh as moving if
+    // it finds a 'meshPhi' or 'V0' field in the start time directory, and then,
+    // for example, backwardD2dt2Scheme stops with a "not implemented for a
+    // moving mesh" error (issue #184). So the flag is cleared here
+    mesh().moving(false);
+
+    checkRemovedMechanicalModelEntries();
+
     // Set the useBoundaryFaceValues fields
     forAll(useBoundaryFaceValuesD_, patchI)
     {
@@ -1296,6 +1461,10 @@ Foam::solidModel::solidModel
                 D_.boundaryField()[patchI]
             )
          || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
+         || isA<solidSpringDashpotFvPatchVectorField>
             (
                 D_.boundaryField()[patchI]
             )
@@ -1317,6 +1486,10 @@ Foam::solidModel::solidModel
                 DD_.boundaryField()[patchI]
             )
          || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+         || isA<solidSpringDashpotFvPatchVectorField>
             (
                 DD_.boundaryField()[patchI]
             )
@@ -1349,6 +1522,35 @@ Foam::solidModel::solidModel
     gradDD_.oldTime();
     sigma_.oldTime();
 
+    // Re-register the old-time levels read on a restart, so that they are
+    // written again (see registerOldTimeLevels)
+    registerOldTimeLevels(D_);
+    registerOldTimeLevels(DD_);
+    registerOldTimeLevels(pointD_);
+
+    // Whether a continued run has the old-time gradient a constitutive
+    // history is measured against. Looked for rather than assumed from
+    // 'restart yes', since the run that wrote this time may not have asked
+    // for it
+    if (runTime.startTimeIndex() > 0)
+    {
+        IOobject gradD0IO
+        (
+            gradD_.oldTime().name(),
+            runTime.timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        );
+
+#ifdef OPENFOAM_NOT_EXTEND
+        restartKinematicsAvailable_ =
+            gradD0IO.typeHeaderOk<volTensorField>(false);
+#else
+        restartKinematicsAvailable_ = gradD0IO.headerOk();
+#endif
+    }
+
     if (restart_)
     {
         // Enable writing of fields which are needed for restart
@@ -1363,9 +1565,78 @@ Foam::solidModel::solidModel
         gradD_.writeOpt() = IOobject::AUTO_WRITE;
         gradD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         gradDD_.writeOpt() = IOobject::AUTO_WRITE;
+
+        // The velocity is created on first use, which is otherwise after the
+        // first time increment, where there is no U to read: a restart would
+        // then predict its first step from zero velocity
+        if (runTime.startTimeIndex() > 0)
+        {
+            U();
+        }
     }
     else
     {
+        // Starting from a time that is not the first, without having been
+        // asked to write what a restart needs. The fields below are switched
+        // off in this branch, so the run is about to continue from a state it
+        // only partly has: the displacement comes back, the increment and the
+        // gradient it is measured against do not.
+        //
+        // Whether that matters depends on the material. A law written in total
+        // strain will not notice; an incremental one reads the whole run's
+        // strain as a single step's and is wrong by tens of percent while
+        // running happily to the end. That is too quiet a way to be wrong to
+        // leave unsaid, and too common a mistake to assume: the flag defaults
+        // to off and most cases never set it
+        if (runTime.startTimeIndex() > 0)
+        {
+            // Continuing from a time that is not the first, without having
+            // been asked to write what a restart needs. Whether that matters
+            // depends on the material: one written in total strain will not
+            // notice, while an incremental one reads the whole run's strain as
+            // a single step's and is wrong by tens of percent while running
+            // happily to the end.
+            //
+            // The fields may still be there, if the run that produced this
+            // time directory did ask for them, so look before complaining
+            const bool present = restartKinematicsAvailable_;
+
+            if (!present && !restartSpecified_)
+            {
+                // The case has not said anything about restarting, and is
+                // restarting. Refuse: this is a mistake far more often than it
+                // is a choice, and the cost of being wrong is a plausible
+                // answer rather than an obvious failure
+                FatalErrorInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << ", but the fields a consistent restart needs were "
+                    << "never written." << nl << nl
+                    << "    The displacement increment, the old-time "
+                    << "displacement gradient and the point fields are only "
+                    << "written when the case asks for them." << nl << nl
+                    << "    Either" << nl << nl
+                    << "        restart yes;" << nl << nl
+                    << "    in the solidModel's coefficients dictionary, and "
+                    << "run again from the start; or" << nl << nl
+                    << "        restart no;" << nl << nl
+                    << "    to say that this material does not need them and "
+                    << "continue. A material written in total strain does not; "
+                    << "an incremental one does, and without them reads the "
+                    << "whole run's strain as one step's."
+                    << exit(FatalError);
+            }
+            else if (!present)
+            {
+                // Said 'no' deliberately. Their call, said once
+                WarningInFunction
+                    << "Continuing from time " << runTime.timeName()
+                    << " with 'restart no': the displacement increment and "
+                    << "old-time gradient were not written, so an incremental "
+                    << "material would continue from the wrong strain."
+                    << endl;
+            }
+        }
+
         D_.oldTime().writeOpt() = IOobject::NO_WRITE;
         D_.oldTime().oldTime().writeOpt() = IOobject::NO_WRITE;
         DD_.writeOpt() = IOobject::NO_WRITE;
@@ -1379,10 +1650,16 @@ Foam::solidModel::solidModel
         gradDD_.writeOpt() = IOobject::NO_WRITE;
     }
 
-    if (solidModelDict().found("highOrderCoeffs"))
-    {
-        const dictionary& hoDict = highOrderCoeffsDict();
+    const dictionary& hoDict = highOrderCoeffsDict();
 
+    highOrderJacobian_ =
+        hoDict.lookupOrDefault<Switch>("highOrderJacobian", false);
+
+    highOrderResidual_ =
+        hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
+
+    if (highOrderJacobian_ || highOrderResidual_)
+    {
         if (!hoDict.found("displacement"))
         {
             FatalErrorInFunction
@@ -1390,26 +1667,7 @@ Foam::solidModel::solidModel
                 << abort(FatalError);
         }
 
-        highOrderJacobian_ =
-            hoDict.lookupOrDefault<Switch>("highOrderJacobian", false);
-
-        highOrderResidual_ =
-            hoDict.lookupOrDefault<Switch>("highOrderResidual", false);
-
-#ifdef FOAMEXTEND
-        if (highOrderJacobian_ || highOrderResidual_)
-        {
-            FatalErrorInFunction
-                << "High-order MLS discretisation is not supported on "
-                << "foam-extend." << abort(FatalError);
-        }
-#endif
-
-        if
-        (
-            (highOrderJacobian_ || highOrderResidual_)
-         && solutionAlg() != solutionAlgorithm::PETSC_SNES
-        )
+        if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
         {
             FatalErrorInFunction
                 << "highOrderResidual/highOrderJacobian are only supported "
@@ -1418,14 +1676,12 @@ Foam::solidModel::solidModel
                    [solidModel::solutionAlgorithm::PETSC_SNES]
                 << abort(FatalError);
         }
+
+        leastSquaresScheme::checkMeshSupported(mesh());
     }
 
     // Print out the relaxation factor
     Info<< "    under-relaxation method: " << relaxationMethod_ << endl;
-    if (relaxationMethod_ == "QuasiNewton")
-    {
-        Info<< "        restart frequency: " << QuasiNewtonRestartFreq_ << endl;
-    }
 
     // If requested, create the residual file
     if (solidModelDict().lookupOrAddDefault<Switch>("residualFile", false))
@@ -1440,15 +1696,9 @@ Foam::solidModel::solidModel
         }
     }
 
+    // Create momentum and pressure stabilisation
     resetMomentumStabilisation(dimless);
     resetPressureStabilisation(dimPressure/dimLength);
-
-#ifdef OPENFOAM_COM
-    if (!fvOptions_.optionList::size())
-    {
-        Info<< "No finite volume options present" << endl;
-    }
-#endif
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())
@@ -1470,11 +1720,6 @@ Foam::solidModel::solidModel
 Foam::solidModel::~solidModel()
 {
     thermalPtr_.clear();
-    mechanicalPtr_.clear();
-
-#ifndef FOAMEXTEND
-    clearMovingLeastSquaresData();
-#endif
 }
 
 
@@ -1501,26 +1746,378 @@ const Foam::thermalModel& Foam::solidModel::thermal() const
 }
 
 
-Foam::mechanicalModel& Foam::solidModel::mechanical()
+const Foam::IOdictionary& Foam::solidModel::mechanicalProperties() const
 {
-    if (mechanicalPtr_.empty())
+    if (mechanicalPropertiesPtr_.empty())
     {
-        makeMechanicalModel();
+        makeMechanicalProperties();
     }
 
-    return mechanicalPtr_();
+    return mechanicalPropertiesPtr_();
 }
 
 
-const Foam::mechanicalModel& Foam::solidModel::mechanical() const
+namespace Foam
 {
-    if (mechanicalPtr_.empty())
+    // Search a law's dictionary and every sub-dictionary for a smoothing
+    // request. A wrapper law - thermoMechanicalLaw, poroMechanicalLaw,
+    // electroMechanicalLaw - keeps its inner law in a sub-dictionary, and a
+    // case could set solvePressureEqn there, where the inner law read it
+    static bool findSmoothingRequest
+    (
+        const dictionary& dict,
+        scalar& scaleFactor
+    )
     {
-        makeMechanicalModel();
+        if (dict.lookupOrDefault<Switch>("solvePressureEqn", false))
+        {
+            scaleFactor =
+                dict.lookupOrDefault<scalar>
+                (
+                    "pressureSmoothingScaleFactor", 100.0
+                );
+
+            return true;
+        }
+
+        forAllConstIter(dictionary, dict, iter)
+        {
+            if
+            (
+                iter().isDict()
+             && findSmoothingRequest(iter().dict(), scaleFactor)
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+
+void Foam::solidModel::readHydrostaticSmoothing() const
+{
+    hydrostaticSmoothingRead_ = true;
+
+    // Read from the law entries, where cases have always set it. It is a
+    // solid-model setting in all but location: one equation is solved, with
+    // the solid model's own momentum diagonal, so one answer is needed for
+    // the whole mesh
+    const PtrList<entry> lawEntries(mechanicalProperties().lookup("mechanical"));
+
+    label nRequested = 0;
+    word requestingLaw;
+
+    forAll(lawEntries, lawI)
+    {
+        scalar scaleFactor = 100.0;
+
+        if (findSmoothingRequest(lawEntries[lawI].dict(), scaleFactor))
+        {
+            nRequested++;
+            requestingLaw = lawEntries[lawI].keyword();
+            pressureSmoothingScaleFactor_ = scaleFactor;
+        }
     }
 
-    return mechanicalPtr_();
+    if (nRequested == 0)
+    {
+        return;
+    }
+
+    // Not supported for more than one material. One equation over the whole
+    // mesh would diffuse the hydrostatic stress across a material interface,
+    // where it genuinely jumps
+    if (lawEntries.size() > 1)
+    {
+        FatalIOErrorInFunction(mechanicalProperties())
+            << "solvePressureEqn is set for material '" << requestingLaw
+            << "', and there are " << lawEntries.size() << " materials."
+            << nl << nl
+            << "    The hydrostatic stress smoothing is done by the solid "
+            << "model, as one equation over the whole mesh, and that would "
+            << "smear the hydrostatic stress across the material interfaces, "
+            << "where it jumps. It is therefore supported for a single "
+            << "material only." << nl
+            << "    Remove solvePressureEqn."
+            << exit(FatalIOError);
+    }
+
+    hydrostaticSmoothingRequested_ = true;
 }
+
+
+bool Foam::solidModel::hydrostaticSmoothingRequested() const
+{
+    if (!hydrostaticSmoothingRead_)
+    {
+        readHydrostaticSmoothing();
+    }
+
+    return hydrostaticSmoothingRequested_;
+}
+
+
+bool Foam::solidModel::smoothHydrostaticStress() const
+{
+    if (!hydrostaticSmoothingRequested())
+    {
+        return false;
+    }
+
+    if (hydrostaticSmoothingChecked_)
+    {
+        return true;
+    }
+
+    if (solvePressure())
+    {
+        FatalErrorInFunction
+            << "solvePressureEqn is set in mechanicalProperties and "
+            << "solvePressure in the " << type() << " coefficients." << nl
+            << "    They are alternatives: the mixed formulation solves for "
+            << "the pressure itself, and the smoothing would be applied to a "
+            << "volumetric response it has already replaced. Remove one."
+            << exit(FatalError);
+    }
+
+    if (solutionAlg() != solutionAlgorithm::IMPLICIT_SEGREGATED)
+    {
+        FatalErrorInFunction
+            << "solvePressureEqn is set in mechanicalProperties, and the "
+            << type() << " solution algorithm is "
+            << solutionAlgorithmNames_[solutionAlg()] << "." << nl
+            << "    The hydrostatic stress smoothing is scaled by the diagonal "
+            << "of the segregated momentum equation, so it is available with "
+            << "the implicitSegregated algorithm only. For another algorithm "
+            << "use the mixed formulation (solvePressure) instead."
+            << exit(FatalError);
+    }
+
+    // Asked by name here rather than left to the split update, whose refusal
+    // is written for the mixed formulation
+    if (!mechanicalManager().allLawsProvideVolumetricSplit())
+    {
+        const PtrList<entry> lawEntries
+        (
+            mechanicalProperties().lookup("mechanical")
+        );
+
+        FatalErrorInFunction
+            << "solvePressureEqn is set for material '"
+            << lawEntries[0].keyword() << "', of type "
+            << word(lawEntries[0].dict().lookup("type"))
+            << ", and that law cannot separate its isochoric stress from its "
+            << "volumetric response." << nl
+            << "    The smoothing replaces the volumetric response with a "
+            << "smoothed one, so it needs the two apart: taking the trace of "
+            << "a total stress would also smooth any spherical stress that "
+            << "is not a volumetric response." << nl
+            << "    Remove solvePressureEqn, or use a law that separates them."
+            << exit(FatalError);
+    }
+
+    Info<< type() << ": smoothing the hydrostatic stress (solvePressureEqn), "
+        << "with pressureSmoothingScaleFactor " << pressureSmoothingScaleFactor_
+        << endl;
+
+    hydrostaticSmoothingChecked_ = true;
+
+    return true;
+}
+
+
+Foam::volScalarField& Foam::solidModel::smoothingVolumetricResponse()
+{
+    if (smoothingVolumetricResponsePtr_.empty())
+    {
+        smoothingVolumetricResponsePtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "smoothingVolumetricResponse",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0)
+            )
+        );
+    }
+
+    return smoothingVolumetricResponsePtr_();
+}
+
+
+void Foam::solidModel::addSmoothedHydrostaticStress
+(
+    volSymmTensorField& sigma,
+    const volScalarField& impK,
+    const volScalarField* JPtr
+)
+{
+    if (sigmaHydPtr_.empty())
+    {
+        // Not read, zero-gradient, and written
+        sigmaHydPtr_.set
+        (
+            new volScalarField
+            (
+                IOobject
+                (
+                    "sigmaHyd",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh(),
+                dimensionedScalar("zero", dimPressure, 0.0),
+                zeroGradientFvPatchScalarField::typeName
+            )
+        );
+
+        // Looked up by name by the leastSquaresS4f gradient scheme
+        useBoundaryFaceValuesSigmaHydPtr_.set
+        (
+            new boolIOList
+            (
+                IOobject
+                (
+                    "useBoundaryFaceValues_sigmaHyd",
+                    mesh().time().constant(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                boolList(mesh().boundary().size(), false)
+            )
+        );
+
+        gradSigmaHydPtr_.set
+        (
+            new volVectorField
+            (
+                IOobject
+                (
+                    "grad(sigmaHyd)",
+                    mesh().time().timeName(),
+                    mesh(),
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE
+                ),
+                mesh(),
+                dimensionedVector("zero", dimPressure/dimLength, vector::zero)
+            )
+        );
+    }
+
+    volScalarField& sigmaHyd = sigmaHydPtr_();
+    volVectorField& gradSigmaHyd = gradSigmaHydPtr_();
+
+    // The solid model registers its momentum diagonal under this name for the
+    // duration of each outer iteration
+    if (!mesh().foundObject<volScalarField>("DEqnA"))
+    {
+        FatalErrorInFunction
+            << "The hydrostatic stress smoothing (solvePressureEqn) needs the "
+            << "momentum equation diagonal, DEqnA, and " << type()
+            << " has not registered one at this stress update." << nl
+            << "    It exists only inside the segregated momentum loop, so "
+            << "the smoothing is not available from a stress update outside "
+            << "it, such as the linear predictor."
+            << exit(FatalError);
+    }
+
+    const volScalarField& AD = mesh().lookupObject<volScalarField>("DEqnA");
+
+    // The explicit hydrostatic Kirchhoff stress, J*dU/dJ.
+    //
+    // Kirchhoff for every law, deliberately. Most of the legacy laws passed
+    // their hydrostatic Kirchhoff stress to the smoothing, but GuccioneElastic
+    // passed its Cauchy one, and since multiplying by a varying J does not
+    // commute with the smoothing, a Guccione case smoothed this way is
+    // stabilised a little differently from before. No case combines the two;
+    // one measure for all laws is the simpler contract
+    const volScalarField& volumetricResponse = smoothingVolumetricResponse();
+    const volScalarField sigmaHydExplicit
+    (
+        "sigmaHydExplicit",
+        JPtr ? (*JPtr)*volumetricResponse : 1.0*volumetricResponse
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const int oldDebug = SolverPerformance<scalar>::debug;
+    SolverPerformance<scalar>::debug = 0;
+#endif
+
+    // Store previous iteration to allow relaxation, if needed
+    sigmaHyd.storePrevIter();
+
+    // Pressure diffusivity field
+    const surfaceScalarField rDAf
+    (
+        "rDAf",
+        pressureSmoothingScaleFactor_*fvc::interpolate
+        (
+            impK/AD, "interpolate(" + gradSigmaHyd.name() + ")"
+        )
+    );
+
+    const dimensionedScalar one("one", dimless, 1.0);
+
+    // The fvm and fvc Laplacians agree for a smooth field, and their
+    // difference damps the oscillations of one that is not
+    fvScalarMatrix sigmaHydEqn
+    (
+        fvm::Sp(one, sigmaHyd)
+      - fvm::laplacian(rDAf, sigmaHyd, "laplacian(rDA,sigmaHyd)")
+     ==
+        sigmaHydExplicit
+      - fvc::div(rDAf*fvc::interpolate(gradSigmaHyd) & mesh().Sf())
+    );
+
+    sigmaHydEqn.solve();
+
+    sigmaHyd.relax();
+
+#ifdef OPENFOAM_NOT_EXTEND
+    SolverPerformance<scalar>::debug = oldDebug;
+#endif
+
+    gradSigmaHyd = fvc::grad(sigmaHyd);
+
+    // Recombine, including on the boundary, where this takes the
+    // zero-gradient value of sigmaHyd
+    if (JPtr)
+    {
+        sigma = sigma + (sigmaHyd/(*JPtr))*I;
+    }
+    else
+    {
+        sigma = sigma + sigmaHyd*I;
+    }
+}
+
+
+#ifdef OPENFOAM_NOT_EXTEND
+const Foam::enhancedVolPointInterpolation& Foam::solidModel::volToPoint() const
+{
+    return enhancedVolPointInterpolation::New(mesh());
+}
+#else
+const Foam::newLeastSquaresVolPointInterpolation&
+Foam::solidModel::volToPoint() const
+{
+    return newLeastSquaresVolPointInterpolation::New(mesh());
+}
+#endif
 
 
 void Foam::solidModel::DisRequired()
@@ -1549,6 +2146,19 @@ void Foam::solidModel::DDisRequired()
         FatalErrorIn(type() + "::DDisRequired()")
             << "This solidModel requires the 'DD' field to be specified!"
             << abort(FatalError);
+    }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    if (incremental() && !restart() && Dheader_.typeHeaderOk<volVectorField>(true))
+#else
+    if (incremental() && !restart() && Dheader_.headerOk())
+#endif
+    {
+        FatalErrorIn(type() + "::DDisRequired()")
+            << "This solidModel solves for the displacement increment 'DD', "
+            << "but a 'D' field was found at the start time." << nl
+            << "Remove 'D' from the initial time directory, or set "
+            << "'restart true' for a consistent restart." << abort(FatalError);
     }
 }
 
@@ -1588,97 +2198,53 @@ void Foam::solidModel::makeGlobalPatches
                 << abort(FatalError);
         }
 
+        // Lookup patch index
+        if (mesh().boundaryMesh().findPatchID(patchNames[i]) == -1)
+        {
+            FatalErrorIn("void Foam::solidModel::makeGlobalPatches(...)")
+                << "Patch " << patchNames[i] << " not found!"
+                << abort(FatalError);
+        }
+
+        // Create the global patch based on the undeformed mesh
+        globalPatchesPtrList_.set
+        (
+            i,
+            new globalPolyPatch(patchNames[i], mesh())
+        );
+
         if (currentConfiguration)
         {
-            // The global patch will create a standAlone zone based on the
-            // current point positions. So we will temporarily move the mesh to
-            // the deformed position, then create the globalPatch, then move the
-            // mesh back
-            const pointField pointsBackup = mesh().points();
-
-            // Lookup patch index
-            const label patchID =
-                mesh().boundaryMesh().findPatchID(patchNames[i]);
-            if (patchID == -1)
-            {
-                FatalErrorIn("void Foam::solidModel::makeGlobalPatches(...)")
-                    << "Patch not found!" << abort(FatalError);
-            }
-
-            // Patch point displacement
-            const vectorField pointDisplacement
-            (
-                pointDorPointDD().internalField(),
-                mesh().boundaryMesh()[patchID].meshPoints()
-            );
-
-            // Calculate deformation point positions
-            const pointField newPoints
-            (
-                mesh().points() + pointDorPointDD().internalField()
-            );
-
-            // Move the mesh to deformed position
-            // const_cast is justified as it is not our intention to permanently
-            // move the mesh; however, it would be better if we did not need it
-            mesh().V();
-            const_cast<dynamicFvMesh&>(mesh()).movePoints(newPoints);
-            const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
-            const_cast<dynamicFvMesh&>(mesh()).changing(false);
-#endif
-
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
-            const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
-                IOobject::NO_WRITE;
-#endif
-
-            // Create global patch based on deformed mesh
-            globalPatchesPtrList_.set
-            (
-                i,
-                new globalPolyPatch(patchNames[i], mesh())
-            );
-
-            // Force creation of standAlonePatch
+            // Force creation of standAlonePatch, so that its points can be set
+            // to the current configuration by syncGlobalPatches() below
             globalPatchesPtrList_[i].globalPatch();
+        }
+    }
 
-            // Move the mesh back
-            const_cast<dynamicFvMesh&>(mesh()).movePoints(pointsBackup);
-            mesh().V();
-            const_cast<dynamicFvMesh&>(mesh()).moving(false);
-#ifdef FOAMEXTEND
-            const_cast<dynamicFvMesh&>(mesh()).changing(false);
-#endif
-#if (OPENFOAM >= 2206)
-            {
-                auto tmeshPhi(const_cast<dynamicFvMesh&>(mesh()).setPhi());
-                if (tmeshPhi)
-                {
-                    tmeshPhi.ref().writeOpt(IOobject::NO_WRITE);
-                }
-            }
-#else
-            const_cast<dynamicFvMesh&>(mesh()).setPhi().writeOpt() =
-                IOobject::NO_WRITE;
-#endif
-        }
-        else
-        {
-            globalPatchesPtrList_.set
-            (
-                i,
-                new globalPolyPatch(patchNames[i], mesh())
-            );
-        }
+    if (currentConfiguration)
+    {
+        // The global patches are required in the current (deformed)
+        // configuration, so displace their points by pointD/pointDD
+        // Note: the global patches are always constructed on the undeformed
+        // mesh above and then moved here; previously, the mesh itself was
+        // temporarily moved to the deformed configuration while the global
+        // patches were constructed, and then moved back. That approach had two
+        // undesirable side-effects (issue #184):
+        //   - fvMesh::movePoints() creates the mesh motion flux field (meshPhi)
+        //     and marks the mesh points as AUTO_WRITE; consequently, meshPhi
+        //     and polyMesh/points were written to every time directory, even
+        //     though the solid mesh is not moved for linear geometry and total
+        //     Lagrangian approaches. On restart, the presence of meshPhi makes
+        //     OpenFOAM consider the solid mesh to be moving, e.g. causing
+        //     backwardD2dt2Scheme to stop with a "not implemented for a moving
+        //     mesh" error, and the reduced-precision points written to the time
+        //     directory can break the processor patch face matching checks in
+        //     parallel.
+        //   - globalPolyPatch merges coincident points across processor
+        //     boundaries using exact point coordinate comparisons; the
+        //     undeformed point coordinates are bit-identical on either side of
+        //     a processor boundary, whereas the deformed ones need not be.
+        syncGlobalPatches();
     }
 }
 
@@ -1704,6 +2270,27 @@ void Foam::solidModel::clearGlobalPatches() const
 }
 
 
+void Foam::solidModel::syncGlobalPatches() const
+{
+    forAll(globalPatchesPtrList_, i)
+    {
+        const polyPatch& ppatch = globalPatchesPtrList_[i].patch();
+
+        const vectorField patchPointDisplacement
+        (
+            pointDorPointDD().internalField(), ppatch.meshPoints()
+        );
+
+        const pointField patchPoints
+        (
+            ppatch.localPoints() + patchPointDisplacement
+        );
+
+        globalPatchesPtrList_[i].syncPoints(patchPoints);
+    }
+}
+
+
 Foam::vector Foam::solidModel::pointU(const label pointID) const
 {
     pointVectorField pointU
@@ -1720,7 +2307,7 @@ Foam::vector Foam::solidModel::pointU(const label pointID) const
         dimensionedVector("0", dimVelocity, vector::zero)
     );
 
-    mechanical().volToPoint().interpolate(U(), pointU);
+    volToPoint().interpolate(U(), pointU);
 
     return pointU.internalField()[pointID];
 }
@@ -1767,7 +2354,16 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
     const label interfaceI
 ) const
 {
-    const volVectorField a(fvc::d2dt2(D()));
+    // Pass physical acceleration, not the Bossak-weighted inertia residual,
+    // using the same scheme dictionary as the momentum equation
+    const volVectorField a
+    (
+        fv::NewmarkBetaD2dt2Scheme<vector>::physicalAcceleration
+        (
+            D(),
+            d2dt2SchemeCompat(mesh(), "d2dt2(" + D().name() + ')')
+        )
+    );
 
     return globalPatches()[interfaceI].patchFaceToGlobal
     (
@@ -1776,9 +2372,366 @@ Foam::tmp<Foam::vectorField> Foam::solidModel::faceZoneAcceleration
 }
 
 
+void Foam::solidModel::rollOverQuadratureHistory()
+{
+    // The high-order discretisation, and hence gradDQuad(), does not exist on
+    // foam-extend
+#ifndef FOAMEXTEND
+    if (gradDQuadPtr_.valid())
+    {
+        if (gradDQuad0Ptr_.empty())
+        {
+            gradDQuad0Ptr_.set(new CompactListList<tensor>());
+        }
+
+        copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
+    }
+#endif
+}
+
+
 void Foam::solidModel::updateTotalFields()
 {
-    mechanical().updateTotalFields();
+    // Here rather than in each solid model because every model needs it
+    mechanicalManager().endTimeStep();
+
+    // A model overriding this must call rollOverQuadratureHistory() itself
+    rollOverQuadratureHistory();
+}
+
+
+// The high-order face quadrature does not run on foam-extend, but these
+// helpers are portable and the models that call them are compiled there
+void Foam::solidModel::quadDeformationGradient
+(
+    const CompactListList<tensor>& gradD,
+    autoPtr<CompactListList<tensor>>& FPtr
+)
+{
+    if (FPtr.empty())
+    {
+        FPtr.set(new CompactListList<tensor>());
+    }
+
+    FPtr().setSize(gradD.sizes());
+
+    const List<tensor>& gradDv = gradD.m();
+    List<tensor>& F = FPtr().m();
+
+    forAll(gradDv, i)
+    {
+        F[i] = I + gradDv[i].T();
+    }
+}
+
+
+void Foam::solidModel::quadInverseAndJacobian
+(
+    const CompactListList<tensor>& F,
+    autoPtr<CompactListList<tensor>>& FinvPtr,
+    autoPtr<CompactListList<scalar>>& JPtr
+)
+{
+    if (FinvPtr.empty())
+    {
+        FinvPtr.set(new CompactListList<tensor>());
+        JPtr.set(new CompactListList<scalar>());
+    }
+
+    FinvPtr().setSize(F.sizes());
+    JPtr().setSize(F.sizes());
+
+    const List<tensor>& Fv = F.m();
+    List<tensor>& Finv = FinvPtr().m();
+    List<scalar>& J = JPtr().m();
+
+    forAll(Fv, i)
+    {
+        Finv[i] = inv(Fv[i]);
+        J[i] = det(Fv[i]);
+    }
+}
+
+
+Foam::mechanicalConstitutiveLawManager&
+Foam::solidModel::mechanicalManager() const
+{
+    if (mechanicalManagerPtr_.empty())
+    {
+        Info<< "Creating the mechanicalConstitutiveLawManager" << endl;
+
+        mechanicalManagerPtr_.set
+        (
+            new mechanicalConstitutiveLawManager(mesh(), mechanicalProperties())
+        );
+
+        mechanicalManagerPtr_->setRestartKinematicsAvailable
+        (
+            restartKinematicsAvailable_
+        );
+    }
+
+    return mechanicalManagerPtr_();
+}
+
+
+void Foam::solidModel::interpolatePointDisplacement
+(
+    const volVectorField& D,
+    const volTensorField& gradD,
+    pointVectorField& pointD
+)
+{
+#ifdef OPENFOAM_NOT_EXTEND
+    enhancedVolPointInterpolation::New(mesh()).interpolate(D, gradD, pointD);
+#else
+    if (mechanicalManager().nLaws() > 1)
+    {
+        // The least squares fit below would straddle a material interface,
+        // where the displacement is continuous but its gradient jumps, and
+        // smear it. Instead each cell's value is extrapolated with its own
+        // gradient, which the material-aware leastSquaresS4f scheme keeps to
+        // one material, as the other forks do for any number of materials
+        volToPoint().interpolate(D, gradD, pointD);
+    }
+    else
+    {
+        volToPoint().interpolate(D, pointD);
+    }
+#endif
+
+    correctPointDisplacement(pointD);
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
+{
+    // A registered copy, so that a field built from it takes over the
+    // registration. The manager's own cache is not registered, and a plain
+    // copy of it would not be either; an unregistered field is not mapped
+    // when the mesh topology changes
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "rho",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            ),
+            mechanicalManager().rho()
+        )
+    );
+}
+
+
+void Foam::solidModel::gradQuad
+(
+    const volVectorField& D,
+    CompactListList<tensor>& gradDQuad
+) const
+{
+    // The framework has no quadrature-point gradient for more than one
+    // material
+    if (mechanicalManager().nLaws() > 1)
+    {
+        FatalErrorInFunction
+            << "The face quadrature gradient is not implemented for more than "
+            << "one material." << exit(FatalError);
+    }
+
+    hofvc::fGrad(D, gradDQuad);
+}
+
+
+void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
+{
+    if (mechanicalManager().nLaws() < 2)
+    {
+        return;
+    }
+
+    const word gradScheme
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        mesh().gradScheme("grad(" + fieldName + ')')
+#else
+        mesh().schemesDict().gradScheme("grad(" + fieldName + ')')
+#endif
+    );
+
+    if (gradScheme != "leastSquaresS4f")
+    {
+        FatalErrorInFunction
+            << "More than one material needs a material-aware gradient for "
+            << "grad(" << fieldName << "), and `" << gradScheme << "` is not "
+            << "one." << nl << nl
+            << "    One gradient is computed on the whole mesh, which only "
+            << "works if the scheme keeps a cell's stencil within its own "
+            << "material. Set "
+            << "`grad(" << fieldName << ") leastSquaresS4f;` in fvSchemes."
+            << abort(FatalError);
+    }
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
+(
+    mechanicalConstitutiveLawManager& manager,
+    const tangentRequest req,
+    const word& fieldName
+) const
+{
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                fieldName,
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // Evaluate the tangent at zero gradient against a state with no history.
+    // impK is formed once and kept, so this gives the same elastic
+    // preconditioner on a cold start and on a restart without disturbing the
+    // stored constitutive state
+    const volTensorField zeroGradD
+    (
+        IOobject
+        (
+            "zeroGradD",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedTensor("zero", gradD().dimensions(), tensor::zero)
+    );
+
+    manager.updateScalarTangent
+    (
+        zeroGradD,
+        zeroGradD,
+        mesh().time().deltaTValue(),
+        impK,
+        req,
+        true        // evaluate against a state with no history
+    );
+
+    return tImpK;
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::shearModulus() const
+{
+    // The deviatoric scalar tangent is (4/3)*mu
+    tmp<volScalarField> tmu;
+
+    if (nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
+    {
+        tmu =
+            lawImpK
+            (
+                mechanicalManager(),
+                tangentRequest::scalarDeviatoric,
+                "shearModulus"
+            );
+    }
+    else
+    {
+        // Finite-strain laws may not implement the small-strain tangent, so
+        // evaluate the finite-strain tangent in the undeformed configuration
+        tmu =
+            tmp<volScalarField>
+            (
+                new volScalarField
+                (
+                    IOobject
+                    (
+                        "shearModulus",
+                        mesh().time().timeName(),
+                        mesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    mesh(),
+                    dimensionedScalar("zero", dimForce/dimArea, 0),
+                    calculatedFvPatchScalarField::typeName
+                )
+            );
+
+        const volTensorField identity
+        (
+            IOobject
+            (
+                "identityF",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, tensor::I)
+        );
+
+        const volScalarField one
+        (
+            IOobject
+            (
+                "identityJ",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("one", dimless, 1.0)
+        );
+
+        mechanicalManager().updateScalarTangentFiniteStrain
+        (
+            identity,
+            identity,
+            identity,
+            identity,
+            one,
+            one,
+            mesh().time().deltaTValue(),
+#ifdef OPENFOAM_NOT_EXTEND
+            tmu.ref(),
+#else
+            tmu(),
+#endif
+            tangentRequest::scalarDeviatoric
+        );
+    }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tmu.ref() *= 0.75;
+#else
+    tmu() *= 0.75;
+#endif
+
+    return tmu;
 }
 
 
@@ -1789,11 +2742,6 @@ void Foam::solidModel::end()
         solidProperties().IOobject::name() + ".withDefaultValues"
     );
     solidProperties_.regIOobject::write();
-
-    if (!mechanicalPtr_.empty())
-    {
-        mechanical().writeDict();
-    }
 
     if (!thermalPtr_.empty())
     {
@@ -1817,6 +2765,23 @@ void Foam::solidModel::end()
     }
 
     physicsModel::end();
+}
+
+
+Foam::tmp<Foam::volTensorField> Foam::solidModel::couplingField
+(
+    const word& fieldName
+) const
+{
+    FatalErrorInFunction
+        << "Coupling field \"" << fieldName
+        << "\" requested from solidModel type " << type() << nl
+        << "This solidModel does not support coupling fields." << nl
+        << "Override couplingField() in the derived class to enable coupling."
+        << abort(FatalError);
+
+    // Keep compiler happy
+    return tmp<volTensorField>(nullptr);
 }
 
 
@@ -1862,7 +2827,7 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
 
     Info<< "Selecting solidModel " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)
@@ -1895,7 +2860,54 @@ Foam::autoPtr<Foam::solidModel> Foam::solidModel::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<solidModel>(ctorPtr(runTime, runRegion));
+    autoPtr<solidModel> modelPtr(ctorPtr(runTime, runRegion));
+
+    // Asked here, once the model is fully constructed and its override can be
+    // seen, so that a solid model which cannot smooth the hydrostatic stress
+    // refuses a case that asks for it rather than silently ignoring it. A
+    // model that can has the request validated here too, rather than at the
+    // first stress update: a model running the mixed formulation returns from
+    // its stress update before reaching the smoothing, so solvePressure with
+    // solvePressureEqn would otherwise be accepted and the smoothing silently
+    // ignored.
+    //
+    // Of every case that has a mechanicalProperties, whether or not the model
+    // has read it or built the framework manager yet: both are made on first
+    // use, so gating on either would let a model that makes them lazily skip
+    // the check
+    IOobject mechPropsIO
+    (
+        "mechanicalProperties",
+        runTime.constant(),
+        modelPtr->mesh(),
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    const bool hasMechProps = mechPropsIO.typeHeaderOk<IOdictionary>(true);
+#else
+    const bool hasMechProps = mechPropsIO.headerOk();
+#endif
+
+    if (hasMechProps && modelPtr->hydrostaticSmoothingRequested())
+    {
+        if (!modelPtr->supportsHydrostaticSmoothing())
+        {
+            FatalErrorIn("solidModel::New(Time&, const word&)")
+                << "solvePressureEqn is set in mechanicalProperties, and "
+                << "solid model " << modelType << " cannot smooth the "
+                << "hydrostatic stress." << nl
+                << "    It is supported by the updated Lagrangian, total "
+                << "Lagrangian and linear geometry total displacement "
+                << "models. Remove solvePressureEqn, or use one of those."
+                << exit(FatalError);
+        }
+
+        modelPtr->smoothHydrostaticStress();
+    }
+
+    return modelPtr;
 }
 
 
@@ -1910,7 +2922,7 @@ void Foam::solidModel::setTraction
         solidTractionFvPatchVectorField& patchD =
             refCast<solidTractionFvPatchVectorField>(tractionPatch);
 
-        patchD.traction() = traction;
+        patchD.setTraction(traction);
     }
 #ifdef FOAMEXTEND
     else if
@@ -1943,6 +2955,28 @@ void Foam::solidModel::setTraction
             << blockSolidTractionFvPatchVectorField::typeName
 #endif
             << abort(FatalError);
+    }
+}
+
+void Foam::solidModel::setTractionQuadrature
+(
+    fvPatchVectorField& tractionPatch,
+    const CompactListList<vector>& traction
+)
+{
+    if (tractionPatch.type() == solidTractionFvPatchVectorField::typeName)
+    {
+        solidTractionFvPatchVectorField& patchD =
+            refCast<solidTractionFvPatchVectorField>(tractionPatch);
+
+        patchD.setTractionQuadrature(traction);
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Boundary condition " << tractionPatch.type() << " for patch "
+            << tractionPatch.patch().name() << " should instead be type "
+            << solidTractionFvPatchVectorField::typeName << abort(FatalError);
     }
 }
 
@@ -2034,14 +3068,11 @@ void Foam::solidModel::recalculateRho()
 }
 
 
-void Foam::solidModel::clearMovingLeastSquaresData()
+void Foam::solidModel::clearLeastSquaresData()
 {
     gradDQuadPtr_.clear();
     sigmaQuadPtr_.clear();
-#ifndef FOAMEXTEND
-    displacementMLSPtr_.clear();
-    pressureMLSPtr_.clear();
-#endif
+    leastSquaresReconstruction::New(mesh()).clear();
 }
 
 
@@ -2116,6 +3147,13 @@ void Foam::solidModel::writeFields(const Time& runTime)
 
     Info<< "Max sigmaEq (von Mises stress) = " << gMax(sigmaEq) << endl;
 
+    // The constitutive history, such as the plastic strain, as fields that
+    // can be viewed. The restart files hold it in a form ParaView cannot read
+    if (mechanicalManagerPtr_.valid())
+    {
+        mechanicalManagerPtr_->writeStateFields();
+    }
+
     // If asked, write the residual field
     if (writeResidualField_)
     {
@@ -2150,15 +3188,6 @@ void Foam::solidModel::writeFields(const Time& runTime)
 }
 
 
-Foam::scalar Foam::solidModel::newDeltaT()
-{
-    return min
-    (
-        runTime().deltaTValue(),
-        mechanical().newDeltaT()
-    );
-}
-
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
@@ -2180,7 +3209,7 @@ void Foam::solidModel::moveMesh
 #ifdef FOAMEXTEND
     mesh().changing(false);
 #endif
-#if (OPENFOAM >= 2206)
+#ifdef OPENFOAM_COM
     {
         auto tmeshPhi(mesh().setPhi());
         if (tmeshPhi)
@@ -2191,18 +3220,64 @@ void Foam::solidModel::moveMesh
 #else
     mesh().setPhi().writeOpt() = IOobject::NO_WRITE;
 #endif
-
-
-#ifdef FOAMEXTEND
-    // Tell the mechanical model to move the subMeshes, if they exist
-    mechanical().moveSubMeshes();
-#endif
 }
 
 
 const Foam::dictionary& Foam::solidModel::solidModelDict() const
 {
     return solidProperties_.subDict(type_ + "Coeffs");
+}
+
+
+Foam::tangentRequest Foam::solidModel::jacobianTangent
+(
+    const tangentRequest deflt
+) const
+{
+    if (jacobianTangentCached_)
+    {
+        return jacobianTangent_;
+    }
+
+    const dictionary& dict = solidModelDict();
+
+    if (dict.found("approximateJacobian"))
+    {
+        if (dict.found("jacobianTangent"))
+        {
+            FatalIOErrorInFunction(dict)
+                << "Both 'approximateJacobian' and 'jacobianTangent' are set."
+                << nl
+                << "'approximateJacobian' is deprecated: use "
+                << "'jacobianTangent' only."
+                << exit(FatalIOError);
+        }
+
+        const Switch approximate(dict.lookup("approximateJacobian"));
+
+        jacobianTangent_ =
+            approximate
+          ? tangentRequest::scalar
+          : tangentRequest::fourthOrder;
+
+        WarningInFunction
+            << "'approximateJacobian' is deprecated. Replace it with "
+            << "'jacobianTangent " << tangentRequestName(jacobianTangent_)
+            << ";'" << endl;
+    }
+    else if (dict.found("jacobianTangent"))
+    {
+        jacobianTangent_ =
+            tangentRequestNamed(word(dict.lookup("jacobianTangent")));
+    }
+    else
+    {
+        jacobianTangent_ = deflt;
+    }
+
+    jacobianTangentCached_ = true;
+
+    return jacobianTangent_;
 }
 
 // ************************************************************************* //

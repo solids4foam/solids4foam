@@ -72,6 +72,8 @@ bool AitkenCouplingInterface::evolve()
 
     scalar residualNorm = 0;
 
+    bool converged = false;
+
     // Check if coupling switch needs to be updated
     if (!coupled())
     {
@@ -118,15 +120,38 @@ bool AitkenCouplingInterface::evolve()
         }
 
         // Optional: write residuals to file
-        if (writeResidualsToFile() && Pstream::master())
+        writeResidualLine(residualNorm);
+
+        // Displacement residual and, on Robin interfaces, the Robin criteria
+        converged = couplingConverged(residualNorm);
+    }
+    while (!converged && outerCorr() < nOuterCorr());
+
+    if (!converged)
+    {
+        if (allowUnconvergedCoupling())
         {
-            residualFile()
-                << runTime().value() << " "
-                << outerCorr() << " "
-                << residualNorm << endl;
+            WarningInFunction
+                << "FSI coupling did not converge after " << outerCorr()
+                << " outer corrections. Final residual: " << residualNorm
+                << ", tolerance: " << outerCorrTolerance() << ". "
+                << "Accepting the unconverged step because "
+                << "allowUnconvergedCoupling is enabled. The resulting "
+                << "solution may be invalid." << endl;
+        }
+        else
+        {
+            FatalErrorInFunction
+                << "FSI coupling did not converge after " << outerCorr()
+                << " outer corrections. Final residual: " << residualNorm
+                << ", tolerance: " << outerCorrTolerance() << nl
+                << "To accept unconverged coupling steps for debugging, set"
+                << nl << "    allowUnconvergedCoupling yes;" << nl
+                << "in the coupling coefficients. The resulting solution "
+                << "may be invalid."
+                << abort(FatalError);
         }
     }
-    while (residualNorm > outerCorrTolerance() && outerCorr() < nOuterCorr());
 
     solid().updateTotalFields();
 
@@ -137,7 +162,7 @@ bool AitkenCouplingInterface::evolve()
         // Transfer the displacement from the solid to the fluid, where we will
         // use no relaxation; in that way, we can force the solid and fluid
         // interfaces to stay aligned
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
@@ -160,21 +185,35 @@ void AitkenCouplingInterface::updateDisplacement()
 
     if (outerCorr() < 3)
     {
-        Info<< "Current fsi under-relaxation factor (fixed): "
-            << relaxationFactor_ << endl;
+        // With the predictor, the first iteration takes the full solid
+        // predictor displacement
+        const scalar factor =
+            ((outerCorr() == 1) && predictor()) ? 1.0 : relaxationFactor_;
 
-        forAll(fluid().globalPatches(), interfaceI)
+        Info<< "Current fsi under-relaxation factor (fixed): " << factor;
+        if ((outerCorr() == 1) && predictor())
+        {
+            Info<< " (predictor)";
+        }
+        Info<< endl;
+
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             fluidZonesPointsDisplsPrev()[interfaceI] =
                 fluidZonesPointsDispls()[interfaceI];
 
             fluidZonesPointsDispls()[interfaceI] +=
-                relaxationFactor_*residuals()[interfaceI];
+                factor*residuals()[interfaceI];
+
+            // The Aitken update of iteration 3 starts from the factor applied
+            // here, in iteration 2, rather than the one the previous time
+            // step ended with
+            aitkenRelaxationFactors_[interfaceI] = factor;
         }
     }
     else
     {
-        forAll(fluid().globalPatches(), interfaceI)
+        for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
         {
             const vectorField resMinusResPrev
             (
@@ -220,10 +259,7 @@ void AitkenCouplingInterface::updateDisplacement()
             }
 
             Info<< "Current fsi under-relaxation factor (Aitken) of "
-                << fluidMesh().boundary()
-                   [
-                       fluid().globalPatches()[interfaceI].patch().index()
-                   ].name()
+                << fluidInterfaceName(interfaceI)
                 << ": " << aitkenRelaxationFactors_[interfaceI] << endl;
 
             fluidZonesPointsDisplsPrev()[interfaceI] =
@@ -233,9 +269,6 @@ void AitkenCouplingInterface::updateDisplacement()
                 aitkenRelaxationFactors_[interfaceI]*residuals()[interfaceI];
         }
     }
-
-    // Update movingWallPressure boundary conditions, if found
-    fluidSolidInterface::updateMovingWallPressureAcceleration();
 
     // Update elasticWallPressure boundary conditions, if found
     fluidSolidInterface::updateElasticWallPressureAcceleration();

@@ -18,6 +18,7 @@ License
 \*---------------------------------------------------------------------------*/
 
 #include "lineQuadrature.H"
+#include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -47,8 +48,8 @@ void lineQuadrature::constructRules()
         1,
         quadratureRule
         {
-            List<scalar>{0.0},
-            List<scalar>{2.0}
+            makeList<scalar>({0.0}),
+            makeList<scalar>({2.0})
         }
     );
 
@@ -58,8 +59,8 @@ void lineQuadrature::constructRules()
         3,
         quadratureRule
         {
-            List<scalar>{1.0/sqrt(3.0), -1.0/sqrt(3.0)},
-            List<scalar>{1.0, 1.0}
+            makeList<scalar>({1.0/sqrt(3.0), -1.0/sqrt(3.0)}),
+            makeList<scalar>({1.0, 1.0})
         }
     );
 
@@ -69,13 +70,12 @@ void lineQuadrature::constructRules()
         5,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                 0.0,
                 sqrt(3.0/5.0),
                -sqrt(3.0/5.0)
-            },
-            List<scalar>{8.0/9.0, 5.0/9.0, 5.0/9.0}
+            }),
+            makeList<scalar>({8.0/9.0, 5.0/9.0, 5.0/9.0})
         }
     );
 
@@ -85,20 +85,18 @@ void lineQuadrature::constructRules()
         7,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                 sqrt((3.0/7.0)-(2.0/7.0)*sqrt(6.0/5.0)),
                 -sqrt((3.0/7.0)-(2.0/7.0)*sqrt(6.0/5.0)),
                 sqrt((3.0/7.0)+(2.0/7.0)*sqrt(6.0/5.0)),
                 -sqrt((3.0/7.0)+(2.0/7.0)*sqrt(6.0/5.0))
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 (18.0+sqrt(30.0))/36.0,
                 (18.0+sqrt(30.0))/36.0,
                 (18.0-sqrt(30.0))/36.0,
                 (18.0-sqrt(30.0))/36.0
-            }
+            })
         }
     );
 
@@ -108,22 +106,20 @@ void lineQuadrature::constructRules()
         9,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                 0,
                 (1.0/3.0)*sqrt(5.0-2.0*sqrt(10.0/7.0)),
                 -(1.0/3.0)*sqrt(5.0-2.0*sqrt(10.0/7.0)),
                 (1.0/3.0)*sqrt(5.0+2.0*sqrt(10.0/7.0)),
                 -(1.0/3.0)*sqrt(5.0+2.0*sqrt(10.0/7.0)),
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 128.0/225.0,
                 (322.0+13.0*sqrt(70.0))/900.0,
                 (322.0+13.0*sqrt(70.0))/900.0,
                 (322.0-13.0*sqrt(70.0))/900.0,
                 (322.0-13.0*sqrt(70.0))/900.0
-            }
+            })
         }
     );
 
@@ -133,24 +129,22 @@ void lineQuadrature::constructRules()
         11,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                  0.932469514203152,
                 -0.932469514203152,
                  0.661209386466265,
                 -0.661209386466265,
                  0.238619186083197,
                 -0.238619186083197
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.171324492379170,
                 0.171324492379170,
                 0.360761573048139,
                 0.360761573048139,
                 0.467913934572691,
                 0.467913934572691
-            }
+            })
         }
     );
 
@@ -160,8 +154,7 @@ void lineQuadrature::constructRules()
         13,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                 0.0,
                 0.949107912342759,
                -0.949107912342759,
@@ -169,9 +162,8 @@ void lineQuadrature::constructRules()
                -0.741531185599394,
                 0.405845151377397,
                -0.405845151377397,
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.417959183673469,
                 0.129484966168870,
                 0.129484966168870,
@@ -179,7 +171,7 @@ void lineQuadrature::constructRules()
                 0.279705391489277,
                 0.381830050505119,
                 0.381830050505119
-            }
+            })
         }
     );
 
@@ -189,8 +181,7 @@ void lineQuadrature::constructRules()
         15,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                 0.960289856497536,
                -0.960289856497536,
                 0.796666477413627,
@@ -199,9 +190,8 @@ void lineQuadrature::constructRules()
                -0.525532409916329,
                 0.183434642495650,
                -0.183434642495650
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.101228536378362,
                 0.101228536378362,
                 0.222381034453374,
@@ -210,7 +200,7 @@ void lineQuadrature::constructRules()
                 0.313706645877887,
                 0.362683783378362,
                 0.362683783378362
-            }
+            })
         }
     );
 
@@ -220,8 +210,7 @@ void lineQuadrature::constructRules()
         17,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                 0.968160239507626,
                -0.968160239507626,
                 0.836031107326636,
@@ -231,9 +220,8 @@ void lineQuadrature::constructRules()
                 0.324253423403809,
                -0.324253423403809,
                 0.0
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.081274388361574,
                 0.081274388361574,
                 0.180648160694857,
@@ -243,7 +231,7 @@ void lineQuadrature::constructRules()
                 0.312347077040003,
                 0.312347077040003,
                 0.330239355001260
-            }
+            })
         }
     );
 
@@ -253,8 +241,7 @@ void lineQuadrature::constructRules()
         19,
         quadratureRule
         {
-            List<scalar>
-            {
+            makeList<scalar>({
                 0.973906528517172,
                -0.973906528517172,
                 0.865063366688985,
@@ -265,9 +252,8 @@ void lineQuadrature::constructRules()
                -0.433395394129247,
                 0.148874338981631,
                -0.148874338981631,
-            },
-            List<scalar>
-            {
+            }),
+            makeList<scalar>({
                 0.066671344308688,
                 0.066671344308688,
                 0.149451349150581,
@@ -278,7 +264,7 @@ void lineQuadrature::constructRules()
                 0.269266719309996,
                 0.295524224714753,
                 0.295524224714753
-            }
+            })
         }
     );
 }
@@ -336,7 +322,7 @@ tmp<Field<point>> lineQuadrature::parametricToPoint
 ) const
 {
     tmp<Field<point>> tglobalPts(new Field<point>(x.size()));
-    Field<point>& globalPts = tglobalPts.ref();
+    Field<point>& globalPts = tmpRef(tglobalPts);
 
     forAll(globalPts, pointI)
     {
@@ -355,7 +341,7 @@ tmp<Field<scalar>> lineQuadrature::normaliseWeights
 ) const
 {
     tmp<Field<scalar>> tNormWeights(new Field<scalar>(w.size()));
-    Field<scalar>& normWeights = tNormWeights.ref();
+    Field<scalar>& normWeights = tmpRef(tNormWeights);
 
     // Weights sum is 2 because interval is [-1,1]. When working on
     // interval [0,1] weights should be rescaled.

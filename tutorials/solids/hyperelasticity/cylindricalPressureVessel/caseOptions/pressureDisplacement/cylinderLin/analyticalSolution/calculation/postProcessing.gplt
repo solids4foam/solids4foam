@@ -1,0 +1,170 @@
+# Script for postProcessing inflation of an infinitely long tube
+# transformStressToCylindrical calculate stress in cylindrical coordinates
+# gnuplot ./postProcessong.gplt
+
+
+
+#
+# Displacement diagram
+#
+
+reset
+set output 'radialDisplacement.eps'
+set term postscript color
+
+set size 0.9,0.9
+
+set style line 1 linecolor rgb "black" dt 1 linetype 6 linewidth 2.75 ps 0.5
+set style line 2 linecolor rgb "red" dt 1 linetype 6 linewidth 2.75 ps 0.7
+set style line 3 linecolor rgb "forest-green" dt 1 linetype 4 linewidth 2.75 ps 0.7
+
+
+set grid
+set xlabel 'Radius (m)'
+set ylabel 'Radial displacement (m)'
+#set title 'Radial displacement vs. radius of the tube'
+set key right top
+
+
+
+path_to_directory = "./postProcessing/sets/1/"
+path_to_file = path_to_directory . "line_D.xy"
+
+path_to_directory2 = "../cylinder_struct_poli/postProcessing/sets/1/"
+path_to_file2 = path_to_directory2 . "line_D.xy"
+
+
+
+plot  "result10.0MPa.txt" using 1:5 w lines ls 1 title'analytical'#, \
+    #path_to_file u (sqrt($1**2+$2**2)):(sqrt($4**2+$5**2)) w p ls 2 title'FVM(polyhedral cells)', \
+    #path_to_file2 u (sqrt($1**2+$2**2)):(sqrt($4**2+$5**2)) w p ls 3 title'FVM(polygonal prisms)'
+
+set output
+
+#
+#  Diagram for Radial stress
+#
+
+reset
+set output 'radialStress.eps'
+set term postscript color
+
+set size 0.5,0.5
+
+set style line 1 linecolor rgb 'black' linetype 7 linewidth 2 ps 0.5
+set style line 2 linecolor rgb 'black' linetype 8 linewidth 2 ps 0.7
+
+set grid
+set xlabel 'Radius (m)'
+set ylabel 'Radial stress (MPa)'
+#set title 'Radial stress vs. radius of the tube'
+set key right bottom
+
+set xrange [8:16]
+#set yrange [-12:0]
+#set ytics 4
+#set xtics 2
+#set samples 800, 800
+
+path_to_directory = "./postProcessing/sets/1/"
+path_to_file = path_to_directory . "line_sigmaRR_sigmaThetaTheta_p.xy"
+
+#a=(p*(1.0/1000000.0)*Ri**2)/(Ro**2-Ri**2)
+
+#u(x)=a*(1-(Ro**2/x**2))
+
+plot [8:16] "result10.0MPa.txt" using 1:2  w l ls 1 title'analytical'#, \
+    #path_to_file u (sqrt($1**2+$2**2)):($4/1e6) w p ls 2 title'FVM(quadrilateral cells)'
+
+set output
+
+#
+#  Diagram for Hoop stress
+#
+
+reset
+set output 'hoopStress.eps'
+set term postscript color
+
+set size 0.5,0.5
+
+set style line 1 linecolor rgb 'black' linetype 7 linewidth 2 ps 0.5
+set style line 2 linecolor rgb 'black' linetype 8 linewidth 2 ps 0.7
+
+set grid
+set xlabel 'Radius (m)'
+set ylabel 'Hoop stress (MPa)'
+#set title 'Hoop stress vs. radius of the tube'
+set key right bottom
+
+set xrange [8:16]
+
+path_to_directory = "./postProcessing/sets/1/"
+path_to_file = path_to_directory . "line_sigmaRR_sigmaThetaTheta_p.xy"
+
+
+plot [8:16] "result10.0MPa.txt" using 1:3  w l ls 1 title'analytical'#, \
+    #path_to_file u (sqrt($1**2+$2**2)):($5/1e6) w p ls 2 title'FVM(quadrilateral cells)'
+
+set output
+#
+#  Diagram for axial stress
+#
+
+reset
+set output 'axialStress.eps'
+set term postscript color
+
+set size 0.5,0.5
+
+set style line 1 linecolor rgb 'black' linetype 7 linewidth 2 ps 0.5
+set style line 2 linecolor rgb 'black' linetype 8 linewidth 2 ps 0.7
+
+set grid
+set xlabel 'Radius (m)'
+set ylabel 'Axial stress (MPa)'
+set key right bottom
+
+set xrange [8:16]
+
+#path_to_directory = "./postProcessing/sets/1/"
+#path_to_file = path_to_directory . "line_sigmaRR_sigmaThetaTheta_p.xy"
+
+
+plot [8:16] "result10.0MPa.txt" using 1:4  w l ls 1 title'analytical'#, \
+    #path_to_file u (sqrt($1**2+$2**2)):($5/1e6) w p ls 2 title'FVM(quadrilateral cells)'
+
+set output
+
+#
+#  Diagram for pressure
+#
+
+reset
+set output 'pressure.eps'
+set term postscript color
+
+set size 0.5,0.5
+
+set style line 1 linecolor rgb 'black' linetype 7 linewidth 2 ps 0.5
+set style line 2 linecolor rgb 'black' linetype 8 linewidth 2 ps 0.7
+
+set grid
+set xlabel 'Radius (m)'
+set ylabel 'Pressure (MPa)'
+#set title 'Pressure vs. radius of the tube'
+set key right bottom
+
+set xrange [8:16]
+
+#path_to_directory = "./postProcessing/sets/1/"
+#path_to_file = path_to_directory . "line_sigmaRR_sigmaThetaTheta_p.xy"
+
+
+
+plot [8:16] "result10.0MPa.txt" using 1:6  w l ls 1 title'analytical'#, \
+#path_to_file u (sqrt($1**2+$2**2)):(($6+333333333.333)/1e6) w p ls 2 title'FVM(quadrilateral cells)'
+
+#plot [8:16] path_to_file u (sqrt($1**2+$2**2)):($6/1e6) w p ls 2 title'FVM(quadrilateral cells)'
+
+set output

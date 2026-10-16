@@ -28,6 +28,7 @@ License
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
+#include "mechanicalConstitutiveLawManager.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -64,7 +65,7 @@ void nonLinGeomTotalLagVelocitySolid::predict()
         + 0.5*sqr(runTime().deltaT())*A_;
 
     // Update gradient of displacement
-    mechanical().grad(D(), gradD());
+    gradD() = fvc::grad(D());
 
     // Total deformation gradient
     F_ = I + gradD().T();
@@ -76,7 +77,7 @@ void nonLinGeomTotalLagVelocitySolid::predict()
     J_ = det(F_);
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    correctStress();
 
     if (solvePressure())
     {
@@ -90,6 +91,93 @@ void nonLinGeomTotalLagVelocitySolid::predict()
 }
 
 
+void nonLinGeomTotalLagVelocitySolid::correctStress()
+{
+    if (linearGeometryFormulation_)
+    {
+        mechanicalManager().updateStressSmallStrain
+        (
+            gradD(),
+            gradD().oldTime(),
+            mesh().time().deltaTValue(),
+            sigma()
+        );
+    }
+    else
+    {
+        mechanicalManager().updateStressFiniteStrain
+        (
+            F_,
+            F_.oldTime(),
+            Finv_,
+            Finv_.oldTime(),
+            J_,
+            J_.oldTime(),
+            mesh().time().deltaTValue(),
+            sigma()
+        );
+    }
+}
+
+
+tmp<volScalarField> nonLinGeomTotalLagVelocitySolid::makeImpK() const
+{
+    // With the mixed displacement-pressure formulation the implicit stiffness
+    // is the deviatoric scalar tangent, as in nonLinGeomTotalLagTotalDispSolid
+    const tangentRequest req =
+        solvePressure()
+      ? tangentRequest::scalarDeviatoric
+      : tangentRequest::scalar;
+
+    if (linearGeometryFormulation_)
+    {
+        return lawImpK(mechanicalManager(), req);
+    }
+
+    tmp<volScalarField> tImpK
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "impK",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("zero", dimForce/dimArea, 0),
+            calculatedFvPatchScalarField::typeName
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    volScalarField& impK = tImpK.ref();
+#else
+    volScalarField& impK = tImpK();
+#endif
+
+    // A tangent query at the current deformation gradient, which neither
+    // writes a stress nor disturbs history; F_, Finv_ and J_ are declared
+    // before impK_, so they are already built
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK,
+        req
+    );
+
+    return tImpK;
+}
+
+
 void nonLinGeomTotalLagVelocitySolid::makeVelocityMomentumStabilisationCoeff()
 {
     if (!velocityMomentumStabilisationCoeffPtr_.empty())
@@ -99,7 +187,9 @@ void nonLinGeomTotalLagVelocitySolid::makeVelocityMomentumStabilisationCoeff()
     }
 
     surfaceScalarField cSqrtRho(sqrt(impKf_*fvc::interpolate(rho())));
+#ifdef OPENFOAM_COM
     cSqrtRho.setOriented(false);
+#endif
 
     velocityMomentumStabilisationCoeffPtr_.set
     (
@@ -116,7 +206,9 @@ void nonLinGeomTotalLagVelocitySolid::makeVelocityMomentumStabilisationCoeff()
             cSqrtRho/mesh().deltaCoeffs()
         )
     );
+#ifdef OPENFOAM_COM
     velocityMomentumStabilisationCoeffPtr_().setOriented(false);
+#endif
 }
 
 
@@ -209,7 +301,8 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
                     tracPatch.tractionRateHistory().old();
 
                 const scalar deltaT = mesh.time().deltaTValue();
-                tracRate = (3.0*trac - 4*tracOld + tracOldOld)/deltaT;
+                // Second-order backward difference of the traction
+                tracRate = (3.0*trac - 4*tracOld + tracOldOld)/(2.0*deltaT);
 
                 const vectorField tracFuture
                 (
@@ -356,10 +449,10 @@ bool nonLinGeomTotalLagVelocitySolid::evolveSnes()
     // Update future-time displacement from the converged velocity
     DFutureTime_ =
         D() + 0.5*runTime().deltaT()*(3*U() - U().oldTime());
-    mechanical().grad(DFutureTime_, gradD());
+    gradD() = fvc::grad(DFutureTime_);
 
     // Interpolate future-time cell displacements to vertices for FSI coupling
-    mechanical().interpolate(DFutureTime_, gradD(), pointD());
+    interpolatePointDisplacement(DFutureTime_, gradD(), pointD());
     pointD().correctBoundaryConditions();
     pointDD() = pointD() - pointD().oldTime();
 
@@ -422,6 +515,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
         solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
         bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
     ),
+    linearGeometryFormulation_(linearGeometryFormulation),
     F_
     (
         IOobject
@@ -471,16 +565,10 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
         ),
         fvc::d2dt2(D())
     ),
-    impK_
-    (
-        solvePressure()
-      ? 2.0*mechanical().shearModulus()
-      : mechanical().impK()
-    ),
+    impK_(makeImpK()),
     impKf_(fvc::interpolate(impK_)),
     rImpK_(1.0/impK_),
     dpdtPtr_(),
-    linearGeometryFormulation_(linearGeometryFormulation),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     velocityBasedMomentumStabilisation_
     (
@@ -622,7 +710,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 
     // It is important to call the stress calculation procedure during the
     // constructor to allow it to correctly initialise fields
-    mechanical().correct(sigma());
+    correctStress();
 
     if (solvePressure())
     {
@@ -683,7 +771,7 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
     if (restart())
     {
         DD() = D() - D().oldTime();
-        mechanical().grad(D(), gradD());
+        gradD() = fvc::grad(D());
         gradDD() = gradD() - gradD().oldTime();
         F_ = I + gradD().T();
         Finv_ = inv(F_);
@@ -691,8 +779,8 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 
         gradD().storeOldTime();
 
-        // Let the mechanical law know
-        mechanical().setRestart();
+        // The framework restores its own constitutive state through the
+        // registered state fields, so there is nothing to tell it here
     }
 
     // Check the gradScheme
@@ -852,7 +940,7 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
 
     // Calculate the current deformed geometry for correcting the old-time
     // force boundary values on traction patches.
-    mechanical().grad(D(), gradD());
+    gradD() = fvc::grad(D());
 
     const volTensorField FCurrent("FCurrent", I + gradD().T());
     const volTensorField FinvCurrent("FinvCurrent", inv(FCurrent));
@@ -868,14 +956,12 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     DFutureTime_ = D() + 0.5*deltaT*(3*U - U.oldTime());
 
     // Calculate future-time gradient of displacement
-    mechanical().grad(DFutureTime_, gradD());
+    gradD() = fvc::grad(DFutureTime_);
 
     if (linearGeometryFormulation_)
     {
-        // Linear elasticity
-        sigma() =
-            2.0*mechanical().shearModulus()*dev(symm(gradD()))
-          + mechanical().bulkModulus()*tr(gradD())*I;
+        // Small strain stress at the future time
+        correctStress();
     }
     else
     {
@@ -890,7 +976,7 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
 
         // Calculate the stress at the future time using run-time selectable
         // mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 
         if (solvePressure())
         {
@@ -1085,7 +1171,8 @@ label nonLinGeomTotalLagVelocitySolid::formJacobian
 
     if (dampingCoeff().value() > SMALL)
     {
-        approxJ -= dampingCoeff()*rho()*U;
+        // Implicit, so that the damping enters the Jacobian coefficients
+        approxJ -= fvm::Sp(dampingCoeff()*rho(), U);
     }
 
     // Optional: under-relaxation of the linear system
@@ -1103,8 +1190,8 @@ label nonLinGeomTotalLagVelocitySolid::formJacobian
 
         // const volScalarField& p = this->p();
 
-        // const volScalarField kappa("kappa", mechanical().bulkModulus());
-        // //const volScalarField rKappa(1.0/mechanical().bulkModulus());
+        // const volScalarField kappa("kappa", mechanicalManager().kappa());
+        // //const volScalarField rKappa(1.0/mechanicalManager().kappa());
         // const volScalarField rKappa(1.0/kappa);
         // const surfaceScalarField kappaf(fvc::interpolate(kappa));
         // const dimensionedScalar omega(solidModelDict().lookup("omega"));

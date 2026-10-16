@@ -1,0 +1,23 @@
+{
+  "reference_curve": "demirdzic_sigmaEq.txt",
+  "default_levels": [1, 2, 3, 4],
+  "default_variants": ["petscSnes"],
+  "tutorial_level": 3,
+  "sample_arc": {
+    "radius_m": 0.0075,
+    "z_m": 1e-09,
+    "theta_min_deg": -90.0,
+    "theta_max_deg": 180.0,
+    "reference_angle_offset_deg": 90.0,
+    "samples": 30
+  },
+  "variants": {
+    "petscSnes": {"approach": "petscSnes"},
+    "segregated": {"approach": "segregated"}
+  },
+  "acceptance": {
+    "reference_rms_relative_error_tolerance": 0.05,
+    "reference_peak_relative_error_tolerance": 0.05,
+    "minimum_net_order": 0.0
+  }
+}

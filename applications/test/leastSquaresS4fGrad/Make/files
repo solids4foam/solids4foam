@@ -1,0 +1,3 @@
+Test-leastSquaresS4fGrad.C
+
+EXE = $(FOAM_MODULE_APPBIN)/Test-leastSquaresS4fGrad

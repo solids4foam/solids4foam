@@ -2,36 +2,239 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# ============================================================
-# blockInTreacle FSI regression test
-# ============================================================
-
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
-CASE_DIR="${REGRESSION_ROOT}/main"
+
+# ============================================================
+# blobInTreacle FSI regression test
+# ============================================================
 
 # ------------------------------------------------------------
-# Regression settings
+# Regression tolerances (relative)
 # ------------------------------------------------------------
 
-# Reference values at t=2 (end of simulation)
-REF_FINAL_DX=0.195323     # final x-displacement
-REF_FINAL_FX=15.77      # final total x-force
+# The steady displacement and force converge tightly; the displacement at
+# t = 1 s is taken during the ramp, where the partitioned coupling and the
+# added-mass effect matter most
+DISP_T1_TOL=0.01
+DISP_END_TOL=0.005
+FORCE_END_TOL=0.01
 
-# Tolerances (~1%)
-DX_TOL=0.002
-FX_TOL=0.20
+# Reference values for all forks: OpenFOAM v2512, serial, Linux. OpenFOAM-9
+# agrees to 4e-4 and foam-extend 4.1 to 1.4e-3
+REF_DISP_T1=0.056563
+REF_DISP_END=0.117303
+REF_FORCE_END=15.8338
 
-# Log file
+# Reference values for the quasi-monolithic Newton coupling, which needs
+# OpenFOAM.com and PETSc: OpenFOAM v2512, serial, macOS. Its solid time
+# integration differs from the partitioned solid model, so it agrees with the
+# partitioned references above to 1.3% at t = 1 s and to 0.8% at the end time
+MONO_REF_DISP_T1=0.0558181
+MONO_REF_DISP_END=0.116404
+MONO_REF_FORCE_END=15.9150
+
+# Log files
 ALLRUN_LOGFILE="log.Allrun"
 
-# Data files (relative to case dir)
-DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
+# Data files
+DISP_FILE="postProcessing/0/solidPointDisplacement_pointDisp.dat"
 FORCE_FILE="postProcessing/fluid/forces/0/force.dat"
 
+echo "============================================================"
+echo "blobInTreacle FSI regression test"
+echo "x displacement at t = 1 s relative difference < ${DISP_T1_TOL}"
+echo "Final x displacement relative difference      < ${DISP_END_TOL}"
+echo "Final x force relative difference             < ${FORCE_END_TOL}"
+echo "============================================================"
+echo
+
+# The helpers below act on CASE_DIR, which run_and_check sets for each arm
+
+prepare_case() {
+    rm -rf "${CASE_DIR}"
+    mkdir -p "${CASE_DIR}"
+
+    for item in "${SCRIPT_DIR}"/*; do
+        base_item=$(basename "${item}")
+        if [[ "${base_item}" == "regressionTests" \
+           || "${base_item}" == "verification" ]]; then
+            continue
+        fi
+        cp -a "${item}" "${CASE_DIR}/"
+    done
+
+    # Copy the record of a selected case variant too, so that the Allrun of
+    # the copy can restore the default variant
+    if [[ -f "${SCRIPT_DIR}/.solids4FoamCaseVariant" ]]; then
+        cp -a "${SCRIPT_DIR}/.solids4FoamCaseVariant" "${CASE_DIR}/"
+    fi
+}
+
 # ------------------------------------------------------------
-# Argument parsing
+# Extract helpers
+# ------------------------------------------------------------
+
+extract_displacement_at() {
+    awk -v t="$1" '
+        $1 !~ /^#/ && ($1 - t < 1e-8 && t - $1 < 1e-8) { print $2 }
+    ' "${CASE_DIR}/${DISP_FILE}" | tail -1
+}
+
+extract_final_displacement() {
+    awk '$1 !~ /^#/ { value = $2 } END { print value }' \
+        "${CASE_DIR}/${DISP_FILE}"
+}
+
+extract_final_force() {
+    # The forces functionObject writes a different set of columns depending on
+    # the OpenFOAM version: OpenFOAM.com writes the total force followed by the
+    # pressure and viscous contributions, whereas OpenFOAM.org and foam-extend
+    # write the pressure and viscous contributions followed by the moments. The
+    # number of columns is used to tell them apart, so that the total force is
+    # compared in both cases.
+    tail -n 1 "${CASE_DIR}/${FORCE_FILE}" | \
+    awk '
+    {
+        # Remove parentheses
+        gsub(/[()]/, "", $0)
+
+        if (NF >= 13)
+        {
+            # time, pressure, viscous, moments: sum the contributions
+            print $2 + $5
+        }
+        else
+        {
+            # time, total, pressure, viscous: use the total directly
+            print $2
+        }
+    }'
+}
+
+relative_difference() {
+    awk -v a="$1" -v b="$2" 'BEGIN {
+        d = (a - b)/b
+        print (d < 0 ? -d : d)
+    }'
+}
+
+# ------------------------------------------------------------
+# Checks
+# ------------------------------------------------------------
+
+check() {
+    local label="$1"
+    local value="$2"
+    local reference="$3"
+    local tolerance="$4"
+    local difference
+    difference=$(relative_difference "${value}" "${reference}")
+
+    if awk "BEGIN {exit !(${difference} < ${tolerance})}"; then
+        printf "PASS [%s]: %s = %.6g (relative difference %.3g)\n" \
+            "${ARM}" "${label}" "${value}" "${difference}"
+    else
+        printf "FAIL [%s]: %s = %.6g (relative difference %.3g)\n" \
+            "${ARM}" "${label}" "${value}" "${difference}"
+        failures=$((failures + 1))
+    fi
+}
+
+
+# ------------------------------------------------------------
+# Run and check one arm
+# Arguments: arm name, Allrun arguments, and the references for the
+# displacement at t = 1 s, the final displacement and the final force
+# ------------------------------------------------------------
+
+run_and_check() {
+    local ARM="$1"
+    local ALLRUN_ARGS="$2"
+    local ref_disp_t1="$3"
+    local ref_disp_end="$4"
+    local ref_force_end="$5"
+    local CASE_DIR="${REGRESSION_ROOT}/${ARM}"
+
+    echo "Running the ${ARM} arm"
+
+    if [ "$CHECK_ONLY" = false ]; then
+        prepare_case
+        ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+        ( cd "${CASE_DIR}" && ./Allrun ${ALLRUN_ARGS} > "${ALLRUN_LOGFILE}" 2>&1 )
+    else
+        echo "Running in check-only mode: skipping Allclean and Allrun"
+    fi
+
+    # OpenFOAM variant compatibility
+    mkdir -p "${CASE_DIR}/postProcessing/fluid/forces/0"
+    (
+        cd "${CASE_DIR}/postProcessing/fluid/forces/0"
+
+        # foam-extend writes forces to a 'forces' sub-directory so we will create a
+        # link
+        if [[ ! -e force.dat && -f ../../../../forces/0/forces.dat ]]; then
+            ln -s ../../../../forces/0/forces.dat force.dat
+        fi
+
+        # OpenFOAM.org creates forces.dat instead of force.dat
+        if [[ ! -e force.dat && -f forces.dat ]]; then
+            ln -s forces.dat force.dat
+        fi
+    )
+
+    # ------------------------------------------------------------
+    # Check that the solver completed
+    # ------------------------------------------------------------
+
+    # Allrun does not return the solver status, so check the solver log and the
+    # time of the last displacement sample
+    SOLVER_LOG="${CASE_DIR}/log.solids4Foam"
+    if [[ ! -f "${SOLVER_LOG}" ]] || ! grep -q "^End" "${SOLVER_LOG}" \
+        || grep -q "FOAM FATAL" "${SOLVER_LOG}"; then
+        echo "FAIL [${ARM}]: solids4Foam did not run to completion; see ${SOLVER_LOG}"
+        failures=$((failures + 1))
+        return
+    fi
+
+    END_TIME=$(awk '/^endTime/ { gsub(";", "", $2); print $2 }' \
+        "${CASE_DIR}/system/controlDict")
+    last_time=$(awk '$1 !~ /^#/ { value = $1 } END { print value }' \
+        "${CASE_DIR}/${DISP_FILE}")
+    if ! awk -v a="${last_time}" -v b="${END_TIME}" \
+        'BEGIN { d = a - b; exit !(d < 1e-8 && d > -1e-8) }'; then
+        echo "FAIL [${ARM}]: last displacement sample at t = ${last_time}," \
+            "not at the end time ${END_TIME}"
+        failures=$((failures + 1))
+        return
+    fi
+
+    # ------------------------------------------------------------
+    # Extract values
+    # ------------------------------------------------------------
+
+    disp_t1=$(extract_displacement_at 1)
+    disp_end=$(extract_final_displacement)
+    force_end=$(extract_final_force)
+
+    if [[ -z "${disp_t1}" || -z "${disp_end}" || -z "${force_end}" ]]; then
+        echo "FAIL [${ARM}]: Could not extract regression quantities"
+        failures=$((failures + 1))
+        return
+    fi
+
+    # ------------------------------------------------------------
+    # Checks
+    # ------------------------------------------------------------
+
+
+    check "x displacement at t = 1 s" "${disp_t1}" "${ref_disp_t1}" "${DISP_T1_TOL}"
+    check "final x displacement" "${disp_end}" "${ref_disp_end}" "${DISP_END_TOL}"
+    check "final x force" "${force_end}" "${ref_force_end}" "${FORCE_END_TOL}"
+}
+
+# ------------------------------------------------------------
+# Clean & run case
 # ------------------------------------------------------------
 
 CHECK_ONLY=false
@@ -46,103 +249,18 @@ for arg in "$@"; do
     esac
 done
 
-# ------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------
-
-abs() { awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'; }
-
-extract_final_dx() {
-    local case_dir="$1"
-    awk '$1+0==$1 {val=$2} END {print val}' "${case_dir}/${DISP_FILE}"
-}
-
-extract_final_fx() {
-    local case_dir="$1"
-    awk '$1+0==$1 {val=$2} END {print val}' "${case_dir}/${FORCE_FILE}"
-}
-
-check_results() {
-    local case_dir="$1"
-    local failures=0
-
-    local final_dx
-    final_dx=$(extract_final_dx "${case_dir}")
-
-    local final_fx
-    final_fx=$(extract_final_fx "${case_dir}")
-
-    if [[ -z "${final_dx}" || -z "${final_fx}" ]]; then
-        echo "FAIL: Could not extract regression quantities"
-        return 1
-    fi
-
-    local dx_diff
-    dx_diff=$(awk "BEGIN {print ${final_dx} - ${REF_FINAL_DX}}")
-    local dx_diff_abs
-    dx_diff_abs=$(abs "${dx_diff}")
-
-    local fx_diff
-    fx_diff=$(awk "BEGIN {print ${final_fx} - ${REF_FINAL_FX}}")
-    local fx_diff_abs
-    fx_diff_abs=$(abs "${fx_diff}")
-
-    if awk "BEGIN {exit !(${dx_diff_abs} < ${DX_TOL})}"; then
-        printf "PASS: final Dx = %.6g (Δ = %.3g)\n" "${final_dx}" "${dx_diff_abs}"
-    else
-        printf "FAIL: final Dx = %.6g (Δ = %.3g)\n" "${final_dx}" "${dx_diff_abs}"
-        failures=$((failures + 1))
-    fi
-
-    if awk "BEGIN {exit !(${fx_diff_abs} < ${FX_TOL})}"; then
-        printf "PASS: final Fx = %.6g (Δ = %.3g)\n" "${final_fx}" "${fx_diff_abs}"
-    else
-        printf "FAIL: final Fx = %.6g (Δ = %.3g)\n" "${final_fx}" "${fx_diff_abs}"
-        failures=$((failures + 1))
-    fi
-
-    return "${failures}"
-}
-
-# ------------------------------------------------------------
-# Main
-# ------------------------------------------------------------
-
-echo "============================================================"
-echo "blockInTreacle FSI regression test"
-echo "Final Dx difference        < ${DX_TOL}"
-echo "Final Fx difference        < ${FX_TOL}"
-echo "============================================================"
-echo
-
-CASE_DIR="${REGRESSION_ROOT}/main"
-
-if [ "${CHECK_ONLY}" = false ]; then
-    rm -rf "${CASE_DIR}"
-    mkdir -p "${CASE_DIR}"
-
-    for item in "${SCRIPT_DIR}"/*; do
-        base_item=$(basename "${item}")
-        [[ "${base_item}" == "regressionTests" ]] && continue
-        cp -a "${item}" "${CASE_DIR}/"
-    done
-
-    ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-
-    # Run case
-    ( cd "${CASE_DIR}" && ./Allrun ) > "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>&1
-
-    if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-        echo "Skipping regression checks because the tutorial skipped in this environment"
-        exit 0
-    fi
-else
-    echo "Running in check-only mode: skipping Allclean and Allrun"
-    CASE_DIR="${SCRIPT_DIR}"
-fi
-
 failures=0
-check_results "${CASE_DIR}" || failures=$((failures + $?))
+
+run_and_check partitioned "" \
+    "${REF_DISP_T1}" "${REF_DISP_END}" "${REF_FORCE_END}"
+
+# The quasi-monolithic coupling needs OpenFOAM.com and PETSc
+if [[ "${WM_PROJECT_VERSION:-}" == v* && -n "${PETSC_DIR:-}" ]]; then
+    run_and_check monolithic monolithic \
+        "${MONO_REF_DISP_T1}" "${MONO_REF_DISP_END}" "${MONO_REF_FORCE_END}"
+else
+    echo "Skipping the monolithic arm: it needs OpenFOAM.com and PETSc"
+fi
 
 echo
 if (( failures == 0 )); then

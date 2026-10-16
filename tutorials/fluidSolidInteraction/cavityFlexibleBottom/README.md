@@ -1,3 +1,7 @@
+---
+sort: 7
+---
+
 # Channel flow over a cavity with a flexible bottom: `cavityFlexibleBottom`
 
 Prepared by Aaron Mullen-Hales, Philip Cardiff and Ivan Batistić
@@ -9,23 +13,22 @@ Prepared by Aaron Mullen-Hales, Philip Cardiff and Ivan Batistić
 ## Case Overview
 
 This case involves a laminar flow of an incompressible fluid with a parabolic
-inlet velocity profile through a two-dimensional channel containing a flexible
-cavity in the bottom wall. The geometry of the fluid and solid domains is shown
-in Fig. 1. The channel height for all simulations is $$H = 1\,\mathrm{m}$$.
-The fluid has a density of $$1\,\mathrm{kg/m^3}$$ and a kinematic viscosity of
-$$0.01\,\mathrm{m^2/s}$$. It enters the channel from the left-hand side with a
-parabolic velocity profile and a mean inlet velocity of $$1\,\mathrm{m/s}$$,
-corresponding to a Reynolds number of $$Re = 100$$ based on the channel height.
-A constant pressure is imposed at the outlet, and no-slip boundary conditions
-are applied at the channel walls. The flexible elastic plate forming the bottom
-of the cavity has a density of $$1000\,\mathrm{kg/m^3}$$, a Young’s modulus of
-$$500\,\mathrm{N/m^2}$$, and a Poisson’s ratio of $$\nu = 0.4$$. Its
-deformation is described using the Saint Venant–Kirchhoff constitutive model.
-The case is solved as a transient problem until a steady-state solution is
-reached. A first-order Euler time discretisation scheme is used for both the
-fluid and solid solvers. To accelerate convergence to the steady state and
-suppress transient oscillations, additional damping is applied to the solid
-domain via the `dampingCoeff` parameter in `constant/solid/solidProperties`.
+ inlet velocity profile through a two-dimensional channel containing a flexible
+cavity in the bottom wall. The geometry of the fluid and solid domains is
+shown in Fig. 1. The channel height for all simulations is $$H = 1\,\mathrm{m}$$.
+The fluid has a density of $$1\,\mathrm{kg/m^3}$$ and a kinematic viscosity of $$0.01\,\mathrm{m^2/s}$$.
+It enters the channel from the left-hand side with a parabolic velocity profile
+with a mean inlet velocity of $$1\,\mathrm{m/s}$$, corresponding to a Reynolds number
+of $$Re = 100$$ based on the channel height. A constant pressure is imposed at the
+outlet, and no-slip boundary conditions are applied at the channel walls. The
+flexible elastic plate forming the bottom of the cavity has a density of $$1000\,\mathrm{kg/m^3}$$,
+a Young’s modulus of $$500\,\mathrm{N/m^2}$$, and a Poisson’s ratio of
+$$\nu = 0.4$$. Its deformation  is described using the Saint Venant–Kirchhoff
+constitutive model. The case is solved as a transient problem until a
+steady-state solution is reached. A first-order Euler time discretisation
+scheme is used for both the fluid and solid solvers. To accelerate
+convergence to the steady state and suppress transient oscillations, additional
+damping is applied to the solid domain via the `dampingCoeff` parameter in `constant/solid/solidProperties`.
 
 ![Figure 1: Geometry of the spatial computational domain for the channel flow over a cavity with a flexible bottom.](images/cavityFlexibleBottom-geometry.png)
 **Figure 1: Geometry of the spatial computational domain for
@@ -40,37 +43,42 @@ the channel flow over a cavity with a flexible bottom [1]**
 
 The tutorial case is located at
 `solids4foam/tutorials/fluidSolidInteraction/cavityFlexibleBottom`. The case
-can be run using the included `Allrun` script. Two solver approaches are
-available:
+can be run using the included `Allrun` script, i.e. `> ./Allrun`. The `Allrun`
+script first executes `blockMesh` for both `solid` and `fluid` domains
+(`> blockMesh -region fluid` and `> blockMesh -region solid` ), and the
+`solids4foam` solver is used to run the case (`> solids4Foam`). Optionally, if
+`gnuplot` is installed, a file `deflection.pdf` will be created with the
+displacement history of point A, and a file `force.pdf` will be created with the
+history of the force on the interface.
 
-**Partitioned** (default — Dirichlet-Neumann with Aitken acceleration):
+### Quasi-monolithic variant
 
-```bash
-./Allrun              # serial
-./Allrun parallel     # parallel
-```
+`./Allrun monolithic` (optionally with `parallel`) runs the case with the
+quasi-monolithic Newton coupling (`fluidSolidInterface NewtonQuasiMonolithic`),
+which needs OpenFOAM.com and PETSc. The fluid velocity and pressure
+(`newtonIcoFluid`) and the solid velocity are solved together with PETSc SNES
+in every time step, so there are no FSI sub-iterations; the fluid mesh motion
+is a separate solid model in the fluid region. The files of this variant are
+stored beside the partitioned ones as `*.monolithic` files, which `Allrun`
+links in and `Allclean` removes again.
 
-**Monolithic** (Newton quasi-monolithic via PETSc SNES — requires PETSc):
-
-```bash
-./Allrun monolithic           # serial
-./Allrun monolithic parallel  # parallel
-```
-
-The `Allrun` script runs `blockMesh` for both `solid` and `fluid` regions and
-then launches the solver. Optionally, if `gnuplot` is installed, it creates
-`deflection.pdf` with the displacement history of point A and `force.pdf` with
-the history of the force on the interface.
+The solid model is `nonLinearGeometryTotalLagrangianVelocity`. Its time
+integration is nearly energy-conserving, and the coupling is active from the
+start rather than from `t = 10 s`, so the flexible bottom oscillates for longer
+before it settles; a small velocity-proportional damping (`dampingCoeff 0.1`),
+which vanishes at the steady state, is added in
+`constant/solid/solidProperties.monolithic`. The final vertical displacement
+of point A is `-0.2017 m`, against `-0.2025 m` for the partitioned approach,
+and the regression test checks both against the same references.
 
 ---
 
 ## Analysing Results
 
-The vertical displacement of point A (located at $$(4\,-1\,0)$$) is recorded in
-`postProcessing/0/solidPointDisplacement_displacement.dat` using a function object
-defined in `system/controlDict`. The forces acting on the fluid–solid
-interface are also recorded in `postProcessing/fluid/forces/0/force.dat` via the
-`forces` function object.
+The vertical displacement of point A (located at $$(4\,-1\,0)$$) is recorded in `postProcessing/0/solidPointDisplacement_displacement.dat`
+ using a function object defined in `system/controlDict`. The forces acting
+ on the fluid–solid interface are also recorded in
+`postProcessing/fluid/forces/0/force.dat` via the `forces` function object.
 
 Figure 3 shows the convergence history of the vertical displacement of point A,
 while Fig. 4 presents the convergence of the interface force components.
@@ -97,27 +105,48 @@ in the solid part at the final time step**
 
 ## Results from the literature
 
-The results reported by [1] show good agreement with those obtained using
-`solids4foam`. Figure 6 presents the velocity field and equivalent stress
-distributions reported in [1], while Fig. 7 shows the corresponding convergence
-histories of displacement and interface forces.
+The results reported by [1] show good agreement with those obtained
+ using `solids4foam`. Figure 6 presents the velocity field and equivalent
+ stress distributions reported in [1], while Fig. 7 shows the corresponding
+convergence histories of displacement and interface forces.
 
-The interface force reported in [1] is several orders of magnitude smaller than
-that obtained in the present solids4foam simulation; this is explained by the
-different domain thickness used in the two studies.
+The interface force reported in [1] is several orders of magnitude smaller
+ than that obtained in the present solids4foam simulation, which is explained
+ by the different domain thickness used in the two studies.
 
-For mesh with $$0.1$$ m spacing, the vertical displacement reported in [1] is
+For mesh with  $$0.1$$ m spacing, the vertical displacement reported in [1] is
 approximately $$-0.232\,\mathrm{m}$$ (estimated from the published diagram),
 whereas the solids4foam prediction is $$-0.219\,\mathrm{m}$$.
 
 ![.](images/cavityFlexibleBottom-TukovicEtAl-results.png)
 
-**Figure 6: Velocity field in the fluid and equivalent stress in the solid part
-at the final time step, from [1]. Mesh spacing 0.025 m**
+**Figure 6: Velocity field in the fluid and equivalent stress
+in the solid part at the final time step, from [1].  Mesh spacing  0.025 m**
 
 ![.](images/cavityFlexibleBottom-TukovicEtAl-displacement.png)
-**Figure 6: Displacement of point A and force at the plate as a function of
-cell size [1]**
+**Figure 6: Displacement of point A and force at the plate
+as a funcion of cell size [1]**
+
+## Verification and Convergence Study
+
+The opt-in [`verification/`](verification/) directory holds a mesh study. It
+doubles the in-plane divisions
+of both meshes through the four spacings used in [1], runs each level to a
+steady response, and compares the steady displacement at $$(4, -1, 0.5)$$ and
+the steady interface force with the published values:
+
+```bash
+cd verification
+./Allverify
+```
+
+The interface force agrees with [1] to within $$0.2$$% on every mesh once the
+published thickness of $$0.05$$ m is accounted for. The displacement converges
+cleanly at a net order of $$1.96$$, towards a value about $$5$$% away from the
+published curve, consistent with the offset already noted above at the
+coarsest spacing. The study is separate from
+`regressionTest.sh` and is not run by the normal tutorial test suites. See the
+verification README for the mesh levels, options, and acceptance criteria.
 
 ---
 

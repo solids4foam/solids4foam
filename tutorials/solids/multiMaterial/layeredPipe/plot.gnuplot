@@ -43,7 +43,7 @@ set ytics 0.1
 set ylabel "{/Symbol s}_{r} / p_i" font "Times Bold,20"
 plot sigmar1(x) w l ls 1 title"Analytical",\
      sigmar2(x) w l ls 1 notitle,\
-    "postProcessing/sets/10/line_sigma:Transformed.xy" using 1:($2/p) w lp ls 2 notitle
+    "postProcessing/sample/10/line_sigma:Transformed.xy" using 1:($2/p) w lp ls 2 notitle
 
 set output 'sigmaTheta.png'
 set yrange [-0.25:2.25]
@@ -51,6 +51,6 @@ set ytics 0.25
 set ylabel "{/Symbol s}_{{/Symbol q}} / p_i" font "Times Bold,20"
 plot sigmatheta1(x) w l ls 1 title"Analytical",\
      sigmatheta2(x) w l ls 1 notitle,\
-     "postProcessing/sets/10/line_sigma\:Transformed.xy" using 1:($5/p) w lp ls 2 notitle
+     "postProcessing/sample/10/line_sigma\:Transformed.xy" using 1:($5/p) w lp ls 2 notitle
  
 

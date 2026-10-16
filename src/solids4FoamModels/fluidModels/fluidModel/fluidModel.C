@@ -27,6 +27,11 @@ License
 #include "EulerDdtScheme.H"
 #include "backwardDdtScheme.H"
 #include "addToRunTimeSelectionTable.H"
+#include "fluxCorrectedVelocityFvPatchVectorField.H"
+#include "compatibilityFunctions.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "extrapolatedCalculatedFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -42,6 +47,121 @@ namespace Foam
         {
             return runTime.controlDict().subOrEmptyDict("fluid")
                 .lookupOrDefault<word>("region", region);
+        }
+
+
+        // Minimal concrete regIOobject, used to read a field file as a
+        // dictionary through the file handler, so that the collated and
+        // distributed cases are handled and the stream format is taken from
+        // the header. Note: regIOobject is abstract, and localIOdictionary,
+        // which serves the same purpose, is not available in foam-extend
+        class fieldFileReader
+        :
+            public regIOobject
+        {
+        public:
+
+            fieldFileReader(const IOobject& io)
+            :
+                regIOobject(io)
+            {}
+
+            //- Never called: the file is only read
+            virtual bool writeData(Ostream&) const
+            {
+                return false;
+            }
+        };
+
+
+        // Restore the fluxCorrectedVelocity boundary values of an old-time
+        // level of U from the "value" entries written to disk
+        // The condition is derived from zeroGradient and so discards the
+        // "value" entry that it writes when the field is read: the normal
+        // component of the patch value is replaced by the zero-gradient
+        // extrapolation. Unlike for the current time level, the value cannot
+        // be re-derived from phi, as the old-time levels of phi are not
+        // written. Nothing is restored, and no error is raised, if the field
+        // was not read from disk or if the entries are not available: the
+        // old-time level is then a synthesised copy of the current level
+        void restoreWrittenFluxCorrectedVelocity(volVectorField& U)
+        {
+            IOobject fieldIO
+            (
+                U.name(),
+                U.instance(),
+                U.db(),
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false // do not register
+            );
+
+#ifdef OPENFOAM_NOT_EXTEND
+            if (!fieldIO.typeHeaderOk<volVectorField>(false))
+#else
+            if (!fieldIO.headerOk())
+#endif
+            {
+                return;
+            }
+
+            fieldFileReader fieldReader(fieldIO);
+            const dictionary fieldDict
+            (
+                fieldReader.readStream(volVectorField::typeName)
+            );
+            fieldReader.close();
+
+            if (!fieldDict.found("boundaryField"))
+            {
+                return;
+            }
+
+            const dictionary& boundaryDict = fieldDict.subDict("boundaryField");
+
+            forAll(U.boundaryField(), patchI)
+            {
+                fvPatchVectorField& Up = boundaryFieldRef(U)[patchI];
+
+                if (!isA<fluxCorrectedVelocityFvPatchVectorField>(Up))
+                {
+                    continue;
+                }
+
+                const word& patchName = Up.patch().name();
+
+                if (!boundaryDict.found(patchName))
+                {
+                    WarningIn
+                    (
+                        "Foam::restoreWrittenFluxCorrectedVelocity"
+                        "(volVectorField&)"
+                    )   << "No entry for patch " << patchName << " in "
+                        << U.name() << ": the "
+                        << fluxCorrectedVelocityFvPatchVectorField::typeName
+                        << " history of this patch is not restored" << endl;
+
+                    continue;
+                }
+
+                const dictionary& patchDict = boundaryDict.subDict(patchName);
+
+                if (!patchDict.found("value"))
+                {
+                    WarningIn
+                    (
+                        "Foam::restoreWrittenFluxCorrectedVelocity"
+                        "(volVectorField&)"
+                    )   << "No value entry for patch " << patchName << " in "
+                        << U.name() << ": the "
+                        << fluxCorrectedVelocityFvPatchVectorField::typeName
+                        << " history of this patch is not restored" << endl;
+
+                    continue;
+                }
+
+                Up == vectorField("value", patchDict, Up.size());
+            }
         }
     }
 }
@@ -87,6 +207,89 @@ void Foam::fluidModel::makePimpleControl() const
             )
         )
     );
+}
+
+
+void Foam::fluidModel::correctFluxCorrectedVelocityBoundaries()
+{
+    volVectorField& U = UPtr_();
+    const surfaceScalarField& phi = phiPtr_();
+
+    // Check if any patch uses the fluxCorrectedVelocity condition
+    bool fluxCorrectedFound = false;
+    forAll(U.boundaryField(), patchI)
+    {
+        if
+        (
+            isA<fluxCorrectedVelocityFvPatchVectorField>
+            (
+                U.boundaryField()[patchI]
+            )
+        )
+        {
+            fluxCorrectedFound = true;
+            break;
+        }
+    }
+
+    if (!fluxCorrectedFound)
+    {
+        return;
+    }
+
+    // The current time level is re-derived from phi, which does persist its
+    // boundary values. When phi is a mass flux, the density is required to
+    // convert it to a velocity; rho is created by the derived fluidModel, i.e.
+    // after this function is called, so the correction is skipped in that case
+    // and the derived model is free to correct the values once rho is
+    // available. Note that this is a no-op on a fresh start, where phi is
+    // calculated from U
+    if (phi.dimensions() == dimVolume/dimTime)
+    {
+        forAll(U.boundaryField(), patchI)
+        {
+            fvPatchVectorField& Up = boundaryFieldRef(U)[patchI];
+
+            if (!isA<fluxCorrectedVelocityFvPatchVectorField>(Up))
+            {
+                continue;
+            }
+
+            // As in fluxCorrectedVelocityFvPatchVectorField::evaluate(): a
+            // zero-gradient extrapolation with the normal component replaced
+            // by the flux
+            const fvPatch& p = Up.patch();
+            const vectorField n(p.nf());
+            const vectorField UzeroGrad(Up.patchInternalField());
+
+            Up == vectorField
+            (
+                UzeroGrad
+              - n*(n & UzeroGrad)
+              + n*phi.boundaryField()[patchI]/p.magSf()
+            );
+        }
+    }
+    else
+    {
+        WarningIn("Foam::fluidModel::correctFluxCorrectedVelocityBoundaries()")
+            << "The " << phi.name() << " field is not a volumetric flux: the "
+            << fluxCorrectedVelocityFvPatchVectorField::typeName
+            << " boundary values of " << U.name() << " are not corrected"
+            << endl;
+    }
+
+    // The old-time levels of phi are not written, so the old-time levels of U
+    // cannot be re-derived in the same way; instead, the "value" entries
+    // written by the fluxCorrectedVelocity condition are read back
+    volVectorField* UOldPtr = &U;
+
+    for (label levelI = 0; levelI < U.nOldTimes(); levelI++)
+    {
+        UOldPtr = &(UOldPtr->oldTime());
+
+        restoreWrittenFluxCorrectedVelocity(*UOldPtr);
+    }
 }
 
 
@@ -423,21 +626,8 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
 #endif
     {
         Info<< "Reading g from constant directory" << endl;
-#if (OPENFOAM >= 1906)
+#ifdef OPENFOAM_COM
         return meshObjects::gravity(runTime());
-#elif (OPENFOAM >= 1812)
-        return meshObjects::gravity
-        (
-            runTime(),
-            IOobject
-            (
-                "g",
-                runTime().caseConstant(),
-                mesh(),
-                IOobject::MUST_READ,
-                IOobject::NO_WRITE
-            )
-        );
 #else
         return uniformDimensionedVectorField
         (
@@ -456,21 +646,8 @@ Foam::uniformDimensionedVectorField Foam::fluidModel::readG() const
     {
         Info<< "g field not found in constant directory: initialising to zero"
             << endl;
-#if (OPENFOAM >= 1906)
+#ifdef OPENFOAM_COM
         return meshObjects::gravity(runTime());
-#elif (OPENFOAM >= 1812)
-        return meshObjects::gravity
-        (
-            runTime(),
-            IOobject
-            (
-                "g",
-                runTime().caseConstant(),
-                mesh(),
-                IOobject::NO_READ,
-                IOobject::NO_WRITE
-            )
-        );
 #else
         return uniformDimensionedVectorField
         (
@@ -628,6 +805,11 @@ Foam::fluidModel::fluidModel
             ),
             mesh(),
             dimensionedTensor("zero", dimVelocity/dimLength, tensor::zero)
+            // The patch type of the fields created by the gradient schemes,
+            // as the gradient cache updates this field when grad(U) is cached
+#ifdef OPENFOAM_NOT_EXTEND
+          , extrapolatedCalculatedFvPatchTensorField::typeName
+#endif
         )
     ),
     gradpPtr_
@@ -644,6 +826,9 @@ Foam::fluidModel::fluidModel
             ),
             mesh(),
             dimensionedVector("zero", p().dimensions()/dimLength, vector::zero)
+#ifdef OPENFOAM_NOT_EXTEND
+          , extrapolatedCalculatedFvPatchVectorField::typeName
+#endif
         )
     ),
     phiPtr_
@@ -749,6 +934,41 @@ Foam::fluidModel::fluidModel
 
     if (!constructNull)
     {
+        // Restore the fluxCorrectedVelocity boundary values, which are lost
+        // when U and its old-time levels are read on restart; performed before
+        // the gradients are calculated so that they see the corrected values
+        correctFluxCorrectedVelocityBoundaries();
+
+        // The gradient fields are registered with the names that the gradient
+        // cache uses, so a cached gradient is this class's field
+#if defined(OPENFOAM_COM) && (OPENFOAM >= 2512)
+        // The cache updates a cached gradient in place, unless it is newer
+        // than its field. The gradient fields were created after U and p, so
+        // mark their initial zero values as out of date
+        gradUPtr_().eventNo() = UPtr_().eventNo();
+        gradpPtr_().eventNo() = pPtr_().eventNo();
+#else
+        // The cache deletes a stale cached gradient, which this class owns
+        if
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().cache(gradUPtr_().name())
+         || mesh().cache(gradpPtr_().name())
+#else
+            mesh().solutionDict().cache(gradUPtr_().name())
+         || mesh().solutionDict().cache(gradpPtr_().name())
+#endif
+        )
+        {
+            FatalErrorIn("Foam::fluidModel::fluidModel(...)")
+                << "Caching " << gradUPtr_().name() << " or "
+                << gradpPtr_().name() << " is only supported by the fluid "
+                << "models with OpenFOAM.com v2512 and later. Please remove "
+                << "them from the cache sub-dictionary of fvSolution"
+                << abort(FatalError);
+        }
+#endif
+
         gradUPtr_() = fvc::grad(UPtr_());
         gradpPtr_() = fvc::grad(pPtr_());
 
@@ -938,6 +1158,13 @@ void Foam::fluidModel::makeGlobalPatches(const wordList& patchNames) const
                 << abort(FatalError);
         }
 
+        // An interface without a fluid patch (an immersed interface) has no
+        // global patch
+        if (patchNames[i] == "none")
+        {
+            continue;
+        }
+
         globalPatchesPtrList_.set
         (
             i,
@@ -965,6 +1192,18 @@ Foam::fluidModel::globalPatches() const
 void Foam::fluidModel::clearGlobalPatches() const
 {
     globalPatchesPtrList_.clear();
+}
+
+
+void Foam::fluidModel::syncGlobalPatches() const
+{
+    forAll(globalPatchesPtrList_, i)
+    {
+        if (globalPatchesPtrList_.set(i))
+        {
+            globalPatchesPtrList_[i].syncPoints();
+        }
+    }
 }
 
 
@@ -1029,7 +1268,7 @@ Foam::autoPtr<Foam::fluidModel> Foam::fluidModel::New
 
     Info<< nl << "Selecting fluidModel " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)

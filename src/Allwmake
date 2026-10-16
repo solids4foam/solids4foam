@@ -8,16 +8,24 @@ then
 fi
 
 (cd blockCoupledSolids4FoamTools && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
-(cd RBFMeshMotionSolver && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+
+if [[ -z "${S4F_NO_RBF:-}" ]]
+then
+    (cd RBFMeshMotionSolver && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+else
+    echo; echo "The S4F_NO_RBF variable is set: skipping RBFMeshMotionSolver"
+    echo "The RBFMeshMotionSolver mesh motion solver and the rbf"
+    echo "interfaceToInterfaceMapping will not be available"; echo
+fi
+
 (cd solids4FoamModels && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
 
-if [[ ! -z "${S4F_USE_GFORTRAN+x}" ]]
+# The immersed boundary method is currently only implemented for OpenFOAM.com
+if [[ "$WM_PROJECT" == "OpenFOAM" && $WM_PROJECT_VERSION == v* ]]
 then
-    (cd abaqusUMATs && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+    (cd immersedBoundary && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
 else
-    echo; echo "The S4F_USE_GFORTRAN variable is not set: skipping abaqusUMATs"
-    echo "To use abaqusUMATs, install gfortran and set the S4F_USE_GFORTRAN "
-    echo "variable to 1"; echo
+    echo; echo "Skipping immersedBoundary: it requires OpenFOAM.com"; echo
 fi
 
 #------------------------------------------------------------------------------

@@ -1,3 +1,7 @@
+---
+sort: 2
+---
+
 # nonLinGeomTotalLagTotalDispSolid
 
 This page documents the nonlinear total-Lagrangian total-displacement solid
@@ -29,15 +33,20 @@ total-displacement linear solver. It:
 - supports segregated implicit and PETSc SNES solution paths;
 - can also solve pressure when requested, but only through the PETSc SNES
   path;
-- uses the selected mechanical law to compute stress.
+- uses the selected mechanical law to compute stress;
+- adds `fvOptions` sources, for example a manufactured body force, to the
+  momentum equation of both solution paths on OpenFOAM.com. The source is per
+  unit reference volume. On OpenFOAM.org and foam-extend a derived model can
+  supply the same source through the protected `fvOptionsSource()` function,
+  as the hyperelasticity `manufacturedSolution` tutorial does.
 
 The model is appropriate when deformation is large enough that linear geometry
 is not valid.
 
 ### Supported solution algorithms
 
-The `solutionAlgorithm` entry in `solidModelCoeffs` selects how the equations
-are solved:
+The `solutionAlgorithm` entry in the coefficients sub-dictionary selects how
+the equations are solved:
 
 | Value | Meaning | Notes |
 | --- | --- | --- |
@@ -64,7 +73,6 @@ The following `solidModel` options are particularly relevant here:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `writeResidualField` | `false` | Writes a residual field during output |
@@ -99,7 +107,7 @@ Minimal example for `constant/solidProperties`:
 ```text
 solidModel        nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-solidModelCoeffs
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     solutionAlgorithm    implicitSegregated;
 
@@ -110,7 +118,6 @@ solidModelCoeffs
     nCorrectors          10000;
     solutionTolerance    1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance    1e-05;
     infoFrequency        100;
 
     restart              false;
@@ -144,7 +151,7 @@ If `solvePressure` is enabled, add:
 
 If `solutionAlgorithm` is `PETScSNES`, also ensure the case provides the PETSc
 options file expected by `optionsFile` (default name: `petscOptions`), unless
-you override that name in `solidModelCoeffs`.
+you override that name in the coefficients sub-dictionary.
 
 ### Required fields and boundary conditions
 
@@ -185,13 +192,15 @@ Here `oldTime()` means the value stored at the previous time step.
 The solver treats the following patch field types specially:
 
 - `solidTraction`
+- `solidSpringDashpot`
 - `fixedDisplacementZeroShear`
 - `symmetry`
 - `slip`
 
 On traction patches, the force is formed using the current deformed normals and
-area measures. On zero-shear, symmetry, and slip patches, the tangential force
-is projected away.
+area measures. On spring-dashpot patches, the spring and dashpot force uses the
+reference area and the traction and pressure use the current area. On
+zero-shear, symmetry, and slip patches, the tangential force is projected away.
 
 The `solidTraction` patch also has an optional `useUndeformedArea()` switch.
 This is not implemented for the total-Lagrangian model when it is asked to use
@@ -223,7 +232,7 @@ are:
 - geometry is evaluated in the reference configuration;
 - `D` is the primary variable;
 - `F`, `Finv`, and `J` are updated from `grad(D)`;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver supports segregated implicit and PETSc SNES paths only.
 
 The class inherits from `solidModel` and `foamPetscSnesHelper`.

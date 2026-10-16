@@ -29,6 +29,9 @@ SourceFiles
 
 \*---------------------------------------------------------------------------*/
 
+// stateFunctionObject is only available in OpenFOAM.com
+#ifdef OPENFOAM_COM
+
 #ifndef fsiSteadyStateControl_H
 #define fsiSteadyStateControl_H
 
@@ -221,5 +224,7 @@ public:
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
+
+#endif // OPENFOAM_COM
 
 // ************************************************************************* //

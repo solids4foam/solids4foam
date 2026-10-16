@@ -1,0 +1,73 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+// The plate displacement of 10 mm is reached at time 1; on the shipped coarse
+// mesh the solution diverges beyond about 8.5 mm, so the case is stopped at
+// 7.5 mm
+endTime         0.75;
+
+deltaT          0.01;
+
+writeControl    timeStep;
+
+writeInterval   5;
+
+purgeWrite      0;
+
+cycleWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  6;
+
+writeCompression uncompressed;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+functions
+{
+    // Force on the outer sphere from the upper rigid plane
+    // (written to postProcessing/0/solidForcesR_top.dat)
+    forcesTop
+    {
+        type solidForces;
+        historyPatch R_top;
+    }
+
+    // Force on the inner sphere from the lower rigid plane
+    // (written to postProcessing/0/solidForcesr_bottom.dat)
+    forcesBottom
+    {
+        type solidForces;
+        historyPatch r_bottom;
+    }
+}
+
+// ************************************************************************* //

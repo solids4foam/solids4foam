@@ -83,7 +83,7 @@ bool Foam::solidPointStress::writeData()
         const solidModel& solMod = lookupSolidModel(mesh);
 
         // Interpolate vol field to point field
-        solMod.mechanical().volToPoint().interpolate(sigma, pointSigma);
+        solMod.volToPoint().interpolate(sigma, pointSigma);
 
         symmTensor pointSigmaValue = symmTensor::zero;
         if (pointID_ > -1)

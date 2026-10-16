@@ -77,6 +77,7 @@ freeEdgeDisplacementFaPatchScalarField
 {}
 
 
+#if (OPENFOAM < 2606)
 Foam::freeEdgeDisplacementFaPatchScalarField::
 freeEdgeDisplacementFaPatchScalarField
 (
@@ -86,6 +87,7 @@ freeEdgeDisplacementFaPatchScalarField
     fixedGradientFaPatchField<scalar>(ptf),
     relaxFac_(ptf.relaxFac_)
 {}
+#endif
 
 
 Foam::freeEdgeDisplacementFaPatchScalarField::

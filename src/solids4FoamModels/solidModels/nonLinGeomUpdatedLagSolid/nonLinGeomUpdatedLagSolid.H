@@ -41,7 +41,9 @@ SourceFiles
 #define nonLinGeomUpdatedLagSolid_H
 
 #include "solidModel.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "foamPetscSnesHelper.H"
+#include "hofvc.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -108,6 +110,18 @@ class nonLinGeomUpdatedLagSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Total deformation gradient at the face quadrature points at the
+        //  start of the time step
+        //  Only used by the high-order approach: the updated Lagrangian
+        //  displacement gradient is relative to the start of the time step, so
+        //  the total deformation gradient must be accumulated
+        mutable autoPtr<CompactListList<tensor>> FQuadOldPtr_;
+
+        //- Total displacement gradient at the face quadrature points
+        //  Only used by the high-order approach: this is what the mechanical
+        //  law expects, as opposed to the relative gradient held in gradDQuad()
+        mutable autoPtr<CompactListList<tensor>> gradDTotalQuadPtr_;
+
 
     // Private Member Functions
 
@@ -115,8 +129,53 @@ class nonLinGeomUpdatedLagSolid
         //  previous time-steps
         void predict();
 
+        //- Allocate the quadrature point deformation gradient fields
+        void makeQuadratureKinematics() const;
+
+        //- Update the total displacement gradient at the face quadrature points
+        //  from the relative gradient in gradDQuad(), i.e.
+        //  F = relF & F.oldTime() and gradDTotal = (F - I).T()
+        void updateQuadratureKinematics() const;
+
+        //- Store the current total deformation gradient at the face quadrature
+        //  points as the reference for the next time step
+        void storeQuadratureKinematicsOldTime() const;
+
         //- Allocate the reciprocal of the bulk modulus
         void makeRKappa() const;
+
+        //- Inverse of the total deformation gradient, needed by the
+        //  framework and not otherwise kept by this solver. Built on first use
+        mutable autoPtr<volTensorField> FinvPtr_;
+
+        //- Update the cell-centred stress
+        void correctStress();
+
+        //- This model smooths the hydrostatic stress on request, in
+        //  correctStress(), in its implicit segregated algorithm
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return true;
+        }
+
+        //- Update the stress at the face quadrature points.
+        //  The high-order face quadrature does not exist on foam-extend
+        void correctStressQuad();
+
+        //- Finite-strain kinematics at the face quadrature points. The old
+        //  time needs no store of its own: FQuadOldPtr_ already holds the
+        //  converged total deformation gradient of the previous step
+        mutable autoPtr<CompactListList<tensor>> FQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
+
+        //- Construct impK from the framework
+        tmp<volScalarField> makeImpK() const;
+
+        //- Construct impKf to match impK
+        tmp<surfaceScalarField> makeImpKf() const;
 
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
@@ -138,7 +197,6 @@ class nonLinGeomUpdatedLagSolid
         //  approach) is provided to PETSc. A Jacobian-free Krylov-Newton method
         //  works well with this approach
         bool evolveSnes();
-
         //- Disallow default bitwise copy construct
         nonLinGeomUpdatedLagSolid(const nonLinGeomUpdatedLagSolid&);
 

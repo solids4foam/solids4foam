@@ -50,7 +50,11 @@ namespace Foam
 {
 
 class fvMesh;
+class polyMesh;
 class pointMesh;
+
+template<class Type, class GeoMesh>
+class DimensionedField;
 
 /*---------------------------------------------------------------------------*\
            Class newLeastSquaresVolPointInterpolation Declaration
@@ -192,6 +196,33 @@ class newLeastSquaresVolPointInterpolation
         tensor hinv(const tensor& t) const;
 #endif
 
+#ifndef OPENFOAM_NOT_EXTEND
+        //- Sum the values of points on coupled patches over all the sides
+        //  that share them, counting each side once
+        template<class Type>
+        static void sumCoupledPointValues
+        (
+            const polyMesh& mesh,
+            List<Type>& pointValues
+        );
+
+        //- Gradient-corrected interpolation of internal fields
+        //  Private because writing a GeometricField through its
+        //  DimensionedField base class bypasses
+        //  GeometricField::storeOldTimes(), leaving a stale oldTime();
+        //  use the GeometricField overload instead
+        template<class Type>
+        void interpolate
+        (
+            const DimensionedField<Type, volMesh>& vf,
+            const DimensionedField
+            <
+                typename outerProduct<vector, Type>::type, volMesh
+            >& gradVf,
+            DimensionedField<Type, pointMesh>& pf
+        ) const;
+#endif
+
         //- Disallow default bitwise copy construct
         newLeastSquaresVolPointInterpolation
         (
@@ -319,6 +350,34 @@ public:
         (
             const GeometricField<Type, fvPatchField, volMesh>&,
             GeometricField<Type, pointPatchField, pointMesh>&
+        ) const;
+
+        //- Interpolate from volField to pointField by extrapolating the
+        //  value of each cell around a point with the cell's gradient, and
+        //  taking the inverse-distance weighted average of the extrapolated
+        //  values.
+        //
+        //  This is not a least squares fit: it is the gradient-corrected
+        //  interpolation of enhancedVolPointInterpolation, which the
+        //  OpenFOAM.com and OpenFOAM.org builds call instead, and the
+        //  foam-extend build has no enhancedVolPointInterpolation. Each cell
+        //  extrapolates with its own gradient, so at a material interface,
+        //  where the value is continuous but its gradient jumps, a point
+        //  takes each material's slope from that material's cells, where the
+        //  least squares fit above straddles both and smears the interface.
+        //  Only the internal field of pf is set; boundary values are not
+        //  used and boundary conditions are not applied
+        template<class Type>
+        void interpolate
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            const GeometricField
+            <
+                typename outerProduct<vector, Type>::type,
+                fvPatchField,
+                volMesh
+            >& gradVf,
+            GeometricField<Type, pointPatchField, pointMesh>& pf
         ) const;
 
         //- Interpolate from volField to pointField

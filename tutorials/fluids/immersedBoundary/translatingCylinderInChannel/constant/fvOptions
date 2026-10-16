@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Immersed cylinder, see src/immersedBoundary/README.md
+immersedBoundary
+{
+    type            immersedBoundaryForce;
+
+    // Sharp interface penalisation with the fluid cells next to the
+    // surface penalised along the cell links cut by the surface, suited to
+    // moving bodies (see src/immersedBoundary/README.md)
+    method          cutLink;
+
+    // Also write the force from the surface traction (columns 11-13 of the
+    // force file)
+    writeSurfaceTraction yes;
+
+    bodies
+    {
+        cylinder
+        {
+            // Diameter 0.1 m, centred at (0.2, 0.2) m at t = 0, extending
+            // beyond the mesh in the z direction
+            surface     "cylinder.stl";
+
+            // Translation downstream at 0.05 m/s: x = 0.2 + 0.05 t m
+
+            motion
+            {
+                type        uniformTranslation;
+                velocity    (0.05 0 0);
+            }
+        }
+    }
+}
+
+// ************************************************************************* //

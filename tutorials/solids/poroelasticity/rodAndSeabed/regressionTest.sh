@@ -5,6 +5,14 @@ IFS=$'\n\t'
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
+
+if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
+    source "${SOLIDS4FOAM_SCRIPTS}"
+fi
+
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
 
 # ============================================================
 # Rod and seabed regression test
@@ -12,11 +20,30 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # ============================================================
 
 # Reference ranges (order-of-magnitude + robustness)
-EPSILON_MIN=6e-5
-EPSILON_MAX=1.1e-4
+#
+# These moved when the anisotropic Biot law stopped selecting its reduced
+# plane model on this three-dimensional mesh. The old values were not
+# self-consistent with the declared material: 80 kPa against a strain of
+# 9.3e-5 implies a stiffness near 9e8 Pa, where the moduli here are 1.2e7 to
+# 2e7 Pa. Forcing the out-of-plane stress to zero while xx and yy were not
+# manufactured a large deviator, so von Mises read high against a small
+# strain. The values below sit on the declared moduli
+EPSILON_MIN=1.4e-3
+EPSILON_MAX=2.2e-3
 
-SIGMA_MIN=70e3
-SIGMA_MAX=90e3
+SIGMA_MIN=40e3
+SIGMA_MAX=58e3
+
+# The final D, as the max and mean component magnitude of the field written
+# to fourteen figures. The case as it ships is poroMechanicalLaw over
+# anisotropicBiotElastic, and the framework reproduced the removed legacy
+# mechanicalModel's D field exactly, in every one of those figures, on every
+# fork (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's;
+# OpenFOAM.org 9 agrees to 1e-8, and foam-extend 4.1 gives a max 3e-4 smaller.
+# The tolerance, 5e-4 of the largest value, covers that
+REF_D_MAX=0.024504218766989
+REF_D_MEAN=0.00528889093233214
+REF_D_REL_TOL=5e-4
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -40,6 +67,15 @@ prepare_case() {
         fi
         cp -a "${item}" "${CASE_DIR}/"
     done
+
+    # Enough digits that the comparison with the legacy answer is about the
+    # solution and not about the last figure written
+    if grep -q "^writePrecision" "${CASE_DIR}/system/controlDict"; then
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
+            "${CASE_DIR}/system/controlDict"
+    else
+        echo "writePrecision  14;" >> "${CASE_DIR}/system/controlDict"
+    fi
 }
 
 # ------------------------------------------------------------
@@ -99,6 +135,38 @@ fi
 # Checks
 # ------------------------------------------------------------
 
+# Check the poroMechanicalLaw composite against the legacy law, on the case as
+# it ships: poroMechanicalLaw over anisotropicBiotElastic.
+#
+# This is the case that exercises the effective stress the composite carries.
+# anisotropicBiotElastic leaves the zz, yz and xz components of the stress
+# unwritten in the branch this case takes, so they come from whatever the
+# sub-law was given to work in - which is the whole reason the composite hands
+# it the effective stress rather than the caller's total stress
+check_poro_against_reference() {
+    if ! grep -q "Selecting mechanical constitutive law" \
+        "${CASE_DIR}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: the case constructed no mechanical constitutive law"
+        return 1
+    fi
+
+    local t end_time
+    t=$(solids4Foam::latestTime "${CASE_DIR}")
+    end_time=$(sed -n 's/^endTime[[:space:]]*\([^;]*\);.*/\1/p' \
+        "${CASE_DIR}/system/controlDict")
+
+    if [[ -z "${t}" || -z "${end_time}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${end_time})^2 <= 1e-20)}"
+    then
+        echo "FAIL: the case stopped at '${t}', not at the end time '${end_time}'"
+        return 1
+    fi
+
+    solids4Foam::checkFieldNorms "poro D at t = ${t}" "${CASE_DIR}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
+}
+
 failures=0
 
 # --- epsilonEq ---
@@ -120,6 +188,10 @@ else
 fi
 
 echo
+if ! check_poro_against_reference; then
+    failures=$((failures + 1))
+fi
+
 if (( failures == 0 ))
 then
     echo "============================================================"

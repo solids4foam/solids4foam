@@ -167,7 +167,7 @@ thermalSolid::thermalSolid
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        thermal_.C()*mechanical().rho()
+        thermal_.C()*initialRho()
     ),
     k_(thermal_.k()),
     T_
@@ -255,14 +255,10 @@ bool thermalSolid::evolve()
 
         // Hack to avoid expensive copy of residuals
 #ifdef OPENFOAM_COM
-    #if (OPENFOAM >= 2312)
         const_cast<dictionary&>
         (
             T_.mesh().data().solverPerformanceDict()
         ).clear();
-    #else
-        const_cast<dictionary&>(T_.mesh().solverPerformanceDict()).clear();
-    #endif
 #endif
     }
     while

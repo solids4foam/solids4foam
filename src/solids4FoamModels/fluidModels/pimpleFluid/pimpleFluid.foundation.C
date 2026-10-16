@@ -321,6 +321,12 @@ pimpleFluid::pimpleFluid
 }
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void pimpleFluid::preUpdateMesh()
+{
+    models().preUpdateMesh();
+}
+
+
 tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
 {
     tmp<vectorField> tvF
@@ -328,9 +334,14 @@ tmp<vectorField> pimpleFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+    // Named normal: a tmp normal field would be reused as the storage of
+    // the inner product, which aliases an input of the loop and gives
+    // wrong results with some -O3 builds (see the 3dTube verification)
+    const vectorField nf(mesh().boundary()[patchID].nf());
+
     tvF.ref() = rho_.value()
        *(
-            mesh().boundary()[patchID].nf()
+            nf
           & (-turbulence_->devTau()().boundaryField()[patchID])
         );
 
@@ -374,9 +385,6 @@ bool pimpleFluid::evolve()
     {
         if (pimple.firstPimpleIter() || moveMeshOuterCorrectors)
         {
-            // fvModels not added yet
-            // fvModels.preUpdateMesh();
-
             // Ideally we would not need a specific FSI mesh update function
             // Hopefully we can remove the need for it soon
             if (fluidModel::fsiMeshUpdate())
@@ -386,6 +394,8 @@ bool pimpleFluid::evolve()
             }
             else
             {
+                preUpdateMesh();
+
                 mesh.update();
             }
 
@@ -406,8 +416,7 @@ bool pimpleFluid::evolve()
             }
         }
 
-        // fvModels not implemented yet
-        //fvModels.correct();
+        models().correct();
 
         // UEqn.H
 
@@ -423,22 +432,20 @@ bool pimpleFluid::evolve()
             // + MRF.DDt(U)
           + turbulence_->divDevSigma(U)
           - boussinesqMomentumSource()
-         // ==
-         //    fvModels.source(U)
+         ==
+            models().source(U)
         );
         fvVectorMatrix& UEqn = tUEqn.ref();
 
         UEqn.relax();
 
-        // fvConstraints not implemented yet
-        //fvConstraints.constrain(UEqn);
+        constraints().constrain(UEqn);
 
         if (pimple.momentumPredictor())
         {
             solve(UEqn == -fvc::grad(p));
 
-            // fvConstraints not implemented yet
-            //fvConstraints.constrain(U);
+            constraints().constrain(U);
         }
 
         // --- Pressure corrector loop
@@ -515,7 +522,7 @@ bool pimpleFluid::evolve()
 
             U = HbyA - rAtU*fvc::grad(p);
             U.correctBoundaryConditions();
-            // fvConstraints.constrain(U);
+            constraints().constrain(U);
 
             gradU() = fvc::grad(U);
             ddtU_ = fvc::ddt(U);
@@ -566,6 +573,21 @@ void pimpleFluid::solveEnergyEq()
         // Store fields for under-relaxation and residual calculation
         TPtr_().storePrevIter();
 
+        volScalarField rhoCp
+        (
+            IOobject
+            (
+                "rhoCp",
+                runTime().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            rho_*Cp
+        );
+
         fvScalarMatrix TEqn
         (
             rho_*Cp*
@@ -574,16 +596,22 @@ void pimpleFluid::solveEnergyEq()
               + fvm::div(phi(), TPtr_())
             )
           - fvm::laplacian(lambdaEffPtr_(), TPtr_())
+         ==
+            models().source(rhoCp, TPtr_())
         );
 
         // Under-relaxation the linear system
         TEqn.relax();
+
+        constraints().constrain(TEqn);
 
         // Solve the linear system
         TEqn.solve();
 
         // Under-relax the field
         TPtr_().relax();
+
+        constraints().constrain(TPtr_());
     }
 }
 

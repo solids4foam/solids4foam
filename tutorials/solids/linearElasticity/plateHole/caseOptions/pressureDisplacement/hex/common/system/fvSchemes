@@ -1,0 +1,84 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+	default		steadyState;
+}
+
+d2dt2Schemes
+{
+	default		steadyState;
+}
+
+gradSchemes
+{
+    default none; //Gauss linear;
+    // default leastSquares;
+
+    grad(p) Gauss linear;
+    grad(Dp) Gauss linear;
+    grad(D) stabLeastSquares;
+    grad(DD) stabLeastSquares;
+}
+
+divSchemes
+{
+    default none;
+    div(DD) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default none;
+
+    // laplacian(rAD,p) Gauss linear uncorr;
+
+    laplacian(DD,D) Gauss linear skewCorrected 1;
+    laplacian(DDD,DD) Gauss linear skewCorrected 1;
+}
+
+snGradSchemes
+{
+    default none;
+    snGrad(D) skewCorrected 1;
+    snGrad(DD) skewCorrected 1;
+    snGrad(DD)ho skewCorrected 1;
+}
+
+interpolationSchemes
+{
+    default linear;
+
+    // interpolate(nuCoeff) linear;
+    // interpolate(p) linear;
+    // interpolate(D) linear;
+    // interpolate(impK) linear;
+    // interpolate(D_0) linear;
+    // interpolate((rAD*ADt)) linear;
+    // interpolate(U_0) linear;
+    // interpolate(D_0_0) linear;
+    // interpolate(grad(p)) linear;
+
+    // interpolate(DD) newSkewCorrected linear leastSquares;
+    // interpolation(D) newSkewCorrected linear leastSquares;
+    // interpolate(U) newSkewCorrected linear leastSquares;
+}
+
+// ************************************************************************* //

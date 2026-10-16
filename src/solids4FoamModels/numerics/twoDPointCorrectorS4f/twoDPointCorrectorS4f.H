@@ -36,6 +36,19 @@ SourceFiles
 #ifndef Foam_twoDPointCorrectorS4f_H
 #define Foam_twoDPointCorrectorS4f_H
 
+#ifndef OPENFOAM_COM
+
+// The parallel fix is only needed, and only implemented, for OpenFOAM.com;
+// the other forks use their own twoDPointCorrector
+#include "twoDPointCorrector.H"
+
+namespace Foam
+{
+    typedef twoDPointCorrector twoDPointCorrectorS4f;
+}
+
+#else
+
 #include "MeshObject.H"
 #include "pointField.H"
 #include "labelList.H"
@@ -166,6 +179,8 @@ public:
 } // End namespace Foam
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif // OPENFOAM_COM
 
 #endif
 

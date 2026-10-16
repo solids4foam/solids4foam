@@ -6,10 +6,14 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
-[ -f constant/polyMesh/blockMeshDict ] && \cp constant/polyMesh/blockMeshDict system/blockMeshDict
 cleanCase
-[ -f system/blockMeshDict ] && mkdir constant/polyMesh && \cp system/blockMeshDict constant/polyMesh/blockMeshDict
 \rm -rf constant/polyMesh/boundary case.foam postProcessing system/*Subset energies.dat
 
-# Convert case version to FOAM EXTEND
-solids4Foam::convertCaseFormatFoamExtend .
+# Restore the stored case format
+solids4Foam::restoreCaseFormat .
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

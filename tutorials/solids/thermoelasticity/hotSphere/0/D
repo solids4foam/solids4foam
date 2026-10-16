@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -26,19 +26,19 @@ boundaryField
     symmx
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     symmy
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     symmz
     {
         type            solidSymmetry;
-        patchType       symmetryPlane;
+        patchType       symmetry;
         value           uniform (0 0 0);
     }
     inside

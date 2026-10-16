@@ -1,0 +1,8 @@
+- to run, supply the internal pressure value:
+
+	analytical.py [internal_pressure]
+
+- the results in results/analytical are for p = 1e7 Pa.
+- u_t is 0 because of the probing position (x-axis), change the probing
+  position to obtain non-zero values
+- the 'case setup' is at the top of the cylinder_eversion.py file

@@ -133,7 +133,18 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                  == cyclicGgiPolyPatch::typeName
                 )
                 {
-                    cyclicGgiFaceSet.insert(faceID);
+                    FatalErrorIn
+                    (
+                        "newLeastSquaresVolPointInterpolation"
+                        "::makePointFaces() const"
+                    )
+                        << "cyclicGgi patches are not supported by "
+                        << "solids4Foam's least-squares vol-to-point "
+                        << "interpolation. Patch "
+                        << mesh().boundaryMesh()[patchID].name()
+                        << " uses type "
+                        << mesh().boundaryMesh()[patchID].type()
+                        << abort(FatalError);
                 }
 #endif
                 else if

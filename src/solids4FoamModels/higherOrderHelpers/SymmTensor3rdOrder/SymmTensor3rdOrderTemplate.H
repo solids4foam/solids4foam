@@ -50,7 +50,11 @@ Author
 #define SymmTensor3rdOrderTemplate_H
 
 #include "VectorSpace.H"
-#include "SymmTensor.H"
+#ifdef FOAMEXTEND
+    #include "symmTensor.H"
+#else
+    #include "SymmTensor.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

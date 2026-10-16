@@ -201,6 +201,17 @@ class fluidModel
         uniformDimensionedVectorField readG() const;
 #endif
 
+        //- Restore the fluxCorrectedVelocity boundary values of U and of its
+        //  old-time levels
+        //  The fluxCorrectedVelocity condition is derived from zeroGradient
+        //  and so does not read the "value" entry that it writes: on restart,
+        //  the normal component of the patch value is replaced by the
+        //  zero-gradient extrapolation, and a restarted run then differs from
+        //  a continuous one. The current time level is re-derived from phi,
+        //  which does persist its boundary values, whereas the old-time
+        //  levels, for which phi is not written, are read back from disk
+        void correctFluxCorrectedVelocityBoundaries();
+
         //- Disallow default bitwise copy construct
         fluidModel(const fluidModel&);
 
@@ -499,6 +510,10 @@ public:
             }
 #endif
 
+            //- Prepare finite volume models for a mesh update
+            virtual void preUpdateMesh()
+            {}
+
             //- Non-const access to the fsiMeshUpdate flag
             virtual bool& fsiMeshUpdate()
             {
@@ -594,7 +609,8 @@ public:
             //- This function will check that the p field was read from disk
             virtual void pisRequired();
 
-            //- Make the global poly patches
+            //- Make the global poly patches; the name none gives no
+            //  global patch (an interface without a fluid patch)
             void makeGlobalPatches(const wordList& patchNames) const;
 
             //- Return const-access to the global poly patches
@@ -602,6 +618,9 @@ public:
 
             //- Clear global poly patches
             void clearGlobalPatches() const;
+
+            //- Synchronise global patches with the current mesh points
+            void syncGlobalPatches() const;
 
         // Edit
 

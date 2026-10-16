@@ -23,7 +23,8 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
-#include "linearElastic.H"
+#include "linearElasticMechanicalConstitutiveLaw.H"
+#include "mechanicalConstitutiveLawManager.H"
 #include "processorPolyPatch.H"
 #ifdef FOAMEXTEND
     #include "blockSolidTractionFvPatchVectorField.H"
@@ -123,34 +124,22 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
 
     DisRequired();
 
-    // We will directly read the linearElastic mechanicalLaw
-    const PtrList<mechanicalLaw>& mechLaws = mechanical();
-    if (mechLaws.size() != 1)
+    // This model assembles one set of Lame constants into its block matrix,
+    // so one isotropic linear elastic material is what it is written for
+    const mechanicalConstitutiveLaw& law = mechanicalManager().singleLaw();
+
+    if (!isA<linearElasticMechanicalConstitutiveLaw>(law))
     {
-        FatalErrorIn
-        (
-            "coupledUnsLinGeomLinearElasticSolid::"
-            "coupledUnsLinGeomLinearElasticSolid"
-        )   << type() << " can currently only be used with a single material"
-            << "\nConsider using one of the other solidModels."
-            << abort(FatalError);
-    }
-    else if (!isA<linearElastic>(mechLaws[0]))
-    {
-        FatalErrorIn
-        (
-            "coupledUnsLinGeomLinearElasticSolid::"
-            "coupledUnsLinGeomLinearElasticSolid"
-        )   << type() << " can only be used with the linearElastic "
-            << "mechanicalLaw" << nl
+        FatalErrorInFunction
+            << type() << " can only be used with the linearElastic "
+            << "mechanical constitutive law" << nl
             << "Consider using one of the other linearGeometry solidModels."
             << abort(FatalError);
     }
 
-    // Cast the mechanical law to a linearElastic mechanicalLaw
-    const linearElastic& mech = refCast<const linearElastic>(mechLaws[0]);
+    const linearElasticMechanicalConstitutiveLaw& mech =
+        refCast<const linearElasticMechanicalConstitutiveLaw>(law);
 
-    // Set mu and lambda fields
     muf_ = mech.mu();
     lambdaf_ = mech.lambda();
 }
@@ -296,7 +285,8 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     D().relax();
 
     // Update gradient of displacement
-    mechanical().interpolate(D(), pointD());
+    volToPoint().interpolate(D(), pointD());
+    correctPointDisplacement(pointD());
 
     // Enforce zero normal displacement on symmetry
     // Todo: we should create a blockSymmetry boundary condition
@@ -343,7 +333,10 @@ bool coupledUnsLinGeomLinearElasticSolid::evolve()
     gradDD() = gradD() - gradD().oldTime();
 
     // Calculate the stress using run-time selectable mechanical law
-    mechanical().correct(sigma());
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(), gradD().oldTime(), mesh().time().deltaTValue(), sigma()
+    );
 
     // Increment of point displacement
     pointDD() = pointD() - pointD().oldTime();

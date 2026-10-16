@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -25,19 +25,19 @@ startTime       0;
 
 stopAt          endTime;
 
-endTime         2;
+endTime         10;
 
-deltaT          0.025;
+deltaT          0.01;
 
 writeControl    runTime;
 
-writeInterval   0.1;
+writeInterval   1;
 
 purgeWrite      0;
 
 writeFormat     ascii;
 
-writePrecision  6;
+writePrecision  8;
 
 writeCompression off;
 
@@ -58,15 +58,17 @@ functions
         libs                ( "libforces.so" );
         outputControl       timeStep;
         outputInterval      1;
-        patches             (cylinder);
+        patches             (interface);
         "pName|p"           p;
         "UName|U"           U;
         "rhoName|rho"       rhoInf;
         log                 false;
         rhoInf              1;
-        CofR                (0.45 0.15 -0.15);
+        CofR                (1.5 -0.5 0);
     }
-    displacement
+
+    // Top of the half cylinder
+    pointDisp
     {
         type                solidPointDisplacement;
         point               (1.5 0 0.5);

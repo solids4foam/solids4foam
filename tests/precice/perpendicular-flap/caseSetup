@@ -1,0 +1,28 @@
+#------------------------------------------------------------------------------
+# License
+#     This file is part of solids4foam, licensed under GNU General Public
+#     License <http://www.gnu.org/licenses/>.
+#
+# File
+#     tests/precice/perpendicular-flap/caseSetup
+#
+# Description
+#     Declares which preCICE tutorial and which participant combination this
+#     test runs. Sourced by Alltest-precice.
+#
+#------------------------------------------------------------------------------
+
+# Tutorial directory in the precice/tutorials clone
+TUTORIAL="perpendicular-flap"
+
+# Participant case directories, run concurrently
+PARTICIPANTS="fluid-openfoam solid-solids4foam"
+
+# The full tutorial runs to t = 5 s. Truncate it so the test is quick; this is
+# the same truncation the upstream system tests apply via the "max_time" key in
+# tests/tests.yaml (which uses 0.1 for this combination). 1.0 s spans the first
+# peak and the reversal, so the checks are sensitive to a period or phase error.
+MAX_TIME="1.0"
+
+# Wall-clock limit for the whole case, in seconds
+TIMEOUT="900"

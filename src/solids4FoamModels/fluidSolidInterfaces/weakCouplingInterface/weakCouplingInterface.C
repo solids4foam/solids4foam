@@ -49,7 +49,14 @@ weakCouplingInterface::weakCouplingInterface
 )
 :
     fluidSolidInterface(typeName, runTime, region)
-{}
+{
+    if (anyImmersedInterface())
+    {
+        FatalErrorInFunction
+            << "The " << typeName << " coupling is not available with an "
+            << "immersed interface" << abort(FatalError);
+    }
+}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
@@ -96,7 +103,7 @@ void weakCouplingInterface::updateWeakDisplacement()
     // Update the residual
     updateResidual();
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
     {
         fluidZonesPointsDisplsPrev()[interfaceI] =
             fluidZonesPointsDispls()[interfaceI];
@@ -105,8 +112,8 @@ void weakCouplingInterface::updateWeakDisplacement()
         fluidZonesPointsDispls()[interfaceI] += residuals()[interfaceI];
     }
 
-    // Update movingWallPressure boundary conditions, if found
-    fluidSolidInterface::updateMovingWallPressureAcceleration();
+    // Update elasticWallPressure boundary conditions, if found
+    fluidSolidInterface::updateElasticWallPressureAcceleration();
 
     // Make sure that displacement on all processors is equal to one
     // calculated on master processor

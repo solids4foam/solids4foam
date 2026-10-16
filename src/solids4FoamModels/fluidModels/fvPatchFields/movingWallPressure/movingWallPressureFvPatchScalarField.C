@@ -38,8 +38,7 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(p, iF),
-    prevAcceleration_(p.patch().size(), vector::zero)
+    fixedGradientFvPatchScalarField(p, iF)
 {}
 
 
@@ -51,8 +50,7 @@ movingWallPressureFvPatchScalarField
     const dictionary& dict
 )
 :
-    fixedGradientFvPatchScalarField(p, iF),
-    prevAcceleration_(p.patch().size(), vector::zero)
+    fixedGradientFvPatchScalarField(p, iF)
 {
     fvPatchField<scalar>::operator=(patchInternalField());
 }
@@ -67,8 +65,7 @@ movingWallPressureFvPatchScalarField
     const fvPatchFieldMapper& mapper
 )
 :
-    fixedGradientFvPatchScalarField(ptf, p, iF, mapper),
-    prevAcceleration_(p.patch().size(), vector::zero)
+    fixedGradientFvPatchScalarField(ptf, p, iF, mapper)
 {}
 
 
@@ -79,8 +76,7 @@ movingWallPressureFvPatchScalarField
     const movingWallPressureFvPatchScalarField& ptf
 )
 :
-    fixedGradientFvPatchScalarField(ptf),
-    prevAcceleration_(ptf.prevAcceleration_)
+    fixedGradientFvPatchScalarField(ptf)
 {}
 #endif
 
@@ -92,8 +88,7 @@ movingWallPressureFvPatchScalarField
     const DimensionedField<scalar, volMesh>& iF
 )
 :
-    fixedGradientFvPatchScalarField(ptf, iF),
-    prevAcceleration_(ptf.prevAcceleration_)
+    fixedGradientFvPatchScalarField(ptf, iF)
 {}
 
 
@@ -224,12 +219,10 @@ void movingWallPressureFvPatchScalarField::updateCoeffs()
         );
 
         gradient() = -rho.value()*(n & movingWallVelocity.acceleration());
-        // gradient() = -rho.value()*(n & prevAcceleration_);
     }
     else
     {
         gradient() = -(n & movingWallVelocity.acceleration());
-        // gradient() = -(n & prevAcceleration_);
         // gradient() = -(n&ddtU);
     }
 

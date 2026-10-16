@@ -159,6 +159,9 @@ public:
 
     // Member Functions
 
+        //- Prepare finite volume models for a mesh update
+        virtual void preUpdateMesh();
+
         // Access
 
             //- Patch viscous force (N/m2)

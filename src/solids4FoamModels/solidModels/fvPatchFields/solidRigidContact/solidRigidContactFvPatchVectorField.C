@@ -825,8 +825,9 @@ void Foam::solidRigidContactFvPatchVectorField::write(Ostream& os) const
 
     solidTractionFvPatchVectorField::write(os);
 
-    // Write triSurfaces subDict
-    dict_.subDict("triSurfaces").write(os, false);
+    // Write triSurfaces subDict, including its keyword so that it can be read
+    // back on restart
+    os.writeKeyword("triSurfaces") << dict_.subDict("triSurfaces");
 
     os.writeKeyword("regionOfInterest")
         << regionOfInterest_ << token::END_STATEMENT << nl;
@@ -836,6 +837,9 @@ void Foam::solidRigidContactFvPatchVectorField::write(Ostream& os) const
         << regionOfInterestBottomCorner_ << token::END_STATEMENT << nl;
     os.writeKeyword("writeZoneVTK")
         << writeZoneVTK_ << token::END_STATEMENT << nl;
+    os.writeKeyword("quickReject")
+        << newGgiInterpolation::quickRejectNames_[quickReject_]
+        << token::END_STATEMENT << nl;
     os.writeKeyword("writePointDistanceFields")
         << writePointDistanceFields_ << token::END_STATEMENT << nl;
     os.writeKeyword("useNewPointDistanceMethod")

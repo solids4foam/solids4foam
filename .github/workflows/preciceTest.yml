@@ -1,0 +1,180 @@
+# Test the preCICE coupling of solids4foam.
+#
+# solids4foam's preCICE cases live upstream in github.com/precice/tutorials,
+# not in this repository. This workflow builds preCICE, the OpenFOAM preCICE
+# adapter and solids4foam, then runs the cases registered under tests/precice
+# against them.
+#
+# The preCICE team run the perpendicular-flap case in their own system tests,
+# but those pin a released solids4foam Docker image, so they cannot catch a
+# regression introduced on a branch. This workflow closes that gap.
+#
+# Building solids4foam dominates the run time, so the job is not run on every
+# pull request. It runs:
+#   - always, for pull requests targeting master, which precede a release
+#   - on any pull request labelled "test-precice" (remove and re-add the label
+#     to trigger it again)
+#   - manually, via workflow_dispatch
+name: preCICE coupling test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+jobs:
+  precice-test:
+    name: preCICE coupling test
+    # Do not filter the trigger above with "branches:": that would stop the
+    # workflow firing at all on pull requests into development, which would
+    # disable the label route.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.base_ref == 'master' ||
+      contains(github.event.pull_request.labels.*.name, 'test-precice')
+
+    runs-on: ubuntu-22.04
+
+    # The OpenFOAM-v2512 image with PETSc, which the upstream solid case
+    # requires.
+    # Unlike the other workflows, this one runs the container as root, so that
+    # the preCICE build dependencies missing from the image can be installed
+    # with apt.
+    container:
+      image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
+      env:
+        HOME: ${{ github.workspace }}
+
+    env:
+      FOAM_BASHRC: /usr/lib/openfoam/openfoam2512/etc/bashrc
+      PRECICE_PREFIX: /opt/precice
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the pinned versions
+        # GITHUB_ENV accepts only KEY=VALUE lines, so drop the comments and
+        # blank lines that versions.txt carries for human readers
+        run: grep -E '^[A-Z][A-Z0-9_]*=' tests/precice/versions.txt >> "$GITHUB_ENV"
+
+      - name: Install the preCICE dependencies
+        # The image already has the rest of Boost, MPI and CMake. These are
+        # needed at run time too, so they are installed even when the preCICE
+        # build itself is restored from the cache. Boost.Test is required by
+        # the preCICE CMake configuration even with BUILD_TESTING off.
+        run: |
+          apt-get -qq update
+          DEBIAN_FRONTEND=noninteractive apt-get -qq -y install \
+              --no-install-recommends \
+              libboost-log-dev libboost-test-dev libeigen3-dev libxml2-dev
+
+      - name: Restore the preCICE build
+        id: precice-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PRECICE_PREFIX }}
+          # Bump the trailing number after changing the build options below
+          key: precice-${{ env.PRECICE_VERSION }}-openfoam-v2512-ubuntu-22.04-1
+
+      - name: Build preCICE
+        # Built from source rather than installed from the release .deb, whose
+        # Depends pull in the distribution PETSc alongside the image's own, and
+        # which ties the preCICE version to the Ubuntu release of the image.
+        # PETSc is disabled: the upstream cases use the <mapping:rbf> alias,
+        # which always selects the Eigen partition-of-unity solver, so it is
+        # not needed and the image's PETSc is left alone. Tests are not built,
+        # which is most of the build time.
+        if: steps.precice-cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          wget -q -O precice.tar.gz \
+              "https://github.com/precice/precice/archive/refs/tags/v${PRECICE_VERSION}.tar.gz"
+          mkdir precice-src
+          tar -xzf precice.tar.gz -C precice-src --strip-components=1
+          cmake -S precice-src -B precice-build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX="${PRECICE_PREFIX}" \
+              -DCMAKE_INSTALL_LIBDIR=lib \
+              -DBUILD_TESTING=OFF \
+              -DPRECICE_FEATURE_PETSC_MAPPING=OFF \
+              -DPRECICE_FEATURE_PYTHON_ACTIONS=OFF \
+              -DPRECICE_BINDINGS_FORTRAN=OFF
+          cmake --build precice-build -j "$(nproc)"
+          cmake --install precice-build
+          rm -rf precice.tar.gz precice-src precice-build
+
+      - name: Put preCICE on the search paths
+        run: |
+          set -e
+          echo "PKG_CONFIG_PATH=${PRECICE_PREFIX}/lib/pkgconfig" >> "$GITHUB_ENV"
+          # Through the linker cache rather than LD_LIBRARY_PATH, so that the
+          # adapter library finds libprecice however the tutorial scripts set
+          # up their environment
+          echo "${PRECICE_PREFIX}/lib" > /etc/ld.so.conf.d/precice.conf
+          ldconfig
+          PKG_CONFIG_PATH="${PRECICE_PREFIX}/lib/pkgconfig" \
+              pkg-config --modversion libprecice
+
+      - name: Build the OpenFOAM preCICE adapter
+        shell: bash -l {0}
+        run: |
+          # Source the OpenFOAM bashrc before enabling errexit: under "set -e"
+          # it aborts the shell at _foamAddLibAuto returning 1 for boost-system
+          # in etc/config.sh/CGAL. Its own exit status is 0, so this shows up
+          # only under errexit.
+          source "${FOAM_BASHRC}"
+          set -e
+          git config --global --add safe.directory '*'
+          # HOME is the repository checkout, so clone alongside it rather than
+          # into it
+          git clone --quiet https://github.com/precice/openfoam-adapter.git "${HOME}/../openfoam-adapter"
+          cd "${HOME}/../openfoam-adapter"
+          git checkout --quiet "${OPENFOAM_ADAPTER_REF}"
+          ./Allwmake -j
+          test -f "${FOAM_USER_LIBBIN}/libpreciceAdapterFunctionObject.so"
+
+      - name: Allwmake
+        shell: bash -l {0}
+        run: |
+          source "${FOAM_BASHRC}"
+          export S4F_NO_FILE_FIXES=1; ./Allwmake -j
+
+      - name: Alltest-precice
+        shell: bash -l {0}
+        run: |
+          source "${FOAM_BASHRC}"
+          export OPENBLAS_CORETYPE=Haswell
+          export OMP_NUM_THREADS=1
+          export OPENBLAS_NUM_THREADS=1
+          export MKL_NUM_THREADS=1
+          ./tests/precice/Alltest-precice
+
+      - name: Collect the preCICE test logs
+        if: ${{ failure() }}
+        shell: bash -l {0}
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/precice-test-logs"
+          cd "${GITHUB_WORKSPACE}"
+          cp tutorialsTest-precice/log.* \
+             "${GITHUB_WORKSPACE}/precice-test-logs/" 2>/dev/null || true
+          find tutorialsTest-precice/tutorials \
+               -name 'log.run' -o -name 'precice-*.log' \
+            | while read -r f
+              do
+                  target="${GITHUB_WORKSPACE}/precice-test-logs/$(echo "${f}" \
+                      | sed 's|tutorialsTest-precice/tutorials/||; s|/|_|g')"
+                  cp "${f}" "${target}" 2>/dev/null || true
+              done
+          ls -la "${GITHUB_WORKSPACE}/precice-test-logs"
+
+      - name: Upload preCICE test logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: precice-test-logs
+          path: precice-test-logs
+          retention-days: 10
+
+      - name: Set job status
+        if: ${{ failure() }}
+        run: echo "::error::The preCICE coupling test failed, marking job as failed"

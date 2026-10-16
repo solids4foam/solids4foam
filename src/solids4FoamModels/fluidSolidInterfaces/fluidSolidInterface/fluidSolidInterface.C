@@ -19,6 +19,7 @@ License
 
 #include "fluidSolidInterface.H"
 #include "volFields.H"
+#include "fixedValueFvPatchFields.H"
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
 #include "twoDPointCorrectorS4f.H"
@@ -33,9 +34,14 @@ License
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
-#include "movingWallPressureFvPatchScalarField.H"
-#include "RBFMeshMotionSolver.H"
+#include "addToRunTimeSelectionTable.H"
+#ifndef S4F_NO_RBF
+    #include "RBFMeshMotionSolver.H"
+#endif
 #include "FieldSumOp.H"
+#ifdef OPENFOAM_COM
+    #include "dynamicMotionSolverFvMesh.H"
+#endif
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -102,6 +108,105 @@ namespace Foam
                 }
             }
         }
+
+
+        // Convergence test of one residual history of the current time step.
+        //
+        // For a linearly converging fixed-point iteration with contraction
+        // rate rho, the remaining error after the latest change R is at most
+        // R*rho/(1 - rho). The rate is the largest of the last two ratios of
+        // successive residuals, using only the iterations in which the solid
+        // solution changed (update[i]): when the solid solver skips its
+        // solve (its own tolerance is met) the interface data do not change,
+        // and the resulting plateaus carry no contraction information.
+        //
+        // The residual is converged if the error estimate satisfies the
+        // tolerance, or if the residual itself does and the iterations are
+        // not contracting slowly (rate below slowRate); slowly contracting
+        // iterations must satisfy the error estimate. It is stalled if the
+        // geometric-mean rate of the last nStall ratios is at or above
+        // stallRate.
+        void robinResidualTest
+        (
+            const UList<scalar>& history,
+            const UList<bool>& update,
+            const scalar tolerance,
+            const scalar slowRate,
+            const scalar stallRate,
+            const label nStall,
+            bool& converged,
+            bool& stalled,
+            scalar& error,
+            scalar& rate
+        )
+        {
+            converged = false;
+            stalled = false;
+            rate = -1;
+            error = GREAT;
+
+            if (history.empty())
+            {
+                return;
+            }
+
+            scalar maxValue = 0;
+            forAll(history, i)
+            {
+                maxValue = max(maxValue, history[i]);
+            }
+            const scalar zeroTol = 1e-12*maxValue + VSMALL;
+
+            const scalar R = history.last() > zeroTol ? history.last() : 0;
+
+            // Residuals of the iterations in which the solid solution changed
+            DynamicList<scalar> values;
+            forAll(history, i)
+            {
+                if (update[i] && history[i] > zeroTol)
+                {
+                    values.append(history[i]);
+                }
+            }
+
+            const label n = values.size();
+
+            if (n < 3)
+            {
+                // Too few iterations to estimate the rate
+                error = R;
+                converged = R <= tolerance;
+                return;
+            }
+
+            rate =
+                max
+                (
+                    values[n - 1]/values[n - 2],
+                    values[n - 2]/values[n - 3]
+                );
+
+            if (nStall > 0 && n > nStall)
+            {
+                scalar logRate = 0;
+                for (label i = n - nStall; i < n; i++)
+                {
+                    logRate += Foam::log(values[i]/values[i - 1]);
+                }
+                // A stall is a plateau: the mean rate is close to one from
+                // both sides, so growing (diverging) residuals are not
+                // accepted
+                const scalar meanRate = Foam::exp(logRate/nStall);
+                stalled = meanRate >= stallRate && meanRate <= 1/stallRate;
+            }
+
+            const scalar rho = min(rate, 0.99);
+            error = R*rho/(1 - rho);
+
+            converged =
+                error <= tolerance
+             || (R <= tolerance && rate < slowRate);
+        }
     }
 }
 
@@ -136,6 +241,54 @@ bool Foam::fluidSolidInterface::newTimeStep() const
     }
 
     return false;
+}
+
+
+void Foam::fluidSolidInterface::checkFluidInterfaceVelocity()
+{
+    // A run that is never coupled solves the fluid with a rigid interface,
+    // for which a static condition is correct
+    if (!coupled_ && couplingStartTime_ < SMALL)
+    {
+        return;
+    }
+
+    const volVectorField& U = fluid().U();
+
+    forAll(fluidPatchIndices_, interfaceI)
+    {
+        // An immersed interface has no fluid patch
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
+        const fvPatchVectorField& Up =
+            U.boundaryField()[fluidPatchIndices_[interfaceI]];
+
+        // Test the exact type, so that conditions derived from fixedValue
+        // which follow the interface motion, e.g. newMovingWallVelocity,
+        // are accepted
+        if
+        (
+            isType<fixedValueFvPatchVectorField>(Up)
+         || Up.type() == "noSlip"
+        )
+        {
+            FatalErrorIn("void fluidSolidInterface::checkFluidInterfaceVelocity()")
+                << "The fluid velocity " << U.name() << " on the coupled "
+                << "interface patch " << Up.patch().name() << " is of type "
+                << Up.type() << ", which ignores the motion of the interface: "
+                << "the fluid does not see the solid velocity and the "
+                << "added-mass effect is lost, so the coupled solution is "
+                << "wrong." << nl
+                << "Use newMovingWallVelocity on this patch, or "
+                << "elasticWallVelocity with a Robin interface condition "
+                << "(elasticWallPressure)." << nl
+                << "For a rigid fluid wall, use the oneWayCoupling "
+                << "fluidSolidInterface instead." << abort(FatalError);
+        }
+    }
 }
 
 
@@ -177,6 +330,13 @@ void Foam::fluidSolidInterface::calcInterfaceToInterfaceList() const
     // Note: the interpolation/mapping for each interface pair can be different
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
+        // An immersed interface has no fluid patch: the immersed surface
+        // follows the solid zone point by point, and needs no mapping
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         // Lookup the type
         const word type = fsiProperties_.lookupOrAddDefault<word>
 #ifdef OPENFOAM_NOT_EXTEND
@@ -223,15 +383,38 @@ calcAccumulatedFluidInterfacesDisplacements() const
         nGlobalPatches_
     );
 
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
-        const label patchID =
-            fluid().globalPatches()[interfaceI].patch().index();
-
         const word accumulatedFluidInterfaceDisplacementName
         (
             "accumulatedFluidInterfaceDisplacement" + Foam::name(interfaceI)
         );
+
+        // An immersed interface does not move the fluid mesh
+        if (immersedInterfaces_[interfaceI])
+        {
+            accumulatedFluidInterfacesDisplacementsList_.set
+            (
+                interfaceI,
+                new vectorIOField
+                (
+                    IOobject
+                    (
+                        accumulatedFluidInterfaceDisplacementName,
+                        fluid().runTime().timeName(),
+                        fluidMesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    vectorField()
+                )
+            );
+
+            continue;
+        }
+
+        const label patchID =
+            fluid().globalPatches()[interfaceI].patch().index();
 
         // Accumulated fluid interface displacement
         IOobject accumulatedFluidInterfaceDisplacementHeader
@@ -350,6 +533,9 @@ Foam::fluidSolidInterface::fluidSolidInterface
     fluidPatchIndices_(),
     nGlobalPatches_(-1),
     interfaceToInterfaceList_(),
+    immersedInterfaces_(),
+    immersedInterfaceList_(),
+    immersedClosurePatches_(),
     outerCorrTolerance_
     (
         fsiProperties_.lookupOrAddDefault<scalar>("outerCorrTolerance", 1e-06)
@@ -357,6 +543,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
     nOuterCorr_
     (
         fsiProperties_.lookupOrAddDefault<int>("nOuterCorr", 30)
+    ),
+    allowUnconvergedCoupling_
+    (
+        fsiProperties_.lookupOrAddDefault<Switch>
+        (
+            "allowUnconvergedCoupling", false
+        )
     ),
     additionalMeshCorrection_
     (
@@ -373,7 +566,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrAddDefault<scalar>("couplingStartTime", -1.0)
     ),
-    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", false)),
+    predictor_(fsiProperties_.lookupOrAddDefault<Switch>("predictor", true)),
     curTimeIndex_(-1),
     interfaceDeformationLimit_
     (
@@ -404,6 +597,81 @@ Foam::fluidSolidInterface::fluidSolidInterface
             "requireAllResidualMeasures", false
         )
     ),
+    outerCorrAbsoluteTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "outerCorrAbsoluteTolerance", 0
+        )
+    ),
+    robinPressureTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinPressureTolerance", 10*outerCorrTolerance_
+        )
+    ),
+    robinFluxTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinFluxTolerance", 10*outerCorrTolerance_
+        )
+    ),
+    robinConvergence_
+    (
+        fsiProperties_.lookupOrAddDefault<word>
+        (
+            "robinConvergence", "residual"
+        )
+    ),
+    robinSlowRate_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>("robinSlowRate", 0.9)
+    ),
+    robinStallRate_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>("robinStallRate", 0.97)
+    ),
+    robinStallIterations_
+    (
+        fsiProperties_.lookupOrAddDefault<label>("robinStallIterations", 4)
+    ),
+    robinStallToleranceFactor_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinStallToleranceFactor", 10
+        )
+    ),
+    robinFluxReferenceVelocity_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinFluxReferenceVelocity", 0
+        )
+    ),
+    robinPressureReference_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "robinPressureReference", 0
+        )
+    ),
+    robinInterfaces_(),
+    robinPressurePrev_(),
+    maxRobinPressureNorm_(),
+    robinPressureResidual_(0),
+    robinFluxResidual_(0),
+    maxRobinKinematicNorm_(0),
+    robinDispHistory_(),
+    robinPressureHistory_(),
+    robinFluxHistory_(),
+    robinConvergenceState_(0),
+    robinKinematicConsistency_(true),
+    robinRelaxationWarned_(false),
+    fieldsInitialized_(false),
+    robinReferenceHintIssued_(false),
     residuals_(),
     residualsPrev_(),
     maxResidualsNorm_(),
@@ -515,6 +783,15 @@ Foam::fluidSolidInterface::fluidSolidInterface
     solidPatchIndices_.setSize(solidPatchNames_.size(), label(-1));
     fluidPatchIndices_.setSize(fluidPatchNames_.size(), label(-1));
 
+    // An interface whose fluid patch is none is immersed: the solid patch
+    // drives an immersed body of the fluid
+    immersedInterfaces_.setSize(fluidPatchNames_.size(), false);
+    forAll(fluidPatchNames_, interfaceI)
+    {
+        immersedInterfaces_[interfaceI] =
+            (fluidPatchNames_[interfaceI] == "none");
+    }
+
     // loop over all coupled patches
     forAll(solidPatchNames_, interfaceI)
     {
@@ -541,6 +818,11 @@ Foam::fluidSolidInterface::fluidSolidInterface
     // loop over all coupled patches
     forAll(fluidPatchNames_, interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         // Fluid patch index
         const polyPatchID fluidPatch
         (
@@ -564,6 +846,9 @@ Foam::fluidSolidInterface::fluidSolidInterface
     // Set the number of global poly patches: solid or fluid
     nGlobalPatches_ = fluid().globalPatches().size();
 
+    // Create the immersed interfaces
+    makeImmersedInterfaces();
+
     // Set interface fields list size and initialize residual
     fluidZonesPointsDispls_.setSize(nGlobalPatches_);
     fluidZonesPointsDisplsRef_.setSize(nGlobalPatches_);
@@ -580,6 +865,35 @@ Foam::fluidSolidInterface::fluidSolidInterface
     residualsPrev_.setSize(nGlobalPatches_);
     maxResidualsNorm_.setSize(nGlobalPatches_);
     maxIntsDisplsNorm_.setSize(nGlobalPatches_);
+    robinInterfaces_.setSize(nGlobalPatches_, false);
+    robinPressurePrev_.setSize(nGlobalPatches_);
+    maxRobinPressureNorm_.setSize(nGlobalPatches_, 0);
+
+    if (robinStallIterations_ < 0)
+    {
+        FatalErrorInFunction
+            << "robinStallIterations must be non-negative (0 disables the"
+            << " stall detection)" << abort(FatalError);
+    }
+
+    if (robinFluxReferenceVelocity_ < 0 || robinPressureReference_ < 0)
+    {
+        FatalErrorInFunction
+            << "robinFluxReferenceVelocity and robinPressureReference must be"
+            << " non-negative (0 disables them)" << abort(FatalError);
+    }
+
+    if
+    (
+        robinConvergence_ != "iterationError"
+     && robinConvergence_ != "residual"
+    )
+    {
+        FatalErrorInFunction
+            << "Unknown robinConvergence " << robinConvergence_
+            << ". Valid options are (residual iterationError)"
+            << abort(FatalError);
+    }
 
     initializeFields();
 
@@ -587,7 +901,7 @@ Foam::fluidSolidInterface::fluidSolidInterface
     {
         residuals_[interfaceI] = vectorField
         (
-            fluid().globalPatches()[interfaceI].globalPatch().nPoints(),
+            fluidZone(interfaceI).nPoints(),
             vector::zero
         );
     }
@@ -639,7 +953,7 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 
     Info<< "Selecting fluidSolidInterface " << modelType << endl;
 
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = dictionaryConstructorTable(modelType);
 
     if (!ctorPtr)
@@ -672,7 +986,20 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     auto* ctorPtr = cstrIter();
 #endif
 
-    return autoPtr<fluidSolidInterface>(ctorPtr(runTime, region));
+    autoPtr<fluidSolidInterface> fsiPtr(ctorPtr(runTime, region));
+
+    // Check once here, rather than in each coupling, that the fluid sees the
+    // interface motion
+    if
+    (
+        fsiPtr->movesFluidInterface()
+     && !fsiPtr->imposesFluidInterfaceVelocity()
+    )
+    {
+        fsiPtr->checkFluidInterfaceVelocity();
+    }
+
+    return fsiPtr;
 }
 
 
@@ -704,8 +1031,14 @@ Foam::OFstream& Foam::fluidSolidInterface::residualFile()
 
         mkDir(historyDir);
         residualFilePtr_.set(new OFstream(historyDir/"fsiResiduals.dat"));
-        residualFilePtr_()
-            << "Time outerCorrector residual" << endl;
+        residualFilePtr_() << "Time outerCorrector residual";
+        if (hasRobinInterface())
+        {
+            residualFilePtr_()
+                << " robinPressureResidual robinFluxResidual"
+                << " robinConvergenceState";
+        }
+        residualFilePtr_() << endl;
     }
 
     return residualFilePtr_();
@@ -721,6 +1054,265 @@ Foam::fluidSolidInterface::interfaceToInterfaceList() const
     }
 
     return interfaceToInterfaceList_;
+}
+
+
+bool Foam::fluidSolidInterface::anyImmersedInterface() const
+{
+    forAll(immersedInterfaces_, interfaceI)
+    {
+        if (immersedInterfaces_[interfaceI])
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+const Foam::standAlonePatch& Foam::fluidSolidInterface::fluidZone
+(
+    const label interfaceI
+) const
+{
+    if (immersedInterfaces_[interfaceI])
+    {
+        return solidZone(interfaceI);
+    }
+
+    return fluid().globalPatches()[interfaceI].globalPatch();
+}
+
+
+const Foam::standAlonePatch& Foam::fluidSolidInterface::solidZone
+(
+    const label interfaceI
+) const
+{
+    return solid().globalPatches()[interfaceI].globalPatch();
+}
+
+
+Foam::word Foam::fluidSolidInterface::fluidInterfaceName
+(
+    const label interfaceI
+) const
+{
+    if (immersedInterfaces_[interfaceI])
+    {
+        return
+            "immersed body "
+          + immersedInterfaceList_[interfaceI].bodyName();
+    }
+
+    return fluidMesh().boundary()[fluidPatchIndices()[interfaceI]].name();
+}
+
+
+Foam::tmp<Foam::vectorField> Foam::fluidSolidInterface::fluidZoneTraction
+(
+    const label interfaceI
+) const
+{
+    if (immersedInterfaces_[interfaceI])
+    {
+        // The traction on the fluid side is minus that on the solid faces
+        return -immersedInterfaceList_[interfaceI].zoneTraction();
+    }
+
+    // Total traction of the fluid zone: viscous force minus the pressure
+    // force along the zone normals
+    return
+        fluid().faceZoneViscousForce(interfaceI)
+      - fluid().faceZonePressureForce(interfaceI)
+       *fluidZone(interfaceI).faceNormals();
+}
+
+
+void Foam::fluidSolidInterface::makeImmersedInterfaces()
+{
+    immersedInterfaceList_.setSize(nGlobalPatches_);
+    immersedClosurePatches_.setSize(nGlobalPatches_);
+
+    if (!anyImmersedInterface())
+    {
+        return;
+    }
+
+#ifdef OPENFOAM_COM
+    const dictionary& interfacesDict =
+        fsiProperties_.subDict("immersedInterfaces");
+
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
+    {
+        if (!immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
+        const word& solidPatchName = solidPatchNames_[interfaceI];
+        const dictionary& dict = interfacesDict.subDict(solidPatchName);
+        const word bodyName(dict.lookup("body"));
+        const wordList closureNames
+        (
+            dict.lookupOrDefault<wordList>("closurePatches", wordList())
+        );
+
+        Info<< "Immersed interface " << interfaceI << ": solid patch "
+            << solidPatchName << " drives the immersed body " << bodyName
+            << endl;
+
+        // Find the immersed boundary option of the fluid that holds the body
+        fsiImmersedBoundary* ibPtr = nullptr;
+        label bodyi = -1;
+
+        PtrList<fv::option>& options = fluid().options();
+        forAll(options, optioni)
+        {
+            fsiImmersedBoundary* ptr =
+                dynamic_cast<fsiImmersedBoundary*>(&options[optioni]);
+
+            if (ptr && ptr->findBody(bodyName) >= 0)
+            {
+                ibPtr = ptr;
+                bodyi = ptr->findBody(bodyName);
+                break;
+            }
+        }
+
+        if (!ibPtr)
+        {
+            FatalErrorInFunction
+                << "No immersedBoundaryForce option of the fluid has a body "
+                << "named " << bodyName << " for the immersed interface of "
+                << "solid patch " << solidPatchName << nl
+                << "The body must be given in the fvOptions of the fluid, "
+                << "with libs (immersedBoundary) in the controlDict"
+                << abort(FatalError);
+        }
+
+        if (!ibPtr->fsiDriven(bodyi))
+        {
+            FatalErrorInFunction
+                << "The motion of immersed body " << bodyName
+                << " must be fsiDriven for it to be driven by the "
+                << "fluid-solid interface" << abort(FatalError);
+        }
+
+        // Global patches of the closure patches, with their current points
+        // (those of the restart time on a restart; the surface is at rest
+        // until it is first moved)
+        immersedClosurePatches_.set
+        (
+            interfaceI,
+            new PtrList<globalPolyPatch>(closureNames.size())
+        );
+        PtrList<globalPolyPatch>& closurePatches =
+            immersedClosurePatches_[interfaceI];
+        List<const standAlonePatch*> closureZones(closureNames.size());
+        List<pointField> closurePoints(closureNames.size());
+
+        forAll(closureNames, i)
+        {
+            if (solidMesh().boundaryMesh().findPatchID(closureNames[i]) < 0)
+            {
+                FatalErrorInFunction
+                    << "Closure patch " << closureNames[i]
+                    << " of the immersed interface of solid patch "
+                    << solidPatchName << " not found" << abort(FatalError);
+            }
+
+            closurePatches.set
+            (
+                i,
+                new globalPolyPatch(closureNames[i], solidMesh())
+            );
+            closureZones[i] = &closurePatches[i].globalPatch();
+            closurePoints[i] = solidZonePointsOld(closurePatches[i], true);
+        }
+
+        immersedInterfaceList_.set
+        (
+            interfaceI,
+            new fsiImmersedInterface
+            (
+                *ibPtr,
+                bodyi,
+                bodyName,
+                solidZone(interfaceI),
+                solidZonePointsOld
+                (
+                    solid().globalPatches()[interfaceI],
+                    true
+                ),
+                closureZones,
+                closurePoints,
+                fluidMesh().solutionD(),
+                fluidMesh().bounds()
+            )
+        );
+    }
+#else
+    FatalErrorInFunction
+        << "Immersed interfaces (fluidPatch none) require the immersed "
+        << "boundary library, which is only available with OpenFOAM.com"
+        << abort(FatalError);
+#endif
+}
+
+
+Foam::tmp<Foam::pointField> Foam::fluidSolidInterface::solidZonePointsOld
+(
+    const globalPolyPatch& gp,
+    const bool current
+) const
+{
+    const polyPatch& pp = gp.patch();
+
+    pointField patchPoints(pp.localPoints());
+
+    // For a solid that does not move its mesh, the mesh points are in the
+    // reference configuration: add the total displacement of the previous
+    // time step, or the current one
+    if (!solid().movingMesh())
+    {
+        const pointVectorField& pointD =
+        (
+            current ? solid().pointD() : solid().pointD().oldTime()
+        );
+
+        patchPoints += vectorField(pointD.internalField(), pp.meshPoints());
+    }
+
+    return gp.patchPointToGlobal(patchPoints);
+}
+
+
+void Foam::fluidSolidInterface::updateImmersedInterfacePoints0()
+{
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
+    {
+        if (!immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
+        const PtrList<globalPolyPatch>& closurePatches =
+            immersedClosurePatches_[interfaceI];
+
+        List<pointField> closurePoints(closurePatches.size());
+        forAll(closurePatches, i)
+        {
+            closurePoints[i] = solidZonePointsOld(closurePatches[i]);
+        }
+
+        immersedInterfaceList_[interfaceI].setPoints0
+        (
+            solidZonePointsOld(solid().globalPatches()[interfaceI]),
+            closurePoints
+        );
+    }
 }
 
 
@@ -758,11 +1350,23 @@ void Foam::fluidSolidInterface::setDeltaT(Time& runTime)
 void Foam::fluidSolidInterface::initializeFields()
 {
     outerCorr_ = 0;
+    maxRobinKinematicNorm_ = 0;
+    robinPressureResidual_ = 0;
+    robinFluxResidual_ = 0;
+    robinDispHistory_.clear();
+    robinPressureHistory_.clear();
+    robinFluxHistory_.clear();
+    robinConvergenceState_ = 0;
 
     //- Check is any of the patches have changed sizes
     bool needUpdate = false;
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         const label nFaces = returnReduce
         (
             fluid().globalPatches()[interfaceI].patch().size(),
@@ -791,15 +1395,15 @@ void Foam::fluidSolidInterface::initializeFields()
         interfaceToInterfaceList();
     }
 
+    // The immersed interfaces start the time step from the solid
+    updateImmersedInterfacePoints0();
+
     // Reset the point fields
-    forAll(fluid().globalPatches(), interfaceI)
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
-        const label nPoints =
-            fluid().globalPatches()[interfaceI].globalPatch().nPoints();
-        const label nFluidFaces =
-            fluid().globalPatches()[interfaceI].globalPatch().size();
-        const label nSolidFaces =
-            solid().globalPatches()[interfaceI].globalPatch().size();
+        const label nPoints = fluidZone(interfaceI).nPoints();
+        const label nFluidFaces = fluidZone(interfaceI).size();
+        const label nSolidFaces = solidZone(interfaceI).size();
 
         fluidZonesPointsDispls_[interfaceI] = vectorField(nPoints, vector::zero);
 
@@ -836,13 +1440,64 @@ void Foam::fluidSolidInterface::initializeFields()
 
         maxIntsDisplsNorm_[interfaceI] = 0;
 
+        const label fluidPatchID = fluidPatchIndices()[interfaceI];
+        robinInterfaces_[interfaceI] =
+            !immersedInterfaces_[interfaceI]
+         && isA<elasticWallPressureFvPatchScalarField>
+            (
+                fluid().solutionP().boundaryField()[fluidPatchID]
+            );
+        maxRobinPressureNorm_[interfaceI] = 0;
+
+        // Robin-Neumann coupling is designed for unrelaxed fixed-point
+        // iterations; warn once otherwise. Not in the call from the
+        // base-class constructor, where the derived coupling interface is not
+        // yet available and fluidMeshFollowsSolid() is the base-class one:
+        // the time index alone does not exclude it on a restart
+        if
+        (
+            robinInterfaces_[interfaceI]
+         && fieldsInitialized_
+         && runTime().timeIndex() > 0
+         && !robinRelaxationWarned_
+         && !fluidMeshFollowsSolid()
+        )
+        {
+            WarningInFunction
+                << "The elasticWallPressure (Robin) interface "
+                << fluidMesh().boundary()[fluidPatchID].name()
+                << " is used with an under-relaxed or accelerated interface"
+                << " displacement (" << type() << "). The Robin-Neumann"
+                << " coupling is designed for fixedRelaxation with"
+                << " relaxationFactor 1: with relaxation the fluid mesh lags"
+                << " the solid within the iterations, so the interface flux"
+                << " cannot be made consistent with the mesh motion and the"
+                << " leakage is only reported." << endl;
+
+            robinRelaxationWarned_ = true;
+        }
+
+        if (robinInterfaces_[interfaceI])
+        {
+            robinPressurePrev_[interfaceI] =
+                fluid().solutionP().boundaryField()[fluidPatchID];
+        }
+        else
+        {
+            robinPressurePrev_[interfaceI].clear();
+        }
+
         interfacesPointsDispls_[interfaceI] =
             vectorField(nPoints, vector::zero);
 
         interfacesPointsDisplsPrev_[interfaceI] =
             vectorField(nPoints, vector::zero);
 
-        if (accumulatedFluidInterfacesDisplacementsList_.size())
+        if
+        (
+            accumulatedFluidInterfacesDisplacementsList_.size()
+         && !immersedInterfaces_[interfaceI]
+        )
         {
             accumulatedFluidInterfacesDisplacementsList_[interfaceI] =
                 vectorField
@@ -855,6 +1510,8 @@ void Foam::fluidSolidInterface::initializeFields()
                 );
         }
     }
+
+    fieldsInitialized_ = true;
 }
 
 
@@ -886,6 +1543,36 @@ void Foam::fluidSolidInterface::updateInterpolatorAndGlobalPatches()
 
 void Foam::fluidSolidInterface::moveFluidMesh()
 {
+    // Immersed interfaces: move the surfaces of the bodies to the interface
+    // displacement, with the velocity of the displacement increment over
+    // the time step. The bodies are re-positioned in the fluid mesh when
+    // the fluid is next solved
+    bool anyFluidPatch = false;
+
+    for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
+    {
+        if (!immersedInterfaces_[interfaceI])
+        {
+            anyFluidPatch = true;
+            continue;
+        }
+
+        Info<< "Moving the immersed surface of interface " << interfaceI
+            << endl;
+
+        immersedInterfaceList_[interfaceI].move
+        (
+            fluidZonesPointsDispls()[interfaceI],
+            fluidZonesPointsDispls()[interfaceI]
+           /fluid().runTime().deltaT().value()
+        );
+    }
+
+    if (!anyFluidPatch)
+    {
+        return;
+    }
+
     // Get fluid patch displacement from fluid zone displacement
     // Take care: these are local patch fields not global patch fields
 
@@ -903,6 +1590,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         fluidPatchesPointsDispls[interfaceI] =
             fluid().globalPatches()[interfaceI].globalPointToPatch
             (
@@ -974,6 +1666,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         }
     }
 
+    fluid().preUpdateMesh();
+
     if (maxDelta < interfaceDeformationLimit())
     {
         // Move only interface points
@@ -985,6 +1679,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         forAll(fluid().globalPatches(), interfaceI)
         {
+            if (immersedInterfaces_[interfaceI])
+            {
+                continue;
+            }
+
             const labelList& meshPoints =
                 fluid().globalPatches()[interfaceI].globalPatch().meshPoints();
 
@@ -1031,16 +1730,41 @@ void Foam::fluidSolidInterface::moveFluidMesh()
         const bool fvMotionSolver =
             fluidMesh().foundObject<pointVectorField>("pointMotionU");
 
-#ifndef OPENFOAM_ORG
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
         // Check for RBF motion solver
-        bool rbfMotionSolver = false;
+        RBFMeshMotionSolver* rbfMotionSolverPtr = nullptr;
+#ifdef OPENFOAM_COM
+        if (isA<dynamicMotionSolverFvMesh>(fluidMesh()))
+        {
+            motionSolver& motion =
+                const_cast<motionSolver&>
+                (
+                    refCast<const dynamicMotionSolverFvMesh>
+                    (
+                        fluidMesh()
+                    ).motion()
+                );
+
+            if (isA<RBFMeshMotionSolver>(motion))
+            {
+                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
+            }
+        }
+#else
         if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
         {
-            rbfMotionSolver = isA<RBFMeshMotionSolver>
-            (
-                fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
-            );
+            motionSolver& motion =
+                const_cast<motionSolver&>
+                (
+                    fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
+                );
+
+            if (isA<RBFMeshMotionSolver>(motion))
+            {
+                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
+            }
         }
+#endif
 #endif
 
         // Set motion on FSI interface
@@ -1061,6 +1785,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             forAll(fluid().globalPatches(), interfaceI)
             {
+                if (immersedInterfaces_[interfaceI])
+                {
+                    continue;
+                }
+
                 fixedValueTetPolyPatchVectorField& motionUFluidPatch =
                     refCast<fixedValueTetPolyPatchVectorField>
                     (
@@ -1095,6 +1824,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             forAll(fluid().globalPatches(), interfaceI)
             {
+                if (immersedInterfaces_[interfaceI])
+                {
+                    continue;
+                }
+
                 fixedValuePointPatchVectorField& motionUFluidPatch =
                     refCast<fixedValuePointPatchVectorField>
                     (
@@ -1139,6 +1873,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
                 forAll(fluid().globalPatches(), interfaceI)
                 {
+                    if (immersedInterfaces_[interfaceI])
+                    {
+                        continue;
+                    }
+
                     fixedValuePointPatchVectorField& motionUFluidPatch =
                         refCast<fixedValuePointPatchVectorField>
                         (
@@ -1157,8 +1896,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             }
         }
 #endif
-#ifndef OPENFOAM_ORG
-        else if (rbfMotionSolver)
+#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
+        else if (rbfMotionSolverPtr)
         {
             // Prepare list of patch motions
             Field<vectorField> motion(fluidMesh().boundaryMesh().size());
@@ -1175,6 +1914,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
             // Loop through all FSI interfaces
             forAll(fluid().globalPatches(), interfaceI)
             {
+                if (immersedInterfaces_[interfaceI])
+                {
+                    continue;
+                }
+
                 // Interpolate the FSI interface point motion to the faces
                 const vectorField interfacePatchMotion
                 (
@@ -1195,10 +1939,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
             // Set motion field in RBF motion solver
             // Note: take displacement as opposed to velocity
-            const_cast<RBFMeshMotionSolver&>
-            (
-                fluidMesh().lookupObject<RBFMeshMotionSolver>("dynamicMeshDict")
-            ).setMotion(motion);
+            rbfMotionSolverPtr->setMotion(motion);
         }
 #endif
         else
@@ -1215,6 +1956,11 @@ void Foam::fluidSolidInterface::moveFluidMesh()
 
         forAll(fluid().globalPatches(), interfaceI)
         {
+            if (immersedInterfaces_[interfaceI])
+            {
+                continue;
+            }
+
             accumulatedFluidInterfacesDisplacements()[interfaceI] =
                 vectorField
                 (
@@ -1246,6 +1992,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //     twoDCorrector.correctPoints(newPoints);
     //     fluidMesh().movePoints(newPoints);
     // }
+
+    fluid().syncGlobalPatches();
 }
 
 
@@ -1256,17 +2004,65 @@ void Foam::fluidSolidInterface::updateForce()
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
+
+        if (immersedInterfaces_[interfaceI])
+        {
+            // The traction on the solid faces from the immersed boundary,
+            // which follows the solid zone point by point: no transfer
+            const fsiImmersedInterface& immersed =
+                immersedInterfaceList_[interfaceI];
+
+            const vectorField solidZoneTotalTraction(immersed.zoneTraction());
+
+            fluidZonesTractions()[interfaceI] = -solidZoneTotalTraction;
+            solidZonesTractions()[interfaceI] = solidZoneTotalTraction;
+
+            if (coupled())
+            {
+                solid().setTraction
+                (
+                    interfaceI,
+                    solidPatchIndices()[interfaceI],
+                    solidZoneTotalTraction
+                );
+            }
+
+            // The force from the surface traction is compared with the
+            // momentum exchange between the fluid and the whole body, which
+            // is the force that the fluid receives
+            const vector tractionForce
+            (
+                totalForceOnInterface(solidZone, solidZoneTotalTraction)
+            );
+            const vector momentumExchangeForce
+            (
+                immersed.momentumExchangeForce()
+            );
+
+            Info<< "Total force on solid interface " << interfaceI
+                << " (" << fluidInterfaceName(interfaceI) << "): "
+                << tractionForce << nl
+                << "Force on the body from the momentum exchange: "
+                << momentumExchangeForce << ", relative difference "
+                << mag(tractionForce - momentumExchangeForce)
+                  /(mag(momentumExchangeForce) + SMALL) << nl;
+
+            if (immersed.nFacesWithoutPoints() > 0)
+            {
+                Info<< immersed.nFacesWithoutPoints() << " interface faces "
+                    << "without quadrature points in the fluid mesh have "
+                    << "zero traction" << nl;
+            }
+
+            Info<< endl;
+
+            continue;
+        }
 
         // Calculate total traction of fluid zone
-        vectorField fluidZoneTotalTraction
-        (
-            fluid().faceZoneViscousForce(interfaceI)
-          - fluid().faceZonePressureForce(interfaceI)*fluidZone.faceNormals()
-        );
+        vectorField fluidZoneTotalTraction(fluidZoneTraction(interfaceI));
 
         fluidZonesTractions()[interfaceI] = fluidZoneTotalTraction;
 
@@ -1349,13 +2145,18 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
 
     Info<< "Setting traction and pressure on solid interfaces" << endl;
 
+    if (anyImmersedInterface())
+    {
+        FatalErrorInFunction
+            << "The separate viscous force and pressure are not available "
+            << "on an immersed interface" << abort(FatalError);
+    }
+
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
         // Calculate total traction of fluid zone
         vectorField fluidZoneTraction
@@ -1423,16 +2224,16 @@ void Foam::fluidSolidInterface::updateViscousForceAndPressure()
 
 Foam::scalar Foam::fluidSolidInterface::updateResidual()
 {
+    solid().syncGlobalPatches();
+
     // Maximum residual for all interfaces
     scalar maxResidual = 0;
 
     for (label interfaceI = 0; interfaceI < nGlobalPatches_; interfaceI++)
     {
         // Take references to zones
-        const standAlonePatch& fluidZone =
-            fluid().globalPatches()[interfaceI].globalPatch();
-        const standAlonePatch& solidZone =
-            solid().globalPatches()[interfaceI].globalPatch();
+        const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+        const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
         // Calculate the point displacements of the solid interface
         const vectorField solidZonePointsDisplsAtSolid
@@ -1450,22 +2251,31 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
             solidZonesPointsDispls()[interfaceI].size(), vector::zero
         );
 
-        // Transfer displacement field from the solid to the fluid
-        interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
-        (
-            solidZone,                              // from zone
-            fluidZone,                              // to zone
-            solidZonePointsDisplsAtSolid,           // from field
-            solidZonesPointsDispls()[interfaceI]    // to field
-        );
+        if (immersedInterfaces_[interfaceI])
+        {
+            // The immersed surface follows the solid zone point by point
+            solidZonesPointsDispls()[interfaceI] = solidZonePointsDisplsAtSolid;
+            solidZonePointsTotDispl = solidZonePointsTotDisplsAtSolid;
+        }
+        else
+        {
+            // Transfer displacement field from the solid to the fluid
+            interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
+            (
+                solidZone,                              // from zone
+                fluidZone,                              // to zone
+                solidZonePointsDisplsAtSolid,           // from field
+                solidZonesPointsDispls()[interfaceI]    // to field
+            );
 
-        interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
-        (
-            solidZone,                              // from zone
-            fluidZone,                              // to zone
-            solidZonePointsTotDisplsAtSolid,        // from field
-            solidZonePointsTotDispl                 // to field
-        );
+            interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
+            (
+                solidZone,                              // from zone
+                fluidZone,                              // to zone
+                solidZonePointsTotDisplsAtSolid,        // from field
+                solidZonePointsTotDispl                 // to field
+            );
+        }
 
         // Update interface residuals
         residualsPrev()[interfaceI] = residuals()[interfaceI];
@@ -1502,34 +2312,48 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
                 solidZonePointsAtSolid += solidZonePointsTotDisplsAtSolid;
             }
 
-            // Map solid points to the fluid interface
+            if (immersedInterfaces_[interfaceI])
+            {
+                // The immersed surface points are those of the solid at the
+                // start of the time step plus the interface displacement
+                residuals()[interfaceI] =
+                    solidZonePointsAtSolid
+                  - (
+                        immersedInterfaceList_[interfaceI].zonePoints0()
+                      + fluidZonesPointsDispls()[interfaceI]
+                    );
+            }
+            else
+            {
+                // Map solid points to the fluid interface
 
-            vectorField solidZonePoints
-            (
-                fluidZonesPointsDispls()[interfaceI].size(), vector::zero
-            );
-
-            interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
-            (
-                solidZone,                              // from zone
-                fluidZone,                              // to zone
-                solidZonePointsAtSolid,                 // from field
-                solidZonePoints                         // to field
-            );
-
-            // Calculate fluid zone positions
-            const vectorField fluidZonePoints
-            (
-                fluid().globalPatches()[interfaceI].patchPointToGlobal
+                vectorField solidZonePoints
                 (
-                    fluidMesh().boundaryMesh()
-                    [
-                        fluid().globalPatches()[interfaceI].patch().index()
-                    ].localPoints()
-                )
-            );
+                    fluidZonesPointsDispls()[interfaceI].size(), vector::zero
+                );
 
-            residuals()[interfaceI] = solidZonePoints - fluidZonePoints;
+                interfaceToInterfaceList()[interfaceI].transferPointsZoneToZone
+                (
+                    solidZone,                              // from zone
+                    fluidZone,                              // to zone
+                    solidZonePointsAtSolid,                 // from field
+                    solidZonePoints                         // to field
+                );
+
+                // Calculate fluid zone positions
+                const vectorField fluidZonePoints
+                (
+                    fluid().globalPatches()[interfaceI].patchPointToGlobal
+                    (
+                        fluidMesh().boundaryMesh()
+                        [
+                            fluid().globalPatches()[interfaceI].patch().index()
+                        ].localPoints()
+                    )
+                );
+
+                residuals()[interfaceI] = solidZonePoints - fluidZonePoints;
+            }
         }
 
         // We will use two definitions of residual
@@ -1571,7 +2395,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
         // Legacy solids4foam behavior uses the minimum of the two residual
         // measures, while stricter convergence requires both to be small.
-        const scalar residualInterfaceI =
+        scalar residualInterfaceI =
             requireAllResidualMeasures_
           ? max(residualNorm1, residualNorm2)
           : min(residualNorm1, residualNorm2);
@@ -1581,92 +2405,510 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
             Info<< "FSI combined residual norm for interface " << interfaceI
                 << " (max): " << residualInterfaceI << endl;
         }
+        else if
+        (
+            min(residualNorm1, residualNorm2) <= outerCorrTolerance_
+         && max(residualNorm1, residualNorm2) > outerCorrTolerance_
+        )
+        {
+            Info<< "FSI legacy minimum test for interface " << interfaceI
+                << " is passed by residual"
+                << (residualNorm1 < residualNorm2 ? "1" : "2")
+                << " only; the other measure is above the tolerance"
+                << " (see requireAllResidualMeasures)" << endl;
+        }
+
+        if (outerCorrAbsoluteTolerance_ > 0)
+        {
+            // Absolute residual: the maximum point mismatch of the interface
+            // [m]
+            const scalar absResidual = gMax(mag(residuals()[interfaceI]));
+
+            Info<< "FSI absolute residual (max point) for interface "
+                << interfaceI << ": " << absResidual << endl;
+
+            if
+            (
+                absResidual < outerCorrAbsoluteTolerance_
+             && residualInterfaceI > outerCorrTolerance_
+            )
+            {
+                Info<< "FSI interface " << interfaceI << " accepted by"
+                    << " outerCorrAbsoluteTolerance: " << absResidual
+                    << " < " << outerCorrAbsoluteTolerance_ << endl;
+
+                // The convergence tests compare the returned residual with
+                // outerCorrTolerance using <=; the factor keeps the accepted
+                // interface converged if a test uses < instead
+                residualInterfaceI = 0.99*outerCorrTolerance_;
+            }
+        }
 
         // Update the maximum residual for all interfaces
         maxResidual = max(maxResidual, residualInterfaceI);
+    }
+
+    robinPressureResidual_ = 0;
+    robinFluxResidual_ = 0;
+    robinKinematicConsistency_ = true;
+
+    if (!hasRobinInterface())
+    {
+        return maxResidual;
+    }
+
+    // Flux scale: the throughput of the physical boundaries plus the flux
+    // swept by the moving Robin interfaces
+    scalar boundaryFluxNorm = 0;
+    scalar interfaceMotionNorm = 0;
+    scalar robinInterfaceArea = 0;
+    forAll(fluid().phi().boundaryField(), patchI)
+    {
+        // Physical boundaries only: the flux through the Robin interfaces is
+        // the leakage itself, which must not enter its own scale
+        bool robinPatch = false;
+        forAll(robinInterfaces_, interfaceI)
+        {
+            robinPatch =
+                robinPatch
+             || (
+                    robinInterfaces_[interfaceI]
+                 && fluidPatchIndices()[interfaceI] == patchI
+                );
+        }
+
+        if (!fluidMesh().boundary()[patchI].coupled() && !robinPatch)
+        {
+            boundaryFluxNorm +=
+                sum(mag(fluid().phi().boundaryField()[patchI]));
+        }
+    }
+    forAll(robinInterfaces_, interfaceI)
+    {
+        if (robinInterfaces_[interfaceI])
+        {
+            robinInterfaceArea +=
+                sum
+                (
+                    fluidMesh().magSf().boundaryField()
+                    [
+                        fluidPatchIndices()[interfaceI]
+                    ]
+                );
+        }
+    }
+    if (fluidMesh().moving())
+    {
+        forAll(robinInterfaces_, interfaceI)
+        {
+            if (robinInterfaces_[interfaceI])
+            {
+                interfaceMotionNorm +=
+                    sum
+                    (
+                        mag
+                        (
+                            fluidMesh().phi().boundaryField()
+                            [
+                                fluidPatchIndices()[interfaceI]
+                            ]
+                        )
+                    );
+            }
+        }
+    }
+    reduce(boundaryFluxNorm, sumOp<scalar>());
+    reduce(interfaceMotionNorm, sumOp<scalar>());
+    reduce(robinInterfaceArea, sumOp<scalar>());
+    maxRobinKinematicNorm_ =
+        max(maxRobinKinematicNorm_, boundaryFluxNorm + interfaceMotionNorm);
+
+    // Flow at or near rest: without throughput and interface motion the flux
+    // scale vanishes, and the leakage floor of the inner solvers would give a
+    // large residual, so the optional reference flux bounds the scale
+    const scalar robinReferenceFlux =
+        robinFluxReferenceVelocity_*robinInterfaceArea;
+    const bool fluxScaleLimited = robinReferenceFlux > maxRobinKinematicNorm_;
+    const scalar fluxScale = max(maxRobinKinematicNorm_, robinReferenceFlux);
+
+    forAll(robinInterfaces_, interfaceI)
+    {
+        if (!robinInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
+        const label fluidPatchID = fluidPatchIndices()[interfaceI];
+        const scalarField currentPressure
+        (
+            fluid().solutionP().boundaryField()[fluidPatchID]
+        );
+        const scalar pressureNorm = Foam::sqrt(gSum(magSqr(currentPressure)));
+        maxRobinPressureNorm_[interfaceI] = max
+        (
+            maxRobinPressureNorm_[interfaceI], pressureNorm
+        );
+
+        // Optional reference pressure, as the norm of a uniform interface
+        // pressure, bounds the scale of a pressure at or near zero
+        const scalar referencePressureNorm =
+            robinPressureReference_
+           *Foam::sqrt
+            (
+                scalar(returnReduce(currentPressure.size(), sumOp<label>()))
+            );
+        const bool pressureScaleLimited =
+            referencePressureNorm > maxRobinPressureNorm_[interfaceI];
+        const scalar pressureScale =
+            max(maxRobinPressureNorm_[interfaceI], referencePressureNorm);
+
+        const scalar pressureResidual =
+            Foam::sqrt
+            (
+                gSum
+                (
+                    magSqr
+                    (
+                        currentPressure - robinPressurePrev_[interfaceI]
+                    )
+                )
+            )
+           /(pressureScale + SMALL);
+
+        // Interface flux relative to the mesh motion, i.e. the leakage
+        // through the moving wall
+        const scalarField& leak = fluid().phi().boundaryField()[fluidPatchID];
+
+        // Kinematic residual: the leakage normalised by the throughput plus
+        // the interface motion flux. If the Robin condition is kinematically
+        // consistent with the mesh motion, the leakage is proportional to
+        // the Robin iteration error and vanishes as the iterations converge,
+        // as for a Dirichlet velocity condition, and it is used as a
+        // convergence criterion. Otherwise the leakage has a discretisation
+        // floor (it does not vanish as the iterations converge) and is only
+        // reported.
+        const scalar leakage = gSum(mag(leak))/(fluxScale + SMALL);
+
+        robinKinematicConsistency_ =
+            robinKinematicConsistency_
+         && refCast<const elasticWallPressureFvPatchScalarField>
+            (
+                fluid().solutionP().boundaryField()[fluidPatchID]
+            ).kinematicConsistency();
+
+        robinPressurePrev_[interfaceI] = currentPressure;
+        robinPressureResidual_ = max
+        (
+            robinPressureResidual_, pressureResidual
+        );
+        robinFluxResidual_ = max(robinFluxResidual_, leakage);
+
+        Info<< "Robin pressure residual for interface " << interfaceI
+            << ": " << pressureResidual
+            << (pressureScaleLimited ? " (reference pressure scale)" : "")
+            << nl
+            << "Robin leakage-flux residual for interface " << interfaceI
+            << ": " << leakage
+            << (fluxScaleLimited ? " (reference flux scale)" : "") << endl;
+    }
+
+    robinDispHistory_.append(maxResidual);
+    robinPressureHistory_.append(robinPressureResidual_);
+    robinFluxHistory_.append(robinFluxResidual_);
+
+    evaluateRobinConvergence();
+
+    // The FSI iterations ran out with a Robin residual that has no reference
+    // scale above its tolerance: if the flow is at or near rest, the relative
+    // residual has no meaningful scale, so point to the reference options
+    if
+    (
+        !robinReferenceHintIssued_
+     && coupled()
+     && robinConvergenceState_ == 0
+     && outerCorr_ >= nOuterCorr_
+    )
+    {
+        const bool pressureUnscaled =
+            robinPressureResidual_ > robinPressureTolerance_
+         && robinPressureReference_ <= 0;
+        const bool fluxUnscaled =
+            robinKinematicConsistency_
+         && robinFluxResidual_ > robinFluxTolerance_
+         && robinFluxReferenceVelocity_ <= 0;
+
+        if (pressureUnscaled || fluxUnscaled)
+        {
+            robinReferenceHintIssued_ = true;
+
+            Info<< nl << "Robin FSI iterations reached nOuterCorr with a"
+                << " Robin residual above its tolerance. If the flow is at or"
+                << " near rest (little throughput or interface motion), the"
+                << " relative residual has no physical scale: set";
+            if (fluxUnscaled)
+            {
+                Info<< " robinFluxReferenceVelocity (a characteristic"
+                    << " velocity of the flow)";
+            }
+            if (pressureUnscaled)
+            {
+                Info<< (fluxUnscaled ? " and" : "")
+                    << " robinPressureReference (a characteristic pressure)";
+            }
+            Info<< " in fsiProperties. Otherwise, check the inner-solver"
+                << " tolerances and nOuterCorr. This hint is written once."
+                << nl << endl;
+        }
     }
 
     return maxResidual;
 }
 
 
-void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
+bool Foam::fluidSolidInterface::hasRobinInterface() const
 {
-    forAll(fluid().globalPatches(), interfaceI)
+    forAll(robinInterfaces_, interfaceI)
     {
-        if
-        (
-            isA<movingWallPressureFvPatchScalarField>
-            (
-                fluid().solutionP().boundaryField()
-                [
-                    fluidPatchIndices()[interfaceI]
-                ]
-            )
-        )
+        if (robinInterfaces_[interfaceI])
         {
-            Info<< "Setting acceleration at fluid side of the interface: "
-                << fluidMesh().boundary()
-                   [
-                       fluidPatchIndices()[interfaceI]
-                   ].name()
-                << endl;
-
-            // Take references to zones
-            const standAlonePatch& fluidZone =
-               fluid().globalPatches()[interfaceI].globalPatch();
-            const standAlonePatch& solidZone =
-               solid().globalPatches()[interfaceI].globalPatch();
-
-            const vectorField solidZoneAcceleration
-            (
-               solid().faceZoneAcceleration(interfaceI)
-            );
-
-            // Initialise the fluid zone acceleration field that is to be
-            // interpolated from the solid zone
-            vectorField fluidZoneAcceleration(fluidZone.size(), vector::zero);
-
-            // Transfer the field from the fluid interface to the solid
-            // interface
-            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
-            (
-                solidZone,                // from zone
-                fluidZone,                // to zone
-                solidZoneAcceleration,    // from field
-                fluidZoneAcceleration     // to field
-            );
-
-            const vectorField fluidPatchAcceleration
-            (
-                fluid().globalPatches()
-                [
-                   interfaceI
-                ].globalFaceToPatch(fluidZoneAcceleration)
-            );
-
-            vectorField& prevAcceleration =
-                const_cast<movingWallPressureFvPatchScalarField&>
-                (
-                    refCast<const movingWallPressureFvPatchScalarField>
-                    (
-                        fluid().solutionP().boundaryField()
-                        [
-                            fluidPatchIndices()[interfaceI]
-                        ]
-                    )
-                ).prevAcceleration();
-
-            if (coupled())
-            {
-                prevAcceleration = fluidPatchAcceleration;
-            }
-            else
-            {
-                prevAcceleration = vector::zero;
-            }
+            return true;
         }
     }
+
+    return false;
+}
+
+
+void Foam::fluidSolidInterface::evaluateRobinConvergence()
+{
+    robinConvergenceState_ = 0;
+
+    // Before the coupling starts only the displacement residual applies
+    if (!coupled())
+    {
+        robinConvergenceState_ =
+            (
+                robinDispHistory_.size()
+             && robinDispHistory_.last() <= outerCorrTolerance_
+            ) ? 1 : 0;
+
+        return;
+    }
+
+    // Iterations in which the solid solution changed
+    scalar maxDisp = 0;
+    forAll(robinDispHistory_, i)
+    {
+        maxDisp = max(maxDisp, robinDispHistory_[i]);
+    }
+    List<bool> update(robinDispHistory_.size());
+    forAll(update, i)
+    {
+        update[i] = robinDispHistory_[i] > 1e-12*maxDisp + VSMALL;
+    }
+
+    if (robinConvergence_ == "residual")
+    {
+        const bool converged =
+            robinDispHistory_.size()
+         && robinDispHistory_.last() <= outerCorrTolerance_
+         && robinPressureResidual_ <= robinPressureTolerance_
+         && (
+                !robinKinematicConsistency_
+             || robinFluxResidual_ <= robinFluxTolerance_
+            );
+
+        if (converged)
+        {
+            robinConvergenceState_ = 1;
+            return;
+        }
+
+        // Stalled residuals: they no longer decrease (e.g. inner-solver
+        // tolerances), so further iterations are pointless; they are
+        // accepted if they are close to their tolerances. Only the stall
+        // flag of robinResidualTest is used here.
+        const UList<scalar>* histories[3] =
+        {
+            &robinDispHistory_, &robinPressureHistory_, &robinFluxHistory_
+        };
+        const scalar tolerances[3] =
+        {
+            outerCorrTolerance_, robinPressureTolerance_, robinFluxTolerance_
+        };
+        const label nMeasures = robinKinematicConsistency_ ? 3 : 2;
+
+        bool allAcceptable = true;
+        for (label i = 0; i < nMeasures; i++)
+        {
+            bool measureConverged = false;
+            bool stalled = false;
+            scalar error = GREAT;
+            scalar rate = -1;
+
+            robinResidualTest
+            (
+                *histories[i],
+                update,
+                tolerances[i],
+                robinSlowRate_,
+                robinStallRate_,
+                robinStallIterations_,
+                measureConverged,
+                stalled,
+                error,
+                rate
+            );
+
+            const scalar R = histories[i]->last();
+
+            allAcceptable =
+                allAcceptable
+             && (
+                    R <= tolerances[i]
+                 || (stalled && R <= robinStallToleranceFactor_*tolerances[i])
+                );
+        }
+
+        if (allAcceptable)
+        {
+            robinConvergenceState_ = 2;
+        }
+
+        return;
+    }
+
+    const UList<scalar>* histories[3] =
+    {
+        &robinDispHistory_, &robinPressureHistory_, &robinFluxHistory_
+    };
+    const scalar tolerances[3] =
+    {
+        outerCorrTolerance_, robinPressureTolerance_, robinFluxTolerance_
+    };
+    const char* names[3] = {"displacement", "pressure", "kinematic"};
+
+    bool allConverged = true;
+    bool allAcceptable = true;
+
+    // The kinematic residual is only a convergence measure if the Robin
+    // condition is kinematically consistent with the mesh motion
+    const label nMeasures = robinKinematicConsistency_ ? 3 : 2;
+
+    Info<< "Robin iteration error estimates:";
+
+    for (label i = 0; i < nMeasures; i++)
+    {
+        bool converged = false;
+        bool stalled = false;
+        scalar error = GREAT;
+        scalar rate = -1;
+
+        robinResidualTest
+        (
+            *histories[i],
+            update,
+            tolerances[i],
+            robinSlowRate_,
+            robinStallRate_,
+            robinStallIterations_,
+            converged,
+            stalled,
+            error,
+            rate
+        );
+
+        // A stalled residual cannot be reduced further by FSI iterations
+        // (e.g. inner-solver tolerances); it is accepted if it is close to
+        // its tolerance
+        const bool acceptable =
+            converged
+         || (
+                stalled
+             && histories[i]->last()
+             <= robinStallToleranceFactor_*tolerances[i]
+            );
+
+        allConverged = allConverged && converged;
+        allAcceptable = allAcceptable && acceptable;
+
+        Info<< " " << names[i] << " " << histories[i]->last()
+            << " (error " << error << ", rate " << rate
+            << (stalled ? ", stalled)" : ")");
+    }
+
+    Info<< endl;
+
+    if (allConverged)
+    {
+        robinConvergenceState_ = 1;
+    }
+    else if (allAcceptable)
+    {
+        robinConvergenceState_ = 2;
+    }
+}
+
+
+bool Foam::fluidSolidInterface::couplingConverged
+(
+    const scalar displacementResidual
+) const
+{
+    // Before the coupling starts (couplingStartTime) the fluid is solved
+    // without solid feedback, so only the displacement residual applies
+    if (!hasRobinInterface() || !coupled())
+    {
+        return displacementResidual <= outerCorrTolerance_;
+    }
+
+    // At least two FSI iterations for the iteration-error estimate, so that
+    // the Robin condition has been updated with the solid response of the
+    // current time step
+    if (robinConvergence_ == "iterationError" && outerCorr_ < 2)
+    {
+        return false;
+    }
+
+    if (robinConvergenceState_ == 2)
+    {
+        Info<< "Robin FSI iterations stalled after " << outerCorr_
+            << " iterations; accepted because the residuals are within "
+            << robinStallToleranceFactor_ << " times the tolerances" << endl;
+    }
+
+    return robinConvergenceState_ > 0;
+}
+
+
+void Foam::fluidSolidInterface::writeResidualLine(const scalar residualNorm)
+{
+    if (!writeResidualsToFile() || !Pstream::master())
+    {
+        return;
+    }
+
+    residualFile()
+        << runTime().value() << " "
+        << outerCorr() << " "
+        << residualNorm;
+
+    if (hasRobinInterface())
+    {
+        // Before the coupling starts the Robin residuals are not evaluated
+        // and a step is accepted on the displacement residual alone
+        const label state =
+            coupled()
+          ? robinConvergenceState_
+          : label(residualNorm <= outerCorrTolerance_ ? 1 : 0);
+
+        residualFile()
+            << " " << robinPressureResidual_
+            << " " << robinFluxResidual_
+            << " " << state;
+    }
+
+    residualFile() << endl;
 }
 
 
@@ -1674,6 +2916,11 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
 {
     forAll(fluid().globalPatches(), interfaceI)
     {
+        if (immersedInterfaces_[interfaceI])
+        {
+            continue;
+        }
+
         // Set interface acceleration
         if
         (
@@ -1695,10 +2942,8 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                 << endl;
 
             // Take references to zones
-            const standAlonePatch& fluidZone =
-               fluid().globalPatches()[interfaceI].globalPatch();
-            const standAlonePatch& solidZone =
-               solid().globalPatches()[interfaceI].globalPatch();
+            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
+            const standAlonePatch& solidZone = this->solidZone(interfaceI);
 
             const vectorField solidZoneAcceleration
             (
@@ -1774,6 +3019,26 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
                         fluidPatchIndices()[interfaceI]
                     );
             }
+
+            elasticWallPressureFvPatchScalarField& pRobin =
+                const_cast<elasticWallPressureFvPatchScalarField&>
+                (
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        fluid().solutionP().boundaryField()
+                        [
+                            fluidPatchIndices()[interfaceI]
+                        ]
+                    )
+                );
+
+            // Update the Robin coefficient estimate from the new pressure and
+            // solid acceleration pair
+            pRobin.updateRobinCoefficient();
+
+            // The fluid model may only make the interface flux consistent
+            // with the mesh motion if the mesh follows the solid
+            pRobin.setFluidMeshFollowsSolid(fluidMeshFollowsSolid());
         }
     }
 }
@@ -1798,11 +3063,13 @@ void Foam::fluidSolidInterface::syncFluidZonePointsDispl
             // pass to all procs
             reduce(fluidZonesPointsDispls[interfaceI], FieldSumOp<vector>());
 
+            // The immersed surface follows the solid zone
             const labelList& map =
-                fluid().globalPatches()
-                [
-                    interfaceI
-                ].globalMasterToCurrentProcPointAddr();
+            (
+                immersedInterfaces_[interfaceI]
+              ? solid().globalPatches()[interfaceI]
+              : fluid().globalPatches()[interfaceI]
+            ).globalMasterToCurrentProcPointAddr();
 
             if (!Pstream::master())
             {

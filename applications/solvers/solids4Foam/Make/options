@@ -3,13 +3,6 @@ SOLIDS4FOAM_ROOT := ../../..
 sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
-ifdef S4F_USE_GFORTRAN
-    GFORTRAN_LIBS = \
-        -lgfortran \
-        $(FOAM_USER_LIBBIN)/abaqusUmatLinearElastic.o \
-        -labaqusUmatLinearElastic
-endif
-
 EXE_INC = \
     -I$(SOLIDS4FOAM_ROOT)/src/solids4FoamModels/lnInclude \
     -I$(SOLIDS4FOAM_ROOT)/src/blockCoupledSolids4FoamTools/lnInclude \
@@ -22,5 +15,4 @@ EXE_INC = \
     -I$(LIB_SRC)/dynamicFvMesh/lnInclude
 
 EXE_LIBS = \
-    -L$(FOAM_MODULE_LIBBIN) -lsolids4FoamModels \
-    $(GFORTRAN_LIBS)
+    -L$(FOAM_MODULE_LIBBIN) -lsolids4FoamModels

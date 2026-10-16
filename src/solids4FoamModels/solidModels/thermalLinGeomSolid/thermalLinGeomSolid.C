@@ -114,13 +114,10 @@ bool thermalLinGeomSolid::converged
             )
         );
 
-    // Calculate material residual
-    const scalar materialResidual = mechanical().residual();
-
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol())
+    // force at least 1 outer iteration
+    if (iCorr > 1)
     {
         bool convergedD = false;
         bool convergedT = false;
@@ -163,8 +160,7 @@ bool thermalLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res (T & D), relRes (T & D), matRes, iters (T & D)"
-            << endl;
+        Info<< "    Corr, res (T & D), relRes (T & D), iters (T & D)" << endl;
     }
     else if (iCorr % infoFrequency() == 0 || converged)
     {
@@ -173,7 +169,6 @@ bool thermalLinGeomSolid::converged
             << ", " << mag(solverPerfD.initialResidual())
             << ", " << residualT
             << ", " << residualD
-            << ", " << materialResidual
             << ", " << solverPerfT.nIterations()
             << ", " << solverPerfD.nIterations() << endl;
 
@@ -213,7 +208,7 @@ thermalLinGeomSolid::thermalLinGeomSolid
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
-        thermal_.C()*mechanical().rho()
+        thermal_.C()*initialRho()
     ),
     k_(thermal_.k()),
     T_
@@ -249,11 +244,14 @@ thermalLinGeomSolid::thermalLinGeomSolid
             1e-06
         )
     ),
-    impK_(mechanical().impK()),
-    impKf_(mechanical().impKf()),
+    impK_(makeImpK()),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_)
 {
     DisRequired();
+
+    // A multi-material run needs a material-aware gradient
+    checkFrameworkGradScheme(D().name());
 
     // Store T old time
     T_.oldTime();
@@ -261,6 +259,37 @@ thermalLinGeomSolid::thermalLinGeomSolid
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+
+void thermalLinGeomSolid::correctStress()
+{
+    // The framework is a pure function of the displacement gradient and the
+    // old-time state, so the gradient is passed explicitly rather than looked
+    // up from the registry, and the old-time state is rolled over by the
+    // manager rather than by a separate call
+    mechanicalManager().updateStressSmallStrain
+    (
+        gradD(),
+        gradD().oldTime(),
+        mesh().time().deltaTValue(),
+        sigma()
+    );
+}
+
+
+Foam::tmp<Foam::volScalarField> thermalLinGeomSolid::makeImpK() const
+{
+    return lawImpK(mechanicalManager(), tangentRequest::scalar);
+}
+
+
+Foam::tmp<Foam::surfaceScalarField> thermalLinGeomSolid::makeImpKf() const
+{
+    // The framework has no separate face tangent: the face value is the
+    // interpolate of the cell one
+    return fvc::interpolate(makeImpK()());
+}
+
 
 
 bool thermalLinGeomSolid::evolve()
@@ -348,20 +377,20 @@ bool thermalLinGeomSolid::evolve()
         U() = fvc::ddt(D());
 
         // Update gradient of displacement
-        mechanical().grad(D(), gradD());
+        gradD() = fvc::grad(D());
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
 
         // Calculate the stress using run-time selectable mechanical law
-        mechanical().correct(sigma());
+        correctStress();
 
         // Update impKf to improve convergence
         // Note: impK and rImpK are not updated as they are used for traction
         // boundaries
         if (iCorr % 10 == 0)
         {
-            impKf_ = mechanical().impKf();
+            impKf_ = makeImpKf();
         }
     }
     while
@@ -371,7 +400,7 @@ bool thermalLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    mechanical().interpolate(D(), pointD());
+    interpolatePointDisplacement(D(), gradD(), pointD());
 
     // Increment of displacement
     DD() = D() - D().oldTime();

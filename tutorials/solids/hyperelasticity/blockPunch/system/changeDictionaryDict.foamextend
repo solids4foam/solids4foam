@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of OpenFOAM software via              |
+|              www.openfoam.com, and owner of the OPENFOAM(R) and OpenCFD(R)  |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      changeDictionaryDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// foam-extend differs from OpenFOAM in two ways here:
+//   1. changeDictionary requires the replacements to be given in a
+//      dictionaryReplacement sub-dictionary;
+//   2. the symmetry patch type is called symmetryPlane.
+
+dictionaryReplacement
+{
+    boundary
+    {
+        xMin
+        {
+            type            symmetryPlane;
+            physicalType    symmetryPlane;
+        }
+        yMin
+        {
+            type            symmetryPlane;
+            physicalType    symmetryPlane;
+        }
+        bottom
+        {
+            type            symmetryPlane;
+            physicalType    symmetryPlane;
+        }
+    }
+}
+
+// ************************************************************************* //

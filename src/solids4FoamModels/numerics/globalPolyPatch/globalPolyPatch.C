@@ -547,11 +547,59 @@ void Foam::globalPolyPatch::updateMesh()
 }
 
 
-void Foam::globalPolyPatch::movePoints(const pointField& p)
+void Foam::globalPolyPatch::setGlobalPoints(const pointField& globalPoints) const
+{
+    if (!globalPatchPtr_)
+    {
+        return;
+    }
+
+    if (globalPoints.size() != globalPatchPtr_->points().size())
+    {
+        FatalErrorIn
+        (
+            "void globalPolyPatch::setGlobalPoints(const pointField&) const"
+        )   << "Point field does not correspond to the global patch points"
+            << nl
+            << "    global patch points : "
+            << globalPatchPtr_->points().size() << nl
+            << "    given field size    : " << globalPoints.size() << nl
+            << "    patch               : " << patchName_
+            << abort(FatalError);
+    }
+
+    // The standAlonePatch owns its point field, and its movePoints() only
+    // clears the cached geometry: it does not store the given points.  So set
+    // the points directly and then clear the geometry derived from them
+    const_cast<pointField&>(globalPatchPtr_->points()) = globalPoints;
+    globalPatchPtr_->movePoints(globalPoints);
+
+    // The interpolation weights are calculated from the patch geometry, so
+    // they are no longer valid; they are re-calculated on demand
+    if (interpPtr_)
+    {
+        interpPtr_->movePoints();
+    }
+}
+
+
+void Foam::globalPolyPatch::movePoints(const pointField& globalPoints)
+{
+    setGlobalPoints(globalPoints);
+}
+
+
+void Foam::globalPolyPatch::syncPoints() const
+{
+    syncPoints(patch_.localPoints());
+}
+
+
+void Foam::globalPolyPatch::syncPoints(const pointField& patchPoints) const
 {
     if (globalPatchPtr_)
     {
-        globalPatchPtr_->movePoints(p);
+        setGlobalPoints(patchPointToGlobal(patchPoints));
     }
 }
 

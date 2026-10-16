@@ -373,4 +373,10 @@ void Foam::eig3::eigen_decomposition
 }
 
 
+// Undefine the local macros so they do not leak into other translation
+// units in a unity build
+#undef MAX
+#undef n
+
+
 // ************************************************************************* //

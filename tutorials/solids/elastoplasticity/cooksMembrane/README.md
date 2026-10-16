@@ -35,7 +35,7 @@ Young's modulus $$E = 206.9$$ MPa, Poisson's ratio $$\nu=0.29$$, initial yield
 stress $$\sigma_Y = 0.45$$ MPa and the hardening parameters
 $$\sigma_{\infty} = 0.715$$ MPa, $$\delta = 16.93$$, $$H = 0.12924$$ MPa. The
 strain hardening function is the one presented in
-[[1]]((https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705)):
+[[1]](https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705):
 
 $$
 \sigma_y = \sigma_Y + (\sigma_{\infty} -
@@ -109,6 +109,14 @@ The tutorial case is located at
 run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
 Allrun consists of creating the mesh using `blockMesh` (`> blockMesh`) followed
 by running the `solids4foam` solver (`> solids4Foam`).
+
+## Verification and convergence study
+
+The opt-in [`verification/`](verification/) directory contains the migrated
+mesh-convergence study and published displacement references. It is separate
+from normal regression testing and is not run by `tutorials/Alltest` or
+`tutorials/Alltest-regression`. See its README for the command, acceptance
+criteria, and expected outputs.
 
 ---
 

@@ -1,0 +1,3 @@
+Test-fvcD2dt2.C
+
+EXE = $(FOAM_MODULE_APPBIN)/Test-fvcD2dt2

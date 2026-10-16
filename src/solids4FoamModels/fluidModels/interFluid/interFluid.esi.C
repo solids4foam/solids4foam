@@ -57,6 +57,20 @@ void interFluid::updateRobinFsiInterfacePhi
     const volScalarField& rAU
 ) const
 {
+    // Mesh flux subtracted from the absolute flux by fvc::makeRelative
+    tmp<surfaceScalarField> tmeshPhi;
+    if
+    (
+        mesh().moving()
+     && mesh().solutionDict().subDict("PIMPLE").lookupOrDefault
+        (
+            "robinKinematicConsistency", true
+        )
+    )
+    {
+        tmeshPhi = fvc::meshPhi(U);
+    }
+
     forAll(p.boundaryField(), patchI)
     {
         const bool isElasticSlipWall =
@@ -101,6 +115,47 @@ void interFluid::updateRobinFsiInterfacePhi
                     << "Not implemented for backward scheme"
                     << exit(FatalError);
             }
+
+            // Kinematic consistency: at a converged Robin state the pressure
+            // equals the previous-iteration pressure, so the Robin condition
+            // fixes the normal pressure gradient, snGrad(p_rgh) =
+            // gSrc - rho*a_s, where phig = gSrc*rAU*|Sf|. Choosing phiHbyA
+            // such that the resulting interface flux,
+            // phiHbyA - rAU*snGrad(p_rgh)*|Sf|, equals the mesh flux removes
+            // the leakage through the moving wall without changing the Robin
+            // condition itself
+            elasticWallPressureFvPatchScalarField& pRobin =
+                const_cast<elasticWallPressureFvPatchScalarField&>
+                (
+                    refCast<const elasticWallPressureFvPatchScalarField>
+                    (
+                        p.boundaryField()[patchI]
+                    )
+                );
+
+            // Only if the mesh follows the solid: with under-relaxation or
+            // interface acceleration the mesh lags the solid during the
+            // iterations and must not enter the flux
+            const bool consistent =
+                tmeshPhi.valid() && pRobin.fluidMeshFollowsSolid();
+
+            if (consistent)
+            {
+                const scalarField& rhoB =
+                    mesh().lookupObject<volScalarField>
+                    (
+                        "rho"
+                    ).boundaryField()[patchI];
+
+                phiHbyA.boundaryFieldRef()[patchI] =
+                    tmeshPhi().boundaryField()[patchI]
+                  + phig.boundaryField()[patchI]
+                  - rAU.boundaryField()[patchI]
+                   *mesh().magSf().boundaryField()[patchI]
+                   *rhoB*pRobin.prevNormalAcceleration();
+            }
+
+            pRobin.setKinematicConsistency(consistent);
         }
         else if
         (
@@ -390,9 +445,14 @@ tmp<vectorField> interFluid::patchViscousForce(const label patchID) const
     const incompressible::turbulenceModel& turb =
         mesh().lookupObject<icoTurbModel>(icoTurbModel::propertiesName);
 
+    // Named normal: a tmp normal field would be reused as the storage of
+    // the inner product, which aliases an input of the loop and gives
+    // wrong results with some -O3 builds (see the 3dTube verification)
+    const vectorField nf(mesh().boundary()[patchID].nf());
+
     tvF.ref() =
         (
-            mesh().boundary()[patchID].nf()
+            nf
           & (
                - rho_.boundaryField()[patchID]
                 *turb.devReff()().boundaryField()[patchID]

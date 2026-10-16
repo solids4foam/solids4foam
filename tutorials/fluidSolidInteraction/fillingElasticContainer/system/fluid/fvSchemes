@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -49,6 +49,7 @@ interpolationSchemes
 {
     default         none; //linear;
     interpolate(yPatch) linear;
+    interpolate(y) linear;
     interpolate(U) skewCorrected linear;
     interpolate(nHat) linear;
     interpolate(rho) linear;

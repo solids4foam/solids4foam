@@ -16,10 +16,12 @@ set xlabel "x [mm]" font "Arial Bold,20"
 set ylabel "Stress [Pa]" font "Arial Bold,20"
 set key r b
 
+data = "postProcessing/sample/1/line_analyticalStress_sigma.xy"
+
 plot \
-"postProcessing/sets/1/line_sigma_analyticalStress.xy" u 1:4 w lp ls 1 title"{/Symbol s}_{xx}",\
-"postProcessing/sets/1/line_sigma_analyticalStress.xy" u 1:7 w lp ls 2 title"{/Symbol s}_{yy}",\
-"postProcessing/sets/1/line_sigma_analyticalStress.xy" u 1:5 w lp ls 3 title"{/Symbol s}_{xy}",\
-"postProcessing/sets/1/line_sigma_analyticalStress.xy" u 1:10 w lp ls 4 title"Analytical {/Symbol s}_{xx}",\
-"postProcessing/sets/1/line_sigma_analyticalStress.xy" u 1:13 w lp ls 5 title"Analytical {/Symbol s}_{yy}",\
-"postProcessing/sets/1/line_sigma_analyticalStress.xy" u 1:11 w lp ls 6 title"Analytical {/Symbol s}_{xy}"
+data u 1:10 w lp ls 1 title"{/Symbol s}_{xx}",\
+data u 1:13 w lp ls 2 title"{/Symbol s}_{yy}",\
+data u 1:11 w lp ls 3 title"{/Symbol s}_{xy}",\
+data u 1:4  w lp ls 4 title"Analytical {/Symbol s}_{xx}",\
+data u 1:7  w lp ls 5 title"Analytical {/Symbol s}_{yy}",\
+data u 1:5  w lp ls 6 title"Analytical {/Symbol s}_{xy}"

@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -14,21 +14,46 @@ FoamFile
     class       dictionary;
     object      fsiProperties;
 }
-fluidSolidInterface NewtonQuasiMonolithic;
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-NewtonQuasiMonolithicCoeffs
+fluidSolidInterface    IQNILS;
+
+"fixedRelaxationCoeffs|AitkenCoeffs|IQNILSCoeffs"
 {
+    // Solid interface patch list
     solidPatch      interface;
-    fluidPatch      cylinder;
-    fluidSystemScaleFactor 1e+08;
+
+    // Fluid interface patch list
+    fluidPatch      interface;
+
+    // Under-relaxation factor for the first two iterations of each time step,
+    // after which the IQN-ILS update is used
+    relaxationFactor 0.05;
+
+    // Tolerance for the FSI loop within each time step
+    outerCorrTolerance 1e-6;
+
+    // Maximum number of outer FSI loop correctors within each time step
+    nOuterCorr      100;
+
+    // Enable coupling from the start
     coupled         yes;
+
+    // Method for transferring information between the interfaces
     interfaceTransferMethod directMap;
+
+    // Extrapolate the interface motion and the solid solution at the start
+    // of each time step; without the predictor, the first IQN-ILS iterate
+    // sees an added-mass spike, as the solid and fluid densities are equal
+    predictor       yes;
+    predictSolid    yes;
+
+    // Move the fluid interface onto the solid interface at the end of each
+    // time step, so that interface position errors do not accumulate
+    additionalMeshCorrection yes;
+
+    // Write FSI residuals to file
     writeResidualsToFile yes;
-    passViscousStress yes;
-    // PETSc SNES options for the monolithic UpU system are defined in
-    // system/fvSolution. Alternatively, an optionsFile can be specified here.
-    //optionsFile petscOptions.lu;
-    //optionsFile petscOptions.mf_fieldsplit;
 }
 
 // ************************************************************************* //

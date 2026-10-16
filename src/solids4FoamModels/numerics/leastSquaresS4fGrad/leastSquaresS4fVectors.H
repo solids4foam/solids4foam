@@ -32,6 +32,7 @@ SourceFiles
 #include "MeshObject.H"
 #include "fvMesh.H"
 #include "surfaceFields.H"
+#include "vectorList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -59,11 +60,27 @@ class leastSquaresS4fVectors
         mutable surfaceVectorField pVectors_;
         mutable surfaceVectorField nVectors_;
 
+        //- Cells whose face stencil is rank-deficient and which instead use
+        //  the wider point-cell (vertex-neighbour) stencil
+        mutable labelList wideCells_;
+
+        //- For each cell in wideCells_, the cells sharing at least one point
+        mutable labelListList wideStencil_;
+
+        //- For each cell in wideCells_, the least-squares vector of each
+        //  cell in wideStencil_
+        mutable List<vectorList> wideVectors_;
+
 
     // Private Member Functions
 
         //- Construct Least-squares gradient vectors
         void calcLeastSquaresVectors() const;
+
+        //- Replace the face stencil by the wider point-cell stencil in cells
+        //  where the face stencil does not span three directions
+        //  Takes the assembled (not yet inverted) face-stencil dd tensor
+        void calcWideStencilVectors(const symmTensorField& dd) const;
 
 
 public:
@@ -114,6 +131,24 @@ public:
         const boolList& useBoundaryFaceValues() const
         {
             return useBoundaryFaceValues_;
+        }
+
+        //- Return the cells using the wider point-cell stencil
+        const labelList& wideCells() const
+        {
+            return wideCells_;
+        }
+
+        //- Return the point-cell stencil of each cell in wideCells()
+        const labelListList& wideStencil() const
+        {
+            return wideStencil_;
+        }
+
+        //- Return the least-squares vectors of each cell in wideCells()
+        const List<vectorList>& wideVectors() const
+        {
+            return wideVectors_;
         }
 
         //- Delete the least square vectors when the mesh moves

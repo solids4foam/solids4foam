@@ -9,6 +9,9 @@ CASE_DIR="${REGRESSION_ROOT}/main"
 # Source solids4Foam scripts
 source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # flexibleDamBreak FSI regression test
 # ============================================================
@@ -17,30 +20,30 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # Regression tolerances
 # ------------------------------------------------------------
 
-DISP_MAX_TOL=1e-4      # max displacement absolute tolerance
+DISP_MAX_TOL=2.5e-3      # max displacement absolute tolerance (~5% of reference)
 
 # Regression end time for the copied case only
 REG_END_TIME=0.3
 
 # Reference values
-REF_MAX_DISP=1.93742e-05
+# Peak horizontal displacement Dx of the tracked dam corner over t <= 0.3.
+# The forks differ by up to 3.6e-3, more than the tolerance, so each has its
+# own reference: OpenFOAM-v2512 gives 0.05158-0.05167 (CI and local, with
+# and without the Aitken correction), OpenFOAM-9 0.04999 and foam-extend-4.1
+# 0.04803 (CI)
+if [[ "${WM_PROJECT:-}" == "foam" ]]; then
+    REF_MAX_DISP=0.04803
+elif [[ "${WM_PROJECT_VERSION:-}" == v* ]]; then
+    REF_MAX_DISP=0.05162
+else
+    REF_MAX_DISP=0.04999
+fi
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
 # Data files
 DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
-
-variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
-    variant="openfoamorg"
-fi
-
-if [[ "${variant}" == "foamextend" ]]; then
-    REF_MAX_DISP=3.76032e-05
-fi
 
 echo "============================================================"
 echo "flexibleDamBreak FSI regression test"
@@ -60,7 +63,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i "s/^\(endTime[[:space:]]*\).*/\1${REG_END_TIME};/" "${CASE_DIR}/system/controlDict"
 }
 
 # ------------------------------------------------------------
@@ -97,7 +100,7 @@ fi
 # ------------------------------------------------------------
 
 extract_max_displacement() {
-    awk 'NR > 1 {print $3}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
+    awk 'NR > 1 {print $2}' "${CASE_DIR}/${DISP_FILE}" | sort -g | tail -1
 }
 
 abs() {

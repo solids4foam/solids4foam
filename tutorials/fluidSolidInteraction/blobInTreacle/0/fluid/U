@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -22,72 +22,45 @@ internalField   uniform (0 0 0);
 
 boundaryField
 {
-    left
+    inlet
     {
-        type            codedFixedValue;
-        value           uniform 0;
-
-        name            smoothRampedParabolicFixedValue;
-
-        code
-        #{
-            // y coordinate
-            const scalarField y
-            (
-                patch().Cf().component(vector::Y)
-            );
-
-            // Velocity magnitude after transition period
-            scalarField UMag((1.0 + 2.0*y)*(1.0 - y));
-
-            // g(t) function
-            // Smoothly ramp the velocity magnitude
-            const scalar t = this->db().time().value();
-            const scalar rampPeriod = 2;
-            if (t < rampPeriod)
-            {
-                UMag *= (1.0 - cos(M_PI*t/rampPeriod))/2.0;
-            }
-
-            // Apply UMag in the x direction
-            operator==(UMag*vector(1, 0, 0));
-        #};
-
-        value             uniform (0 0 0);
-    }
-
-    up
-    {
-        type              fixedValue;
-        // type              fixedValueCorrected;
-        value             uniform (0 0 0);
-    }
-
-    right
-    {
-        type              zeroGradient;
-        //type              fixedGradientCorrected;
-        //gradient          uniform (0 0 0);;
-    }
-
-    cylinder
-    {
-        type              fixedValue;
-        // type            fixedValueCorrected;
+        // Liu et al. (2014): u = g(t)*(1 + 2y)*(1 - y), which is a parabola
+        // across y = -0.5 to 1 with a peak of 1.125 m/s at y = 0.25, ramped
+        // with g(t) = 0.5*(1 - cos(pi*t/2)) for t < 2 s
+        type            transitionalParabolicVelocity;
+        maxValue        1.125;
+        n               (1 0 0);
+        y               (0 1 0);
+        transitionPeriod 2;
+        boundBoxMin     (0 -0.5 -0.5);
+        boundBoxMax     (0 1 0.5);
         value           uniform (0 0 0);
     }
 
-    down
+    outlet
     {
-        type            symmetryPlane;
+        type            zeroGradient;
+    }
+
+    top
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+
+    bottom
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
     }
 
     frontAndBack
-    {
-        type            empty;
-    }
-
-    defaultFaces
     {
         type            empty;
     }
