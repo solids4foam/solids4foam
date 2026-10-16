@@ -1592,6 +1592,11 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
         }
     }
 
+    if (interfaceDOffsetPtr_.valid())
+    {
+        motionPatchD -= interfaceDOffsetPtr_();
+    }
+
     if (interfaceToInterfaceList().size() != 1)
     {
         FatalErrorInFunction
@@ -1658,10 +1663,76 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
     // Set the mesh interface pointD
     // Use "==" to reassign fixedValue
-    boundaryFieldRef(motionSolid().pointD())[fluidPatchID] == meshPatchPointD;
+    if (interfacePointDOffsetPtr_.valid())
+    {
+        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
+            meshPatchPointD - interfacePointDOffsetPtr_();
+    }
+    else
+    {
+        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
+            meshPatchPointD;
+    }
 
     // Correct boundary conditions to enforce the new patch values on the
     // internal field
+    motionSolid().pointD().correctBoundaryConditions();
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::setInterfaceDisplacementOffsets()
+{
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+
+    fvPatchVectorField& motionPatchD =
+        boundaryFieldRef(motionSolid().D())[fluidPatchID];
+    fvPatchVectorField& motionPatchU =
+        boundaryFieldRef(motionSolid().U())[fluidPatchID];
+    pointPatchVectorField& motionPatchPointD =
+        boundaryFieldRef(motionSolid().pointD())[fluidPatchID];
+
+    // The mesh motion interface state at the start
+    const vectorField motionD(motionPatchD);
+    const vectorField motionU(motionPatchU);
+    const vectorField motionPointD
+    (
+        refCast<fixedValuePointPatchVectorField>(motionPatchPointD)
+    );
+
+    // The mapped solid interface state at the start
+    interfaceDOffsetPtr_.clear();
+    interfacePointDOffsetPtr_.clear();
+    solid().gradD() = fvc::grad(solid().D());
+    solid().interpolatePointDisplacement
+    (
+        solid().D(), solid().gradD(), solid().pointD()
+    );
+    solid().pointD().correctBoundaryConditions();
+    mapInterfaceSolidToMeshMotion();
+
+    interfaceDOffsetPtr_.reset(new vectorField(motionPatchD - motionD));
+    interfacePointDOffsetPtr_.reset
+    (
+        new vectorField
+        (
+            refCast<fixedValuePointPatchVectorField>(motionPatchPointD)
+          - motionPointD
+        )
+    );
+
+    Info<< "Interface displacement offset between the solid and the fluid "
+        << "mesh at the start: max "
+        << gMax(mag(interfacePointDOffsetPtr_())) << endl;
+
+    // Restore the mesh motion interface state
+    motionPatchD == motionD;
+    if (isA<fixedDisplacementFvPatchVectorField>(motionPatchD))
+    {
+        refCast<fixedDisplacementFvPatchVectorField>(motionPatchD).totalDisp() =
+            motionD;
+    }
+    motionPatchU == motionU;
+    motionPatchPointD == motionPointD;
     motionSolid().pointD().correctBoundaryConditions();
 }
 
@@ -1944,6 +2015,8 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     ),
     interfaceMeshPhiOldPtr_(),
     interfaceMeshPhiOldOldPtr_(),
+    interfaceDOffsetPtr_(),
+    interfacePointDOffsetPtr_(),
     accumulatedInterfaceFluxLeakage_(0.0),
     nRegions_(2),
     subMatsPtr_(nullptr),
@@ -2249,6 +2322,11 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     );
 
     label timeStepRetry = 0;
+
+    if (!interfaceDOffsetPtr_.valid())
+    {
+        setInterfaceDisplacementOffsets();
+    }
 
     while (true)
     {
