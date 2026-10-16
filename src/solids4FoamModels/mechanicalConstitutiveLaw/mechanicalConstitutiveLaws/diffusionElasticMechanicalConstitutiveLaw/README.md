@@ -12,7 +12,7 @@ diffusionElastic
 ```
 
 The law is used by the `solids4foamSolidModel` fluid mesh motion solver, which
-solves a solid model on a static copy of the fluid mesh; see the
+moves the fluid mesh with a solid model; see the
 [fluid-solid interface page](../../../fluidSolidInterfaces/README.md). The
 dictionary layout common to all laws is described in the
 [material models page](../../../materialModels/README.md), and the framework
@@ -33,8 +33,8 @@ sigma = d*(2*mu*epsilon + lambda*tr(epsilon)*I)
 
 `d` is read from the `stiffnessScaleFactor` field, at the law's integration
 points (face values are interpolated from the cells). The
-`solids4foamSolidModel` mesh motion solver calculates it once, on the
-reference mesh, from the `diffusivity` in `constant/fluid/dynamicMeshDict`, as
+`solids4foamSolidModel` mesh motion solver calculates it once, from the mesh
+at construction, from the `diffusivity` in `constant/fluid/dynamicMeshDict`, as
 the face diffusivity limited to between `minFactor` (default `0.1`) and
 `maxFactor` (default `100`) times its average, divided by its average, and
 averaged to the cells. With `quadratic inverseDistance (interface)`, the mesh
@@ -61,8 +61,8 @@ it cannot be used with a mixed displacement-pressure solid model.
 
 ### Example
 
-From the `beamInCrossFlow` tutorial (`./Allrun diffusionElastic`), in
-`constant/fluidMeshMotion/mechanicalProperties`:
+In `constant/fluid/mechanicalProperties`, with `diffusivity` set in
+`constant/fluid/dynamicMeshDict`:
 
 ```text
 planeStress     no;
@@ -92,4 +92,4 @@ mechanical
 
 ## Tutorials
 
-- `fluidSolidInteraction/beamInCrossFlow` (`./Allrun diffusionElastic`)
+- None yet.
