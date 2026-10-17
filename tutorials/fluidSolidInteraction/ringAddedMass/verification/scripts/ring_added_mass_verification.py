@@ -99,6 +99,17 @@ def refine_mesh(path: Path, factor: int) -> None:
     path.write_text(text)
 
 
+def set_solid_cells(path: Path, cells: int) -> None:
+    """Set the circumferential cells of the solid block, so that the solid
+    and fluid interface faces do not match."""
+    text = path.read_text()
+    text, count = re.subn(r"(hex\s+\([^)]*\)\s+\(\s*\d+\s+)\d+",
+                          lambda m: m.group(1) + str(cells), text)
+    if count != 1:
+        fail(f"Expected one block in {path}, found {count}")
+    path.write_text(text)
+
+
 def time_controls(control: Path, delta_t: float, n_steps: int) -> None:
     replace_entry(control, "deltaT", f"{delta_t:.12g}")
     replace_entry(control, "endTime", f"{n_steps * delta_t:.12g}")
@@ -166,6 +177,8 @@ def case_name(spec: dict) -> str:
         parts += [spec["level"], spec["coupling"]]
     parts += [spec["solid"], f"m{spec['factor']}", f"n{spec['steps']}",
               f"p{spec['periods']}"]
+    if spec.get("solidCells"):
+        parts.append(f"nc{spec['solidCells']}")
     return "_".join(parts)
 
 
@@ -233,10 +246,23 @@ def configure(case: Path, spec: dict, reference: dict) -> None:
     if spec["kind"] == "dry":
         prepare_dry(case, spec["solid"])
         refine_mesh(case / "system/blockMeshDict", spec["factor"])
+        if spec.get("solidCells"):
+            set_solid_cells(case / "system/blockMeshDict", spec["solidCells"])
     else:
         shutil.copytree(TUTORIAL, case, symlinks=True, ignore=ignore_results)
         refine_mesh(case / "system/solid/blockMeshDict", spec["factor"])
         refine_mesh(case / "system/fluid/blockMeshDict", spec["factor"])
+        if spec.get("solidCells"):
+            # Non-conformal interface: the interface data are transferred with
+            # AMI instead of the direct face map
+            set_solid_cells(case / "system/solid/blockMeshDict",
+                            spec["solidCells"])
+            for path in case.glob("constant/fsiProperties.*"):
+                text, count = re.subn(r"(interfaceTransferMethod\s+)\w+;",
+                                      r"\1AMI;", path.read_text())
+                if count != 1:
+                    fail(f"Expected one interfaceTransferMethod in {path}")
+                path.write_text(text)
         rho = reference["levels"][spec["level"]]["rhoFluid"]
         replace_entry(case / "constant/fluid/transportProperties", "rho",
                       f"rho [1 -3 0 0 0 0 0] {rho:.12g}")
@@ -469,7 +495,8 @@ def build_specs(args: argparse.Namespace, reference: dict) -> list[dict]:
     specs: dict[str, dict] = {}
 
     def add(kind: str, solid: str, factor: int, n: int, level: str = "",
-            coupling: str = "iqnils", group: str = "main") -> None:
+            coupling: str = "iqnils", group: str = "main",
+            solid_cells: int = 0) -> None:
         omega = exact["dry"]["omega"] if kind == "dry" \
             else exact["levels"][level]["omega"]
         spec = {"kind": kind, "level": level if kind == "wet" else "",
@@ -477,6 +504,8 @@ def build_specs(args: argparse.Namespace, reference: dict) -> list[dict]:
                 "solid": solid, "factor": factor, "steps": n,
                 "periods": periods, "omega_exact": omega,
                 "period": 2 * math.pi / omega}
+        if solid_cells:
+            spec["solidCells"] = solid_cells
         spec["name"] = case_name(spec)
         entry = specs.setdefault(spec["name"], spec)
         entry.setdefault("groups", set()).add(group)
@@ -515,6 +544,17 @@ def build_specs(args: argparse.Namespace, reference: dict) -> list[dict]:
                 for coupling in ("iqnils", "monolithic"):
                     add("wet", "standard", factor, n, level, coupling,
                         group="monolithic")
+    if "nonconformal" in studies:
+        # The monolithic coupling with conformal interfaces and with solid
+        # interfaces coarser and finer than the fluid, under mesh refinement
+        for factor in mesh_factors:
+            cells = [0] + [c*factor for c in study["nonconformalSolidCells"]]
+            for solid_cells in cells:
+                add("dry", "standard", factor, steps, group="nonconformal",
+                    solid_cells=solid_cells)
+                for level in levels:
+                    add("wet", "standard", factor, steps, level, "monolithic",
+                        group="nonconformal", solid_cells=solid_cells)
     for spec in specs.values():
         spec["groups"] = sorted(spec["groups"])
     return list(specs.values())
@@ -545,7 +585,8 @@ def add_ratios(rows: list[dict], reference: dict) -> None:
         if row["kind"] != "wet":
             continue
         dry = find(rows, kind="dry", solid=row["solid"], factor=row["factor"],
-                   steps=row["steps"], periods=row["periods"])
+                   steps=row["steps"], periods=row["periods"],
+                   solidCells=row.get("solidCells"))
         if dry is None:
             continue
         row["ratio"] = row["omega"] / dry["omega"]
@@ -736,6 +777,31 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
               f"{finest['steps']} steps per period (IQN-ILS "
               f"{pct(other['loss_per_period'])}) at most "
               f"{100 * tol['maxLossPerPeriod']:.1f}%")
+    nonconformal_rows = [r for r in rows if "nonconformal" in r["groups"]]
+    factors = study["meshFactors"]
+    steps = study["stepsPerPeriod"]
+    for level in levels if nonconformal_rows else []:
+        for cells in [None] + study["nonconformalSolidCells"]:
+            series = [find(nonconformal_rows, kind="wet", level=level,
+                           coupling="monolithic", factor=f, steps=steps,
+                           solidCells=cells*f if cells else None)
+                      for f in factors]
+            if any(s is None or "ratio_error" not in s for s in series):
+                continue
+            label = f"{level}: monolithic, " + (
+                f"non-conformal ({cells}/48 solid/fluid interface faces)"
+                if cells else "conformal")
+            finest = series[-1]
+            record(f"{label}: wet/dry ratio error, mesh",
+                   [s["ratio_error"] for s in series])
+            check(abs(finest["ratio_error"]) <= tol["ratio"],
+                  f"{label}: finest-mesh wet/dry ratio error "
+                  f"{pct(finest['ratio_error'])} within "
+                  f"{100 * tol['ratio']:.2f}%")
+            loss = finest["loss_per_period"]
+            check(-tol["maxGrowthPerPeriod"] <= loss <= tol["maxLossPerPeriod"],
+                  f"{label}: amplitude loss {pct(loss)} per period at most "
+                  f"{100 * tol['maxLossPerPeriod']:.1f}%")
     if len(orders) > 5:
         lines += orders
     return failures
@@ -761,7 +827,8 @@ def table(rows: list[dict]) -> list[str]:
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
-    fields = ["name", "kind", "level", "coupling", "solid", "factor", "steps",
+    fields = ["name", "kind", "level", "coupling", "solid", "solidCells",
+              "factor", "steps",
               "periods", "omega", "omega_exact", "error", "ratio",
               "ratio_error", "ratio_thin_error", "amplitude", "decay_rate",
               "damping_ratio", "loss_per_period", "mean_iterations",
@@ -776,14 +843,17 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--study", choices=("all", "main", "solid", "coupling",
-                                            "monolithic"),
+                                            "monolithic", "nonconformal"),
                         default="all",
                         help="main: high-order solid mesh and time-step studies; "
                         "solid: standard against high-order solid; coupling: "
                         "IQN-ILS against Robin-Neumann; monolithic: "
                         "quasi-monolithic Newton against IQN-ILS coupling "
-                        "under time-step refinement, OpenFOAM.com only and "
-                        "not part of all (default: all)")
+                        "under time-step refinement; nonconformal: "
+                        "quasi-monolithic Newton coupling with conformal and "
+                        "non-conformal interfaces under mesh refinement; "
+                        "monolithic and nonconformal are OpenFOAM.com only "
+                        "and not part of all (default: all)")
     parser.add_argument("--levels",
                         help="comma-separated added-mass levels (default: all)")
     parser.add_argument("--cores", type=int, default=1,
@@ -828,7 +898,8 @@ def main() -> int:
     rows.sort(key=lambda r: (r["kind"] != "dry",
                              list(reference["levels"]).index(r["level"])
                              if r["level"] else -1,
-                             r["coupling"], r["solid"], r["factor"], r["steps"]))
+                             r["coupling"], r["solid"], r.get("solidCells", 0),
+                             r["factor"], r["steps"]))
 
     lines = ["# ringAddedMass verification summary", ""]
     lines += table(rows)

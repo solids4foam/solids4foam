@@ -27,6 +27,7 @@
         "timeSteps": [25, 50, 100],
         "timeStudyFactor": 2,
         "couplingStudyFactor": 2,
+        "nonconformalSolidCells": [32, 72],
         "quick": {
             "levels": ["moderate"],
             "meshFactors": [1],
