@@ -1,0 +1,52 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Immersed cylinder, see src/immersedBoundary/README.md
+immersedBoundary
+{
+    type            immersedBoundaryForce;
+
+    // cutLink (the default), with the force from the surface traction
+    // (the momentum exchange is written in columns 11-13)
+    forceEstimator  surfaceTraction;
+
+    bodies
+    {
+        beam
+        {
+            // Beam of 0.2 x 2.0295 m on the bottom wall at x = 12 m
+            surface     "beam.stl";
+            CofR        (12 1.01475 0);
+
+            // Bending with the quintic smoothstep profile along y
+            motion
+            {
+                type        customProfileBend;
+                amplitudeX  0.4;
+                amplitudeY  0.8;
+                period      1;
+                yMin        0;
+                yMax        2.0295;
+                xCenter     12;
+            }
+        }
+    }
+}
+
+// ************************************************************************* //

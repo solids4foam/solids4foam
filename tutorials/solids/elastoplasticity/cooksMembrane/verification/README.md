@@ -1,10 +1,9 @@
 # Elastoplastic Cook's membrane verification
 
-This opt-in study migrates the structured quadrilateral mesh sweep previously
-kept in `solid-benchmarks/elastoPlasticity/cooksMembrane`. It copies the parent
-tutorial into `verification/work/`, runs the updated-Lagrangian elastoplastic
-formulation on successively refined meshes, and records the top-right vertical
-displacement. The tutorial and normal regression tests are not modified.
+This opt-in study is a structured quadrilateral mesh sweep. It copies the
+parent tutorial into `verification/work/`, runs the updated-Lagrangian
+elastoplastic formulation on successively refined meshes, and records the
+top-right vertical displacement.
 
 With OpenFOAM and solids4foam loaded, run:
 
@@ -30,3 +29,7 @@ over the sweep with positive net order. The default full study took about 8
 minutes on an Apple M1 Max reference machine with OpenFOAM-v2512. The quick
 mode checks only that all requested cases finish and produce finite
 displacement values.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

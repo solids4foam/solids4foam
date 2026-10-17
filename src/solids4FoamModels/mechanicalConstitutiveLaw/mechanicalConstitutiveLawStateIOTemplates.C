@@ -38,7 +38,7 @@ bool Foam::stateIOFieldProxy<Type>::writeData(Ostream& os) const
     forAll(parts_, partI)
     {
         const Field<Type>& f =
-            stateFieldAccess<Type>::get(*parts_[partI], variableName_);
+            parts_[partI]->template getField<Type>(variableName_);
 
         forAll(f, i)
         {
@@ -221,9 +221,9 @@ bool Foam::mechanicalConstitutiveLawStateIO::readOwnFile
     forAll(parts, partI)
     {
         Field<Type>& f =
-            stateFieldAccess<Type>::ref(*parts[partI], variableName);
+            parts[partI]->field<Type>(variableName);
         Field<Type>& f0 =
-            stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+            parts[partI]->field0<Type>(variableName);
 
         forAll(f, i)
         {
@@ -374,9 +374,9 @@ bool Foam::mechanicalConstitutiveLawStateIO::distributeFromSerial
         forAll(parts, partI)
         {
             Field<Type>& f =
-                stateFieldAccess<Type>::ref(*parts[partI], variableName);
+                parts[partI]->field<Type>(variableName);
             Field<Type>& f0 =
-                stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+                parts[partI]->field0<Type>(variableName);
 
             forAll(f, i)
             {
@@ -648,9 +648,9 @@ bool Foam::mechanicalConstitutiveLawStateIO::gatherFromProcessors
     forAll(parts, partI)
     {
         Field<Type>& f =
-            stateFieldAccess<Type>::ref(*parts[partI], variableName);
+            parts[partI]->field<Type>(variableName);
         Field<Type>& f0 =
-            stateFieldAccess<Type>::ref0(*parts[partI], variableName);
+            parts[partI]->field0<Type>(variableName);
 
         forAll(f, i)
         {

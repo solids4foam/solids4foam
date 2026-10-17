@@ -50,6 +50,8 @@ Author
 #ifndef manufacturedSolutionSource_H
 #define manufacturedSolutionSource_H
 
+#ifdef OPENFOAM_COM
+
 #include "fvOption.H"
 #include "manufacturedSolution.H"
 
@@ -124,6 +126,7 @@ public:
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
+#endif
 #endif
 
 // ************************************************************************* //

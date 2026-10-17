@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # cylinderCrush regression test
 # Uses the short displacement and force histories as a contact benchmark.
@@ -45,7 +48,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i.bak 's/^endTime[[:space:]]\+30;/endTime         1;/' "${CASE_DIR}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+30;/endTime         1;/' "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 }
 
@@ -87,20 +90,33 @@ if [[ -z "${final_force_y}" || -z "${final_disp_y}" ]]; then
     exit 1
 fi
 
-# Run the case both ways and require the two to agree.
+# Against the removed legacy mechanicalModel.
 #
-# Both arms turn the pressure equation off. The case ships with
-# solvePressureEqn yes and a smoothing scale factor, and the framework has no
-# equivalent yet - the hydrostatic stress there is 0.5*K*(J^2 - 1) taken
-# directly, where the legacy law solves and smooths an equation for it. So this
-# checks the Ogden law itself: the principal stretches, the stress built from
-# them, and the rotation back. The shipped configuration is covered by the
-# checks above, and the pressure equation is a separate piece of work.
+# The comparison run turns the pressure equation off. The case ships with
+# solvePressureEqn yes and a smoothing scale factor; the legacy law smoothed the
+# hydrostatic stress itself, and on the framework the solid model does it
+# instead. Turning it off here checks the MooneyRivlin law on its own. The
+# shipped configuration, smoothing included, is covered by the force band
+# above - without the smoothing the final force is about -497 N, outside it -
+# and by the log line checked below.
 #
-# Two of the thirty steps. The legacy solver reaches its corrector limit from
-# the third step onwards, so past that it is an unconverged answer being
-# compared against a converged one
+# Two of the thirty steps. The legacy solver reached its corrector limit from
+# the third step onwards, so past that it was an unconverged answer
 COMPARISON_END_TIME=2
+
+# The norms of the comparison run's final D, max and mean component magnitude,
+# on the removed legacy mechanicalModel, from the last commit that had it
+# (mcl-stage8-coverage, c3a92b3d), on foam-extend 4.1, the one fork this case
+# runs on. The framework reproduced the legacy D field to round-off, 1e-10 of
+# its largest value. These are
+# recorded numbers, though, and another compiler, CPU or MPI build moves an
+# iterative solution by round-off at the solver tolerance: CI measures up to
+# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
+# largest value, allows for that, and is ten times below the 1e-5 that a
+# 0.001% change in a material constant makes
+REF_D_MAX=0.0066666666744038
+REF_D_MEAN=0.00116545530838457
+REF_D_REL_TOL=1e-6
 
 # The latest written time directory.
 #
@@ -134,64 +150,12 @@ check_completed() {
     fi
 }
 
-compare_internal_vector_fields() {
-    python3 - "$1" "$2" << 'PYEOF'
-import re
-import sys
-
-number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-
-def read_internal(path):
-    text = open(path).read()
-    uniform = re.search(
-        rf"\binternalField\s+uniform\s+\(({number})\s+({number})\s+({number})\)\s*;",
-        text,
-    )
-    if uniform:
-        return [tuple(map(float, uniform.groups()))]
-
-    nonuniform = re.search(
-        r"\binternalField\s+nonuniform\s+List<vector>\s+\d+\s*\((.*?)\)\s*;",
-        text,
-        re.DOTALL,
-    )
-    if not nonuniform:
-        raise ValueError(f"cannot parse internalField in {path}")
-
-    values = re.findall(
-        rf"\(({number})\s+({number})\s+({number})\)", nonuniform.group(1)
-    )
-    if not values:
-        raise ValueError(f"empty internalField in {path}")
-    return [tuple(map(float, value)) for value in values]
-
-try:
-    a = read_internal(sys.argv[1])
-    b = read_internal(sys.argv[2])
-    if len(a) == 1 and len(b) > 1:
-        a *= len(b)
-    if len(b) == 1 and len(a) > 1:
-        b *= len(a)
-    if len(a) != len(b):
-        raise ValueError("different internalField sizes")
-    max_diff = max(abs(x - y) for av, bv in zip(a, b) for x, y in zip(av, bv))
-    max_value = max(abs(x) for av in a for x in av)
-    print(f"{max_diff/max_value if max_value else max_diff:.10g}")
-except (OSError, ValueError) as error:
-    print(error, file=sys.stderr)
-    sys.exit(1)
-PYEOF
-}
-
-run_framework_comparison() {
-    local legacy_dir="${REGRESSION_ROOT}/comparisonLegacy"
-    local framework_dir="${REGRESSION_ROOT}/comparisonFramework"
-    local dir
+run_reference_comparison() {
+    local dir="${REGRESSION_ROOT}/comparison"
 
     if [ "$CHECK_ONLY" = false ]; then
-        for dir in "${legacy_dir}" "${framework_dir}"; do
-            rm -rf "${dir}"
-            mkdir -p "${dir}"
+        rm -rf "${dir}"
+        mkdir -p "${dir}"
 
         local item base_item
         for item in "${SCRIPT_DIR}"/*; do
@@ -202,89 +166,52 @@ run_framework_comparison() {
             cp -a "${item}" "${dir}/"
         done
 
-        sed -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
+        "${SOLIDS4FOAM_SED}" -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
             "${dir}/system/controlDict"
 
-        sed -i 's|solvePressureEqn[[:space:]]*yes;|solvePressureEqn no;|' \
+        "${SOLIDS4FOAM_SED}" -i 's|solvePressureEqn[[:space:]]*yes;|solvePressureEqn no;|' \
             "${dir}/constant/mechanicalProperties"
 
         if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-            sed -i 's|^writePrecision.*|writePrecision  14;|' \
+            "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
                 "${dir}/system/controlDict"
         else
             echo "writePrecision  14;" >> "${dir}/system/controlDict"
         fi
-        done
 
-        sed -i \
-            's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-            "${framework_dir}/constant/solidProperties"
-
-        for dir in "${legacy_dir}" "${framework_dir}"; do
-            ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-                echo "FAIL: the comparison could not run ${dir}"
-                return 1
-            }
-        done
+        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+            echo "FAIL: the comparison could not run ${dir}"
+            return 1
+        }
     else
-        echo "Check-only: checking existing framework comparison"
+        echo "Check-only: checking the existing comparison run"
     fi
 
-    if solids4Foam::regressionCaseSkipped "${legacy_dir}/${ALLRUN_LOGFILE}"; then
-        echo "Skipping the framework comparison: the case skipped here"
+    if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"; then
+        echo "Skipping the reference comparison: the case skipped here"
         return 0
     fi
 
     if ! grep -q "Selecting mechanical constitutive law" \
-        "${framework_dir}/${SOLVER_LOGFILE}"
+        "${dir}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the framework arm did not use the framework"
+        echo "FAIL: the comparison run constructed no mechanical constitutive law"
         return 1
     fi
 
-    if grep -q "Selecting mechanical constitutive law" \
-        "${legacy_dir}/${SOLVER_LOGFILE}"
+    # Without solvePressureEqn there must be no smoothing, or this is not the
+    # law on its own
+    if grep -q "smoothing the hydrostatic stress" "${dir}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the legacy arm used the framework"
+        echo "FAIL: the comparison run smoothed the hydrostatic stress"
         return 1
     fi
 
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        if ! check_completed "${dir}" "${COMPARISON_END_TIME}"; then
-            return 1
-        fi
-    done
+    check_completed "${dir}" "${COMPARISON_END_TIME}" || return 1
 
-    local t
-    t=$(latest_time_dir "${legacy_dir}")
-
-    if [[ "${t}" != "$(latest_time_dir "${framework_dir}")" ]]; then
-        echo "FAIL: the arms reached different times"
-        return 1
-    fi
-
-    if [[ -z "${t}" || ! -f "${legacy_dir}/${t}/D" \
-       || ! -f "${framework_dir}/${t}/D" ]]
-    then
-        echo "FAIL: the comparison produced no D field"
-        return 1
-    fi
-
-    local rel
-    if ! rel=$(compare_internal_vector_fields \
-        "${legacy_dir}/${t}/D" "${framework_dir}/${t}/D")
-    then
-        echo "FAIL: could not compare the two D internal fields"
-        return 1
-    fi
-
-    if awk "BEGIN {exit !(${rel} < 1e-10)}"; then
-        printf "PASS: framework and legacy agree to round-off, %.3g\n" "${rel}"
-        return 0
-    fi
-
-    printf "FAIL: framework and legacy differ, relative D diff = %.4g\n" "${rel}"
-    return 1
+    solids4Foam::checkFieldNorms "D at t = ${COMPARISON_END_TIME}" \
+        "${dir}/$(latest_time_dir "${dir}")/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_D_REL_TOL}"
 }
 
 failures=0
@@ -303,13 +230,24 @@ else
     failures=$((failures + 1))
 fi
 
+# The shipped case asks for the hydrostatic stress smoothing, and the solid
+# model has to say it is doing it
+if grep -q "smoothing the hydrostatic stress (solvePressureEqn)" \
+    "${CASE_DIR}/${SOLVER_LOGFILE}"
+then
+    echo "PASS: the hydrostatic stress is smoothed"
+else
+    echo "FAIL: no hydrostatic stress smoothing in the log"
+    failures=$((failures + 1))
+fi
+
 if [ "$CHECK_ONLY" = false ]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 
 echo
 
-if ! run_framework_comparison; then
+if ! run_reference_comparison; then
     failures=$((failures + 1))
 fi
 

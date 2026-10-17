@@ -19,3 +19,13 @@ for file in $(find ./0 ./constant ./system -name '*.petscSnes')
 do
     ln -vnsf ${file##*/} ${file%.*}
 done
+
+# Restore the default time scheme and remove comparison runs
+ln -vnsf fvSchemes.bdf2 system/fvSchemes
+rm -rf timeSchemeRuns
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

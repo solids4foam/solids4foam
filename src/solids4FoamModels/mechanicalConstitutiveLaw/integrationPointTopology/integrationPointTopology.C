@@ -40,7 +40,7 @@ Foam::integrationPointTopology::New
     const fvMesh& mesh
 )
 {
-#if (OPENFOAM >= 2112)
+#ifdef OPENFOAM_COM
     auto* ctorPtr = fvMeshConstructorTable(topologyType);
 
     if (!ctorPtr)

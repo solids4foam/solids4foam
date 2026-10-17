@@ -117,17 +117,23 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Field to provide fvOptions with the correct dimensions
+        volScalarField ds_;
+
 
     // Private Member Functions
 
-        //- Update the cell-centred stress, from the framework when
-        //  the framework is in use and from the legacy
-        //  mechanicalModel otherwise
+        //- Update the cell-centred stress
         void correctStress();
 
-        //- Update the stress at the face quadrature points, from the framework
-        //  when the framework is in use and from the
-        //  legacy mechanicalModel otherwise.
+        //- This model smooths the hydrostatic stress on request, in
+        //  correctStress(), in its implicit segregated algorithm
+        virtual bool supportsHydrostaticSmoothing() const
+        {
+            return true;
+        }
+
+        //- Update the stress at the face quadrature points.
         //  The high-order face quadrature does not exist on foam-extend
         void correctStressQuad();
 
@@ -141,9 +147,7 @@ class nonLinGeomTotalLagTotalDispSolid
         mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
         mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
 
-        //- Construct impK from the framework when
-        //  the framework is in use, and from the legacy
-        //  mechanicalModel otherwise
+        //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
 
         //- Calculate the current face-area vectors
@@ -202,6 +206,12 @@ protected:
 
     // Protected member functions
 
+#ifndef OPENFOAM_COM
+        //- Return optional source per unit reference volume; empty (no
+        //  source) by default
+        virtual tmp<volVectorField> fvOptionsSource() const;
+#endif
+
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const
         {
@@ -243,10 +253,6 @@ public:
             }
 
         // Edit
-
-            //- Material residual, zero on the framework path: see the
-            //  base class declaration
-            virtual scalar materialResidual() override;
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();

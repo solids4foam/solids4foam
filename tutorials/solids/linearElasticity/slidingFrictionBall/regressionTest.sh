@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # slidingFrictionBall regression test
 # Uses a short point-displacement history as a cheap contact check.
@@ -49,7 +52,7 @@ prepare_case() {
 
 shorten_case() {
     local controlDict="${CASE_DIR}/system/controlDict"
-    sed -i.bak 's/^endTime[[:space:]]\+100;/endTime         5;/' "${controlDict}"
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime[[:space:]]\+100;/endTime         5;/' "${controlDict}"
     rm -f "${controlDict}.bak"
 
     cat >> "${controlDict}" <<'EOF'

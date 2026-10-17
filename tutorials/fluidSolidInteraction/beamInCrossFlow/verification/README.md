@@ -141,6 +141,10 @@ The scripts write `original_mesh_sweep.png` and `modified_mesh_sweep.png` to
 `verification/postProcessing/`. They use the initial solid spacing of `0.025 m`
 and the time-step-to-refinement relationship from the sweep configuration.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference results
 
 The following plots are versioned with this verification setup. They record the

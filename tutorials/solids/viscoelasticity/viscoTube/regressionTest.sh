@@ -4,15 +4,17 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-# Run twice: the legacy mechanicalModel and the mechanicalConstitutiveLaw
-# framework. viscousHookeanElastic is history dependent through its Maxwell
-# arms, and this is the only end-to-end comparison of that law against the
-# legacy one. There is no pressure smoothing here, so the two must agree
-APPROACHES=(
-    legacy
-    framework
-)
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
+source "${SOLIDS4FOAM_SCRIPTS}"
+
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
+# viscousHookeanElastic is history dependent through its Maxwell arms, and
+# this is the only end-to-end comparison of the mechanicalConstitutiveLaw
+# framework's law against the removed legacy one. There is no pressure
+# smoothing here, so the framework must reproduce the legacy answer
 # ============================================================
 # viscoTube regression test
 # Checks order of magnitude of strain and von Mises stress
@@ -24,6 +26,17 @@ EPS_MAX=1e-3
 
 SIGMA_MIN=1e6
 SIGMA_MAX=1e8
+
+# The final extrema, logged to fourteen figures. The framework matched the
+# removed legacy mechanicalModel's to the eight digits compared, on every fork
+# (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's, the same as
+# OpenFOAM.org 9's; foam-extend 4.1 gives both 1.9e-3 larger, and the
+# tolerance, 3e-3 relative, covers that. The Maxwell arms are history, so a
+# relaxation error accumulates over the run and shows here in a way the unit
+# checks, which compare two trial states from one rest state, cannot see
+REF_EPS=0.00019987366
+REF_SIG=11480085
+REF_REL_TOL=3e-3
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -41,10 +54,10 @@ echo
 # viscousHookeanElastic, the first law whose response depends on the time
 # increment, so this is the runtime coverage of the inputs object carrying dt
 run_constitutive_test() {
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${CASE_DIR}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
@@ -71,9 +84,9 @@ run_constitutive_test() {
     return 1
 }
 
+# A copy of the case in regressionTests/<name>, main unless named
 prepare_case() {
-    local approach="$1"
-    CASE_DIR="${REGRESSION_ROOT}/${approach}"
+    CASE_DIR="${REGRESSION_ROOT}/${1:-main}"
 
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
@@ -89,24 +102,21 @@ prepare_case() {
     # Every arm at the same precision. Comparing a value logged at six
     # significant figures against one logged at fourteen measures the log
     # format and calls the difference a regression
-    sed -i.bak 's/^writePrecision  6;/writePrecision  14;/' \
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^writePrecision  6;/writePrecision  14;/' \
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 
-    if [[ "${approach}" == framework* ]]; then
-        # The switch lives in the <type>Coeffs sub-dictionary; at the top level
-        # it is silently ignored and this arm would repeat the legacy run
-        sed -i.bak \
-            's/^    nCorrectors     1000;/    useMechanicalConstitutiveLawManager yes;\n    restart yes;\n    nCorrectors     1000;/' \
-            "${CASE_DIR}/constant/solidProperties"
-        rm -f "${CASE_DIR}/constant/solidProperties.bak"
+    # restart yes makes the solid model write the kinematic history the
+    # restart test below needs; the main arm asks too, so that the two are set
+    # up the same
+    "${SOLIDS4FOAM_SED}" -i.bak \
+        's/^    nCorrectors     1000;/    restart yes;\n    nCorrectors     1000;/' \
+        "${CASE_DIR}/constant/solidProperties"
+    rm -f "${CASE_DIR}/constant/solidProperties.bak"
 
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${CASE_DIR}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
+    if ! grep -q 'restart yes' "${CASE_DIR}/constant/solidProperties"; then
+        echo "FAIL: could not set restart in solidProperties"
+        exit 1
     fi
 }
 
@@ -129,98 +139,81 @@ extract_max_sigma() {
 }
 
 # ------------------------------------------------------------
-# Run and check each approach
+# Run and check the case
 # ------------------------------------------------------------
 
 failures=0
-declare -A RESULT_E
-declare -A RESULT_S
+result_e=""
+result_s=""
 
-for approach in "${APPROACHES[@]}"; do
-    echo
-    echo "------------------------------------------------------------"
-    echo "Testing approach: ${approach}"
-    echo "------------------------------------------------------------"
-
-    prepare_case "${approach}"
+run_case() {
+    prepare_case
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
 
     if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null
     then
-        used_framework=true
+        echo "PASS: took its material from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not construct the framework"
+        echo "FAIL: constructed no mechanical constitutive law"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly constructed the framework"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected path"
     fi
 
     epsilon=$(extract_max_epsilon)
     sigma=$(extract_max_sigma)
 
     if [[ -z "${epsilon}" || -z "${sigma}" ]]; then
-        echo "FAIL: ${approach} could not extract epsilonEq or sigmaEq"
+        echo "FAIL: could not extract epsilonEq or sigmaEq"
         failures=$((failures + 1))
-        continue
+        return 0
     fi
 
-    RESULT_E["${approach}"]="${epsilon}"
-    RESULT_S["${approach}"]="${sigma}"
+    result_e="${epsilon}"
+    result_s="${sigma}"
 
     if awk "BEGIN {exit !(${epsilon} > ${EPS_MIN} && ${epsilon} < ${EPS_MAX})}"; then
-        printf "PASS: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+        printf "PASS: Max epsilonEq = %.6g\n" "${epsilon}"
     else
-        printf "FAIL: %s Max epsilonEq = %.6g\n" "${approach}" "${epsilon}"
+        printf "FAIL: Max epsilonEq = %.6g\n" "${epsilon}"
         failures=$((failures + 1))
     fi
 
     if awk "BEGIN {exit !(${sigma} > ${SIGMA_MIN} && ${sigma} < ${SIGMA_MAX})}"; then
-        printf "PASS: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+        printf "PASS: Max sigmaEq = %.6g\n" "${sigma}"
     else
-        printf "FAIL: %s Max sigmaEq = %.6g\n" "${approach}" "${sigma}"
+        printf "FAIL: Max sigmaEq = %.6g\n" "${sigma}"
         failures=$((failures + 1))
     fi
 
-    if [[ "${approach}" == "legacy" ]]; then
-        if ! run_constitutive_test; then
-            failures=$((failures + 1))
-        fi
+    if ! run_constitutive_test; then
+        failures=$((failures + 1))
     fi
 
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-done
+}
 
-# The Maxwell arms are history, so a relaxation error accumulates over the run
-# and shows here in a way the unit checks, which compare two trial states from
-# one rest state, cannot see
-if [[ -n "${RESULT_E[legacy]:-}" && -n "${RESULT_E[framework]:-}" ]]; then
+run_case
+
+if [[ -n "${result_e}" ]]; then
     for q in eps sig; do
         if [[ "${q}" == "eps" ]]; then
-            a="${RESULT_E[legacy]}"; b="${RESULT_E[framework]}"; n="epsilonEq"
+            a="${REF_EPS}"; b="${result_e}"; n="epsilonEq"
         else
-            a="${RESULT_S[legacy]}"; b="${RESULT_S[framework]}"; n="sigmaEq"
+            a="${REF_SIG}"; b="${result_s}"; n="sigmaEq"
         fi
 
-        if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
-            printf "PASS: legacy and framework %s agree (%.8g vs %.8g)\n" "$n" "$a" "$b"
+        if awk "BEGIN {exit !(($a - $b)^2 <= (${REF_REL_TOL}*$a)^2)}"; then
+            printf "PASS: %s matches the reference (%.8g vs %.8g)\n" "$n" "$b" "$a"
         else
-            printf "FAIL: legacy and framework %s differ (%.8g vs %.8g)\n" "$n" "$a" "$b"
+            printf "FAIL: %s differs from the reference (%.8g vs %.8g)\n" "$n" "$b" "$a"
             failures=$((failures + 1))
         fi
     done
 else
-    echo "SKIP: cross-check needs both approaches to have run"
+    echo "FAIL: the case produced nothing to compare with the reference"
+    failures=$((failures + 1))
 fi
-
 
 # ------------------------------------------------------------
 # Restart
@@ -232,12 +225,12 @@ fi
 # history survived: relaxation is the whole behaviour, and a run that forgot
 # how far each arm had relaxed starts again from an unstressed state
 run_restart_test() {
-    local d="${REGRESSION_ROOT}/frameworkRestart"
+    local d="${REGRESSION_ROOT}/restart"
 
-    prepare_case "frameworkRestart"
+    prepare_case "restart"
     CASE_DIR="${d}"
 
-    sed -i.bak 's/^endTime         7000;/endTime         3500;/' \
+    "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime         7000;/endTime         3500;/' \
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
 
@@ -248,15 +241,15 @@ run_restart_test() {
 
     # One file per arm, plus the relaxing deviatoric stress
     local nArms
-    nArms=$(ls "${d}"/3500/*:*:h[0-9]* 2>/dev/null | wc -l)
+    nArms=$(ls "${d}"/3500/*IntegrationPointTopology_h[0-9]* 2>/dev/null | wc -l)
 
-    if ! ls "${d}"/3500/*:*:s > /dev/null 2>&1 || (( nArms == 0 )); then
+    if ! ls "${d}"/3500/*IntegrationPointTopology_s > /dev/null 2>&1 || (( nArms == 0 )); then
         echo "FAIL: restart: the viscous history was not written"
         return 1
     fi
     echo "PASS: restart: the viscous history is written (${nArms} arm(s))"
 
-    sed -i.bak \
+    "${SOLIDS4FOAM_SED}" -i.bak \
         's/^startFrom       startTime;/startFrom       latestTime;/; s/^endTime         3500;/endTime         7000;/' \
         "${d}/system/controlDict"
     rm -f "${d}/system/controlDict.bak"
@@ -273,14 +266,14 @@ run_restart_test() {
     eps=$(extract_max_epsilon)
     sig=$(extract_max_sigma)
 
-    if [[ -z "${eps}" || -z "${RESULT_S[framework]:-}" ]]; then
-        echo "SKIP: restart needs the framework arm to have run"
+    if [[ -z "${eps}" || -z "${result_s}" ]]; then
+        echo "SKIP: restart needs the main arm to have run"
         return 0
     fi
 
     # Stress, not strain: strain is driven by the load and comes back whatever
     # the history did, while the stress is what the relaxation determines
-    local a="${RESULT_S[framework]}"
+    local a="${result_s}"
 
     if awk "BEGIN {exit !(($a - $sig)^2 <= (1e-6*$a)^2)}"; then
         printf "PASS: restart reproduces the uninterrupted run (%.8g vs %.8g)\n" \

@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # compressedSpheres regression test
 # Runs the default frictionless case on the shipped coarse mesh up to a
@@ -57,7 +60,7 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    sed -i.bak "s/^endTime[[:space:]]\+0.75;/endTime         ${REGRESSION_END_TIME};/" \
+    "${SOLIDS4FOAM_SED}" -i.bak "s/^endTime[[:space:]]\+0.75;/endTime         ${REGRESSION_END_TIME};/" \
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 }

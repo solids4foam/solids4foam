@@ -1,0 +1,96 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Wan and Turek (2006) closed channel: [0, 2.2] x [0, 0.41] m. The immersed
+// cylinder is not meshed: the mesh is uniform in the band 0.78 < x < 1.42 m
+// swept by the cylinder, and coarsens towards the ends of the channel.
+//
+// The mesh density is set by the MESH_LEVEL environment variable (default 1),
+// which halves the cell size for each level:
+//     MESH_LEVEL=2 ./Allrun
+
+MESH_LEVEL ${MESH_LEVEL:-1};
+
+nRefine #eval "pow(2, $MESH_LEVEL - 1)";
+nxBand #eval "round(64*$nRefine)";
+nxEnd #eval "round(30*$nRefine)";
+ny #eval "round(41*$nRefine)";
+
+convertToMeters 1;
+
+vertices
+(
+    (0    0    0)
+    (0.78 0    0)
+    (1.42 0    0)
+    (2.2  0    0)
+    (0    0.41 0)
+    (0.78 0.41 0)
+    (1.42 0.41 0)
+    (2.2  0.41 0)
+    (0    0    0.1)
+    (0.78 0    0.1)
+    (1.42 0    0.1)
+    (2.2  0    0.1)
+    (0    0.41 0.1)
+    (0.78 0.41 0.1)
+    (1.42 0.41 0.1)
+    (2.2  0.41 0.1)
+);
+
+blocks
+(
+    hex (0 1 5 4 8 9 13 12) ($nxEnd $ny 1) simpleGrading (0.25 1 1)
+    hex (1 2 6 5 9 10 14 13) ($nxBand $ny 1) simpleGrading (1 1 1)
+    hex (2 3 7 6 10 11 15 14) ($nxEnd $ny 1) simpleGrading (4 1 1)
+);
+
+boundary
+(
+    walls
+    {
+        type            wall;
+        faces
+        (
+            (0 8 12 4)
+            (3 7 15 11)
+            (0 1 9 8)
+            (1 2 10 9)
+            (2 3 11 10)
+            (4 12 13 5)
+            (5 13 14 6)
+            (6 14 15 7)
+        );
+    }
+    frontAndBack
+    {
+        type            empty;
+        faces
+        (
+            (0 4 5 1)
+            (1 5 6 2)
+            (2 6 7 3)
+            (8 9 13 12)
+            (9 10 14 13)
+            (10 11 15 14)
+        );
+    }
+);
+
+// ************************************************************************* //

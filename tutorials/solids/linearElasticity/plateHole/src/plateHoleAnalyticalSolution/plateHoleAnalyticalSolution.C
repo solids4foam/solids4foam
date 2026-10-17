@@ -100,9 +100,7 @@ void Foam::plateHoleAnalyticalSolution::derivedMaterial
 ) const
 {
     // Read from the law's own entry in mechanicalProperties rather than asked
-    // of the solid model, so the answer is the same whichever implementation
-    // the run uses: the legacy mechanicalModel and the mechanicalConstitutiveLaw
-    // framework read this same entry
+    // of the solid model
     const PtrList<entry> laws
     (
         mechanicalProperties(mesh).lookup("mechanical")

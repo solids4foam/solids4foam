@@ -132,6 +132,12 @@
         const scalarField& pMagSf =
             magSf.boundaryField()[patchI];
 
+        // Named operands are used in the products below: a tmp operand with
+        // the type of the result would be reused as the storage of the inner
+        // product, which aliases an input of the loop and gives wrong results
+        // with some -O3 builds (see pimpleFluid::patchViscousForce)
+        const tensorField nfnf(nf*nf);
+
         const vectorField& pCorrection =
             correction.boundaryField()[patchI];
 
@@ -146,20 +152,28 @@
             tensor4Field& cu = DDDpEqn.coupleUpper()[patchI].asSquare();
             tensor4Field& cl = DDDpEqn.coupleLower()[patchI].asSquare();
 
+            const diagTensorField gradBouCoeffsDiag
+            (
+                diag(DD().boundaryField()[patchI].gradientBoundaryCoeffs())
+            );
+
             tensorField boundaryCoeffs =
                -impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientBoundaryCoeffs())
+                    nfnf & gradBouCoeffsDiag
                 );
 
             bouCoeffsSourceContrib = vector::zero;
 
+            const diagTensorField gradIntCoeffsDiag
+            (
+                diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+            );
+
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+                    nfnf & gradIntCoeffsDiag
                 );
 
             forAll(cu, faceI)
@@ -217,68 +231,31 @@
         }
         else if
         (
-            isA<fixedValueFvPatchVectorField>
-            (
-                DD().boundaryField()[patchI]
-            )
+            isA<fixedValueFvPatchVectorField>(DD().boundaryField()[patchI])
+         || isA<wedgeFvPatchVectorField>(DD().boundaryField()[patchI])
+         || isA<symmetryFvPatchVectorField>(DD().boundaryField()[patchI])
         )
         {
-            bouCoeffsSourceContrib =
-               -impKf.boundaryField()[patchI]*pMagSf
-               *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].gradientBoundaryCoeffs()
-                );
-
-            internalCoeffs =
-                impKf.boundaryField()[patchI]*pMagSf*
-                (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
-                );
-        }
-        else if
-        (
-            isA<wedgeFvPatchVectorField>
+            const vectorField gradBouCoeffs
             (
-                DD().boundaryField()[patchI]
-            )
-        )
-        {
-            internalCoeffs =
-                impKf.boundaryField()[patchI]*pMagSf*
-                (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
-                );
+                DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+            );
 
             bouCoeffsSourceContrib =
                -impKf.boundaryField()[patchI]*pMagSf
                *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].gradientBoundaryCoeffs()
+                   nfnf & gradBouCoeffs
                 );
-        }
-        else if
-        (
-            isA<symmetryFvPatchVectorField>
+
+            const diagTensorField gradIntCoeffsDiag
             (
-                DD().boundaryField()[patchI]
-            )
-        )
-        {
-            bouCoeffsSourceContrib =
-               -impKf.boundaryField()[patchI]*pMagSf
-               *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].gradientBoundaryCoeffs()
-                );
+                diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+            );
 
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & diag(DD().boundaryField()[patchI].gradientInternalCoeffs())
+                    nfnf & gradIntCoeffsDiag
                 );
         }
         else if
@@ -286,19 +263,27 @@
             DD().boundaryField()[patchI].blockCoupled()
         )
         {
+            const vectorField blockGradBouCoeffs
+            (
+                DD().boundaryField()[patchI].blockGradientBoundaryCoeffs()
+            );
+
             bouCoeffsSourceContrib =
                -impKf.boundaryField()[patchI]*pMagSf
                *(
-                   (nf*nf)
-                 & DD().boundaryField()[patchI].blockGradientBoundaryCoeffs()
+                   nfnf & blockGradBouCoeffs
                 );
+
+            const tensorField blockGradIntCoeffs
+            (
+                DD().boundaryField()[patchI].blockGradientInternalCoeffs()()
+               .asSquare()
+            );
 
             internalCoeffs =
                 impKf.boundaryField()[patchI]*pMagSf*
                 (
-                    (nf*nf)
-                  & DD().boundaryField()[patchI].blockGradientInternalCoeffs()()
-                   .asSquare()
+                    nfnf & blockGradIntCoeffs
                 );
         }
         else if

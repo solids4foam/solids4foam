@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the contact patch test with its two legacy solid formulations."""
+"""Run the contact patch test verification with linearGeometryTotalDisplacement."""
 
 from __future__ import annotations
 
@@ -14,10 +14,9 @@ import sys
 from pathlib import Path
 
 
-VARIANTS = (
-    "linearGeometryTotalDisplacement",
-    "unsLinearGeometry",
-)
+# The original study also ran unsLinearGeometry, which was removed together
+# with the legacy mechanical model
+VARIANTS = ("linearGeometryTotalDisplacement",)
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,7 +26,7 @@ def parse_args() -> argparse.Namespace:
         "--variant",
         choices=("all", *VARIANTS),
         default="all",
-        help="formulation to run (default: both)",
+        help="formulation to run (default: all)",
     )
     parser.add_argument(
         "--reuse",
@@ -68,19 +67,6 @@ def prepare_case(parent: Path, case_dir: Path, variant: str) -> None:
         properties,
         count=1,
     )
-
-    if variant == "unsLinearGeometry":
-        properties += """
-
-unsLinearGeometryCoeffs
-{
-    nCorrectors          10000;
-    solutionTolerance    1e-06;
-    alternativeTolerance 1e-06;
-    materialTolerance    1e-04;
-    infoFrequency        100;
-}
-"""
 
     properties_path.write_text(properties, encoding="utf-8")
 

@@ -39,11 +39,10 @@ Description
     increment is not a deformation measure and no longer lives in the
     kinematics.
 
-    The Williams-Landel-Ferry temperature shift of the relaxation times is
-    supported in the algorithm and asks for the temperature as a live input.
-    Nothing supplies that input yet, so a case enabling it fails with a clear
-    message rather than silently ignoring the shift; it will work unchanged
-    once the manager can scatter a field into the inputs.
+    The Williams-Landel-Ferry temperature shift of the relaxation times asks
+    for the temperature as a coupling input, which the manager gathers from a
+    registered field, a field read from another case directory, or the time
+    directory, and stops the run if none has it.
 
     Elastic parameters are specified as EInfinity, nu, a list of moduli E and
     a matching list of relaxationTimes.

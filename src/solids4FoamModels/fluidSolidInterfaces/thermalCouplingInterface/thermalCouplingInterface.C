@@ -79,6 +79,13 @@ thermalCouplingInterface::thermalCouplingInterface
     oldOldSolidFaceZoneHeatFlux_(),
     timeIndex_(-1)
 {
+    if (anyImmersedInterface())
+    {
+        FatalErrorInFunction
+            << "The " << typeName << " coupling is not available with an "
+            << "immersed interface" << abort(FatalError);
+    }
+
     maxThermalResidualsNorm_.setSize(nGlobalPatches());
 
     // Set equivalent interface heat transfer coefficient

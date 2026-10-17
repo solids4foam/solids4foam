@@ -11,11 +11,14 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # Plate-with-hole regression tests
 # Checks numerical vs analytical solution for the displacement
-# (segregated/segregatedManager/petscSnes/petscSnesPressure/high-order
-# variants) and pressure-displacement
+# (segregated/petscSnes/petscSnesPressure/high-order variants) and
+# pressure-displacement
 #
 # Note that petscSnesPressure and pressureDisplacement* are different things:
 # petscSnesPressure is the mixed displacement-pressure form of
@@ -32,7 +35,6 @@ fi
 DISP_TOL=1e-7
 POINT_DISP_TOL=1e-7
 STRESS_TOL=2e5
-FRAMEWORK_FIELD_ABS_TOL=2e-12
 
 PD_DISP_TOL=3.0e-4
 PD_POINT_DISP_TOL=3.0e-4
@@ -45,10 +47,8 @@ PARALLEL_N_PROCS=2
 
 APPROACHES=(
     segregated
-    segregatedManager
     petscSnes
     petscSnesPressure
-    petscSnesPressureManager
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
     highOrder-movingLeastSquares-parallel
@@ -61,16 +61,47 @@ PRESSURE_DISPLACEMENT_CASES=(
     "pressureDisplacementCompressible medium"
     "pressureDisplacementIncompressible coarse"
     "pressureDisplacementIncompressible medium"
-    "pressureDisplacementCompressibleManager coarse"
-    "pressureDisplacementIncompressibleManager coarse"
 )
 
-# Each *Manager arm is its twin run with coupledPressureDisplacementSolid
-# taking its constitutive response from the mechanicalConstitutiveLaw
-# framework. These cases run the model in linear mode, where the law is not
-# evaluated and the stiffness is the same shear modulus on both paths, so the
-# error measures must agree with the twin's to round-off
-PD_FRAMEWORK_REL_TOL=1e-6
+# ------------------------------------------------------------
+# Against the removed legacy mechanicalModel
+# ------------------------------------------------------------
+# From the last commit that had it (mcl-stage8-coverage, c3a92b3d).
+#
+# segregated and petscSnesPressure: the final D, as the max and mean component
+# magnitude of the field as written. For isotropic linear elasticity a
+# deviatoric projection and the declared volumetric split are the same
+# operation, so the framework reproduced the legacy D fields to the precision
+# written, 2e-12 at most. These are OpenFOAM.com v2512's, the same as
+# OpenFOAM.org 9's; foam-extend 4.1 gives a segregated D 3.6e-4 larger at most,
+# and the tolerance, 5e-4 of the largest value, covers that. Both norms are
+# within the largest pointwise difference, so the bound carries over
+declare -A REF_D_MAX=(
+    [segregated]=1.05063e-05
+    [petscSnesPressure]=1.05169e-05
+)
+declare -A REF_D_MEAN=(
+    [segregated]=2.56367713626666e-06
+    [petscSnesPressure]=2.56525614836667e-06
+)
+REF_D_REL_TOL=5e-4
+
+# The pressure-displacement cases, on foam-extend 4.1, where
+# coupledPressureDisplacementSolid runs: DError and pErr maxima, as logged. The
+# model runs in linear mode here, where the law is not evaluated and the
+# stiffness is the same shear modulus on both paths, so the framework matched
+# them to the 1e-6 relative it was held to. These are the legacy values CI
+# logged (foam-extend-4.1-PETSc image, mcl-stage8-coverage 652cdb62). A macOS
+# foam-extend 4.1 build gave 0.0001275 and 38740.5 for the compressible case,
+# up to 40% apart, so this solver's answer here depends on the build, not only
+# on round-off, and the values hold for the CI build. The log gives six
+# figures; the tolerance, 1e-5 relative, is a few units in the last one
+declare -A REF_PD=(
+    # case : DError max, pErr max
+    [pressureDisplacementCompressible-coarse]="7.748e-05 22215.6"
+    [pressureDisplacementIncompressible-coarse]="8.66026e-05 31612.4"
+)
+REF_PD_REL_TOL=1e-5
 
 echo "============================================================"
 echo "Plate-with-hole regression tests"
@@ -103,7 +134,7 @@ prepare_case() {
     # relative SOLIDS4FOAM_ROOT in this local library build no longer points to
     # the repository root.
     if [[ -f "${case_dir}/src/Make/options" ]]; then
-        sed -i.bak \
+        "${SOLIDS4FOAM_SED}" -i.bak \
             "s|^SOLIDS4FOAM_ROOT := .*|SOLIDS4FOAM_ROOT := ${SOLIDS4FOAM_ROOT_ABS}|" \
             "${case_dir}/src/Make/options"
     fi
@@ -142,13 +173,6 @@ run_case() {
                 "${case_dir}/constant/solidProperties.highOrder"
             rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
             set -- highOrder parallel
-            ;;
-        pressureDisplacement*Manager)
-            local switch="    useMechanicalConstitutiveLawManager yes;"
-            sed -i \
-                "/coupledPressureDisplacementSolidCoeffs/,/{/ s|{|{\n${switch}|" \
-                "${case_dir}/caseOptions/pressureDisplacement/hex/common/constant/solidProperties"
-            set -- "${requested%Manager}" "${@:2}"
             ;;
     esac
 
@@ -236,78 +260,17 @@ check_less_than() {
     fi
 }
 
-compare_written_fields() {
-    python3 - "$1" "$2" << 'PYEOF'
-import re
-import sys
-
-number = re.compile(
-    r"(?<![A-Za-z_])[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
-)
-
-try:
-    texts = [open(path).read() for path in sys.argv[1:]]
-    structure = [number.sub("<number>", text) for text in texts]
-    if structure[0] != structure[1]:
-        raise ValueError("field structures differ")
-
-    values = [
-        [float(match.group()) for match in number.finditer(text)]
-        for text in texts
-    ]
-    if not values[0] or len(values[0]) != len(values[1]):
-        raise ValueError("field numeric data are missing or differ in size")
-
-    print(max(abs(a - b) for a, b in zip(*values)))
-except (OSError, ValueError) as error:
-    print(error, file=sys.stderr)
-    sys.exit(1)
-PYEOF
-}
-
-# The arms whose solidProperties carries useMechanicalConstitutiveLawManager.
-# Every other arm must run the legacy path
-FRAMEWORK_APPROACHES=(
-    segregatedManager
-    petscSnesPressureManager
-    highOrderFourthOrder
-    pressureDisplacementCompressibleManager
-    pressureDisplacementIncompressibleManager
-)
-
-is_framework_approach() {
-    local a="$1"
-    local f
-    for f in "${FRAMEWORK_APPROACHES[@]}"; do
-        [[ "${a}" == "${f}" ]] && return 0
-    done
-    return 1
-}
-
-# An arm that silently ran the other path still satisfies every tolerance
-# below, because both paths solve the same problem correctly. Without this the
-# framework arms prove nothing: losing the switch from the dictionary, or
-# linking the wrong file, would read as a pass
-check_took_its_path() {
+# Every arm takes its material from the mechanicalConstitutiveLaw framework
+check_used_framework() {
     local approach="$1"
     local log="${2}/${SOLVER_LOGFILE}"
 
     if [[ ! -f "${log}" ]]; then
-        echo "FAIL: ${approach}: no solver log to check the path taken"
+        echo "FAIL: ${approach}: no solver log to check"
         failures=$((failures + 1))
-        return
-    fi
-
-    if is_framework_approach "${approach}"; then
-        if ! grep -q "Selecting mechanical constitutive law" "${log}"; then
-            echo "FAIL: ${approach}: framework arm did not use the framework"
-            failures=$((failures + 1))
-        fi
-    else
-        if grep -q "Selecting mechanical constitutive law" "${log}"; then
-            echo "FAIL: ${approach}: legacy arm used the framework"
-            failures=$((failures + 1))
-        fi
+    elif ! grep -q "Selecting mechanical constitutive law" "${log}"; then
+        echo "FAIL: ${approach}: constructed no mechanical constitutive law"
+        failures=$((failures + 1))
     fi
 }
 
@@ -319,7 +282,7 @@ for approach in "${APPROACHES[@]}"; do
         echo "SKIP: ${approach}"
         continue
     fi
-    check_took_its_path "${approach}" "${case_dir}"
+    check_used_framework "${approach}" "${case_dir}"
     check_less_than \
         "${approach}" "DDifference LInf" \
         "$(extract_disp_linf "${case_dir}" "DDifference")" \
@@ -335,56 +298,29 @@ for approach in "${APPROACHES[@]}"; do
 done
 
 # ------------------------------------------------------------
-# Each framework arm against the legacy arm it mirrors
+# segregated and petscSnesPressure against the legacy D fields
 # ------------------------------------------------------------
-# Checking both arms against the analytical tolerances separately does not
-# compare them with each other: both paths solve this problem well within
-# tolerance, so both would pass even if they disagreed. For isotropic linear
-# elasticity a deviatoric projection and the declared volumetric split are the
-# same operation, so the two arms must agree to the precision written in the
-# fields, not merely satisfy the analytical tolerances independently.
+# Checking against the analytical tolerances does not do this: both models
+# solve this problem well within them, so a framework that disagreed with the
+# legacy model would still pass them.
 #
-# highOrderFourthOrder has no legacy twin here - the other high-order arms are
-# different discretisations rather than the same one on the legacy path - so it
-# is covered by its tolerances and its path assertion only
-FRAMEWORK_PAIRS=(
-    "segregated segregatedManager"
-    "petscSnesPressure petscSnesPressureManager"
-)
+# highOrderFourthOrder has no legacy counterpart - it asks for the full
+# material tangent, which the legacy model did not have - so it is covered by
+# its tolerances only
+for approach in segregated petscSnesPressure; do
+    case_dir="${REGRESSION_ROOT}/${approach}"
 
-for pair in "${FRAMEWORK_PAIRS[@]}"; do
-    IFS=' ' read -r legacy_arm framework_arm <<< "${pair}"
-    legacy_case="${REGRESSION_ROOT}/${legacy_arm}"
-    framework_case="${REGRESSION_ROOT}/${framework_arm}"
-
-    if solids4Foam::regressionCaseSkipped "${legacy_case}/${ALLRUN_LOGFILE}" \
-        || solids4Foam::regressionCaseSkipped \
-            "${framework_case}/${ALLRUN_LOGFILE}"
-    then
-        echo "SKIP: ${framework_arm} against ${legacy_arm}"
+    if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
+        echo "SKIP: ${approach} against the reference"
         continue
     fi
 
-    t=$(solids4Foam::latestTime "${framework_case}")
+    t=$(solids4Foam::latestTime "${case_dir}")
 
-    if [[ -z "${t}" || ! -f "${framework_case}/${t}/D" \
-        || ! -f "${legacy_case}/${t}/D" ]]
+    if ! solids4Foam::checkFieldNorms "${approach} D" "${case_dir}/${t}/D" \
+        "${REF_D_MAX[${approach}]}" "${REF_D_MEAN[${approach}]}" \
+        "${REF_D_REL_TOL}"
     then
-        echo "FAIL: ${framework_arm}: no D field to compare with ${legacy_arm}"
-        failures=$((failures + 1))
-        continue
-    fi
-
-    field_diff=""
-    if field_diff=$(compare_written_fields \
-        "${legacy_case}/${t}/D" "${framework_case}/${t}/D") \
-      && awk "BEGIN {exit !(${field_diff} <= ${FRAMEWORK_FIELD_ABS_TOL})}"
-    then
-        printf "PASS: %s and %s agree to write precision (max |delta| = %.3g)\n" \
-            "${framework_arm}" "${legacy_arm}" "${field_diff}"
-    else
-        printf "FAIL: %s and %s fields differ (max |delta| = %s)\n" \
-            "${framework_arm}" "${legacy_arm}" "${field_diff:-unavailable}"
         failures=$((failures + 1))
     fi
 done
@@ -399,23 +335,31 @@ for case_args in "${PRESSURE_DISPLACEMENT_CASES[@]}"; do
         continue
     fi
 
-    check_took_its_path "${approach}" "${case_dir}"
+    if ! grep -q "taking the stiffness from the mechanicalConstitutiveLaw" \
+        "${case_dir}/${SOLVER_LOGFILE}" 2>/dev/null
+    then
+        echo "FAIL: ${case_name}: did not take its stiffness from the framework"
+        failures=$((failures + 1))
+    fi
 
-    if [[ "${approach}" == *Manager ]]; then
-        twin_dir="${REGRESSION_ROOT}/${approach%Manager}-${mesh}"
-        for label in "DError, max" "pErr, max"; do
-            twin_value="$(extract_log_value "${twin_dir}" "${label}")"
+    if [[ -n "${REF_PD[${case_name}]:-}" ]]; then
+        IFS=' ' read -r ref_derror ref_perr \
+            <<< "${REF_PD[${case_name}]}"
+        for pair in "DError, max:${ref_derror}" "pErr, max:${ref_perr}"
+        do
+            label="${pair%%:*}"
+            ref_value="${pair##*:}"
             value="$(extract_log_value "${case_dir}" "${label}")"
-            if [[ -z "${twin_value}" || -z "${value}" ]]; then
-                echo "FAIL: ${case_name}: could not compare ${label} with its twin"
+            if [[ -z "${value}" ]]; then
+                echo "FAIL: ${case_name}: could not compare ${label} with the reference"
                 failures=$((failures + 1))
-            elif awk "BEGIN {d = ${value} - ${twin_value}; \
-                exit !(${twin_value} > 0 \
-                    && d*d <= (${PD_FRAMEWORK_REL_TOL}*${twin_value})^2)}"
+            elif awk "BEGIN {d = ${value} - ${ref_value}; \
+                exit !(${ref_value} > 0 \
+                    && d*d <= (${REF_PD_REL_TOL}*${ref_value})^2)}"
             then
-                echo "PASS: ${case_name}: ${label} matches the legacy twin"
+                echo "PASS: ${case_name}: ${label} matches the reference"
             else
-                echo "FAIL: ${case_name}: ${label} = ${value}, legacy twin ${twin_value}"
+                echo "FAIL: ${case_name}: ${label} = ${value}, reference ${ref_value}"
                 failures=$((failures + 1))
             fi
         done

@@ -66,7 +66,6 @@ The relevant inherited `solidModel` entries are:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance, `T` and `D` |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `relaxationMethod` | `fixed` | Under-relaxation method (`fixed`, `aitken`) |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `stabilisation` | auto-created if absent | `momentum` sub-dictionary is used |
@@ -108,7 +107,6 @@ thermalLinearGeometryCoeffs
     nCorrectors                  10000;
     solutionTolerance            1e-06;
     alternativeTolerance         1e-07;
-    materialTolerance            1e-05;
     absoluteTemperatureTolerance 1e-06;
     infoFrequency                100;
 }
@@ -156,15 +154,14 @@ magnitude of the heat flux.
 - the momentum equation is the same deferred-correction Laplacian form used by
   `linGeomTotalDispSolid`, with the momentum stabilisation term applied
   explicitly;
-- the heat equation and the momentum equation share one outer loop, which is
-  what distinguishes this model from
-  [weakThermalLinGeomSolid](https://www.solids4foam.com/documentation/solid-models/weakThermalLinGeomSolid.html).
+- the heat equation and the momentum equation share one outer loop, so the
+  temperature-displacement coupling is converged within each time step.
 
 ### Construction
 
 The constructor calls the base `solidModel` constructor and `DisRequired()`,
 constructs the `thermalModel` from the mesh, builds `rhoC_` as
-`thermal.C()*mechanical().rho()` and `k_` from `thermal.k()`, reads `T`
+`thermal.C()` times the initial density and `k_` from `thermal.k()`, reads `T`
 (`MUST_READ`) and creates `grad(T)`, reads `absoluteTemperatureTolerance`, and
 takes `impK_`, `impKf_` and `rImpK_` from the mechanical law. It then forces
 creation of `T.oldTime()`.

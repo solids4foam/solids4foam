@@ -1,0 +1,17 @@
+# Drag and lift coefficients of the static cylinder at the positions of the
+# translating cylinder, x = 0.2 + 0.05 t m, on the uniform channel mesh of this
+# case (MESH_LEVEL=3, 40 cells across the cylinder), with the cutLink method.
+# The drag is higher when the cylinder is near the inlet, and reaches 5.29
+# for x > 0.4 m.
+# t x Cd Cl
+0 0.20 5.5794 0.01032
+1 0.25 5.3989 0.01509
+2 0.30 5.3324 0.01490
+3 0.35 5.3059 0.01317
+4 0.40 5.2948 0.01121
+5 0.45 5.2901 0.00950
+6 0.50 5.2881 0.00815
+7 0.55 5.2872 0.00714
+8 0.60 5.2867 0.00638
+9 0.65 5.2865 0.00582
+10 0.70 5.2864 0.00540

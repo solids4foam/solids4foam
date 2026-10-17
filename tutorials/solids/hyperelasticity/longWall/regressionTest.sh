@@ -14,12 +14,12 @@ fi
 # longWall regression test
 # Uses top-surface stress and displacement histories.
 #
-# Run twice: once with the implicit stiffness from the legacy mechanicalModel
-# and once with it from the mechanicalConstitutiveLaw framework. impK is the
-# coefficient of a Laplacian that is added implicitly and subtracted
-# explicitly, so it sets how the solution is reached and not what it is. The
-# two runs must therefore agree, and that agreement is the check on the
-# framework's finite-strain scalar tangent for MooneyRivlinElastic.
+# The implicit stiffness comes from the mechanicalConstitutiveLaw framework.
+# impK is the coefficient of a Laplacian that is added implicitly and
+# subtracted explicitly, so it sets how the solution is reached and not what it
+# is. The answer must therefore be the one the removed legacy mechanicalModel
+# reached, and that agreement is the check on the framework's finite-strain
+# scalar tangent for MooneyRivlinElastic.
 #
 # The case also carries the framework's own checks, since its law is
 # finite-strain only.
@@ -30,36 +30,38 @@ UY_MAX=0.407
 SYY_MIN=9.99e7
 SYY_MAX=1.001e8
 
-# The two runs are NOT expected to be bit-identical here, unlike
-# rotatingCylinder. This case sets solvePressureEqn, so the legacy
-# MooneyRivlinElastic solves a Laplacian equation for its hydrostatic stress,
-# which the framework law deliberately omits: that smoothing stabilises the
-# discretisation rather than describing the material, and belongs to the solid
-# model. The converged answers agree to about 2e-6 relative, which is the
-# evidence that it is indeed a stabilisation, so the tolerance is set to
-# accommodate that rather than to hide it
-CROSS_TOL=1e-4
+# The final top-surface uy and sigma_yy of the removed legacy mechanicalModel,
+# from the last commit that had it (mcl-stage8-coverage, c3a92b3d), the same on
+# every fork.
+#
+# This case used to set solvePressureEqn, which made the legacy
+# MooneyRivlinElastic solve a Laplacian equation for its hydrostatic stress.
+# That smoothing stabilises the discretisation rather than describing the
+# material, and with it the converged answers of the two models agreed to
+# about 2e-6 relative, which is the evidence that it was only a stabilisation.
+# The case does not need it, so it no longer sets it, and without it the legacy
+# run matched the framework one in every written digit of D. The tolerance is
+# left at the 1e-4 that accommodated the smoothing
+REF_UY=0.405906
+REF_SYY=1e+08
+REF_REL_TOL=1e-4
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 CONSTITUTIVE_LOGFILE="log.Test-mechanicalConstitutiveLaw"
 
-APPROACHES=(
-    legacy
-    framework
-)
-
 echo "============================================================"
 echo "longWall regression test"
 echo "Top-surface uy in [${UY_MIN}, ${UY_MAX}] m"
 echo "Top-surface sigma_yy in [${SYY_MIN}, ${SYY_MAX}] Pa"
-echo "Legacy and framework impK agree to ${CROSS_TOL} relative"
+echo "uy and sigma_yy match the reference to ${REF_REL_TOL} relative"
 echo "============================================================"
 echo
 
+CASE_DIR="${REGRESSION_ROOT}/main"
+
 prepare_case() {
-    local approach="$1"
-    local case_dir="${REGRESSION_ROOT}/${approach}"
+    local case_dir="${CASE_DIR}"
 
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
@@ -71,24 +73,6 @@ prepare_case() {
         fi
         cp -a "${item}" "${case_dir}/"
     done
-
-    if [[ "${approach}" == "framework" ]]; then
-        # The switch is read from solidModelDict(), which is the <type>Coeffs
-        # sub-dictionary, so it must go inside those braces. Appended at the
-        # top level it is silently ignored and this approach would quietly be
-        # a second legacy run
-        sed -i.bak \
-            's/^    nCorrectors\(.*\)$/    useMechanicalConstitutiveLawManager yes;\n    nCorrectors\1/' \
-            "${case_dir}/constant/solidProperties"
-        rm -f "${case_dir}/constant/solidProperties.bak"
-
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${case_dir}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
-    fi
 }
 
 find_history_file() {
@@ -104,10 +88,10 @@ find_history_file() {
 run_constitutive_test() {
     local case_dir="$1"
 
-    if ! command -v Test-mechanicalConstitutiveLaw > /dev/null 2>&1; then
-        echo "SKIP: Test-mechanicalConstitutiveLaw not found in PATH"
-        return 0
-    fi
+    # A skip where the application is not built, and a failure in CI, where
+    # it always is
+    solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
+        || return $(( $? - 1 ))
 
     if [[ ! -d "${case_dir}/constant/polyMesh" ]]; then
         echo "SKIP: mechanicalConstitutiveLaw checks (case has no mesh)"
@@ -147,118 +131,102 @@ for arg in "$@"; do
 done
 
 failures=0
-constitutive_tested=false
-declare -A RESULT_UY
-declare -A RESULT_SYY
+result_uy=""
+result_syy=""
 
-for approach in "${APPROACHES[@]}"; do
-    CASE_DIR="${REGRESSION_ROOT}/${approach}"
-
-    echo
-    echo "------------------------------------------------------------"
-    echo "Testing approach: ${approach}"
-    echo "------------------------------------------------------------"
-
+run_case() {
     if [ "$CHECK_ONLY" = false ]; then
-        prepare_case "${approach}"
+        prepare_case
         ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
     else
         echo "Running in check-only mode: skipping Allclean and Allrun"
     fi
 
     if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
-        echo "Skipping ${approach} because it is unavailable in this environment"
-        continue
+        echo "Skipping because the case is unavailable in this environment"
+        return 0
     fi
 
-    # Assert the run really took the path this approach names
+    # impK must have come from the framework
     marker='Implicit stiffness from the mechanicalConstitutiveLaw framework'
     if grep -q "${marker}" "${CASE_DIR}/${SOLVER_LOGFILE}"; then
-        used_framework=true
+        echo "PASS: took impK from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not use the framework impK"
+        echo "FAIL: did not take impK from the framework"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly used the framework impK"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected impK path"
     fi
 
     disp_file=$(find_history_file "${CASE_DIR}" 'solidDisplacementstop.dat')
     stress_file=$(find_history_file "${CASE_DIR}" 'solidStressestop.dat')
 
     if [[ -z "${disp_file}" || -z "${stress_file}" ]]; then
-        echo "FAIL: ${approach} could not find one or more history files"
+        echo "FAIL: could not find one or more history files"
         failures=$((failures + 1))
-        continue
+        return 0
     fi
 
     top_uy=$(awk 'END {print $9}' "${disp_file}")
     top_syy=$(awk 'END {print $5}' "${stress_file}")
 
     if [[ -z "${top_uy}" || -z "${top_syy}" ]]; then
-        echo "FAIL: ${approach} could not extract top-surface values"
+        echo "FAIL: could not extract top-surface values"
         failures=$((failures + 1))
-        continue
+        return 0
     fi
 
-    RESULT_UY["${approach}"]="${top_uy}"
-    RESULT_SYY["${approach}"]="${top_syy}"
+    result_uy="${top_uy}"
+    result_syy="${top_syy}"
 
     if awk "BEGIN {exit !(${top_uy} >= ${UY_MIN} && ${top_uy} <= ${UY_MAX})}"; then
-        printf "PASS: %s top-surface uy = %.6g\n" "${approach}" "${top_uy}"
+        printf "PASS: top-surface uy = %.6g\n" "${top_uy}"
     else
-        printf "FAIL: %s top-surface uy = %.6g\n" "${approach}" "${top_uy}"
+        printf "FAIL: top-surface uy = %.6g\n" "${top_uy}"
         failures=$((failures + 1))
     fi
 
     if awk "BEGIN {exit !(${top_syy} >= ${SYY_MIN} && ${top_syy} <= ${SYY_MAX})}"; then
-        printf "PASS: %s top-surface sigma_yy = %.6g\n" "${approach}" "${top_syy}"
+        printf "PASS: top-surface sigma_yy = %.6g\n" "${top_syy}"
     else
-        printf "FAIL: %s top-surface sigma_yy = %.6g\n" "${approach}" "${top_syy}"
+        printf "FAIL: top-surface sigma_yy = %.6g\n" "${top_syy}"
         failures=$((failures + 1))
     fi
 
-    if [[ "${constitutive_tested}" == false ]]; then
-        constitutive_tested=true
-
-        if ! run_constitutive_test "${CASE_DIR}"; then
-            failures=$((failures + 1))
-        fi
+    if ! run_constitutive_test "${CASE_DIR}"; then
+        failures=$((failures + 1))
     fi
 
     if [ "$CHECK_ONLY" = false ]; then
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     fi
-done
+}
 
-# The point of running both: impK changes the path, not the answer
-if [[ -n "${RESULT_UY[legacy]:-}" && -n "${RESULT_UY[framework]:-}" ]]; then
+run_case
+
+# impK changes the path, not the answer
+if [[ -n "${result_uy}" ]]; then
     for quantity in uy syy; do
         if [[ "${quantity}" == "uy" ]]; then
-            a="${RESULT_UY[legacy]}"
-            b="${RESULT_UY[framework]}"
+            a="${REF_UY}"
+            b="${result_uy}"
         else
-            a="${RESULT_SYY[legacy]}"
-            b="${RESULT_SYY[framework]}"
+            a="${REF_SYY}"
+            b="${result_syy}"
         fi
 
-        if awk "BEGIN {exit !(($a - $b)^2 <= ($CROSS_TOL*$a)^2)}"; then
-            printf "PASS: legacy and framework %s agree (%.8g vs %.8g)\n" \
-                "${quantity}" "$a" "$b"
+        if awk "BEGIN {exit !(($a - $b)^2 <= (${REF_REL_TOL}*$a)^2)}"; then
+            printf "PASS: %s matches the reference (%.8g vs %.8g)\n" \
+                "${quantity}" "$b" "$a"
         else
-            printf "FAIL: legacy and framework %s differ (%.8g vs %.8g)\n" \
-                "${quantity}" "$a" "$b"
+            printf "FAIL: %s differs from the reference (%.8g vs %.8g)\n" \
+                "${quantity}" "$b" "$a"
             failures=$((failures + 1))
         fi
     done
-else
-    echo "SKIP: cross-check needs both approaches to have run"
+elif [ "$CHECK_ONLY" = false ] \
+    && ! solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"
+then
+    echo "FAIL: the case produced nothing to compare with the reference"
+    failures=$((failures + 1))
 fi
 
 echo

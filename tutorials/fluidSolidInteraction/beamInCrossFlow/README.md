@@ -176,6 +176,12 @@ solid predictor, fluid residual control and shared FSI settings, gives:
 So for this like-for-like setup, IQNILS is both faster and requires fewer FSI
 iterations than Aitken.
 
+The IQNILS setup sets `relMinSignificant 1e-2` in `constant/fsiProperties.iqnils`,
+which drops a secant mode when the part of it that is orthogonal to the newer
+modes is less than 1% of its norm. Without this filter, nearly dependent modes
+are retained once the solution approaches a steady state, and the FSI residual
+can stall just above `outerCorrTolerance` until `nOuterCorr` is reached.
+
 ## Regression Test
 
 The case also includes a `regressionTest.sh` script which runs short regression
@@ -360,6 +366,98 @@ Remember that a tutorial case can be cleaned and reset using the included
 
 ---
 
+## Multi-Material Variant
+
+The beam can be made of more than one material, e.g. a stiff root with a
+flexible tip. Nothing changes on the fluid side or in the FSI coupling: the
+solid region is simply given a cell zone for each material. The three changes
+below convert this tutorial into a two-material case.
+
+**1. Define the materials.** In `constant/solid/mechanicalProperties`, replace
+the single `rubber` entry with one entry per material:
+
+```c++
+mechanical
+(
+    stiff
+    {
+        type        StVenantKirchhoffElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1000;
+        E           E [1 -1 -2 0 0 0 0] 1.4e6;
+        nu          nu [0 0 0 0 0 0 0] 0.4;
+    }
+
+    flexible
+    {
+        type        StVenantKirchhoffElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1000;
+        E           E [1 -1 -2 0 0 0 0] 1e4;
+        nu          nu [0 0 0 0 0 0 0] 0.4;
+    }
+);
+```
+
+**2. Define the cell sets.** Create a file called `batch.setSet` in the case
+directory, which places the lower half of the beam ($$y < 0.1$$ m) in the
+`stiff` set and the upper half in the `flexible` set:
+
+```plaintext
+cellSet stiff new boxToCell (0.45 0 -0.2) (0.55 0.1 0)
+cellSet flexible new boxToCell (0.45 0.1 -0.2) (0.55 0.2 0)
+```
+
+**3. Create the cell zones.** In the `Allrun` script, convert the sets to cell
+zones in the solid region after the meshes have been created, i.e. after the
+two `blockMesh` lines:
+
+```bash
+# Create the material cellZones in the solid region
+solids4Foam::runApplication -s solid setSet -region solid -batch batch.setSet
+solids4Foam::runApplication -s solid setsToZones -region solid
+```
+
+```note
+For multi-material cases, solids4foam expects to find a cellZone for each
+material defined in `mechanicalProperties`, where the cellZone name is the same
+as the material name.
+```
+
+Two further points apply to any multi-material case:
+
+- The gradient of the displacement must be calculated with the material-aware
+  `leastSquaresS4f` scheme, which keeps each cell's stencil within its own
+  material. This tutorial already uses it in `system/solid/fvSchemes`.
+- The materials share one solid mesh, so the FSI interface patch can span
+  several materials, as it does here.
+
+The case is then run as before, i.e. `./Allrun`, or `./Allrun parallel` to run
+in parallel. The `aitken` and `robin` options also work.
+
+```note
+The `highOrder` option cannot be used with more than one material: the
+high-order face quadrature gradient is not yet implemented for multi-material
+cases, and the solver stops with a message saying so.
+```
+
+The table below gives the $$x$$ displacement of the beam tip (the point
+monitored in `postProcessing/0/solidPointDisplacement_displacement.dat`) at
+`t = 4 s`, calculated with OpenFOAM-v2512. As expected, the two-material
+results lie between those of the two single-material beams, and the beam is
+much stiffer when the stiff material is at the root, where the bending moment
+is greatest.
+
+| Beam                                          | Tip $$x$$ displacement (m) |
+| --------------------------------------------- | -------------------------- |
+| Flexible throughout (the unmodified tutorial) | `9.90e-3`                  |
+| Flexible root, stiff tip                      | `7.94e-3`                  |
+| Stiff root, flexible tip (as described above) | `1.26e-3`                  |
+| Stiff throughout                              | `6.97e-5`                  |
+
+The serial and parallel (four processors) results for the stiff-root case
+agree to five significant figures.
+
+---
+
 ## Analysing the Results
 
 In the ParaView (Figure 3), both the solid and fluid regions are loaded by
@@ -476,9 +574,9 @@ Total force (fluid) = (-0.147015 0.378642 -0.38067)
 Total force (solid) = (0.146715 -0.378943 0.380941)
 Evolving solid solver
 Solving the updated Lagrangian form of the momentum equation for DD
-    Corr, res, relRes, matRes, iters
+    Corr, res, relRes, iters
     Both residuals have converged
-    2, 5.23068e-07, 7.10068e-07, 0, 2
+    2, 5.23068e-07, 7.10068e-07, 2
 
 Current fsi relative residual norm: 5.70921e-07
 Alternative fsi residual: 5.70555e-07

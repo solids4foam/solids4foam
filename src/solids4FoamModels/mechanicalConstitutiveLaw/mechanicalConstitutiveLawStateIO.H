@@ -39,7 +39,11 @@ Description
     here.
 
     The cost of an IOField is that decomposePar and reconstructPar do not map
-    it, so the state can only be read back on the decomposition that wrote it.
+    it. For the cell-centred topology the manager writes, alongside the state,
+    where each entry sits on the mesh in the numbering of the undecomposed
+    mesh, so that a run on a different decomposition, or a serial one, can
+    match the state entry by entry. The other topologies write no locations,
+    so their state can only be read back on the decomposition that wrote it.
     That is a real limit, and the alternative was worse: a volField restart
     would buy decomposition changes for two of the six topologies at the price
     of two IO paths, a dimensionSet that no law declares, and a boundary field
@@ -48,7 +52,8 @@ Description
     mismatch here is fatal rather than mapped.
 
     One file per law, per topology, per state variable, holding that law's
-    integration points followed by its boundary points patch by patch. The name
+    integration points followed by its boundary points patch by patch, named
+    <law>_<topology>[_<sub-law>]_<variable>. The name
     carries the law and the topology because two laws may legitimately hold
     different values of the same variable name, and the same law may hold state
     on more than one topology in the same run.
@@ -264,129 +269,6 @@ public:
             const bool isRestart,
             PtrList<regIOobject>& proxies
         );
-};
-
-
-/*---------------------------------------------------------------------------*\
-                      Struct stateFieldAccess Declaration
-\*---------------------------------------------------------------------------*/
-
-//- Reaching a state field of a given type by name.
-//  The state exposes one accessor per type rather than a template, so this
-//  turns the four of them back into one, and the IO below is written once
-template<class Type>
-struct stateFieldAccess;
-
-template<>
-struct stateFieldAccess<scalar>
-{
-    static const Field<scalar>& get
-    (
-        const mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.getScalarField(n);
-    }
-
-    static Field<scalar>& ref
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.scalarField(n);
-    }
-
-    static Field<scalar>& ref0
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.scalarField0(n);
-    }
-};
-
-template<>
-struct stateFieldAccess<vector>
-{
-    static const Field<vector>& get
-    (
-        const mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.getVectorField(n);
-    }
-
-    static Field<vector>& ref
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.vectorField(n);
-    }
-
-    static Field<vector>& ref0
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.vectorField0(n);
-    }
-};
-
-template<>
-struct stateFieldAccess<tensor>
-{
-    static const Field<tensor>& get
-    (
-        const mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.getTensorField(n);
-    }
-
-    static Field<tensor>& ref
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.tensorField(n);
-    }
-
-    static Field<tensor>& ref0
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.tensorField0(n);
-    }
-};
-
-template<>
-struct stateFieldAccess<symmTensor>
-{
-    static const Field<symmTensor>& get
-    (
-        const mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.getSymmTensorField(n);
-    }
-
-    static Field<symmTensor>& ref
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.symmTensorField(n);
-    }
-
-    static Field<symmTensor>& ref0
-    (
-        mechanicalConstitutiveLawState& s, const word& n
-    )
-    {
-        return s.symmTensorField0(n);
-    }
 };
 
 

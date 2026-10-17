@@ -11,6 +11,9 @@ if [[ -f "${SOLIDS4FOAM_SCRIPTS}" ]]; then
     source "${SOLIDS4FOAM_SCRIPTS}"
 fi
 
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
 # ============================================================
 # suctionCaission regression test
 #
@@ -19,7 +22,7 @@ fi
 #
 # The bands are wide, and deliberately so. This case does not
 # converge tightly - it reaches the corrector limit on every
-# time step, in the legacy solver as much as the framework one
+# time step, as it did with the removed legacy mechanicalModel
 # - so the bands say the caisson yielded and suction developed,
 # not that a particular number came back.
 # ============================================================
@@ -29,11 +32,42 @@ EPS_MAX=1.25
 SIGMA_MIN=1.5e6
 SIGMA_MAX=2.2e6
 
-# The framework comparison runs two steps rather than ten. The full case takes
-# about nine minutes an arm, and the plastic return mapping and the effective
-# stress the composite carries are both exercised within the first step; ten
-# steps of agreement would cost twenty minutes to say the same thing
+# The comparison with the removed legacy mechanicalModel runs to t = 1 rather
+# than ten. The full case takes about nine minutes, and the plastic return
+# mapping and the effective stress the composite carries are both exercised
+# within the first step
 COMPARISON_END_TIME=1
+
+# The legacy model's D and porePressure at t = 1, as the max and mean component
+# magnitude of each field written to fourteen figures, from the last commit
+# that had it (mcl-stage8-coverage, c3a92b3d), per fork. The framework
+# reproduced both fields exactly, in every one of those figures. These are
+# recorded numbers, though, and another compiler, CPU or MPI build moves an
+# iterative solution by round-off at the solver tolerance: CI measures up to
+# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
+# largest value, allows for that, and is ten times below the 1e-5 that a
+# 0.001% change in a material constant makes
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        REF_D_MAX=0.039970270753559
+        REF_D_MEAN=0.00324034872160463
+        REF_P_MAX=94941.676957032
+        REF_P_MEAN=19655.7130753187
+        ;;
+    org)
+        REF_D_MAX=0.039970258883115
+        REF_D_MEAN=0.00324070141058448
+        REF_P_MAX=94957.392747739
+        REF_P_MEAN=19661.8147230215
+        ;;
+    foamextend)
+        REF_D_MAX=0.039984257331651
+        REF_D_MEAN=0.00342262334429839
+        REF_P_MAX=66272.071942348
+        REF_P_MEAN=17304.5184317787
+        ;;
+esac
+REF_REL_TOL=1e-6
 
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
@@ -42,7 +76,7 @@ echo "============================================================"
 echo "suctionCaission regression test"
 echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
-echo "Plus the legacy-versus-framework comparison, to t=${COMPARISON_END_TIME}"
+echo "Plus the comparison with the reference, to t=${COMPARISON_END_TIME}"
 echo "============================================================"
 echo
 
@@ -86,89 +120,58 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-# Run the case both ways and require the two to agree exactly. Both arms are
-# shortened, and both are shortened the same way, so the comparison is still
-# between two runs that differ in one dictionary entry and nothing else
-run_framework_comparison() {
-    local legacy_dir="${REGRESSION_ROOT}/comparisonLegacy"
-    local framework_dir="${REGRESSION_ROOT}/comparisonFramework"
-    local dir
+# Run the case to the comparison time and hold it to the legacy answer there
+run_reference_comparison() {
+    local dir="${REGRESSION_ROOT}/comparison"
 
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        prepare_case "${dir}"
+    prepare_case "${dir}"
 
-        sed -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
+    "${SOLIDS4FOAM_SED}" -i "s|^endTime .*|endTime         ${COMPARISON_END_TIME};|" \
+        "${dir}/system/controlDict"
+
+    # Enough digits that the comparison is about the solution and not about
+    # the last figure written
+    if grep -q "^writePrecision" "${dir}/system/controlDict"; then
+        "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
             "${dir}/system/controlDict"
+    else
+        echo "writePrecision  14;" >> "${dir}/system/controlDict"
+    fi
 
-        # Enough digits that the comparison is about the solution and not
-        # about the last figure written
-        if grep -q "^writePrecision" "${dir}/system/controlDict"; then
-            sed -i 's|^writePrecision.*|writePrecision  14;|' \
-                "${dir}/system/controlDict"
-        else
-            echo "writePrecision  14;" >> "${dir}/system/controlDict"
-        fi
-    done
+    ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
+        echo "FAIL: the comparison could not run ${dir}"
+        return 1
+    }
 
-    sed -i \
-        's|^\( *\)nCorrectors|\1useMechanicalConstitutiveLawManager yes;\n\1nCorrectors|' \
-        "${framework_dir}/constant/solidProperties"
-
-    for dir in "${legacy_dir}" "${framework_dir}"; do
-        ( cd "${dir}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || {
-            echo "FAIL: the comparison could not run ${dir}"
-            return 1
-        }
-    done
-
-    # Each arm must have taken the path it was set up for
     if ! grep -q "Selecting mechanical constitutive law" \
-        "${framework_dir}/${SOLVER_LOGFILE}"
+        "${dir}/${SOLVER_LOGFILE}"
     then
-        echo "FAIL: the framework arm did not use the framework"
+        echo "FAIL: the comparison constructed no mechanical constitutive law"
         return 1
     fi
 
-    if grep -q "Selecting mechanical constitutive law" \
-        "${legacy_dir}/${SOLVER_LOGFILE}"
+    local t
+    t=$(solids4Foam::latestTime "${dir}")
+
+    if [[ -z "${t}" ]] \
+        || ! awk "BEGIN {exit !((${t} - ${COMPARISON_END_TIME})^2 <= 1e-20)}"
     then
-        echo "FAIL: the legacy arm used the framework"
+        echo "FAIL: the comparison stopped at '${t}', not at ${COMPARISON_END_TIME}"
         return 1
     fi
 
-    local tL tF
-    tL=$(solids4Foam::latestTime "${legacy_dir}")
-    tF=$(solids4Foam::latestTime "${framework_dir}")
+    local failed=0
 
-    if [[ -z "${tL}" || "${tL}" != "${tF}" ]]; then
-        echo "FAIL: the arms reached different times ('${tL}' vs '${tF}')"
-        return 1
-    fi
+    solids4Foam::checkFieldNorms "D at t = ${t}" "${dir}/${t}/D" \
+        "${REF_D_MAX}" "${REF_D_MEAN}" "${REF_REL_TOL}" \
+        || failed=1
 
-    local ok=0
-    local f
-    for f in D porePressure; do
-        if [[ ! -f "${legacy_dir}/${tL}/${f}" ]]; then
-            continue
-        fi
+    solids4Foam::checkFieldNorms "porePressure at t = ${t}" \
+        "${dir}/${t}/porePressure" \
+        "${REF_P_MAX}" "${REF_P_MEAN}" "${REF_REL_TOL}" \
+        || failed=1
 
-        if ! diff -q "${legacy_dir}/${tL}/${f}" "${framework_dir}/${tF}/${f}" \
-            > /dev/null
-        then
-            echo "FAIL: framework and legacy differ in ${f}"
-            return 1
-        fi
-
-        ok=$((ok + 1))
-    done
-
-    if (( ok == 0 )); then
-        echo "FAIL: the comparison produced no fields"
-        return 1
-    fi
-
-    echo "PASS: framework and legacy agree exactly (${ok} fields)"
-    return 0
+    return "${failed}"
 }
 
 epsilon=$(grep "Max epsilonEq" "${CASE_DIR}/${SOLVER_LOGFILE}" 2>/dev/null \
@@ -199,7 +202,7 @@ else
     failures=$((failures + 1))
 fi
 
-if [ "$CHECK_ONLY" = false ] && ! run_framework_comparison; then
+if [ "$CHECK_ONLY" = false ] && ! run_reference_comparison; then
     failures=$((failures + 1))
 fi
 

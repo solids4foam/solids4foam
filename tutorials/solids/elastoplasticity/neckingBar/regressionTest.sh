@@ -4,17 +4,19 @@ IFS=$'\n\t'
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
-# Run twice: the legacy mechanicalModel and the mechanicalConstitutiveLaw
-# framework. This is the end-to-end check of two things nothing else covers:
-# the stress migration of nonLinGeomUpdatedLagSolid, and the finite-strain
-# plastic law. It is the only tutorial pairing them that does not enable
-# pressure smoothing, so it is the only one where the framework is expected to
-# reproduce the legacy result exactly rather than approximately
-APPROACHES=(
-    legacy
-    framework
-)
+SOLIDS4FOAM_SCRIPTS="${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
+source "${SOLIDS4FOAM_SCRIPTS}"
+
+# GNU sed, for the in-place edits below
+solids4Foam::requireGnuSed
+
+# The end-to-end check of two things nothing else covers: the stress
+# migration of nonLinGeomUpdatedLagSolid onto the mechanicalConstitutiveLaw
+# framework, and the finite-strain plastic law. It is the only tutorial pairing
+# them that does not enable pressure smoothing, so it is the only one where the
+# framework reproduced the removed legacy model exactly rather than
+# approximately, and it is held to that below
 # ============================================================
 # neckingBar regression test
 # Checks the final loading force after the necking curve.
@@ -22,6 +24,16 @@ APPROACHES=(
 
 FORCE_MIN=74.3
 FORCE_MAX=74.6
+
+# The final loading force. With no pressure smoothing the framework omits
+# nothing, and it matched the removed legacy mechanicalModel's in all eight
+# digits printed, on every fork (mcl-stage8-coverage, c3a92b3d). This is
+# OpenFOAM.com v2512's, the same as OpenFOAM.org 9's; foam-extend 4.1 gives
+# 2e-4 more, and the tolerance, 5e-4 relative, covers that. A history error in
+# the finite-strain plastic path, or in the relative deformation gradient the
+# framework is given, shows up here and nowhere else
+REF_FORCE=74.4649
+REF_REL_TOL=5e-4
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -31,9 +43,9 @@ echo "Final loading force in [${FORCE_MIN}, ${FORCE_MAX}]"
 echo "============================================================"
 echo
 
+# A copy of the case in regressionTests/<name>, main unless named
 prepare_case() {
-    local approach="$1"
-    CASE_DIR="${REGRESSION_ROOT}/${approach}"
+    CASE_DIR="${REGRESSION_ROOT}/${1:-main}"
 
     rm -rf "${CASE_DIR}"
     mkdir -p "${CASE_DIR}"
@@ -46,20 +58,17 @@ prepare_case() {
         cp -a "${item}" "${CASE_DIR}/"
     done
 
-    if [[ "${approach}" == framework* ]]; then
-        # The switch lives in the <type>Coeffs sub-dictionary; at the top level
-        # it is silently ignored and this arm would repeat the legacy run
-        sed -i.bak \
-            's/^    nCorrectors     1000;/    useMechanicalConstitutiveLawManager yes;\n    restart yes;\n    nCorrectors     1000;/' \
-            "${CASE_DIR}/constant/solidProperties"
-        rm -f "${CASE_DIR}/constant/solidProperties.bak"
+    # restart yes makes the solid model write the kinematic history the
+    # restart test below needs; the main arm asks too, so that the two are set
+    # up the same
+    "${SOLIDS4FOAM_SED}" -i.bak \
+        's/^    nCorrectors     1000;/    restart yes;\n    nCorrectors     1000;/' \
+        "${CASE_DIR}/constant/solidProperties"
+    rm -f "${CASE_DIR}/constant/solidProperties.bak"
 
-        if ! grep -q 'useMechanicalConstitutiveLawManager' \
-            "${CASE_DIR}/constant/solidProperties"
-        then
-            echo "FAIL: could not enable the framework in solidProperties"
-            exit 1
-        fi
+    if ! grep -q 'restart yes' "${CASE_DIR}/constant/solidProperties"; then
+        echo "FAIL: could not set restart in solidProperties"
+        exit 1
     fi
 }
 
@@ -76,81 +85,67 @@ for arg in "$@"; do
 done
 
 failures=0
-declare -A RESULT_F
+result_f=""
 
-for approach in "${APPROACHES[@]}"; do
-    echo
-    echo "------------------------------------------------------------"
-    echo "Testing approach: ${approach}"
-    echo "------------------------------------------------------------"
-
+run_case() {
     if [ "$CHECK_ONLY" = false ]; then
-        prepare_case "${approach}"
-        sed -i.bak 's/^endTime         1;/endTime         0.184;/' \
+        prepare_case
+        "${SOLIDS4FOAM_SED}" -i.bak 's/^endTime         1;/endTime         0.184;/' \
             "${CASE_DIR}/system/controlDict"
         rm -f "${CASE_DIR}/system/controlDict.bak"
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
         ( cd "${CASE_DIR}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 )
     else
-        CASE_DIR="${REGRESSION_ROOT}/${approach}"
+        CASE_DIR="${REGRESSION_ROOT}/main"
         echo "Running in check-only mode: skipping Allclean and Allrun"
     fi
 
     if grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/log.solids4Foam" 2>/dev/null
     then
-        used_framework=true
+        echo "PASS: took its material from the framework"
     else
-        used_framework=false
-    fi
-
-    if [[ "${approach}" == "framework" && "${used_framework}" == false ]]; then
-        echo "FAIL: framework approach did not construct the framework"
+        echo "FAIL: constructed no mechanical constitutive law"
         failures=$((failures + 1))
-    elif [[ "${approach}" == "legacy" && "${used_framework}" == true ]]; then
-        echo "FAIL: legacy approach unexpectedly constructed the framework"
-        failures=$((failures + 1))
-    else
-        echo "PASS: ${approach} took the expected path"
     fi
 
     force_file=$(find "${CASE_DIR}/postProcessing" \
         -name 'solidForcesDisplacementsloading.dat' -print | tail -n 1)
     if [[ -z "${force_file}" ]]; then
-        echo "FAIL: ${approach} could not find loading force history"
+        echo "FAIL: could not find loading force history"
         failures=$((failures + 1))
-        continue
+        return 0
     fi
 
     final_force=$(awk 'END {print $5*360e-3}' "${force_file}")
-    RESULT_F["${approach}"]="${final_force}"
+    result_f="${final_force}"
 
     if awk "BEGIN {exit !(${final_force} >= ${FORCE_MIN} && ${final_force} <= ${FORCE_MAX})}"; then
-        printf "PASS: %s final loading force = %.6g\n" "${approach}" "${final_force}"
+        printf "PASS: final loading force = %.6g\n" "${final_force}"
     else
-        printf "FAIL: %s final loading force = %.6g\n" "${approach}" "${final_force}"
+        printf "FAIL: final loading force = %.6g\n" "${final_force}"
         failures=$((failures + 1))
     fi
 
     if [ "$CHECK_ONLY" = false ]; then
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     fi
-done
+}
 
-# No pressure smoothing here, so the framework omits nothing and the two must
-# agree. A history error in the finite-strain plastic path, or in the relative
-# deformation gradient the framework is given, shows up here and nowhere else
-if [[ -n "${RESULT_F[legacy]:-}" && -n "${RESULT_F[framework]:-}" ]]; then
-    a="${RESULT_F[legacy]}"; b="${RESULT_F[framework]}"
+run_case
 
-    if awk "BEGIN {exit !(($a - $b)^2 <= (1e-6*$a)^2)}"; then
-        printf "PASS: legacy and framework force agree (%.8g vs %.8g)\n" "$a" "$b"
+if [[ -n "${result_f}" ]]; then
+    a="${REF_FORCE}"; b="${result_f}"
+
+    if awk "BEGIN {exit !(($a - $b)^2 <= (${REF_REL_TOL}*$a)^2)}"; then
+        printf "PASS: force matches the reference (%.8g vs %.8g)\n" "$b" "$a"
     else
-        printf "FAIL: legacy and framework force differ (%.8g vs %.8g)\n" "$a" "$b"
+        printf "FAIL: force differs from the reference (%.8g vs %.8g)\n" "$b" "$a"
         failures=$((failures + 1))
     fi
 else
-    echo "SKIP: cross-check needs both approaches to have run"
+    echo "FAIL: the main arm produced no force to compare with the reference"
+    failures=$((failures + 1))
 fi
 
 echo
@@ -170,12 +165,12 @@ echo
 # perforatedPlate and stripFooting. What is uncovered, and what this covers, is
 # finite-strain history through a different solid model
 run_restart_test() {
-    local d="${REGRESSION_ROOT}/frameworkRestart"
+    local d="${REGRESSION_ROOT}/restart"
 
     if [ "$CHECK_ONLY" = false ]; then
-        prepare_case "frameworkRestart"
+        prepare_case "restart"
 
-        sed -i.bak \
+        "${SOLIDS4FOAM_SED}" -i.bak \
             's/^writePrecision.*/writePrecision  14;/; s/^endTime         1;/endTime         0.1;/; s/^deltaT          0.002;/deltaT          0.01;/; s/^writeInterval   10;/writeInterval   5;/' \
             "${d}/system/controlDict"
         rm -f "${d}/system/controlDict.bak"
@@ -205,7 +200,7 @@ run_restart_test() {
     # The state has to be real history, or this proves nothing. bEbar starts as
     # the identity, so a deformed state is one whose diagonal has moved off one
     local bfile
-    bfile=$(ls "${d}"/0.05/*:*:bEbar 2>/dev/null | head -n 1)
+    bfile=$(ls "${d}"/0.05/*IntegrationPointTopology_bEbar 2>/dev/null | head -n 1)
 
     if [[ -z "${bfile}" ]]; then
         echo "FAIL: finite-strain restart: bEbar was not written"
@@ -216,22 +211,23 @@ run_restart_test() {
     # than by looking at one component of lines that start with a bracket: a
     # uniform list is written as N{(...)} with no such line, and a deformation
     # that left xx at one while moving another component would have been missed
-    if python3 - "${bfile}" << 'PYEOF'
-import re, sys
-s = open(sys.argv[1]).read()
-body = s.split('* * * * *')[-1]
-nums = [float(x) for x in re.findall(r'-?\d+\.?\d*(?:[eE][-+]?\d+)?', body)]
-# drop a leading count if present
-if nums and float(nums[0]).is_integer() and len(nums) % 6 == 1:
-    nums = nums[1:]
-identity = (1.0, 0.0, 0.0, 1.0, 0.0, 1.0)
-moved = any(
-    abs(nums[i + c] - identity[c]) > 1e-10
-    for i in range(0, len(nums) - 5, 6)
-    for c in range(6)
-)
-sys.exit(0 if moved else 1)
-PYEOF
+    if awk '
+        # The list after the header, as the count and then six components per
+        # point, or as N{(...)} for a uniform list
+        /^\/\/ \* \* \*/ { text = ""; next }
+        /^[ \t]*\/\// { next }
+        { text = text " " $0 }
+        END {
+            gsub(/[(){}]/, " ", text)
+            n = split(text, v, " ")
+            split("1 0 0 1 0 1", identity, " ")
+            for (k = 2; k <= n; k++) {
+                d = v[k] - identity[(k - 2) % 6 + 1]
+                if (d < 0) d = -d
+                if (d > 1e-10) exit 0
+            }
+            exit 1
+        }' "${bfile}"
     then
         echo "PASS: finite-strain restart: bEbar carries deformation"
     else
@@ -245,12 +241,12 @@ PYEOF
     # tolerate a difference this solid model shows with or without the
     # framework, and a tolerance wide enough to pass would also be wide enough
     # to hide a lost state if nothing else were checked
-    local m="${REGRESSION_ROOT}/frameworkRestartMissing"
+    local m="${REGRESSION_ROOT}/restartMissing"
     if [ "$CHECK_ONLY" = false ]; then
         rm -rf "${m}"; cp -a "${d}" "${m}"
         rm -rf "${m}"/0.0[6-9] "${m}"/0.1 "${m}"/postProcessing
-        rm -f "${m}"/0.05/*:*:bEbar
-        sed -i.bak 's/^startFrom       startTime;/startFrom       latestTime;/' \
+        rm -f "${m}"/0.05/*IntegrationPointTopology_bEbar
+        "${SOLIDS4FOAM_SED}" -i.bak 's/^startFrom       startTime;/startFrom       latestTime;/' \
             "${m}/system/controlDict"
         rm -f "${m}/system/controlDict.bak"
 
@@ -268,11 +264,11 @@ PYEOF
     fi
 
     # Continue from halfway in a copy, so the reference stays intact
-    local g="${REGRESSION_ROOT}/frameworkRestartLeg"
+    local g="${REGRESSION_ROOT}/restartLeg"
     if [ "$CHECK_ONLY" = false ]; then
         rm -rf "${g}"; cp -a "${d}" "${g}"
         rm -rf "${g}"/0.0[6-9] "${g}"/0.1 "${g}"/postProcessing
-        sed -i.bak \
+        "${SOLIDS4FOAM_SED}" -i.bak \
             's/^startFrom       startTime;/startFrom       latestTime;/' \
             "${g}/system/controlDict"
         rm -f "${g}/system/controlDict.bak"
@@ -297,9 +293,9 @@ PYEOF
 
     # 1e-4, not the 1e-6 the small-strain cases hold to. This solid model does
     # not reproduce an uninterrupted run exactly across a restart, with or
-    # without the framework: the legacy model differs by 1.3e-5 on this
-    # quantity here and the framework by 4.3e-6, so the residual is the solid
-    # model's and the framework is if anything the closer of the two. The
+    # without the framework: the removed legacy model differed by 1.3e-5 on
+    # this quantity here and the framework by 4.3e-6, so the residual is the
+    # solid model's and the framework is if anything the closer of the two. The
     # tolerance is set to accept that and nothing larger; a lost bEbar is
     # caught by the check above rather than by this number
     if awk "BEGIN {exit !(($ref - $got)^2 <= (1e-4*$ref)^2)}"; then

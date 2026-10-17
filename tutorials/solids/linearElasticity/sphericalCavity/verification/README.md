@@ -1,10 +1,8 @@
 # Spherical-cavity verification study
 
-This opt-in study migrates and extends the mesh-convergence sweep previously
-kept in `solid-benchmarks/linearElasticity/sphericalCavity`. It verifies both
-tetrahedral and polyhedral meshes. Each level is a complete copy of the parent
-tutorial under `verification/work/`; the tutorial and its normal regression
-tests are not modified.
+This opt-in study is a mesh-convergence sweep on both tetrahedral and
+polyhedral meshes. Each level is a complete copy of the parent tutorial under
+`verification/work/`.
 
 Source a supported OpenFOAM.com environment with PETSc, ensure Gmsh is
 available, and run:
@@ -35,3 +33,7 @@ convergence directly toward the analytical solution without fixing
 machine-dependent regression values. Quick mode checks only that both cases
 finish and produce finite positive errors. The study is not run by
 `tutorials/Alltest` or `tutorials/Alltest-regression`.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

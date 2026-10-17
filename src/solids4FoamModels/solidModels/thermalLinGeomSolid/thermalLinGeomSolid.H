@@ -98,21 +98,14 @@ class thermalLinGeomSolid
 
     // Private Member Functions
 
-        //- Update the stress, from the framework when
-        //  the framework is in use and from the legacy
-        //  mechanicalModel otherwise
+        //- Update the stress
         void correctStress();
 
-        //- Construct impK from whichever of the two is in use
+        //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
 
-        //- Construct impKf from whichever of the two is in use
+        //- Construct impKf to match impK
         tmp<surfaceScalarField> makeImpKf() const;
-
-
-        //- The material residual. The framework rolls its own state over and
-        //  reports no residual of its own, so it contributes nothing here
-        virtual scalar materialResidual() override;
 
         //- Check if the momentum equation is converged
         bool converged

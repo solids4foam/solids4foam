@@ -60,8 +60,7 @@ class anisotropicBiotElasticMechanicalConstitutiveLaw
         //- Density
         dimensionedScalar rho_;
 
-        //- True when the z direction is solved. Named as the legacy law names
-        //  it, which is the opposite way round from what it selects
+        //- True when the z direction is not solved, i.e. a 2-D case
         bool model2d_;
 
         //- Orthotropic stiffness coefficients
@@ -121,9 +120,9 @@ public:
         }
 
         //- Return the bulk modulus.
-        //  The legacy law offers no bulk modulus, and an orthotropic material
-        //  has no single one; the largest direct stiffness is what its impK
-        //  uses and is the closest thing available
+        //  An orthotropic material has no single bulk modulus; the largest
+        //  direct stiffness is what its impK uses and is the closest thing
+        //  available
         virtual dimensionedScalar kappa() const override
         {
             return dimensionedScalar

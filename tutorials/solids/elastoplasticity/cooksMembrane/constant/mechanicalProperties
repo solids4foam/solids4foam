@@ -28,13 +28,6 @@ mechanical
         nu              nu [ 0 0 0 0 0 0 0 ] 0.29;
         "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
         outOfBounds     clamp;
-
-        // Solve a Poisson equation to calculate the hydrostatic sigma/pressure
-        // field
-        smoothPressure  yes;
-
-        // Scale the amount of smoothing applied to the pressure field
-        pressureSmoothingScaleFactor 100;
     }
 );
 

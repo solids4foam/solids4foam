@@ -1,0 +1,63 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+// The lid velocity is vBar = 1 - cos(2 pi t/5) m/s. The inlet profile rises
+// linearly from zero at the bottom of the opening (y = 0.875) to vBar at the
+// lid (y = 1), i.e. vBar*(8 y - 7). Both are imposed with the
+// mokCavityVelocity condition, built from src/ by Allrun
+boundaryField
+{
+    lid
+    {
+        type            mokCavityVelocity;
+        period          5;
+        value           uniform (0 0 0);
+    }
+    inlet
+    {
+        type            mokCavityVelocity;
+        period          5;
+        yBottom         0.875;
+        yTop            1;
+        value           uniform (0 0 0);
+    }
+    outlet
+    {
+        type            zeroGradient;
+    }
+    walls
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

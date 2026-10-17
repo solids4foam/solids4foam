@@ -64,7 +64,6 @@ The following `solidModel` options are particularly relevant here:
 | `nCorrectors` | `10000` | Maximum number of outer correctors |
 | `solutionTolerance` | `1e-06` | Primary convergence tolerance |
 | `alternativeTolerance` | `1e-07` | Secondary convergence tolerance |
-| `materialTolerance` | `1e-05` | Mechanical-law convergence tolerance |
 | `infoFrequency` | `100` | Frequency for solver progress output |
 | `restart` | `false` | Writes extra fields needed for a consistent restart |
 | `writeResidualField` | `false` | Writes a residual field during output |
@@ -125,7 +124,6 @@ linearGeometryTotalDisplacementCoeffs
     nCorrectors         10000;
     solutionTolerance   1e-06;
     alternativeTolerance 1e-07;
-    materialTolerance   1e-05;
     infoFrequency       100;
 
     restart             false;
@@ -199,6 +197,7 @@ Here `oldTime()` means the value stored at the previous time step.
 The following boundary-condition types are treated specially by the solver:
 
 - `solidTraction` patch fields;
+- `solidSpringDashpot` patch fields;
 - `fixedDisplacementZeroShear` patch fields;
 - `symmetry` patch fields.
 
@@ -232,7 +231,7 @@ family. The key design choices are:
 
 - `D` is the primary solution variable;
 - the geometry is fixed in the governing equations;
-- stress is delegated to `mechanicalModel`;
+- stress is delegated to the `mechanicalConstitutiveLaw` framework;
 - the solver can run in three distinct modes: segregated implicit, PETSc SNES,
   and explicit.
 
@@ -325,6 +324,8 @@ standard solids4foam displacement/traction patch types and applies model-specifi
 rules:
 
 - `solidTraction`: uses the patch traction and subtracts the pressure term;
+- `solidSpringDashpot`: uses the spring-dashpot traction of the current
+  boundary displacement, plus the patch traction and pressure;
 - `fixedDisplacementZeroShear` and `symmetry`: remove the tangential traction
   component by projection onto the normal direction.
 

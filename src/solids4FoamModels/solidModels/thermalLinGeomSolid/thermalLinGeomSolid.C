@@ -114,13 +114,10 @@ bool thermalLinGeomSolid::converged
             )
         );
 
-    // Calculate material residual
-    const scalar materialResidual = this->materialResidual();
-
     // If one of the residuals has converged to an order of magnitude
     // less than the tolerance then consider the solution converged
-    // force at leaast 1 outer iteration and the material law must be converged
-    if (iCorr > 1 && materialResidual < materialTol())
+    // force at least 1 outer iteration
+    if (iCorr > 1)
     {
         bool convergedD = false;
         bool convergedT = false;
@@ -163,8 +160,7 @@ bool thermalLinGeomSolid::converged
     // Print residual information
     if (iCorr == 0)
     {
-        Info<< "    Corr, res (T & D), relRes (T & D), matRes, iters (T & D)"
-            << endl;
+        Info<< "    Corr, res (T & D), relRes (T & D), iters (T & D)" << endl;
     }
     else if (iCorr % infoFrequency() == 0 || converged)
     {
@@ -173,7 +169,6 @@ bool thermalLinGeomSolid::converged
             << ", " << mag(solverPerfD.initialResidual())
             << ", " << residualT
             << ", " << residualD
-            << ", " << materialResidual
             << ", " << solverPerfT.nIterations()
             << ", " << solverPerfD.nIterations() << endl;
 
@@ -255,7 +250,7 @@ thermalLinGeomSolid::thermalLinGeomSolid
 {
     DisRequired();
 
-    // A multi-material framework run needs a material-aware gradient
+    // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(D().name());
 
     // Store T old time
@@ -268,12 +263,6 @@ thermalLinGeomSolid::thermalLinGeomSolid
 
 void thermalLinGeomSolid::correctStress()
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        mechanical().correct(sigma());
-        return;
-    }
-
     // The framework is a pure function of the displacement gradient and the
     // old-time state, so the gradient is passed explicitly rather than looked
     // up from the registry, and the old-time state is rolled over by the
@@ -290,41 +279,15 @@ void thermalLinGeomSolid::correctStress()
 
 Foam::tmp<Foam::volScalarField> thermalLinGeomSolid::makeImpK() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().impK();
-    }
-
-    return frameworkImpK(mechanicalManager(), tangentRequest::scalar);
+    return lawImpK(mechanicalManager(), tangentRequest::scalar);
 }
 
 
 Foam::tmp<Foam::surfaceScalarField> thermalLinGeomSolid::makeImpKf() const
 {
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().impKf();
-    }
-
     // The framework has no separate face tangent: the face value is the
-    // interpolate of the cell one, which is what the legacy impKf() amounts to
-    // for a law whose stiffness does not vary within a material
+    // interpolate of the cell one
     return fvc::interpolate(makeImpK()());
-}
-
-
-Foam::scalar thermalLinGeomSolid::materialResidual()
-{
-    if (!useMechanicalConstitutiveLawManager())
-    {
-        return mechanical().residual();
-    }
-
-    // The framework keeps its own state and rolls it over itself, so it has no
-    // residual of its own to report and contributes nothing to convergence.
-    // The legacy residual is a plasticity-style measure that only some laws
-    // define; the framework's equivalent is not yet defined
-    return 0.0;
 }
 
 
@@ -414,14 +377,7 @@ bool thermalLinGeomSolid::evolve()
         U() = fvc::ddt(D());
 
         // Update gradient of displacement
-        if (useMechanicalConstitutiveLawManager())
-        {
-            gradD() = fvc::grad(D());
-        }
-        else
-        {
-            mechanical().grad(D(), gradD());
-        }
+        gradD() = fvc::grad(D());
 
         // Update gradient of displacement increment
         gradDD() = gradD() - gradD().oldTime();
@@ -444,14 +400,7 @@ bool thermalLinGeomSolid::evolve()
     );
 
     // Interpolate cell displacements to vertices
-    if (useMechanicalConstitutiveLawManager())
-    {
-        frameworkInterpolate(D(), gradD(), pointD());
-    }
-    else
-    {
-        mechanical().interpolate(D(), pointD());
-    }
+    interpolatePointDisplacement(D(), gradD(), pointD());
 
     // Increment of displacement
     DD() = D() - D().oldTime();

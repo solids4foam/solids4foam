@@ -1,11 +1,8 @@
 # cantilever2d verification study
 
-This opt-in study adds the order-of-accuracy sweep that the tutorial README
-describes in words but does not ship. It is a port of the cantilever
-order-of-accuracy study in the `solid-benchmarks` repository
-(`linearElasticity/cantilever`) onto the block-structured tutorial mesh, so
-that the same measurement can be made with any of the tutorial's solution
-approaches rather than only the vertex-centred one.
+This opt-in study is the order-of-accuracy sweep that the tutorial README
+describes, on the block-structured tutorial mesh, so that the measurement can
+be made with any of the tutorial's solution approaches.
 
 The tutorial already builds the Timoshenko slender-cantilever analytical
 solution as the `cantileverAnalyticalSolution` function object, which writes
@@ -103,6 +100,10 @@ One exception applies to the `highOrder` variant: below a roundoff floor of
 $$10^{-8}$$ the monotone and order checks are skipped, because that
 discretisation reproduces the analytical solution exactly and its remaining
 error is arithmetic roundoff, which neither decreases nor has an order.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
 
 ## Reference results
 

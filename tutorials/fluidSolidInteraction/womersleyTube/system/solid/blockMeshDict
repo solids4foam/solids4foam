@@ -1,0 +1,79 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Axisymmetric wedge of the tube wall, 1 degree wide, about the x axis
+
+nAxial      64;
+nRadial     8;
+
+vertices
+(
+    (0 0.9999619231 -0.008726535498)
+    (15 0.9999619231 -0.008726535498)
+    (15 1.099958115 -0.009599189048)
+    (0 1.099958115 -0.009599189048)
+    (0 0.9999619231 0.008726535498)
+    (15 0.9999619231 0.008726535498)
+    (15 1.099958115 0.009599189048)
+    (0 1.099958115 0.009599189048)
+);
+
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) ($nAxial $nRadial 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces ((0 3 7 4));
+    }
+    outlet
+    {
+        type patch;
+        faces ((1 5 6 2));
+    }
+    interface
+    {
+        type wall;
+        faces ((0 4 5 1));
+    }
+    outer
+    {
+        type patch;
+        faces ((3 2 6 7));
+    }
+    front
+    {
+        type wedge;
+        faces ((0 1 2 3));
+    }
+    back
+    {
+        type wedge;
+        faces ((4 7 6 5));
+    }
+);
+
+// ************************************************************************* //

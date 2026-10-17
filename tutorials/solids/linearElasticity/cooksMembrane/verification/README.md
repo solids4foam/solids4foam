@@ -1,10 +1,8 @@
 # Linear-elastic Cook's membrane verification
 
-This opt-in study migrates the structured quadrilateral mesh sweep previously
-kept in `solid-benchmarks/linearElasticity/cooksMembrane`. It copies the parent
-tutorial into `verification/work/`, runs the segregated formulation on
+This opt-in study is a structured quadrilateral mesh sweep. It copies the
+parent tutorial into `verification/work/`, runs the segregated formulation on
 successively refined meshes, and records the top-right vertical displacement.
-The tutorial and normal regression tests are not modified.
 
 With OpenFOAM and solids4foam loaded, run:
 
@@ -26,3 +24,7 @@ the midpoint of the 32.20--32.28 mm very-fine finite-element range reported in
 the tutorial README, and its reference error decreases over the sweep with
 positive net order. The quick mode checks only that all requested cases finish
 and produce finite displacement values.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

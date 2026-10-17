@@ -42,12 +42,11 @@ Description
             }
         }
 
-    and the legacy spelling <input>caseDirectory, i.e. TcaseDirectory for the
+    and the older spelling <input>caseDirectory, i.e. TcaseDirectory for the
     temperature of thermoMechanicalLaw, means the same, so an existing
-    dictionary runs unchanged on either implementation. The path is relative
-    to the case, as the legacy law's is.
+    dictionary runs unchanged. The path is relative to the case.
 
-    Semantics are those of the legacy thermoMechanicalLaw TcaseDirectory:
+    Semantics:
       - the second case has its own Time and mesh; the mesh must match this
         one (the same numbers of points, faces and cells and the same points),
         and additionally the same patches, since the boundary values are
@@ -63,13 +62,13 @@ Description
       - a field of the same name registered by another model, i.e. one this
         class did not read, takes precedence over the case directory.
 
-    The copy lives on the full mesh. There are no per-material sub-meshes in
-    the framework: each law gathers its own cells and boundary faces from it.
+    The copy lives on the full mesh: each law gathers its own cells and
+    boundary faces from it.
     Two materials may name different case directories for one input; each
     then has its own copy, and only the first is registered.
 
-    In parallel the case directory is taken relative to this processor's case,
-    exactly as the legacy law does: processorN/<caseDirectory> must hold that
+    In parallel the case directory is taken relative to this processor's case:
+    processorN/<caseDirectory> must hold that
     processor's portion of the second case, decomposed in the same way.
 
 SourceFiles

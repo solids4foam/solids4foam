@@ -1,11 +1,9 @@
 # narrowTmember verification study
 
-This opt-in study migrates the mesh study from
-`solid-benchmarks/linearElasticity/narrowTmember` into the tutorial itself. It
-refines the tutorial `blockMesh` through the mesh family of Demirdžić et al.
-(1997), samples the equivalent (von Mises) stress along the arc `r = 1.5R` in
-the `z = 0` plane, where `R = 5 mm` is the fillet radius, and compares the
-result with the published curve.
+This opt-in study is a mesh study. It refines the tutorial `blockMesh` through
+the mesh family of Demirdžić et al. (1997), samples the equivalent (von Mises)
+stress along the arc `r = 1.5R` in the `z = 0` plane, where `R = 5 mm` is the
+fillet radius, and compares the result with the published curve.
 
 It is deliberately separate from `regressionTest.sh`: the regression test
 checks that the tutorial remains numerically stable, whereas this study checks
@@ -72,6 +70,10 @@ floor, so the two questions are separated:
 A `--quick` run only exercises the two coarsest meshes, which are not expected
 to meet the accuracy tolerances, so it checks only that the sweep produces
 usable numbers.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
 
 ## Reference results
 
