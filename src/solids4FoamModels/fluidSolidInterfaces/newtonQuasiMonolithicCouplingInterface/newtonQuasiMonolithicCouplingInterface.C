@@ -1638,6 +1638,60 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
         << " sum_abs_pressure_flux_delta=" << sumAbsPressureFluxDelta
         << " max_abs_pressure_flux_delta=" << maxAbsPressureFluxDelta
         << endl;
+
+    // Interface force balance: the force of the fluid on the interface,
+    // integrated over the fluid faces, and the force applied to the solid,
+    // integrated over the solid faces with the areas the solid uses. These
+    // differ only through the interface transfer on a non-conformal interface
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+    const fvPatch& fluidPatch = fluidMesh().boundary()[fluidPatchID];
+
+    vectorField fluidTraction
+    (
+      - fluid().patchPressureForce(fluidPatchID)*fluidPatch.nf()
+    );
+
+    if (passViscousStress_)
+    {
+        fluidTraction += fluid().patchViscousForce(fluidPatchID);
+    }
+
+    const vector fluidForce = -gSum(fluidTraction*fluidPatch.magSf());
+
+    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+    const fvPatch& solidPatch = solidMesh().boundary()[solidPatchID];
+    const solidTractionFvPatchVectorField& solidTractionPatch =
+        refCast<const solidTractionFvPatchVectorField>
+        (
+            solid().D().boundaryField()[solidPatchID]
+        );
+
+    scalarField solidMagSf(solidPatch.magSf());
+
+    if
+    (
+        isA<solidModels::nonLinGeomTotalLagVelocitySolid>(solid())
+     && !solidTractionPatch.useUndeformedArea()
+    )
+    {
+        // Deformed solid face areas, as used by the solid
+        const tensorField F
+        (
+            I + solid().gradD().boundaryField()[solidPatchID].T()
+        );
+
+        solidMagSf = mag(det(F)*(inv(F)().T() & solidPatch.Sf()));
+    }
+
+    const vector solidForce =
+        gSum(solidTractionPatch.traction()*solidMagSf);
+
+    Info<< "Interface force balance:"
+        << " fluid=" << fluidForce
+        << " solid=" << solidForce
+        << " rel_imbalance="
+        << mag(solidForce - fluidForce)/(mag(fluidForce) + VSMALL)
+        << endl;
 }
 
 
