@@ -34,9 +34,10 @@ fi
 
 # ============================================================
 # idealisedVentricle regression test
-# Runs the petsc and pressureDisplacement approaches with a
-# shortened end-time and loosened tolerances, and checks that
-# Max sigmaEq from the solver log is within sensible bounds.
+# Runs the petsc, pressureDisplacement and isotropicFung
+# approaches with a shortened end-time and loosened tolerances,
+# and checks that Max sigmaEq from the solver log is within
+# sensible bounds.
 # Approaches that are not supported in the current OpenFOAM
 # flavour are reported as SKIP rather than failures.
 # ============================================================
@@ -81,12 +82,19 @@ SIGMA_PD_MAX=7.6e2
 REF_PETSC_SIGMA=154.986
 REF_PETSC_REL_TOL=0.01
 
+# The isotropicFung arm is the petsc arm with the material written as
+# isotropicFungElastic, with c = k and a = cf = ct = cfs, which is the same
+# material. Its Max sigmaEq must equal the petsc arm's to the six significant
+# figures the log prints
+REF_ISOTROPIC_FUNG_REL_TOL=1e-5
+
 SOLVER_LOGFILE="log.solids4Foam"
 ALLRUN_LOGFILE="log.Allrun"
 
 APPROACHES=(
     "petsc"
     "pressureDisplacement"
+    "isotropicFung"
 )
 
 echo "============================================================"
@@ -151,9 +159,14 @@ prepare_case() {
     done
 
     # Shorten controlDict for the requested approach so the
-    # regression run terminates after a couple of time steps.
+    # regression run terminates after a couple of time steps. The
+    # isotropicFung approach runs the petsc case's system directory
+    local options="${approach}"
+    if [[ "${approach}" == "isotropicFung" ]]; then
+        options="petsc"
+    fi
     shorten_controlDict \
-        "${case_dir}/caseOptions/${approach}/system/controlDict"
+        "${case_dir}/caseOptions/${options}/system/controlDict"
 
     if [[ "${approach}" == "pressureDisplacement" ]]; then
         loosen_pressureDisplacement_tolerances \
@@ -255,6 +268,17 @@ for approach in "${APPROACHES[@]}"; do
         continue
     fi
 
+    # Otherwise an arm whose material was not replaced would run the petsc
+    # arm's GuccioneElastic and agree with it trivially
+    if [[ "${approach}" == "isotropicFung" ]] \
+        && ! grep -q "Selecting mechanical constitutive law: isotropicFungElastic" \
+            "${case_dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: ${approach}: did not select isotropicFungElastic"
+        failures=$((failures + 1))
+        continue
+    fi
+
     sigma=$(extract_max_sigma "${case_dir}")
 
     if [[ -z "${sigma}" ]]; then
@@ -281,6 +305,8 @@ for approach in "${APPROACHES[@]}"; do
 
     if [[ "${approach}" == "petsc" ]]; then
         petsc_sigma="${sigma}"
+    elif [[ "${approach}" == "isotropicFung" ]]; then
+        fung_sigma="${sigma}"
     fi
 done
 
@@ -298,52 +324,78 @@ if [[ -n "${petsc_sigma:-}" ]]; then
     fi
 fi
 
+# The isotropicFung arm against the petsc arm, which is the same material
+if [[ -n "${fung_sigma:-}" ]]; then
+    if [[ -z "${petsc_sigma:-}" ]]; then
+        echo "FAIL: isotropicFung ran but the petsc arm it is compared with did not"
+        failures=$((failures + 1))
+    elif awk "BEGIN {exit !((${fung_sigma} - ${petsc_sigma})^2 \
+        <= (${REF_ISOTROPIC_FUNG_REL_TOL}*${petsc_sigma})^2)}"
+    then
+        printf "PASS: isotropicFungElastic reproduces GuccioneElastic (%.6g vs %.6g)\n" \
+            "${fung_sigma}" "${petsc_sigma}"
+    else
+        printf "FAIL: isotropicFungElastic differs from GuccioneElastic (%.6g vs %.6g)\n" \
+            "${fung_sigma}" "${petsc_sigma}"
+        failures=$((failures + 1))
+    fi
+fi
+
 # ------------------------------------------------------------
-# The framework's check on GuccioneElastic's isochoric split
+# The framework's check on each law's isochoric split
 # ------------------------------------------------------------
-# This case uses GuccioneElastic on its own, so its split can be checked
-# directly: a law that declares it can separate its isochoric stress from its
-# volumetric response is taken at its word by every mixed formulation, and a
-# superposed dilation is the one thing that tells an honest split from dev()
-# of a total. Where the law is wrapped in electroMechanicalLaw the check does
-# not apply, because the active tension is not derived from a potential - so
-# this is where it does apply
+# This case uses GuccioneElastic and isotropicFungElastic on their own, so
+# their splits can be checked directly: a law that declares it can separate
+# its isochoric stress from its volumetric response is taken at its word by
+# every mixed formulation, and a superposed dilation is the one thing that
+# tells an honest split from dev() of a total. Where the law is wrapped in
+# electroMechanicalLaw the check does not apply, because the active tension is
+# not derived from a potential - so this is where it does apply
 run_split_check() {
-    # Run on any meshed arm that selected a mechanical constitutive law, so a
-    # renamed or added arm remains covered, while an arm that stopped before
-    # constructing its law is not selected merely because it appears first
-    # (#466)
-    local d
+    # Run on every meshed arm that selected a mechanical constitutive law, so
+    # a renamed or added arm remains covered, while an arm that stopped before
+    # constructing its law is not checked (#466). Each arm's law is checked,
+    # rather than only the first arm's, as the arms do not all use one law
+    local d law
+    local checked=0
+    local result=0
     for d in "${REGRESSION_ROOT}"/*; do
         [[ -d "${d}/constant/polyMesh" ]] || continue
-        grep -q "Selecting mechanical constitutive law" \
-            "${d}/${SOLVER_LOGFILE}" 2>/dev/null || continue
+        law=$(grep -m1 "Selecting mechanical constitutive law" \
+            "${d}/${SOLVER_LOGFILE}" 2>/dev/null | awk '{print $NF}') || true
+        [[ -n "${law}" ]] || continue
 
         # A skip where the application is not built, and a failure in CI,
         # where it always is
         solids4Foam::requireTestApp Test-mechanicalConstitutiveLaw \
             || return $(( $? - 1 ))
 
+        checked=$((checked + 1))
+
         if ! ( cd "${d}" && Test-mechanicalConstitutiveLaw > log.unit 2>&1 )
         then
-            echo "FAIL: the law checks did not pass"
+            echo "FAIL: ${law}: the law checks did not pass"
             grep -m2 "FAIL:" "${d}/log.unit" || true
-            return 1
+            result=1
+            continue
         fi
 
         if ! grep -q "isochoric stress ignores a superposed dilation" \
             "${d}/log.unit"
         then
-            echo "FAIL: GuccioneElastic's isochoric split was not checked"
-            return 1
+            echo "FAIL: ${law}'s isochoric split was not checked"
+            result=1
+            continue
         fi
 
-        echo "PASS: GuccioneElastic's isochoric split is dilation invariant"
-        return 0
+        echo "PASS: ${law}'s isochoric split is dilation invariant"
     done
 
-    echo "SKIP: mechanicalConstitutiveLaw checks (neither arm ran here)"
-    return 0
+    if (( checked == 0 )); then
+        echo "SKIP: mechanicalConstitutiveLaw checks (no arm ran here)"
+    fi
+
+    return ${result}
 }
 
 if ! run_split_check; then

@@ -91,6 +91,7 @@ use it:
 | [`MooneyRivlinElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/MooneyRivlinElasticMechanicalConstitutiveLaw/README.md) | finite | Mooney-Rivlin hyperelasticity |
 | [`OgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/OgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Three-term Ogden hyperelasticity |
 | [`GuccioneElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/GuccioneElasticMechanicalConstitutiveLaw/README.md) | finite | Transversely isotropic myocardium (Guccione) |
+| [`isotropicFungElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/isotropicFungElasticMechanicalConstitutiveLaw/README.md) | finite | Isotropic Fung-type exponential soft tissue |
 | [`HolzapfelGasserOgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Fibre-reinforced arterial tissue (HGO) |
 | [`electroMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/electroMechanicalLawMechanicalConstitutiveLaw/README.md) | finite | Active fibre tension over a passive sub-law |
 

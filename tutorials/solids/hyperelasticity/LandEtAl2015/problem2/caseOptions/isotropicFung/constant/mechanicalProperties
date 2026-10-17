@@ -1,0 +1,39 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      mechanicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+planeStress     no;
+
+mechanical
+(
+    heartTissue
+    {
+        // The same material as the petsc approach: isotropicFungElastic with
+        // c = k and a = cf = ct = cfs is identical to that GuccioneElastic law
+        type            isotropicFungElastic;
+        rho             rho [1 -3 0 0 0 0 0] 3000;
+        c               c [1 -1 -2 0 0 0 0] 10e3;
+        a               1.0;
+
+        // The bulk modulus acts as a penalty factor to enforce
+        // incompressibility
+        // Aim for 100 x shear modulus
+        bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
+    }
+);
+
+// ************************************************************************* //
