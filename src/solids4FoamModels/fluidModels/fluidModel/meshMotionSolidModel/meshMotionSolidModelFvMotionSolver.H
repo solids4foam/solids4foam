@@ -24,27 +24,29 @@ Group
 Description
     Mesh motion solver for an fvMesh using a solids4foam solidModel.
 
-    The solid model is solved on the region given by regionName. When this
-    is a separate region whose mesh is a copy of the moving mesh, e.g.
-    constant/fluidMeshMotion/polyMesh copied from constant/fluid/polyMesh,
-    the solid model is solved on this static reference mesh for the total
-    displacement from the reference points, and the mesh points are the
-    reference points plus the solid model point displacement. The meshes must
-    have the same points, in the same order, including in parallel, where
-    they must be decomposed in the same way.
+    The solid model is solved on the moving mesh itself, for the total
+    displacement from the reference points, points0, and the mesh points
+    are the reference points plus the solid model point displacement, pointD.
+    As with displacementLaplacian, the equations are discretised on the
+    current mesh, so no copy of the mesh is needed and, because the unknown
+    is the total displacement and not an increment, the mesh for a given
+    interface position does not drift with the path taken to reach it.
 
-    When the reference mesh is used, the optional diffusivity entry, as for
-    displacementLaplacian, creates the stiffnessScaleFactor field on the
-    reference mesh, which the diffusionElastic and diffusionHyperElastic
-    mechanical laws use to scale their stiffness; it is calculated once, from
-    the reference mesh, as the face diffusivity limited to between minFactor
-    and maxFactor times its average, divided by its average, and averaged to
-    the cells:
+    The solid model reads its solidProperties and mechanicalProperties from
+    constant/<region>, its D and pointD fields from <time>/<region>, and its
+    schemes and solver settings from system/<region> of the moving mesh. Its
+    fields whose names other models also use, e.g. U, p and rho, are private
+    to it (see solidModel::sharedMesh()).
+
+    The optional diffusivity entry, as for displacementLaplacian, sets the
+    stiffnessScaleFactor field, which the diffusionElastic and
+    diffusionHyperElastic mechanical laws use to scale their stiffness: the
+    face diffusivity, limited to between minFactor and maxFactor times its
+    average, divided by its average, and averaged to the cells. It is
+    recalculated on the current mesh before each solution:
 
     \verbatim
     motionSolver    solids4foamSolidModel;
-
-    regionName      fluidMeshMotion;
 
     // Optional
     diffusivity     quadratic inverseDistance (interface);
@@ -53,9 +55,8 @@ Description
     writeStiffScaleFactor no;
     \endverbatim
 
-    When regionName is the region of the moving mesh itself, the solid model
-    shares the moving mesh; its pointD field is then expected to be set by
-    external functions (see solveEquations).
+    If the solveEquations flag is false, the solid model pointD field is
+    expected to be set by external functions.
 
 SourceFiles
     meshMotionSolidModelFvMotionSolver.C
@@ -89,11 +90,10 @@ class meshMotionSolidModelFvMotionSolver
 {
     // Private data
 
-        //- Static reference mesh on which the solid model is solved, if the
-        //  solid model region is not the region of the moving mesh
-        autoPtr<dynamicFvMesh> referenceMeshPtr_;
+        //- Mesh motion diffusivity, if specified
+        autoPtr<motionDiffusivity> diffusivityPtr_;
 
-        //- Stiffness scale factor on the reference mesh
+        //- Stiffness scale factor, if a diffusivity is specified
         autoPtr<volScalarField> stiffnessScaleFactorPtr_;
 
         //- Solid model
@@ -107,16 +107,15 @@ class meshMotionSolidModelFvMotionSolver
 
     // Private Member Functions
 
-        //- Read the reference mesh, unless the solid model region is the
-        //  region of the moving mesh
-        autoPtr<dynamicFvMesh> makeReferenceMesh() const;
+        //- Check that the solid model region is the region of the moving
+        //  mesh, and return it
+        word regionName() const;
 
-        //- Calculate the stiffness scale factor on the reference mesh, if a
-        //  diffusivity is specified
-        autoPtr<volScalarField> makeStiffnessScaleFactor() const;
+        //- Create the stiffness scale factor, if a diffusivity is specified
+        autoPtr<volScalarField> makeStiffnessScaleFactor();
 
-        //- Check that the reference mesh points are the reference points
-        void checkReferenceMesh() const;
+        //- Update the stiffness scale factor on the current mesh
+        void updateStiffnessScaleFactor();
 
         //- No copy construct
         meshMotionSolidModelFvMotionSolver
@@ -169,13 +168,6 @@ public:
         solidModel& model()
         {
             return modelPtr_();
-        }
-
-        //- Return true if the solid model is solved on a separate, static
-        //  reference mesh
-        bool referenceMesh() const
-        {
-            return referenceMeshPtr_.valid();
         }
 
         //- Access to the solveEquations flag

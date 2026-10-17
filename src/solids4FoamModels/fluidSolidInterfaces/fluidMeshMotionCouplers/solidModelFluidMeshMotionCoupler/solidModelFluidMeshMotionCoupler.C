@@ -54,46 +54,25 @@ Foam::solidModelFluidMeshMotionCoupler::solidModelFluidMeshMotionCoupler
     motionSolver_
     (
         refCast<meshMotionSolidModelFvMotionSolver>(*lookupMotionSolver(mesh))
-    ),
-    referencePatchIDs_(mesh.boundaryMesh().size(), -1)
+    )
 {
-    if (!motionSolver_.referenceMesh())
+    const solidModel& model = motionSolver_.model();
+
+    if (model.incremental())
     {
         FatalErrorInFunction
-            << "The solids4foamSolidModel mesh motion solver must solve the "
-            << "solid model on a separate reference copy of the fluid mesh: "
-            << "set regionName to a region other than "
-            << mesh.name() << exit(FatalError);
+            << "The solids4foamSolidModel mesh motion coupler needs a "
+            << "total-displacement solid model, e.g. "
+            << "linearGeometryTotalDisplacement, not " << model.type()
+            << exit(FatalError);
     }
-
-    const solidModel& model = motionSolver_.model();
-    const polyBoundaryMesh& referenceBoundary = model.mesh().boundaryMesh();
 
     forAll(patchIDs, i)
     {
-        const polyPatch& patch = mesh.boundaryMesh()[patchIDs[i]];
-        const label referencePatchID = referenceBoundary.findPatchID
-        (
-            patch.name()
-        );
+        const label patchID = patchIDs[i];
+        const word& patchName = mesh.boundaryMesh()[patchID].name();
 
-        if
-        (
-            referencePatchID < 0
-         || referenceBoundary[referencePatchID].size() != patch.size()
-        )
-        {
-            FatalErrorInFunction
-                << "The fluid interface patch " << patch.name()
-                << " is not a patch of the same size in the mesh motion "
-                << "reference mesh " << model.mesh().name()
-                << exit(FatalError);
-        }
-
-        referencePatchIDs_[patchIDs[i]] = referencePatchID;
-
-        const fvPatchVectorField& DPatch =
-            model.D().boundaryField()[referencePatchID];
+        const fvPatchVectorField& DPatch = model.D().boundaryField()[patchID];
 
         if
         (
@@ -109,9 +88,9 @@ Foam::solidModelFluidMeshMotionCoupler::solidModelFluidMeshMotionCoupler
         )
         {
             FatalErrorInFunction
-                << "The " << model.D().name() << " boundary condition on "
-                << "the patch " << patch.name() << " of the mesh motion "
-                << "reference mesh must be of type fixedDisplacement, with "
+                << "The " << model.D().name() << " boundary condition of the "
+                << "mesh motion solid model on the patch " << patchName
+                << " must be of type fixedDisplacement, with "
                 << "enforcePointPatchField no and no displacementSeries"
                 << exit(FatalError);
         }
@@ -120,15 +99,14 @@ Foam::solidModelFluidMeshMotionCoupler::solidModelFluidMeshMotionCoupler
         (
             !isA<fixedValuePointPatchVectorField>
             (
-                model.pointD().boundaryField()[referencePatchID]
+                model.pointD().boundaryField()[patchID]
             )
         )
         {
             FatalErrorInFunction
                 << "The " << model.pointD().name() << " boundary condition "
-                << "on the patch " << patch.name() << " of the mesh motion "
-                << "reference mesh must be of type fixedValue"
-                << exit(FatalError);
+                << "of the mesh motion solid model on the patch " << patchName
+                << " must be of type fixedValue" << exit(FatalError);
         }
     }
 }
@@ -143,7 +121,6 @@ void Foam::solidModelFluidMeshMotionCoupler::setPatchMotion
 )
 {
     solidModel& model = motionSolver_.model();
-    const label referencePatchID = referencePatchIDs_[patchID];
 
     const vectorField totalDisp
     (
@@ -155,12 +132,10 @@ void Foam::solidModelFluidMeshMotionCoupler::setPatchMotion
         )
     );
 
-    // The reference mesh is a copy of the fluid mesh, so the patch points
-    // are in the same order
     fixedValuePointPatchVectorField& pointDPatch =
         refCast<fixedValuePointPatchVectorField>
         (
-            boundaryFieldRef(model.pointD())[referencePatchID]
+            boundaryFieldRef(model.pointD())[patchID]
         );
 
     pointDPatch == totalDisp;
@@ -168,13 +143,10 @@ void Foam::solidModelFluidMeshMotionCoupler::setPatchMotion
     fixedDisplacementFvPatchVectorField& DPatch =
         refCast<fixedDisplacementFvPatchVectorField>
         (
-            boundaryFieldRef(model.D())[referencePatchID]
+            boundaryFieldRef(model.D())[patchID]
         );
 
-    primitivePatchInterpolation interp
-    (
-        model.mesh().boundaryMesh()[referencePatchID]
-    );
+    primitivePatchInterpolation interp(mesh().boundaryMesh()[patchID]);
 
     DPatch.totalDisp() = interp.pointToFaceInterpolate(totalDisp);
 }

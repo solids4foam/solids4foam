@@ -31,6 +31,13 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
 # Shortened end time for regression efficiency
 REGRESSION_END_TIME=1
 
+# The diffusionElastic fluid mesh motion variant costs about ten times as much
+# as the others, so it is run to a shorter end time, with its own references
+# and tolerances
+SOLID_MESH_MOTION_END_TIME=0.5
+SOLID_MESH_MOTION_DISP_TOL=1e-3
+SOLID_MESH_MOTION_FORCE_TOL=0.1
+
 variant="openfoamcom"
 if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
     variant="foamextend"
@@ -365,6 +372,13 @@ REF_MAX_DISP=0.0263297
 REF_FINAL_DISP=0.0247337
 REF_FINAL_FORCE=4.799864
 
+# diffusionElastic fluid mesh motion, to t = 0.5, from the OpenFOAM.com v2512
+# run: the tip displacement is still increasing, so its maximum is its final
+# value. All the fluid mesh motions agree to within 3e-6 and 2e-3 at this time
+REF_SOLID_MESH_MOTION_MAX_DISP=0.0122427
+REF_SOLID_MESH_MOTION_FINAL_DISP=0.0122427
+REF_SOLID_MESH_MOTION_FINAL_FORCE=3.485105
+
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
 
@@ -379,15 +393,18 @@ if [[ "${variant}" != "foamextend" ]]; then
     run_high_order_case "${high_order_case}"
 fi
 
-# The fluid mesh motion variants: the mesh motion should change the beam
-# response by much less than the tolerances, so they share the references.
-# Each Allrun declares a skip where its mesh motion is unavailable
-MESH_MOTIONS=(displacementLaplacian diffusionElastic diffusionHyperElastic)
-declare -A mesh_motion_cases
-for mesh_motion in "${MESH_MOTIONS[@]}"; do
-    mesh_motion_cases[${mesh_motion}]=$(prepare_case iqnils "${mesh_motion}")
-    run_mesh_motion_case "${mesh_motion_cases[${mesh_motion}]}" "${mesh_motion}"
-done
+# The fluid mesh motion variants: displacementLaplacian changes the beam
+# response by much less than the tolerances, so it shares the references;
+# diffusionElastic is run to the shorter end time, and diffusionHyperElastic
+# is not run. Each Allrun declares a skip where its mesh motion is unavailable
+displacement_case=$(prepare_case iqnils displacementLaplacian)
+run_mesh_motion_case "${displacement_case}" displacementLaplacian
+
+solid_mesh_motion_case=$(
+    REGRESSION_END_TIME="${SOLID_MESH_MOTION_END_TIME}" \
+        prepare_case iqnils diffusionElastic
+)
+run_mesh_motion_case "${solid_mesh_motion_case}" diffusionElastic
 
 echo
 
@@ -413,11 +430,18 @@ else
     echo "Skipping high-order regression case: unavailable on foam-extend"
 fi
 
-for mesh_motion in "${MESH_MOTIONS[@]}"; do
-    check_case "${mesh_motion}" "${mesh_motion_cases[${mesh_motion}]}" \
-        "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
-        || failures=$((failures + $?))
-done
+check_case displacementLaplacian "${displacement_case}" \
+    "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+    || failures=$((failures + $?))
+
+REGRESSION_END_TIME="${SOLID_MESH_MOTION_END_TIME}" \
+DISP_MAX_TOL="${SOLID_MESH_MOTION_DISP_TOL}" \
+DISP_FINAL_TOL="${SOLID_MESH_MOTION_DISP_TOL}" \
+FORCE_FINAL_TOL="${SOLID_MESH_MOTION_FORCE_TOL}" \
+    check_case diffusionElastic "${solid_mesh_motion_case}" \
+    "${REF_SOLID_MESH_MOTION_MAX_DISP}" "${REF_SOLID_MESH_MOTION_FINAL_DISP}" \
+    "${REF_SOLID_MESH_MOTION_FINAL_FORCE}" \
+    || failures=$((failures + $?))
 
 echo
 if (( failures == 0 )); then

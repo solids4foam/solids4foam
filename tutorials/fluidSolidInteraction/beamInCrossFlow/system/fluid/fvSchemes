@@ -19,11 +19,22 @@ FoamFile
 ddtSchemes
 {
     default            backward;
+
+    // solids4foamSolidModel mesh motion: quasi-static (fvc::d2dt2 reads its
+    // scheme from ddtSchemes)
+    d2dt2(D)           steadyState;
+}
+
+// solids4foamSolidModel mesh motion: quasi-static
+d2dt2Schemes
+{
+    default            steadyState;
 }
 
 gradSchemes
 {
     default            leastSquares;
+    grad(D)            leastSquaresS4f;
 }
 
 divSchemes
@@ -42,6 +53,7 @@ laplacianSchemes
     laplacian(diffusivity,cellMotionU) Gauss linear corrected;
     laplacian(diffusivity,cellDisplacement) Gauss linear corrected;
     laplacian(rAU,p)   Gauss linear corrected;
+    laplacian(DD,D)    Gauss linear corrected;
 }
 
 interpolationSchemes

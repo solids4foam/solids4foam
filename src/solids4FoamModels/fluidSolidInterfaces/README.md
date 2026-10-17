@@ -223,26 +223,34 @@ of the run being continued.
 ### Solid model mesh motion
 
 `solids4foamSolidModel` moves the fluid mesh with a solids4foam solid model
-solved on a static copy of the fluid mesh, in its own region (`regionName`),
-typically with the `diffusionElastic` or `diffusionHyperElastic` law, whose
-stiffness is scaled by a mesh motion diffusivity so that the mesh is stiffer
-near the interface:
+solved on the fluid mesh itself, typically with the `diffusionElastic` or
+`diffusionHyperElastic` law, whose stiffness is scaled by a mesh motion
+diffusivity so that the mesh is stiffer near the interface:
 
 ```text
 // constant/fluid/dynamicMeshDict
 dynamicFvMesh   dynamicMotionSolverFvMesh;
 motionSolver    solids4foamSolidModel;
-regionName      fluidMeshMotion;
 diffusivity     quadratic inverseDistance (interface);
 ```
 
-The region needs `constant/fluidMeshMotion/polyMesh`, a copy of the fluid mesh
-(decomposed in the same way in parallel), with `solidProperties`,
-`mechanicalProperties` and `g`, `0/fluidMeshMotion/D` and `pointD`, and
-`system/fluidMeshMotion/fvSchemes` and `fvSolution`. On the FSI patches, `D`
-must be `fixedDisplacement` with `enforcePointPatchField no`, and `pointD`
-must be `fixedValue`. The `beamInCrossFlow` tutorial has an example:
-`./Allrun diffusionElastic`.
+As with `displacementLaplacian`, the solid model solves for the total
+displacement from `points0`, discretised on the current fluid mesh, so no copy
+of the mesh is needed, and it must be a total-displacement solid model, e.g.
+`linearGeometryTotalDisplacement`. The stiffness scale factor is recalculated
+on the current mesh before each solution.
+
+The solid model reads `solidProperties`, `mechanicalProperties` and `g` from
+`constant/fluid`, `D` and `pointD` from `0/fluid`, and its schemes and solver
+settings from `system/fluid/fvSchemes` and `fvSolution`, e.g. `grad(D)`,
+`laplacian(DD,D)`, `d2dt2Schemes` and, because `fvc::d2dt2` reads its scheme
+from `ddtSchemes`, `d2dt2(D)` in `ddtSchemes`. Use `steadyState` for both. On
+the FSI patches, `D` must be `fixedDisplacement` with
+`enforcePointPatchField no`, and `pointD` must be `fixedValue`. The solid
+model fields whose names the fluid may also use, e.g. `U`, `p` and `rho`, are
+private to it, and are neither read nor written; it writes its `D`, `pointD`
+and `sigma` fields, and the state of its law, to the fluid time directories.
+The `beamInCrossFlow` tutorial has an example: `./Allrun diffusionElastic`.
 
 ---
 

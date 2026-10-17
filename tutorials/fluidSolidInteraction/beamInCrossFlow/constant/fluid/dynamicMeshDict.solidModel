@@ -18,11 +18,9 @@ FoamFile
 
 dynamicFvMesh dynamicMotionSolverFvMesh;
 
-// Mesh motion by a solids4foam solid model, solved on the static reference
-// copy of the fluid mesh in the fluidMeshMotion region
+// Mesh motion by a solids4foam solid model, solved on the fluid mesh, with
+// its solidProperties and mechanicalProperties in constant/fluid
 "solver|motionSolver" solids4foamSolidModel;
-
-regionName fluidMeshMotion;
 
 // Stiffness scale factor for the diffusionElastic and diffusionHyperElastic
 // laws: the mesh is stiffer near the interface

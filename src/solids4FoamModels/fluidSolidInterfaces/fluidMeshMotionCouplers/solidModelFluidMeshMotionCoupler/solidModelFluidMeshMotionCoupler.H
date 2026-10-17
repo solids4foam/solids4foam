@@ -20,8 +20,8 @@ Class
 
 Description
     Fluid mesh motion coupler for the solids4foamSolidModel mesh motion
-    solver, which solves a solids4foam solid model on a static reference copy
-    of the fluid mesh, e.g. with the diffusionElastic or diffusionHyperElastic
+    solver, which solves a total-displacement solids4foam solid model on the
+    fluid mesh, e.g. with the diffusionElastic or diffusionHyperElastic
     mechanical laws.
 
     On each fluid interface patch, the total displacement from the reference
@@ -72,9 +72,6 @@ class solidModelFluidMeshMotionCoupler
 
         //- Solid model mesh motion solver
         meshMotionSolidModelFvMotionSolver& motionSolver_;
-
-        //- Index of the reference mesh patch for each fluid mesh patch
-        labelList referencePatchIDs_;
 
 
     // Private Member Functions

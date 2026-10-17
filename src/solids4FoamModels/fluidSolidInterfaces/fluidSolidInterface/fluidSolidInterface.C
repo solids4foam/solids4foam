@@ -1001,6 +1001,25 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     if (fsiPtr->movesFluidInterface())
     {
         fsiPtr->checkFluidInterfaceVelocity();
+
+        // Create the fluid mesh motion coupler now, rather than when the
+        // fluid mesh is first moved, so that its checks of the motion solver
+        // and its boundary conditions fail at start-up and not at the
+        // couplingStartTime. With only immersed interfaces, the fluid mesh
+        // is not moved
+        bool anyFluidPatch = false;
+        forAll(fsiPtr->immersedInterfaces_, interfaceI)
+        {
+            if (!fsiPtr->immersedInterfaces_[interfaceI])
+            {
+                anyFluidPatch = true;
+            }
+        }
+
+        if (anyFluidPatch)
+        {
+            fsiPtr->fluidMeshMotion();
+        }
     }
 
     return fsiPtr;

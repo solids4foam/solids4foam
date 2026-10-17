@@ -976,11 +976,10 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     ),
     A_
     (
-        IOobject
+        sharedMeshIOobject
         (
             "A",
             runTime.timeName(),
-            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),
@@ -1049,11 +1048,10 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         (
             new volScalarField
             (
-                IOobject
+                sharedMeshIOobject
                 (
                     "dpdt",
                     runTime.timeName(),
-                    mesh(),
                     IOobject::READ_IF_PRESENT,
                     IOobject::NO_WRITE
                 ),
