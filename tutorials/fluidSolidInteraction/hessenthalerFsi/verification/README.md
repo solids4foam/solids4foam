@@ -17,7 +17,7 @@ modulus:
 
 | Item | Definition |
 | --- | --- |
-| Geometry | the published fluid-domain surface (`geometry/fluidDomain.vtk.gz`) with the 250 mm outlet extension of `makeFluidSurface.py`; flap 11 x 2 x 65 mm, clamped at z = 0 |
+| Geometry | the published fluid-domain surface (`geometry/fluidDomain.vtk.gz`) with the 250 mm outlet extension of `validation/scripts/makeFluidSurface.py` (committed as `constant/triSurface/fluidDomain.stl.gz`); flap 11 x 2 x 65 mm, clamped at z = 0 |
 | Fluid | incompressible Newtonian, ρ = 1163.3 kg/m³, μ_f = 12.50 mPa s, laminar, no gravity |
 | Inlets | parabolic, peak 630 mm/s (upper) and 615 mm/s (lower), radius 10.95 mm, centres y = ±27.15 mm, ramp 3s² − 2s³ over 0.5 s |
 | Outlet | p = 0, `inletOutlet` velocity |
