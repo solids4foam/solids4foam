@@ -80,15 +80,26 @@ Source OpenFOAM, build solids4foam with PETSc, and run from this directory:
 ./Allverify --study solid                      # zero-flow problem, S1-S4
 ./Allverify --study solid --levels S1,S2 --jobs 4
 ./Allverify --study meshes --threads 32        # build F1-F5, record quality
-./Allverify --study run --spec F2:S2 --cores 48
-./Allverify --study run --spec F2:S2:dt=0.001 --cores 48
+./Allverify --study run --spec F2:S2:fsitest=strict:reuse=0:T=45 --cores 96
+./Allverify --study run --spec F2:S2:fsitest=strict:reuse=0:T=60 \
+    --extend-from F2:S2:fsitest=strict:reuse=0:T=45 --cores 96
+./Allverify --study run --spec F2:S2:fsitest=strict:reuse=0:T=45 --restart --cores 96
 ./Allverify --study analyse                    # tables, orders, uncertainty
 ```
+
+Use `fsitest=strict` (both IQN residual measures; see the finding below) and
+`reuse=0` for every verification run; `tol=1e-3` is sufficient with the
+strict test and avoids its noise-floor stalls near steady state.
 
 A coupled run is named by its spec: the fluid level `F1`-`F5`, the solid
 level `S1`-`S4`, and optional `dt=`, `T=` (end time), `tol=` (coupling
 tolerance), `coupling=robin`, `fluidtol=tight` (fluid linear solvers),
-`pimple=` (PIMPLE outer correctors), `sf=` (stabilisation) and `mu=`.
+`pimple=` (PIMPLE outer correctors), `sf=` (stabilisation), `mu=`,
+`fsitest=strict` (require both IQN residual measures), `reuse=` (IQN-ILS
+modes reused from previous steps; tutorial 5), `wall=Fk` (wall cell size of
+level Fk, a diagnostic) and `rep=` (a replicate tag). `--extend-from`
+continues a finished run to a later end time; `--restart` continues an
+interrupted one from its latest written time.
 Each run is a copy of the tutorial under `verification/work`; its evaluated
 quantities are written to `verification/postProcessing/runs/<name>.json`.
 Both directories are ignored by Git. `--reuse` re-evaluates a completed run
@@ -118,7 +129,12 @@ root size `maxCellSize`, by 2^(−(k−1)/2). Every region is refined
 consistently by a nominal √2 per level, and F1 → F3 → F5 by 2. The meshes
 are not nested (the octree is re-fitted on each level).
 
-FLUID_MESH_TABLE
+| Level | Cells | Interface faces | Interface / flap-sweep / wall cell size (mm) |
+| --- | --- | --- | --- |
+| F1 | 231 034 | 7 184 | 0.505 / 1.01 / 2.02 |
+| F2 | 605 497 | 14 252 | 0.357 / 0.714 / 1.43 |
+| F3 | 1 531 752 | 28 062 | 0.253 / 0.505 / 1.01 |
+| F4 | 4 177 457 | 56 704 | 0.179 / 0.357 / 0.714 |
 
 The tutorial's `medium` mesh (0.81 M cells) is not part of the family: it
 refines only the wall and merging region and keeps the near-flap and flap
@@ -145,14 +161,16 @@ sampled at the stations, checks them.
 
 ## Steady state
 
-The flap settles through a slowly decaying oscillation, so every QoI is a
-time average over the final 20 % of the run, the end time is 15 s (not the
-tutorial's 10 s), and each run estimates its own residual transient error.
-The tip history is smoothed over one oscillation period and fitted with
-a + b exp(−t/τ) over the second half of the run (and, as a sensitivity, its
-last 40 % and 30 %). The distance between the window mean and the fitted
-steady value a is the residual transient error. One run to 40 s tests the
-estimator.
+With the strict FSI test the tip approaches its steady value geometrically
+(τ ≈ 4 s on F1S2) after the start-up oscillation: 35-45 s of simulated time
+are needed (the tutorial's 10 s leaves the F1S2 tip 0.25 mm below its steady
+value). The steady QoIs are means over the last 4 s of runs whose final drift
+is at most about 1e-4 mm/s; an unchanged restart of the settled F1S2 stays
+constant to 5e-7 mm/s. The driver still reports its time averages over the
+final 20 % of a run and an exponential-fit estimate of the residual transient
+(a + b exp(−t/τ) on the smoothed history); with the default convergence test
+these estimates were unreliable, because the "transient" was an accumulating
+iterative error.
 
 ## Finding: the default FSI convergence test lets an iterative error accumulate
 
@@ -219,4 +237,38 @@ Richardson estimate and a fine-level GCI (safety factor 1.25) reported.
 Otherwise, a heuristic envelope of three times the largest successive
 difference is given, and no order is claimed.
 
-RESULTS
+## Results (strict test from t = 0, μ* = 64.2 kPa, Δt = 0.002 s)
+
+Compact results: `results/hessenthaler_phaseI_verification_steady.csv` and
+`results/hessenthaler_phaseI_verification_final.json`. The full evidence
+report is `paper-data/hessenthaler_phaseI_verification.md` in the paper
+repository.
+
+Steady tip y (mm):
+
+| | S1 | S2 | S3 |
+| --- | --- | --- | --- |
+| F1 | 16.2006 | 16.6550 | 16.7530 |
+| F2 | | 16.6920 | |
+| F3 | | 16.7219 | 16.8133 (tol 1e-3) |
+
+- Solid refinement (F1, ratio 2): differences 0.454 and 0.098 mm, observed
+  order 2.21, Richardson 16.780 mm, GCI on S3 0.034 mm (0.20 %).
+- Fluid refinement (S2, ratio √2): differences 0.037 and 0.030 mm,
+  convergence ratio 0.81, observed order 0.62 (formal 2): asymptotic
+  convergence is not established. Provisional Richardson-based GCI
+  indicator 0.16 mm. The upstream jets and inlet pressures converge at about
+  second order (the lower-inlet pressure at ~0.9); refining only the walls
+  (`wall=F3` on F1) accounts for about 20 % of the F1 → F3 tip change.
+- Additivity: F3S3 = 16.8133 mm against F3S2 + (F1S3 − F1S2) = 16.8198 mm.
+- At the F1S2 steady state: Δt halved/doubled −0.0036/+0.0028 mm; coupling
+  tolerance 1e-3 or 1e-5 < 1e-4 mm (1e-3 vs 1e-4 from t = 0: 0.0004 mm);
+  stabilisation 0.01 → 0.001 +0.050 mm (contained in the solid refinement).
+- PR #546 (barycentric transfer weights) changes S3 levels by +0.006 mm
+  (bit-identical on S1/S2); the build is -O2, unaffected by its aliasing
+  defect.
+- Best-resolved tip (F3S3): 16.813 mm (16.819 mm with the PR #546
+  correction); provisional linear aggregate allowance ≈ 0.20 mm (1.2 %),
+  dominated by the fluid discretisation.
+- Validation (MRI tip 16.41 mm): F3S3 is 0.40 mm above; every refinement
+  moves the tip away from the measurement (S1 −0.21 mm, F3S3 +0.40 mm).
