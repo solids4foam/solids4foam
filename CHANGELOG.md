@@ -681,6 +681,12 @@ release. For complete commit-level details and contributor information, see the
   be restarted with OpenFOAM.com (#409). The condition read its nonuniform
   `value` a second time, which fails once the base class has read it, and
   rejected the old-time fields, such as `D_0`, read on restart.
+- `leastSquaresS4f`: the warning that cells remain rank-deficient after the
+  gradient stencil is widened to point neighbours was repeated every time the
+  least-squares vectors were recomputed, which with the updated Lagrangian
+  solid models is every time step (#566). It is now issued when the vectors
+  are first computed and repeated only if the number of such cells grows on a
+  later mesh change, which points to mesh degradation.
 
 ## [v2.4] - 2026-08-24
 
