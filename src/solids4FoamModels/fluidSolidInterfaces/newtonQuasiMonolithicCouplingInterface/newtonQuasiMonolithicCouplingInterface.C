@@ -422,6 +422,67 @@ tmp<Field<Type>> newtonQuasiMonolithicCouplingInterface::fluidZoneToSolidZone
 }
 
 
+template<class Type>
+tmp<Field<Type>>
+newtonQuasiMonolithicCouplingInterface::fluidZoneToSolidZoneTranspose
+(
+    const Field<Type>& fluidZoneField
+) const
+{
+    const labelListList& addr = fluidFaceSolidFaces();
+    const scalarListList& w = fluidFaceSolidWeights();
+
+    tmp<Field<Type>> tresult
+    (
+        new Field<Type>(solidFaceFluidFaces().size(), Zero)
+    );
+    Field<Type>& result = tresult.ref();
+
+    forAll(addr, fluidFaceI)
+    {
+        forAll(addr[fluidFaceI], i)
+        {
+            result[addr[fluidFaceI][i]] +=
+                w[fluidFaceI][i]*fluidZoneField[fluidFaceI];
+        }
+    }
+
+    return tresult;
+}
+
+
+tmp<scalarField>
+newtonQuasiMonolithicCouplingInterface::solidInterfaceMagSf() const
+{
+    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+    const fvPatch& solidPatch = solidMesh().boundary()[solidPatchID];
+    const solidTractionFvPatchVectorField& solidTractionPatch =
+        refCast<const solidTractionFvPatchVectorField>
+        (
+            solid().D().boundaryField()[solidPatchID]
+        );
+
+    tmp<scalarField> tmagSf(new scalarField(solidPatch.magSf()));
+
+    if
+    (
+        solid().nonLinGeom() != nonLinearGeometry::LINEAR_GEOMETRY
+     && !solidTractionPatch.useUndeformedArea()
+    )
+    {
+        // Deformed solid face areas, as used by the solid
+        const tensorField F
+        (
+            I + solid().gradD().boundaryField()[solidPatchID].T()
+        );
+
+        tmagSf.ref() = mag(det(F)*(inv(F)().T() & solidPatch.Sf()));
+    }
+
+    return tmagSf;
+}
+
+
 void newtonQuasiMonolithicCouplingInterface::createSubMatsAndMat
 (
     Mat& jac,
@@ -1659,32 +1720,14 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
     const vector fluidForce = -gSum(fluidTraction*fluidPatch.magSf());
 
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
-    const fvPatch& solidPatch = solidMesh().boundary()[solidPatchID];
     const solidTractionFvPatchVectorField& solidTractionPatch =
         refCast<const solidTractionFvPatchVectorField>
         (
             solid().D().boundaryField()[solidPatchID]
         );
 
-    scalarField solidMagSf(solidPatch.magSf());
-
-    if
-    (
-        isA<solidModels::nonLinGeomTotalLagVelocitySolid>(solid())
-     && !solidTractionPatch.useUndeformedArea()
-    )
-    {
-        // Deformed solid face areas, as used by the solid
-        const tensorField F
-        (
-            I + solid().gradD().boundaryField()[solidPatchID].T()
-        );
-
-        solidMagSf = mag(det(F)*(inv(F)().T() & solidPatch.Sf()));
-    }
-
     const vector solidForce =
-        gSum(solidTractionPatch.traction()*solidMagSf);
+        gSum(solidTractionPatch.traction()*solidInterfaceMagSf());
 
     Info<< "Interface force balance:"
         << " fluid=" << fluidForce
@@ -2212,6 +2255,14 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         )
     ),
     passViscousStress_(fsiProperties().lookup("passViscousStress")),
+    conservativeTractionTransfer_
+    (
+        fsiProperties().lookupOrDefault<Switch>
+        (
+            "conservativeTractionTransfer",
+            false
+        )
+    ),
     liuInterfaceCondition_
     (
         fsiProperties().lookupOrDefault<Switch>
@@ -2334,6 +2385,31 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             << "are only first-order accurate in space. Use a fixedGradient "
             << "condition, whose gradient the coupling sets from the normal "
             << "momentum equation" << endl;
+    }
+
+    if (conservativeTractionTransfer_)
+    {
+        Info<< "The fluid interface forces are transferred to the solid "
+            << "conservatively" << endl;
+
+        // The transferred forces are divided by the undeformed solid face
+        // areas, so a nonlinear-geometry solid must apply the traction on
+        // these areas
+        const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+        if
+        (
+            solid().nonLinGeom() != nonLinearGeometry::LINEAR_GEOMETRY
+         && !refCast<const solidTractionFvPatchVectorField>
+            (
+                solid().D().boundaryField()[solidPatchID]
+            ).useUndeformedArea()
+        )
+        {
+            FatalErrorInFunction
+                << "conservativeTractionTransfer requires the solid interface "
+                << "patch " << solidMesh().boundary()[solidPatchID].name()
+                << " to set 'useUndeformedArea yes'" << exit(FatalError);
+        }
     }
 
     if (!validInterfaceFluxMode(quasiMonolithicInterfaceFluxMode_))
@@ -3131,24 +3207,48 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     const label solidPatchID =
         fluidSolidInterface::solidPatchIndices()[0];
 
-    // Broadcast local fluid traction to zone level
     const vectorField negFluidTraction(-fluidTraction);
-    const vectorField zoneFluidTraction
-    (
-        fluidGlobalPatch.patchFaceToGlobal(negFluidTraction)
-    );
+    vectorField solidTraction;
 
-    // Transfer from fluid zone faces to solid zone faces at zone level
-    const vectorField zoneSolidTraction
-    (
-        fluidZoneToSolidZone(zoneFluidTraction)
-    );
+    if (conservativeTractionTransfer_)
+    {
+        // Distribute the fluid face forces to the solid faces with the
+        // transpose of the solid-to-fluid velocity transfer, which conserves
+        // the total force and the interface power, and divide by the
+        // undeformed solid face areas, on which the solid applies them
+        const vectorField fluidForce
+        (
+            negFluidTraction*fluidMesh().boundary()[fluidPatchID].magSf()
+        );
+        const vectorField zoneSolidForce
+        (
+            fluidZoneToSolidZoneTranspose
+            (
+                fluidGlobalPatch.patchFaceToGlobal(fluidForce)()
+            )
+        );
 
-    // Extract local solid traction from zone level
-    const vectorField solidTraction
-    (
-        solidGlobalPatch.globalFaceToPatch(zoneSolidTraction)
-    );
+        solidTraction =
+            solidGlobalPatch.globalFaceToPatch(zoneSolidForce)
+           /solidMesh().boundary()[solidPatchID].magSf();
+    }
+    else
+    {
+        // Broadcast local fluid traction to zone level
+        const vectorField zoneFluidTraction
+        (
+            fluidGlobalPatch.patchFaceToGlobal(negFluidTraction)
+        );
+
+        // Transfer from fluid zone faces to solid zone faces at zone level
+        const vectorField zoneSolidTraction
+        (
+            fluidZoneToSolidZone(zoneFluidTraction)
+        );
+
+        // Extract local solid traction from zone level
+        solidTraction = solidGlobalPatch.globalFaceToPatch(zoneSolidTraction);
+    }
 
     // Lookup the displacement interface traction patch and set the traction
     fvPatchVectorField& solidPatchD =

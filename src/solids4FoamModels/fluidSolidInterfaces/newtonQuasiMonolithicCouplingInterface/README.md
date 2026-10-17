@@ -46,6 +46,44 @@ NewtonQuasiMonolithicCoeffs
 }
 ```
 
+## Non-conformal Interfaces
+
+`interfaceTransferMethod` selects how interface data are transferred between
+the fluid and solid interface faces:
+
+- `directMap`: conformal interfaces, where each fluid face matches one solid
+  face.
+- `AMI`: non-conformal interfaces, where the fluid and solid faces differ. Each
+  fluid face value is the face-area-weighted sum of the overlapping solid face
+  values, and vice versa.
+
+The same face weights are used for every transfer in the residual (interface
+velocity and displacement, traction) and for the coupling blocks of the
+Jacobian, so the Newton convergence is the same as for a conformal interface.
+Other methods (`RBF`) do not provide face weights and are not supported. The
+point displacement that moves the fluid mesh uses the mapping's point transfer.
+
+By default, the solid traction is interpolated from the fluid traction, as in
+the partitioned couplings. The total interface force then balances only up to
+the discretisation error of the interface geometry. Setting
+
+```c++
+    conservativeTractionTransfer yes;
+```
+
+instead distributes the fluid face forces to the solid faces with the transpose
+of the solid-to-fluid velocity transfer, so the total interface force and power
+balance to round-off. The solid applies the resulting nominal traction on its
+undeformed face areas, so a nonlinear-geometry solid must set
+`useUndeformedArea yes` on its interface `solidTraction` patch.
+
+With `interfaceFluxDiagnostics yes`, the log reports the interface force
+balance at each time step (`Interface force balance: ... rel_imbalance=`).
+
+`ringAddedMass/verification` (`./Allverify --study nonconformal`) verifies the
+coupling with solid interface faces coarser and finer than the fluid's against
+the exact added-mass frequency.
+
 ## PETSc Options
 
 PETSc options for the monolithic `UpU` solver can be defined either in the

@@ -92,6 +92,13 @@ class newtonQuasiMonolithicCouplingInterface
         //  Defaults to yes
         const Switch passViscousStress_;
 
+        //- Transfer the fluid interface forces to the solid with the
+        //  transpose of the solid-to-fluid velocity transfer, instead of
+        //  interpolating the traction, so that the total interface force and
+        //  power are conserved on a non-conformal interface. The solid
+        //  applies the traction on the undeformed face areas. Defaults to no
+        const Switch conservativeTractionTransfer_;
+
         //- Use the Liu (2014) Eq.31 interface velocity condition
         //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
         //  This condition is from Liu et al., JCP 270, 2014, Section 4.
@@ -288,6 +295,18 @@ class newtonQuasiMonolithicCouplingInterface
         (
             const Field<Type>& fluidZoneField
         ) const;
+
+        //- Apply the transpose of the solid-to-fluid zone face transfer to a
+        //  fluid zone face field, e.g. to distribute face forces
+        template<class Type>
+        tmp<Field<Type>> fluidZoneToSolidZoneTranspose
+        (
+            const Field<Type>& fluidZoneField
+        ) const;
+
+        //- Return the local solid interface face areas on which the solid
+        //  applies the interface traction
+        tmp<scalarField> solidInterfaceMagSf() const;
 
         //- Create the empty submatrices and nested matrix given the
         //  corresponding solution lengths and block sizes
