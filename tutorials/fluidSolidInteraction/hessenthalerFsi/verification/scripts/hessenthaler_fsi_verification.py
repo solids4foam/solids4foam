@@ -1103,8 +1103,11 @@ def PC_AUTO_RULE(spec: dict, cores: int) -> str:
 def build_meshes(case: Path, spec: dict, cores: int) -> dict:
     """Build both meshes as the tutorial's Allrun does; record metrics."""
     timings = {}
-    timings["surface_s"] = run(["python3", "makeFluidSurface.py"], case,
-                               "log.python3")
+    # The fluid surface is committed (constant/triSurface/fluidDomain.stl.gz,
+    # written by validation/scripts/makeFluidSurface.py); it matches the
+    # surface the earlier runs generated to round-off (1e-18 m)
+    if not (case / "constant" / "triSurface" / "fluidDomain.stl.gz").is_file():
+        fail(f"{case} has no constant/triSurface/fluidDomain.stl.gz")
     mesh_dict = case / "system" / "meshDict"
     if mesh_dict.exists() or mesh_dict.is_symlink():
         mesh_dict.unlink()
