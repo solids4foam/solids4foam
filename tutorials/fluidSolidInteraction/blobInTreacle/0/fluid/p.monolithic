@@ -11,35 +11,49 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      DFutureTime;
+    class       volScalarField;
+    object      p;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+dimensions      [0 2 -2 0 0 0 0];
 
-internalField   uniform (0 0 0);
+internalField   uniform 0;
 
 boundaryField
 {
-    membrane-solid
+    inlet
     {
-       type            calculated;
-       value           uniform (0 0 0);
+        type            zeroGradient;
+    }
+
+    outlet
+    {
+        type            fixedValue;
+        value           uniform 0;
+    }
+
+    top
+    {
+        type            zeroGradient;
     }
 
     bottom
     {
-        type            solidTraction;
-        traction        uniform ( 0 0 0 );
-        pressure        uniform 0;
-        value           uniform (0 0 0);
+        type            zeroGradient;
     }
 
-    sides
+    interface
     {
-       type            fixedValue;
-       value           uniform (0 0 0);
+        // The normal gradient is set by the coupling from the normal
+        // momentum equation at the moving wall
+        type            fixedGradient;
+        gradient        uniform 0;
+    }
+
+    frontAndBack
+    {
+        type            empty;
     }
 }
 

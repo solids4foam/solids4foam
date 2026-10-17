@@ -128,6 +128,33 @@ def set_control(run_dir: Path, key: str, value: float) -> None:
         raise RuntimeError(f"no controlDict in {run_dir} declares {key}")
 
 
+def ramp_inlet(run_dir: Path, period: float) -> None:
+    """Ramp the parabolic inlet profile in over the given period.
+
+    The monolithic coupling resolves the pressure impulse of the impulsive
+    start, which on the finer meshes inverts the fluid mesh; the ramp does not
+    change the steady response that the study compares. The profile is the
+    tutorial's, 1.5*(1 - 4*(y - 1.5)^2) m/s across the inlet at y = 1 to 2 m.
+    """
+    u_file = run_dir / "0" / "fluid" / "U.monolithic"
+    text, count = re.subn(
+        r'#include\s+"velocityInletProfile"',
+        "type            transitionalParabolicVelocity;\n"
+        "        maxValue        1.5;\n"
+        "        n               (1 0 0);\n"
+        "        y               (0 1 0);\n"
+        f"        transitionPeriod {period:g};\n"
+        "        boundBoxMin     (0 1 0);\n"
+        "        boundBoxMax     (0 2 1);\n"
+        "        value           uniform (0 0 0);",
+        u_file.read_text(),
+        count=1,
+    )
+    if count != 1:
+        raise RuntimeError(f"could not set the ramped inlet in {u_file}")
+    u_file.write_text(text)
+
+
 def set_coupling(run_dir: Path, coupling: str) -> None:
     fsi_properties = run_dir / "constant" / "fsiProperties"
     text, count = re.subn(
@@ -320,7 +347,15 @@ def run_level(
         refine_mesh(run_dir / "system" / "solid" / "blockMeshDict", factor)
         set_control(run_dir, "endTime", end_time)
         set_control(run_dir, "deltaT", delta_t)
-        set_coupling(run_dir, variant["coupling"])
+        command = ["./Allrun"]
+        if variant["coupling"] == "monolithic":
+            # The quasi-monolithic Newton coupling (OpenFOAM.com) is a case
+            # variant selected by the tutorial Allrun
+            command.append("monolithic")
+            if "inlet_ramp_s" in variant:
+                ramp_inlet(run_dir, float(variant["inlet_ramp_s"]))
+        else:
+            set_coupling(run_dir, variant["coupling"])
         print(
             f"Running {variant_name} mesh{level} "
             f"(DeltaX = {delta_x:g} m) in {run_dir}",
@@ -328,7 +363,7 @@ def run_level(
         )
         with (run_dir / "log.Allverify").open("w") as log:
             completed = subprocess.run(
-                ["./Allrun"],
+                command,
                 cwd=run_dir,
                 stdout=log,
                 stderr=subprocess.STDOUT,

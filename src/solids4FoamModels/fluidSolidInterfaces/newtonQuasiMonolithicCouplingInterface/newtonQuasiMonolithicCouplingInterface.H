@@ -116,6 +116,15 @@ class newtonQuasiMonolithicCouplingInterface
         //- Old-old geometric interface mesh flux on local fluid patch faces
         autoPtr<scalarField> interfaceMeshPhiOldOldPtr_;
 
+        //- Offset subtracted from the mapped solid interface displacement on
+        //  the local fluid patch faces, so that the fluid mesh follows the
+        //  solid displacement relative to the start of the coupling
+        autoPtr<vectorField> interfaceDOffsetPtr_;
+
+        //- Offset subtracted from the mapped solid interface point
+        //  displacement on the local fluid patch points
+        autoPtr<vectorField> interfacePointDOffsetPtr_;
+
         //- Accumulated signed leakage from interface flux defect
         scalar accumulatedInterfaceFluxLeakage_;
 
@@ -294,6 +303,14 @@ class newtonQuasiMonolithicCouplingInterface
         //- Map the velocity from the mesh motion to the fluid interface
         void mapInterfaceMotionUToFluidU();
 
+        //- Set the normal gradient of the fluid pressure on the interface
+        //  from the normal momentum equation, if the pressure condition
+        //  there is fixedGradient (see
+        //  newtonIcoFluid::updatePressureGradientBoundaries). A zeroGradient
+        //  pressure instead gives a first-order error in the interface
+        //  pressure and the added mass
+        void setInterfacePressureGradient();
+
         //- Set the fluid interface velocity using Liu (2014) Eq.31
         //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
         //  This replaces mapInterfaceMotionUToFluidU() when
@@ -327,6 +344,12 @@ class newtonQuasiMonolithicCouplingInterface
         //- Map the displacement and velocity from the solid to the mesh motion
         //  interface. Three fields are mapped: D, U and pointD
         void mapInterfaceSolidToMeshMotion();
+
+        //- Set the interface displacement offsets from the difference between
+        //  the mapped solid interface displacement and the mesh motion
+        //  interface displacement at the start of the coupling, which is
+        //  zero for an undeformed start and recovers the offset on a restart
+        void setInterfaceDisplacementOffsets();
 
         //- Restore the coupled fields and fluid mesh after a failed PETSc solve
         void restoreOldTimeState(const pointField& oldFluidPoints);

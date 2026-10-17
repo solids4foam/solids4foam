@@ -149,6 +149,34 @@ $$t = 13.925$$ s in all three runs with $$\Delta t = 0.025$$ s. The 96 x 96
 level therefore stands in for it. The cause was not isolated, and the
 divergence is recorded as a known limitation.
 
+### Mesh study with the quasi-monolithic coupling
+
+`./Allverify --monolithic --study mesh` repeats the mesh study with the
+quasi-monolithic Newton coupling (`./Allrun monolithic`, OpenFOAM.com only),
+whose velocity solid has the standard residual. Recorded with OpenFOAM v2512 on
+macOS, serial:
+
+| Mesh | $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | Time (s) |
+|---|---|---|---|---|---|
+| 16 x 16 | 0.2 | 0.2950 | 0.2053 | 0.2495 | 16 |
+| 32 x 32 | 0.1 | 0.2903 | 0.2027 | 0.2460 | 96 |
+| 64 x 64 | 0.05 | 0.2877 | 0.2026 | 0.2447 | 606 |
+| 96 x 96 | 0.025 | 0.2867 | 0.2025 | 0.2441 | 2499 |
+| 128 x 128 | 0.0125 | 0.2860 | 0.2025 | 0.2438 | 9109 |
+
+The peak behaves as with the partitioned coupling (changes of 1.6%, 0.9% and
+0.4% of the peak) and agrees with it to 0.2% on the finest mesh. The trough,
+however, is mesh-independent to 0.1% from the 32 x 32 mesh on, at 0.2025 m,
+whereas the partitioned trough is still rising (0.1942 to 0.2044 m) and has
+passed it on the 96 x 96 mesh; the means approach 0.244 m from either side.
+The slow convergence of the partitioned trough is therefore a property of the
+partitioned solution, not of the benchmark. The 128 x 128 level, on which the
+partitioned coupling diverges, runs to completion with the monolithic
+coupling (run separately, with the same members' settings). Its peak changes
+by 0.0017 m from the 64 x 64 level, against 0.0026 m from 32 x 32 to 64 x 64,
+an observed order below 1: the peak is not yet in the asymptotic range, so no
+Richardson estimate is made.
+
 ### Time-step study (64 mesh, high-order solid, 2 ranks)
 
 | $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its | Time |

@@ -24,6 +24,25 @@ Group
 Description
     Mesh motion solver for an fvMesh using a solids4foam solidModel.
 
+    The optional diffusivity entry, as for displacementLaplacian, creates the
+    stiffnessScaleFactor field, which the diffusionElastic and
+    diffusionHyperElastic mechanical laws use to scale their stiffness. It is
+    calculated once, from the mesh at construction, as the face diffusivity
+    limited to between minFactor and maxFactor times its average, divided by
+    its average, and averaged to the cells:
+
+    \verbatim
+    motionSolver    solids4foamSolidModel;
+
+    regionName      fluid;
+
+    // Optional
+    diffusivity     quadratic inverseDistance (interface);
+    maxFactor       100;
+    minFactor       0.1;
+    writeStiffScaleFactor no;
+    \endverbatim
+
 SourceFiles
     meshMotionSolidModelFvMotionSolver.C
 
@@ -56,6 +75,11 @@ class meshMotionSolidModelFvMotionSolver
 {
     // Private data
 
+        //- Stiffness scale factor for the diffusionElastic and
+        //  diffusionHyperElastic mechanical laws, if a diffusivity is
+        //  specified
+        autoPtr<volScalarField> stiffnessScaleFactorPtr_;
+
         //- Solid model
         mutable autoPtr<solidModel> modelPtr_;
 
@@ -66,6 +90,10 @@ class meshMotionSolidModelFvMotionSolver
 
 
     // Private Member Functions
+
+        //- Calculate the stiffness scale factor, if a diffusivity is
+        //  specified
+        autoPtr<volScalarField> makeStiffnessScaleFactor() const;
 
         //- No copy construct
         meshMotionSolidModelFvMotionSolver

@@ -45,7 +45,10 @@ boundaryField
     }
     wall
     {
-        type            zeroGradient;
+        // The normal gradient is set by the coupling from the normal
+        // momentum equation at the moving wall
+        type            fixedGradient;
+        gradient        uniform 0;
     }
 }
 
