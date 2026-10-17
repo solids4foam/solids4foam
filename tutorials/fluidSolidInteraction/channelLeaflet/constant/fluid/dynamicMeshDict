@@ -1,0 +1,51 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dynamicFvMesh dynamicMotionSolverFvMesh;
+
+// Radial-basis-function mesh motion: the internal points follow the
+// interface displacement from the initial mesh, so that the mesh returns to
+// the same shape in every period of the pulsatile flow. The velocityLaplacian
+// solver accumulates the motion of each time step, and its mesh drifts by
+// several cell sizes over the run
+"solver|motionSolver" RBFMeshMotionSolver;
+motionSolverLibs ("libRBFMeshMotionSolver.so");
+
+RBFMeshMotionSolverCoeffs
+{
+    movingPatches    (interface);
+    staticPatches    (walls);
+    fixedPatches     (inlet outlet);
+
+    interpolation
+    {
+        function     TPS;
+        polynomial   no;
+        cpu          no;
+        fullCPU      no;
+    }
+
+    // Use every boundary face as a control point: with a fixed set of control
+    // points the interpolation does not depend on the path of the motion
+    coarsening
+    {
+        enabled      no;
+    }
+}
+
+// ************************************************************************* //

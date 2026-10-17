@@ -597,6 +597,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
             "requireAllResidualMeasures", false
         )
     ),
+    outerCorrAbsoluteTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "outerCorrAbsoluteTolerance", 0
+        )
+    ),
     robinPressureTolerance_
     (
         fsiProperties_.lookupOrAddDefault<scalar>
@@ -2384,7 +2391,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
         // Legacy solids4foam behavior uses the minimum of the two residual
         // measures, while stricter convergence requires both to be small.
-        const scalar residualInterfaceI =
+        scalar residualInterfaceI =
             requireAllResidualMeasures_
           ? max(residualNorm1, residualNorm2)
           : min(residualNorm1, residualNorm2);
@@ -2393,6 +2400,44 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         {
             Info<< "FSI combined residual norm for interface " << interfaceI
                 << " (max): " << residualInterfaceI << endl;
+        }
+        else if
+        (
+            min(residualNorm1, residualNorm2) <= outerCorrTolerance_
+         && max(residualNorm1, residualNorm2) > outerCorrTolerance_
+        )
+        {
+            Info<< "FSI legacy minimum test for interface " << interfaceI
+                << " is passed by residual"
+                << (residualNorm1 < residualNorm2 ? "1" : "2")
+                << " only; the other measure is above the tolerance"
+                << " (see requireAllResidualMeasures)" << endl;
+        }
+
+        if (outerCorrAbsoluteTolerance_ > 0)
+        {
+            // Absolute residual: the maximum point mismatch of the interface
+            // [m]
+            const scalar absResidual = gMax(mag(residuals()[interfaceI]));
+
+            Info<< "FSI absolute residual (max point) for interface "
+                << interfaceI << ": " << absResidual << endl;
+
+            if
+            (
+                absResidual < outerCorrAbsoluteTolerance_
+             && residualInterfaceI > outerCorrTolerance_
+            )
+            {
+                Info<< "FSI interface " << interfaceI << " accepted by"
+                    << " outerCorrAbsoluteTolerance: " << absResidual
+                    << " < " << outerCorrAbsoluteTolerance_ << endl;
+
+                // The convergence tests compare the returned residual with
+                // outerCorrTolerance using <=; the factor keeps the accepted
+                // interface converged if a test uses < instead
+                residualInterfaceI = 0.99*outerCorrTolerance_;
+            }
         }
 
         // Update the maximum residual for all interfaces
