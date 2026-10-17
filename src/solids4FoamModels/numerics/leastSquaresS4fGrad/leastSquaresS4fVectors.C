@@ -328,7 +328,7 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         mesh,
         dimensionedVector("0", dimless/dimLength, vector::zero)
     ),
-    rankDeficientWarned_(false)
+    nRankDeficientWarned_(0)
 {
     calcLeastSquaresVectors();
 }
@@ -380,7 +380,7 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         mesh,
         dimensionedVector("zero", dimless/dimLength, vector::zero)
     ),
-    rankDeficientWarned_(false)
+    nRankDeficientWarned_(0)
 {
     calcLeastSquaresVectors();
 }
@@ -937,9 +937,12 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         // point-cell stencil truncated at a processor boundary can produce it
         // in parallel. Neither is new, so neither is fatal.
         //
-        // The vectors are recomputed on every mesh motion, so the warning is
-        // issued once per object rather than once per time step
-        if (!rankDeficientWarned_)
+        // The vectors are recomputed on every mesh change, so rather than
+        // warning once per time step, the warning is repeated only when the
+        // number of such cells has grown since it was last issued, which
+        // points to mesh degradation rather than to the geometry. With debug
+        // set it is issued on every recomputation
+        if (debug || nStillSingular > nRankDeficientWarned_)
         {
             WarningInFunction
                 << nStillSingular
@@ -950,10 +953,11 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
                 << "    Either the body is one cell thick in some direction"
                 << " or, in parallel, the point-cell stencil is truncated at"
                 << " a processor boundary." << nl
-                << "    This warning is issued once and is not repeated when"
-                << " the vectors are recomputed on mesh motion." << endl;
+                << "    This warning is repeated only if the number of such"
+                << " cells grows when the vectors are recomputed on mesh"
+                << " changes." << endl;
 
-            rankDeficientWarned_ = true;
+            nRankDeficientWarned_ = nStillSingular;
         }
     }
     else if (nStillSingular > 0)
