@@ -125,6 +125,18 @@ class newtonQuasiMonolithicCouplingInterface
         //  displacement on the local fluid patch points
         autoPtr<vectorField> interfacePointDOffsetPtr_;
 
+        //- Solid zone faces giving the value on each fluid zone face
+        mutable autoPtr<labelListList> fluidFaceSolidFacesPtr_;
+
+        //- Weights of the solid zone faces giving each fluid zone face value
+        mutable autoPtr<scalarListList> fluidFaceSolidWeightsPtr_;
+
+        //- Fluid zone faces giving the value on each solid zone face
+        mutable autoPtr<labelListList> solidFaceFluidFacesPtr_;
+
+        //- Weights of the fluid zone faces giving each solid zone face value
+        mutable autoPtr<scalarListList> solidFaceFluidWeightsPtr_;
+
         //- Accumulated signed leakage from interface flux defect
         scalar accumulatedInterfaceFluxLeakage_;
 
@@ -243,6 +255,39 @@ class newtonQuasiMonolithicCouplingInterface
         //- Return a reference to the mesh motion solver cast as a solid
         //  model
         solidModel& motionSolid();
+
+        //- Calculate the interface face transfer addressing and weights in
+        //  both directions from the interface-to-interface mapping. For a
+        //  conformal interface (directMap), each face has one unit weight;
+        //  for a non-conformal interface (AMI), the weights are the face
+        //  overlap areas divided by the area of the receiving face
+        void calcInterfaceFaceWeights() const;
+
+        //- Return the solid zone faces giving each fluid zone face value
+        const labelListList& fluidFaceSolidFaces() const;
+
+        //- Return the weights of the solid zone faces for each fluid face
+        const scalarListList& fluidFaceSolidWeights() const;
+
+        //- Return the fluid zone faces giving each solid zone face value
+        const labelListList& solidFaceFluidFaces() const;
+
+        //- Return the weights of the fluid zone faces for each solid face
+        const scalarListList& solidFaceFluidWeights() const;
+
+        //- Transfer a solid zone face field to the fluid zone faces
+        template<class Type>
+        tmp<Field<Type>> solidZoneToFluidZone
+        (
+            const Field<Type>& solidZoneField
+        ) const;
+
+        //- Transfer a fluid zone face field to the solid zone faces
+        template<class Type>
+        tmp<Field<Type>> fluidZoneToSolidZone
+        (
+            const Field<Type>& fluidZoneField
+        ) const;
 
         //- Create the empty submatrices and nested matrix given the
         //  corresponding solution lengths and block sizes
