@@ -272,3 +272,14 @@ Steady tip y (mm):
   dominated by the fluid discretisation.
 - Validation (MRI tip 16.41 mm): F3S3 is 0.40 mm above; every refinement
   moves the tip away from the measurement (S1 −0.21 mm, F3S3 +0.40 mm).
+
+**Open: the fluid convergence of the tip.** A fourth uniform fluid level
+(F4, 4.2 M cells, about 800 node-hours with the strict test) was not run.
+- Proposed route: a locally refined fluid series. Keep the far field and the
+  outlet extension fixed, and refine the flap-sweep, interface and merging
+  regions (and possibly the inlet jets) by √2 per level.
+- The wall-only diagnostic and the second-order convergence of the upstream
+  jets point to those regions.
+
+Related issues: #552 (the default convergence test) and #587
+(`couplingReuse` with the strict test).
