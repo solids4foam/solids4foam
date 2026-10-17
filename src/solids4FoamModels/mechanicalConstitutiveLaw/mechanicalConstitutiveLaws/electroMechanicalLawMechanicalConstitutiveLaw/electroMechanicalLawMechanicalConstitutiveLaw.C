@@ -51,12 +51,21 @@ electroMechanicalLawMechanicalConstitutiveLaw
         )
     ),
     subStateName_("passiveMechanicalLaw"),
-    Ta_(dict.lookup("activeTension")),
-    rampTime_(readScalar(dict.lookup("rampTime"))),
+    Ta_
+    (
+        dict.found("activeTension")
+      ? dimensionedScalar(dict.lookup("activeTension"))
+      : dimensionedScalar("activeTension", dimPressure, 0.0)
+    ),
+    rampTime_(dict.lookupOrDefault<scalar>("rampTime", 0.0)),
     TaName_(dict.lookupOrDefault<word>("activeTensionFieldName", "Ta")),
     TaFromField_
     (
-        dict.lookupOrDefault<Switch>("activeTensionFromField", false)
+        dict.lookupOrDefault<Switch>
+        (
+            "activeTensionFromField",
+            !dict.found("activeTension")
+        )
     ),
     f0Default_
     (
@@ -69,6 +78,13 @@ electroMechanicalLawMechanicalConstitutiveLaw
     {
         FatalIOErrorInFunction(dict)
             << "rampTime must not be negative." << exit(FatalIOError);
+    }
+
+    if (!TaFromField_ && !dict.found("activeTension"))
+    {
+        FatalIOErrorInFunction(dict)
+            << "activeTensionFromField is off but no constant 'activeTension' "
+            << "is given." << exit(FatalIOError);
     }
 
     Info<< "    Active tension law over " << subLawPtr_->type()
