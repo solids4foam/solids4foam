@@ -1,0 +1,13 @@
+variant,level,delta_x_m,delta_t_s,uy_bot,uy_mid,uy_top,ux_bot,ux_mid,ux_top,fy,uy_rec_spread,fy_spread,r1_median_last10,r1_max_last10,r1_frac_above_tol,iters_mean_last10,nsteps,clock_s,note
+partitioned_legacy_test,1,0.1,0.5,-0.202495,-0.205999,-0.204563,-0.000169304,-4.81522e-05,7.45995e-05,-5.15266,5e-06,2.6e-05,0.000189338,0.0596455,0.5,2,400,11,"Aitken, default min(r1,r2) test, nOuterCorr 20"
+partitioned_legacy_test,2,0.05,0.5,-0.228799,-0.232658,-0.231412,-0.000165628,-3.85729e-05,9.03489e-05,-5.23784,7e-06,5e-05,0.0006496,0.0265797,0.85,2,400,40,"Aitken, default min(r1,r2) test, nOuterCorr 20"
+partitioned_legacy_test,3,0.025,0.25,-0.235628,-0.2396,-0.238396,-0.000164515,-3.58608e-05,9.47131e-05,-5.25637,9e-06,7e-05,0.00187414,0.0478971,0.925,2,800,252,"Aitken, default min(r1,r2) test, nOuterCorr 20"
+partitioned_legacy_test,4,0.0125,0.0625,-0.237312,-0.241313,-0.240118,-0.000164312,-3.51862e-05,9.58705e-05,-5.20412,1.4e-05,0.115244,0.758607,1,1,2.7125,3200,1900,"Aitken, default min(r1,r2) test, nOuterCorr 20, 4 MPI ranks (r1~1 at acceptance: NOT converged coupling)"
+partitioned_strict,1,0.1,0.5,-0.202499,-0.206004,-0.204568,-0.000169323,-4.81499e-05,7.46234e-05,-5.1528,5e-06,2.7e-05,0,1.96592e-17,0,2.95,400,20,"Aitken, requireAllResidualMeasures yes, nOuterCorr 20"
+partitioned_strict,2,0.05,0.25,-0.22883,-0.23269,-0.231445,-0.000165616,-3.85522e-05,9.03795e-05,-5.23881,9e-06,4.7e-05,0,5.81808e-17,0,3.2,800,127,"Aitken, requireAllResidualMeasures yes, nOuterCorr 20"
+partitioned_strict,3,0.025,0.125,-0.235636,-0.239607,-0.238404,-0.000164539,-3.58668e-05,9.47262e-05,-5.25661,1e-05,7e-05,0,1.03138e-06,0,4.16875,1600,936,"Aitken, requireAllResidualMeasures yes, nOuterCorr 20"
+partitioned_strict,4,0.0125,0.0625,-0.237307,-0.241307,-0.240113,-0.000164319,-3.52009e-05,9.58503e-05,-5.25993,1.3e-05,8.7e-05,0,6.02881e-06,0,3.77813,3200,4074,"Aitken, requireAllResidualMeasures yes, nOuterCorr 40, fluid p/U/cellMotionU solver tolerance 1e-8, 4 MPI ranks"
+monolithic,1,0.1,0.5,-0.201557,-0.20504,-0.203607,-0.000170784,-4.89993e-05,7.43526e-05,-5.12249,2.5e-05,5.9e-05,,,,,,,"quasi-monolithic Newton, inlet ramped over 20 s, 1 PETSc/serial"
+monolithic,2,0.05,0.5,-0.228817,-0.232677,-0.231431,-0.000165895,-3.84193e-05,9.09397e-05,-5.23811,2.3e-05,5.1e-05,,,,,,,"quasi-monolithic Newton, inlet ramped over 20 s, 1 PETSc/serial"
+monolithic,3,0.025,0.5,-0.235676,-0.239648,-0.238445,-0.000164574,-3.58186e-05,9.48625e-05,-5.25764,2.3e-05,5e-05,,,,,,,"quasi-monolithic Newton, inlet ramped over 20 s, 1 PETSc/serial"
+monolithic,4,0.0125,0.5,-0.237336,-0.241337,-0.240142,-0.000164356,-3.52135e-05,9.58644e-05,-5.26056,2.3e-05,4.9e-05,,,,,,,"quasi-monolithic Newton, inlet ramped over 20 s, 1 PETSc/serial"

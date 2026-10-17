@@ -153,3 +153,110 @@ checked.
 Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković, OpenFOAM finite
 volume solver for fluid-solid interaction, *Transactions of FAMENA*, 42(3),
 1–31, 2018.
+
+## Partitioned four-level sequence and the monitor point (recorded 17 Oct 2026)
+
+Data: `results/four_level_partitioned_monolithic.csv` and `.json`
+(`results/sample_pointD.py` reads the solid `pointD` at a mesh node).
+
+### The tutorial monitor point is on the plate underside
+
+The solid mesh of this tutorial occupies `-0.4 <= y <= 0` (blockMeshDict), with
+the wetted interface at `y = 0`; the geometry figure puts point A on the top
+(wetted) surface at `(4, 0)`. The `solidPointDisplacement` function object uses
+the mesh point nearest to `(4 -1 0.5)`, which is `(4, -0.4)`: the **underside**
+of the plate. The `uy` recorded above (and in `mesh_convergence.csv`) is
+therefore the underside value, not the wetted-surface value. The values below
+are sampled from the final-time `pointD` at the mesh nodes `(4, y)` (all three
+`y` are nodes on every level; `z` averaged over the two spanwise nodes). The
+underside value reproduces the recorded `solidPointDisplacement` value, and
+`postProcess -region solid` probes of `D` with `cellPoint` interpolation agree
+with the nodal `pointD` to <= 0.3 % (mesh 1) and <= 2e-5 m (meshes 3, 4).
+
+Quasi-monolithic `uy` (m), `y` in tutorial coordinates (top `y = 0`, mid
+`y = -0.2`, underside `y = -0.4`); the mid-thickness point corresponds to
+(4, -1.2) in ANSYS coordinates if its plate top is at `y = -1` (assumption,
+not confirmed by the ANSYS author):
+
+| ΔX (m) | top | mid | underside (recorded) | ANSYS mid (Tandis) | Tukovic A |
+|---:|---:|---:|---:|---:|---:|
+| 0.1 | -0.20361 | -0.20504 | -0.20156 | -0.2502 | -0.2333 |
+| 0.05 | -0.23143 | -0.23268 | -0.22882 | -0.2535 | -0.2457 |
+| 0.025 | -0.23845 | -0.23965 | -0.23568 | -0.2525 (not steady) | -0.2496 |
+| 0.0125 | -0.24014 | -0.24134 | -0.23734 | – | -0.2506 |
+
+Orders 1.99 and 2.05; Richardson (p = 2): top -0.2407, mid -0.2419,
+underside -0.2379. The top-to-mid difference is 0.5 % (0.0012 m), the
+mid-to-underside 1.7 %, so the choice of surface changes `uy` by at most 2 %.
+Against ANSYS at the same (mid) point we are lower in magnitude by 18 %, 8.2 %
+and 5.1 % on the three meshes; Tukovic's finest value (-0.2506) is 4.2 % above
+our top value. The surface-versus-mid choice cannot explain a 4 to 5 % offset,
+so the discrepancy with the published and ANSYS values is not resolved by the
+monitor-point correction. The ANSYS values were reported to hardly change with
+mesh (-0.2502, -0.2535), ours change by 13 % over the same meshes. `ux` at all
+three points is below 1.1e-4 m (ANSYS `ux` of +0.0325 m reported at its first
+point is not reproduced).
+
+### Partitioned versus quasi-monolithic, four levels
+
+`uy` is the underside (recorded) value; `Fy` is the total interface force
+(N per metre of span).
+
+| ΔX (m) | uy partitioned | uy monolithic | Fy partitioned | Fy monolithic |
+|---:|---:|---:|---:|---:|
+| 0.1 | -0.202495 | -0.201557 | -5.15266 | -5.12249 |
+| 0.05 | -0.228799 | -0.228817 | -5.23784 | -5.23811 |
+| 0.025 | -0.235628 | -0.235676 | -5.25637 | -5.25764 |
+| 0.0125 | -0.237307 | -0.237336 | -5.25993 | -5.26056 |
+| order | 1.95, 2.02 | 1.99, 2.05 | 2.20, 2.38 | 2.57, 2.74 |
+| Richardson (p = 2) | -0.23787 | -0.23789 | -5.2611 | -5.2615 |
+
+The `uy` orders are compatible (about 2) so the p = 2 extrapolation is
+meaningful; the `Fy` orders are higher and not constant, so the Fy
+extrapolations (using the observed last order: -5.2608 and -5.2611) are only
+indicative. Partitioned and monolithic agree to 0.01 to 0.02 % in `uy` and
+`Fy` on the three finest meshes.
+
+### Partitioned level 4 (ΔX = 0.0125 m)
+
+Platform and build: macOS arm64 (Mac Studio), Apple Clang, OpenFOAM v2512
+(build 87ed40d256-20251219), solids4foam v2.4 development library built from
+branch `feature-ring-monolithic-verification` at 0698d55cd (HEAD when the
+`ring3` library used by the recorded partitioned runs was built on 15 Oct
+2026; the working tree at build time is not independently verified), Aitken
+coupling, `relaxationFactor 0.1`, `outerCorrTolerance 1e-5`, coupling from
+t = 10 s, end time 200 s. Level 4 ran on 4 MPI ranks (scotch).
+
+* At the tutorial pseudo-time step (0.5 s) level 4 diverged earlier; the
+  fluid-only start-up (the coupling starts at 10 s) also diverges at
+  ΔT = 0.125 s (mean Courant number 8, blow-up at t = 9) and with a 20 s
+  ramped inlet at ΔT = 0.125 and 0.25 s. ΔT = 0.0625 s (mean Courant number 4)
+  is stable.
+* With the default FSI test (`min(r1, r2)`) at ΔT = 0.0625 s the run reaches
+  t = 200 s and `uy` = -0.237312, but steps are accepted after one iteration
+  with `r1` of order 1 (median 0.76; issue #552) and `Fy` fluctuates by 0.1 N
+  from step to step (-5.20 N at the end): the coupling is not converged and
+  that run is not used.
+* `requireAllResidualMeasures yes` with the default `nOuterCorr 20` fails at
+  t = 56.75 s (residual floor about 1.6e-4 from the 1e-6 fluid linear solver
+  tolerance); with `nOuterCorr 40` it fails at t = 142.6 s (2.1e-5). The
+  accepted run uses `requireAllResidualMeasures yes`, `nOuterCorr 40` and
+  the fluid linear solver tolerance 1e-8: `r1` at acceptance in the last 10 %
+  of the run has a maximum of 6.0e-6 (below the 1e-5 tolerance, 3.8 outer
+  iterations on average), r2 below 5e-13.
+* Steadiness: the change in `uy` over the last 10 % of the run is 1.3e-5 m
+  (target 1e-5; the monolithic runs are at 2.3e-5 m, oscillating with a
+  decaying amplitude, extrapolated remaining about 5e-6 m).
+
+The time-step reduction does not change the steady state on the coarser
+meshes (strict test, smaller ΔT, compared with the recorded runs): level 2
+ΔT = 0.25 s: `uy` -0.228830 against -0.228799 (0.014 %), `Fy` -5.23881 against
+-5.23784 (0.02 %); level 3 ΔT = 0.125 s: -0.235636 against -0.235628 (0.003 %),
+-5.25661 against -5.25637 (0.005 %); level 1 at ΔT = 0.5 s with the strict
+test: -0.202499 against -0.202495. The recorded levels 1 to 3 used the default
+FSI test with `r1` at acceptance between 1e-4 and 6e-2 in the closing 10 % of
+the run (50 to 92 % of steps above the tolerance); the strict reruns
+(`partitioned_strict` rows) have `r1` below 1e-6, and agree with them to
+0.02 % or better. The `partitioned_strict` rows are the four-level set with
+the acceptance check passed; the `partitioned_legacy_test` rows are the
+recorded runs (level 4 shown for the default test, not usable).
