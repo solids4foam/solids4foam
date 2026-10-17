@@ -31,8 +31,8 @@ FORCE_NORM_TOL=1e-3     # innerWall normal force absolute tolerance
 REG_END_TIME=0.0005
 
 # Reference values at REG_END_TIME
-REF_MAX_DISP=5.23438e-05
-REF_NORMAL_FORCE=-0.0138715
+REF_MAX_DISP=4.8226e-05
+REF_NORMAL_FORCE=-0.0403263
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"

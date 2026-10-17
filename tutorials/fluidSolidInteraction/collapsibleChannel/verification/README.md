@@ -336,3 +336,7 @@ symmetric SOR.
   yet parallelised. A fix is in preparation, after which the parallel runs,
   including the wrong linear-reconstruction displacement, should be
   rechecked.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

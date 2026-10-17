@@ -33,3 +33,7 @@ convergence directly toward the analytical solution without fixing
 machine-dependent regression values. Quick mode checks only that both cases
 finish and produce finite positive errors. The study is not run by
 `tutorials/Alltest` or `tutorials/Alltest-regression`.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

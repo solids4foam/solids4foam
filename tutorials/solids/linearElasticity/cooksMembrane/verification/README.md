@@ -24,3 +24,7 @@ the midpoint of the 32.20--32.28 mm very-fine finite-element range reported in
 the tutorial README, and its reference error decreases over the sweep with
 positive net order. The quick mode checks only that all requested cases finish
 and produce finite displacement values.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

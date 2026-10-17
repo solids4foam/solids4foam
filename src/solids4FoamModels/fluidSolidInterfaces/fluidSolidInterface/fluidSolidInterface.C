@@ -34,7 +34,6 @@ License
 #include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
-#include "movingWallPressureFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
 #ifndef S4F_NO_RBF
     #include "RBFMeshMotionSolver.H"
@@ -596,6 +595,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
         fsiProperties_.lookupOrAddDefault<Switch>
         (
             "requireAllResidualMeasures", false
+        )
+    ),
+    outerCorrAbsoluteTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "outerCorrAbsoluteTolerance", 0
         )
     ),
     robinPressureTolerance_
@@ -2385,7 +2391,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
         // Legacy solids4foam behavior uses the minimum of the two residual
         // measures, while stricter convergence requires both to be small.
-        const scalar residualInterfaceI =
+        scalar residualInterfaceI =
             requireAllResidualMeasures_
           ? max(residualNorm1, residualNorm2)
           : min(residualNorm1, residualNorm2);
@@ -2394,6 +2400,44 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         {
             Info<< "FSI combined residual norm for interface " << interfaceI
                 << " (max): " << residualInterfaceI << endl;
+        }
+        else if
+        (
+            min(residualNorm1, residualNorm2) <= outerCorrTolerance_
+         && max(residualNorm1, residualNorm2) > outerCorrTolerance_
+        )
+        {
+            Info<< "FSI legacy minimum test for interface " << interfaceI
+                << " is passed by residual"
+                << (residualNorm1 < residualNorm2 ? "1" : "2")
+                << " only; the other measure is above the tolerance"
+                << " (see requireAllResidualMeasures)" << endl;
+        }
+
+        if (outerCorrAbsoluteTolerance_ > 0)
+        {
+            // Absolute residual: the maximum point mismatch of the interface
+            // [m]
+            const scalar absResidual = gMax(mag(residuals()[interfaceI]));
+
+            Info<< "FSI absolute residual (max point) for interface "
+                << interfaceI << ": " << absResidual << endl;
+
+            if
+            (
+                absResidual < outerCorrAbsoluteTolerance_
+             && residualInterfaceI > outerCorrTolerance_
+            )
+            {
+                Info<< "FSI interface " << interfaceI << " accepted by"
+                    << " outerCorrAbsoluteTolerance: " << absResidual
+                    << " < " << outerCorrAbsoluteTolerance_ << endl;
+
+                // The convergence tests compare the returned residual with
+                // outerCorrTolerance using <=; the factor keeps the accepted
+                // interface converged if a test uses < instead
+                residualInterfaceI = 0.99*outerCorrTolerance_;
+            }
         }
 
         // Update the maximum residual for all interfaces
@@ -2861,89 +2905,6 @@ void Foam::fluidSolidInterface::writeResidualLine(const scalar residualNorm)
     }
 
     residualFile() << endl;
-}
-
-
-void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
-{
-    forAll(fluid().globalPatches(), interfaceI)
-    {
-        if (immersedInterfaces_[interfaceI])
-        {
-            continue;
-        }
-
-        if
-        (
-            isA<movingWallPressureFvPatchScalarField>
-            (
-                fluid().solutionP().boundaryField()
-                [
-                    fluidPatchIndices()[interfaceI]
-                ]
-            )
-        )
-        {
-            Info<< "Setting acceleration at fluid side of the interface: "
-                << fluidMesh().boundary()
-                   [
-                       fluidPatchIndices()[interfaceI]
-                   ].name()
-                << endl;
-
-            // Take references to zones
-            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
-            const standAlonePatch& solidZone = this->solidZone(interfaceI);
-
-            const vectorField solidZoneAcceleration
-            (
-               solid().faceZoneAcceleration(interfaceI)
-            );
-
-            // Initialise the fluid zone acceleration field that is to be
-            // interpolated from the solid zone
-            vectorField fluidZoneAcceleration(fluidZone.size(), vector::zero);
-
-            // Transfer the field from the fluid interface to the solid
-            // interface
-            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
-            (
-                solidZone,                // from zone
-                fluidZone,                // to zone
-                solidZoneAcceleration,    // from field
-                fluidZoneAcceleration     // to field
-            );
-
-            const vectorField fluidPatchAcceleration
-            (
-                fluid().globalPatches()
-                [
-                   interfaceI
-                ].globalFaceToPatch(fluidZoneAcceleration)
-            );
-
-            vectorField& prevAcceleration =
-                const_cast<movingWallPressureFvPatchScalarField&>
-                (
-                    refCast<const movingWallPressureFvPatchScalarField>
-                    (
-                        fluid().solutionP().boundaryField()
-                        [
-                            fluidPatchIndices()[interfaceI]
-                        ]
-                    )
-                ).prevAcceleration();
-
-            if (coupled())
-            {
-                prevAcceleration = fluidPatchAcceleration;
-            }
-            else
-            {
-                prevAcceleration = vector::zero;
-            }
-        }
-    }
 }
 
 

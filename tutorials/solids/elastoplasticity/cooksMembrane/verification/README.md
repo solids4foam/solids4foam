@@ -29,3 +29,7 @@ over the sweep with positive net order. The default full study took about 8
 minutes on an Apple M1 Max reference machine with OpenFOAM-v2512. The quick
 mode checks only that all requested cases finish and produce finite
 displacement values.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

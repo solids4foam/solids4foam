@@ -194,9 +194,6 @@ void fixedRelaxationCouplingInterface::updateDisplacement()
         fluidZonesPointsDispls()[interfaceI] += factor*residuals()[interfaceI];
     }
 
-    // Update movingWallPressure boundary conditions, if found
-    fluidSolidInterface::updateMovingWallPressureAcceleration();
-
     // Update elasticWallPressure boundary conditions, if found
     fluidSolidInterface::updateElasticWallPressureAcceleration();
 

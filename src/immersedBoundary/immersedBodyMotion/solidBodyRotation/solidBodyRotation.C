@@ -82,7 +82,12 @@ Foam::immersedBodyMotions::solidBodyRotation::points
       + (1 - c)*sqr(axis_)
     );
 
-    return origin_ + (R & (points0 - origin_));
+    // Named operand: a tmp field would be reused as the storage of the inner
+    // product, which aliases an input of the loop and gives wrong results
+    // with some -O3 builds (see pimpleFluid::patchViscousForce)
+    const pointField relPoints0(points0 - origin_);
+
+    return origin_ + (R & relPoints0);
 }
 
 
@@ -93,7 +98,10 @@ Foam::immersedBodyMotions::solidBodyRotation::velocity
     const scalar t
 ) const
 {
-    return (omega_*axis_) ^ (x - origin_);
+    // Named operand: see points()
+    const pointField relX(x - origin_);
+
+    return (omega_*axis_) ^ relX;
 }
 
 
