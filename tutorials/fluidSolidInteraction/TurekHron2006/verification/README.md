@@ -21,6 +21,7 @@ cd tutorials/fluidSolidInteraction/HronTurek/verification
 ./Allverify --study coupling           # Robin vs IQN-ILS, 1x and 2x meshes
 ./Allverify --quick                    # smoke run to t = 2.3 s, no checks
 ./Allverify --reuse                    # re-evaluate completed runs
+./Allverify --coupling monolithic --levels 1,2,4   # quasi-monolithic coupling
 ```
 
 The driver requires `python3`, `blockMesh` and `solids4Foam`; `gnuplot` is
@@ -546,6 +547,49 @@ The 4x level (`Δt = 0.00025 s`, 16 ranks by default) is reachable with
 `--levels 1,2,4`, but it has not been run. Its end time would first have to
 be checked against the mesh drift described above: the finer mesh
 distorted sooner.
+
+## Quasi-monolithic coupling
+
+`--coupling monolithic` runs the studies with the quasi-monolithic Newton
+coupling (`./Allrun monolithic`), on its conformal interface meshes. These
+have a quarter of the tutorial's solid cells at each refinement factor (5 by
+30 cells on the plate at 1x), so the reference tolerances of a run are those of
+the tutorial level whose plate it matches: conformal 2x and 4x are checked as
+tutorial 1x and 2x. The fluid mesh moves with a `diffusionHyperElastic`
+pseudo-solid stiffened near the plate and the cylinder. With a uniform
+pseudo-solid, linear or neo-Hookean, the fluid mesh inverts at `t = 2.76 s`
+in the FSI3 start-up overshoot to about 40 mm, which IQN-ILS shows on the same
+meshes too.
+
+Recorded with OpenFOAM v2512 on an Apple M1 Ultra shared with other jobs.
+Every step converged in 2 or 3 Newton iterations (FSI1: 1.3-1.4).
+
+FSI1, serial, errors against Featflow level 7+0 (both studies pass):
+
+| Level | Plate as tutorial | `u_x(A)` | `u_y(A)` | drag | lift | Clock (s) |
+|---|---:|---:|---:|---:|---:|---:|
+| conformal 1x | 0.5x | +16.4% | -38.4% | -0.51% | +15.3% | 146 |
+| conformal 2x | 1x | +0.37% | -15.0% | +0.05% | +6.0% | 668 |
+| conformal 4x | 2x | +0.09% | -4.75% | +0.11% | +1.7% | 6 146 |
+
+FSI3 (`t = 7 s`, last second), errors against Featflow level 4; conformal 4x
+ran on 12 ranks in 3.6 h:
+
+| Quantity | conformal 2x | conformal 4x | IQN-ILS, tutorial 2x |
+|---|---:|---:|---:|
+| `u_x` mean | 11.5% | 5.9% | 3.1% |
+| `u_x` amplitude | 10.7% | 5.8% | 2.1% |
+| `u_y` amplitude | 9.6% | 3.7% | 2.3% |
+| `u_y` frequency | 2.7% | 1.3% | 1.2% |
+| drag mean | 2.1% | 0.9% | 0.3% |
+| drag amplitude | 10.7% | 3.4% | 1.2% |
+| lift amplitude | 33.5% | 8.3% | 13.3% |
+
+Every error falls with refinement. At the same plate resolution (conformal
+4x against tutorial 2x, 2 400 against 2 520 solid cells), IQN-ILS is closer in
+the displacements and the drag, and the quasi-monolithic coupling in the lift
+amplitude; the meshes differ (the tutorial plate has twice the cells along its
+length, the conformal fluid mesh more cells).
 
 ## References
 
