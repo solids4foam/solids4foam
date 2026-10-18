@@ -24,6 +24,11 @@ Description
 
     The stress is calculated by the run-time selectable mechanical law.
 
+    The momentum equation is discretised in time with the second-order
+    backward (BDF2) scheme, and the displacement at the new time is given by
+    the same scheme applied to the velocity, so that the stress and the
+    acceleration are both evaluated at the new time.
+
 Author
     Philip Cardiff, UCD.  All rights reserved.
 
@@ -105,33 +110,19 @@ class nonLinGeomTotalLagVelocitySolid
         //- Coefficient for velocity-based momentum stabilisation
         autoPtr<surfaceScalarField> velocityMomentumStabilisationCoeffPtr_;
 
-        //- Displacement at the future time (extrapolated)
-        volVectorField DFutureTime_;
+        //- Displacement at the new time from the backward integration of the
+        //  velocity. During a coupled solve, D holds the predicted
+        //  displacement that moved the fluid mesh, so the stress is
+        //  calculated from this field
+        volVectorField DImplicit_;
 
         //- Boundary flag field used by the leastSquaresS4f gradient scheme
-        //  for the DFutureTime field
-        boolIOList useBoundaryFaceValuesDFutureTime_;
+        //  for the DImplicit field
+        boolIOList useBoundaryFaceValuesDImplicit_;
 
         //- Boundary flag field used by the leastSquaresS4f gradient scheme
         //  for the U field
         boolIOList useBoundaryFaceValuesU_;
-
-        //- Force at the current time
-        surfaceVectorField forceCurrentTime_;
-
-        //- Force at the future time (extrapolated)
-        surfaceVectorField forceFutureTime_;
-
-        //- Extrapolate traction boundaries in time for the centered stress
-        //  averaging. Defaults to true, which is correct for solid-only
-        //  problems with prescribed traction. Should be set to false when
-        //  used in a monolithic FSI coupling, where the traction is an
-        //  implicit function of the solution and extrapolation amplifies
-        //  interface pressure oscillations.
-        const Switch extrapolateTractionBoundaries_;
-
-        //- Current time index is used for updating the old force fields
-        label curTimeIndex_;
 
 
     // Private Member Functions
@@ -153,15 +144,26 @@ class nonLinGeomTotalLagVelocitySolid
         //- Return coefficient for velocity-based momentum stabilisation
         const surfaceScalarField& velocityMomentumStabilisationCoeff();
 
-        //- Enforce traction boundary conditions on the provided traction field
+        //- Enforce traction boundary conditions on the provided force field
         void enforceTractionBoundaries
         (
-            surfaceVectorField& force,                  // future-time force
-            volVectorField& D,                          // displacement field
-            const surfaceVectorField& nCurrent,         // future-time normals
-            const surfaceScalarField& magSfCurrent,     // future-time areas
-            const surfaceScalarField& magSfOldTime      // current-time areas
+            surfaceVectorField& force,          // force at the faces
+            volVectorField& D,                  // displacement field
+            const surfaceVectorField& nCurrent, // deformed unit normals
+            const surfaceScalarField& magSfCurrent // deformed face areas
         ) const;
+
+        //- Return the old time-step of the backward scheme of ddt(U), or
+        //  GREAT on the first time-step, where the scheme is the Euler scheme
+        scalar backwardDeltaT0() const;
+
+        //- Return the derivative of DImplicit_ with respect to the velocity,
+        //  i.e. the time-step divided by the backward scheme coefficient of
+        //  the new time
+        dimensionedScalar DImplicitVelocityCoeff() const;
+
+        //- Calculate DImplicit_ from the velocity with the backward scheme
+        void updateDImplicit(const volVectorField& U);
 
         //- Evolve the solid solver using the PETSc nonlinear solver (SNES)
         //  A compact approximate Jacobian (same one as used by the segregated
@@ -244,6 +246,12 @@ public:
 
             //- Evolve the solid solver and solve the mathematical model
             virtual bool evolve();
+
+            //- Set the displacement, its gradient, the stress and the point
+            //  displacement from the converged velocity. A coupling interface
+            //  that moved the fluid mesh with a predicted displacement calls
+            //  this after its solve
+            void updateDisplacement();
 
 #ifdef USE_PETSC
             //- Initialise the Jacobian matrix

@@ -23,6 +23,8 @@ License
 #include "fvm.H"
 #include "findRefCell.H"
 #include "fixedValueFvPatchFields.H"
+#include "fixedGradientFvPatchFields.H"
+#include "wallFvPatch.H"
 #include "compatibilityFunctions.H"
 
 
@@ -55,19 +57,6 @@ void scaleFvScalarMatrix(Foam::fvScalarMatrix& matrix, const Foam::scalar scale)
     }
 }
 
-
-bool containsLabel(const Foam::labelList& labels, const Foam::label value)
-{
-    forAll(labels, i)
-    {
-        if (labels[i] == value)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 
 const Foam::dictionary& solverControls
@@ -271,8 +260,6 @@ newtonIcoFluid::newtonIcoFluid
     ),
     pressureUnknownScale_(1.0),
     pressureEqnScale_(pressureScaleFactor_),
-    pressureStabilisationGammaPtr_(),
-    zeroPressureStabilisationFluxPatchIDs_(),
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_()
 {
@@ -522,20 +509,18 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
-    // Named normal: a tmp normal field would be reused as the storage of
-    // the inner product, which aliases an input of the loop and gives
-    // wrong results with some -O3 builds (see the 3dTube verification)
-    const vectorField nf(mesh().boundary()[patchID].nf());
+    // The viscous force is the boundary flux of the momentum residual's
+    // viscous term, laplacian(nuEff, U), i.e. nuEff*snGrad(U), so that the
+    // force on the solid is the momentum the fluid loses. At an
+    // incompressible no-slip wall this is also the viscous traction. The
+    // full n & devReff would add the transpose and trace parts of the
+    // boundary velocity gradient, whose tangential components are the
+    // adjacent cell values, a first-order error that the residual does not
+    // contain
+    const scalarField nuEff(turbulence_->nuEff()().boundaryField()[patchID]);
+    const vectorField snGradU(U().boundaryField()[patchID].snGrad());
 
-    tmpRef(tvF) = rho_.value()
-       *(
-            nf
-#ifdef OPENFOAM_ORG
-          & (-turbulence_->devTau()().boundaryField()[patchID])
-#else
-          & (-turbulence_->devReff()().boundaryField()[patchID])
-#endif
-        );
+    tmpRef(tvF) = rho_.value()*nuEff*snGradU;
 
     return tvF;
 }
@@ -950,65 +935,6 @@ bool newtonIcoFluid::evolve()
 void newtonIcoFluid::clearRAUf()
 {
     rAUfPtr_.clear();
-    pressureStabilisationGammaPtr_.clear();
-}
-
-
-const surfaceScalarField& newtonIcoFluid::pressureStabilisationGamma()
-{
-    if (zeroPressureStabilisationFluxPatchIDs_.empty())
-    {
-        return rAUf();
-    }
-
-    if (pressureStabilisationGammaPtr_.empty())
-    {
-        pressureStabilisationGammaPtr_.reset
-        (
-            new surfaceScalarField
-            (
-                IOobject
-                (
-                    "pressureStabilisationGamma",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                rAUf()
-            )
-        );
-    }
-    else
-    {
-        pressureStabilisationGammaPtr_() = rAUf();
-    }
-
-    forAll(zeroPressureStabilisationFluxPatchIDs_, i)
-    {
-        const label patchID = zeroPressureStabilisationFluxPatchIDs_[i];
-        boundaryFieldRef(pressureStabilisationGammaPtr_())[patchID] = 0.0;
-    }
-
-    return pressureStabilisationGammaPtr_();
-}
-
-
-void newtonIcoFluid::addZeroPressureStabilisationFluxPatch(const label patchID)
-{
-    if (patchID < 0 || patchID >= mesh().boundary().size())
-    {
-        FatalErrorInFunction
-            << "Invalid patch ID " << patchID << " for mesh "
-            << mesh().name() << abort(FatalError);
-    }
-
-    if (!containsLabel(zeroPressureStabilisationFluxPatchIDs_, patchID))
-    {
-        const label oldSize = zeroPressureStabilisationFluxPatchIDs_.size();
-        zeroPressureStabilisationFluxPatchIDs_.setSize(oldSize + 1);
-        zeroPressureStabilisationFluxPatchIDs_[oldSize] = patchID;
-    }
 }
 
 
@@ -1127,6 +1053,60 @@ label newtonIcoFluid::initialiseSolution(Vec& x)
 }
 
 
+void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
+{
+    volScalarField& p = this->p();
+    const volVectorField& U = this->U();
+
+    if
+    (
+        !isA<fixedGradientFvPatchScalarField>(p.boundaryField()[patchI])
+     || !isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI])
+    )
+    {
+        return;
+    }
+
+    // Acceleration of the boundary faces, with the ddt scheme of U
+    const vectorField acceleration
+    (
+        fvc::ddt(U)().boundaryField()[patchI]
+    );
+
+    // Viscous term in the cells next to the boundary, as in the momentum
+    // residual
+    const vectorField viscousTerm
+    (
+        fvc::laplacian
+        (
+            turbulence_->nuEff(), U
+        )().boundaryField()[patchI].patchInternalField()
+    );
+
+    // Unit normals pointing out of the fluid
+    const vectorField n(mesh().boundary()[patchI].nf());
+
+    fvPatchScalarField& pPatch = boundaryFieldRef(p)[patchI];
+
+    refCast<fixedGradientFvPatchScalarField>(pPatch).gradient() =
+        n & (viscousTerm - acceleration);
+
+    pPatch.evaluate();
+}
+
+
+void newtonIcoFluid::updatePressureGradientBoundaries()
+{
+    forAll(mesh().boundary(), patchI)
+    {
+        if (isA<wallFvPatch>(mesh().boundary()[patchI]))
+        {
+            updatePressureGradientBoundary(patchI);
+        }
+    }
+}
+
+
 label newtonIcoFluid::formResidual
 (
     Vec f,         // Residual
@@ -1147,6 +1127,10 @@ label newtonIcoFluid::formResidual
     // unpackSolution also corrects the boundary conditions on both
     // fields, so the rest of this routine can use them directly
     unpackSolution(x);
+
+    // Set the pressure gradient on the fixedGradient walls from the current
+    // velocity
+    updatePressureGradientBoundaries();
 
     volVectorField& U = const_cast<volVectorField&>(this->U());
     volScalarField& p = const_cast<volScalarField&>(this->p());
@@ -1266,7 +1250,7 @@ label newtonIcoFluid::formResidual
     );
 
     rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
-    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
+    const surfaceScalarField& pStabGamma = rAUf();
 
     pressureStabilisation().updateScalar(p, &gradp());
     pressureResidual += pressureStabilisation().cellScalar(&pStabGamma, true);
@@ -1385,7 +1369,7 @@ label newtonIcoFluid::formJacobian
     // diagonal damping terms that are not part of the upwind pressure
     // stabilisation operator and may not preserve the sign of UEqn.A().
     rAUf() = -fvc::interpolate(1.0/UEqn.A());
-    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
+    const surfaceScalarField& pStabGamma = rAUf();
 
     if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
     {
@@ -1645,7 +1629,7 @@ label newtonIcoFluid::precondition
 
     // Match the pressure-block sign convention in formJacobian().
     rAUf() = -fvc::interpolate(rAU);
-    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
+    const surfaceScalarField& pStabGamma = rAUf();
 
     surfaceScalarField phiHbyA
     (

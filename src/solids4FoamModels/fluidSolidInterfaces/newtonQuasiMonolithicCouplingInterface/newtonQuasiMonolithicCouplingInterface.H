@@ -74,48 +74,40 @@ class newtonQuasiMonolithicCouplingInterface
         //  number of the monlithic system
         const scalar solidSystemScaleFactor_;
 
-        //- Flag to enable fluid-to-solid coupling
-        // const Switch fluidToSolidCoupling_;
-
-        //- Flag to enable mesh-to-fluid coupling
-        // const Switch meshToFluidCoupling_;
-
-        //- Flag to enable solid-to-mesh coupling
-        // const Switch solidToMeshCoupling_;
-
-        //- Flag to extrapolate the displacement at the solid interface
-        //  Alternatively, the adjacenet cell centre displacement is used
-        //  This affects the residual calculation, whereas the Jacobian always
-        //  uses the adjacenet cell centre displacement
-        const Switch extrapolateSolidInterfaceDisplacement_;
-
         //- Pass the viscous stress from the fluid to the solid
         //  Defaults to yes
         const Switch passViscousStress_;
 
-        //- Use the Liu (2014) Eq.31 interface velocity condition
-        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-        //  This condition is from Liu et al., JCP 270, 2014, Section 4.
-        //  Note: in the FVM-ALE context, this condition creates a mismatch
-        //  between the mesh velocity (U_solid) and the fluid BC (Liu combo),
-        //  violating the GCL for interface-adjacent cells. This causes
-        //  pressure oscillations in practice. Defaults to no.
-        const Switch liuInterfaceCondition_;
-
-        //- Interface normal flux treatment for the fluid pressure equation
-        const word quasiMonolithicInterfaceFluxMode_;
+        //- Transfer the fluid interface forces to the solid with the
+        //  transpose of the solid-to-fluid velocity transfer, instead of
+        //  interpolating the traction, so that the total interface force and
+        //  power are conserved on a non-conformal interface. The solid
+        //  applies the traction on the undeformed face areas. Defaults to no
+        const Switch conservativeTractionTransfer_;
 
         //- Report interface normal flux defect diagnostics
         const Switch interfaceFluxDiagnostics_;
 
-        //- Suppress pressure-stabilisation boundary flux on the FSI interface
-        const Switch zeroPressureStabilisationFluxOnFsiInterface_;
+        //- Offset subtracted from the mapped solid interface displacement on
+        //  the local fluid patch faces, so that the fluid mesh follows the
+        //  solid displacement relative to the start of the coupling
+        autoPtr<vectorField> interfaceDOffsetPtr_;
 
-        //- Old geometric interface mesh flux on the local fluid patch faces
-        autoPtr<scalarField> interfaceMeshPhiOldPtr_;
+        //- Offset subtracted from the mapped solid interface point
+        //  displacement on the local fluid patch points
+        autoPtr<vectorField> interfacePointDOffsetPtr_;
 
-        //- Old-old geometric interface mesh flux on local fluid patch faces
-        autoPtr<scalarField> interfaceMeshPhiOldOldPtr_;
+        //- Solid zone faces giving the value on each fluid zone face
+        mutable autoPtr<labelListList> fluidFaceSolidFacesPtr_;
+
+        //- Weights of the solid zone faces giving each fluid zone face value
+        mutable autoPtr<scalarListList> fluidFaceSolidWeightsPtr_;
+
+        //- Fluid zone faces giving the value on each solid zone face
+        mutable autoPtr<labelListList> solidFaceFluidFacesPtr_;
+
+        //- Weights of the fluid zone faces giving each solid zone face value
+        mutable autoPtr<scalarListList> solidFaceFluidWeightsPtr_;
 
         //- Accumulated signed leakage from interface flux defect
         scalar accumulatedInterfaceFluxLeakage_;
@@ -135,9 +127,6 @@ class newtonQuasiMonolithicCouplingInterface
         //- PETSc index set for the fluid pressure unknowns
         mutable IS isFluidPressure_;
 
-        //- PETSc index set for the motion unknowns
-        //mutable IS isMotion_;
-
         //- PETSc index set for the solid unknowns
         mutable IS isSolid_;
 
@@ -151,20 +140,12 @@ class newtonQuasiMonolithicCouplingInterface
         Mat Pmat_;
 
         //- Cached KSP for the solid sub-block in the physics preconditioner
+        //  (work in progress, see precondition())
         mutable KSP solidSubKSP_;
 
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
-
-        // //- Store the old time value for resetting the time
-        // scalar oldTimeValue_;
-
-        // //- Number of consecutive failed SNES solves
-        // label nConsecutiveFailedSolves_;
-
-        // //- Maximum allowed number of consecutive failed SNES solves
-        // const label maxAllowedConsecutiveFailedSolves_;
 
 
     // Private Member Functions
@@ -207,17 +188,6 @@ class newtonQuasiMonolithicCouplingInterface
         }
 
         //- Return isSolid pointer
-        // IS isMotion() const
-        // {
-        //     if (isMotion_ == nullptr)
-        //     {
-        //         makeIsFluidIsMotionIsSolid();
-        //     }
-
-        //     return isMotion_;
-        // }
-
-        //- Return isSolid pointer
         IS isSolid() const
         {
             if (isSolid_ == nullptr)
@@ -243,6 +213,51 @@ class newtonQuasiMonolithicCouplingInterface
         //- Return a reference to the mesh motion solver cast as a solid
         //  model
         solidModel& motionSolid();
+
+        //- Calculate the interface face transfer addressing and weights in
+        //  both directions from the interface-to-interface mapping. For a
+        //  conformal interface (directMap), each face has one unit weight;
+        //  for a non-conformal interface (AMI), the weights are the face
+        //  overlap areas divided by the area of the receiving face
+        void calcInterfaceFaceWeights() const;
+
+        //- Return the solid zone faces giving each fluid zone face value
+        const labelListList& fluidFaceSolidFaces() const;
+
+        //- Return the weights of the solid zone faces for each fluid face
+        const scalarListList& fluidFaceSolidWeights() const;
+
+        //- Return the fluid zone faces giving each solid zone face value
+        const labelListList& solidFaceFluidFaces() const;
+
+        //- Return the weights of the fluid zone faces for each solid face
+        const scalarListList& solidFaceFluidWeights() const;
+
+        //- Transfer a solid zone face field to the fluid zone faces
+        template<class Type>
+        tmp<Field<Type>> solidZoneToFluidZone
+        (
+            const Field<Type>& solidZoneField
+        ) const;
+
+        //- Transfer a fluid zone face field to the solid zone faces
+        template<class Type>
+        tmp<Field<Type>> fluidZoneToSolidZone
+        (
+            const Field<Type>& fluidZoneField
+        ) const;
+
+        //- Apply the transpose of the solid-to-fluid zone face transfer to a
+        //  fluid zone face field, e.g. to distribute face forces
+        template<class Type>
+        tmp<Field<Type>> fluidZoneToSolidZoneTranspose
+        (
+            const Field<Type>& fluidZoneField
+        ) const;
+
+        //- Return the local solid interface face areas on which the solid
+        //  applies the interface traction
+        tmp<scalarField> solidInterfaceMagSf() const;
 
         //- Create the empty submatrices and nested matrix given the
         //  corresponding solution lengths and block sizes
@@ -303,17 +318,13 @@ class newtonQuasiMonolithicCouplingInterface
         //- Map the velocity from the mesh motion to the fluid interface
         void mapInterfaceMotionUToFluidU();
 
-        //- Set the fluid interface velocity using Liu (2014) Eq.31
-        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-        //  This replaces mapInterfaceMotionUToFluidU() when
-        //  liuInterfaceCondition_ is enabled
-        void setLiuInterfaceVelocity();
-
-        //- Return true if the selected interface flux mode is recognised
-        bool validInterfaceFluxMode(const word& mode) const;
-
-        //- Return d(Phi_Gamma)/d(U_solid.Sf) coefficient
-        scalar interfaceFluxImplicitScale() const;
+        //- Set the normal gradient of the fluid pressure on the interface
+        //  from the normal momentum equation, if the pressure condition
+        //  there is fixedGradient (see
+        //  newtonIcoFluid::updatePressureGradientBoundaries). A zeroGradient
+        //  pressure instead gives a first-order error in the interface
+        //  pressure and the added mass
+        void setInterfacePressureGradient();
 
         //- Return current geometric interface mesh flux
         scalarField currentInterfaceMeshPhi() const;
@@ -321,21 +332,19 @@ class newtonQuasiMonolithicCouplingInterface
         //- Return current fluid-boundary normal velocity flux
         scalarField currentInterfaceVelocityPhi() const;
 
-        //- Ensure geometric interface mesh-flux history is allocated
-        void initialiseInterfaceMeshPhiHistory(const scalarField& meshPhi);
-
-        //- Return selected interface pressure flux
-        tmp<scalarField> interfacePressurePhi();
-
-        //- Report interface pressure flux defect diagnostics
+        //- Report interface pressure flux defect diagnostics: the defect
+        //  between the interface velocity flux and the mesh flux
         void reportInterfaceFluxDiagnostics();
-
-        //- Shift geometric interface mesh-flux history after accepted step
-        void updateInterfaceMeshPhiHistory();
 
         //- Map the displacement and velocity from the solid to the mesh motion
         //  interface. Three fields are mapped: D, U and pointD
         void mapInterfaceSolidToMeshMotion();
+
+        //- Set the interface displacement offsets from the difference between
+        //  the mapped solid interface displacement and the mesh motion
+        //  interface displacement at the start of the coupling, which is
+        //  zero for an undeformed start and recovers the offset on a restart
+        void setInterfaceDisplacementOffsets();
 
         //- Restore the coupled fields and fluid mesh after a failed PETSc solve
         void restoreOldTimeState(const pointField& oldFluidPoints);
@@ -420,7 +429,6 @@ public:
             ISDestroy(&isFluid_);
             ISDestroy(&isFluidVelocity_);
             ISDestroy(&isFluidPressure_);
-            // ISDestroy(&isMotion_);
             ISDestroy(&isSolid_);
         }
 
@@ -475,6 +483,10 @@ public:
             //- Apply a block physics preconditioner
             //  Fluid block: delegates to newtonIcoFluid SIMPLE-type PC
             //  Solid block: one approximate solve using the solid sub-matrix
+            //  Work in progress: selected with pc_type physics, which no
+            //  tutorial uses yet. On ringAddedMass the Newton iterations
+            //  stall at the first coupled time step, so it is kept for
+            //  further development and is not ready for use
             virtual label precondition
             (
                 Vec y,         // Output: y = M^{-1} x

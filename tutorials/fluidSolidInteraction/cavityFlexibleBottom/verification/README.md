@@ -24,6 +24,7 @@ Useful options:
 ```bash
 ./Allverify --quick              # levels 1 and 2 only, smoke test
 ./Allverify --variants iqnils    # IQN-ILS instead of Aitken coupling
+./Allverify --variants monolithic # quasi-monolithic Newton (OpenFOAM.com)
 ./Allverify --end-time 400       # longer pseudo-transient
 ./Allverify --delta-t 0.1        # smaller time step, needed by level 4
 ./Allverify --reuse              # resume a sweep without re-running cases
@@ -117,6 +118,35 @@ That residual offset is consistent with the difference already noted in the
 tutorial README between the solids4foam prediction and the published
 displacement at the coarsest spacing, and it is why the displacement tolerance
 is looser than the force tolerance.
+
+## Quasi-monolithic coupling
+
+`--variants monolithic` runs the quasi-monolithic Newton coupling
+(`./Allrun monolithic`, OpenFOAM.com only). Its inlet profile is ramped in over
+the first 20 s (`inlet_ramp_s` in the reference JSON) with
+`transitionalParabolicVelocity`, which gives the same parabola: the monolithic
+coupling resolves the pressure impulse of the impulsive start, which inverted
+the fluid mesh on level 3, and the ramp does not change the steady response.
+Recorded with OpenFOAM v2512 on macOS, serial, at `deltaT = 0.5`, with the
+partitioned Aitken coupling on levels 1 to 3 for comparison (level 3 at
+`deltaT = 0.25`, at which its coupling converges; mono and part are the
+monolithic and partitioned couplings):
+
+| Level | ΔX (m) | Uy mono (m) | Uy part (m) | Fy mono (N) | Fy part (N) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0.1 | -0.201557 | -0.202495 | -5.1225 | -5.1527 |
+| 2 | 0.05 | -0.228817 | -0.228799 | -5.2381 | -5.2378 |
+| 3 | 0.025 | -0.235676 | -0.235628 | -5.2576 | -5.2564 |
+| 4 | 0.0125 | -0.237336 | – | -5.2606 | – |
+
+The two couplings agree to 0.02% in Uy and Fy on level 3. The monolithic Uy
+converges at observed orders of 1.99 and 2.05 to an extrapolated
+-0.23787 m. The published mesh-study values are about 5% larger in magnitude
+(-0.2496 m at ΔX = 0.025 m), as is an independent ANSYS calculation (about
+-0.25 m); with both couplings converged to the same value, the difference is
+not a discretisation error of either coupling, and the definition of the
+published case (monitor point, boundary conditions, material) is being
+checked.
 
 ## References
 

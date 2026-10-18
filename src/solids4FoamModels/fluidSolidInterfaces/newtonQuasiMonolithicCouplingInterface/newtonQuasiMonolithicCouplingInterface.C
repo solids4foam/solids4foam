@@ -23,8 +23,9 @@ License
 
 #include "newtonQuasiMonolithicCouplingInterface.H"
 #include "addToRunTimeSelectionTable.H"
-#include "directMapInterfaceToInterfaceMapping.H"
+#include "interfaceToInterfaceMapping.H"
 #include "fixedValueFvPatchFields.H"
+#include "fixedGradientFvPatchFields.H"
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "newtonIcoFluid.H"
@@ -273,6 +274,241 @@ solidModel& newtonQuasiMonolithicCouplingInterface::motionSolid()
 }
 
 
+void newtonQuasiMonolithicCouplingInterface::calcInterfaceFaceWeights() const
+{
+    if (fluidFaceSolidFacesPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    if (interfaceToInterfaceList().size() != 1)
+    {
+        FatalErrorInFunction
+            << "Currently, only one interface is allowed when using "
+            << typeName << abort(FatalError);
+    }
+
+    // The mapping is constructed with the fluid zone as zoneA and the solid
+    // zone as zoneB
+    const interfaceToInterfaceMapping& interfaceMap =
+        interfaceToInterfaceList()[0];
+    const standAlonePatch& fluidZone = interfaceMap.zoneA();
+    const standAlonePatch& solidZone = interfaceMap.zoneB();
+
+    fluidFaceSolidFacesPtr_.reset(new labelListList());
+    fluidFaceSolidWeightsPtr_.reset(new scalarListList());
+    interfaceMap.zoneToZoneFaceWeights
+    (
+        solidZone,
+        fluidZone,
+        fluidFaceSolidFacesPtr_(),
+        fluidFaceSolidWeightsPtr_()
+    );
+
+    solidFaceFluidFacesPtr_.reset(new labelListList());
+    solidFaceFluidWeightsPtr_.reset(new scalarListList());
+    interfaceMap.zoneToZoneFaceWeights
+    (
+        fluidZone,
+        solidZone,
+        solidFaceFluidFacesPtr_(),
+        solidFaceFluidWeightsPtr_()
+    );
+
+    if
+    (
+        fluidFaceSolidFacesPtr_().size() != fluidZone.size()
+     || solidFaceFluidFacesPtr_().size() != solidZone.size()
+    )
+    {
+        FatalErrorInFunction
+            << "The interface face transfer addressing has the wrong size"
+            << abort(FatalError);
+    }
+
+    // Report the range of the weight sums, which are 1 where a face is fully
+    // covered by the other side of the interface
+    const scalarListList& fluidW = fluidFaceSolidWeightsPtr_();
+    scalarField fluidWSum(fluidW.size(), 0.0);
+    forAll(fluidW, faceI)
+    {
+        fluidWSum[faceI] = sum(fluidW[faceI]);
+    }
+
+    const scalarListList& solidW = solidFaceFluidWeightsPtr_();
+    scalarField solidWSum(solidW.size(), 0.0);
+    forAll(solidW, faceI)
+    {
+        solidWSum[faceI] = sum(solidW[faceI]);
+    }
+
+    Info<< "Interface face transfer weight sums (" << interfaceMap.type()
+        << "): fluid faces min " << min(fluidWSum) << " max "
+        << max(fluidWSum) << ", solid faces min " << min(solidWSum)
+        << " max " << max(solidWSum) << endl;
+}
+
+
+const labelListList&
+newtonQuasiMonolithicCouplingInterface::fluidFaceSolidFaces() const
+{
+    if (fluidFaceSolidFacesPtr_.empty())
+    {
+        calcInterfaceFaceWeights();
+    }
+
+    return fluidFaceSolidFacesPtr_();
+}
+
+
+const scalarListList&
+newtonQuasiMonolithicCouplingInterface::fluidFaceSolidWeights() const
+{
+    if (fluidFaceSolidWeightsPtr_.empty())
+    {
+        calcInterfaceFaceWeights();
+    }
+
+    return fluidFaceSolidWeightsPtr_();
+}
+
+
+const labelListList&
+newtonQuasiMonolithicCouplingInterface::solidFaceFluidFaces() const
+{
+    if (solidFaceFluidFacesPtr_.empty())
+    {
+        calcInterfaceFaceWeights();
+    }
+
+    return solidFaceFluidFacesPtr_();
+}
+
+
+const scalarListList&
+newtonQuasiMonolithicCouplingInterface::solidFaceFluidWeights() const
+{
+    if (solidFaceFluidWeightsPtr_.empty())
+    {
+        calcInterfaceFaceWeights();
+    }
+
+    return solidFaceFluidWeightsPtr_();
+}
+
+
+template<class Type>
+tmp<Field<Type>> newtonQuasiMonolithicCouplingInterface::solidZoneToFluidZone
+(
+    const Field<Type>& solidZoneField
+) const
+{
+    const labelListList& addr = fluidFaceSolidFaces();
+    const scalarListList& w = fluidFaceSolidWeights();
+
+    tmp<Field<Type>> tresult(new Field<Type>(addr.size(), Zero));
+    Field<Type>& result = tresult.ref();
+
+    forAll(result, fluidFaceI)
+    {
+        forAll(addr[fluidFaceI], i)
+        {
+            result[fluidFaceI] +=
+                w[fluidFaceI][i]*solidZoneField[addr[fluidFaceI][i]];
+        }
+    }
+
+    return tresult;
+}
+
+
+template<class Type>
+tmp<Field<Type>> newtonQuasiMonolithicCouplingInterface::fluidZoneToSolidZone
+(
+    const Field<Type>& fluidZoneField
+) const
+{
+    const labelListList& addr = solidFaceFluidFaces();
+    const scalarListList& w = solidFaceFluidWeights();
+
+    tmp<Field<Type>> tresult(new Field<Type>(addr.size(), Zero));
+    Field<Type>& result = tresult.ref();
+
+    forAll(result, solidFaceI)
+    {
+        forAll(addr[solidFaceI], i)
+        {
+            result[solidFaceI] +=
+                w[solidFaceI][i]*fluidZoneField[addr[solidFaceI][i]];
+        }
+    }
+
+    return tresult;
+}
+
+
+template<class Type>
+tmp<Field<Type>>
+newtonQuasiMonolithicCouplingInterface::fluidZoneToSolidZoneTranspose
+(
+    const Field<Type>& fluidZoneField
+) const
+{
+    const labelListList& addr = fluidFaceSolidFaces();
+    const scalarListList& w = fluidFaceSolidWeights();
+
+    tmp<Field<Type>> tresult
+    (
+        new Field<Type>(solidFaceFluidFaces().size(), Zero)
+    );
+    Field<Type>& result = tresult.ref();
+
+    forAll(addr, fluidFaceI)
+    {
+        forAll(addr[fluidFaceI], i)
+        {
+            result[addr[fluidFaceI][i]] +=
+                w[fluidFaceI][i]*fluidZoneField[fluidFaceI];
+        }
+    }
+
+    return tresult;
+}
+
+
+tmp<scalarField>
+newtonQuasiMonolithicCouplingInterface::solidInterfaceMagSf() const
+{
+    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+    const fvPatch& solidPatch = solidMesh().boundary()[solidPatchID];
+    const solidTractionFvPatchVectorField& solidTractionPatch =
+        refCast<const solidTractionFvPatchVectorField>
+        (
+            solid().D().boundaryField()[solidPatchID]
+        );
+
+    tmp<scalarField> tmagSf(new scalarField(solidPatch.magSf()));
+
+    if
+    (
+        solid().nonLinGeom() != nonLinearGeometry::LINEAR_GEOMETRY
+     && !solidTractionPatch.useUndeformedArea()
+    )
+    {
+        // Deformed solid face areas, as used by the solid
+        const tensorField F
+        (
+            I + solid().gradD().boundaryField()[solidPatchID].T()
+        );
+
+        tmagSf.ref() = mag(det(F)*(inv(F)().T() & solidPatch.Sf()));
+    }
+
+    return tmagSf;
+}
+
+
 void newtonQuasiMonolithicCouplingInterface::createSubMatsAndMat
 (
     Mat& jac,
@@ -420,9 +656,9 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
             << "Initialising" << endl;
     }
 
-    // Initially we assume a conformal FSI interface, where each fluid cell
-    // shares a face with a solid cell. So we assume the number of blocks in
-    // the Afs matrix is equal to the number of cells at the interface
+    // Each fluid interface face couples to the solid cells adjacent to the
+    // solid interface faces that give its value: one for a conformal
+    // interface, and those that overlap it for a non-conformal interface
 
     // Initially, we only allow one FSI interface
     if (interfaceToInterfaceList().size() != 1)
@@ -432,17 +668,9 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
             << typeName << abort(FatalError);
     }
 
-    // Allow only a direct map (conformal interface)
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
+    // Interface mapping between the fluid (zoneA) and solid (zoneB) zones
+    const interfaceToInterfaceMapping& interfaceMap =
+        interfaceToInterfaceList()[0];
 
     // CAREFUL: we are setting non-zeros here based on the scalar rows, not
     // the block rows
@@ -490,8 +718,8 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
         solidGlobalPatch.patchFaceToGlobal(localSolidGlobalCellIDs)
     );
 
-    // Zone-level face map: fluid zone face -> solid zone face
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    // Zone-level face transfer: fluid zone face <- solid zone faces
+    const labelListList& fluidFaceSolidFacesRef = fluidFaceSolidFaces();
     const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
 
     // Loop over LOCAL fluid interface faces
@@ -499,42 +727,47 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
     {
         const label fluidCellID = fluidFaceCells[fluidFaceI];
 
-        // Map local fluid face -> zone fluid face -> zone solid face
+        // Map local fluid face -> zone fluid face -> zone solid faces
         const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-        const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
-        const label globalSolidCellID =
-            label(zoneSolidGlobalCellIDs[solidZoneFaceI]);
+        const labelList& solidZoneFaces =
+            fluidFaceSolidFacesRef[fluidZoneFaceI];
 
-        // Check if the coupled solid cell is on this processor
-        const bool solidCellLocal =
-            solidGlobalCells.isLocal(globalSolidCellID);
-
-        // Calculate the row index for this cells first scalar equation
-        label rowI = fluidCellID*fluidBlockSize;
-
-        // Accumulate the number of non-zeros (a corner cell may have
-        // multiple faces on the interface, each coupling to a different
-        // solid cell)
-        if (solidCellLocal)
+        forAll(solidZoneFaces, i)
         {
-            d_nnz[rowI++] += solidBlockSize;
-            d_nnz[rowI++] += solidBlockSize;
-            d_nnz[rowI++] += solidBlockSize;
+            const label globalSolidCellID =
+                label(zoneSolidGlobalCellIDs[solidZoneFaces[i]]);
 
-            if (!twoD)
+            // Check if the coupled solid cell is on this processor
+            const bool solidCellLocal =
+                solidGlobalCells.isLocal(globalSolidCellID);
+
+            // Calculate the row index for this cells first scalar equation
+            label rowI = fluidCellID*fluidBlockSize;
+
+            // Accumulate the number of non-zeros (a corner cell may have
+            // multiple faces on the interface, each coupling to a different
+            // solid cell)
+            if (solidCellLocal)
             {
                 d_nnz[rowI++] += solidBlockSize;
-            }
-        }
-        else
-        {
-            o_nnz[rowI++] += solidBlockSize;
-            o_nnz[rowI++] += solidBlockSize;
-            o_nnz[rowI++] += solidBlockSize;
+                d_nnz[rowI++] += solidBlockSize;
+                d_nnz[rowI++] += solidBlockSize;
 
-            if (!twoD)
+                if (!twoD)
+                {
+                    d_nnz[rowI++] += solidBlockSize;
+                }
+            }
+            else
             {
                 o_nnz[rowI++] += solidBlockSize;
+                o_nnz[rowI++] += solidBlockSize;
+                o_nnz[rowI++] += solidBlockSize;
+
+                if (!twoD)
+                {
+                    o_nnz[rowI++] += solidBlockSize;
+                }
             }
         }
     }
@@ -547,7 +780,6 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
 
     // Raise an error if mallocs are required during matrix assembly
     CHKERRQ(MatSetOption(Afs, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
-    //CHKERRQ(MatSetOption(Afs, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
 
     return 0;
 }
@@ -568,17 +800,9 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
             << "Initialising" << endl;
     }
 
-    // Allow only a direct map (conformal interface)
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
+    // Interface mapping between the fluid (zoneA) and solid (zoneB) zones
+    const interfaceToInterfaceMapping& interfaceMap =
+        interfaceToInterfaceList()[0];
 
     // CAREFUL: we are setting non-zeros her based on the scalar rows, not
     // the block rows
@@ -626,8 +850,8 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
         fluidGlobalPatch.patchFaceToGlobal(localFluidGlobalCellIDs)
     );
 
-    // Zone-level face map: solid zone face -> fluid zone face
-    const labelList& solidFaceMap = interfaceMap.zoneAToZoneBFaceMap();
+    // Zone-level face transfer: solid zone face <- fluid zone faces
+    const labelListList& solidFaceFluidFacesRef = solidFaceFluidFaces();
     const labelList& solidFaceToZone = solidGlobalPatch.faceToGlobalAddr();
 
     // Loop over LOCAL solid interface faces
@@ -635,42 +859,47 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
     {
         const label solidCellID = solidFaceCells[solidFaceI];
 
-        // Map local solid face -> zone solid face -> zone fluid face
+        // Map local solid face -> zone solid face -> zone fluid faces
         const label solidZoneFaceI = solidFaceToZone[solidFaceI];
-        const label fluidZoneFaceI = solidFaceMap[solidZoneFaceI];
-        const label globalFluidCellID =
-            label(zoneFluidGlobalCellIDs[fluidZoneFaceI]);
+        const labelList& fluidZoneFaces =
+            solidFaceFluidFacesRef[solidZoneFaceI];
 
-        // Check if the coupled fluid cell is on this processor
-        const bool fluidCellLocal =
-            fluidGlobalCells.isLocal(globalFluidCellID);
-
-        // Calculate the row index for this cells first scalar equation
-        label rowI = solidCellID*solidBlockSize;
-
-        // Accumulate the number of non-zeros (a corner cell may have
-        // multiple faces on the interface, each coupling to a different
-        // fluid cell)
-        // e.g., The x-momentum equation could have a coefficient for the
-        // fluid x/y/z velocity and fluid pressure
-        if (fluidCellLocal)
+        forAll(fluidZoneFaces, i)
         {
-            d_nnz[rowI++] += fluidBlockSize;
-            d_nnz[rowI++] += fluidBlockSize;
+            const label globalFluidCellID =
+                label(zoneFluidGlobalCellIDs[fluidZoneFaces[i]]);
 
-            if (!twoD)
+            // Check if the coupled fluid cell is on this processor
+            const bool fluidCellLocal =
+                fluidGlobalCells.isLocal(globalFluidCellID);
+
+            // Calculate the row index for this cells first scalar equation
+            label rowI = solidCellID*solidBlockSize;
+
+            // Accumulate the number of non-zeros (a corner cell may have
+            // multiple faces on the interface, each coupling to a different
+            // fluid cell)
+            // e.g., The x-momentum equation could have a coefficient for the
+            // fluid x/y/z velocity and fluid pressure
+            if (fluidCellLocal)
             {
                 d_nnz[rowI++] += fluidBlockSize;
-            }
-        }
-        else
-        {
-            o_nnz[rowI++] += fluidBlockSize;
-            o_nnz[rowI++] += fluidBlockSize;
+                d_nnz[rowI++] += fluidBlockSize;
 
-            if (!twoD)
+                if (!twoD)
+                {
+                    d_nnz[rowI++] += fluidBlockSize;
+                }
+            }
+            else
             {
                 o_nnz[rowI++] += fluidBlockSize;
+                o_nnz[rowI++] += fluidBlockSize;
+
+                if (!twoD)
+                {
+                    o_nnz[rowI++] += fluidBlockSize;
+                }
             }
         }
     }
@@ -683,7 +912,6 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
 
     // Raise an error if mallocs are required during matrix assembly
     CHKERRQ(MatSetOption(Asf, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
-    //CHKERRQ(MatSetOption(Asf, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
 
     return 0;
 }
@@ -719,17 +947,9 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
             << abort(FatalError);
     }
 
-    // Allow only a direct map (conformal interface)
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
+    // Interface mapping between the fluid (zoneA) and solid (zoneB) zones
+    const interfaceToInterfaceMapping& interfaceMap =
+        interfaceToInterfaceList()[0];
 
     // Lookup the fluid interface patch
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
@@ -743,7 +963,6 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
     // Check the fluid U patch type is fixedValue (not just derived from it)
     // TODO: use the corrected version of fixedValue
     if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
-    //if (fluidPatchU.type() != "fixedValue")
     {
         FatalErrorInFunction
             << "The fluid interface patch must be of type 'fixedValue'"
@@ -786,11 +1005,8 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
     // Pressure coefficient from div(U)
     fluidPatchPressureCoeffs = -fluidPatchSf;
 
-    // Keep the existing full-vector momentum coupling as direct no-slip.
-    // The selected pressure-flux mode only changes the normal flux in the
-    // pressure equation.
+    // Keep the existing full-vector momentum coupling as direct no-slip
     const scalar momentumInterfaceScale = 1.0;
-    const scalar pressureInterfaceScale = interfaceFluxImplicitScale();
     const scalar pressureScale =
         refCast<const fluidModels::newtonIcoFluid>(fluid()).pressureScaleFactor();
 
@@ -823,8 +1039,9 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
         solidGlobalPatch.patchFaceToGlobal(localSolidGlobalCellIDs)
     );
 
-    // Zone-level face map and local-to-zone addressing
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    // Zone-level face transfer and local-to-zone addressing
+    const labelListList& fluidFaceSolidFacesRef = fluidFaceSolidFaces();
+    const scalarListList& fluidFaceSolidWeightsRef = fluidFaceSolidWeights();
     const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
 
     forAll(fluidPatch, fluidFaceI)
@@ -832,57 +1049,56 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
         // Fluid cell adjacent to the interface
         const label fluidCellID = fluidFaceCells[fluidFaceI];
 
-        // Map local fluid face -> zone fluid face -> zone solid face
+        // Map local fluid face -> zone fluid face -> zone solid faces
         const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-        const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
-
-        // Get global solid cell ID from the zone-level array
-        const label globalSolidCellID =
-            label(zoneSolidGlobalCellIDs[solidZoneFaceI]);
+        const labelList& solidZoneFaces =
+            fluidFaceSolidFacesRef[fluidZoneFaceI];
+        const scalarList& solidZoneWeights =
+            fluidFaceSolidWeightsRef[fluidZoneFaceI];
 
         // Global block row ID of fluid matrix
         const label globalBlockRowI =
             fluidGlobalCells.toGlobal(fluidCellID);
 
-        // Global block column ID of solid matrix
-        const label globalBlockColI = globalSolidCellID;
-
-        // CAREFUL: we cannot use MatSetValuesBlocked as it only works with
-        // square block coefficients, so we will insert the scalar
-        // coefficients manually
-
-        // Calculate the scalar global row ID (not the block row ID)
-        label globalRowI = globalBlockRowI*fluidBlockSize;
-        label globalColI = globalBlockColI*solidBlockSize;
-
-        // Momentum coefficient for this face
-        PetscScalar value =
-            momentumInterfaceScale*fluidPatchDiffusionCoeffs[fluidFaceI];
-
-        // Manually insert the 3 scalar coefficients (2 in 2-D) for the momentum
-        // coupling
-        // Note that the pressure equation coupling is inserted after (further
-        // below in this function)
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        globalRowI++;
-        globalColI++;
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        if (!twoD)
+        // The fluid interface velocity is the weighted sum of the solid
+        // interface face velocities, which are approximated by the adjacent
+        // solid cell velocities
+        forAll(solidZoneFaces, i)
         {
+            const scalar w = solidZoneWeights[i];
+
+            // Get global solid cell ID from the zone-level array
+            const label globalSolidCellID =
+                label(zoneSolidGlobalCellIDs[solidZoneFaces[i]]);
+
+            // Global block column ID of solid matrix
+            const label globalBlockColI = globalSolidCellID;
+
+            // CAREFUL: we cannot use MatSetValuesBlocked as it only works
+            // with square block coefficients, so we will insert the scalar
+            // coefficients manually
+
+            // Calculate the scalar global row ID (not the block row ID)
+            label globalRowI = globalBlockRowI*fluidBlockSize;
+            label globalColI = globalBlockColI*solidBlockSize;
+
+            // Momentum coefficient for this face
+            PetscScalar value =
+                w*momentumInterfaceScale
+               *fluidPatchDiffusionCoeffs[fluidFaceI];
+
+            // Manually insert the 3 scalar coefficients (2 in 2-D) for the
+            // momentum coupling
+            // Note that the pressure equation coupling is inserted after
+            // (further below in this function)
+            CHKERRQ
+            (
+                MatSetValues
+                (
+                    Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                )
+            );
+
             globalRowI++;
             globalColI++;
             CHKERRQ
@@ -892,48 +1108,31 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
                     Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                 )
             );
-        }
 
-        // Secondly we will insert the contributions for the pressure
-        // equation
+            if (!twoD)
+            {
+                globalRowI++;
+                globalColI++;
+                CHKERRQ
+                (
+                    MatSetValues
+                    (
+                        Afs, 1, &globalRowI, 1, &globalColI,
+                        &value, ADD_VALUES
+                    )
+                );
+            }
 
-        // Manually insert the 3 scalar coefficients (2 in 2-D)
-        // The pressure-interface scale preserves the implicit part of the
-        // selected normal flux. For geometricHistory this is 0.75; for
-        // geometricOnly it is zero; oldVelocityHistory keeps the original
-        // direct-mapping coefficient.
-        value =
-            pressureScale*pressureInterfaceScale
-           *fluidPatchPressureCoeffs[fluidFaceI][vector::X];
+            // Secondly we will insert the contributions for the pressure
+            // equation
 
-        globalRowI++; // pressure equation
-        globalColI = globalBlockColI*solidBlockSize; // x velocity
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        value =
-            pressureScale*pressureInterfaceScale
-           *fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
-        globalColI++; // y velocity
-        CHKERRQ
-        (
-            MatSetValues
-            (
-                Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-            )
-        );
-
-        if (!twoD)
-        {
+            // Manually insert the 3 scalar coefficients (2 in 2-D)
             value =
-                pressureScale*pressureInterfaceScale
-               *fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
-            globalColI++; // z velocity
+                w*pressureScale
+               *fluidPatchPressureCoeffs[fluidFaceI][vector::X];
+
+            globalRowI++; // pressure equation
+            globalColI = globalBlockColI*solidBlockSize; // x velocity
             CHKERRQ
             (
                 MatSetValues
@@ -941,6 +1140,34 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
                     Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                 )
             );
+
+            value =
+                w*pressureScale
+               *fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
+            globalColI++; // y velocity
+            CHKERRQ
+            (
+                MatSetValues
+                (
+                    Afs, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                )
+            );
+
+            if (!twoD)
+            {
+                value =
+                    w*pressureScale
+                   *fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
+                globalColI++; // z velocity
+                CHKERRQ
+                (
+                    MatSetValues
+                    (
+                        Afs, 1, &globalRowI, 1, &globalColI,
+                        &value, ADD_VALUES
+                    )
+                );
+            }
         }
     }
 
@@ -980,19 +1207,12 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
     }
 
     // Lookup the interface map from the solid faces to the fluid faces
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
+    const interfaceToInterfaceMapping& interfaceMap =
+        interfaceToInterfaceList()[0];
 
-    // Zone-level face map and local-to-zone addressing for parallel
-    const labelList& solidFaceMap = interfaceMap.zoneAToZoneBFaceMap();
+    // Zone-level face transfer and local-to-zone addressing for parallel
+    const labelListList& solidFaceFluidFacesRef = solidFaceFluidFaces();
+    const scalarListList& solidFaceFluidWeightsRef = solidFaceFluidWeights();
     const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
     const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
     const labelList& solidFaceToZone = solidGlobalPatch.faceToGlobalAddr();
@@ -1008,10 +1228,11 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
     const labelList& solidFaceCells = solidPatch.faceCells();
 
     // The approximate force on the solid interface is the solid face area
-    // vector multiplied by the adjacent fluid cell centre pressure. We also
-    // need to multiply by the fluid density, if the kinematic pressure is
-    // used. So the coefficient is the solid face area vector times the
-    // fluid density
+    // times the fluid face unit normal times the adjacent fluid cell centre
+    // pressure; the fluid normal is used, as in the residual, because on a
+    // non-conformal curved interface the fluid and solid normals differ. We
+    // also need to multiply by the fluid density, if the kinematic pressure
+    // is used
     // To-do: determine on the fly whether kinematic or dynamic pressure is
     // used
     const fvPatchVectorField& solidPatchD =
@@ -1043,18 +1264,25 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
         fluidGlobalPatch.patchFaceToGlobal(localFluidGlobalCellIDs)
     );
 
-    // Pressure coupling coefficients: solidSf * rho * pressureUnknownScale.
+    // Pressure coupling coefficients:
+    // solid |Sf| * rho * pressureUnknownScale, times the fluid normal.
     // The pHat-column factor pressureUnknownScale_ implements the chain
     // rule for the scaled pressure unknown
     //   ∂(solid traction residual)/∂pHat
     //     = pressureUnknownScale_ * ∂(solid traction residual)/∂p
     // It equals 1 (no-op) when scaleMixedPetScFields is disabled
     const scalar pressureUnknownScale = newtonFluid.pressureUnknownScale();
-    const vectorField pressureCoeffs
+    const scalarField pressureCoeffs
     (
-        solidPatch.Sf()
+        solidPatch.magSf()
        *newtonFluid.rho().value()
        *pressureUnknownScale
+    );
+
+    // Fluid interface unit normals at the zone level for parallel access
+    const vectorField zoneFluidNf
+    (
+        fluidGlobalPatch.patchFaceToGlobal(vectorField(fluidPatch.nf()))
     );
 
     // Viscous coupling coefficients (only when passViscousStress is enabled)
@@ -1064,10 +1292,11 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
     //   d(t_viscous_i)/d(U_cell_k) = rho*nuEff*deltaCoeffs*(delta_ik + nf_i*nf_k)
     // So the force contribution is:
     //   d(F_i)/d(U_cell_k) = rho*nuEff*deltaCoeffs*|Sf|*(delta_ik + nf_i*nf_k)
+    // where |Sf| is the solid face area times the transfer weight of the
+    // fluid face, which is the overlap area of the two faces
     // In parallel, the viscous coefficients are on the fluid side so we
     // broadcast them to the zone level for cross-processor access
     scalarField zoneViscDiffCoeffs;
-    vectorField zoneFluidNf;
     if (passViscousStress_)
     {
         const scalarField fluidPatchNuEff
@@ -1080,110 +1309,90 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
             newtonFluid.rho().value()
            *fluidPatchNuEff
            *fluidPatch.deltaCoeffs()
-           *fluidPatch.magSf()
         );
-
-        vectorField localFluidNf(fluidPatch.nf());
 
         // Broadcast to zone level for parallel access
         zoneViscDiffCoeffs =
             fluidGlobalPatch.patchFaceToGlobal(localViscDiffCoeffs);
-        zoneFluidNf =
-            fluidGlobalPatch.patchFaceToGlobal(localFluidNf);
     }
 
     const globalIndex& solidGlobalCells =
         solidAssembly().globalCells();
 
+    const scalarField& solidPatchMagSf = solidPatch.magSf();
+
     forAll(solidPatch, solidFaceI)
     {
-        // Map local solid face -> zone solid face -> zone fluid face
+        // Map local solid face -> zone solid face -> zone fluid faces
         const label solidZoneFaceI = solidFaceToZone[solidFaceI];
-        const label fluidZoneFaceI = solidFaceMap[solidZoneFaceI];
+        const labelList& fluidZoneFaces =
+            solidFaceFluidFacesRef[solidZoneFaceI];
+        const scalarList& fluidZoneWeights =
+            solidFaceFluidWeightsRef[solidZoneFaceI];
 
         // Solid cell is local
         const label solidCellID = solidFaceCells[solidFaceI];
-
-        // Get global fluid cell ID from the zone-level array
-        const label globalFluidCellID =
-            label(zoneFluidGlobalCellIDs[fluidZoneFaceI]);
 
         // Global block row ID of solid matrix
         const label globalBlockRowI =
             solidGlobalCells.toGlobal(solidCellID);
 
-        // Global block column ID of fluid matrix
-        const label globalBlockColI = globalFluidCellID;
-
-        // CAREFUL: we cannot use MatSetValuesBlocked as it only works with
-        // square block coefficients, so we will insert the scalar
-        // coefficients manually
-
-        // --- Pressure coupling ---
-        // The column corresponds to the pressure equation in the fluid cell
+        // The solid interface traction is the weighted sum of the fluid
+        // interface face tractions, which are approximated from the adjacent
+        // fluid cells
+        forAll(fluidZoneFaces, faceI)
         {
-            label globalRowI = globalBlockRowI*solidBlockSize;
-            const label globalColI =
-                globalBlockColI*fluidBlockSize + (fluidBlockSize - 1);
+            const label fluidZoneFaceI = fluidZoneFaces[faceI];
+            const scalar w = fluidZoneWeights[faceI];
 
-            // Manually insert the 3 scalar coefficients (2 in 2-D)
-            PetscScalar value = -pressureCoeffs[solidFaceI][vector::X];
-            CHKERRQ
-            (
-                MatSetValues
-                (
-                    Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-                )
-            );
+            // Get global fluid cell ID from the zone-level array
+            const label globalFluidCellID =
+                label(zoneFluidGlobalCellIDs[fluidZoneFaceI]);
 
-            globalRowI++;
-            value = -pressureCoeffs[solidFaceI][vector::Y];
-            CHKERRQ
-            (
-                MatSetValues
-                (
-                    Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
-                )
-            );
+            // Global block column ID of fluid matrix
+            const label globalBlockColI = globalFluidCellID;
 
-            if (!twoD)
+            // CAREFUL: we cannot use MatSetValuesBlocked as it only works with
+            // square block coefficients, so we will insert the scalar
+            // coefficients manually
+
+            // --- Pressure coupling ---
+            // The column corresponds to the pressure equation in the fluid cell
             {
-                globalRowI++;
-                value = -pressureCoeffs[solidFaceI][vector::Z];
+                label globalRowI = globalBlockRowI*solidBlockSize;
+                const label globalColI =
+                    globalBlockColI*fluidBlockSize + (fluidBlockSize - 1);
+
+                // Manually insert the 3 scalar coefficients (2 in 2-D)
+                PetscScalar value =
+                    w*pressureCoeffs[solidFaceI]
+                   *zoneFluidNf[fluidZoneFaceI][vector::X];
                 CHKERRQ
                 (
                     MatSetValues
                     (
-                        Asf, 1, &globalRowI, 1, &globalColI,
-                        &value, ADD_VALUES
+                        Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
                     )
                 );
-            }
-        }
 
-        // --- Viscous stress coupling ---
-        // The columns correspond to the velocity equations in the fluid cell
-        if (passViscousStress_)
-        {
-            // Use zone-level coefficients for parallel access
-            const scalar D = zoneViscDiffCoeffs[fluidZoneFaceI];
-            const vector& nf = zoneFluidNf[fluidZoneFaceI];
+                globalRowI++;
+                value =
+                    w*pressureCoeffs[solidFaceI]
+                   *zoneFluidNf[fluidZoneFaceI][vector::Y];
+                CHKERRQ
+                (
+                    MatSetValues
+                    (
+                        Asf, 1, &globalRowI, 1, &globalColI, &value, ADD_VALUES
+                    )
+                );
 
-            // Number of velocity components
-            const label nVelCmpts = twoD ? 2 : 3;
-
-            for (label i = 0; i < nVelCmpts; ++i)
-            {
-                for (label k = 0; k < nVelCmpts; ++k)
+                if (!twoD)
                 {
-                    // d(F_i)/d(U_k) = D * (delta_ik + nf_i*nf_k)
-                    PetscScalar value = D*((i == k ? 1.0 : 0.0) + nf[i]*nf[k]);
-
-                    PetscInt globalRowI =
-                        globalBlockRowI*solidBlockSize + i;
-                    PetscInt globalColI =
-                        globalBlockColI*fluidBlockSize + k;
-
+                    globalRowI++;
+                    value =
+                        w*pressureCoeffs[solidFaceI]
+                       *zoneFluidNf[fluidZoneFaceI][vector::Z];
                     CHKERRQ
                     (
                         MatSetValues
@@ -1192,6 +1401,43 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
                             &value, ADD_VALUES
                         )
                     );
+                }
+            }
+
+            // --- Viscous stress coupling ---
+            // The columns correspond to the velocity equations in the fluid cell
+            if (passViscousStress_)
+            {
+                // Use zone-level coefficients for parallel access
+                const scalar D =
+                    zoneViscDiffCoeffs[fluidZoneFaceI]
+                   *w*solidPatchMagSf[solidFaceI];
+                const vector& nf = zoneFluidNf[fluidZoneFaceI];
+
+                // Number of velocity components
+                const label nVelCmpts = twoD ? 2 : 3;
+
+                for (label i = 0; i < nVelCmpts; ++i)
+                {
+                    for (label k = 0; k < nVelCmpts; ++k)
+                    {
+                        // d(F_i)/d(U_k) = D * (delta_ik + nf_i*nf_k)
+                        PetscScalar value = D*((i == k ? 1.0 : 0.0) + nf[i]*nf[k]);
+
+                        PetscInt globalRowI =
+                            globalBlockRowI*solidBlockSize + i;
+                        PetscInt globalColI =
+                            globalBlockColI*fluidBlockSize + k;
+
+                        CHKERRQ
+                        (
+                            MatSetValues
+                            (
+                                Asf, 1, &globalRowI, 1, &globalColI,
+                                &value, ADD_VALUES
+                            )
+                        );
+                    }
                 }
             }
         }
@@ -1228,116 +1474,16 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
 }
 
 
-void newtonQuasiMonolithicCouplingInterface::setLiuInterfaceVelocity()
+void newtonQuasiMonolithicCouplingInterface::setInterfacePressureGradient()
 {
-    // Set the fluid interface velocity using Liu (2014) Eq.31:
-    //   U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-    //
-    // This is required for energy-stable temporal coupling. The (3/4, 1/2,
-    // -1/4) coefficients arise from the compatibility between the BDF2
-    // temporal discretisation and the trapezoidal stress averaging in the
-    // solid equations. See Liu et al., JCP 270, 2014, Eq. 31 and Section 4.
-
-    // Lookup interface mapping
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
+    // The fluid sets the gradient of a fixedGradient interface pressure from
+    // the current interface velocity, and updates the interface pressure that
+    // gives the solid traction
+    refCast<fluidModels::newtonIcoFluid>(fluid())
+        .updatePressureGradientBoundary
         (
-            interfaceToInterfaceList()[0]
+            fluidSolidInterface::fluidPatchIndices()[0]
         );
-
-    // Global patches for parallel face data transfer
-    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
-    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
-    const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
-
-    // Solid interface patch
-    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
-    const labelList& solidFaceCells =
-        solidMesh().boundary()[solidPatchID].faceCells();
-
-    // Access solid velocity at current, old, and old-old time levels
-    const vectorField& solidUI = solid().U();
-    const vectorField& solidUOld = solid().U().oldTime();
-    const vectorField& solidUOldOld = solid().U().oldTime().oldTime();
-
-    // Build local solid interface velocities at each time level using
-    // adjacent cell-centre values
-    const label nSolidFaces = solidMesh().boundary()[solidPatchID].size();
-    vectorField localSolidU(nSolidFaces);
-    vectorField localSolidUOld(nSolidFaces);
-    vectorField localSolidUOldOld(nSolidFaces);
-
-    forAll(localSolidU, faceI)
-    {
-        const label cellI = solidFaceCells[faceI];
-        localSolidU[faceI] = solidUI[cellI];
-        localSolidUOld[faceI] = solidUOld[cellI];
-        localSolidUOldOld[faceI] = solidUOldOld[cellI];
-    }
-
-    // Broadcast to zone level for parallel access
-    const vectorField zoneSolidU
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidU)
-    );
-    const vectorField zoneSolidUOld
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidUOld)
-    );
-    const vectorField zoneSolidUOldOld
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidUOldOld)
-    );
-
-    // Set the fluid interface velocity with Liu Eq.31 coefficients
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    fvPatchVectorField& fluidPatchU =
-        boundaryFieldRef(fluid().U())[fluidPatchID];
-
-    forAll(fluidPatchU, fluidFaceI)
-    {
-        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-        const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
-
-        fluidPatchU[fluidFaceI] =
-            0.75*zoneSolidU[solidZoneFaceI]
-          + 0.50*zoneSolidUOld[solidZoneFaceI]
-          - 0.25*zoneSolidUOldOld[solidZoneFaceI];
-    }
-}
-
-
-bool newtonQuasiMonolithicCouplingInterface::validInterfaceFluxMode
-(
-    const word& mode
-) const
-{
-    return
-        mode == "oldVelocityHistory"
-     || mode == "geometricOnly"
-     || mode == "geometricHistory";
-}
-
-
-scalar
-newtonQuasiMonolithicCouplingInterface::interfaceFluxImplicitScale() const
-{
-    if (quasiMonolithicInterfaceFluxMode_ == "oldVelocityHistory")
-    {
-        return 1.0;
-    }
-    else if (quasiMonolithicInterfaceFluxMode_ == "geometricOnly")
-    {
-        return 0.0;
-    }
-
-    return 0.75;
 }
 
 
@@ -1365,65 +1511,6 @@ newtonQuasiMonolithicCouplingInterface::currentInterfaceVelocityPhi() const
 }
 
 
-void newtonQuasiMonolithicCouplingInterface::initialiseInterfaceMeshPhiHistory
-(
-    const scalarField& meshPhi
-)
-{
-    if (interfaceMeshPhiOldPtr_.empty())
-    {
-        interfaceMeshPhiOldPtr_.reset(new scalarField(meshPhi));
-    }
-
-    if (interfaceMeshPhiOldOldPtr_.empty())
-    {
-        interfaceMeshPhiOldOldPtr_.reset(new scalarField(meshPhi));
-    }
-
-    if
-    (
-        interfaceMeshPhiOldPtr_().size() != meshPhi.size()
-     || interfaceMeshPhiOldOldPtr_().size() != meshPhi.size()
-    )
-    {
-        FatalErrorInFunction
-            << "Stored interface mesh-flux history size changed from "
-            << interfaceMeshPhiOldPtr_().size() << " and "
-            << interfaceMeshPhiOldOldPtr_().size() << " to "
-            << meshPhi.size() << ". This prototype assumes unchanged "
-            << "interface face ordering and count."
-            << abort(FatalError);
-    }
-}
-
-
-Foam::tmp<Foam::scalarField>
-newtonQuasiMonolithicCouplingInterface::interfacePressurePhi()
-{
-    const scalarField phiG(currentInterfaceMeshPhi());
-    initialiseInterfaceMeshPhiHistory(phiG);
-
-    if (quasiMonolithicInterfaceFluxMode_ == "oldVelocityHistory")
-    {
-        return tmp<scalarField>(new scalarField(currentInterfaceVelocityPhi()));
-    }
-    else if (quasiMonolithicInterfaceFluxMode_ == "geometricOnly")
-    {
-        return tmp<scalarField>(new scalarField(phiG));
-    }
-
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    const fvPatch& fluidPatch = fluidMesh().boundary()[fluidPatchID];
-    const fvPatchVectorField& motionPatchU =
-        motionSolid().U().boundaryField()[fluidPatchID];
-
-    return
-        0.75*scalarField(motionPatchU & fluidPatch.Sf())
-      + 0.50*interfaceMeshPhiOldPtr_()
-      - 0.25*interfaceMeshPhiOldOldPtr_();
-}
-
-
 void
 newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
 {
@@ -1432,12 +1519,10 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
         return;
     }
 
+    // Interface flux in the continuity equation (the interface velocity
+    // flux) and the flux swept by the moving fluid interface
     const scalarField phiG(currentInterfaceMeshPhi());
-    const scalarField phiGamma(interfacePressurePhi());
-    const scalarField pressureFluxDelta
-    (
-        phiGamma - currentInterfaceVelocityPhi()
-    );
+    const scalarField phiGamma(currentInterfaceVelocityPhi());
     const scalarField epsilon(phiGamma - phiG);
 
     const scalar sumEpsilon = gSum(epsilon);
@@ -1445,15 +1530,11 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
     const scalar maxAbsEpsilon = gMax(mag(epsilon));
     const scalar sumAbsPhiG = gSum(mag(phiG));
     const scalar sumAbsPhiGamma = gSum(mag(phiGamma));
-    const scalar sumPressureFluxDelta = gSum(pressureFluxDelta);
-    const scalar sumAbsPressureFluxDelta = gSum(mag(pressureFluxDelta));
-    const scalar maxAbsPressureFluxDelta = gMax(mag(pressureFluxDelta));
 
     accumulatedInterfaceFluxLeakage_ +=
         fluidMesh().time().deltaTValue()*sumEpsilon;
 
     Info<< "Interface pressure flux defect:"
-        << " mode=" << quasiMonolithicInterfaceFluxMode_
         << " sum_epsilon=" << sumEpsilon
         << " sum_abs_epsilon=" << sumAbsEpsilon
         << " max_abs_epsilon=" << maxAbsEpsilon
@@ -1463,20 +1544,43 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
         << " sum_abs_Phi_Gamma=" << sumAbsPhiGamma
         << " rel_g=" << sumAbsEpsilon/(sumAbsPhiG + SMALL)
         << " rel_Gamma=" << sumAbsEpsilon/(sumAbsPhiGamma + SMALL)
-        << " sum_pressure_flux_delta=" << sumPressureFluxDelta
-        << " sum_abs_pressure_flux_delta=" << sumAbsPressureFluxDelta
-        << " max_abs_pressure_flux_delta=" << maxAbsPressureFluxDelta
         << endl;
-}
 
+    // Interface force balance: the force of the fluid on the interface,
+    // integrated over the fluid faces, and the force applied to the solid,
+    // integrated over the solid faces with the areas the solid uses. These
+    // differ only through the interface transfer on a non-conformal interface
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+    const fvPatch& fluidPatch = fluidMesh().boundary()[fluidPatchID];
 
-void newtonQuasiMonolithicCouplingInterface::updateInterfaceMeshPhiHistory()
-{
-    const scalarField phiG(currentInterfaceMeshPhi());
-    initialiseInterfaceMeshPhiHistory(phiG);
+    vectorField fluidTraction
+    (
+      - fluid().patchPressureForce(fluidPatchID)*fluidPatch.nf()
+    );
 
-    interfaceMeshPhiOldOldPtr_() = interfaceMeshPhiOldPtr_();
-    interfaceMeshPhiOldPtr_() = phiG;
+    if (passViscousStress_)
+    {
+        fluidTraction += fluid().patchViscousForce(fluidPatchID);
+    }
+
+    const vector fluidForce = -gSum(fluidTraction*fluidPatch.magSf());
+
+    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+    const solidTractionFvPatchVectorField& solidTractionPatch =
+        refCast<const solidTractionFvPatchVectorField>
+        (
+            solid().D().boundaryField()[solidPatchID]
+        );
+
+    const vector solidForce =
+        gSum(solidTractionPatch.traction()*solidInterfaceMagSf());
+
+    Info<< "Interface force balance:"
+        << " fluid=" << fluidForce
+        << " solid=" << solidForce
+        << " rel_imbalance="
+        << mag(solidForce - fluidForce)/(mag(fluidForce) + VSMALL)
+        << endl;
 }
 
 
@@ -1485,19 +1589,8 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     // Map solid interface motion to the mesh motion interface
 
     // Lookup the interface map from the fluid faces to the solid faces
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
-
-    // Zone-level face map: fluidZoneFace -> solidZoneFace
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    const interfaceToInterfaceMapping& interfaceMap =
+        interfaceToInterfaceList()[0];
 
     // Global patches for parallel face data transfer
     const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
@@ -1525,68 +1618,56 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
 
     // Map the solid interface displacement to the motion interface
-    // In parallel, we broadcast solid data to zone level, map solid->fluid
-    // zone faces, then extract local fluid values
-    if (extrapolateSolidInterfaceDisplacement_)
+    // In parallel, we broadcast solid data to zone level, transfer solid to
+    // fluid zone faces, then extract local fluid values
+    // The boundary value of the solid displacement is extrapolated from the
+    // adjacent cell centres by the solidTraction condition
+    const fvPatchVectorField& solidPatchD =
+        solid().D().boundaryField()[solidPatchID];
+
+    // The solid velocity on the interface is extrapolated from the
+    // adjacent cell centres with the cell gradient, as the solidTraction
+    // condition does for D; the boundary value of the velocity is the
+    // cell value, which would give a first-order interface velocity
+    const volTensorField gradU(fvc::grad(solid().U()));
+    const vectorField solidPatchU
+    (
+        solid().U().boundaryField()[solidPatchID].patchInternalField()
+      + (
+            (
+                solidMesh().boundary()[solidPatchID].Cf()
+              - solidMesh().boundary()[solidPatchID].Cn()
+            )
+          & gradU.boundaryField()[solidPatchID].patchInternalField()
+        )
+    );
+
+    // Broadcast to zone level
+    const vectorField zoneSolidD
+    (
+        solidGlobalPatch.patchFaceToGlobal(solidPatchD)
+    );
+    const vectorField zoneSolidU
+    (
+        solidGlobalPatch.patchFaceToGlobal(solidPatchU)
+    );
+
+    // Transfer from the solid zone to the fluid zone
+    const vectorField fluidZoneD(solidZoneToFluidZone(zoneSolidD));
+    const vectorField fluidZoneU(solidZoneToFluidZone(zoneSolidU));
+
+    // Extract the local fluid values
+    forAll(motionPatchD, fluidFaceI)
     {
-        const fvPatchVectorField& solidPatchD =
-            solid().D().boundaryField()[solidPatchID];
-        const fvPatchVectorField& solidPatchU =
-            solid().U().boundaryField()[solidPatchID];
+        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
 
-        // Broadcast to zone level
-        const vectorField zoneSolidD
-        (
-            solidGlobalPatch.patchFaceToGlobal(solidPatchD)
-        );
-        const vectorField zoneSolidU
-        (
-            solidGlobalPatch.patchFaceToGlobal(solidPatchU)
-        );
-
-        // Map from solid zone to fluid local via zone face mapping
-        forAll(motionPatchD, fluidFaceI)
-        {
-            const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-            const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
-
-            motionPatchD[fluidFaceI] = zoneSolidD[solidZoneFaceI];
-            motionPatchU[fluidFaceI] = zoneSolidU[solidZoneFaceI];
-        }
+        motionPatchD[fluidFaceI] = fluidZoneD[fluidZoneFaceI];
+        motionPatchU[fluidFaceI] = fluidZoneU[fluidZoneFaceI];
     }
-    else
+
+    if (interfaceDOffsetPtr_.valid())
     {
-        const labelList& solidFaceCells =
-            solidMesh().boundary()[solidPatchID].faceCells();
-        const vectorField& solidDI = solid().D();
-        const vectorField& solidUI = solid().U();
-
-        // Build local solid cell-centre D and U, then broadcast to zone level
-        vectorField localSolidCellD(solidMesh().boundary()[solidPatchID].size());
-        vectorField localSolidCellU(solidMesh().boundary()[solidPatchID].size());
-        forAll(localSolidCellD, faceI)
-        {
-            localSolidCellD[faceI] = solidDI[solidFaceCells[faceI]];
-            localSolidCellU[faceI] = solidUI[solidFaceCells[faceI]];
-        }
-
-        const vectorField zoneSolidCellD
-        (
-            solidGlobalPatch.patchFaceToGlobal(localSolidCellD)
-        );
-        const vectorField zoneSolidCellU
-        (
-            solidGlobalPatch.patchFaceToGlobal(localSolidCellU)
-        );
-
-        forAll(motionPatchD, fluidFaceI)
-        {
-            const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-            const label solidZoneFaceI = fluidFaceMap[fluidZoneFaceI];
-
-            motionPatchD[fluidFaceI] = zoneSolidCellD[solidZoneFaceI];
-            motionPatchU[fluidFaceI] = zoneSolidCellU[solidZoneFaceI];
-        }
+        motionPatchD -= interfaceDOffsetPtr_();
     }
 
     if (interfaceToInterfaceList().size() != 1)
@@ -1655,10 +1736,76 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
     // Set the mesh interface pointD
     // Use "==" to reassign fixedValue
-    boundaryFieldRef(motionSolid().pointD())[fluidPatchID] == meshPatchPointD;
+    if (interfacePointDOffsetPtr_.valid())
+    {
+        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
+            meshPatchPointD - interfacePointDOffsetPtr_();
+    }
+    else
+    {
+        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
+            meshPatchPointD;
+    }
 
     // Correct boundary conditions to enforce the new patch values on the
     // internal field
+    motionSolid().pointD().correctBoundaryConditions();
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::setInterfaceDisplacementOffsets()
+{
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+
+    fvPatchVectorField& motionPatchD =
+        boundaryFieldRef(motionSolid().D())[fluidPatchID];
+    fvPatchVectorField& motionPatchU =
+        boundaryFieldRef(motionSolid().U())[fluidPatchID];
+    pointPatchVectorField& motionPatchPointD =
+        boundaryFieldRef(motionSolid().pointD())[fluidPatchID];
+
+    // The mesh motion interface state at the start
+    const vectorField motionD(motionPatchD);
+    const vectorField motionU(motionPatchU);
+    const vectorField motionPointD
+    (
+        refCast<fixedValuePointPatchVectorField>(motionPatchPointD)
+    );
+
+    // The mapped solid interface state at the start
+    interfaceDOffsetPtr_.clear();
+    interfacePointDOffsetPtr_.clear();
+    solid().gradD() = fvc::grad(solid().D());
+    solid().interpolatePointDisplacement
+    (
+        solid().D(), solid().gradD(), solid().pointD()
+    );
+    solid().pointD().correctBoundaryConditions();
+    mapInterfaceSolidToMeshMotion();
+
+    interfaceDOffsetPtr_.reset(new vectorField(motionPatchD - motionD));
+    interfacePointDOffsetPtr_.reset
+    (
+        new vectorField
+        (
+            refCast<fixedValuePointPatchVectorField>(motionPatchPointD)
+          - motionPointD
+        )
+    );
+
+    Info<< "Interface displacement offset between the solid and the fluid "
+        << "mesh at the start: max "
+        << gMax(mag(interfacePointDOffsetPtr_())) << endl;
+
+    // Restore the mesh motion interface state
+    motionPatchD == motionD;
+    if (isA<fixedDisplacementFvPatchVectorField>(motionPatchD))
+    {
+        refCast<fixedDisplacementFvPatchVectorField>(motionPatchD).totalDisp() =
+            motionD;
+    }
+    motionPatchU == motionU;
+    motionPatchPointD == motionPointD;
     motionSolid().pointD().correctBoundaryConditions();
 }
 
@@ -1879,32 +2026,13 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             )
         )
     ),
-    // fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
-    // meshToFluidCoupling_(fsiProperties().lookup("meshToFluidCoupling")),
-    // solidToMeshCoupling_(fsiProperties().lookup("solidToMeshCoupling")),
-    extrapolateSolidInterfaceDisplacement_
-    (
-        fsiProperties().lookupOrDefault<Switch>
-        (
-            "extrapolateSolidInterfaceDisplacement",
-            true
-        )
-    ),
     passViscousStress_(fsiProperties().lookup("passViscousStress")),
-    liuInterfaceCondition_
+    conservativeTractionTransfer_
     (
         fsiProperties().lookupOrDefault<Switch>
         (
-            "liuInterfaceCondition",
+            "conservativeTractionTransfer",
             false
-        )
-    ),
-    quasiMonolithicInterfaceFluxMode_
-    (
-        fsiProperties().lookupOrDefault<word>
-        (
-            "quasiMonolithicInterfaceFluxMode",
-            "oldVelocityHistory"
         )
     ),
     interfaceFluxDiagnostics_
@@ -1915,16 +2043,12 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             false
         )
     ),
-    zeroPressureStabilisationFluxOnFsiInterface_
-    (
-        fsiProperties().lookupOrDefault<Switch>
-        (
-            "zeroPressureStabilisationFluxOnFsiInterface",
-            false
-        )
-    ),
-    interfaceMeshPhiOldPtr_(),
-    interfaceMeshPhiOldOldPtr_(),
+    interfaceDOffsetPtr_(),
+    interfacePointDOffsetPtr_(),
+    fluidFaceSolidFacesPtr_(),
+    fluidFaceSolidWeightsPtr_(),
+    solidFaceFluidFacesPtr_(),
+    solidFaceFluidWeightsPtr_(),
     accumulatedInterfaceFluxLeakage_(0.0),
     nRegions_(2),
     subMatsPtr_(nullptr),
@@ -1976,34 +2100,59 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             << exit(FatalError);
     }
 
-    if (!validInterfaceFluxMode(quasiMonolithicInterfaceFluxMode_))
+    const bool interfacePressureGradient =
+        isA<fixedGradientFvPatchScalarField>
+        (
+            fluid().p().boundaryField()
+            [
+                fluidSolidInterface::fluidPatchIndices()[0]
+            ]
+        );
+
+    if (interfacePressureGradient)
     {
-        FatalErrorInFunction
-            << "Unknown quasiMonolithicInterfaceFluxMode "
-            << quasiMonolithicInterfaceFluxMode_ << nl
-            << "Valid options are oldVelocityHistory, geometricOnly "
-            << "and geometricHistory"
-            << exit(FatalError);
+        Info<< "The fluid interface pressure gradient is set from the normal "
+            << "momentum equation at the interface" << endl;
+    }
+    else
+    {
+        WarningInFunction
+            << "The fluid pressure condition on the interface is not "
+            << "fixedGradient, so the interface pressure and the added mass "
+            << "are only first-order accurate in space. Use a fixedGradient "
+            << "condition, whose gradient the coupling sets from the normal "
+            << "momentum equation" << endl;
     }
 
-    if (zeroPressureStabilisationFluxOnFsiInterface_)
+    if (conservativeTractionTransfer_)
     {
-        refCast<fluidModels::newtonIcoFluid>(fluid())
-           .addZeroPressureStabilisationFluxPatch
+        Info<< "The fluid interface forces are transferred to the solid "
+            << "conservatively" << endl;
+
+        // The transferred forces are divided by the undeformed solid face
+        // areas, so a nonlinear-geometry solid must apply the traction on
+        // these areas
+        const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+        if
+        (
+            solid().nonLinGeom() != nonLinearGeometry::LINEAR_GEOMETRY
+         && !refCast<const solidTractionFvPatchVectorField>
             (
-                fluidSolidInterface::fluidPatchIndices()[0]
-            );
+                solid().D().boundaryField()[solidPatchID]
+            ).useUndeformedArea()
+        )
+        {
+            FatalErrorInFunction
+                << "conservativeTractionTransfer requires the solid interface "
+                << "patch " << solidMesh().boundary()[solidPatchID].name()
+                << " to set 'useUndeformedArea yes'" << exit(FatalError);
+        }
     }
 
     Info<< "fluidSystemScaleFactor = " << fluidSystemScaleFactor_ << nl
         << "solidSystemScaleFactor = " << solidSystemScaleFactor_ << nl
-        << "liuInterfaceCondition = " << liuInterfaceCondition_ << nl
-        << "quasiMonolithicInterfaceFluxMode = "
-        << quasiMonolithicInterfaceFluxMode_ << nl
         << "interfaceFluxDiagnostics = "
-        << interfaceFluxDiagnostics_ << nl
-        << "zeroPressureStabilisationFluxOnFsiInterface = "
-        << zeroPressureStabilisationFluxOnFsiInterface_
+        << interfaceFluxDiagnostics_
         << endl;
 
     // Store old time values
@@ -2013,7 +2162,9 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     fluid().p().storeOldTime();
     solid().U().storeOldTime();
     solid().U().oldTime().storeOldTime();
-    solid().D().storeOldTime();
+    // The solid needs D and its old-time and old-old-time values; allocate
+    // them without shifting a history that was read on a restart
+    solid().D().oldTime().oldTime();
     motionSolid().D().storeOldTime();
     solid().sigma().storeOldTime();
 
@@ -2073,7 +2224,6 @@ void newtonQuasiMonolithicCouplingInterface::setDeltaT(Time& runTime)
         const scalar currentDeltaT = runTime.deltaTValue();
         scalar newDeltaT = currentDeltaT;
 
-        // if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
         if (reason < 0)
         {
             // SNES failed to converge
@@ -2218,6 +2368,11 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
 
     label timeStepRetry = 0;
 
+    if (!interfaceDOffsetPtr_.valid())
+    {
+        setInterfaceDisplacementOffsets();
+    }
+
     while (true)
     {
         const dimensionedScalar& deltaT = time.deltaT();
@@ -2236,8 +2391,11 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         D.correctBoundaryConditions();
         DMotion.correctBoundaryConditions();
 
-        //    (a) Explicitly update the solid displacement field D[n]:
+        //    (a) Explicitly predict the solid displacement field D[n], which
+        //        moves the fluid mesh:
         //          D[n] = D[n-1] + (3*dt/2)*USolid[n-1] - (dt/2)*USolid[n-2]
+        //        After the solve, the solid sets D[n] from the converged
+        //        velocity with the backward scheme
         D = D.oldTime()
           + (3.0*deltaT/2.0)*USolid.oldTime()
           - (deltaT/2.0)*USolid.oldTime().oldTime();
@@ -2464,16 +2622,16 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     );
 
     mapInterfaceSolidToMeshMotion();
-    if (liuInterfaceCondition_)
-    {
-        setLiuInterfaceVelocity();
-    }
-    else
-    {
-        mapInterfaceMotionUToFluidU();
-    }
+    mapInterfaceMotionUToFluidU();
+    setInterfacePressureGradient();
     reportInterfaceFluxDiagnostics();
-    updateInterfaceMeshPhiHistory();
+
+    // Set the solid displacement from the converged velocity: during the
+    // solve, D held the predicted displacement that moved the fluid mesh
+    refCast<solidModels::nonLinGeomTotalLagVelocitySolid>
+    (
+        solid()
+    ).updateDisplacement();
 
     return true;
 }
@@ -2677,8 +2835,6 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     volVectorField& UFluid = fluid().U();
     volScalarField& p = fluid().p();
     volVectorField& USolid = solid().U();
-    // const label fluidSystemEnd = fluidMesh().nCells()*fluidBlockSize;
-    // const label solidFirstEqnID = fluidSystemEnd;
 
 
     // Considerations on the order of updating the fluid, solid, and mesh motion
@@ -2708,23 +2864,27 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
         twoD
     );
 
-    // 1b. When passViscousStress is enabled, update the fluid interface
-    //     velocity from the current USolid BEFORE computing the viscous
-    //     traction. Without this, patchViscousForce computes grad(U) using the
-    //     stale fixedValue boundary from the previous SNES iteration, making
-    //     the residual an inconsistent function of x.
-    if (passViscousStress_)
+    // 1b. When passViscousStress is enabled, or the interface pressure
+    //     gradient is set from the interface acceleration, update the fluid
+    //     interface velocity from the current USolid BEFORE computing the
+    //     traction. Without this, the traction uses the stale interface
+    //     velocity from the previous SNES iteration, making the residual an
+    //     inconsistent function of x.
+    const bool mapInterfaceBeforeTraction =
+        passViscousStress_
+     || isA<fixedGradientFvPatchScalarField>
+        (
+            fluid().p().boundaryField()
+            [
+                fluidSolidInterface::fluidPatchIndices()[0]
+            ]
+        );
+
+    if (mapInterfaceBeforeTraction)
     {
         mapInterfaceSolidToMeshMotion();
-
-        if (liuInterfaceCondition_)
-        {
-            setLiuInterfaceVelocity();
-        }
-        else
-        {
-            mapInterfaceMotionUToFluidU();
-        }
+        mapInterfaceMotionUToFluidU();
+        setInterfacePressureGradient();
     }
 
     // 2. Map the fluid interface traction to the solid interface
@@ -2752,20 +2912,8 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     }
 
     // Lookup the interface map from the fluid faces to the solid faces
-    const interfaceToInterfaceMappings::
-        directMapInterfaceToInterfaceMapping& interfaceMap =
-        refCast
-        <
-            const interfaceToInterfaceMappings::
-            directMapInterfaceToInterfaceMapping
-        >
-        (
-            interfaceToInterfaceList()[0]
-        );
-
-    // Zone-level face map: fluidZoneFace -> solidZoneFace
-    // zoneBToZoneAFaceMap: size = zoneA (fluid), map[fluidZoneFaceI] = solidZoneFaceI
-    const labelList& fluidFaceMap = interfaceMap.zoneBToZoneAFaceMap();
+    const interfaceToInterfaceMapping& interfaceMap =
+        interfaceToInterfaceList()[0];
 
     // Global patch for parallel face data transfer
     const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
@@ -2777,26 +2925,48 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     const label solidPatchID =
         fluidSolidInterface::solidPatchIndices()[0];
 
-    // Broadcast local fluid traction to zone level
     const vectorField negFluidTraction(-fluidTraction);
-    const vectorField zoneFluidTraction
-    (
-        fluidGlobalPatch.patchFaceToGlobal(negFluidTraction)
-    );
+    vectorField solidTraction;
 
-    // Map from fluid zone faces to solid zone faces at zone level
-    vectorField zoneSolidTraction(solidGlobalPatch.globalPatch().size(), vector::zero);
-    forAll(fluidFaceMap, fluidZoneFaceI)
+    if (conservativeTractionTransfer_)
     {
-        zoneSolidTraction[fluidFaceMap[fluidZoneFaceI]] =
-            zoneFluidTraction[fluidZoneFaceI];
-    }
+        // Distribute the fluid face forces to the solid faces with the
+        // transpose of the solid-to-fluid velocity transfer, which conserves
+        // the total force and the interface power, and divide by the
+        // undeformed solid face areas, on which the solid applies them
+        const vectorField fluidForce
+        (
+            negFluidTraction*fluidMesh().boundary()[fluidPatchID].magSf()
+        );
+        const vectorField zoneSolidForce
+        (
+            fluidZoneToSolidZoneTranspose
+            (
+                fluidGlobalPatch.patchFaceToGlobal(fluidForce)()
+            )
+        );
 
-    // Extract local solid traction from zone level
-    const vectorField solidTraction
-    (
-        solidGlobalPatch.globalFaceToPatch(zoneSolidTraction)
-    );
+        solidTraction =
+            solidGlobalPatch.globalFaceToPatch(zoneSolidForce)
+           /solidMesh().boundary()[solidPatchID].magSf();
+    }
+    else
+    {
+        // Broadcast local fluid traction to zone level
+        const vectorField zoneFluidTraction
+        (
+            fluidGlobalPatch.patchFaceToGlobal(negFluidTraction)
+        );
+
+        // Transfer from fluid zone faces to solid zone faces at zone level
+        const vectorField zoneSolidTraction
+        (
+            fluidZoneToSolidZone(zoneFluidTraction)
+        );
+
+        // Extract local solid traction from zone level
+        solidTraction = solidGlobalPatch.globalFaceToPatch(zoneSolidTraction);
+    }
 
     // Lookup the displacement interface traction patch and set the traction
     fvPatchVectorField& solidPatchD =
@@ -2853,19 +3023,11 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
 
 
     // 4. Map the solid interface velocity to the fluid interface
-    //    When liuInterfaceCondition is enabled, the fluid interface velocity
-    //    uses the temporally consistent condition from Liu (2014) Eq.31:
-    //      U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-    //    This is O(dt^2) accurate and ensures energy stability at the FSI
-    //    interface for the BDF2/trapezoidal temporal discretisation.
-    mapInterfaceSolidToMeshMotion();
-
-    if (liuInterfaceCondition_)
+    //    This was already done in step 1b, from the same solution, if
+    //    mapInterfaceBeforeTraction
+    if (!mapInterfaceBeforeTraction)
     {
-        setLiuInterfaceVelocity();
-    }
-    else
-    {
+        mapInterfaceSolidToMeshMotion();
         mapInterfaceMotionUToFluidU();
     }
 
@@ -3214,6 +3376,11 @@ label newtonQuasiMonolithicCouplingInterface::precondition
     const Vec x
 )
 {
+    // Work in progress: this physics-based block preconditioner (pc_type
+    // physics) is not used by any tutorial. On ringAddedMass, the Newton
+    // iterations stall at the first coupled time step with it, whereas the
+    // fieldsplit preconditioner converges in two Newton iterations. It is
+    // kept for further development of a scalable preconditioner
     if (debug)
     {
         InfoInFunction

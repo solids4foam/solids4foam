@@ -1,0 +1,165 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "$FOAM_CASE/system/womersleyCode"
+
+// The exact wall velocity, the time derivative of the exact displacement,
+// i omega times its complex amplitude. The time level (0 to 1 steps before
+// the start time) of the initial fields is read from womersleyTimeLevel
+womersleySolidVelocity
+#{
+    const womersley::mode& m = womersley::lookup(this->db().time());
+    const scalar t = this->db().time().value();
+    const vectorField& Cf = this->patch().Cf();
+    vectorField value(Cf.size());
+    forAll(Cf, faceI)
+    {
+        const vector& C = Cf[faceI];
+        const scalar r = Foam::sqrt(Foam::sqr(C.y()) + Foam::sqr(C.z()));
+        const vector er
+        (
+            r > VSMALL ? vector(0, C.y()/r, C.z()/r) : vector::zero
+        );
+        womersley::cplx ur, ux;
+        m.solid(r, ur, ux);
+        const womersley::cplx w = womersley::cplx(0, m.omega)*m.wave(t, C.x());
+        value[faceI] = std::real(w*ux)*vector(1, 0, 0) + std::real(w*ur)*er;
+    }
+    operator==(value);
+#};
+
+womersleyInitialSolidVelocity
+#{
+    const IOdictionary& d = static_cast<const IOdictionary&>(dict);
+    const fvMesh& mesh = refCast<const fvMesh>(d.db());
+    const womersley::mode& m = womersley::lookup(mesh.time());
+    const scalar t =
+        mesh.time().value()
+      - readScalar(dict.lookup("womersleyTimeLevel"))
+       *mesh.time().deltaTValue();
+    const vectorField& CC = mesh.cellCentres();
+    vectorField value(CC.size());
+    forAll(CC, cellI)
+    {
+        const vector& C = CC[cellI];
+        const scalar r = Foam::sqrt(Foam::sqr(C.y()) + Foam::sqr(C.z()));
+        const vector er
+        (
+            r > VSMALL ? vector(0, C.y()/r, C.z()/r) : vector::zero
+        );
+        womersley::cplx ur, ux;
+        m.solid(r, ur, ux);
+        const womersley::cplx w = womersley::cplx(0, m.omega)*m.wave(t, C.x());
+        value[cellI] = std::real(w*ux)*vector(1, 0, 0) + std::real(w*ur)*er;
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
+womersleyPatchSolidVelocity
+#{
+    const dictionary& top = dict.topDict();
+    const fvMesh& mesh =
+        refCast<const fvMesh>(static_cast<const IOdictionary&>(top).db());
+    const womersley::mode& m = womersley::lookup(mesh.time());
+    const scalar t =
+        mesh.time().value()
+      - readScalar(top.lookup("womersleyTimeLevel"))
+       *mesh.time().deltaTValue();
+    const label patchI = mesh.boundaryMesh().findPatchID(dict.dictName());
+    if (patchI < 0)
+    {
+        FatalErrorInFunction
+            << "No patch " << dict.dictName() << exit(FatalError);
+    }
+    // A copy: faceCentres() returns a temporary sub-field, so a reference
+    // to it would dangle
+    const vectorField Cf(mesh.boundaryMesh()[patchI].faceCentres());
+    vectorField value(Cf.size());
+    forAll(Cf, faceI)
+    {
+        const vector& C = Cf[faceI];
+        const scalar r = Foam::sqrt(Foam::sqr(C.y()) + Foam::sqr(C.z()));
+        const vector er
+        (
+            r > VSMALL ? vector(0, C.y()/r, C.z()/r) : vector::zero
+        );
+        womersley::cplx ur, ux;
+        m.solid(r, ur, ux);
+        const womersley::cplx w = womersley::cplx(0, m.omega)*m.wave(t, C.x());
+        value[faceI] = std::real(w*ux)*vector(1, 0, 0) + std::real(w*ur)*er;
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
+womersleyTimeLevel 0;
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   #codeStream
+{
+    codeInclude     $womersleyCodeInclude;
+    codeOptions     $womersleyCodeOptions;
+    codeLibs        $womersleyCodeLibs;
+    code            $womersleyInitialSolidVelocity;
+};
+
+boundaryField
+{
+    inlet
+    {
+        type            codedFixedValue;
+        value #codeStream
+        {
+            codeInclude     $womersleyCodeInclude;
+            codeOptions     $womersleyCodeOptions;
+            codeLibs        $womersleyCodeLibs;
+            code            $womersleyPatchSolidVelocity;
+        };
+        name            womersleySolidVelocity;
+        codeInclude     $womersleyCodeInclude;
+        code            $womersleySolidVelocity;
+    }
+    outlet
+    {
+        type            codedFixedValue;
+        value #codeStream
+        {
+            codeInclude     $womersleyCodeInclude;
+            codeOptions     $womersleyCodeOptions;
+            codeLibs        $womersleyCodeLibs;
+            code            $womersleyPatchSolidVelocity;
+        };
+        name            womersleySolidVelocity;
+        codeInclude     $womersleyCodeInclude;
+        code            $womersleySolidVelocity;
+    }
+    interface
+    {
+        type            zeroGradient;
+    }
+    outer
+    {
+        type            zeroGradient;
+    }
+    "front|back"
+    {
+        type            wedge;
+    }
+}
+
+// ************************************************************************* //

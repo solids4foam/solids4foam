@@ -27,6 +27,7 @@ License
 #include "fvcGrad.H"
 #include "surfaceInterpolate.H"
 #include "fvcLaplacian.H"
+#include "fvcAverage.H"
 #include "mapPolyMesh.H"
 #include "fvOptions.H"
 #include "motionInterpolation.H"
@@ -53,6 +54,77 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::volScalarField>
+Foam::meshMotionSolidModelFvMotionSolver::makeStiffnessScaleFactor() const
+{
+    if (!coeffDict().found("diffusivity"))
+    {
+        return autoPtr<volScalarField>();
+    }
+
+    const scalar maxFactor =
+        coeffDict().lookupOrDefault<scalar>("maxFactor", 100);
+    const scalar minFactor =
+        coeffDict().lookupOrDefault<scalar>("minFactor", 0.1);
+
+    if (maxFactor < minFactor)
+    {
+        FatalErrorInFunction
+            << "maxFactor cannot be less than minFactor!" << exit(FatalError);
+    }
+
+    autoPtr<motionDiffusivity> diffusivityPtr
+    (
+        motionDiffusivity::New(fvMesh_, coeffDict().lookup("diffusivity"))
+    );
+
+    // Limit the range of the face diffusivity and normalise it by its average
+    surfaceScalarField df("stiffnessScaleFactorf", diffusivityPtr()());
+    const dimensionedScalar avDf = average(df);
+
+    if (avDf.value() < SMALL)
+    {
+        FatalErrorInFunction
+            << "The average mesh motion diffusivity must be positive"
+            << exit(FatalError);
+    }
+
+    df = min(maxFactor*avDf, max(minFactor*avDf, df));
+    df /= avDf;
+
+    autoPtr<volScalarField> dPtr
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "stiffnessScaleFactor",
+                fvMesh_.time().timeName(),
+                fvMesh_,
+                IOobject::NO_READ,
+                Switch(coeffDict().lookupOrDefault<Switch>
+                (
+                    "writeStiffScaleFactor", false
+                ))
+              ? IOobject::AUTO_WRITE
+              : IOobject::NO_WRITE
+            ),
+            fvc::average(df),
+            "zeroGradient"
+        )
+    );
+
+    dPtr->correctBoundaryConditions();
+
+    Info<< "Stiffness scale factor: min " << gMin(dPtr->primitiveField())
+        << ", max " << gMax(dPtr->primitiveField()) << endl;
+
+    return dPtr;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
@@ -63,6 +135,7 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
 :
     displacementMotionSolver(mesh, dict, typeName),
     fvMotionSolver(mesh),
+    stiffnessScaleFactorPtr_(makeStiffnessScaleFactor()),
     modelPtr_
     (
         solidModel::New
@@ -85,6 +158,7 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
 :
     displacementMotionSolver(mesh, dict, pointDisplacement, points0, typeName),
     fvMotionSolver(mesh),
+    stiffnessScaleFactorPtr_(makeStiffnessScaleFactor()),
     modelPtr_
     (
         solidModel::New

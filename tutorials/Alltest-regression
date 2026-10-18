@@ -181,6 +181,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/perpendicularFlap"
     "fluidSolidInteraction/TurekHron2006"
     "fluidSolidInteraction/mokLidDrivenCavity"
+    "fluidSolidInteraction/channelLeaflet"
     "fluidSolidInteraction/fillingElasticContainer"
     "fluidSolidInteraction/hessenthalerFsi"
     "fluidSolidInteraction/membraneRoof"

@@ -681,6 +681,46 @@ void amiInterfaceToInterfaceMapping::transferPointsZoneToZone
 }
 
 
+void amiInterfaceToInterfaceMapping::zoneToZoneFaceWeights
+(
+    const standAlonePatch& fromZone,
+    const standAlonePatch& toZone,
+    labelListList& addressing,
+    scalarListList& weights
+) const
+{
+#ifdef OPENFOAM_COM
+    // The addressing refers to the zone faces only if the interpolator is
+    // not distributed
+    if (interpolator().distributed())
+    {
+        FatalErrorInFunction
+            << "The face transfer weights are not available for a "
+            << "distributed AMI" << abort(FatalError);
+    }
+#endif
+
+    // Check if fromZone is zoneA (AMI source) or zoneB (AMI target) by
+    // checking the memory address: interpolateToTarget uses the target
+    // addressing and weights, and interpolateToSource the source ones
+    if (&fromZone == &zoneA() && &toZone == &zoneB())
+    {
+        addressing = interpolator().tgtAddress();
+        weights = interpolator().tgtWeights();
+    }
+    else if (&toZone == &zoneA() && &fromZone == &zoneB())
+    {
+        addressing = interpolator().srcAddress();
+        weights = interpolator().srcWeights();
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown zones!" << abort(FatalError);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace interfaceToInterfaceMappings
