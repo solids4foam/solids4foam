@@ -46,8 +46,12 @@ source solids4FoamScripts.sh
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
+# GNU sed, for the in-place edit below
+solids4Foam::requireGnuSed
+
 # Set the requested fluid model before running the solver
-sed -i "s/^fluidModel .*/fluidModel ${fluidModel};/" constant/fluidProperties
+"${SOLIDS4FOAM_SED}" -i "s/^fluidModel .*/fluidModel ${fluidModel};/" \
+    constant/fluidProperties
 
 # Create the mesh
 solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh

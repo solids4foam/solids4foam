@@ -88,13 +88,13 @@ models are available:
 ```
 
 The `Allrun` script patches `constant/fluidProperties` to select the requested
-fluid model before running, and restores the default (`pimpleFluid`) on exit.
+fluid model before running; `./Allclean` restores the default (`pimpleFluid`).
 The mesh in Fluent format is converted to OpenFOAM format first, and a
 `force.pdf` plot is generated afterwards if `gnuplot` is installed.
 
 ```tip
 Remember that a tutorial case can be cleaned and reset using the included
- `Allrun` script, i.e. `./Allclean`.
+ `Allclean` script, i.e. `./Allclean`.
 ```
 
 ---

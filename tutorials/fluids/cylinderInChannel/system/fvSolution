@@ -108,18 +108,9 @@ solvers
 PIMPLE
 {
     momentumPredictor   on;
-    nOuterCorrectors    20;
+    nOuterCorrectors    2;
     nCorrectors         3;
     nNonOrthogonalCorrectors 1;
-
-    residualControl
-    {
-        "U|p"
-        {
-            tolerance    1e-6;
-            relTol       0.01;
-        }
-    }
 }
 
 // ************************************************************************* //
