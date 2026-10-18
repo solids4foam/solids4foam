@@ -327,7 +327,8 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         ),
         mesh,
         dimensionedVector("0", dimless/dimLength, vector::zero)
-    )
+    ),
+    nRankDeficientWarned_(0)
 {
     calcLeastSquaresVectors();
 }
@@ -378,7 +379,8 @@ Foam::leastSquaresS4fVectors::leastSquaresS4fVectors
         ),
         mesh,
         dimensionedVector("zero", dimless/dimLength, vector::zero)
-    )
+    ),
+    nRankDeficientWarned_(0)
 {
     calcLeastSquaresVectors();
 }
@@ -929,21 +931,34 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     if (nStillSingular > 0 && !multiMaterial)
     {
         // With a single material nothing has been filtered, so the stencil is
-        // the one this scheme used before the filtering arrived. A body one
-        // cell thick in some direction produces this in serial - the striker
-        // in pipeCrush is a single row of cells - and a point-cell stencil
-        // truncated at a processor boundary can produce it in parallel.
-        // Neither is new, so neither is fatal: the gradient is reconstructed
-        // in the directions the stencil spans and is zero along the others
-        WarningInFunction
-            << nStillSingular
-            << " cells remain rank-deficient after widening the gradient"
-            << " stencil to point neighbours." << nl
-            << "    Worst on this processor: cell " << worstCell
-            << ", smallest eigenvalue ratio " << worstRatio << nl
-            << "    Either the body is one cell thick in some direction or, in"
-            << " parallel, the point-cell stencil is truncated at a processor"
-            << " boundary." << endl;
+        // the one this scheme used before the filtering arrived, and so is the
+        // answer. A body one cell thick in some direction produces this in
+        // serial - the striker in pipeCrush is a single row of cells - and a
+        // point-cell stencil truncated at a processor boundary can produce it
+        // in parallel. Neither is new, so neither is fatal.
+        //
+        // The vectors are recomputed on every mesh change, so rather than
+        // warning once per time step, the warning is repeated only when the
+        // number of such cells has grown since it was last issued, which
+        // points to mesh degradation rather than to the geometry. With debug
+        // set it is issued on every recomputation
+        if (debug || nStillSingular > nRankDeficientWarned_)
+        {
+            WarningInFunction
+                << nStillSingular
+                << " cells remain rank-deficient after widening the gradient"
+                << " stencil to point neighbours." << nl
+                << "    Worst on this processor: cell " << worstCell
+                << ", smallest eigenvalue ratio " << worstRatio << nl
+                << "    Either the body is one cell thick in some direction"
+                << " or, in parallel, the point-cell stencil is truncated at"
+                << " a processor boundary." << nl
+                << "    This warning is repeated only if the number of such"
+                << " cells grows when the vectors are recomputed on mesh"
+                << " changes." << endl;
+
+            nRankDeficientWarned_ = nStillSingular;
+        }
     }
     else if (nStillSingular > 0)
     {
