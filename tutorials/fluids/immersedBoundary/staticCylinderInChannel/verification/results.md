@@ -26,6 +26,44 @@ settings of the four formulations, and compares them on the four mesh levels
 of the tutorial. Every case uses a fixed time step of 0.001 s, taken from the
 Courant number of Level 4 (`calibration.md`), and `nCorrectors 3`.
 
+## Summary figures
+
+![Legacy incremental sensitivity](images/legacy_incremental_sensitivity.png)
+
+**Legacy incremental sensitivity.** Drag of the legacy incremental
+formulation on L2 (20 cells/D) and L4 (80 cells/D), against:
+
+- (a) the outer correctors, with `couplingCoeff 0.2` and `deltaT = 1 ms`;
+- (b) the coupling coefficient, with `nOuterCorrectors 5` and
+  `deltaT = 1 ms`;
+- (c) the time step, with `couplingCoeff 0.2` and `nOuterCorrectors 5`.
+
+Hollow markers are limit cycles, and dotted lines mark the frozen settings.
+The `n_outer = 1` points are the common-settings incremental baseline.
+`nOuterCorrectors 5` is the historical setting. It does not establish
+independence from the outer iterations: the drag still changes between 5
+and 7 outer correctors.
+
+![Four-method comparison](images/four_method_comparison.png)
+
+**Four-method comparison.** (a) Drag and (b) CPU hours of `cutLink`,
+`ghostCell`, `penalty` and legacy incremental on L1-L4. All four use the
+same non-body-fitted background meshes, `deltaT = 1 ms` and `nCorrectors
+3`. `cutLink`, `ghostCell` and `penalty` use `nOuterCorrectors 1`; legacy
+incremental uses `nOuterCorrectors 5` with `couplingCoeff 0.2`.
+
+The inset in (a) enlarges L3-L4. The band is the Schäfer and Turek (1996)
+range and the dashed line is `C_d = 5.57953523384`, a high-precision
+numerical benchmark value, not an analytical solution. In (b) the marker
+fills are translucent, so that overlapping markers stay visible. The only
+limit cycle is the legacy incremental point on L4, drawn with a hollow
+marker.
+
+These previews were rendered from LaTeX/PGFPlots figures built from the
+same data as `reference/*.csv`. `python3 scripts/plot_publication_figures.py`
+regenerates equivalent Matplotlib figures from the tracked CSVs; they differ
+in style only.
+
 ## Meshes
 
 Each case runs `blockMesh` on the tutorial's `system/blockMeshDict`, with

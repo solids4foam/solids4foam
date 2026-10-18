@@ -17,9 +17,30 @@ the tutorial in drag and cost. It is not run by `tutorials/Alltest` or
 | `calibration.md` | time step and rank calibration |
 | `reference/*.csv` | compact results of every case (tracked) |
 | `images/mesh_L2_closeup.png` | the L2 mesh around the cylinder (tracked preview, `scripts/plot_mesh.py`) |
+| `images/legacy_incremental_sensitivity.png`, `images/four_method_comparison.png` | summary figures (tracked previews, see below) |
 | `scripts/` | case generation, analysis, export and figures |
 | `.gitignore` | keeps `work/`, `postProcessing/`, job output and logs untracked |
 | `work/`, `postProcessing/` | generated cases, results and figures (not tracked) |
+
+## Summary figures
+
+![Legacy incremental sensitivity](images/legacy_incremental_sensitivity.png)
+
+The legacy incremental drag on L2 and L4 against (a) the outer correctors,
+(b) the coupling coefficient and (c) the time step. Five outer correctors
+are the historical setting; they do not make the drag independent of the
+outer iterations.
+
+![Four-method comparison](images/four_method_comparison.png)
+
+(a) Drag and (b) CPU hours of the four formulations on the identical
+non-body-fitted L1-L4 meshes. `cutLink`, `ghostCell` and `penalty` use
+`nOuterCorrectors 1` and legacy incremental uses `nOuterCorrectors 5`. The
+reference drag is a numerical benchmark value, not an analytical solution.
+
+Hollow markers are limit cycles. The full captions are in `results.md`.
+`scripts/plot_publication_figures.py` regenerates the same data from
+`reference/*.csv`.
 
 ## Frozen settings
 
