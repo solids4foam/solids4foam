@@ -13,9 +13,10 @@ echo "optionalFixes/Allcheck"
 
 # Function for the checking and reporting how to replace a file
 # Arguments:
-#   $1  - File name
-#   $2  - Target path, without the file name and the slash at the end
-#   $3  - Path to library to be re-built
+#   $1  - Directory in optionalFixes containing the replacement file
+#   $2  - File name
+#   $3  - Target path, without the file name and the slash at the end
+#   $4  - Path to library to be re-built
 #
 checkAndReport()
 {
@@ -84,6 +85,14 @@ then
         "$FOAM_SRC/finiteVolume"
     if [ $? -ne 0 ]; then result=1; fi
 
+    # This corrects the backward scheme for a moving mesh
+    checkAndReport \
+        "foam-extend-4.1" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
+    if [ $? -ne 0 ]; then result=1; fi
+
     # Fix time index storage in the storeOldTimes function
     checkAndReport \
         "foam-extend-4.1" \
@@ -93,29 +102,23 @@ then
     if [ $? -ne 0 ]; then result=1; fi
 elif [[ $WM_PROJECT_VERSION == v* ]]
 then
-    # Fix time index storage in the storeOldTimes function
-    if [ "${WM_PROJECT_VERSION:1}" -ge 2412 ]
-    then
-        checkAndReport \
-            "OpenFOAM-v2412" \
-            "backwardDdtScheme.C" \
-            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-            "$FOAM_SRC/finiteVolume"
-    else
-        checkAndReport \
-            "OpenFOAM-v2012" \
-            "backwardDdtScheme.C" \
-            "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-            "$FOAM_SRC/finiteVolume"
-    fi
+    # Fix the start-up of the backward scheme: use Euler only while the
+    # field has no old-old time level, rather than for the first time step
+    # of the run. The same file is used for all supported OpenFOAM.com
+    # versions (v2312 to v2606), where the upstream file is identical.
+    checkAndReport \
+        "OpenFOAM.com" \
+        "backwardDdtScheme.C" \
+        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
+        "$FOAM_SRC/finiteVolume"
     if [ $? -ne 0 ]; then result=1; fi
 else
     # Fix required for newer compilers
     checkAndReport \
         "OpenFOAM-9" \
         "FixedList.C" \
-        "$FOAM_SRC/foam/containers/Lists/FixedList" \
-        "$FOAM_SRC/foam"
+        "$FOAM_SRC/OpenFOAM/containers/Lists/FixedList" \
+        "$FOAM_SRC/OpenFOAM"
     if [ $? -ne 0 ]; then result=1; fi
 
     # Fix time index storage in the storeOldTimes function
@@ -126,7 +129,7 @@ else
         "$FOAM_SRC/OpenFOAM"
     if [ $? -ne 0 ]; then result=1; fi
 
-    # Fix time index storage in the storeOldTimes function
+    # This corrects the backward scheme for a moving mesh
     checkAndReport \
         "OpenFOAM-9" \
         "backwardDdtScheme.C" \
