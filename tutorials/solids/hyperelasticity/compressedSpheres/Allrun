@@ -9,16 +9,22 @@ source solids4FoamScripts.sh
 usage() {
 cat <<'USAGE'
 Usage:
-  ./Allrun [contact]
+  ./Allrun [contact] [mesh]
 
 Where [contact] is one of:
   frictionless      (default) frictionless contact between the spheres
   friction          Coulomb friction (mu = 0.5) between the spheres
 
+Where [mesh] is one of:
+  coarse            (default) 682 cells, shipped with the tutorial
+  medium            2 122 cells, downloaded from the solids4foam website
+  fine              4 042 cells, downloaded from the solids4foam website
+
 Examples:
   ./Allrun
   ./Allrun frictionless
   ./Allrun friction
+  ./Allrun friction fine
 USAGE
 }
 
@@ -29,12 +35,16 @@ then
 fi
 
 CONTACT=frictionless
+MESH=coarse
 
 for arg in "$@"
 do
     case "$arg" in
         frictionless|friction)
             CONTACT="$arg"
+            ;;
+        coarse|medium|fine)
+            MESH="$arg"
             ;;
         *)
             echo "Error: Unknown argument '$arg'"
@@ -70,10 +80,39 @@ link_files_for_suffix "${CONTACT}"
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-# Extract the mesh (coarse quarter-symmetry mesh, dimensions in m)
-echo "Extracting the mesh from coarseMesh.tar.xz"
+# Extract the quarter-symmetry mesh
 rm -rf constant/polyMesh
-tar -xJf coarseMesh.tar.xz -C constant
+if [[ "$MESH" == "coarse" ]]
+then
+    # The coarse mesh is stored with dimensions in m
+    echo "Extracting the mesh from coarseMesh.tar.xz"
+    tar -xJf coarseMesh.tar.xz -C constant
+else
+    # The finer meshes are stored on the solids4foam website, with dimensions
+    # in mm
+    ARCHIVE="compressedSpheres-${MESH}Mesh.tar.xz"
+    URL="https://www.solids4foam.com/tutorials/archive/${ARCHIVE}"
+    if [[ ! -f "${ARCHIVE}" ]]
+    then
+        echo "Downloading ${URL}"
+        if command -v curl &> /dev/null
+        then
+            curl -fsSL -o "${ARCHIVE}" "${URL}" || rm -f "${ARCHIVE}"
+        elif command -v wget &> /dev/null
+        then
+            wget -q -O "${ARCHIVE}" "${URL}" || rm -f "${ARCHIVE}"
+        fi
+    fi
+    if [[ ! -f "${ARCHIVE}" ]]
+    then
+        echo "Error: could not download ${URL}"
+        echo "Download it manually into this directory and run Allrun again"
+        exit 1
+    fi
+    echo "Extracting the mesh from ${ARCHIVE}"
+    tar -xJf "${ARCHIVE}" -C constant
+    solids4Foam::runApplication transformPoints -scale "(0.001 0.001 0.001)"
+fi
 
 # Run solver
 solids4Foam::runApplication solids4Foam

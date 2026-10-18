@@ -51,8 +51,17 @@ archive `coarseMesh.tar.xz`. On this mesh, beyond a displacement of about
 increments, and the solution diverges at about 8.6 mm. The tutorial is therefore
 run to a displacement of 7.5 mm (`endTime 0.75` in `system/controlDict`), which
 covers the initial loading phase, the buckling and the post-buckling recovery of
-the force. The finer meshes used in the original study are available in the
-`solid-benchmarks` repository (`hyperElasticity/compressedSpheres/meshes`).
+the force.
+
+The two finer meshes of the original study, with 2 122 and 4 042 cells, are
+stored on the solids4foam website
+([medium](https://www.solids4foam.com/tutorials/archive/compressedSpheres-mediumMesh.tar.xz),
+[fine](https://www.solids4foam.com/tutorials/archive/compressedSpheres-fineMesh.tar.xz))
+and can be selected with the `medium` and `fine` options of `Allrun` (see
+below). These meshes are stored with dimensions in mm, so `Allrun` scales them
+to m with `transformPoints`. The tutorial settings, including the end time,
+were chosen for the coarse mesh and have not been retuned for the finer
+meshes.
 
 ![Figure 1: Problem geometry and computational mesh [1]](./images/compressedSpheres-geometry.png)
 
@@ -74,12 +83,17 @@ be run using the included `Allrun` script, i.e.
 ```bash
 > ./Allrun              # frictionless contact between the spheres (default)
 > ./Allrun friction     # Coulomb friction (mu = 0.5) between the spheres
+> ./Allrun friction fine    # frictional contact on the 4 042-cell mesh
 ```
+
+The optional mesh argument is `coarse` (the default), `medium` or `fine`. The
+`medium` and `fine` meshes are downloaded from the solids4foam website with
+`curl` or `wget` if their archive is not already in the case directory.
 
 The `Allrun` script links the `0/DD`, `system/fvSchemes` and
 `system/fvSolution` files to their `.frictionless` or `.friction` variants,
-converts the case to the foam-extend format, extracts the mesh from
-`coarseMesh.tar.xz` into `constant/polyMesh`, and runs the `solids4Foam`
+converts the case to the foam-extend format, extracts the selected mesh into
+`constant/polyMesh`, and runs the `solids4Foam`
 solver. The compression force on the outer sphere, from its contact with the
 upper rigid plane, is written to `postProcessing/0/solidForcesR_top.dat`
 (columns: time, force components and normal force, in N); the force on the
@@ -90,7 +104,8 @@ compression force is plotted against the published solutions in
 3.5 minutes and the frictional case about 4.5 minutes.
 
 To run a different variant, first clean the case with `./Allclean`, which also
-removes the extracted mesh and the links created by `Allrun`.
+removes the extracted mesh, any downloaded mesh archive and the links created
+by `Allrun`.
 
 ---
 

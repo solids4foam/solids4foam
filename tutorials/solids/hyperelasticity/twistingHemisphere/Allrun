@@ -6,20 +6,81 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+usage() {
+cat <<'USAGE'
+Usage:
+  ./Allrun [mesh]
+
+Where [mesh] is one of:
+  coarse            (default) 2 349 cells, shipped with the tutorial
+  medium            24 000 cells, downloaded from the solids4foam website
+  paper             35 424 cells, the mesh of the published results,
+                    downloaded from the solids4foam website
+  fine              43 488 cells, downloaded from the solids4foam website
+
+Examples:
+  ./Allrun
+  ./Allrun paper
+USAGE
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]
+then
+    usage
+    exit 0
+fi
+
+MESH="${1:-coarse}"
+
+case "$MESH" in
+    coarse|medium|paper|fine) ;;
+    *)
+        echo "Error: Unknown mesh '$MESH'"
+        usage
+        exit 1
+        ;;
+esac
+
 # Check version
 solids4Foam::caseOnlyRunsWithFoamExtend
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
-# Unpack the coarse mesh (2 349 cells)
-echo "Unpacking constant/polyMesh_coarse.tar.xz"
 \rm -rf constant/polyMesh
-tar -xJf constant/polyMesh_coarse.tar.xz -C constant
+if [[ "$MESH" == "coarse" ]]
+then
+    # Unpack the coarse mesh (2 349 cells)
+    echo "Unpacking constant/polyMesh_coarse.tar.xz"
+    tar -xJf constant/polyMesh_coarse.tar.xz -C constant
 
-# The coarse mesh is stored with L = 0.002; scale it to L = 2, the length
-# unit used by the boundary conditions and the reference data
-solids4Foam::runApplication transformPoints -scale "(1000 1000 1000)"
+    # The coarse mesh is stored with L = 0.002; scale it to L = 2, the length
+    # unit used by the boundary conditions and the reference data
+    solids4Foam::runApplication transformPoints -scale "(1000 1000 1000)"
+else
+    # The finer meshes are stored on the solids4foam website, with L = 2
+    ARCHIVE="twistingHemisphere-${MESH}Mesh.tar.xz"
+    URL="https://www.solids4foam.com/tutorials/archive/${ARCHIVE}"
+    if [[ ! -f "${ARCHIVE}" ]]
+    then
+        echo "Downloading ${URL}"
+        if command -v curl &> /dev/null
+        then
+            curl -fsSL -o "${ARCHIVE}" "${URL}" || rm -f "${ARCHIVE}"
+        elif command -v wget &> /dev/null
+        then
+            wget -q -O "${ARCHIVE}" "${URL}" || rm -f "${ARCHIVE}"
+        fi
+    fi
+    if [[ ! -f "${ARCHIVE}" ]]
+    then
+        echo "Error: could not download ${URL}"
+        echo "Download it manually into this directory and run Allrun again"
+        exit 1
+    fi
+    echo "Unpacking ${ARCHIVE}"
+    tar -xJf "${ARCHIVE}" -C constant
+fi
 
 # Run solver
 solids4Foam::runApplication solids4Foam

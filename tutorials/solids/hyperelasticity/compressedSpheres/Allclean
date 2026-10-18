@@ -13,6 +13,9 @@ cleanCase
 # Remove the links created by Allrun for the selected contact settings
 \rm -f 0/DD system/fvSchemes system/fvSolution
 
+# Remove the finer meshes downloaded by Allrun
+\rm -f compressedSpheres-*Mesh.tar.xz
+
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
 

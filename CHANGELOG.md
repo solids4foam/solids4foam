@@ -8,6 +8,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Cook's membrane verification studies now store the per-mesh tip
+  displacements of the published references migrated from solid-benchmarks
+  (Simo and Armero, César de Sá et al., Areias and Abaqus for the
+  elastoplastic case; Zienkiewicz and Taylor and Abaqus for the linear-elastic
+  case), list them in the summary and plot them against the sweep. The
+  elastoplastic tutorial gains an unstructured triangular-prism Gmsh mesh
+  (`./Allrun triangular`), which its study sweeps with `--mesh triangular`.
+- The `compressedSpheres` and `twistingHemisphere` tutorials can run on the
+  finer meshes of the original benchmarks (`./Allrun fine`, for example),
+  which `Allrun` downloads from the solids4foam website.
 - Added the `channelLeaflet` fluid-solid interaction tutorial: a thin
   elastic leaflet, clamped in a 2D channel and wetted on both faces, in a
   pulsatile flow at Re = 200, after the oomph-lib channel-with-leaflet

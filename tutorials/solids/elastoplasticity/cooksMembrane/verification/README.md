@@ -30,6 +30,25 @@ minutes on an Apple M1 Max reference machine with OpenFOAM-v2512. The quick
 mode checks only that all requested cases finish and produce finite
 displacement values.
 
+The default sweep uses structured quadrilateral meshes. The tutorial can also
+be run on an unstructured triangular-prism mesh created by Gmsh from
+`cooksMembrane.geo` (`./Allrun triangular`), and `./Allverify --mesh
+triangular` sweeps that family instead. Its levels are the nominal Gmsh
+spacings of the legacy study, 25 mm halved at each level, and the default
+levels `2, 3, 4, 5, 6` give 31, 119, 413, 1 591 and 6 323 cells with Gmsh
+4.15. The triangular family requires `gmsh`, `gmshToFoam` and
+`changeDictionary`, uses the same pass criterion as the structured family, and
+writes its outputs with a `triangular_` prefix.
+
+The per-mesh tip displacements of the four published sources of the legacy
+study are stored in `reference/` as CSV files: Simo and Armero (Q1/P0 and
+Q1/E4 elements), César de Sá et al. (Q4, Q1E4 and Qi6), Areias (Simplas,
+δ and α), and Abaqus (CPE4H). The summary lists the finest value of each
+series and its difference from the finest solids4foam result, and, when
+`gnuplot` is available, `cooksMembrane_mesh_convergence.pdf` plots the sweep
+against all series as a function of the average cell spacing. These series
+are reported for comparison only and do not enter the pass criterion.
+
 `verification/Allclean` removes the generated `work/` and `postProcessing/`
 directories, as does `./Allclean all` in the case directory; the plain case
 `./Allclean` keeps them.
