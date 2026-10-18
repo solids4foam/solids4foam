@@ -131,16 +131,28 @@ generated:
 
 The fields are set to the exact solution at $$t = 0$$ (and the solid's old-time
 displacements at $$-\Delta t$$, $$-2 \Delta t$$ and $$-3 \Delta t$$, as the
-`backward` d2dt2 scheme applies the backward ddt twice), so there is no
-start-up ramp. A small start-up transient remains, of about 0.5% in the wall
-displacement over the first period, and it grows as the time-step is reduced.
-Its source has not been pinned down. One candidate is that the initial point
-displacement is the exact value at the points, which differs slightly from
-the solid model's interpolation of the cell values that moves the fluid mesh
-from the first time-step on; a mismatch of this kind would grow as the
-time-step is reduced. The transient decays slowly, so the driver runs six
-periods and analyses the last two; `periodicity` is the change in the wall
-displacement coefficient from the fifth to the sixth period.
+`backward` d2dt2 scheme applies the backward ddt twice), in the cells and on
+the boundaries, so there is no start-up ramp. The boundary values of the
+old-time displacements matter with Robin-Neumann coupling, which imposes the
+solid's boundary acceleration on the fluid: with the placeholder zero values
+an earlier version had, the first-period transient grew as the time-step was
+reduced (to 3.4% of the amplitude at 400 steps per period); with exact values
+it is 0.2-0.3% from 100 to 400 steps per period (1.6% at 50, a resolution
+effect) (`womersley_temporal_investigation.md`, sections 6.2 and 15). The
+transient decays slowly, so the driver runs six periods and analyses the last
+two; `periodicity` is the change in the wall displacement coefficient from the
+fifth to the sixth period.
+
+At the tube ends the pressure is fixed and the velocity condition (mixed,
+imposing the gradient) fixes the boundary value, so without further
+treatment the pressure equation's end flux differs from the boundary
+velocity flux by a term proportional to the time-step, which limits the
+time-step study to first order. The tutorial uses the `pimpleFluid` entry
+`fluxConsistentPatches (inlet outlet);`, which makes the end flux consistent
+with the boundary velocity to O(Δt h): the observed time order is then two
+over the study's steps and under joint refinement, while at a fixed mesh it
+would tend to one at much smaller steps (beyond about 6400 steps per period on
+the tutorial mesh; `womersley_temporal_investigation.md`, section 15).
 
 ### Why the wall is not tethered
 
@@ -211,11 +223,11 @@ coefficients read by the tutorial, `--write-case <tutorial>`.
 The mesh study refines every direction together by factors of 1, 2 and 4 from
 32 axial cells, 10 radial fluid cells and 4 cells through the wall, at 200
 time-steps per period; the tutorial mesh is the middle one. The time-step
-study uses 50, 100 and 200 steps per period on the tutorial mesh. Both use the
-Robin-Neumann coupling, which is about twice as fast as IQN-ILS here. The
+study uses 50, 100, 200 and 400 steps per period on the tutorial mesh. Both use
+the Robin-Neumann coupling, which is about twice as fast as IQN-ILS here. The
 coupling comparison runs both couplings on the tutorial mesh at 100 steps per
-period. The runs take 2.5 to 25 minutes each in serial; the whole study takes
-about 30 minutes with `--cores 5`.
+period. The seven runs take 4 to 37 minutes each in serial; the whole study
+takes about 40 minutes with `--cores 7`.
 
 ### Measured quantities
 
@@ -236,62 +248,68 @@ amplitude:
 
 ## Results
 
-OpenFOAM-v2412 on macOS (arm64). Errors are relative, and phases in radians.
+OpenFOAM-v2512 on Linux (x86_64), solids4foam with `fluxConsistentPatches`.
+Errors are relative, and phases in radians.
 
 | Case | profile | flow_amp | flow_phase | wallMid_amp |
 |---|---:|---:|---:|---:|
-| m1, n200 | 1.78e-2 | 5.62e-3 | 6.24e-3 | -9.73e-3 |
-| m2, n200 | 4.91e-3 | 4.40e-4 | 1.31e-3 | -1.09e-3 |
-| m4, n200 | 1.18e-3 | -7.15e-4 | 1.53e-5 | 8.57e-4 |
-| m2, n50 | 7.05e-3 | -2.06e-3 | 1.23e-4 | 7.14e-3 |
-| m2, n100 | 4.90e-3 | -1.69e-4 | 1.05e-3 | 8.40e-4 |
-| m2, n100, IQN-ILS | 4.91e-3 | -1.41e-4 | 1.06e-3 | 1.12e-3 |
+| m1, n200 | 1.79e-2 | 6.10e-3 | 6.05e-3 | -1.03e-2 |
+| m2, n200 | 4.96e-3 | 9.39e-4 | 1.33e-3 | -2.19e-3 |
+| m4, n200 | 1.20e-3 | -3.09e-4 | 8.23e-5 | -1.76e-4 |
+| m2, n50 | 6.18e-3 | -1.23e-3 | 1.43e-4 | 5.28e-3 |
+| m2, n100 | 4.98e-3 | 5.14e-4 | 1.07e-3 | -6.63e-4 |
+| m2, n400 | 4.95e-3 | 1.04e-3 | 1.40e-3 | -2.58e-3 |
+| m2, n100, IQN-ILS | 4.98e-3 | 5.48e-4 | 1.09e-3 | -4.47e-4 |
 
 | Case | wallMid_phase | speed | attenuation | Iter./step |
 |---|---:|---:|---:|---:|
-| m1, n200 | -3.71e-3 | -1.80e-3 | -8.46e-3 | 12.3 |
-| m2, n200 | -2.50e-3 | 4.83e-4 | -6.04e-3 | 10.3 |
-| m4, n200 | -1.88e-3 | 8.93e-4 | -4.47e-3 | 7.9 |
-| m2, n50 | -7.87e-3 | 2.97e-3 | -1.99e-2 | 10.4 |
-| m2, n100 | -3.74e-3 | 1.21e-3 | -9.63e-3 | 8.7 |
-| m2, n100, IQN-ILS | -3.64e-3 | 1.27e-3 | -9.46e-3 | 14.8 |
+| m1, n200 | -2.37e-3 | -2.33e-3 | -2.08e-3 | 12.8 |
+| m2, n200 | -1.48e-3 | -4.50e-4 | -2.18e-3 | 11.0 |
+| m4, n200 | -1.15e-3 | 1.40e-5 | -1.96e-3 | 8.4 |
+| m2, n50 | -6.12e-3 | 1.41e-3 | -1.31e-2 | 10.3 |
+| m2, n100 | -2.34e-3 | -6.62e-5 | -4.24e-3 | 9.3 |
+| m2, n400 | -1.28e-3 | -5.48e-4 | -1.69e-3 | 9.5 |
+| m2, n100, IQN-ILS | -2.40e-3 | -3.72e-5 | -4.41e-3 | 14.6 |
 
 `m` is the mesh factor and `n` the number of time-steps per period; the runs
 use the Robin-Neumann coupling unless stated. The change in the wall
 displacement coefficient from the fifth to the sixth period is below
-$$10^{-4}$$ in every run.
+$$7 \times 10^{-5}$$ in every run.
 
 ### Observed orders
 
-| Quantity | Mesh | Time step |
+| Quantity | Mesh | Time step (50/100/200, 100/200/400) |
 |---|---:|---:|
-| profile | 2.06 | – |
-| flow_amp | 2.16 | 1.64 |
-| flow_phase | 1.92 | 1.84 |
-| wallMid_amp | 2.15 | 1.71 |
-| wallMid_phase | 0.97 | 1.74 |
-| speed | 2.48 | 1.29 |
-| attenuation | 0.63 | 1.51 |
+| profile | 2.04 | – |
+| flow_amp | 2.05 | 2.04, 2.05 |
+| flow_phase | 1.92 | 1.86, 1.91 |
+| wallMid_amp | 2.01 | 1.96, 1.97 |
+| wallMid_phase | 1.40 | 2.14, 2.06 |
+| speed | 2.02 | 1.94, 1.97 |
+| attenuation | – | 2.10, 2.07 |
 
 The profile order is from its errors on the two finest meshes. The other
-orders are from the differences between the three runs of a series, which
-cancel the error the series shares, such as the time error of the mesh study
-(at 200 steps per period it is of the same size as the mesh error on the
-finest mesh).
+orders are from the differences between three successive runs of a series,
+which cancel the error the series shares, such as the time error of the mesh
+study.
 
 - The velocity profile, the flow rate, the wall displacement amplitude and the
-  wave speed converge at second order in space.
-- The wall displacement phase and the attenuation converge more slowly, at
-  about first order, and the attenuation error is the largest, -0.45% on the
-  finest mesh. $$\mathrm{Im}(k)$$ is only 14% of $$\mathrm{Re}(k)$$, so a given
-  error in the fitted wave number is seven times larger relative to
-  $$\mathrm{Im}(k)$$.
-- In time, the orders are 1.3 to 1.8, below the nominal second order of the
-  `backward` scheme, which is used in both regions and in the interface
-  velocity condition; the cause has not been identified.
-- IQN-ILS and Robin-Neumann agree to $$3 \times 10^{-4}$$ or better on every
-  quantity. Robin-Neumann takes 8.7 coupling iterations per time-step against
-  14.8 for IQN-ILS, and half the run time.
+  wave speed converge at second order in space, the wave speed to
+  $$1.4 \times 10^{-5}$$ on the finest mesh.
+- The wall displacement phase converges more slowly in space (order 1.4). The
+  attenuation error is about $$-2 \times 10^{-3}$$ on all three meshes and
+  no longer changes with the mesh: it is at the level of the linear theory
+  (below), amplified because $$\mathrm{Im}(k)$$ is only 14% of
+  $$\mathrm{Re}(k)$$.
+- In time, every quantity converges at about second order over the study's
+  steps. Without `fluxConsistentPatches` the orders were 1.3-1.8 from
+  50/100/200 and fell to about one from 100/200/400, because of an O(Δt)
+  inconsistency of the end flux. The remaining boundary term is O(Δt h), so
+  the order stays two under joint refinement but, at a fixed mesh, would tend
+  to one at much smaller steps. See `womersley_temporal_investigation.md`.
+- IQN-ILS and Robin-Neumann agree to $$2.2 \times 10^{-4}$$ or better on every
+  quantity. Robin-Neumann takes 9.3 coupling iterations per time-step against
+  14.6 for IQN-ILS, and half the run time.
 
 ### Tolerances
 
@@ -301,7 +319,7 @@ finest mesh).
 | Finest mesh: wall phase | 5e-3 rad |
 | Finest mesh: attenuation | 1e-2 |
 | Mesh order of the profile, flow rate, wall amplitude and wave speed | 1.5 |
-| Time order of the signed quantities | 1.2 |
+| Time order of the signed quantities (finest three steps) | 1.7 |
 | Coupling runs (m2, n100): profile | 6e-3 |
 | Coupling runs: wall amplitude and wave speed | 3e-3 |
 | Robin-Neumann against IQN-ILS, every quantity | 1e-3 |
@@ -313,9 +331,11 @@ over the radius ($$5 \times 10^{-4}$$) and of the velocity over the wave speed
 ($$1.5 \times 10^{-3}$$), so agreement much better than $$10^{-3}$$ cannot be
 expected; the finest-mesh tolerances allow this and the measured error, with a
 margin, and the looser attenuation tolerance reflects its larger sensitivity.
-The order thresholds sit below the observed orders. The wall phase and the
-attenuation are not checked for their mesh order, which is about one; every
-signed quantity is checked for its time order.
+The order thresholds sit below the observed orders; the time-order threshold
+(1.7, on the 100/200/400 triplet) fails without `fluxConsistentPatches`,
+where those orders are 0.75-1.79. The wall phase and the attenuation are not
+checked for their mesh order; every signed quantity is checked for its time
+order.
 
 The driver also rejects histories that are truncated, non-finite, not
 increasing or not uniformly spaced in time, and fluid samples with an
