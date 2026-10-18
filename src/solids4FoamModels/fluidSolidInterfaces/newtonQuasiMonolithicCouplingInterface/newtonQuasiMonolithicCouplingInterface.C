@@ -2101,13 +2101,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     }
 
     const bool interfacePressureGradient =
-        isA<fixedGradientFvPatchScalarField>
-        (
-            fluid().p().boundaryField()
-            [
-                fluidSolidInterface::fluidPatchIndices()[0]
-            ]
-        );
+        fluid().p().boundaryField()
+        [
+            fluidSolidInterface::fluidPatchIndices()[0]
+        ].type() == fixedGradientFvPatchScalarField::typeName;
 
     if (interfacePressureGradient)
     {
@@ -2872,13 +2869,10 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     //     inconsistent function of x.
     const bool mapInterfaceBeforeTraction =
         passViscousStress_
-     || isA<fixedGradientFvPatchScalarField>
-        (
-            fluid().p().boundaryField()
-            [
-                fluidSolidInterface::fluidPatchIndices()[0]
-            ]
-        );
+     || fluid().p().boundaryField()
+        [
+            fluidSolidInterface::fluidPatchIndices()[0]
+        ].type() == fixedGradientFvPatchScalarField::typeName;
 
     if (mapInterfaceBeforeTraction)
     {
