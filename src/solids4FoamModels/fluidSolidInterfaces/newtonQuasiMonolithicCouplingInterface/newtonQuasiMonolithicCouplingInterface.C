@@ -754,7 +754,6 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
 
     // Raise an error if mallocs are required during matrix assembly
     CHKERRQ(MatSetOption(Afs, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
-    //CHKERRQ(MatSetOption(Afs, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
 
     return 0;
 }
@@ -887,7 +886,6 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
 
     // Raise an error if mallocs are required during matrix assembly
     CHKERRQ(MatSetOption(Asf, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_TRUE));
-    //CHKERRQ(MatSetOption(Asf, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
 
     return 0;
 }
@@ -939,7 +937,6 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
     // Check the fluid U patch type is fixedValue (not just derived from it)
     // TODO: use the corrected version of fixedValue
     if (!isA<fixedValueFvPatchVectorField>(fluidPatchU))
-    //if (fluidPatchU.type() != "fixedValue")
     {
         FatalErrorInFunction
             << "The fluid interface patch must be of type 'fixedValue'"
@@ -1455,89 +1452,6 @@ void newtonQuasiMonolithicCouplingInterface::setInterfacePressureGradient()
 }
 
 
-void newtonQuasiMonolithicCouplingInterface::setLiuInterfaceVelocity()
-{
-    // Set the fluid interface velocity using Liu (2014) Eq.31:
-    //   U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-    //
-    // This is required for energy-stable temporal coupling. The (3/4, 1/2,
-    // -1/4) coefficients arise from the compatibility between the BDF2
-    // temporal discretisation and the trapezoidal stress averaging in the
-    // solid equations. See Liu et al., JCP 270, 2014, Eq. 31 and Section 4.
-
-    // Lookup interface mapping
-    const interfaceToInterfaceMapping& interfaceMap =
-        interfaceToInterfaceList()[0];
-
-    // Global patches for parallel face data transfer
-    const globalPolyPatch& fluidGlobalPatch = interfaceMap.globalPatchA();
-    const globalPolyPatch& solidGlobalPatch = interfaceMap.globalPatchB();
-    const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
-
-    // Solid interface patch
-    const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
-    const labelList& solidFaceCells =
-        solidMesh().boundary()[solidPatchID].faceCells();
-
-    // Access solid velocity at current, old, and old-old time levels
-    const vectorField& solidUI = solid().U();
-    const vectorField& solidUOld = solid().U().oldTime();
-    const vectorField& solidUOldOld = solid().U().oldTime().oldTime();
-
-    // Build local solid interface velocities at each time level using
-    // adjacent cell-centre values
-    const label nSolidFaces = solidMesh().boundary()[solidPatchID].size();
-    vectorField localSolidU(nSolidFaces);
-    vectorField localSolidUOld(nSolidFaces);
-    vectorField localSolidUOldOld(nSolidFaces);
-
-    forAll(localSolidU, faceI)
-    {
-        const label cellI = solidFaceCells[faceI];
-        localSolidU[faceI] = solidUI[cellI];
-        localSolidUOld[faceI] = solidUOld[cellI];
-        localSolidUOldOld[faceI] = solidUOldOld[cellI];
-    }
-
-    // Broadcast to zone level for parallel access
-    const vectorField zoneSolidU
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidU)
-    );
-    const vectorField zoneSolidUOld
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidUOld)
-    );
-    const vectorField zoneSolidUOldOld
-    (
-        solidGlobalPatch.patchFaceToGlobal(localSolidUOldOld)
-    );
-
-    // Transfer from the solid zone faces to the fluid zone faces
-    const vectorField fluidZoneU(solidZoneToFluidZone(zoneSolidU));
-    const vectorField fluidZoneUOld(solidZoneToFluidZone(zoneSolidUOld));
-    const vectorField fluidZoneUOldOld
-    (
-        solidZoneToFluidZone(zoneSolidUOldOld)
-    );
-
-    // Set the fluid interface velocity with Liu Eq.31 coefficients
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    fvPatchVectorField& fluidPatchU =
-        boundaryFieldRef(fluid().U())[fluidPatchID];
-
-    forAll(fluidPatchU, fluidFaceI)
-    {
-        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-
-        fluidPatchU[fluidFaceI] =
-            0.75*fluidZoneU[fluidZoneFaceI]
-          + 0.50*fluidZoneUOld[fluidZoneFaceI]
-          - 0.25*fluidZoneUOldOld[fluidZoneFaceI];
-    }
-}
-
-
 scalarField
 newtonQuasiMonolithicCouplingInterface::currentInterfaceMeshPhi() const
 {
@@ -1671,86 +1585,49 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     // Map the solid interface displacement to the motion interface
     // In parallel, we broadcast solid data to zone level, transfer solid to
     // fluid zone faces, then extract local fluid values
-    if (extrapolateSolidInterfaceDisplacement_)
-    {
-        const fvPatchVectorField& solidPatchD =
-            solid().D().boundaryField()[solidPatchID];
+    // The boundary value of the solid displacement is extrapolated from the
+    // adjacent cell centres by the solidTraction condition
+    const fvPatchVectorField& solidPatchD =
+        solid().D().boundaryField()[solidPatchID];
 
-        // The solid velocity on the interface is extrapolated from the
-        // adjacent cell centres with the cell gradient, as the solidTraction
-        // condition does for D; the boundary value of the velocity is the
-        // cell value, which would give a first-order interface velocity
-        const volTensorField gradU(fvc::grad(solid().U()));
-        const vectorField solidPatchU
-        (
-            solid().U().boundaryField()[solidPatchID].patchInternalField()
-          + (
-                (
-                    solidMesh().boundary()[solidPatchID].Cf()
-                  - solidMesh().boundary()[solidPatchID].Cn()
-                )
-              & gradU.boundaryField()[solidPatchID].patchInternalField()
+    // The solid velocity on the interface is extrapolated from the
+    // adjacent cell centres with the cell gradient, as the solidTraction
+    // condition does for D; the boundary value of the velocity is the
+    // cell value, which would give a first-order interface velocity
+    const volTensorField gradU(fvc::grad(solid().U()));
+    const vectorField solidPatchU
+    (
+        solid().U().boundaryField()[solidPatchID].patchInternalField()
+      + (
+            (
+                solidMesh().boundary()[solidPatchID].Cf()
+              - solidMesh().boundary()[solidPatchID].Cn()
             )
-        );
+          & gradU.boundaryField()[solidPatchID].patchInternalField()
+        )
+    );
 
-        // Broadcast to zone level
-        const vectorField zoneSolidD
-        (
-            solidGlobalPatch.patchFaceToGlobal(solidPatchD)
-        );
-        const vectorField zoneSolidU
-        (
-            solidGlobalPatch.patchFaceToGlobal(solidPatchU)
-        );
+    // Broadcast to zone level
+    const vectorField zoneSolidD
+    (
+        solidGlobalPatch.patchFaceToGlobal(solidPatchD)
+    );
+    const vectorField zoneSolidU
+    (
+        solidGlobalPatch.patchFaceToGlobal(solidPatchU)
+    );
 
-        // Transfer from the solid zone to the fluid zone
-        const vectorField fluidZoneD(solidZoneToFluidZone(zoneSolidD));
-        const vectorField fluidZoneU(solidZoneToFluidZone(zoneSolidU));
+    // Transfer from the solid zone to the fluid zone
+    const vectorField fluidZoneD(solidZoneToFluidZone(zoneSolidD));
+    const vectorField fluidZoneU(solidZoneToFluidZone(zoneSolidU));
 
-        // Extract the local fluid values
-        forAll(motionPatchD, fluidFaceI)
-        {
-            const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-
-            motionPatchD[fluidFaceI] = fluidZoneD[fluidZoneFaceI];
-            motionPatchU[fluidFaceI] = fluidZoneU[fluidZoneFaceI];
-        }
-    }
-    else
+    // Extract the local fluid values
+    forAll(motionPatchD, fluidFaceI)
     {
-        const labelList& solidFaceCells =
-            solidMesh().boundary()[solidPatchID].faceCells();
-        const vectorField& solidDI = solid().D();
-        const vectorField& solidUI = solid().U();
+        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
 
-        // Build local solid cell-centre D and U, then broadcast to zone level
-        vectorField localSolidCellD(solidMesh().boundary()[solidPatchID].size());
-        vectorField localSolidCellU(solidMesh().boundary()[solidPatchID].size());
-        forAll(localSolidCellD, faceI)
-        {
-            localSolidCellD[faceI] = solidDI[solidFaceCells[faceI]];
-            localSolidCellU[faceI] = solidUI[solidFaceCells[faceI]];
-        }
-
-        const vectorField zoneSolidCellD
-        (
-            solidGlobalPatch.patchFaceToGlobal(localSolidCellD)
-        );
-        const vectorField zoneSolidCellU
-        (
-            solidGlobalPatch.patchFaceToGlobal(localSolidCellU)
-        );
-
-        const vectorField fluidZoneD(solidZoneToFluidZone(zoneSolidCellD));
-        const vectorField fluidZoneU(solidZoneToFluidZone(zoneSolidCellU));
-
-        forAll(motionPatchD, fluidFaceI)
-        {
-            const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-
-            motionPatchD[fluidFaceI] = fluidZoneD[fluidZoneFaceI];
-            motionPatchU[fluidFaceI] = fluidZoneU[fluidZoneFaceI];
-        }
+        motionPatchD[fluidFaceI] = fluidZoneD[fluidZoneFaceI];
+        motionPatchU[fluidFaceI] = fluidZoneU[fluidZoneFaceI];
     }
 
     if (interfaceDOffsetPtr_.valid())
@@ -2130,17 +2007,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             )
         )
     ),
-    // fluidToSolidCoupling_(fsiProperties().lookup("fluidToSolidCoupling")),
-    // meshToFluidCoupling_(fsiProperties().lookup("meshToFluidCoupling")),
-    // solidToMeshCoupling_(fsiProperties().lookup("solidToMeshCoupling")),
-    extrapolateSolidInterfaceDisplacement_
-    (
-        fsiProperties().lookupOrDefault<Switch>
-        (
-            "extrapolateSolidInterfaceDisplacement",
-            true
-        )
-    ),
     passViscousStress_(fsiProperties().lookup("passViscousStress")),
     conservativeTractionTransfer_
     (
@@ -2150,27 +2016,11 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             false
         )
     ),
-    liuInterfaceCondition_
-    (
-        fsiProperties().lookupOrDefault<Switch>
-        (
-            "liuInterfaceCondition",
-            false
-        )
-    ),
     interfaceFluxDiagnostics_
     (
         fsiProperties().lookupOrDefault<Switch>
         (
             "interfaceFluxDiagnostics",
-            false
-        )
-    ),
-    zeroPressureStabilisationFluxOnFsiInterface_
-    (
-        fsiProperties().lookupOrDefault<Switch>
-        (
-            "zeroPressureStabilisationFluxOnFsiInterface",
             false
         )
     ),
@@ -2244,15 +2094,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     {
         Info<< "The fluid interface pressure gradient is set from the normal "
             << "momentum equation at the interface" << endl;
-
-        if (liuInterfaceCondition_)
-        {
-            FatalErrorInFunction
-                << "A fixedGradient interface pressure, which is set from the "
-                << "interface acceleration, cannot be combined with "
-                << "liuInterfaceCondition, whose interface velocity is not "
-                << "the velocity of the interface" << exit(FatalError);
-        }
     }
     else
     {
@@ -2289,22 +2130,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         }
     }
 
-    if (zeroPressureStabilisationFluxOnFsiInterface_)
-    {
-        refCast<fluidModels::newtonIcoFluid>(fluid())
-           .addZeroPressureStabilisationFluxPatch
-            (
-                fluidSolidInterface::fluidPatchIndices()[0]
-            );
-    }
-
     Info<< "fluidSystemScaleFactor = " << fluidSystemScaleFactor_ << nl
         << "solidSystemScaleFactor = " << solidSystemScaleFactor_ << nl
-        << "liuInterfaceCondition = " << liuInterfaceCondition_ << nl
         << "interfaceFluxDiagnostics = "
-        << interfaceFluxDiagnostics_ << nl
-        << "zeroPressureStabilisationFluxOnFsiInterface = "
-        << zeroPressureStabilisationFluxOnFsiInterface_
+        << interfaceFluxDiagnostics_
         << endl;
 
     // Store old time values
@@ -2354,7 +2183,6 @@ void newtonQuasiMonolithicCouplingInterface::setDeltaT(Time& runTime)
         const scalar currentDeltaT = runTime.deltaTValue();
         scalar newDeltaT = currentDeltaT;
 
-        // if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
         if (reason < 0)
         {
             // SNES failed to converge
@@ -2753,14 +2581,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     );
 
     mapInterfaceSolidToMeshMotion();
-    if (liuInterfaceCondition_)
-    {
-        setLiuInterfaceVelocity();
-    }
-    else
-    {
-        mapInterfaceMotionUToFluidU();
-    }
+    mapInterfaceMotionUToFluidU();
     setInterfacePressureGradient();
     reportInterfaceFluxDiagnostics();
 
@@ -2971,8 +2792,6 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     volVectorField& UFluid = fluid().U();
     volScalarField& p = fluid().p();
     volVectorField& USolid = solid().U();
-    // const label fluidSystemEnd = fluidMesh().nCells()*fluidBlockSize;
-    // const label solidFirstEqnID = fluidSystemEnd;
 
 
     // Considerations on the order of updating the fluid, solid, and mesh motion
@@ -3021,15 +2840,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
     if (mapInterfaceBeforeTraction)
     {
         mapInterfaceSolidToMeshMotion();
-
-        if (liuInterfaceCondition_)
-        {
-            setLiuInterfaceVelocity();
-        }
-        else
-        {
-            mapInterfaceMotionUToFluidU();
-        }
+        mapInterfaceMotionUToFluidU();
         setInterfacePressureGradient();
     }
 
@@ -3169,25 +2980,12 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
 
 
     // 4. Map the solid interface velocity to the fluid interface
-    //    When liuInterfaceCondition is enabled, the fluid interface velocity
-    //    uses the temporally consistent condition from Liu (2014) Eq.31:
-    //      U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-    //    This is O(dt^2) accurate and ensures energy stability at the FSI
-    //    interface for the BDF2/trapezoidal temporal discretisation.
     //    This was already done in step 1b, from the same solution, if
     //    mapInterfaceBeforeTraction
     if (!mapInterfaceBeforeTraction)
     {
         mapInterfaceSolidToMeshMotion();
-
-        if (liuInterfaceCondition_)
-        {
-            setLiuInterfaceVelocity();
-        }
-        else
-        {
-            mapInterfaceMotionUToFluidU();
-        }
+        mapInterfaceMotionUToFluidU();
     }
 
     // 5. Update the fluid residual, which now has the correct interface
@@ -3543,6 +3341,11 @@ label newtonQuasiMonolithicCouplingInterface::precondition
     const Vec x
 )
 {
+    // Work in progress: this physics-based block preconditioner (pc_type
+    // physics) is not used by any tutorial. On ringAddedMass, the Newton
+    // iterations stall at the first coupled time step with it, whereas the
+    // fieldsplit preconditioner converges in two Newton iterations. It is
+    // kept for further development of a scalable preconditioner
     if (debug)
     {
         InfoInFunction
