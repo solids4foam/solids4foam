@@ -982,11 +982,8 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
     // Pressure coefficient from div(U)
     fluidPatchPressureCoeffs = -fluidPatchSf;
 
-    // Keep the existing full-vector momentum coupling as direct no-slip.
-    // The selected pressure-flux mode only changes the normal flux in the
-    // pressure equation.
+    // Keep the existing full-vector momentum coupling as direct no-slip
     const scalar momentumInterfaceScale = 1.0;
-    const scalar pressureInterfaceScale = interfaceFluxImplicitScale();
     const scalar pressureScale =
         refCast<const fluidModels::newtonIcoFluid>(fluid()).pressureScaleFactor();
 
@@ -1107,12 +1104,8 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
             // equation
 
             // Manually insert the 3 scalar coefficients (2 in 2-D)
-            // The pressure-interface scale preserves the implicit part of the
-            // selected normal flux. For geometricHistory this is 0.75; for
-            // geometricOnly it is zero; oldVelocityHistory keeps the original
-            // direct-mapping coefficient.
             value =
-                w*pressureScale*pressureInterfaceScale
+                w*pressureScale
                *fluidPatchPressureCoeffs[fluidFaceI][vector::X];
 
             globalRowI++; // pressure equation
@@ -1126,7 +1119,7 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
             );
 
             value =
-                w*pressureScale*pressureInterfaceScale
+                w*pressureScale
                *fluidPatchPressureCoeffs[fluidFaceI][vector::Y];
             globalColI++; // y velocity
             CHKERRQ
@@ -1140,7 +1133,7 @@ label newtonQuasiMonolithicCouplingInterface::formAfs
             if (!twoD)
             {
                 value =
-                    w*pressureScale*pressureInterfaceScale
+                    w*pressureScale
                    *fluidPatchPressureCoeffs[fluidFaceI][vector::Z];
                 globalColI++; // z velocity
                 CHKERRQ
@@ -1545,34 +1538,6 @@ void newtonQuasiMonolithicCouplingInterface::setLiuInterfaceVelocity()
 }
 
 
-bool newtonQuasiMonolithicCouplingInterface::validInterfaceFluxMode
-(
-    const word& mode
-) const
-{
-    return
-        mode == "oldVelocityHistory"
-     || mode == "geometricOnly"
-     || mode == "geometricHistory";
-}
-
-
-scalar
-newtonQuasiMonolithicCouplingInterface::interfaceFluxImplicitScale() const
-{
-    if (quasiMonolithicInterfaceFluxMode_ == "oldVelocityHistory")
-    {
-        return 1.0;
-    }
-    else if (quasiMonolithicInterfaceFluxMode_ == "geometricOnly")
-    {
-        return 0.0;
-    }
-
-    return 0.75;
-}
-
-
 scalarField
 newtonQuasiMonolithicCouplingInterface::currentInterfaceMeshPhi() const
 {
@@ -1597,65 +1562,6 @@ newtonQuasiMonolithicCouplingInterface::currentInterfaceVelocityPhi() const
 }
 
 
-void newtonQuasiMonolithicCouplingInterface::initialiseInterfaceMeshPhiHistory
-(
-    const scalarField& meshPhi
-)
-{
-    if (interfaceMeshPhiOldPtr_.empty())
-    {
-        interfaceMeshPhiOldPtr_.reset(new scalarField(meshPhi));
-    }
-
-    if (interfaceMeshPhiOldOldPtr_.empty())
-    {
-        interfaceMeshPhiOldOldPtr_.reset(new scalarField(meshPhi));
-    }
-
-    if
-    (
-        interfaceMeshPhiOldPtr_().size() != meshPhi.size()
-     || interfaceMeshPhiOldOldPtr_().size() != meshPhi.size()
-    )
-    {
-        FatalErrorInFunction
-            << "Stored interface mesh-flux history size changed from "
-            << interfaceMeshPhiOldPtr_().size() << " and "
-            << interfaceMeshPhiOldOldPtr_().size() << " to "
-            << meshPhi.size() << ". This prototype assumes unchanged "
-            << "interface face ordering and count."
-            << abort(FatalError);
-    }
-}
-
-
-Foam::tmp<Foam::scalarField>
-newtonQuasiMonolithicCouplingInterface::interfacePressurePhi()
-{
-    const scalarField phiG(currentInterfaceMeshPhi());
-    initialiseInterfaceMeshPhiHistory(phiG);
-
-    if (quasiMonolithicInterfaceFluxMode_ == "oldVelocityHistory")
-    {
-        return tmp<scalarField>(new scalarField(currentInterfaceVelocityPhi()));
-    }
-    else if (quasiMonolithicInterfaceFluxMode_ == "geometricOnly")
-    {
-        return tmp<scalarField>(new scalarField(phiG));
-    }
-
-    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
-    const fvPatch& fluidPatch = fluidMesh().boundary()[fluidPatchID];
-    const fvPatchVectorField& motionPatchU =
-        motionSolid().U().boundaryField()[fluidPatchID];
-
-    return
-        0.75*scalarField(motionPatchU & fluidPatch.Sf())
-      + 0.50*interfaceMeshPhiOldPtr_()
-      - 0.25*interfaceMeshPhiOldOldPtr_();
-}
-
-
 void
 newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
 {
@@ -1664,12 +1570,10 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
         return;
     }
 
+    // Interface flux in the continuity equation (the interface velocity
+    // flux) and the flux swept by the moving fluid interface
     const scalarField phiG(currentInterfaceMeshPhi());
-    const scalarField phiGamma(interfacePressurePhi());
-    const scalarField pressureFluxDelta
-    (
-        phiGamma - currentInterfaceVelocityPhi()
-    );
+    const scalarField phiGamma(currentInterfaceVelocityPhi());
     const scalarField epsilon(phiGamma - phiG);
 
     const scalar sumEpsilon = gSum(epsilon);
@@ -1677,15 +1581,11 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
     const scalar maxAbsEpsilon = gMax(mag(epsilon));
     const scalar sumAbsPhiG = gSum(mag(phiG));
     const scalar sumAbsPhiGamma = gSum(mag(phiGamma));
-    const scalar sumPressureFluxDelta = gSum(pressureFluxDelta);
-    const scalar sumAbsPressureFluxDelta = gSum(mag(pressureFluxDelta));
-    const scalar maxAbsPressureFluxDelta = gMax(mag(pressureFluxDelta));
 
     accumulatedInterfaceFluxLeakage_ +=
         fluidMesh().time().deltaTValue()*sumEpsilon;
 
     Info<< "Interface pressure flux defect:"
-        << " mode=" << quasiMonolithicInterfaceFluxMode_
         << " sum_epsilon=" << sumEpsilon
         << " sum_abs_epsilon=" << sumAbsEpsilon
         << " max_abs_epsilon=" << maxAbsEpsilon
@@ -1695,9 +1595,6 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
         << " sum_abs_Phi_Gamma=" << sumAbsPhiGamma
         << " rel_g=" << sumAbsEpsilon/(sumAbsPhiG + SMALL)
         << " rel_Gamma=" << sumAbsEpsilon/(sumAbsPhiGamma + SMALL)
-        << " sum_pressure_flux_delta=" << sumPressureFluxDelta
-        << " sum_abs_pressure_flux_delta=" << sumAbsPressureFluxDelta
-        << " max_abs_pressure_flux_delta=" << maxAbsPressureFluxDelta
         << endl;
 
     // Interface force balance: the force of the fluid on the interface,
@@ -1735,16 +1632,6 @@ newtonQuasiMonolithicCouplingInterface::reportInterfaceFluxDiagnostics()
         << " rel_imbalance="
         << mag(solidForce - fluidForce)/(mag(fluidForce) + VSMALL)
         << endl;
-}
-
-
-void newtonQuasiMonolithicCouplingInterface::updateInterfaceMeshPhiHistory()
-{
-    const scalarField phiG(currentInterfaceMeshPhi());
-    initialiseInterfaceMeshPhiHistory(phiG);
-
-    interfaceMeshPhiOldOldPtr_() = interfaceMeshPhiOldPtr_();
-    interfaceMeshPhiOldPtr_() = phiG;
 }
 
 
@@ -2271,14 +2158,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             false
         )
     ),
-    quasiMonolithicInterfaceFluxMode_
-    (
-        fsiProperties().lookupOrDefault<word>
-        (
-            "quasiMonolithicInterfaceFluxMode",
-            "oldVelocityHistory"
-        )
-    ),
     interfaceFluxDiagnostics_
     (
         fsiProperties().lookupOrDefault<Switch>
@@ -2295,8 +2174,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             false
         )
     ),
-    interfaceMeshPhiOldPtr_(),
-    interfaceMeshPhiOldOldPtr_(),
     interfaceDOffsetPtr_(),
     interfacePointDOffsetPtr_(),
     fluidFaceSolidFacesPtr_(),
@@ -2412,16 +2289,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         }
     }
 
-    if (!validInterfaceFluxMode(quasiMonolithicInterfaceFluxMode_))
-    {
-        FatalErrorInFunction
-            << "Unknown quasiMonolithicInterfaceFluxMode "
-            << quasiMonolithicInterfaceFluxMode_ << nl
-            << "Valid options are oldVelocityHistory, geometricOnly "
-            << "and geometricHistory"
-            << exit(FatalError);
-    }
-
     if (zeroPressureStabilisationFluxOnFsiInterface_)
     {
         refCast<fluidModels::newtonIcoFluid>(fluid())
@@ -2434,8 +2301,6 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     Info<< "fluidSystemScaleFactor = " << fluidSystemScaleFactor_ << nl
         << "solidSystemScaleFactor = " << solidSystemScaleFactor_ << nl
         << "liuInterfaceCondition = " << liuInterfaceCondition_ << nl
-        << "quasiMonolithicInterfaceFluxMode = "
-        << quasiMonolithicInterfaceFluxMode_ << nl
         << "interfaceFluxDiagnostics = "
         << interfaceFluxDiagnostics_ << nl
         << "zeroPressureStabilisationFluxOnFsiInterface = "
@@ -2898,7 +2763,6 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     }
     setInterfacePressureGradient();
     reportInterfaceFluxDiagnostics();
-    updateInterfaceMeshPhiHistory();
 
     // Set the solid displacement from the converged velocity: during the
     // solve, D held the predicted displacement that moved the fluid mesh
