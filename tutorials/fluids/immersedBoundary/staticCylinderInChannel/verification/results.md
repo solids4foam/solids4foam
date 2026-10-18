@@ -393,9 +393,3 @@ The inlet effect is relative to the port with its own inlet.
 - It therefore biased `C_d` downwards, more on the coarser mesh, and hid
   most of the mesh dependence: the change between the two meshes is -0.015
   with the historical inlet, against -0.060 with the exact inlet.
-
-## Other reference data
-
-`mpi_scaling.csv` records the rank check on the reference machine that set
-the decomposition of the reference runs (1, 1, 2 and 8 ranks on L1-L4). It
-is specific to that machine.
