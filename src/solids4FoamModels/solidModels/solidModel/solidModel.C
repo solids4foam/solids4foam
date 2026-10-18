@@ -733,7 +733,7 @@ void Foam::solidModel::correctPointDisplacement
         }
     }
 
-    twoDCorrector_.correctPoints(pointDI);
+    twoDCorrectPoints(pointDI);
 }
 
 
@@ -3074,6 +3074,19 @@ void Foam::solidModel::writeFields(const Time& runTime)
 }
 
 
+void Foam::solidModel::twoDCorrectPoints(vectorField& points) const
+{
+    // Not on a processor holding no points of this region: in a 2-D case the
+    // corrector finds the plane normal from the local empty or wedge faces,
+    // and fails if there are none. It has nothing to correct there anyway,
+    // and it holds no collective operations, so the ranks need not agree
+    if (points.size())
+    {
+        twoDCorrector_.correctPoints(points);
+    }
+}
+
+
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
@@ -3086,7 +3099,7 @@ void Foam::solidModel::moveMesh
 
     // Calculate the new points and apply 2-D corrections
     vectorField newPoints(oldPoints + pointDDI);
-    twoDCorrector_.correctPoints(newPoints);
+    twoDCorrectPoints(newPoints);
 
     // Move the mesh
     mesh().movePoints(newPoints);
