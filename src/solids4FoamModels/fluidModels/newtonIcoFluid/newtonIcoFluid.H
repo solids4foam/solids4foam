@@ -305,7 +305,8 @@ public:
             void updatePressureGradientBoundary(const label patchI);
 
             //- Call updatePressureGradientBoundary on every wall patch with
-            //  fixedGradient pressure and fully prescribed velocity
+            //  fixedGradient pressure (not a condition derived from it) and
+            //  fully prescribed velocity
             void updatePressureGradientBoundaries();
 
 #ifdef USE_PETSC
