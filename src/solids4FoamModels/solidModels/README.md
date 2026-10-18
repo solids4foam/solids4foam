@@ -374,6 +374,11 @@ finite volume discretisation unless stated otherwise.
   - `nonLinGeomUpdatedLagSolid`: an updated Lagrangian nonlinear geometry solid
     model which solves for the increment of displacement
     $$\Delta \boldsymbol{d}$$ (`DD`) using a segregated approach.
+  - `meshMotionTotalDispSolid`: a quasi-static solid model for moving a mesh
+    owned by another model, e.g. the fluid mesh with the
+    `solids4foamSolidModel` mesh motion solver; solves for the total
+    displacement $$\boldsymbol{d}$$ (`D`) on the current mesh, optionally with
+    finite-strain kinematics; _OpenFOAM.com only_.
   - `coupledPressureDisplacementSolid`: a block-coupled mixed formulation for
     incompressible and nearly incompressible solids, solving the increments of
     displacement $$\Delta \boldsymbol{d}$$ (`DD`) and hydrostatic pressure

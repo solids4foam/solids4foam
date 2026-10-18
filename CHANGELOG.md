@@ -19,13 +19,18 @@ release. For complete commit-level details and contributor information, see the
   `solids4foamSolidModel` solver. Velocity-based solvers are path dependent
   and the interior mesh can drift under periodic motion, which
   `displacementLaplacian` avoids.
-- The `solids4foamSolidModel` mesh motion solver solves for the total
-  displacement from the reference points on the moving mesh itself, as
-  `displacementLaplacian` does, and calculates the `stiffnessScaleFactor`
-  field from an optional mesh motion `diffusivity`. A solid model on a mesh
-  owned by another model (`solidModel::sharedMesh()`) does not update the mesh
-  or clear its moving flag, and its `U`, `p`, `rho`, `A`, `dpdt`, `rAUf` and
-  `useBoundaryFaceValues_p` fields are private to it.
+- The `meshMotionTotalDisplacement` solid model (OpenFOAM.com) moves a mesh
+  owned by another model: it solves quasi-statically for the total
+  displacement from the reference points on the current mesh, as
+  `displacementLaplacian` does, optionally with current-configuration
+  finite-strain kinematics, so the mesh for a given boundary motion does not
+  depend on its path, without a copy of the reference mesh. The
+  `solids4foamSolidModel` mesh motion solver uses it on the fluid mesh, and
+  calculates the `stiffnessScaleFactor` field from an optional mesh motion
+  `diffusivity`. A solid model on a mesh owned by another model
+  (`solidModel::sharedMesh()`) does not clear the mesh's moving flag or the
+  owner's solver performance records, and its `U`, `p`, `rho`, `g`, `rAUf`
+  and `useBoundaryFaceValues_p` fields are private to it.
 - Ported the `diffusionElastic` and `diffusionHyperElastic` laws, removed
   with the legacy mechanical laws, to the `mechanicalConstitutiveLaw`
   framework, for mesh motion with `solids4foamSolidModel`: `linearElastic`

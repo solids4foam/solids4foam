@@ -24,13 +24,14 @@ Group
 Description
     Mesh motion solver for an fvMesh using a solids4foam solidModel.
 
-    The solid model is solved on the moving mesh itself, for the total
-    displacement from the reference points, points0, and the mesh points
-    are the reference points plus the solid model point displacement, pointD.
-    As with displacementLaplacian, the equations are discretised on the
-    current mesh, so no copy of the mesh is needed and, because the unknown
-    is the total displacement and not an increment, the mesh for a given
-    interface position does not drift with the path taken to reach it.
+    The solid model, which must be meshMotionTotalDisplacement, is solved on
+    the moving mesh itself, for the total displacement from the reference
+    points, points0, and the mesh points are the reference points plus the
+    solid model point displacement, pointD. As with displacementLaplacian, the
+    equations are discretised on the current mesh, so no copy of the mesh is
+    needed and, because the unknown is the total displacement and not an
+    increment, the mesh for a given interface position does not drift with
+    the path taken to reach it.
 
     The solid model reads its solidProperties and mechanicalProperties from
     constant/<region>, its D and pointD fields from <time>/<region>, and its
@@ -116,6 +117,9 @@ class meshMotionSolidModelFvMotionSolver
 
         //- Update the stiffness scale factor on the current mesh
         void updateStiffnessScaleFactor();
+
+        //- Create the solid model, which must be meshMotionTotalDisplacement
+        void makeModel();
 
         //- No copy construct
         meshMotionSolidModelFvMotionSolver

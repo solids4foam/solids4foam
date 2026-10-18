@@ -20,6 +20,7 @@ License
 #ifdef OPENFOAM_COM
 
 #include "meshMotionSolidModelFvMotionSolver.H"
+#include "meshMotionTotalDispSolid.H"
 #include "motionDiffusivity.H"
 #include "fvmLaplacian.H"
 #include "addToRunTimeSelectionTable.H"
@@ -66,8 +67,9 @@ Foam::word Foam::meshMotionSolidModelFvMotionSolver::regionName() const
     if (regionName != fvMesh_.name())
     {
         FatalErrorInFunction
-            << "The solid model is solved on the moving mesh " << fvMesh_.name()
-            << ", so regionName, if given, must be " << fvMesh_.name()
+            << "The solid model is solved on the moving mesh "
+            << fvMesh_.name() << ", so regionName, if given, must be "
+            << fvMesh_.name()
             << ", not " << regionName << exit(FatalError);
     }
 
@@ -156,6 +158,26 @@ void Foam::meshMotionSolidModelFvMotionSolver::updateStiffnessScaleFactor()
 }
 
 
+void Foam::meshMotionSolidModelFvMotionSolver::makeModel()
+{
+    // The stiffness scale factor is needed when the solid model is created
+    updateStiffnessScaleFactor();
+
+    modelPtr_ = solidModel::New
+    (
+        const_cast<Time&>(fvMesh_.time()), regionName()
+    );
+
+    if (!isA<solidModels::meshMotionTotalDispSolid>(modelPtr_()))
+    {
+        FatalErrorInFunction
+            << "The " << typeName << " mesh motion solver needs the "
+            << solidModels::meshMotionTotalDispSolid::typeName
+            << " solid model, not " << modelPtr_->type() << exit(FatalError);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
@@ -171,13 +193,7 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
     modelPtr_(),
     solveEquations_(true)
 {
-    // The stiffness scale factor is needed when the solid model is created
-    updateStiffnessScaleFactor();
-
-    modelPtr_ = solidModel::New
-    (
-        const_cast<Time&>(fvMesh_.time()), regionName()
-    );
+    makeModel();
 }
 
 
@@ -196,13 +212,7 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
     modelPtr_(),
     solveEquations_(true)
 {
-    // The stiffness scale factor is needed when the solid model is created
-    updateStiffnessScaleFactor();
-
-    modelPtr_ = solidModel::New
-    (
-        const_cast<Time&>(fvMesh_.time()), regionName()
-    );
+    makeModel();
 
     // Update pointD
     modelPtr_->pointD().primitiveFieldRef() =

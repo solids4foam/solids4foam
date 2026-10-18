@@ -445,7 +445,7 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
         // Velocity
         U() = fvc::ddt(D());
     }
-    while (!sharedMesh() && solidModel::mesh().update());
+    while (solidModel::mesh().update());
 
 #ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector>::debug = 1;
@@ -856,10 +856,11 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     rKappa_(makeRKappa()),
     A_
     (
-        sharedMeshIOobject
+        IOobject
         (
             "A",
             mesh().time().timeName(),
+            mesh(),
             IOobject::READ_IF_PRESENT,
             IOobject::NO_WRITE
         ),

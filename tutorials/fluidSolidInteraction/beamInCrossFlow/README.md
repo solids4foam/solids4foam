@@ -167,11 +167,12 @@ The fluid mesh is moved with `velocityLaplacian` by default. Adding
 diffusivity, e.g. `./Allrun displacementLaplacian`, which gives the same mesh
 for the same beam position. Adding `diffusionElastic` or
 `diffusionHyperElastic` moves the fluid mesh with a solids4foam solid model
-(`solids4foamSolidModel`), using the law of that name, solved on the fluid
-mesh, with its settings in `constant/fluid/solidProperties.*` and
-`mechanicalProperties.*`, `0/fluid/D` and `pointD`, and the `D` entries of
-`system/fluid/fvSchemes` and `fvSolution`; the law's stiffness is scaled by
-the `quadratic inverseDistance (interface)` diffusivity.
+(`solids4foamSolidModel`), using the law of that name in the
+`meshMotionTotalDisplacement` solid model, solved on the fluid mesh, with its
+settings in `constant/fluid/solidProperties.*` and `mechanicalProperties.*`,
+`0/fluid/D` and `pointD`, and the `D` entries of `system/fluid/fvSchemes` and
+`fvSolution`; the law's stiffness is scaled by the
+`quadratic inverseDistance (interface)` diffusivity.
 The displacement-based options are not available on foam-extend, and the
 solid model options only on OpenFOAM.com. See the
 [fluid-solid interfaces README](../../../src/solids4FoamModels/fluidSolidInterfaces/README.md)

@@ -859,12 +859,20 @@ void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 
 void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
-    // Hack to avoid expensive copy of residuals
+    // Hack to avoid expensive copy of residuals. On a shared mesh, only the
+    // residuals of D are removed, as the others belong to the mesh's owner
 #ifdef OPENFOAM_COM
-    const_cast<dictionary&>
-    (
-        D.mesh().data().solverPerformanceDict()
-    ).clear();
+    dictionary& solverPerf =
+        const_cast<dictionary&>(D.mesh().data().solverPerformanceDict());
+
+    if (sharedMesh_)
+    {
+        solverPerf.remove(D.name());
+    }
+    else
+    {
+        solverPerf.clear();
+    }
 #endif
 
     if (relaxationMethod_ == "fixed")
@@ -1224,13 +1232,16 @@ Foam::solidModel::solidModel
     rhoPtr_(),
     g_
     (
+        // On a shared mesh, the owner's g, e.g. that of a buoyant fluid, is
+        // neither required nor registered over
         IOobject
         (
             "g",
             runTime.constant(),
             mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
+            sharedMesh_ ? IOobject::READ_IF_PRESENT : IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            !sharedMesh_
         )
     ),
     dampingCoeff_

@@ -58,15 +58,6 @@ Foam::solidModelFluidMeshMotionCoupler::solidModelFluidMeshMotionCoupler
 {
     const solidModel& model = motionSolver_.model();
 
-    if (model.incremental())
-    {
-        FatalErrorInFunction
-            << "The solids4foamSolidModel mesh motion coupler needs a "
-            << "total-displacement solid model, e.g. "
-            << "linearGeometryTotalDisplacement, not " << model.type()
-            << exit(FatalError);
-    }
-
     forAll(patchIDs, i)
     {
         const label patchID = patchIDs[i];

@@ -375,9 +375,9 @@ REF_FINAL_FORCE=4.799864
 # diffusionElastic fluid mesh motion, to t = 0.5, from the OpenFOAM.com v2512
 # run: the tip displacement is still increasing, so its maximum is its final
 # value. All the fluid mesh motions agree to within 3e-6 and 2e-3 at this time
-REF_SOLID_MESH_MOTION_MAX_DISP=0.0122427
-REF_SOLID_MESH_MOTION_FINAL_DISP=0.0122427
-REF_SOLID_MESH_MOTION_FINAL_FORCE=3.485105
+REF_SOLID_MESH_MOTION_MAX_DISP=0.0122428
+REF_SOLID_MESH_MOTION_FINAL_DISP=0.0122428
+REF_SOLID_MESH_MOTION_FINAL_FORCE=3.485119
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken

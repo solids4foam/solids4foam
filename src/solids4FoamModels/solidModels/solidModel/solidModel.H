@@ -779,9 +779,11 @@ public:
 
             //- Is the mesh shared with, and owned by, another model? e.g.
             //  the moving fluid mesh, for the solids4foamSolidModel mesh
-            //  motion solver. The solid model then does not update the mesh
-            //  or change its moving flag, and its fields whose names the
-            //  owner may also use are private (see sharedMeshIOobject)
+            //  motion solver, with the meshMotionTotalDisplacement solid
+            //  model, which never updates the mesh. The solid model then does
+            //  not change the mesh's moving flag or clear the owner's solver
+            //  performance records, and its fields whose names the owner may
+            //  also use, and g, are private (see sharedMeshIOobject)
             bool sharedMesh() const
             {
                 return sharedMesh_;

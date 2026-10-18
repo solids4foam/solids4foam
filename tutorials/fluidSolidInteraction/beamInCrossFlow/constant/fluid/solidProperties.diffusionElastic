@@ -17,9 +17,9 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 // Small strain mesh motion with the diffusionElastic law
-solidModel     linearGeometryTotalDisplacement;
+solidModel     meshMotionTotalDisplacement;
 
-linearGeometryTotalDisplacementCoeffs
+meshMotionTotalDisplacementCoeffs
 {
     // Maximum number of momentum correctors
     nCorrectors     1000;

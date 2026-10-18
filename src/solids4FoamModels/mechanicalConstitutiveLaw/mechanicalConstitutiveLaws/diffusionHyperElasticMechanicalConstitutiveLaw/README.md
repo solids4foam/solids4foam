@@ -12,7 +12,8 @@ diffusionHyperElastic
 ```
 
 The law is used by the `solids4foamSolidModel` fluid mesh motion solver, which
-solves a solid model on the fluid mesh; see the
+solves the `meshMotionTotalDisplacement` solid model on the fluid mesh,
+with `finiteStrain yes`; see the
 [fluid-solid interface page](../../../fluidSolidInterfaces/README.md). The
 dictionary layout common to all laws is described in the
 [material models page](../../../materialModels/README.md), and the framework
@@ -35,10 +36,11 @@ sigma = d*(mu*dev(bEbar) + 0.5*K*(J^2 - 1)*I)/J
 points (face values are interpolated from the cells). The
 `solids4foamSolidModel` mesh motion solver calculates it on the current fluid
 mesh before each solution, from the `diffusivity` in
-`constant/fluid/dynamicMeshDict`, as the face diffusivity limited to between `minFactor` (default `0.1`) and
-`maxFactor` (default `100`) times its average, divided by its average, and
-averaged to the cells. With `quadratic inverseDistance (interface)`, the mesh
-is stiffer, and deforms less, near the interface. Set
+`constant/fluid/dynamicMeshDict`, as the face diffusivity limited to between
+`minFactor` (default `0.1`) and `maxFactor` (default `100`) times its average,
+divided by its average, and averaged to the cells. With
+`quadratic inverseDistance (interface)`, the mesh is stiffer, and deforms
+less, near the interface. Set
 `writeStiffScaleFactor yes` in the `dynamicMeshDict` to write the field. The
 law can also be used with a `stiffnessScaleFactor` field given in the time
 directory.

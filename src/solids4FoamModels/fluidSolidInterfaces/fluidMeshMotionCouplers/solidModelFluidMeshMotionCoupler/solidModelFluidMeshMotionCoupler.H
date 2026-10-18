@@ -20,7 +20,7 @@ Class
 
 Description
     Fluid mesh motion coupler for the solids4foamSolidModel mesh motion
-    solver, which solves a total-displacement solids4foam solid model on the
+    solver, which solves the meshMotionTotalDisplacement solid model on the
     fluid mesh, e.g. with the diffusionElastic or diffusionHyperElastic
     mechanical laws.
 
