@@ -1202,10 +1202,11 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
     const labelList& solidFaceCells = solidPatch.faceCells();
 
     // The approximate force on the solid interface is the solid face area
-    // vector multiplied by the adjacent fluid cell centre pressure. We also
-    // need to multiply by the fluid density, if the kinematic pressure is
-    // used. So the coefficient is the solid face area vector times the
-    // fluid density
+    // times the fluid face unit normal times the adjacent fluid cell centre
+    // pressure; the fluid normal is used, as in the residual, because on a
+    // non-conformal curved interface the fluid and solid normals differ. We
+    // also need to multiply by the fluid density, if the kinematic pressure
+    // is used
     // To-do: determine on the fly whether kinematic or dynamic pressure is
     // used
     const fvPatchVectorField& solidPatchD =
@@ -1237,18 +1238,25 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
         fluidGlobalPatch.patchFaceToGlobal(localFluidGlobalCellIDs)
     );
 
-    // Pressure coupling coefficients: solidSf * rho * pressureUnknownScale.
+    // Pressure coupling coefficients:
+    // solid |Sf| * rho * pressureUnknownScale, times the fluid normal.
     // The pHat-column factor pressureUnknownScale_ implements the chain
     // rule for the scaled pressure unknown
     //   ∂(solid traction residual)/∂pHat
     //     = pressureUnknownScale_ * ∂(solid traction residual)/∂p
     // It equals 1 (no-op) when scaleMixedPetScFields is disabled
     const scalar pressureUnknownScale = newtonFluid.pressureUnknownScale();
-    const vectorField pressureCoeffs
+    const scalarField pressureCoeffs
     (
-        solidPatch.Sf()
+        solidPatch.magSf()
        *newtonFluid.rho().value()
        *pressureUnknownScale
+    );
+
+    // Fluid interface unit normals at the zone level for parallel access
+    const vectorField zoneFluidNf
+    (
+        fluidGlobalPatch.patchFaceToGlobal(vectorField(fluidPatch.nf()))
     );
 
     // Viscous coupling coefficients (only when passViscousStress is enabled)
@@ -1263,7 +1271,6 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
     // In parallel, the viscous coefficients are on the fluid side so we
     // broadcast them to the zone level for cross-processor access
     scalarField zoneViscDiffCoeffs;
-    vectorField zoneFluidNf;
     if (passViscousStress_)
     {
         const scalarField fluidPatchNuEff
@@ -1278,13 +1285,9 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
            *fluidPatch.deltaCoeffs()
         );
 
-        vectorField localFluidNf(fluidPatch.nf());
-
         // Broadcast to zone level for parallel access
         zoneViscDiffCoeffs =
             fluidGlobalPatch.patchFaceToGlobal(localViscDiffCoeffs);
-        zoneFluidNf =
-            fluidGlobalPatch.patchFaceToGlobal(localFluidNf);
     }
 
     const globalIndex& solidGlobalCells =
@@ -1335,7 +1338,9 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
                     globalBlockColI*fluidBlockSize + (fluidBlockSize - 1);
 
                 // Manually insert the 3 scalar coefficients (2 in 2-D)
-                PetscScalar value = -w*pressureCoeffs[solidFaceI][vector::X];
+                PetscScalar value =
+                    w*pressureCoeffs[solidFaceI]
+                   *zoneFluidNf[fluidZoneFaceI][vector::X];
                 CHKERRQ
                 (
                     MatSetValues
@@ -1345,7 +1350,9 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
                 );
 
                 globalRowI++;
-                value = -w*pressureCoeffs[solidFaceI][vector::Y];
+                value =
+                    w*pressureCoeffs[solidFaceI]
+                   *zoneFluidNf[fluidZoneFaceI][vector::Y];
                 CHKERRQ
                 (
                     MatSetValues
@@ -1357,7 +1364,9 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
                 if (!twoD)
                 {
                     globalRowI++;
-                    value = -w*pressureCoeffs[solidFaceI][vector::Z];
+                    value =
+                        w*pressureCoeffs[solidFaceI]
+                       *zoneFluidNf[fluidZoneFaceI][vector::Z];
                     CHKERRQ
                     (
                         MatSetValues
