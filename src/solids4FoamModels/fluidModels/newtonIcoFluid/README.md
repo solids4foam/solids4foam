@@ -350,7 +350,9 @@ given PETSc solution vector:
 - corrects boundary conditions and updates `gradU`, `gradp`, and `phi`;
 - computes the momentum residual from diffusion, pressure gradient, transient,
   advection, and optional momentum stabilisation terms;
-- computes the pressure residual from `-div(U)` and pressure stabilisation;
+- computes the pressure residual from the divergence of the face flux
+  `interpolate(U) & Sf`, the same flux that convects momentum, plus the
+  pressure stabilisation;
 - applies the pressure reference cell and `pressureScaleFactor`;
 - inserts the cell residuals into the PETSc residual vector.
 
