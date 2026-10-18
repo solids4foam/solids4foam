@@ -305,6 +305,23 @@ public:
             //- Return a const reference to the rAU field
             void clearRAUf();
 
+            //- Set the normal gradient of the (kinematic) pressure on a
+            //  patch with fixedGradient pressure and fully prescribed
+            //  velocity, at which the fluid moves with the boundary (a
+            //  no-slip wall or a fluid-solid interface), from the normal
+            //  momentum equation:
+            //      dp/dn = n & (laplacian(nuEff, U) - dU/dt)
+            //  where dU/dt is the acceleration of the boundary faces. The
+            //  convective term, which vanishes at a no-slip wall that moves
+            //  with the mesh, is neglected. A zeroGradient pressure at such a
+            //  boundary gives first-order errors in the boundary pressure and
+            //  in the pressure gradient of the cells next to it
+            void updatePressureGradientBoundary(const label patchI);
+
+            //- Call updatePressureGradientBoundary on every wall patch with
+            //  fixedGradient pressure and fully prescribed velocity
+            void updatePressureGradientBoundaries();
+
 #ifdef USE_PETSC
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of

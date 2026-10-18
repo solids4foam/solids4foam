@@ -11,6 +11,9 @@ source solids4FoamScripts.sh
 # ./Allrun linear     # second-order solid: linear reconstruction
 # ./Allrun robin      # Robin-Neumann coupling
 # ./Allrun robin linear
+# ./Allrun monolithic # quasi-monolithic Newton coupling (OpenFOAM.com only),
+#                     # with its own velocity-based solid (the linear option
+#                     # does not apply)
 # The case runs in serial: see the README
 
 # PETSc is required for this case
@@ -30,21 +33,46 @@ do
             coupling=robin
             interfaceCondition=robin
             ;;
+        monolithic|Monolithic)
+            coupling=monolithic
+            interfaceCondition=dirichletNeumann
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [linear] [robin]"
+            echo "Usage: ./Allrun [linear] [robin|monolithic]"
             exit 1
             ;;
     esac
 done
 
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach requires PETSc and is only
+    # implemented for OpenFOAM.com; its files are stored as *.monolithic
+    # variants
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+fi
+
+# Start from the stored case
+solids4Foam::restoreCaseVariant .
+
 ln -vnsf "solidProperties.${solidVariant}" constant/solid/solidProperties
 ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
-ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+rm -f 0/fluid/U 0/fluid/p
+if [[ "${coupling}" == "monolithic" ]]; then
+    # Replaces the solid, fsiProperties and solver settings links made above
+    solids4Foam::selectCaseVariant . monolithic
+    fluidVelocity=monolithic
+    fluidPressure=monolithic
+else
+    ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+    fluidVelocity="${interfaceCondition}"
+    fluidPressure="${interfaceCondition}"
+fi
 # Copied rather than linked, as setPoiseuilleFlow writes the initial fields
 rm -f 0/fluid/U 0/fluid/p
-cp "0/fluid/U.${interfaceCondition}" 0/fluid/U
-cp "0/fluid/p.${interfaceCondition}" 0/fluid/p
+cp "0/fluid/U.${fluidVelocity}" 0/fluid/U
+cp "0/fluid/p.${fluidPressure}" 0/fluid/p
 
 # Build the utility that sets the initial Poiseuille flow
 wmake setPoiseuilleFlow

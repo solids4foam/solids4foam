@@ -16,10 +16,28 @@ release. For complete commit-level details and contributor information, see the
   runs in parallel, also with `decomposeParMonolithic`. It comes with the
   velocity-based solid models `nonLinearGeometryTotalLagrangianVelocity` and
   `linearGeometryVelocity`, and the `fsiSteadyStateControl` function object.
+  The velocity solid models integrate the displacement with the backward
+  (BDF2) scheme of `ddt(U)` and evaluate the stress and the interface
+  traction once, at the new time, which is second order in time and damps
+  high-frequency modes. In `newtonIcoFluid`, a `fixedGradient` pressure on a
+  wall with fixed velocity, such as the interface in the monolithic tutorial
+  variants, has its gradient set from the normal momentum equation at the
+  wall, which makes the interface pressure and the added mass second-order
+  accurate in space (a `zeroGradient` interface pressure is first order, and
+  gives a warning), and the viscous interface traction is the wall flux of
+  the momentum equation's viscous term, `nuEff*snGrad(U)`, so that the force
+  on the solid is the momentum the fluid loses;
+  `ringAddedMass/verification/Allverify --study monolithic` verifies the
+  coupling against the exact added-mass solution. The velocity solid models
+  work on axisymmetric (wedge) meshes, and the coupling accepts a solid that
+  starts deformed, which the fluid mesh then follows relative to its initial
+  displacement; `womersleyTube/verification/Allverify --monolithic` verifies
+  both against the exact pulsatile flow in an elastic tube.
   `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,
-  `cavityFlexibleBottom`, `membraneRoof`, `perpendicularFlap`,
-  `ringAddedMass`, `3dTube`, `mokLidDrivenCavity` and `foilInWind`
-  tutorials, whose files are stored as `*.monolithic` variants selected with
+  `cavityFlexibleBottom`, `collapsibleChannel`, `membraneRoof`,
+  `perpendicularFlap`, `ringAddedMass`, `3dTube`, `mokLidDrivenCavity`,
+  `womersleyTube` and `foilInWind` tutorials, whose files are stored as
+  `*.monolithic` variants selected with
   `solids4Foam::selectCaseVariant`. The regression tests of
   `beamInCrossFlow`, `blobInTreacle` and `cavityFlexibleBottom` have a
   monolithic arm.

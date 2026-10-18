@@ -20,8 +20,6 @@ solidModel      linearGeometryVelocity;
 
 linearGeometryVelocityCoeffs
 {
-    // Disable temporal extrapolation of traction boundaries
-    extrapolateTractionBoundaries no;
 }
 
 // ************************************************************************* //

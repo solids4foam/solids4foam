@@ -203,6 +203,7 @@ significance test, which then stall.
 ./Allverify --study coupling # IQN-ILS against Robin-Neumann only
 ./Allverify --cores 5        # run up to 5 serial cases at once
 ./Allverify --reuse          # reuse completed runs whose settings match
+./Allverify --monolithic     # the studies with the quasi-monolithic coupling
 ```
 
 The driver works on copies under `verification/work/` and writes
@@ -310,6 +311,44 @@ study.
 - IQN-ILS and Robin-Neumann agree to $$2.2 \times 10^{-4}$$ or better on every
   quantity. Robin-Neumann takes 9.3 coupling iterations per time-step against
   14.6 for IQN-ILS, and half the run time.
+
+### Quasi-monolithic coupling
+
+`--monolithic` runs the mesh and time-step studies with the quasi-monolithic
+Newton coupling (`./Allrun monolithic`: `newtonIcoFluid` and
+`linearGeometryVelocity`), and compares it, rather than Robin-Neumann, with
+IQN-ILS on the tutorial mesh at 100 steps per period. The seven runs take
+1.3 to 18 minutes each in serial. Every check of the partitioned study
+passes with the same tolerances
+(`postProcessing/verification_summary_monolithic.md`):
+
+| Case | profile | flow_amp | wallMid_amp | wallMid_phase | speed | attenuation |
+|---|---:|---:|---:|---:|---:|---:|
+| m1, n200 | 1.76e-2 | 6.08e-3 | -1.04e-2 | -2.89e-3 | -2.35e-3 | -2.80e-3 |
+| m2, n200 | 4.69e-3 | 9.01e-4 | -2.52e-3 | -1.96e-3 | -5.19e-4 | -2.58e-3 |
+| m4, n200 | 9.97e-4 | -3.42e-4 | -5.30e-4 | -1.62e-3 | -5.96e-5 | -2.31e-3 |
+| m2, n50 | 6.22e-3 | -1.27e-3 | 4.94e-3 | -6.59e-3 | 1.34e-3 | -1.35e-2 |
+| m2, n100 | 4.70e-3 | 4.73e-4 | -9.96e-4 | -2.82e-3 | -1.36e-4 | -4.64e-3 |
+| m2, n400 | 4.68e-3 | 1.01e-3 | -2.90e-3 | -1.76e-3 | -6.16e-4 | -2.09e-3 |
+
+- The observed mesh orders are 2.23 (profile), 2.06 (flow rate), 1.98 (wall
+  amplitude) and 2.00 (wave speed), and the time-step orders of the signed
+  quantities 1.94-2.07 over the finest three steps, so the coupled solution
+  is second order in space and time. `newtonIcoFluid` has no
+  `fluxConsistentPatches` option, but its coupled pressure-velocity solve has
+  no splitting error at the tube ends.
+- It agrees with IQN-ILS to $$7.2 \times 10^{-4}$$ or better on every
+  quantity (the velocity profile, of the largest velocity), and to
+  $$5.5 \times 10^{-4}$$ in the wall amplitude. Its wall amplitude is lower
+  than that of the partitioned (Robin-Neumann) runs by
+  $$3.3$$-$$3.5 \times 10^{-4}$$ on every mesh and step size, so the
+  difference does not change with refinement; its source is not identified.
+  It is below the $$5 \times 10^{-4}$$ the linear theory neglects.
+- It takes 2 Newton iterations per time-step and 149 s, against 14.6 coupling
+  iterations and 524 s for IQN-ILS.
+- The velocity solid starts from the exact displacement with `restart yes`,
+  and the fluid mesh follows the wall displacement relative to its initial
+  value, as in the partitioned set-up.
 
 ### Tolerances
 

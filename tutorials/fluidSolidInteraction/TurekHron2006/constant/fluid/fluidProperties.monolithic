@@ -11,46 +11,33 @@ FoamFile
 {
     version     2.0;
     format      ascii;
-    class       volVectorField;
-    object      DFutureTime;
+    class       dictionary;
+    object      fluidProperties;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-dimensions      [0 1 0 0 0 0 0];
+fluidModel    newtonIcoFluid;
 
-internalField   uniform (0 0 0);
-
-boundaryField
+newtonIcoFluidCoeffs
 {
-    interface
-    {
-        type            calculated;
-        value           uniform (0 0 0);
-    }
+    // Force an implicit flux
+    forceImplicitFlux yes;
 
-    bottom
-    {
-        type            solidTraction;
-        traction        uniform (0 0 0);
-        pressure        uniform 0;
-        value           uniform (0 0 0);
-    }
+    // If the flux is explicit, specific the extrapolation approach
+    // This is not used if forceImplicitFlux is enabled
+    fluidFluxExtrapolationAlgorithm1 yes;
 
-    left
-    {
-        type            fixedValue;
-        value           uniform (0 0 0);
-    }
+    // Additional divU term which is meant to improve convergence
+    addDivPhiUDamping no;
 
-    right
-    {
-        type            fixedValue;
-        value           uniform (0 0 0);
-    }
+    // Scaling of pressure equation relative to the momentum
+    pressureScaleFactor 1.0;
 
-    frontAndBack
+    // Pressure stabilisation approach
+    stabilisation
     {
-        type            empty;
+        type RhieChow;
+        scaleFactor 1.0;
     }
 }
 
