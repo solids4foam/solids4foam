@@ -1,24 +1,30 @@
 #!/usr/bin/env python3
-"""
-Verification driver for the staticCylinderInChannel tutorial: the
-Schafer and Turek (1996) 2D-1 benchmark with the four forcing methods of
+"""Verification of the staticCylinderInChannel tutorial: the Schafer and
+Turek (1996) 2D-1 benchmark with the four forcing methods of
 immersedBoundaryForce on the four MESH_LEVELs of the tutorial.
 
-Each case is generated from the canonical tutorial under verification/work/,
-with only the settings of the study changed: the forcing method (and the
-settings it requires), the mesh level, a fixed time step common to all the
-methods and levels, the end and write times, and the decomposition. The
-tutorial itself is never modified.
+Each case is a copy of the tutorial under verification/work/<study>/, with
+only the settings of the study changed: the forcing method and its settings,
+the mesh level, the time step, end and write times, the outer correctors and
+the decomposition. Serial cases are run with the tutorial's Allrun; parallel
+cases with the solids4foam run functions (solids4Foam::runApplication and
+solids4Foam::runParallel). The tutorial itself is never modified.
 
-Sub-commands:
-    generate   create the cases and their SLURM scripts
-    submit     submit the generated cases (after a resource summary and an
-               explicit --yes), within the aggregate CPU limit
-    analyse    extract Cd and Cl, the steady-state statistics, the Courant
-               number and the cost of the cases into runs.csv; with
-               --report, also convergence.csv, summary.md and the plots
-    extend     restart cases from their end time with the same time step
-               and ranks, and extend them (default by 5 s)
+By default the cases use the frozen settings of the final comparison
+(reference/final_method_comparison.csv): deltaT = 0.001 s, endTime = 15 s,
+nCorrectors 3, nOuterCorrectors 1 for cutLink, ghostCell and penalty, and
+nOuterCorrectors 5 with couplingCoeff 0.2 and the vertexFraction occupancy for
+the legacy incremental method. Overriding a setting adds a tag to the case
+names, so that the sensitivity cases do not replace the final ones.
+
+Usage:
+    ./Allverify [options]            generate, run locally, analyse, check
+    ./Allverify generate [options]   generate the cases only
+    ./Allverify analyse [--study S]  analyse and check the completed cases
+    ./Allverify submit [options]     optional: submit generated cases to SLURM
+
+The default run is cutLink on levels 1-4; --methods all runs the four
+methods (16 cases). --dry-run lists the cases and their estimated cost.
 """
 
 import argparse
@@ -27,9 +33,11 @@ import json
 import math
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -41,46 +49,45 @@ VERIFICATION_DIR = Path(__file__).resolve().parent.parent
 TUTORIAL_DIR = VERIFICATION_DIR.parent
 WORK_DIR = VERIFICATION_DIR / "work"
 OUTPUT_DIR = VERIFICATION_DIR / "postProcessing"
+REFERENCE_DIR = VERIFICATION_DIR / "reference"
 
 METHODS = ("cutLink", "ghostCell", "penalty", "incremental")
 LEVELS = (1, 2, 3, 4)
+DEFAULT_STUDY = "final"
+DEFAULT_METHODS = ("cutLink",)
 
-# Common fixed time step (s), chosen by the Level 4 Courant number
-# calibration (see README.md)
+# Frozen settings of the final comparison
 DELTA_T = 0.001
-
-END_TIME = 10.0
+END_TIME = 15.0
 WRITE_INTERVAL = 5.0
+N_CORRECTORS = 3
+N_OUTER = {"cutLink": 1, "ghostCell": 1, "penalty": 1, "incremental": 5}
+COUPLING_COEFF = 0.2
 
-# MPI ranks at each mesh level, the same for all the methods, from the
-# Level 4 scaling calibration (see README.md)
-RANKS = {1: 1, 2: 1, 3: 2, 4: 8}
+# MPI ranks of each level with --cores auto (the decomposition of the
+# reference runs, capped at the number of available cores)
+AUTO_RANKS = {1: 1, 2: 1, 3: 2, 4: 8}
 
-# SLURM requests at each mesh level: memory and wall time, with a margin of
-# about four over the calibration estimate for 10 s at DELTA_T (Level 4 with
-# 4 ranks: 0.28-0.42 s per step, about 0.8-1.2 h)
-MEMORY = {1: "2G", 2: "2G", 3: "4G", 4: "8G"}
-WALLTIME = {1: "01:00:00", 2: "01:00:00", 3: "03:00:00", 4: "06:00:00"}
-# Site settings, from the environment:
-#   S4F_VERIFY_PARTITION  SLURM partition (default: the default partition)
-#   S4F_VERIFY_MAX_CPUS   aggregate CPU limit of the user's jobs (default 96)
-#   S4F_VERIFY_ENV        script sourced by the jobs to set up OpenFOAM and
-#                         solids4foam (default: none, the jobs inherit the
-#                         environment of the submitting shell)
-PARTITION = os.environ.get("S4F_VERIFY_PARTITION", "")
-MAX_CPUS = int(os.environ.get("S4F_VERIFY_MAX_CPUS", "96"))
-ENV_SH = os.environ.get("S4F_VERIFY_ENV", "")
+# Optional SLURM requests of each level (the legacy incremental cases are
+# the longest: about 6 h on 8 ranks for Level 4)
+SLURM_MEMORY = {1: "2G", 2: "2G", 3: "4G", 4: "8G"}
+SLURM_TIME = {1: "01:00:00", 2: "03:00:00", 3: "08:00:00", 4: "12:00:00"}
 
-# Benchmark reference values (Schafer and Turek, 1996, bounds)
+# Schafer and Turek (1996) 2D-1 benchmark ranges
 CD_BOUNDS = (5.57, 5.59)
 CL_BOUNDS = (0.0104, 0.0110)
 
-# High-precision reference values of the benchmark (FEATFLOW)
+# High-precision numerical reference values (FeatFlow; Nabh, 1998)
 CD_REF = 5.57953523384
 CL_REF = 0.010618948146
 
 # Cd = 2 F/(rho Umean^2 D Lz), with rho = 1, Umean = 0.2, D = Lz = 0.1
 COEFF_SCALE = 2.0/(1.0*0.2**2*0.1*0.1)
+
+# The verification check: the drag of cutLink, with the frozen settings, on
+# the finest level
+CHECK_METHOD = "cutLink"
+CHECK_LEVEL = 4
 
 # Settings of each method in constant/fvOptions, written explicitly (the
 # defaults of immersedBoundaryForce at f33b244a2), and of the body
@@ -114,7 +121,7 @@ METHOD_SETTINGS = {
     ),
     "incremental": (
         [
-            ("couplingCoeff", "0.8"),
+            ("couplingCoeff", "0.2"),
         ],
         [("occupancy", "vertexFraction")],
     ),
@@ -137,13 +144,73 @@ FoamFile
 """
 
 
-def case_name(method: str, level: int, tag: str = "") -> str:
-    return f"{method}-L{level}{('-' + tag) if tag else ''}"
+def fail(message: str) -> None:
+    raise RuntimeError(message)
 
 
 def fmt(value: float) -> str:
     return f"{value:.12g}"
 
+
+# -----------------------------------------------------------------------------
+# Case settings and names
+# -----------------------------------------------------------------------------
+
+def case_settings(method: str, args) -> dict:
+    """Settings of a case: the frozen settings, with the overrides given"""
+    return {
+        "deltaT": args.deltaT if args.deltaT else DELTA_T,
+        "end_time": args.end_time if args.end_time else END_TIME,
+        "write_interval": args.write_interval or WRITE_INTERVAL,
+        "nOuterCorrectors": args.n_outer if args.n_outer else N_OUTER[method],
+        "nCorrectors": N_CORRECTORS,
+        "couplingCoeff": ((args.coupling_coeff if args.coupling_coeff
+                           else COUPLING_COEFF)
+                          if method == "incremental" else None),
+    }
+
+
+def auto_tag(method: str, args) -> str:
+    """Tag of the case names for the settings that differ from the frozen
+    ones, e.g. n3-cc0p8-dt0p0005 (empty for the frozen settings)"""
+    def short(value):
+        return fmt(value).replace(".", "p")
+    parts = []
+    if args.n_outer and args.n_outer != N_OUTER[method]:
+        parts.append(f"n{args.n_outer}")
+    if (method == "incremental" and args.coupling_coeff
+            and args.coupling_coeff != COUPLING_COEFF):
+        parts.append(f"cc{short(args.coupling_coeff)}")
+    if args.deltaT and args.deltaT != DELTA_T:
+        parts.append(f"dt{short(args.deltaT)}")
+    if args.end_time and args.end_time != END_TIME:
+        parts.append(f"t{short(args.end_time)}")
+    return "-".join(parts)
+
+
+def case_name(method: str, level: int, tag: str) -> str:
+    return f"{method}-L{level}{('-' + tag) if tag else ''}"
+
+
+def selected_cases(args) -> list:
+    """(method, level, name) of the selected cases"""
+    cases = []
+    for method in args.methods:
+        tag = "-".join(t for t in (args.tag, auto_tag(method, args)) if t)
+        for level in args.levels:
+            cases.append((method, level, case_name(method, level, tag)))
+    return cases
+
+
+def ranks_of(level: int, cores: str) -> int:
+    if cores == "auto":
+        return max(1, min(AUTO_RANKS[level], os.cpu_count() or 1))
+    return int(cores)
+
+
+# -----------------------------------------------------------------------------
+# Case generation
+# -----------------------------------------------------------------------------
 
 def replace_entry(path: Path, key: str, value: str) -> None:
     """Replace the value of a top-level 'key value;' entry, exactly once"""
@@ -151,20 +218,8 @@ def replace_entry(path: Path, key: str, value: str) -> None:
     pattern = re.compile(rf"^({re.escape(key)}\s+)[^;\n]*;", re.MULTILINE)
     new, count = pattern.subn(lambda m: f"{m.group(1)}{value};", text)
     if count != 1:
-        sys.exit(f"ERROR: found {count} '{key}' entries in {path}")
+        fail(f"found {count} '{key}' entries in {path}")
     path.write_text(new)
-
-
-def method_settings(method: str, coupling_coeff: float = 0.0):
-    """Settings of the method in fvOptions and of the body, with the
-    coupling coefficient of the incremental method overridden if given"""
-    option, body = METHOD_SETTINGS[method]
-    if coupling_coeff > 0:
-        if method != "incremental":
-            sys.exit("ERROR: --coupling-coeff is only used by incremental")
-        option = [(k, fmt(coupling_coeff) if k == "couplingCoeff" else v)
-                  for k, v in option]
-    return option, body
 
 
 def set_pimple_entry(path: Path, key: str, value: int) -> None:
@@ -173,7 +228,7 @@ def set_pimple_entry(path: Path, key: str, value: int) -> None:
     pattern = re.compile(rf"^(\s+{key}\s+)\d+;", re.MULTILINE)
     new, count = pattern.subn(lambda m: f"{m.group(1)}{value};", text)
     if count != 1:
-        sys.exit(f"ERROR: found {count} '{key}' entries in {path}")
+        fail(f"found {count} '{key}' entries in {path}")
     path.write_text(new)
 
 
@@ -184,9 +239,11 @@ def pimple_entry(case: Path, key: str):
     return int(m.group(1)) if m else ""
 
 
-def write_fv_options(path: Path, method: str,
-                     coupling_coeff: float = 0.0) -> None:
-    option, body = method_settings(method, coupling_coeff)
+def write_fv_options(path: Path, method: str, settings: dict) -> None:
+    option, body = METHOD_SETTINGS[method]
+    if method == "incremental":
+        option = [(k, fmt(settings["couplingCoeff"])
+                   if k == "couplingCoeff" else v) for k, v in option]
     width = max(len(k) for k, _ in option + [("method", "")]) + 4
     lines = [FOAM_HEADER.format(location="constant", object="fvOptions")]
     lines.append("// Generated by verification/scripts/"
@@ -220,126 +277,78 @@ def write_decompose_par_dict(path: Path, ranks: int) -> None:
     path.write_text(text)
 
 
-def slurm_header(case: Path, job_name: str, ranks: int, memory: str,
-                 walltime: str, partition: str, env_sh: str) -> str:
-    """SLURM directives and environment set-up of a job script"""
-    lines = [
-        "#!/bin/bash",
-        f"#SBATCH --job-name={job_name}",
-    ]
-    if partition:
-        lines.append(f"#SBATCH --partition={partition}")
-    lines += [
-        "#SBATCH --nodes=1",
-        f"#SBATCH --ntasks={ranks}",
-        "#SBATCH --cpus-per-task=1",
-        f"#SBATCH --mem={memory}",
-        f"#SBATCH --time={walltime}",
-        # With an environment script the job starts from a clean
-        # environment; otherwise it inherits that of the submitting shell
-        f"#SBATCH --export={'NONE' if env_sh else 'ALL'}",
-        f"#SBATCH --chdir={case}",
-        "#SBATCH --output=slurm-%j.out",
-        "#SBATCH --error=slurm-%j.err",
-        "# Generated by verification/scripts/static_cylinder_verification.py",
-        "set -euo pipefail",
-        'export USER="${USER:-$(id -un)}"',
-        'export HOME="${HOME:-$(getent passwd "$USER" | cut -d: -f6)}"',
-        "",
-    ]
-    if env_sh:
-        lines += [
-            f"source {env_sh}",
-            "if declare -F s4f_check_binaries > /dev/null",
-            "then",
-            "    s4f_check_binaries",
-            "fi",
-        ]
-    lines += [
-        'command -v solids4Foam > /dev/null || '
-        '{ echo "solids4Foam not found" >&2; exit 1; }',
-        'echo "solids4Foam=$(command -v solids4Foam)"',
-        "",
-    ]
-    return "\n".join(lines) + "\n"
-
-
-def mpi_run(ranks: int) -> str:
-    # SLURM may not confine the jobs to their cores (TaskPlugin=task/none):
-    # binding with mpirun would then place the ranks of concurrent jobs on
-    # the same cores, so the placement is left to the kernel
-    return "solids4Foam" if ranks == 1 else (
-        f"mpirun -np {ranks} --bind-to none solids4Foam -parallel")
-
-
-def write_run_script(case: Path, name: str, level: int, ranks: int,
-                     memory: str, walltime: str, partition: str,
-                     env_sh: str) -> None:
-    decompose = "" if ranks == 1 else (
-        "decomposePar -force > log.decomposePar 2>&1\n")
-    script = slurm_header(case, f"scv-{name}", ranks, memory, walltime,
-                          partition, env_sh) + f"""\
-echo "job=${{SLURM_JOB_ID:-}} host=$(hostname) ranks={ranks} start=$(date -Is)"
-START=$(date +%s)
-
-blockMesh > log.blockMesh 2>&1
-{decompose}{mpi_run(ranks)} > log.solids4Foam 2>&1
-
-END=$(date +%s)
-echo "end=$(date -Is) wall_s=$((END - START))" | tee wallclock.txt
+# Run script of each case: the tutorial's Allrun in serial, the solids4foam
+# run functions in parallel; it records the wall time in wallclock.txt
+RUN_SCRIPT = """\
+#!/bin/bash
+# Generated by verification/scripts/static_cylinder_verification.py
+cd "${{0%/*}}" || exit 1
+start=$(date +%s)
+{body}
+status=$?
+echo "wall_s=$(( $(date +%s) - start )) status=$status" >> wallclock.txt
+exit $status
 """
-    path = case / "run.slurm"
-    path.write_text(script)
-    path.chmod(0o755)
+
+SERIAL_BODY = "./Allrun"
+
+PARALLEL_BODY = """\
+(
+    # As in the tutorial's Allrun, with decomposePar and runParallel
+    . "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+    source solids4FoamScripts.sh
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    solids4Foam::runApplication blockMesh || exit 1
+    solids4Foam::runApplication decomposePar || exit 1
+    solids4Foam::runParallel solids4Foam
+)"""
 
 
-def generate_case(method: str, level: int, args) -> Path:
-    ranks = args.ranks if args.ranks else RANKS[level]
-    name = case_name(method, level, args.tag)
-    case = WORK_DIR / (args.study) / name
+def generate_case(method: str, level: int, name: str, args) -> Path:
+    settings = case_settings(method, args)
+    ranks = ranks_of(level, args.cores)
+    case = WORK_DIR / args.study / name
     if case.exists():
         if not args.force:
-            sys.exit(f"ERROR: {case} exists (use --force to regenerate)")
+            fail(f"{case} exists: use --reuse to keep completed runs or "
+                 "--force to regenerate it")
         shutil.rmtree(case)
     case.mkdir(parents=True)
 
-    for item in ("0", "constant", "system"):
-        shutil.copytree(TUTORIAL_DIR / item, case / item, symlinks=True)
+    for item in ("0", "constant", "system", "Allrun", "forceCoeffs.gnuplot"):
+        source = TUTORIAL_DIR / item
+        if source.is_dir():
+            shutil.copytree(source, case / item, symlinks=True)
+        else:
+            shutil.copy2(source, case / item)
 
     # Mesh level, written into the dictionary rather than taken from the
     # environment
     replace_entry(case / "system/blockMeshDict", "MESH_LEVEL", str(level))
 
-    # Fixed time step
     control = case / "system/controlDict"
-    replace_entry(control, "deltaT", fmt(args.deltaT))
+    replace_entry(control, "deltaT", fmt(settings["deltaT"]))
     replace_entry(control, "adjustTimeStep", "no")
-    replace_entry(control, "endTime", fmt(args.end_time))
+    replace_entry(control, "endTime", fmt(settings["end_time"]))
     replace_entry(control, "writeControl", "runTime")
-    replace_entry(control, "writeInterval", fmt(args.write_interval))
+    replace_entry(control, "writeInterval", fmt(settings["write_interval"]))
 
-    write_fv_options(case / "constant/fvOptions", method,
-                     args.coupling_coeff)
-    if args.n_outer:
-        set_pimple_entry(case / "system/fvSolution", "nOuterCorrectors",
-                         args.n_outer)
+    write_fv_options(case / "constant/fvOptions", method, settings)
+    fv_solution = case / "system/fvSolution"
+    set_pimple_entry(fv_solution, "nOuterCorrectors",
+                     settings["nOuterCorrectors"])
+    set_pimple_entry(fv_solution, "nCorrectors", settings["nCorrectors"])
     write_decompose_par_dict(case / "system/decomposeParDict", ranks)
 
-    write_run_script(
-        case, name, level, ranks,
-        args.memory or MEMORY[level], args.walltime or WALLTIME[level],
-        args.partition, args.env_sh
-    )
+    script = case / "Allrun.verify"
+    script.write_text(RUN_SCRIPT.format(
+        body=SERIAL_BODY if ranks == 1 else PARALLEL_BODY))
+    script.chmod(0o755)
 
     sha = subprocess.run(
         ["git", "-C", str(TUTORIAL_DIR), "rev-parse", "HEAD"],
-        capture_output=True, text=True, check=False
-    ).stdout.strip()
-    dirty = subprocess.run(
-        ["git", "-C", str(TUTORIAL_DIR), "status", "--porcelain", "--", "."],
-        capture_output=True, text=True, check=False
-    ).stdout.strip()
-
+        capture_output=True, text=True, check=False).stdout.strip()
     meta = {
         "study": args.study,
         "case": name,
@@ -347,83 +356,188 @@ def generate_case(method: str, level: int, args) -> Path:
         "level": level,
         "cells_per_D": 10*2**(level - 1),
         "h_over_D": 0.1/2**(level - 1),
-        "n_cells_expected": (60 + 50)*41*4**(level - 1),
         "ranks": ranks,
         "decomposition": f"simple ({ranks} 1 1)",
-        "deltaT": args.deltaT,
-        "nOuterCorrectors": pimple_entry(case, "nOuterCorrectors"),
-        "nCorrectors": pimple_entry(case, "nCorrectors"),
-        "end_time": args.end_time,
-        "write_interval": args.write_interval,
-        "fvOptions": dict(method_settings(method, args.coupling_coeff)[0]),
-        "body": dict(method_settings(method, args.coupling_coeff)[1]),
-        "partition": args.partition,
-        "memory": args.memory or MEMORY[level],
-        "walltime": args.walltime or WALLTIME[level],
-        "env_sh": args.env_sh,
+        "deltaT": settings["deltaT"],
+        "end_time": settings["end_time"],
+        "write_interval": settings["write_interval"],
+        "nOuterCorrectors": settings["nOuterCorrectors"],
+        "nCorrectors": settings["nCorrectors"],
+        "fvOptions": dict(METHOD_SETTINGS[method][0]),
+        "body": dict(METHOD_SETTINGS[method][1]),
         "git_sha": sha,
-        "tutorial_modified": bool(dirty),
         "generated": datetime.now().isoformat(timespec="seconds"),
     }
+    if method == "incremental":
+        meta["fvOptions"]["couplingCoeff"] = fmt(settings["couplingCoeff"])
     (case / "case.json").write_text(json.dumps(meta, indent=2) + "\n")
     return case
 
 
-def selected_cases(args) -> list:
-    return [(m, lv) for m in args.methods for lv in args.levels]
+def completed(case: Path) -> bool:
+    log = case / "log.solids4Foam"
+    return log.is_file() and bool(re.search(
+        r"^End\s*$", log.read_text(errors="replace"), re.MULTILINE))
 
 
-def cmd_generate(args) -> None:
-    if not args.env_sh and shutil.which("solids4Foam") is None:
-        sys.exit("ERROR: solids4Foam is not on the PATH and no environment "
-                 "script is given: source OpenFOAM and solids4foam, or set "
-                 "S4F_VERIFY_ENV (or --env-sh)")
-    if args.env_sh and not Path(args.env_sh).is_file():
-        sys.exit(f"ERROR: environment script {args.env_sh} not found")
-    for method, level in selected_cases(args):
-        case = generate_case(method, level, args)
-        meta = json.loads((case / "case.json").read_text())
-        print(f"{case.relative_to(VERIFICATION_DIR)}: ranks={meta['ranks']}"
-              f" deltaT={meta['deltaT']} endTime={meta['end_time']}")
+def solver_problem(case: Path) -> str:
+    """Empty if the solver log shows a completed run, else the reason"""
+    log = case / "log.solids4Foam"
+    if not log.is_file():
+        return f"no {log.name}"
+    text = log.read_text(errors="replace")
+    if re.search(r"FOAM FATAL|FOAM aborting|^ERROR$", text, re.MULTILINE):
+        return f"the solver failed; see {log}"
+    if not re.search(r"^End\s*$", text, re.MULTILINE):
+        return f"the run did not complete; see {log}"
+    return ""
+
+
+def estimate_cpu_hours(cases, args) -> dict:
+    """CPU hours of the reference runs with the same method, level and
+    settings, where available (machine-dependent)"""
+    rows = read_reference_rows()
+    estimates = {}
+    for method, level, name in cases:
+        settings = case_settings(method, args)
+        match = find_reference(rows, method, level, settings)
+        estimates[name] = float(match["cpu_hours"]) if match else math.nan
+    return estimates
+
+
+def prepare(args, generate_only: bool = False) -> list:
+    """Generate the selected cases (or keep the completed ones with --reuse)
+    and return (case, name) pairs; with --dry-run, only list them"""
+    cases = selected_cases(args)
+    estimates = estimate_cpu_hours(cases, args)
+    total = sum(v for v in estimates.values() if not math.isnan(v))
+    print(f"{'case':30s} {'ranks':>5s} {'est. CPU-h':>11s}")
+    for method, level, name in cases:
+        est = estimates[name]
+        print(f"{name:30s} {ranks_of(level, args.cores):5d} "
+              f"{'n/a' if math.isnan(est) else f'{est:.2f}':>11s}")
+    print(f"{len(cases)} case(s) in work/{args.study}; about {total:.1f} "
+          "CPU-h on the reference machine (2 x AMD EPYC 9684X) for the cases "
+          "with a reference run")
+    if args.dry_run:
+        print("Dry run: nothing generated or run")
+        return []
+    prepared = []
+    for method, level, name in cases:
+        case = WORK_DIR / args.study / name
+        if args.reuse and case.exists() and (completed(case)
+                                             or generate_only):
+            print(f"{name}: reusing {case}")
+        else:
+            generate_case(method, level, name, args)
+            print(f"{name}: generated in {case}")
+        prepared.append((case, name))
+    return prepared
+
+
+# -----------------------------------------------------------------------------
+# Running
+# -----------------------------------------------------------------------------
+
+def check_environment() -> None:
+    for executable in ("blockMesh", "solids4Foam", "solids4FoamScripts.sh"):
+        if shutil.which(executable) is None:
+            fail(f"'{executable}' is unavailable: source OpenFOAM and "
+                 "solids4foam first")
+
+
+def run_local(case: Path, name: str) -> None:
+    if completed(case):
+        print(f"{name}: completed run reused")
+        return
+    meta = json.loads((case / "case.json").read_text())
+    print(f"{name}: running on {meta['ranks']} rank(s) "
+          f"({datetime.now():%H:%M:%S})", flush=True)
+    with (case / "log.Allverify").open("w") as handle:
+        result = subprocess.run(["./Allrun.verify"], cwd=case, stdout=handle,
+                                stderr=subprocess.STDOUT, text=True)
+    problem = solver_problem(case)
+    if result.returncode or problem:
+        fail(f"{name}: {problem or 'Allrun.verify failed'}; "
+             f"see {case / 'log.Allverify'}")
+
+
+def cmd_run(args) -> int:
+    if not args.dry_run:
+        check_environment()
+    prepared = prepare(args)
+    if not prepared:
+        return 0
+    start = time.time()
+    for case, name in prepared:
+        run_local(case, name)
+    print(f"All cases completed in {(time.time() - start)/3600:.2f} h")
+    return analyse_and_check(args.study)
+
+
+def cmd_generate(args) -> int:
+    prepare(args, generate_only=True)
+    return 0
 
 
 def queue_cpus() -> int:
+    """CPUs of the user's running and pending SLURM jobs"""
     out = subprocess.run(
-        ["squeue", "-h", "-u", subprocess.run(
-            ["id", "-un"], capture_output=True, text=True).stdout.strip(),
-         "-o", "%C"],
-        capture_output=True, text=True, check=True
-    ).stdout.split()
-    return sum(int(c) for c in out)
+        ["squeue", "--me", "--noheader", "--states=R,PD", "--format=%C"],
+        capture_output=True, text=True, check=True).stdout
+    return sum(int(x) for x in out.split() if x.isdigit())
 
 
-def cmd_submit(args) -> None:
-    cases = []
-    for method, level in selected_cases(args):
-        case = WORK_DIR / args.study / case_name(method, level, args.tag)
-        if not (case / "run.slurm").exists():
-            sys.exit(f"ERROR: {case} has not been generated")
+def cmd_submit(args) -> int:
+    """Optional: submit generated cases to SLURM, one job per case running
+    its Allrun.verify; only the summary is printed without --yes"""
+    jobs = []
+    for method, level, name in selected_cases(args):
+        case = WORK_DIR / args.study / name
+        if not (case / "Allrun.verify").exists():
+            fail(f"{case} has not been generated (./Allverify generate)")
+        if completed(case):
+            print(f"{name}: completed run, not submitted")
+            continue
         meta = json.loads((case / "case.json").read_text())
-        cases.append((case, meta))
-
-    in_queue = queue_cpus()
-    requested = sum(m["ranks"] for _, m in cases)
-    print(f"{'case':28s} {'ranks':>5s} {'memory':>7s} {'walltime':>9s}")
-    for case, m in cases:
-        print(f"{m['case']:28s} {m['ranks']:5d} {m['memory']:>7s} "
-              f"{m['walltime']:>9s}")
-    print(f"jobs={len(cases)} cpus_requested={requested} "
-          f"cpus_already_in_queue={in_queue} limit={MAX_CPUS}")
-
-    if in_queue + requested > MAX_CPUS:
-        sys.exit("ERROR: the aggregate CPU limit would be exceeded")
+        jobs.append((case, meta))
+    requested = sum(m["ranks"] for _, m in jobs)
+    print(f"{'case':30s} {'ranks':>5s} {'memory':>7s} {'time':>9s}")
+    for case, m in jobs:
+        print(f"{m['case']:30s} {m['ranks']:5d} "
+              f"{args.mem or SLURM_MEMORY[m['level']]:>7s} "
+              f"{args.time or SLURM_TIME[m['level']]:>9s}")
+    print(f"{len(jobs)} job(s), {requested} CPU(s)")
+    if args.max_cpus:
+        if shutil.which("squeue") is None:
+            fail("--max-cpus needs squeue")
+        in_queue = queue_cpus()
+        print(f"{in_queue} CPU(s) already queued; limit {args.max_cpus}")
+        if in_queue + requested > args.max_cpus:
+            fail("the CPU limit given by --max-cpus would be exceeded")
     if not args.yes:
         print("Not submitted: re-run with --yes to submit")
-        return
-    for case, _ in cases:
-        out = subprocess.run(["sbatch", "run.slurm"], cwd=case,
-                             capture_output=True, text=True, check=True)
-        print(f"{case.name}: {out.stdout.strip()}")
+        return 0
+    if shutil.which("sbatch") is None:
+        fail("sbatch is unavailable: run the cases locally with ./Allverify")
+    setup = (f"source {shlex.quote(args.env_script)} && "
+             if args.env_script else "")
+    for case, m in jobs:
+        command = (f"{setup}cd {shlex.quote(str(case))} && "
+                   "./Allrun.verify > log.Allverify 2>&1")
+        sbatch = ["sbatch", "--parsable", f"--job-name=scv-{m['case']}",
+                  f"--ntasks={m['ranks']}", "--cpus-per-task=1",
+                  f"--mem={args.mem or SLURM_MEMORY[m['level']]}",
+                  f"--time={args.time or SLURM_TIME[m['level']]}",
+                  f"--output={case / 'log.slurm'}", f"--chdir={case}"]
+        if args.partition:
+            sbatch.append(f"--partition={args.partition}")
+        sbatch += shlex.split(args.sbatch_args)
+        sbatch += ["--wrap", f"bash -c {shlex.quote(command)}"]
+        job = subprocess.run(sbatch, capture_output=True, text=True,
+                             check=True).stdout.strip()
+        print(f"{m['case']}: SLURM job {job}")
+    return 0
 
 
 # -----------------------------------------------------------------------------
@@ -439,8 +553,8 @@ def force_files(case: Path) -> list:
 
 
 def read_forces(files: list):
-    """Time, force and surface-traction drag; on a restart, the rows of the
-    later file replace those of the earlier files from its start time"""
+    """Time and force; on a restart, the rows of the later file replace those
+    of the earlier files from its start time"""
     data = {}
     for path in files:
         start = float(path.parent.name)
@@ -450,13 +564,9 @@ def read_forces(files: list):
             if not line.strip() or line.startswith("#"):
                 continue
             cols = line.split()
-            data[float(cols[0])] = (
-                float(cols[1]), float(cols[2]),
-                float(cols[10]) if len(cols) >= 13 else math.nan
-            )
+            data[float(cols[0])] = (float(cols[1]), float(cols[2]))
     t = sorted(data)
-    return (t, [data[k][0] for k in t], [data[k][1] for k in t],
-            [data[k][2] for k in t])
+    return t, [data[k][0] for k in t], [data[k][1] for k in t]
 
 
 def window_stats(t, v, t0):
@@ -473,15 +583,16 @@ def window_stats(t, v, t0):
     mean = area/duration
     tm = sum(t[i] for i in idx)/len(idx)
     vm = sum(v[i] for i in idx)/len(idx)
-    slope = (sum((t[i] - tm)*(v[i] - vm) for i in idx)
-             / sum((t[i] - tm)**2 for i in idx))
+    denominator = sum((t[i] - tm)**2 for i in idx)
+    slope = (sum((t[i] - tm)*(v[i] - vm) for i in idx)/denominator
+             if denominator > 0 else 0.0)
     values = [v[i] for i in idx]
-    return mean, min(values), max(values), slope, len(idx)
+    return mean, min(values), max(values), slope
 
 
 def range_ratio(t, v):
     """Range of v over the last second divided by that over the second
-    before"""
+    before (about 1 for an oscillation of stationary amplitude)"""
     end = t[-1]
     last = [x for ti, x in zip(t, v) if ti >= end - 1.0 - 1e-12]
     prev = [x for ti, x in zip(t, v) if end - 2.0 - 1e-12 <= ti < end - 1.0]
@@ -491,323 +602,336 @@ def range_ratio(t, v):
     return (max(last) - min(last))/r_prev if r_prev > 0 else math.nan
 
 
-def log_stats(logs: list):
-    """Courant number, time steps, pressure iterations and solver times of
-    the run and its restarts"""
-    max_co = 0.0
-    n_steps = 0
-    exec_time = clock_time = 0.0
-    p_iters = []
-    corr = []
-    lines = []
-    for log in logs:
-        last = None
-        for line in log.read_text(errors="replace").splitlines():
-            lines.append(line)
-            if line.startswith("ExecutionTime"):
-                last = line
-        if last:
-            m = re.search(r"ExecutionTime = ([\d.e+-]+) s\s+ClockTime = "
-                          r"([\d.e+-]+) s", last)
-            if m:
-                exec_time += float(m.group(1))
-                clock_time += float(m.group(2))
-    if not lines:
-        return {}
-    max_co_developed = 0.0
-    for line in lines:
-        if line.startswith("Courant Number mean:"):
-            parts = line.split()
-            max_co = max(max_co, float(parts[5]))
-            # After the start-up (the first 100 time steps)
-            if n_steps > 100:
-                max_co_developed = max(max_co_developed, float(parts[5]))
-        elif line.startswith("Time = "):
-            n_steps += 1
-            if corr:
-                p_iters.append(sum(corr))
-            corr = []
-        elif "Solving for p," in line:
-            m = re.search(r"No Iterations (\d+)", line)
-            if m:
-                corr.append(int(m.group(1)))
-    if corr:
-        p_iters.append(sum(corr))
+def classify(t, cd, cl, end_time, window=2.0, steady_tol=1e-5,
+             cl_tol=1e-5) -> dict:
+    """Statistics of Cd and Cl over the final window and the status of the
+    run: steady, limit cycle (constant mean, stationary oscillation),
+    drifting or incomplete"""
+    t0 = t[-1] - window
+    scd = window_stats(t, cd, t0)
+    scl = window_stats(t, cl, t0)
+    complete = t[-1] >= end_time - 1e-9
+    cd_mean = scd[0] if scd else math.nan
+    cd_rel_range = (scd[2] - scd[1])/abs(cd_mean) if scd else math.nan
+    cd_rel_drift = abs(scd[3])*10.0/abs(cd_mean) if scd else math.nan
+    cl_range = scl[2] - scl[1] if scl else math.nan
+    steady = bool(complete and scd and scl and cd_rel_range <= steady_tol
+                  and cd_rel_drift <= steady_tol and cl_range <= cl_tol)
+    if steady:
+        status = "steady"
+    elif (complete and scd and scl and cd_rel_drift <= steady_tol
+          and (cd_rel_range <= steady_tol
+               or 0.9 <= range_ratio(t, cd) <= 1.1)
+          and (cl_range <= cl_tol or 0.9 <= range_ratio(t, cl) <= 1.1)):
+        status = "limit cycle"
+    else:
+        status = "drifting" if complete else "incomplete"
     return {
-        "n_steps": n_steps,
-        "max_co": max_co,
-        "max_co_developed": max_co_developed,
-        "execution_time_s": exec_time,
-        "clock_time_s": clock_time,
-        "p_iters_per_step": (sum(p_iters)/len(p_iters)) if p_iters
-        else math.nan,
+        "end_time": t[-1], "Cd_mean": cd_mean,
+        "Cd_range": (scd[2] - scd[1]) if scd else math.nan,
+        "Cd_rel_drift_10s": cd_rel_drift,
+        "Cl_mean": scl[0] if scl else math.nan, "Cl_range": cl_range,
+        "complete": complete, "status": status,
     }
 
 
-def case_rows(study: str, window: float, steady_tol: float,
-              cl_tol: float) -> list:
-    """One row per case with results: force statistics over the final
-    window, steady-state flag, Courant number, iterations and cost"""
+def log_stats(case: Path) -> dict:
+    """Maximum Courant number and pressure iterations per time step of the
+    run and its restarts"""
+    logs = sorted(case.glob("log.solids4Foam*"),
+                  key=lambda f: (f.name != "log.solids4Foam", f.name))
+    max_co, steps, p_iters, corr = 0.0, 0, [], []
+    for log in logs:
+        for line in log.read_text(errors="replace").splitlines():
+            if line.startswith("Courant Number mean:"):
+                max_co = max(max_co, float(line.split()[5]))
+            elif line.startswith("Time = "):
+                steps += 1
+                if corr:
+                    p_iters.append(sum(corr))
+                corr = []
+            elif "Solving for p," in line:
+                m = re.search(r"No Iterations (\d+)", line)
+                if m:
+                    corr.append(int(m.group(1)))
+    if corr:
+        p_iters.append(sum(corr))
+    return {"max_co": max_co, "n_steps": steps,
+            "p_iters_per_step": (sum(p_iters)/len(p_iters)) if p_iters
+            else math.nan}
+
+
+def wall_seconds(case: Path) -> float:
+    """Wall time of the run (and its restarts) from wallclock.txt"""
+    path = case / "wallclock.txt"
+    if not path.exists():
+        return math.nan
+    walls = re.findall(r"wall_s=(\d+)", path.read_text())
+    return float(sum(int(w) for w in walls)) if walls else math.nan
+
+
+def case_row(case: Path):
+    meta_path = case / "case.json"
+    files = force_files(case)
+    if not meta_path.exists() or not files:
+        return None
+    meta = json.loads(meta_path.read_text())
+    t, fx, fy = read_forces(files)
+    stats = classify(t, [COEFF_SCALE*f for f in fx],
+                     [COEFF_SCALE*f for f in fy], meta["end_time"])
+    wall = wall_seconds(case)
+    row = {
+        "study": meta["study"], "case": meta["case"],
+        "method": meta["method"], "level": meta["level"],
+        "cells_per_D": meta["cells_per_D"], "ranks": meta["ranks"],
+        "couplingCoeff": meta["fvOptions"].get("couplingCoeff", ""),
+        "occupancy": meta["body"].get("occupancy", ""),
+        "deltaT": meta["deltaT"],
+        "nOuterCorrectors": pimple_entry(case, "nOuterCorrectors"),
+        "nCorrectors": pimple_entry(case, "nCorrectors"),
+        "end_time_target": meta["end_time"],
+    }
+    row["frozen_settings"] = is_frozen(row)
+    row.update(stats)
+    row.update(log_stats(case))
+    row["Cd_rel_deviation"] = stats["Cd_mean"]/CD_REF - 1.0
+    row["Cl_rel_deviation"] = stats["Cl_mean"]/CL_REF - 1.0
+    row["wall_s"] = wall
+    row["cpu_hours"] = wall*meta["ranks"]/3600.0
+    return row
+
+
+def is_frozen(row: dict) -> bool:
+    """Whether a case used the frozen settings of the final comparison"""
+    method = row["method"]
+    try:
+        return (int(row["nOuterCorrectors"]) == N_OUTER[method]
+                and int(row["nCorrectors"]) == N_CORRECTORS
+                and abs(float(row["deltaT"]) - DELTA_T) < 1e-12
+                and abs(float(row["end_time_target"]) - END_TIME) < 1e-9
+                and (method != "incremental"
+                     or abs(float(row["couplingCoeff"]) - COUPLING_COEFF)
+                     < 1e-12))
+    except (KeyError, ValueError, TypeError):
+        return False
+
+
+def study_rows(study: str) -> list:
     rows = []
     for case in sorted((WORK_DIR / study).glob("*-L*")):
-        meta_path = case / "case.json"
-        files = force_files(case)
-        if not meta_path.exists() or not files:
-            continue
-        meta = json.loads(meta_path.read_text())
-        t, fx, fy, fxs = read_forces(files)
-        cd = [COEFF_SCALE*f for f in fx]
-        cl = [COEFF_SCALE*f for f in fy]
-        t0 = t[-1] - window
-        scd = window_stats(t, cd, t0)
-        scl = window_stats(t, cl, t0)
-        logs = sorted(case.glob("log.solids4Foam*"),
-                      key=lambda f: (f.name != "log.solids4Foam", f.name))
-        stats = log_stats(logs)
-        wall = math.nan
-        wc = case / "wallclock.txt"
-        if wc.exists():
-            walls = re.findall(r"wall_s=(\d+)", wc.read_text())
-            wall = float(sum(int(w) for w in walls)) if walls else math.nan
-        n_cells = math.nan
-        bm = case / "log.blockMesh"
-        if bm.exists():
-            m = re.search(r"nCells:\s*(\d+)", bm.read_text())
-            n_cells = int(m.group(1)) if m else math.nan
-        cd_mean = scd[0] if scd else math.nan
-        cd_rel_range = ((scd[2] - scd[1])/abs(cd_mean)) if scd else math.nan
-        cd_rel_drift = (abs(scd[3])*10.0/abs(cd_mean)) if scd else math.nan
-        cl_range = (scl[2] - scl[1]) if scl else math.nan
-        complete = t[-1] >= meta["end_time"] - 1e-9
-        cd_steady = bool(
-            complete and scd is not None
-            and cd_rel_range <= steady_tol
-            and cd_rel_drift <= steady_tol
-        )
-        cl_steady = bool(complete and scl is not None and cl_range <= cl_tol)
-        steady = cd_steady and cl_steady
-        # Ratio of the ranges over the last and the previous second of the
-        # window: about 1 for a stationary oscillation amplitude
-        cd_ratio = range_ratio(t, cd)
-        cl_ratio = range_ratio(t, cl)
-        if steady:
-            status = "steady"
-        elif (complete and cd_rel_drift <= steady_tol
-              and (cd_rel_range <= steady_tol
-                   or 0.9 <= cd_ratio <= 1.1)
-              and (cl_range <= cl_tol or 0.9 <= cl_ratio <= 1.1)):
-            # Constant mean with a persistent oscillation of constant
-            # amplitude
-            status = "limit cycle"
-        else:
-            status = "drifting" if complete else "incomplete"
-        # Fraction of successive differences of Cl over the window that
-        # change sign: close to 1 for a period-2 (time step to time step)
-        # oscillation
-        wcl = [c for ti, c in zip(t, cl) if ti >= t0 - 1e-12]
-        dcl = [b - a for a, b in zip(wcl, wcl[1:])]
-        cl_alternation = (
-            sum(1 for a, b in zip(dcl, dcl[1:]) if a*b < 0)/(len(dcl) - 1)
-            if len(dcl) > 1 else math.nan
-        )
-        row = {
-            "study": meta["study"], "case": meta["case"],
-            "method": meta["method"], "level": meta["level"],
-            "n_cells": n_cells, "cells_per_D": meta["cells_per_D"],
-            "h_over_D": meta["h_over_D"], "ranks": meta["ranks"],
-            "decomposition": meta["decomposition"],
-            "partition": meta["partition"],
-            "deltaT": meta["deltaT"], "dt_strategy": "fixed",
-            "end_time": t[-1], "window_t0": t0,
-            "Cd_last": cd[-1], "Cd_mean": cd_mean,
-            "Cd_min": scd[1] if scd else math.nan,
-            "Cd_max": scd[2] if scd else math.nan,
-            "Cd_rel_range": cd_rel_range,
-            "Cd_slope_per_s": scd[3] if scd else math.nan,
-            "Cd_rel_drift_10s": cd_rel_drift,
-            "Cl_last": cl[-1], "Cl_mean": scl[0] if scl else math.nan,
-            "Cl_min": scl[1] if scl else math.nan,
-            "Cl_max": scl[2] if scl else math.nan,
-            "Cl_range": cl_range,
-            "Cd_surface_traction_last": COEFF_SCALE*fxs[-1],
-            "Cd_ref": CD_REF,
-            "Cd_abs_err": cd_mean - CD_REF,
-            "Cd_rel_err": (cd_mean - CD_REF)/CD_REF,
-            "Cl_ref": CL_REF,
-            "Cl_abs_err": (scl[0] - CL_REF) if scl else math.nan,
-            "Cd_in_bounds": CD_BOUNDS[0] <= cd_mean <= CD_BOUNDS[1],
-            "Cl_in_bounds": bool(scl and CL_BOUNDS[0] <= scl[0] <= CL_BOUNDS[1]),
-            "complete": complete,
-            "Cd_steady": cd_steady,
-            "Cl_steady": cl_steady,
-            "Cl_step_alternation": cl_alternation,
-            "Cd_range_ratio": cd_ratio,
-            "Cl_range_ratio": cl_ratio,
-            "steady": steady,
-            "status": status,
-            "wall_s": wall,
-            "cpu_hours": wall*meta["ranks"]/3600.0,
-            "couplingCoeff": meta["fvOptions"].get("couplingCoeff", ""),
-            "nOuterCorrectors": pimple_entry(case, "nOuterCorrectors"),
-            "nCorrectors": pimple_entry(case, "nCorrectors"),
-            "git_sha": meta["git_sha"],
-        }
-        row.update(stats)
-        rows.append(row)
+        row = case_row(case)
+        if row:
+            rows.append(row)
     return rows
 
 
-def cmd_analyse(args) -> None:
-    rows = case_rows(args.study, args.window, args.steady_tol, args.cl_tol)
-    if not rows:
-        sys.exit(f"No cases with results in {WORK_DIR / args.study}")
-    out_dir = OUTPUT_DIR / args.study
+def read_reference_rows() -> list:
+    rows = []
+    for path in sorted(REFERENCE_DIR.glob("*.csv")):
+        with path.open() as handle:
+            lines = [line for line in handle if not line.startswith("#")]
+        for row in csv.DictReader(lines):
+            if "level" in row and "method" in row:
+                row["_file"] = path.name
+                rows.append(row)
+    return rows
+
+
+def find_reference(rows: list, method: str, level: int, settings: dict):
+    """The reference row with the same method, level and settings"""
+    for row in rows:
+        try:
+            if (row["method"] == method and int(row["level"]) == level
+                    and abs(float(row["deltaT"]) - settings["deltaT"]) < 1e-12
+                    and int(row["nOuterCorrectors"])
+                    == settings["nOuterCorrectors"]
+                    and abs(float(row.get("end_time") or 0)
+                            - settings["end_time"]) < 1e-9
+                    and (method != "incremental"
+                         or abs(float(row["couplingCoeff"])
+                                - settings["couplingCoeff"]) < 1e-12)):
+                return row
+        except (KeyError, ValueError):
+            continue
+    return None
+
+
+def verification_check(rows: list) -> tuple:
+    """The verification check on the analysed cases: the time-averaged drag
+    of cutLink, with the frozen settings, on Level 4 within the Schafer and
+    Turek (1996) range. Returns (result, message), result PASS, FAIL or
+    SKIPPED"""
+    case = next((r for r in rows if r["method"] == CHECK_METHOD
+                 and int(r["level"]) == CHECK_LEVEL
+                 and r.get("frozen_settings")), None)
+    label = f"{CHECK_METHOD} L{CHECK_LEVEL} (frozen settings)"
+    if case is None:
+        return "SKIPPED", f"{label} was not run"
+    if not case["complete"] or math.isnan(case["Cd_mean"]):
+        return "SKIPPED", f"{label} is incomplete"
+    lo, hi = CD_BOUNDS
+    cd = case["Cd_mean"]
+    if lo <= cd <= hi:
+        return "PASS", (f"{label}: Cd = {cd:.6f} is within the Schafer and "
+                        f"Turek range {lo} <= Cd <= {hi}")
+    return "FAIL", (f"{label}: Cd = {cd:.6f} is outside the Schafer and "
+                    f"Turek range {lo} <= Cd <= {hi}")
+
+
+def analyse_and_check(study: str) -> int:
+    rows = study_rows(study)
+    out_dir = OUTPUT_DIR / study
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / "runs.csv"
-    with out.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(rows)
+    references = read_reference_rows()
+    for row in rows:
+        settings = {"deltaT": float(row["deltaT"]),
+                    "nOuterCorrectors": int(row["nOuterCorrectors"]),
+                    "end_time": float(row["end_time_target"]),
+                    "couplingCoeff": float(row["couplingCoeff"] or 0)}
+        ref = find_reference(references, row["method"], int(row["level"]),
+                             settings)
+        row["Cd_reference_run"] = float(ref["Cd_mean"]) if ref else math.nan
+        row["reference_file"] = ref["_file"] if ref else ""
+    if rows:
+        with (out_dir / "cases.csv").open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(rows)
+    result, message = verification_check(rows)
+
+    lines = [f"# staticCylinderInChannel verification: {study}", "",
+             f"- Result: {result}", f"- {message}", ""]
+    if rows:
+        lines += ["| Case | Cd | Cd dev. | Cl | Status | Ref. run Cd |",
+                  "| --- | --- | --- | --- | --- | --- |"]
+        for r in rows:
+            ref = ("" if math.isnan(r["Cd_reference_run"])
+                   else f"{r['Cd_reference_run']:.6f}")
+            lines.append(f"| {r['case']} | {r['Cd_mean']:.6f} | "
+                         f"{100*r['Cd_rel_deviation']:+.3f}% | "
+                         f"{r['Cl_mean']:.6f} | {r['status']} | {ref} |")
+        lines += ["", "Cd dev. is the relative deviation from the numerical "
+                  f"reference Cd = {CD_REF}; Ref. run Cd is the tracked "
+                  "reference run with the same settings, if any.", ""]
+    (out_dir / "verification_summary.md").write_text("\n".join(lines))
+
     for r in rows:
-        print(f"{r['case']:16s} t={r['end_time']:<6g} Cd={r['Cd_mean']:.6f} "
-              f"relRange={r['Cd_rel_range']:.1e} "
-              f"drift={r['Cd_rel_drift_10s']:.1e} Cl={r['Cl_mean']:.6f} "
-              f"ClRange={r['Cl_range']:.1e} maxCo={r.get('max_co', math.nan):.3f} "
-              f"steady={r['steady']}")
-    print(f"Wrote {out}")
-
-    if args.report:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import convergence_report
-        convergence_report.report(rows, out_dir, CD_REF, CD_BOUNDS,
-                                  CL_REF, CL_BOUNDS, METHODS, LEVELS)
+        print(f"{r['case']:30s} Cd={r['Cd_mean']:.6f} "
+              f"({100*r['Cd_rel_deviation']:+.3f}%) Cl={r['Cl_mean']:.6f} "
+              f"{r['status']}")
+    print(f"Verification: {result}: {message}")
+    print(f"Results: {out_dir / 'cases.csv'}, "
+          f"{out_dir / 'verification_summary.md'}")
+    return 1 if result == "FAIL" else 0
 
 
-def cmd_extend(args) -> None:
-    """Restart cases from their latest time with the same time step and
-    ranks, adding args.add seconds to the end time"""
-    cases = []
-    for method, level in selected_cases(args):
-        case = WORK_DIR / args.study / case_name(method, level, args.tag)
-        meta = json.loads((case / "case.json").read_text())
-        control = case / "system/controlDict"
-        end = float(re.search(r"^endTime\s+([^;]+);", control.read_text(),
-                              re.MULTILINE).group(1))
-        times_dir = case / "processor0" if meta["ranks"] > 1 else case
-        times = [float(d.name) for d in times_dir.iterdir()
-                 if re.fullmatch(r"[0-9.e+-]+", d.name)]
-        latest = max(times)
-        if abs(latest - end) > 1e-9:
-            sys.exit(f"ERROR: {case.name}: latest time {latest} is not the "
-                     f"end time {end} (incomplete run?)")
-        cases.append((case, meta, end))
-
-    in_queue = queue_cpus()
-    requested = sum(m["ranks"] for _, m, _ in cases)
-    for case, meta, end in cases:
-        print(f"{meta['case']:16s} ranks={meta['ranks']} restart t={end:g} "
-              f"-> {end + args.add:g}")
-    print(f"jobs={len(cases)} cpus_requested={requested} "
-          f"cpus_already_in_queue={in_queue} limit={MAX_CPUS}")
-    if in_queue + requested > MAX_CPUS:
-        sys.exit("ERROR: the aggregate CPU limit would be exceeded")
-    if not args.yes:
-        print("Not extended: re-run with --yes to restart and submit")
-        return
-
-    for case, meta, end in cases:
-        new_end = end + args.add
-        control = case / "system/controlDict"
-        replace_entry(control, "startFrom", "latestTime")
-        replace_entry(control, "endTime", fmt(new_end))
-        k = len(meta.get("extensions", [])) + 1
-        ranks = meta["ranks"]
-        script = slurm_header(
-            case, f"scv-{meta['case']}-ext{k}", ranks, meta["memory"],
-            meta["walltime"], meta["partition"], meta["env_sh"]
-        ) + f"""\
-echo "job=${{SLURM_JOB_ID:-}} host=$(hostname) ranks={ranks} restart from t={end:g} to t={new_end:g} start=$(date -Is)"
-START=$(date +%s)
-
-{mpi_run(ranks)} > log.solids4Foam.ext{k} 2>&1
-
-END=$(date +%s)
-echo "ext{k} end=$(date -Is) wall_s=$((END - START))" | tee -a wallclock.txt
-"""
-        path = case / f"run-ext{k}.slurm"
-        path.write_text(script)
-        path.chmod(0o755)
-        meta.setdefault("extensions", []).append(
-            {"from": end, "to": new_end, "script": path.name,
-             "date": datetime.now().isoformat(timespec="seconds")})
-        meta["end_time"] = new_end
-        (case / "case.json").write_text(json.dumps(meta, indent=2) + "\n")
-        out = subprocess.run(["sbatch", path.name], cwd=case,
-                             capture_output=True, text=True, check=True)
-        print(f"{case.name}: {out.stdout.strip()} ({path.name})")
+def cmd_analyse(args) -> int:
+    if not (WORK_DIR / args.study).is_dir():
+        print(f"No cases in {WORK_DIR / args.study}")
+    return analyse_and_check(args.study)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    sub = parser.add_subparsers(dest="command", required=True)
+# -----------------------------------------------------------------------------
+# Command line
+# -----------------------------------------------------------------------------
 
-    def common(p):
-        p.add_argument("--study", default="mesh",
-                       help="sub-directory of work/ (default mesh)")
-        p.add_argument("--methods", nargs="+", default=list(METHODS),
-                       choices=METHODS)
-        p.add_argument("--levels", nargs="+", type=int, default=list(LEVELS),
-                       choices=LEVELS)
-        p.add_argument("--tag", default="", help="suffix of the case names")
+def positive_cores(value: str) -> str:
+    if value != "auto" and (not value.isdecimal() or int(value) < 1):
+        raise argparse.ArgumentTypeError("a positive integer or auto")
+    return value
 
-    g = sub.add_parser("generate", help="generate the cases")
-    common(g)
-    g.add_argument("--deltaT", type=float, default=DELTA_T)
-    g.add_argument("--end-time", type=float, default=END_TIME)
-    g.add_argument("--write-interval", type=float, default=WRITE_INTERVAL)
-    g.add_argument("--coupling-coeff", type=float, default=0.0,
-                   help="override couplingCoeff of the incremental method")
-    g.add_argument("--n-outer", type=int, default=0,
-                   help="nOuterCorrectors of PIMPLE (default: the tutorial)")
-    g.add_argument("--ranks", type=int, default=0,
-                   help="override the rank policy for all the cases")
-    g.add_argument("--memory", default="")
-    g.add_argument("--walltime", default="")
-    g.add_argument("--partition", default=PARTITION)
-    g.add_argument("--env-sh", default=ENV_SH)
-    g.add_argument("--force", action="store_true",
-                   help="regenerate existing cases")
-    g.set_defaults(func=cmd_generate)
 
-    s = sub.add_parser("submit", help="submit the generated cases")
-    common(s)
-    s.add_argument("--yes", action="store_true",
-                   help="submit (otherwise only the summary is printed)")
-    s.set_defaults(func=cmd_submit)
+def method_list(values: list) -> list:
+    if values == ["all"]:
+        return list(METHODS)
+    for value in values:
+        if value not in METHODS:
+            raise SystemExit(f"--methods: unknown method {value}; choose from "
+                             f"{', '.join(METHODS)} or all")
+    return values
 
-    a = sub.add_parser("analyse", help="analyse the completed cases")
-    a.add_argument("--study", default="mesh")
-    a.add_argument("--window", type=float, default=2.0,
-                   help="final time window for the statistics (s)")
-    a.add_argument("--steady-tol", type=float, default=1e-5,
-                   help="relative range and 10 s drift tolerance of Cd")
-    a.add_argument("--cl-tol", type=float, default=1e-5,
-                   help="range tolerance of Cl over the window")
-    a.add_argument("--report", action="store_true",
-                   help="also write convergence.csv, summary.md and plots")
-    a.set_defaults(func=cmd_analyse)
 
-    e = sub.add_parser("extend", help="restart cases and extend them")
-    common(e)
-    e.add_argument("--add", type=float, default=5.0,
-                   help="time added to the end time (s)")
-    e.add_argument("--yes", action="store_true",
-                   help="restart and submit (otherwise only the summary)")
-    e.set_defaults(func=cmd_extend)
+def selection_options(p, run_options: bool = True) -> None:
+    p.add_argument("--study", default=DEFAULT_STUDY,
+                   help=f"sub-directory of work/ (default {DEFAULT_STUDY})")
+    p.add_argument("--methods", nargs="+", default=list(DEFAULT_METHODS),
+                   metavar="METHOD",
+                   help="cutLink, ghostCell, penalty, incremental or all "
+                   "(default cutLink)")
+    p.add_argument("--levels", nargs="+", type=int, default=list(LEVELS),
+                   choices=LEVELS, help="mesh levels (default 1 2 3 4)")
+    p.add_argument("--tag", default="", help="extra suffix of the case names")
+    p.add_argument("--n-outer", type=int, default=0,
+                   help="override nOuterCorrectors (frozen: 1, and 5 for "
+                   "incremental)")
+    p.add_argument("--coupling-coeff", type=float, default=0.0,
+                   help="override couplingCoeff of incremental (frozen 0.2)")
+    p.add_argument("--deltaT", type=float, default=0.0,
+                   help=f"override the time step (frozen {DELTA_T} s)")
+    p.add_argument("--end-time", type=float, default=0.0,
+                   help=f"override the end time (frozen {END_TIME:g} s)")
+    if run_options:
+        p.add_argument("--write-interval", type=float, default=0.0,
+                       help=f"write interval (default {WRITE_INTERVAL:g} s)")
+        p.add_argument("--cores", type=positive_cores, default="auto",
+                       help="MPI ranks per case: a positive integer or auto "
+                       "(default: 1, 1, 2 and 8 on levels 1-4, at most the "
+                       "available cores)")
+        p.add_argument("--reuse", action="store_true",
+                       help="keep the completed cases found in work/")
+        p.add_argument("--force", action="store_true",
+                       help="regenerate existing cases")
+        p.add_argument("--dry-run", action="store_true",
+                       help="list the cases and their cost; run nothing")
 
-    args = parser.parse_args()
-    args.func(args)
+
+def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    commands = ("run", "generate", "analyse", "submit")
+    command = argv.pop(0) if argv and argv[0] in commands else "run"
+    parser = argparse.ArgumentParser(
+        prog=f"Allverify {command}" if command != "run" else "Allverify",
+        description=__doc__.split("\n\n")[0])
+    if command in ("run", "generate"):
+        selection_options(parser)
+    elif command == "analyse":
+        parser.add_argument("--study", default=DEFAULT_STUDY,
+                            help="sub-directory of work/ (default "
+                            f"{DEFAULT_STUDY})")
+    else:
+        selection_options(parser, run_options=False)
+        parser.add_argument("--env-script",
+                            default=os.environ.get("S4F_ENV_SCRIPT", ""),
+                            help="script sourced in each job to set up "
+                            "OpenFOAM and solids4foam (default "
+                            "$S4F_ENV_SCRIPT; none: the job inherits the "
+                            "submitting environment)")
+        parser.add_argument("--partition", default="",
+                            help="SLURM partition (default: the default)")
+        parser.add_argument("--max-cpus", type=int, default=0,
+                            help="refuse to submit beyond this number of "
+                            "queued CPUs of the user (default: no limit)")
+        parser.add_argument("--time", default="",
+                            help="wall time of each job (default by level)")
+        parser.add_argument("--mem", default="",
+                            help="memory of each job (default by level)")
+        parser.add_argument("--sbatch-args", default="",
+                            help="further sbatch options, e.g. site settings")
+        parser.add_argument("--yes", action="store_true",
+                            help="submit (otherwise only the summary)")
+    args = parser.parse_args(argv)
+    if hasattr(args, "methods"):
+        args.methods = method_list(args.methods)
+    if command == "submit":
+        args.write_interval = 0.0
+        args.cores = "auto"
+    return {"run": cmd_run, "generate": cmd_generate,
+            "analyse": cmd_analyse, "submit": cmd_submit}[command](args)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        sys.exit(main())
+    except (RuntimeError, subprocess.SubprocessError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        sys.exit(2)

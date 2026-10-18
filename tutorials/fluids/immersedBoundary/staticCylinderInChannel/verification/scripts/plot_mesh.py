@@ -11,15 +11,14 @@ cut links (0 < kappa < kappa_s). It reads existing files only and runs no
 OpenFOAM application.
 
 Usage (from verification/):
-    python3 scripts/plot_mesh.py                   # work/mesh/cutLink-L2
-    python3 scripts/plot_mesh.py --case work/mesh/cutLink-L3 --name mesh_L3
+    python3 scripts/plot_mesh.py                   # work/final/cutLink-L2
+    python3 scripts/plot_mesh.py --case work/final/cutLink-L3 --name mesh_L3
 
 Writes postProcessing/figures/mesh/<name>.pdf and .png (300 dpi) and,
 with --preview, a 150 dpi PNG (the tracked images/<name>.png).
 """
 
 import argparse
-import math
 import re
 import sys
 from pathlib import Path
@@ -95,7 +94,7 @@ def stl_section(path: Path, z0: float):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--case", default="work/mesh/cutLink-L2",
+    parser.add_argument("--case", default="work/final/cutLink-L2",
                         help="case directory, relative to verification/")
     parser.add_argument("--time", default="",
                         help="time directory of the fields (default latest)")

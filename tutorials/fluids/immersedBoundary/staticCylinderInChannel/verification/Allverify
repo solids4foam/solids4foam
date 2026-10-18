@@ -2,14 +2,14 @@
 # Opt-in verification driver for the staticCylinderInChannel tutorial: the
 # four immersedBoundaryForce methods on the four mesh levels. See README.md.
 #
-#     ./Allverify generate                 # all methods, levels 1-4
-#     ./Allverify submit                   # resource summary only
-#     ./Allverify submit --yes             # submit through SLURM
-#     ./Allverify analyse                  # CSV of the completed cases
+#     ./Allverify                  # cutLink on levels 1-4: run, analyse, check
+#     ./Allverify --methods all    # the four methods (16 cases)
+#     ./Allverify --dry-run        # list the cases and their estimated cost
+#     ./Allverify --help
 set -euo pipefail
 
 if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 is required" >&2
+    echo "ERROR: python3 is required for staticCylinderInChannel verification." >&2
     exit 2
 fi
 

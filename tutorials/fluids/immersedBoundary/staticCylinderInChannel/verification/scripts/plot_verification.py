@@ -1,37 +1,23 @@
 #!/usr/bin/env python3
 """
-Publication figures and tables of the staticCylinderInChannel verification,
-from the compact data in verification/reference/ only: no CFD is run and
-work/ is not needed. The data are validated before anything is drawn.
+Summary figures of the staticCylinderInChannel verification, from the
+tracked data in verification/reference/ only: no CFD is run and work/ is not
+needed. The data are validated before anything is drawn.
 
-Layout variants (--variant, default manuscript; "all" writes all four):
+    legacy_incremental_sensitivity   Cd of the legacy incremental method on
+                                     levels 2 and 4 against (a) the outer
+                                     correctors, (b) the coupling coefficient
+                                     and (c) the time step
+    four_method_comparison           (a) Cd and (b) CPU hours of the four
+                                     methods, with their frozen settings,
+                                     against the cells per diameter
 
-    manuscript     Figure_A_legacy_incremental_sensitivity (175 mm, three
-                       panels in a row) and Figure_A_..._single_column
-                       (88 mm, stacked): (a) Cd vs n_outer, (b) Cd vs C_IB,
-                       (c) Cd vs Delta t, legacy incremental, L2 and L4
-                   Figure_B_method_comparison (175 mm) and
-                       Figure_B_..._single_column (88 mm): (a) Cd and
-                       (b) CPU-hours vs cells/D, four formulations;
-                       Figure_B_method_comparison_inset: the same with a
-                       zoom of the benchmark range in (a)
-                   captions.md, historical_parity_table.{md,tex}
-    expanded       fig_outer_corrector_sensitivity,
-                   fig_coupling_coefficient_sensitivity,
-                   fig_timestep_sensitivity, fig_four_method_Cd,
-                   fig_four_method_CPU_hours (88 mm each), the tables
-    presentation   talk_* figures with larger text
-    review         contact_sheet.{png,pdf} of the manuscript and expanded
-                   figures (requires them, written by --variant all)
-
-Each figure is written as vector PDF and 600 dpi PNG to
-verification/postProcessing/figures/<variant>/ (--out to change the root).
-Text uses Matplotlib MathText with STIX fonts; --usetex renders it with an
-external LaTeX installation instead.
+Each figure is written as PDF and PNG to
+verification/postProcessing/figures/ (--out to change the directory). Text
+uses Matplotlib MathText with STIX fonts.
 
 Usage:
-    python3 scripts/plot_publication_figures.py
-    python3 scripts/plot_publication_figures.py --variant all
+    python3 scripts/plot_verification.py
 """
 
 import argparse
@@ -78,14 +64,8 @@ MM = 1.0/25.4
 FULL = 175*MM                  # full page width
 COLUMN = 88*MM                 # single column width
 
-VARIANT = {
-    "manuscript": dict(font=8, tick=7.5, legend=7, small=6.8, line=1.0,
-                       marker=4.2),
-    "expanded": dict(font=8, tick=7.5, legend=7, small=6.8, line=1.0,
-                     marker=4.2),
-    "presentation": dict(font=14, tick=13, legend=12, small=12, line=1.8,
-                         marker=7.5),
-}
+# Text and line sizes
+SIZES = dict(font=8, tick=7.5, legend=7, small=6.8, line=1.0, marker=4.2)
 
 # Conditions of each sensitivity panel: what is held fixed
 CONDITIONS = {
@@ -203,19 +183,18 @@ def load_and_validate():
 # Drawing
 # -----------------------------------------------------------------------------
 
-def setup(variant, usetex):
+def setup():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    v = VARIANT.get(variant, VARIANT["manuscript"])
+    v = SIZES
     plt.rcParams.update({
-        "text.usetex": usetex,
         "font.family": "serif",
         "font.serif": ["STIXGeneral", "DejaVu Serif"],
         "mathtext.fontset": "stix",
         "font.size": v["font"],
         "axes.labelsize": v["font"],
-        "axes.linewidth": 0.6 if variant != "presentation" else 1.0,
+        "axes.linewidth": 0.6,
         "axes.grid": False,
         "xtick.direction": "in",
         "ytick.direction": "in",
@@ -237,7 +216,7 @@ def setup(variant, usetex):
         "legend.frameon": False,
         "legend.handlelength": 2.2,
         "pdf.fonttype": 42,
-        "savefig.dpi": 600,
+        "savefig.dpi": 300,
         "savefig.bbox": "tight",
         "savefig.pad_inches": 0.03,
     })
@@ -405,7 +384,7 @@ def save(fig, out, name, written):
 
 
 # -----------------------------------------------------------------------------
-# Variants
+# Figures
 # -----------------------------------------------------------------------------
 
 def figure_a(plt, v, data, layout):
@@ -454,269 +433,26 @@ def figure_b(plt, v, data, layout, inset=False):
     return fig
 
 
-def manuscript(plt, v, data, out, written):
-    for layout, suffix in (("row", ""), ("column", "_single_column")):
-        fig = figure_a(plt, v, data, layout)
-        save(fig, out, f"Figure_A_legacy_incremental_sensitivity{suffix}",
-             written)
-        plt.close(fig)
-        fig = figure_b(plt, v, data, layout)
-        save(fig, out, f"Figure_B_method_comparison{suffix}", written)
-        plt.close(fig)
-    fig = figure_b(plt, v, data, "row", inset=True)
-    save(fig, out, "Figure_B_method_comparison_inset", written)
-    plt.close(fig)
-
-
-def expanded(plt, v, data, out, written):
-    size = (COLUMN, 2.55)
-    for name, draw, key in (
-        ("fig_outer_corrector_sensitivity", draw_outer, "outer"),
-        ("fig_coupling_coefficient_sensitivity", draw_coupling, "coupling"),
-        ("fig_timestep_sensitivity", draw_timestep, "timestep"),
-    ):
-        fig, ax = plt.subplots(figsize=size)
-        draw(ax, data)
-        legacy_ylim([ax], data, (key,), top=0.22)
-        ax.text(0.03, 0.95, CONDITIONS[key], transform=ax.transAxes,
-                va="top", ha="left", fontsize=v["small"], color="#333333")
-        limit_cycle_proxy(ax)
-        fig.tight_layout()
-        top_legend(fig, ax, ncol=2)
-        save(fig, out, name, written)
-        plt.close(fig)
-    for name, draw in (("fig_four_method_Cd", draw_cd),
-                       ("fig_four_method_CPU_hours", draw_cpu)):
-        fig, ax = plt.subplots(figsize=size)
-        draw(ax, data)
-        limit_cycle_proxy(ax)
-        fig.tight_layout()
-        top_legend(fig, ax, ncol=2 if draw is draw_cpu else 3)
-        save(fig, out, name, written)
-        plt.close(fig)
-
-
-def presentation(plt, v, data, out, written):
-    def simple_legend(fig, ax, ncol):
-        # Only the series, the benchmark range and the limit cycles
-        handles, labels = ax.get_legend_handles_labels()
-        keep = [(h, lab) for h, lab in zip(handles, labels)
-                if lab != "reference value"]
-        fig.legend([h for h, _ in keep], [lab for _, lab in keep],
-                   loc="lower center", ncol=ncol, bbox_to_anchor=(0.5, 1.0))
-
-    fig, ax = plt.subplots(figsize=(7.2, 4.6))
-    draw_outer(ax, data)
-    legacy_ylim([ax], data, ("outer",), top=0.2)
-    ax.text(0.03, 0.95, "legacy incremental, " + CONDITIONS["outer"],
-            transform=ax.transAxes, va="top", ha="left", fontsize=v["small"])
-    limit_cycle_proxy(ax, "limit cycle")
-    fig.tight_layout()
-    simple_legend(fig, ax, ncol=2)
-    save(fig, out, "talk_outer_corrector_sensitivity", written)
-    plt.close(fig)
-
-    fig, axes = plt.subplots(1, 2, figsize=(12.0, 4.6), sharey=True)
-    draw_coupling(axes[0], data)
-    draw_timestep(axes[1], data)
-    legacy_ylim(axes, data, ("coupling", "timestep"), top=0.3)
-    axes[1].set_ylabel("")
-    for ax, label, key in zip(axes, ("(a)", "(b)"), ("coupling", "timestep")):
-        panel_label(ax, label, CONDITIONS[key], v["small"])
-    limit_cycle_proxy(axes[0], "limit cycle")
-    fig.tight_layout(w_pad=1.0)
-    simple_legend(fig, axes[0], ncol=4)
-    save(fig, out, "talk_coupling_and_timestep", written)
-    plt.close(fig)
-
-    for name, draw in (("talk_four_method_Cd", draw_cd),
-                       ("talk_four_method_CPU_hours", draw_cpu)):
-        fig, ax = plt.subplots(figsize=(7.2, 4.6))
-        draw(ax, data)
-        limit_cycle_proxy(ax, "limit cycle")
-        fig.tight_layout()
-        simple_legend(fig, ax, ncol=3)
-        save(fig, out, name, written)
-        plt.close(fig)
-
-
-def review(plt, root, written):
-    """Contact sheet of the manuscript and expanded figures"""
-    import matplotlib.image as mpimg
-    panels = [
-        ("manuscript", "Figure_A_legacy_incremental_sensitivity"),
-        ("manuscript", "Figure_B_method_comparison"),
-        ("manuscript", "Figure_B_method_comparison_inset"),
-        ("manuscript", "Figure_A_legacy_incremental_sensitivity_single_column"),
-        ("manuscript", "Figure_B_method_comparison_single_column"),
-        ("expanded", "fig_outer_corrector_sensitivity"),
-        ("expanded", "fig_coupling_coefficient_sensitivity"),
-        ("expanded", "fig_timestep_sensitivity"),
-        ("expanded", "fig_four_method_Cd"),
-        ("expanded", "fig_four_method_CPU_hours"),
-    ]
-    missing = [f"{d}/{n}.png" for d, n in panels
-               if not (root / d / f"{n}.png").exists()]
-    if missing:
-        sys.exit("review: run --variant all first; missing " + ", ".join(
-            missing))
-    fig = plt.figure(figsize=(16, 22))
-    grid = fig.add_gridspec(6, 6, height_ratios=(1.0, 1.1, 1.1, 2.2, 1.0,
-                                                 1.0))
-    slots = [grid[0, :], grid[1, :], grid[2, :], grid[3, 0:3], grid[3, 3:6],
-             grid[4, 0:2], grid[4, 2:4], grid[4, 4:6], grid[5, 0:3],
-             grid[5, 3:6]]
-    for (d, n), slot in zip(panels, slots):
-        ax = fig.add_subplot(slot)
-        ax.imshow(mpimg.imread(root / d / f"{n}.png"))
-        ax.set_axis_off()
-        ax.set_title(f"{d}/{n}", fontsize=9, family="monospace")
-    fig.tight_layout()
-    out = root / "review"
-    out.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out / "contact_sheet.png", dpi=150)
-    fig.savefig(out / "contact_sheet.pdf")
-    plt.close(fig)
-    written.append(out / "contact_sheet")
-
-
-# -----------------------------------------------------------------------------
-# Tables and captions
-# -----------------------------------------------------------------------------
-
-def captions(out, written):
-    hollow = ("Hollow markers denote bounded limit-cycle results, for which "
-              "the plotted value is the mean over the final averaging "
-              "interval (2 s); filled markers are steady results.")
-    band = (f"The grey band is the Schäfer–Turek benchmark range "
-            f"{CD_RANGE[0]} ≤ C_d ≤ {CD_RANGE[1]}, and the dashed line the "
-            f"high-precision reference value C_d = {CD_REF} (FeatFlow; "
-            f"John and Matthies, 2001).")
-    text = [
-        "# Figure captions (draft)", "",
-        "**Figure A.** Sensitivity of the drag coefficient of the legacy "
-        "incremental formulation (vertexFraction occupancy, n_corr = 3) on "
-        "L2 (20 cells/D) and L4 (80 cells/D) to (a) the number of outer "
-        "correctors n_outer, with C_IB = 0.2 and Δt = 0.001 s; (b) the "
-        "coupling coefficient C_IB, with n_outer = 5 and Δt = 0.001 s; and "
-        "(c) the time step Δt, with C_IB = 0.2 and n_outer = 5. In (a), the "
-        "values at n_outer = 1 are from the common-settings incremental "
-        "baseline with the same C_IB and Δt. " + band + " " + hollow, "",
-        "**Figure B.** (a) Drag coefficient and (b) CPU-hours (allocated "
-        "ranks × wall time) against the mesh resolution for cutLink, "
-        "ghostCell and penalty (n_outer = 1) and legacy incremental "
-        "(C_IB = 0.2, vertexFraction, n_outer = 5), all with n_corr = 3 and "
-        "Δt = 0.001 s; 1, 1, 2 and 8 MPI ranks on 10, 20, 40 and 80 cells/D. "
-        "The CPU-hours of legacy incremental include its five outer "
-        "correctors. " + band + " " + hollow + " In the inset variant, the "
-        "inset of (a) magnifies the benchmark range at the same mesh "
-        "resolutions; the C_d axis of (a) is extended downwards to make room "
-        "for it below the data, with its scale unchanged.", "",
-        "**Table (historical parity).** Drag coefficient of the "
-        "manuscript-era pimpleHFDIBFoam static-cylinder cases (D = 1, "
-        "ρ = 1000, Ū = 1) as saved, and as computed by the current "
-        "solids4foam legacy incremental port with the historical numerical "
-        "settings (C_IB = 0.2, vertexFraction, Δt = 0.005 s, n_outer = 5, "
-        "n_corr = 3, two non-orthogonal correctors, relaxation 0.7/0.3), "
-        "with the historical inlet and with the exact parabolic inlet.", "",
-    ]
-    (out / "captions.md").write_text("\n".join(text))
-    written.append(out / "captions")
-
-
-def parity_table(data, out, written):
-    parity = data["parity"]
-    meshes = sorted({r["historical_case"] for r in parity},
-                    key=lambda m: int(m.split("Mesh")[-1]))
-    md = [
-        "| Mesh | Saved manuscript $C_d$ | Current port, historical inlet "
-        "| Difference | Current port, canonical inlet | Inlet-induced change |",
-        "| --- | --- | --- | --- | --- | --- |",
-    ]
-    tex = [
-        r"\begin{tabular}{lccccc}", r"\hline",
-        r"Mesh & Saved $C_d$ & Port, historical inlet & Difference & "
-        r"Port, canonical inlet & Inlet-induced change \\", r"\hline",
-    ]
-    for mesh in meshes:
-        hist = next(r for r in parity if r["historical_case"] == mesh
-                    and r["inlet"] == "historical")
-        canon = next(r for r in parity if r["historical_case"] == mesh
-                     and r["inlet"] == "canonical")
-        saved = num(hist, "Cd_historical")
-        h = num(hist, "Cd_current")
-        c = num(canon, "Cd_current")
-        cells_tex = f"{int(hist['n_cells']):,}".replace(",", r"\,")
-        cells_md = f"{int(hist['n_cells']):,}".replace(",", " ")
-        md.append(f"| {cells_md} cells | {saved:.5f} | {h:.6f} | "
-                  f"{h - saved:+.1e} | {c:.6f} | {100*(c - h)/h:+.2f}% |")
-        tex.append(f"{cells_tex} cells & {saved:.5f} & {h:.6f} & "
-                   f"${h - saved:+.1e}$ & {c:.6f} & "
-                   f"${100*(c - h)/h:+.2f}$\\% " r"\\")
-    tex += [r"\hline", r"\end{tabular}"]
-    (out / "historical_parity_table.md").write_text("\n".join(md) + "\n")
-    (out / "historical_parity_table.tex").write_text("\n".join(tex) + "\n")
-    written.append(out / "historical_parity_table")
-
-
-def comparison_table(data, out, written):
-    md = ["| Formulation | $n_{outer}$ | Level | cells/$D$ | $C_d$ | $C_l$ | "
-          "Status | Ranks | Wall time (s) | CPU-hours |",
-          "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
-    tex = [r"\begin{tabular}{llrrcclrrr}", r"\hline",
-           r"Formulation & $n_{\mathrm{outer}}$ & Level & cells/$D$ & $C_d$ & "
-           r"$C_l$ & Status & Ranks & Wall time (s) & CPU-hours \\",
-           r"\hline"]
-    for f in FORMULATIONS:
-        for r in sorted((r for r in data["comparison"]
-                         if r["formulation"] == f),
-                        key=lambda r: int(r["level"])):
-            cells = (f"{f} & {r['nOuterCorrectors']} & L{r['level']} & "
-                     f"{r['cells_per_D']} & {num(r, 'Cd_mean'):.5f} & "
-                     f"{num(r, 'Cl_mean'):.5f} & {r['status']} & "
-                     f"{r['ranks']} & {num(r, 'wall_s'):.0f} & "
-                     f"{num(r, 'cpu_hours'):.3f}")
-            md.append("| " + cells.replace(" & ", " | ") + " |")
-            tex.append(cells + r" \\")
-    tex += [r"\hline", r"\end{tabular}"]
-    (out / "final_comparison_table.md").write_text("\n".join(md) + "\n")
-    (out / "final_comparison_table.tex").write_text("\n".join(tex) + "\n")
-    written.append(out / "final_comparison_table")
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--variant", default="manuscript",
-                        choices=("manuscript", "expanded", "presentation",
-                                 "review", "all"))
     parser.add_argument("--out", default=str(VERIFICATION_DIR
-                                             / "postProcessing" / "figures"))
-    parser.add_argument("--usetex", action="store_true",
-                        help="render text with an external LaTeX "
-                             "installation (default: MathText)")
+                                             / "postProcessing" / "figures"),
+                        help="output directory")
     args = parser.parse_args()
-    root = Path(args.out)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
 
     data = load_and_validate()
-    variants = (("manuscript", "expanded", "presentation", "review")
-                if args.variant == "all" else (args.variant,))
+    plt, v = setup()
     written = []
-    for variant in variants:
-        plt, v = setup(variant, args.usetex)
-        if variant == "review":
-            review(plt, root, written)
-            continue
-        out = root / variant
-        out.mkdir(parents=True, exist_ok=True)
-        {"manuscript": manuscript, "expanded": expanded,
-         "presentation": presentation}[variant](plt, v, data, out, written)
-        if variant in ("manuscript", "expanded"):
-            parity_table(data, out, written)
-            comparison_table(data, out, written)
-        if variant == "manuscript":
-            captions(out, written)
+    fig = figure_a(plt, v, data, "row")
+    save(fig, out, "legacy_incremental_sensitivity", written)
+    plt.close(fig)
+    fig = figure_b(plt, v, data, "row", inset=True)
+    save(fig, out, "four_method_comparison", written)
+    plt.close(fig)
     for path in written:
-        print(f"Wrote {path}")
+        print(f"Wrote {path}.pdf and .png")
 
 
 if __name__ == "__main__":
