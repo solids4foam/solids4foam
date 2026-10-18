@@ -1,0 +1,102 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0";
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    // Steady parabolic inflow (Hessenthaler et al. 2017): peak velocity
+    // 0.630 m/s in the upper inlet and 0.615 m/s in the lower inlet, both of
+    // radius 10.95 mm centred at y = +/-27.15 mm, ramped in smoothly over the
+    // first 0.5 s
+    upperInlet
+    {
+        type            codedFixedValue;
+        value           uniform (0 0 0);
+        name            upperInletParabolic;
+        code
+        #{
+            const vector centre(0, 0.02715, 0);
+            const scalar radius = 0.01095;
+            const scalar peak = 0.630;
+            const scalar rampTime = 0.5;
+
+            const scalar s =
+                min(max(this->db().time().value()/rampTime, 0.0), 1.0);
+            const scalar ramp = s*s*(3.0 - 2.0*s);
+            const vectorField& Cf = patch().Cf();
+            vectorField& field = *this;
+            forAll(Cf, faceI)
+            {
+                const scalar r2 =
+                    sqr(Cf[faceI].x() - centre.x())
+                  + sqr(Cf[faceI].y() - centre.y());
+                field[faceI] =
+                    vector(0, 0, ramp*peak*max(1.0 - r2/sqr(radius), 0.0));
+            }
+        #};
+    }
+    lowerInlet
+    {
+        type            codedFixedValue;
+        value           uniform (0 0 0);
+        name            lowerInletParabolic;
+        code
+        #{
+            const vector centre(0, -0.02715, 0);
+            const scalar radius = 0.01095;
+            const scalar peak = 0.615;
+            const scalar rampTime = 0.5;
+
+            const scalar s =
+                min(max(this->db().time().value()/rampTime, 0.0), 1.0);
+            const scalar ramp = s*s*(3.0 - 2.0*s);
+            const vectorField& Cf = patch().Cf();
+            vectorField& field = *this;
+            forAll(Cf, faceI)
+            {
+                const scalar r2 =
+                    sqr(Cf[faceI].x() - centre.x())
+                  + sqr(Cf[faceI].y() - centre.y());
+                field[faceI] =
+                    vector(0, 0, ramp*peak*max(1.0 - r2/sqr(radius), 0.0));
+            }
+        #};
+    }
+    outlet
+    {
+        // Fluid re-entering through the outlet is given zero velocity
+        type            inletOutlet;
+        inletValue      uniform (0 0 0);
+        value           uniform (0 0 0);
+    }
+    wall
+    {
+        type            noSlip;
+    }
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+}
+
+// ************************************************************************* //

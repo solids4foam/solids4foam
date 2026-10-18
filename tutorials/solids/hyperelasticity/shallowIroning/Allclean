@@ -8,8 +8,14 @@ source solids4FoamScripts.sh
 
 cleanCase
 \rm -rf system/*Subset constant/*Subset VTK postProcessing/ case.foam \
-        constant/polyMesh regressionTests \
+        constant/polyMesh \
         constant/*.withDefaultValues *.withDefaultValues *.png
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

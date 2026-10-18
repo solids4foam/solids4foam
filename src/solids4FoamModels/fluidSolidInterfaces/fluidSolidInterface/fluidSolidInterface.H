@@ -185,6 +185,12 @@ class fluidSolidInterface
         //  using the legacy minimum-based combination
         const Switch requireAllResidualMeasures_;
 
+        //- Optional absolute interface residual tolerance [m]: a step is also
+        //  converged if the maximum point residual (displacement-increment
+        //  mismatch if incrementalResiduals) is below it. Disabled if not
+        //  positive.
+        const scalar outerCorrAbsoluteTolerance_;
+
         //- Pressure-change tolerance for Robin interfaces: the normalised
         //  change in interface pressure between FSI iterations. The default
         //  is 10*outerCorrTolerance, as for the kinematic residual below;
@@ -783,10 +789,6 @@ public:
 
             //- Update interface force
             virtual scalar updateResidual();
-
-            //- Update movingWallPressure boundary condition acceleration, if
-            //  found
-            virtual void updateMovingWallPressureAcceleration();
 
             //- Update elasticWallPressure boundary condition acceleration, if
             //  found

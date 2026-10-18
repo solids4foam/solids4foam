@@ -192,6 +192,10 @@ normalised by the IQN-ILS peak, and the relative differences in
 `u_r,max(A)`, `u_z,min(A)`, `t_arr(A)` and `c_p`, must each be within 1%. The
 number of FSI iterations of each coupling is reported.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference quality
 
 - Tuković et al. (2018), Section 4.4, Fig. 25: finite volume, backward,
