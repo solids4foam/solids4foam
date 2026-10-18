@@ -1,0 +1,8 @@
+# staticCylinderInChannel verification: the same time steps from the same developed state with each rank count (scripts/mpi_scaling.sh), mpirun --bind-to none
+study,case,ranks,time_steps,wall_s,wall_s_per_step,cpu_hours,Cd_mean_last_75pct,Cd_range_last_75pct,Cl_mean_last_75pct,Cl_range_last_75pct
+calibration,"cutLink L4, nOuter 1, from t = 3 s",1,300,364.8,1.2160,0.1013,5.5813898,5.85e-04,0.0122038,2.26e-03
+calibration,"cutLink L4, nOuter 1, from t = 3 s",2,300,172.0,0.5734,0.0956,5.5813897,5.85e-04,0.0122039,2.26e-03
+calibration,"cutLink L4, nOuter 1, from t = 3 s",4,300,88.4,0.2947,0.0982,5.5813898,5.85e-04,0.0122044,2.26e-03
+calibration,"cutLink L4, nOuter 1, from t = 3 s",8,300,39.8,0.1327,0.0884,5.5813895,5.84e-04,0.0122048,2.26e-03
+final-C,"legacy incremental L4, c 0.2, nOuter 5, from t = 15 s",8,200,253.2,1.2662,0.5628,5.7338715,3.24e-04,0.0122728,6.61e-05
+final-C,"legacy incremental L4, c 0.2, nOuter 5, from t = 15 s",16,200,146.5,0.7325,0.6511,5.7337691,1.30e-05,0.0122951,2.49e-06
