@@ -1058,9 +1058,12 @@ void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
     volScalarField& p = this->p();
     const volVectorField& U = this->U();
 
+    // Only a plain fixedGradient pressure: conditions derived from it, such
+    // as fixedGradientCorrected, keep the gradient they are given
     if
     (
-        !isA<fixedGradientFvPatchScalarField>(p.boundaryField()[patchI])
+        p.boundaryField()[patchI].type()
+     != fixedGradientFvPatchScalarField::typeName
      || !isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI])
     )
     {
