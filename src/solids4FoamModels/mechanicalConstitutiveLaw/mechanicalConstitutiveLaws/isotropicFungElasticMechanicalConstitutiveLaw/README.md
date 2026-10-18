@@ -173,8 +173,9 @@ This gives `mu = 5e3`, so `bulkModulus` is 200 times the shear modulus.
 ## Tutorials
 
 - [`solids/hyperelasticity/LandEtAl2015/problem2`](../../../../../tutorials/solids/hyperelasticity/LandEtAl2015/problem2),
-  with `./Allrun isotropicFung`, which runs the material given above in place
-  of the equivalent `GuccioneElastic` law of the default `petsc` option
+  whose README explains how to run the case with the material given above in
+  place of the equivalent `GuccioneElastic` law; its regression test checks
+  that the two laws agree
 
 ---
 

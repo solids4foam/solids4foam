@@ -13,8 +13,8 @@ sort: 5
 - Show two solution approaches available in solids4foam:
   - PETSc SNES (default), as used in [1].
   - Block-coupled pressure-displacement (foam-extend), as used in [2].
-- Verify the `isotropicFungElastic` law against the equivalent isotropic
-  Guccione law.
+- Show how the material law of the case can be changed, using the
+  equivalent `isotropicFungElastic` law as an example.
 
 ---
 
@@ -26,7 +26,7 @@ ventricle under an internal endocardial pressure that ramps linearly from
 nearly-incompressible Guccione passive law; for the pressure-displacement
 approach, an isotropic Guccione form is used (`cf = ct = cfs = 1`).
 
-Three options are provided:
+Two options are provided:
 
 - `petsc` (default): solved with the
   `nonLinearGeometryTotalLagrangianTotalDisplacement` solid model and the
@@ -37,10 +37,6 @@ Three options are provided:
   `coupledPressureDisplacementSolid` block-coupled solid model on a
   symmetric (one-quarter) tetrahedral mesh imported from a Fluent `.msh`
   file.
-- `isotropicFung`: the `petsc` case with the material described by the
-  `isotropicFungElastic` law instead, with `c = 10 kPa` and `a = 1`. With
-  `c = k` and `a = cf = ct = cfs` the two laws are identical, so this option
-  should reproduce the `petsc` results.
 
 ---
 
@@ -55,17 +51,15 @@ can be run using the included `Allrun` script:
 ```
 
 The default option uses the PETSc SNES approach. The script also supports
-the pressure-displacement solution option and the `isotropicFungElastic`
-material option:
+the pressure-displacement solution option:
 
 ```bash
 ./Allrun petsc
 ./Allrun pressureDisplacement
-./Allrun isotropicFung
 ```
 
-The default `petsc` case and the `isotropicFung` option require OpenFOAM.com
-with PETSc enabled. The `pressureDisplacement` option is foam-extend-only.
+The default `petsc` case requires OpenFOAM.com with PETSc enabled. The
+`pressureDisplacement` option is foam-extend-only.
 
 The default approach can also be run in parallel using:
 
@@ -73,11 +67,37 @@ The default approach can also be run in parallel using:
 ./Allrun parallel
 ```
 
-and the `isotropicFung` option using:
+## Changing the Material Law
+
+The material is defined in `constant/mechanicalProperties`, which `Allrun`
+copies from `caseOptions/petsc/constant/mechanicalProperties`. To run the case
+with a different law, edit that file. For example,
+`caseOptions/isotropicFung/constant/mechanicalProperties` describes the
+material with the isotropic Fung-type `isotropicFungElastic` law instead of
+`GuccioneElastic`:
+
+```text
+heartTissue
+{
+    type            isotropicFungElastic;
+    rho             rho [1 -3 0 0 0 0 0] 3000;
+    c               c [1 -1 -2 0 0 0 0] 10e3;
+    a               1.0;
+    bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
+}
+```
+
+To run it, in a copy of the tutorial:
 
 ```bash
-./Allrun isotropicFung parallel
+cp caseOptions/isotropicFung/constant/mechanicalProperties \
+    caseOptions/petsc/constant/
+./Allrun
 ```
+
+With `c = k` and `a = cf = ct = cfs`, `isotropicFungElastic` is identical to
+`GuccioneElastic`, so this gives the same results as the default case. The
+regression test runs this variant to check that the two laws agree.
 
 ## Verification and Convergence Study
 

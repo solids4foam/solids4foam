@@ -7,7 +7,6 @@ IFS=$'\n\t'
 # Allows selection of solution approach:
 #   petsc                 (default; PETSc SNES)
 #   pressureDisplacement  (foam-extend; coupled pressure-displacement)
-#   isotropicFung         (petsc with the equivalent isotropicFungElastic law)
 # -------------------------------------------------------------------------
 
 usage() {
@@ -18,7 +17,6 @@ Usage:
 Where [approach] is one of:
   petsc                                (default)
   pressureDisplacement
-  isotropicFung
   parallel                             (shorthand for: petsc parallel)
 
 Examples:
@@ -26,8 +24,6 @@ Examples:
   ./Allrun petsc
   ./Allrun petsc parallel
   ./Allrun pressureDisplacement
-  ./Allrun isotropicFung
-  ./Allrun isotropicFung parallel
   ./Allrun parallel
 EOF
 }
@@ -62,7 +58,7 @@ elif [[ "${2:-}" == "parallel" ]]; then
 fi
 
 case "${APPROACH}" in
-    petsc|isotropicFung)
+    petsc)
         solids4Foam::caseDoesNotRunWithFoamExtend
         solids4Foam::caseDoesNotRunWithOpenFOAMOrg
         solids4Foam::requirePetscOrExitSilently
@@ -151,12 +147,6 @@ case "${APPROACH}" in
         ;;
     pressureDisplacement)
         select_pressure_displacement_case
-        ;;
-    isotropicFung)
-        # The petsc case, with only the material law replaced
-        select_petsc_case petsc
-        echo "Using the isotropicFungElastic material law"
-        cp -a caseOptions/isotropicFung/constant/mechanicalProperties constant/
         ;;
 esac
 

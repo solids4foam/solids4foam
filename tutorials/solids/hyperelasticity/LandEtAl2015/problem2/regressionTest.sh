@@ -34,10 +34,10 @@ fi
 
 # ============================================================
 # idealisedVentricle regression test
-# Runs the petsc, pressureDisplacement and isotropicFung
-# approaches with a shortened end-time and loosened tolerances,
-# and checks that Max sigmaEq from the solver log is within
-# sensible bounds.
+# Runs the petsc and pressureDisplacement approaches, and the
+# petsc case with the isotropicFungElastic material, with a
+# shortened end-time and loosened tolerances, and checks that
+# Max sigmaEq from the solver log is within sensible bounds.
 # Approaches that are not supported in the current OpenFOAM
 # flavour are reported as SKIP rather than failures.
 # ============================================================
@@ -158,13 +158,18 @@ prepare_case() {
         cp -a "${item}" "${case_dir}/"
     done
 
-    # Shorten controlDict for the requested approach so the
-    # regression run terminates after a couple of time steps. The
-    # isotropicFung approach runs the petsc case's system directory
+    # The isotropicFung arm is not an Allrun option: it is the petsc case
+    # with the material replaced, as the tutorial README describes
     local options="${approach}"
     if [[ "${approach}" == "isotropicFung" ]]; then
         options="petsc"
+        cp -a \
+            "${case_dir}/caseOptions/isotropicFung/constant/mechanicalProperties" \
+            "${case_dir}/caseOptions/petsc/constant/"
     fi
+
+    # Shorten controlDict for the requested approach so the
+    # regression run terminates after a couple of time steps
     shorten_controlDict \
         "${case_dir}/caseOptions/${options}/system/controlDict"
 
@@ -178,9 +183,14 @@ run_case() {
     local approach="$1"
     local case_dir="${REGRESSION_ROOT}/${approach}"
 
+    local allrun_approach="${approach}"
+    if [[ "${approach}" == "isotropicFung" ]]; then
+        allrun_approach="petsc"
+    fi
+
     prepare_case "${case_dir}" "${approach}"
     ( cd "${case_dir}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${case_dir}" && ./Allrun "${approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
+    ( cd "${case_dir}" && ./Allrun "${allrun_approach}" > "${ALLRUN_LOGFILE}" 2>&1 )
 }
 
 # ------------------------------------------------------------
