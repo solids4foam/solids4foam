@@ -82,6 +82,7 @@ Author
 #include "fvCFD.H"
 #include "transform.H"
 #include "unitConversion.H"
+#include "compatibilityFunctions.H"
 
 // Rotation tensor for a rotation of omega about the axis a, by Rodrigues'
 // formula. OpenFOAM.com and .org provide this as rotationAboutAxis() in
@@ -286,13 +287,7 @@ int main(int argc, char *argv[])
         const tensor rotT = rotationAboutAxis(et[cellI], alphaRadians[cellI]);
         f0[cellI] = transform(-rotT, f0[cellI]);
     }
-    // foam-extend writes through boundaryField(); the others require
-    // boundaryFieldRef()
-#ifdef OPENFOAM_NOT_EXTEND
-    auto& f0BoundaryRef = f0.boundaryFieldRef();
-#else
-    auto& f0BoundaryRef = f0.boundaryField();
-#endif
+    auto& f0BoundaryRef = boundaryFieldRef(f0);
 
     forAll(et.boundaryField(), patchI)
     {
@@ -351,13 +346,7 @@ int main(int argc, char *argv[])
         const tensor rotT = rotationAboutAxis(etf[faceI], alphaRadiansf[faceI]);
         f0f[faceI] = transform(-rotT, f0f[faceI]);
     }
-    // foam-extend writes through boundaryField(); the others require
-    // boundaryFieldRef()
-#ifdef OPENFOAM_NOT_EXTEND
-    auto& f0fBoundaryRef = f0f.boundaryFieldRef();
-#else
-    auto& f0fBoundaryRef = f0f.boundaryField();
-#endif
+    auto& f0fBoundaryRef = boundaryFieldRef(f0f);
 
     forAll(etf.boundaryField(), patchI)
     {

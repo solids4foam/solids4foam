@@ -6,7 +6,7 @@ sort: 11
 
 ---
 
-Prepared by Chanikya Valeti (UCD), with Claude Opus 5.5
+Prepared by Chanikya Valeti and Philip Cardiff (UCD), with Claude Opus 5.5
 
 ---
 
@@ -170,27 +170,18 @@ The participants' solutions in [1] agree to within about 0.5 mm. For step 1
 the x-displacement of p0 reaches about −35 mm at t ≈ 0.48 s and that of p1
 about −27 mm (Fig. 10 of [1]).
 
-Results so far (O-grid mesh 2, pressure formulation, serial; every step
-converges in 3–4 Newton iterations):
+The twist of p1 about the long axis is the most sensitive output: it is held
+only by the soft base springs, and in step 1 it is the small difference
+between the large passive rotation of step 0B (about 16 mm) and the active
+counter-rotation.
 
-- **step0A** (active only): the timing of contraction and relaxation follows
-  the participants'. Peak long-axis displacements are within about 2 mm
-  (p0 x −31.8 vs ≈ −30 mm, p1 x −23.5 vs ≈ −22 mm); the radial displacement
-  of p1 is too large (−3.5 vs ≈ −2.6 mm).
-- **step1** (full beat): filling, onset and relaxation follow the
-  participants'; during systole the long-axis shortening is 3–5 mm too large
-  (p0 x −38.4 vs −35.4 mm at t = 0.45 s) and the twist of p1 is about 1 mm
-  too small. The twist about the long axis is only held by the soft base
-  springs, and in step 1 it is the small difference between the large passive
-  rotation (≈ 16 mm in step 0B) and the active counter-rotation, so it is the
-  most sensitive output.
-
-The results depend on the FV stabilisation, which is scaled by the
-`tangentShearModulus` of the law (default a + (af + as + afs)/6); including
-the viscous η/Δt in it, as an earlier version did, made the response
-markedly too stiff. The momentum stabilisation (`diffStencilLaplacian`,
-`scaleFactor 100` in `solidProperties.pressure`) and the mesh resolution are
-still to be studied (`MESH_NUMBER=3`), before reference values are recorded.
+```note
+The results depend on the finite-volume stabilisation: the momentum
+stabilisation (`diffStencilLaplacian`, `scaleFactor` in
+`constant/solidProperties.pressure`) is scaled by the scalar tangent of the
+law, `tangentShearModulus` (default a + (af + as + afs)/6, without the
+viscous η/Δt, which would make the wall far too stiff).
+```
 
 `regressionTest.sh` runs step 1 on mesh 1 to t = 0.05 s (about a minute) and
 checks that p0 x lies near the participants' range there.

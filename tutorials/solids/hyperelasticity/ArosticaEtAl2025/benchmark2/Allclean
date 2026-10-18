@@ -9,7 +9,7 @@ cleanCase0
 # Remove the formulation links created by Allrun
 rm -f system/fvSolution constant/solidProperties
 
-# Remove the mesh, the downloaded toolkit data and the time series generated
+# Remove the mesh, the downloaded mesh archive and the time series generated
 # by Allrun
 rm -rf constant/polyMesh data
 rm -f constant/activeStress constant/pressureLV constant/pressureRV

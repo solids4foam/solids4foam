@@ -17,11 +17,7 @@
         << radToDeg(p.alphaEndo) << " to " << radToDeg(p.alphaEpi)
         << " degrees" << endl;
 
-#ifdef OPENFOAM_NOT_EXTEND
-    const scalarField& tI = t.primitiveField();
-#else
-    const scalarField& tI = t.internalField();
-#endif
+    const scalarField& tI = Foam::primitiveField(t);
 
     Info<< "    t in [" << gMin(tI) << ", " << gMax(tI) << "]" << endl;
 
@@ -49,17 +45,9 @@
         ellipsoidBasis(p, C[cellI], tI[cellI], f0[cellI], s0[cellI], n0[cellI]);
     }
 
-    // foam-extend writes through boundaryField(); the others require
-    // boundaryFieldRef()
-#ifdef OPENFOAM_NOT_EXTEND
-    auto& f0B = f0.boundaryFieldRef();
-    auto& s0B = s0.boundaryFieldRef();
-    auto& n0B = n0.boundaryFieldRef();
-#else
-    auto& f0B = f0.boundaryField();
-    auto& s0B = s0.boundaryField();
-    auto& n0B = n0.boundaryField();
-#endif
+    auto& f0B = boundaryFieldRef(f0);
+    auto& s0B = boundaryFieldRef(s0);
+    auto& n0B = boundaryFieldRef(n0);
 
     forAll(mesh.boundary(), patchI)
     {

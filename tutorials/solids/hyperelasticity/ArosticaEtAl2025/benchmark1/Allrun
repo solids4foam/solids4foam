@@ -135,20 +135,20 @@ restore0Dir
 rm -rf constant/polyMesh
 python3 "$SCRIPTS/makeOGridMesh.py" "$MESH_NUMBER" > log.makeOGridMesh 2>&1 \
     || { echo "makeOGridMesh.py failed: see log.makeOGridMesh"; exit 1; }
-runApplication checkMesh
+solids4Foam::runApplication checkMesh
 
 # Transmural coordinate t, fibres f0, sheets s0 and sheet-normals n0
 # (system/setFibreFieldDict selects the ellipsoid method)
-runApplication setFibreField
+solids4Foam::runApplication setFibreField
 
 # Run the solver
 if [[ "$PARALLEL" == "yes" ]]
 then
-    runApplication decomposePar
-    runParallel solids4Foam
-    runApplication reconstructPar
+    solids4Foam::runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication reconstructPar
 else
-    runApplication solids4Foam
+    solids4Foam::runApplication solids4Foam
 fi
 
 # Compare with the benchmark participants, if numpy is available (and

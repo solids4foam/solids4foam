@@ -6,7 +6,7 @@ sort: 12
 
 ---
 
-Prepared by Chanikya Valeti (UCD), with Claude Opus 5.5
+Prepared by Chanikya Valeti and Philip Cardiff (UCD), with Claude Opus 5.5
 
 ---
 
@@ -20,12 +20,13 @@ Prepared by Chanikya Valeti (UCD), with Claude Opus 5.5
 
 **Geometry and mesh** (Section 4.2, Table 6). The idealised biventricle is the
 tetrahedral mesh distributed with the benchmark (cardiac-benchmark-toolkit
-[2], `data/biv_mesh_and_fibers_{coarse,fine}_p1`). `Allrun` downloads it, at
-a fixed commit of the toolkit and checked against SHA-256 sums, into `data/`,
-and `../scripts/convertBiVMesh.py` converts it to an OpenFOAM `polyMesh`. This
-needs `python3` with `numpy` and `h5py`, and internet access (or the two
-`.h5` files placed in `data/<mesh>` beforehand). Patches: `base` (marker 10),
-`endo_rv` (20), `endo_lv` (30), `epi` (40).
+[2], `data/biv_mesh_and_fibers_{coarse,fine}_p1`), converted once to OpenFOAM
+format. `Allrun` downloads the converted meshes and fibres from the
+solids4foam website (`ArosticaEtAl2025.zip`, checked against its SHA-256 sum)
+into `data/` with `../scripts/fetchBiVMesh.py`, which needs only `python3`.
+Without internet access, place `ArosticaEtAl2025.zip` in `data/` first. The
+archive also holds the converter, `convertBiVMesh.py`, and the provenance of
+the toolkit's files. Patches: `base`, `endo_rv`, `endo_lv` and `epi`.
 
 | Mesh | Tetrahedra | Nodes |
 | --- | --- | --- |
@@ -52,40 +53,27 @@ Table 8 (σ0 = 1.5·10⁵ Pa, t_sys = 0.163 s, t_dias = 0.5 s; τ_max ≈ 120.1 
 **Output**: displacement at p0 = (0.025, 0.03, 0), p1 = (0, 0.03, 0) and
 p2 = (0.025, 0, 0.072) m.
 
-**Results so far** (coarse mesh, pressure formulation, serial, full beat
-t ∈ [0, 1] s; every step converges in 3 Newton iterations, about 4 h; run
-with this PR's first spring-dashpot condition, before the switch to the
-`solidSpringDashpot` of #528, so they are to be re-run). The
-timing of contraction and relaxation follows the participants' at all three
-points, and the deformed shape at t = 0.3 and 0.5 s matches Fig. 11 of [1].
-Of the nine displacement components, 6 are inside the participants' range at
-t = 0.17 s (end of filling), 6 at 0.3 s, 5 at 0.5 s, 7 at 0.7 s and 6 at
-1 s; all of p2 is inside during systole. Outside it:
+**Formulation and solver.** As in `benchmark1`: the mixed
+displacement-pressure formulation (default, serial only) or the displacement
+formulation, with PETSc SNES, BDF2 and Δt = 1 ms over t ∈ [0, 1] s.
 
-- the long-axis shortening in systole is too large: p0 x 9.6 vs a median of
-  8.2 mm (max 8.9) at t = 0.5 s, and p1 x just above the range, as in the
-  step 1 of `benchmark1`;
-- at low pressure the response is too stiff: during filling some components
-  are about a third of the participants' (p0 x 0.08 vs 0.45 mm, p0 z 0.41 vs
-  1.03 mm at t = 0.17 s), and in late relaxation the displacements return to
-  zero by t ≈ 0.75 s, while the participants keep 0.2-0.5 mm at t = 1 s;
-- p1 y overshoots to +0.5 mm at the onset of contraction and reaches
-  −1.45 mm at t = 0.5 s (range −1.22 to −0.71 mm).
+## Expected Results
 
-A polyhedral mesh made from the coarse tetrahedra by `polyDualMesh` (12 573
-cells, fibres mapped from the nearest tetrahedron) was not better: it moved
-p0 and p1 x into the range, but over-contracted p2, and its filling phase was
-as stiff. The stiffness at low load is therefore attributed to the momentum
-stabilisation (`diffStencilLaplacian`, `scaleFactor 100`) rather than to the
-tetrahedral cells; a study of the stabilisation scale and the `fine` mesh is
-still to be run.
+The participants' solutions in [1] spread over 1-6 mm, depending on the
+component, over the beat. At t = 0.5 s (end of contraction), their median
+displacements are about 8 mm (p0 x), 13 mm (p1 x) and 15 mm (p2 x).
+`compareWithReference.py` writes `verification/<mesh>.png` and prints the
+largest difference from the median for each component.
 
-The displacement formulation, with the benchmark's κ = 10⁶ Pa in the momentum
-equation, follows the pressure formulation during filling (within 0.14 mm),
-but lags it at the onset of contraction, by up to 1.2 mm at t = 0.22 s: it
-is stiffer, as expected from volumetric locking and from its stabilisation
-being scaled by κ. Lowering κ would change the benchmark's material, so the
-pressure formulation is the default.
+```note
+The results depend on the momentum stabilisation (`diffStencilLaplacian`,
+`scaleFactor` in `constant/solidProperties.pressure`): with too large a
+scale the wall is too stiff at low load, which shows in the filling phase
+(t < 0.17 s) and in late relaxation. The displacement formulation, with the
+benchmark's κ = 10⁶ Pa in the momentum equation, is stiffer still at the onset
+of contraction (volumetric locking), so the pressure formulation is the
+default.
+```
 
 ## Running the Case
 
