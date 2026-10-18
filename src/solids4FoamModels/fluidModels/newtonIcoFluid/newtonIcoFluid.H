@@ -125,13 +125,6 @@ class newtonIcoFluid
         //  with the solid-side scaling pattern
         scalar pressureEqnScale_;
 
-        //- Optional pressure stabilisation gamma with selected patch fluxes
-        //  zeroed
-        autoPtr<surfaceScalarField> pressureStabilisationGammaPtr_;
-
-        //- Patch IDs where pressure-stabilisation boundary flux is suppressed
-        labelList zeroPressureStabilisationFluxPatchIDs_;
-
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -168,10 +161,6 @@ class newtonIcoFluid
             const fvVectorMatrix& ddtUEqn,
             const fvVectorMatrix& HUEqn
         );
-
-        //- Return pressure-stabilisation gamma with selected patch fluxes
-        //  zeroed
-        const surfaceScalarField& pressureStabilisationGamma();
 
 #ifdef USE_PETSC
         //- Copy the PETSc solution vector x into the U and p fields,
@@ -289,9 +278,6 @@ public:
                 return pressureUnknownScale_;
             }
 
-            //- Suppress pressure-stabilisation boundary flux on a patch
-            void addZeroPressureStabilisationFluxPatch(const label patchID);
-
 
 
         // Edit
@@ -374,6 +360,8 @@ public:
             //- Apply a SIMPLE-type segregated preconditioner
             //  Approximately solves y = M^{-1} x using one SIMPLE iteration
             //  when PETSc uses the `physics` preconditioner
+            //  Work in progress: the quasi-monolithic coupling's physics
+            //  preconditioner, which uses this, is not yet ready for use
             virtual label precondition
             (
                 Vec y,         // Output: y = M^{-1} x

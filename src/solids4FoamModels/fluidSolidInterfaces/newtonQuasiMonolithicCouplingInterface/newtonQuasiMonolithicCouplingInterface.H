@@ -73,21 +73,6 @@ class newtonQuasiMonolithicCouplingInterface
         //  number of the monlithic system
         const scalar solidSystemScaleFactor_;
 
-        //- Flag to enable fluid-to-solid coupling
-        // const Switch fluidToSolidCoupling_;
-
-        //- Flag to enable mesh-to-fluid coupling
-        // const Switch meshToFluidCoupling_;
-
-        //- Flag to enable solid-to-mesh coupling
-        // const Switch solidToMeshCoupling_;
-
-        //- Flag to extrapolate the displacement at the solid interface
-        //  Alternatively, the adjacenet cell centre displacement is used
-        //  This affects the residual calculation, whereas the Jacobian always
-        //  uses the adjacenet cell centre displacement
-        const Switch extrapolateSolidInterfaceDisplacement_;
-
         //- Pass the viscous stress from the fluid to the solid
         //  Defaults to yes
         const Switch passViscousStress_;
@@ -99,20 +84,8 @@ class newtonQuasiMonolithicCouplingInterface
         //  applies the traction on the undeformed face areas. Defaults to no
         const Switch conservativeTractionTransfer_;
 
-        //- Use the Liu (2014) Eq.31 interface velocity condition
-        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-        //  This condition is from Liu et al., JCP 270, 2014, Section 4.
-        //  Note: in the FVM-ALE context, this condition creates a mismatch
-        //  between the mesh velocity (U_solid) and the fluid BC (Liu combo),
-        //  violating the GCL for interface-adjacent cells. This causes
-        //  pressure oscillations in practice. Defaults to no.
-        const Switch liuInterfaceCondition_;
-
         //- Report interface normal flux defect diagnostics
         const Switch interfaceFluxDiagnostics_;
-
-        //- Suppress pressure-stabilisation boundary flux on the FSI interface
-        const Switch zeroPressureStabilisationFluxOnFsiInterface_;
 
         //- Offset subtracted from the mapped solid interface displacement on
         //  the local fluid patch faces, so that the fluid mesh follows the
@@ -153,9 +126,6 @@ class newtonQuasiMonolithicCouplingInterface
         //- PETSc index set for the fluid pressure unknowns
         mutable IS isFluidPressure_;
 
-        //- PETSc index set for the motion unknowns
-        //mutable IS isMotion_;
-
         //- PETSc index set for the solid unknowns
         mutable IS isSolid_;
 
@@ -170,20 +140,12 @@ class newtonQuasiMonolithicCouplingInterface
         Mat Pmat_;
 
         //- Cached KSP for the solid sub-block in the physics preconditioner
+        //  (work in progress, see precondition())
         mutable KSP solidSubKSP_;
 
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
-
-        // //- Store the old time value for resetting the time
-        // scalar oldTimeValue_;
-
-        // //- Number of consecutive failed SNES solves
-        // label nConsecutiveFailedSolves_;
-
-        // //- Maximum allowed number of consecutive failed SNES solves
-        // const label maxAllowedConsecutiveFailedSolves_;
 
 
     // Private Member Functions
@@ -224,17 +186,6 @@ class newtonQuasiMonolithicCouplingInterface
 
             return isFluidPressure_;
         }
-
-        //- Return isSolid pointer
-        // IS isMotion() const
-        // {
-        //     if (isMotion_ == nullptr)
-        //     {
-        //         makeIsFluidIsMotionIsSolid();
-        //     }
-
-        //     return isMotion_;
-        // }
 
         //- Return isSolid pointer
         IS isSolid() const
@@ -366,12 +317,6 @@ class newtonQuasiMonolithicCouplingInterface
         //  pressure and the added mass
         void setInterfacePressureGradient();
 
-        //- Set the fluid interface velocity using Liu (2014) Eq.31
-        //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
-        //  This replaces mapInterfaceMotionUToFluidU() when
-        //  liuInterfaceCondition_ is enabled
-        void setLiuInterfaceVelocity();
-
         //- Return current geometric interface mesh flux
         scalarField currentInterfaceMeshPhi() const;
 
@@ -475,7 +420,6 @@ public:
             ISDestroy(&isFluid_);
             ISDestroy(&isFluidVelocity_);
             ISDestroy(&isFluidPressure_);
-            // ISDestroy(&isMotion_);
             ISDestroy(&isSolid_);
         }
 
@@ -530,6 +474,10 @@ public:
             //- Apply a block physics preconditioner
             //  Fluid block: delegates to newtonIcoFluid SIMPLE-type PC
             //  Solid block: one approximate solve using the solid sub-matrix
+            //  Work in progress: selected with pc_type physics, which no
+            //  tutorial uses yet. On ringAddedMass the Newton iterations
+            //  stall at the first coupled time step, so it is kept for
+            //  further development and is not ready for use
             virtual label precondition
             (
                 Vec y,         // Output: y = M^{-1} x

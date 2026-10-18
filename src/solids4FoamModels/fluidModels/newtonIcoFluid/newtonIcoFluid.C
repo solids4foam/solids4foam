@@ -58,19 +58,6 @@ void scaleFvScalarMatrix(Foam::fvScalarMatrix& matrix, const Foam::scalar scale)
 }
 
 
-bool containsLabel(const Foam::labelList& labels, const Foam::label value)
-{
-    forAll(labels, i)
-    {
-        if (labels[i] == value)
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 
 const Foam::dictionary& solverControls
 (
@@ -273,8 +260,6 @@ newtonIcoFluid::newtonIcoFluid
     ),
     pressureUnknownScale_(1.0),
     pressureEqnScale_(pressureScaleFactor_),
-    pressureStabilisationGammaPtr_(),
-    zeroPressureStabilisationFluxPatchIDs_(),
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_()
 {
@@ -950,65 +935,6 @@ bool newtonIcoFluid::evolve()
 void newtonIcoFluid::clearRAUf()
 {
     rAUfPtr_.clear();
-    pressureStabilisationGammaPtr_.clear();
-}
-
-
-const surfaceScalarField& newtonIcoFluid::pressureStabilisationGamma()
-{
-    if (zeroPressureStabilisationFluxPatchIDs_.empty())
-    {
-        return rAUf();
-    }
-
-    if (pressureStabilisationGammaPtr_.empty())
-    {
-        pressureStabilisationGammaPtr_.reset
-        (
-            new surfaceScalarField
-            (
-                IOobject
-                (
-                    "pressureStabilisationGamma",
-                    mesh().time().timeName(),
-                    mesh(),
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE
-                ),
-                rAUf()
-            )
-        );
-    }
-    else
-    {
-        pressureStabilisationGammaPtr_() = rAUf();
-    }
-
-    forAll(zeroPressureStabilisationFluxPatchIDs_, i)
-    {
-        const label patchID = zeroPressureStabilisationFluxPatchIDs_[i];
-        boundaryFieldRef(pressureStabilisationGammaPtr_())[patchID] = 0.0;
-    }
-
-    return pressureStabilisationGammaPtr_();
-}
-
-
-void newtonIcoFluid::addZeroPressureStabilisationFluxPatch(const label patchID)
-{
-    if (patchID < 0 || patchID >= mesh().boundary().size())
-    {
-        FatalErrorInFunction
-            << "Invalid patch ID " << patchID << " for mesh "
-            << mesh().name() << abort(FatalError);
-    }
-
-    if (!containsLabel(zeroPressureStabilisationFluxPatchIDs_, patchID))
-    {
-        const label oldSize = zeroPressureStabilisationFluxPatchIDs_.size();
-        zeroPressureStabilisationFluxPatchIDs_.setSize(oldSize + 1);
-        zeroPressureStabilisationFluxPatchIDs_[oldSize] = patchID;
-    }
 }
 
 
@@ -1324,7 +1250,7 @@ label newtonIcoFluid::formResidual
     );
 
     rAUf() = -fvc::interpolate(1.0/pressureStabUEqn.A());
-    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
+    const surfaceScalarField& pStabGamma = rAUf();
 
     pressureStabilisation().updateScalar(p, &gradp());
     pressureResidual += pressureStabilisation().cellScalar(&pStabGamma, true);
@@ -1443,7 +1369,7 @@ label newtonIcoFluid::formJacobian
     // diagonal damping terms that are not part of the upwind pressure
     // stabilisation operator and may not preserve the sign of UEqn.A().
     rAUf() = -fvc::interpolate(1.0/UEqn.A());
-    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
+    const surfaceScalarField& pStabGamma = rAUf();
 
     if (Switch(fluidProperties().lookupOrDefault<Switch>("addDivPhiUDamping", false)))
     {
@@ -1703,7 +1629,7 @@ label newtonIcoFluid::precondition
 
     // Match the pressure-block sign convention in formJacobian().
     rAUf() = -fvc::interpolate(rAU);
-    const surfaceScalarField& pStabGamma = pressureStabilisationGamma();
+    const surfaceScalarField& pStabGamma = rAUf();
 
     surfaceScalarField phiHbyA
     (
