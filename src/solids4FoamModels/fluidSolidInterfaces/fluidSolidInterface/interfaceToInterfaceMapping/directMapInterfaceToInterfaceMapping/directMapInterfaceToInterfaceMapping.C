@@ -705,6 +705,42 @@ void directMapInterfaceToInterfaceMapping::transferPointsZoneToZone
 }
 
 
+void directMapInterfaceToInterfaceMapping::zoneToZoneFaceWeights
+(
+    const standAlonePatch& fromZone,
+    const standAlonePatch& toZone,
+    labelListList& addressing,
+    scalarListList& weights
+) const
+{
+    // Check if fromZone is zoneA or zoneB by checking the memory address
+    const labelList* mapPtr = nullptr;
+    if (&fromZone == &zoneA() && &toZone == &zoneB())
+    {
+        mapPtr = &zoneAToZoneBFaceMap();
+    }
+    else if (&toZone == &zoneA() && &fromZone == &zoneB())
+    {
+        mapPtr = &zoneBToZoneAFaceMap();
+    }
+    else
+    {
+        FatalErrorInFunction
+            << "Unknown zones!" << abort(FatalError);
+    }
+
+    const labelList& map = *mapPtr;
+
+    addressing.setSize(map.size());
+    weights.setSize(map.size());
+    forAll(map, faceI)
+    {
+        addressing[faceI] = labelList(1, map[faceI]);
+        weights[faceI] = scalarList(1, 1.0);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace interfaceToInterfaceMappings

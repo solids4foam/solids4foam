@@ -122,9 +122,10 @@ static bool appendIfAbsent(labelList& labels, const label value)
 }
 
 
-// Build face-centre matching between two conformal patches.
+// Build face-centre matching between two interface patches: one-to-one for
+// conformal patches, and nearest face centre in both directions otherwise.
 // Returns list of (ownerCellA, ownerCellB) pairs.
-List<labelPair> matchConformalInterface
+List<labelPair> matchInterface
 (
     const fvMesh& meshA,
     const word& patchNameA,
@@ -156,19 +157,9 @@ List<labelPair> matchConformalInterface
     const vectorField cfA(ppA.faceCentres());
     const vectorField cfB(ppB.faceCentres());
 
-    if (cfA.size() != cfB.size())
-    {
-        FatalErrorInFunction
-            << "Interface patches have different sizes: "
-            << patchNameA << " (" << cfA.size() << ") vs "
-            << patchNameB << " (" << cfB.size() << ")" << nl
-            << "Non-conformal interfaces are not supported in v1."
-            << exit(FatalError);
-    }
-
     // Compute a length scale for tolerance
     scalar tolSq = 0;
-    if (cfA.size() > 0)
+    if (cfA.size() > 0 && cfB.size() > 0)
     {
         // Use a fraction of the mesh bounding box diagonal
         const boundBox bbA(cfA);
@@ -185,24 +176,74 @@ List<labelPair> matchConformalInterface
         }
     }
 
-    List<labelPair> pairs(cfA.size());
-
     // For each face in patchA, find the matching face in patchB by nearest
     // face centre. For conformal meshes this should be exact. This is an
     // O(n^2) search and can be revisited if it becomes a bottleneck.
-    labelList usedB(cfB.size(), -1);
+    bool conformal = (cfA.size() == cfB.size());
+
+    List<labelPair> pairs(cfA.size());
+
+    if (conformal)
+    {
+        labelList usedB(cfB.size(), -1);
+
+        forAll(cfA, faceI)
+        {
+            const point& ptA = cfA[faceI];
+            label bestJ = -1;
+            scalar bestDistSq = GREAT;
+
+            forAll(cfB, faceJ)
+            {
+                if (usedB[faceJ] >= 0) continue;
+
+                const scalar dSq = magSqr(ptA - cfB[faceJ]);
+                if (dSq < bestDistSq)
+                {
+                    bestDistSq = dSq;
+                    bestJ = faceJ;
+                }
+            }
+
+            if (bestJ < 0 || bestDistSq > tolSq)
+            {
+                conformal = false;
+                break;
+            }
+
+            usedB[bestJ] = faceI;
+
+            // Get owner cells
+            const label cellA = ppA.faceCells()[faceI];
+            const label cellB = ppB.faceCells()[bestJ];
+
+            pairs[faceI] = labelPair(cellA, cellB);
+        }
+    }
+
+    if (conformal)
+    {
+        return pairs;
+    }
+
+    // Non-conformal interface: pair each face of either patch with the face
+    // of the other patch with the nearest face centre. The pairs only add
+    // graph edges, so they need not be one-to-one
+    Info<< "  Interface patches " << patchNameA << " and " << patchNameB
+        << " are not conformal: each face is paired with the nearest face "
+        << "centre on the other patch" << endl;
+
+    pairs.setSize(cfA.size() + cfB.size());
+    label pairI = 0;
 
     forAll(cfA, faceI)
     {
-        const point& ptA = cfA[faceI];
         label bestJ = -1;
         scalar bestDistSq = GREAT;
 
         forAll(cfB, faceJ)
         {
-            if (usedB[faceJ] >= 0) continue;
-
-            const scalar dSq = magSqr(ptA - cfB[faceJ]);
+            const scalar dSq = magSqr(cfA[faceI] - cfB[faceJ]);
             if (dSq < bestDistSq)
             {
                 bestDistSq = dSq;
@@ -210,25 +251,36 @@ List<labelPair> matchConformalInterface
             }
         }
 
-        if (bestJ < 0 || bestDistSq > tolSq)
+        if (bestJ >= 0)
         {
-            FatalErrorInFunction
-                << "Could not find matching face for face " << faceI
-                << " of patch " << patchNameA
-                << " at " << ptA << nl
-                << "Best distance: " << Foam::sqrt(bestDistSq)
-                << ", tolerance: " << Foam::sqrt(tolSq)
-                << exit(FatalError);
+            pairs[pairI++] =
+                labelPair(ppA.faceCells()[faceI], ppB.faceCells()[bestJ]);
+        }
+    }
+
+    forAll(cfB, faceJ)
+    {
+        label bestI = -1;
+        scalar bestDistSq = GREAT;
+
+        forAll(cfA, faceI)
+        {
+            const scalar dSq = magSqr(cfA[faceI] - cfB[faceJ]);
+            if (dSq < bestDistSq)
+            {
+                bestDistSq = dSq;
+                bestI = faceI;
+            }
         }
 
-        usedB[bestJ] = faceI;
-
-        // Get owner cells
-        const label cellA = ppA.faceCells()[faceI];
-        const label cellB = ppB.faceCells()[bestJ];
-
-        pairs[faceI] = labelPair(cellA, cellB);
+        if (bestI >= 0)
+        {
+            pairs[pairI++] =
+                labelPair(ppA.faceCells()[bestI], ppB.faceCells()[faceJ]);
+        }
     }
+
+    pairs.setSize(pairI);
 
     return pairs;
 }
@@ -456,7 +508,7 @@ int main(int argc, char *argv[])
         Info<< "Matching interface: " << regionAName << "/" << patchAName
             << " <-> " << regionBName << "/" << patchBName << endl;
 
-        const List<labelPair> pairs = matchConformalInterface
+        const List<labelPair> pairs = matchInterface
         (
             regionMeshes[riA], patchAName,
             regionMeshes[riB], patchBName

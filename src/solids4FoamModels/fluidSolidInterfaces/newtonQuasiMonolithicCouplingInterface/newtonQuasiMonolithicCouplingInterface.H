@@ -92,6 +92,13 @@ class newtonQuasiMonolithicCouplingInterface
         //  Defaults to yes
         const Switch passViscousStress_;
 
+        //- Transfer the fluid interface forces to the solid with the
+        //  transpose of the solid-to-fluid velocity transfer, instead of
+        //  interpolating the traction, so that the total interface force and
+        //  power are conserved on a non-conformal interface. The solid
+        //  applies the traction on the undeformed face areas. Defaults to no
+        const Switch conservativeTractionTransfer_;
+
         //- Use the Liu (2014) Eq.31 interface velocity condition
         //  U_fluid = (3/4)*U_solid + (1/2)*U_solid_old - (1/4)*U_solid_oldold
         //  This condition is from Liu et al., JCP 270, 2014, Section 4.
@@ -124,6 +131,18 @@ class newtonQuasiMonolithicCouplingInterface
         //- Offset subtracted from the mapped solid interface point
         //  displacement on the local fluid patch points
         autoPtr<vectorField> interfacePointDOffsetPtr_;
+
+        //- Solid zone faces giving the value on each fluid zone face
+        mutable autoPtr<labelListList> fluidFaceSolidFacesPtr_;
+
+        //- Weights of the solid zone faces giving each fluid zone face value
+        mutable autoPtr<scalarListList> fluidFaceSolidWeightsPtr_;
+
+        //- Fluid zone faces giving the value on each solid zone face
+        mutable autoPtr<labelListList> solidFaceFluidFacesPtr_;
+
+        //- Weights of the fluid zone faces giving each solid zone face value
+        mutable autoPtr<scalarListList> solidFaceFluidWeightsPtr_;
 
         //- Accumulated signed leakage from interface flux defect
         scalar accumulatedInterfaceFluxLeakage_;
@@ -243,6 +262,51 @@ class newtonQuasiMonolithicCouplingInterface
         //- Return a reference to the mesh motion solver cast as a solid
         //  model
         solidModel& motionSolid();
+
+        //- Calculate the interface face transfer addressing and weights in
+        //  both directions from the interface-to-interface mapping. For a
+        //  conformal interface (directMap), each face has one unit weight;
+        //  for a non-conformal interface (AMI), the weights are the face
+        //  overlap areas divided by the area of the receiving face
+        void calcInterfaceFaceWeights() const;
+
+        //- Return the solid zone faces giving each fluid zone face value
+        const labelListList& fluidFaceSolidFaces() const;
+
+        //- Return the weights of the solid zone faces for each fluid face
+        const scalarListList& fluidFaceSolidWeights() const;
+
+        //- Return the fluid zone faces giving each solid zone face value
+        const labelListList& solidFaceFluidFaces() const;
+
+        //- Return the weights of the fluid zone faces for each solid face
+        const scalarListList& solidFaceFluidWeights() const;
+
+        //- Transfer a solid zone face field to the fluid zone faces
+        template<class Type>
+        tmp<Field<Type>> solidZoneToFluidZone
+        (
+            const Field<Type>& solidZoneField
+        ) const;
+
+        //- Transfer a fluid zone face field to the solid zone faces
+        template<class Type>
+        tmp<Field<Type>> fluidZoneToSolidZone
+        (
+            const Field<Type>& fluidZoneField
+        ) const;
+
+        //- Apply the transpose of the solid-to-fluid zone face transfer to a
+        //  fluid zone face field, e.g. to distribute face forces
+        template<class Type>
+        tmp<Field<Type>> fluidZoneToSolidZoneTranspose
+        (
+            const Field<Type>& fluidZoneField
+        ) const;
+
+        //- Return the local solid interface face areas on which the solid
+        //  applies the interface traction
+        tmp<scalarField> solidInterfaceMagSf() const;
 
         //- Create the empty submatrices and nested matrix given the
         //  corresponding solution lengths and block sizes
