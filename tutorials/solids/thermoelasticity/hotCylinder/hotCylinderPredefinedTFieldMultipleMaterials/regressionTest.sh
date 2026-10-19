@@ -63,7 +63,8 @@ REF_SINGLE_D_MEAN=0.000297930205721125
 # material sub-meshes on the legacy path, the material-aware leastSquaresS4f
 # gradient on one mesh on the framework - as on layeredPipe and punch, so they
 # agree only to the discretisation. Measured: 9.4e-4 of the largest
-# displacement on OpenFOAM.com v2606. Before #570, when both were the answer
+# displacement on OpenFOAM.com v2512 and v2606 and OpenFOAM.org 9, and 9.1e-4
+# on foam-extend 4.1. Before #570, when both were the answer
 # to T = 80, 1.23e-3 on OpenFOAM.com v2512 and OpenFOAM.org 9, and 1.35e-3 on
 # foam-extend 4.1. This is the coarse check: a 1% change in steel's alpha
 # took the framework to 5.8e-3 and failed, a 0.1% change (1.4e-3) did not, and
@@ -72,8 +73,9 @@ REF_SINGLE_D_MEAN=0.000297930205721125
 FRAMEWORK_D_REL_TOL=3e-3
 
 # One material. The same discretisation, so the two agree to the solution
-# tolerance (rTol 1e-6): measured 6.1e-6 on OpenFOAM.com v2606, and 3.7e-8
-# with rTol 1e-10. Before #570 the last answer came from a step that ran to
+# tolerance (rTol 1e-6): measured 6.1e-6 on OpenFOAM.com v2512 and v2606 and
+# OpenFOAM.org 9, 1.4e-5 on foam-extend 4.1, and 3.7e-8 with rTol 1e-10 on
+# v2606. Before #570 the last answer came from a step that ran to
 # the step-norm tolerance, and agreed to 2.7e-8 on OpenFOAM.com v2512, 3.1e-8
 # on foam-extend 4.1 and 8.2e-8 on OpenFOAM.org 9. The threshold, 5e-5, covers
 # the 2e-5 between the forks and is below the 1e-4 that a 0.01% change in
@@ -82,6 +84,19 @@ SINGLE_D_REL_TOL=5e-5
 
 # The last time step, and the last directory of the temperature case
 COMPARISON_END_TIME=4
+
+# The temperatures the 90/80 scaling assumes at the last two times of the
+# temperature case
+LEGACY_T=80
+END_T=90
+
+# The first time step. The answer is proportional to T, so in each arm D there
+# must be T(1)/T(4) of D at the end. Before #570 the first step was accepted
+# with D = 0. It starts from rest, so it has the largest iteration error:
+# measured 3.3e-4 with two materials and 7.4e-4 with one on OpenFOAM.com
+# v2606, and 7.6e-8 with two materials at rTol 1e-10
+FIRST_TIME=1
+FIRST_D_REL_TOL=1e-2
 
 # A thermal stress of at least this much must be present at the end in every
 # arm, so that the comparisons are not of stress-free solutions
@@ -98,6 +113,8 @@ echo "Max epsilonEq in [${EPS_MIN}, ${EPS_MAX}]"
 echo "Max sigmaEq   in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "D against the reference, relative to its largest value: two"\
 " materials < ${FRAMEWORK_D_REL_TOL}, one material < ${SINGLE_D_REL_TOL}"
+echo "D at the first step against T(1)/T(4) of D at the end"\
+" < ${FIRST_D_REL_TOL}"
 echo "============================================================"
 echo
 
@@ -150,6 +167,37 @@ use_single_material() {
 
 extract_last() {
     grep "$1" "$2/${SOLVER_LOGFILE}" | tail -n 1 | awk '{print $NF}'
+}
+
+# The uniform temperature of the temperature case at a time
+temperature_at() {
+    solids4Foam::internalFieldValues \
+        "${SCRIPT_DIR}/hotCylinderTemperatureField/$1/T"
+}
+
+# An arm's first step against its last, scaled by the temperatures
+check_first_step() {
+    local label="$1"
+    local dir="$2"
+    local t_first t_end norms ref_max ref_mean
+
+    if ! t_first=$(temperature_at "${FIRST_TIME}") \
+      || ! t_end=$(temperature_at "${COMPARISON_END_TIME}") \
+      || ! norms=$(solids4Foam::internalFieldNorms \
+            "${dir}/${COMPARISON_END_TIME}/D")
+    then
+        echo "FAIL: ${label}: could not read T or the final D"
+        return 1
+    fi
+
+    read -r ref_max ref_mean <<< "$(
+        awk -v norms="${norms}" -v a="${t_first}" -v b="${t_end}" \
+            'BEGIN {split(norms, n); printf "%.15g\t%.15g\n", n[1]*a/b, n[2]*a/b}'
+    )"
+
+    solids4Foam::checkFieldNorms "${label}, D at the first step" \
+        "${dir}/${FIRST_TIME}/D" "${ref_max}" "${ref_mean}" \
+        "${FIRST_D_REL_TOL}"
 }
 
 # Checks common to every arm: it completed, took its material and its
@@ -278,6 +326,22 @@ solids4Foam::checkFieldNorms "one material, D" \
     "${SINGLE_DIR}/${COMPARISON_END_TIME}/D" \
     "${REF_SINGLE_D_MAX}" "${REF_SINGLE_D_MEAN}" "${SINGLE_D_REL_TOL}" \
     || failures=$((failures + 1))
+
+check_first_step "two materials" "${CASE_DIR}" || failures=$((failures + 1))
+check_first_step "one material" "${SINGLE_DIR}" || failures=$((failures + 1))
+
+# The scaled references hold only while the temperature case ends at these
+t_legacy=$(temperature_at $((COMPARISON_END_TIME - 1)) || true)
+t_end=$(temperature_at "${COMPARISON_END_TIME}" || true)
+
+if awk "BEGIN {exit !(${t_legacy:-0} == ${LEGACY_T} && ${t_end:-0} == ${END_T})}"
+then
+    echo "PASS: T = ${t_legacy} and ${t_end} at the last two times"
+else
+    echo "FAIL: T = '${t_legacy}' and '${t_end}' at the last two times;" \
+        "the references assume ${LEGACY_T} and ${END_T}"
+    failures=$((failures + 1))
+fi
 
 # Clean case again
 if [ "$CHECK_ONLY" = false ]; then

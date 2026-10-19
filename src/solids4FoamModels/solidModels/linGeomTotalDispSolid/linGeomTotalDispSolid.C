@@ -317,12 +317,14 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
         }
         else if (!smoothHydrostaticStress())
         {
-            // The stress is otherwise first updated at the end of the first
-            // iteration below, so the first residual would not see a load
+            // Without this, the stress is first updated at the end of the
+            // first iteration below, so the first residual would miss a load
             // that only the law supplies, such as a prescribed temperature,
-            // and the step could be accepted without it. The smoothing is
-            // excluded, as for the predictor, because it needs DEqnA, which
-            // exists only inside the momentum loop
+            // and the step could be accepted without it. gradD is not
+            // recomputed: new boundary displacements already reach the first
+            // residual through the stabilisation. The smoothing is skipped
+            // because it needs DEqnA, which exists only inside the momentum
+            // loop
             correctStress();
         }
     }
