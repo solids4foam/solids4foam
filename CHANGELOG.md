@@ -308,6 +308,14 @@ release. For complete commit-level details and contributor information, see the
   `couplingReuse` greater than zero, `relMinSignificant` defaults to `1e-3` (a
   preCICE-QR2-style relative filter), and the secants of a step accepted
   unconverged (`allowUnconvergedCoupling`) are discarded (#587).
+- The `IQNILS` set-ups of the `TurekHron2006`, `membraneRoof`,
+  `mokLidDrivenCavity`, `ringAddedMass`, `womersleyTube` and `blobInTreacle`
+  tutorials now use `couplingReuse 5`. Over the full tutorial runs
+  (OpenFOAM-v2512, serial), the mean coupling iterations per time step fall
+  from 5.0 to 2.6, 5.9 to 2.7, 4.3 to 2.6, 4.0 to 2.4, 14.6 to 8.4 and 6.2 to
+  4.2, and the regression tests pass unchanged. The results in the
+  `verification/` READMEs of these tutorials were computed without reuse
+  (#587).
 
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the

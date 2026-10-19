@@ -169,7 +169,9 @@ above.
 The results in Figure 2 were produced with the tutorial settings (mesh as
 above, $$\Delta t = 0.005$$ s) using OpenFOAM-v2412 on 6 processes of an Apple
 M1 Ultra, in 31 min. The coupling took 6.2 iterations per time step on
-average.
+average. These runs predate the reuse of IQN-ILS secant modes
+(`couplingReuse 5`, #587), which lowers this to 2.7 iterations per time step
+(OpenFOAM-v2512, Linux, serial; 5.9 without reuse).
 
 ```note
 The finer mesh 2 of Figure 3 (58 min on 32 processes) brings the mean
