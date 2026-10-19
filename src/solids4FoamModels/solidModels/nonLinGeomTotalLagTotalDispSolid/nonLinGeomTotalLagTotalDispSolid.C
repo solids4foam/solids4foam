@@ -445,9 +445,22 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     // Update D boundary conditions
     D().correctBoundaryConditions();
 
-    if (predictor_ && newTimeStep())
+    if (newTimeStep())
     {
-        predict();
+        if (predictor_)
+        {
+            predict();
+        }
+        else if (!smoothHydrostaticStress())
+        {
+            // The stress is otherwise first updated at the end of the first
+            // iteration below, so the first residual would not see a load
+            // that only the law supplies, such as a prescribed temperature,
+            // and the step could be accepted without it. The smoothing is
+            // excluded, as for the predictor, because it needs DEqnA, which
+            // exists only inside the momentum loop
+            correctStress();
+        }
     }
 
 #ifdef OPENFOAM_NOT_EXTEND

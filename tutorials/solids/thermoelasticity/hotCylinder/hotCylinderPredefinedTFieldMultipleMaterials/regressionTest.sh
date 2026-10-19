@@ -31,40 +31,51 @@ solids4Foam::requireGnuSed
 # two-material arm is then the multi-material path with that input.
 # ============================================================
 
+# The legacy values below are scaled by 90/80. The legacy model, like the
+# framework before #570, accepted the last step after one iteration whose
+# stress still held the previous temperature, so what it wrote was the answer
+# to T = 80 rather than to the last time's T = 90. With T0 = 0 and no other
+# load the steady answer is proportional to T, so 90/80 of it is the legacy
+# answer to T = 90
+
 # Bounds on the main arm's final extrema. The temperature is uniform in
 # each time directory, so the stress is the mismatch of the two materials'
-# expansion. Measured on the legacy model: max epsilonEq 1.47489e-3 and max
-# sigmaEq 1.8164e8 on OpenFOAM.com v2512 and OpenFOAM.org 9, 1.47582e-3 and
-# 1.81641e8 on foam-extend 4.1
-EPS_MIN=1.4e-3
-EPS_MAX=1.55e-3
-SIGMA_MIN=1.75e8
-SIGMA_MAX=1.9e8
+# expansion. Measured on the legacy model, and scaled: max epsilonEq
+# 1.65925e-3 and max sigmaEq 2.04345e8 on OpenFOAM.com v2512 and OpenFOAM.org
+# 9, 1.66030e-3 and 2.04346e8 on foam-extend 4.1
+EPS_MIN=1.58e-3
+EPS_MAX=1.74e-3
+SIGMA_MIN=1.97e8
+SIGMA_MAX=2.14e8
 
 # The final D of the removed legacy mechanicalModel, as the max and mean
 # component magnitude of the field written to fourteen figures, for each arm,
-# from the last commit that had it (mcl-stage8-coverage, c3a92b3d). These are
-# OpenFOAM.com v2512's; OpenFOAM.org 9 agrees to 6e-8, and foam-extend 4.1
-# differs by 1.7e-4 in the two-material arm and 2e-5 in the single-material one
-REF_D_MAX=0.00098799181372038
-REF_D_MEAN=0.000340730093870825
-REF_SINGLE_D_MAX=0.0007175233920732
-REF_SINGLE_D_MEAN=0.000264826849529889
+# from the last commit that had it (mcl-stage8-coverage, c3a92b3d), scaled.
+# These are OpenFOAM.com v2512's; OpenFOAM.org 9 agrees to 6e-8, and
+# foam-extend 4.1 differs by 1.7e-4 in the two-material arm and 2e-5 in the
+# single-material one
+REF_D_MAX=0.00111149079043543
+REF_D_MEAN=0.000383321355604678
+REF_SINGLE_D_MAX=0.00080721381608235
+REF_SINGLE_D_MEAN=0.000297930205721125
 
 # Two materials. These are different discretisations of the interface - per
 # material sub-meshes on the legacy path, the material-aware leastSquaresS4f
 # gradient on one mesh on the framework - as on layeredPipe and punch, so they
-# agree only to the discretisation. Measured: 1.23e-3 of the largest
-# displacement on OpenFOAM.com v2512 and OpenFOAM.org 9, 1.35e-3 on
+# agree only to the discretisation. Measured: 9.4e-4 of the largest
+# displacement on OpenFOAM.com v2606. Before #570, when both were the answer
+# to T = 80, 1.23e-3 on OpenFOAM.com v2512 and OpenFOAM.org 9, and 1.35e-3 on
 # foam-extend 4.1. This is the coarse check: a 1% change in steel's alpha
-# took the framework to 6.2e-3 and failed, a 0.1% change (1.7e-3) did not, and
-# holding T at its second-step value took it to 0.12. The single-material arm
+# took the framework to 5.8e-3 and failed, a 0.1% change (1.4e-3) did not, and
+# holding T at its second-step value took it to 0.22. The single-material arm
 # below is the fine one
 FRAMEWORK_D_REL_TOL=3e-3
 
-# One material. The same discretisation, so the two agreed to the solution
-# tolerance (1e-6): measured 2.7e-8 on OpenFOAM.com v2512, 3.1e-8 on
-# foam-extend 4.1 and 8.2e-8 on OpenFOAM.org 9. The threshold, 5e-5, covers
+# One material. The same discretisation, so the two agree to the solution
+# tolerance (rTol 1e-6): measured 6.1e-6 on OpenFOAM.com v2606, and 3.7e-8
+# with rTol 1e-10. Before #570 the last answer came from a step that ran to
+# the step-norm tolerance, and agreed to 2.7e-8 on OpenFOAM.com v2512, 3.1e-8
+# on foam-extend 4.1 and 8.2e-8 on OpenFOAM.org 9. The threshold, 5e-5, covers
 # the 2e-5 between the forks and is below the 1e-4 that a 0.01% change in
 # alpha makes
 SINGLE_D_REL_TOL=5e-5

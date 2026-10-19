@@ -554,6 +554,22 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- With the `implicitSegregated` algorithm,
+  `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the stress
+  once at the start of each time step, before the momentum loop (#570). The
+  stress was first updated at the end of the first iteration, so a load that
+  only the mechanical law supplies, such as a temperature read from
+  `TcaseDirectory` or an active tension, was missing from the first residual,
+  and the step could be accepted without it. The first such step gave
+  `D = 0`, and a step after a tightly converged one could be accepted
+  unchanged, one load step behind. The predictor already updated the stress
+  and is unchanged, and the hydrostatic stress smoothing (`solvePressureEqn`)
+  still skips the update, as it needs the momentum matrix diagonal. Other
+  cases change only within the solution tolerance. The
+  `hotCylinderPredefinedTFieldMultipleMaterials` regression references came
+  from the legacy model, which had the same lag, and are rescaled from the
+  second-last temperature to the last.
 - `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
   cell whose face stencil does not span three directions, for example a
   corner cell bounded by traction patches, the tensor's determinant can round
