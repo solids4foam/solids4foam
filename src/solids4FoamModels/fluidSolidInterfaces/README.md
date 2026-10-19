@@ -65,14 +65,16 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
   retained.
 - `minSignificant`: absolute filtering tolerance for repeated or
   near-dependent modes.
-- `relMinSignificant`: optional relative QR2-style filtering tolerance based on
-  the fraction of new information in each older secant mode.
+- `relMinSignificant`: relative QR2-style filtering tolerance based on
+  the fraction of new information in each older secant mode. Defaults to
+  `1e-3` when `couplingReuse` is greater than zero; otherwise it is disabled.
 - `normalizeCouplingColumns`: optionally normalize each `V/W` secant column
   pair before the QR solve to improve the conditioning of the least-squares
   system.
-- `residualSumPreconditioning`: optionally scale each `V` column by the inverse
-  of the current residual magnitude before the QR solve, mimicking preCICE's
-  residual-sum approach.
+- `residualSumPreconditioning`: optionally scale each `V` column and the
+  residual by the inverse of the current pointwise residual magnitude in the
+  `preciceStyleCouplingQR` solve. Unlike preCICE's residual-sum
+  preconditioner, which weights whole data blocks, the weight is per point.
 - `residualPreconditioningEpsilon`: regularization added to the residual
   magnitude when computing the above scaling weight.
 - `reusePreviousStepModes`: optionally reuse the previous time step's cached
@@ -80,8 +82,10 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
   immediately previous time step converged in one iteration and generated no
   new secants, the implementation falls back to the latest non-empty cached
   time step instead, which is closer to preCICE's backup LS-system behavior.
-- `maxReuseUpdateNormRatio`: optional safeguard that caps the norm of that
-  first reused IQN-ILS correction relative to the current interface residual.
+- `maxReuseUpdateNormRatio`: optional safeguard that caps the norm of the
+  interface displacement update, relative to the current interface residual,
+  in every IQN-ILS solve that uses secants from previous time steps
+  (`couplingReuse` or `reusePreviousStepModes`).
 - `combinedCouplingSystem`: optionally assemble one aligned least-squares
   system across all coupled interfaces instead of solving one interface at a
   time. On single-interface cases this should reproduce the per-interface
@@ -99,6 +103,17 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
 - `reorthogonalizeCouplingColumns`: optionally apply a second
   Gram-Schmidt-style correction while assembling the QR system.
 - `predictSolid`: optionally solve the solid once before the outer FSI loop.
+- `skipModesOnSolidPredictor` (default `yes`): do not apply the secant modes
+  to the residual of the solid predictor. That residual comes from a solid
+  solve with the previous step's fluid force, not from the fluid-solid
+  coupling the modes describe, and applying reused modes to it can move the
+  interface by orders of magnitude too much (#587). The first iteration of a
+  step then uses the predictor/relaxation update, and the modes are first
+  applied after a complete fluid-solid iteration, as in preCICE and CoCoNuT.
+
+With `couplingReuse` greater than zero, the secants of a step accepted
+unconverged (`allowUnconvergedCoupling yes`) are discarded rather than
+reused.
 
 Implementation:
 `IQNILSCouplingInterface/IQNILSCouplingInterface.{H,C}`

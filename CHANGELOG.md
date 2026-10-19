@@ -292,6 +292,23 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `IQNILS` with `couplingReuse` greater than zero is now robust: the reused
+  secant modes are no longer applied to the residual of the solid-only
+  predictor (`predictSolid`), which comes from a solid solve with the previous
+  step's fluid force, not from the fluid-solid coupling the modes describe.
+  The first iteration of a step now uses the predictor update, and the modes
+  are applied from the second iteration, after a complete fluid-solid
+  iteration, as in preCICE and CoCoNuT. `skipModesOnSolidPredictor no`
+  restores the old behaviour. On the `TurekHron2006` FSI3 case, `couplingReuse`
+  5 and 15 previously diverged at the first iteration of a step, 0.01 to
+  2.9 s after the coupling start, with or without a relative filter; they now
+  complete with 3.4 and 2.9 coupling iterations per step, against 6.9 with
+  `couplingReuse 0`. `membraneRoof` and `beamInCrossFlow` with
+  `couplingReuse 5` previously diverged and now complete. In addition, with
+  `couplingReuse` greater than zero, `relMinSignificant` defaults to `1e-3` (a
+  preCICE-QR2-style relative filter), and the secants of a step accepted
+  unconverged (`allowUnconvergedCoupling`) are discarded (#587).
+
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes
@@ -553,6 +570,16 @@ release. For complete commit-level details and contributor information, see the
   available as an archive from the solids4foam website.
 
 ### Fixed
+
+- `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
+  and with `combinedCouplingSystem`, had the wrong sign and moved the interface
+  away from the fixed point. With `residualSumPreconditioning`, the residual
+  is now scaled like the secant columns. `maxReuseUpdateNormRatio` now limits
+  the interface displacement update of every solve that uses secants from
+  previous steps, including `couplingReuse` greater than zero, where it
+  previously had no effect. With `normalizeCouplingColumns`, the
+  `qrFilterTolerance` test now compares like with like, and a zero secant
+  column is no longer divided by zero (#587).
 
 - `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
   cell whose face stencil does not span three directions, for example a
