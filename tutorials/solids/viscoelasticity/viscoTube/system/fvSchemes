@@ -32,12 +32,12 @@ ddtSchemes
 gradSchemes
 {
     default            none;
-    grad(U)            pointCellsLeastSquares;
-    grad(T)            pointCellsLeastSquares;
-    grad(D)            pointCellsLeastSquares;
-    grad(DD)           pointCellsLeastSquares;
-    snGradCorr(D)      pointCellsLeastSquares;
-    snGradCorr(DD)     pointCellsLeastSquares;
+    grad(U)            leastSquaresS4f;
+    grad(T)            leastSquaresS4f;
+    grad(D)            leastSquaresS4f;
+    grad(DD)           leastSquaresS4f;
+    snGradCorr(D)      leastSquaresS4f;
+    snGradCorr(DD)     leastSquaresS4f;
 }
 
 divSchemes

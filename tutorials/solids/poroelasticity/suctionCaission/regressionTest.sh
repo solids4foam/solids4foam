@@ -27,9 +27,11 @@ solids4Foam::requireGnuSed
 # not that a particular number came back.
 # ============================================================
 
+# With the leastSquares gradient on every fork: a max sigmaEq of 1.05e6
+# on OpenFOAM.com v2412, 9.0e5 on OpenFOAM.org 9 and 7.3e5 on foam-extend 4.1
 EPS_MIN=0.85
 EPS_MAX=1.25
-SIGMA_MIN=1.5e6
+SIGMA_MIN=6e5
 SIGMA_MAX=2.2e6
 
 # The comparison with the removed legacy mechanicalModel runs to t = 1 rather
@@ -38,33 +40,36 @@ SIGMA_MAX=2.2e6
 # within the first step
 COMPARISON_END_TIME=1
 
-# The legacy model's D and porePressure at t = 1, as the max and mean component
-# magnitude of each field written to fourteen figures, from the last commit
-# that had it (mcl-stage8-coverage, c3a92b3d), per fork. The framework
-# reproduced both fields exactly, in every one of those figures. These are
-# recorded numbers, though, and another compiler, CPU or MPI build moves an
-# iterative solution by round-off at the solver tolerance: CI measures up to
-# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
-# largest value, allows for that, and is ten times below the 1e-5 that a
-# 0.001% change in a material constant makes
+# D and porePressure at t = 1, as the max and mean component magnitude of each
+# field written to fourteen figures, per fork, with the leastSquares gradient
+# on every fork: before, OpenFOAM ran pointCellsLeastSquares, which
+# gave a max porePressure of 94942, and foam-extend leastSquares. The forks
+# still differ, by 27% in the max porePressure, so the gradient scheme is not
+# the cause of that difference; this case reaches the corrector limit
+# on every step, as noted above. These are recorded numbers, though, and
+# another compiler, CPU or MPI build moves an iterative solution by round-off
+# at the solver tolerance: CI measures up to 3e-8 relative against values
+# recorded on macOS. The tolerance, 1e-6 of the largest value, allows for
+# that, and is ten times below the 1e-5 that a 0.001% change in a material
+# constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        REF_D_MAX=0.039970270753559
-        REF_D_MEAN=0.00324034872160463
-        REF_P_MAX=94941.676957032
-        REF_P_MEAN=19655.7130753187
+        REF_D_MAX=0.039971853415323
+        REF_D_MEAN=0.00326804246128935
+        REF_P_MAX=91160.280037436
+        REF_P_MEAN=19082.323226845
         ;;
     org)
-        REF_D_MAX=0.039970258883115
-        REF_D_MEAN=0.00324070141058448
-        REF_P_MAX=94957.392747739
-        REF_P_MEAN=19661.8147230215
+        REF_D_MAX=0.039971831329265
+        REF_D_MEAN=0.00326747514301296
+        REF_P_MAX=91153.098748193
+        REF_P_MEAN=19081.5856382194
         ;;
     foamextend)
-        REF_D_MAX=0.039984257331651
-        REF_D_MEAN=0.00342262334429839
-        REF_P_MAX=66272.071942348
-        REF_P_MEAN=17304.5184317787
+        REF_D_MAX=0.039984257366288
+        REF_D_MEAN=0.00342428784043281
+        REF_P_MAX=66277.760264684
+        REF_P_MEAN=17317.8068986057
         ;;
 esac
 REF_REL_TOL=1e-6

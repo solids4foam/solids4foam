@@ -183,7 +183,7 @@ EOF
 gradSchemes
 {
     default extendedLeastSquares 0;
-    grad(D) pointCellsLeastSquares;
+    grad(D) leastSquaresS4f;
 }
 EOF
 
@@ -333,7 +333,7 @@ function testConversion()
         grep -q "symmetryPlane front" \
             "${CASE_DIR}/constant/polyMesh/blockMeshDict" ||
             { echo "FORWARD-FAIL: blockMeshDict"; exit 1; }
-        grep -q " leastSquares;" "${CASE_DIR}/system/fvSchemes" ||
+        grep -q " leastSquaresS4f;" "${CASE_DIR}/system/fvSchemes" ||
             { echo "FORWARD-FAIL: fvSchemes"; exit 1; }
         grep -q "basePoint" "${CASE_DIR}/system/mirrorMeshDict" ||
             { echo "FORWARD-FAIL: mirrorMeshDict basePoint"; exit 1; }
@@ -361,8 +361,8 @@ function testConversion()
         "${CASE_DIR}/0/D" "symmetry;"
     checkFileLacks "${LABEL}: no symmetryPlane remains in 0/D" \
         "${CASE_DIR}/0/D" "symmetryPlane"
-    checkFileContains "${LABEL}: reverse conversion restores fvSchemes" \
-        "${CASE_DIR}/system/fvSchemes" "pointCellsLeastSquares;"
+    checkFileContains "${LABEL}: conversion leaves fvSchemes untouched" \
+        "${CASE_DIR}/system/fvSchemes" "leastSquaresS4f;"
     checkFileContains "${LABEL}: reverse conversion restores mirrorMeshDict" \
         "${CASE_DIR}/system/mirrorMeshDict" "    point ("
     checkFileLacks "${LABEL}: no basePoint remains in mirrorMeshDict" \

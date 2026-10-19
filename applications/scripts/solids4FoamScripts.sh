@@ -395,28 +395,11 @@ function solids4Foam::applyFoamExtendTweaks()
             "${CASE_DIR}/system/createPatchDict"
     fi
 
-    # 9. pointCellsLeastSquares is used as the gradScheme for the solid in
-    #    OpenFOAM, as it is consistent with boundary non-orthogonal correction;
-    #    foam extend uses leastSquares
-    if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
-    then
-        echo "foam extend specific: replacing 'pointCellsLeastSquares' with"
-        echo "'leastSquares' in system/fvSchemes"
-        "${SOLIDS4FOAM_SED}" -i "s/ pointCellsLeastSquares;/ leastSquares;/g" \
-            "${CASE_DIR}"/system/fvSchemes
-    elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
-    then
-        echo "foam extend specific: replacing 'pointCellsLeastSquares' with"
-        echo "'leastSquares' in system/solid/fvSchemes"
-        "${SOLIDS4FOAM_SED}" -i "s/ pointCellsLeastSquares;/ leastSquares;/g" \
-            "${CASE_DIR}"/system/solid/fvSchemes
-    fi
-
-    # 10. foam extend writes forces.dat rather than force.dat
+    # 9. foam extend writes forces.dat rather than force.dat
     solids4Foam::useForcesDat "${CASE_DIR}"
 
-    # 11. foam extend samples to postProcessing/sets
-    # 12. foam extend writes surfaces to postProcessing/surfaces
+    # 10. foam extend samples to postProcessing/sets
+    # 11. foam extend writes surfaces to postProcessing/surfaces
     for FILE in $(find "${CASE_DIR}" -name plot.gnuplot)
     do
         echo "Updating ${FILE}"
@@ -424,7 +407,7 @@ function solids4Foam::applyFoamExtendTweaks()
         "${SOLIDS4FOAM_SED}" -i "s@postProcessing/sample.surfaces/@postProcessing/surfaces/@g" "${FILE}"
     done
 
-    # 13. foam extend uses basePoint and normalVector in mirrorMeshDict
+    # 12. foam extend uses basePoint and normalVector in mirrorMeshDict
     for FILE in "${CASE_DIR}"/system/mirrorMeshDict \
         "${CASE_DIR}"/system/solid/mirrorMeshDict
     do
@@ -571,28 +554,11 @@ function solids4Foam::undoFoamExtendTweaks()
             "${CASE_DIR}/system/createPatchDict"
     fi
 
-    # 9. Either pointCellsLeastSquares or edgeCellsLeastSquares should be used
-    #    as the gradScheme for the solid in OpenFOAM, as these are the only
-    #    schemes consistent with boundary non-orthogonal correction
-    if [[ -f "${CASE_DIR}"/constant/solidProperties ]]
-    then
-        echo "OpenFOAM specific: replacing 'leastSquares' with"
-        echo "'pointCellsLeastSquares' in system/fvSchemes"
-        "${SOLIDS4FOAM_SED}" -i "s/ leastSquares;/ pointCellsLeastSquares;/g" \
-            "${CASE_DIR}"/system/fvSchemes
-    elif [[ -f "${CASE_DIR}"/constant/solid/solidProperties ]]
-    then
-        echo "OpenFOAM specific: replacing 'leastSquares' with"
-        echo "'pointCellsLeastSquares' in system/solid/fvSchemes"
-        "${SOLIDS4FOAM_SED}" -i "s/ leastSquares;/ pointCellsLeastSquares;/g" \
-            "${CASE_DIR}"/system/solid/fvSchemes
-    fi
-
-    # 10. OpenFOAM.com writes force.dat rather than forces.dat
+    # 9. OpenFOAM.com writes force.dat rather than forces.dat
     solids4Foam::useForceDat "${CASE_DIR}"
 
-    # 11. OpenFOAM samples to postProcessing/sample
-    # 12. OpenFOAM writes surfaces to postProcessing/sample.surfaces
+    # 10. OpenFOAM samples to postProcessing/sample
+    # 11. OpenFOAM writes surfaces to postProcessing/sample.surfaces
     for FILE in $(find "${CASE_DIR}" -name plot.gnuplot)
     do
         echo "Updating ${FILE}"
@@ -600,7 +566,7 @@ function solids4Foam::undoFoamExtendTweaks()
         "${SOLIDS4FOAM_SED}" -i "s@postProcessing/surfaces/@postProcessing/sample.surfaces/@g" "${FILE}"
     done
 
-    # 13. OpenFOAM uses point and normal in mirrorMeshDict
+    # 12. OpenFOAM uses point and normal in mirrorMeshDict
     for FILE in "${CASE_DIR}"/system/mirrorMeshDict \
         "${CASE_DIR}"/system/solid/mirrorMeshDict
     do
@@ -640,10 +606,10 @@ function solids4Foam::applyOpenFOAMOrgTweaks()
         "${SOLIDS4FOAM_SED}" -i "s/type.*face;/type lineFace;/g" "${CASE_DIR}"/system/sample
     fi
 
-    # 10. OpenFOAM.org writes forces.dat rather than force.dat
+    # 9. OpenFOAM.org writes forces.dat rather than force.dat
     solids4Foam::useForcesDat "${CASE_DIR}"
 
-    # 14. OpenFOAM.org reads the PIMPLE outer-corrector convergence controls
+    # 13. OpenFOAM.org reads the PIMPLE outer-corrector convergence controls
     #     from outerCorrectorResidualControl: its residualControl, with a
     #     single tolerance per field, is the criterion for ending the run.
     #     Only a residualControl with the OpenFOAM.com sub-dictionaries
@@ -705,10 +671,10 @@ function solids4Foam::undoOpenFOAMOrgTweaks()
         "${SOLIDS4FOAM_SED}" -i "s/type.*lineFace;/type face;/g" "${CASE_DIR}"/system/sample
     fi
 
-    # 10. OpenFOAM.com writes force.dat rather than forces.dat
+    # 9. OpenFOAM.com writes force.dat rather than forces.dat
     solids4Foam::useForceDat "${CASE_DIR}"
 
-    # 14. OpenFOAM.com reads the PIMPLE outer-corrector convergence controls
+    # 13. OpenFOAM.com reads the PIMPLE outer-corrector convergence controls
     #     from residualControl
     local FILE
     for FILE in "${CASE_DIR}"/system/fvSolution "${CASE_DIR}"/system/*/fvSolution

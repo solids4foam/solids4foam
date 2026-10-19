@@ -45,7 +45,10 @@ SIGMA_MAX=1.9e8
 # component magnitude of the field written to fourteen figures, for each arm,
 # from the last commit that had it (mcl-stage8-coverage, c3a92b3d). These are
 # OpenFOAM.com v2512's; OpenFOAM.org 9 agrees to 6e-8, and foam-extend 4.1
-# differs by 1.7e-4 in the two-material arm and 2e-5 in the single-material one
+# differs by 1.7e-4 in the two-material arm and 2e-5 in the single-material one.
+# The single-material arm was recorded with pointCellsLeastSquares and now runs
+# with leastSquaresS4f like the rest of the tutorial, which moves its D by
+# 2e-6 of the largest value
 REF_D_MAX=0.00098799181372038
 REF_D_MEAN=0.000340730093870825
 REF_SINGLE_D_MAX=0.0007175233920732
@@ -120,19 +123,6 @@ use_single_material() {
 
     if grep -q aluminium "${dir}/constant/mechanicalProperties"; then
         echo "FAIL: could not remove the second material from ${dir}"
-        return 1
-    fi
-
-    # One material needs no material-aware gradient, and the legacy single
-    # material answer this arm is held to was computed with the gradient the
-    # tutorial used before it needed one. Using it here keeps the comparison
-    # about the temperature the law was given, not about the gradient
-    "${SOLIDS4FOAM_SED}" -i \
-        's|^\( *default *\)leastSquaresS4f;|\1pointCellsLeastSquares;|' \
-        "${dir}/system/fvSchemes"
-
-    if ! grep -q "pointCellsLeastSquares" "${dir}/system/fvSchemes"; then
-        echo "FAIL: could not set the single-material gradient in ${dir}"
         return 1
     fi
 }

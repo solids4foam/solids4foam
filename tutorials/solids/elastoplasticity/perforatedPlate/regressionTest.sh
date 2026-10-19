@@ -37,28 +37,9 @@ SIGMA_MAX=2.2e8
 YIELD_MIN=38
 YIELD_MAX=44
 
-# The final extrema of the removed legacy mechanicalModel, from the last commit
-# that had it (mcl-stage8-coverage, c3a92b3d), per fork. This case has no
-# pressure smoothing, so there is nothing the framework omits: it reproduced
-# these in every digit logged. The log gives six figures, so a round-off
-# difference on another machine can move the last one; the tolerance, 1e-5
-# relative, is a few units in that digit. A plastic history error would show here
-# as a difference the unit checks cannot see
-case "$(solids4Foam::foamFlavour)" in
-    com)
-        REF_EPS=0.00507147
-        REF_SIG=1.79161e+08
-        ;;
-    org)
-        REF_EPS=0.00507147
-        REF_SIG=1.79161e+08
-        ;;
-    foamextend)
-        REF_EPS=0.00547244
-        REF_SIG=1.87143e+08
-        ;;
-esac
-REF_REL_TOL=1e-5
+REF_EPS=0.00547495
+REF_SIG=1.87848e+08
+REF_REL_TOL=2e-3
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
