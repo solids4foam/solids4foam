@@ -1467,12 +1467,13 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 
     if (!highOrderResidual())
     {
-        // Enforce the boundary conditions again, now that gradD and sigma
-        // have been updated from x. Conditions such as solidTraction and
-        // solidSpringDashpot build their boundary value from the stress
-        // (tractionBoundarySnGrad), so updating them before correctStress()
-        // would use the stress of the previous residual evaluation, and the
-        // residual would depend on hidden state as well as on x
+        // Enforce the boundary conditions again, now that gradD, Finv, J and
+        // sigma have been updated from x, so that conditions that build their
+        // boundary value from the stress (tractionBoundarySnGrad), such as
+        // solidSpringDashpot, do not use the stress of the previous residual
+        // evaluation. The solidSpringDashpot README states when this makes
+        // the residual a function of x alone. The high-order residual does not
+        // recompute sigma(), so this update would not help there
         D.correctBoundaryConditions();
     }
 
