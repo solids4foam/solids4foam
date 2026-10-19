@@ -58,8 +58,9 @@ laminar, and the fluid velocity is initialised with a potential flow solution
 | Parameter | Value |
 |-----------|-------|
 | End time | 12 s |
-| Time step | 0.01 s |
-| Total steps | 1200 |
+| Time step (partitioned) | 0.01 s |
+| Time step (quasi-monolithic) | 0.0025 s |
+| Total steps | 1200 (partitioned), 4800 (quasi-monolithic) |
 
 The fluid mesh is created with `blockMesh` and refined once around the foil
 with `setSet` and `refineMesh`, so that the fluid `flag` patch conforms to the
@@ -143,23 +144,35 @@ velocity and hypre BoomerAMG for the pressure; the solid block is gathered
 onto one rank and factorised with LU (`redundant`), which keeps the solid
 preconditioner exact for any number of ranks.
 
+The quasi-monolithic setup uses a quarter of the partitioned time step
+(`system/controlDict.monolithic`). With $$0.01$$ s, the Newton method stagnates
+in the step to $$t = 0.05$$ s: the linear solves converge, but the full Newton
+step reduces the residual by less than a fifth and the residual stalls at about
+a quarter of its initial value, in serial and in parallel. With $$0.0025$$ s,
+every step converges in about three Newton iterations.
+
 ---
 
 ## Expected Results
 
 The geometry and the inflow are symmetric about the mid-plane of the foil, so
-the foil is only loaded by the drag of the air flowing along it until the
-wake of the block becomes unsteady. Over the first $$0.2$$ s, the foil
-trailing edge moves less than $$10^{-7}$$ m, and the drag force on the foil
-decays from about $$2 \times 10^{-5}$$ N, during the start-up transient, to
-about $$2 \times 10^{-6}$$ N. The partitioned and quasi-monolithic approaches
-give a maximum streamwise trailing-edge displacement within $$1\%$$ of each
-other, and drag forces within about $$10\%$$; at these tiny loads, the
-cross-stream displacement (below $$2 \times 10^{-8}$$ m) is at the level of
-the solver tolerances and differs between the approaches. The flapping of
-the foil, if it develops later in the run, has not been verified.
+the foil is only loaded by the drag of the air flowing along it until the wake
+of the block becomes unsteady. Over the first $$0.2$$ s, the foil trailing edge
+moves less than $$10^{-7}$$ m, and the drag force on the foil decays from about
+$$7 \times 10^{-5}$$ N, during the start-up transient, to the order of
+$$10^{-6}$$ N. The two approaches use different time steps ($$0.01$$ s and
+$$0.0025$$ s), so they resolve the start-up transient differently: the peak streamwise
+trailing-edge displacement, reached in the first $$0.01$$ s, is
+$$5.1 \times 10^{-8}$$ m (partitioned) and $$7.7 \times 10^{-8}$$ m
+(quasi-monolithic). Between $$0.05$$ and $$0.1$$ s the streamwise displacements
+and the drag forces agree within about $$25\%$$; by $$0.2$$ s both are an order
+of magnitude smaller and no longer agree. At these tiny loads, the cross-stream
+displacement (below $$10^{-8}$$ m) is at the level of the solver tolerances and
+differs between the approaches. The flapping of the foil, if it develops later
+in the run, has not been verified.
 
-The full run is expensive: on an Apple M1 Ultra, the first $$0.2$$ s took
-about 13 min for the partitioned IQNILS setup on 2 processes (5 to 15
-coupling iterations per time step) and about 29 min for the quasi-monolithic
-setup on 2 processes (3 to 14 Newton iterations per time step).
+The full run is expensive: on an Apple M1 Ultra, the first $$0.2$$ s took about
+13 min for the partitioned IQNILS setup on 2 processes (5 to 15 coupling
+iterations per time step) and about 55 min for the quasi-monolithic setup on 2
+processes (80 time steps of 2 to 4 Newton iterations each), or about 94 min in
+serial.
