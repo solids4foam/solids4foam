@@ -346,6 +346,9 @@ bool thermalLinGeomSolid::evolve()
         momentumStabilisation().updateVector(D(), &gradD());
 
         const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+        // linearInterpolate is deliberate: it reproduces the Gauss linear
+        // div(sigma) scheme these models used, without requiring a new
+        // interpolate(sigma) entry in fvSchemes
         surfaceVectorField traction(n & linearInterpolate(sigma()));
 
         // Add stabilisation before enforcing the traction condition so that

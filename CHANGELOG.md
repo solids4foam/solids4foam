@@ -292,6 +292,22 @@ release. For complete commit-level details and contributor information, see the
 - `Allwmake` and `Allwclean` now stop with an error when an unsupported
   OpenFOAM version is sourced, listing the supported versions, where before
   they printed a warning and carried on.
+- `thermalLinearGeometry` and `poroLinearGeometry` assemble the explicit
+  part of the momentum equation as a face traction flux, including the
+  stabilisation, and impose the boundary traction on it in the same way as
+  `linearGeometryTotalDisplacement`: the prescribed traction on
+  `solidTraction` and `solidSpringDashpot` patches, and zero shear traction
+  on `fixedDisplacementZeroShear`, `normalDisplacementZeroShear`, symmetry,
+  `symmetryPlane`, `solidSymmetry` and `slip` patches. The stabilisation is
+  now the divergence of a face flux, which differs from the previous
+  cell-based form where the stiffness varies in space. Results of cases with
+  these models change slightly; the `hotSphere`, `stripFooting` and
+  `suctionCaission` regression references were updated (#578).
+- With the implicit coupled or PETSc SNES solution algorithms, a
+  `solidTraction` patch with `secondOrder yes` or
+  `nonOrthogonalCorrections no` is now a fatal error. These algorithms
+  extrapolate the patch value from the adjacent cell, and either setting
+  previously stopped that extrapolation without a message (#578).
 
 - `OgdenElastic` assembles its Cauchy stress along the principal directions
   of the left Cauchy-Green tensor, the spatial ones. It used the right

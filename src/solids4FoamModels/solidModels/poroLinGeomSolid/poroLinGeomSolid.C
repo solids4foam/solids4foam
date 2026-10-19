@@ -237,7 +237,6 @@ poroLinGeomSolid::poroLinGeomSolid
 
     // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(D().name());
-
 }
 
 
@@ -334,11 +333,16 @@ bool poroLinGeomSolid::evolve()
         momentumStabilisation().updateVector(D(), &gradD());
 
         const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+        // linearInterpolate is deliberate: it reproduces the Gauss linear
+        // div(sigma) scheme these models used, without requiring a new
+        // interpolate(sigma) entry in fvSchemes
         surfaceVectorField traction(n & linearInterpolate(sigma()));
 
         // Add stabilisation before enforcing the traction condition so that
         // its boundary contribution is also replaced by the prescribed load
         traction += impKf_*momentumStabilisation().faceVector();
+        // TODO: solidTraction patches with setEffectiveTraction set the total
+        // traction here, while their gradient enforces the effective traction
         enforceTractionBoundaries(traction, D(), n);
 
         // Linear momentum equation total displacement form
