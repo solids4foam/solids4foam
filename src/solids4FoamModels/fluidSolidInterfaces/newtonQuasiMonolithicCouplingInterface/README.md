@@ -166,6 +166,28 @@ fieldsplit_fluid_pc_fieldsplit_1_fields "3";
 Copy the `solvers/UpU` entry of a tutorial with the same dimension, e.g.
 `ringAddedMass` (2-D) or `3dTube` (3-D), as a starting point.
 
+`3dTube` and `beamInCrossFlow` change this set-up as follows, which makes
+their serial runs about 2.3 (`beamInCrossFlow`) and 2.9 (`3dTube`) times
+faster, with the same results to within the solver tolerances:
+
+- `ksp_rtol "1e-3"`: the first Newton iteration of a time step is limited
+  by the nonlinearity of the residual to a reduction of about 1e-3, so a
+  tighter linear tolerance only adds Krylov iterations, each of which costs
+  a residual evaluation with `snes_mf_operator`;
+- `snes_lag_jacobian "8"` and `snes_lag_preconditioner "8"`, with
+  `snes_lag_jacobian_persists` and `snes_lag_preconditioner_persists`:
+  with `snes_mf_operator`, the assembled Jacobian only builds the
+  preconditioner, which can be reused across Newton iterations and time
+  steps;
+- `fieldsplit_fluid_pc_fieldsplit_schur_fact_type full` and
+  `snes_linesearch_type basic`;
+- in the fluid mesh motion (`D` in `system/fluid/fvSolution`), HYPRE
+  BoomerAMG instead of an LU factorisation, rebuilt every 20 time steps.
+
+Replacing `snes_mf_operator` with the assembled Jacobian is not
+recommended: the assembled Jacobian is approximate, and Newton then
+converges only linearly.
+
 The physics-based preconditioner (`pc_type physics`) is work in progress: on
 `ringAddedMass`, Newton stalls at the first coupled time step with it.
 
