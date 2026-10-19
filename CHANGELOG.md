@@ -601,6 +601,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `newtonIcoFluid` builds its continuity residual from the face flux
+  `interpolate(U) & Sf`, the flux that convects momentum, instead of
+  `fvc::div(U)`, which interpolates with its own `div(U)` scheme. With a
+  different `interpolate(U)` scheme, such as the `skewCorrected linear` of the
+  monolithic tutorial variants, the convecting flux was not divergence-free,
+  which damped vortex shedding: behind the rigid Hron-Turek plate the lift
+  amplitude was 13% below `pimpleFluid` on the 2x mesh, and is now 3% below.
+  The `div(U)` scheme is no longer used by `newtonIcoFluid`.
 - The PETSc SNES Jacobian of the least-squares pressure gradient now uses the
   owner-cell coefficient across processor boundaries and the boundary
   condition's value coefficients on boundary faces, and the divergence
