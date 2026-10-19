@@ -554,6 +554,19 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The PETSc SNES residuals of `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the boundary
+  conditions after the stress. Conditions that build their boundary value
+  from the stress, such as `solidTraction` and `solidSpringDashpot`, used the
+  stress of the previous residual evaluation, so the residual depended on
+  hidden state: with a stiff `solidSpringDashpot` the matrix-free linear solve
+  diverged or Newton stalled. A stiff isotropic spring
+  (`kNormal = kTangential = 2e9 Pa/m`) on a pulmonary artery wall now
+  converges in two Newton iterations per solve, and the `cerebralAneurysm`
+  tutorial needs at most two instead of four. The `solidSpringDashpot`
+  README notes that very stiff normal-only springs may still fail to
+  converge.
+
 - `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
   cell whose face stencil does not span three directions, for example a
   corner cell bounded by traction patches, the tensor's determinant can round

@@ -68,6 +68,15 @@ stiffness, including `2μ` when `solvePressure` is used.
   iterations converge slowly. This condition returns `valueFraction_ii`, the
   diagonal of the linearised boundary gradient. Only the coupling between
   components stays explicit when `kNormal ≠ kTangential`.
+- **Stiff normal-only springs:** that explicit coupling can stop the solid
+  solve from converging when `kNormal` is much larger than `kTangential`
+  and much larger than the wall's own stiffness. On a pulmonary artery wall
+  with `kNormal = 2e9 Pa/m` and `kTangential = 0`, the implicit segregated
+  algorithm inverted cells in the first time step, and the PETSc SNES linear
+  solve did not converge, as the segregated Jacobian used as its
+  preconditioner has no coupling between components. The same case runs
+  with both algorithms when `kTangential = kNormal`. Use an isotropic or a
+  softer spring in such cases.
 - **Imposed traction:** `linearGeometryTotalDisplacement` and
   `nonLinearGeometryTotalLagrangianTotalDisplacement` impose
   `-K·D - C·(D - D_old)/Δt + t - p n` directly on the boundary faces,
@@ -80,6 +89,12 @@ stiffness, including `2μ` when `solvePressure` is used.
   evaluation; in a PETSc SNES residual that lag acts as a hidden fixed-point
   iteration, and Newton diverged on the `cerebralAneurysm` tutorial, even for
   a very soft spring.
+- **PETSc SNES residual:** the residual updates the boundary conditions
+  again after the stress has been computed from the current unknowns, so
+  the Robin closure uses the current stress rather than that of the previous
+  residual evaluation. Otherwise the residual depends on hidden state, which
+  the matrix-free Jacobian (`snes_mf_operator`) cannot differentiate: with a
+  stiff spring the linear solve diverged or Newton stalled.
 - **Area ratio:** in the total Lagrangian model, `dA/da` is taken from `J` and
   `Finv`, because `tractionBoundarySnGrad` expects a traction per unit current
   area there.
