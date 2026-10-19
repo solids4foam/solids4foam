@@ -130,7 +130,9 @@ the fluid mesh on level 3, and the ramp does not change the steady response.
 Recorded with OpenFOAM v2512 on macOS, serial, at `deltaT = 0.5`, with the
 partitioned Aitken coupling on levels 1 to 3 for comparison (level 3 at
 `deltaT = 0.25`, at which its coupling converges; mono and part are the
-monolithic and partitioned couplings):
+monolithic and partitioned couplings). **The monolithic values in this
+table are pre-#597** (before the `newtonIcoFluid` continuity fix); the rerun
+is in "Rerun with the newtonIcoFluid continuity fix" below and supersedes them:
 
 | Level | ΔX (m) | Uy mono (m) | Uy part (m) | Fy mono (N) | Fy part (N) |
 |---:|---:|---:|---:|---:|---:|
@@ -173,7 +175,7 @@ underside value reproduces the recorded `solidPointDisplacement` value, and
 `postProcess -region solid` probes of `D` with `cellPoint` interpolation agree
 with the nodal `pointD` to <= 0.3 % (mesh 1) and <= 2e-5 m (meshes 3, 4).
 
-Quasi-monolithic `uy` (m), `y` in tutorial coordinates (top `y = 0`, mid
+Quasi-monolithic `uy` (m) (**pre-#597** values; see the rerun section below), `y` in tutorial coordinates (top `y = 0`, mid
 `y = -0.2`, underside `y = -0.4`); the mid-thickness point corresponds to
 (4, -1.2) in ANSYS coordinates if its plate top is at `y = -1` (assumption,
 not confirmed by the ANSYS author):
@@ -202,7 +204,7 @@ point is not reproduced).
 `uy` is the underside (recorded) value; `Fy` is the total interface force
 (N per metre of span).
 
-| ΔX (m) | uy partitioned | uy monolithic | Fy partitioned | Fy monolithic |
+| ΔX (m) | uy partitioned | uy monolithic (pre-#597) | Fy partitioned | Fy monolithic (pre-#597) |
 |---:|---:|---:|---:|---:|
 | 0.1 | -0.202495 | -0.201557 | -5.15266 | -5.12249 |
 | 0.05 | -0.228799 | -0.228817 | -5.23784 | -5.23811 |
@@ -216,6 +218,68 @@ meaningful; the `Fy` orders are higher and not constant, so the Fy
 extrapolations (using the observed last order: -5.2608 and -5.2611) are only
 indicative. Partitioned and monolithic agree to 0.01 to 0.02 % in `uy` and
 `Fy` on the three finest meshes.
+
+### Rerun with the newtonIcoFluid continuity fix (solids4foam PR #597, recorded 20 Oct 2026)
+
+`newtonIcoFluid` built its continuity residual from `fvc::div(U)` rather than
+from the flux that convects momentum; #597 fixes that. Everything else is as
+for the pre-#597 monolithic runs (same case files from the tutorial variants,
+inlet ramped over 20 s, `deltaT = 0.5`, SNES and linear tolerances unchanged).
+Only the code version changed. Data: `monolithic_597` rows of the CSV/JSON;
+the earlier monolithic rows are now labelled `monolithic_pre597`.
+
+Build: solids4foam branch `feature-petsc-snes-quasi-monolithic` at 257b2e564
+(contains 597cc6317), OpenFOAM v2512 (OpenCFD) on xenosim (Ubuntu 22.04),
+gcc 11.4.0, wmake `-O3` (default `Opt`), PETSc 3.24.1 with MUMPS and HYPRE;
+private lib/app directories; the `solids4Foam` solver was linked and run.
+Levels 1 to 3 ran serially; level 4 ran on 4 MPI ranks (`Allrun monolithic
+parallel`, scotch) because serial took about 55 to 80 s per step, with the
+fluid mesh-motion PETSc preconditioner changed from `bjacobi`+LU to
+`redundant`+LU (exact LU as in serial: a 4-rank `bjacobi` run failed its
+mesh-motion linear solve at t = 15.5 s). The first three levels at the same
+settings were not rerun in parallel, so a serial/parallel difference on level 4
+is not separately quantified. End time 300 s (not 200 s): at 200 s the level 2
+`uy` still oscillated with peak-to-peak 2.3e-5 m (decaying), above the 1e-5 m
+target; at 300 s the change in `uy` over the last 10 % is at most 5e-6 m on every
+level and `Fy` changes by at most 2e-7 N. Levels 1 and 2 at 200 s gave
+-0.201552 and -0.228473, within 6e-6 m of the 300 s values.
+
+`uy` underside (recorded point (4, -0.4)); top and mid are sampled from the
+final `pointD` at the nodes (4, 0) and (4, -0.2):
+
+| ΔX (m) | uy pre-#597 | uy mono (#597) | uy partitioned | Fy pre-#597 | Fy mono (#597) | Fy partitioned |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.1 | -0.201557 | -0.201546 | -0.202495 | -5.12249 | -5.12258 | -5.15266 |
+| 0.05 | -0.228817 | -0.228468 | -0.228799 | -5.23811 | -5.22750 | -5.23784 |
+| 0.025 | -0.235676 | -0.235448 | -0.235628 | -5.25764 | -5.25072 | -5.25637 |
+| 0.0125 | -0.237336 | -0.237187 | -0.237307 | -5.26056 | -5.25611 | -5.25993 |
+| order | 1.99, 2.05 | 1.95, 2.01 | 1.95, 2.02 | 2.57, 2.74 | 2.18, 2.11 | 2.20, 2.38 |
+| Richardson (p = 2, levels 3-4) | -0.23789 | -0.23777 | -0.23787 | -5.2615 | -5.2579 | -5.2611 |
+
+Top (y = 0) `uy`: -0.203597, -0.231074, -0.238211, -0.239990; mid (y = -0.2):
+-0.205030, -0.232320, -0.239415, -0.241184 (pre-#597 top -0.203607,
+-0.231431, -0.238445, -0.240142). `ux` at all three points is below 1.1e-4 m.
+The monitor point in the tutorial is now (4 0 0.5), the top surface (PR
+#584); all three points are recorded regardless.
+
+Change relative to pre-#597 (`uy` / `Fy`): +0.005 % / -0.002 % (level 1),
++0.15 % / +0.20 % (level 2), +0.10 % / +0.13 % (level 3), +0.06 % / +0.08 %
+(level 4), where positive means a smaller magnitude. The fix lowers the
+magnitude of both `uy` and `Fy`, by up to 0.15 to 0.2 % at ΔX = 0.05 m. The
+monolithic values are now below the partitioned ones by 0.14 % (level 2),
+0.08 % (level 3) and 0.05 % (level 4) in `uy` (0.20, 0.11 and 0.07 % in `Fy`),
+where pre-#597 they agreed to 0.01 to 0.02 % on those levels (level 1: 0.46 %
+in `uy` and 0.58 % in `Fy` before and after; the level-1 offset is the
+partitioned one). The p = 2 extrapolated `uy` values still agree to 0.04 %
+(-0.23777 monolithic against -0.23787 partitioned); the `Fy` extrapolations
+differ by 0.06 % (-5.2579 against -5.2611, with `Fy` orders around 2.1 to 2.4
+so these are indicative only). The monolithic-minus-partitioned `uy` difference
+shrinks with refinement (3.3e-4, 1.8e-4, 1.2e-4 m on levels 2 to 4, a ratio of
+only about 1.5 to 1.8 per halving, so not at second order); its origin is not
+established. The
+quasi-monolithic solver shares most of its code with the partitioned one, so
+this agreement is a consistency check between formulations, not an independent
+reference. The offset to the published values (about 5 %) is unchanged.
 
 ### Partitioned level 4 (ΔX = 0.0125 m)
 
