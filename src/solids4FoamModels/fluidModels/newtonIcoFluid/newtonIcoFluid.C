@@ -1239,7 +1239,7 @@ label newtonIcoFluid::formResidual
     // flows such as vortex shedding
     scalarField pressureResidual
     (
-        -fvc::div(fvc::interpolate(U) & mesh.Sf())().primitiveField()
+        -Foam::primitiveField(fvc::div(fvc::interpolate(U) & mesh.Sf())())
     );
 
     // Approximate momentum operator used only to derive the rAUf
