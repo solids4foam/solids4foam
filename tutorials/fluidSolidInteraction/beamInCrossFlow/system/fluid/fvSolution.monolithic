@@ -39,11 +39,22 @@ solvers
             ksp_gmres_restart "100";
             ksp_converged_reason;
 
-            pc_type bjacobi;
-            sub_pc_type lu;
+            // Algebraic multigrid: an LU factorisation of the 3-D mesh motion
+            // system is expensive, even when reused within a time step
+            pc_type hypre;
+            pc_hypre_type boomeramg;
+            pc_hypre_boomeramg_numfunctions "3";
+            pc_hypre_boomeramg_strong_threshold "0.7";
+            pc_hypre_boomeramg_coarsen_type HMIS;
+            pc_hypre_boomeramg_interp_type ext+i;
+            pc_hypre_boomeramg_agg_nl "1";
 
+            // The mesh motion system changes little between time steps, so
+            // the Jacobian and preconditioner are rebuilt every 20 time steps
+            snes_lag_jacobian "20";
+            snes_lag_preconditioner "20";
+            snes_lag_jacobian_persists true;
             snes_lag_preconditioner_persists true;
-            snes_lag_preconditioner "-2";
         }
     }
 

@@ -25,7 +25,7 @@ solvers
         options
         {
             snes_type newtonls;
-            snes_linesearch_type l2;
+            snes_linesearch_type basic;
             snes_rtol "1e-4";
             snes_stol "1e-4";
             snes_monitor;
@@ -34,9 +34,20 @@ solvers
 
             snes_mf_operator;
 
+            // The Jacobian is only used to build the preconditioner, as the
+            // operator is matrix-free, so the Jacobian and preconditioner can
+            // be rebuilt every 8 Newton iterations, across time steps
+            snes_lag_jacobian "8";
+            snes_lag_preconditioner "8";
+            snes_lag_jacobian_persists true;
+            snes_lag_preconditioner_persists true;
+
             ksp_type lgmres;
             ksp_gmres_restart "200";
-            ksp_rtol "1e-4";
+            // The first Newton iteration of a time step is limited by the
+            // nonlinearity to a reduction of about 1e-3, so a tighter linear
+            // tolerance does not reduce the number of Newton iterations
+            ksp_rtol "1e-3";
             ksp_converged_reason;
             ksp_max_it "1000";
 
@@ -53,7 +64,7 @@ solvers
             fieldsplit_fluid_ksp_type preonly;
             fieldsplit_fluid_pc_type fieldsplit;
             fieldsplit_fluid_pc_fieldsplit_type schur;
-            fieldsplit_fluid_pc_fieldsplit_schur_fact_type upper;
+            fieldsplit_fluid_pc_fieldsplit_schur_fact_type full;
             fieldsplit_fluid_pc_fieldsplit_schur_precondition selfp;
             fieldsplit_fluid_pc_fieldsplit_block_size "4";
             fieldsplit_fluid_pc_fieldsplit_0_fields "0,1,2";

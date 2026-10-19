@@ -1612,9 +1612,14 @@ label foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
     label blockSize;
     MatGetBlockSize(jac, &blockSize);
 
-    const label nCoeffCmpts = blockSize*blockSize;
-    List<PetscScalar> values(nCoeffCmpts, 0.0);
-    const label valueOffset = rowOffset*blockSize + colOffset;
+    // The stencil only couples the (rowOffset, colOffset) component of each
+    // block, so the coefficients are accumulated per row and inserted as
+    // scalar entries with one MatSetValues call per row. Inserting the full
+    // block with MatSetValuesBlocked would add blockSize^2 - 1 explicit zeros
+    // for every coefficient, which are then stored in the matrix and slow
+    // its assembly, factorisation and multiplication
+    List<DynamicList<PetscInt>> rowCols(mesh.nCells());
+    List<DynamicList<PetscScalar>> rowValues(mesh.nCells());
 
     auto insertGradDivStencil =
         [&]
@@ -1625,29 +1630,16 @@ label foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
             const DynamicList<vector>& coeffs
         )
         {
-            const label globalBlockRowI = globalCells().toGlobal(rowCellID);
-
             forAll(cols, coeffI)
             {
-                const label globalBlockColI = cols[coeffI];
-
                 // Insert unconditionally to establish the full sparsity
                 // pattern on the first assembly.  PETSc compresses the
                 // storage after MatAssemblyEnd, so skipping zero entries
                 // would lose their positions; on a moving mesh the
                 // coefficients may later become nonzero, triggering a
                 // MAT_NEW_NONZERO_ALLOCATION_ERR.
-                values[valueOffset] = faceCoeff & coeffs[coeffI];
-                AssertPETSc
-                (
-                    MatSetValuesBlocked
-                    (
-                        jac, 1, &globalBlockRowI, 1, &globalBlockColI,
-                        values.cdata(),
-                        ADD_VALUES
-                    )
-                );
-                values[valueOffset] = 0.0;
+                rowCols[rowCellID].append(cols[coeffI]*blockSize + colOffset);
+                rowValues[rowCellID].append(faceCoeff & coeffs[coeffI]);
             }
         };
 
@@ -1732,6 +1724,22 @@ label foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
                 );
             }
         }
+    }
+
+    forAll(rowCols, cellI)
+    {
+        const PetscInt globalRowI =
+            globalCells().toGlobal(cellI)*blockSize + rowOffset;
+
+        AssertPETSc
+        (
+            MatSetValues
+            (
+                jac, 1, &globalRowI, rowCols[cellI].size(),
+                rowCols[cellI].cdata(), rowValues[cellI].cdata(),
+                ADD_VALUES
+            )
+        );
     }
 
     return 0;
