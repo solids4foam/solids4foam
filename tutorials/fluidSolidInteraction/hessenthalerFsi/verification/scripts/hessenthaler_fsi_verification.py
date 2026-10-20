@@ -521,6 +521,35 @@ def settling_estimate(rows: list[list[float]], column: int, end_time: float,
             "uncertainty": max(drift, 2.0 * se if math.isfinite(se) else 0.0)}
 
 
+def set_displacement_mesh_motion(case: Path) -> None:
+    """Move the fluid mesh with displacementLaplacian (same diffusivity).
+
+    velocityLaplacian advances the mesh from its current state, so the
+    interior mesh depends on the path of the interface; displacementLaplacian
+    solves from the reference points, and the FSI coupler sets the interface
+    to its total displacement (needs the fluid mesh motion couplers of
+    solids4foam #554).
+    """
+    replace_text(case / "constant" / "fluid" / "dynamicMeshDict",
+                 '"solver|motionSolver" velocityLaplacian;',
+                 '"solver|motionSolver" displacementLaplacian;')
+    motion_u = case / "0" / "fluid" / "pointMotionU"
+    text = motion_u.read_text()
+    text = text.replace("object      pointMotionU;",
+                        "object      pointDisplacement;")
+    text, found = re.subn(r"^dimensions\s+\[0 1 -1 0 0 0 0\];",
+                          "dimensions      [0 1 0 0 0 0 0];", text,
+                          flags=re.MULTILINE)
+    if found != 1:
+        fail(f"Could not set the dimensions of pointDisplacement in {case}")
+    (case / "0" / "fluid" / "pointDisplacement").write_text(text)
+    motion_u.unlink()
+    replace_text(case / "system" / "fluid" / "fvSolution",
+                 '"cellMotionU|cellMotionUFinal"',
+                 '"cellMotionU|cellMotionUFinal|cellDisplacement|'
+                 'cellDisplacementFinal"')
+
+
 def adopt_restart_monitor_files(case: Path) -> None:
     """Use the monitor files of a restart from the time of an earlier write.
 
@@ -821,7 +850,7 @@ DEFAULT_SPEC = {
     "fluidtol": "default", "pimple": 1.0, "pc": "auto",
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
     "solidtol": "default", "coupled": "yes", "fsitest": "default",
-    "reuse": -1.0, "wall": "",
+    "reuse": -1.0, "wall": "", "motion": "velocity",
 }
 
 
@@ -854,6 +883,8 @@ def parse_spec(text: str) -> dict:
         fail("fsitest must be default or strict")
     if spec["wall"] and spec["wall"] not in FLUID_LEVELS:
         fail("wall must be a fluid level, e.g. wall=F3")
+    if spec["motion"] not in ("velocity", "displacement"):
+        fail("motion must be velocity or displacement")
     return spec
 
 
@@ -888,6 +919,8 @@ def spec_name(spec: dict) -> str:
         name += f"_reuse{spec['reuse']:g}"
     if spec["wall"]:
         name += f"_wall{spec['wall']}"
+    if spec["motion"] != "velocity":
+        name += f"_motion{spec['motion']}"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -1059,6 +1092,8 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     if spec["pimple"] != 1:
         solution = case / "system" / "fluid" / "fvSolution"
         replace_entry(solution, "nOuterCorrectors", f"{int(spec['pimple'])}")
+    if spec["motion"] == "displacement":
+        set_displacement_mesh_motion(case)
 
     # Decomposition and the solid's parallel linear solver
     vmod.set_subdomains(case, cores, ("", "fluid", "solid"))
