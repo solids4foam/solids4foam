@@ -1268,6 +1268,11 @@ label newtonQuasiMonolithicCouplingInterface::formAsf
     //   d(F_i)/d(U_cell_k) = rho*nuEff*deltaCoeffs*|Sf|*(delta_ik + nf_i*nf_k)
     // where |Sf| is the solid face area times the transfer weight of the
     // fluid face, which is the overlap area of the two faces
+    // The residual traction is n & (-devReff) (newtonIcoFluid
+    // patchViscousForce), whose exact snGrad derivative is
+    // delta_ik + nf_i*nf_k/3, as dev2 removes two thirds of the normal part;
+    // the symmetric-gradient form above is kept, as it only enters the
+    // preconditioner
     // In parallel, the viscous coefficients are on the fluid side so we
     // broadcast them to the zone level for cross-processor access
     scalarField zoneViscDiffCoeffs;

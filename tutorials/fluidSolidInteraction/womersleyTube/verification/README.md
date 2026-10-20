@@ -314,6 +314,12 @@ study.
 
 ### Quasi-monolithic coupling
 
+> **Note:** the results in this section predate the transpose viscous term in
+> the `newtonIcoFluid` momentum residual and interface traction
+> (`viscousStressTranspose`, see the `newtonIcoFluid` README), which changes
+> the load on the deforming wall. They must be rerun; until then they
+> describe the earlier Laplacian-form traction `nuEff*snGrad(U)`.
+
 `--monolithic` runs the mesh and time-step studies with the quasi-monolithic
 Newton coupling (`./Allrun monolithic`: `newtonIcoFluid` and
 `linearGeometryVelocity`), and compares it, rather than Robin-Neumann, with
@@ -341,9 +347,13 @@ passes with the same tolerances
   quantity (the velocity profile, of the largest velocity), and to
   $$5.5 \times 10^{-4}$$ in the wall amplitude. Its wall amplitude is lower
   than that of the partitioned (Robin-Neumann) runs by
-  $$3.3$$-$$3.5 \times 10^{-4}$$ on every mesh and step size, so the
-  difference does not change with refinement; its source is not identified.
-  It is below the $$5 \times 10^{-4}$$ the linear theory neglects.
+  $$3.2$$-$$3.5 \times 10^{-4}$$ on m2 (all four step sizes) and m4, so the
+  difference does not change with refinement there; on m1 it is
+  $$8.0 \times 10^{-5}$$ at $$L/2$$. It is below the $$5 \times 10^{-4}$$
+  the linear theory neglects. The traction omitted the physical term
+  $$\mu \nabla(\mathbf{u} \cdot \mathbf{n})$$ on the deforming wall, of
+  relative size about $$\mu \omega R / (E h)$$, which is a leading
+  candidate for this offset.
 - It takes 2 Newton iterations per time-step and 149 s, against 14.6 coupling
   iterations and 524 s for IQN-ILS.
 - The velocity solid starts from the exact displacement with `restart yes`,

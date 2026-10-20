@@ -125,6 +125,11 @@ class newtonIcoFluid
         //  with the solid-side scaling pattern
         scalar pressureEqnScale_;
 
+        //- Include the transpose part of the viscous stress,
+        //  div(nuEff*dev2(T(grad(U)))), in the momentum residual and the
+        //  interface viscous force (default yes)
+        const Switch viscousStressTranspose_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -146,6 +151,13 @@ class newtonIcoFluid
 
         //- Correct phi function
         void correctPhi();
+
+        //- Transpose part of the viscous stress, nuEff*dev2(T(gradU)), as
+        //  in the divDevReff of pimpleFluid
+        tmp<volTensorField> viscousStressTranspose
+        (
+            const volTensorField& gradU
+        ) const;
 
         //- Restore the flow fields and mesh after a failed PETSc solve
         void restoreOldTimeState
