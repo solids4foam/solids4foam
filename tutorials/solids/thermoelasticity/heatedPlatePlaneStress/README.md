@@ -1,5 +1,5 @@
 ---
-sort: 4
+sort: 5
 ---
 
 # Uniform heating of a plane stress plate: `heatedPlatePlaneStress`
