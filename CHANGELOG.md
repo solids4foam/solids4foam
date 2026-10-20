@@ -570,6 +570,22 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The PETSc SNES residuals of `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the boundary
+  conditions after the stress. `solidSpringDashpot` built its boundary value,
+  and so its spring-dashpot traction, from the stress of the previous
+  residual evaluation, so the residual depended on hidden state: with a stiff
+  spring the matrix-free linear solve diverged or Newton stalled. With
+  `leastSquaresS4f` the residual is now a function of the unknowns alone for
+  this condition; the `solidSpringDashpot` README lists the conditions for
+  which a lag remains. A stiff isotropic spring
+  (`kNormal = kTangential = 2e9 Pa/m`) on a pulmonary artery wall now
+  converges in at most two Newton iterations per solve, and the
+  `cerebralAneurysm` tutorial needs at most two per solve instead of four
+  (110 instead of 142 in its 10-step regression test). The
+  `solidSpringDashpot` README notes that very stiff normal-only springs may
+  still fail to converge.
+
 - With the `implicitSegregated` algorithm,
   `linearGeometryTotalDisplacement` and
   `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the stress

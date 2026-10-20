@@ -1364,10 +1364,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
         // Update gradient of displacement
         gradD() = fvc::grad(D);
-
-        // Enforce the boundary conditions again for any conditions that use
-        // gradD
-        D.correctBoundaryConditions();
     }
 
     // Increment of displacement
@@ -1459,6 +1455,18 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         (
             pressureResidual, f, blockSize_ - 1
         );
+    }
+
+    if (!highOrderResidual())
+    {
+        // Enforce the boundary conditions again, now that gradD, Finv, J and
+        // sigma have been updated from x, so that conditions that build their
+        // boundary value from the stress (tractionBoundarySnGrad), such as
+        // solidSpringDashpot, do not use the stress of the previous residual
+        // evaluation. The solidSpringDashpot README states when this makes
+        // the residual a function of x alone. The high-order residual does not
+        // recompute sigma(), so this update would not help there
+        D.correctBoundaryConditions();
     }
 
     // Unit normal vectors at the faces

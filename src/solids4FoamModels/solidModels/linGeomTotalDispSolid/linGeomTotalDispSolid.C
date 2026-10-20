@@ -1089,10 +1089,6 @@ label linGeomTotalDispSolid::formResidual
         // Update gradient of displacement
         gradD() = fvc::grad(D);
 
-        // Enforce the boundary conditions again for any conditions that
-        // use gradD
-        //D.correctBoundaryConditions();
-
         // Calculate the stress using run-time selectable mechanical law
         correctStress();
     }
@@ -1159,11 +1155,20 @@ label linGeomTotalDispSolid::formResidual
         );
     }
 
-    // Calculate the traction at the faces. This must be placed after the
-    // pressure solve so that sigma() already carries the pressure component
-    // when solvePressure() is active.
     if (!highOrderResidual())
     {
+        // Enforce the boundary conditions again, now that gradD and sigma
+        // have been updated from x, so that conditions that build their
+        // boundary value from the stress (tractionBoundarySnGrad), such as
+        // solidSpringDashpot, do not use the stress of the previous residual
+        // evaluation. The solidSpringDashpot README states when this makes
+        // the residual a function of x alone. The high-order residual does not
+        // recompute sigma(), so this update would not help there
+        D.correctBoundaryConditions();
+
+        // Calculate the traction at the faces. This must be placed after the
+        // pressure solve so that sigma() already carries the pressure
+        // component when solvePressure() is active.
         traction = (n & fvc::interpolate(sigma()));
     }
 
