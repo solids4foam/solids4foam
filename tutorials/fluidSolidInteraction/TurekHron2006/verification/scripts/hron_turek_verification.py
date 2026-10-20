@@ -148,6 +148,22 @@ def tutorial_level(case: Path) -> str:
     return str(int(level)) if level >= 1 else f"{level:g}"
 
 
+def configure_interface_mesh(case: Path, coupling: str) -> None:
+    """Run the quasi-monolithic variant on the tutorial meshes.
+
+    The monolithicAMI coupling removes the conformal interface meshes of the
+    variant, so that the tutorial meshes, those of the partitioned couplings,
+    are used, and transfers the interface data with AMI, as their interface
+    faces do not match.
+    """
+    if coupling != "monolithicAMI":
+        return
+    for region in ("fluid", "solid"):
+        (case / f"system/{region}/blockMeshDict.monolithic").unlink()
+    replace_entry(case / "constant/fsiProperties.monolithic",
+                  "interfaceTransferMethod", "AMI")
+
+
 def configure_case(case: Path, spec: dict, factor: int, delta_t: float,
                    end_time: float, write_interval: int | None,
                    cores: int) -> None:
@@ -217,7 +233,9 @@ def run_case(case: Path, label: str, cores: int, coupling: str,
     allrun = case / "Allrun"
     if not allrun.is_file():
         fail(f"Missing {allrun}")
-    command = [str(allrun), coupling]
+    # monolithicAMI is the quasi-monolithic variant on the tutorial meshes
+    command = [str(allrun), "monolithic" if coupling == "monolithicAMI"
+               else coupling]
     if cores > 1:
         command.append("parallel")
     log = case / "log.Allverify"
@@ -598,6 +616,7 @@ def run_level(args: argparse.Namespace, spec: dict, factor: int, coupling: str,
         case = copy_case(name)
         configure_case(case, spec, factor, delta_t, end_time,
                        args.write_interval, cores)
+        configure_interface_mesh(case, coupling)
         if spec.get("benchmark") == "fsi2":
             configure_fsi2(case, spec["fsi2"])
     run_case(case, name, cores, coupling, args.reuse)
@@ -1117,6 +1136,7 @@ def fsi1_run(args: argparse.Namespace, spec: dict, factor: int,
         configure_case(case, spec, factor, delta_t, end_time,
                        args.write_interval, cores)
         configure_fsi1(case, fsi1)
+        configure_interface_mesh(case, coupling)
     run_case(case, name, cores, coupling, args.reuse)
     # A reused run keeps the rank count it was run with
     cores = len(list(case.glob("processor*"))) or 1
@@ -1421,7 +1441,8 @@ def main() -> int:
     parser.add_argument("--benchmark", choices=("fsi3", "fsi1", "fsi2"), default="fsi3",
                         help="periodic FSI3 (default), steady FSI1 or periodic FSI2 benchmark")
     parser.add_argument("--study", choices=("mesh", "coupling"), default="mesh")
-    parser.add_argument("--coupling", choices=("iqnils", "robin", "monolithic"),
+    parser.add_argument("--coupling",
+                        choices=("iqnils", "robin", "monolithic", "monolithicAMI"),
                         default="iqnils",
                         help="coupling variant for the mesh study (default: iqnils)")
     parser.add_argument("--levels", help="comma-separated refinement factors, e.g. 1,2,4 "
