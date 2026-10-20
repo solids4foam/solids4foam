@@ -165,6 +165,9 @@ prepare_case() {
     if [[ "${coupling}" == "robin" ]]; then
         solution_setup="iqnils"
         interface_condition="robin"
+    elif [[ "${coupling}" == "monolithic" ]]; then
+        # The monolithic variant shares the IQNILS controlDict
+        solution_setup="iqnils"
     fi
 
     rm -rf "${case_dir}"
@@ -180,6 +183,12 @@ prepare_case() {
 
         cp -a "${item}" "${case_dir}/"
     done
+
+    # Copy the record of a selected case variant too, so that the Allrun of
+    # the copy can restore the default variant
+    if [[ -f "${SCRIPT_DIR}/.solids4FoamCaseVariant" ]]; then
+        cp -a "${SCRIPT_DIR}/.solids4FoamCaseVariant" "${case_dir}/"
+    fi
 
     (
         cd "${case_dir}"
@@ -353,6 +362,15 @@ REF_MAX_DISP=0.0263297
 REF_FINAL_DISP=0.0247337
 REF_FINAL_FORCE=4.799864
 
+# Reference values for the quasi-monolithic Newton coupling: OpenFOAM v2512,
+# serial, macOS. Its fluid and solid set-up differs from the partitioned one:
+# its tip displacement is 6-8% and its force 6.5% higher than the partitioned
+# references above. The difference persists under time-step refinement;
+# neither coupling has been refined in space on this case
+MONO_REF_MAX_DISP=0.0278474
+MONO_REF_FINAL_DISP=0.0267971
+MONO_REF_FINAL_FORCE=5.11391
+
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
 
@@ -365,6 +383,12 @@ run_case "${robin_case}" robin
 if [[ "${variant}" != "foamextend" ]]; then
     high_order_case=$(prepare_case iqnils highOrder)
     run_high_order_case "${high_order_case}"
+fi
+
+# The quasi-monolithic Newton coupling is only implemented for OpenFOAM.com
+if [[ "${variant}" == "openfoamcom" ]]; then
+    monolithic_case=$(prepare_case monolithic)
+    run_case "${monolithic_case}" monolithic
 fi
 
 echo
@@ -389,6 +413,15 @@ if [[ "${variant}" != "foamextend" ]]; then
         || failures=$((failures + $?))
 else
     echo "Skipping high-order regression case: unavailable on foam-extend"
+fi
+
+if [[ "${variant}" == "openfoamcom" ]]; then
+    check_case monolithic "${monolithic_case}" \
+        "${MONO_REF_MAX_DISP}" "${MONO_REF_FINAL_DISP}" \
+        "${MONO_REF_FINAL_FORCE}" \
+        || failures=$((failures + $?))
+else
+    echo "Skipping monolithic regression case: only available on OpenFOAM.com"
 fi
 
 echo

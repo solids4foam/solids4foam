@@ -192,6 +192,40 @@ Because the published data are limited to self-convergence norms and the
 coarse-mesh figures of the preprint, an independent reference solution, e.g.
 from COMSOL, LS-DYNA or ANSYS, would be valuable; one is being arranged.
 
+## Quasi-monolithic coupling
+
+The driver runs the partitioned coupling only. For the quasi-monolithic
+Newton coupling (`./Allrun monolithic`, OpenFOAM.com only), the tutorial was
+run separately on levels x1, x2 and x4 to `t = 3 s`, with the same time steps
+as the mesh study, alongside the partitioned coupling on the same machine
+(OpenFOAM v2512, macOS, serial). Steady `u_x` of the top point (m):
+
+| Coupling | x1 | x2 | x4 | Observed order | Extrapolated |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Partitioned | 0.117301 | 0.119696 | 0.120224 | 2.2 | 0.12037 |
+| Monolithic, `devReff` | 0.115467 | 0.118301 | 0.119376 | 1.4 | 0.12003 |
+| Monolithic, `div(U)` | 0.117429 | 0.119524 | 0.120053 | 2.0 | 0.12023 |
+| Monolithic | 0.116851 | 0.119346 | 0.120020 | 1.9 | 0.12027 |
+
+The x4 partitioned value differs from the one in the reference results above,
+recorded on Linux, by 0.06%. In this viscous case the interface traction is
+dominated by the wall shear. The monolithic fluid's momentum equation has the
+viscous term `laplacian(nuEff, U)` only, so its discrete wall flux is
+`nuEff*snGrad(U)`; its interface traction was `n & devReff`, which adds the
+transpose and trace parts of the boundary velocity gradient, whose tangential
+components are the adjacent cell values: a first-order force that the fluid's
+momentum balance does not contain. With the traction equal to the wall flux
+of the momentum equation, the monolithic coupling converges at second order,
+to within 0.12% of the partitioned value. Building the continuity residual of
+`newtonIcoFluid` from the convecting face flux `interpolate(U) & Sf`, instead
+of `div(U)` (row `div(U)`), moves the coarse-mesh values by up to
+0.5% and the extrapolated value to within 0.08% of the partitioned one
+(recorded on Linux). A quadratic estimate of the wall
+shear through the first two cells was also tried: it converged quickly here
+but made the partitioned coupling first order, as it treats the cell values
+as pointwise values and is not conservative; the traction passed to the solid
+must be the fluid's own discrete wall flux.
+
 ## References
 
 J. Liu, R.K. Jaiman, P.S. Gurugubelli, A stable second-order scheme for

@@ -22,7 +22,7 @@ License
 #include "fixedValueFvPatchFields.H"
 #include "polyPatchID.H"
 #include "primitivePatchInterpolation.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #ifndef OPENFOAM_NOT_EXTEND
     #include "tetPointFields.H"
     #include "fixedValueTetPolyPatchFields.H"
@@ -990,7 +990,11 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 
     // Check once here, rather than in each coupling, that the fluid sees the
     // interface motion
-    if (fsiPtr->movesFluidInterface())
+    if
+    (
+        fsiPtr->movesFluidInterface()
+     && !fsiPtr->imposesFluidInterfaceVelocity()
+    )
     {
         fsiPtr->checkFluidInterfaceVelocity();
     }
@@ -1690,7 +1694,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                   - fluidPatchesPointsDisplsPrev[interfaceI][pointI];
             }
 
-            twoDPointCorrector twoDCorrector(fluidMesh());
+            twoDPointCorrectorS4f twoDCorrector(fluidMesh());
             twoDCorrector.correctPoints(newPoints);
 
             fluidMesh().movePoints(newPoints);
@@ -1984,7 +1988,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //               - fluidZonePointsDisplPrev()[pointI];
     //         }
     //     }
-    //     twoDPointCorrector twoDCorrector(fluidMesh());
+    //     twoDPointCorrectorS4f twoDCorrector(fluidMesh());
     //     twoDCorrector.correctPoints(newPoints);
     //     fluidMesh().movePoints(newPoints);
     // }

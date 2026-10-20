@@ -8,6 +8,49 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The quasi-monolithic Newton fluid-solid coupling
+  (`fluidSolidInterface NewtonQuasiMonolithic`, OpenFOAM.com with PETSc),
+  which solves the fluid velocity and pressure (`newtonIcoFluid`) and the
+  solid velocity together with PETSc SNES in every time step, following
+  Jaiman and Joshi (2022). It accepts conformal (`directMap`) and
+  non-conformal (`AMI`) interfaces, using the same face weights in the
+  residual and the Jacobian, with an optional transfer of the interface
+  forces that balances the total force and power to round-off
+  (`conservativeTractionTransfer`); `ringAddedMass/verification/Allverify
+  --study nonconformal` verifies it. It runs in parallel, also with
+  `decomposeParMonolithic`, which now also pairs non-conformal patches, and
+  can adapt the time step to the number of Newton iterations, retrying a
+  failed step with a smaller one (`adjustTimeStep`). It comes with the
+  velocity-based solid models `nonLinearGeometryTotalLagrangianVelocity` and
+  `linearGeometryVelocity`, and the `fsiSteadyStateControl` function object.
+  The velocity solid models integrate the displacement with the backward
+  (BDF2) scheme of `ddt(U)` and evaluate the stress and the interface
+  traction once, at the new time, which is second order in time and damps
+  high-frequency modes. In `newtonIcoFluid`, a `fixedGradient` pressure on a
+  wall with fixed velocity, such as the interface in the monolithic tutorial
+  variants, has its gradient set from the normal momentum equation at the
+  wall (conditions derived from `fixedGradient`, such as
+  `fixedGradientCorrected`, keep their given gradient), which makes the
+  interface pressure and the added mass second-order accurate in space (a
+  `zeroGradient` interface pressure is first order, and gives a warning), and
+  the viscous interface traction is the wall flux of
+  the momentum equation's viscous term, `nuEff*snGrad(U)`, so that the force
+  on the solid is the momentum the fluid loses;
+  `ringAddedMass/verification/Allverify --study monolithic` verifies the
+  coupling against the exact added-mass solution. The velocity solid models
+  work on axisymmetric (wedge) meshes, and the coupling accepts a solid that
+  starts deformed, which the fluid mesh then follows relative to its initial
+  displacement; `womersleyTube/verification/Allverify --monolithic` verifies
+  both against the exact pulsatile flow in an elastic tube.
+  `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,
+  `cavityFlexibleBottom`, `collapsibleChannel`, `membraneRoof`,
+  `perpendicularFlap`, `ringAddedMass`, `3dTube`, `mokLidDrivenCavity`,
+  `womersleyTube`, `TurekHron2006` and `foilInWind` tutorials, whose files
+  are stored as `*.monolithic` variants selected with
+  `solids4Foam::selectCaseVariant`. The regression tests of
+  `beamInCrossFlow`, `blobInTreacle` and `cavityFlexibleBottom` have a
+  monolithic arm.
+- The `foilInWind` tutorial, a flexible flag behind a block in a wind flow.
 - Added the `channelLeaflet` fluid-solid interaction tutorial: a thin
   elastic leaflet, clamped in a 2D channel and wetted on both faces, in a
   pulsatile flow at Re = 200, after the oomph-lib channel-with-leaflet
@@ -292,6 +335,10 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The interface-to-interface mappings (`AMI`, `directMap`, `GGI` and `RBF`)
+  print their per-call messages in debug mode only, as the `directMap` point
+  transfer already did, which shortens the logs of the fluid-solid
+  couplings.
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes
@@ -554,6 +601,26 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `newtonIcoFluid` builds its continuity residual from the face flux
+  `interpolate(U) & Sf`, the flux that convects momentum, instead of
+  `fvc::div(U)`, which interpolates with its own `div(U)` scheme. With a
+  different `interpolate(U)` scheme, such as the `skewCorrected linear` of the
+  monolithic tutorial variants, the convecting flux was not divergence-free,
+  which damped vortex shedding: behind the rigid Hron-Turek plate the lift
+  amplitude was 13% below `pimpleFluid` on the 2x mesh, and is now 3% below.
+  The `div(U)` scheme is no longer used by `newtonIcoFluid`.
+- The PETSc SNES Jacobian of the least-squares pressure gradient now uses the
+  owner-cell coefficient across processor boundaries and the boundary
+  condition's value coefficients on boundary faces, and the divergence
+  Jacobian is implemented across processor boundaries.
+- The PETSc SNES solution vector of `linearGeometryTotalDisplacement` is seeded
+  from the displacement (and pressure) on every time step, so that initial
+  conditions and restarts are no longer overwritten by a stale solution.
+- Restarting or decomposing a case whose solid region has no cells on some
+  processors no longer stops in `mechanicalConstitutiveLawStateIO`.
+- The `womersleyTube` patch displacement read the face centres through a
+  dangling reference, which gave NaN or a floating point exception with
+  Clang.
 - `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
   cell whose face stencil does not span three directions, for example a
   corner cell bounded by traction patches, the tensor's determinant can round

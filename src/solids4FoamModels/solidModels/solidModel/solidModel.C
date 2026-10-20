@@ -22,7 +22,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "solidSpringDashpotFvPatchVectorField.H"
@@ -563,6 +563,49 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
 }
 
 
+Foam::dictionary& Foam::solidModel::stabilisationDict()
+{
+    dictionary defaultStabSubDict;
+    defaultStabSubDict.add("type", "diffStencilLaplacian");
+    defaultStabSubDict.add("scaleFactor", 0.1);
+
+    if (!solidModelDict().found("stabilisation"))
+    {
+        // If the stabilisation sub-dict is not found, we will add it with
+        // default settings
+        dictionary stabDict;
+        stabDict.add("momentum", defaultStabSubDict);
+        stabDict.add("pressure", defaultStabSubDict);
+
+        // Add stabilisation dict
+        solidModelDict().add("stabilisation", stabDict);
+    }
+
+    dictionary& stabDict = solidModelDict().subDict("stabilisation");
+
+    // Check for previous stabilisation definition
+    if (stabDict.found("type") || stabDict.found("scaleFactor"))
+    {
+        FatalErrorInFunction
+            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
+            << "solidProperties: this is the old format. Instead, define a "
+            << "stabilisation/momentum sub-dict" << exit(FatalError);
+    }
+
+    if (!stabDict.found("momentum"))
+    {
+        stabDict.add("momentum", defaultStabSubDict);
+    }
+
+    if (!stabDict.found("pressure"))
+    {
+        stabDict.add("pressure", defaultStabSubDict);
+    }
+
+    return stabDict;
+}
+
+
 const Foam::leastSquaresScheme&
 Foam::solidModel::displacementLeastSquares() const
 {
@@ -794,6 +837,48 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::stabilisationModel> Foam::solidModel::createStabilisation
+(
+    const word& name,
+    const dimensionSet& dims
+)
+{
+    return stabilisationModel::New
+    (
+        mesh(),
+        stabilisationDict().subDict(name),
+        dims
+    );
+}
+
+
+void Foam::solidModel::resetMomentumStabilisation(const dimensionSet& dims)
+{
+    momentumStabilisationPtr_ = createStabilisation("momentum", dims);
+
+    // Only stabilisation models that support high-order residual/Jacobian
+    // calculation are allowed when high-order is enabled
+    if
+    (
+        (highOrderResidual() || highOrderJacobian())
+     && !momentumStabilisationPtr_->supportsHighOrderResidual()
+    )
+    {
+        FatalErrorInFunction
+            << "Momentum stabilisation type "
+            << momentumStabilisationPtr_->type()
+            << " does not support high-order residual or Jacobian "
+            << "calculation" << abort(FatalError);
+    }
+}
+
+
+void Foam::solidModel::resetPressureStabilisation(const dimensionSet& dims)
+{
+    pressureStabilisationPtr_ = createStabilisation("pressure", dims);
+}
+
 
 const Foam::meshDual& Foam::solidModel::dualMesh() const
 {
@@ -1611,75 +1696,9 @@ Foam::solidModel::solidModel
         }
     }
 
-    // Create momentum stabilisation
-
-    dictionary defaultStabSubDict;
-    defaultStabSubDict.add("type", "diffStencilLaplacian");
-    defaultStabSubDict.add("scaleFactor", 0.1);
-
-    if (!solidModelDict().found("stabilisation"))
-    {
-        // If the stabilisation sub-dict is not found, we will add it with
-        // default settings
-        dictionary stabDict;
-        stabDict.add("momentum", defaultStabSubDict);
-        stabDict.add("pressure", defaultStabSubDict);
-
-        // Add stabilisation dict
-        solidModelDict().add("stabilisation", stabDict);
-    }
-
-    dictionary& stabDict = solidModelDict().subDict("stabilisation");
-
-    // Check for previous stabilisation definition
-    if (stabDict.found("type") || stabDict.found("scaleFactor"))
-    {
-        FatalErrorInFunction
-            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
-            << "solidProperties: this is the old format. Instead, define a "
-            << "stabilisation/momentum sub-dict" << exit(FatalError);
-    }
-
-    if (!stabDict.found("momentum"))
-    {
-        stabDict.add("momentum", defaultStabSubDict);
-    }
-
-    if (!stabDict.found("pressure"))
-    {
-        stabDict.add("pressure", defaultStabSubDict);
-    }
-
-    momentumStabilisationPtr_ =
-        stabilisationModel::New
-        (
-            mesh(),
-            stabDict.subDict("momentum"),
-            dimless
-        );
-
-    // Only stabilisation models that support high-order residual/Jacobian
-    // calculation are allowed when high-order is enabled
-    if
-    (
-        (highOrderResidual() || highOrderJacobian())
-     && !momentumStabilisationPtr_->supportsHighOrderResidual()
-    )
-    {
-        FatalErrorInFunction
-            << "Momentum stabilisation type "
-            << momentumStabilisationPtr_->type()
-            << " does not support high-order residual or Jacobian "
-            << "calculation" << abort(FatalError);
-    }
-
-    pressureStabilisationPtr_ =
-        stabilisationModel::New
-        (
-            mesh(),
-            stabDict.subDict("pressure"),
-            dimPressure/dimLength
-        );
+    // Create momentum and pressure stabilisation
+    resetMomentumStabilisation(dimless);
+    resetPressureStabilisation(dimPressure/dimLength);
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())
@@ -2562,7 +2581,8 @@ void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
 (
     mechanicalConstitutiveLawManager& manager,
-    const tangentRequest req
+    const tangentRequest req,
+    const word& fieldName
 ) const
 {
     tmp<volScalarField> tImpK
@@ -2571,7 +2591,7 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
         (
             IOobject
             (
-                "impK",
+                fieldName,
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -2618,6 +2638,100 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
     );
 
     return tImpK;
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::shearModulus() const
+{
+    // The deviatoric scalar tangent is (4/3)*mu
+    tmp<volScalarField> tmu;
+
+    if (nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
+    {
+        tmu =
+            lawImpK
+            (
+                mechanicalManager(),
+                tangentRequest::scalarDeviatoric,
+                "shearModulus"
+            );
+    }
+    else
+    {
+        // Finite-strain laws may not implement the small-strain tangent, so
+        // evaluate the finite-strain tangent in the undeformed configuration
+        tmu =
+            tmp<volScalarField>
+            (
+                new volScalarField
+                (
+                    IOobject
+                    (
+                        "shearModulus",
+                        mesh().time().timeName(),
+                        mesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    mesh(),
+                    dimensionedScalar("zero", dimForce/dimArea, 0),
+                    calculatedFvPatchScalarField::typeName
+                )
+            );
+
+        const volTensorField identity
+        (
+            IOobject
+            (
+                "identityF",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, tensor::I)
+        );
+
+        const volScalarField one
+        (
+            IOobject
+            (
+                "identityJ",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("one", dimless, 1.0)
+        );
+
+        mechanicalManager().updateScalarTangentFiniteStrain
+        (
+            identity,
+            identity,
+            identity,
+            identity,
+            one,
+            one,
+            mesh().time().deltaTValue(),
+#ifdef OPENFOAM_NOT_EXTEND
+            tmu.ref(),
+#else
+            tmu(),
+#endif
+            tangentRequest::scalarDeviatoric
+        );
+    }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tmu.ref() *= 0.75;
+#else
+    tmu() *= 0.75;
+#endif
+
+    return tmu;
 }
 
 

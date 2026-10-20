@@ -65,6 +65,7 @@ SourceFiles
 namespace Foam
 {
     class foamPetscSnesHelper;
+    class IOdictionary;
 }
 
 // User data "context" for PETSc functions
@@ -123,9 +124,26 @@ private:
         //- Was PETSc initialised?
         const Switch initialised_;
 
-        //- Store the options file
-        //  We re-set the options file before each call to solve
+        //- Name of the solution field used to look up PETSc options
+        const word fieldName_;
+
+        //- Default PETSc options file used when fvSolution does not define
+        //  this solver
+        const fileName optionsFile_;
+
+        //- Mesh used for local-to-global maps and default fvSolution lookup
+        const fvMesh& mesh_;
+
+        //- Optional explicit location of the fvSolution dictionary to use
+        //  when looking up PETSc options. If empty, use the mesh fvSolution
+        const fileName fvSolutionLocation_;
+
+        //- Store the options database
+        //  We re-set the options database before each call to solve
         PetscOptions options_;
+
+        //- Flag indicating if the PETSc options database has been populated
+        bool optionsLoaded_;
 
         //- Flag to set whether the solver stops when PETSc SNES returns an
         //  error
@@ -133,6 +151,9 @@ private:
 
         //- Flag to track if SNES diverged
         bool diverged_;
+
+        //- Force stale lagged Jacobian/preconditioner state to rebuild
+        bool forceSnesSolverStateRebuild_;
 
         //- Pointer to the PETSc SNES object
         //  Note that SNES is a pointer type
@@ -169,7 +190,6 @@ private:
         //- A flag indicating if the solve function has been called
         bool snesHasRun_;
 
-
     // Private Member Functions
 
         //- Make the neighbour processor patch fields for the given mesh
@@ -183,6 +203,19 @@ private:
 
         //- Return a reference to the least squares vectors
         const leastSquaresS4fVectors& lsVectors(const volScalarField& p) const;
+
+        //- Return an explicit fvSolution dictionary override if requested
+        autoPtr<IOdictionary> makeSolutionDictOverride() const;
+
+        //- Populate the PETSc options database from the given fvSolution dict
+        bool populateOptionsFromDict
+        (
+            const dictionary& solutionDict,
+            const fileName& solutionDictPath
+        );
+
+        //- Populate the PETSc options database on first use
+        void loadOptions();
 
         //- Initialise the snes object
         virtual label initialiseSnes();
@@ -216,6 +249,9 @@ public:
         //    stopOnPetscError    - Optional: Give a FatalError when PETSc
         //                          returns an error
         //    initialise          - Optional: Initialise PETSc
+        //    fvSolutionLocation  - Optional: explicit location of the
+        //                          fvSolution dictionary used to look up PETSc
+        //                          options. If unset, use the mesh fvSolution
         foamPetscSnesHelper
         (
             const word& fieldName,
@@ -223,7 +259,8 @@ public:
             const fvMesh& mesh,
             const solutionLocation& location = solutionLocation::CELLS,
             const Switch stopOnPetscError = true,
-            const Switch initialise = true
+            const Switch initialise = true,
+            const fileName& fvSolutionLocation = fileName()
         );
 
 
@@ -313,6 +350,14 @@ public:
 
         // Edit
 
+            //- Called after the PETSc options are pushed, before SNESSolve()
+            virtual void customiseSolver()
+            {}
+
+            //- Called after resetting the SNES/KSP/PC setup
+            virtual void resetCustomSolverState()
+            {}
+
             //- Store the solution to the solution backup
             void storeSolutionBackup()
             {
@@ -328,6 +373,10 @@ public:
 
             //- Reset the solution and snes object
             void resetSnes();
+
+            //- Reset retry-sensitive SNES/KSP state while preserving the
+            //  solution vector
+            void resetSnesSolverState();
 
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of
@@ -433,14 +482,26 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = true
+                const scalar scale = -1.0
             ) const;
 
-            //- Insert linearisation of div(phi,U) into a PETSc matrix
-            //  where phi = Sf & Uf
-            //  An upwind discretisation is assumed
-            //  If "flipSign" is true, -div(phi,U) is inserted rather than
-            //  div(phi,U)
+            //- Insert V*div(gamma*SfHat & interpolate(grad(p))) into a PETSc
+            //  matrix. This is the least-squares gradient-interpolation part of
+            //  the diff-stencil pressure stabilisation.
+            label InsertFvcDivGradInterpolateIntoPETScMatrix
+            (
+                const volScalarField& p,
+                const surfaceScalarField& gamma,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const scalar scale = 1.0
+            ) const;
+
+            //- Insert the missing tensor part of the linearisation of
+            //  div(phi,U) into a PETSc matrix, where phi = Sf & Uf.
+            //  The caller must insert the segregated fvm::div(phi,U)
+            //  contribution separately. An upwind discretisation is assumed.
             label InsertFvmDivPhiUIntoPETScMatrix
             (
                 const volVectorField& U,
@@ -449,12 +510,17 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = true
+                const scalar scale = -1.0
             ) const;
 
-            //- Insert div(U) into the scalar p equation of a a PETSc matrix
-            //  If "flipSign" is true, -div(phi,U) is inserted rather than
-            //  div(phi,U)
+            //- Insert div(U) into the scalar p equation of a PETSc matrix.
+            //  The inserted matrix is `scale * V * div(U)`. Callers
+            //  needing `-V * div(U)` should pass `scale = -1.0`, or
+            //  `-alpha` if they additionally want to row-scale by `alpha`
+            //  (e.g. for a non-dimensionalised pressure residual).
+            //  Includes proper processor-patch coupling and a Dirichlet
+            //  boundary correction that undoes the implicit zeroGradient
+            //  assumption baked into negSumDiag at boundary cells.
             label InsertFvmDivUIntoPETScMatrix
             (
                 const volScalarField& p,
@@ -463,7 +529,25 @@ public:
                 const label rowOffset,
                 const label colOffset,
                 const label nScalarEqns,
-                const bool flipSign = false
+                const scalar scale = 1.0
+            ) const;
+
+            //- Insert the Gauss-style grad(p) into the vector D equation
+            //  of a PETSc matrix. The inserted matrix is
+            //  `scale * V * grad(p)`. Callers needing `-V*grad(p)`
+            //  should pass `scale = -1.0`. This is the structural
+            //  transpose of `InsertFvmDivUIntoPETScMatrix` (same per-face
+            //  coefficient pattern, inserted at block position
+            //  (rowOffset + cmptI, colOffset) instead of
+            //  (rowOffset, colOffset + cmptI)).
+            label InsertFvmGradPGaussIntoPETScMatrix
+            (
+                const volScalarField& p,
+                Mat jac,
+                const label rowOffset,
+                const label colOffset,
+                const label nScalarEqns,
+                const scalar scale = 1.0
             ) const;
 
             //- Extract a subset of components a raw scalar array 'x' into the
@@ -628,7 +712,8 @@ public:
         const fvMesh& /*mesh*/,
         const solutionLocation& /*location*/ = solutionLocation::CELLS,
         const Switch /*stopOnPetscError*/ = true,
-        const Switch /*initialise*/ = true
+        const Switch /*initialise*/ = true,
+        const fileName& /*fvSolutionLocation*/ = fileName()
     )
     {}
 

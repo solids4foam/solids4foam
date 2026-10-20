@@ -290,6 +290,49 @@ and that the temporal error at $$\Delta t = 0.00625\,\mathrm{s}$$ is about
 0.3% on the tutorial mesh; the temporal error on the finest mesh was not
 measured separately.
 
+## Quasi-monolithic coupling
+
+The quasi-monolithic Newton coupling (`./Allrun monolithic`, OpenFOAM.com
+only) was run separately to $$t = 1.5\,\mathrm{s}$$, with the driver's case
+set-up. Its velocity solid has the second-order (linear) discretisation only,
+and its interface meshes must match, so the solid mesh is refined with the
+fluid mesh: 80 x 8 on fluid level 1, 160 x 8 on level 2 and 320 x 8 on
+level 4. First trough of the wall midpoint (m), against oomph-lib at the same
+time step (OpenFOAM v2512, macOS, serial):
+
+| Fluid | Solid | dt (s) | ρs/ρf | Trough (m) | vs oomph-lib | s |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 80 x 8 | 0.00625 | 1 | -0.19619 | -9.1% | 553 |
+| 2 | 160 x 8 | 0.00625 | 1 | -0.20691 | -4.1% | 2008 |
+| 4 | 320 x 8 | 0.00625 | 1 | -0.21063 | -2.4% | 7901 |
+| 2 | 160 x 8 | 0.0125 | 1 | -0.20361 | – | 1072 |
+| 2 | 160 x 8 | 0.003125 | 1 | -0.20795 | -3.7% | 2896 |
+| 1 | 80 x 8 | 0.003125 | 0 | -0.19759 | – | 766 |
+| 2 | 160 x 8 | 0.00625 | 0 | -0.20689 | – | 2072 |
+| 2 | 160 x 8 | 0.003125 | 0 | -0.20835 | – | 2771 |
+| 4 | 320 x 8 | 0.00625 | 0 | -0.21061 | -2.5% | 7796 |
+
+The massless rows are compared with the massless oomph-lib reference where
+one is available.
+
+- **Robustness.** The monolithic coupling completes the massless wall of the
+  published problem, the smallest time step and the fluid level 4 mesh, on
+  which IQN-ILS fails at every wall density and Robin-Neumann fails for
+  $$\rho_s/\rho_f \le 0.1$$ (density sweep above). The massless and
+  $$\rho_s/\rho_f = 1$$ troughs agree to within 0.2%, as the two
+  oomph-lib references do. It needs no regularising wall density.
+- **Accuracy.** The error against oomph-lib falls from 9.1% to 4.1% and 2.4%
+  under the combined refinement (observed order 1.5), limited by the linear
+  solid on elongated cells, as for the partitioned linear solid (static wall:
+  16.7%, 6.0% and 1.1% too stiff on 80, 160 and 320 x 8). The high-order
+  (cubic) solid, which reaches 0.5% on the tutorial solid mesh, is not
+  available in the velocity solid. On level 2 the time step converges at an
+  observed order of 1.7 (0.0125 to 0.003125 s).
+- **Limitation.** At $$\Delta t = 0.025\,\mathrm{s}$$ on fluid level 2 the run
+  fails during the collapse ($$t = 0.25\,\mathrm{s}$$): the wall
+  displacement predicted for the fluid mesh motion over one step inverts a
+  fluid cell next to the wall.
+
 ## Solid solver
 
 The solid is solved with PETSc SNES in matrix-free mode (`snes_mf_operator`)

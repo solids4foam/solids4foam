@@ -54,7 +54,7 @@ SourceFiles
 #include "mechanicalConstitutiveLawManager.H"
 #include "integrationPointTopologies.H"
 #include "globalPointIndices.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #ifdef OPENFOAM_COM
     #include "pointVolInterpolation.H"
 #endif

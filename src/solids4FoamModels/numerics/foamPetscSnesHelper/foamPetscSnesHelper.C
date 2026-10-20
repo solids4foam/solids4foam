@@ -23,12 +23,16 @@ License
 #include "processorFvPatch.H"
 #include "symmetryFvPatchFields.H"
 #include "leastSquaresVectors.H"
+#include "DynamicList.H"
+#include "HashSet.H"
 #include "fvm.H"
 #include "IFstream.H"
+#include "IOdictionary.H"
 #include "petscUtils.H"
 #include "petscErrorHandling.H"
 #include <petsc/private/pcimpl.h>
 #include "petscdmshell.h"
+#include <cstring>
 #ifdef OPENFOAM_NOT_EXTEND
     #include "symmetryPlaneFvPatchFields.H"
 #endif
@@ -43,15 +47,9 @@ PetscErrorCode formResidualFoamPetscSnesHelper
     void *ctx     // user context
 )
 {
-    const PetscScalar *xx;
-    PetscScalar       *ff;
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
 
     PetscFunctionBeginUser;
-
-    // Access x and f data
-    CHKERRQ(VecGetArrayRead(x, &xx));
-    CHKERRQ(VecGetArray(f, &ff));
 
     // Compute the residual
     if (user->solMod_.formResidual(f, x) != 0)
@@ -77,10 +75,6 @@ PetscErrorCode formResidualFoamPetscSnesHelper
         PetscFunctionReturn(0);
     }
 
-    // Restore the solution and residual vectors
-    CHKERRQ(VecRestoreArrayRead(x, &xx));
-    CHKERRQ(VecRestoreArray(f, &ff));
-
     PetscFunctionReturn(0);
 }
 
@@ -98,10 +92,6 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
     // The "-snes_lag_jacobian -2" PETSc option can be used to avoid
     // re-building the matrix
 
-    // Get pointer to solution data
-    const PetscScalar *xx;
-    CHKERRQ(VecGetArrayRead(x, &xx));
-
     // Access the OpenFOAM data
     appCtxfoamPetscSnesHelper *user = (appCtxfoamPetscSnesHelper *)ctx;
 
@@ -116,9 +106,6 @@ PetscErrorCode formJacobianFoamPetscSnesHelper
             << "formJacobian(B, xx) returned an error code!"
             << Foam::abort(Foam::FatalError);
     }
-
-    // Restore solution vector
-    CHKERRQ(VecRestoreArrayRead(x, &xx));
 
     // Complete matrix assembly
     CHKERRQ(MatAssemblyBegin(B, MAT_FINAL_ASSEMBLY));
@@ -164,11 +151,41 @@ PetscErrorCode convergenceCheckFoamPetscSnesHelper
 }
 
 
+struct physicsPCData
+{
+    KSP ksp{nullptr};
+    bool useOperator{false};
+};
+
+
 static PetscErrorCode PCApplyPhysics(PC pc, Vec x, Vec y)
 {
     PetscFunctionBeginUser;
 
-    // Retreive the solid model context from the DM
+    physicsPCData* data = static_cast<physicsPCData*>(pc->data);
+
+    if (data && data->useOperator)
+    {
+        PetscCall(KSPSolve(data->ksp, x, y));
+
+        KSPConvergedReason reason;
+        PetscCall(KSPGetConvergedReason(data->ksp, &reason));
+
+        if (reason < 0)
+        {
+            SETERRQ
+            (
+                PetscObjectComm((PetscObject)pc),
+                PETSC_ERR_CONV_FAILED,
+                "Inner physics operator KSP failed with reason %d",
+                (int)reason
+            );
+        }
+
+        PetscFunctionReturn(0);
+    }
+
+    // Retrieve the model context from the DM
     DM dm = nullptr;
     AssertPETSc(PCGetDM(pc, &dm));
     appCtxfoamPetscSnesHelper* user = nullptr;
@@ -197,34 +214,75 @@ static PetscErrorCode PCSetUpPhysics(PC pc)
 {
     PetscFunctionBeginUser;
 
-    // // Retreive the solid model context from the DM
-    // DM dm = nullptr;
-    // AssertPETSc(PCGetDM(pc, &dm));
-    // appCtxfoamPetscSnesHelper* user = nullptr;
+    physicsPCData* data = static_cast<physicsPCData*>(pc->data);
 
-    // if (dm)
-    // {
-    //     AssertPETSc(DMGetApplicationContext(dm, (void**)&user));
-    // }
+    char pcType[32] = "model";
+    PetscCall
+    (
+        PetscOptionsGetString
+        (
+            nullptr,
+            nullptr,
+            "-pc_physics_type",
+            pcType,
+            sizeof(pcType),
+            nullptr
+        )
+    );
 
-    // if (!user)
-    // {
-    //     Foam::FatalError
-    //         << "The solid model context needs to be attached to the SNES "
-    //         << "object via a DM"
-    //         << Foam::abort(Foam::FatalError);
-    // }
+    const bool useModel = (std::strcmp(pcType, "model") == 0);
+    data->useOperator = (std::strcmp(pcType, "operator") == 0);
 
-    // Read any runtime knobs and set them in my solid model
-    // char variant[64] = "schur";
-    // PetscOptionsGetString
-    // (
-    //     nullptr, nullptr, "-pc_physics_variant", variant, sizeof(variant), nullptr
-    // );
-    // PetscInt steps = 3;
-    // PetscReal tol = 1e-1;
-    // PetscOptionsGetInt(nullptr, nullptr, "-pc_physics_steps", &steps, nullptr);
-    // PetscOptionsGetReal(nullptr, nullptr, "-pc_physics_tol", &tol, nullptr);
+    if (!useModel && !data->useOperator)
+    {
+        SETERRQ
+        (
+            PetscObjectComm((PetscObject)pc),
+            PETSC_ERR_ARG_WRONG,
+            "Unknown pc_physics_type '%s'; expected 'model' or 'operator'",
+            pcType
+        );
+    }
+
+    if (data->useOperator)
+    {
+        Mat mat = nullptr;
+        Mat pmat = nullptr;
+        PetscCall(PCGetOperators(pc, &mat, &pmat));
+
+        if (!pmat)
+        {
+            SETERRQ
+            (
+                PetscObjectComm((PetscObject)pc),
+                PETSC_ERR_ARG_NULL,
+                "No preconditioning matrix available for pc_physics_type operator"
+            );
+        }
+
+        if (!data->ksp)
+        {
+            PetscCall
+            (
+                KSPCreate(PetscObjectComm((PetscObject)pc), &data->ksp)
+            );
+            PetscCall(KSPSetOptionsPrefix(data->ksp, "pc_physics_operator_"));
+        }
+
+        PetscCall(KSPSetOperators(data->ksp, pmat, pmat));
+        PetscCall(KSPSetType(data->ksp, KSPPREONLY));
+
+        PC innerPc = nullptr;
+        PetscCall(KSPGetPC(data->ksp, &innerPc));
+        PetscCall(PCSetType(innerPc, PCLU));
+
+        PetscCall(KSPSetFromOptions(data->ksp));
+        PetscCall(KSPSetUp(data->ksp));
+    }
+    else if (data->ksp)
+    {
+        PetscCall(KSPReset(data->ksp));
+    }
 
     PetscFunctionReturn(0);
 }
@@ -234,7 +292,14 @@ static PetscErrorCode PCDestroyPhysics(PC pc)
 {
     PetscFunctionBeginUser;
 
-    // Nothing to do
+    physicsPCData* data = static_cast<physicsPCData*>(pc->data);
+
+    if (data)
+    {
+        PetscCall(KSPDestroy(&data->ksp));
+        delete data;
+        pc->data = nullptr;
+    }
 
     PetscFunctionReturn(0);
 }
@@ -243,6 +308,8 @@ static PetscErrorCode PCDestroyPhysics(PC pc)
 static PetscErrorCode PCCreatePhysics(PC pc)
 {
     PetscFunctionBeginUser;
+
+    pc->data = new physicsPCData;
 
     pc->ops->setup   = PCSetUpPhysics;
     pc->ops->apply   = PCApplyPhysics;
@@ -443,6 +510,155 @@ const leastSquaresS4fVectors& foamPetscSnesHelper::lsVectors
 }
 
 
+autoPtr<IOdictionary> foamPetscSnesHelper::makeSolutionDictOverride() const
+{
+    if (fvSolutionLocation_.empty())
+    {
+        return autoPtr<IOdictionary>();
+    }
+
+    autoPtr<IOdictionary> solutionDictPtr
+    (
+        new IOdictionary
+        (
+            IOobject
+            (
+                "fvSolution",
+                fvSolutionLocation_,
+                mesh_.time(),
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE
+            )
+        )
+    );
+
+    if (!solutionDictPtr().headerOk())
+    {
+        solutionDictPtr.clear();
+    }
+
+    return solutionDictPtr;
+}
+
+
+bool foamPetscSnesHelper::populateOptionsFromDict
+(
+    const dictionary& solutionDict,
+    const fileName& solutionDictPath
+)
+{
+    if (!solutionDict.found("solvers"))
+    {
+        return false;
+    }
+
+    const dictionary& solversDict = solutionDict.subDict("solvers");
+
+    if (!solversDict.found(fieldName_))
+    {
+        return false;
+    }
+
+    const dictionary& solverDict = solversDict.subDict(fieldName_);
+
+    if (solverDict.empty())
+    {
+        return false;
+    }
+
+    if (solverDict.lookupOrDefault<word>("solver", "none") != "petsc")
+    {
+        return false;
+    }
+
+    Info<< "Reading the PETSc options from " << solutionDictPath
+        << " for " << fieldName_ << endl;
+
+    const dictionary& optionsDict = solverDict.subDict("options");
+
+    // We will load (push) the empty options database and populate it
+    // with options from the the dictionary, then unload (pop) the
+    // database
+    AssertPETSc(PetscOptionsPush(options_));
+
+    // Populate the database
+    PetscUtils::setFlags("", optionsDict, debug);
+
+    // Unload (pop) the database
+    AssertPETSc(PetscOptionsPop());
+
+    return true;
+}
+
+
+void foamPetscSnesHelper::loadOptions()
+{
+    if (optionsLoaded_)
+    {
+        return;
+    }
+
+    if (!options_)
+    {
+        AssertPETSc(PetscOptionsCreate(&options_));
+    }
+
+    bool useDict = false;
+    const fileName fvSolutionPath =
+        fvSolutionLocation_.empty()
+      ? fileName("fvSolution")
+      : fvSolutionLocation_/"fvSolution";
+
+    if (fvSolutionLocation_.empty())
+    {
+        useDict = populateOptionsFromDict(mesh_.solutionDict(), fvSolutionPath);
+    }
+    else
+    {
+        autoPtr<IOdictionary> solutionDictPtr = makeSolutionDictOverride();
+
+        if (solutionDictPtr.valid())
+        {
+            useDict = populateOptionsFromDict(solutionDictPtr(), fvSolutionPath);
+        }
+    }
+
+    if (!useDict)
+    {
+        fileName optionsFile(optionsFile_);
+
+        Info<< "Reading the PETSc options from the " << optionsFile
+            << " file" << endl;
+
+        // Expand the options file name
+        optionsFile.expand();
+
+        // Check the options file exists
+        IFstream is(optionsFile);
+        if (!is.good())
+        {
+            FatalErrorInFunction
+                << "Cannot find the PETSc options file: " << optionsFile
+                << ". Either provide an option file or add 'solver petsc;' "
+                << "to " << fvSolutionPath << "/solvers/" << fieldName_
+                << " dictionary"
+                << exit(FatalError);
+        }
+
+        // Populate the options database with the options file
+        AssertPETSc
+        (
+            PetscOptionsInsertFile
+            (
+                PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
+            )
+        );
+    }
+
+    optionsLoaded_ = true;
+}
+
+
 label foamPetscSnesHelper::initialiseSnes()
 {
     if (snes_.s)
@@ -549,14 +765,21 @@ foamPetscSnesHelper::foamPetscSnesHelper
     const fvMesh& mesh,
     const solutionLocation& location,
     const Switch stopOnPetscError,
-    const Switch initialise
+    const Switch initialise,
+    const fileName& fvSolutionLocation
 )
 :
     location_(location),
     initialised_(initialise),
+    fieldName_(fieldName),
+    optionsFile_(optionsFile),
+    mesh_(mesh),
+    fvSolutionLocation_(fvSolutionLocation),
     options_(nullptr),
+    optionsLoaded_(false),
     stopOnPetscError_(stopOnPetscError),
     diverged_(false),
+    forceSnesSolverStateRebuild_(false),
     snes_(),
     x_(),
     xBackup_(),
@@ -580,91 +803,8 @@ foamPetscSnesHelper::foamPetscSnesHelper
 {
     if (initialise)
     {
-        // Initialise PETSc without any options file
+        // Initialise PETSc without any options file or fvSolution lookup
         PetscInitialize(NULL, NULL, NULL, NULL);
-
-        // Create and store the options database from a dedicated options file
-        // or from an OpenFOAM dict
-
-        // Lookup the solver in fvSolution and check if PETSc is specified
-        bool useDict = false;
-#ifdef OPENFOAM_COM
-        if (mesh.solversDict().found(fieldName))
-        {
-            const dictionary& solverDict = mesh.solverDict(fieldName);
-#else
-        if (mesh.solutionDict().subDict("solvers").found(fieldName))
-        {
-            const dictionary& solverDict =
-                mesh.solutionDict().subDict("solvers").subDict(fieldName);
-#endif
-
-            if (!solverDict.empty())
-            {
-                if
-                (
-                    solverDict.lookupOrDefault<word>("solver", "none")
-                 == "petsc"
-                )
-                {
-                    useDict = true;
-                }
-            }
-        }
-
-        // Create an empty options database
-        PetscOptionsCreate(&options_);
-
-        // Populate the options database from the dict or options file
-        if (useDict)
-        {
-            Info<< "Reading the PETSc options from fvSolution" << endl;
-
-            // We will load (push) the empty options database and populate it
-            // with options from the the dictionary, then unload (pop) the
-            // database
-#ifdef OPENFOAM_NOT_EXTEND
-            const dictionary& optionsDict =
-                mesh.solverDict(fieldName).subDict("options");
-#else
-            const dictionary& optionsDict =
-                mesh.solutionDict().solverDict(fieldName).subDict("options");
-#endif
-
-            // Load (push) the database
-            AssertPETSc(PetscOptionsPush(options_));
-
-            // Populate the database
-            PetscUtils::setFlags("", optionsDict, debug);
-
-            // Unload (pop) the database
-            AssertPETSc(PetscOptionsPop());
-        }
-        else
-        {
-            Info<< "Reading the PETSc options from the " << optionsFile
-                << " file" << endl;
-
-            // Expand the options file name
-            optionsFile.expand();
-
-            // Check the options file exists
-            IFstream is(optionsFile);
-            if (!is.good())
-            {
-                FatalErrorInFunction
-                    << "Cannot find the PETSc options file: " << optionsFile
-                    << ". Either provide an option file or add 'solver petsc;' "
-                    << "to fvSolution/solvers/" << fieldName << " dictionary"
-                    << exit(FatalError);
-            }
-
-            // Populate the options database with the options file
-            PetscOptionsInsertFile
-            (
-                PETSC_COMM_WORLD, options_, optionsFile.c_str(), PETSC_TRUE
-            );
-        }
     }
 }
 
@@ -675,7 +815,10 @@ foamPetscSnesHelper::~foamPetscSnesHelper()
 {
     if (initialised_)
     {
-        PetscOptionsDestroy(&options_);
+        if (options_)
+        {
+            PetscOptionsDestroy(&options_);
+        }
         snesUserPtr_.clear();
 
         WarningInFunction
@@ -719,6 +862,36 @@ void foamPetscSnesHelper::resetSnes()
     // SNESLineSearch ls;
     // SNESGetLineSearch(foamPetscSnesHelper::snes(), &ls);
     // SNESLineSearchReset(ls);
+}
+
+
+void foamPetscSnesHelper::resetSnesSolverState()
+{
+    if (!snes_)
+    {
+        return;
+    }
+
+    Info<< "Resetting PETSc SNES/KSP retry state" << endl;
+
+    SNESLineSearch lineSearch = nullptr;
+    AssertPETSc(SNESGetLineSearch(snes_.s, &lineSearch));
+
+    if (lineSearch)
+    {
+        AssertPETSc(SNESLineSearchReset(lineSearch));
+    }
+
+    KSP ksp = nullptr;
+    AssertPETSc(SNESGetKSP(snes_.s, &ksp));
+
+    if (ksp)
+    {
+        AssertPETSc(KSPSetReusePreconditioner(ksp, PETSC_FALSE));
+    }
+
+    forceSnesSolverStateRebuild_ = true;
+    diverged_ = false;
 }
 
 
@@ -787,7 +960,8 @@ label foamPetscSnesHelper::initialiseJacobian
     else
     {
         FatalErrorInFunction
-            << "Unknown solution location = " << location_
+            << "Unknown solution location = "
+            << solutionLocationNames_[location_]
             << exit(FatalError);
     }
 
@@ -818,29 +992,53 @@ label foamPetscSnesHelper::initialiseJacobian
     // Count the neighbours
     if (location_ == solutionLocation::CELLS)
     {
-        // Count neighbours sharing an internal face
+        List<labelHashSet> gradCols(blockn);
+        List<labelHashSet> rowCols(blockn);
+
+        forAll(rowCols, cellI)
+        {
+            gradCols[cellI] = labelHashSet(16);
+            rowCols[cellI] = labelHashSet(32);
+
+            const label globalCellID = globalCells().toGlobal(cellI);
+            gradCols[cellI].insert(globalCellID);
+            rowCols[cellI].insert(globalCellID);
+        }
+
         const Foam::labelUList& own = mesh.owner();
         const Foam::labelUList& nei = mesh.neighbour();
         forAll(own, faceI)
         {
             const Foam::label ownCellID = own[faceI];
             const Foam::label neiCellID = nei[faceI];
-            d_nnz[ownCellID]++;
-            d_nnz[neiCellID]++;
+
+            const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+            const label globalNeiCellID = globalCells().toGlobal(neiCellID);
+
+            gradCols[ownCellID].insert(globalNeiCellID);
+            gradCols[neiCellID].insert(globalOwnCellID);
+
+            rowCols[ownCellID].insert(globalNeiCellID);
+            rowCols[neiCellID].insert(globalOwnCellID);
         }
 
-        // Count off-processor neighbour cells
+        const PtrList<labelList>& neiProcGlobalIDs =
+            this->neiProcGlobalIDs(mesh);
+
         forAll(mesh.boundary(), patchI)
         {
             if (mesh.boundary()[patchI].type() == "processor")
             {
                 const Foam::labelUList& faceCells =
                     mesh.boundary()[patchI].faceCells();
+                const labelList& neiGlobalFaceCells =
+                    neiProcGlobalIDs[patchI];
 
                 forAll(faceCells, fcI)
                 {
                     const Foam::label cellID = faceCells[fcI];
-                    o_nnz[cellID]++;
+                    gradCols[cellID].insert(neiGlobalFaceCells[fcI]);
+                    rowCols[cellID].insert(neiGlobalFaceCells[fcI]);
                 }
             }
             else if (mesh.boundary()[patchI].coupled())
@@ -849,6 +1047,55 @@ label foamPetscSnesHelper::initialiseJacobian
                 Foam::FatalError
                     << "Coupled boundary are not implemented, except for"
                     << " processor boundaries" << Foam::abort(Foam::FatalError);
+            }
+        }
+
+        auto insertSet =
+            [](labelHashSet& row, const labelHashSet& cols)
+            {
+                forAllConstIter(labelHashSet, cols, iter)
+                {
+                    row.insert(iter.key());
+                }
+            };
+
+        // The pressure stabilisation may contain div(interpolate(grad(p))).
+        // This reaches the gradient stencil of the neighbouring cell across
+        // each internal face, not just the direct face-neighbour stencil.
+        forAll(own, faceI)
+        {
+            const Foam::label ownCellID = own[faceI];
+            const Foam::label neiCellID = nei[faceI];
+
+            insertSet(rowCols[ownCellID], gradCols[neiCellID]);
+            insertSet(rowCols[neiCellID], gradCols[ownCellID]);
+        }
+
+#if defined(OPENFOAM_ORG) || defined(FOAMEXTEND)
+        const label myProcNo = Pstream::myProcNo();
+        const label gStart = globalCells().offset(myProcNo);
+        const label gEnd = gStart + globalCells().localSize(myProcNo);
+#else
+        const label gStart = globalCells().localStart();
+        const label gEnd = globalCells().localEnd();
+#endif
+
+        d_nnz = 0;
+
+        forAll(rowCols, cellI)
+        {
+            forAllConstIter(labelHashSet, rowCols[cellI], iter)
+            {
+                const label gCol = iter.key();
+
+                if (gCol >= gStart && gCol < gEnd)
+                {
+                    ++d_nnz[cellI];
+                }
+                else
+                {
+                    ++o_nnz[cellI];
+                }
             }
         }
     }
@@ -900,9 +1147,12 @@ label foamPetscSnesHelper::initialiseJacobian
     // dispatches to whichever type the matrix actually has, so the matrix is
     // preallocated whether it is AIJ, BAIJ or SBAIJ, e.g. if the user
     // overrides the type with -mat_type
-    AssertPETSc(MatXAIJSetPreallocation
+    AssertPETSc
     (
-        jac, blockSize, d_nnz.data(), o_nnz.data(), NULL, NULL)
+        MatXAIJSetPreallocation
+        (
+            jac, blockSize, d_nnz.data(), o_nnz.data(), NULL, NULL
+        )
     );
 
     // Raise an error if mallocs are required during matrix assembly
@@ -1002,7 +1252,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const scalar scale
 ) const
 {
     // Get reference to least square vectors
@@ -1017,7 +1267,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 
     const scalarField& VI = mesh.V();
 
-    const scalar sign = flipSign ? -1.0 : 1.0;
+    // const scalar sign = flipSign ? -1.0 : 1.0;
+    const scalar sign = scale;
 
     // Get the blockSize
     label blockSize;
@@ -1129,9 +1380,6 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             const labelList& neiGlobalFaceCells =
                 neiProcGlobalIDs(mesh)[patchI];
-            const scalarField& patchNeiVols = neiProcVolumes(mesh)[patchI];
-            const vectorField& patchNeiLs = neiLs.boundaryField()[patchI];
-            // const vectorField patchNeiLs(... patchNeighbourField());
 
             forAll(fp, patchFaceI)
             {
@@ -1163,12 +1411,12 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 const label globalBlockColI = neiGlobalFaceCells[patchFaceI];
 
                 // Off-proc off-diagonal coefficient
-                // mat(ownCellID, neiCellID) += VI[ownCellID]*neiLs[faceI];
+                // mat(ownCellID, neiCellID) += VI[ownCellID]*ownLs[faceI];
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
                     values[cmptI*blockSize + colOffset] =
-                        sign*patchNeiVols[patchFaceI]
-                       *patchNeiLs[patchFaceI][cmptI];
+                        sign*VI[ownCellID]
+                       *patchOwnLs[patchFaceI][cmptI];
                 }
                 AssertPETSc
                 (
@@ -1202,6 +1450,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             if (useBoundaryFaceValues[patchI])
             {
+                const fvPatchScalarField& pp = p.boundaryField()[patchI];
+                const scalarField intCoeffs(pp.valueInternalCoeffs(fp.weights()));
+
                 forAll(faceCells, patchFaceI)
                 {
                     // Explicit calculation
@@ -1224,7 +1475,9 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                     for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                     {
                         values[cmptI*blockSize + colOffset] =
-                            -sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
+                            sign*VI[ownCellID]
+                           *(intCoeffs[patchFaceI] - 1.0)
+                           *patchOwnLs[patchFaceI][cmptI];
                     }
                     AssertPETSc
                     (
@@ -1244,6 +1497,255 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 }
 
 
+label foamPetscSnesHelper::InsertFvcDivGradInterpolateIntoPETScMatrix
+(
+    const volScalarField& p,
+    const surfaceScalarField& gamma,
+    Mat jac,
+    const label rowOffset,
+    const label colOffset,
+    const scalar scale
+) const
+{
+    const fvMesh& mesh = p.mesh();
+    const leastSquaresS4fVectors& lsv = lsVectors(p);
+
+    const surfaceVectorField& ownLs = lsv.pVectors();
+    const surfaceVectorField& neiLs = lsv.nVectors();
+    const boolList& useBoundaryFaceValues = lsv.useBoundaryFaceValues();
+
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+
+    List<DynamicList<label>> gradCols(mesh.nCells());
+    List<DynamicList<vector>> gradCoeffs(mesh.nCells());
+
+    auto appendGradCoeff =
+        [&](const label cellI, const label globalColI, const vector& coeff)
+        {
+            gradCols[cellI].append(globalColI);
+            gradCoeffs[cellI].append(coeff);
+        };
+
+    forAll(own, faceI)
+    {
+        const label ownCellID = own[faceI];
+        const label neiCellID = nei[faceI];
+
+        const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+        const label globalNeiCellID = globalCells().toGlobal(neiCellID);
+
+        appendGradCoeff(ownCellID, globalOwnCellID, -ownLs[faceI]);
+        appendGradCoeff(ownCellID, globalNeiCellID, ownLs[faceI]);
+
+        appendGradCoeff(neiCellID, globalNeiCellID, -neiLs[faceI]);
+        appendGradCoeff(neiCellID, globalOwnCellID, neiLs[faceI]);
+    }
+
+    const PtrList<labelList>& neiProcGlobalIDs = this->neiProcGlobalIDs(mesh);
+
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        const labelUList& faceCells = fp.faceCells();
+        const fvsPatchVectorField& patchOwnLs = ownLs.boundaryField()[patchI];
+
+        if (fp.type() == "processor")
+        {
+            const labelList& neiGlobalFaceCells = neiProcGlobalIDs[patchI];
+
+            forAll(fp, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+
+                appendGradCoeff
+                (
+                    ownCellID, globalOwnCellID, -patchOwnLs[patchFaceI]
+                );
+                appendGradCoeff
+                (
+                    ownCellID,
+                    neiGlobalFaceCells[patchFaceI],
+                    patchOwnLs[patchFaceI]
+                );
+            }
+        }
+        else if (fp.coupled())
+        {
+            // Coupled non-processor patches are not handled elsewhere in the
+            // PETSc helper either.
+            FatalErrorInFunction
+                << "Coupled boundaries (except processors) not implemented"
+                << abort(FatalError);
+        }
+        else if
+        (
+            isA<symmetryPolyPatch>(fp.patch())
+#ifdef OPENFOAM_NOT_EXTEND
+         || isA<symmetryPlanePolyPatch>(fp.patch())
+#endif
+        )
+        {
+            // The scalar jump across a symmetry plane is zero.
+        }
+        else if (useBoundaryFaceValues[patchI])
+        {
+            const fvPatchScalarField& pp = p.boundaryField()[patchI];
+            const scalarField intCoeffs(pp.valueInternalCoeffs(fp.weights()));
+
+            forAll(faceCells, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const label globalOwnCellID = globalCells().toGlobal(ownCellID);
+
+                appendGradCoeff
+                (
+                    ownCellID,
+                    globalOwnCellID,
+                    (intCoeffs[patchFaceI] - 1.0)*patchOwnLs[patchFaceI]
+                );
+            }
+        }
+    }
+
+    label blockSize;
+    MatGetBlockSize(jac, &blockSize);
+
+    // The stencil only couples the (rowOffset, colOffset) component of each
+    // block, so the coefficients are accumulated per row and inserted as
+    // scalar entries with one MatSetValues call per row. Inserting the full
+    // block with MatSetValuesBlocked would add blockSize^2 - 1 explicit zeros
+    // for every coefficient, which are then stored in the matrix and slow
+    // its assembly, factorisation and multiplication
+    List<DynamicList<PetscInt>> rowCols(mesh.nCells());
+    List<DynamicList<PetscScalar>> rowValues(mesh.nCells());
+
+    auto insertGradDivStencil =
+        [&]
+        (
+            const label rowCellID,
+            const vector& faceCoeff,
+            const DynamicList<label>& cols,
+            const DynamicList<vector>& coeffs
+        )
+        {
+            forAll(cols, coeffI)
+            {
+                // Insert unconditionally to establish the full sparsity
+                // pattern on the first assembly.  PETSc compresses the
+                // storage after MatAssemblyEnd, so skipping zero entries
+                // would lose their positions; on a moving mesh the
+                // coefficients may later become nonzero, triggering a
+                // MAT_NEW_NONZERO_ALLOCATION_ERR.
+                rowCols[rowCellID].append(cols[coeffI]*blockSize + colOffset);
+                rowValues[rowCellID].append(faceCoeff & coeffs[coeffI]);
+            }
+        };
+
+    const scalarField& gammaI = gamma;
+    const vectorField& SfI = mesh.Sf();
+    const scalarField& wI = mesh.weights();
+
+    forAll(own, faceI)
+    {
+        const label ownCellID = own[faceI];
+        const label neiCellID = nei[faceI];
+
+        const vector ownFaceCoeff =
+            scale*gammaI[faceI]*wI[faceI]*SfI[faceI];
+        const vector neiFaceCoeff =
+            scale*gammaI[faceI]*(1.0 - wI[faceI])*SfI[faceI];
+
+        insertGradDivStencil
+        (
+            ownCellID, ownFaceCoeff,
+            gradCols[ownCellID], gradCoeffs[ownCellID]
+        );
+        insertGradDivStencil
+        (
+            ownCellID, neiFaceCoeff,
+            gradCols[neiCellID], gradCoeffs[neiCellID]
+        );
+
+        insertGradDivStencil
+        (
+            neiCellID, -ownFaceCoeff,
+            gradCols[ownCellID], gradCoeffs[ownCellID]
+        );
+        insertGradDivStencil
+        (
+            neiCellID, -neiFaceCoeff,
+            gradCols[neiCellID], gradCoeffs[neiCellID]
+        );
+    }
+
+    forAll(mesh.boundary(), patchI)
+    {
+        const fvPatch& fp = mesh.boundary()[patchI];
+        const labelUList& faceCells = fp.faceCells();
+        const vectorField& pSf = fp.Sf();
+        const fvsPatchScalarField& pGamma = gamma.boundaryField()[patchI];
+
+        if (fp.type() == "empty")
+        {
+            continue;
+        }
+        else if (fp.coupled())
+        {
+            const fvsPatchScalarField& pw =
+                mesh.weights().boundaryField()[patchI];
+
+            forAll(fp, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const vector faceCoeff =
+                    scale*pGamma[patchFaceI]*pw[patchFaceI]*pSf[patchFaceI];
+
+                insertGradDivStencil
+                (
+                    ownCellID, faceCoeff,
+                    gradCols[ownCellID], gradCoeffs[ownCellID]
+                );
+            }
+        }
+        else
+        {
+            forAll(fp, patchFaceI)
+            {
+                const label ownCellID = faceCells[patchFaceI];
+                const vector faceCoeff =
+                    scale*pGamma[patchFaceI]*pSf[patchFaceI];
+
+                insertGradDivStencil
+                (
+                    ownCellID, faceCoeff,
+                    gradCols[ownCellID], gradCoeffs[ownCellID]
+                );
+            }
+        }
+    }
+
+    forAll(rowCols, cellI)
+    {
+        const PetscInt globalRowI =
+            globalCells().toGlobal(cellI)*blockSize + rowOffset;
+
+        AssertPETSc
+        (
+            MatSetValues
+            (
+                jac, 1, &globalRowI, rowCols[cellI].size(),
+                rowCols[cellI].cdata(), rowValues[cellI].cdata(),
+                ADD_VALUES
+            )
+        );
+    }
+
+    return 0;
+}
+
+
 label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
 (
     const volVectorField& U,
@@ -1252,7 +1754,7 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const scalar scale
 ) const
 {
     // Take references for efficiency and brevity
@@ -1263,24 +1765,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     const scalarField& wI = mesh.weights();
     const labelList& own = mesh.owner();
     const labelList& nei = mesh.neighbour();
-    const scalar sign = flipSign ? -1 : 1;
+    // const scalar sign = flipSign ? -1 : 1;
+    const scalar sign = scale;
     tensor coeff = tensor::zero;
-
-    // Add segregated component of convection term
-    {
-        fvVectorMatrix UEqn
-        (
-          - fvm::div(phi, U, "jacobian-div(phi,U)")
-        );
-
-        UEqn.relax();
-
-        // Convert fvMatrix matrix to PETSc matrix
-        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
-        (
-            UEqn, jac, 0, 0, nScalarEqns
-        );
-    }
 
     // The first-order upwind discretisation for cell P is
     //     div(phi,U)_P = \sum phi*Uf
@@ -1308,8 +1795,9 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
     //     (d/dUp)(phi*Un) = w*Un*Sf                => diagonal
     //     (d/dUn)(phi*Un) = phi*I + (1 - w)*Un*Sf  => off-diagonal
     //
-    // The w*Sf*Up term is missing from fvm::div(phi(), U) as it requires a
-    // coupled solver. So we will add the w*Sf*Up term here
+    // The w*Sf*Up term is missing from fvm::div(phi, U) as it requires a
+    // coupled solver. The caller inserts the segregated fvm::div(phi,U)
+    // matrix; this routine adds only the missing tensor terms.
     // From the neighbours perspective, the coefficient is (1 - w)*Sf*Un
 
     // Get the blockSize
@@ -1541,7 +2029,11 @@ label foamPetscSnesHelper::InsertFvmDivPhiUIntoPETScMatrix
 
         if (patch.coupled())
         {
-            notImplemented("div(phi,U) additional term for processors");
+            // TODO: add the extra Newton linearisation tensor terms
+            // (w*Sf*U and (1-w)*Sf*U) for processor faces. Omitting
+            // these only affects the Jacobian accuracy at processor
+            // boundaries; the segregated fvm::div part is already
+            // handled correctly by InsertFvMatrixIntoPETScMatrix.
         }
         else if
         (
@@ -1599,12 +2091,12 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const scalar scale
 ) const
 {
     // Take references for efficiency and brevity
     const fvMesh& mesh = p.mesh();
-    const scalar sign = flipSign ? -1 : 1;
+    const scalar sign = scale;
 
     for (label cmptI = 0; cmptI < 3; ++cmptI)
     {
@@ -1622,8 +2114,19 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
         scalarField& upper = divUCoeffs.upper();
         scalarField& lower = divUCoeffs.lower();
 
-        lower = w*Sf.component(cmptI);
-        upper = lower - Sf.component(cmptI);
+        // Interior face coefficients (scaled by sign so the whole row
+        // is scaled consistently). Note: these are the negation of
+        // OpenFOAM's `fvm::div(phi, U)` coefficient convention, so the
+        // assembled matrix for sign=+1 represents -V*div(U) per the
+        // operator action at interior cells but with a self-consistent
+        // boundary treatment that pairs with the gradient helper. In
+        // practice the empirically self-consistent sign for the
+        // displacement-pressure Newton system on this discretisation
+        // requires the caller to pass scale = -alpha when assembling
+        // J_pD = -alpha*V*div(D); see the call site in
+        // linGeomTotalDispSolid::formJacobian for details.
+        lower = sign*w*Sf.component(cmptI);
+        upper = lower - sign*Sf.component(cmptI);
 
         divUCoeffs.negSumDiag();
 
@@ -1637,31 +2140,68 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
             const fvsPatchScalarField& pw = weights.boundaryField()[patchI];
             const labelUList& fc = patch.faceCells();
 
-            const vectorField internalCoeffs(pU.valueInternalCoeffs(pw));
-
-            // Diag contribution
-            forAll(pU, faceI)
-            {
-                diag[fc[faceI]] -=
-                    sign*internalCoeffs[faceI][cmptI]*Sf[faceI][cmptI];
-            }
-
             if (patch.coupled())
             {
-                // Todo: add off-core coeffs
-                notImplemented("patch.coupled(): D-in-p");
+                if (patch.type() == "processor")
+                {
+                    // Convention: InsertFvMatrixIntoPETScMatrix inserts
+                    //   +internalCoeffs to the diagonal
+                    //   -boundaryCoeffs to the off-diagonal
+                    //
+                    // Interior face convention (lower = +sign*w*Sf,
+                    // upper = sign*(w-1)*Sf, negSumDiag adds
+                    // -sign*w*Sf to the owner diagonal per face).
+                    // Reproduce the same stencil across processor
+                    // boundaries by setting:
+                    //   internalCoeffs[f] = -sign*w*Sf
+                    //     (matches negSumDiag's contribution).
+                    //   boundaryCoeffs[f] = sign*(1-w)*Sf
+                    //     so -boundaryCoeffs = sign*(w-1)*Sf = upper[f].
+                    scalarField& patchIntCoeffs =
+                        divUCoeffs.internalCoeffs()[patchI];
+                    scalarField& patchBndCoeffs =
+                        divUCoeffs.boundaryCoeffs()[patchI];
 
-                // CoeffField<vector>::linearTypeField& pcoupleUpper =
-                //     bs.coupleUpper()[patchI].asLinear();
-                // CoeffField<vector>::linearTypeField& pcoupleLower =
-                //     bs.coupleLower()[patchI].asLinear();
+                    forAll(pU, faceI)
+                    {
+                        patchIntCoeffs[faceI] =
+                            -sign*pw[faceI]*Sf[faceI][cmptI];
+                        patchBndCoeffs[faceI] =
+                            sign*(1.0 - pw[faceI])*Sf[faceI][cmptI];
+                    }
+                }
+                else
+                {
+                    FatalErrorInFunction
+                        << "Coupled boundary type " << patch.type()
+                        << " not yet supported in "
+                        << "InsertFvmDivUIntoPETScMatrix"
+                        << abort(FatalError);
+                }
+            }
+            else
+            {
+                // Non-coupled boundary contribution.
+                // With the fvm::div-style interior coefficients above,
+                // negSumDiag already yields the correct V*div diagonal
+                // at Dirichlet boundary cells (where the BC's
+                // valueInternalCoeffs is zero). For BCs where the face
+                // value depends on the interior cell value
+                // (e.g. zeroGradient, where valueInternalCoeffs = 1),
+                // an additional `-sign*intCoeffs*Sf` correction per
+                // face is required to recover the true V*div diagonal.
+                const vectorField internalCoeffs
+                (
+                    pU.valueInternalCoeffs(pw)
+                );
 
-                // const vectorField pcl = -pw*Sf;
-                // const vectorField pcu = pcl + Sf;
-
-                // // Coupling  contributions
-                // pcoupleLower -= pcl;
-                // pcoupleUpper -= pcu;
+                forAll(pU, faceI)
+                {
+                    diag[fc[faceI]] -=
+                        sign
+                       *internalCoeffs[faceI][cmptI]
+                       *Sf[faceI][cmptI];
+                }
             }
         }
 
@@ -1670,6 +2210,123 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
         foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
         (
             divUCoeffs, jac, rowOffset, colOffset + cmptI, 1
+        );
+    }
+
+    return 0;
+}
+
+
+label foamPetscSnesHelper::InsertFvmGradPGaussIntoPETScMatrix
+(
+    const volScalarField& p,
+    Mat jac,
+    const label rowOffset,
+    const label colOffset,
+    const label nScalarEqns,
+    const scalar scale
+) const
+{
+    // Gauss-style discrete gradient of p, inserted as the J_Dp block.
+    // Interior face contribution to V*grad(p)|_own_i :
+    //   = Sf_i * (w * p[own] + (1-w) * p[nei])
+    // The scalar matrix is built identically to InsertFvmDivUIntoPETScMatrix
+    // (same upper/lower/negSumDiag coefficients per face). The difference
+    // is the destination block position: this helper inserts at
+    //   (rowOffset + cmptI, colOffset)
+    // i.e. cmptI varies the displacement-equation ROW (D_x, D_y, D_z),
+    // while InsertFvmDivU varies the displacement-field COLUMN. Together
+    // they produce the structurally consistent J_pD/J_Dp pair for the
+    // Gauss discretisation of (-V*div D) in the pressure equation and
+    // (-V*grad p) in the momentum equation.
+    const fvMesh& mesh = p.mesh();
+    const scalar sign = scale;
+
+    for (label cmptI = 0; cmptI < 3; ++cmptI)
+    {
+        if (nScalarEqns == 2 && cmptI == 2)
+        {
+            break;
+        }
+
+        fvScalarMatrix gradPCoeffs(p, dimArea*dimPressure);
+
+        const vectorField& Sf = mesh.Sf();
+        const surfaceScalarField& weights = mesh.weights();
+        const scalarField& w = weights;
+
+        scalarField& upper = gradPCoeffs.upper();
+        scalarField& lower = gradPCoeffs.lower();
+
+        // Interior coefficients (mirror InsertFvmDivU)
+        lower = sign*w*Sf.component(cmptI);
+        upper = lower - sign*Sf.component(cmptI);
+
+        gradPCoeffs.negSumDiag();
+
+        // Boundary contributions: use p's BC (not U's)
+        scalarField& diag = gradPCoeffs.diag();
+        forAll(mesh.boundary(), patchI)
+        {
+            const fvPatchScalarField& pP = p.boundaryField()[patchI];
+            const fvPatch& patch = pP.patch();
+            const vectorField& Sfp = patch.Sf();
+            const fvsPatchScalarField& pw = weights.boundaryField()[patchI];
+            const labelUList& fc = patch.faceCells();
+
+            if (patch.coupled())
+            {
+                if (patch.type() == "processor")
+                {
+                    scalarField& patchIntCoeffs =
+                        gradPCoeffs.internalCoeffs()[patchI];
+                    scalarField& patchBndCoeffs =
+                        gradPCoeffs.boundaryCoeffs()[patchI];
+
+                    forAll(pP, faceI)
+                    {
+                        patchIntCoeffs[faceI] =
+                            -sign*pw[faceI]*Sfp[faceI][cmptI];
+                        patchBndCoeffs[faceI] =
+                            sign*(1.0 - pw[faceI])*Sfp[faceI][cmptI];
+                    }
+                }
+                else
+                {
+                    FatalErrorInFunction
+                        << "Coupled boundary type " << patch.type()
+                        << " not yet supported in "
+                        << "InsertFvmGradPGaussIntoPETScMatrix"
+                        << abort(FatalError);
+                }
+            }
+            else
+            {
+                // Non-coupled boundary: use p's BC valueInternalCoeffs.
+                // For zeroGradient p, valueInternalCoeffs = 1 → adds
+                //   -sign*Sf[cmpt] to diag per boundary face.
+                // For fixedValue p, valueInternalCoeffs = 0 → no
+                //   additional correction (and the diag stays as set
+                //   by negSumDiag, which is the correct V*grad value
+                //   for that BC because the face value of p doesn't
+                //   depend on the interior).
+                const scalarField internalCoeffs
+                (
+                    pP.valueInternalCoeffs(pw)
+                );
+
+                forAll(pP, faceI)
+                {
+                    diag[fc[faceI]] -=
+                        sign*internalCoeffs[faceI]*Sfp[faceI][cmptI];
+                }
+            }
+        }
+
+        // Insert at (rowOffset + cmptI, colOffset)
+        foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
+        (
+            gradPCoeffs, jac, rowOffset + cmptI, colOffset, 1
         );
     }
 
@@ -1700,22 +2357,76 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
         }
     }
 
+    loadOptions();
+
     // Load the correct options database
-    PetscOptionsPush(options_);
-    SNESSetFromOptions(snes_.s);
+    AssertPETSc(PetscOptionsPush(options_));
+
+    AssertPETSc(SNESSetFromOptions(snes_.s));
+
+    // Allow derived classes to adjust PC, KSP, etc.
+    this->customiseSolver();
+
+    PetscInt lagJacobian = 1;
+    PetscInt lagPreconditioner = 1;
+    const bool forceSolverStateRebuild = forceSnesSolverStateRebuild_;
+
+    if (forceSolverStateRebuild)
+    {
+        AssertPETSc(SNESGetLagJacobian(snes_.s, &lagJacobian));
+        AssertPETSc(SNESGetLagPreconditioner(snes_.s, &lagPreconditioner));
+
+        if (lagJacobian == -1)
+        {
+            AssertPETSc(SNESSetLagJacobian(snes_.s, -2));
+        }
+
+        if (lagPreconditioner == -1)
+        {
+            AssertPETSc(SNESSetLagPreconditioner(snes_.s, -2));
+        }
+
+        if (lagJacobian < 0 || lagPreconditioner < 0)
+        {
+            Info<< "Forcing PETSc Jacobian/preconditioner rebuild" << endl;
+        }
+
+        forceSnesSolverStateRebuild_ = false;
+    }
 
     // Set the snesHasRun flag
     snesHasRun_ = true;
 
+    // Clear any divergence flag from a previous failed solve before entering
+    // the next SNES convergence check.
+    diverged_ = false;
+
     // Solve the nonlinear system
     AssertPETSc(SNESSolve(snes_.s, NULL, x_.v));
 
+    if (forceSolverStateRebuild)
+    {
+        if (lagJacobian == -2)
+        {
+            lagJacobian = -1;
+        }
+
+        if (lagPreconditioner == -2)
+        {
+            lagPreconditioner = -1;
+        }
+
+        AssertPETSc(SNESSetLagJacobian(snes_.s, lagJacobian));
+        AssertPETSc(SNESSetLagPreconditioner(snes_.s, lagPreconditioner));
+    }
+
     // Un-load the options file
-    PetscOptionsPop();
+    AssertPETSc(PetscOptionsPop());
 
     // Check convergence
     SNESConvergedReason reason;
     SNESGetConvergedReason(snes_.s, &reason);
+    diverged_ = (reason < 0);
 
     if (reason == SNES_DIVERGED_FUNCTION_DOMAIN)
     {
@@ -1723,7 +2434,10 @@ int foamPetscSnesHelper::solve(const bool returnOnSnesError)
             << "PETSc SNES solver returned a diverged function domain: "
             << "returning" << endl;
 
-        return 0;
+        if (returnOnSnesError)
+        {
+            return reason;
+        }
     }
     else if (reason < 0)
     {
