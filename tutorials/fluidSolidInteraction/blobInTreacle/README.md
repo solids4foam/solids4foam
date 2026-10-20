@@ -79,9 +79,9 @@ links in and `Allclean` removes again.
 
 The solid model is `linearGeometryVelocity`, the velocity form of the
 partitioned `linearGeometryTotalDisplacement`. The x displacement of the top of
-the half cylinder is `0.0558 m` at `t = 1 s` and `0.1164 m` at the end, against
+the half cylinder is `0.0566 m` at `t = 1 s` and `0.1169 m` at the end, against
 `0.0566 m` and `0.1173 m` for the partitioned approach, and the final force
-agrees to 0.5%. The monolithic run takes about half the time of the
+agrees to 0.8%. The monolithic run takes about half the time of the
 partitioned one, and the serial and parallel (four processes) results agree to
 seven significant figures. The regression test runs this variant as a second
 arm on OpenFOAM.com.

@@ -361,8 +361,6 @@ public:
             //- Apply a SIMPLE-type segregated preconditioner
             //  Approximately solves y = M^{-1} x using one SIMPLE iteration
             //  when PETSc uses the `physics` preconditioner
-            //  Work in progress: the quasi-monolithic coupling's physics
-            //  preconditioner, which uses this, is not yet ready for use
             virtual label precondition
             (
                 Vec y,         // Output: y = M^{-1} x

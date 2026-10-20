@@ -149,7 +149,9 @@ The model also provides a `physics` PETSc preconditioner path that applies one
 segregated SIMPLE-type correction through `newtonIcoFluid::precondition(...)`.
 This is useful for benchmarking and tuning because it is cheap per application
 and can reduce Krylov iterations. It may not always reduce wall time in
-parallel, because the inner OpenFOAM pressure correction can dominate.
+parallel, because the inner OpenFOAM pressure correction can dominate. No
+tutorial currently uses it; the tutorials use the `fieldsplit` preconditioner
+shown above.
 
 Example PETSc options:
 
@@ -350,7 +352,9 @@ given PETSc solution vector:
 - corrects boundary conditions and updates `gradU`, `gradp`, and `phi`;
 - computes the momentum residual from diffusion, pressure gradient, transient,
   advection, and optional momentum stabilisation terms;
-- computes the pressure residual from `-div(U)` and pressure stabilisation;
+- computes the pressure residual from the divergence of the face flux
+  `interpolate(U) & Sf`, the same flux that convects momentum, plus the
+  pressure stabilisation;
 - applies the pressure reference cell and `pressureScaleFactor`;
 - inserts the cell residuals into the PETSc residual vector.
 
@@ -408,5 +412,4 @@ boundary/parallel-stencil gaps.
 
 - `src/solids4FoamModels/numerics/foamPetscSnesHelper`
 - `src/solids4FoamModels/numerics/stabilisationModels`
-- `tutorials/fluids/cylinderInChannel/system/fvSolution.newtonIcoFluid`
-- `tutorials/fluids/cylinderInChannel/system/fvSolution.newtonIcoFluid.physicsPC`
+- `tutorials/fluids/decayingTaylorGreenVortex/system/fvSolution`

@@ -12,8 +12,15 @@ release. For complete commit-level details and contributor information, see the
   (`fluidSolidInterface NewtonQuasiMonolithic`, OpenFOAM.com with PETSc),
   which solves the fluid velocity and pressure (`newtonIcoFluid`) and the
   solid velocity together with PETSc SNES in every time step, following
-  Jaiman and Joshi (2022). It needs a conformal interface (`directMap`) and
-  runs in parallel, also with `decomposeParMonolithic`. It comes with the
+  Jaiman and Joshi (2022). It accepts conformal (`directMap`) and
+  non-conformal (`AMI`) interfaces, using the same face weights in the
+  residual and the Jacobian, with an optional transfer of the interface
+  forces that balances the total force and power to round-off
+  (`conservativeTractionTransfer`); `ringAddedMass/verification/Allverify
+  --study nonconformal` verifies it. It runs in parallel, also with
+  `decomposeParMonolithic`, which now also pairs non-conformal patches, and
+  can adapt the time step to the number of Newton iterations, retrying a
+  failed step with a smaller one (`adjustTimeStep`). It comes with the
   velocity-based solid models `nonLinearGeometryTotalLagrangianVelocity` and
   `linearGeometryVelocity`, and the `fsiSteadyStateControl` function object.
   The velocity solid models integrate the displacement with the backward
@@ -38,8 +45,8 @@ release. For complete commit-level details and contributor information, see the
   `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,
   `cavityFlexibleBottom`, `collapsibleChannel`, `membraneRoof`,
   `perpendicularFlap`, `ringAddedMass`, `3dTube`, `mokLidDrivenCavity`,
-  `womersleyTube` and `foilInWind` tutorials, whose files are stored as
-  `*.monolithic` variants selected with
+  `womersleyTube`, `TurekHron2006` and `foilInWind` tutorials, whose files
+  are stored as `*.monolithic` variants selected with
   `solids4Foam::selectCaseVariant`. The regression tests of
   `beamInCrossFlow`, `blobInTreacle` and `cavityFlexibleBottom` have a
   monolithic arm.
@@ -328,6 +335,10 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The interface-to-interface mappings (`AMI`, `directMap`, `GGI` and `RBF`)
+  print their per-call messages in debug mode only, as the `directMap` point
+  transfer already did, which shortens the logs of the fluid-solid
+  couplings.
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes
@@ -590,6 +601,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `newtonIcoFluid` builds its continuity residual from the face flux
+  `interpolate(U) & Sf`, the flux that convects momentum, instead of
+  `fvc::div(U)`, which interpolates with its own `div(U)` scheme. With a
+  different `interpolate(U)` scheme, such as the `skewCorrected linear` of the
+  monolithic tutorial variants, the convecting flux was not divergence-free,
+  which damped vortex shedding: behind the rigid Hron-Turek plate the lift
+  amplitude was 13% below `pimpleFluid` on the 2x mesh, and is now 3% below.
+  The `div(U)` scheme is no longer used by `newtonIcoFluid`.
 - The PETSc SNES Jacobian of the least-squares pressure gradient now uses the
   owner-cell coefficient across processor boundaries and the boundary
   condition's value coefficients on boundary faces, and the divergence

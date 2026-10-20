@@ -1230,8 +1230,17 @@ label newtonIcoFluid::formResidual
       : makeList<label>({0,1,2})
     );
 
-    // Pressure residual
-    scalarField pressureResidual(- fvc::div(U));
+    // Pressure residual: the divergence of the face flux of the current
+    // velocity, interpolated with the same interpolate(U) scheme as the
+    // flux that convects momentum. Using fvc::div(U) instead, which
+    // interpolates with its own div(U) scheme, makes the convecting flux
+    // non-solenoidal whenever the two schemes differ (e.g. skewCorrected
+    // linear for interpolate(U)), and that inconsistency damps transient
+    // flows such as vortex shedding
+    scalarField pressureResidual
+    (
+        -Foam::primitiveField(fvc::div(fvc::interpolate(U) & mesh.Sf())())
+    );
 
     // Approximate momentum operator used only to derive the rAUf
     // coefficient field. Use the same first-order upwind named scheme
@@ -1637,7 +1646,7 @@ label newtonIcoFluid::precondition
     surfaceScalarField phiHbyA
     (
         "phiHbyA",
-        fvc::interpolate(dU) & mesh.Sf()
+        fvc::interpolate(dU, "interpolate(U)") & mesh.Sf()
     );
 
     fvScalarMatrix pEqn
