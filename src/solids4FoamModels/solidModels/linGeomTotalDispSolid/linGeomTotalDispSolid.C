@@ -172,9 +172,24 @@ bool linGeomTotalDispSolid::evolveImplicitSegregated()
     // Update D boundary conditions
     D().correctBoundaryConditions();
 
-    if (predictor_ && newTimeStep())
+    if (newTimeStep())
     {
-        predict();
+        if (predictor_)
+        {
+            predict();
+        }
+        else if (!smoothHydrostaticStress())
+        {
+            // Without this, the stress is first updated at the end of the
+            // first iteration below, so the first residual would miss a load
+            // that only the law supplies, such as a prescribed temperature,
+            // and the step could be accepted without it. gradD is not
+            // recomputed: new boundary displacements already reach the first
+            // residual through the stabilisation. The smoothing is skipped
+            // because it needs DEqnA, which exists only inside the momentum
+            // loop
+            correctStress();
+        }
     }
 
 #ifdef OPENFOAM_NOT_EXTEND
