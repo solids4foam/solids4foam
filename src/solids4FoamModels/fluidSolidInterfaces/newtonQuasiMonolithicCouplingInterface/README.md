@@ -188,9 +188,6 @@ Replacing `snes_mf_operator` with the assembled Jacobian is not
 recommended: the assembled Jacobian is approximate, and Newton then
 converges only linearly.
 
-The physics-based preconditioner (`pc_type physics`) is work in progress: on
-`ringAddedMass`, Newton stalls at the first coupled time step with it.
-
 ## Time-step Adjustment
 
 With `adjustTimeStep yes` in `system/controlDict`, which then also needs
