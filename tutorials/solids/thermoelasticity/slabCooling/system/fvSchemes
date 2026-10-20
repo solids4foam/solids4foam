@@ -35,7 +35,6 @@ gradSchemes
 divSchemes
 {
     default                none;
-    div(threeKalphaDeltaT) Gauss linear;
 }
 
 laplacianSchemes
