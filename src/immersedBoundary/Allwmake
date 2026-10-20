@@ -9,3 +9,4 @@ fi
 
 wmake $targetType libso
 wmake $targetType utilities/immersedBodyRefinementCells
+wmake $targetType test/immersedSurfaceTraction

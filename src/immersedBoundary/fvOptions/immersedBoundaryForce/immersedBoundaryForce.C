@@ -373,13 +373,23 @@ void Foam::fv::immersedBoundaryForce::calcForces(const volVectorField& U)
                     // The points of a body driven by a fluid-solid
                     // interface are not thinned: each face of the
                     // interface needs its own points
-                    const bool thin =
-                        !isA<immersedBodyMotions::fsiDriven>(body.motion());
+                    const word quadrature
+                    (
+                        isA<immersedBodyMotions::fsiDriven>(body.motion())
+                      ? word("none")
+                      : tractionQuadrature_
+                    );
 
                     tractions_.set
                     (
                         bodyi,
-                        new immersedSurfaceTraction(body, mesh_, thin)
+                        new immersedSurfaceTraction
+                        (
+                            body,
+                            mesh_,
+                            quadrature,
+                            tractionPointSpacing_
+                        )
                     );
                 }
 
@@ -1932,6 +1942,8 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     solidCellsPtr_(),
     forceEstimator_("momentumExchange"),
     writeSurfaceTraction_(false),
+    tractionQuadrature_("greedy"),
+    tractionPointSpacing_(0.5),
     imageDistance_(1.5),
     imageInterpolation_(cellPointImage),
     insideCells_(),
@@ -2680,9 +2692,63 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
         coeffs_.readIfPresent("linkCorrection", linkCorrection_);
         coeffs_.readIfPresent("forceEstimator", forceEstimator_);
         coeffs_.readIfPresent("writeSurfaceTraction", writeSurfaceTraction_);
+        coeffs_.readIfPresent("tractionQuadrature", tractionQuadrature_);
+        coeffs_.readIfPresent("tractionPointSpacing", tractionPointSpacing_);
+        if
+        (
+            tractionQuadrature_ != "greedy"
+         && tractionQuadrature_ != "none"
+         && tractionQuadrature_ != "clustered"
+        )
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Option " << name_ << ": unknown tractionQuadrature "
+                << tractionQuadrature_ << ": valid quadratures are greedy, "
+                << "none and clustered" << exit(FatalIOError);
+        }
+        if
+        (
+            coeffs_.found("tractionPointSpacing")
+         && tractionQuadrature_ != "clustered"
+        )
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Option " << name_ << ": tractionPointSpacing is only "
+                << "used by tractionQuadrature clustered, not "
+                << tractionQuadrature_ << exit(FatalIOError);
+        }
+        if (tractionPointSpacing_ <= 0)
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Option " << name_ << ": tractionPointSpacing must be "
+                << "positive" << exit(FatalIOError);
+        }
+        if
+        (
+            method_ == cutLink
+         && !surfaceTractionRequired()
+         && (
+                coeffs_.found("tractionQuadrature")
+             || coeffs_.found("tractionPointSpacing")
+            )
+        )
+        {
+            WarningInFunction
+                << "Option " << name_ << ": tractionQuadrature and "
+                << "tractionPointSpacing have no effect: the surface traction "
+                << "is only evaluated with forceEstimator surfaceTraction or "
+                << "writeSurfaceTraction yes" << endl;
+        }
         if (method_ != cutLink)
         {
-            for (const word key : {"forceEstimator", "writeSurfaceTraction"})
+            for
+            (
+                const word key
+              : {
+                    "forceEstimator", "writeSurfaceTraction",
+                    "tractionQuadrature", "tractionPointSpacing"
+                }
+            )
             {
                 if (coeffs_.found(key))
                 {

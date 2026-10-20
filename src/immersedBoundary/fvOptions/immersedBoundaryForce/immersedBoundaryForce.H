@@ -269,6 +269,18 @@ Description
         // the surface traction, optional, default no
         writeSurfaceTraction no;
 
+        // cutLink: quadrature of the surface traction, optional: greedy
+        // (default: the candidate points thinned to about 0.7 mean cell
+        // widths in the order of the surface triangles), none (every
+        // candidate point) or clustered (one point per cluster of candidate
+        // points, independent of the order of the triangles)
+        tractionQuadrature greedy;
+
+        // cutLink, tractionQuadrature clustered only: size of the clusters
+        // relative to the smallest width of the cells containing the
+        // surface, optional, default 0.5
+        tractionPointSpacing 0.5;
+
         // Relaxation c of each incremental direct-forcing update, optional,
         // default 0.8. Reduce it to damp oscillatory forcing or pressure
         // corrections, at the cost of slower enforcement of body velocity
@@ -484,6 +496,14 @@ class immersedBoundaryForce
             //- With the momentum exchange force, also evaluate the force from
             //  the surface traction and write it after the inertia
             bool writeSurfaceTraction_;
+
+            //- Quadrature of the surface traction: greedy (default), none or
+            //  clustered
+            word tractionQuadrature_;
+
+            //- Size of the clusters of the clustered quadrature, relative to
+            //  the smallest width of the cells containing the surface
+            scalar tractionPointSpacing_;
 
         // Ghost cell method
 

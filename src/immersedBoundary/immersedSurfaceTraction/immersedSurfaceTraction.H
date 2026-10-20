@@ -31,9 +31,37 @@ Description
     barycentric coordinates, so that it follows the motion or deformation of
     the surface. Where the triangles are smaller than the cells, the points
     are thinned to a spacing of about 0.7 cell widths, with the area of each
-    removed point given to the nearest kept point; the thinning is optional
-    (thin), and is not used for a body driven by a fluid-solid interface,
-    whose faces each need their own points.
+    removed point given to the nearest kept point (quadrature greedy); the
+    thinning is optional (quadrature none keeps every candidate point), and
+    is not used for a body driven by a fluid-solid interface, whose faces
+    each need their own points. The kept points of the greedy thinning
+    depend on the order of the surface triangles, and the area that each
+    takes from its neighbours is not centred on it, so that the quadrature
+    of a smooth traction has a first-order error.
+
+    With the quadrature clustered, the candidate points are made in the
+    reference configuration of the surface and grouped by the cell of a
+    uniform grid of spacing s (a fraction tractionPointSpacing of the
+    smallest width of the cells containing the surface, with the origin at
+    the origin of the coordinates), the dominant signed axis of their normal
+    (so that the two sides of a thin body are never merged) and whether they
+    are inside the mesh, and each such group is split into the connected
+    components of the triangles of its candidates (so that the layers of a
+    folded surface or the faces of nearby bodies are never merged): the
+    clusters do not depend on the order of the
+    triangles or the decomposition, nor on the time at which they are made
+    (e.g. a restart), except, for a surface crossing the boundary of the
+    mesh, through which candidates are then inside it. At each time each
+    cluster is represented by one point, its current area centroid
+    projected on the current plane of the triangle of its candidate nearest
+    to the reference centroid, with the area A = sum(A_i) and the vector
+    area a = sum(A_i n_i) of its candidates on their current triangles: the
+    normal is a/|a|, the tangential traction is integrated with A and the
+    pressure with |a|. The total area is kept, the pressure force of a
+    closed surface is invariant to a constant pressure (the vector areas sum
+    to that of the candidates), and the first moment of the area of each
+    cluster about its point vanishes in the tangent plane. faceValues gives
+    the value of a cluster to each of its candidates, with its area.
 
     At each point \f$ x_w \f$, with the outward unit normal n, the pressure
     and the velocity relative to the rigid body velocity \f$ U_b \f$ are
@@ -100,8 +128,13 @@ class immersedSurfaceTraction
         //- Solved directions
         const Vector<label> solD_;
 
-        //- Thin the points where the triangles are smaller than the cells
-        const bool thin_;
+        //- Quadrature: greedy (thinning in the order of the triangles), none
+        //  or clustered
+        const word quadrature_;
+
+        //- Size of the clusters relative to the smallest width of the cells
+        //  containing the surface (clustered)
+        const scalar spacingFactor_;
 
         //- Parent surface face of each point
         labelList faces_;
@@ -127,6 +160,20 @@ class immersedSurfaceTraction
 
         //- Local cells of the least squares stencil of each point
         List<labelList> stencils_;
+
+        //- Clustered quadrature: the parent faces, barycentric coordinates
+        //  and reference and current areas of the candidate points, the
+        //  reference areas of their faces, and the candidates of each point
+        labelList candidateFaces_;
+        List<FixedList<scalar, 3>> candidateBarycentric_;
+        scalarField candidateAreas0_;
+        scalarField candidateAreas_;
+        scalarField candidateFaceAreas0_;
+        List<labelList> members_;
+
+        //- Ratio of the magnitude of the vector area to the area of each
+        //  point, by which its pressure is multiplied (1 unless clustered)
+        scalarField pressureScale_;
 
 
     // Private Member Functions
@@ -157,6 +204,30 @@ public:
             const fvMesh& mesh,
             const bool thin = true
         );
+
+        //- Construct from the body and the mesh with the quadrature greedy,
+        //  none or clustered, and the size of the clusters relative to the
+        //  smallest width of the cells containing the surface
+        immersedSurfaceTraction
+        (
+            const immersedBody& body,
+            const fvMesh& mesh,
+            const word& quadrature,
+            const scalar spacingFactor = 0.5
+        );
+
+        //- As above, for a quadrature given as a string literal (which would
+        //  otherwise select the constructor from a bool)
+        immersedSurfaceTraction
+        (
+            const immersedBody& body,
+            const fvMesh& mesh,
+            const char* quadrature,
+            const scalar spacingFactor = 0.5
+        )
+        :
+            immersedSurfaceTraction(body, mesh, word(quadrature), spacingFactor)
+        {}
 
         //- No copy construct
         immersedSurfaceTraction(const immersedSurfaceTraction&) = delete;
