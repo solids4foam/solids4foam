@@ -10,6 +10,9 @@ source solids4FoamScripts.sh
 cleanCase
 rm -rf constant/polyMesh forceCoeffs.pdf
 
+# Link the forcing method back to the default
+ln -vnsf fvOptions.cutLink constant/fvOptions
+
 # Remove the regression test cases, and the verification study cases and
 # results, too with ./Allclean all
 if [ "${1:-}" = "all" ]

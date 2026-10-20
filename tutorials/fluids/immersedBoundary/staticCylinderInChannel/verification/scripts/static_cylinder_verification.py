@@ -260,6 +260,9 @@ def write_fv_options(path: Path, method: str, settings: dict) -> None:
     lines.append("        }\n    }\n}\n\n")
     lines.append("// ****************************************************"
                  "********************* //\n")
+    # A regular file in place of the tutorial's link to fvOptions.cutLink,
+    # which the case's Allrun, run without a method, keeps
+    path.unlink(missing_ok=True)
     path.write_text("".join(lines))
 
 
