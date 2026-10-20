@@ -267,6 +267,12 @@ public:
                 return stopOnPetscError_;
             }
 
+            //- Return the diverged flag
+            bool diverged() const
+            {
+                return diverged_;
+            }
+
             //- Return non-const access to the diverged flag
             bool& diverged()
             {

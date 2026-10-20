@@ -202,10 +202,12 @@ public:
                 return stopOnPetscError_;
             }
 
-            //- Return non-const access to the diverged flag
-            bool& diverged()
+            //- Return true if the last SNES solve diverged
+            //  Does not create the solver, as a model that is only a block of
+            //  a larger system has none
+            bool diverged() const
             {
-                return solver().diverged();
+                return solverPtr_.valid() && solverPtr_->diverged();
             }
 
             //- Const access to the global index object
@@ -476,15 +478,13 @@ public:
     enum solutionLocation { CELLS, POINTS, NONE };
 
 #ifdef OPENFOAM_COM
-    // If you rely on solutionLocationNames_, you can still declare it.
-    // Provide a definition in a .C for the no-PETSc build if needed,
-    // or omit it if not referenced.
+    //- Names of the solution locations
     static const Enum<solutionLocation> solutionLocationNames_;
 #else
     static const NamedEnum<solutionLocation, 3> solutionLocationNames_;
 #endif
 
-    // Constructor with identical signature: does nothing in no-PETSc builds
+    //- Construct with the same signature as the PETSc version; does nothing
     foamPetscSnesHelper
     (
         const word& /*fieldName*/,
@@ -497,13 +497,10 @@ public:
     )
     {}
 
+    //- Destructor
     virtual ~foamPetscSnesHelper() {}
 
-    // --- Minimal API surface you might call even when PETSc is off
-
-    // If something accidentally calls solve() without PETSc, you can either:
-    //  a) return an error code (0=success in your code? pick a non-zero),
-    //  b) or abort loudly.
+    //- Stop with an error: solids4foam was built without PETSc
     int solve(const bool /*returnOnSnesError*/ = false)
     {
         FatalErrorInFunction
@@ -512,8 +509,7 @@ public:
         return -1;
     }
 
-    // If you ever take the SNES by reference, provide a stub accessor
-    // to keep overload resolution happy (don’t call it!)
+    //- Stop with an error: solids4foam was built without PETSc
     SNES& snes()
     {
         FatalErrorInFunction
@@ -523,14 +519,12 @@ public:
         return dummy;
     }
 
-    // --- Keep the pure virtuals so derived classes still compile & define them
+    // The system functions, so that the derived models compile without
+    // PETSc; they are not called
     virtual label initialiseJacobian(Mat& /*jac*/) { return 0; }
     virtual label initialiseSolution(Vec& /*x*/) { return 0; }
     virtual label formResidual(Vec /*f*/, const Vec /*x*/) { return 0; }
     virtual label formJacobian(Mat /*jac*/, const Vec /*x*/) { return 0; }
-
-    // If you have template helpers that don’t depend on PETSc directly,
-    // you can keep them here as well (or omit to keep the stub minimal).
 };
 
 
