@@ -26,24 +26,24 @@ fi
 REG_END_TIME=1
 CD_MIN=1.25
 CD_MAX=1.35
-CL_MIN=-0.015
-CL_MAX=-0.002
+CL_MIN=0.008
+CL_MAX=0.012
 
-# Opt-in check of the clustered surface-traction quadrature:
-#     TRACTION_QUADRATURE=clustered ./regressionTest.sh
-# The tolerances above are those of the default (greedy) quadrature, whose
-# lift has a drag-to-lift leak that depends on the order of the STL facets.
-# With the clustered quadrature the lift at t = 1 is that of the quadrature
-# with every candidate point (0.0100 on this mesh), and that of the
-# body-fitted reference solutions of verification/reference is 0.0095
-# (CdBodyFitted/ClBodyFitted) to 0.0097 (bodyFitted901k.csv): the range
-# covers them with a margin of about 20%. The drag is unchanged
-TRACTION_QUADRATURE="${TRACTION_QUADRATURE:-greedy}"
-if [[ "${TRACTION_QUADRATURE}" == "clustered" ]]; then
-    CL_MIN=0.008
-    CL_MAX=0.012
-elif [[ "${TRACTION_QUADRATURE}" != "greedy" ]]; then
-    echo "FAIL: TRACTION_QUADRATURE must be greedy (default) or clustered"
+# The tolerances above are those of the default (clustered) surface-traction
+# quadrature: the lift at t = 1 is that of the quadrature with every
+# candidate point (0.0100 on this mesh), and that of the body-fitted
+# reference solutions of verification/reference is 0.0095
+# (CdBodyFitted/ClBodyFitted) to 0.0097: the range covers them with a margin
+# of about 20%. Check of the legacy greedy quadrature:
+#     TRACTION_QUADRATURE=greedy ./regressionTest.sh
+# whose lift has a drag-to-lift leak that depends on the order of the STL
+# facets (-0.0083 on this mesh); the drag differs by 0.1%
+TRACTION_QUADRATURE="${TRACTION_QUADRATURE:-clustered}"
+if [[ "${TRACTION_QUADRATURE}" == "greedy" ]]; then
+    CL_MIN=-0.015
+    CL_MAX=-0.002
+elif [[ "${TRACTION_QUADRATURE}" != "clustered" ]]; then
+    echo "FAIL: TRACTION_QUADRATURE must be clustered (default) or greedy"
     exit 1
 fi
 
@@ -53,9 +53,7 @@ FORCE_FILE="postProcessing/immersedBoundary/0/cylinder.dat"
 echo "============================================================"
 echo "oscillatingCylinderInChannel regression test"
 echo "Regression end time = ${REG_END_TIME}"
-if [[ "${TRACTION_QUADRATURE}" == "clustered" ]]; then
-    echo "Traction quadrature = clustered (opt-in check)"
-fi
+echo "Traction quadrature = ${TRACTION_QUADRATURE}"
 echo "Final Cd in [${CD_MIN}, ${CD_MAX}]"
 echo "Final Cl in [${CL_MIN}, ${CL_MAX}]"
 echo "============================================================"
@@ -78,14 +76,14 @@ prepare_case() {
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
 
-    if [[ "${TRACTION_QUADRATURE}" == "clustered" ]]; then
+    if [[ "${TRACTION_QUADRATURE}" == "greedy" ]]; then
         local fvOptions="${CASE_DIR}/constant/fvOptions"
         sed -i.bak \
-            "/type *immersedBoundaryForce;/a\\    tractionQuadrature clustered;" \
+            "/type *immersedBoundaryForce;/a\\    tractionQuadrature greedy;" \
             "${fvOptions}"
         rm -f "${fvOptions}.bak"
-        if ! grep -q "tractionQuadrature clustered;" "${fvOptions}"; then
-            echo "FAIL: could not select tractionQuadrature clustered"
+        if ! grep -q "tractionQuadrature greedy;" "${fvOptions}"; then
+            echo "FAIL: could not select tractionQuadrature greedy"
             exit 1
         fi
     fi

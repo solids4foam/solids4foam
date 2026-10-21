@@ -273,13 +273,14 @@ Description
         writeSurfaceTraction no;
 
         // cutLink, with the surface traction only: quadrature of the
-        // surface traction, optional: greedy (default: the candidate points
-        // thinned to about 0.7 mean cell widths in the order of the surface
-        // triangles), none (every candidate point) or clustered (one point
-        // per cluster of candidate points, independent of the order of the
-        // surface triangles). Bodies driven by a fluid-solid interface
-        // always use none
-        tractionQuadrature greedy;
+        // surface traction, optional: clustered (default: one point per
+        // cluster of candidate points, independent of the order of the
+        // surface triangles), none (every candidate point) or greedy (legacy:
+        // the candidate points thinned to about 0.7 mean cell widths in the
+        // order of the surface triangles, which gives the results of
+        // earlier versions). Bodies driven by a fluid-solid interface always
+        // use none. See src/immersedBoundary/README.md
+        tractionQuadrature clustered;
 
         // cutLink, tractionQuadrature clustered only: size of the clusters
         // relative to the smallest width of the cells containing the

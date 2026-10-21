@@ -1942,7 +1942,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     solidCellsPtr_(),
     forceEstimator_("momentumExchange"),
     writeSurfaceTraction_(false),
-    tractionQuadrature_(immersedSurfaceTraction::greedy),
+    tractionQuadrature_(immersedSurfaceTraction::clustered),
     tractionPointSpacing_(0.5),
     imageDistance_(1.5),
     imageInterpolation_(cellPointImage),
