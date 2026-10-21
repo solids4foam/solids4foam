@@ -207,7 +207,12 @@ is the header-only interface implemented by `immersedBoundaryForce`.
 - For `IQNILS`, increasing `couplingReuse` can improve convergence, but it is
   not guaranteed to make a case monotonically more robust. The best reuse level
   is case dependent and interacts with time-step size and the quality of the
-  inner fluid and solid solves.
+  inner fluid and solid solves. Conversely, `couplingReuse 0` with a small
+  `relaxationFactor` is not robust on cases with a strong added-mass effect:
+  after the full predictor step of the first iteration, the next iterations
+  have no secants yet and barely move the interface, and the solid can
+  diverge within the first few iterations of a step. Reused secants recover
+  the step from the second iteration.
 
 ---
 
