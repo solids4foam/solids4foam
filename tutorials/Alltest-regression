@@ -190,7 +190,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/womersleyTube"
     # Not tutorials: test applications' cases, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
-    "../src/immersedBoundary/test/immersedSurfaceTraction/case"
+    "../applications/test/immersedSurfaceTraction/case"
 )
 
 failures=0

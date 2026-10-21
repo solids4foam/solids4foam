@@ -20,7 +20,7 @@ Application
 
 Description
     Manufactured checks of the quadratures of immersedSurfaceTraction
-    (tractionQuadrature none, greedy and clustered) on closed surfaces
+    (tractionQuadrature clustered, none and greedy) on closed surfaces
     inside the mesh, without a flow solution: the pressure is set to
     constant and linear fields, whose least-squares wall fits are exact, and
     the velocity to that of the body, so that the force is the quadrature
@@ -46,6 +46,9 @@ Description
     stacked thin plates, 1.5 mm apart, against clusters of 5 mm),
     and the clustered quadrature is also made after the motion (as on a
     restart) and compared with the one made in the reference configuration.
+    On a mesh graded in x (case twoDGraded), the motions move the bodies
+    into cells of a different width, so that this checks that the clusters
+    are those of the reference configuration.
 
     Checks (PASS/FAIL lines; tolerances relative to the scales given):
       - none and clustered: |F(p = 1)| <= 1e-12 A (vector area);
@@ -58,6 +61,10 @@ Description
         p = x - c (second-order cluster error);
       - clustered: total and face areas of faceValues equal to those of
         none to 1e-12 A;
+      - clustered: the traction at each point is the physical traction,
+        | |t| - p(x) | <= 1e-10 for p = 1 + x - c_x (with the velocity of
+        the body, t = -p n), whereas the force integrates the pressure with
+        the vector area of each cluster (|F(p = 1)| above);
       - clustered, two dimensions: at most 0.6 times the points of none
         (the candidates are much closer than the clusters; the mesh
         mid-plane, z = 0, lies on a plane of the cluster grid);
@@ -68,6 +75,11 @@ Description
     The greedy quadrature is reported (INFO) only: its vector area and
     moments depend on the facet order.
 
+    The tolerances of the invariants that are exact up to the rounding of the
+    least squares fits (1e-12 and 1e-10 above) are multiplied by the option
+    -roundoff (default 1): on a graded mesh the fits are solved with a larger
+    rounding error. The check of the clusters made after the motion is not.
+
 Author
     Sairam Pamulaparthi Venkata, UCD.
 
@@ -77,8 +89,7 @@ Author
 #include "immersedBody.H"
 #include "immersedSurfaceTraction.H"
 #include "OFstream.H"
-#include <map>
-#include <numeric>
+#include "EdgeMap.H"
 
 using namespace Foam;
 
@@ -106,6 +117,18 @@ void check(const string& name, const scalar error, const scalar tolerance)
 }
 
 typedef FixedList<point, 3> tri3;
+
+// Greatest common divisor of two positive integers (Euclid)
+label greatestCommonDivisor(label a, label b)
+{
+    while (b != 0)
+    {
+        const label r = a % b;
+        a = b;
+        b = r;
+    }
+    return a;
+}
 
 // A point rounded to single precision, as the STL reader keeps it, so that
 // the volumes computed here are those of the surface read back
@@ -203,19 +226,20 @@ List<tri3> ellipsoid
     });
     for (label l = 0; l < level; ++l)
     {
-        std::map<std::pair<label, label>, label> mid;
+        // Midpoint vertex of each edge
+        EdgeMap<label> mid;
         auto midpoint = [&](const label i, const label j)
         {
-            const std::pair<label, label> k(min(i, j), max(i, j));
-            auto iter = mid.find(k);
-            if (iter != mid.end())
+            const edge e(i, j);
+            const auto iter = mid.cfind(e);
+            if (iter.good())
             {
-                return iter->second;
+                return iter.val();
             }
             point m(v[i] + v[j]);
             v.append(m/mag(m));
-            mid[k] = v.size() - 1;
-            return v.size() - 1;
+            mid.insert(e, v.size() - 1);
+            return label(v.size() - 1);
         };
         DynamicList<FixedList<label, 3>> nf;
         for (const FixedList<label, 3>& g : f)
@@ -303,6 +327,8 @@ struct result
     vector FxOff = Zero;            // p = x_0 - c_0 + 1e3
     vector Tx = Zero;               // torque about c of p = x_0 - c_0
     tensor M = Zero;                // M_ij = -F_i(p = x_j - c_j)
+    scalar tractionError = 0;       // max | |t| - p(x) |, p = 1 + x_0 - c_0
+    label nTraction = 0;            // number of points with a traction
 };
 
 result evaluate
@@ -359,6 +385,20 @@ result evaluate
     }
     force(C.component(dirs[0]) - c[dirs[0]] + 1e3, r.FxOff, T);
 
+    // Physical traction: t = -p n at each point inside the mesh, so |t| is
+    // the pressure at the point, for a positive linear pressure
+    p.primitiveFieldRef() = 1 + C.component(dirs[0]) - c[dirs[0]];
+    const vectorField t(tr.traction(U, p, 0));
+    forAll(t, i)
+    {
+        if (mag(t[i]) > 0)
+        {
+            const scalar pk = 1 + tr.points()[i][dirs[0]] - c[dirs[0]];
+            r.tractionError = max(r.tractionError, mag(mag(t[i]) - pk));
+            ++r.nTraction;
+        }
+    }
+
     // Face areas (and values) of a unit point value
     vectorField faceValues;
     tr.faceValues(vectorField(tr.size(), vector::one), faceValues, r.faceAreas);
@@ -374,6 +414,14 @@ result evaluate
 
 int main(int argc, char *argv[])
 {
+    argList::addOption
+    (
+        "roundoff",
+        "factor",
+        "Multiply the tolerances of the invariants that are exact up to the "
+        "rounding of the least squares fits (default 1)"
+    );
+
     #include "setRootCase.H"
     #include "createTime.H"
     #include "createMesh.H"
@@ -550,7 +598,10 @@ int main(int argc, char *argv[])
         motions.append(d);
     }
 
-    const scalar exact = 1e-12;
+    // Tolerances of the exact invariants, up to the rounding of the fits
+    const scalar roundoff = args.getOrDefault<scalar>("roundoff", 1);
+    const scalar exact = 1e-12*roundoff;
+    const scalar fitExact = 1e-10*roundoff;
     const scalar clusterTol = 1e-2;
     mkDir(runTime.constant()/"triSurface");
 
@@ -565,7 +616,7 @@ int main(int argc, char *argv[])
         List<labelList> order(3, labelList(nTris));
         List<labelList> rotate(3, labelList(nTris, Zero));
         label stride = 37;
-        while (std::gcd(stride, nTris) != 1)
+        while (greatestCommonDivisor(stride, nTris) != 1)
         {
             ++stride;
         }
@@ -617,17 +668,23 @@ int main(int argc, char *argv[])
                 body.move(0);
                 immersedSurfaceTraction clustered0
                 (
-                    body, mesh, word("clustered")
+                    body, mesh, immersedSurfaceTraction::clustered
                 );
                 body.move(t);
 
                 // The others made in the current configuration (clustered
                 // too, as on a restart)
-                immersedSurfaceTraction noneTr(body, mesh, word("none"));
-                immersedSurfaceTraction greedyTr(body, mesh, word("greedy"));
+                immersedSurfaceTraction noneTr
+                (
+                    body, mesh, immersedSurfaceTraction::none
+                );
+                immersedSurfaceTraction greedyTr
+                (
+                    body, mesh, immersedSurfaceTraction::greedy
+                );
                 immersedSurfaceTraction clusteredT
                 (
-                    body, mesh, word("clustered")
+                    body, mesh, immersedSurfaceTraction::clustered
                 );
 
                 const point c(gAverage(body.surface().points()));
@@ -663,7 +720,7 @@ int main(int argc, char *argv[])
                     {
                         dM(d, d) -= Vn;
                     }
-                    check(ot + ": none |M - V I|/V", mag(dM)/Vn, 1e-10);
+                    check(ot + ": none |M - V I|/V", mag(dM)/Vn, fitExact);
                 }
                 if (rigid)
                 {
@@ -694,6 +751,19 @@ int main(int argc, char *argv[])
                     ot + ": clustered max face |area - area_none|/A",
                     max(mag(rc.faceAreas - rn.faceAreas))/A,
                     exact
+                );
+
+                // clustered: the physical traction at the points (every
+                // point of these surfaces is inside the mesh)
+                check
+                (
+                    ot + ": clustered physical traction max | |t| - p(x) |",
+                    (
+                        rc.nTraction == rc.nPoints
+                      ? rc.tractionError
+                      : GREAT
+                    ),
+                    fitExact
                 );
 
                 // clustered: the candidate pieces of the two-dimensional
@@ -734,7 +804,7 @@ int main(int argc, char *argv[])
                 (
                     ot + ": clustered made after the motion, max difference",
                     dRestart + mag(rcT.nPoints - rc.nPoints),
-                    exact
+                    1e-12
                 );
 
                 Info<< "INFO: " << ot.c_str() << ": greedy |F(p=1)|/A "

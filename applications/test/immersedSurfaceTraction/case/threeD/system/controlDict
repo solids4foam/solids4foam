@@ -20,18 +20,31 @@ FoamFile
 application     Test-immersedSurfaceTraction;
 
 startFrom       startTime;
+
 startTime       0;
+
 stopAt          endTime;
+
 endTime         1;
+
 deltaT          1;
+
 writeControl    timeStep;
+
 writeInterval   1;
+
 purgeWrite      0;
+
 writeFormat     ascii;
+
 writePrecision  12;
+
 writeCompression off;
+
 timeFormat      general;
+
 timePrecision   6;
+
 runTimeModifiable no;
 
 // ************************************************************************* //

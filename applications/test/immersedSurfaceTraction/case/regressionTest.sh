@@ -4,11 +4,11 @@ IFS=$'\n\t'
 
 # ============================================================
 # immersedSurfaceTraction quadrature checks
-# Runs Test-immersedSurfaceTraction on a two-dimensional and a
-# three-dimensional mesh (no flow solution): the quadratures none and
-# clustered of the surface traction against the exact integrals of
-# constant and linear pressures on closed surfaces, in three facet orders,
-# static, rotated, translated and bent. See README.md
+# Runs Test-immersedSurfaceTraction on a uniform and a graded
+# two-dimensional mesh and a three-dimensional mesh (no flow solution): the
+# quadratures none and clustered of the surface traction against the exact
+# integrals of constant and linear pressures on closed surfaces, in three
+# facet orders, static, rotated, translated and bent. See README.md
 # ============================================================
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -32,14 +32,20 @@ solids4Foam::requireTestApp Test-immersedSurfaceTraction \
     || exit $(( $? - 1 ))
 
 # Number of checks of each mesh: 4 two-dimensional surfaces x (3 rigid
-# motions x (3 facet orders x 11 + 2) + 1 bend x (3 x 10 + 2)), and the
-# three-dimensional ellipsoid x (2 rigid motions x (3 x 10 + 2) + 1 bend x
-# (3 x 9 + 2)): a check that stopped, or a surface or motion dropped from the
-# application, fails the test
-declare -A EXPECTED=([twoD]=548 [threeD]=93)
+# motions x (3 facet orders x 12 + 2) + 1 bend x (3 x 11 + 2)), on each
+# two-dimensional mesh, and the three-dimensional ellipsoid x (2 rigid
+# motions x (3 x 11 + 2) + 1 bend x (3 x 10 + 2)): a check that stopped, or a
+# surface or motion dropped from the application, fails the test
+declare -A EXPECTED=([twoD]=596 [twoDGraded]=596 [threeD]=102)
+
+# On the graded mesh the least squares fits are solved with a larger rounding
+# error: the tolerances of the invariants that are exact up to this rounding
+# are multiplied by 1e3 (the largest errors are about 4e-9 of the 1e-7
+# tolerance of the traction and 4e-11 of the 1e-9 tolerance of the forces)
+declare -A OPTIONS=([twoD]="" [twoDGraded]="-roundoff 1e3" [threeD]="")
 
 failed=0
-for sub in twoD threeD
+for sub in twoD twoDGraded threeD
 do
     CASE_DIR="${SCRIPT_DIR}/regressionTests/${sub}"
     rm -rf "${CASE_DIR}"
@@ -49,7 +55,9 @@ do
         cd "${CASE_DIR}"
         blockMesh > log.blockMesh 2>&1
         status=0
-        Test-immersedSurfaceTraction > "${LOGFILE}" 2>&1 || status=$?
+        IFS=' ' read -r -a options <<< "${OPTIONS[${sub}]}"
+        Test-immersedSurfaceTraction ${options[@]+"${options[@]}"} \
+            > "${LOGFILE}" 2>&1 || status=$?
         summary=$(grep -E "^Checks: [0-9]+ passed" "${LOGFILE}" || true)
         nPass=$(grep -c "^PASS:" "${LOGFILE}" || true)
         grep -E "^FAIL:" "${LOGFILE}" || true

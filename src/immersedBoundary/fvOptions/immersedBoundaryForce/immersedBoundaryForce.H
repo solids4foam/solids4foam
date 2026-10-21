@@ -140,7 +140,10 @@ Description
     included). The estimates that are not selected are written after the
     inertia: the momentum exchange, unless it is selected, then the surface
     traction, with writeSurfaceTraction, unless it is selected.
-    forceEstimator and writeSurfaceTraction are only used by cutLink.
+    forceEstimator, writeSurfaceTraction, tractionQuadrature and
+    tractionPointSpacing are only used by cutLink, and setting them with
+    another method, or the last two without the surface traction, is an
+    error.
     The momentum exchange and forcing estimates are exact on average for
     static and steadily moving bodies, the forcing estimate also gives the
     wall shear of a tangentially accelerating wall accurately, and the
@@ -269,16 +272,18 @@ Description
         // the surface traction, optional, default no
         writeSurfaceTraction no;
 
-        // cutLink: quadrature of the surface traction, optional: greedy
-        // (default: the candidate points thinned to about 0.7 mean cell
-        // widths in the order of the surface triangles), none (every
-        // candidate point) or clustered (one point per cluster of candidate
-        // points, independent of the order of the triangles)
+        // cutLink, with the surface traction only: quadrature of the
+        // surface traction, optional: greedy (default: the candidate points
+        // thinned to about 0.7 mean cell widths in the order of the surface
+        // triangles), none (every candidate point) or clustered (one point
+        // per cluster of candidate points, independent of the order of the
+        // surface triangles). Bodies driven by a fluid-solid interface
+        // always use none
         tractionQuadrature greedy;
 
         // cutLink, tractionQuadrature clustered only: size of the clusters
         // relative to the smallest width of the cells containing the
-        // surface, optional, default 0.5
+        // surface in its reference configuration, optional, default 0.5
         tractionPointSpacing 0.5;
 
         // Relaxation c of each incremental direct-forcing update, optional,
@@ -497,9 +502,9 @@ class immersedBoundaryForce
             //  the surface traction and write it after the inertia
             bool writeSurfaceTraction_;
 
-            //- Quadrature of the surface traction: greedy (default), none or
-            //  clustered
-            word tractionQuadrature_;
+            //- Quadrature of the surface traction (not const: it is read by
+            //  read, as are the other settings)
+            immersedSurfaceTraction::quadratureType tractionQuadrature_;
 
             //- Size of the clusters of the clustered quadrature, relative to
             //  the smallest width of the cells containing the surface
