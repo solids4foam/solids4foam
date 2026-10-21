@@ -265,6 +265,21 @@ GuccioneElastic
     }
 }
 
+isotropicFungElastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            isotropicFungElastic;
+        rho             rho [1 -3 0 0 0 0 0] 3000;
+        c               c [1 -1 -2 0 0 0 0] 10e3;
+        a               1.0;
+        bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
+    }
+}
+
 HolzapfelGasserOgdenElastic
 {
     finiteStrain    yes;
