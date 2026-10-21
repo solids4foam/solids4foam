@@ -156,6 +156,7 @@ REGRESSION_TESTS=(
     "solids/poroelasticity/stripFooting"
     "solids/thermoelasticity/hotSphere"
     "solids/thermoelasticity/slabCooling"
+    "solids/thermoelasticity/heatedPlatePlaneStress"
     "solids/thermoelasticity/hotCylinder/hotCylinder"
     "solids/thermoelasticity/hotCylinder/hotCylinderPredefinedTFieldMultipleMaterials"
     "solids/viscoelasticity/viscoTube"
