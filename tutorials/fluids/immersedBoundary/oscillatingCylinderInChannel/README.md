@@ -127,7 +127,15 @@ solution, which decrease by about a factor of two with each refinement; the
 last is the difference from the Wan and Turek (2006) coefficients, which stops
 decreasing at about 0.08, the difference between the body-fitted mesh
 solution and the Wan and Turek (2006) coefficients: these lag the converged
-solutions by about 0.015 s. The `cutLink` force from the momentum exchange
+solutions by about 0.015 s. The root mean square difference between the
+`cutLink` lift coefficient from the surface traction and the body-fitted
+mesh solution, relative to the root mean square of the body-fitted lift
+coefficient, is 13.2%, 6.7% and 4.9% for levels 1-3 with the default
+`tractionQuadrature clustered`. With `tractionQuadrature greedy;` (the
+default of earlier versions), it is 140-149% on every mesh, with a sign set
+by the order of the facets of the STL file, while the drag differs by less
+than 0.001 (see `src/immersedBoundary/README.md`). The `cutLink` force from
+the momentum exchange
 (columns 11-13) differs from the body-fitted mesh solution by 0.19, 0.07 and
 0.06: it over-predicts the inertia of the fluid inside the accelerating
 cylinder. With the `penalty` method, the force without the inertia of the

@@ -100,9 +100,14 @@ coefficient (53.9):
 
 | `MESH_LEVEL` | Cells across the beam | Surface traction | Momentum exchange |
 | ------------ | --------------------- | ---------------- | ----------------- |
-| 1 | 3 | 8.6% | 7.4% |
-| 2 | 6 | 4.9% | 4.6% |
-| 3 | 11 | 3.5% | 3.5% |
+| 1 | 3 | 7.7% | 7.4% |
+| 2 | 6 | 4.6% | 4.6% |
+| 3 | 11 | 3.1% | 3.3% |
+
+The surface traction is integrated with the default `tractionQuadrature
+clustered`; with `tractionQuadrature greedy;` (the default of earlier
+versions), whose points are thinned in the order of the triangles of the
+surface, it differs by 8.6%, 4.9% and 3.1%.
 
 The difference is largest when the beam is bent furthest upstream, where the
 immersed drag is less negative than the body-fitted drag. The sections of the

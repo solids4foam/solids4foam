@@ -86,7 +86,8 @@ positions and velocities of the body, and the bodies are re-positioned in
 the mesh (occupancy, links, apertures) when the momentum equation is next
 assembled, keeping the forcing, momentum and apertures of the previous time
 step. The traction returned to the solid is the surface traction (`cutLink`
-only) averaged over the quadrature points of each interface face; the log
+only) averaged over the quadrature points of each interface face, with every
+candidate point (see "Surface traction" below); the log
 compares its total with the momentum exchange between the fluid and the
 whole body, which also includes the inertia of the fluid inside the body and
 the closure patches, so the two agree only for a slowly accelerating body.
@@ -323,6 +324,227 @@ to 19 000 cells are inside the mitral leaflets and 1 700 to 12 000 inside the
 aortic leaflets at all times. The `valveSliceAxis` motion shrinks the
 thickness of the leaflets with their radius, so the free edge of a closed
 valve with `Fmax` close to 1 can remain thinner than the refined cells.
+
+## Surface traction
+
+With the `cutLink` method, `forceEstimator surfaceTraction` (the force of the
+body) or `writeSurfaceTraction yes` (columns 11-13 of the force file) evaluates
+the traction exerted by the fluid on the surface (`immersedSurfaceTraction`).
+At points on the surface, the pressure and the velocity relative to the body
+are fitted by weighted quadratic least squares over the fluid cells within
+three cell widths, and the kinematic traction is
+
+```text
+t = -p_w n + nu (I - n n) . (grad(U - U_b) . n)
+```
+
+with the wall pressure `p_w` and the unit normal `n` (with the surface
+gradient terms of the body velocity for a deforming body); the force is
+`rho` times its quadrature over the surface.
+
+### Quadrature
+
+The candidate points are made on the surface triangles at a spacing of about
+the mean cell width: in two dimensions along the intersection of the surface
+with the mid-plane of the mesh, each representing the thickness of the mesh,
+and in three dimensions at the centroids of a uniform subdivision of each
+triangle. Each candidate is defined by its triangle and barycentric
+coordinates, so that it follows the motion or deformation of the surface.
+`tractionQuadrature` selects how they are used:
+
+- `clustered` (the default): one point per cluster of candidates. It does not
+  depend on the order of the triangles, the force of a constant pressure is
+  that of every candidate, and the moment error is of second order;
+- `none`: every candidate, the reference, with the most points;
+- `greedy` (legacy, the default of earlier versions): the candidates thinned
+  to 0.7 mean cell widths, in the order of the triangles. It depends on that
+  order, and the moment error is of first order.
+
+```c++
+// cutLink, with the surface traction only
+tractionQuadrature   clustered;    // default
+tractionPointSpacing 0.5;          // clustered only, default 0.5
+```
+
+Setting either entry without the surface traction, or with another method,
+is an error, as is `tractionPointSpacing` without `clustered`. Bodies driven
+by a fluid-solid interface always use `none` (see below).
+
+The greedy thinning keeps a candidate if no kept candidate is closer than
+the spacing, in the order of the triangles, and gives the area of each
+removed candidate to the nearest kept one, which keeps its own position and
+normal. The kept points are therefore offset from the area they represent,
+in the direction of the facet order: a pressure varying along the drag
+direction produces a lift whose sign depends on the order of the facets
+(for the moving cylinder of `oscillatingCylinderInChannel`, a lift 140-150%
+off the body-fitted reference at every mesh level, reversed with the facets
+of the STL), and on thin bodies the two faces can be merged. It is kept, as
+`tractionQuadrature greedy`, to reproduce earlier results: it gives the force
+files of earlier versions unchanged.
+
+### Clustered quadrature
+
+The candidates are made in the reference configuration of the surface and
+grouped by
+
+- the cell of a uniform grid of spacing `s` in the solved directions, with
+  its origin at the origin of the coordinates, where `s` is
+  `tractionPointSpacing` times the smallest width of the cells containing the
+  candidates in the reference configuration;
+- the dominant signed axis of their normal, so that the two sides of a thin
+  body are never merged;
+- whether they are inside the mesh (in the reference configuration);
+
+and each such group is split into the connected components of the triangles
+of its candidates, so that a cluster never joins surface regions that are not
+connected locally (the layers of a fold, nearby bodies). The clusters are
+numbered by these geometric keys, and the triangle of each cluster's point
+is chosen by quantised distances and positions, so that nothing depends on
+the order of the triangles or on rounding.
+
+At each time step, each cluster k is represented by one point, its current
+area centroid projected on the plane of one of its triangles, with the area
+`A_k = sum_i A_i`, the vector area `a_k = sum_i A_i n_i` of its candidates on
+their current triangles, and the unit normal `n_k = a_k/|a_k|`. The force is
+
+```text
+F = rho sum_k (-p_k a_k + A_k tau_k)
+```
+
+with the wall pressure `p_k` and the viscous traction `tau_k` of the fits at
+the point: the pressure is integrated with the vector area, and the viscous
+traction with the area. Then
+
+- the force of a constant pressure is `-p sum_k a_k = -p sum_i A_i n_i`, that
+  of the candidates: zero for a closed surface in the mesh, so that the
+  pressure level, which is arbitrary in an incompressible flow, gives no
+  force. With `A_k n_k` instead of `a_k`, the pressure force of a curved
+  cluster would be too large by `p_k (A_k - |a_k|)` along `n_k` (since
+  `|a_k| <= A_k`), and a constant pressure would give a force;
+- the total area is that of the candidates;
+- the first moment of the area of each cluster about its point has no
+  tangential part, so that the quadrature error of a smooth traction is of
+  second order in the cluster size (in the manufactured test, the first
+  moments differ from those of every candidate by at most 8e-4 of the
+  volume).
+
+The traction at the points (`immersedSurfaceTraction::traction`) is the
+physical traction `-p_k n_k + tau_k`: the vector area is a quadrature weight
+of the force only. `writeSurfaceTraction` writes the integrated force, not
+values at the points. `faceValues` gives each candidate's triangle the value
+of its cluster with the candidate's area, so that the face values of the
+traction integrate the pressure with the area rather than the vector area of
+each cluster (a difference of second order in the cluster size); its only
+user is the fluid-solid interface, which uses `none`.
+
+### Invariance and its limits
+
+- Order of the triangles: the clusters and their points do not depend on it
+  (manufactured test: forces equal to 3e-14 for three facet orders, 2.5e-11
+  on the graded mesh, where the fits are solved with a larger rounding error;
+  moving cylinder: original and reversed STL equal to 2e-11).
+- Decomposition: every processor holds the whole surface and the cell widths
+  are reduced over the processors, so that the clusters are the same on every
+  processor (moving cylinder: 1 and 2 processors as `none`).
+- Rigid motion and deformation: the clusters are made once, in the reference
+  configuration, and move with the surface; their points, areas, vector
+  areas and normals are found again at each time step.
+- Restart: the clusters are a function of the reference surface, the mesh and
+  `tractionPointSpacing` only (the spacing and the inside or outside of the
+  mesh are those of the reference configuration), so that a restart, or
+  clusters made at any other time, give the same clusters on the same mesh.
+  The manufactured test checks this on a mesh graded so that the motions move
+  the bodies into cells of a different width.
+- Local refinement: the whole surface gets the spacing of the finest cells
+  containing it in the reference configuration, and the spacing is not
+  changed as the body moves, so that a body moving into finer cells keeps
+  clusters that are coarser relative to the local cells, and one moving into
+  coarser cells more points than needed. On a mesh refined around the swept
+  region (`immersedBodyRefinementCells`), the reference configuration should
+  be in the refined region.
+- Changing meshes: the clusters are made with the mesh at their creation
+  (the first force evaluation of a run); a mesh whose cells change, e.g. by
+  adaptive refinement, or a restart on a different mesh, can give different
+  clusters.
+
+### Cost
+
+The clustered quadrature never has more points than `none`. With the default
+spacing (half the smallest cell width), for the moving cylinder of
+`oscillatingCylinderInChannel` (fixed time steps, 8 s):
+
+| Cells across D | Points (greedy, clustered, none) | CPU hours (same order) |
+| -------------- | -------------------------------- | ---------------------- |
+| 10 | 32, 64, 256 | 0.023, 0.029, 0.054 |
+| 20 | 64, 136, 256 | 0.238, 0.304, 0.426 |
+| 40 | 128, 232, 256 | 3.39, 3.76, 4.40 |
+
+that is 11-28% more than `greedy`. In three dimensions the default spacing
+gives more points relative to `greedy` (798 against 193 for the ellipsoid of
+the manufactured test, 1280 for `none`); a larger `tractionPointSpacing`
+reduces them. Since the spacing follows the smallest cell width at the
+surface, on locally refined meshes the whole surface gets the fine spacing.
+
+### Bodies driven by a fluid-solid interface
+
+A body driven by a fluid-solid interface (`fsiDriven`) always uses `none`.
+The traction is returned to the solid face by face: `faceValues` averages the
+values of the points of each surface triangle, and the interface averages the
+triangles of each interface face. This needs points on every triangle, at
+their own positions, with their own areas. The greedy quadrature gives the
+area of the removed points to kept points of other triangles, possibly of
+other interface faces, and can leave faces without points. The clustered
+quadrature keeps the area of every triangle, but gives each triangle the
+traction of its cluster, along the cluster normal: the force returned to the
+solid then differs from that of the cluster by `p_k (A_k - |a_k|) n_k`, unless
+the pressure is applied with the normal of each triangle (`-p_k n_i A_i`, which
+sums to `-p_k a_k`). This transfer is not implemented, and the
+fluid-solid interface with the immersed boundary (`immersedHronTurekFsi2`,
+which requires PETSc) has not been run with the clustered quadrature, so its
+use there is left as a separate development.
+
+### Verification
+
+`applications/test/immersedSurfaceTraction` (see its `case/README.md`)
+checks the quadratures without a flow solution, against the exact integrals
+of constant and linear pressures on closed surfaces: 1294 checks on a
+uniform and a graded two-dimensional mesh and on a three-dimensional mesh,
+for three facet orders, static, rotated, translated and bent. Run it with
+
+```bash
+applications/test/immersedSurfaceTraction/case/regressionTest.sh
+```
+
+For the moving cylinder (`oscillatingCylinderInChannel`), the root mean
+square differences of the surface-traction drag and lift from a moving
+body-fitted solution over 0.25 < t < 7.5 s, relative to the root mean squares
+of the body-fitted coefficients, are:
+
+| Cells across D | Drag (greedy, clustered, none) | Lift (same order) |
+| -------------- | ------------------------------ | ----------------- |
+| 10 | 5.36, 5.40, 5.38% | 140, 13.2, 13.2% |
+| 20 | 1.83, 1.86, 1.87% | 149, 6.7, 6.7% |
+| 40 | 1.10, 1.08, 1.10% | 140, 4.9, 4.8% |
+
+With this version, `clustered` (the default) against `greedy`:
+
+- `bendingBeamInChannel`: the root mean square difference of the surface
+  traction drag from the body-fitted solution over 1 < t < 8 s, relative to
+  that of the body-fitted drag, is 7.7%, 4.6% and 3.1% for `MESH_LEVEL`
+  1-3, against 8.6%, 4.9% and 3.1% (the momentum exchange gives 7.4%, 4.6%
+  and 3.3%);
+- `staticCylinderInChannel`: the surface-traction lift at 10, 20 and 40 cells
+  across the cylinder is 0.0026, 0.0078 and 0.0084 (`none`: 0.0083 at 40
+  cells), against -0.060, -0.063 and -0.048 (reference 0.0104-0.0110). The
+  drag is 5.35, 5.46 and 5.49 (`none`: 5.48 at 40 cells), against 5.35, 5.46
+  and 5.50: the greedy drag at 40 cells is closer to the reference only
+  through its quadrature error, 0.3% from that of every candidate point;
+- `oscillatingWallStokesLayer`: the wall shear stress from the surface
+  traction is the same with both;
+- `tractionQuadrature greedy` gives the force files of earlier versions
+  unchanged (checked with `MESH_LEVEL=1` for `oscillatingCylinderInChannel`,
+  `staticCylinderInChannel`, `translatingCylinderInChannel`,
+  `bendingBeamInChannel` and `oscillatingWallStokesLayer`).
 
 ## Provenance
 
