@@ -10,8 +10,11 @@ source solids4FoamScripts.sh
 cleanCase
 rm -rf constant/polyMesh forceCoeffs.pdf
 
-# Link the forcing method back to the default
+# Link the forcing method back to the default, with one outer corrector
 ln -vnsf fvOptions.cutLink constant/fvOptions
+sed "s/^\( *nOuterCorrectors *\)[0-9]*;/\11;/" \
+    system/fvSolution > system/fvSolution.tmp \
+    && mv system/fvSolution.tmp system/fvSolution
 
 # Remove the regression test cases, and the verification study cases and
 # results, too with ./Allclean all

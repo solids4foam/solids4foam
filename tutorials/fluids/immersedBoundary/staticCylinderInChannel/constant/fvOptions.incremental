@@ -23,9 +23,10 @@ immersedBoundary
     type            immersedBoundaryForce;
 
     // Incremental direct forcing of the pimpleHFDIBFoam solver from which
-    // the option is derived
+    // the option is derived, with the coupling coefficient of the
+    // verification study; ./Allrun incremental also sets 5 outer correctors
     method          incremental;
-    couplingCoeff   0.8;
+    couplingCoeff   0.2;
 
     bodies
     {

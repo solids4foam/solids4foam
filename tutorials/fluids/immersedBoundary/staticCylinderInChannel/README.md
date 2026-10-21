@@ -95,9 +95,12 @@ The `Allrun` script optionally takes the forcing method:
 ```
 
 With a method, `constant/fvOptions` is linked to `constant/fvOptions.<method>`,
-which holds the settings of that method; without one, the case is run with the
-current `constant/fvOptions`. `./Allclean` links it back to
-`fvOptions.cutLink`.
+which holds the settings of that method, and `nOuterCorrectors` in
+`system/fvSolution` is set to 5 for `incremental` and 1 for the other methods,
+as in the verification study (`verification/`); without one, the case is run
+with the current `constant/fvOptions` and `system/fvSolution`. `./Allclean`
+links `constant/fvOptions` back to `fvOptions.cutLink` and sets
+`nOuterCorrectors` back to 1.
 
 The mesh density is set by the `MESH_LEVEL` environment variable (default 1),
 where each level halves the cell size, e.g.
@@ -138,14 +141,15 @@ The other forcing methods of `immersedBoundaryForce` (see
 - `./Allrun penalty`, with `weighting occupancy;` and
   `occupancy vertexFraction;` added to `constant/fvOptions.penalty`:
   $$C_d$$ = 5.45, 5.61 and 5.61;
-- `./Allrun incremental` (`couplingCoeff 0.8;` and
-  `occupancy vertexFraction;`): $$C_d$$ = 6.04, 6.42 and 6.60.
+- `./Allrun incremental` (`couplingCoeff 0.2;`, `occupancy vertexFraction;`
+  and `nOuterCorrectors 5;`, the settings of the verification study):
+  $$C_d$$ = 5.52, 5.70 and 5.72.
 
 The `incremental` method is the direct forcing of the `pimpleHFDIBFoam`
-solver from which the option is derived. Its results also depend on the
-coupling coefficient, the time step and the number of pressure correctors: for
-example, with `MESH_LEVEL=1`, a coupling coefficient of 0.2 gives
-$$C_d = 5.99$$, and a fixed time step of 0.00125 s gives $$C_d = 5.79$$.
+solver from which the option is derived. Unlike the other methods, its results
+also depend on the coupling coefficient, the number of outer correctors and
+the time step; the verification study (`verification/README.md`) quantifies
+this sensitivity.
 
 ## References
 

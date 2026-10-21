@@ -12,9 +12,11 @@ Where [method] is the forcing method of immersedBoundaryForce, one of:
   penalty
   incremental
 
-With a method, constant/fvOptions is linked to constant/fvOptions.<method>;
-without one, the case is run with the current constant/fvOptions. The mesh
-density is set by MESH_LEVEL (default 1).
+With a method, constant/fvOptions is linked to constant/fvOptions.<method>
+and nOuterCorrectors in system/fvSolution is set to 5 for incremental and 1
+for the other methods; without one, the case is run with the current
+constant/fvOptions and system/fvSolution. The mesh density is set by
+MESH_LEVEL (default 1).
 
 Examples:
   ./Allrun
@@ -49,10 +51,20 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-# Select the forcing method
+# Select the forcing method and its number of outer correctors, as in the
+# verification study: 5 for incremental and 1 for the other methods
 if [ -n "$METHOD" ]
 then
     ln -vnsf "fvOptions.$METHOD" constant/fvOptions
+
+    N_OUTER=1
+    if [ "$METHOD" = "incremental" ]
+    then
+        N_OUTER=5
+    fi
+    sed "s/^\( *nOuterCorrectors *\)[0-9]*;/\1$N_OUTER;/" \
+        system/fvSolution > system/fvSolution.tmp \
+        && mv system/fvSolution.tmp system/fvSolution
 fi
 echo "Using the $(sed -n 's/^ *method *\([A-Za-z]*\);.*/\1/p' \
     constant/fvOptions | head -n 1) method"
