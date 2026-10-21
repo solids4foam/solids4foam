@@ -46,6 +46,12 @@ supported. Traction conditions act on the current face areas;
 The model stops if the displacement inverts the mesh, i.e. if the
 determinant of `Finv` is not positive.
 
+The corrector loop stops when the relative residual falls below `rTol`
+(default `1e-6`), the residual below `aTol` (default `1e-50`) or the
+relative correction below `sTol` (default `1e-10`), and fails after
+`nCorrectors` (default `10000`) iterations. The older `solutionTolerance` and
+`alternativeTolerance` keys are not read.
+
 ### Example
 
 From the `beamInCrossFlow` tutorial (`./Allrun diffusionHyperElastic`), in
@@ -60,8 +66,7 @@ meshMotionTotalDisplacementCoeffs
     finiteStrain    yes;
 
     nCorrectors     1000;
-    solutionTolerance 1e-06;
-    alternativeTolerance 1e-07;
+    rTol            1e-04;
     infoFrequency   100;
 }
 ```

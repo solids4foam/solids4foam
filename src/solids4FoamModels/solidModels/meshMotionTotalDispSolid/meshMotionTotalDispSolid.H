@@ -53,8 +53,7 @@ Description
         finiteStrain        yes;
 
         nCorrectors         1000;
-        solutionTolerance   1e-6;
-        alternativeTolerance 1e-7;
+        rTol                1e-4;
         infoFrequency       100;
     }
     \endverbatim

@@ -27,11 +27,10 @@ meshMotionTotalDisplacementCoeffs
     // Maximum number of momentum correctors
     nCorrectors     1000;
 
-    // Solution tolerance for displacement
-    solutionTolerance 1e-06;
-
-    // Alternative solution tolerance for displacement
-    alternativeTolerance 1e-07;
+    // Relative residual tolerance for each mesh motion solve. Tolerances of
+    // 1e-6 and 1e-4 give the same beam response to six significant figures;
+    // 1e-4 costs about 25% less
+    rTol            1e-04;
 
     // Write frequency for the residuals
     infoFrequency   100;
