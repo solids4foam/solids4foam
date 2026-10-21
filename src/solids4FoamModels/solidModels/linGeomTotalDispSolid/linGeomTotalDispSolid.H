@@ -159,14 +159,6 @@ class linGeomTotalDispSolid
         //  previous time-steps
         void predict();
 
-        //- Enforce traction boundary conditions on the provided traction field
-        void enforceTractionBoundaries
-        (
-            surfaceVectorField& traction,
-            const volVectorField& D,      // displacement field
-            const surfaceVectorField& n   // unit normals field
-        ) const;
-
         //- Evolve the solid solver using the segregated implicit approach
         bool evolveImplicitSegregated();
 

@@ -332,6 +332,22 @@ release. For complete commit-level details and contributor information, see the
 - `Allwmake` and `Allwclean` now stop with an error when an unsupported
   OpenFOAM version is sourced, listing the supported versions, where before
   they printed a warning and carried on.
+- `thermalLinearGeometry` and `poroLinearGeometry` assemble the explicit
+  part of the momentum equation as a face traction flux, including the
+  stabilisation, and impose the boundary traction on it in the same way as
+  `linearGeometryTotalDisplacement`: the prescribed traction on
+  `solidTraction` and `solidSpringDashpot` patches, and zero shear traction
+  on `fixedDisplacementZeroShear`, `normalDisplacementZeroShear`, symmetry,
+  `symmetryPlane`, `solidSymmetry` and `slip` patches. The stabilisation is
+  now the divergence of a face flux, which differs from the previous
+  cell-based form where the stiffness varies in space. Results of cases with
+  these models change slightly; the `hotSphere`, `stripFooting` and
+  `suctionCaission` regression references were updated (#578).
+- With the implicit coupled or PETSc SNES solution algorithms, a
+  `solidTraction` patch with `secondOrder yes` or
+  `nonOrthogonalCorrections no` is now a fatal error. These algorithms
+  extrapolate the patch value from the adjacent cell, and either setting
+  previously stopped that extrapolation without a message (#578).
 
 - `OgdenElastic` assembles its Cauchy stress along the principal directions
   of the left Cauchy-Green tensor, the spatial ones. It used the right
@@ -589,6 +605,38 @@ release. For complete commit-level details and contributor information, see the
   `qrFilterTolerance` test now compares like with like, and a zero secant
   column is no longer divided by zero (#587).
 
+- The PETSc SNES residuals of `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the boundary
+  conditions after the stress. `solidSpringDashpot` built its boundary value,
+  and so its spring-dashpot traction, from the stress of the previous
+  residual evaluation, so the residual depended on hidden state: with a stiff
+  spring the matrix-free linear solve diverged or Newton stalled. With
+  `leastSquaresS4f` the residual is now a function of the unknowns alone for
+  this condition; the `solidSpringDashpot` README lists the conditions for
+  which a lag remains. A stiff isotropic spring
+  (`kNormal = kTangential = 2e9 Pa/m`) on a pulmonary artery wall now
+  converges in at most two Newton iterations per solve, and the
+  `cerebralAneurysm` tutorial needs at most two per solve instead of four
+  (110 instead of 142 in its 10-step regression test). The
+  `solidSpringDashpot` README notes that very stiff normal-only springs may
+  still fail to converge.
+
+- With the `implicitSegregated` algorithm,
+  `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the stress
+  once at the start of each time step, before the momentum loop (#570). The
+  stress was first updated at the end of the first iteration, so a load that
+  only the mechanical law supplies, such as a temperature read from
+  `TcaseDirectory` or an active tension, was missing from the first residual,
+  and the step could be accepted without it. The first such step gave
+  `D = 0`, and a step after a tightly converged one could be accepted
+  unchanged, one load step behind. The predictor already updated the stress
+  and is unchanged, and the hydrostatic stress smoothing (`solvePressureEqn`)
+  still skips the update, as it needs the momentum matrix diagonal. Other
+  cases change only within the solution tolerance. The
+  `hotCylinderPredefinedTFieldMultipleMaterials` regression references came
+  from the legacy model, which had the same lag, and are rescaled from the
+  second-last temperature to the last.
 - `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
   cell whose face stencil does not span three directions, for example a
   corner cell bounded by traction patches, the tensor's determinant can round
@@ -739,6 +787,16 @@ release. For complete commit-level details and contributor information, see the
   be restarted with OpenFOAM.com (#409). The condition read its nonuniform
   `value` a second time, which fails once the base class has read it, and
   rejected the old-time fields, such as `D_0`, read on restart.
+- The thermal stress of `thermoMechanicalLaw` is now correct in plane stress
+  (#137): it was `(1 + 2*nu)/(1 + nu)` times too large, about 23% for
+  `nu = 0.3`, because it used the sub-law's bulk modulus, which is modified in
+  plane stress for the mechanical stress. A new `thermalKappa()` gives the
+  bulk modulus for the thermal stress, `E/(3*(1 - nu))` in plane stress, in
+  `linearElastic`, `linearElasticMohrCoulombPlastic` and
+  `viscousHookeanElastic`. Plane strain, axisymmetric and 3-D results are
+  unchanged. The new `heatedPlatePlaneStress` tutorial checks the
+  displacement of a free plate and the stress of a clamped one against the
+  analytical solution.
 - `leastSquaresS4f`: the warning that cells remain rank-deficient after the
   gradient stencil is widened to point neighbours was repeated every time the
   least-squares vectors were recomputed, which with the updated Lagrangian

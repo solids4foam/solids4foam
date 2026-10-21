@@ -18,7 +18,7 @@ set logscale x
 set xlabel "Mesh spacing {/Symbol D}x (m)"
 set key inside right bottom opaque box
 
-set ylabel "Steady u_y at (4 -1 0.5) (m)"
+set ylabel "Steady u_y at point A (4 0 0.5) (m)"
 plot displacements using 1:2 with linespoints pt 7 ps 0.6 lc rgb "#333333" \
          title "Tukovic et al. (2018)", \
      data using 1:2 with linespoints pt 6 ps 0.8 lc rgb "#d7191c" \
