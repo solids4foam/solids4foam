@@ -888,6 +888,26 @@ function solids4Foam::requirePetscOrExitSilently()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# requirePythonOrExitSilently
+#     Exit cleanly (exit 0) if python3 is not available. Used by tutorials
+#     that generate their mesh or input data with Python scripts (standard
+#     library only), e.g. ArosticaEtAl2025.
+# Arguments:
+#     None
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::requirePythonOrExitSilently()
+{
+    if ! command -v python3 > /dev/null 2>&1
+    then
+        echo
+        echo "Skipping this case as python3 is not available"
+        echo
+        exit 0
+    fi
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # regressionCaseSkipped
 #     Return success when an Allrun log contains a known case-skip message.
 #     Regression scripts use this to exit cleanly when a tutorial is not
@@ -905,7 +925,7 @@ function solids4Foam::regressionCaseSkipped()
         return 1
     fi
 
-    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed|command not found, which is required for this case" "${LOG_FILE}"
+    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed|command not found, which is required for this case|Skipping this case as python3 is not available" "${LOG_FILE}"
     then
         return 0
     fi

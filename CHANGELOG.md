@@ -8,6 +8,26 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
+  `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
+  idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an
+  all-hexahedral O-grid mesh, and `benchmark2`, the idealised biventricle on
+  the benchmark's tetrahedral mesh and fibres. Both compare the displacement
+  of the benchmark points with the participants' published solutions.
+  `Allrun` generates the time series and the `benchmark1` mesh with Python
+  scripts (standard library only), and downloads the converted `benchmark2`
+  meshes from the solids4foam website.
+- The `viscoActiveHolzapfelOgden` mechanical law: an orthotropic
+  Holzapfel-Ogden myocardium with a smooth fibre-compression switch, a
+  viscous term and a tabulated active stress along the fibres. It returns its
+  volumetric penalty separately, so it can be used with the mixed
+  displacement-pressure formulation.
+- An `ellipsoid` method for the `setFibreField` utility, selected in the new
+  optional `system/setFibreFieldDict`: the fibre, sheet and sheet-normal
+  fields of a truncated ellipsoid (Aróstica et al. 2025). Without the
+  dictionary the utility behaves as before.
+- `solids4Foam::requirePythonOrExitSilently` in `solids4FoamScripts.sh`, for
+  tutorials that generate their inputs with Python scripts.
 - Added the `channelLeaflet` fluid-solid interaction tutorial: a thin
   elastic leaflet, clamped in a 2D channel and wetted on both faces, in a
   pulsatile flow at Re = 200, after the oomph-lib channel-with-leaflet
