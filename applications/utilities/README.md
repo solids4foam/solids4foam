@@ -290,3 +290,43 @@ The mesh is overwritten!
   ```
 
 ---
+
+## `updatePrestretch`
+
+- **Utility purpose** Performs one pass of the modified updated Lagrangian
+  formulation for prestressing a solid model (see the Prestress section of
+  `src/solids4FoamModels/mechanicalConstitutiveLaw/README.md`). The prestretch
+  for the next pass is the deformation gradient `F` at the latest time composed
+  with the prestretch the run used, `Fpre_new = F & Fpre`. It is written to
+  the start time at full precision, and every time directory after the start
+  time is removed, so the next pass starts with zero displacement.
+  `max mag(F - I)` is printed as the convergence measure.
+
+- **Arguments** None
+
+- **Options/parameters**
+
+  `-parallel` to update a decomposed case.
+
+- **Example of usage**
+
+  Run the first pass with `prestress no;` in `constant/mechanicalProperties`
+  (or without the entry): the utility then takes the prestretch of that pass
+  to be the identity. Set `prestress yes;` for every later pass.
+
+  ```bash
+  solids4Foam
+  updatePrestretch
+  ```
+
+  Each pass should be a static solve at the target load: `steadyState` for
+  `ddt(D)` and `predictor no;`.
+
+```note
+Every time directory after the start time is removed, and the Fpre in the
+start time is overwritten. Log files and postProcessing are kept.
+A warning is given if the time scheme for D is not steadyState, or the results
+are written in ascii with a writePrecision below 10.
+```
+
+---

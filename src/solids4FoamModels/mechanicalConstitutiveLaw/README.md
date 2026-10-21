@@ -395,11 +395,15 @@ estimates and need nothing more. Laws with fibre directions take those
 directions in the stress-free configuration, so directions defined on the
 imaged geometry should be mapped back through `inv(Fpre)` first.
 
-Finding `Fpre` is the solid model's business. In the modified updated
-Lagrangian formulation (Gee, Förster and Wall, 2010) the load is applied in
-steps on the imaged mesh; after each step `Fpre` becomes `Fstep & Fpre` and the
-displacement is reset to zero, until the imaged mesh is in equilibrium with the
-load at `Fstep = I`.
+`Fpre` is found with the modified updated Lagrangian formulation (Gee, Förster
+and Wall, 2010): the load is applied to the imaged mesh, `Fpre` becomes
+`Fstep & Fpre` and the displacement is reset to zero, and this is repeated
+until the imaged mesh is in equilibrium with the load at `Fstep = I`. The
+`updatePrestretch` utility performs one such update between runs; each run
+should be a static solve, since `Fstep` from a transient one is a snapshot of a
+vibration rather than the equilibrium. The `F` a solid model writes is its own,
+mesh-relative deformation gradient, so copying it into `Fpre` discards the
+prestretch of every earlier pass and the passes do not converge.
 
 ---
 
