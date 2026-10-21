@@ -400,9 +400,9 @@ The explicit transpose viscous term is not in this matrix.
 `rho*(n & -devReff)` as in `pimpleFluid`, so the force on the solid is the
 momentum the fluid loses (with `viscousStressTranspose yes`; by default the
 force is `rho*nuEff*snGrad(U)` only). The gradient is recalculated from the
-current velocity. The transpose part, `mu*grad(u & n)` at the wall, vanishes on a
-stationary no-slip wall, but not on a deforming wall, where it is part of the
-physical traction. Without it (`viscousStressTranspose no`, or before this
+current velocity. The transpose part, `mu*grad(u & n)` at the wall, vanishes
+on a stationary no-slip wall, but not on a deforming wall, where it is part of
+the physical traction. Without it (`viscousStressTranspose no`, or before this
 term was added), the monolithic wall motion of `womersleyTube` is offset from
 the partitioned solutions by a constant amount that does not vanish with mesh
 or time-step refinement.
