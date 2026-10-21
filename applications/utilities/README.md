@@ -327,6 +327,9 @@ Every time directory after the start time is removed, and the Fpre in the
 start time is overwritten. Log files and postProcessing are kept.
 A warning is given if the time scheme for D is not steadyState, or the results
 are written in ascii with a writePrecision below 10.
+A case where a material uses one of the linearElastic laws is refused before
+anything is changed: they are small-strain laws, which prestress does not apply
+to.
 ```
 
 ---

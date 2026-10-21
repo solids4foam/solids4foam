@@ -55,6 +55,10 @@ Description
     when the time scheme for D is not steadyState, since F is then one
     instant of a transient response rather than the equilibrium.
 
+    A material whose law, or a law it wraps, is one of the linearElastic laws
+    is refused before anything is written or removed: they are small-strain
+    laws, which prestress does not apply to.
+
 Usage
     updatePrestretch [-parallel]
 
@@ -76,6 +80,24 @@ bool foundVolTensorField(IOobject& io)
 #else
     return io.headerOk();
 #endif
+}
+
+
+//- Append to lawTypes the type of every law in dict, including the laws
+//  wrapped by another law
+void collectLawTypes(const dictionary& dict, DynamicList<word>& lawTypes)
+{
+    forAllConstIter(dictionary, dict, iter)
+    {
+        if (iter().isDict())
+        {
+            collectLawTypes(iter().dict(), lawTypes);
+        }
+        else if (iter().keyword() == "type")
+        {
+            lawTypes.append(word(iter().stream()));
+        }
+    }
 }
 
 
@@ -135,6 +157,56 @@ int main(int argc, char *argv[])
 
     Info<< nl << "Updating the prestretch in time " << startTime.name()
         << " from the results at time " << latestTime.name() << nl << endl;
+
+    {
+        const IOdictionary mechanicalProperties
+        (
+            IOobject
+            (
+                "mechanicalProperties",
+                runTime.constant(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            )
+        );
+
+        const PtrList<entry> lawEntries
+        (
+            mechanicalProperties.lookup("mechanical")
+        );
+
+        OStringStream smallStrainLaws;
+
+        forAll(lawEntries, lawI)
+        {
+            DynamicList<word> lawTypes;
+            collectLawTypes(lawEntries[lawI].dict(), lawTypes);
+
+            forAll(lawTypes, typeI)
+            {
+                if (lawTypes[typeI].find("linearElastic") == 0)
+                {
+                    smallStrainLaws
+                        << "    material " << lawEntries[lawI].keyword()
+                        << " uses " << lawTypes[typeI] << nl;
+                }
+            }
+        }
+
+        if (!smallStrainLaws.str().empty())
+        {
+            FatalErrorInFunction
+                << "Prestress applies only to finite-strain laws and solid "
+                << "models, and these are small-strain laws:" << nl
+                << smallStrainLaws.str().c_str()
+                << "A run with them cannot apply a prestretch, and a "
+                << "prestretch built from one is not one a finite-strain law "
+                << "can use, so the prestretch is not updated"
+                << exit(FatalError);
+        }
+    }
 
     if
     (
