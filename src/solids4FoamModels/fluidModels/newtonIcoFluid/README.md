@@ -244,6 +244,12 @@ The following entries are read from `newtonIcoFluidCoeffs`:
   the negative-diagonal momentum-block sign is added implicitly.
 - `pressureScaleFactor`: scales the pressure-continuity residual and pressure
   Jacobian rows relative to the momentum rows.
+- `viscousStressTranspose` (default `yes`): includes the transpose part of
+  the viscous stress, `div(nuEff*dev2(T(grad(U))))`, explicitly in the
+  momentum residual, as in the `divDevReff` of `pimpleFluid`, and its wall
+  flux in the interface viscous force (see Interface Viscous Force). It needs
+  `div((nuEff*dev2(T(grad(U))))) Gauss linear;` in `divSchemes`. `no`
+  restores the earlier Laplacian-only form, for comparison only.
 - `maxTimeStepRetries`: maximum failed-PETSc-solve retry count when
   `adjustTimeStep` is enabled.
 - `stopOnPetscError`: passed to `foamPetscSnesHelper` to control whether PETSc
@@ -350,8 +356,9 @@ given PETSc solution vector:
 
 - copies velocity and pressure from `x` into `U` and `p`;
 - corrects boundary conditions and updates `gradU`, `gradp`, and `phi`;
-- computes the momentum residual from diffusion, pressure gradient, transient,
-  advection, and optional momentum stabilisation terms;
+- computes the momentum residual from diffusion (`laplacian(nuEff, U)` plus
+  the explicit transpose term `div(nuEff*dev2(T(grad(U))))`), pressure
+  gradient, transient, advection, and optional momentum stabilisation terms;
 - computes the pressure residual from the divergence of the face flux
   `interpolate(U) & Sf`, the same flux that convects momentum, plus the
   pressure stabilisation;
@@ -381,6 +388,20 @@ the preconditioning matrix:
 This matrix is an approximation to the nonlinear residual Jacobian. The usual
 PETSc setup uses `snes_mf_operator`, so PETSc applies the nonlinear operator
 matrix-free and uses this assembled matrix as the preconditioner.
+The explicit transpose viscous term is not in this matrix.
+
+### Interface Viscous Force
+
+`patchViscousForce` returns the boundary flux of the residual's viscous terms,
+`rho*(nuEff*snGrad(U) + n & nuEff*dev2(T(grad(U))))`, which is
+`rho*(n & -devReff)` as in `pimpleFluid`, so the force on the solid is the
+momentum the fluid loses. The gradient is recalculated from the current
+velocity. The transpose part, `mu*grad(u & n)` at the wall, vanishes on a
+stationary no-slip wall, but not on a deforming wall, where it is part of the
+physical traction. Without it (`viscousStressTranspose no`, or before this
+term was added), the monolithic wall motion of `womersleyTube` is offset from
+the partitioned solutions by a constant amount that does not vanish with mesh
+or time-step refinement.
 
 ### Model-Side Physics Preconditioner
 
