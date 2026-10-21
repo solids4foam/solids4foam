@@ -44,6 +44,7 @@ SourceFiles
 
 #include "fluidSolidInterface.H"
 #include "foamPetscSnesHelper.H"
+#include "foamPetscSnesSolver.H"
 #include "labelPairHashes.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -61,7 +62,7 @@ namespace fluidSolidInterfaces
 class newtonQuasiMonolithicCouplingInterface
 :
     public fluidSolidInterface,
-    public foamPetscSnesHelper
+    public petscSnesSystem
 {
     // Private data
 
@@ -132,9 +133,8 @@ class newtonQuasiMonolithicCouplingInterface
         //- Flag to indicate the fluid index fields have been set
         mutable bool configuredNestedFluidSplit_;
 
-        //- Pointer to the MatNest used for assembly (stored after first
-        //  formJacobian call). Not owned — it is A_.m from the base class.
-        Mat nestMat_;
+        //- Solver of the monolithic system
+        autoPtr<foamPetscSnesSolver> solverPtr_;
 
         //- Converted monolithic MPIAIJ preconditioner matrix (owned)
         Mat Pmat_;
@@ -193,6 +193,15 @@ class newtonQuasiMonolithicCouplingInterface
 
             return isSolid_;
         }
+
+        //- Return the solver of the monolithic system
+        foamPetscSnesSolver& solver();
+
+        //- Return the assembly of the fluid region
+        const foamPetscMeshAssembly& fluidAssembly() const;
+
+        //- Return the assembly of the solid region
+        const foamPetscMeshAssembly& solidAssembly() const;
 
         //- Return a reference to the mesh motion solver
         foamPetscSnesHelper& motion();
@@ -437,17 +446,17 @@ public:
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of
             //  the matrix
-            virtual label initialiseJacobian(Mat& jac);
+            virtual label initialiseJacobian(Mat& jac) override;
 
             //- Initialise the solution vector
             //  This procedure should set the size of the solution vector
-            virtual label initialiseSolution(Vec& x);
+            virtual label initialiseSolution(Vec& x) override;
 
             //- Called after the PETSc options are pushed, before SNESSolve()
-            virtual void customiseSolver();
+            virtual void customiseSolver(SNES snes) override;
 
-            //- Called after resetting the SNES/KSP/PC setup
-            virtual void resetCustomSolverState();
+            //- Called after the solver rebuilds its SNES object
+            virtual void resetCustomSolverState() override;
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector
@@ -455,14 +464,14 @@ public:
             (
                 Vec f,        // Residual
                 const Vec x   // Solution
-            );
+            ) override;
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
                 Mat jac,     // Jacobian
                 const Vec x  // Solution
-            );
+            ) override;
 };
 
 
