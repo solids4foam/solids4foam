@@ -314,11 +314,11 @@ study.
 
 ### Quasi-monolithic coupling
 
-> **Note:** the results in this section predate the transpose viscous term in
-> the `newtonIcoFluid` momentum residual and interface traction
-> (`viscousStressTranspose`, see the `newtonIcoFluid` README), which changes
-> the load on the deforming wall. They must be rerun; until then they
-> describe the earlier Laplacian-form traction `nuEff*snGrad(U)`.
+> **Note:** the results in this section use the default Laplacian-form
+> traction `nuEff*snGrad(U)`. The optional transpose viscous term
+> (`viscousStressTranspose yes`, see the `newtonIcoFluid` README) changes the
+> load on the deforming wall; it is off by default until it is verified, and
+> a comparison with it is pending.
 
 `--monolithic` runs the mesh and time-step studies with the quasi-monolithic
 Newton coupling (`./Allrun monolithic`: `newtonIcoFluid` and

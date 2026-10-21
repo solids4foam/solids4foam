@@ -283,7 +283,7 @@ newtonIcoFluid::newtonIcoFluid
     (
         fluidProperties().lookupOrDefault<Switch>
         (
-            "viscousStressTranspose", true
+            "viscousStressTranspose", false
         )
     ),
     blockSize_(fluidModel::twoD() ? 3 : 4),

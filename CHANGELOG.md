@@ -35,13 +35,12 @@ release. For complete commit-level details and contributor information, see the
   `zeroGradient` interface pressure is first order, and gives a warning), and
   the viscous interface traction is the wall flux of
   the momentum equation's viscous terms, so that the force on the solid is
-  the momentum the fluid loses; the momentum residual includes the explicit
-  transpose term `div(nuEff*dev2(T(grad(U))))`, as in `pimpleFluid`, so the
-  traction is `n & (-devReff)`, which on a deforming wall contains the
-  physical term `mu*grad(u & n)` that the earlier `nuEff*snGrad(U)` traction
-  omitted (`viscousStressTranspose no` restores the earlier form for
-  comparison; monolithic results on deforming walls computed before this
-  change are superseded);
+  the momentum the fluid loses; `viscousStressTranspose yes` adds the
+  explicit transpose term `div(nuEff*dev2(T(grad(U))))` to the momentum
+  residual, as in `pimpleFluid`, so that the traction is `n & (-devReff)`,
+  which on a deforming wall contains the physical term `mu*grad(u & n)`
+  missing from the default `nuEff*snGrad(U)` traction (off by default until
+  it is verified);
   `ringAddedMass/verification/Allverify --study monolithic` verifies the
   coupling against the exact added-mass solution. The velocity solid models
   work on axisymmetric (wedge) meshes, and the coupling accepts a solid that
