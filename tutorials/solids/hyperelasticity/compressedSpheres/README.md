@@ -51,8 +51,18 @@ archive `coarseMesh.tar.xz`. On this mesh, beyond a displacement of about
 increments, and the solution diverges at about 8.6 mm. The tutorial is therefore
 run to a displacement of 7.5 mm (`endTime 0.75` in `system/controlDict`), which
 covers the initial loading phase, the buckling and the post-buckling recovery of
-the force. The finer meshes used in the original study are available in the
-`solid-benchmarks` repository (`hyperElasticity/compressedSpheres/meshes`).
+the force.
+
+The two finer meshes of the original study, with 2 122 and 4 042 cells, are
+available in the
+[solids4foam tutorial archive](https://www.solids4foam.com/tutorials/archive/)
+([medium](https://www.solids4foam.com/tutorials/archive/compressedSpheres-mediumMesh.tar.xz),
+[fine](https://www.solids4foam.com/tutorials/archive/compressedSpheres-fineMesh.tar.xz)).
+These meshes are stored with dimensions in mm, so after extracting one into
+`constant` in place of the coarse mesh, scale it to m with
+`> transformPoints -scale "(0.001 0.001 0.001)"`. The tutorial settings,
+including the end time, were chosen for the coarse mesh and have not been
+retuned for the finer meshes.
 
 ![Figure 1: Problem geometry and computational mesh [1]](./images/compressedSpheres-geometry.png)
 
