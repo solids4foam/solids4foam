@@ -55,9 +55,11 @@ Description
     when the time scheme for D is not steadyState, since F is then one
     instant of a transient response rather than the equilibrium.
 
-    A material whose law, or a law it wraps, is one of the linearElastic laws
-    is refused before anything is written or removed: they are small-strain
-    laws, which prestress does not apply to.
+    A material whose law cannot be prestressed (see
+    mechanicalConstitutiveLaw::admitsPrestress) is refused before anything is
+    written or removed: the laws are constructed from mechanicalProperties
+    and asked, as the mechanicalConstitutiveLawManager asks them, so the
+    utility and the solver refuse the same laws.
 
 Usage
     updatePrestress [-parallel]
@@ -69,6 +71,8 @@ Author
 
 #include "fvCFD.H"
 #include "compatibilityFunctions.H"
+#include "mechanicalConstitutiveLaw.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -80,24 +84,6 @@ bool foundVolTensorField(IOobject& io)
 #else
     return io.headerOk();
 #endif
-}
-
-
-//- Append to lawTypes the type of every law in dict, including the laws
-//  wrapped by another law
-void collectLawTypes(const dictionary& dict, DynamicList<word>& lawTypes)
-{
-    forAllConstIter(dictionary, dict, iter)
-    {
-        if (iter().isDict())
-        {
-            collectLawTypes(iter().dict(), lawTypes);
-        }
-        else if (iter().keyword() == "type")
-        {
-            lawTypes.append(word(iter().stream()));
-        }
-    }
 }
 
 
@@ -177,33 +163,43 @@ int main(int argc, char *argv[])
             mechanicalProperties.lookup("mechanical")
         );
 
-        OStringStream smallStrainLaws;
+        // Each law is constructed as the manager constructs it, with the
+        // settings the manager injects, and asked whether it can be
+        // prestressed; this covers the laws a law wraps as well
+        const Switch planeStress
+        (
+            mechanicalProperties.lookupOrDefault<Switch>("planeStress", false)
+        );
+
+        OStringStream refused;
 
         forAll(lawEntries, lawI)
         {
-            DynamicList<word> lawTypes;
-            collectLawTypes(lawEntries[lawI].dict(), lawTypes);
+            dictionary lawDict(lawEntries[lawI].dict());
+            lawDict.add("planeStress", planeStress, true);
+            lawDict.add("solutionD", mesh.solutionD(), true);
 
-            forAll(lawTypes, typeI)
+            const autoPtr<mechanicalConstitutiveLaw> lawPtr
+            (
+                mechanicalConstitutiveLaw::New(lawDict)
+            );
+
+            if (!lawPtr->admitsPrestress())
             {
-                if (lawTypes[typeI].find("linearElastic") == 0)
-                {
-                    smallStrainLaws
-                        << "    material " << lawEntries[lawI].keyword()
-                        << " uses " << lawTypes[typeI] << nl;
-                }
+                refused
+                    << "    material " << lawEntries[lawI].keyword()
+                    << " uses " << lawPtr->type() << nl;
             }
         }
 
-        if (!smallStrainLaws.str().empty())
+        if (!refused.str().empty())
         {
             FatalErrorInFunction
-                << "Prestress applies only to finite-strain laws and solid "
-                << "models, and these are small-strain laws:" << nl
-                << smallStrainLaws.str().c_str()
+                << "These laws cannot be prestressed:" << nl
+                << refused.str().c_str()
                 << "A run with them cannot be prestressed, and an Fpre "
-                << "built from one is not one a finite-strain law can use, "
-                << "so Fpre is not updated"
+                << "built from one is not one they can use, so Fpre is not "
+                << "updated"
                 << exit(FatalError);
         }
     }

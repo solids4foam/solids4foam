@@ -10,5 +10,6 @@ EXE_INC = \
     -I$(LIB_SRC)/finiteVolume/lnInclude
 
 EXE_LIBS = \
+    -L$(FOAM_MODULE_LIBBIN) -lsolids4FoamModels \
     -lmeshTools \
     -lfiniteVolume

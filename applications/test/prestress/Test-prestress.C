@@ -45,7 +45,8 @@ Description
          volField update.
       7. The guards fire: a small-strain update, a flat-list update on a
          topology other than the cell-centred one, a fourth-order tangent,
-         and asking a manager without prestress for its Fpre.
+         asking a manager without prestress for its Fpre, and building a
+         prestressed manager with a law that cannot be prestressed.
 
 Author
     Conor Moore, UCD.
@@ -721,6 +722,36 @@ int main(int argc, char *argv[])
         (
             "a manager without prestress has no Fpre to give",
             throwsFatal([&]() { plain.Fpre(); })
+        );
+
+        // A law that has not said it can be prestressed is refused when the
+        // manager is built, before Fpre is read
+        const dictionary unprestressableDict
+        (
+            IStringStream
+            (
+                "prestress yes;"
+                "mechanical "
+                "("
+                "    steel"
+                "    {"
+                "        type linearElastic;"
+                "        rho rho [1 -3 0 0 0 0 0] 7800;"
+                "        E E [1 -1 -2 0 0 0 0] 2e11;"
+                "        nu nu [0 0 0 0 0 0 0] 0.3;"
+                "    }"
+                ");"
+            )()
+        );
+
+        report
+        (
+            "a law that cannot be prestressed is refused",
+            throwsFatal([&]()
+            {
+                mechanicalConstitutiveLawManager
+                    refused(mesh, unprestressableDict);
+            })
         );
     }
 

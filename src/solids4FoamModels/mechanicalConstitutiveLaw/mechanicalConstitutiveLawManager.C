@@ -1521,6 +1521,33 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
 
     if (prestress_)
     {
+        // Refused before Fpre is read, so that a case that cannot be
+        // prestressed says so whatever is in the start time
+        OStringStream refused;
+
+        forAll(laws_, lawI)
+        {
+            if (!laws_[lawI].admitsPrestress())
+            {
+                refused
+                    << "    material " << lawNames[lawI] << " uses "
+                    << laws_[lawI].type() << nl;
+            }
+        }
+
+        if (!refused.str().empty())
+        {
+            FatalErrorInFunction
+                << "prestress is on, but these laws cannot be prestressed:"
+                << nl << refused.str().c_str()
+                << "Prestress applies to finite-strain laws whose stress is a "
+                << "function of the total deformation gradient. A law that "
+                << "integrates an increment from a history variable, such as "
+                << "a plastic one, cancels Fpre out of the increment, and a "
+                << "small-strain law has no deformation gradient to compose "
+                << "it with" << exit(FatalError);
+        }
+
         readPrestress();
     }
 }

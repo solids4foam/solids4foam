@@ -194,6 +194,14 @@ public:
             return true;
         }
 
+        //- The stress is a function of the total deformation gradient,
+        //  with no history, so a prestress Fpre composed onto it is seen. The
+        //  fibre directions are taken in the stress-free configuration
+        virtual bool admitsPrestress() const override
+        {
+            return true;
+        }
+
         //- Declare the local basis this law is given
         virtual void declareState
         (

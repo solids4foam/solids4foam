@@ -374,8 +374,18 @@ and the laws are given the solver's kinematics composed with it:
 `Fpre` is on the right because it acts first. The solver keeps its own
 mesh-relative `F` and `J` for the momentum equation; the laws return the Cauchy
 stress, which belongs to the current configuration whichever reference it was
-computed from, so the two agree without the solver knowing about `Fpre`. No
-law needs changing.
+computed from, so the two agree without the solver knowing about `Fpre`.
+
+That holds for a law whose stress is a function of the total `F`, and a law
+says so through `admitsPrestress()`: the hyperelastic laws (`neoHookeanElastic`,
+`MooneyRivlinElastic`, `OgdenElastic`, `StVenantKirchhoffElastic`,
+`GuccioneElastic`, `HolzapfelGasserOgdenElastic`) do, and `electroMechanicalLaw`
+does when its passive law does. The answer is no by default, and the manager
+refuses to start with prestress on and a law that answers no, naming it. A law
+that integrates an increment `F & Finv0` onto a history variable, such as
+`neoHookeanElasticMisesPlastic`, would otherwise cancel `Fpre` out of the
+increment and start its history from the stress-free value, so it would run as
+if there were no prestress.
 
 `Fpre` is held at the cells. A face evaluation uses it interpolated to the
 faces, so only cell values (and the patch values that come with a
@@ -385,6 +395,7 @@ so a continued run reads the `Fpre` it started with.
 What prestress does not cover, and refuses rather than evaluates without
 `Fpre`:
 
+- laws that do not admit prestress, as above,
 - small-strain evaluations, which have no deformation gradient to compose,
 - flat-list evaluations on any topology but the cell-centred one, including
   the `CompactListList` (high-order quadrature) path,
