@@ -362,7 +362,8 @@ mechanical
 );
 ```
 
-The manager then reads a prestretch `Fpre` (a dimensionless `volTensorField`)
+The manager then reads a prestress deformation gradient `Fpre` (a
+dimensionless `volTensorField`)
 from the start time. `Fpre` maps the stress-free configuration onto the mesh,
 and the laws are given the solver's kinematics composed with it:
 
@@ -373,16 +374,16 @@ and the laws are given the solver's kinematics composed with it:
 `Fpre` is on the right because it acts first. The solver keeps its own
 mesh-relative `F` and `J` for the momentum equation; the laws return the Cauchy
 stress, which belongs to the current configuration whichever reference it was
-computed from, so the two agree without the solver knowing about the
-prestretch. No law needs changing.
+computed from, so the two agree without the solver knowing about `Fpre`. No
+law needs changing.
 
 `Fpre` is held at the cells. A face evaluation uses it interpolated to the
 faces, so only cell values (and the patch values that come with a
 `volTensorField`) need to be written. It is written back at every write time,
-so a continued run reads the prestretch it started with.
+so a continued run reads the `Fpre` it started with.
 
-What prestress does not cover, and refuses rather than evaluates without the
-prestretch:
+What prestress does not cover, and refuses rather than evaluates without
+`Fpre`:
 
 - small-strain evaluations, which have no deformation gradient to compose,
 - flat-list evaluations on any topology but the cell-centred one, including
@@ -399,11 +400,11 @@ imaged geometry should be mapped back through `inv(Fpre)` first.
 and Wall, 2010): the load is applied to the imaged mesh, `Fpre` becomes
 `Fstep & Fpre` and the displacement is reset to zero, and this is repeated
 until the imaged mesh is in equilibrium with the load at `Fstep = I`. The
-`updatePrestretch` utility performs one such update between runs; each run
+`updatePrestress` utility performs one such update between runs; each run
 should be a static solve, since `Fstep` from a transient one is a snapshot of a
 vibration rather than the equilibrium. The `F` a solid model writes is its own,
 mesh-relative deformation gradient, so copying it into `Fpre` discards the
-prestretch of every earlier pass and the passes do not converge.
+prestress of every earlier pass and the passes do not converge.
 
 ---
 

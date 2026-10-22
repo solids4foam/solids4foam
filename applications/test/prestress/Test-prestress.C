@@ -23,29 +23,29 @@ Description
     the case mesh, using the case constant/mechanicalProperties dictionary,
     which must hold finite-strain laws.
 
-    A smooth, non-uniform, non-symmetric prestretch Fpre is written to the
-    start time, and two managers are built from the dictionary: one with
-    prestress on, which reads it, and one with prestress off. The prestressed
-    manager is given the solver's deformation gradient Fstep; the plain one
-    is given Fstep & Fpre, with its inverse and determinant taken here from
-    the product rather than composed, so the reference does not share the
-    composition it checks.
+    A smooth, non-uniform, non-symmetric prestress deformation gradient Fpre
+    is written to the start time, and two managers are built from the
+    dictionary: one with prestress on, which reads it, and one with prestress
+    off. The prestressed manager is given the solver's deformation gradient
+    Fstep; the plain one is given Fstep & Fpre, with its inverse and
+    determinant taken here from the product rather than composed, so the
+    reference does not share the composition it checks.
 
     The following are checked:
       1. The volField stress, internal and boundary values, matches the
          plain manager's at the composed kinematics.
-      2. The prestretch has an effect: at Fstep = I the stress is that of
+      2. Fpre has an effect: at Fstep = I the stress is that of
          Fpre, and not zero.
       3. The order of composition is checked: Fpre & Fstep gives a
          different stress, so check 1 would see the wrong order.
       4. The scalar tangent matches the plain manager's.
       5. The surfaceField stress matches the plain manager's at Ff composed
-         with the prestretch interpolated to faces.
+         with Fpre interpolated to faces.
       6. The flat-list update on the cell-centred topology matches the
          volField update.
       7. The guards fire: a small-strain update, a flat-list update on a
          topology other than the cell-centred one, a fourth-order tangent,
-         and asking a manager without prestress for its prestretch.
+         and asking a manager without prestress for its Fpre.
 
 Author
     Conor Moore, UCD.
@@ -197,7 +197,7 @@ tensor testFstep(const vector& p)
 }
 
 
-//- The prestretch at a point: larger than the step and with different
+//- Fpre at a point: larger than the step and with different
 //  principal directions, so that the two do not commute
 tensor testFpre(const vector& p)
 {
@@ -430,7 +430,7 @@ int main(int argc, char *argv[])
 
 
     // -------------------------------------------------------------------------
-    Info<< nl << "2. The prestretch alone carries a stress" << endl;
+    Info<< nl << "2. Fpre alone carries a stress" << endl;
 
     {
         const volTensorField Fid(pointwiseField(mesh, "Fid", [](const vector&)
@@ -569,8 +569,8 @@ int main(int argc, char *argv[])
         const surfaceTensorField Finvf("Finvf", inv(Ff));
         const surfaceScalarField Jf("Jf", det(Ff));
 
-        // The face prestretch the switch is documented to use: the cell
-        // prestretch interpolated
+        // The face Fpre the switch is documented to use: the cell
+        // Fpre interpolated
         const surfaceTensorField Ftotf("Ftotf", Ff & fvc::interpolate(Fpre));
         const surfaceTensorField FtotInvf("FtotInvf", inv(Ftotf));
         const surfaceScalarField Jtotf("Jtotf", det(Ftotf));
@@ -604,7 +604,7 @@ int main(int argc, char *argv[])
         reportError
         (
             "prestressed face stress matches the plain one at the "
-            "interpolated prestretch",
+            "interpolated Fpre",
             relativeDifference(tSigmafPre(), tSigmafRef()),
             1e-10
         );
@@ -719,7 +719,7 @@ int main(int argc, char *argv[])
 
         report
         (
-            "a manager without prestress has no prestretch to give",
+            "a manager without prestress has no Fpre to give",
             throwsFatal([&]() { plain.Fpre(); })
         );
     }

@@ -276,20 +276,21 @@ class mechanicalConstitutiveLawManager
         //  declared after them
         mechanicalConstitutiveLawStateSetup stateSetup_;
 
-        //- Whether the laws see a prestretch composed onto the solver's
+        //- Whether the laws see Fpre composed onto the solver's
         //  deformation gradient: the prestress switch in mechanicalProperties
         const Switch prestress_;
 
-        //- The prestretch, read as Fpre from the start time, from the
-        //  stress-free configuration to the mesh. Null without prestress
+        //- The prestress deformation gradient, read as Fpre from the start
+        //  time, from the stress-free configuration to the mesh. Null without
+        //  prestress
         autoPtr<volTensorField> FprePtr_;
 
-        //- Inverse and determinant of the prestretch, taken once since the
-        //  prestretch does not change during a run
+        //- Inverse and determinant of Fpre, taken once since Fpre does not
+        //  change during a run
         autoPtr<volTensorField> FpreInvPtr_;
         autoPtr<volScalarField> JprePtr_;
 
-        //- The prestretch interpolated to faces, with its inverse and
+        //- Fpre interpolated to faces, with its inverse and
         //  determinant, made on the first face evaluation
         mutable autoPtr<surfaceTensorField> FpreSurfacePtr_;
         mutable autoPtr<surfaceTensorField> FpreInvSurfacePtr_;
@@ -298,13 +299,13 @@ class mechanicalConstitutiveLawManager
 
     // Private Member Functions
 
-        //- Read the prestretch and check it is invertible
-        void readPrestretch();
+        //- Read Fpre and check it is invertible
+        void readPrestress();
 
-        //- Make the face prestretch, if it has not been made
-        void makeSurfacePrestretch() const;
+        //- Make the face Fpre, if it has not been made
+        void makeSurfacePrestress() const;
 
-        //- Refuse an evaluation that has no way to apply the prestretch,
+        //- Refuse an evaluation that has no way to apply Fpre,
         //  rather than evaluate it without one
         void checkPrestressSupported(const word& context) const;
 
@@ -779,13 +780,13 @@ public:
         //- Const-access to the bulk modulus field
         const volScalarField& kappa() const;
 
-        //- True if the laws see a prestretch
+        //- True if the laws see Fpre
         bool prestressed() const
         {
             return prestress_;
         }
 
-        //- The prestretch; fatal without prestress
+        //- Fpre; fatal without prestress
         const volTensorField& Fpre() const;
 
     // Edit

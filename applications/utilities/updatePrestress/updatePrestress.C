@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Application
-    updatePrestretch
+    updatePrestress
 
 Description
     One pass of the modified updated Lagrangian formulation (Gee, Förster
@@ -25,13 +25,13 @@ Description
     After a prestressed run of a solid model (prestress yes; in
     mechanicalProperties), the deformation gradient F written at the latest
     time is the solver's own, from the mesh to the deformed configuration.
-    The prestretch for the next pass is that deformation composed with the
-    prestretch the run used:
+    Fpre for the next pass is that deformation composed with the
+    Fpre the run used:
 
         Fpre_new = F & Fpre
 
     F is on the left because it acts after Fpre. Copying F into Fpre
-    instead discards the prestretch of every earlier pass, and the passes do
+    instead discards the prestress of every earlier pass, and the passes do
     not converge.
 
     Fpre_new is written to the start time, internal and patch values alike,
@@ -40,18 +40,18 @@ Description
     time with zero displacement. Log files and postProcessing are left.
 
     The manager writes Fpre at every write time, so Fpre in the latest time
-    says the run applied it. The prestretch is then taken from the start
+    says the run applied it. Fpre is then taken from the start
     time, which holds it at full precision, and from the latest time only if
     the start time has none. Fpre in the start time but not the latest is
     refused, since the run did not apply it. On the first pass, where there
-    is no Fpre in either, the prestretch the run used is taken to be the
+    is no Fpre in either, Fpre the run used is taken to be the
     identity.
 
     max mag(F - I) is reported as the convergence measure: it tends to zero
-    as the mesh comes into equilibrium with the load under the prestretch.
+    as the mesh comes into equilibrium with the load under Fpre.
 
     A warning is given when the results are written in ascii with fewer than
-    10 digits, which limits how well F, and so the prestretch, is known, and
+    10 digits, which limits how well F, and so Fpre, is known, and
     when the time scheme for D is not steadyState, since F is then one
     instant of a transient response rather than the equilibrium.
 
@@ -60,7 +60,7 @@ Description
     laws, which prestress does not apply to.
 
 Usage
-    updatePrestretch [-parallel]
+    updatePrestress [-parallel]
 
 Author
     Conor Moore, UCD.
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
     {
         FatalErrorInFunction
             << "There are no results after the start time to update the "
-            << "prestretch from." << nl
+            << "Fpre from." << nl
             << "Run the prestressed solid model first"
             << exit(FatalError);
     }
@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
 
 #   include "createMesh.H"
 
-    Info<< nl << "Updating the prestretch in time " << startTime.name()
+    Info<< nl << "Updating Fpre in time " << startTime.name()
         << " from the results at time " << latestTime.name() << nl << endl;
 
     {
@@ -201,9 +201,9 @@ int main(int argc, char *argv[])
                 << "Prestress applies only to finite-strain laws and solid "
                 << "models, and these are small-strain laws:" << nl
                 << smallStrainLaws.str().c_str()
-                << "A run with them cannot apply a prestretch, and a "
-                << "prestretch built from one is not one a finite-strain law "
-                << "can use, so the prestretch is not updated"
+                << "A run with them cannot be prestressed, and an Fpre "
+                << "built from one is not one a finite-strain law can use, "
+                << "so Fpre is not updated"
                 << exit(FatalError);
         }
     }
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
     {
         WarningInFunction
             << "The results are written in ascii with writePrecision "
-            << IOstream::defaultPrecision() << ", so F, and the prestretch "
+            << IOstream::defaultPrecision() << ", so F, and Fpre "
             << "built from it, are known only to that many digits." << nl
             << "    Set writePrecision to 10 or more, or writeFormat to "
             << "binary, in system/controlDict" << nl << endl;
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
             << "The time scheme for D is " << ddtDScheme << ", not "
             << "steadyState, so F at the latest time is one instant of a "
             << "transient response rather than the equilibrium under the "
-            << "load, and a prestretch built from it does not converge."
+            << "load, and an Fpre built from it does not converge."
             << nl
             << "    Use steadyState, with predictor no, for prestress passes"
             << nl << endl;
@@ -257,8 +257,8 @@ int main(int argc, char *argv[])
         mesh
     );
 
-    // The prestretch the run used: in the latest time if the run applied it.
-    // Unregistered, so that the updated prestretch can be registered under
+    // Fpre the run used: in the latest time if the run applied it.
+    // Unregistered, so that the updated Fpre can be registered under
     // the same name
     IOobject FpreLatestHeader
     (
@@ -287,7 +287,7 @@ int main(int argc, char *argv[])
 
     if (FpreAtLatest && FpreAtStart)
     {
-        // The same prestretch, but the start time holds it as this utility
+        // The same Fpre, but the start time holds it as this utility
         // wrote it, at full precision, and the latest time as the run wrote
         // it, at writePrecision
         FpreOldPtr.reset(new volTensorField(FpreStartHeader, mesh));
@@ -332,7 +332,7 @@ int main(int argc, char *argv[])
 
     const volTensorField& FpreOld = *FpreOldPtr;
 
-    // The updated prestretch, with the patch types of the old one
+    // The updated Fpre, with the patch types of the old one
     volTensorField FpreNew
     (
         IOobject
@@ -354,7 +354,7 @@ int main(int argc, char *argv[])
     if (minJpre <= SMALL)
     {
         FatalErrorInFunction
-            << "det(Fpre) of the updated prestretch must be positive "
+            << "det(Fpre) of the updated Fpre must be positive "
             << "everywhere, but its minimum is " << minJpre
             << exit(FatalError);
     }
@@ -373,7 +373,7 @@ int main(int argc, char *argv[])
     // current time, so the current time is set back to the start time first
     runTime.setTime(startTime, 0);
 
-    // At full precision, so that the next pass starts from the prestretch
+    // At full precision, so that the next pass starts from Fpre
     // computed here rather than a rounding of it
     const unsigned int precision = IOstream::defaultPrecision();
     IOstream::defaultPrecision(17);
@@ -383,11 +383,11 @@ int main(int argc, char *argv[])
 
     IOstream::defaultPrecision(precision);
 
-    // Nothing is removed unless the updated prestretch is on disk
+    // Nothing is removed unless the updated Fpre is on disk
     if (!isFile(FpreNew.objectPath()))
     {
         FatalErrorInFunction
-            << "The updated prestretch was not written to "
+            << "The updated Fpre was not written to "
             << FpreNew.objectPath() << ", so no results are removed"
             << exit(FatalError);
     }

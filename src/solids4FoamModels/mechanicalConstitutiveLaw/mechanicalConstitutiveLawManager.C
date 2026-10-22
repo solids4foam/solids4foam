@@ -30,7 +30,7 @@ License
 #include "mat66.H"
 #include "Switch.H"
 #include "CompactListList.H"
-#include "mechanicalConstitutiveLawPrestretch.H"
+#include "mechanicalConstitutiveLawPrestress.H"
 #include "surfaceInterpolate.H"
 #include <cstdint>
 
@@ -50,11 +50,11 @@ namespace Foam
 namespace
 {
 
-// The flat-list twin of finiteStrainPrestretchedFields: the solver's
-// kinematics at cell-centred integration points composed with the prestretch
+// The flat-list twin of finiteStrainPrestressedFields: the solver's
+// kinematics at cell-centred integration points composed with Fpre
 // at the cells, held so that the views evaluateFlat builds have something to
 // refer to
-struct prestretchedLists
+struct prestressedLists
 {
     const tensorField F;
     const tensorField F0;
@@ -63,7 +63,7 @@ struct prestretchedLists
     const scalarField J;
     const scalarField J0;
 
-    prestretchedLists
+    prestressedLists
     (
         const UList<tensor>& FIn,
         const UList<tensor>& F0In,
@@ -1521,7 +1521,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
 
     if (prestress_)
     {
-        readPrestretch();
+        readPrestress();
     }
 }
 
@@ -1653,7 +1653,7 @@ const Foam::volTensorField& Foam::mechanicalConstitutiveLawManager::Fpre() const
     if (!FprePtr_.valid())
     {
         FatalErrorInFunction
-            << "There is no prestretch: prestress is off in "
+            << "There is no Fpre: prestress is off in "
             << "mechanicalProperties" << exit(FatalError);
     }
 
@@ -1661,14 +1661,15 @@ const Foam::volTensorField& Foam::mechanicalConstitutiveLawManager::Fpre() const
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::readPrestretch()
+void Foam::mechanicalConstitutiveLawManager::readPrestress()
 {
     Info<< "Prestress: the mechanical constitutive laws see the deformation "
-        << "gradient composed with the prestretch Fpre, read from time "
+        << "gradient composed with the prestress deformation gradient Fpre, "
+        << "read from time "
         << mesh_.time().timeName() << endl;
 
     // Written at every write time, so that a continued run reads back the
-    // prestretch it was started with
+    // Fpre it was started with
     FprePtr_.reset
     (
         new volTensorField
@@ -1715,7 +1716,7 @@ void Foam::mechanicalConstitutiveLawManager::readPrestretch()
         )
     );
 
-    // Checked before the inverse is taken: a prestretch that turns an element
+    // Checked before the inverse is taken: an Fpre that turns an element
     // inside out has no inverse, and one that is singular has no stress-free
     // configuration to refer to
     scalar minJpre = gMin(Foam::primitiveField(*JprePtr_));
@@ -1761,14 +1762,14 @@ void Foam::mechanicalConstitutiveLawManager::readPrestretch()
 }
 
 
-void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestretch() const
+void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
 {
     if (FpreSurfacePtr_.valid())
     {
         return;
     }
 
-    // The inverse and determinant are taken of the interpolated prestretch,
+    // The inverse and determinant are taken of the interpolated Fpre,
     // not interpolated themselves, so that the three agree with one another
     // on every face
     FpreSurfacePtr_.reset
@@ -1833,7 +1834,7 @@ void Foam::mechanicalConstitutiveLawManager::checkPrestressSupported
     {
         FatalErrorInFunction
             << context << " is a small-strain evaluation, which has no "
-            << "deformation gradient to compose the prestretch with." << nl
+            << "deformation gradient to compose Fpre with." << nl
             << "prestress applies to the finite-strain solid models only"
             << exit(FatalError);
     }
@@ -1847,7 +1848,7 @@ void Foam::mechanicalConstitutiveLawManager::checkCellCentredPrestress
     const word& context
 ) const
 {
-    // A flat list carries no location, so the prestretch, held at the cells,
+    // A flat list carries no location, so Fpre, held at the cells,
     // can be placed on it only when its integration points are the cells
     if (topo.type() != cellCentredIntegrationPointTopology::typeName)
     {
@@ -1856,13 +1857,13 @@ void Foam::mechanicalConstitutiveLawManager::checkCellCentredPrestress
             << "With prestress, a flat-list finite-strain evaluation is "
             << "supported only on the "
             << cellCentredIntegrationPointTopology::typeName << ", where "
-            << "the prestretch at the cells is the prestretch at the "
+            << "Fpre at the cells is Fpre at the "
             << "integration points" << exit(FatalError);
     }
 
     // The laws differentiate with respect to the composed deformation
     // gradient, and a solver's Jacobian needs the derivative with respect to
-    // its own, which differs from it by the prestretch
+    // its own, which differs from it by Fpre
     if (fourthOrderTangentPtr)
     {
         FatalErrorInFunction
@@ -2389,7 +2390,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
     const tangentRequest tangentReq
 )
 {
-    autoPtr<prestretchedLists> prePtr;
+    autoPtr<prestressedLists> prePtr;
 
     if (prestress_)
     {
@@ -2402,7 +2403,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
         prePtr.reset
         (
-            new prestretchedLists
+            new prestressedLists
             (
                 F, F0, Finv, Finv0, J, J0,
                 *FprePtr_, *FpreInvPtr_, *JprePtr_
@@ -2491,7 +2492,7 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
             << exit(FatalError);
     }
 
-    autoPtr<prestretchedLists> prePtr;
+    autoPtr<prestressedLists> prePtr;
 
     if (prestress_)
     {
@@ -2502,7 +2503,7 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
 
         prePtr.reset
         (
-            new prestretchedLists
+            new prestressedLists
             (
                 F, F0, Finv, Finv0, J, J0,
                 *FprePtr_, *FpreInvPtr_, *JprePtr_
@@ -2615,13 +2616,13 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
 {
     const finiteStrainVolFields step(F, F0, Finv, Finv0, J, J0);
 
-    autoPtr<finiteStrainPrestretchedFields<fvPatchField, volMesh>> prePtr;
+    autoPtr<finiteStrainPrestressedFields<fvPatchField, volMesh>> prePtr;
 
     if (prestress_)
     {
         prePtr.reset
         (
-            new finiteStrainPrestretchedFields<fvPatchField, volMesh>
+            new finiteStrainPrestressedFields<fvPatchField, volMesh>
             (
                 step, *FprePtr_, *FpreInvPtr_, *JprePtr_
             )
@@ -3453,13 +3454,13 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 {
     const finiteStrainVolFields step(F, F0, Finv, Finv0, J, J0);
 
-    autoPtr<finiteStrainPrestretchedFields<fvPatchField, volMesh>> prePtr;
+    autoPtr<finiteStrainPrestressedFields<fvPatchField, volMesh>> prePtr;
 
     if (prestress_)
     {
         prePtr.reset
         (
-            new finiteStrainPrestretchedFields<fvPatchField, volMesh>
+            new finiteStrainPrestressedFields<fvPatchField, volMesh>
             (
                 step, *FprePtr_, *FpreInvPtr_, *JprePtr_
             )
@@ -3669,18 +3670,18 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
     const finiteStrainSurfaceFields step(F, F0, Finv, Finv0, J, J0);
 
-    // The prestretch is held at cell centres and reaches the faces
+    // Fpre is held at cell centres and reaches the faces
     // interpolated, so no face values of it need be written
-    autoPtr<finiteStrainPrestretchedFields<fvsPatchField, surfaceMesh>>
+    autoPtr<finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>>
         prePtr;
 
     if (prestress_)
     {
-        makeSurfacePrestretch();
+        makeSurfacePrestress();
 
         prePtr.reset
         (
-            new finiteStrainPrestretchedFields<fvsPatchField, surfaceMesh>
+            new finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>
             (
                 step, *FpreSurfacePtr_, *FpreInvSurfacePtr_, *JpreSurfacePtr_
             )

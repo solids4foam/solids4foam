@@ -16,13 +16,13 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::finiteStrainPrestretchedFields
+    Foam::finiteStrainPrestressedFields
 
 Description
-    The finite-strain kinematics a constitutive law sees when the solid
-    carries a prestretch: the solver's deformation gradient composed with a
-    fixed prestretch Fpre, which maps a stress-free configuration onto the
-    mesh the solver is solving on.
+    The finite-strain kinematics a constitutive law sees when the solid is
+    prestressed: the solver's deformation gradient composed with a fixed
+    prestress deformation gradient Fpre, which maps a stress-free
+    configuration onto the mesh the solver is solving on.
 
         F    = Fstep & Fpre
         Finv = inv(Fpre) & Finv_step
@@ -51,8 +51,8 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#ifndef mechanicalConstitutiveLawPrestretch_H
-#define mechanicalConstitutiveLawPrestretch_H
+#ifndef mechanicalConstitutiveLawPrestress_H
+#define mechanicalConstitutiveLawPrestress_H
 
 #include "mechanicalConstitutiveLawKinematicsFields.H"
 #include "compatibilityFunctions.H"
@@ -63,11 +63,11 @@ namespace Foam
 {
 
 /*---------------------------------------------------------------------------*\
-                 Class finiteStrainPrestretchedFields Declaration
+                 Class finiteStrainPrestressedFields Declaration
 \*---------------------------------------------------------------------------*/
 
 template<template<class> class PatchField, class GeoMesh>
-class finiteStrainPrestretchedFields
+class finiteStrainPrestressedFields
 {
 public:
 
@@ -100,7 +100,7 @@ private:
             (
                 IOobject
                 (
-                    fld.name() + "Prestretched",
+                    fld.name() + "Prestressed",
                     fld.instance(),
                     fld.db(),
                     IOobject::NO_READ,
@@ -152,13 +152,13 @@ private:
         }
 
         //- No copy construct
-        finiteStrainPrestretchedFields
+        finiteStrainPrestressedFields
         (
-            const finiteStrainPrestretchedFields&
+            const finiteStrainPrestressedFields&
         ) = delete;
 
         //- No copy assignment
-        void operator=(const finiteStrainPrestretchedFields&) = delete;
+        void operator=(const finiteStrainPrestressedFields&) = delete;
 
 
 public:
@@ -169,9 +169,9 @@ public:
 
     // Constructors
 
-        //- Compose the solver's kinematics, step, with the prestretch Fpre,
-        //  given with its inverse and determinant
-        finiteStrainPrestretchedFields
+        //- Compose the solver's kinematics, step, with the prestress
+        //  deformation gradient Fpre, given with its inverse and determinant
+        finiteStrainPrestressedFields
         (
             const geometricFields& step,
             const tensorFieldType& Fpre,
