@@ -2518,6 +2518,15 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             "updateStressFiniteStrain (flat list)"
         );
 
+        // Before the lists are composed with Fpre, which reads them at every
+        // cell: evaluateFlat checks the same, but only after
+        checkKinematicsListSizes
+        (
+            topo.nIntegrationPoints(),
+            finiteStrainKinematicsFields(F, F0, Finv, Finv0, J, J0),
+            "updateStressFiniteStrain (flat list)"
+        );
+
         prePtr.reset
         (
             new prestressedLists
@@ -2618,6 +2627,15 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
         checkCellCentredPrestress
         (
             topo, fourthOrderTangentPtr, "updateTangentFiniteStrain"
+        );
+
+        // Before the lists are composed with Fpre, which reads them at every
+        // cell: evaluateFlat checks the same, but only after
+        checkKinematicsListSizes
+        (
+            topo.nIntegrationPoints(),
+            finiteStrainKinematicsFields(F, F0, Finv, Finv0, J, J0),
+            "updateTangentFiniteStrain"
         );
 
         prePtr.reset

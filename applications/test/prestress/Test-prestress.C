@@ -45,7 +45,7 @@ Description
          volField update.
       7. The guards fire: a small-strain update, a flat-list update on a
          topology other than the cell-centred one, a fourth-order tangent,
-         asking a manager without prestress for its Fpre, building a
+         a flat list of the wrong size, asking a manager without prestress for its Fpre, building a
          prestressed manager with a law that cannot be prestressed, and
          reading an Fpre whose patches set their own values.
 
@@ -718,6 +718,28 @@ int main(int argc, char *argv[])
                 );
             })
         );
+
+        // A list of the wrong size is refused before it is composed with
+        // Fpre, which would read it at every cell
+        {
+            const label nShort = max(mesh.nCells() - 1, 0);
+            const tensorField shortF(nShort, I);
+            const scalarField shortJ(nShort, 1.0);
+            symmTensorField shortSigma(mesh.nCells(), symmTensor::zero);
+
+            report
+            (
+                "a flat list of the wrong size is refused",
+                throwsFatal([&]()
+                {
+                    pre.updateStressFiniteStrain
+                    (
+                        cellTopo, shortF, shortF, shortF, shortF, shortJ,
+                        shortJ, dt, shortSigma
+                    );
+                })
+            );
+        }
 
         report
         (
