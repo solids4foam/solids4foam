@@ -833,7 +833,10 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
 
     // The hydrostatic stress smoothing (solvePressureEqn): the law gives its
     // stress in two parts, and the volumetric part is smoothed before it is
-    // added back
+    // added back. It is scaled by the solver's J_ for the smoothing and
+    // divided by it again after, so with prestress the smoothed measure is
+    // Kirchhoff with respect to the mesh rather than the stress-free
+    // configuration; unsmoothed, the two scalings cancel either way
     if (smoothHydrostaticStress())
     {
         mechanicalManager().updateStressFiniteStrainSplit
