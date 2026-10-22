@@ -2157,18 +2157,18 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
         << interfaceFluxDiagnostics_
         << endl;
 
-    // Store old time values
-    fluid().U().storeOldTime();
-    fluid().U().oldTime().storeOldTime();
-    fluid().U().oldTime().oldTime().storeOldTime();
-    fluid().p().storeOldTime();
-    solid().U().storeOldTime();
-    solid().U().oldTime().storeOldTime();
-    // The solid needs D and its old-time and old-old-time values; allocate
-    // them without shifting a history that was read on a restart
+    // Allocate the old-time values without shifting a history that was read
+    // on a restart: storeOldTime() would copy the current values into the
+    // old-time levels, so that the predictors of the first step after a
+    // restart would, e.g., take the solid velocity at t^(n-1) for that at
+    // t^(n-2)
+    fluid().U().oldTime().oldTime();
+    fluid().p().oldTime();
+    solid().U().oldTime().oldTime();
+    // The solid needs D and its old-time and old-old-time values
     solid().D().oldTime().oldTime();
-    motionSolid().D().storeOldTime();
-    solid().sigma().storeOldTime();
+    motionSolid().D().oldTime();
+    solid().sigma().oldTime();
 
     // Create the solver of the monolithic system. The PETSc options are read
     // from the solvers/UpU sub-dictionary of system/fvSolution, or from the
@@ -2634,6 +2634,13 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     (
         solid()
     ).updateDisplacement();
+
+    // Map the final solid interface displacement to the mesh motion
+    // interface. The fluid mesh is not moved again, but the mesh motion
+    // fields written at this time then hold it, so that a restart from this
+    // time recovers the offset at the start of the coupling rather than the
+    // error of the last displacement predictor
+    mapInterfaceSolidToMeshMotion();
 
     return true;
 }
