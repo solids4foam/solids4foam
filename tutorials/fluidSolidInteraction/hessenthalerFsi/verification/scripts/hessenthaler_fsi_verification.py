@@ -550,6 +550,93 @@ def set_displacement_mesh_motion(case: Path) -> None:
                  'cellDisplacementFinal"')
 
 
+HYPERELASTIC_SOLID_PROPERTIES = """solidModel     meshMotionTotalDisplacement;
+
+meshMotionTotalDisplacementCoeffs
+{
+    finiteStrain    yes;
+    nCorrectors     1000;
+    rTol            1e-04;
+    infoFrequency   100;
+}
+"""
+
+HYPERELASTIC_MECHANICAL_PROPERTIES = """planeStress no;
+
+mechanical
+(
+    meshMotion
+    {
+        type        diffusionHyperElastic;
+        rho         rho [1 -3 0 0 0 0 0] 1;
+        mu          mu [1 -1 -2 0 0 0 0] 1;
+        K           K [1 -1 -2 0 0 0 0] 3;
+    }
+);
+"""
+
+
+def set_hyperelastic_mesh_motion(case: Path) -> None:
+    """Move the fluid mesh with the solids4foamSolidModel mesh motion.
+
+    A quasi-static meshMotionTotalDisplacement model with the
+    diffusionHyperElastic law (finite strain) is solved on the fluid mesh
+    for the total displacement, with the stiffness scaled by the tutorial's
+    diffusivity; it stops if the mesh would invert. As in the #554
+    beamInCrossFlow example (needs the couplers of solids4foam #554).
+    """
+    head = ("FoamFile\n{{\n    version     2.0;\n    format      ascii;\n"
+            "    class       {cls};\n    object      {obj};\n}}\n\n")
+    replace_text(case / "constant" / "fluid" / "dynamicMeshDict",
+                 '"solver|motionSolver" velocityLaplacian;',
+                 '"solver|motionSolver" solids4foamSolidModel;')
+    fluid = case / "constant" / "fluid"
+    (fluid / "solidProperties").write_text(
+        head.format(cls="dictionary", obj="solidProperties")
+        + HYPERELASTIC_SOLID_PROPERTIES)
+    (fluid / "mechanicalProperties").write_text(
+        head.format(cls="dictionary", obj="mechanicalProperties")
+        + HYPERELASTIC_MECHANICAL_PROPERTIES)
+    zero = case / "0" / "fluid"
+    patches = ("upperInlet", "lowerInlet", "outlet", "wall")
+    entries = "".join(
+        f"    {p}\n    {{\n        type            fixedDisplacement;\n"
+        f"        value           uniform (0 0 0);\n    }}\n"
+        for p in patches)
+    entries += ("    interface\n    {\n        type                    "
+                "fixedDisplacement;\n        enforcePointPatchField  no;\n"
+                "        value                   uniform (0 0 0);\n    }\n")
+    (zero / "D").write_text(
+        head.format(cls="volVectorField", obj="D")
+        + "dimensions      [0 1 0 0 0 0 0];\n\n"
+        + "internalField   uniform (0 0 0);\n\nboundaryField\n{\n"
+        + entries + "}\n")
+    motion_u = zero / "pointMotionU"
+    text = motion_u.read_text().replace("object      pointMotionU;",
+                                        "object      pointD;")
+    text, found = re.subn(r"^dimensions\s+\[0 1 -1 0 0 0 0\];",
+                          "dimensions      [0 1 0 0 0 0 0];", text,
+                          flags=re.MULTILINE)
+    if found != 1:
+        fail(f"Could not set the dimensions of pointD in {case}")
+    (zero / "pointD").write_text(text)
+    motion_u.unlink()
+    solution = case / "system" / "fluid" / "fvSolution"
+    replace_text(solution, "solvers\n{\n",
+                 "solvers\n{\n    // solids4foamSolidModel mesh motion\n"
+                 "    \"D|DD\"\n    {\n        solver          PCG;\n"
+                 "        preconditioner  FDIC;\n"
+                 "        tolerance       1e-09;\n"
+                 "        relTol          0.1;\n    }\n\n")
+    solution.write_text(solution.read_text()
+                        + "\nrelaxationFactors\n{\n    fields\n    {\n"
+                        "        \"D|DD\"          0.7;\n    }\n}\n")
+    replace_text(case / "system" / "fluid" / "fvSchemes",
+                 "    grad(U)            cellLimited Gauss linear 1;\n",
+                 "    grad(U)            cellLimited Gauss linear 1;\n"
+                 "    grad(D)            leastSquaresS4f;\n")
+
+
 def adopt_restart_monitor_files(case: Path) -> None:
     """Use the monitor files of a restart from the time of an earlier write.
 
@@ -851,6 +938,7 @@ DEFAULT_SPEC = {
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
     "solidtol": "default", "coupled": "yes", "fsitest": "default",
     "reuse": -1.0, "wall": "", "motion": "velocity",
+    "write": 0.0,
 }
 
 
@@ -883,8 +971,8 @@ def parse_spec(text: str) -> dict:
         fail("fsitest must be default or strict")
     if spec["wall"] and spec["wall"] not in FLUID_LEVELS:
         fail("wall must be a fluid level, e.g. wall=F3")
-    if spec["motion"] not in ("velocity", "displacement"):
-        fail("motion must be velocity or displacement")
+    if spec["motion"] not in ("velocity", "displacement", "hyperelastic"):
+        fail("motion must be velocity, displacement or hyperelastic")
     return spec
 
 
@@ -1002,6 +1090,10 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     write_every = end_time if end_time <= 10 else 5.0
     replace_entry(control, "writeInterval", f"{write_every:.10g}", True)
     replace_entry(control, "purgeWrite", "2", True)
+    if spec["write"] > 0:
+        # Diagnostic: write (and keep) the fields every 'write' seconds
+        replace_entry(control, "writeInterval", f"{spec['write']:.10g}", True)
+        replace_entry(control, "purgeWrite", "0", True)
     replace_text(control, '    #include "flapCentreline"\n',
                  '    #include "flapCentreline"\n\n'
                  '    // Monitors of the verification study\n'
@@ -1094,6 +1186,8 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
         replace_entry(solution, "nOuterCorrectors", f"{int(spec['pimple'])}")
     if spec["motion"] == "displacement":
         set_displacement_mesh_motion(case)
+    elif spec["motion"] == "hyperelastic":
+        set_hyperelastic_mesh_motion(case)
 
     # Decomposition and the solid's parallel linear solver
     vmod.set_subdomains(case, cores, ("", "fluid", "solid"))
