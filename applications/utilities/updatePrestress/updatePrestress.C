@@ -330,7 +330,7 @@ int main(int argc, char *argv[])
         autoPtrRef(FpreOldPtr) == dimensionedTensor("I", dimless, I);
     }
 
-    const volTensorField& FpreOld = *FpreOldPtr;
+    const volTensorField& FpreOld = autoPtrRef(FpreOldPtr);
 
     // The updated Fpre, with the patch types of the old one
     volTensorField FpreNew

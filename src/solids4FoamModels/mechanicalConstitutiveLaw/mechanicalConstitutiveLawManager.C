@@ -1657,7 +1657,7 @@ const Foam::volTensorField& Foam::mechanicalConstitutiveLawManager::Fpre() const
             << "mechanicalProperties" << exit(FatalError);
     }
 
-    return *FprePtr_;
+    return autoPtrRef(FprePtr_);
 }
 
 
@@ -1686,7 +1686,7 @@ void Foam::mechanicalConstitutiveLawManager::readPrestress()
         )
     );
 
-    volTensorField& Fpre = *FprePtr_;
+    volTensorField& Fpre = autoPtrRef(FprePtr_);
 
     if (Fpre.dimensions() != dimless)
     {
@@ -1719,7 +1719,7 @@ void Foam::mechanicalConstitutiveLawManager::readPrestress()
     // Checked before the inverse is taken: an Fpre that turns an element
     // inside out has no inverse, and one that is singular has no stress-free
     // configuration to refer to
-    scalar minJpre = gMin(Foam::primitiveField(*JprePtr_));
+    scalar minJpre = gMin(Foam::primitiveField(autoPtrRef(JprePtr_)));
 
     forAll(JprePtr_->boundaryField(), patchI)
     {
@@ -1758,7 +1758,7 @@ void Foam::mechanicalConstitutiveLawManager::readPrestress()
     );
 
     Info<< "    det(Fpre) ranges from " << minJpre << " to "
-        << gMax(Foam::primitiveField(*JprePtr_)) << nl << endl;
+        << gMax(Foam::primitiveField(autoPtrRef(JprePtr_))) << nl << endl;
 }
 
 
@@ -1785,7 +1785,7 @@ void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
                 IOobject::NO_WRITE,
                 false
             ),
-            fvc::interpolate(*FprePtr_)
+            fvc::interpolate(autoPtrRef(FprePtr_))
         )
     );
 
@@ -1802,7 +1802,7 @@ void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
                 IOobject::NO_WRITE,
                 false
             ),
-            inv(*FpreSurfacePtr_)
+            inv(autoPtrRef(FpreSurfacePtr_))
         )
     );
 
@@ -1819,7 +1819,7 @@ void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
                 IOobject::NO_WRITE,
                 false
             ),
-            det(*FpreSurfacePtr_)
+            det(autoPtrRef(FpreSurfacePtr_))
         )
     );
 }
@@ -2406,7 +2406,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             new prestressedLists
             (
                 F, F0, Finv, Finv0, J, J0,
-                *FprePtr_, *FpreInvPtr_, *JprePtr_
+                autoPtrRef(FprePtr_),
+                autoPtrRef(FpreInvPtr_),
+                autoPtrRef(JprePtr_)
             )
         );
     }
@@ -2506,7 +2508,9 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
             new prestressedLists
             (
                 F, F0, Finv, Finv0, J, J0,
-                *FprePtr_, *FpreInvPtr_, *JprePtr_
+                autoPtrRef(FprePtr_),
+                autoPtrRef(FpreInvPtr_),
+                autoPtrRef(JprePtr_)
             )
         );
     }
@@ -2624,7 +2628,10 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
         (
             new finiteStrainPrestressedFields<fvPatchField, volMesh>
             (
-                step, *FprePtr_, *FpreInvPtr_, *JprePtr_
+                step,
+                autoPtrRef(FprePtr_),
+                autoPtrRef(FpreInvPtr_),
+                autoPtrRef(JprePtr_)
             )
         );
     }
@@ -3462,7 +3469,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         (
             new finiteStrainPrestressedFields<fvPatchField, volMesh>
             (
-                step, *FprePtr_, *FpreInvPtr_, *JprePtr_
+                step,
+                autoPtrRef(FprePtr_),
+                autoPtrRef(FpreInvPtr_),
+                autoPtrRef(JprePtr_)
             )
         );
     }
@@ -3683,7 +3693,10 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         (
             new finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>
             (
-                step, *FpreSurfacePtr_, *FpreInvSurfacePtr_, *JpreSurfacePtr_
+                step,
+                autoPtrRef(FpreSurfacePtr_),
+                autoPtrRef(FpreInvSurfacePtr_),
+                autoPtrRef(JpreSurfacePtr_)
             )
         );
     }
