@@ -298,15 +298,19 @@ The mesh is overwritten!
   `src/solids4FoamModels/mechanicalConstitutiveLaw/README.md`). `Fpre`
   for the next pass is the deformation gradient `F` at the latest time composed
   with `Fpre` the run used, `Fpre_new = F & Fpre`. It is written to
-  the start time at full precision, and every time directory after the start
-  time is removed, so the next pass starts with zero displacement.
+  the start time (`startTime` in `system/controlDict`) at full precision, and
+  every time directory after the start time is removed, so the next pass
+  starts with zero displacement.
   `max mag(F - I)` is printed as the convergence measure.
 
 - **Arguments** None
 
 - **Options/parameters**
 
-  `-parallel` to update a decomposed case.
+  `-parallel` to update a decomposed case (uncollated only).
+
+  `-force` to update `Fpre` even when the time schemes for D are not
+  `steadyState`.
 
 - **Example of usage**
 
@@ -320,13 +324,16 @@ The mesh is overwritten!
   ```
 
   Each pass should be a static solve at the target load: `steadyState` for
-  `ddt(D)` and `predictor no;`.
+  `ddt(D)` and `d2dt2(D)`, and `predictor no;`.
 
 ```note
 Every time directory after the start time is removed, and the Fpre in the
-start time is overwritten. Log files and postProcessing are kept.
-A warning is given if the time scheme for D is not steadyState, or the results
-are written in ascii with a writePrecision below 10.
+start time is overwritten. Time directories before the start time, log files
+and postProcessing are kept.
+A case whose ddt or d2dt2 scheme for D is not steadyState is refused before
+anything is changed, unless `-force` is given, and so is a case written with a
+collated fileHandler. A warning is given if the results are written in ascii
+with a writePrecision below 10.
 A case where a material uses a law that cannot be prestressed (a small-strain
 law, or one with history such as `neoHookeanElasticMisesPlastic`) is refused
 before anything is changed: the laws are asked, as the solver asks them.

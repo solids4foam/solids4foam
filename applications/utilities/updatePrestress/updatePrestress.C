@@ -34,10 +34,13 @@ Description
     instead discards the prestress of every earlier pass, and the passes do
     not converge.
 
-    Fpre_new is written to the start time, internal and patch values alike,
-    at full precision, replacing the Fpre there, and every time directory
-    after the start time is removed, so the next pass starts from the start
-    time with zero displacement. Log files and postProcessing are left.
+    Fpre_new is written to the start time, the startTime entry of
+    system/controlDict, internal and patch values alike, at full precision,
+    replacing the Fpre there, and every time directory after the start time
+    is removed, so the next pass starts from the start time with zero
+    displacement. Time directories before the start time, log files and
+    postProcessing are left. A case written with a collated fileHandler is
+    refused, since its time directories are not ones this can remove.
 
     The manager writes Fpre at every write time, so Fpre in the latest time
     says the run applied it. Fpre is then taken from the start
@@ -51,9 +54,12 @@ Description
     as the mesh comes into equilibrium with the load under Fpre.
 
     A warning is given when the results are written in ascii with fewer than
-    10 digits, which limits how well F, and so Fpre, is known, and
-    when the time scheme for D is not steadyState, since F is then one
-    instant of a transient response rather than the equilibrium.
+    10 digits, which limits how well F, and so Fpre, is known.
+
+    A case whose ddt or d2dt2 scheme for D is not steadyState is refused
+    before anything is written or removed, unless -force is given: F is then
+    one instant of a transient response rather than the equilibrium, and an
+    Fpre built from it does not converge.
 
     A material whose law cannot be prestressed (see
     mechanicalConstitutiveLaw::admitsPrestress) is refused before anything is
@@ -62,7 +68,7 @@ Description
     utility and the solver refuse the same laws.
 
 Usage
-    updatePrestress [-parallel]
+    updatePrestress [-parallel] [-force]
 
 Author
     Conor Moore, UCD.
@@ -110,31 +116,78 @@ void compose
 
 int main(int argc, char *argv[])
 {
+    argList::addBoolOption
+    (
+        "force",
+        "Update Fpre even when the time schemes for D are not steadyState"
+    );
+
 #   include "setRootCase.H"
 #   include "createTime.H"
+
+#ifdef OPENFOAM_COM
+    const bool force = args.found("force");
+#else
+    const bool force = args.optionFound("force");
+#endif
+
+#ifdef OPENFOAM_NOT_EXTEND
+    // A collated case keeps every processor's time directories together,
+    // and they are not ones rmDir on this processor's path can remove
+    if (fileHandler().type() != "uncollated")
+    {
+        FatalErrorInFunction
+            << "The fileHandler is " << fileHandler().type() << "; only an "
+            << "uncollated case can be updated." << nl
+            << "Write the case with '-fileHandler uncollated', or set "
+            << "fileHandler uncollated in OptimisationSwitches"
+            << exit(FatalError);
+    }
+#endif
+
+    // The start time the passes start from, as the controlDict gives it,
+    // rather than the earliest time directory, which may be an earlier
+    // stage of the case
+    const scalar startValue
+    (
+        readScalar(runTime.controlDict().lookup("startTime"))
+    );
 
     // The time directories, earliest first; constant is not one of them
     const instantList allTimes(runTime.times());
     DynamicList<instant> timeDirs(allTimes.size());
+    label startI = -1;
 
     forAll(allTimes, timeI)
     {
         if (allTimes[timeI].name() != runTime.constant())
         {
+            if (allTimes[timeI].equal(startValue))
+            {
+                startI = timeDirs.size();
+            }
+
             timeDirs.append(allTimes[timeI]);
         }
     }
 
-    if (timeDirs.size() < 2)
+    if (startI == -1)
     {
         FatalErrorInFunction
-            << "There are no results after the start time to update the "
-            << "Fpre from." << nl
+            << "There is no time directory for the startTime " << startValue
+            << " in system/controlDict" << exit(FatalError);
+    }
+
+    if (startI == timeDirs.size() - 1)
+    {
+        FatalErrorInFunction
+            << "There are no results after the start time " << startValue
+            << " to update the Fpre from." << nl
             << "Run the prestressed solid model first"
             << exit(FatalError);
     }
 
-    const instant startTime(timeDirs.first());
+    const instant startTime(timeDirs[startI]);
     const instant latestTime(timeDirs.last());
 
     runTime.setTime(latestTime, timeDirs.size() - 1);
@@ -230,25 +283,54 @@ int main(int argc, char *argv[])
             << "binary, in system/controlDict" << nl << endl;
     }
 
-    const word ddtDScheme
-    (
-#ifdef OPENFOAM_NOT_EXTEND
-        mesh.ddtScheme("ddt(D)")
-#else
-        mesh.schemesDict().ddtScheme("ddt(D)")
-#endif
-    );
-
-    if (ddtDScheme != "steadyState")
+    // Checked before anything is written or removed. A solid model takes its
+    // inertia from d2dt2(D), and some its damping from ddt(D), so both have
+    // to be steady for F at the latest time to be the equilibrium
     {
-        WarningInFunction
-            << "The time scheme for D is " << ddtDScheme << ", not "
-            << "steadyState, so F at the latest time is one instant of a "
-            << "transient response rather than the equilibrium under the "
-            << "load, and an Fpre built from it does not converge."
-            << nl
-            << "    Use steadyState, with predictor no, for prestress passes"
-            << nl << endl;
+        const word ddtDScheme
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh.ddtScheme("ddt(D)")
+#else
+            mesh.schemesDict().ddtScheme("ddt(D)")
+#endif
+        );
+
+        const word d2dt2DScheme
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh.d2dt2Scheme("d2dt2(D)")
+#else
+            mesh.schemesDict().d2dt2Scheme("d2dt2(D)")
+#endif
+        );
+
+        if (ddtDScheme != "steadyState" || d2dt2DScheme != "steadyState")
+        {
+            if (force)
+            {
+                WarningInFunction
+                    << "The time schemes for D are " << ddtDScheme
+                    << " (ddt) and " << d2dt2DScheme << " (d2dt2), not "
+                    << "steadyState, so F at the latest time is one instant "
+                    << "of a transient response. Updating Fpre anyway, as "
+                    << "-force was given" << nl << endl;
+            }
+            else
+            {
+                FatalErrorInFunction
+                    << "The time schemes for D are " << ddtDScheme
+                    << " (ddt) and " << d2dt2DScheme << " (d2dt2), not "
+                    << "steadyState, so F at the latest time is one instant "
+                    << "of a transient response rather than the equilibrium "
+                    << "under the load, and an Fpre built from it does not "
+                    << "converge." << nl
+                    << "Use steadyState for both, with predictor no, for "
+                    << "prestress passes, or give -force to update Fpre "
+                    << "anyway. Nothing has been written or removed"
+                    << exit(FatalError);
+            }
+        }
     }
 
     const volTensorField F
@@ -400,7 +482,7 @@ int main(int argc, char *argv[])
             << exit(FatalError);
     }
 
-    for (label timeI = 1; timeI < timeDirs.size(); timeI++)
+    for (label timeI = startI + 1; timeI < timeDirs.size(); timeI++)
     {
         Info<< "Removing time " << timeDirs[timeI].name() << endl;
         rmDir(runTime.path()/timeDirs[timeI].name());
