@@ -50,6 +50,35 @@ namespace Foam
 namespace
 {
 
+// Fpre, written at full round-trip precision whatever writePrecision the case
+// asks for, as the constitutive state is: a continued run reads Fpre back from
+// the time it continues from, and a rounding of it would move the stress the
+// laws see. writeData is overridden rather than writeObject, whose signature
+// differs between the three forks
+class fullPrecisionVolTensorField
+:
+    public volTensorField
+{
+public:
+
+    fullPrecisionVolTensorField(const IOobject& io, const fvMesh& mesh)
+    :
+        volTensorField(io, mesh)
+    {}
+
+    virtual bool writeData(Ostream& os) const
+    {
+        const int oldPrecision = os.precision(17);
+
+        const bool ok = volTensorField::writeData(os);
+
+        os.precision(oldPrecision);
+
+        return ok;
+    }
+};
+
+
 // The flat-list twin of finiteStrainPrestressedFields: the solver's
 // kinematics at cell-centred integration points composed with Fpre
 // at the cells, held so that the views evaluateFlat builds have something to
@@ -1720,11 +1749,11 @@ void Foam::mechanicalConstitutiveLawManager::readPrestress()
         << "read from time "
         << mesh_.time().timeName() << endl;
 
-    // Written at every write time, so that a continued run reads back the
-    // Fpre it was started with
+    // Written at every write time, at full precision, so that a continued run
+    // reads back the Fpre it was started with
     FprePtr_.reset
     (
-        new volTensorField
+        new fullPrecisionVolTensorField
         (
             IOobject
             (

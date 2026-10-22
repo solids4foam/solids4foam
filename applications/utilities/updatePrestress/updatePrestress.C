@@ -377,9 +377,9 @@ int main(int argc, char *argv[])
 
     if (FpreAtLatest && FpreAtStart)
     {
-        // The same Fpre, but the start time holds it as this utility
-        // wrote it, at full precision, and the latest time as the run wrote
-        // it, at writePrecision
+        // The same Fpre, both at full precision; the start time's is the
+        // one this utility wrote, which a run started from an earlier
+        // build, one that wrote Fpre at writePrecision, has not rounded
         FpreOldPtr.reset(new volTensorField(FpreStartHeader, mesh));
     }
     else if (FpreAtLatest)

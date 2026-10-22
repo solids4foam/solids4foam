@@ -394,7 +394,9 @@ leaves it at zero.
 `Fpre` is held at the cells. A face evaluation uses it interpolated to the
 faces, so only cell values (and the patch values that come with a
 `volTensorField`) need to be written. It is written back at every write time,
-so a continued run reads the `Fpre` it started with.
+at full precision whatever the `writePrecision`, as the constitutive state is,
+so a continued run reads the `Fpre` it started with rather than a rounding of
+it.
 
 What prestress does not cover, and refuses rather than evaluates without
 `Fpre`:
