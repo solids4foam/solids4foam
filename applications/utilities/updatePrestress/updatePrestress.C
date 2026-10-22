@@ -145,29 +145,66 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    // The start time the passes start from, as the controlDict gives it,
-    // rather than the earliest time directory, which may be an earlier
-    // stage of the case
-    const scalar startValue
-    (
-        readScalar(runTime.controlDict().lookup("startTime"))
-    );
-
     // The time directories, earliest first; constant is not one of them
     const instantList allTimes(runTime.times());
     DynamicList<instant> timeDirs(allTimes.size());
-    label startI = -1;
 
     forAll(allTimes, timeI)
     {
         if (allTimes[timeI].name() != runTime.constant())
         {
-            if (allTimes[timeI].equal(startValue))
-            {
-                startI = timeDirs.size();
-            }
-
             timeDirs.append(allTimes[timeI]);
+        }
+    }
+
+    if (timeDirs.empty())
+    {
+        FatalErrorInFunction
+            << "There are no time directories" << exit(FatalError);
+    }
+
+    // The start time the passes start from, as the controlDict gives it,
+    // rather than the earliest time directory, which may be an earlier
+    // stage of the case. With startFrom firstTime a pass starts from the
+    // earliest directory instead, so the two must agree; with latestTime it
+    // starts from the start time, once the later directories are removed
+    const word startFrom
+    (
+        runTime.controlDict().lookupOrDefault<word>("startFrom", "latestTime")
+    );
+
+    scalar startValue = timeDirs.first().value();
+
+    if (runTime.controlDict().found("startTime"))
+    {
+        startValue = readScalar(runTime.controlDict().lookup("startTime"));
+
+        if (startFrom == "firstTime" && !timeDirs.first().equal(startValue))
+        {
+            FatalErrorInFunction
+                << "startFrom is firstTime, so a pass starts from time "
+                << timeDirs.first().name() << ", but startTime is "
+                << startValue << "." << nl
+                << "Set startFrom startTime, or remove the time directories "
+                << "before the start time, so that Fpre is written to the "
+                << "time the next pass starts from"
+                << exit(FatalError);
+        }
+    }
+    else if (startFrom != "firstTime")
+    {
+        FatalErrorInFunction
+            << "There is no startTime in system/controlDict to update Fpre "
+            << "in, and startFrom is " << startFrom << exit(FatalError);
+    }
+
+    label startI = -1;
+
+    forAll(timeDirs, timeI)
+    {
+        if (timeDirs[timeI].equal(startValue))
+        {
+            startI = timeI;
         }
     }
 
@@ -296,14 +333,7 @@ int main(int argc, char *argv[])
 #endif
         );
 
-        const word d2dt2DScheme
-        (
-#ifdef OPENFOAM_NOT_EXTEND
-            mesh.d2dt2Scheme("d2dt2(D)")
-#else
-            mesh.schemesDict().d2dt2Scheme("d2dt2(D)")
-#endif
-        );
+        const word d2dt2DScheme(d2dt2SchemeCompat(mesh, "d2dt2(D)"));
 
         if (ddtDScheme != "steadyState" || d2dt2DScheme != "steadyState")
         {
