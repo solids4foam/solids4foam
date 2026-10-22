@@ -385,7 +385,11 @@ refuses to start with prestress on and a law that answers no, naming it. A law
 that integrates an increment `F & Finv0` onto a history variable, such as
 `neoHookeanElasticMisesPlastic`, would otherwise cancel `Fpre` out of the
 increment and start its history from the stress-free value, so it would run as
-if there were no prestress.
+if there were no prestress. `OgdenElastic` also takes a prescribed initial
+stress `sigma0`, and with prestress on the two add: `sigma0` is pushed forward
+with the composed `F`, so it is read as a stress in the stress-free
+configuration, on top of the stress `Fpre` gives. A prestressed case normally
+leaves it at zero.
 
 `Fpre` is held at the cells. A face evaluation uses it interpolated to the
 faces, so only cell values (and the patch values that come with a

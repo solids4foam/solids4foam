@@ -176,8 +176,20 @@ int main(int argc, char *argv[])
         forAll(lawEntries, lawI)
         {
             dictionary lawDict(lawEntries[lawI].dict());
-            lawDict.add("planeStress", planeStress, true);
-            lawDict.add("solutionD", mesh.solutionD(), true);
+
+            // Given by the manager, and refused by it inside a material
+            if (lawDict.found("planeStress") || lawDict.found("solutionD"))
+            {
+                FatalIOErrorInFunction(lawDict)
+                    << "'planeStress' and 'solutionD' must not be given "
+                    << "inside the '" << lawEntries[lawI].keyword()
+                    << "' sub-dictionary: planeStress is set once in "
+                    << "mechanicalProperties, and solutionD is supplied by "
+                    << "the mesh" << exit(FatalIOError);
+            }
+
+            lawDict.add("planeStress", planeStress);
+            lawDict.add("solutionD", mesh.solutionD());
 
             const autoPtr<mechanicalConstitutiveLaw> lawPtr
             (
