@@ -42,6 +42,9 @@ Description
 
     The composed fields are copies of the solver's, so they keep its patch
     types, and with them which patches are coupled; only the values change.
+    A copy brings the old-time fields of what it copies with it, so the
+    manager makes one of these once and recomposes it with update() at every
+    later evaluation, rather than copying the solver's fields each time.
 
 SourceFiles
     (header only)
@@ -186,6 +189,23 @@ public:
             J_(copyOf(step.J)),
             J0_(copyOf(step.J0)),
             fields(F_, F0_, Finv_, Finv0_, J_, J0_)
+        {
+            update(step, Fpre, FpreInv, Jpre);
+        }
+
+
+    // Member Functions
+
+        //- Compose step with Fpre again, into the fields already made.
+        //  step must be on the mesh, and have the patches, of the step this
+        //  was constructed from; only its values are read
+        void update
+        (
+            const geometricFields& step,
+            const tensorFieldType& Fpre,
+            const tensorFieldType& FpreInv,
+            const scalarFieldType& Jpre
+        )
         {
             compose(F_, step.F, Fpre);
             compose(F0_, step.F0, Fpre);

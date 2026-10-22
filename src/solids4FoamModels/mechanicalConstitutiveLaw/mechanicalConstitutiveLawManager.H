@@ -66,6 +66,7 @@ Author
 #include "mechanicalConstitutiveLawCaseInputs.H"
 #include "mechanicalConstitutiveLawStateSetup.H"
 #include "mechanicalConstitutiveLawInputGatherer.H"
+#include "mechanicalConstitutiveLawPrestress.H"
 
 #ifdef OPENFOAM_ORG
 #include "CompactListList.H"
@@ -296,6 +297,16 @@ class mechanicalConstitutiveLawManager
         mutable autoPtr<surfaceTensorField> FpreInvSurfacePtr_;
         mutable autoPtr<surfaceScalarField> JpreSurfacePtr_;
 
+        //- The solver's kinematics composed with Fpre, made on the first
+        //  evaluation and recomposed at every later one, so that the
+        //  solver's fields, old times and all, are copied only once
+        mutable autoPtr<finiteStrainPrestressedFields<fvPatchField, volMesh>>
+            volPrestressedPtr_;
+        mutable autoPtr
+        <
+            finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>
+        > surfacePrestressedPtr_;
+
 
     // Private Member Functions
 
@@ -304,6 +315,18 @@ class mechanicalConstitutiveLawManager
 
         //- Make the face Fpre, if it has not been made
         void makeSurfacePrestress() const;
+
+        //- The kinematics the laws see: step composed with Fpre, into
+        //  fields kept from one evaluation to the next
+        const finiteStrainVolFields& prestressedFields
+        (
+            const finiteStrainVolFields& step
+        ) const;
+
+        const finiteStrainSurfaceFields& prestressedFields
+        (
+            const finiteStrainSurfaceFields& step
+        ) const;
 
         //- Refuse an evaluation that has no way to apply Fpre,
         //  rather than evaluate it without one

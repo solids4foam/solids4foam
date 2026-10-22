@@ -1332,7 +1332,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     JprePtr_(),
     FpreSurfacePtr_(),
     FpreInvSurfacePtr_(),
-    JpreSurfacePtr_()
+    JpreSurfacePtr_(),
+    volPrestressedPtr_(),
+    surfacePrestressedPtr_()
 {
     // Read the mechanical laws
     const PtrList<entry> lawEntries(dict.lookup("mechanical"));
@@ -1939,6 +1941,78 @@ void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
             det(autoPtrRef(FpreSurfacePtr_))
         )
     );
+}
+
+
+const Foam::finiteStrainVolFields&
+Foam::mechanicalConstitutiveLawManager::prestressedFields
+(
+    const finiteStrainVolFields& step
+) const
+{
+    if (volPrestressedPtr_.valid())
+    {
+        volPrestressedPtr_->update
+        (
+            step,
+            autoPtrRef(FprePtr_),
+            autoPtrRef(FpreInvPtr_),
+            autoPtrRef(JprePtr_)
+        );
+    }
+    else
+    {
+        volPrestressedPtr_.reset
+        (
+            new finiteStrainPrestressedFields<fvPatchField, volMesh>
+            (
+                step,
+                autoPtrRef(FprePtr_),
+                autoPtrRef(FpreInvPtr_),
+                autoPtrRef(JprePtr_)
+            )
+        );
+    }
+
+    return volPrestressedPtr_->fields;
+}
+
+
+const Foam::finiteStrainSurfaceFields&
+Foam::mechanicalConstitutiveLawManager::prestressedFields
+(
+    const finiteStrainSurfaceFields& step
+) const
+{
+    // Fpre is held at cell centres and reaches the faces interpolated, so no
+    // face values of it need be written
+    makeSurfacePrestress();
+
+    if (surfacePrestressedPtr_.valid())
+    {
+        surfacePrestressedPtr_->update
+        (
+            step,
+            autoPtrRef(FpreSurfacePtr_),
+            autoPtrRef(FpreInvSurfacePtr_),
+            autoPtrRef(JpreSurfacePtr_)
+        );
+    }
+    else
+    {
+        surfacePrestressedPtr_.reset
+        (
+            new finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>
+            (
+                step,
+                autoPtrRef(FpreSurfacePtr_),
+                autoPtrRef(FpreInvSurfacePtr_),
+                autoPtrRef(JpreSurfacePtr_)
+            )
+        );
+    }
+
+    return surfacePrestressedPtr_->fields;
 }
 
 
@@ -2755,25 +2829,9 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentFiniteStrain
 {
     const finiteStrainVolFields step(F, F0, Finv, Finv0, J, J0);
 
-    autoPtr<finiteStrainPrestressedFields<fvPatchField, volMesh>> prePtr;
-
-    if (prestress_)
-    {
-        prePtr.reset
-        (
-            new finiteStrainPrestressedFields<fvPatchField, volMesh>
-            (
-                step,
-                autoPtrRef(FprePtr_),
-                autoPtrRef(FpreInvPtr_),
-                autoPtrRef(JprePtr_)
-            )
-        );
-    }
-
     updateScalarTangentVol
     (
-        prePtr.valid() ? prePtr->fields : step,
+        prestress_ ? prestressedFields(step) : step,
         dt,
         scalarTangent,
         tangentReq,
@@ -3596,25 +3654,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 {
     const finiteStrainVolFields step(F, F0, Finv, Finv0, J, J0);
 
-    autoPtr<finiteStrainPrestressedFields<fvPatchField, volMesh>> prePtr;
-
-    if (prestress_)
-    {
-        prePtr.reset
-        (
-            new finiteStrainPrestressedFields<fvPatchField, volMesh>
-            (
-                step,
-                autoPtrRef(FprePtr_),
-                autoPtrRef(FpreInvPtr_),
-                autoPtrRef(JprePtr_)
-            )
-        );
-    }
-
     updateStressVol
     (
-        prePtr.valid() ? prePtr->fields : step,
+        prestress_ ? prestressedFields(step) : step,
         dt,
         stress,
         scalarTangentPtr,
@@ -3815,33 +3857,12 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
 
     const finiteStrainSurfaceFields step(F, F0, Finv, Finv0, J, J0);
 
-    // Fpre is held at cell centres and reaches the faces
-    // interpolated, so no face values of it need be written
-    autoPtr<finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>>
-        prePtr;
-
-    if (prestress_)
-    {
-        makeSurfacePrestress();
-
-        prePtr.reset
-        (
-            new finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>
-            (
-                step,
-                autoPtrRef(FpreSurfacePtr_),
-                autoPtrRef(FpreInvSurfacePtr_),
-                autoPtrRef(JpreSurfacePtr_)
-            )
-        );
-    }
-
     // No tangent is computed on this path
     updateStressSurface
     (
         topo,
         tp,
-        prePtr.valid() ? prePtr->fields : step,
+        prestress_ ? prestressedFields(step) : step,
         dt,
         stress,
         collapseRule,
