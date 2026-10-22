@@ -163,6 +163,20 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 }
 
 
+tmp<volScalarField> nonLinGeomTotalLagTotalDispSolid::lawJ() const
+{
+    if (mechanicalManager().prestressed())
+    {
+        return tmp<volScalarField>
+        (
+            new volScalarField("lawJ", J_*mechanicalManager().Jpre())
+        );
+    }
+
+    return tmp<volScalarField>(new volScalarField("lawJ", J_));
+}
+
+
 void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
 {
     if (volumetricClosureChecked_)
@@ -183,9 +197,12 @@ void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
     // The response the law returns is exactly dU/dJ, so the assumption can be
     // checked rather than trusted. Once is enough: it is a property of the
     // law, not of the state
+    // On the J the law sees, which with prestress includes det(Fpre)
+    const volScalarField Jlaw(lawJ());
+
     const volScalarField assumed
     (
-        0.5*(sqr(J_) - 1.0)/(J_*rKappa())
+        0.5*(sqr(Jlaw) - 1.0)/(Jlaw*rKappa())
     );
 
     const volScalarField& actual = volumetricResponse();
@@ -1439,12 +1456,18 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
         }
 
-        // Calculate pressure equation residual
+        // Calculate pressure equation residual. The pressure stands in for
+        // the law's volumetric response, so it is written on the J the law
+        // sees, which with prestress includes det(Fpre). The Jacobian below
+        // linearises it about J = 1 whether or not there is prestress; it is
+        // an approximation either way, and only the residual sets the answer
+        const volScalarField Jlaw(lawJ());
+
         scalarField pressureResidual
         (
           - p*rKappa()
           + pressureStabilisation().cellScalar(&rAUf(), true)*one
-          - 0.5*(pow(J_, 2.0) - 1.0)/J_
+          - 0.5*(pow(Jlaw, 2.0) - 1.0)/Jlaw
         );
 
         // Make residual extensive

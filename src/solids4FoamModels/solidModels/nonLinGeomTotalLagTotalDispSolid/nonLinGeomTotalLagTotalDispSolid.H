@@ -163,6 +163,12 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
 
+        //- The Jacobian of the deformation the laws see: J_, times
+        //  det(Fpre) when the laws are prestressed. The pressure equation
+        //  stands in for the laws' volumetric response, so it is written on
+        //  this J rather than on the solver's own
+        tmp<volScalarField> lawJ() const;
+
         //- Refuse a law whose volumetric response is not the one the
         //  pressure equation was written for
         void checkVolumetricClosure() const;

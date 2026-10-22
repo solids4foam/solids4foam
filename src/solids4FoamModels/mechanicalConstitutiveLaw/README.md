@@ -396,13 +396,19 @@ What prestress does not cover, and refuses rather than evaluates without
 `Fpre`:
 
 - laws that do not admit prestress, as above,
+- `coupledPressureDisplacementSolid`, whose pressure equation is an
+  incremental relation on the mesh and does not see `Fpre`,
 - small-strain evaluations, which have no deformation gradient to compose,
 - flat-list evaluations on any topology but the cell-centred one, including
   the `CompactListList` (high-order quadrature) path,
 - fourth-order tangents, which the laws give with respect to the composed
   deformation gradient rather than the solver's.
 
-Scalar tangents are given at the composed kinematics; they are preconditioner
+The mixed formulation of `nonLinearGeometryTotalLagrangianTotalDisplacement`
+(`solvePressure`) is written on the `J` the laws see, `J_step*det(Fpre)`, in
+its pressure residual and in its check of the law's volumetric response, since
+the pressure stands in for that response; its approximate Jacobian is
+unchanged. Scalar tangents are given at the composed kinematics; they are preconditioner
 estimates and need nothing more. Laws with fibre directions take those
 directions in the stress-free configuration, so directions defined on the
 imaged geometry should be mapped back through `inv(Fpre)` first.

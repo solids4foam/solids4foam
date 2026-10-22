@@ -789,6 +789,10 @@ public:
         //- Fpre; fatal without prestress
         const volTensorField& Fpre() const;
 
+        //- det(Fpre), which J the laws see is the solver's J times;
+        //  fatal without prestress
+        const volScalarField& Jpre() const;
+
     // Edit
 
         //- Register an externally constructed integration-point topology and
