@@ -37,7 +37,7 @@ triangular` sweeps that family instead. Its levels are the nominal Gmsh
 spacings of the legacy study, 25 mm halved at each level, and the default
 levels `2, 3, 4, 5, 6` give 31, 119, 413, 1 591 and 6 323 cells with Gmsh
 4.15. The triangular family requires `gmsh`, `gmshToFoam` and
-`changeDictionary`, uses the same pass criterion as the structured family, and
+`changeDictionary`, uses the same pass criterion as the quadrilateral family, and
 writes its outputs with a `triangular_` prefix.
 
 The per-mesh tip displacements of the four published sources of the legacy

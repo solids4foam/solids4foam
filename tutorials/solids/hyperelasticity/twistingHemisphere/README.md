@@ -67,18 +67,19 @@ hemisphere as master, as in the original benchmark, the momentum loop stalls
 from about half-way through the indentation. For the same reason, the friction
 penalty scale factor is reduced from 1.5 to 0.5.
 
-The finer meshes of the original benchmark are stored on the solids4foam
-website and can be selected with the mesh option of `Allrun` (see below):
+The finer meshes of the original benchmark are available in the
+[solids4foam tutorial archive](https://www.solids4foam.com/tutorials/archive/):
 [medium](https://www.solids4foam.com/tutorials/archive/twistingHemisphere-mediumMesh.tar.xz)
 (24 000 cells),
 [paper](https://www.solids4foam.com/tutorials/archive/twistingHemisphere-paperMesh.tar.xz)
 (35 424 cells, the mesh of Figure 1b and of the results of [1] in Figures 3
 and 4) and
 [fine](https://www.solids4foam.com/tutorials/archive/twistingHemisphere-fineMesh.tar.xz)
-(43 488 cells). These meshes are stored with $$L = 2$$ and are not scaled. The
-tutorial contact settings above were chosen for the coarse mesh; the results
-of [1] on the 35 424-cell mesh were obtained with the hemisphere as the master
-contact patch and a friction penalty scale factor of 1.5.
+(43 488 cells). These meshes are stored with $$L = 2$$, so they do not need the
+`transformPoints` scaling applied to the coarse mesh. The tutorial contact
+settings above were chosen for the coarse mesh; the results of [1] on the
+35 424-cell mesh were obtained with the hemisphere as the master contact patch
+and a friction penalty scale factor of 1.5.
 
 ![Figure 1: Problem geometry and computational mesh [1]](./images/twistingHemisphere-geometry.png)
 
@@ -103,11 +104,6 @@ script extracts the mesh from `constant/polyMesh_coarse.tar.xz`, scales it with
 installed, the vertical force and the twisting torque on the
 `sphere-displacement` patch are plotted against the reference data in the
 `force.png` and `torque.png` files.
-
-A finer mesh is selected with `> ./Allrun medium`, `> ./Allrun paper` or
-`> ./Allrun fine`. The mesh archive is downloaded from the solids4foam website
-with `curl` or `wget` if it is not already in the case directory, and is
-removed again by `./Allclean`.
 
 With foam-extend-4.1, the complete run (130 increments) takes about 13 minutes
 on one core. In 20 increments, between $$t = 3.8$$ and $$t = 5.7$$ (the end of

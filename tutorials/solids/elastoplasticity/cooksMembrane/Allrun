@@ -12,7 +12,7 @@ Usage:
   ./Allrun [mesh]
 
 Where [mesh] is one of:
-  structured        (default) structured quadrilateral mesh from blockMesh
+  quadrilateral     (default) structured quadrilateral mesh from blockMesh
   triangular        unstructured triangular-prism mesh from Gmsh
 
 Examples:
@@ -27,10 +27,10 @@ then
     exit 0
 fi
 
-MESH="${1:-structured}"
+MESH="${1:-quadrilateral}"
 
 case "$MESH" in
-    structured|triangular) ;;
+    quadrilateral|triangular) ;;
     *)
         echo "Error: Unknown mesh '$MESH'"
         usage
@@ -42,7 +42,7 @@ esac
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-if [[ "$MESH" == "structured" ]]
+if [[ "$MESH" == "quadrilateral" ]]
 then
     solids4Foam::runApplication blockMesh
 elif command -v gmsh &> /dev/null

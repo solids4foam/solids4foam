@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-MESH_FAMILIES = ("structured", "triangular")
+MESH_FAMILIES = ("quadrilateral", "triangular")
 MEMBRANE_AREA_MM2 = 1440.0
 
 
@@ -30,13 +30,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mesh",
         choices=MESH_FAMILIES,
-        default="structured",
-        help="mesh family to verify (default: structured)",
+        default="quadrilateral",
+        help="mesh family to verify (default: quadrilateral)",
     )
     parser.add_argument(
         "--levels",
         help=(
-            "comma-separated cell counts per side for the structured family, "
+            "comma-separated cell counts per side for the quadrilateral family, "
             "or spacing levels for the triangular family (default: reference "
             "file)"
         ),
@@ -111,7 +111,7 @@ def run_level(
     work_dir: Path,
     reuse: bool,
 ) -> dict[str, float | int]:
-    if mesh == "structured":
+    if mesh == "quadrilateral":
         name = f"{level} x {level} mesh"
         run_dir = work_dir / f"mesh_{level}x{level}"
         allrun_arguments = reference["allrun_arguments"]
@@ -137,7 +137,7 @@ def run_level(
         if run_dir.exists():
             shutil.rmtree(run_dir)
         shutil.copytree(case_dir, run_dir, ignore=ignored, symlinks=True)
-        if mesh == "structured":
+        if mesh == "quadrilateral":
             set_mesh_level(run_dir / "system" / "blockMeshDict", level)
         else:
             set_triangular_spacing(
@@ -184,9 +184,9 @@ def run_level(
         if matches:
             clock_time = float(matches[-1])
 
-    cells = level * level if mesh == "structured" else read_cell_count(run_dir)
+    cells = level * level if mesh == "quadrilateral" else read_cell_count(run_dir)
     return {
-        "cells_per_side" if mesh == "structured" else "level": level,
+        "cells_per_side" if mesh == "quadrilateral" else "level": level,
         "cells": cells,
         "spacing_mm": math.sqrt(MEMBRANE_AREA_MM2 / cells),
         "displacement_y_m": displacement_y,
@@ -278,8 +278,8 @@ def write_results(
     post_dir: Path,
 ) -> bool:
     post_dir.mkdir(parents=True, exist_ok=True)
-    prefix = "" if mesh == "structured" else f"{mesh}_"
-    level_key = "cells_per_side" if mesh == "structured" else "level"
+    prefix = "" if mesh == "quadrilateral" else f"{mesh}_"
+    level_key = "cells_per_side" if mesh == "quadrilateral" else "level"
     target = float(reference["primary_reference"]["displacement_m"])
     tolerance = float(reference["primary_reference"]["relative_tolerance"])
 
@@ -366,11 +366,11 @@ def main() -> int:
     reference_dir = verify_dir / "reference"
     reference_file = reference_dir / "cooksMembrane_verification_references.json"
     reference = json.loads(reference_file.read_text())
-    if args.mesh != "structured" and args.mesh not in reference:
+    if args.mesh != "quadrilateral" and args.mesh not in reference:
         raise SystemExit(f"the {args.mesh} mesh family is not available here")
     if args.levels:
         levels = [int(value) for value in args.levels.split(",")]
-    elif args.mesh == "structured":
+    elif args.mesh == "quadrilateral":
         levels = [int(value) for value in reference["default_levels"]]
     else:
         levels = [
@@ -383,7 +383,7 @@ def main() -> int:
     if levels != sorted(set(levels)):
         raise SystemExit("mesh levels must be unique and increasing")
 
-    if args.mesh == "structured":
+    if args.mesh == "quadrilateral":
         required = ["blockMesh", "solids4Foam"]
     else:
         required = ["gmsh", "gmshToFoam", "changeDictionary", "solids4Foam"]

@@ -118,7 +118,7 @@ The mesh spacing is set by `dx` in `cooksMembrane.geo`.
 ## Verification and convergence study
 
 The opt-in [`verification/`](verification/) directory contains the migrated
-mesh-convergence study, for the structured and the triangular meshes, and the
+mesh-convergence study, for the quadrilateral and the triangular meshes, and the
 published per-mesh displacement references. It is separate from normal
 regression testing and is not run by `tutorials/Alltest` or
 `tutorials/Alltest-regression`. See its README for the command, acceptance

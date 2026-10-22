@@ -15,9 +15,9 @@ release. For complete commit-level details and contributor information, see the
   case), list them in the summary and plot them against the sweep. The
   elastoplastic tutorial gains an unstructured triangular-prism Gmsh mesh
   (`./Allrun triangular`), which its study sweeps with `--mesh triangular`.
-- The `compressedSpheres` and `twistingHemisphere` tutorials can run on the
-  finer meshes of the original benchmarks (`./Allrun fine`, for example),
-  which `Allrun` downloads from the solids4foam website.
+- The `compressedSpheres` and `twistingHemisphere` READMEs now point to the
+  finer meshes of the original benchmarks in the solids4foam website archive,
+  instead of the solid-benchmarks repository.
 - Added the `channelLeaflet` fluid-solid interaction tutorial: a thin
   elastic leaflet, clamped in a 2D channel and wetted on both faces, in a
   pulsatile flow at Re = 200, after the oomph-lib channel-with-leaflet

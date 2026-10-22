@@ -10,9 +10,6 @@ cleanCase
 \rm -rf system/*Subset constant/*Subset VTK postProcessing/ case.foam \
         constant/polyMesh constant/*.withDefaultValues *.png
 
-# Remove the finer meshes downloaded by Allrun
-\rm -f twistingHemisphere-*Mesh.tar.xz
-
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
 
