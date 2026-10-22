@@ -660,28 +660,32 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
         // Use the segregated solver as a predictor
         //evolveImplicitSegregated();
+    }
 
-        // Map the D field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<vector>
+    // Seed the SNES solution vector from the current fields on every time
+    // step, as linGeomTotalDispSolid does, so that initial conditions,
+    // restarts and externally set fields (e.g. FSI mesh motion) are not
+    // overwritten by a stale solution vector. On a restart the vector is
+    // otherwise zero, and the first residual is that of a zero displacement
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        primitiveFieldRef(D()),
+        foamPetscSnesHelper::solution(),
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    if (solvePressure())
+    {
+        // Map the p field to the SNES solution vector
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            primitiveFieldRef(D()),
+            p(),
             foamPetscSnesHelper::solution(),
-            0, // Location of first component
-            solidModel::twoD()
-          ? makeList<label>({0,1})
-          : makeList<label>({0,1,2})
+            blockSize_ -1 // Location of first component
         );
-
-        if (solvePressure())
-        {
-            // Map the p field to the SNES solution vector
-            foamPetscSnesHelper::InsertFieldComponents<scalar>
-            (
-                p(),
-                foamPetscSnesHelper::solution(),
-                blockSize_ -1 // Location of first component
-            );
-        }
     }
 
     // Solve the nonlinear system and check the convergence
