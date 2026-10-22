@@ -45,8 +45,9 @@ Description
          volField update.
       7. The guards fire: a small-strain update, a flat-list update on a
          topology other than the cell-centred one, a fourth-order tangent,
-         asking a manager without prestress for its Fpre, and building a
-         prestressed manager with a law that cannot be prestressed.
+         asking a manager without prestress for its Fpre, building a
+         prestressed manager with a law that cannot be prestressed, and
+         reading an Fpre whose patches set their own values.
 
 Author
     Conor Moore, UCD.
@@ -751,6 +752,49 @@ int main(int argc, char *argv[])
             {
                 mechanicalConstitutiveLawManager
                     refused(mesh, unprestressableDict);
+            })
+        );
+
+        // An Fpre whose patches set their own values, here zeroGradient on
+        // every patch that is not a constraint one, is refused when read. It
+        // replaces the Fpre in the start time, which the managers above have
+        // already read
+        {
+            wordList patchTypes(mesh.boundary().size());
+
+            forAll(mesh.boundary(), patchI)
+            {
+                const word& type = mesh.boundary()[patchI].type();
+
+                patchTypes[patchI] =
+                    polyPatch::constraintType(type) ? type : "zeroGradient";
+            }
+
+            volTensorField FpreZeroGrad
+            (
+                IOobject
+                (
+                    "Fpre",
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::NO_READ,
+                    IOobject::NO_WRITE,
+                    false
+                ),
+                mesh,
+                dimensionedTensor("I", dimless, I),
+                patchTypes
+            );
+
+            FpreZeroGrad.write();
+        }
+
+        report
+        (
+            "an Fpre with patches that set their own values is refused",
+            throwsFatal([&]()
+            {
+                mechanicalConstitutiveLawManager refused(mesh, preDict);
             })
         );
     }

@@ -402,6 +402,11 @@ What prestress does not cover, and refuses rather than evaluates without
 - laws that do not admit prestress, as above,
 - `coupledPressureDisplacementSolid`, whose pressure equation is an
   incremental relation on the mesh and does not see `Fpre`,
+- a topology change, through which `Fpre` is not carried (no solid model
+  that changes topology is a finite-strain one),
+- an `Fpre` that is not `calculated` on every patch but the constraint ones:
+  a patch type that sets its own value would replace the composed patch
+  values `updatePrestress` writes,
 - small-strain evaluations, which have no deformation gradient to compose,
 - flat-list evaluations on any topology but the cell-centred one, including
   the `CompactListList` (high-order quadrature) path,

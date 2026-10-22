@@ -299,7 +299,7 @@ class mechanicalConstitutiveLawManager
 
     // Private Member Functions
 
-        //- Read Fpre and check it is invertible
+        //- Read Fpre, check its patch types and that it is invertible
         void readPrestress();
 
         //- Make the face Fpre, if it has not been made

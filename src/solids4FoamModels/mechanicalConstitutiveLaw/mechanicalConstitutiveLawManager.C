@@ -952,6 +952,18 @@ void Foam::mechanicalConstitutiveLawManager::updateAddressingIfTopologyChanged()
             << exit(FatalError);
     }
 
+    // Fpre is mapped by the mesh with the other registered fields, but its
+    // inverse, determinant and face values are not, and the faces a change
+    // adds have no Fpre of their own to map from. No solid model that changes
+    // topology is a finite-strain one, so this is refused rather than handled
+    if (prestress_)
+    {
+        FatalErrorInFunction
+            << "The mesh topology changed, and prestress is on." << nl
+            << "    Fpre is not carried through a topology change"
+            << exit(FatalError);
+    }
+
     forAll(laws_, lawI)
     {
         if (stateSetup_.declaresPersistentState(laws_[lawI]))
@@ -1734,6 +1746,42 @@ void Foam::mechanicalConstitutiveLawManager::readPrestress()
             << "Fpre is a deformation gradient and must be dimensionless, "
             << "but it has dimensions " << Fpre.dimensions()
             << exit(FatalError);
+    }
+
+    // The patch values of Fpre are composed with the solver's, as
+    // updatePrestress writes them, and a patch type that evaluates its own
+    // value, such as zeroGradient or fixedValue, would replace or freeze them.
+    // So Fpre is calculated on every patch but the constraint ones (coupled,
+    // empty, symmetry, wedge), whose values follow from the cells
+    {
+        OStringStream refused;
+
+        forAll(Fpre.boundaryField(), patchI)
+        {
+            const fvPatchTensorField& pFpre = Fpre.boundaryField()[patchI];
+
+            if
+            (
+                !polyPatch::constraintType(pFpre.patch().type())
+             && pFpre.type() != calculatedFvPatchField<tensor>::typeName
+            )
+            {
+                refused
+                    << "    patch " << pFpre.patch().name() << " is "
+                    << pFpre.type() << nl;
+            }
+        }
+
+        if (!refused.str().empty())
+        {
+            FatalErrorInFunction
+                << "Fpre must be calculated on every patch but the "
+                << "constraint ones, and here:" << nl
+                << refused.str().c_str()
+                << "A patch type that sets its own value would replace the "
+                << "patch values of Fpre that updatePrestress composes"
+                << exit(FatalError);
+        }
     }
 
     // Fills the processor patches, which the file does not decide
