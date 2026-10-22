@@ -620,6 +620,10 @@ def set_hyperelastic_mesh_motion(case: Path) -> None:
     if found != 1:
         fail(f"Could not set the dimensions of pointD in {case}")
     (zero / "pointD").write_text(text)
+    # The motion solver (a displacement motion solver) also reads
+    # pointDisplacement, as in the #554 beamInCrossFlow example
+    (zero / "pointDisplacement").write_text(
+        text.replace("object      pointD;", "object      pointDisplacement;"))
     motion_u.unlink()
     solution = case / "system" / "fluid" / "fvSolution"
     replace_text(solution, "solvers\n{\n",
