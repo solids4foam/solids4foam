@@ -279,16 +279,20 @@ newtonIcoFluid::newtonIcoFluid
     ),
     pressureUnknownScale_(1.0),
     pressureEqnScale_(pressureScaleFactor_),
-    viscousStressTranspose_
-    (
-        fluidProperties().lookupOrDefault<Switch>
-        (
-            "viscousStressTranspose", false
-        )
-    ),
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_()
 {
+    // The transpose part of the viscous stress is always included; the
+    // former switch is ignored
+    if (fluidProperties().found("viscousStressTranspose"))
+    {
+        WarningInFunction
+            << "viscousStressTranspose is no longer an option and is "
+            << "ignored: the transpose part of the viscous stress is always "
+            << "included in the momentum residual, the wall pressure "
+            << "gradient and the interface traction" << endl;
+    }
+
     setRefCell(p(), fluidProperties(), pRefCell_, pRefValue_);
     //mesh().setFluxRequired(p().name());
 
@@ -547,20 +551,17 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
 
     tmpRef(tvF) = rho_.value()*nuEff*snGradU;
 
-    if (viscousStressTranspose_)
-    {
-        // The gradient is recalculated from the current velocity, as the
-        // stored gradU is only updated in formResidual
-        const volTensorField gradU(fvc::grad(U()));
-        const volTensorField nuDevGradUT(viscousStressTranspose(gradU));
+    // The gradient is recalculated from the current velocity, as the stored
+    // gradU is only updated in formResidual
+    const volTensorField gradU(fvc::grad(U()));
+    const volTensorField nuDevGradUT(viscousStressTranspose(gradU));
 
-        // Named operands: see pimpleFluid::patchViscousForce
-        const vectorField nf(mesh().boundary()[patchID].nf());
-        const tensorField& nuDevGradUTb = nuDevGradUT.boundaryField()[patchID];
-        const vectorField transposeForce(nf & nuDevGradUTb);
+    // Named operands: see pimpleFluid::patchViscousForce
+    const vectorField nf(mesh().boundary()[patchID].nf());
+    const tensorField& nuDevGradUTb = nuDevGradUT.boundaryField()[patchID];
+    const vectorField transposeForce(nf & nuDevGradUTb);
 
-        tmpRef(tvF) += rho_.value()*transposeForce;
-    }
+    tmpRef(tvF) += rho_.value()*transposeForce;
 
     return tvF;
 }
@@ -1117,13 +1118,26 @@ void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
     );
 
     // Viscous term in the cells next to the boundary, as in the momentum
-    // residual
+    // residual: the Laplacian and the transpose part of the viscous stress.
+    // Without the transpose part the wall pressure gradient is inconsistent
+    // with the momentum equation wherever the discrete velocity gradient is
+    // not trace-free, which gives a first-order error in the wall pressure
+    // and traction (blobInTreacle). The gradient is calculated here, as this
+    // function runs before formResidual updates the stored gradU
+    const volTensorField gradU(fvc::grad(U));
+    const volTensorField nuDevGradUT(viscousStressTranspose(gradU));
+    const volVectorField laplacianU
+    (
+        fvc::laplacian(turbulence_->nuEff(), U)
+    );
+    const volVectorField divTranspose
+    (
+        fvc::div(nuDevGradUT, "div((nuEff*dev2(T(grad(U)))))")
+    );
     const vectorField viscousTerm
     (
-        fvc::laplacian
-        (
-            turbulence_->nuEff(), U
-        )().boundaryField()[patchI].patchInternalField()
+        laplacianU.boundaryField()[patchI].patchInternalField()
+      + divTranspose.boundaryField()[patchI].patchInternalField()
     );
 
     // Unit normals pointing out of the fluid
@@ -1262,7 +1276,6 @@ label newtonIcoFluid::formResidual
     // divDevReff. It is zero in the interior of an incompressible flow but
     // its wall flux is part of the traction on a deforming wall
     // (patchViscousForce). The Jacobian omits it
-    if (viscousStressTranspose_)
     {
         const volTensorField nuDevGradUT(viscousStressTranspose(gradU()));
 

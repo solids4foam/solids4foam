@@ -244,15 +244,13 @@ The following entries are read from `newtonIcoFluidCoeffs`:
   the negative-diagonal momentum-block sign is added implicitly.
 - `pressureScaleFactor`: scales the pressure-continuity residual and pressure
   Jacobian rows relative to the momentum rows.
-- `viscousStressTranspose` (default `no`): `yes` includes the transpose part
-  of the viscous stress, `div(nuEff*dev2(T(grad(U))))`, explicitly in the
-  momentum residual, as in the `divDevReff` of `pimpleFluid`, and its wall
-  flux in the interface viscous force (see Interface Viscous Force). It needs
-  `div((nuEff*dev2(T(grad(U))))) Gauss linear;` in `divSchemes`. It is off
-  by default until it is verified: with it, the steady monolithic
-  `blobInTreacle` displacement moves 2% away from the partitioned one,
-  although the term vanishes on a stationary wall, which suggests a
-  first-order error in its wall value.
+- The transpose part of the viscous stress, `div(nuEff*dev2(T(grad(U))))`,
+  is always included, explicitly in the momentum residual as in the
+  `divDevReff` of `pimpleFluid`, in the wall pressure gradient (see Wall
+  Pressure Gradient) and in the interface viscous force (see Interface
+  Viscous Force). It needs `div((nuEff*dev2(T(grad(U))))) Gauss linear;` in
+  `divSchemes`. The former `viscousStressTranspose` switch is ignored, with
+  a warning.
 - `maxTimeStepRetries`: maximum failed-PETSc-solve retry count when
   `adjustTimeStep` is enabled.
 - `stopOnPetscError`: passed to `foamPetscSnesHelper` to control whether PETSc
@@ -398,14 +396,33 @@ The explicit transpose viscous term is not in this matrix.
 `patchViscousForce` returns the boundary flux of the residual's viscous terms,
 `rho*(nuEff*snGrad(U) + n & nuEff*dev2(T(grad(U))))`, which is
 `rho*(n & -devReff)` as in `pimpleFluid`, so the force on the solid is the
-momentum the fluid loses (with `viscousStressTranspose yes`; by default the
-force is `rho*nuEff*snGrad(U)` only). The gradient is recalculated from the
-current velocity. The transpose part, `mu*grad(u & n)` at the wall, vanishes
-on a stationary no-slip wall, but not on a deforming wall, where it is part of
-the physical traction. Without it (`viscousStressTranspose no`, or before this
-term was added), the monolithic wall motion of `womersleyTube` is offset from
-the partitioned solutions by a constant amount that does not vanish with mesh
-or time-step refinement.
+momentum the fluid loses. The gradient is recalculated from the current
+velocity. The transpose part, `mu*grad(u & n)` at the wall, vanishes on a
+stationary no-slip wall, but not on a deforming wall, where it is part of the
+physical traction. Without it (the former default), the monolithic wall
+motion of `womersleyTube` is offset from the partitioned solutions by an
+amount that does not vanish with mesh or time-step refinement (wall phase
+4.8e-4 rad at m1, m2 and m4).
+
+### Wall Pressure Gradient
+
+A plain `fixedGradient` pressure on a wall with fixed velocity, such as the
+FSI interface of the monolithic tutorials, has its gradient set from the
+normal momentum equation in the adjacent cells,
+`n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))) - ddt(U)_wall)`
+(`updatePressureGradientBoundary`), with the same viscous terms as the
+momentum residual. Leaving the transpose term out of this gradient, while it
+is in the residual and the traction, makes the wall pressure inconsistent
+with the momentum equation wherever the discrete velocity gradient is not
+trace-free: on `blobInTreacle` this gave a first-order error, a steady
+displacement 2.3%, 1.0% and 0.44% below the partitioned one on the x1, x2
+and x4 meshes. With the term, the differences are 1.3%, 0.56% and 0.22%,
+and the monolithic and partitioned series extrapolate to the same
+displacement within 0.05%. Of the remaining 1.3% at x1, 0.35 points come
+from the partitioned `zeroGradient` interface pressure (first order) and 0.45
+from the face interpolation of U (`skewCorrected linear` in the monolithic
+continuity flux, plain linear in `pimpleFluid`'s `flux(HbyA)`); the rest
+(0.5%, falling at second order) from the different face-flux construction.
 
 ### Model-Side Physics Preconditioner
 

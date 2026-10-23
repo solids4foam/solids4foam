@@ -87,10 +87,9 @@ On the fluid interface patch:
   the added mass second-order accurate in space. A `zeroGradient` interface
   pressure also runs, but is first order, and the coupling gives a warning.
 - **Viscous traction** (`passViscousStress yes`): the boundary flux of the
-  fluid momentum residual's viscous terms, `rho*nuEff*snGrad(U)` by default,
-  or `rho*(n & -devReff)` including the transpose part of the viscous stress,
-  which is nonzero on a deforming wall, with `viscousStressTranspose yes`
-  (see the `newtonIcoFluid` README). The coupling
+  fluid momentum residual's viscous terms, `rho*(n & -devReff)`, including
+  the transpose part of the viscous stress, which is nonzero on a deforming
+  wall (see the `newtonIcoFluid` README). The coupling
   blocks of the assembled Jacobian approximate it through the boundary-face
   `snGrad` of the adjacent fluid cell velocity; the matrix-free residual
   contains the full form.

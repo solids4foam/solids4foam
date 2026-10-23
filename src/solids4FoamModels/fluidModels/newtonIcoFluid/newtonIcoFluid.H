@@ -125,11 +125,6 @@ class newtonIcoFluid
         //  with the solid-side scaling pattern
         scalar pressureEqnScale_;
 
-        //- Include the transpose part of the viscous stress,
-        //  div(nuEff*dev2(T(grad(U)))), in the momentum residual and the
-        //  interface viscous force (default no)
-        const Switch viscousStressTranspose_;
-
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
