@@ -440,6 +440,18 @@ so the two tractions are the same expression only away from these walls (and
 only with gradient schemes that impose `n & grad(U) = snGrad(U)` on the
 boundary, such as `leastSquares`; `leastSquaresS4f` does not).
 
+The gradient, the transpose stress, its divergence, the viscous Laplacian and
+`ddt(U)` are evaluated once per velocity state and cached: the cache compares
+the velocity (internal and boundary values), the mesh points, the time index
+and the time step with those of the last evaluation, with the decision agreed
+across processors, and is invalidated explicitly where the velocity or the
+viscosity is changed by the model (`unpackSolution`, `restoreOldTimeState`,
+the transport and turbulence corrections). The momentum residual, the wall
+pressure gradient of every wall patch and the interface traction share these
+fields. The mesh-dependent part of the surface fit (neighbours, weighted
+tangential distances, regularised inverse) is precomputed per fixed-velocity
+patch and reused until the mesh points change.
+
 ### Wall Pressure Gradient
 
 A plain `fixedGradient` pressure on a wall with fixed velocity, such as the
@@ -447,7 +459,8 @@ FSI interface of the monolithic tutorials, has its gradient set from the
 normal momentum equation in the adjacent cells,
 `n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))) - ddt(U)_wall)`
 (`updatePressureGradientBoundary`), with the same viscous terms as the
-momentum residual. Leaving the transpose term out of this gradient, while it
+momentum residual, taken from the cached fields described above (no
+whole-mesh evaluation per patch). Leaving the transpose term out of this gradient, while it
 is in the residual and the traction, makes the wall pressure inconsistent
 with the momentum equation wherever the discrete velocity gradient is not
 trace-free.
