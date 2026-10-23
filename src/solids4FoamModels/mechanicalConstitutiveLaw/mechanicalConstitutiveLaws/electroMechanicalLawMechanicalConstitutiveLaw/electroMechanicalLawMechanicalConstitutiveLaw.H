@@ -204,6 +204,13 @@ public:
             return subLawPtr_->providesVolumetricSplit();
         }
 
+        //- The active tension is a function of the total deformation
+        //  gradient, so this law can be prestressed if the passive law can
+        virtual bool admitsPrestress() const override
+        {
+            return subLawPtr_->admitsPrestress();
+        }
+
         //- The active tension is added as a Cauchy stress
         //  symm(F & (Ta*f0f0) & F.T())/J, which is not derived from a
         //  potential and scales with a superposed dilation. So the split this

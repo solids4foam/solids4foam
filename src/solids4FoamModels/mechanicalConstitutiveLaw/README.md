@@ -346,6 +346,98 @@ storage it is written into.
 
 ---
 
+## Prestress
+
+A vascular geometry taken from an image is already loaded: an artery imaged at
+diastole via MRI or CT scan carries the stress of the diastolic pressure.
+Assuming this geometry to be the stress-free configuration will over-inflate the
+artery. The `prestress` switch in `mechanicalProperties` lets every
+finite-strain law see that stress without the mesh being moved to a stress-free
+configuration first:
+
+```c++
+prestress       yes;
+
+mechanical
+(
+    ...
+);
+```
+
+The manager then reads a prestress deformation gradient `Fpre` (a
+dimensionless `volTensorField`)
+from the start time. `Fpre` maps the stress-free configuration onto the mesh,
+and the laws are given the solver's kinematics composed with it:
+
+- `F = Fstep & Fpre`, with the old-time `F` composed the same way,
+- `Finv = inv(Fpre) & FinvStep`,
+- `J = Jstep*det(Fpre)`.
+
+`Fpre` is on the right because it acts first. The solver keeps its own
+mesh-relative `F` and `J` for the momentum equation; the laws return the Cauchy
+stress, which belongs to the current configuration whichever reference it was
+computed from, so the two agree without the solver knowing about `Fpre`.
+
+That holds for a law whose stress is a function of the total `F`, and a law
+says so through `admitsPrestress()`: the hyperelastic laws (`neoHookeanElastic`,
+`MooneyRivlinElastic`, `OgdenElastic`, `StVenantKirchhoffElastic`,
+`GuccioneElastic`, `HolzapfelGasserOgdenElastic`) do, and `electroMechanicalLaw`
+does when its passive law does. The answer is no by default, and the manager
+refuses to start with prestress on and a law that answers no, naming it. A law
+that integrates an increment `F & Finv0` onto a history variable, such as
+`neoHookeanElasticMisesPlastic`, would otherwise cancel `Fpre` out of the
+increment and start its history from the stress-free value, so it would run as
+if there were no prestress. `OgdenElastic` also takes a prescribed initial
+stress `sigma0`, and with prestress on the two add: `sigma0` is pushed forward
+with the composed `F`, so it is read as a stress in the stress-free
+configuration, on top of the stress `Fpre` gives. A prestressed case normally
+leaves it at zero.
+
+`Fpre` is held at the cells. A face evaluation uses it interpolated to the
+faces, so only cell values (and the patch values that come with a
+`volTensorField`) need to be written. It is written back at every write time,
+at full precision whatever the `writePrecision`, as the constitutive state is,
+so a continued run reads the `Fpre` it started with rather than a rounding of
+it.
+
+What prestress does not cover, and refuses rather than evaluates without
+`Fpre`:
+
+- laws that do not admit prestress, as above,
+- `coupledPressureDisplacementSolid`, whose pressure equation is an
+  incremental relation on the mesh and does not see `Fpre`,
+- a topology change, through which `Fpre` is not carried (no solid model
+  that changes topology is a finite-strain one),
+- an `Fpre` that is not `calculated` on every patch but the constraint ones:
+  a patch type that sets its own value would replace the composed patch
+  values `updatePrestress` writes,
+- small-strain evaluations, which have no deformation gradient to compose,
+- flat-list evaluations on any topology but the cell-centred one, including
+  the `CompactListList` (high-order quadrature) path,
+- fourth-order tangents, which the laws give with respect to the composed
+  deformation gradient rather than the solver's.
+
+The mixed formulation of `nonLinearGeometryTotalLagrangianTotalDisplacement`
+(`solvePressure`) needs nothing more either: its pressure residual is written
+on the volumetric response the law returns, which the manager has evaluated at
+the composed kinematics, so the solid model never needs a `J` other than its
+own. Scalar tangents are given at the composed kinematics; they are
+preconditioner estimates and need nothing more. Laws with fibre directions
+take those directions in the stress-free configuration, so directions defined
+on the imaged geometry should be mapped back through `inv(Fpre)` first.
+
+`Fpre` is found with the modified updated Lagrangian formulation (Gee, Förster
+and Wall, 2010): the load is applied to the imaged mesh, `Fpre` becomes
+`Fstep & Fpre` and the displacement is reset to zero, and this is repeated
+until the imaged mesh is in equilibrium with the load at `Fstep = I`. The
+`updatePrestress` utility performs one such update between runs; each run
+should be a static solve, since `Fstep` from a transient one is a snapshot of a
+vibration rather than the equilibrium. The `F` a solid model writes is its own,
+mesh-relative deformation gradient, so copying it into `Fpre` discards the
+prestress of every earlier pass and the passes do not converge.
+
+---
+
 ## Higher-order discretisations
 
 Higher-order solid models store stress and kinematics as:
@@ -375,6 +467,16 @@ laws and mesh of its own case: `layeredPipe` (more than one material),
 a tangent query has history to disturb), `viscoTube` (viscoelasticity),
 `blockPunch`, `longWall`, `rotatingCylinder`, `ratCarotid`,
 `idealisedVentricle` and `LandEtAl2015/problem3` (hyperelasticity).
+
+`Test-prestress` checks the `prestress` switch on a case mesh with
+finite-strain laws: that the prestressed volField, surfaceField and flat-list
+stress updates match a manager without prestress given the composed
+kinematics, that the order of composition is visible to that check, that each
+of the six composed fields, old times included, is the product with `Fpre`,
+and that the unsupported evaluations are refused. The scalar tangent of these
+laws is a material constant, so whether the scalar tangent update composes the
+kinematics is not tested. The test moves the case's own `Fpre` aside while it
+runs and puts it back after.
 
 Every solid model takes its stress and tangent from this framework, so every
 tutorial's regression test is runtime coverage of it as well.

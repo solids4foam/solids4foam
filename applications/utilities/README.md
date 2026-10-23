@@ -290,3 +290,66 @@ The mesh is overwritten!
   ```
 
 ---
+
+## `updatePrestress`
+
+- **Utility purpose** Performs one pass of the modified updated Lagrangian
+  formulation for prestressing a solid model (see the Prestress section of
+  `src/solids4FoamModels/mechanicalConstitutiveLaw/README.md`). `Fpre`
+  for the next pass is the deformation gradient `F` at the latest time composed
+  with `Fpre` the run used, `FpreNew = F & Fpre`. It is written to
+  the start time (`startTime` in `system/controlDict`) at full precision, and
+  every time directory after the start time is removed, so the next pass
+  starts with zero displacement.
+  `max mag(F - I)` is printed as the convergence measure, and appended, with
+  the pass and the range of `det(Fpre)`, to `prestressHistory` in the case
+  directory.
+  The `Fpre` the start time held is kept as `FprePass<N>`, `N` being the pass
+  that wrote it; copying it back to `Fpre` restores it.
+
+- **Arguments** None
+
+- **Options/parameters**
+
+  `-parallel` to update a decomposed case (uncollated only).
+
+  `-force` to update `Fpre` even when the time schemes for D are not
+  `steadyState`.
+
+  `-keepPasses` to keep every earlier `Fpre` as `FprePass<N>`, rather than
+  only the one from before this update.
+
+- **Example of usage**
+
+  Run the first pass with `prestress no;` in `constant/mechanicalProperties`
+  (or without the entry): the utility then takes `Fpre` of that pass
+  to be the identity. Set `prestress yes;` for every later pass.
+
+  ```bash
+  solids4Foam
+  updatePrestress
+  ```
+
+  Each pass should be a static solve at the target load: `steadyState` for
+  `ddt(D)` and `d2dt2(D)`, and `predictor no;`.
+
+```note
+Every time directory after the start time is removed, and the Fpre in the
+start time is replaced, its previous contents kept as FprePass<N>. Nothing is
+removed until that backup is made and the new Fpre is written and read back,
+on every processor; if any of that fails, the previous Fpre is put back and no
+results are removed. Time directories before the start time, log files and
+postProcessing are kept.
+A case whose ddt or d2dt2 scheme for D is not steadyState is refused before
+anything is changed, unless `-force` is given, and so is a case written with a
+collated fileHandler.
+A case whose start-time Fpre is not the one the run used, or whose processors
+disagree about which Fpre there is, is refused before anything is changed.
+A warning is given if the results are written in ascii with a writePrecision
+below 10.
+A case where a material uses a law that cannot be prestressed (a small-strain
+law, or one with history such as `neoHookeanElasticMisesPlastic`) is refused
+before anything is changed: the laws are asked, as the solver asks them.
+```
+
+---
