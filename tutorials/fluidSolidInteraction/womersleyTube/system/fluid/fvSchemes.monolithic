@@ -26,8 +26,8 @@ ddtSchemes
 {
     default            none;
     ddt(U)             backward;
-    ddt(dU)            Euler;
-    ddt(p)             Euler;
+    ddt(dU)            backward;
+    ddt(p)             backward;
     ddt(D)             steadyState;
     d2dt2(D)           steadyState;
 }
@@ -56,7 +56,6 @@ laplacianSchemes
 interpolationSchemes
 {
     default            linear;
-    interpolate(U)     skewCorrected linear;
 }
 
 snGradSchemes
