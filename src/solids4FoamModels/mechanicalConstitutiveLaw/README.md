@@ -368,8 +368,8 @@ from the start time. `Fpre` maps the stress-free configuration onto the mesh,
 and the laws are given the solver's kinematics composed with it:
 
 - `F = Fstep & Fpre`, with the old-time `F` composed the same way,
-- `Finv = inv(Fpre) & Finv_step`,
-- `J = J_step*det(Fpre)`.
+- `Finv = inv(Fpre) & FinvStep`,
+- `J = Jstep*det(Fpre)`.
 
 `Fpre` is on the right because it acts first. The solver keeps its own
 mesh-relative `F` and `J` for the momentum equation; the laws return the Cauchy
@@ -416,7 +416,7 @@ What prestress does not cover, and refuses rather than evaluates without
   deformation gradient rather than the solver's.
 
 The mixed formulation of `nonLinearGeometryTotalLagrangianTotalDisplacement`
-(`solvePressure`) is written on the `J` the laws see, `J_step*det(Fpre)`, in
+(`solvePressure`) is written on the `J` the laws see, `Jstep*det(Fpre)`, in
 its pressure residual and in its check of the law's volumetric response, since
 the pressure stands in for that response; its approximate Jacobian is
 unchanged. Scalar tangents are given at the composed kinematics; they are preconditioner

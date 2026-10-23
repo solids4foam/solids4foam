@@ -25,8 +25,8 @@ Description
     configuration onto the mesh the solver is solving on.
 
         F    = Fstep & Fpre
-        Finv = inv(Fpre) & Finv_step
-        J    = J_step*det(Fpre)
+        Finv = inv(Fpre) & FinvStep
+        J    = Jstep*det(Fpre)
 
     and the same for the old-time values, against the same Fpre. Fpre is on
     the right because it acts first: it takes the stress-free configuration
