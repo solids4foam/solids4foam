@@ -285,7 +285,8 @@ void newtonIcoFluid::updateWallVelocityFits() const
         const labelListList& faceFaces = fp.patch().faceFaces();
 
         fit.nbrs.setSize(fp.size());
-        fit.wd.setSize(fp.size());
+        fit.d.setSize(fp.size());
+        fit.w.setSize(fp.size());
         fit.n = nf;
         fit.invDdReg.setSize(fp.size(), tensor::zero);
 
@@ -300,13 +301,14 @@ void newtonIcoFluid::updateWallVelocityFits() const
             // the neighbouring wall faces (and the wedge images), with
             // tangential distance vectors and inverse-square-distance
             // weights; exact for a linear velocity on any face spacing and
-            // zero for a rigid translation. The distance tensor dd and the
-            // weighted distance vectors w*d depend on the mesh only
+            // zero for a rigid translation. The distance tensor dd, the
+            // distance vectors d and the weights w depend on the mesh only
             symmTensor dd(symmTensor::zero);
 
             const labelList& allNbrs = faceFaces[faceI];
             DynamicList<label> nbrs(allNbrs.size());
-            DynamicList<vector> wd(allNbrs.size() + wedgeT.size());
+            DynamicList<vector> d(allNbrs.size() + wedgeT.size());
+            DynamicList<scalar> w(allNbrs.size() + wedgeT.size());
 
             forAll(allNbrs, i)
             {
@@ -315,11 +317,12 @@ void newtonIcoFluid::updateWallVelocityFits() const
                     continue;
                 }
 
-                const vector d(P & (Cf[allNbrs[i]] - Cf[faceI]));
-                const scalar w = 1.0/max(magSqr(d), VSMALL);
-                dd += w*sqr(d);
+                const vector di(P & (Cf[allNbrs[i]] - Cf[faceI]));
+                const scalar wi = 1.0/max(magSqr(di), VSMALL);
+                dd += wi*sqr(di);
                 nbrs.append(allNbrs[i]);
-                wd.append(w*d);
+                d.append(di);
+                w.append(wi);
             }
 
             forAll(wedgeT, i)
@@ -329,14 +332,16 @@ void newtonIcoFluid::updateWallVelocityFits() const
                     Cf[faceI]
                   - 2.0*((Cf[faceI] - wedgeC[i]) & wedgeN[i])*wedgeN[i]
                 );
-                const vector d(P & (CfImage - Cf[faceI]));
-                const scalar w = 1.0/max(magSqr(d), VSMALL);
-                dd += w*sqr(d);
-                wd.append(w*d);
+                const vector di(P & (CfImage - Cf[faceI]));
+                const scalar wi = 1.0/max(magSqr(di), VSMALL);
+                dd += wi*sqr(di);
+                d.append(di);
+                w.append(wi);
             }
 
             fit.nbrs[faceI] = nbrs;
-            fit.wd[faceI] = wd;
+            fit.d[faceI] = d;
+            fit.w[faceI] = w;
 
             // Resolved directions: the 2x2 eigen-analysis of dd in the
             // tangent plane (t1, t2), done analytically so that it is safe
@@ -444,21 +449,22 @@ void newtonIcoFluid::setWallViscousStressTranspose
         {
             const vector& n = fit.n[faceI];
             const labelList& nbrs = fit.nbrs[faceI];
-            const vectorField& wd = fit.wd[faceI];
+            const vectorField& d = fit.d[faceI];
+            const scalarField& w = fit.w[faceI];
 
             // Weighted velocity differences to the neighbours and the wedge
-            // images, in the order of the weighted distance vectors
+            // images, in the order of the distance vectors
             tensor dU(tensor::zero);
 
             forAll(nbrs, i)
             {
-                dU += wd[i]*(Ub[nbrs[i]] - Ub[faceI]);
+                dU += w[i]*(d[i]*(Ub[nbrs[i]] - Ub[faceI]));
             }
 
             forAll(wedgeT_, i)
             {
-                dU +=
-                    wd[nbrs.size() + i]*((wedgeT_[i] & Ub[faceI]) - Ub[faceI]);
+                const label j = nbrs.size() + i;
+                dU += w[j]*(d[j]*((wedgeT_[i] & Ub[faceI]) - Ub[faceI]));
             }
 
             const tensor Gs(fit.invDdReg[faceI] & dU);

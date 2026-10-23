@@ -144,9 +144,12 @@ class newtonIcoFluid
             //- Neighbour faces kept by the sharp-edge filter, per face
             labelListList nbrs;
 
-            //- Weighted tangential distance vectors w*d to the neighbours
-            //  (in the order of nbrs), followed by the wedge images, per face
-            List<vectorField> wd;
+            //- Tangential distance vectors d to the neighbours (in the order
+            //  of nbrs), followed by the wedge images, per face
+            List<vectorField> d;
+
+            //- Inverse-square-distance weights w, in the same order
+            List<scalarField> w;
 
             //- Unit normals
             vectorField n;
