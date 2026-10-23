@@ -206,12 +206,14 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
     // Named intermediate: a reused tmp would alias an input of dev2
     const volTensorField gradUT(T(gradU));
 
+    const volScalarField nuEff(turbulence_->nuEff());
+
     tmp<volTensorField> tnuDevGradUT
     (
         new volTensorField
         (
             "nuEff*dev2(T(grad(U)))",
-            turbulence_->nuEff()*dev2(gradUT)
+            nuEff*dev2(gradUT)
         )
     );
 
@@ -230,38 +232,37 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
     // n & (boundary value), both get q. (The trace of n*q is not zero; the
     // tensor is only constructed for this normal flux.)
     volTensorField& nuDevGradUT = tmpRef(tnuDevGradUT);
-    const volScalarField nuEff(turbulence_->nuEff());
     const volVectorField& U = this->U();
 
-    // Directions without a solution (empty), excluded from the fit
-    const Vector<label>& solD = mesh().solutionD();
-    symmTensor emptyDirs(symmTensor::zero);
-    for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
+    // Wedge planes (one-cell axisymmetric cases): the images of a wall face
+    // across them supply the circumferential derivatives. The image of the
+    // face centre, which lies on the centre plane, is its reflection across
+    // the wedge plane (no assumption on the position of the axis); the image
+    // of the velocity is its rotation by the wedge transformation
+    DynamicList<tensor> wedgeT;
+    DynamicList<vector> wedgeN;
+    DynamicList<vector> wedgeC;
+    forAll(mesh().boundaryMesh(), patchI)
     {
-        if (solD[cmpt] == -1)
+        const polyPatch& pp = mesh().boundaryMesh()[patchI];
+
+        if (isA<wedgePolyPatch>(pp) && pp.size())
         {
-            vector e(vector::zero);
-            e[cmpt] = 1;
-            emptyDirs += sqr(e);
+            wedgeT.append(refCast<const wedgePolyPatch>(pp).cellT());
+            wedgeN.append(pp.faceNormals()[0]);
+            wedgeC.append(pp.faceCentres()[0]);
         }
     }
 
-    // Wedge transformations: the images of a wall face across the wedge
-    // planes supply the circumferential derivatives of an axisymmetric case
-    DynamicList<tensor> wedgeT;
-    forAll(mesh().boundaryMesh(), patchI)
-    {
-        if (isA<wedgePolyPatch>(mesh().boundaryMesh()[patchI]))
-        {
-            wedgeT.append
-            (
-                refCast<const wedgePolyPatch>
-                (
-                    mesh().boundaryMesh()[patchI]
-                ).cellT()
-            );
-        }
-    }
+    // Neighbour faces across a sharp edge of the wall patch (normals more
+    // than 45 degrees apart) are not used in the fit
+    const scalar minNbrCos = 0.7;
+
+    // A tangential fit direction with less than this fraction of the largest
+    // eigenvalue of the distance tensor is not resolved: its derivative is
+    // set to zero rather than extrapolated (the empty direction of a 2-D
+    // case, nearly collinear neighbours)
+    const scalar eigTol = 1e-6;
 
     forAll(mesh().boundary(), patchI)
     {
@@ -303,6 +304,11 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
 
             forAll(nbrs, i)
             {
+                if ((nf[nbrs[i]] & n) < minNbrCos)
+                {
+                    continue;
+                }
+
                 const vector d(P & (Cf[nbrs[i]] - Cf[faceI]));
                 const scalar w = 1.0/max(magSqr(d), VSMALL);
                 dd += w*sqr(d);
@@ -311,20 +317,68 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
 
             forAll(wedgeT, i)
             {
-                const vector d(P & ((wedgeT[i] & Cf[faceI]) - Cf[faceI]));
+                const vector CfImage
+                (
+                    Cf[faceI]
+                  - 2.0*((Cf[faceI] - wedgeC[i]) & wedgeN[i])*wedgeN[i]
+                );
+                const vector d(P & (CfImage - Cf[faceI]));
                 const scalar w = 1.0/max(magSqr(d), VSMALL);
                 dd += w*sqr(d);
                 dU += w*(d*((wedgeT[i] & Ub[faceI]) - Ub[faceI]));
             }
 
-            // Regularise the normal and empty directions, which have no
-            // distance component, as the leastSquares gradient does
-            const symmTensor ddReg(dd + sqr(n) + emptyDirs);
-
             vector q(vector::zero);
 
-            if (mag(det(ddReg)) > SMALL*pow3(max(tr(dd), VSMALL)))
+            // Resolved directions: the 2x2 eigen-analysis of dd in the
+            // tangent plane (t1, t2), done analytically so that it is safe
+            // for repeated or zero eigenvalues
+            const vector absN(cmptMag(n));
+            vector t1(vector::zero);
+            if (absN.x() <= absN.y() && absN.x() <= absN.z())
             {
+                t1.x() = 1;
+            }
+            else if (absN.y() <= absN.z())
+            {
+                t1.y() = 1;
+            }
+            else
+            {
+                t1.z() = 1;
+            }
+            t1 -= (t1 & n)*n;
+            t1 /= mag(t1);
+            const vector t2(n ^ t1);
+
+            const scalar a11 = t1 & dd & t1;
+            const scalar a12 = t1 & dd & t2;
+            const scalar a22 = t2 & dd & t2;
+            const scalar m = 0.5*(a11 + a22);
+            const scalar r = Foam::sqrt(sqr(0.5*(a11 - a22)) + sqr(a12));
+            const scalar lambdaMax = m + r;
+            const scalar lambdaMin = m - r;
+
+            if (lambdaMax > VSMALL)
+            {
+                // The normal direction carries no distance component
+                symmTensor ddReg(dd + lambdaMax*sqr(n));
+
+                if (lambdaMin < eigTol*lambdaMax)
+                {
+                    // Unresolved tangential direction (an empty direction
+                    // of a 2-D case, or nearly collinear neighbours): zero
+                    // derivative along it instead of an extrapolation
+                    vector e
+                    (
+                        mag(a12) > SMALL*lambdaMax
+                      ? a12*t1 + (lambdaMin - a11)*t2
+                      : (a11 <= a22 ? t1 : t2)
+                    );
+                    e /= mag(e);
+                    ddReg += lambdaMax*sqr(e);
+                }
+
                 const tensor Gs(inv(ddReg) & dU);
 
                 q = nuEffb[faceI]*((P & (Gs & n)) - n*tr(Gs));

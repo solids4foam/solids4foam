@@ -414,10 +414,18 @@ vectors and inverse-square-distance weights: it is zero for a rigid
 translation (also on a curved wall) and exact for a linear wall velocity on
 any face spacing. On a one-cell wedge the images of each face across the
 wedge planes are added as neighbours, which supplies the circumferential
-derivatives (the `U_r/R` part of the surface divergence); empty directions
-are regularised as in the `leastSquares` gradient. The fit uses the faces on
-the same processor, so it is one-sided at processor cuts (ringAddedMass on 4
-ranks: frequency identical to serial, amplitude loss within 4e-6). The same
+derivatives (the `U_r/R` part of the surface divergence): the image of the
+face centre is its reflection across the wedge plane, so no assumption on
+the position of the axis is made, and the image of the velocity its rotation
+by the wedge transformation. Neighbours across a sharp edge of the patch
+(normals more than 45 degrees apart) are not used, so a curved wall needs
+adjacent face normals within 45 degrees (at least eight faces per turn). A tangential direction
+that the neighbours do not resolve (the empty direction of a 2-D case, or
+nearly collinear neighbours: eigenvalue of the distance tensor below 1e-6 of
+the largest) gets a zero derivative rather than an extrapolated one. The fit
+uses the faces on the same processor, so it is one-sided at processor cuts,
+cyclic and symmetry patches (ringAddedMass on 4 ranks: frequency identical
+to serial, amplitude loss within 4e-6). The same
 value enters the momentum residual's wall flux and the traction, so the
 traction stays the fluid's own discrete wall flux. Evaluated instead from the boundary value of `grad(U)`,
 whose tangential derivatives come from the adjacent cell values, the term
