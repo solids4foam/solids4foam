@@ -34,7 +34,7 @@ Description
     instead discards the prestress of every earlier pass, and the passes do
     not converge.
 
-    Fpre_new is written to the start time, the startTime entry of
+    FpreNew is written to the start time, the startTime entry of
     system/controlDict, internal and patch values alike, at full precision,
     replacing the Fpre there, and every time directory after the start time
     is removed, so the next pass starts from the start time with zero
