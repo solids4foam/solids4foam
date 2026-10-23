@@ -6,13 +6,6 @@ release. For complete commit-level details and contributor information, see the
 
 ## [Unreleased]
 
-### Changed
-
-- The fluid tutorials use `interpolate(U) linear` instead of
-  `skewCorrected linear` (in `newtonIcoFluid` it is the interpolation of the
-  continuity flux; on blobInTreacle it accounted for up to 0.45% of the
-  difference from the partitioned steady displacement).
-
 ### Added
 
 - The quasi-monolithic Newton fluid-solid coupling

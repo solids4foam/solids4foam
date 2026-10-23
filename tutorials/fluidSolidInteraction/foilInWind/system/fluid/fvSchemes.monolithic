@@ -55,7 +55,7 @@ laplacianSchemes
 interpolationSchemes
 {
     default            linear;
-    interpolate(U)     linear;
+    interpolate(U)     skewCorrected linear;
 }
 
 snGradSchemes
