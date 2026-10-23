@@ -22,9 +22,18 @@ License
 #include "treeDataCell.H"
 #include "scalarMatrices.H"
 #include "SVD.H"
-#include <unordered_map>
-#include <vector>
-#include <cstdint>
+#include "HashTable.H"
+
+// * * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * //
+
+const Foam::Enum<Foam::immersedSurfaceTraction::quadratureType>
+Foam::immersedSurfaceTraction::quadratureTypeNames
+({
+    { quadratureType::greedy, "greedy" },
+    { quadratureType::none, "none" },
+    { quadratureType::clustered, "clustered" },
+});
+
 
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
@@ -66,8 +75,12 @@ Foam::scalarField Foam::immersedSurfaceTraction::cellWidths
 void Foam::immersedSurfaceTraction::createPoints()
 {
     const triSurface& surf = body_.surface();
-    const pointField& pts = surf.points();
     const boundBox& meshBb = mesh_.bounds();
+
+    // The candidates of the clustered quadrature are made in the reference
+    // configuration of the surface, those of the others in the current one
+    const bool clustered = (quadrature_ == quadratureType::clustered);
+    const pointField& pts = clustered ? body_.points0() : surf.points();
 
     label nD = 0;
     for (direction d = 0; d < vector::nComponents; ++d)
@@ -219,7 +232,7 @@ void Foam::immersedSurfaceTraction::createPoints()
     // for surfaces whose triangles are smaller than the cells: the points are
     // kept in order if no kept point is closer, and the area of each point
     // is given to the nearest kept point
-    if (thin_)
+    if (quadrature_ == quadratureType::greedy)
     {
         scalar thickness = 1;
         for (direction d = 0; d < vector::nComponents; ++d)
@@ -240,9 +253,9 @@ void Foam::immersedSurfaceTraction::createPoints()
         auto key = [&](const point& x, const label di, const label dj,
             const label dk)
         {
-            const std::int64_t i = std::int64_t(std::floor(x.x()/spacing)) + di;
-            const std::int64_t j = std::int64_t(std::floor(x.y()/spacing)) + dj;
-            const std::int64_t k = std::int64_t(std::floor(x.z()/spacing)) + dk;
+            const int64_t i = int64_t(std::floor(x.x()/spacing)) + di;
+            const int64_t j = int64_t(std::floor(x.y()/spacing)) + dj;
+            const int64_t k = int64_t(std::floor(x.z()/spacing)) + dk;
             return (i*73856093) ^ (j*19349663) ^ (k*83492791);
         };
 
@@ -251,7 +264,9 @@ void Foam::immersedSurfaceTraction::createPoints()
         const scalarField candidateWidths(cellWidths(pointField(positions)));
         auto inMesh = [&](const label i) { return candidateWidths[i] > 0; };
 
-        std::unordered_map<std::int64_t, std::vector<label>> grid;
+        // Kept points (indices into kept) by the cell of a grid of the
+        // spacing
+        HashTable<DynamicList<label>, int64_t> grid;
         DynamicList<label> kept(positions.size());
 
         // Nearest kept point within the spacing, on the same side of the
@@ -267,12 +282,12 @@ void Foam::immersedSurfaceTraction::createPoints()
                 {
                     for (label dk = -1; dk <= 1; ++dk)
                     {
-                        const auto iter = grid.find(key(x, di, dj, dk));
-                        if (iter == grid.end())
+                        const auto iter = grid.cfind(key(x, di, dj, dk));
+                        if (!iter.good())
                         {
                             continue;
                         }
-                        for (const label k : iter->second)
+                        for (const label k : iter.val())
                         {
                             if (inMesh(kept[k]) != inMesh(pi))
                             {
@@ -295,7 +310,7 @@ void Foam::immersedSurfaceTraction::createPoints()
         {
             if (nearestKept(i, spacing) < 0)
             {
-                grid[key(positions[i], 0, 0, 0)].push_back(kept.size());
+                grid(key(positions[i], 0, 0, 0)).append(kept.size());
                 kept.append(i);
             }
         }
@@ -324,6 +339,275 @@ void Foam::immersedSurfaceTraction::createPoints()
         Info<< "    Immersed body " << body_.name() << ": area in the mesh "
             << meshArea << endl;
     }
+    else if (clustered)
+    {
+        // Clusters of the candidates by the cell of a uniform grid of
+        // spacing s, the dominant signed axis of the normal and whether they
+        // are inside the mesh, numbered in the order of these keys, so that
+        // they do not depend on the order of the triangles. The candidates
+        // (positions), the cell widths from which s is set, the inside or
+        // outside of the mesh, the grid and the choice of the points are
+        // those of the reference configuration (pts), so that the clusters
+        // move with the body and are a function of the reference surface
+        // and the mesh only: they do not depend on the time at which they
+        // are made (e.g. a restart), if the mesh is the same
+        const scalarField candidateWidths(cellWidths(pointField(positions)));
+
+        scalar hMin = GREAT;
+        forAll(candidateWidths, i)
+        {
+            if (candidateWidths[i] > 0)
+            {
+                hMin = min(hMin, candidateWidths[i]);
+            }
+        }
+
+        // Without a candidate in the mesh, the mean width of the cells
+        scalar thickness = 1;
+        for (direction d = 0; d < vector::nComponents; ++d)
+        {
+            if (solD_[d] != 1)
+            {
+                thickness = meshBb.span()[d];
+            }
+        }
+        const scalar hMean =
+        (
+            nD == 2
+          ? Foam::sqrt(gAverage(mesh_.V())/thickness)
+          : Foam::cbrt(gAverage(mesh_.V()))
+        );
+        const scalar s = spacingFactor_*(hMin < GREAT ? hMin : hMean);
+
+        // The grid uses the solved directions only: in two dimensions every
+        // candidate is on the mid-plane of the mesh, which may lie on a plane
+        // of the grid, where rounding would split the candidates
+        auto cell = [&](const point& x, const direction d)
+        {
+            return solD_[d] == 1 ? int64_t(std::floor(x[d]/s)) : int64_t(0);
+        };
+
+        typedef FixedList<int64_t, 5> clusterKey;
+        auto keyOf = [&](const label i)
+        {
+            const point& x = positions[i];
+            const vector nf(surf[faces[i]].areaNormal(pts));
+            direction a = 0;
+            for (direction d = 1; d < vector::nComponents; ++d)
+            {
+                if (mag(nf[d]) > (1 + 1e-12)*mag(nf[a]))
+                {
+                    a = d;
+                }
+            }
+
+            clusterKey key;
+            key[0] = cell(x, vector::X);
+            key[1] = cell(x, vector::Y);
+            key[2] = cell(x, vector::Z);
+            key[3] = int64_t(2*a + (nf[a] < 0 ? 1 : 0));
+            key[4] = int64_t(candidateWidths[i] > 0 ? 1 : 0);
+            return key;
+        };
+
+        // Distances and positions are compared on a grid of 1e-9 s, so that
+        // rounding differences cannot change the choice between equidistant
+        // candidates or the order of the clusters
+        const scalar q = 1e-9*s;
+        auto quantise = [q](const scalar x)
+        {
+            return int64_t(std::llround(x/q));
+        };
+
+        // Groups of the candidates with the same key, numbered in the
+        // (lexicographic) order of the keys
+        labelList groupOf(positions.size());
+        label nGroups = 0;
+        {
+            List<clusterKey> keys(positions.size());
+            forAll(positions, i)
+            {
+                keys[i] = keyOf(i);
+            }
+
+            const labelList order(sortedOrder(keys));
+
+            forAll(order, j)
+            {
+                if (j == 0 || keys[order[j]] != keys[order[j - 1]])
+                {
+                    ++nGroups;
+                }
+                groupOf[order[j]] = nGroups - 1;
+            }
+        }
+        List<DynamicList<label>> groups(nGroups);
+        forAll(groupOf, i)
+        {
+            groups[groupOf[i]].append(i);
+        }
+
+        // Each group is split into the connected components of the
+        // triangles of its candidates (edge neighbours within the group), so
+        // that a cluster never joins surface regions that are not connected
+        // locally (the layers of a folded or the faces of nearby bodies),
+        // ordered by their smallest candidate position
+        const labelListList& faceFaces = surf.faceFaces();
+        labelList root(surf.size(), -1);
+        auto findRoot = [&root](label f)
+        {
+            while (root[f] != f)
+            {
+                root[f] = root[root[f]];
+                f = root[f];
+            }
+            return f;
+        };
+
+        DynamicList<labelList> clusters(groups.size());
+        for (const DynamicList<label>& g : groups)
+        {
+            for (const label i : g)
+            {
+                root[faces[i]] = faces[i];
+            }
+            for (const label i : g)
+            {
+                for (const label nbr : faceFaces[faces[i]])
+                {
+                    if (root[nbr] >= 0)
+                    {
+                        const label a = findRoot(faces[i]);
+                        const label b = findRoot(nbr);
+                        root[max(a, b)] = min(a, b);
+                    }
+                }
+            }
+
+            // The components by their root, each with its candidates in the
+            // order of the group (the sort is stable)
+            labelList roots(g.size());
+            forAll(g, j)
+            {
+                roots[j] = findRoot(faces[g[j]]);
+            }
+            const labelList byRoot(sortedOrder(roots));
+
+            DynamicList<labelList> parts;
+            DynamicList<FixedList<int64_t, 4>> partKeys;
+            for (label j0 = 0; j0 < byRoot.size(); )
+            {
+                label j1 = j0 + 1;
+                while
+                (
+                    j1 < byRoot.size()
+                 && roots[byRoot[j1]] == roots[byRoot[j0]]
+                )
+                {
+                    ++j1;
+                }
+
+                // The smallest candidate position of the component, then its
+                // root (which only separates components at the same
+                // position, i.e. duplicated triangles)
+                labelList part(j1 - j0);
+                FixedList<int64_t, 4> partKey;
+                for (label j = j0; j < j1; ++j)
+                {
+                    const label i = g[byRoot[j]];
+                    part[j - j0] = i;
+
+                    FixedList<int64_t, 4> x;
+                    x[0] = quantise(positions[i].x());
+                    x[1] = quantise(positions[i].y());
+                    x[2] = quantise(positions[i].z());
+                    x[3] = roots[byRoot[j0]];
+                    if (j == j0 || x < partKey)
+                    {
+                        partKey = x;
+                    }
+                }
+                parts.append(part);
+                partKeys.append(partKey);
+
+                j0 = j1;
+            }
+
+            for (const label k : sortedOrder(partKeys))
+            {
+                clusters.append(parts[k]);
+            }
+
+            for (const label i : g)
+            {
+                root[faces[i]] = -1;
+            }
+        }
+        const label nClusters = clusters.size();
+        members_.transfer(clusters);
+
+        // The parent face of each point is that of its candidate nearest to
+        // the area centroid of the cluster; the point itself is placed by
+        // updatePoints
+
+        faces_.setSize(nClusters);
+        barycentric_.setSize(nClusters);
+        scalarField clusterAreas(nClusters, Zero);
+        scalar meshArea = 0;
+        forAll(members_, k)
+        {
+            const labelList& m = members_[k];
+
+            scalar A = 0;
+            vector xc(Zero);
+            for (const label i : m)
+            {
+                A += areas[i];
+                xc += areas[i]*positions[i];
+            }
+            xc /= max(A, VSMALL);
+
+            label best = -1;
+            FixedList<int64_t, 4> bestKey(int64_t(0));
+            for (const label i : m)
+            {
+                const point& x = positions[i];
+                FixedList<int64_t, 4> key;
+                key[0] = quantise(mag(x - xc));
+                key[1] = quantise(x.x());
+                key[2] = quantise(x.y());
+                key[3] = quantise(x.z());
+                if (best < 0 || key < bestKey)
+                {
+                    best = i;
+                    bestKey = key;
+                }
+            }
+
+            faces_[k] = faces[best];
+            barycentric_[k] = barycentric[best];
+            clusterAreas[k] = A;
+            if (candidateWidths[best] > 0)
+            {
+                meshArea += A;
+            }
+        }
+
+        candidateFaces_ = faces;
+        candidateBarycentric_ = barycentric;
+        candidateAreas0_ = areas;
+        candidateAreas_ = areas;
+        candidateFaceAreas0_.setSize(faces.size());
+        forAll(faces, i)
+        {
+            candidateFaceAreas0_[i] = mag(surf[faces[i]].areaNormal(pts));
+        }
+        areas_.transfer(clusterAreas);
+
+        Info<< "    Immersed body " << body_.name() << ": clustered "
+            << positions.size() << " candidate points at a spacing of " << s
+            << ", area in the mesh " << meshArea << endl;
+    }
     else
     {
         faces_.transfer(faces);
@@ -333,6 +617,9 @@ void Foam::immersedSurfaceTraction::createPoints()
 
     Info<< "    Immersed body " << body_.name() << ": " << faces_.size()
         << " traction points, area " << sum(areas_) << endl;
+
+    pressureScale_.setSize(faces_.size());
+    pressureScale_ = 1;
 
     areas0_ = areas_;
     faceAreas0_.setSize(faces_.size());
@@ -361,10 +648,60 @@ void Foam::immersedSurfaceTraction::updatePoints()
         normals_[i] = faceNormals[faces_[i]];
     }
 
-    // The area of each point of a deforming body changes with that of its
-    // parent face
-    if (!body_.rigid())
+    if (members_.size())
     {
+        // Clustered: the area, the vector area and the area centroid of each
+        // cluster from the current triangles of its candidates (whose areas
+        // change with those of their triangles); the point is the centroid
+        // projected on the current plane of its parent face, its normal the
+        // direction of the vector area
+        if (!body_.rigid())
+        {
+            forAll(candidateAreas_, i)
+            {
+                candidateAreas_[i] =
+                    candidateAreas0_[i]
+                   *mag(surf[candidateFaces_[i]].areaNormal(pts))
+                   /max(candidateFaceAreas0_[i], VSMALL);
+            }
+        }
+
+        forAll(faces_, k)
+        {
+            scalar A = 0;
+            vector a(Zero);
+            vector xc(Zero);
+            for (const label i : members_[k])
+            {
+                const label facei = candidateFaces_[i];
+                const labelledTri& f = surf[facei];
+                const FixedList<scalar, 3>& b = candidateBarycentric_[i];
+                const scalar Ai = candidateAreas_[i];
+                A += Ai;
+                a += Ai*faceNormals[facei];
+                xc += Ai*(b[0]*pts[f[0]] + b[1]*pts[f[1]] + b[2]*pts[f[2]]);
+            }
+
+            if (A > VSMALL)
+            {
+                xc /= A;
+                const vector& nf = faceNormals[faces_[k]];
+                points_[k] = xc - ((xc - points_[k]) & nf)*nf;
+            }
+
+            const scalar magA = mag(a);
+            areas_[k] = A;
+            pressureScale_[k] = (A > VSMALL ? magA/A : 1);
+            if (magA > VSMALL)
+            {
+                normals_[k] = a/magA;
+            }
+        }
+    }
+    else if (!body_.rigid())
+    {
+        // The area of each point of a deforming body changes with that of
+        // its parent face
         forAll(faces_, i)
         {
             areas_[i] =
@@ -381,40 +718,13 @@ void Foam::immersedSurfaceTraction::updatePoints()
 }
 
 
-// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
-
-Foam::immersedSurfaceTraction::immersedSurfaceTraction
-(
-    const immersedBody& body,
-    const fvMesh& mesh,
-    const bool thin
-)
-:
-    mesh_(mesh),
-    body_(body),
-    solD_(mesh.solutionD()),
-    thin_(thin),
-    faces_(),
-    barycentric_(),
-    areas_(),
-    areas0_(),
-    faceAreas0_(),
-    h_(),
-    points_(),
-    normals_(),
-    stencils_()
-{
-    createPoints();
-}
-
-
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
-
-Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
+void Foam::immersedSurfaceTraction::wallValues
 (
     const volVectorField& U,
     const volScalarField& p,
-    const scalar nu
+    const scalar nu,
+    scalarField& pw,
+    vectorField& tau
 )
 {
     updatePoints();
@@ -602,8 +912,9 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
         UPstream::worldComm
     );
 
-    tmp<vectorField> ttraction(new vectorField(n, Zero));
-    vectorField& t = ttraction.ref();
+    // Wall pressure (first) and viscous traction of each point, set on the
+    // processor that solves its fits, and then summed over the processors
+    scalarField values(4*n, Zero);
 
     // Solve a small weighted least squares system, whose matrix is
     // symmetric positive semi-definite, with a small regularisation of the
@@ -723,7 +1034,7 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
             rp[0][j] = Rp[j];
         }
         solve(Mp, nP, 1 + nD, rp);
-        const scalar pw = rp[0][0];
+        values[4*i] = rp[0][0];
 
         // Velocity gradient at the wall
         List<List<scalar>> ru(3, List<scalar>(nU));
@@ -783,29 +1094,102 @@ Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
                 tau += -2*tr(Gs)*nw + (Gs.T() & nw);
             }
 
-            t[i] = -pw*nw + nu*tau;
+            const vector taui(nu*tau);
+            for (direction c = 0; c < vector::nComponents; ++c)
+            {
+                values[4*i + 1 + c] = taui[c];
+            }
         }
         else
         {
             // Tangential viscous traction nu*(I - nn).(grad(U - Ub) & n): on
             // a no-slip wall the tangential derivatives of U - Ub vanish, and
             // the rigid body velocity Ub has no strain
-            const vector tau(nu*((I - sqr(nw)) & (gradU & nw)));
-
-            t[i] = -pw*nw + tau;
+            const vector taui(nu*((I - sqr(nw)) & (gradU & nw)));
+            for (direction c = 0; c < vector::nComponents; ++c)
+            {
+                values[4*i + 1 + c] = taui[c];
+            }
         }
     }
 
     reduce
     (
-        reinterpret_cast<scalar*>(t.data()),
-        vector::nComponents*t.size(),
+        values.data(),
+        values.size(),
         sumOp<scalar>(),
         UPstream::msgType(),
         UPstream::worldComm
     );
 
-    return ttraction;
+    pw.setSize(n);
+    tau.setSize(n);
+    forAll(pw, i)
+    {
+        pw[i] = values[4*i];
+        tau[i] = vector(values[4*i + 1], values[4*i + 2], values[4*i + 3]);
+    }
+}
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
+Foam::immersedSurfaceTraction::immersedSurfaceTraction
+(
+    const immersedBody& body,
+    const fvMesh& mesh,
+    const quadratureType quadrature,
+    const scalar spacingFactor
+)
+:
+    mesh_(mesh),
+    body_(body),
+    solD_(mesh.solutionD()),
+    quadrature_(quadrature),
+    spacingFactor_(spacingFactor),
+    faces_(),
+    barycentric_(),
+    areas_(),
+    areas0_(),
+    faceAreas0_(),
+    h_(),
+    points_(),
+    normals_(),
+    stencils_(),
+    candidateFaces_(),
+    candidateBarycentric_(),
+    candidateAreas0_(),
+    candidateAreas_(),
+    candidateFaceAreas0_(),
+    members_(),
+    pressureScale_()
+{
+    if (spacingFactor_ <= 0)
+    {
+        FatalErrorInFunction
+            << "The spacing factor of the clusters must be positive, not "
+            << spacingFactor_ << exit(FatalError);
+    }
+
+    createPoints();
+}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+Foam::tmp<Foam::vectorField> Foam::immersedSurfaceTraction::traction
+(
+    const volVectorField& U,
+    const volScalarField& p,
+    const scalar nu
+)
+{
+    scalarField pw;
+    vectorField tau;
+    wallValues(U, p, nu, pw, tau);
+
+    // The physical traction, with the unit normal of each point
+    return -pw*normals_ + tau;
 }
 
 
@@ -833,14 +1217,34 @@ void Foam::immersedSurfaceTraction::faceValues
 
     // The points outside the mesh have no value but keep their area, so
     // that the mean over a face partly outside the mesh gives the force of
-    // its part in the mesh when it is applied to the whole face
-    forAll(faces_, i)
+    // its part in the mesh when it is applied to the whole face. The value
+    // of a cluster applies to each of its candidates, with its area, on its
+    // face
+    if (members_.size())
     {
-        if (h_[i] > 0)
+        forAll(members_, k)
         {
-            faceValues[faces_[i]] += areas_[i]*pointValues[i];
+            for (const label i : members_[k])
+            {
+                const label facei = candidateFaces_[i];
+                if (h_[k] > 0)
+                {
+                    faceValues[facei] += candidateAreas_[i]*pointValues[k];
+                }
+                faceAreas[facei] += candidateAreas_[i];
+            }
         }
-        faceAreas[faces_[i]] += areas_[i];
+    }
+    else
+    {
+        forAll(faces_, i)
+        {
+            if (h_[i] > 0)
+            {
+                faceValues[faces_[i]] += areas_[i]*pointValues[i];
+            }
+            faceAreas[faces_[i]] += areas_[i];
+        }
     }
 
     forAll(faceValues, facei)
@@ -869,16 +1273,21 @@ void Foam::immersedSurfaceTraction::force
     vector& T
 )
 {
-    const vectorField t(traction(U, p, nu));
+    scalarField pw;
+    vectorField tau;
+    wallValues(U, p, nu, pw, tau);
 
-    // The traction is the same on every processor
+    // The values are the same on every processor. The pressure is
+    // integrated with the vector area of each point, |a| n = (|a|/A) A n,
+    // and the viscous traction with its area A
     F = Zero;
     T = Zero;
-    forAll(t, i)
+    forAll(pw, i)
     {
         if (h_[i] > 0)
         {
-            const vector dF(rho*t[i]*areas_[i]);
+            const vector t(-pw[i]*pressureScale_[i]*normals_[i] + tau[i]);
+            const vector dF(rho*t*areas_[i]);
             F += dF;
             T += (points_[i] - CofR) ^ dF;
         }

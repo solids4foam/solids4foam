@@ -1,0 +1,18 @@
+#!/bin/bash
+cd "${0%/*}" || exit  # Run from this directory
+
+# Parse arguments for application compilation
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
+fi
+
+# The immersed boundary library is currently only built with OpenFOAM.com
+if [[ "$WM_PROJECT" == "OpenFOAM" && $WM_PROJECT_VERSION == v* ]]
+then
+    wmake $targetType
+else
+    echo "Skipping Test-immersedSurfaceTraction: it requires OpenFOAM.com"
+fi
+
+#------------------------------------------------------------------------------

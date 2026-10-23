@@ -140,7 +140,10 @@ Description
     included). The estimates that are not selected are written after the
     inertia: the momentum exchange, unless it is selected, then the surface
     traction, with writeSurfaceTraction, unless it is selected.
-    forceEstimator and writeSurfaceTraction are only used by cutLink.
+    forceEstimator, writeSurfaceTraction, tractionQuadrature and
+    tractionPointSpacing are only used by cutLink, and setting them with
+    another method, or the last two without the surface traction, is an
+    error.
     The momentum exchange and forcing estimates are exact on average for
     static and steadily moving bodies, the forcing estimate also gives the
     wall shear of a tangentially accelerating wall accurately, and the
@@ -268,6 +271,21 @@ Description
         // cutLink: with the momentum exchange, also write the force from
         // the surface traction, optional, default no
         writeSurfaceTraction no;
+
+        // cutLink, with the surface traction only: quadrature of the
+        // surface traction, optional: clustered (default: one point per
+        // cluster of candidate points, independent of the order of the
+        // surface triangles), none (every candidate point) or greedy (legacy:
+        // the candidate points thinned to about 0.7 mean cell widths in the
+        // order of the surface triangles, which gives the results of
+        // earlier versions). Bodies driven by a fluid-solid interface always
+        // use none. See src/immersedBoundary/README.md
+        tractionQuadrature clustered;
+
+        // cutLink, tractionQuadrature clustered only: size of the clusters
+        // relative to the smallest width of the cells containing the
+        // surface in its reference configuration, optional, default 0.5
+        tractionPointSpacing 0.5;
 
         // Relaxation c of each incremental direct-forcing update, optional,
         // default 0.8. Reduce it to damp oscillatory forcing or pressure
@@ -484,6 +502,14 @@ class immersedBoundaryForce
             //- With the momentum exchange force, also evaluate the force from
             //  the surface traction and write it after the inertia
             bool writeSurfaceTraction_;
+
+            //- Quadrature of the surface traction (not const: it is read by
+            //  read, as are the other settings)
+            immersedSurfaceTraction::quadratureType tractionQuadrature_;
+
+            //- Size of the clusters of the clustered quadrature, relative to
+            //  the smallest width of the cells containing the surface
+            scalar tractionPointSpacing_;
 
         // Ghost cell method
 

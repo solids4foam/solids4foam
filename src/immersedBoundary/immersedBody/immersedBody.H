@@ -303,6 +303,12 @@ public:
                 return surface_;
             }
 
+            //- Surface points in the reference configuration
+            const pointField& points0() const
+            {
+                return points0_;
+            }
+
             //- Local cells fully covered by the body
             const labelList& internalCells() const
             {
