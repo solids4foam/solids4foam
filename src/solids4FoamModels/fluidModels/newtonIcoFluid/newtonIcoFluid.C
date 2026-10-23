@@ -26,6 +26,7 @@ License
 #include "fixedGradientFvPatchFields.H"
 #include "wallFvPatch.H"
 #include "compatibilityFunctions.H"
+#include "wedgePolyPatch.H"
 
 
 namespace
@@ -205,7 +206,7 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
     // Named intermediate: a reused tmp would alias an input of dev2
     const volTensorField gradUT(T(gradU));
 
-    return tmp<volTensorField>
+    tmp<volTensorField> tnuDevGradUT
     (
         new volTensorField
         (
@@ -213,6 +214,127 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
             turbulence_->nuEff()*dev2(gradUT)
         )
     );
+
+    // On a wall where the fluid moves with the boundary (fixed velocity),
+    // n & grad(U)^T = grad(U & n) at fixed n, whose tangential part follows
+    // from the surface gradient of the wall velocity and whose normal part
+    // is, by continuity, minus the surface divergence of the wall velocity;
+    // the trace vanishes. These depend on the wall velocity only. Taken from
+    // the boundary value of grad(U), the tangential derivatives are those of
+    // the adjacent cell values and do not cancel, which gives a first-order
+    // force on a stationary wall (blobInTreacle). The wall value is
+    // therefore set to n*q with
+    //     q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))
+    // where G_s is the surface gradient of the wall velocity vector, so that
+    // the momentum residual's wall flux and the traction, which only use
+    // n & (boundary value), both get q. (The trace of n*q is not zero; the
+    // tensor is only constructed for this normal flux.)
+    volTensorField& nuDevGradUT = tmpRef(tnuDevGradUT);
+    const volScalarField nuEff(turbulence_->nuEff());
+    const volVectorField& U = this->U();
+
+    // Directions without a solution (empty), excluded from the fit
+    const Vector<label>& solD = mesh().solutionD();
+    symmTensor emptyDirs(symmTensor::zero);
+    for (direction cmpt = 0; cmpt < vector::nComponents; ++cmpt)
+    {
+        if (solD[cmpt] == -1)
+        {
+            vector e(vector::zero);
+            e[cmpt] = 1;
+            emptyDirs += sqr(e);
+        }
+    }
+
+    // Wedge transformations: the images of a wall face across the wedge
+    // planes supply the circumferential derivatives of an axisymmetric case
+    DynamicList<tensor> wedgeT;
+    forAll(mesh().boundaryMesh(), patchI)
+    {
+        if (isA<wedgePolyPatch>(mesh().boundaryMesh()[patchI]))
+        {
+            wedgeT.append
+            (
+                refCast<const wedgePolyPatch>
+                (
+                    mesh().boundaryMesh()[patchI]
+                ).cellT()
+            );
+        }
+    }
+
+    forAll(mesh().boundary(), patchI)
+    {
+        const fvPatch& fp = mesh().boundary()[patchI];
+
+        if
+        (
+            !isA<wallFvPatch>(fp)
+         || !isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI])
+        )
+        {
+            continue;
+        }
+
+        const vectorField& Ub = U.boundaryField()[patchI];
+        const vectorField nf(fp.nf());
+        const vectorField& Cf = fp.Cf();
+        const scalarField& nuEffb = nuEff.boundaryField()[patchI];
+        const labelListList& faceFaces = fp.patch().faceFaces();
+
+        fvPatchTensorField& bfPatch = boundaryFieldRef(nuDevGradUT)[patchI];
+
+        forAll(Ub, faceI)
+        {
+            const vector& n = nf[faceI];
+
+            // Tangential projector
+            const tensor P(I - sqr(n));
+
+            // Least-squares surface gradient G_s (G_s_ij = d_i U_j) from
+            // the neighbouring wall faces (and the wedge images), with
+            // tangential distance vectors and inverse-square-distance
+            // weights; exact for a linear velocity on any face spacing and
+            // zero for a rigid translation
+            symmTensor dd(symmTensor::zero);
+            tensor dU(tensor::zero);
+
+            const labelList& nbrs = faceFaces[faceI];
+
+            forAll(nbrs, i)
+            {
+                const vector d(P & (Cf[nbrs[i]] - Cf[faceI]));
+                const scalar w = 1.0/max(magSqr(d), VSMALL);
+                dd += w*sqr(d);
+                dU += w*(d*(Ub[nbrs[i]] - Ub[faceI]));
+            }
+
+            forAll(wedgeT, i)
+            {
+                const vector d(P & ((wedgeT[i] & Cf[faceI]) - Cf[faceI]));
+                const scalar w = 1.0/max(magSqr(d), VSMALL);
+                dd += w*sqr(d);
+                dU += w*(d*((wedgeT[i] & Ub[faceI]) - Ub[faceI]));
+            }
+
+            // Regularise the normal and empty directions, which have no
+            // distance component, as the leastSquares gradient does
+            const symmTensor ddReg(dd + sqr(n) + emptyDirs);
+
+            vector q(vector::zero);
+
+            if (mag(det(ddReg)) > SMALL*pow3(max(tr(dd), VSMALL)))
+            {
+                const tensor Gs(inv(ddReg) & dU);
+
+                q = nuEffb[faceI]*((P & (Gs & n)) - n*tr(Gs));
+            }
+
+            bfPatch[faceI] = n*q;
+        }
+    }
+
+    return tnuDevGradUT;
 }
 
 

@@ -37,9 +37,10 @@ release. For complete commit-level details and contributor information, see the
   the momentum equation's viscous terms, so that the force on the solid is
   the momentum the fluid loses; the explicit transpose term
   `div(nuEff*dev2(T(grad(U))))` is in the momentum residual, as in
-  `pimpleFluid`, and in the wall pressure gradient, so that the traction is
-  `n & (-devReff)`, which on a deforming wall contains the physical term
-  `mu*grad(u & n)`;
+  `pimpleFluid`, and in the wall pressure gradient, so that the traction
+  contains the physical term `mu*grad(u & n)` of a deforming wall; on walls
+  with fixed velocity its value is taken from a least-squares surface
+  gradient of the wall velocity, not from the adjacent cell gradient;
   `ringAddedMass/verification/Allverify --study monolithic` verifies the
   coupling against the exact added-mass solution. The velocity solid models
   work on axisymmetric (wedge) meshes, and the coupling accepts a solid that

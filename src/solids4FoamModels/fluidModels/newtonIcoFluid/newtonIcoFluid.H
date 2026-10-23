@@ -148,7 +148,12 @@ class newtonIcoFluid
         void correctPhi();
 
         //- Transpose part of the viscous stress, nuEff*dev2(T(gradU)), as
-        //  in the divDevReff of pimpleFluid
+        //  in the divDevReff of pimpleFluid. On walls with fixed velocity
+        //  the boundary value is n*q, set from the wall velocity only:
+        //      q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))
+        //  with G_s the least-squares surface gradient of the wall velocity,
+        //  i.e. n & grad(U)^T at fixed n with the normal derivative from
+        //  continuity (zero velocity divergence)
         tmp<volTensorField> viscousStressTranspose
         (
             const volTensorField& gradU
@@ -303,7 +308,8 @@ public:
             //  velocity, at which the fluid moves with the boundary (a
             //  no-slip wall or a fluid-solid interface), from the normal
             //  momentum equation:
-            //      dp/dn = n & (laplacian(nuEff, U) - dU/dt)
+            //      dp/dn = n & (laplacian(nuEff, U)
+            //                 + div(nuEff*dev2(T(grad(U)))) - dU/dt)
             //  where dU/dt is the acceleration of the boundary faces. The
             //  convective term, which vanishes at a no-slip wall that moves
             //  with the mesh, is neglected. A zeroGradient pressure at such a
