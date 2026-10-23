@@ -1895,23 +1895,6 @@ void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
         )
     );
 
-    FpreInvSurfacePtr_.reset
-    (
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "FpreInvf",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            inv(autoPtrRef(FpreSurfacePtr_))
-        )
-    );
-
     JpreSurfacePtr_.reset
     (
         new surfaceScalarField
@@ -1926,6 +1909,56 @@ void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
                 false
             ),
             det(autoPtrRef(FpreSurfacePtr_))
+        )
+    );
+
+    // A positive det(Fpre) in every cell does not make it positive on every
+    // face: I and diag(-3, -1/3, 1) both have det 1, and their mean has
+    // det -1/3. So the faces are checked, processor patches included,
+    // before the face Fpre is inverted
+    {
+        const surfaceScalarField& Jpref = autoPtrRef(JpreSurfacePtr_);
+
+        scalar minJpref = gMin(Foam::primitiveField(Jpref));
+
+        forAll(Jpref.boundaryField(), patchI)
+        {
+            const scalarField& Jp = Jpref.boundaryField()[patchI];
+
+            if (Jp.size())
+            {
+                minJpref = min(minJpref, min(Jp));
+            }
+        }
+
+        reduce(minJpref, minOp<scalar>());
+
+        if (minJpref <= SMALL)
+        {
+            FatalErrorInFunction
+                << "det(Fpre) must be positive on every face, but the minimum "
+                << "of det(Fpre) interpolated to the faces is " << minJpref
+                << "." << nl
+                << "Fpre is positive in every cell but changes too sharply "
+                << "between neighbouring cells to be interpolated"
+                << exit(FatalError);
+        }
+    }
+
+    FpreInvSurfacePtr_.reset
+    (
+        new surfaceTensorField
+        (
+            IOobject
+            (
+                "FpreInvf",
+                mesh_.time().timeName(),
+                mesh_,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            inv(autoPtrRef(FpreSurfacePtr_))
         )
     );
 }

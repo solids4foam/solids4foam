@@ -469,10 +469,14 @@ a tangent query has history to disturb), `viscoTube` (viscoelasticity),
 `idealisedVentricle` and `LandEtAl2015/problem3` (hyperelasticity).
 
 `Test-prestress` checks the `prestress` switch on a case mesh with
-finite-strain laws: that the prestressed volField, surfaceField, flat-list and
-scalar tangent updates match a manager without prestress given the composed
-kinematics, that the order of composition is visible to that check, and that
-the unsupported evaluations are refused.
+finite-strain laws: that the prestressed volField, surfaceField and flat-list
+stress updates match a manager without prestress given the composed
+kinematics, that the order of composition is visible to that check, that each
+of the six composed fields, old times included, is the product with `Fpre`,
+and that the unsupported evaluations are refused. The scalar tangent of these
+laws is a material constant, so whether the scalar tangent update composes the
+kinematics is not tested. The test moves the case's own `Fpre` aside while it
+runs and puts it back after.
 
 Every solid model takes its stress and tangent from this framework, so every
 tutorial's regression test is runtime coverage of it as well.

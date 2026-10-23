@@ -31,6 +31,10 @@ Description
     determinant taken here from the product rather than composed, so the
     reference does not share the composition it checks.
 
+    The case's own Fpre in the start time, if it has one, is moved aside to
+    Fpre.beforeTest while the checks run and put back after them, so the
+    case is left as it was found.
+
     The following are checked:
       1. The volField stress, internal and boundary values, matches the
          plain manager's at the composed kinematics.
@@ -38,16 +42,24 @@ Description
          Fpre, and not zero.
       3. The order of composition is checked: Fpre & Fstep gives a
          different stress, so check 1 would see the wrong order.
-      4. The scalar tangent matches the plain manager's.
+      4. The scalar tangent matches the plain manager's. For these laws it
+         is a material constant, so this shows the route runs, not that it
+         composes the kinematics; that is not tested.
       5. The surfaceField stress matches the plain manager's at Ff composed
          with Fpre interpolated to faces.
       6. The flat-list update on the cell-centred topology matches the
          volField update.
-      7. The guards fire: a small-strain update, a flat-list update on a
+      7. The six fields the cell and face updates compose, F, F0, Finv,
+         Finv0, J and J0, each match the product with Fpre, with old-time
+         values that differ from the current ones, and again after update()
+         composes new values into the same fields.
+      8. The guards fire: a small-strain update, a flat-list update on a
          topology other than the cell-centred one, a fourth-order tangent,
-         a flat list of the wrong size, asking a manager without prestress for its Fpre, building a
-         prestressed manager with a law that cannot be prestressed, and
-         reading an Fpre whose patches set their own values.
+         a flat list of the wrong size, asking a manager without prestress
+         for its Fpre, building a prestressed manager with a law that cannot
+         be prestressed, reading an Fpre whose patches set their own values,
+         and a face evaluation with an Fpre whose det is positive in every
+         cell but not on every face.
 
 Author
     Conor Moore, UCD.
@@ -56,6 +68,7 @@ Author
 
 #include "fvCFD.H"
 #include "mechanicalConstitutiveLawManager.H"
+#include "mechanicalConstitutiveLawPrestress.H"
 #include "integrationPointTopologies.H"
 #include "mechanicalConstitutiveLawTangentRequest.H"
 #include "mat66.H"
@@ -106,10 +119,18 @@ void reportError
 }
 
 
-//- Largest difference between two lists, relative to the largest magnitude
-//  in either of them
+//- Accumulate, on this processor alone, the largest difference between two
+//  lists and the largest magnitude in either of them. It does not
+//  communicate, so it can be called once per patch, however many patches
+//  each processor has
 template<class Type>
-scalar relativeDifference(const UList<Type>& a, const UList<Type>& b)
+void accumulateDifference
+(
+    const UList<Type>& a,
+    const UList<Type>& b,
+    scalar& maxDiff,
+    scalar& scale
+)
 {
     if (a.size() != b.size())
     {
@@ -118,21 +139,32 @@ scalar relativeDifference(const UList<Type>& a, const UList<Type>& b)
             << b.size() << exit(FatalError);
     }
 
-    scalar scale = SMALL;
-    scalar maxDiff = 0.0;
-
     forAll(a, i)
     {
         scale = max(scale, max(mag(a[i]), mag(b[i])));
         maxDiff = max(maxDiff, mag(a[i] - b[i]));
     }
+}
+
+
+//- Largest difference between two lists, relative to the largest magnitude
+//  in either of them, over every processor
+template<class Type>
+scalar relativeDifference(const UList<Type>& a, const UList<Type>& b)
+{
+    scalar maxDiff = 0.0;
+    scalar scale = SMALL;
+
+    accumulateDifference(a, b, maxDiff, scale);
 
     return returnReduce(maxDiff, maxOp<scalar>())
         /returnReduce(scale, maxOp<scalar>());
 }
 
 
-//- As above, over the internal values and every patch of two fields
+//- As above, over the internal values and every patch of two fields. The
+//  patches are accumulated locally and reduced once, since the processors
+//  do not all have the same number of patches
 template<class Type, template<class> class PatchField, class GeoMesh>
 scalar relativeDifference
 (
@@ -140,22 +172,27 @@ scalar relativeDifference
     const GeometricField<Type, PatchField, GeoMesh>& b
 )
 {
-    scalar err =
-        relativeDifference(Foam::primitiveField(a), Foam::primitiveField(b));
+    scalar maxDiff = 0.0;
+    scalar scale = SMALL;
+
+    accumulateDifference
+    (
+        Foam::primitiveField(a), Foam::primitiveField(b), maxDiff, scale
+    );
 
     forAll(a.boundaryField(), patchI)
     {
-        err = max
+        accumulateDifference
         (
-            err,
-            relativeDifference
-            (
-                a.boundaryField()[patchI], b.boundaryField()[patchI]
-            )
+            a.boundaryField()[patchI],
+            b.boundaryField()[patchI],
+            maxDiff,
+            scale
         );
     }
 
-    return err;
+    return returnReduce(maxDiff, maxOp<scalar>())
+        /returnReduce(scale, maxOp<scalar>());
 }
 
 
@@ -199,6 +236,28 @@ tensor testFstep(const vector& p)
 }
 
 
+//- The solver's deformation gradient at the previous time: a different
+//  stretch and shear, so that a composition that used the current values for
+//  the old ones would be seen
+tensor testFstep0(const vector& p)
+{
+    const scalar s = 1.5e-2;
+
+    const vector q(unitCoordinates(p));
+
+    const scalar x = q.x();
+    const scalar y = q.y();
+    const scalar z = q.z();
+
+    return I + s*tensor
+    (
+        0.50 - 0.20*y,    0.30 + 0.10*z*z, -0.20 + 0.05*x,
+       -0.30 + 0.15*x*z,  0.80 - 0.10*x,    0.10 + 0.20*y,
+        0.25 - 0.10*y*y, -0.40 + 0.05*z,    0.35 + 0.15*x*y
+    );
+}
+
+
 //- Fpre at a point: larger than the step and with different
 //  principal directions, so that the two do not commute
 tensor testFpre(const vector& p)
@@ -217,6 +276,14 @@ tensor testFpre(const vector& p)
        -0.40 + 0.10*z,    0.50 + 0.20*x*x,  0.70 - 0.20*y,
         0.20 + 0.30*y,   -0.60 + 0.10*x,    0.40 + 0.15*y*z
     );
+}
+
+
+//- The identity at a point, for an Fpre or a deformation gradient that
+//  does nothing
+tensor identityAt(const vector&)
+{
+    return tensor(I);
 }
 
 
@@ -295,6 +362,82 @@ tmp<GeometricField<Type, PatchField, GeoMesh>> resultField
 }
 
 
+//- Moves the case's own Fpre, if it has one, aside while the checks write
+//  theirs into the start time, and puts it back when it goes out of scope,
+//  so that running the test does not change the case
+class caseFpreGuard
+{
+    //- The start time directory
+    const fileName dir_;
+
+    //- The case's Fpre as it was named, or empty if it had none
+    fileName original_;
+
+
+public:
+
+    caseFpreGuard(const fileName& dir)
+    :
+        dir_(dir),
+        original_()
+    {
+        // A .beforeTest left by a run of the test that stopped before putting
+        // it back is the case's own Fpre, and the Fpre beside it is one of
+        // the test's; moving that aside would overwrite the case's
+        forAll(fpreNames(), nameI)
+        {
+            const fileName kept(dir_/fpreNames()[nameI] + ".beforeTest");
+
+            if (isFile(kept, false))
+            {
+                FatalErrorInFunction
+                    << kept << " is the case's Fpre, kept by a run of the "
+                    << "test that stopped before putting it back." << nl
+                    << "Move it back to " << fpreNames()[nameI] << " before "
+                    << "running the test again" << exit(FatalError);
+            }
+        }
+
+        forAll(fpreNames(), nameI)
+        {
+            const fileName file(dir_/fpreNames()[nameI]);
+
+            if (isFile(file, false))
+            {
+                original_ = file;
+                mv(original_, original_ + ".beforeTest");
+
+                Info<< "The case's " << original_.name() << " is kept as "
+                    << original_.name() << ".beforeTest while the checks "
+                    << "run, and put back after them" << endl;
+
+                break;
+            }
+        }
+    }
+
+    ~caseFpreGuard()
+    {
+        forAll(fpreNames(), nameI)
+        {
+            rm(dir_/fpreNames()[nameI]);
+        }
+
+        if (!original_.empty())
+        {
+            mv(original_ + ".beforeTest", original_);
+        }
+    }
+
+    //- The names Fpre is written under, compressed or not
+    static const wordList& fpreNames()
+    {
+        static const wordList names({"Fpre", "Fpre.gz"});
+        return names;
+    }
+};
+
+
 //- True if f throws a FatalError
 template<class Function>
 bool throwsFatal(Function f)
@@ -318,6 +461,30 @@ bool throwsFatal(Function f)
 }
 
 
+//- True if f throws a FatalError whose message contains what, so that a
+//  check refused for some other reason does not pass
+template<class Function>
+bool throwsFatalSaying(const string& what, Function f)
+{
+    FatalError.throwExceptions();
+
+    bool threw = false;
+
+    try
+    {
+        f();
+    }
+    catch (const Foam::error& err)
+    {
+        threw = (err.message().find(what) != string::npos);
+    }
+
+    FatalError.dontThrowExceptions();
+
+    return threw;
+}
+
+
 int main(int argc, char *argv[])
 {
 #   include "setRootCase.H"
@@ -327,6 +494,10 @@ int main(int argc, char *argv[])
     const scalar dt = runTime.deltaTValue();
 
     bounds_ = boundBox(mesh.points(), true);
+
+    // The checks write Fpre into the start time; the case's own is put back
+    // when this goes out of scope, after the managers below
+    const caseFpreGuard keepCaseFpre(runTime.path()/runTime.timeName());
 
     Info<< nl << "Reading mechanicalProperties" << endl;
 
@@ -645,7 +816,72 @@ int main(int argc, char *argv[])
 
 
     // -------------------------------------------------------------------------
-    Info<< nl << "7. Guards" << endl;
+    Info<< nl << "7. The six composed fields, with old times that differ"
+        << endl;
+
+    // The laws above read only F and J, and the checks above give them the
+    // same current and old-time values, so they would not see Finv or the
+    // old-time fields composed wrongly. The composition the cell and face
+    // updates use is checked directly here instead, against the products
+    {
+        const volTensorField F0(pointwiseField(mesh, "F0", testFstep0));
+        const volTensorField Finv0("Finv0", inv(F0));
+        const volScalarField J0("J0", det(F0));
+
+        const volTensorField FpreInv("FpreInv", inv(Fpre));
+        const volScalarField Jpre("Jpre", det(Fpre));
+
+        const volTensorField Ftot0("Ftot0", F0 & Fpre);
+        const volTensorField FtotInv0("FtotInv0", inv(Ftot0));
+        const volScalarField Jtot0("Jtot0", det(Ftot0));
+
+        const finiteStrainVolFields step(F, F0, Finv, Finv0, J, J0);
+
+        finiteStrainPrestressedFields<fvPatchField, volMesh> composed
+        (
+            step, Fpre, FpreInv, Jpre
+        );
+
+        const finiteStrainVolFields& c = composed.fields;
+
+        scalar err = relativeDifference(c.F, Ftot);
+        err = max(err, relativeDifference(c.F0, Ftot0));
+        err = max(err, relativeDifference(c.Finv, FtotInv));
+        err = max(err, relativeDifference(c.Finv0, FtotInv0));
+        err = max(err, relativeDifference(c.J, Jtot));
+        err = max(err, relativeDifference(c.J0, Jtot0));
+
+        reportError
+        (
+            "F, F0, Finv, Finv0, J and J0 are each composed with Fpre",
+            err,
+            1e-12
+        );
+
+        // Composed again, into the same fields, with current and old-time
+        // swapped, as the manager recomposes at every later evaluation
+        const finiteStrainVolFields swapped(F0, F, Finv0, Finv, J0, J);
+
+        composed.update(swapped, Fpre, FpreInv, Jpre);
+
+        scalar errSwapped = relativeDifference(c.F, Ftot0);
+        errSwapped = max(errSwapped, relativeDifference(c.F0, Ftot));
+        errSwapped = max(errSwapped, relativeDifference(c.Finv, FtotInv0));
+        errSwapped = max(errSwapped, relativeDifference(c.Finv0, FtotInv));
+        errSwapped = max(errSwapped, relativeDifference(c.J, Jtot0));
+        errSwapped = max(errSwapped, relativeDifference(c.J0, Jtot));
+
+        reportError
+        (
+            "update() composes the new values into the same fields",
+            errSwapped,
+            1e-12
+        );
+    }
+
+
+    // -------------------------------------------------------------------------
+    Info<< nl << "8. Guards" << endl;
 
     {
         const volTensorField gradD
@@ -817,6 +1053,57 @@ int main(int argc, char *argv[])
             throwsFatal([&]()
             {
                 mechanicalConstitutiveLawManager refused(mesh, preDict);
+            })
+        );
+
+        // det(Fpre) positive in every cell but not on every face: I and
+        // diag(-3, -1/3, 1), alternating from cell to cell, both have det 1,
+        // and a face between the two has det -1/3. It is read without
+        // complaint, and refused at the first face evaluation
+        {
+            volTensorField FpreAlternating
+            (
+                pointwiseField(mesh, "Fpre", identityAt)
+            );
+
+            forAll(FpreAlternating, cellI)
+            {
+                if (cellI % 2)
+                {
+                    FpreAlternating[cellI] =
+                        tensor(-3, 0, 0, 0, -1.0/3.0, 0, 0, 0, 1);
+                }
+            }
+
+            FpreAlternating.write();
+        }
+
+        const surfaceTensorField If
+        (
+            "If", fvc::interpolate(pointwiseField(mesh, "Fid", identityAt))
+        );
+        const surfaceScalarField Jf("Jf", det(If));
+
+        tmp<surfaceSymmTensorField> tSigmaf
+        (
+            resultField<symmTensor, fvsPatchField, surfaceMesh>
+            (
+                mesh, "sigmafAlternating", dimPressure
+            )
+        );
+
+        report
+        (
+            "an Fpre positive in the cells but not on the faces is refused "
+            "at the first face evaluation",
+            throwsFatalSaying("positive on every face", [&]()
+            {
+                mechanicalConstitutiveLawManager alternating(mesh, preDict);
+
+                alternating.updateStressFiniteStrain
+                (
+                    If, If, If, If, Jf, Jf, dt, Foam::tmpRef(tSigmaf)
+                );
             })
         );
     }

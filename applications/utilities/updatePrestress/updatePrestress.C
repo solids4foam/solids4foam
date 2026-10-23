@@ -42,13 +42,25 @@ Description
     postProcessing are left. A case written with a collated fileHandler is
     refused, since its time directories are not ones this can remove.
 
-    The manager writes Fpre at every write time, so Fpre in the latest time
-    says the run applied it. Fpre is then taken from the start
-    time, which holds it at full precision, and from the latest time only if
-    the start time has none. Fpre in the start time but not the latest is
-    refused, since the run did not apply it. On the first pass, where there
-    is no Fpre in either, Fpre the run used is taken to be the
-    identity.
+    The Fpre the start time held is kept, as it was, as FprePass<N>, N being
+    the pass that wrote it, so that copying it back to Fpre restores it. Only
+    that backup is kept, unless -keepPasses is given, in which case every
+    earlier one is. Nothing is removed until the backup is made and FpreNew
+    is written and read back as it is held, on every processor; if any of
+    that fails, the Fpre that was there is put back and the utility stops.
+    Each pass appends a line to prestressHistory in the case directory: the
+    pass written, max mag(F - I) of the run that used the pass before it,
+    and the range of det(Fpre).
+
+    The manager writes the Fpre it used at every write time, at full
+    precision, so Fpre in the latest time is the one the run used, and is
+    the one composed with. If the start time also holds an Fpre it must be
+    the same one; otherwise the run was continued from a time holding a
+    different Fpre, or an earlier update did not finish, and the case is
+    refused before anything is written or removed. Fpre in the start time
+    but not the latest is refused, since the run did not apply it. On the
+    first pass, where there is no Fpre in either, Fpre the run used is taken
+    to be the identity.
 
     max mag(F - I) is reported as the convergence measure: it tends to zero
     as the mesh comes into equilibrium with the load under Fpre.
@@ -68,7 +80,7 @@ Description
     utility and the solver refuse the same laws.
 
 Usage
-    updatePrestress [-parallel] [-force]
+    updatePrestress [-parallel] [-force] [-keepPasses]
 
 Author
     Conor Moore, UCD.
@@ -79,6 +91,7 @@ Author
 #include "compatibilityFunctions.H"
 #include "mechanicalConstitutiveLaw.H"
 #include "Switch.H"
+#include <fstream>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -90,6 +103,154 @@ bool foundVolTensorField(IOobject& io)
 #else
     return io.headerOk();
 #endif
+}
+
+
+//- The file a field is written to, compressed or not, or an empty name if
+//  there is neither
+fileName fieldFile(const fileName& path)
+{
+    if (isFile(path, false))
+    {
+        return path;
+    }
+
+    const fileName gzPath(path + ".gz");
+
+    if (isFile(gzPath, false))
+    {
+        return gzPath;
+    }
+
+    return fileName();
+}
+
+
+//- The pass of a backup named FprePass<N>, or 0 for any other name
+label backupPass(const fileName& name)
+{
+    const word base(name.ext() == "gz" ? name.lessExt().name() : name.name());
+    const string prefix("FprePass");
+
+    if
+    (
+        base.size() <= prefix.size()
+     || base.compare(0, prefix.size(), prefix) != 0
+    )
+    {
+        return 0;
+    }
+
+    const string digits(base.substr(prefix.size()));
+
+    for (std::size_t charI = 0; charI < digits.size(); charI++)
+    {
+        if (!isdigit(digits[charI]))
+        {
+            return 0;
+        }
+    }
+
+    return readLabel(IStringStream(digits)());
+}
+
+
+//- The backups, FprePass<N>, in the directory
+fileNameList prestressBackups(const fileName& dir)
+{
+    const fileNameList files(readDir(dir, fileName::FILE));
+
+    DynamicList<fileName> backups(files.size());
+
+    forAll(files, fileI)
+    {
+        if (backupPass(files[fileI]) > 0)
+        {
+            backups.append(files[fileI]);
+        }
+    }
+
+    return fileNameList(backups);
+}
+
+
+//- True if Fpre as read back from the instance is held: its internal values,
+//  and those of every patch that writes them. A constraint patch, a symmetry
+//  plane say, is evaluated from the internal values on reading rather than
+//  read, so it is not compared. False, rather than fatal, if it cannot be
+//  read, so that the caller can put back what was there
+bool writtenAsHeld
+(
+    const volTensorField& held,
+    const word& instance,
+    const fvMesh& mesh
+)
+{
+    FatalError.throwExceptions();
+    FatalIOError.throwExceptions();
+
+    bool same = false;
+
+    try
+    {
+        const volTensorField read
+        (
+            IOobject
+            (
+                held.name(),
+                instance,
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh
+        );
+
+        // At full precision or in binary the round trip is exact; the
+        // tolerance only allows for the last digit
+        const scalar tolerance =
+            1e-14*max(1.0, max(mag(Foam::primitiveField(held))));
+
+        same =
+            max(mag(Foam::primitiveField(read) - Foam::primitiveField(held)))
+         <= tolerance;
+
+        forAll(read.boundaryField(), patchI)
+        {
+            const word& patchType = mesh.boundaryMesh()[patchI].type();
+
+            if
+            (
+                polyPatch::constraintType(patchType)
+             || read.boundaryField()[patchI].empty()
+            )
+            {
+                continue;
+            }
+
+            same =
+                same
+             && max
+                (
+                    mag
+                    (
+                        read.boundaryField()[patchI]
+                      - held.boundaryField()[patchI]
+                    )
+                )
+             <= tolerance;
+        }
+    }
+    catch (const Foam::error&)
+    {
+        same = false;
+    }
+
+    FatalError.dontThrowExceptions();
+    FatalIOError.dontThrowExceptions();
+
+    return same;
 }
 
 
@@ -122,13 +283,22 @@ int main(int argc, char *argv[])
         "Update Fpre even when the time schemes for D are not steadyState"
     );
 
+    argList::addBoolOption
+    (
+        "keepPasses",
+        "Keep every earlier Fpre as FprePass<N>, rather than only the one "
+        "before this update"
+    );
+
 #   include "setRootCase.H"
 #   include "createTime.H"
 
 #ifdef OPENFOAM_COM
     const bool force = args.found("force");
+    const bool keepPasses = args.found("keepPasses");
 #else
     const bool force = args.optionFound("force");
+    const bool keepPasses = args.optionFound("keepPasses");
 #endif
 
 #ifdef OPENFOAM_NOT_EXTEND
@@ -403,18 +573,67 @@ int main(int argc, char *argv[])
     const bool FpreAtLatest = foundVolTensorField(FpreLatestHeader);
     const bool FpreAtStart = foundVolTensorField(FpreStartHeader);
 
+    // Each processor looks at its own files, so the processors must agree on
+    // which there are before any of them takes a branch with a reduction in
+    // it, or those that do will wait for those that do not
+    if
+    (
+        returnReduce(FpreAtLatest, orOp<bool>())
+     != returnReduce(FpreAtLatest, andOp<bool>())
+     || returnReduce(FpreAtStart, orOp<bool>())
+     != returnReduce(FpreAtStart, andOp<bool>())
+    )
+    {
+        FatalErrorInFunction
+            << "Fpre is in time " << startTime.name() << " or time "
+            << latestTime.name() << " on some processors but not on others."
+            << nl
+            << "Check the processor directories. Nothing has been written or "
+            << "removed" << exit(FatalError);
+    }
+
     autoPtr<volTensorField> FpreOldPtr;
 
-    if (FpreAtLatest && FpreAtStart)
+    if (FpreAtLatest)
     {
-        // The same Fpre, both at full precision; the start time's is the
-        // one this utility wrote, which a run started from an earlier
-        // build, one that wrote Fpre at writePrecision, has not rounded
-        FpreOldPtr.reset(new volTensorField(FpreStartHeader, mesh));
-    }
-    else if (FpreAtLatest)
-    {
+        // The manager writes the Fpre it used at every write time, at full
+        // precision, so the latest time's is the one the run used
         FpreOldPtr.reset(new volTensorField(FpreLatestHeader, mesh));
+
+        // and the start time's, if there is one, has to be the same Fpre:
+        // otherwise the run did not start from it, or an earlier update
+        // wrote it without removing the results it was built from
+        if (FpreAtStart)
+        {
+            const volTensorField FpreStart(FpreStartHeader, mesh);
+
+            const scalar scale =
+                max(1.0, gMax(mag(Foam::primitiveField(FpreStart))));
+
+            const scalar diff = gMax
+            (
+                mag
+                (
+                    Foam::primitiveField(FpreStart)
+                  - Foam::primitiveField(autoPtrRef(FpreOldPtr))
+                )
+            );
+
+            if (diff > 1e-10*scale)
+            {
+                FatalErrorInFunction
+                    << "Fpre in time " << startTime.name() << " is not the "
+                    << "Fpre in time " << latestTime.name() << " (max mag "
+                    << "difference " << diff << "), so the start time does "
+                    << "not hold the Fpre the run used." << nl
+                    << "Either the run was continued from a time holding a "
+                    << "different Fpre, or an earlier update wrote Fpre to "
+                    << "time " << startTime.name() << " without removing the "
+                    << "results it was built from." << nl
+                    << "Nothing has been written or removed"
+                    << exit(FatalError);
+            }
+        }
     }
     else if (FpreAtStart)
     {
@@ -484,32 +703,154 @@ int main(int argc, char *argv[])
         "mag(F - I)", mag(F - dimensionedTensor("I", dimless, I))
     );
 
-    Info<< "    max mag(F - I)    = " << max(magFminusI).value() << nl;
+    const scalar maxMagFminusI = max(magFminusI).value();
+    const scalar maxJpre = max(JpreNew).value();
 
-    Info<< "    det(Fpre) ranges from " << minJpre << " to "
-        << max(JpreNew).value() << nl << endl;
+    Info<< "    max mag(F - I)    = " << maxMagFminusI << nl;
+
+    Info<< "    det(Fpre) ranges from " << minJpre << " to " << maxJpre
+        << nl << endl;
 
     // Writing moves an instance that is not constant or system to the
     // current time, so the current time is set back to the start time first
     runTime.setTime(startTime, 0);
 
-    // At full precision, so that the next pass starts from Fpre
-    // computed here rather than a rounding of it
-    const unsigned int precision = IOstream::defaultPrecision();
-    IOstream::defaultPrecision(17);
+    const fileName startDir(runTime.path()/startTime.name());
 
-    Info<< "Writing Fpre to time " << startTime.name() << endl;
-    FpreNew.write();
+    // The backups are numbered by the pass that wrote them, so the Fpre in
+    // the start time, if any, is from the pass after the latest backup. The
+    // ranks agree on the number, so a backup has the same name on each
+    label lastBackupPass = 0;
+    const fileNameList backups(prestressBackups(startDir));
 
-    IOstream::defaultPrecision(precision);
-
-    // Nothing is removed unless the updated Fpre is on disk
-    if (!isFile(FpreNew.objectPath()))
+    forAll(backups, fileI)
     {
+        lastBackupPass =
+            max(lastBackupPass, backupPass(backups[fileI].name()));
+    }
+
+    reduce(lastBackupPass, maxOp<label>());
+
+    const fileName oldFpreFile(fieldFile(startDir/"Fpre"));
+    const bool backingUp = !oldFpreFile.empty();
+    const label oldPass = backingUp ? lastBackupPass + 1 : lastBackupPass;
+    const label newPass = oldPass + 1;
+
+    // The Fpre in the start time is kept, as it was, as FprePass<N>, so that
+    // copying it back to Fpre restores it. Nothing below removes a result
+    // unless every rank has its backup made and the updated Fpre written
+    // and read back as it is held here
+    fileName backupFile;
+    bool ok = true;
+
+    if (backingUp)
+    {
+        backupFile = startDir/("FprePass" + Foam::name(oldPass));
+
+        if (oldFpreFile.ext() == "gz")
+        {
+            backupFile += ".gz";
+        }
+
+        Info<< "Keeping the Fpre from pass " << oldPass << " as "
+            << backupFile.name() << endl;
+
+        ok = mv(oldFpreFile, backupFile);
+    }
+
+    if (ok)
+    {
+        // At full precision, so that the next pass starts from Fpre
+        // computed here rather than a rounding of it
+        const unsigned int precision = IOstream::defaultPrecision();
+        IOstream::defaultPrecision(17);
+
+        Info<< "Writing Fpre from pass " << newPass << " to time "
+            << startTime.name() << endl;
+
+        ok = FpreNew.write();
+
+        IOstream::defaultPrecision(precision);
+    }
+
+    if (ok)
+    {
+        ok = writtenAsHeld(FpreNew, startTime.name(), mesh);
+    }
+
+    reduce(ok, andOp<bool>());
+
+    if (!ok)
+    {
+        // Back as it was on every rank: the updated Fpre, if any of it was
+        // written, is removed, and the backup is moved back
+        const fileName newFpreFile(fieldFile(startDir/"Fpre"));
+
+        if (!newFpreFile.empty())
+        {
+            rm(newFpreFile);
+        }
+
+        if (backingUp && isFile(backupFile, false))
+        {
+            mv(backupFile, oldFpreFile);
+        }
+
         FatalErrorInFunction
-            << "The updated Fpre was not written to "
-            << FpreNew.objectPath() << ", so no results are removed"
-            << exit(FatalError);
+            << "The updated Fpre could not be written to time "
+            << startTime.name() << " and read back as it was computed, on "
+            << "at least one processor." << nl
+            << "The Fpre that was there has been put back, and no results "
+            << "have been removed. The Fpre the run used is also in time "
+            << latestTime.name() << exit(FatalError);
+    }
+
+    // Only the backup just made is kept, unless every pass is asked for
+    if (!keepPasses)
+    {
+        forAll(backups, fileI)
+        {
+            const fileName backup(fieldFile(startDir/backups[fileI].name()));
+
+            if (!backup.empty() && backup != backupFile)
+            {
+                Info<< "Removing " << backup.name() << endl;
+                rm(backup);
+            }
+        }
+    }
+
+    // One line per pass in the case directory: the pass written, max mag(F -
+    // I) of the run that used the pass before it, and the range of det(Fpre)
+    if (Pstream::master())
+    {
+        const fileName historyFile
+        (
+            runTime.rootPath()/runTime.globalCaseName()/"prestressHistory"
+        );
+
+        const bool newHistory = !isFile(historyFile, false);
+
+        std::ofstream history(historyFile.c_str(), std::ios::app);
+
+        if (newHistory)
+        {
+            history
+                << "# pass  maxMag(F-I)  minDet(Fpre)  maxDet(Fpre)" << nl
+                << "# maxMag(F-I) is of the run that used the pass before"
+                << nl;
+        }
+
+        history.precision(12);
+        history
+            << newPass << "  " << maxMagFminusI << "  " << minJpre << "  "
+            << maxJpre << std::endl;
+
+        if (!history.good())
+        {
+            WarningInFunction
+                << "Could not append to " << historyFile << endl;
+        }
     }
 
     for (label timeI = startI + 1; timeI < timeDirs.size(); timeI++)
