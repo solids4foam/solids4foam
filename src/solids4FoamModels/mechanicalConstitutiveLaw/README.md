@@ -348,10 +348,12 @@ storage it is written into.
 
 ## Prestress
 
-A geometry taken from an image is already loaded: an artery imaged at
-diastole carries the stress of the diastolic pressure. The `prestress` switch
-in `mechanicalProperties` lets every finite-strain law see that stress without
-the mesh being moved to a stress-free configuration first:
+A vascular geometry taken from an image is already loaded: an artery imaged at
+diastole via MRI or CT scan carries the stress of the diastolic pressure.
+Assuming this geometry to be the stress-free configuration will over-inflate the
+artery. The `prestress` switch in `mechanicalProperties` lets every
+finite-strain law see that stress without the mesh being moved to a stress-free
+configuration first:
 
 ```c++
 prestress       yes;

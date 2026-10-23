@@ -286,15 +286,22 @@ class mechanicalConstitutiveLawManager
         //  prestress
         autoPtr<volTensorField> FprePtr_;
 
-        //- Inverse and determinant of Fpre, taken once since Fpre does not
-        //  change during a run
+        //- Inverse of Fpre, taken once since Fpre does not change during a run
         autoPtr<volTensorField> FpreInvPtr_;
+
+        //- Determinant of Fpre, taken once since Fpre does not change during a
+        //  run
         autoPtr<volScalarField> JprePtr_;
 
-        //- Fpre interpolated to faces, with its inverse and
-        //  determinant, made on the first face evaluation
+        //- Fpre interpolated to faces made on the first face evaluation
         mutable autoPtr<surfaceTensorField> FpreSurfacePtr_;
+
+        //- Inverse of Fpre interpolated to faces made on the first face
+        //  evaluation
         mutable autoPtr<surfaceTensorField> FpreInvSurfacePtr_;
+
+        //- Determinant of Fpre interpolated to faces made on the first face
+        //  evaluation
         mutable autoPtr<surfaceScalarField> JpreSurfacePtr_;
 
         //- The solver's kinematics composed with Fpre, made on the first
@@ -302,6 +309,10 @@ class mechanicalConstitutiveLawManager
         //  solver's fields, old times and all, are copied only once
         mutable autoPtr<finiteStrainPrestressedFields<fvPatchField, volMesh>>
             volPrestressedPtr_;
+
+        //- The solver's kinematics composed with Fpre, made on the first
+        //  evaluation and recomposed at every later one, so that the
+        //  solver's fields, old times and all, are copied only once
         mutable autoPtr
         <
             finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>

@@ -28,7 +28,7 @@ Description
     Fpre for the next pass is that deformation composed with the
     Fpre the run used:
 
-        Fpre_new = F & Fpre
+        FpreNew = F & Fpre
 
     F is on the left because it acts after Fpre. Copying F into Fpre
     instead discards the prestress of every earlier pass, and the passes do
