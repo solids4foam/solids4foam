@@ -50,7 +50,7 @@ interpolationSchemes
     default         none; //linear;
     interpolate(yPatch) linear;
     interpolate(y) linear;
-    interpolate(U) skewCorrected linear;
+    interpolate(U) linear;
     interpolate(nHat) linear;
     interpolate(rho) linear;
     interpolate(alpha.water) linear;

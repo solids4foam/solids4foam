@@ -448,13 +448,14 @@ meshes) the former `viscousStressTranspose yes` gave -2.34%, -1.04% and
 -0.44%; with the transpose term in the wall pressure gradient -1.31%, -0.56%
 and -0.22%; with the wall evaluation of the transpose stress as well
 -0.71%, -0.39% and -0.18% (the former Laplacian-only form: -0.33%, -0.29% and
--0.16%). All series extrapolate to the partitioned value within 0.08%. The
+-0.16%), all with the former tutorial `interpolate(U) skewCorrected linear`.
+With the tutorials' `interpolate(U) linear`, which is also the interpolation
+of `pimpleFluid`'s `flux(HbyA)`, the differences are -0.19%, -0.23% and
+-0.14%. All series extrapolate to the partitioned value within 0.08%. The
 rest of the difference comes from the partitioned `zeroGradient` interface
-pressure (first order), the face interpolation of U (`skewCorrected linear` in
-the monolithic continuity flux, plain linear in `pimpleFluid`'s
-`flux(HbyA)`) and the different face-flux construction: with a
-`zeroGradient` interface pressure and linear interpolation in the monolithic
-case as well, the differences are +0.31%, +0.11% and +0.06%.
+pressure (first order) and the different face-flux construction: with a
+`zeroGradient` interface pressure in the monolithic case as well, the
+differences are +0.31%, +0.11% and +0.06%.
 
 ### Model-Side Physics Preconditioner
 
