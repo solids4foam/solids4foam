@@ -416,13 +416,13 @@ What prestress does not cover, and refuses rather than evaluates without
   deformation gradient rather than the solver's.
 
 The mixed formulation of `nonLinearGeometryTotalLagrangianTotalDisplacement`
-(`solvePressure`) is written on the `J` the laws see, `Jstep*det(Fpre)`, in
-its pressure residual and in its check of the law's volumetric response, since
-the pressure stands in for that response; its approximate Jacobian is
-unchanged. Scalar tangents are given at the composed kinematics; they are preconditioner
-estimates and need nothing more. Laws with fibre directions take those
-directions in the stress-free configuration, so directions defined on the
-imaged geometry should be mapped back through `inv(Fpre)` first.
+(`solvePressure`) needs nothing more either: its pressure residual is written
+on the volumetric response the law returns, which the manager has evaluated at
+the composed kinematics, so the solid model never needs a `J` other than its
+own. Scalar tangents are given at the composed kinematics; they are
+preconditioner estimates and need nothing more. Laws with fibre directions
+take those directions in the stress-free configuration, so directions defined
+on the imaged geometry should be mapped back through `inv(Fpre)` first.
 
 `Fpre` is found with the modified updated Lagrangian formulation (Gee, Förster
 and Wall, 2010): the load is applied to the imaged mesh, `Fpre` becomes

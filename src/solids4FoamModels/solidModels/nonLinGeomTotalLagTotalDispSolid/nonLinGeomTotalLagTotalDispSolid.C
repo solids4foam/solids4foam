@@ -163,94 +163,6 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 }
 
 
-tmp<volScalarField> nonLinGeomTotalLagTotalDispSolid::lawJ() const
-{
-    if (mechanicalManager().prestressed())
-    {
-        return tmp<volScalarField>
-        (
-            new volScalarField("lawJ", J_*mechanicalManager().Jpre())
-        );
-    }
-
-    return tmp<volScalarField>(new volScalarField("lawJ", J_));
-}
-
-
-void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
-{
-    if (volumetricClosureChecked_)
-    {
-        return;
-    }
-
-
-    // The pressure equation hard-codes its half of the constitutive model:
-    // its residual is -p/K + stabilisation - 0.5*(J^2 - 1)/J, so it assumes
-    // the law's volumetric energy is U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)) and
-    // takes K from the mechanical model. Nothing in providesVolumetricSplit()
-    // promises that. A law with a different U(J) would separate its response
-    // honestly and then be solved against a pressure equation describing a
-    // different material - silently, because both halves are individually
-    // reasonable.
-    //
-    // The response the law returns is exactly dU/dJ, so the assumption can be
-    // checked rather than trusted. Once is enough: it is a property of the
-    // law, not of the state
-    // On the J the law sees, which with prestress includes det(Fpre)
-    const volScalarField Jlaw(lawJ());
-
-    const volScalarField assumed
-    (
-        0.5*(sqr(Jlaw) - 1.0)/(Jlaw*rKappa())
-    );
-
-    const volScalarField& actual = volumetricResponse();
-
-    // Guarded on the size of the comparison rather than on a threshold in
-    // the kinematics. Both responses are zero in an undeformed material, and
-    // for a nearly incompressible case they stay small for ever - plateHole's
-    // mixed arm runs at tr(epsilon) of order 1e-20 - so a fixed cut-off
-    // either fires on nothing or never fires at all. What matters is only
-    // that there is something to compare: once either response is non-zero
-    // the comparison is relative and means something at any magnitude
-    const scalar scale =
-        max
-        (
-            gMax(mag(Foam::primitiveField(assumed))),
-            gMax(mag(Foam::primitiveField(actual)))
-        );
-
-    if (scale <= 0)
-    {
-        return;
-    }
-
-    volumetricClosureChecked_ = true;
-    const scalar err =
-        gMax
-        (
-            mag(Foam::primitiveField(actual) - Foam::primitiveField(assumed))
-        );
-
-    if (err > 1e-8*scale)
-    {
-        FatalErrorInFunction
-            << "The law's volumetric response is not the one the pressure "
-            << "equation was written for." << nl << nl
-            << "    The pressure equation assumes "
-            << "U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)), so dU/dJ = "
-            << "0.5*K*(J^2 - 1)/J, with K taken from the mechanical model. "
-            << "The law returned something else: the largest difference is "
-            << err << " against a response of order " << scale << '.' << nl << nl
-            << "    Separating the volumetric response honestly is not enough "
-            << "on its own - the pressure equation has to be solving for the "
-            << "same thing, or the two halves describe different materials."
-            << exit(FatalError);
-    }
-}
-
-
 void nonLinGeomTotalLagTotalDispSolid::replaceVolumetricStress
 (
     const volScalarField& p
@@ -826,17 +738,12 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
             volumetricResponse()
         );
 
-        checkVolumetricClosure();
-
         return;
     }
 
     // The hydrostatic stress smoothing (solvePressureEqn): the law gives its
     // stress in two parts, and the volumetric part is smoothed before it is
-    // added back. It is scaled by the solver's J_ for the smoothing and
-    // divided by it again after, so with prestress the smoothed measure is
-    // Kirchhoff with respect to the mesh rather than the stress-free
-    // configuration; unsmoothed, the two scalings cancel either way
+    // added back
     if (smoothHydrostaticStress())
     {
         mechanicalManager().updateStressFiniteStrainSplit
@@ -1460,17 +1367,12 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         }
 
         // Calculate pressure equation residual. The pressure stands in for
-        // the law's volumetric response, so it is written on the J the law
-        // sees, which with prestress includes det(Fpre). The Jacobian below
-        // linearises it about J = 1 whether or not there is prestress; it is
-        // an approximation either way, and only the residual sets the answer
-        const volScalarField Jlaw(lawJ());
-
+        // the law's volumetric response, dU/dJ, which correctStress() has just
+        // evaluated at the kinematics the law was given
         scalarField pressureResidual
         (
-          - p*rKappa()
+          - rKappa()*(p + volumetricResponse())
           + pressureStabilisation().cellScalar(&rAUf(), true)*one
-          - 0.5*(pow(Jlaw, 2.0) - 1.0)/Jlaw
         );
 
         // Make residual extensive

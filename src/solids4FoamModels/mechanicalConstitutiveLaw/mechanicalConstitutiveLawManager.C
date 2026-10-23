@@ -1731,19 +1731,6 @@ const Foam::volTensorField& Foam::mechanicalConstitutiveLawManager::Fpre() const
 }
 
 
-const Foam::volScalarField& Foam::mechanicalConstitutiveLawManager::Jpre() const
-{
-    if (!JprePtr_.valid())
-    {
-        FatalErrorInFunction
-            << "There is no Jpre: prestress is off in "
-            << "mechanicalProperties" << exit(FatalError);
-    }
-
-    return autoPtrRef(JprePtr_);
-}
-
-
 void Foam::mechanicalConstitutiveLawManager::readPrestress()
 {
     Info<< "Prestress: the mechanical constitutive laws see the deformation "
