@@ -217,7 +217,8 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
         )
     );
 
-    // On a wall where the fluid moves with the boundary (fixed velocity),
+    // On a boundary with a prescribed velocity (a no-slip wall, the FSI
+    // interface, an inlet), for an incompressible flow
     // n & grad(U)^T = grad(U & n) at fixed n, whose tangential part follows
     // from the surface gradient of the wall velocity and whose normal part
     // is, by continuity, minus the surface divergence of the wall velocity;
@@ -268,11 +269,9 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
     {
         const fvPatch& fp = mesh().boundary()[patchI];
 
-        if
-        (
-            !isA<wallFvPatch>(fp)
-         || !isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI])
-        )
+        // Every boundary with a prescribed velocity: no-slip walls, the FSI
+        // interface (whatever its patch type) and inlets
+        if (!isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI]))
         {
             continue;
         }

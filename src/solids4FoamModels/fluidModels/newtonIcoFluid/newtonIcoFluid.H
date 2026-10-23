@@ -148,7 +148,7 @@ class newtonIcoFluid
         void correctPhi();
 
         //- Transpose part of the viscous stress, nuEff*dev2(T(gradU)), as
-        //  in the divDevReff of pimpleFluid. On walls with fixed velocity
+        //  in the divDevReff of pimpleFluid. On boundaries with fixed velocity
         //  the boundary value is n*q, set from the wall velocity only:
         //      q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))
         //  with G_s the least-squares surface gradient of the wall velocity,

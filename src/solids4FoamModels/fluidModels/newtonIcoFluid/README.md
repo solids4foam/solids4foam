@@ -402,7 +402,8 @@ the monolithic wall motion of `womersleyTube` is offset from the partitioned
 solutions by an amount that does not vanish with mesh or time-step refinement
 (wall phase 4.8e-4 rad at m1, m2 and m4).
 
-On walls with fixed velocity (no-slip walls and the FSI interface), the
+On boundaries with a prescribed velocity (no-slip walls, the FSI interface
+whatever its patch type, e.g. `patch` in TurekHron2006, and inlets), the
 boundary value of the transpose stress is set from the wall velocity: it is
 `n*q` with `q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))`, where `G_s` is
 the surface gradient of the wall velocity vector. This is `n & grad(U)^T` at
