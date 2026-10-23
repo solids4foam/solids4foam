@@ -120,6 +120,9 @@ private:
 
     // Private data
 
+        //- Is the mesh shared with, and owned by, another model?
+        const bool sharedMesh_;
+
         //- Pointer to the mesh if we created it
         autoPtr<dynamicFvMesh> meshOwnerPtr_;
 
@@ -444,6 +447,18 @@ private:
 
 
 protected:
+
+        //- Return the IOobject of a field whose name the owner of a shared
+        //  mesh may also use, e.g. U, p or rho: on a shared mesh, the field
+        //  is private to the solid model, i.e. not registered, read or
+        //  written, so that it does not clash with the owner's field
+        IOobject sharedMeshIOobject
+        (
+            const word& name,
+            const fileName& instance,
+            const IOobject::readOption r,
+            const IOobject::writeOption w
+        ) const;
 
         //- The mechanicalConstitutiveLaw framework, constructed on first use
         mechanicalConstitutiveLawManager& mechanicalManager() const;
@@ -784,6 +799,18 @@ public:
             dynamicFvMesh& mesh()
             {
                 return *meshPtr_;
+            }
+
+            //- Is the mesh shared with, and owned by, another model? e.g.
+            //  the moving fluid mesh, for the solids4foamSolidModel mesh
+            //  motion solver, with the meshMotionTotalDisplacement solid
+            //  model, which never updates the mesh. The solid model then does
+            //  not change the mesh's moving flag or clear the owner's solver
+            //  performance records, and its fields whose names the owner may
+            //  also use, and g, are private (see sharedMeshIOobject)
+            bool sharedMesh() const
+            {
+                return sharedMesh_;
             }
 
             //- Return dualMesh

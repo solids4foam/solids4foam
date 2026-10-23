@@ -184,6 +184,98 @@ is the header-only interface implemented by `immersedBoundaryForce`.
 
 ---
 
+## Fluid mesh motion
+
+The fluid mesh is moved by the mesh motion solver in
+`constant/fluid/dynamicMeshDict`. At each mesh update, the interface gives a
+*fluid mesh motion coupler* the change in the displacement of each fluid
+interface patch, and the coupler sets it in the form its family of motion
+solvers expects. The coupler is selected from the motion solver, or set
+explicitly in `constant/fsiProperties`:
+
+```text
+fluidMeshMotion
+{
+    type    auto;   // default
+}
+```
+
+- `velocity`: velocity-based solvers, e.g. `velocityLaplacian`; the
+  `pointMotionU` patch value is the displacement increment divided by the
+  time-step size.
+- `displacement`: displacement-based solvers, e.g. `displacementLaplacian` and
+  `displacementSBRStress`; the `pointDisplacement` patch value is the total
+  displacement relative to the solver reference points, `points0`.
+- `solidModel`: `solids4foamSolidModel` (OpenFOAM.com); the total
+  displacement is set on the solid model `pointD` and `fixedDisplacement` `D`.
+- `RBF`: `RBFMeshMotionSolver`; the patch face displacement increments are
+  set.
+- `tetFemVelocity`: foam-extend tetFEM solvers; the `motionU` patch value is
+  the displacement increment divided by the time-step size.
+- `subsetMesh`: foam-extend `newSubsetMotionSolverFvMesh`; `pointMotionU` is
+  set on the sub-mesh.
+
+The FSI patches must have a `fixedValue` condition in the motion field.
+Component solvers, e.g. `velocityComponentLaplacian`, are not supported.
+
+### Velocity- or displacement-based motion
+
+Velocity-based solvers are path dependent: the interior mesh is advanced from
+its current state each time step, so under periodic or long-running motion the
+interior mesh can drift cycle after cycle and periodic quantities of interest
+may not become stationary. A displacement-based solver, e.g.
+`displacementLaplacian` with the same `diffusivity`, always solves from the
+reference points, so the mesh for a given interface position does not depend
+on how the interface got there. It is recommended for periodic or
+long-running FSI cases; add a `0/fluid/pointDisplacement` file, with
+`fixedValue` on the FSI patches, in place of `pointMotionU`.
+
+The `displacement` coupler sets the interface value from the current geometry,
+`points + increment - points0`, rather than accumulating increments, so it is
+the same whatever the number of outer iterations, it includes the interface
+points moved directly when `interfaceDeformationLimit` is used, and it does
+not depend on the earlier boundary values. A restart still needs a
+`pointDisplacement` field to read, and `points0` must be the reference points
+of the run being continued.
+
+### Solid model mesh motion
+
+`solids4foamSolidModel` moves the fluid mesh with the
+`meshMotionTotalDisplacement` solid model, solved on the fluid mesh itself,
+typically with the `diffusionElastic` or `diffusionHyperElastic` law, whose
+stiffness is scaled by a mesh motion diffusivity so that the mesh is stiffer
+near the interface:
+
+```text
+// constant/fluid/dynamicMeshDict
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+motionSolver    solids4foamSolidModel;
+diffusivity     quadratic inverseDistance (interface);
+```
+
+As with `displacementLaplacian`, the solid model solves for the total
+displacement from `points0`, discretised on the current fluid mesh, so no copy
+of the mesh is needed; with `finiteStrain yes`, for the
+`diffusionHyperElastic` law, its kinematics are those of the current
+configuration (see the
+[solid model page](../solidModels/meshMotionTotalDispSolid/README.md)). The
+stiffness scale factor is recalculated on the current mesh before each
+solution.
+
+The solid model reads `solidProperties` and `mechanicalProperties` from
+`constant/fluid`, `D` and `pointD` from `0/fluid`, and its schemes and solver
+settings from `system/fluid/fvSchemes` and `fvSolution`: `grad(D)`
+(`leastSquaresS4f`), `laplacian(DD,D)`, and the `D` solver and relaxation
+factor. On the FSI patches, `D` must be `fixedDisplacement` with
+`enforcePointPatchField no`, and `pointD` must be `fixedValue`. The solid
+model fields whose names the fluid may also use, e.g. `U`, `p`, `rho` and
+`g`, are private to it, and are neither read nor written; it writes its `D`,
+`pointD` and `sigma` fields, and the state of its law, to the fluid time
+directories. The `beamInCrossFlow` tutorial has an example:
+`./Allrun diffusionElastic`.
+
+---
+
 ## Notes
 
 - The partitioned schemes share the common `fluidSolidInterface` machinery for

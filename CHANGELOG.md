@@ -8,6 +8,36 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The fluid-solid interface passes the interface motion to the fluid mesh
+  motion solver through a runtime-selectable *fluid mesh motion coupler*,
+  selected from the motion solver or with an optional `fluidMeshMotion`
+  sub-dictionary in `fsiProperties`, in place of the fixed list of supported
+  solvers in `moveFluidMesh`. Existing cases are unchanged. New couplers
+  support displacement-based solvers, e.g. `displacementLaplacian` and
+  `displacementSBRStress`, which set the total interface displacement relative
+  to the reference points from the current geometry, and the
+  `solids4foamSolidModel` solver. Velocity-based solvers are path dependent
+  and the interior mesh can drift under periodic motion, which
+  `displacementLaplacian` avoids.
+- The `meshMotionTotalDisplacement` solid model (OpenFOAM.com) moves a mesh
+  owned by another model: it solves quasi-statically for the total
+  displacement from the reference points on the current mesh, as
+  `displacementLaplacian` does, optionally with current-configuration
+  finite-strain kinematics, so the mesh for a given boundary motion does not
+  depend on its path, without a copy of the reference mesh. The
+  `solids4foamSolidModel` mesh motion solver uses it on the fluid mesh, and
+  calculates the `stiffnessScaleFactor` field from an optional mesh motion
+  `diffusivity`. A solid model on a mesh owned by another model
+  (`solidModel::sharedMesh()`) does not clear the mesh's moving flag or the
+  owner's solver performance records, and its `U`, `p`, `rho`, `g`, `rAUf`
+  and `useBoundaryFaceValues_p` fields are private to it.
+- Ported the `diffusionElastic` and `diffusionHyperElastic` laws, removed
+  with the legacy mechanical laws, to the `mechanicalConstitutiveLaw`
+  framework, for mesh motion with `solids4foamSolidModel`: `linearElastic`
+  and `neoHookeanElastic` with the stiffness scaled by `stiffnessScaleFactor`.
+  The `diffusivity` entries move from the law to the `dynamicMeshDict`.
+- `beamInCrossFlow`: `./Allrun displacementLaplacian`, `diffusionElastic`
+  and `diffusionHyperElastic` select the fluid mesh motion.
 - Added the `channelLeaflet` fluid-solid interaction tutorial: a thin
   elastic leaflet, clamped in a 2D channel and wetted on both faces, in a
   pulsatile flow at Re = 200, after the oomph-lib channel-with-leaflet
