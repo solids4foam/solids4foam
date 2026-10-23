@@ -25,8 +25,8 @@ d2dt2Schemes
 ddtSchemes
 {
     default            none;
-    ddt(U)             Euler;
-    ddt(p)             Euler;
+    ddt(U)             backward;
+    ddt(p)             backward;
     ddt(D)             steadyState;
     d2dt2(D)           steadyState;
 }
@@ -41,7 +41,7 @@ divSchemes
 {
     default            none;
     jacobian-div(phi,U) Gauss upwind;
-    div(phi,U)         Gauss linearUpwind cellLimited leastSquares 1;
+    div(phi,U)         Gauss LUST grad(U);
     div((nuEff*dev2(T(grad(U))))) Gauss linear;
     div((nuEff*dev(T(grad(U))))) Gauss linear;
     div(U)             Gauss linear;
