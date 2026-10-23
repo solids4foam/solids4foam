@@ -297,7 +297,7 @@ The mesh is overwritten!
   formulation for prestressing a solid model (see the Prestress section of
   `src/solids4FoamModels/mechanicalConstitutiveLaw/README.md`). `Fpre`
   for the next pass is the deformation gradient `F` at the latest time composed
-  with `Fpre` the run used, `Fpre_new = F & Fpre`. It is written to
+  with `Fpre` the run used, `FpreNew = F & Fpre`. It is written to
   the start time (`startTime` in `system/controlDict`) at full precision, and
   every time directory after the start time is removed, so the next pass
   starts with zero displacement.
