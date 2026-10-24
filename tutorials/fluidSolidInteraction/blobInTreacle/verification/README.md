@@ -226,6 +226,12 @@ but made the partitioned coupling first order, as it treats the cell values
 as pointwise values and is not conservative; the traction passed to the solid
 must be the fluid's own discrete wall flux.
 
+These rows predate the transpose viscous term, which `newtonIcoFluid` now
+always includes in its momentum residual, wall pressure gradient and
+traction, with the wall value taken from the wall velocity (see the
+`newtonIcoFluid` README, Interface Viscous Force and Wall Pressure Gradient);
+the table is pending a rerun.
+
 ## References
 
 J. Liu, R.K. Jaiman, P.S. Gurugubelli, A stable second-order scheme for
