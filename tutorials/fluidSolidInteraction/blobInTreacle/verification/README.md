@@ -206,6 +206,7 @@ as the mesh study, alongside the partitioned coupling on the same machine
 | Monolithic, `devReff` | 0.115467 | 0.118301 | 0.119376 | 1.4 | 0.12003 |
 | Monolithic, `div(U)` | 0.117429 | 0.119524 | 0.120053 | 2.0 | 0.12023 |
 | Monolithic | 0.116851 | 0.119346 | 0.120020 | 1.9 | 0.12027 |
+| Monolithic, transpose term (`1252bd2e5`) | 0.116390 | 0.119224 | 0.119991 | 1.9 | 0.12028 |
 
 The x4 partitioned value differs from the one in the reference results above,
 recorded on Linux, by 0.06%. In this viscous case the interface traction is
@@ -226,11 +227,20 @@ but made the partitioned coupling first order, as it treats the cell values
 as pointwise values and is not conservative; the traction passed to the solid
 must be the fluid's own discrete wall flux.
 
-These rows predate the transpose viscous term, which `newtonIcoFluid` now
-always includes in its momentum residual, wall pressure gradient and
-traction, with the wall value taken from the wall velocity (see the
-`newtonIcoFluid` README, Interface Viscous Force and Wall Pressure Gradient);
-the table is pending a rerun.
+The rows above the last predate the transpose viscous term, which
+`newtonIcoFluid` now always includes in its momentum residual, wall pressure
+gradient and traction, with the wall value taken from the wall velocity (see
+the `newtonIcoFluid` README, Interface Viscous Force and Wall Pressure
+Gradient). The last row was recorded with `feature-petsc-snes-quasi-monolithic`
+at `1252bd2e5` (#618, #617; `ddt` backward, `linearUpwind grad(U)`,
+`interpolate(U) skewCorrected linear` as the partitioned set-up) on Linux
+(MeluXina, GCC) on 1, 2 and 4 ranks; 2.0, 2.0 and 2.6 Newton iterations per
+step. Against the partitioned values recorded with the same set-up on macOS
+(0.117231, 0.119691, 0.120206), it is 0.72%, 0.39% and 0.18% lower, and
+both series extrapolate to the same value within 0.06%. Most of the
+remaining difference is the partitioned `zeroGradient` interface pressure
+(first order) against the monolithic `fixedGradient` one, and the face-flux
+construction of the two pressure-velocity couplings.
 
 ## References
 

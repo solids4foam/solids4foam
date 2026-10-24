@@ -314,48 +314,42 @@ study.
 
 ### Quasi-monolithic coupling
 
-> **Note:** the results in this section use the former Laplacian-form
-> traction `nuEff*snGrad(U)`. The transpose viscous term is now always
-> included (see the `newtonIcoFluid` README); it changes the load on the
-> deforming wall and removes the wall phase offset from the partitioned
-> solutions (4.8e-4 rad at every mesh). The table is pending a rerun.
-
 `--monolithic` runs the mesh and time-step studies with the quasi-monolithic
 Newton coupling (`./Allrun monolithic`: `newtonIcoFluid` and
 `linearGeometryVelocity`), and compares it, rather than Robin-Neumann, with
-IQN-ILS on the tutorial mesh at 100 steps per period. The seven runs take
-1.3 to 18 minutes each in serial. Every check of the partitioned study
-passes with the same tolerances
-(`postProcessing/verification_summary_monolithic.md`):
+IQN-ILS on the tutorial mesh at 100 steps per period. The table was recorded
+with `feature-petsc-snes-quasi-monolithic` at `1252bd2e5` (transpose viscous
+term, #618; tutorial schemes, #617), OpenFOAM v2512, Linux (MeluXina, GCC),
+serial, with the driver's set-up and analysis and PETSc tolerances
+`snes_rtol`/`snes_stol` 1e-8, `ksp_rtol` 1e-6:
 
 | Case | profile | flow_amp | wallMid_amp | wallMid_phase | speed | attenuation |
 |---|---:|---:|---:|---:|---:|---:|
-| m1, n200 | 1.76e-2 | 6.08e-3 | -1.04e-2 | -2.89e-3 | -2.35e-3 | -2.80e-3 |
-| m2, n200 | 4.69e-3 | 9.01e-4 | -2.52e-3 | -1.96e-3 | -5.19e-4 | -2.58e-3 |
-| m4, n200 | 9.97e-4 | -3.42e-4 | -5.30e-4 | -1.62e-3 | -5.96e-5 | -2.31e-3 |
-| m2, n50 | 6.22e-3 | -1.27e-3 | 4.94e-3 | -6.59e-3 | 1.34e-3 | -1.35e-2 |
-| m2, n100 | 4.70e-3 | 4.73e-4 | -9.96e-4 | -2.82e-3 | -1.36e-4 | -4.64e-3 |
-| m2, n400 | 4.68e-3 | 1.01e-3 | -2.90e-3 | -1.76e-3 | -6.16e-4 | -2.09e-3 |
+| m1, n200 | 1.76e-2 | 6.08e-3 | -1.02e-2 | -2.41e-3 | -2.30e-3 | -2.34e-3 |
+| m2, n200 | 4.65e-3 | 8.98e-4 | -2.34e-3 | -1.51e-3 | -4.65e-4 | -2.19e-3 |
+| m4, n200 | 9.60e-4 | -3.45e-4 | -3.46e-4 | -1.18e-3 | -5.96e-6 | -1.95e-3 |
+| m2, n50 | 6.19e-3 | -1.28e-3 | 5.13e-3 | -6.14e-3 | 1.39e-3 | -1.31e-2 |
+| m2, n100 | 4.67e-3 | 4.71e-4 | -8.14e-4 | -2.37e-3 | -8.14e-5 | -4.24e-3 |
+| m2, n400 | 4.65e-3 | 1.00e-3 | -2.72e-3 | -1.31e-3 | -5.62e-4 | -1.70e-3 |
 
-- The observed mesh orders are 2.23 (profile), 2.06 (flow rate), 1.98 (wall
-  amplitude) and 2.00 (wave speed), and the time-step orders of the signed
-  quantities 1.94-2.07 over the finest three steps, so the coupled solution
-  is second order in space and time. `newtonIcoFluid` has no
-  `fluxConsistentPatches` option, but its coupled pressure-velocity solve has
-  no splitting error at the tube ends.
-- It agrees with IQN-ILS to $$7.2 \times 10^{-4}$$ or better on every
-  quantity (the velocity profile, of the largest velocity), and to
-  $$5.5 \times 10^{-4}$$ in the wall amplitude. Its wall amplitude is lower
-  than that of the partitioned (Robin-Neumann) runs by
-  $$3.2$$-$$3.5 \times 10^{-4}$$ on m2 (all four step sizes) and m4, so the
-  difference does not change with refinement there; on m1 it is
-  $$8.0 \times 10^{-5}$$ at $$L/2$$. It is below the $$5 \times 10^{-4}$$
-  the linear theory neglects. The traction omitted the physical term
-  $$\mu \nabla(\mathbf{u} \cdot \mathbf{n})$$ on the deforming wall, of
-  relative size about $$\mu \omega R / (E h)$$, which is a leading
-  candidate for this offset.
-- It takes 2 Newton iterations per time-step and 149 s, against 14.6 coupling
-  iterations and 524 s for IQN-ILS.
+- The profile error falls by 3.8 and 4.8 from m1 to m2 and from m2 to m4,
+  and the time-step orders of the signed quantities over the finest three
+  steps are 1.98-2.07, so the coupled solution is second order in space and
+  time. `newtonIcoFluid` has no `fluxConsistentPatches` option, but its
+  coupled pressure-velocity solve has no splitting error at the tube ends.
+- It agrees with the partitioned solutions in the wall motion: against
+  Robin-Neumann on the same meshes and steps, the wall phase differs by
+  2.6-4.6e-5 rad and the attenuation by at most 2.6e-4 (m1) and 1.4e-5 from
+  m2; the wall amplitude is 1.4-1.7e-4 lower from m2 (8.6e-5 higher on m1),
+  the size of the Robin-Neumann/IQN-ILS spread. Against IQN-ILS (m2, n100)
+  every quantity agrees to 3.7e-4 or better.
+- Before the transpose viscous term was included (the former
+  `nuEff*snGrad(U)` traction), the wall phase was 4.8e-4 rad behind the
+  partitioned solutions at every mesh and step size and the wall amplitude
+  3.2-3.5e-4 lower on m2 and m4: the omitted physical term
+  $$\mu \nabla(\mathbf{u} \cdot \mathbf{n})$$ on the deforming wall.
+- It takes 2 Newton iterations per time-step (m2, n100: 550 s serial,
+  against 14.6 coupling iterations and 524 s for IQN-ILS on another machine).
 - The velocity solid starts from the exact displacement with `restart yes`,
   and the fluid mesh follows the wall displacement relative to its initial
   value, as in the partitioned set-up.
