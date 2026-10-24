@@ -244,15 +244,13 @@ The following entries are read from `newtonIcoFluidCoeffs`:
   the negative-diagonal momentum-block sign is added implicitly.
 - `pressureScaleFactor`: scales the pressure-continuity residual and pressure
   Jacobian rows relative to the momentum rows.
-- `viscousStressTranspose` (default `no`): `yes` includes the transpose part
-  of the viscous stress, `div(nuEff*dev2(T(grad(U))))`, explicitly in the
-  momentum residual, as in the `divDevReff` of `pimpleFluid`, and its wall
-  flux in the interface viscous force (see Interface Viscous Force). It needs
-  `div((nuEff*dev2(T(grad(U))))) Gauss linear;` in `divSchemes`. It is off
-  by default until it is verified: with it, the steady monolithic
-  `blobInTreacle` displacement moves 2% away from the partitioned one,
-  although the term vanishes on a stationary wall, which suggests a
-  first-order error in its wall value.
+- The transpose part of the viscous stress, `div(nuEff*dev2(T(grad(U))))`,
+  is always included, explicitly in the momentum residual as in the
+  `divDevReff` of `pimpleFluid`, in the wall pressure gradient (see Wall
+  Pressure Gradient) and in the interface viscous force (see Interface
+  Viscous Force). It needs `div((nuEff*dev2(T(grad(U))))) Gauss linear;` in
+  `divSchemes`. The former `viscousStressTranspose` switch is ignored, with
+  a warning.
 - `maxTimeStepRetries`: maximum failed-PETSc-solve retry count when
   `adjustTimeStep` is enabled.
 - `stopOnPetscError`: passed to `foamPetscSnesHelper` to control whether PETSc
@@ -396,16 +394,103 @@ The explicit transpose viscous term is not in this matrix.
 ### Interface Viscous Force
 
 `patchViscousForce` returns the boundary flux of the residual's viscous terms,
-`rho*(nuEff*snGrad(U) + n & nuEff*dev2(T(grad(U))))`, which is
-`rho*(n & -devReff)` as in `pimpleFluid`, so the force on the solid is the
-momentum the fluid loses (with `viscousStressTranspose yes`; by default the
-force is `rho*nuEff*snGrad(U)` only). The gradient is recalculated from the
-current velocity. The transpose part, `mu*grad(u & n)` at the wall, vanishes
-on a stationary no-slip wall, but not on a deforming wall, where it is part of
-the physical traction. Without it (`viscousStressTranspose no`, or before this
-term was added), the monolithic wall motion of `womersleyTube` is offset from
-the partitioned solutions by a constant amount that does not vanish with mesh
-or time-step refinement.
+`rho*(nuEff*snGrad(U) + n & nuEff*dev2(T(grad(U))))`, so the force on the
+solid is the momentum the fluid loses. The transpose part, `mu*grad(u & n)` at
+the wall, vanishes on a stationary no-slip wall, but not on a deforming wall,
+where it is part of the physical traction. Without it (the former default),
+the monolithic wall motion of `womersleyTube` is offset from the partitioned
+solutions by an amount that does not vanish with mesh or time-step refinement
+(wall phase 4.8e-4 rad at m1, m2 and m4).
+
+On boundaries with a prescribed velocity (no-slip walls, the FSI interface
+whatever its patch type, e.g. `patch` in TurekHron2006, and inlets), the
+boundary value of the transpose stress is set from the wall velocity: it is
+`n*q` with `q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))`, where `G_s` is
+the surface gradient of the wall velocity vector. This is `n & grad(U)^T` at
+fixed `n` with the normal derivative of the normal velocity taken from
+continuity (zero velocity divergence); the stored tensor `n*q` only serves
+this normal flux, its own trace is not zero. `G_s` is a least-squares fit
+to the neighbouring faces of the wall patch, with tangential distance
+vectors and inverse-square-distance weights: it is zero for a rigid
+translation (also on a curved wall) and exact for a linear wall velocity on
+any face spacing. On a one-cell wedge the images of each face across the
+wedge planes are added as neighbours, which supplies the circumferential
+derivatives (the `U_r/R` part of the surface divergence): the image of the
+face centre is its reflection across the wedge plane, so no assumption on
+the position of the axis is made, and the image of the velocity its rotation
+by the wedge transformation. Neighbours across a sharp edge of the patch
+(normals more than 45 degrees apart) are not used, so a curved wall needs
+adjacent face normals within 45 degrees (at least eight faces per turn). A tangential direction
+that the neighbours do not resolve (the empty direction of a 2-D case, or
+nearly collinear neighbours: eigenvalue of the distance tensor below 1e-6 of
+the largest) gets a zero derivative rather than an extrapolated one. The
+neighbours are the edge neighbours in the whole patch: on a patch with faces
+on more than one processor the fit addresses them in a global copy of the
+patch (`globalPolyPatch`, as the FSI coupler uses for the interface), whose
+face centres and normals are gathered when the mesh moves and whose wall
+velocity is gathered once per evaluation (one global sum of the patch
+velocity per split patch), so that serial and parallel runs give the same
+wall values to round-off. The fit is still one-sided at cyclic and symmetry
+patches. The same
+value enters the momentum residual's wall flux and the traction, so the
+traction stays the fluid's own discrete wall flux. Evaluated instead from the boundary value of `grad(U)`,
+whose tangential derivatives come from the adjacent cell values, the term
+carries the near-wall discretisation error of the cell velocity: on the
+stationary `blobInTreacle` wall it gave a spurious transpose force of 0.6%,
+0.39% and 0.22% of the interface load on the x1, x2 and x4 meshes, decaying at
+order 0.6–0.8. With the wall evaluation it is zero there; on `womersleyTube`
+m2 n200 the monolithic wall phase and attenuation are within 2e-5 of the
+Robin–Neumann ones. `pimpleFluid` evaluates `n & -devReff` from `grad(U)`,
+so the two tractions are the same expression only away from these walls (and
+only with gradient schemes that impose `n & grad(U) = snGrad(U)` on the
+boundary, such as `leastSquares`; `leastSquaresS4f` does not).
+
+The gradient, the transpose stress, its divergence, the viscous Laplacian and
+`ddt(U)` are evaluated once per velocity state and cached: the cache compares
+the velocity (internal and boundary values), the mesh points, the time index
+and the time step with those of the last evaluation, with the decision agreed
+across processors, and is invalidated explicitly where the velocity or the
+viscosity is changed by the model (`unpackSolution`, `restoreOldTimeState`,
+the transport and turbulence corrections). The gradient is written to the
+registered `grad(U)` of the fluid model before the other fields are
+evaluated, because boundary conditions may look it up in their `snGrad`
+(the non-orthogonal correction of `decayingTaylorGreenVortexVelocity`), which
+the viscous Laplacian calls on the walls: evaluated with the gradient of the
+previous iterate, the Laplacian is inconsistent with the Newton iterate and
+the line search fails (decayingTaylorGreenVortex). The momentum residual, the
+wall pressure gradient of every wall patch and the interface traction share
+these fields. The mesh-dependent part of the surface fit (neighbours,
+weighted tangential distances, regularised inverse) is precomputed per
+fixed-velocity patch and reused until the mesh points change.
+
+### Wall Pressure Gradient
+
+A plain `fixedGradient` pressure on a wall with fixed velocity, such as the
+FSI interface of the monolithic tutorials, has its gradient set from the
+normal momentum equation in the adjacent cells,
+`n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))) - ddt(U)_wall)`
+(`updatePressureGradientBoundary`), with the same viscous terms as the
+momentum residual, taken from the cached fields described above (no
+whole-mesh evaluation per patch). Leaving the transpose term out of this gradient, while it
+is in the residual and the traction, makes the wall pressure inconsistent
+with the momentum equation wherever the discrete velocity gradient is not
+trace-free.
+
+On `blobInTreacle` (steady displacement, monolithic minus partitioned, x1/x2/x4
+meshes) the former `viscousStressTranspose yes` gave -2.34%, -1.04% and
+-0.44%; with the transpose term in the wall pressure gradient -1.31%, -0.56%
+and -0.22%; with the wall evaluation of the transpose stress as well
+-0.71%, -0.39% and -0.18% (the former Laplacian-only form: -0.33%, -0.29% and
+-0.16%). All series extrapolate to the partitioned value within 0.08%. The
+rest of the difference comes from the partitioned `zeroGradient` interface
+pressure (first order), the face interpolation of U (`skewCorrected linear` in
+the monolithic continuity flux, plain linear in `pimpleFluid`'s
+`flux(HbyA)`) and the different face-flux construction: with a
+`zeroGradient` interface pressure and linear interpolation in the monolithic
+case as well, the differences are +0.31%, +0.11% and +0.06%; with
+`interpolate(U) linear` alone, -0.20%, -0.23% and -0.14%. (The tutorial
+schemes are unchanged here; on TurekHron2006 the interpolation of U has a
+large effect on the coarse meshes.)
 
 ### Model-Side Physics Preconditioner
 

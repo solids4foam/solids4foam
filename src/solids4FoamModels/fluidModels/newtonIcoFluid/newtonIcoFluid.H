@@ -125,17 +125,91 @@ class newtonIcoFluid
         //  with the solid-side scaling pattern
         scalar pressureEqnScale_;
 
-        //- Include the transpose part of the viscous stress,
-        //  div(nuEff*dev2(T(grad(U)))), in the momentum residual and the
-        //  interface viscous force (default no)
-        const Switch viscousStressTranspose_;
-
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
+
+
+    // Viscous cache
+
+        //- Mesh-dependent part of the least-squares surface fit of the wall
+        //  velocity on one fixed-velocity patch (see viscousStressTranspose).
+        //  The neighbours of a face are its edge neighbours in the whole
+        //  patch, so that the fit does not depend on the decomposition: on a
+        //  patch with faces on more than one processor they are addressed in
+        //  the global patch (wallGlobalPatches_), otherwise in the local one
+        class wallVelocityFit
+        {
+        public:
+
+            //- True if the patch has faces on more than one processor
+            bool split;
+
+            //- Global patch index of every local face (split patches only)
+            labelList toGlobal;
+
+            //- Neighbour faces kept by the sharp-edge filter, per face, in
+            //  the global patch if split and in the local patch otherwise
+            labelListList nbrs;
+
+            //- Tangential distance vectors d to the neighbours (in the order
+            //  of nbrs), followed by the wedge images, per face
+            List<vectorField> d;
+
+            //- Inverse-square-distance weights w, in the same order
+            List<scalarField> w;
+
+            //- Unit normals
+            vectorField n;
+
+            //- Inverse of the regularised distance tensor; zero where the
+            //  neighbours resolve no tangential direction
+            tensorField invDdReg;
+        };
+
+        //- Surface-fit geometry of every fixed-velocity patch (unset for the
+        //  other patches), for the mesh points fitPoints_
+        mutable PtrList<wallVelocityFit> wallFits_;
+
+        //- Global copies of the fixed-velocity patches that have faces on
+        //  more than one processor (unset for the other patches): the
+        //  topology of the whole patch, so that the fit sees the neighbour
+        //  faces across the processor boundaries, and the gather of the
+        //  wall velocity. Built once; the topology does not change
+        mutable PtrList<globalPolyPatch> wallGlobalPatches_;
+
+        //- Wedge transformations, for the images of the wall faces across
+        //  the wedge planes
+        mutable List<tensor> wedgeT_;
+
+        //- Mesh points the surface-fit geometry was evaluated for
+        mutable pointField fitPoints_;
+
+        //- The transpose part of the viscous stress, its divergence, the
+        //  viscous Laplacian and the time derivative of the velocity,
+        //  evaluated together once for each velocity state
+        //  (updateViscousCache) and shared by the momentum residual, the
+        //  wall pressure gradient and the interface traction. The velocity
+        //  gradient they are evaluated with is the registered gradU() of the
+        //  fluid model, which the same evaluation sets first
+        mutable autoPtr<volTensorField> cachedNuDevGradUTPtr_;
+        mutable autoPtr<volVectorField> cachedDivNuDevGradUTPtr_;
+        mutable autoPtr<volVectorField> cachedLaplacianUPtr_;
+        mutable autoPtr<volVectorField> cachedDdtUPtr_;
+
+        //- The velocity state the cached fields were evaluated for: the
+        //  internal and boundary values of U, the time index and the
+        //  time-step size (and the mesh points, fitPoints_)
+        mutable vectorField cachedUInternal_;
+        mutable List<vectorField> cachedUBoundary_;
+        mutable label cachedTimeIndex_;
+        mutable scalar cachedDeltaT_;
+
+        //- False after invalidateViscousCache, until the next evaluation
+        mutable bool viscousCacheValid_;
 
 
     // Private Member Functions
@@ -152,12 +226,48 @@ class newtonIcoFluid
         //- Correct phi function
         void correctPhi();
 
+        //- True if the surface-fit geometry is for the current mesh points
+        bool fitGeometryCurrent() const;
+
+        //- Evaluate the surface-fit geometry (wallFits_, wedgeT_) for the
+        //  current mesh points
+        void updateWallVelocityFits() const;
+
+        //- Set the wall value of the transpose stress on every boundary with
+        //  fixed velocity from the boundary velocity, with the surface-fit
+        //  geometry
+        void setWallViscousStressTranspose
+        (
+            volTensorField& nuDevGradUT,
+            const volScalarField& nuEff
+        ) const;
+
         //- Transpose part of the viscous stress, nuEff*dev2(T(gradU)), as
-        //  in the divDevReff of pimpleFluid
+        //  in the divDevReff of pimpleFluid. On boundaries with fixed velocity
+        //  the boundary value is n*q, set from the wall velocity only:
+        //      q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))
+        //  with G_s the least-squares surface gradient of the wall velocity,
+        //  i.e. n & grad(U)^T at fixed n with the normal derivative from
+        //  continuity (zero velocity divergence)
         tmp<volTensorField> viscousStressTranspose
         (
             const volTensorField& gradU
         ) const;
+
+        //- Evaluate the cached fields if the velocity, the mesh points, the
+        //  time index or the time step changed since the last evaluation.
+        //  The registered velocity gradient gradU() is set first, as the
+        //  boundary conditions may look it up when the other fields are
+        //  evaluated (a non-orthogonal correction of the wall snGrad).
+        //  Collective: the decision is agreed by all processors, as the
+        //  evaluation communicates across processor boundaries
+        void updateViscousCache() const;
+
+        //- Cached fields for the current velocity state
+        const volTensorField& cachedViscousStressTranspose() const;
+        const volVectorField& cachedDivViscousStressTranspose() const;
+        const volVectorField& cachedLaplacianU() const;
+        const volVectorField& cachedDdtU() const;
 
         //- Restore the flow fields and mesh after a failed PETSc solve
         void restoreOldTimeState
@@ -303,12 +413,19 @@ public:
             //- Return a const reference to the rAU field
             void clearRAUf();
 
+            //- Mark the cached viscous fields as out of date. The cache also
+            //  checks the velocity, the mesh points, the time index and the
+            //  time step itself; this is for changes it cannot see, such as
+            //  a new effective viscosity
+            void invalidateViscousCache() const;
+
             //- Set the normal gradient of the (kinematic) pressure on a
             //  patch with fixedGradient pressure and fully prescribed
             //  velocity, at which the fluid moves with the boundary (a
             //  no-slip wall or a fluid-solid interface), from the normal
             //  momentum equation:
-            //      dp/dn = n & (laplacian(nuEff, U) - dU/dt)
+            //      dp/dn = n & (laplacian(nuEff, U)
+            //                 + div(nuEff*dev2(T(grad(U)))) - dU/dt)
             //  where dU/dt is the acceleration of the boundary faces. The
             //  convective term, which vanishes at a no-slip wall that moves
             //  with the mesh, is neglected. A zeroGradient pressure at such a

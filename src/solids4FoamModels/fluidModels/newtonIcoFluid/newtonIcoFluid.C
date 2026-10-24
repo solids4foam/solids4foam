@@ -26,6 +26,7 @@ License
 #include "fixedGradientFvPatchFields.H"
 #include "wallFvPatch.H"
 #include "compatibilityFunctions.H"
+#include "wedgePolyPatch.H"
 
 
 namespace
@@ -70,6 +71,28 @@ const Foam::dictionary& solverControls
 #else
     return mesh.solutionDict().solver(fieldName);
 #endif
+}
+
+
+// True if the two lists have the same size and identical values. (Field's
+// operator== is a forced assignment, not a comparison)
+template<class Type>
+bool sameValues(const Foam::UList<Type>& a, const Foam::UList<Type>& b)
+{
+    if (a.size() != b.size())
+    {
+        return false;
+    }
+
+    forAll(a, i)
+    {
+        if (a[i] != b[i])
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 
@@ -194,6 +217,331 @@ void newtonIcoFluid::restoreOldTimeState
     {
         fvc::makeRelative(phi, U);
     }
+
+    invalidateViscousCache();
+}
+
+
+bool newtonIcoFluid::fitGeometryCurrent() const
+{
+    return wallFits_.size() && sameValues(fitPoints_, mesh().points());
+}
+
+
+void newtonIcoFluid::updateWallVelocityFits() const
+{
+    const volVectorField& U = this->U();
+
+    // Wedge planes (one-cell axisymmetric cases): the images of a wall face
+    // across them supply the circumferential derivatives. The image of the
+    // face centre, which lies on the centre plane, is its reflection across
+    // the wedge plane (no assumption on the position of the axis); the image
+    // of the velocity is its rotation by the wedge transformation
+    DynamicList<tensor> wedgeT;
+    DynamicList<vector> wedgeN;
+    DynamicList<vector> wedgeC;
+    forAll(mesh().boundaryMesh(), patchI)
+    {
+        const polyPatch& pp = mesh().boundaryMesh()[patchI];
+
+        if (isA<wedgePolyPatch>(pp) && pp.size())
+        {
+            wedgeT.append(refCast<const wedgePolyPatch>(pp).cellT());
+            wedgeN.append(pp.faceNormals()[0]);
+            wedgeC.append(pp.faceCentres()[0]);
+        }
+    }
+    wedgeT_ = wedgeT;
+
+    // Neighbour faces across a sharp edge of the wall patch (normals more
+    // than 45 degrees apart) are not used in the fit
+    const scalar minNbrCos = 0.7;
+
+    // A tangential fit direction with less than this fraction of the largest
+    // eigenvalue of the distance tensor is not resolved: its derivative is
+    // set to zero rather than extrapolated (the empty direction of a 2-D
+    // case, nearly collinear neighbours)
+    const scalar eigTol = 1e-6;
+
+    wallFits_.clear();
+    wallFits_.setSize(mesh().boundary().size());
+
+    if (wallGlobalPatches_.size() != mesh().boundary().size())
+    {
+        wallGlobalPatches_.clear();
+        wallGlobalPatches_.setSize(mesh().boundary().size());
+    }
+
+    forAll(mesh().boundary(), patchI)
+    {
+        const fvPatch& fp = mesh().boundary()[patchI];
+
+        // Every boundary with a prescribed velocity: no-slip walls, the FSI
+        // interface (whatever its patch type) and inlets
+        if (!isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI]))
+        {
+            continue;
+        }
+
+        // Processors holding faces of the patch (collective: all processors
+        // take the same decision below, as the global patch communicates)
+        const label nProcsWithFaces =
+            returnReduce(label(fp.size() > 0), sumOp<label>());
+
+        if (nProcsWithFaces == 0)
+        {
+            continue;
+        }
+
+        wallFits_.set(patchI, new wallVelocityFit());
+        wallVelocityFit& fit = wallFits_[patchI];
+
+        const vectorField nf(fp.nf());
+        const vectorField& Cf = fp.Cf();
+
+        // The whole patch as seen by this processor: on a patch with faces
+        // on more than one processor, the global patch, whose faces are
+        // connected across the processor boundaries, with the face centres
+        // and normals of all its faces gathered; otherwise the local patch.
+        // In serial and on a patch held by one processor the local patch is
+        // the whole patch, so the fit is the same for every decomposition
+        fit.split = nProcsWithFaces > 1;
+
+        vectorField gatheredCf;
+        vectorField gatheredNf;
+
+        if (fit.split)
+        {
+            if (!wallGlobalPatches_.set(patchI))
+            {
+                wallGlobalPatches_.set
+                (
+                    patchI,
+                    new globalPolyPatch(fp.name(), mesh())
+                );
+            }
+
+            const globalPolyPatch& gpp = wallGlobalPatches_[patchI];
+
+            fit.toGlobal = gpp.faceToGlobalAddr();
+            gatheredCf = gpp.patchFaceToGlobal(Cf);
+            gatheredNf = gpp.patchFaceToGlobal(nf);
+        }
+
+        const labelListList& faceFaces =
+            fit.split
+          ? wallGlobalPatches_[patchI].globalPatch().faceFaces()
+          : fp.patch().faceFaces();
+        const vectorField& allCf = fit.split ? gatheredCf : Cf;
+        const vectorField& allNf = fit.split ? gatheredNf : nf;
+
+        fit.nbrs.setSize(fp.size());
+        fit.d.setSize(fp.size());
+        fit.w.setSize(fp.size());
+        fit.n = nf;
+        fit.invDdReg.setSize(fp.size(), tensor::zero);
+
+        forAll(nf, faceI)
+        {
+            const vector& n = nf[faceI];
+
+            // Tangential projector
+            const tensor P(I - sqr(n));
+
+            // Least-squares surface gradient G_s (G_s_ij = d_i U_j) from
+            // the neighbouring wall faces (and the wedge images), with
+            // tangential distance vectors and inverse-square-distance
+            // weights; exact for a linear velocity on any face spacing and
+            // zero for a rigid translation. The distance tensor dd, the
+            // distance vectors d and the weights w depend on the mesh only
+            symmTensor dd(symmTensor::zero);
+
+            const labelList& allNbrs =
+                faceFaces[fit.split ? fit.toGlobal[faceI] : faceI];
+            DynamicList<label> nbrs(allNbrs.size());
+            DynamicList<vector> d(allNbrs.size() + wedgeT.size());
+            DynamicList<scalar> w(allNbrs.size() + wedgeT.size());
+
+            forAll(allNbrs, i)
+            {
+                if ((allNf[allNbrs[i]] & n) < minNbrCos)
+                {
+                    continue;
+                }
+
+                const vector di(P & (allCf[allNbrs[i]] - Cf[faceI]));
+                const scalar wi = 1.0/max(magSqr(di), VSMALL);
+                dd += wi*sqr(di);
+                nbrs.append(allNbrs[i]);
+                d.append(di);
+                w.append(wi);
+            }
+
+            forAll(wedgeT, i)
+            {
+                const vector CfImage
+                (
+                    Cf[faceI]
+                  - 2.0*((Cf[faceI] - wedgeC[i]) & wedgeN[i])*wedgeN[i]
+                );
+                const vector di(P & (CfImage - Cf[faceI]));
+                const scalar wi = 1.0/max(magSqr(di), VSMALL);
+                dd += wi*sqr(di);
+                d.append(di);
+                w.append(wi);
+            }
+
+            fit.nbrs[faceI] = nbrs;
+            fit.d[faceI] = d;
+            fit.w[faceI] = w;
+
+            // Resolved directions: the 2x2 eigen-analysis of dd in the
+            // tangent plane (t1, t2), done analytically so that it is safe
+            // for repeated or zero eigenvalues
+            const vector absN(cmptMag(n));
+            vector t1(vector::zero);
+            if (absN.x() <= absN.y() && absN.x() <= absN.z())
+            {
+                t1.x() = 1;
+            }
+            else if (absN.y() <= absN.z())
+            {
+                t1.y() = 1;
+            }
+            else
+            {
+                t1.z() = 1;
+            }
+            t1 -= (t1 & n)*n;
+            t1 /= mag(t1);
+            const vector t2(n ^ t1);
+
+            const scalar a11 = t1 & dd & t1;
+            const scalar a12 = t1 & dd & t2;
+            const scalar a22 = t2 & dd & t2;
+            const scalar m = 0.5*(a11 + a22);
+            const scalar r = Foam::sqrt(sqr(0.5*(a11 - a22)) + sqr(a12));
+            const scalar lambdaMax = m + r;
+            const scalar lambdaMin = m - r;
+
+            if (lambdaMax > VSMALL)
+            {
+                // The normal direction carries no distance component
+                symmTensor ddReg(dd + lambdaMax*sqr(n));
+
+                if (lambdaMin < eigTol*lambdaMax)
+                {
+                    // Unresolved tangential direction (an empty direction
+                    // of a 2-D case, or nearly collinear neighbours): zero
+                    // derivative along it instead of an extrapolation
+                    vector e
+                    (
+                        mag(a12) > SMALL*lambdaMax
+                      ? a12*t1 + (lambdaMin - a11)*t2
+                      : (a11 <= a22 ? t1 : t2)
+                    );
+                    e /= mag(e);
+                    ddReg += lambdaMax*sqr(e);
+                }
+
+                fit.invDdReg[faceI] = inv(ddReg);
+            }
+
+            // Otherwise no direction is resolved: inv(ddReg) stays zero and
+            // so does the wall value
+        }
+    }
+
+    fitPoints_ = mesh().points();
+}
+
+
+void newtonIcoFluid::setWallViscousStressTranspose
+(
+    volTensorField& nuDevGradUT,
+    const volScalarField& nuEff
+) const
+{
+    // On a boundary with a prescribed velocity (a no-slip wall, the FSI
+    // interface, an inlet), for an incompressible flow
+    // n & grad(U)^T = grad(U & n) at fixed n, whose tangential part follows
+    // from the surface gradient of the wall velocity and whose normal part
+    // is, by continuity, minus the surface divergence of the wall velocity;
+    // the trace vanishes. These depend on the wall velocity only. Taken from
+    // the boundary value of grad(U), the tangential derivatives are those of
+    // the adjacent cell values and do not cancel, which gives a first-order
+    // force on a stationary wall (blobInTreacle). The wall value is
+    // therefore set to n*q with
+    //     q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))
+    // where G_s is the surface gradient of the wall velocity vector, so that
+    // the momentum residual's wall flux and the traction, which only use
+    // n & (boundary value), both get q. (The trace of n*q is not zero; the
+    // tensor is only constructed for this normal flux.)
+    if (!fitGeometryCurrent())
+    {
+        updateWallVelocityFits();
+    }
+
+    const volVectorField& U = this->U();
+
+    forAll(wallFits_, patchI)
+    {
+        if (!wallFits_.set(patchI))
+        {
+            continue;
+        }
+
+        const wallVelocityFit& fit = wallFits_[patchI];
+        const vectorField& Ub = U.boundaryField()[patchI];
+        const scalarField& nuEffb = nuEff.boundaryField()[patchI];
+
+        // Velocity of the neighbour faces: on a patch with faces on more
+        // than one processor, the wall velocity of the whole patch,
+        // gathered (collective: one global sum of the patch velocity per
+        // evaluation); otherwise the local patch velocity
+        vectorField gatheredUb;
+
+        if (fit.split)
+        {
+            gatheredUb = wallGlobalPatches_[patchI].patchFaceToGlobal(Ub);
+        }
+
+        const vectorField& allUb = fit.split ? gatheredUb : Ub;
+
+        fvPatchTensorField& bfPatch = boundaryFieldRef(nuDevGradUT)[patchI];
+
+        forAll(Ub, faceI)
+        {
+            const vector& n = fit.n[faceI];
+            const labelList& nbrs = fit.nbrs[faceI];
+            const vectorField& d = fit.d[faceI];
+            const scalarField& w = fit.w[faceI];
+
+            // Weighted velocity differences to the neighbours and the wedge
+            // images, in the order of the distance vectors
+            tensor dU(tensor::zero);
+
+            forAll(nbrs, i)
+            {
+                dU += w[i]*(d[i]*(allUb[nbrs[i]] - Ub[faceI]));
+            }
+
+            forAll(wedgeT_, i)
+            {
+                const label j = nbrs.size() + i;
+                dU += w[j]*(d[j]*((wedgeT_[i] & Ub[faceI]) - Ub[faceI]));
+            }
+
+            const tensor Gs(fit.invDdReg[faceI] & dU);
+
+            // Tangential projector
+            const tensor P(I - sqr(n));
+
+            const vector q(nuEffb[faceI]*((P & (Gs & n)) - n*tr(Gs)));
+
+            bfPatch[faceI] = n*q;
+        }
+    }
 }
 
 
@@ -205,14 +553,162 @@ tmp<volTensorField> newtonIcoFluid::viscousStressTranspose
     // Named intermediate: a reused tmp would alias an input of dev2
     const volTensorField gradUT(T(gradU));
 
-    return tmp<volTensorField>
+    const volScalarField nuEff(turbulence_->nuEff());
+
+    tmp<volTensorField> tnuDevGradUT
     (
         new volTensorField
         (
             "nuEff*dev2(T(grad(U)))",
-            turbulence_->nuEff()*dev2(gradUT)
+            nuEff*dev2(gradUT)
         )
     );
+
+    setWallViscousStressTranspose(tmpRef(tnuDevGradUT), nuEff);
+
+    return tnuDevGradUT;
+}
+
+
+void newtonIcoFluid::updateViscousCache() const
+{
+    const fvMesh& mesh = this->mesh();
+    const volVectorField& U = this->U();
+
+    // The cache is valid if nothing the cached fields depend on changed: the
+    // velocity (internal and boundary values, as the coupler maps the solid
+    // velocity onto the interface without going through unpackSolution), the
+    // mesh points, the time index and the time step (the time derivative).
+    // The effective viscosity is not checked; invalidateViscousCache is
+    // called when it is corrected
+    label valid =
+        viscousCacheValid_
+     && cachedNuDevGradUTPtr_.valid()
+     && cachedTimeIndex_ == mesh.time().timeIndex()
+     && cachedDeltaT_ == mesh.time().deltaTValue()
+     && fitGeometryCurrent()
+     && sameValues(cachedUInternal_, Foam::primitiveField(U))
+     && cachedUBoundary_.size() == U.boundaryField().size();
+
+    if (valid)
+    {
+        forAll(U.boundaryField(), patchI)
+        {
+            if
+            (
+                !sameValues(cachedUBoundary_[patchI], U.boundaryField()[patchI])
+            )
+            {
+                valid = 0;
+                break;
+            }
+        }
+    }
+
+    // All processors must take the same decision: the evaluation below
+    // exchanges values across processor boundaries, and the interface
+    // velocity changes only on the processors that hold the interface
+    reduce(valid, minOp<label>());
+
+    if (valid)
+    {
+        return;
+    }
+
+    // The velocity gradient goes into the registered gradU() of the fluid
+    // model first: boundary conditions may look up grad(U) when the fields
+    // below are evaluated (the non-orthogonal correction of the wall snGrad
+    // that the viscous Laplacian uses), and must see the gradient of the
+    // current velocity, not of the previous iterate. The gradient cache of
+    // the mesh, if enabled, updates the registered field in place and
+    // returns it; it is then not assigned to itself
+    volTensorField& gradU = const_cast<newtonIcoFluid&>(*this).gradU();
+    {
+        const tmp<volTensorField> tgradU(fvc::grad(U));
+
+        if (&tgradU() != &gradU)
+        {
+            gradU = tgradU();
+        }
+    }
+
+    // Evaluated as in the momentum residual: the same schemes and the same
+    // effective viscosity, with the wall values of the transpose stress from
+    // the wall velocity
+    cachedNuDevGradUTPtr_.reset
+    (
+        new volTensorField
+        (
+            "newtonIcoFluid:nuDevGradUT",
+            viscousStressTranspose(gradU)
+        )
+    );
+
+    cachedDivNuDevGradUTPtr_.reset
+    (
+        new volVectorField
+        (
+            "newtonIcoFluid:divNuDevGradUT",
+            fvc::div(cachedNuDevGradUTPtr_(), "div((nuEff*dev2(T(grad(U)))))")
+        )
+    );
+
+    cachedLaplacianUPtr_.reset
+    (
+        new volVectorField
+        (
+            "newtonIcoFluid:laplacianU",
+            fvc::laplacian(turbulence_->nuEff(), U)
+        )
+    );
+
+    cachedDdtUPtr_.reset
+    (
+        new volVectorField("newtonIcoFluid:ddtU", fvc::ddt(U))
+    );
+
+    // The state the fields were evaluated for
+    cachedUInternal_ = Foam::primitiveField(U);
+    cachedUBoundary_.setSize(U.boundaryField().size());
+    forAll(U.boundaryField(), patchI)
+    {
+        cachedUBoundary_[patchI] = U.boundaryField()[patchI];
+    }
+    cachedTimeIndex_ = mesh.time().timeIndex();
+    cachedDeltaT_ = mesh.time().deltaTValue();
+    viscousCacheValid_ = true;
+}
+
+
+const volTensorField& newtonIcoFluid::cachedViscousStressTranspose() const
+{
+    updateViscousCache();
+
+    return cachedNuDevGradUTPtr_();
+}
+
+
+const volVectorField& newtonIcoFluid::cachedDivViscousStressTranspose() const
+{
+    updateViscousCache();
+
+    return cachedDivNuDevGradUTPtr_();
+}
+
+
+const volVectorField& newtonIcoFluid::cachedLaplacianU() const
+{
+    updateViscousCache();
+
+    return cachedLaplacianUPtr_();
+}
+
+
+const volVectorField& newtonIcoFluid::cachedDdtU() const
+{
+    updateViscousCache();
+
+    return cachedDdtUPtr_();
 }
 
 
@@ -279,16 +775,33 @@ newtonIcoFluid::newtonIcoFluid
     ),
     pressureUnknownScale_(1.0),
     pressureEqnScale_(pressureScaleFactor_),
-    viscousStressTranspose_
-    (
-        fluidProperties().lookupOrDefault<Switch>
-        (
-            "viscousStressTranspose", false
-        )
-    ),
     blockSize_(fluidModel::twoD() ? 3 : 4),
-    tsLogPtr_()
+    tsLogPtr_(),
+    wallFits_(),
+    wallGlobalPatches_(),
+    wedgeT_(),
+    fitPoints_(),
+    cachedNuDevGradUTPtr_(),
+    cachedDivNuDevGradUTPtr_(),
+    cachedLaplacianUPtr_(),
+    cachedDdtUPtr_(),
+    cachedUInternal_(),
+    cachedUBoundary_(),
+    cachedTimeIndex_(-1),
+    cachedDeltaT_(0),
+    viscousCacheValid_(false)
 {
+    // The transpose part of the viscous stress is always included; the
+    // former switch is ignored
+    if (fluidProperties().found("viscousStressTranspose"))
+    {
+        WarningInFunction
+            << "viscousStressTranspose is no longer an option and is "
+            << "ignored: the transpose part of the viscous stress is always "
+            << "included in the momentum residual, the wall pressure "
+            << "gradient and the interface traction" << endl;
+    }
+
     setRefCell(p(), fluidProperties(), pRefCell_, pRefValue_);
     //mesh().setFluxRequired(p().name());
 
@@ -541,26 +1054,24 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
     // n & nuEff*dev2(T(grad(U))) from the explicit transpose term. Together
     // these are n & (-devReff), as in pimpleFluid. The transpose part,
     // nuEff*grad(U & n) at the wall, vanishes on a stationary no-slip wall
-    // but not on a deforming one, where it is part of the physical traction
+    // but not on a deforming one, where it is part of the physical traction.
+    // The transpose stress of the current velocity: the cache re-evaluates
+    // it if the velocity changed since the last residual, and sets the
+    // registered gradU(), which the snGrad of a boundary condition with a
+    // non-orthogonal correction looks up, so it is taken first
+    const volTensorField& nuDevGradUT = cachedViscousStressTranspose();
+
     const scalarField nuEff(turbulence_->nuEff()().boundaryField()[patchID]);
     const vectorField snGradU(U().boundaryField()[patchID].snGrad());
 
     tmpRef(tvF) = rho_.value()*nuEff*snGradU;
 
-    if (viscousStressTranspose_)
-    {
-        // The gradient is recalculated from the current velocity, as the
-        // stored gradU is only updated in formResidual
-        const volTensorField gradU(fvc::grad(U()));
-        const volTensorField nuDevGradUT(viscousStressTranspose(gradU));
+    // Named operands: see pimpleFluid::patchViscousForce
+    const vectorField nf(mesh().boundary()[patchID].nf());
+    const tensorField& nuDevGradUTb = nuDevGradUT.boundaryField()[patchID];
+    const vectorField transposeForce(nf & nuDevGradUTb);
 
-        // Named operands: see pimpleFluid::patchViscousForce
-        const vectorField nf(mesh().boundary()[patchID].nf());
-        const tensorField& nuDevGradUTb = nuDevGradUT.boundaryField()[patchID];
-        const vectorField transposeForce(nf & nuDevGradUTb);
-
-        tmpRef(tvF) += rho_.value()*transposeForce;
-    }
+    tmpRef(tvF) += rho_.value()*transposeForce;
 
     return tvF;
 }
@@ -959,6 +1470,9 @@ bool newtonIcoFluid::evolve()
     turbulence_->correct();
     Info<< endl;
 
+    // The effective viscosity may have changed
+    invalidateViscousCache();
+
 #else
 
     FatalErrorInFunction
@@ -975,6 +1489,12 @@ bool newtonIcoFluid::evolve()
 void newtonIcoFluid::clearRAUf()
 {
     rAUfPtr_.clear();
+}
+
+
+void newtonIcoFluid::invalidateViscousCache() const
+{
+    viscousCacheValid_ = false;
 }
 
 
@@ -997,6 +1517,9 @@ void newtonIcoFluid::unpackSolution(const Vec x)
       : makeList<label>({0,1,2})
     );
     U.correctBoundaryConditions();
+
+    // The velocity changed (the cache would also see this itself)
+    invalidateViscousCache();
 
     // Copy the scaled pressure unknown pHat from x into the physical
     // p field via p = pressureUnknownScale_ * pHat. When the scale is
@@ -1113,17 +1636,24 @@ void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
     // Acceleration of the boundary faces, with the ddt scheme of U
     const vectorField acceleration
     (
-        fvc::ddt(U)().boundaryField()[patchI]
+        cachedDdtU().boundaryField()[patchI]
     );
 
     // Viscous term in the cells next to the boundary, as in the momentum
-    // residual
+    // residual: the Laplacian and the transpose part of the viscous stress.
+    // Without the transpose part the wall pressure gradient is inconsistent
+    // with the momentum equation wherever the discrete velocity gradient is
+    // not trace-free, which gives a first-order error in the wall pressure
+    // and traction (blobInTreacle). The fields are those of the cache, which
+    // evaluates them for the current velocity (this function runs before
+    // formResidual updates the stored gradU) and shares them between the
+    // patches, the residual and the traction
+    const volVectorField& laplacianU = cachedLaplacianU();
+    const volVectorField& divTranspose = cachedDivViscousStressTranspose();
     const vectorField viscousTerm
     (
-        fvc::laplacian
-        (
-            turbulence_->nuEff(), U
-        )().boundaryField()[patchI].patchInternalField()
+        laplacianU.boundaryField()[patchI].patchInternalField()
+      + divTranspose.boundaryField()[patchI].patchInternalField()
     );
 
     // Unit normals pointing out of the fluid
@@ -1179,7 +1709,10 @@ label newtonIcoFluid::formResidual
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
 
-    gradU() = fvc::grad(U);
+    // Evaluate the cached viscous fields for the current velocity, if the
+    // wall pressure gradients above did not; this sets the registered
+    // velocity gradient gradU()
+    updateViscousCache();
 
     // Lookup the forceImplicitFlux flag
     const Switch forceImplicitFlux =
@@ -1243,12 +1776,13 @@ label newtonIcoFluid::formResidual
     // Update momentum stabilisation
     momentumStabilisation().updateVector(U, &gradU());
 
-    // The residual vector
+    // The residual vector. The viscous Laplacian and the time derivative are
+    // the cached fields, evaluated once for this velocity
     vectorField residual
     (
-        fvc::laplacian(turbulence_->nuEff(), U)
+        cachedLaplacianU()
       - gradp()
-      - fvc::ddt(U)
+      - cachedDdtU()
       - fvc::div(phi, U)
       + momentumStabilisation().cellVector(&nuEfff, true)
     );
@@ -1262,16 +1796,7 @@ label newtonIcoFluid::formResidual
     // divDevReff. It is zero in the interior of an incompressible flow but
     // its wall flux is part of the traction on a deforming wall
     // (patchViscousForce). The Jacobian omits it
-    if (viscousStressTranspose_)
-    {
-        const volTensorField nuDevGradUT(viscousStressTranspose(gradU()));
-
-        residual +=
-            Foam::primitiveField
-            (
-                fvc::div(nuDevGradUT, "div((nuEff*dev2(T(grad(U)))))")()
-            );
-    }
+    residual += Foam::primitiveField(cachedDivViscousStressTranspose());
 
     residual *= mesh.V();
 
