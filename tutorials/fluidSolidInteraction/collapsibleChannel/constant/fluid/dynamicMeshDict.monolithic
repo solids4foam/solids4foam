@@ -22,4 +22,8 @@ dynamicFvMesh dynamicMotionSolverFvMesh;
 
 regionName fluid;
 
+// Stiffen the mesh motion near the moving wall (diffusionHyperElastic law in
+// mechanicalProperties), as the partitioned dynamicMeshDict does
+diffusivity     quadratic inverseDistance (interface);
+
 // ************************************************************************* //
