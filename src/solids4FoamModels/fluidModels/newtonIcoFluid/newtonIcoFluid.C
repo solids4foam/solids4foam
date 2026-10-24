@@ -266,6 +266,12 @@ void newtonIcoFluid::updateWallVelocityFits() const
     wallFits_.clear();
     wallFits_.setSize(mesh().boundary().size());
 
+    if (wallGlobalPatches_.size() != mesh().boundary().size())
+    {
+        wallGlobalPatches_.clear();
+        wallGlobalPatches_.setSize(mesh().boundary().size());
+    }
+
     forAll(mesh().boundary(), patchI)
     {
         const fvPatch& fp = mesh().boundary()[patchI];
@@ -277,12 +283,57 @@ void newtonIcoFluid::updateWallVelocityFits() const
             continue;
         }
 
+        // Processors holding faces of the patch (collective: all processors
+        // take the same decision below, as the global patch communicates)
+        const label nProcsWithFaces =
+            returnReduce(label(fp.size() > 0), sumOp<label>());
+
+        if (nProcsWithFaces == 0)
+        {
+            continue;
+        }
+
         wallFits_.set(patchI, new wallVelocityFit());
         wallVelocityFit& fit = wallFits_[patchI];
 
         const vectorField nf(fp.nf());
         const vectorField& Cf = fp.Cf();
-        const labelListList& faceFaces = fp.patch().faceFaces();
+
+        // The whole patch as seen by this processor: on a patch with faces
+        // on more than one processor, the global patch, whose faces are
+        // connected across the processor boundaries, with the face centres
+        // and normals of all its faces gathered; otherwise the local patch.
+        // In serial and on a patch held by one processor the local patch is
+        // the whole patch, so the fit is the same for every decomposition
+        fit.split = nProcsWithFaces > 1;
+
+        vectorField gatheredCf;
+        vectorField gatheredNf;
+
+        if (fit.split)
+        {
+            if (!wallGlobalPatches_.set(patchI))
+            {
+                wallGlobalPatches_.set
+                (
+                    patchI,
+                    new globalPolyPatch(fp.name(), mesh())
+                );
+            }
+
+            const globalPolyPatch& gpp = wallGlobalPatches_[patchI];
+
+            fit.toGlobal = gpp.faceToGlobalAddr();
+            gatheredCf = gpp.patchFaceToGlobal(Cf);
+            gatheredNf = gpp.patchFaceToGlobal(nf);
+        }
+
+        const labelListList& faceFaces =
+            fit.split
+          ? wallGlobalPatches_[patchI].globalPatch().faceFaces()
+          : fp.patch().faceFaces();
+        const vectorField& allCf = fit.split ? gatheredCf : Cf;
+        const vectorField& allNf = fit.split ? gatheredNf : nf;
 
         fit.nbrs.setSize(fp.size());
         fit.d.setSize(fp.size());
@@ -305,19 +356,20 @@ void newtonIcoFluid::updateWallVelocityFits() const
             // distance vectors d and the weights w depend on the mesh only
             symmTensor dd(symmTensor::zero);
 
-            const labelList& allNbrs = faceFaces[faceI];
+            const labelList& allNbrs =
+                faceFaces[fit.split ? fit.toGlobal[faceI] : faceI];
             DynamicList<label> nbrs(allNbrs.size());
             DynamicList<vector> d(allNbrs.size() + wedgeT.size());
             DynamicList<scalar> w(allNbrs.size() + wedgeT.size());
 
             forAll(allNbrs, i)
             {
-                if ((nf[allNbrs[i]] & n) < minNbrCos)
+                if ((allNf[allNbrs[i]] & n) < minNbrCos)
                 {
                     continue;
                 }
 
-                const vector di(P & (Cf[allNbrs[i]] - Cf[faceI]));
+                const vector di(P & (allCf[allNbrs[i]] - Cf[faceI]));
                 const scalar wi = 1.0/max(magSqr(di), VSMALL);
                 dd += wi*sqr(di);
                 nbrs.append(allNbrs[i]);
@@ -443,6 +495,19 @@ void newtonIcoFluid::setWallViscousStressTranspose
         const vectorField& Ub = U.boundaryField()[patchI];
         const scalarField& nuEffb = nuEff.boundaryField()[patchI];
 
+        // Velocity of the neighbour faces: on a patch with faces on more
+        // than one processor, the wall velocity of the whole patch,
+        // gathered (collective: one global sum of the patch velocity per
+        // evaluation); otherwise the local patch velocity
+        vectorField gatheredUb;
+
+        if (fit.split)
+        {
+            gatheredUb = wallGlobalPatches_[patchI].patchFaceToGlobal(Ub);
+        }
+
+        const vectorField& allUb = fit.split ? gatheredUb : Ub;
+
         fvPatchTensorField& bfPatch = boundaryFieldRef(nuDevGradUT)[patchI];
 
         forAll(Ub, faceI)
@@ -458,7 +523,7 @@ void newtonIcoFluid::setWallViscousStressTranspose
 
             forAll(nbrs, i)
             {
-                dU += w[i]*(d[i]*(Ub[nbrs[i]] - Ub[faceI]));
+                dU += w[i]*(d[i]*(allUb[nbrs[i]] - Ub[faceI]));
             }
 
             forAll(wedgeT_, i)
@@ -518,7 +583,7 @@ void newtonIcoFluid::updateViscousCache() const
     // called when it is corrected
     label valid =
         viscousCacheValid_
-     && cachedGradUPtr_.valid()
+     && cachedNuDevGradUTPtr_.valid()
      && cachedTimeIndex_ == mesh.time().timeIndex()
      && cachedDeltaT_ == mesh.time().deltaTValue()
      && fitGeometryCurrent()
@@ -550,21 +615,32 @@ void newtonIcoFluid::updateViscousCache() const
         return;
     }
 
+    // The velocity gradient goes into the registered gradU() of the fluid
+    // model first: boundary conditions may look up grad(U) when the fields
+    // below are evaluated (the non-orthogonal correction of the wall snGrad
+    // that the viscous Laplacian uses), and must see the gradient of the
+    // current velocity, not of the previous iterate. The gradient cache of
+    // the mesh, if enabled, updates the registered field in place and
+    // returns it; it is then not assigned to itself
+    volTensorField& gradU = const_cast<newtonIcoFluid&>(*this).gradU();
+    {
+        const tmp<volTensorField> tgradU(fvc::grad(U));
+
+        if (&tgradU() != &gradU)
+        {
+            gradU = tgradU();
+        }
+    }
+
     // Evaluated as in the momentum residual: the same schemes and the same
     // effective viscosity, with the wall values of the transpose stress from
-    // the wall velocity. Named so as not to clash with the registered
-    // grad(U) of the fluid model
-    cachedGradUPtr_.reset
-    (
-        new volTensorField("newtonIcoFluid:gradU", fvc::grad(U))
-    );
-
+    // the wall velocity
     cachedNuDevGradUTPtr_.reset
     (
         new volTensorField
         (
             "newtonIcoFluid:nuDevGradUT",
-            viscousStressTranspose(cachedGradUPtr_())
+            viscousStressTranspose(gradU)
         )
     );
 
@@ -601,14 +677,6 @@ void newtonIcoFluid::updateViscousCache() const
     cachedTimeIndex_ = mesh.time().timeIndex();
     cachedDeltaT_ = mesh.time().deltaTValue();
     viscousCacheValid_ = true;
-}
-
-
-const volTensorField& newtonIcoFluid::cachedGradU() const
-{
-    updateViscousCache();
-
-    return cachedGradUPtr_();
 }
 
 
@@ -710,9 +778,9 @@ newtonIcoFluid::newtonIcoFluid
     blockSize_(fluidModel::twoD() ? 3 : 4),
     tsLogPtr_(),
     wallFits_(),
+    wallGlobalPatches_(),
     wedgeT_(),
     fitPoints_(),
-    cachedGradUPtr_(),
     cachedNuDevGradUTPtr_(),
     cachedDivNuDevGradUTPtr_(),
     cachedLaplacianUPtr_(),
@@ -986,16 +1054,17 @@ tmp<vectorField> newtonIcoFluid::patchViscousForce(const label patchID) const
     // n & nuEff*dev2(T(grad(U))) from the explicit transpose term. Together
     // these are n & (-devReff), as in pimpleFluid. The transpose part,
     // nuEff*grad(U & n) at the wall, vanishes on a stationary no-slip wall
-    // but not on a deforming one, where it is part of the physical traction
+    // but not on a deforming one, where it is part of the physical traction.
+    // The transpose stress of the current velocity: the cache re-evaluates
+    // it if the velocity changed since the last residual, and sets the
+    // registered gradU(), which the snGrad of a boundary condition with a
+    // non-orthogonal correction looks up, so it is taken first
+    const volTensorField& nuDevGradUT = cachedViscousStressTranspose();
+
     const scalarField nuEff(turbulence_->nuEff()().boundaryField()[patchID]);
     const vectorField snGradU(U().boundaryField()[patchID].snGrad());
 
     tmpRef(tvF) = rho_.value()*nuEff*snGradU;
-
-    // The transpose stress of the current velocity: the cache re-evaluates
-    // it if the velocity changed since the last residual (the stored gradU
-    // is only updated in formResidual)
-    const volTensorField& nuDevGradUT = cachedViscousStressTranspose();
 
     // Named operands: see pimpleFluid::patchViscousForce
     const vectorField nf(mesh().boundary()[patchID].nf());
@@ -1640,9 +1709,10 @@ label newtonIcoFluid::formResidual
     volScalarField& p = const_cast<volScalarField&>(this->p());
     surfaceScalarField& phi = const_cast<surfaceScalarField&>(this->phi());
 
-    // The velocity gradient of the cache, which the wall pressure gradients
-    // above evaluated for the current velocity
-    gradU() = cachedGradU();
+    // Evaluate the cached viscous fields for the current velocity, if the
+    // wall pressure gradients above did not; this sets the registered
+    // velocity gradient gradU()
+    updateViscousCache();
 
     // Lookup the forceImplicitFlux flag
     const Switch forceImplicitFlux =

@@ -423,10 +423,15 @@ by the wedge transformation. Neighbours across a sharp edge of the patch
 adjacent face normals within 45 degrees (at least eight faces per turn). A tangential direction
 that the neighbours do not resolve (the empty direction of a 2-D case, or
 nearly collinear neighbours: eigenvalue of the distance tensor below 1e-6 of
-the largest) gets a zero derivative rather than an extrapolated one. The fit
-uses the faces on the same processor, so it is one-sided at processor cuts,
-cyclic and symmetry patches (ringAddedMass on 4 ranks: frequency identical
-to serial, amplitude loss within 4e-6). The same
+the largest) gets a zero derivative rather than an extrapolated one. The
+neighbours are the edge neighbours in the whole patch: on a patch with faces
+on more than one processor the fit addresses them in a global copy of the
+patch (`globalPolyPatch`, as the FSI coupler uses for the interface), whose
+face centres and normals are gathered when the mesh moves and whose wall
+velocity is gathered once per evaluation (one global sum of the patch
+velocity per split patch), so that serial and parallel runs give the same
+wall values to round-off. The fit is still one-sided at cyclic and symmetry
+patches. The same
 value enters the momentum residual's wall flux and the traction, so the
 traction stays the fluid's own discrete wall flux. Evaluated instead from the boundary value of `grad(U)`,
 whose tangential derivatives come from the adjacent cell values, the term
@@ -446,11 +451,17 @@ the velocity (internal and boundary values), the mesh points, the time index
 and the time step with those of the last evaluation, with the decision agreed
 across processors, and is invalidated explicitly where the velocity or the
 viscosity is changed by the model (`unpackSolution`, `restoreOldTimeState`,
-the transport and turbulence corrections). The momentum residual, the wall
-pressure gradient of every wall patch and the interface traction share these
-fields. The mesh-dependent part of the surface fit (neighbours, weighted
-tangential distances, regularised inverse) is precomputed per fixed-velocity
-patch and reused until the mesh points change.
+the transport and turbulence corrections). The gradient is written to the
+registered `grad(U)` of the fluid model before the other fields are
+evaluated, because boundary conditions may look it up in their `snGrad`
+(the non-orthogonal correction of `decayingTaylorGreenVortexVelocity`), which
+the viscous Laplacian calls on the walls: evaluated with the gradient of the
+previous iterate, the Laplacian is inconsistent with the Newton iterate and
+the line search fails (decayingTaylorGreenVortex). The momentum residual, the
+wall pressure gradient of every wall patch and the interface traction share
+these fields. The mesh-dependent part of the surface fit (neighbours,
+weighted tangential distances, regularised inverse) is precomputed per
+fixed-velocity patch and reused until the mesh points change.
 
 ### Wall Pressure Gradient
 
