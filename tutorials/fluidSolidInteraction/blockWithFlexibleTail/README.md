@@ -124,15 +124,25 @@ Table 1.**
 | Hübner et al. [4], as reported by [2, 3] | - | - | 0.80 | 3.10 |
 | Xia et al., as reported by [2, 3] | - | - | 0.81 | 3.30 |
 
-The partitioned case completed a three-step smoke test with the stored mesh and
-settings. The three steps needed 6, 6 and 5 IQN-ILS iterations and 4.5 s in
-serial, but this is far too short to measure an oscillation. A long shake-down
-could not be submitted because the test sandbox prevented Slurm socket access;
-PETSc's OpenMPI initialisation was blocked for the same reason, so the
-quasi-monolithic time stepping was not exercised. Its case selection, 162
-conformal interface-face pairs and four-rank combined decomposition were
-checked with `decomposeParMonolithic`. No solids4foam amplitude, frequency or
-quasi-monolithic Newton-iteration count is therefore claimed here.
+Four-rank partitioned and quasi-monolithic shake-down runs reached 10 s. Both
+developed an oscillation which was still growing: the half peak-to-peak tip
+motion over 8--10 s was 0.46 cm partitioned and 0.56 cm quasi-monolithic. Both
+runs instead oscillated in the first bending mode at approximately 1.2 Hz, not
+the published second-mode response at 2.97--3.3 Hz. These are consequently not
+validated benchmark results or limit-cycle amplitudes.
+
+Diagnostics point to excessive numerical bending stiffness in the shake-down
+solid discretisation. A solid-only gravity-step test gives a first natural
+frequency of 1.031 Hz on the 80 x 2 mesh, versus 0.607 Hz from beam theory and
+the finite-element reference. In contrast, probes in the computed wake give
+approximately 4.0 Hz, close to the published uncoupled-fluid value of 3.71 Hz.
+Through-thickness refinement and reducing the momentum-stabilisation factor
+move the solid frequency toward the reference, but a converged solid
+discretisation and repeated FSI run are still required.
+
+The 10 s runs took 2,140 s partitioned and 8,336 s quasi-monolithic on four
+ranks of a shared node. The quasi-monolithic run averaged 1.77 solid and 2.00
+fluid SNES Newton iterations per time step. These timings are indicative only.
 
 ---
 
