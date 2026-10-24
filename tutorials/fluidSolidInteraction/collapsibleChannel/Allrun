@@ -74,8 +74,14 @@ rm -f 0/fluid/U 0/fluid/p
 cp "0/fluid/U.${fluidVelocity}" 0/fluid/U
 cp "0/fluid/p.${fluidPressure}" 0/fluid/p
 
-# Build the utility that sets the initial Poiseuille flow
-wmake setPoiseuilleFlow
+# Build the utility that sets the initial Poiseuille flow; stop if it does
+# not build, rather than running the solver without the initial flow (set
+# SOLIDS4FOAM_ROOT when the case is copied outside the solids4foam tree)
+if ! wmake setPoiseuilleFlow
+then
+    echo "ERROR: setPoiseuilleFlow did not build; set SOLIDS4FOAM_ROOT" 1>&2
+    exit 1
+fi
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
