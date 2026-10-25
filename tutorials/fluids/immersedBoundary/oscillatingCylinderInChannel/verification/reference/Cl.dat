@@ -1,6 +1,13 @@
-# Cl of the cylinder oscillating in a closed channel, from Wan and Turek (2006),
-# DOI: 10.1016/j.jcp.2006.06.002, as used by the oscillatingCylinderInChannel
-# case of https://github.com/solids4foam/fluid-benchmarks (commit 6f3953a)
+# Cl of the cylinder oscillating in a closed channel: the result of Wan and
+# Turek (2007), J. Comput. Phys. 222, 28-56, DOI 10.1016/j.jcp.2006.06.002, as
+# shown in a figure of Erzincanli and Sahin (2013), J. Comput. Phys. 255,
+# 660-679, DOI 10.1016/j.jcp.2013.08.038, digitised for the
+# oscillatingCylinderInChannel case of
+# https://github.com/solids4foam/fluid-benchmarks (data added in commit
+# 0dc5a6d; file of commit 6f3953a). Secondary data: points digitised from a
+# published figure (the figure and the digitising method are not recorded),
+# sorted by time; values unchanged. Normalised as Cd, Cl = 2F/(rho U^2 D Lz)
+# with U = 2 pi A/T.
 # t Cl
 0.07928913192070963 -0.001990049751243797
 0.11346548188653371 -0.0006965174129353324
