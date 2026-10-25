@@ -923,9 +923,11 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpKf() const
     // read is the deformed mesh of the start time, and the interpolation
     // weights differ from those of the original run: the values of the
     // original run are read instead, if they were written
+    // The name is that given by fvc::interpolate, which the scheme names of
+    // the terms with impKf are formed from
     tmp<surfaceScalarField> tImpKf
     (
-        readRestartField<surfaceScalarField>("impKf")
+        readRestartField<surfaceScalarField>("interpolate(impK)")
     );
 
     if (tImpKf.valid())
@@ -933,10 +935,7 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpKf() const
         return tImpKf;
     }
 
-    return tmp<surfaceScalarField>
-    (
-        new surfaceScalarField("impKf", fvc::interpolate(impK_))
-    );
+    return fvc::interpolate(impK_);
 }
 
 
