@@ -57,10 +57,12 @@ Description
     the one composed with. If the start time also holds an Fpre it must be
     the same one; otherwise the run was continued from a time holding a
     different Fpre, or an earlier update did not finish, and the case is
-    refused before anything is written or removed. Fpre in the start time
-    but not the latest is refused, since the run did not apply it. On the
-    first pass, where there is no Fpre in either, Fpre the run used is taken
-    to be the identity.
+    refused before anything is written or removed. A difference that
+    rounding to the writePrecision explains, as when decomposePar or
+    reconstructPar has written one of them in ascii, gives a warning
+    instead. Fpre in the start time but not the latest is refused, since the
+    run did not apply it. On the first pass, where there is no Fpre in
+    either, Fpre the run used is taken to be the identity.
 
     max mag(F - I) is reported as the convergence measure: it tends to zero
     as the mesh comes into equilibrium with the load under Fpre.
@@ -1012,7 +1014,34 @@ int main(int argc, char *argv[])
                 )
             );
 
-            if (diff > 1e-10*scale)
+            // In ascii, decomposePar and reconstructPar write Fpre at the
+            // writePrecision, so a copy that went through them is rounded:
+            // to p significant digits, each component is off by at most
+            // 0.5*10^(1 - p) of itself. A difference that rounding explains
+            // is the same Fpre, and the latest time's, being what the run
+            // used, is kept
+            const scalar roundingTol =
+                runTime.writeFormat() == IOstream::ASCII
+              ? max
+                (
+                    1e-10,
+                    Foam::pow(10.0, 1.0 - IOstream::defaultPrecision())
+                )
+              : 1e-10;
+
+            if (diff > 1e-10*scale && diff <= roundingTol*scale)
+            {
+                WarningInFunction
+                    << "Fpre in time " << startTime.name() << " and in time "
+                    << latestTime.name() << " differ by " << diff << ", "
+                    << "which rounding to writePrecision "
+                    << IOstream::defaultPrecision() << " explains, as when "
+                    << "decomposePar or reconstructPar has written one of "
+                    << "them." << nl
+                    << "    The one in time " << latestTime.name() << ", "
+                    << "which the run used, is composed with" << nl << endl;
+            }
+            else if (diff > roundingTol*scale)
             {
                 FatalErrorInFunction
                     << "Fpre in time " << startTime.name() << " is not the "

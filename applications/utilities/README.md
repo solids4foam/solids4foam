@@ -360,7 +360,10 @@ postProcessing are kept.
 A case whose ddt or d2dt2 scheme for D is not steadyState is refused before
 anything is changed, and so is a case written with a collated fileHandler.
 A case whose start-time Fpre is not the one the run used, or whose processors
-disagree about which Fpre there is, is refused before anything is changed.
+disagree about which Fpre there is, is refused before anything is changed;
+a difference that rounding to the writePrecision explains, as when
+decomposePar or reconstructPar has written one of them in ascii, gives a
+warning instead, and the latest time's Fpre is used.
 A warning is given if the results are written in ascii with a writePrecision
 below 10.
 A case where a material uses a law that cannot be prestressed (a small-strain
