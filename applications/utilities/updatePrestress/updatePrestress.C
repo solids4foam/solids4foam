@@ -65,13 +65,45 @@ Description
     max mag(F - I) is reported as the convergence measure: it tends to zero
     as the mesh comes into equilibrium with the load under Fpre.
 
+    A law with directions, such as fibres (see
+    mechanicalConstitutiveLaw::stressFreeDirections), takes them in the
+    stress-free configuration, and they are not mapped back from the imaged
+    geometry. For each direction the law's stress depends on, the largest and
+    mean angle between d and FpreNew & d, over the cells of its material, are
+    reported, and the largest is added to prestressHistory as a
+    maxAngle(<material>.<name>) column, -1 where no cell has a non-zero
+    direction. A direction field is found from a file as the manager finds it,
+    with the default of the law, or the law it wraps, that declares it. For
+    HolzapfelGasserOgdenElastic, whose stress depends on the fibre families
+    N4 = cosA*Ec + sinA*Ea and N6 = -cosA*Ec + sinA*Ea, those are reported
+    rather than Ec and Ea, which a stretch along them does not turn. A direction
+    field read by more than one law of a material, such as the f0 of
+    electroMechanicalLaw and of its passive law, is reported once if the case
+    gives it, since the laws then read the same field; if it does not, and the
+    laws' defaults differ, each is reported under where it is declared, as
+    maxAngle(<material>.f0) and maxAngle(<material>.passiveMechanicalLaw.f0),
+    with a warning that the laws use different directions. A new header line
+    is written to prestressHistory whenever its columns change.
+
+    Only one tree is updated: with -parallel the processor directories, and
+    otherwise the case directory. A warning is given when the other one holds
+    an Fpre that is now stale: the case directory's after a parallel update,
+    which decomposePar -force would bring back, or the processor directories'
+    after a serial update of a decomposed case. After a parallel update, the
+    case directory's time directories later than the start time, which a
+    serial run with startFrom latestTime would start from, are warned about
+    too; nothing in the other tree is removed.
+
+    If prestress is off in mechanicalProperties, as it is for the first pass,
+    a reminder to switch it on for the next pass is printed.
+
     A warning is given when the results are written in ascii with fewer than
     10 digits, which limits how well F, and so Fpre, is known.
 
     A case whose ddt or d2dt2 scheme for D is not steadyState is refused
-    before anything is written or removed, unless -force is given: F is then
-    one instant of a transient response rather than the equilibrium, and an
-    Fpre built from it does not converge.
+    before anything is written or removed: F is then one instant of a
+    transient response rather than the equilibrium, and an Fpre built from it
+    does not converge.
 
     A material whose law cannot be prestressed (see
     mechanicalConstitutiveLaw::admitsPrestress) is refused before anything is
@@ -80,7 +112,7 @@ Description
     utility and the solver refuse the same laws.
 
 Usage
-    updatePrestress [-parallel] [-force] [-keepPasses]
+    updatePrestress [-parallel] [-keepPasses]
 
 Author
     Conor Moore, UCD.
@@ -90,21 +122,13 @@ Author
 #include "fvCFD.H"
 #include "compatibilityFunctions.H"
 #include "mechanicalConstitutiveLaw.H"
+#include "mechanicalConstitutiveLawGather.H"
 #include "Switch.H"
+#include "unitConversion.H"
 #include <fstream>
+#include <string>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-//- True if the IOobject's file holds a volTensorField
-bool foundVolTensorField(IOobject& io)
-{
-#ifdef OPENFOAM_NOT_EXTEND
-    return io.typeHeaderOk<volTensorField>(true);
-#else
-    return io.headerOk();
-#endif
-}
-
 
 //- The file a field is written to, compressed or not, or an empty name if
 //  there is neither
@@ -158,7 +182,7 @@ label backupPass(const fileName& name)
 //- The backups, FprePass<N>, in the directory
 fileNameList prestressBackups(const fileName& dir)
 {
-    const fileNameList files(readDir(dir, fileName::FILE));
+    const fileNameList files(readDir(dir));
 
     DynamicList<fileName> backups(files.size());
 
@@ -254,6 +278,242 @@ bool writtenAsHeld
 }
 
 
+//- Whether a direction field is in the start time and in 0, as the manager
+//  looks for a prescribed field. The processors must agree, since reading a
+//  field communicates
+void findDirectionField
+(
+    const word& name,
+    const word& startTimeName,
+    const fvMesh& mesh,
+    bool& atStart,
+    bool& atZero
+)
+{
+    IOobject startIO
+    (
+        name,
+        startTimeName,
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE,
+        false
+    );
+
+    IOobject zeroIO
+    (
+        name,
+        "0",
+        mesh,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE,
+        false
+    );
+
+    atStart = mechanicalConstitutiveLawHeaderIsA<volVectorField>(startIO);
+    atZero = mechanicalConstitutiveLawHeaderIsA<volVectorField>(zeroIO);
+
+    if
+    (
+        returnReduce(atStart, orOp<bool>())
+     != returnReduce(atStart, andOp<bool>())
+     || returnReduce(atZero, orOp<bool>())
+     != returnReduce(atZero, andOp<bool>())
+    )
+    {
+        FatalErrorInFunction
+            << "The direction field " << name << " is in time "
+            << startTimeName << " or time 0 on some processors but not on "
+            << "others." << nl
+            << "Check the processor directories. Nothing has been written or "
+            << "removed" << exit(FatalError);
+    }
+}
+
+
+//- The values in the cells of a direction field a law takes as stress-free,
+//  found as the manager finds a prescribed field: in the start time, then in
+//  0, and otherwise the default the law declared, everywhere
+vectorField directionField
+(
+    const word& name,
+    const vector& deflt,
+    const word& startTimeName,
+    const fvMesh& mesh
+)
+{
+    bool atStart = false;
+    bool atZero = false;
+
+    findDirectionField(name, startTimeName, mesh, atStart, atZero);
+
+    const word instance(atStart ? startTimeName : word("0"));
+
+    if (atStart || atZero)
+    {
+        return vectorField
+        (
+            Foam::primitiveField
+            (
+                volVectorField
+                (
+                    IOobject
+                    (
+                        name,
+                        instance,
+                        mesh,
+                        IOobject::MUST_READ,
+                        IOobject::NO_WRITE,
+                        false
+                    ),
+                    mesh
+                )
+            )
+        );
+    }
+
+    return vectorField(mesh.nCells(), deflt);
+}
+
+
+//- Each law in the tree that declares the state field, labelled by where it
+//  is declared, empty for the law itself and the child state names below it,
+//  with the default it declares
+void collectDeclarations
+(
+    const mechanicalConstitutiveLaw& law,
+    const word& name,
+    const word& path,
+    DynamicList<word>& paths,
+    DynamicList<vector>& defaults
+)
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    forAll(spec.entries(), entryI)
+    {
+        if (spec.entries()[entryI].name == name)
+        {
+            paths.append(path);
+            defaults.append(spec.entries()[entryI].vectorDefault);
+        }
+    }
+
+    const wordList children(law.childStateNames());
+
+    forAll(children, childI)
+    {
+        collectDeclarations
+        (
+            law.childLaw(children[childI]),
+            name,
+            path.empty()
+          ? children[childI]
+          : word(path + "." + children[childI]),
+            paths,
+            defaults
+        );
+    }
+}
+
+
+//- The default a law, or a law it wraps, declares for the state field: the
+//  first non-zero one, since each law that reads the field falls back to its
+//  own default, and a zero one means the law has none
+vector declaredDefault
+(
+    const mechanicalConstitutiveLaw& law,
+    const word& name
+)
+{
+    mechanicalConstitutiveLawStateSpec spec;
+    law.declareState(spec);
+
+    forAll(spec.entries(), entryI)
+    {
+        if
+        (
+            spec.entries()[entryI].name == name
+         && mag(spec.entries()[entryI].vectorDefault) > SMALL
+        )
+        {
+            return spec.entries()[entryI].vectorDefault;
+        }
+    }
+
+    const wordList children(law.childStateNames());
+
+    forAll(children, childI)
+    {
+        const vector deflt
+        (
+            declaredDefault(law.childLaw(children[childI]), name)
+        );
+
+        if (mag(deflt) > SMALL)
+        {
+            return deflt;
+        }
+    }
+
+    return vector::zero;
+}
+
+
+//- The dictionary, dict itself or one inside it, that selects the law type,
+//  or null if there is none
+const dictionary* lawDictOfType(const dictionary& dict, const word& type)
+{
+    if (dict.found("type") && word(dict.lookup("type")) == type)
+    {
+        return &dict;
+    }
+
+    const wordList keys(dict.toc());
+
+    forAll(keys, keyI)
+    {
+        if (dict.isDict(keys[keyI]))
+        {
+            const dictionary* found =
+                lawDictOfType(dict.subDict(keys[keyI]), type);
+
+            if (found)
+            {
+                return found;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+
+//- A direction a law's stress depends on, as reported: a direction field,
+//  or the sum of two, coeff1*field1 + coeff2*field2, each normalised, as HGO
+//  builds its fibre families from its local basis
+struct reportedDirection
+{
+    //- The material, and its cells
+    word material;
+    labelList cells;
+
+    //- The name the direction is reported under
+    word name;
+
+    //- The first field, its default, and its coefficient
+    word field1;
+    vector default1;
+    scalar coeff1;
+
+    //- The second field, empty for a direction that is one field alone
+    word field2;
+    vector default2;
+    scalar coeff2;
+};
+
+
 //- Set out to a & b, internal and boundary values alike
 void compose
 (
@@ -279,12 +539,6 @@ int main(int argc, char *argv[])
 {
     argList::addBoolOption
     (
-        "force",
-        "Update Fpre even when the time schemes for D are not steadyState"
-    );
-
-    argList::addBoolOption
-    (
         "keepPasses",
         "Keep every earlier Fpre as FprePass<N>, rather than only the one "
         "before this update"
@@ -294,10 +548,8 @@ int main(int argc, char *argv[])
 #   include "createTime.H"
 
 #ifdef OPENFOAM_COM
-    const bool force = args.found("force");
     const bool keepPasses = args.found("keepPasses");
 #else
-    const bool force = args.optionFound("force");
     const bool keepPasses = args.optionFound("keepPasses");
 #endif
 
@@ -401,6 +653,14 @@ int main(int argc, char *argv[])
 
 #   include "createMesh.H"
 
+    // The directions the laws' stresses depend on, taken in the stress-free
+    // configuration, as they are reported on each pass
+    DynamicList<reportedDirection> reported;
+
+    // Whether the run this updates applied Fpre, to remind the user to
+    // switch it on after the first pass
+    bool prestressOn = false;
+
     Info<< nl << "Updating Fpre in time " << startTime.name()
         << " from the results at time " << latestTime.name() << nl << endl;
 
@@ -422,6 +682,9 @@ int main(int argc, char *argv[])
         (
             mechanicalProperties.lookup("mechanical")
         );
+
+        prestressOn =
+            mechanicalProperties.lookupOrDefault<Switch>("prestress", false);
 
         // Each law is constructed as the manager constructs it, with the
         // settings the manager injects, and asked whether it can be
@@ -461,6 +724,148 @@ int main(int argc, char *argv[])
                 refused
                     << "    material " << lawEntries[lawI].keyword()
                     << " uses " << lawPtr->type() << nl;
+            }
+
+            const wordList directions(lawPtr->stressFreeDirections());
+
+            if (directions.empty())
+            {
+                continue;
+            }
+
+            // The material's cells, as the manager assigns them: all of
+            // them for one material, its cellZone for more than one
+            labelList cells;
+
+            if (lawEntries.size() == 1)
+            {
+                cells = identity(mesh.nCells());
+            }
+            else
+            {
+                const label zoneI =
+                    mesh.cellZones().findZoneID(lawEntries[lawI].keyword());
+
+                if (zoneI < 0)
+                {
+                    FatalErrorInFunction
+                        << "There is no cellZone "
+                        << lawEntries[lawI].keyword() << " for its material"
+                        << exit(FatalError);
+                }
+
+                cells = mesh.cellZones()[zoneI];
+            }
+
+            // HGO's stress depends on its two fibre families, built from its
+            // local basis Ec and Ea, so those are reported rather than Ec and
+            // Ea themselves, which a stretch along them does not turn
+            const dictionary* hgoDictPtr = lawDictOfType
+            (
+                lawEntries[lawI].dict(), "HolzapfelGasserOgdenElastic"
+            );
+
+            forAll(directions, dirI)
+            {
+                const word& field = directions[dirI];
+
+                if (hgoDictPtr && (field == "Ec" || field == "Ea"))
+                {
+                    continue;
+                }
+
+                // A field read by more than one law in the tree, the active
+                // and passive laws of electroMechanicalLaw say, is the same
+                // field for each when the case gives it. Without one each
+                // falls back to its own default, and if those differ each is
+                // reported under where it is declared
+                DynamicList<word> paths;
+                DynamicList<vector> defaults;
+                collectDeclarations
+                (
+                    lawPtr(), field, word::null, paths, defaults
+                );
+
+                bool atStart = false;
+                bool atZero = false;
+                findDirectionField
+                (
+                    field, startTime.name(), mesh, atStart, atZero
+                );
+
+                bool differ = false;
+
+                forAll(defaults, declI)
+                {
+                    differ =
+                        differ || mag(defaults[declI] - defaults[0]) > SMALL;
+                }
+
+                const bool separately = !atStart && !atZero && differ;
+
+                if (separately)
+                {
+                    WarningInFunction
+                        << "Material " << lawEntries[lawI].keyword() << ": "
+                        << field << " is read by more than one of its laws, "
+                        << "no " << field << " field is given, and their "
+                        << "defaults differ, so the active and passive laws "
+                        << "use different fibre directions, which is probably "
+                        << "unintended. Each is reported separately" << nl
+                        << endl;
+                }
+
+                const label nReported = separately ? paths.size() : 1;
+
+                for (label declI = 0; declI < nReported; declI++)
+                {
+                    reportedDirection direction;
+                    direction.material = lawEntries[lawI].keyword();
+                    direction.cells = cells;
+                    direction.name =
+                        (separately && !paths[declI].empty())
+                      ? word(paths[declI] + "." + field)
+                      : field;
+                    direction.field1 = field;
+                    direction.default1 =
+                        separately
+                      ? defaults[declI]
+                      : declaredDefault(lawPtr(), field);
+                    direction.coeff1 = 1.0;
+                    direction.field2 = word::null;
+                    direction.default2 = vector::zero;
+                    direction.coeff2 = 0.0;
+
+                    reported.append(direction);
+                }
+            }
+
+            if (hgoDictPtr)
+            {
+                // Read in degrees, and converted, as the law reads it
+                const scalar fibreAngle =
+                    dimensionedScalar(hgoDictPtr->lookup("fibreAngle")).value()
+                   *M_PI/180.0;
+
+                const scalar cosA = Foam::cos(fibreAngle);
+                const scalar sinA = Foam::sin(fibreAngle);
+
+                // N4 = cosA*Ec + sinA*Ea and N6 = -cosA*Ec + sinA*Ea
+                for (label family = 0; family < 2; family++)
+                {
+                    reportedDirection direction;
+                    direction.material = lawEntries[lawI].keyword();
+                    direction.cells = cells;
+                    direction.name = (family == 0 ? "N4" : "N6");
+                    direction.field1 = "Ec";
+                    direction.default1 = declaredDefault(lawPtr(), "Ec");
+                    direction.coeff1 = (family == 0 ? cosA : -cosA);
+                    direction.field2 = "Ea";
+                    direction.default2 = declaredDefault(lawPtr(), "Ea");
+                    direction.coeff2 = sinA;
+
+                    reported.append(direction);
+                }
             }
         }
 
@@ -507,29 +912,15 @@ int main(int argc, char *argv[])
 
         if (ddtDScheme != "steadyState" || d2dt2DScheme != "steadyState")
         {
-            if (force)
-            {
-                WarningInFunction
-                    << "The time schemes for D are " << ddtDScheme
-                    << " (ddt) and " << d2dt2DScheme << " (d2dt2), not "
-                    << "steadyState, so F at the latest time is one instant "
-                    << "of a transient response. Updating Fpre anyway, as "
-                    << "-force was given" << nl << endl;
-            }
-            else
-            {
-                FatalErrorInFunction
-                    << "The time schemes for D are " << ddtDScheme
-                    << " (ddt) and " << d2dt2DScheme << " (d2dt2), not "
-                    << "steadyState, so F at the latest time is one instant "
-                    << "of a transient response rather than the equilibrium "
-                    << "under the load, and an Fpre built from it does not "
-                    << "converge." << nl
-                    << "Use steadyState for both, with predictor no, for "
-                    << "prestress passes, or give -force to update Fpre "
-                    << "anyway. Nothing has been written or removed"
-                    << exit(FatalError);
-            }
+            FatalErrorInFunction
+                << "The time schemes for D are " << ddtDScheme
+                << " (ddt) and " << d2dt2DScheme << " (d2dt2), not "
+                << "steadyState, so F at the latest time is one instant of a "
+                << "transient response rather than the equilibrium under the "
+                << "load, and an Fpre built from it does not converge." << nl
+                << "Use steadyState for both, with predictor no, for "
+                << "prestress passes. Nothing has been written or removed"
+                << exit(FatalError);
         }
     }
 
@@ -570,8 +961,10 @@ int main(int argc, char *argv[])
         false
     );
 
-    const bool FpreAtLatest = foundVolTensorField(FpreLatestHeader);
-    const bool FpreAtStart = foundVolTensorField(FpreStartHeader);
+    const bool FpreAtLatest =
+        mechanicalConstitutiveLawHeaderIsA<volTensorField>(FpreLatestHeader);
+    const bool FpreAtStart =
+        mechanicalConstitutiveLawHeaderIsA<volTensorField>(FpreStartHeader);
 
     // Each processor looks at its own files, so the processors must agree on
     // which there are before any of them takes a branch with a reduction in
@@ -711,6 +1104,111 @@ int main(int argc, char *argv[])
     Info<< "    det(Fpre) ranges from " << minJpre << " to " << maxJpre
         << nl << endl;
 
+    // A law with directions takes them in the stress-free configuration, so
+    // in the imaged geometry its direction lies along FpreNew & d rather than
+    // along the d the case gives. The angle between the two is reported, not
+    // corrected
+    //
+    // The largest angle of each direction, or -1 where no cell of its
+    // material has a non-zero one, so that it is not taken for a real 0
+    scalarList maxAngles(reported.size(), -1.0);
+
+    forAll(reported, dirI)
+    {
+        const reportedDirection& direction = reported[dirI];
+
+        const vectorField d1
+        (
+            directionField
+            (
+                direction.field1, direction.default1, startTime.name(), mesh
+            )
+        );
+
+        const bool combined = !direction.field2.empty();
+
+        const vectorField d2
+        (
+            combined
+          ? directionField
+            (
+                direction.field2, direction.default2, startTime.name(), mesh
+            )
+          : vectorField()
+        );
+
+        const labelList& cells = direction.cells;
+
+        scalar maxAngle = 0.0;
+        scalar sumAngle = 0.0;
+        label nCells = 0;
+
+        forAll(cells, i)
+        {
+            const label cellI = cells[i];
+            const scalar mag1 = mag(d1[cellI]);
+            const scalar mag2 = combined ? mag(d2[cellI]) : 1.0;
+
+            if (mag1 < SMALL || mag2 < SMALL)
+            {
+                continue;
+            }
+
+            vector dn(direction.coeff1*d1[cellI]/mag1);
+
+            if (combined)
+            {
+                dn += direction.coeff2*d2[cellI]/mag2;
+            }
+
+            const scalar magDn = mag(dn);
+
+            if (magDn < SMALL)
+            {
+                continue;
+            }
+
+            dn /= magDn;
+
+            const vector e(FpreNew[cellI] & dn);
+
+            const scalar cosAngle =
+                max(-1.0, min(1.0, (dn & e)/max(mag(e), SMALL)));
+
+            const scalar angle = radToDeg(Foam::acos(cosAngle));
+
+            maxAngle = max(maxAngle, angle);
+            sumAngle += angle;
+            nCells++;
+        }
+
+        reduce(maxAngle, maxOp<scalar>());
+        reduce(sumAngle, sumOp<scalar>());
+        reduce(nCells, sumOp<label>());
+
+        if (nCells == 0)
+        {
+            Info<< "    " << direction.name << " (material "
+                << direction.material << "): no cell has a non-zero "
+                << direction.name << ", so there is no angle to report" << nl;
+
+            continue;
+        }
+
+        maxAngles[dirI] = maxAngle;
+
+        Info<< "    " << direction.name << " (material "
+            << direction.material << "): in the imaged geometry the law's "
+            << "direction is up to " << maxAngle << " deg from it (mean "
+            << sumAngle/nCells << " deg)" << nl;
+    }
+
+    if (reported.size())
+    {
+        Info<< "    These directions are taken in the stress-free "
+            << "configuration and are not mapped back" << nl << endl;
+    }
+
     // Writing moves an instance that is not constant or system to the
     // current time, so the current time is set back to the start time first
     runTime.setTime(startTime, 0);
@@ -829,22 +1327,63 @@ int main(int argc, char *argv[])
             runTime.rootPath()/runTime.globalCaseName()/"prestressHistory"
         );
 
-        const bool newHistory = !isFile(historyFile, false);
+        // The columns, as a header line. A new one is written whenever it
+        // differs from the last in the file, so a history that gains or
+        // loses a direction column still says what each column is
+        std::string header("# pass  maxMag(F-I)  minDet(Fpre)  maxDet(Fpre)");
+
+        forAll(reported, dirI)
+        {
+            header +=
+                "  maxAngle(" + reported[dirI].material + "."
+              + reported[dirI].name + ")";
+        }
+
+        std::string lastHeader;
+
+        {
+            std::ifstream existing(historyFile.c_str());
+            std::string line;
+
+            while (std::getline(existing, line))
+            {
+                if (line.compare(0, 6, "# pass") == 0)
+                {
+                    lastHeader = line;
+                }
+            }
+        }
 
         std::ofstream history(historyFile.c_str(), std::ios::app);
 
-        if (newHistory)
+        if (header != lastHeader)
         {
             history
-                << "# pass  maxMag(F-I)  minDet(Fpre)  maxDet(Fpre)" << nl
+                << header << nl
                 << "# maxMag(F-I) is of the run that used the pass before"
                 << nl;
+
+            if (reported.size())
+            {
+                history
+                    << "# maxAngle, in degrees, is between each direction the "
+                    << "case gives and the law's direction in the imaged "
+                    << "geometry; -1 where no cell has a non-zero direction"
+                    << nl;
+            }
         }
 
         history.precision(12);
         history
             << newPass << "  " << maxMagFminusI << "  " << minJpre << "  "
-            << maxJpre << std::endl;
+            << maxJpre;
+
+        forAll(maxAngles, dirI)
+        {
+            history << "  " << maxAngles[dirI];
+        }
+
+        history << std::endl;
 
         if (!history.good())
         {
@@ -857,6 +1396,97 @@ int main(int argc, char *argv[])
     {
         Info<< "Removing time " << timeDirs[timeI].name() << endl;
         rmDir(runTime.path()/timeDirs[timeI].name());
+    }
+
+    // Only one tree is updated: the processor directories in parallel, the
+    // case directory in serial. The other is left as it was, and so holds the
+    // previous pass, which decomposePar or reconstructPar would bring back
+    if (Pstream::parRun())
+    {
+        Info<< nl << "Updated the processor directories" << endl;
+
+        if (Pstream::master())
+        {
+            const fileName rootStartDir
+            (
+                runTime.rootPath()/runTime.globalCaseName()/startTime.name()
+            );
+
+            if (!fieldFile(rootStartDir/"Fpre").empty())
+            {
+                WarningInFunction
+                    << "The case directory's " << startTime.name() << "/Fpre "
+                    << "was not updated and now holds the previous pass." << nl
+                    << "    decomposePar -force would bring it back; run "
+                    << "reconstructPar, or remove it, before decomposing "
+                    << "again" << nl << endl;
+            }
+
+            // Left by an earlier reconstructPar, and the time a serial run
+            // with startFrom latestTime would start from
+            const instantList rootTimes
+            (
+                Time::findTimes
+                (
+                    runTime.rootPath()/runTime.globalCaseName()
+                )
+            );
+
+            OStringStream laterTimes;
+
+            forAll(rootTimes, timeI)
+            {
+                if
+                (
+                    rootTimes[timeI].name() != runTime.constant()
+                 && rootTimes[timeI].value() > startTime.value()
+                 && !rootTimes[timeI].equal(startTime.value())
+                )
+                {
+                    laterTimes << " " << rootTimes[timeI].name();
+                }
+            }
+
+            if (!laterTimes.str().empty())
+            {
+                WarningInFunction
+                    << "The case directory has time directories after the "
+                    << "start time," << laterTimes.str().c_str() << ", which "
+                    << "were not removed." << nl
+                    << "    A serial run with startFrom latestTime would start "
+                    << "from them rather than from the updated Fpre" << nl
+                    << endl;
+            }
+        }
+    }
+    else
+    {
+        Info<< nl << "Updated the case directory" << endl;
+
+        // A decomposed case always has processor0, and its start time holds
+        // an Fpre if the processor directories were prestressed
+        if
+        (
+            !fieldFile
+            (
+                runTime.path()/"processor0"/startTime.name()/"Fpre"
+            ).empty()
+        )
+        {
+            WarningInFunction
+                << "The case is decomposed, but only the case directory was "
+                << "updated: the processor directories now hold the previous "
+                << "pass." << nl
+                << "    Run updatePrestress -parallel on a decomposed case, or "
+                << "decompose it again" << nl << endl;
+        }
+    }
+
+    if (!prestressOn)
+    {
+        Info<< nl << "prestress is off in constant/mechanicalProperties: set "
+            << "'prestress yes;' before the next pass, or it will not apply "
+            << "the Fpre written here" << endl;
     }
 
     Info<< nl << "End" << nl << endl;

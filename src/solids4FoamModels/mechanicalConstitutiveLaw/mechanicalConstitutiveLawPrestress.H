@@ -208,6 +208,11 @@ public:
         )
         {
             compose(F_, step.F, Fpre);
+
+            // The old-time values are composed with the same Fpre, which is
+            // right for any law, since Fpre is constant during a run. A law
+            // that builds its stress from increments, F & Finv0 say, would
+            // cancel Fpre out; such laws are refused through admitsPrestress()
             compose(F0_, step.F0, Fpre);
             compose(Finv_, FpreInv, step.Finv);
             compose(Finv0_, FpreInv, step.Finv0);

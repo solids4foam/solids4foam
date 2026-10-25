@@ -184,6 +184,12 @@ public:
             return true;
         }
 
+        //- The fibre direction, f0
+        virtual wordList stressFreeDirections() const override
+        {
+            return wordList(1, word("f0"));
+        }
+
         //- Declare the fibre direction this law is given
         virtual void declareState
         (

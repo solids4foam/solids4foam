@@ -412,6 +412,17 @@ public:
             return false;
         }
 
+        //- The prescribed vector state fields this law takes as directions
+        //  in the stress-free configuration, such as fibre directions.
+        //  With prestress they are not mapped back from the imaged
+        //  geometry, so there the law's directions lie along Fpre & d
+        //  rather than along d: the manager warns, and updatePrestress
+        //  reports the angle between the two on each pass. None by default
+        virtual wordList stressFreeDirections() const
+        {
+            return wordList();
+        }
+
         //- Initialise constitutive state variables
         //  Called once after state allocation.
         //  Default implementation does nothing.

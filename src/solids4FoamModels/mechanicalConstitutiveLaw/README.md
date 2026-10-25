@@ -364,6 +364,11 @@ mechanical
 );
 ```
 
+The manager warns about a keyword that differs from `prestress` only in case,
+such as `preStress`, which would otherwise leave prestress off without a word,
+and, with prestress off, about an `Fpre` in the start time that is not
+applied.
+
 The manager then reads a prestress deformation gradient `Fpre` (a
 dimensionless `volTensorField`)
 from the start time. `Fpre` maps the stress-free configuration onto the mesh,
@@ -417,14 +422,35 @@ What prestress does not cover, and refuses rather than evaluates without
 - fourth-order tangents, which the laws give with respect to the composed
   deformation gradient rather than the solver's.
 
+These last three are refused at the first stress evaluation, not when the
+manager is constructed, since only then is it known which evaluation a solid
+model asks for. Supporting a fourth-order tangent would need the law's
+derivative with respect to the full, unsymmetric `F`: the `mat66` tangents are
+taken by symmetric perturbations, and a symmetric perturbation of `Fstep` is
+an unsymmetric perturbation `delta & Fpre` of `F`, so the solver's tangent
+cannot be recovered from the law's.
+
 The mixed formulation of `nonLinearGeometryTotalLagrangianTotalDisplacement`
 (`solvePressure`) needs nothing more either: its pressure residual is written
 on the volumetric response the law returns, which the manager has evaluated at
 the composed kinematics, so the solid model never needs a `J` other than its
 own. Scalar tangents are given at the composed kinematics; they are
-preconditioner estimates and need nothing more. Laws with fibre directions
-take those directions in the stress-free configuration, so directions defined
-on the imaged geometry should be mapped back through `inv(Fpre)` first.
+preconditioner estimates and need nothing more.
+
+Laws with fibre directions (`HolzapfelGasserOgdenElastic`, `GuccioneElastic`,
+`electroMechanicalLaw`) take those directions in the stress-free
+configuration, and they are not mapped back from the imaged geometry they were
+usually built on: in the imaged geometry a law's direction lies along
+`Fpre & d` rather than along the `d` the case gives. Each such law lists its
+direction fields through `stressFreeDirections()`. With prestress the manager
+warns about them at construction, and `updatePrestress` reports, on each pass,
+the angle between `d` and `Fpre & d` and adds it to `prestressHistory`, so the
+size of the effect can be judged. For `HolzapfelGasserOgdenElastic` the angle
+is of its fibre families, built from `Ec`, `Ea` and its `fibreAngle`, since a
+stretch along `Ec` and `Ea` turns the fibres without turning either of them.
+A fibre angle fitted to unloaded tissue is
+already a stress-free one; directions measured on the imaged geometry would
+have to be mapped back through `inv(Fpre)`, which is not done.
 
 `Fpre` is found with the modified updated Lagrangian formulation (Gee, Förster
 and Wall, 2010): the load is applied to the imaged mesh, `Fpre` becomes

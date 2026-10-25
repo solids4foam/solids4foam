@@ -304,6 +304,10 @@ class mechanicalConstitutiveLawManager
         //  evaluation
         mutable autoPtr<surfaceScalarField> JpreSurfacePtr_;
 
+        //- The time index the face Fpre was made at, so that on a moving
+        //  mesh it is made again at most once per time step
+        mutable label FpreSurfaceTimeIndex_;
+
         //- The solver's kinematics composed with Fpre, made on the first
         //  evaluation and recomposed at every later one, so that the
         //  solver's fields, old times and all, are copied only once

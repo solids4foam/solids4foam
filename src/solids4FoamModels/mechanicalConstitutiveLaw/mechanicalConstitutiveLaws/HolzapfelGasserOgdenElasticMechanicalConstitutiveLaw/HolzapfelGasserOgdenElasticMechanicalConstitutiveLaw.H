@@ -202,6 +202,15 @@ public:
             return true;
         }
 
+        //- The local basis, Ec and Ea, from which the fibres are built
+        virtual wordList stressFreeDirections() const override
+        {
+            wordList names(2);
+            names[0] = "Ec";
+            names[1] = "Ea";
+            return names;
+        }
+
         //- Declare the local basis this law is given
         virtual void declareState
         (

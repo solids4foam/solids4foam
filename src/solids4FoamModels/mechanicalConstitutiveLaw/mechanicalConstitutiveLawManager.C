@@ -31,8 +31,10 @@ License
 #include "Switch.H"
 #include "CompactListList.H"
 #include "mechanicalConstitutiveLawPrestress.H"
+#include "mechanicalConstitutiveLawGather.H"
 #include "surfaceInterpolate.H"
 #include <cstdint>
+#include <cctype>
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -66,7 +68,7 @@ public:
         volTensorField(io, mesh)
     {}
 
-    virtual bool writeData(Ostream& os) const
+    virtual bool writeData(Ostream& os) const override
     {
         const int oldPrecision = os.precision(17);
 
@@ -1333,6 +1335,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     FpreSurfacePtr_(),
     FpreInvSurfacePtr_(),
     JpreSurfacePtr_(),
+    FpreSurfaceTimeIndex_(-1),
     volPrestressedPtr_(),
     surfacePrestressedPtr_()
 {
@@ -1562,6 +1565,54 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
     // Set lawBoundaryFaces
     calcLawBoundaryFaces();
 
+    // The switch is looked up with a default, so a misspelt one turns
+    // prestress off without a word. A keyword that differs from it only in
+    // case, and an Fpre that is there but not applied, are pointed out
+    {
+        const wordList keys(dict.toc());
+
+        forAll(keys, keyI)
+        {
+            string lowerKey(keys[keyI]);
+
+            for (std::size_t charI = 0; charI < lowerKey.size(); charI++)
+            {
+                lowerKey[charI] =
+                    std::tolower(static_cast<unsigned char>(lowerKey[charI]));
+            }
+
+            if (lowerKey == "prestress" && keys[keyI] != "prestress")
+            {
+                WarningInFunction
+                    << "'" << keys[keyI] << "' in mechanicalProperties is not "
+                    << "the prestress switch, which is 'prestress' (case "
+                    << "matters), so prestress is "
+                    << (prestress_ ? "on" : "off") << nl << endl;
+            }
+        }
+    }
+
+    if (!prestress_)
+    {
+        IOobject FpreHeader
+        (
+            "Fpre",
+            mesh_.time().timeName(),
+            mesh_,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        );
+
+        if (mechanicalConstitutiveLawHeaderIsA<volTensorField>(FpreHeader))
+        {
+            WarningInFunction
+                << "There is an Fpre in time " << mesh_.time().timeName()
+                << ", but prestress is off in mechanicalProperties, so it is "
+                << "not applied" << nl << endl;
+        }
+    }
+
     if (prestress_)
     {
         // Refused before Fpre is read, so that a case that cannot be
@@ -1589,6 +1640,36 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
                 << "a plastic one, cancels Fpre out of the increment, and a "
                 << "small-strain law has no deformation gradient to compose "
                 << "it with" << exit(FatalError);
+        }
+
+        // A law with directions, such as fibres, takes them in the
+        // stress-free configuration, and they are not mapped back from the
+        // imaged geometry they were usually built on
+        forAll(laws_, lawI)
+        {
+            const wordList directions(laws_[lawI].stressFreeDirections());
+
+            if (directions.size())
+            {
+                // Written as "Ec Ea" rather than as the list "2(Ec Ea)"
+                string names;
+
+                forAll(directions, dirI)
+                {
+                    names += (dirI ? " " : "") + directions[dirI];
+                }
+
+                WarningInFunction
+                    << "Material " << lawNames[lawI] << " uses "
+                    << laws_[lawI].type() << ", which takes "
+                    << names.c_str() << " as directions in the stress-free "
+                    << "configuration." << nl
+                    << "    With prestress they are not mapped back from the "
+                    << "imaged geometry, so in the imaged geometry the law's "
+                    << "directions lie along Fpre & d rather than along d. "
+                    << "updatePrestress reports the angle between the two on "
+                    << "each pass" << nl << endl;
+            }
         }
 
         readPrestress();
@@ -1870,10 +1951,22 @@ void Foam::mechanicalConstitutiveLawManager::readPrestress()
 
 void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
 {
-    if (FpreSurfacePtr_.valid())
+    // Made once on a static mesh. On a moving one the interpolation weights
+    // change, so it is made again, and the faces checked again, once in each
+    // time step
+    if
+    (
+        FpreSurfacePtr_.valid()
+     && (
+            !mesh_.moving()
+         || FpreSurfaceTimeIndex_ == mesh_.time().timeIndex()
+        )
+    )
     {
         return;
     }
+
+    FpreSurfaceTimeIndex_ = mesh_.time().timeIndex();
 
     // The inverse and determinant are taken of the interpolated Fpre,
     // not interpolated themselves, so that the three agree with one another
@@ -2618,7 +2711,7 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
         (
             topo.nIntegrationPoints(),
             finiteStrainKinematicsFields(F, F0, Finv, Finv0, J, J0),
-            "updateStressFiniteStrain (flat list)"
+            "updateStressFiniteStrain (flat list, with Fpre)"
         );
 
         prePtr.reset
@@ -2729,7 +2822,7 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
         (
             topo.nIntegrationPoints(),
             finiteStrainKinematicsFields(F, F0, Finv, Finv0, J, J0),
-            "updateTangentFiniteStrain"
+            "updateTangentFiniteStrain (with Fpre)"
         );
 
         prePtr.reset

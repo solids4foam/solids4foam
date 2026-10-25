@@ -1013,6 +1013,26 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         // Ensure p is created and the oldTime is stored
         p().oldTime();
 
+        // A p that is zero everywhere, as it is at the start of a run, starts
+        // from the law's volumetric response at the initial kinematics, which
+        // correctStress() above has evaluated: p = -dU/dJ, as the pressure
+        // residual has it. A p that is not, as when a run is continued, is
+        // left as it was read. With no initial deformation, and no prestress,
+        // the response is zero everywhere and there is nothing to do
+        if
+        (
+            gMax(mag(Foam::primitiveField(p()))) == 0
+         && gMax(mag(Foam::primitiveField(volumetricResponse()))) > 0
+        )
+        {
+            Info<< "Initialising p from the law's volumetric response" << endl;
+
+            Foam::primitiveFieldRef(p()) =
+                -Foam::primitiveField(volumetricResponse());
+            p().correctBoundaryConditions();
+            p().oldTime() = p();
+        }
+
         // Initialise dpdt field
         dpdtPtr_.set
         (

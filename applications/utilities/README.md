@@ -306,15 +306,31 @@ The mesh is overwritten!
   directory.
   The `Fpre` the start time held is kept as `FprePass<N>`, `N` being the pass
   that wrote it; copying it back to `Fpre` restores it.
+  For a law with fibre or other directions, which are taken in the
+  stress-free configuration and not mapped back from the imaged geometry, the
+  largest and mean angle between each direction and the law's direction in the
+  imaged geometry are printed, and the largest is added to `prestressHistory`
+  (`-1` where no cell has a non-zero direction). For
+  `HolzapfelGasserOgdenElastic` these are its two fibre families, built from
+  `Ec` and `Ea` and its `fibreAngle` as the law builds them, rather than `Ec`
+  and `Ea` themselves. A direction read by two laws of one material, such as
+  the `f0` of `electroMechanicalLaw` and of its passive law, is reported once
+  when the case gives the field; when it does not and their defaults differ,
+  each is reported separately (`maxAngle(<material>.f0)` and
+  `maxAngle(<material>.passiveMechanicalLaw.f0)`), with a warning that the two
+  laws use different fibre directions.
 
 - **Arguments** None
 
 - **Options/parameters**
 
-  `-parallel` to update a decomposed case (uncollated only).
-
-  `-force` to update `Fpre` even when the time schemes for D are not
-  `steadyState`.
+  `-parallel` to update a decomposed case (uncollated only). Only the
+  processor directories are updated, and the case directory's `Fpre`, if it
+  has one, is left holding the previous pass, with a warning: run
+  `reconstructPar`, or remove it, before decomposing again. Likewise a serial
+  update of a decomposed case leaves the processor directories stale, with a
+  warning. After a parallel update, the case directory's time directories
+  later than the start time are warned about too, and left in place.
 
   `-keepPasses` to keep every earlier `Fpre` as `FprePass<N>`, rather than
   only the one from before this update.
@@ -323,7 +339,8 @@ The mesh is overwritten!
 
   Run the first pass with `prestress no;` in `constant/mechanicalProperties`
   (or without the entry): the utility then takes `Fpre` of that pass
-  to be the identity. Set `prestress yes;` for every later pass.
+  to be the identity, and reminds you to set `prestress yes;` for every later
+  pass.
 
   ```bash
   solids4Foam
@@ -341,8 +358,7 @@ on every processor; if any of that fails, the previous Fpre is put back and no
 results are removed. Time directories before the start time, log files and
 postProcessing are kept.
 A case whose ddt or d2dt2 scheme for D is not steadyState is refused before
-anything is changed, unless `-force` is given, and so is a case written with a
-collated fileHandler.
+anything is changed, and so is a case written with a collated fileHandler.
 A case whose start-time Fpre is not the one the run used, or whose processors
 disagree about which Fpre there is, is refused before anything is changed.
 A warning is given if the results are written in ascii with a writePrecision

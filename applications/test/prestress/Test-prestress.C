@@ -59,7 +59,11 @@ Description
          for its Fpre, building a prestressed manager with a law that cannot
          be prestressed, reading an Fpre whose patches set their own values,
          and a face evaluation with an Fpre whose det is positive in every
-         cell but not on every face.
+         cell but not on every face. Each is recognised by its own message,
+         so a check cannot pass because the call failed for another reason,
+         and where the same call means something without prestress (a
+         flat list off the cell-centred topology, asking for Fpre, building
+         with that law), it is made on the other manager and must succeed.
 
 Author
     Conor Moore, UCD.
@@ -432,7 +436,7 @@ public:
     //- The names Fpre is written under, compressed or not
     static const wordList& fpreNames()
     {
-        static const wordList names({"Fpre", "Fpre.gz"});
+        static const wordList names(Foam::makeList<word>({"Fpre", "Fpre.gz"}));
         return names;
     }
 };
@@ -900,7 +904,7 @@ int main(int argc, char *argv[])
         report
         (
             "a small-strain update is refused",
-            throwsFatal([&]()
+            throwsFatalSaying("is a small-strain evaluation", [&]()
             {
                 pre.updateStressSmallStrain
                 (
@@ -920,12 +924,37 @@ int main(int argc, char *argv[])
         report
         (
             "a flat-list update off the cell-centred topology is refused",
-            throwsFatal([&]()
+            throwsFatalSaying
+            (
+                "a flat-list finite-strain evaluation is supported only on",
+                [&]()
+                {
+                    pre.updateStressFiniteStrain
+                    (
+                        faceTopo, faceF, faceF, faceF, faceF, faceJ, faceJ,
+                        dt, faceSigma
+                    );
+                }
+            )
+        );
+
+        report
+        (
+            "and the plain manager accepts the same call",
+            !throwsFatal([&]()
             {
-                pre.updateStressFiniteStrain
+                // A topology is the manager's own, so the plain one is
+                // given its own face topology, of the same size
+                const integrationPointTopology& plainFaceTopo =
+                    plain.topologyFor
+                    (
+                        faceCentredIntegrationPointTopology::typeName
+                    );
+
+                plain.updateStressFiniteStrain
                 (
-                    faceTopo, faceF, faceF, faceF, faceF, faceJ, faceJ, dt,
-                    faceSigma
+                    plainFaceTopo, faceF, faceF, faceF, faceF, faceJ, faceJ,
+                    dt, faceSigma
                 );
             })
         );
@@ -936,7 +965,7 @@ int main(int argc, char *argv[])
         report
         (
             "a fourth-order tangent is refused",
-            throwsFatal([&]()
+            throwsFatalSaying("was asked for a fourth-order tangent", [&]()
             {
                 pre.updateTangentFiniteStrain
                 (
@@ -966,7 +995,7 @@ int main(int argc, char *argv[])
             report
             (
                 "a flat list of the wrong size is refused",
-                throwsFatal([&]()
+                throwsFatalSaying("(flat list, with Fpre)", [&]()
                 {
                     pre.updateStressFiniteStrain
                     (
@@ -980,7 +1009,17 @@ int main(int argc, char *argv[])
         report
         (
             "a manager without prestress has no Fpre to give",
-            throwsFatal([&]() { plain.Fpre(); })
+            throwsFatalSaying
+            (
+                "There is no Fpre: prestress is off",
+                [&]() { plain.Fpre(); }
+            )
+        );
+
+        report
+        (
+            "and the prestressed manager gives its Fpre",
+            !throwsFatal([&]() { pre.Fpre(); })
         );
 
         // A law that has not said it can be prestressed is refused when the
@@ -1006,12 +1045,27 @@ int main(int argc, char *argv[])
         report
         (
             "a law that cannot be prestressed is refused",
-            throwsFatal([&]()
+            throwsFatalSaying("these laws cannot be prestressed", [&]()
             {
                 mechanicalConstitutiveLawManager
                     refused(mesh, unprestressableDict);
             })
         );
+
+        {
+            dictionary notPrestressedDict(unprestressableDict);
+            notPrestressedDict.set("prestress", Switch(false));
+
+            report
+            (
+                "and the same law is accepted without prestress",
+                !throwsFatal([&]()
+                {
+                    mechanicalConstitutiveLawManager
+                        accepted(mesh, notPrestressedDict);
+                })
+            );
+        }
 
         // An Fpre whose patches set their own values, here zeroGradient on
         // every patch that is not a constraint one, is refused when read. It
@@ -1050,7 +1104,7 @@ int main(int argc, char *argv[])
         report
         (
             "an Fpre with patches that set their own values is refused",
-            throwsFatal([&]()
+            throwsFatalSaying("Fpre must be calculated on every patch", [&]()
             {
                 mechanicalConstitutiveLawManager refused(mesh, preDict);
             })
