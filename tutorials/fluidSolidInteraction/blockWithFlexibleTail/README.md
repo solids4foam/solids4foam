@@ -71,8 +71,8 @@ attributed to it. The suggested Wood et al., Habchi et al. and Olivier et al.
 citations were not used: accessible summaries concern the lighter 51.3 cm/s
 case or did not establish that they used this exact parameter set.
 
-The fluid mesh has 12,920 cells and the tail mesh has 160 cells. Both have 80
-faces along each long tail surface and two faces at the tip, so the interface
+The fluid mesh has 13,020 cells and the tail mesh has 320 cells. Both have 80
+faces along each long tail surface and four faces at the tip, so the interface
 is conformal. This is a shake-down mesh, not a mesh-converged discretisation.
 
 ---
@@ -97,6 +97,27 @@ implementation supports polynomial orders 1, 2 and 3; this tutorial selects
 the cubic option. The high-order residual and Jacobian are not implemented for
 the velocity-based solid model used by the quasi-monolithic coupling, so
 `highOrder` cannot be combined with `monolithic`.
+
+A controlled solid-only gravity-step study used PETSc SNES, `alpha`
+stabilisation with scale 0.1, and the high-order residual and Jacobian for
+every polynomial order. The Euler--Bernoulli references are 0.607 Hz and
+3.804 Hz for the first two bending modes.
+
+| Tail mesh | Order | First mode (Hz) | Error | Second mode (Hz) | Error |
+| :-- | --: | --: | --: | --: | --: |
+| 80 x 2 | 1 | 0.4740 | -21.9% | 3.5035 | -7.9% |
+| 80 x 2 | 2 | 1.0388 | +71.1% | 6.2595 | +64.6% |
+| 80 x 2 | 3 | 0.7918 | +30.4% | 4.9145 | +29.2% |
+| 80 x 4 | 1 | 0.5907 | -2.7% | 3.7180 | -2.3% |
+| 80 x 4 | 2 | 0.7900 | +30.1% | 4.8875 | +28.5% |
+| 80 x 4 | 3 | 0.6068 | -0.0% | 3.7795 | -0.6% |
+
+The 80 x 4 cubic result motivates the mesh and order selected here. The
+unexpectedly large errors for order 2 are not yet explained. Earlier
+segregated order-1 calculations gave errors of +39.2%/+37.5% on 80 x 2 and
++19.4%/+18.2% on 80 x 4. Their disagreement with the controlled order-1 rows
+shows that stabilisation or the solution path, rather than the mesh alone,
+strongly affects the bending response.
 
 Run the quasi-monolithic Newton variant with:
 
@@ -143,14 +164,14 @@ runs instead oscillated in the first bending mode at approximately 1.2 Hz, not
 the published second-mode response at 2.97--3.3 Hz. These are consequently not
 validated benchmark results or limit-cycle amplitudes.
 
-Diagnostics point to excessive numerical bending stiffness in the shake-down
-solid discretisation. A solid-only gravity-step test gives a first natural
-frequency of 1.031 Hz on the 80 x 2 mesh, versus 0.607 Hz from beam theory and
-the finite-element reference. In contrast, probes in the computed wake give
-approximately 4.0 Hz, close to the published uncoupled-fluid value of 3.71 Hz.
-Through-thickness refinement and reducing the momentum-stabilisation factor
-move the solid frequency toward the reference, but a converged solid
-discretisation and repeated FSI run are still required.
+Diagnostics point to excessive numerical bending stiffness in the original
+shake-down solid discretisation. A solid-only gravity-step test gave a first
+natural frequency of 1.031 Hz on the original 80 x 2 segregated mesh, versus
+0.607 Hz from beam theory and the finite-element reference. In contrast,
+probes in the computed wake give approximately 4.0 Hz, close to the published
+uncoupled-fluid value of 3.71 Hz. The controlled modal study above supports
+the current 80 x 4 mesh with the cubic discretisation, but its repeated FSI
+run and a mesh-convergence study are still required.
 
 The 10 s runs took 2,140 s partitioned and 8,336 s quasi-monolithic on four
 ranks of a shared node. The quasi-monolithic run averaged 1.77 solid and 2.00
