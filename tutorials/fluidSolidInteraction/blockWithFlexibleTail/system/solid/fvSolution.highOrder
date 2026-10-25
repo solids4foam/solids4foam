@@ -28,9 +28,10 @@ solvers
             // Nonlinear solver
             snes_type newtonls;
             snes_linesearch_type basic;
-            snes_rtol "1e-6";
-            snes_atol "1e-10";
-            snes_stol "1e-8";
+            // Resolve solid corrections below the FSI coupling tolerance
+            snes_rtol "1e-8";
+            snes_atol "1e-12";
+            snes_stol "1e-9";
             snes_max_it "100";
             snes_divergence_tolerance "1e12";
             snes_monitor;

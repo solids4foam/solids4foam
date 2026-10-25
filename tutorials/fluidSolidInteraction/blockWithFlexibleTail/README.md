@@ -157,12 +157,27 @@ Table 1.**
 | Hübner et al. [4], as reported by [2, 3] | - | - | 0.80 | 3.10 |
 | Xia et al., as reported by [2, 3] | - | - | 0.81 | 3.30 |
 
-Four-rank partitioned and quasi-monolithic shake-down runs reached 10 s. Both
-developed an oscillation which was still growing: the half peak-to-peak tip
-motion over 8--10 s was 0.46 cm partitioned and 0.56 cm quasi-monolithic. Both
-runs instead oscillated in the first bending mode at approximately 1.2 Hz, not
-the published second-mode response at 2.97--3.3 Hz. These are consequently not
-validated benchmark results or limit-cycle amplitudes.
+Table 3 summarises the current four-rank shake-down results. The controlled
+order-1 run uses the same PETSc SNES, high-order residual/Jacobian machinery
+and `alpha` stabilisation as the modal study, with `polynomialOrder 1`.
+
+**Table 3: Current computed tail-tip response. Amplitudes are half the
+peak-to-peak vertical displacement.**
+
+| Solid setup | Time window (s) | Amplitude (cm) | Frequency (Hz) | Status |
+| :-- | :--: | --: | --: | :-- |
+| 80 x 4, controlled order 1 | 8--10 | 0.650 | 3.23 | Still growing |
+| 80 x 4, order 3 | 2--3.313 | 0.108 | - | Run stopped during growth |
+| Literature [2--4] | Limit cycle | 0.76--0.81 | 2.97--3.3 | Reference |
+
+The controlled order-1 run is the first calculation close to the published
+benchmark response: its frequency lies in the literature range and its 10 s
+amplitude is approaching the reference range. Growth is slowing, but 10 s is
+not a demonstrated limit cycle; a continuation to 25 s is required before
+quoting a converged amplitude. The cubic run stopped at 3.314 s because its
+solid absolute convergence threshold accepted zero-iteration solves, leaving
+the FSI residual at `1.12127e-6`, just above the `1e-6` coupling tolerance. Its
+SNES tolerances have been tightened and a fresh 25 s run is pending.
 
 Diagnostics point to excessive numerical bending stiffness in the original
 shake-down solid discretisation. A solid-only gravity-step test gave a first
@@ -170,12 +185,24 @@ natural frequency of 1.031 Hz on the original 80 x 2 segregated mesh, versus
 0.607 Hz from beam theory and the finite-element reference. In contrast,
 probes in the computed wake give approximately 4.0 Hz, close to the published
 uncoupled-fluid value of 3.71 Hz. The controlled modal study above supports
-the current 80 x 4 mesh with the cubic discretisation, but its repeated FSI
-run and a mesh-convergence study are still required.
+the current 80 x 4 mesh with the cubic discretisation. Its repeated FSI run
+and a mesh-convergence study are still required.
 
-The 10 s runs took 2,140 s partitioned and 8,336 s quasi-monolithic on four
-ranks of a shared node. The quasi-monolithic run averaged 1.77 solid and 2.00
-fluid SNES Newton iterations per time step. These timings are indicative only.
+The controlled order-1 10 s run took 3,574 s on four ranks. The earlier 10 s
+partitioned and quasi-monolithic runs took 2,140 s and 8,336 s respectively;
+their approximately 1.2 Hz first-mode response used the original, excessively
+stiff solid setup and is superseded by Table 3. The quasi-monolithic run
+averaged 1.77 solid and 2.00 fluid SNES Newton iterations per time step. These
+timings are indicative only.
+
+The reusable analysis script reports half peak-to-peak amplitude, peak
+magnitude, detrended upward-zero-crossing frequency and Hann-windowed FFT
+frequency over a selected interval. For example:
+
+```bash
+python3 verification/analyseTipDisplacement.py \
+    --case order1 postProcessing 8 10
+```
 
 ---
 
