@@ -76,6 +76,51 @@ Foam::meshMotionSolidModelFvMotionSolver::makeStiffnessScaleFactor() const
             << "maxFactor cannot be less than minFactor!" << exit(FatalError);
     }
 
+    const IOobject::writeOption writeOpt =
+        Switch
+        (
+            coeffDict().lookupOrDefault<Switch>("writeStiffScaleFactor", false)
+        )
+      ? IOobject::AUTO_WRITE
+      : IOobject::NO_WRITE;
+
+    // The factor is calculated once, from the mesh at the start of the run.
+    // On a restart the mesh is the deformed mesh of the start time, so the
+    // factor of the original run is read if it was written (it is written
+    // when the mesh motion solid has 'restart yes'); otherwise the mesh motion
+    // after the restart is not that of a continuous run
+    if (fvMesh_.time().startTimeIndex() > 0)
+    {
+        IOobject io
+        (
+            "stiffnessScaleFactor",
+            fvMesh_.time().timeName(),
+            fvMesh_,
+            IOobject::MUST_READ,
+            writeOpt
+        );
+
+        if (io.typeHeaderOk<volScalarField>(true))
+        {
+            autoPtr<volScalarField> dPtr(new volScalarField(io, fvMesh_));
+
+            Info<< "Stiffness scale factor read from "
+                << fvMesh_.time().timeName() << ": min "
+                << gMin(dPtr->primitiveField()) << ", max "
+                << gMax(dPtr->primitiveField()) << endl;
+
+            return dPtr;
+        }
+
+        WarningInFunction
+            << "The stiffness scale factor was not found at the start time "
+            << fvMesh_.time().timeName() << ", so it is calculated from "
+            << "the current (deformed) mesh rather than the mesh at the start "
+            << "of the original run: the mesh motion is not that of a "
+            << "continuous run. Set 'restart yes' in the mesh motion solid "
+            << "model coefficients to write it" << endl;
+    }
+
     autoPtr<motionDiffusivity> diffusivityPtr
     (
         motionDiffusivity::New(fvMesh_, coeffDict().lookup("diffusivity"))
@@ -105,12 +150,7 @@ Foam::meshMotionSolidModelFvMotionSolver::makeStiffnessScaleFactor() const
                 fvMesh_.time().timeName(),
                 fvMesh_,
                 IOobject::NO_READ,
-                Switch(coeffDict().lookupOrDefault<Switch>
-                (
-                    "writeStiffScaleFactor", false
-                ))
-              ? IOobject::AUTO_WRITE
-              : IOobject::NO_WRITE
+                writeOpt
             ),
             fvc::average(df),
             "zeroGradient"
@@ -146,7 +186,13 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
         )
     ),
     solveEquations_(true)
-{}
+{
+    // A restart needs the stiffness scale factor of the original run
+    if (stiffnessScaleFactorPtr_.valid() && modelPtr_->restart())
+    {
+        stiffnessScaleFactorPtr_->writeOpt() = IOobject::AUTO_WRITE;
+    }
+}
 
 
 Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
@@ -170,6 +216,12 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
     ),
     solveEquations_(true)
 {
+    // A restart needs the stiffness scale factor of the original run
+    if (stiffnessScaleFactorPtr_.valid() && modelPtr_->restart())
+    {
+        stiffnessScaleFactorPtr_->writeOpt() = IOobject::AUTO_WRITE;
+    }
+
     // Update pointD
     modelPtr_->pointD().primitiveFieldRef() =
         pointDisplacement.primitiveField();

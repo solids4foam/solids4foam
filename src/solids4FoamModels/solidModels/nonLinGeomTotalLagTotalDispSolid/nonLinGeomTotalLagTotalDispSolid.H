@@ -150,6 +150,14 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
 
+        //- Construct the implicit stiffness surface field
+        tmp<surfaceScalarField> makeImpKf() const;
+
+        //- Read a field of the time a restart starts from, if this model
+        //  writes what a restart needs and the field was written
+        template<class GeoField>
+        tmp<GeoField> readRestartField(const word& name) const;
+
         //- Calculate the current face-area vectors
         tmp<surfaceVectorField> currentSf() const;
 
