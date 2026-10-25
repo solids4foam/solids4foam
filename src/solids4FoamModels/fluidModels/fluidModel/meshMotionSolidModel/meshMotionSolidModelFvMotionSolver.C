@@ -31,6 +31,7 @@ License
 #include "mapPolyMesh.H"
 #include "fvOptions.H"
 #include "motionInterpolation.H"
+#include "pointConstraints.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -194,6 +195,38 @@ Foam::meshMotionSolidModelFvMotionSolver::curPoints() const
     );
 
     twoDCorrectPoints(tcurPoints.ref());
+
+    if (debug && Pstream::parRun())
+    {
+        // Check that the processors agree on the position of every point they
+        // share; otherwise the moved mesh does not match across processor
+        // boundaries
+        pointField maxPoints(tcurPoints());
+        pointField minPoints(tcurPoints());
+        pointConstraints::syncUntransformedData
+        (
+            fvMesh_, maxPoints, maxEqOp<vector>()
+        );
+        pointConstraints::syncUntransformedData
+        (
+            fvMesh_, minPoints, minEqOp<vector>()
+        );
+
+        const scalarField mismatch(mag(maxPoints - minPoints));
+
+        label nMismatch = 0;
+        forAll(mismatch, pointI)
+        {
+            if (mismatch[pointI] > 1e-12)
+            {
+                ++nMismatch;
+            }
+        }
+
+        Info<< "Processor point mismatch of the moved mesh: max "
+            << gMax(mismatch) << " m, number of point copies above 1e-12 m "
+            << returnReduce(nMismatch, sumOp<label>()) << endl;
+    }
 
     pointDisplacement_.primitiveFieldRef() =
         modelPtr_->pointD().primitiveField();

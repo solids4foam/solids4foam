@@ -612,6 +612,17 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- In parallel, a point displacement boundary condition (`fixedValue`) or
+  symmetry plane is now applied to every processor's copy of a point, also on
+  a processor that holds none of the patch's faces at that point, as happens
+  where a processor boundary meets the edge of a patch. That copy kept the
+  value interpolated from the cells, so a fluid mesh moved by a solid model
+  (`solids4foamSolidModel` mesh motion) no longer matched across the processor
+  boundary, by up to the interface displacement, and the quasi-monolithic
+  `foilInWind` tutorial on 128 processors stopped at t = 0.9525 s with "face
+  area does not match neighbour". Setting the debug switch
+  `solids4foamSolidModel` reports the largest such mismatch of
+  the moved mesh in every time step.
 - `newtonIcoFluid` builds its continuity residual from the face flux
   `interpolate(U) & Sf`, the flux that convects momentum, instead of
   `fvc::div(U)`, which interpolates with its own `div(U)` scheme. With a

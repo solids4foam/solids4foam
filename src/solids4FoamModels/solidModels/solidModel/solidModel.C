@@ -44,6 +44,7 @@ License
 #include "zeroGradientFvPatchFields.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "enhancedVolPointInterpolation.H"
+    #include "pointConstraints.H"
 #endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -742,6 +743,26 @@ void Foam::solidModel::correctPointDisplacement
     const polyMesh& pMesh = pointD.mesh().mesh();
     vectorField& pointDI = pointD;
 
+    // Points whose displacement is set here by a boundary condition or a
+    // symmetry plane, rather than interpolated from the cells
+    boolList constrainedPoint(pMesh.nPoints(), false);
+
+#ifdef OPENFOAM_NOT_EXTEND
+    forAll(pointD.boundaryField(), patchI)
+    {
+        if (pointD.boundaryField()[patchI].fixesValue())
+        {
+            const labelList& meshPoints =
+                pointD.boundaryField()[patchI].patch().meshPoints();
+
+            forAll(meshPoints, pointI)
+            {
+                constrainedPoint[meshPoints[pointI]] = true;
+            }
+        }
+    }
+#endif
+
     forAll(pMesh.boundaryMesh(), patchI)
     {
         if (isA<symmetryPolyPatch>(pMesh.boundaryMesh()[patchI]))
@@ -758,6 +779,8 @@ void Foam::solidModel::correctPointDisplacement
 
             forAll(meshPoints, pointI)
             {
+                constrainedPoint[meshPoints[pointI]] = true;
+
                 vector& pointValue = pointDI[meshPoints[pointI]];
 
                 if (mag(avgN.x()) > 0.95)
@@ -775,6 +798,43 @@ void Foam::solidModel::correctPointDisplacement
             }
         }
     }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    // In parallel, a point on a fixed-value or symmetry patch can be shared
+    // with a processor that holds none of that patch's faces at the point,
+    // e.g. where a processor boundary meets the edge of a patch. That
+    // processor keeps the value interpolated from the cells, so the two copies
+    // of the point differ, and a mesh moved with this field no longer matches
+    // across the processor boundary. Give every copy the constrained value
+    if (Pstream::parRun())
+    {
+        vectorField constrainedValue(pMesh.nPoints(), vector::zero);
+        forAll(constrainedPoint, pointI)
+        {
+            if (constrainedPoint[pointI])
+            {
+                constrainedValue[pointI] = pointDI[pointI];
+            }
+        }
+
+        pointConstraints::syncUntransformedData
+        (
+            pMesh, constrainedPoint, orEqOp<bool>()
+        );
+        pointConstraints::syncUntransformedData
+        (
+            pMesh, constrainedValue, maxMagSqrEqOp<vector>()
+        );
+
+        forAll(constrainedPoint, pointI)
+        {
+            if (constrainedPoint[pointI])
+            {
+                pointDI[pointI] = constrainedValue[pointI];
+            }
+        }
+    }
+#endif
 
     twoDCorrector_.correctPoints(pointDI);
 }
