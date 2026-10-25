@@ -21,6 +21,9 @@ solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
 nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
+    // Write the kinematic state required for a consistent continuation
+    restart yes;
+
     // Jacobian-free Newton-Krylov solution with PETSc SNES (options in
     // system/solid/fvSolution)
     solutionAlgorithm PETScSNES;

@@ -20,6 +20,9 @@ solidModel    nonLinearGeometryTotalLagrangianVelocity;
 
 nonLinearGeometryTotalLagrangianVelocityCoeffs
 {
+    // Write the kinematic state required for a consistent continuation
+    restart yes;
+
     // Stabilisation
     stabilisation
     {

@@ -22,6 +22,9 @@ solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
 
 "linearGeometryTotalDisplacementCoeffs|nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs"
 {
+    // Write the kinematic state required for a consistent continuation
+    restart yes;
+
     // Solution algorithm
     solutionAlgorithm implicitSegregated;
 

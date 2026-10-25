@@ -31,13 +31,14 @@ deltaT          1e-3;
 
 writeControl    timeStep;
 
-writeInterval   50;
+// Keep restart checkpoints at 1 s intervals without accumulating the full run
+writeInterval   1000;
 
-purgeWrite      0;
+purgeWrite      4;
 
 writeFormat     ascii;
 
-writePrecision  6;
+writePrecision  12;
 
 writeCompression off;
 

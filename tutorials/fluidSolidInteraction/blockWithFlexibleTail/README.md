@@ -130,7 +130,8 @@ quasi-monolithic run uses `decomposeParMonolithic`, with the coupled regions
 and conformal tail patches declared in `system/decomposeParDict`.
 
 The default time step is 0.001 s, matching the second-mode study in [2, 3],
-and the case runs to 10 s. The `solidPointDisplacement` function object writes
+and the case runs to 10 s. Restart state is written every 1 s and the four most
+recent checkpoints are retained. The `solidPointDisplacement` function object writes
 the displacement of the initial tail-tip point `(0.095 0.06 0.0005)`. If
 Gnuplot is installed, `Allrun` writes `deflection.pdf`.
 
@@ -166,18 +167,26 @@ peak-to-peak vertical displacement.**
 
 | Solid setup | Time window (s) | Amplitude (cm) | Frequency (Hz) | Status |
 | :-- | :--: | --: | --: | :-- |
-| 80 x 4, controlled order 1 | 8--10 | 0.650 | 3.23 | Still growing |
-| 80 x 4, order 3 | 2--3.313 | 0.108 | - | Run stopped during growth |
+| 80 x 4, controlled order 1 | 8--10 | 0.650 | 3.24 | Stopped at 11.135 s |
+| 80 x 4, order 3 | 8--10 | 0.651 | 3.25 | Stopped at 10.316 s |
 | Literature [2--4] | Limit cycle | 0.76--0.81 | 2.97--3.3 | Reference |
 
-The controlled order-1 run is the first calculation close to the published
-benchmark response: its frequency lies in the literature range and its 10 s
-amplitude is approaching the reference range. Growth is slowing, but 10 s is
-not a demonstrated limit cycle; a continuation to 25 s is required before
-quoting a converged amplitude. The cubic run stopped at 3.314 s because its
-solid absolute convergence threshold accepted zero-iteration solves, leaving
-the FSI residual at `1.12127e-6`, just above the `1e-6` coupling tolerance. Its
-SNES tolerances have been tightened and a fresh 25 s run is pending.
+Both orders now reproduce the published frequency and give essentially the
+same 8--10 s amplitude. Growth is slowing, but 10 s is not a demonstrated
+limit cycle and neither attempted 25 s run completed. The order-1 run reached
+0.689 cm before IQN-ILS stalled at 11.135 s. The cubic run reached a similar
+amplitude before a large IQN-ILS correction and solid linear-solver failure at
+10.316 s.
+
+Mesh checks identify deformation of the fluid grid, rather than the solid
+discretisation, as the common large-amplitude limit. At 10.3 s in the cubic
+run the maximum non-orthogonality was 91.5 degrees, the maximum skewness was
+4.95, the minimum cell volume had fallen to 3.7% of its initial value, and one
+face was incorrectly oriented. The current setup therefore uses a less
+concentrated inverse-distance mesh diffusivity. It also filters nearly
+dependent IQN-ILS modes relatively and guards reuse of previous-step modes.
+These changes require validation to 25 s before a limit-cycle result can be
+claimed.
 
 Diagnostics point to excessive numerical bending stiffness in the original
 shake-down solid discretisation. A solid-only gravity-step test gave a first
