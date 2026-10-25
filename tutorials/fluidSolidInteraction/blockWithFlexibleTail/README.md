@@ -86,6 +86,17 @@ using:
 ./Allrun
 ```
 
+Use the cubic high-order finite-volume solid discretisation with:
+
+```bash
+./Allrun highOrder
+```
+
+This variant requires PETSc and is unavailable on foam-extend. The high-order
+residual and Jacobian are not implemented for the velocity-based solid model
+used by the quasi-monolithic coupling, so `highOrder` cannot be combined with
+`monolithic`.
+
 Run the quasi-monolithic Newton variant with:
 
 ```bash

@@ -15,6 +15,8 @@ rm -rf case.foam residuals deflection.pdf postProcessing
 solids4Foam::restoreCaseFormat .
 solids4Foam::restoreCaseVariant .
 
+ln -vnsf solidProperties.linear constant/solid/solidProperties
+ln -vnsf fvSolution.linear system/solid/fvSolution
 ln -vnsf fsiProperties.iqnils constant/fsiProperties
 ln -vnsf U.dirichletNeumann 0/fluid/U
 ln -vnsf p.dirichletNeumann 0/fluid/p

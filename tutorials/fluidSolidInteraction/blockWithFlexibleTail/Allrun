@@ -9,11 +9,14 @@ source solids4FoamScripts.sh
 # Example usage
 # ./Allrun                      # partitioned IQN-ILS, serial
 # ./Allrun parallel             # partitioned IQN-ILS, parallel
+# ./Allrun highOrder            # partitioned IQN-ILS, cubic solid, serial
+# ./Allrun highOrder parallel   # partitioned IQN-ILS, cubic solid, parallel
 # ./Allrun monolithic           # quasi-monolithic Newton, serial
 # ./Allrun monolithic parallel  # quasi-monolithic Newton, parallel
 
 coupling=iqnils
 runMode=serial
+solidVariant=linear
 
 for arg in "$@"
 do
@@ -27,9 +30,12 @@ do
         parallel)
             runMode=parallel
             ;;
+        highOrder)
+            solidVariant=highOrder
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [iqnils|monolithic] [parallel]"
+            echo "Usage: ./Allrun [iqnils|monolithic] [highOrder] [parallel]"
             exit 1
             ;;
     esac
@@ -43,11 +49,22 @@ if [[ "${coupling}" == "monolithic" ]]; then
     solids4Foam::caseDoesNotRunWithFoamExtend
     solids4Foam::caseDoesNotRunWithOpenFOAMOrg
     solids4Foam::requirePetscOrExitSilently
+    if [[ "${solidVariant}" == "highOrder" ]]; then
+        echo "The highOrder option is not available with monolithic coupling"
+        exit 1
+    fi
+elif [[ "${solidVariant}" == "highOrder" ]]; then
+    # The high-order solid discretisation requires PETSc SNES and is not
+    # available on foam-extend.
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::requirePetscOrExitSilently
 fi
 
 # Start from the stored partitioned case. The quasi-monolithic dictionaries
 # and fields are stored as *.monolithic variants.
 solids4Foam::restoreCaseVariant .
+ln -vnsf "solidProperties.${solidVariant}" constant/solid/solidProperties
+ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
 ln -vnsf fsiProperties.iqnils constant/fsiProperties
 ln -vnsf U.dirichletNeumann 0/fluid/U
 ln -vnsf p.dirichletNeumann 0/fluid/p
