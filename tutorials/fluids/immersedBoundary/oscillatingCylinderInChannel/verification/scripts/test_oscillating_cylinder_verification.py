@@ -356,6 +356,21 @@ class Generation(Sandbox):
                          "clustered")
         self.assertEqual(ocv.traction_quadrature("auto",
                                                  self.tmp / "missing.C"), "")
+        # Keyword and names in different files of a source directory, as
+        # when the names are an Enum of immersedSurfaceTraction
+        src_dir = self.tmp / "immersedBoundary"
+        (src_dir / "fvOptions").mkdir(parents=True)
+        (src_dir / "fvOptions/immersedBoundaryForce.C").write_text(
+            'tractionQuadrature_(immersedSurfaceTraction::clustered);')
+        (src_dir / "immersedSurfaceTraction.C").write_text(
+            '{ quadratureType::greedy, "greedy" },')
+        self.assertEqual(ocv.traction_quadrature("auto", src_dir), "greedy")
+        (src_dir / "immersedSurfaceTraction.C").write_text(
+            '{ quadratureType::clustered, "clustered" },')
+        (src_dir / "test").mkdir()
+        (src_dir / "test/Test.C").write_text('"greedy"')
+        with self.assertRaises(RuntimeError):
+            ocv.traction_quadrature("auto", src_dir)
         self.assertEqual(ocv.quadrature_tag("cutLink", "clustered"),
                          "clustered")
         self.assertEqual(ocv.quadrature_tag("cutLink", "greedy"), "")

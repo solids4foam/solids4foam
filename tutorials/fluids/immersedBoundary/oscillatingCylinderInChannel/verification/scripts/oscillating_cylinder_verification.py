@@ -295,22 +295,34 @@ def run_n_outer(run: str) -> int:
 # candidate points, the only quadrature of the solver revisions that have no
 # tractionQuadrature keyword
 HISTORICAL_QUADRATURE = "greedy"
-SOLVER_SOURCE = (TUTORIAL_DIR.parents[3] / "src/immersedBoundary/fvOptions/"
-                 "immersedBoundaryForce/immersedBoundaryForce.C")
+SOLVER_SOURCE = TUTORIAL_DIR.parents[3] / "src/immersedBoundary"
+
+
+def source_text(source: Path) -> str:
+    """The text of a source file, or of the .C and .H files of a source
+    directory (its test/ directories excluded); '' if absent"""
+    if source.is_file():
+        return source.read_text(errors="replace")
+    if not source.is_dir():
+        return ""
+    return "\n".join(
+        f.read_text(errors="replace") for f in sorted(source.rglob("*"))
+        if f.suffix in (".C", ".H") and "test" not in f.relative_to(
+            source).parts)
 
 
 def traction_quadrature(choice: str = "auto", source: Path = None) -> str:
     """The tractionQuadrature entry to write for cutLink, '' for none.
     'auto' selects the historical (greedy) quadrature explicitly if the
-    solver source of this repository has the tractionQuadrature keyword,
-    writes nothing if it has not (its only quadrature is greedy), and fails
-    if the keyword exists without greedy, rather than comparing another
-    quadrature with the tracked results. Any other choice is written as
-    given (and tags the case name, see quadrature_tag())"""
+    immersed-boundary sources of this repository (src/immersedBoundary)
+    have the tractionQuadrature keyword, writes nothing if they have not
+    (their only quadrature is greedy), and fails if the keyword exists
+    without a greedy choice, rather than comparing another quadrature with
+    the tracked results. Any other choice is written as given (and tags the
+    case name, see quadrature_tag())"""
     if choice != "auto":
         return choice
-    path = SOLVER_SOURCE if source is None else source
-    text = path.read_text(errors="replace") if path.is_file() else ""
+    text = source_text(SOLVER_SOURCE if source is None else source)
     if "tractionQuadrature" not in text:
         return ""
     if f'"{HISTORICAL_QUADRATURE}"' not in text:
