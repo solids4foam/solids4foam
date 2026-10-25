@@ -92,10 +92,11 @@ Use the cubic high-order finite-volume solid discretisation with:
 ./Allrun highOrder
 ```
 
-This variant requires PETSc and is unavailable on foam-extend. The high-order
-residual and Jacobian are not implemented for the velocity-based solid model
-used by the quasi-monolithic coupling, so `highOrder` cannot be combined with
-`monolithic`.
+This variant requires PETSc and is unavailable on foam-extend. The
+implementation supports polynomial orders 1, 2 and 3; this tutorial selects
+the cubic option. The high-order residual and Jacobian are not implemented for
+the velocity-based solid model used by the quasi-monolithic coupling, so
+`highOrder` cannot be combined with `monolithic`.
 
 Run the quasi-monolithic Newton variant with:
 
