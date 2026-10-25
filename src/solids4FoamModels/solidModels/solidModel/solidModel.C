@@ -747,6 +747,7 @@ void Foam::solidModel::correctPointDisplacement
     // symmetry plane, rather than interpolated from the cells
     boolList constrainedPoint(pMesh.nPoints(), false);
 
+#ifdef OPENFOAM_NOT_EXTEND
     forAll(pointD.boundaryField(), patchI)
     {
         if (pointD.boundaryField()[patchI].fixesValue())
@@ -760,6 +761,7 @@ void Foam::solidModel::correctPointDisplacement
             }
         }
     }
+#endif
 
     forAll(pMesh.boundaryMesh(), patchI)
     {
