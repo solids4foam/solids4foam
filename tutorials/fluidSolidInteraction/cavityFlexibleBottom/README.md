@@ -75,7 +75,9 @@ and the regression test checks both against the same references.
 
 ## Analysing Results
 
-The vertical displacement of point A (located at $$(4\,-1\,0)$$) is recorded in `postProcessing/0/solidPointDisplacement_displacement.dat`
+The vertical displacement of point A (on the top, wetted surface of the plate,
+ at $$(4\,0\,0)$$ in the tutorial coordinates; the plate occupies
+ $$-0.4 \le y \le 0$$) is recorded in `postProcessing/0/solidPointDisplacement_displacement.dat`
  using a function object defined in `system/controlDict`. The forces acting
  on the fluid–solid interface are also recorded in
 `postProcessing/fluid/forces/0/force.dat` via the `forces` function object.

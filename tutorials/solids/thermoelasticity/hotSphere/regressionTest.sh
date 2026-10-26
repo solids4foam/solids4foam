@@ -107,8 +107,8 @@ extract_max_sigma() {
         | awk '{print $NF}'
 }
 
-# Run the case to its full end time, and hold it to the answer of the removed
-# legacy mechanicalModel.
+# Run the case to its full end time, and hold it to a recorded answer, which
+# began as that of the removed legacy mechanicalModel.
 #
 # This case runs several time steps, so unlike slabCooling it exercises the
 # framework rolling its constitutive state over between them.
@@ -126,11 +126,16 @@ FRAMEWORK_D_REL_TOL=1e-6
 COMPARISON_END_TIME=5
 
 # The final D, as the max and mean component magnitude of the field written
-# to fourteen figures, from the removed legacy mechanicalModel on the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d). OpenFOAM.com v2512's;
-# OpenFOAM.org 9 agrees to 2e-9. foam-extend is not compared, as below
-REF_D_MAX=0.00015702498751748
-REF_D_MEAN=7.86486280639836e-05
+# to fourteen figures. These were first the removed legacy mechanicalModel's,
+# from the last commit that had it (mcl-stage8-coverage, c3a92b3d), and were
+# re-recorded when thermalLinearGeometry started to impose the boundary
+# traction on the complete face traction, stabilisation included (#578): the
+# stabilisation flux is now replaced by the prescribed load on the traction
+# patches and loses its shear part on the symmetry patches, which moved the
+# max of D by 1.7e-5 relative. OpenFOAM.com v2512's; OpenFOAM.org 9 agrees to
+# 2e-10. foam-extend is not compared, as below
+REF_D_MAX=0.00015702235246175
+REF_D_MEAN=7.86487406615176e-05
 
 run_reference_comparison() {
     # Not on foam-extend, where the framework and the legacy model differed by

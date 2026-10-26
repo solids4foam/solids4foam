@@ -1,0 +1,12 @@
+# J.C. Simo and F. Armero, Geometrically nonlinear enhanced strain mixed
+# methods and the method of incompatible modes, IJNME 33:1413-1449, 1992;
+# Q1/P0 and Q1/E4 elements (legacy values in mm, converted to m).
+# Columns: cells per side n, average cell spacing sqrt(1440 mm^2 / n^2) in
+# mm, and the vertical displacement of the top-right corner in m.
+# Migrated from solid-benchmarks/elastoPlasticity/cooksMembrane/plotScripts.
+cells_per_side,spacing_mm,displacement_Q1P0_m,displacement_Q1E4_m
+2,18.97,0.00212994,0.00385075
+4,9.487,0.00509495,0.00645025
+8,4.743,0.00631425,0.00677618
+16,2.372,0.00673761,0.00693045
+32,1.186,0.00688372,0.00697006
