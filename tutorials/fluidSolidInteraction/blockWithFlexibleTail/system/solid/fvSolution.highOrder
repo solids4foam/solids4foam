@@ -44,12 +44,13 @@ solvers
             // Linear solver
             ksp_type lgmres;
             ksp_gmres_restart "100";
-            ksp_rtol "1e-4";
-            ksp_max_it "1000";
             ksp_converged_reason;
 
-            // Rebuild the partition-local LU preconditioner as the highly
-            // flexible tail changes configuration
+            // Store the preconditioner
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+
+            // Preconditioner - LU
             pc_type bjacobi;
             sub_pc_type lu;
         }

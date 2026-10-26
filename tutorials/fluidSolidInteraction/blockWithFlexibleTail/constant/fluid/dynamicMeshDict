@@ -20,9 +20,6 @@ dynamicFvMesh dynamicMotionSolverFvMesh;
 
 "solver|motionSolver" velocityLaplacian;
 
-// A quadratic inverse-distance diffusivity over-concentrates the deformation
-// and collapses cells near the tail tip at the benchmark amplitude. The
-// unsquared diffusivity spreads the motion over more of the channel.
-diffusivity inverseDistance 2(tail rigidBlock);
+diffusivity quadratic inverseDistance 2(tail rigidBlock);
 
 // ************************************************************************* //

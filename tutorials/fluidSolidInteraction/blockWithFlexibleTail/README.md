@@ -169,6 +169,8 @@ peak-to-peak vertical displacement.**
 | :-- | :--: | --: | --: | :-- |
 | 80 x 4, controlled order 1 | 8--10 | 0.650 | 3.24 | Stopped at 11.135 s |
 | 80 x 4, order 3 | 8--10 | 0.651 | 3.25 | Stopped at 10.316 s |
+| 80 x 4, revised order 1 | 8--10 | 0.650 | 3.18 | Stopped at 10.655 s |
+| 80 x 4, revised order 3 | 8--9.353 | 0.644 | 3.30 | Stopped at 9.353 s |
 | Literature [2--4] | Limit cycle | 0.76--0.81 | 2.97--3.3 | Reference |
 
 Both orders now reproduce the published frequency and give essentially the
@@ -178,15 +180,22 @@ limit cycle and neither attempted 25 s run completed. The order-1 run reached
 amplitude before a large IQN-ILS correction and solid linear-solver failure at
 10.316 s.
 
-Mesh checks identify deformation of the fluid grid, rather than the solid
-discretisation, as the common large-amplitude limit. At 10.3 s in the cubic
-run the maximum non-orthogonality was 91.5 degrees, the maximum skewness was
-4.95, the minimum cell volume had fallen to 3.7% of its initial value, and one
-face was incorrectly oriented. The current setup therefore uses a less
-concentrated inverse-distance mesh diffusivity. It also filters nearly
-dependent IQN-ILS modes relatively and guards reuse of previous-step modes.
-These changes require validation to 25 s before a limit-cycle result can be
-claimed.
+Mesh checks identify severe deformation of the fluid grid near the tail tip.
+At 10.3 s in the cubic run the maximum non-orthogonality was 91.5 degrees, the
+maximum skewness was 4.95, the minimum cell volume had fallen to 3.7% of its
+initial value, and one face was incorrectly oriented. Changing to unsquared
+inverse-distance diffusion, filtering IQN-ILS modes, guarding mode reuse and
+rebuilding the solid preconditioner did not delay the failure in fresh runs;
+those changes have therefore been removed.
+
+The `solids4foamSolidModel` motion solver with a total-Lagrangian
+`diffusionHyperElastic` law is a promising replacement and is already used by
+the quasi-monolithic variant. It cannot currently be selected by the
+partitioned interface, however: partitioned coupling prescribes
+`pointMotionU`, whereas this solver owns `pointD`, and the interface aborts at
+its first mesh update. The tutorial retains `velocityLaplacian` until that
+solver-interface gap is fixed. Restart checkpoints remain enabled so a later
+large-amplitude run can continue without repeating its first 10 s.
 
 Diagnostics point to excessive numerical bending stiffness in the original
 shake-down solid discretisation. A solid-only gravity-step test gave a first
