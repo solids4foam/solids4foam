@@ -28,9 +28,10 @@ Description
     The active tension Ta is either a field, supplied by an electrophysiology
     model or read from the case, or a constant ramped over rampTime. The field
     is read when activeTensionFromField is set, under the name given by
-    activeTensionFieldName (default Ta), and the constant is used otherwise.
-    activeTensionFromField is on by default when no constant activeTension
-    is given, and rampTime defaults to 0.
+    activeTensionFieldName (default Ta), and the constant is used otherwise;
+    the constant and rampTime are then not used. activeTensionFromField is
+    on by default when no constant activeTension is given, and rampTime
+    defaults to 0.
     Unlike the removed legacy law, a registered field is not picked up
     unasked: a coupled case sets activeTensionFromField, and one that does not
     is warned that it is running on the constant.
@@ -88,7 +89,10 @@ class electroMechanicalLawMechanicalConstitutiveLaw
         //- Name of the child state the passive law keeps its history in
         const word subStateName_;
 
-        //- Active tension, when it is not supplied as a field
+        //- Whether a constant 'activeTension' is given
+        const bool TaGiven_;
+
+        //- Active tension, used only when it is not supplied as a field
         const dimensionedScalar Ta_;
 
         //- Time over which the constant tension is ramped from zero
