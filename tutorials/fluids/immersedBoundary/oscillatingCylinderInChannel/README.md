@@ -153,7 +153,11 @@ the inertia is noisy, as it jumps when cells enter or leave the cylinder.
 `verification/` holds an opt-in verification of the `cutLink`, `ghostCell`,
 `penalty` and legacy incremental methods on this case, on four mesh levels
 with fixed time steps, against two moving body-fitted mesh solutions; it is
-not run by the tutorial tests. See `verification/README.md` and
+not run by the tutorial tests. It shows that an accurate drag does not
+guarantee an accurate lift for a moving body: with the greedy quadrature
+of the tested revision, the `cutLink` surface-traction lift differs from
+the body-fitted solution by 140-161 % on D/h = 10-40, while its drag
+differs by 1.1-5.4 %. See `verification/README.md` and
 `verification/results.md`.
 
 ## References

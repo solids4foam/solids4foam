@@ -8,10 +8,55 @@ that revision (see `README.md`, Quadrature). The values are those of
 `reference/results/cases.csv`, computed by `./Allverify analyse` from the
 complete force histories.
 
+## Summary
+
+The four methods are compared on a body that moves and accelerates through
+a stationary mesh. Drag and lift are both evaluated: the lift of this case
+is about 100 times smaller than the drag, so an error in the force
+estimator that is invisible in the drag can dominate the lift.
+
+- **Steady accuracy is not enough.** In the static-cylinder verification
+  of solids4foam pull request #595, the mean drag on the finest mesh
+  (D/h = 80) differs from the high-precision reference by 0.003 %
+  (cutLink), 0.16 % (ghostCell), 1.2 % (penalty) and 2.8 % (legacy
+  incremental, a limit-cycle mean). On the moving
+  cylinder, at the common D/h = 40, the raw drag differs from reference B
+  by 1.10 % (cutLink), 1.41 % (penalty), 8.32 % (ghostCell) and 26.45 %
+  (legacy incremental), and the raw lift by 139.7 %, 3.7 %, 12.4 % and
+  12.7 %. The force estimator, the surface quadrature, the resolution, the
+  time scheme and the crossing of cells by the body all matter.
+- **cutLink lift with the greedy quadrature.** The surface-traction drag
+  of cutLink is the most accurate of the four, but its lift differs from
+  the references by 140-161 % on D/h = 10-40. The greedy thinning of the
+  candidate surface points (in the order of the STL facets, with the area
+  of the discarded points given to the kept ones) breaks the cancellation
+  of the transverse pressure force (see Limitations). On D/h = 80 all 256
+  candidate points are kept, the defect is absent and the lift differs by
+  4.6 %. This is a property of this mesh and surface, not a convergence of
+  the greedy quadrature, and it does not make that quadrature reliable for
+  the lift of moving bodies. The momentum-exchange estimate of the same
+  runs, reported separately, gives 17.7 %, 8.7 %, 5.3 % and 4.8 %. A
+  different quadrature is a separate change to the solver (solids4foam
+  pull request #612); every result here uses the greedy quadrature of
+  `f33b244a2`.
+- **Cell-crossing fluctuations.** ghostCell and the legacy method have
+  force fluctuations at the cell-crossing frequency that do not vanish
+  with more outer correctors and grow when the time step is halved; they
+  dominate their raw errors (the low-passed errors are a diagnostic only).
+- **References.** Both body-fitted references are numerical solutions with
+  a second-order time scheme, and differ from each other by 0.77 % (Cd)
+  and 3.0 % (Cl); the immersed-boundary runs use the first-order Euler
+  scheme. Differences below the A-B difference are not ranked.
+- **Cost.** At D/h = 40 (8 ranks, 8 s simulated) the runs took 3.391
+  (cutLink), 2.731 (ghostCell), 1.493 (penalty) and 14.278 (legacy
+  incremental) allocated CPU hours on one shared node. These are not a
+  scaling measurement or a comparison with the body-fitted solver.
+
 ## Case and references
 
-The cylinder moves as `x = 1.1 + 0.25 sin(2 pi t/4)` m in a closed channel
-of `2.2 x 0.41` m filled with fluid at rest (`nu = 1e-3` m^2/s,
+The centre of the cylinder (D = 0.1 m) moves as
+`x_c = 1.1 + 0.25 sin(2 pi t/4)` m, `y_c = 0.2` m, in a closed channel of
+`2.2 x 0.41` m with no-slip walls, filled with fluid at rest (`nu = 1e-3` m^2/s,
 `rho = 1` kg/m^3; Re = U_ref D/nu = 39). The motion starts impulsively at
 the maximum velocity `U_ref = 2 pi A/T = 0.3927` m/s, so the force is
 singular at `t = 0`.
@@ -28,7 +73,13 @@ singular at `t = 0`.
 - **B:** moving body-fitted mesh, solids4foam `pimpleFluid`, 901 120 cells,
   backward scheme, `deltaT = 0.00025` s, at most 30 outer correctors per
   step, to `t = 8` s. The provenance is in the file header; the solids4foam
-  revision of that run is not recorded.
+  revision of that run is not recorded. Its solver log (not tracked here)
+  shows one continuous run of 32 000 steps on 96 MPI ranks: the residual
+  control (1e-6) ended every step but one after 5 to 30 outer correctors
+  (mean 7.75), and the solver clock time was 42 524 s (11.8 h, about
+  1 134 rank-hours). No scheduler accounting of that run exists. It is a
+  high-resolution reference computation, not an optimised production
+  setting, and its cost is not compared with that of the runs here.
 - **digitised:** the result of Wan and Turek (2007) as shown in a figure of
   Erzincanli and Sahin (2013), digitised for fluid-benchmarks (commit
   `0dc5a6d`). It differs from B by 3.3 % (Cd) and 7.3 % (Cl), and leads both
@@ -244,42 +295,51 @@ boundary near the mean position of the cylinder):
 ## Figures
 
 The figures are drawn by `./Allverify plot` from `reference/results/`. The
-compact histories there are sampled every 0.02 s, so the fluctuations above
-25 Hz appear aliased in the figures; all errors are computed from the full
-histories.
+force histories are drawn from the compact histories there, sampled every
+0.02 s: the fluctuations above 25 Hz (the cell-crossing frequencies are
+39-314 Hz) are aliased in the drawing, and no frequency content is read
+from them. Every error is computed from the complete histories, and
+`cell_crossing` uses the full-resolution extracts (`zoom-*.csv`).
 
 ![Force histories](images/force_histories.png)
 
-Cd and Cl of the four methods on their finest runs (legacy incremental:
-Level 3; not run on Level 4), against the two body-fitted references and
-the digitised histories. cutLink is shown with its surface traction (greedy
-quadrature). All runs use solids4foam `f33b244a2` with the Euler (first
-order) time scheme, while the references use backward differencing (second
-order).
+**Force histories.** (a, b) Cd and Cl of the references: body-fitted A and
+B and the digitised Wan and Turek (2007) histories, which lead the
+body-fitted solutions by about 18 ms and are not phase-aligned with them.
+(c, d) The four methods at D/h = 40 and `deltaT = 0.000625` s, the finest
+mesh run by all of them, against B and the digitised histories: cutLink
+with its surface traction and the greedy quadrature; the other methods
+with the forcing plus the inertia of the fluid inside. Raw histories, no
+filter or shift. The impulsive start (`t < 0.25` s, shaded) is off scale
+and excluded from the errors.
 
 ![Error against resolution](images/error_vs_resolution.png)
 
-Normalised RMS difference of the raw forces from reference B against
-`D/h`. Filled markers are the runs with the time step halved with the cell
-size; open markers are R4. The dashed line is the A-B difference. The
-filtered (< 5 Hz) values are in the table above only, as a diagnostic.
-
-![Error against cost](images/error_vs_cost.png)
-
-The same against the allocated CPU hours of each run: MPI ranks times wall
-time on one shared node. No parallel scaling was measured, and the figure
-is not a speed-up measurement or a comparison with body-fitted solvers.
+**Error against resolution.** Normalised RMS difference of the raw Cd and
+Cl from reference B against `D/h`. Filled markers: the time step halved
+with the cell size, so that space and time are refined together; open
+markers: D/h = 20 at the D/h = 40 time step (R4), a separate time-step
+sensitivity. The grey band is below the A-B difference. The legacy method
+was not run on D/h = 80. No order of convergence is derived.
 
 ![cutLink estimators](images/cutlink_estimators.png)
 
-The cutLink surface-traction and momentum-exchange lift of the same runs on
-Level 3, where the default quadrature thins the surface points, and on
-Level 4, where every candidate point is kept.
+**cutLink force estimators.** Cl of the same cutLink runs from the surface
+traction with the greedy quadrature (the estimator of the tracked results)
+and from the momentum exchange, reported separately and never added. On
+D/h = 40 the quadrature keeps 128 of the 256 candidate points and the lift
+differs from B by 139.7 %, while the drag differs by 1.10 %; on D/h = 80
+all 256 points are kept and the lift differs by 4.6 %.
 
-![Cell crossing](images/cell_crossing.png)
+Further diagnostics, not discussed above:
 
-A zoom of Cd at full resolution, showing the force fluctuations as the
-cylinder crosses the cells.
+- [`images/error_vs_cost.png`](images/error_vs_cost.png): the same errors
+  against the allocated CPU hours of each run (MPI ranks times wall time,
+  1, 2, 8 and 8 ranks on Levels 1-4, one shared node; not a speed-up
+  measurement or a comparison with body-fitted solvers);
+- [`images/cell_crossing.png`](images/cell_crossing.png): Cd at every time
+  step over 1.8-2.2 s, from the full-resolution extracts, showing the
+  force fluctuations as the cylinder crosses the cells.
 
 ## Limitations
 

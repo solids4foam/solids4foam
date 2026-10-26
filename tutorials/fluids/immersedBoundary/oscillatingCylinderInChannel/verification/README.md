@@ -9,12 +9,37 @@ for a body that moves and accelerates through a stationary mesh:
 - `penalty`;
 - legacy incremental, `method incremental`.
 
-The case is the cylinder oscillating in a closed channel filled with fluid
-initially at rest. The results are compared with two moving body-fitted
-mesh solutions and, as a secondary comparison, with the result of Wan and
-Turek (2007) digitised from a figure of Erzincanli and Sahin (2013). The
-verification is not run by `tutorials/Alltest` or
-`tutorials/Alltest-regression`.
+The case is the cylinder (D = 0.1 m) oscillating in a closed channel of
+2.2 x 0.41 m filled with fluid initially at rest, with its centre at
+`x_c(t) = 1.1 + 0.25 sin(2 pi t/4)` m, `y_c = 0.2` m. The results are
+compared with two moving body-fitted mesh solutions and, as a secondary
+comparison, with the result of Wan and Turek (2007) digitised from a
+figure of Erzincanli and Sahin (2013). The verification is not run by
+`tutorials/Alltest` or `tutorials/Alltest-regression`.
+
+## What it shows
+
+Accurate steady drag does not by itself establish accurate unsteady forces.
+For a moving body, the force estimator, the surface quadrature, the mesh
+and time resolution, the time scheme and the crossing of cells by the body
+all affect the drag and, more strongly, the lift. In particular, the
+cutLink surface traction with the greedy quadrature (the only quadrature
+of the tested revision) gives an accurate drag but a lift that differs
+from body-fitted reference B by 140-161 % on D/h = 10-40, because the
+thinning of the surface points in STL-facet order breaks the cancellation
+of the transverse pressure force. On D/h = 80 every candidate point is
+kept and the lift agrees to 4.6 %; this does not establish that the
+greedy quadrature converges in general. `results.md` has the evidence,
+the figures and the limitations.
+
+| Figure (`images/`) | Content |
+| --- | --- |
+| `force_histories.png` | references; the four methods at D/h = 40 |
+| `error_vs_resolution.png` | raw Cd and Cl errors against D/h |
+| `cutlink_estimators.png` | cutLink lift: greedy traction, momentum exchange |
+| `error_vs_cost.png`, `cell_crossing.png` | further diagnostics |
+
+The files:
 
 | File | Content |
 | --- | --- |
@@ -35,7 +60,7 @@ removes them.
 
 The driver needs Python 3 with numpy. scipy is needed for the filtered
 diagnostics, which are reported as nan without it, and matplotlib for the
-figures. Source OpenFOAM and solids4foam, then:
+figures (no LaTeX installation is needed). Source OpenFOAM and solids4foam, then:
 
 ```bash
 ./Allverify                      # cutLink, Level 1: run, analyse, check
@@ -111,7 +136,11 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
 The previews in `images/` are written by
-`python3 scripts/plot_verification.py --out images --dpi 110 --png-only`.
+`python3 scripts/plot_verification.py --out images --dpi 110 --png-only`;
+without `--png-only`, PDF and SVG versions are also written. The force
+histories in the figures are drawn from the compact histories of
+`reference/results/` (every 0.02 s, for display only); the errors are
+computed from the complete histories.
 
 ## Quadrature of the cutLink surface traction
 
