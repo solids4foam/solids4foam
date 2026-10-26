@@ -45,6 +45,25 @@ linearElastic
     }
 }
 
+diffusionElastic
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          yes;
+    fields
+    {
+        // Not 1, so that the checks see the scaled stress and tangents
+        stiffnessScaleFactor stiffnessScaleFactor [0 0 0 0 0 0 0] 2;
+    }
+    law
+    {
+        type            diffusionElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1;
+        mu              mu [1 -1 -2 0 0 0 0] 1;
+        kappa           kappa [1 -1 -2 0 0 0 0] 3;
+    }
+}
+
 linearElasticMisesPlastic
 {
     finiteStrain    no;
@@ -191,6 +210,25 @@ neoHookeanElastic
         rho             rho [1 -3 0 0 0 0 0] 1000;
         E               E [1 -1 -2 0 0 0 0] 5.6e6;
         nu              nu [0 0 0 0 0 0 0] 0.4;
+    }
+}
+
+diffusionHyperElastic
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    fields
+    {
+        // Not 1, so that the checks see the scaled stress and tangents
+        stiffnessScaleFactor stiffnessScaleFactor [0 0 0 0 0 0 0] 2;
+    }
+    law
+    {
+        type            diffusionHyperElastic;
+        rho             rho [1 -3 0 0 0 0 0] 1;
+        mu              mu [1 -1 -2 0 0 0 0] 1;
+        K               K [1 -1 -2 0 0 0 0] 3;
     }
 }
 

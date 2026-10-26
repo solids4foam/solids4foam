@@ -366,7 +366,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             }
             else
             {
-                tracP = tracPatch.traction() - nPatch*tracPatch.pressure();
+                tracP = tracPatch.boundaryTraction(nPatch);
 
                 if (useUndeformedArea)
                 {
@@ -445,9 +445,24 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     // Update D boundary conditions
     D().correctBoundaryConditions();
 
-    if (predictor_ && newTimeStep())
+    if (newTimeStep())
     {
-        predict();
+        if (predictor_)
+        {
+            predict();
+        }
+        else if (!smoothHydrostaticStress())
+        {
+            // Without this, the stress is first updated at the end of the
+            // first iteration below, so the first residual would miss a load
+            // that only the law supplies, such as a prescribed temperature,
+            // and the step could be accepted without it. gradD is not
+            // recomputed: new boundary displacements already reach the first
+            // residual through the stabilisation. The smoothing is skipped
+            // because it needs DEqnA, which exists only inside the momentum
+            // loop
+            correctStress();
+        }
     }
 
 #ifdef OPENFOAM_NOT_EXTEND
@@ -1154,30 +1169,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 << " solution algorithm" << abort(FatalError);
         }
 
-        // Set extrapolateValue to true for solidTraction boundaries
-        forAll(D().boundaryField(), patchI)
-        {
-            if
-            (
-                isA<solidTractionFvPatchVectorField>
-                (
-                    D().boundaryField()[patchI]
-                )
-            )
-            {
-                Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the D "
-                    << "field" << endl;
-
-                solidTractionFvPatchVectorField& tracPatch =
-                    refCast<solidTractionFvPatchVectorField>
-                    (
-                        boundaryFieldRef(D())[patchI]
-                    );
-
-                tracPatch.extrapolateValue() = true;
-            }
-        }
+        enableTractionBoundaryExtrapolation(D());
     }
 }
 
@@ -1372,10 +1364,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
         // Update gradient of displacement
         gradD() = fvc::grad(D);
-
-        // Enforce the boundary conditions again for any conditions that use
-        // gradD
-        D.correctBoundaryConditions();
     }
 
     // Increment of displacement
@@ -1467,6 +1455,18 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         (
             pressureResidual, f, blockSize_ - 1
         );
+    }
+
+    if (!highOrderResidual())
+    {
+        // Enforce the boundary conditions again, now that gradD, Finv, J and
+        // sigma have been updated from x, so that conditions that build their
+        // boundary value from the stress (tractionBoundarySnGrad), such as
+        // solidSpringDashpot, do not use the stress of the previous residual
+        // evaluation. The solidSpringDashpot README states when this makes
+        // the residual a function of x alone. The high-order residual does not
+        // recompute sigma(), so this update would not help there
+        D.correctBoundaryConditions();
     }
 
     // Unit normal vectors at the faces
