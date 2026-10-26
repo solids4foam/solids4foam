@@ -125,11 +125,14 @@ Run the quasi-monolithic Newton variant with:
 ./Allrun monolithic
 ```
 
-The quasi-monolithic solid uses the same 80 x 4 linear mesh and `alpha`
-stabilisation scale 0.1 as the controlled order-1 path. It remains a distinct
-velocity-based formulation, without the partitioned model's high-order
-residual/Jacobian machinery; its modal response is therefore being validated
-separately.
+The quasi-monolithic solid uses the same 80 x 4 linear mesh and nominal
+`alpha` stabilisation scale 0.1 as the controlled order-1 path. It remains a
+distinct velocity-based formulation without the partitioned model's
+high-order residual/Jacobian machinery. Its solid-only frequencies are 0.7245
+and 4.4990 Hz, 19.4% and 18.3% above the beam references. The compact
+velocity residual therefore remains too stiff on this mesh; a stabilisation
+and mesh-refinement study is required before its FSI result can be compared
+with the partitioned calculation.
 
 Append `parallel` to either command for a four-rank run. A parallel
 quasi-monolithic run uses `decomposeParMonolithic`, with the coupled regions
@@ -217,9 +220,9 @@ partitioned and quasi-monolithic runs took 2,140 s and 8,336 s respectively;
 their approximately 1.2 Hz first-mode response used the original, excessively
 stiff solid setup and is superseded by Table 3. That quasi-monolithic run used
 an 80 x 2 tail and `diffStencilLaplacian` stabilisation at scale 0.5; its
-80 x 4, `alpha`-stabilised replacement has not yet been run. The old run
-averaged 1.77 solid and 2.00 fluid SNES Newton iterations per time step. These
-timings are indicative only.
+80 x 4, `alpha`-stabilised replacement is under test, but its solid-only modal
+error is approximately 19%. The old run averaged 1.77 solid and 2.00 fluid
+SNES Newton iterations per time step. These timings are indicative only.
 
 The reusable analysis script reports half peak-to-peak amplitude, peak
 magnitude, detrended upward-zero-crossing frequency and Hann-windowed FFT
