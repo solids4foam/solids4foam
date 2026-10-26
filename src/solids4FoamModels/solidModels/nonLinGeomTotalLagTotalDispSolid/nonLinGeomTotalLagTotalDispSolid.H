@@ -111,6 +111,35 @@ class nonLinGeomTotalLagTotalDispSolid
         //  the volumetric energy the pressure equation was written for
         mutable autoPtr<volScalarField> volumetricResponsePtr_;
 
+        // Scaling of the mixed displacement-pressure system (solvePressure)
+        // Ported from Philip Cardiff's a4a9c07f and 7b01886d on the
+        // fix-pressure-solid branch
+
+            //- Store the pressure in the PETSc solution vector as
+            //  pHat = p/pressureUnknownScale_
+            const Switch scaleMixedPetScFields_;
+
+            //- Type of the pressure unknown scale: twoMu, user or none
+            const word pressureUnknownScaleType_;
+
+            //- Scale of the PETSc pressure unknown
+            scalar pressureUnknownScale_;
+
+            //- Dimensionless factor applied to the pressure equation rows
+            const scalar pressureScaleFactor_;
+
+            //- Multiply pressureScaleFactor_ by a representative 2*mu, so
+            //  that the pressure residual has the units and magnitude of the
+            //  momentum residual
+            const Switch pressureScaleByTwoMu_;
+
+            //- Volume-averaged 2*mu, from the deviatoric implicit stiffness
+            scalar twoMuRef_;
+
+            //- Scale of the pressure equation rows (residual and Jacobian):
+            //  pressureScaleFactor_*(pressureScaleByTwoMu_ ? twoMuRef_ : 1)
+            scalar pressureEqnScale_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
