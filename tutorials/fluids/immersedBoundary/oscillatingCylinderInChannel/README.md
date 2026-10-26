@@ -11,11 +11,11 @@ Prepared by Sairam Pamulaparthi Venkata and Philip Cardiff
 - Demonstrate how to prescribe the motion of an immersed body with the
   immersed boundary finite volume option `immersedBoundaryForce`, on a static
   mesh;
-- Compare the drag and lift coefficients with those of Wan and Turek (2006).
+- Compare the drag and lift coefficients with those of Wan and Turek (2007).
 
 ## Case Overview
 
-Wan and Turek (2006) computed the 2-D laminar flow around a cylinder that
+Wan and Turek (2007) computed the 2-D laminar flow around a cylinder that
 oscillates horizontally in a closed channel filled with fluid initially at
 rest. The channel is $$[0, 2.2] \times [0, 0.41]$$ m, and the cylinder, of
 diameter $$D = 0.1$$ m, is centred at
@@ -84,7 +84,8 @@ $$
 where the reference velocity is the maximum velocity of the cylinder,
 $$U_{ref} = 2 \pi A/T = 0.3927$$ m/s, and $$L_z = 0.1$$ m is the thickness of
 the mesh, i.e. $$C_d = 1296.9 F_x$$. The `verification/reference` directory
-has the coefficients of Wan and Turek (2006) (`Cd.dat`, `Cl.dat`), and those
+has the coefficients of Wan and Turek (2007), digitised from a figure of
+Erzincanli and Sahin (2013) (`Cd.dat`, `Cl.dat`), and those
 of a moving body-fitted mesh solution (`CdBodyFitted.dat`, `ClBodyFitted.dat`),
 computed by the `newtonIcoFluid` solver in the `oscillatingCylinderInChannel`
 case of fluid-benchmarks, on its finest quadrilateral mesh (level 6, 282 624
@@ -124,10 +125,26 @@ drag coefficient is 2.05, with the `cutLink` method (surface traction) and the
 
 The first two columns are the differences from the body-fitted mesh
 solution, which decrease by about a factor of two with each refinement; the
-last is the difference from the Wan and Turek (2006) coefficients, which stops
+last is the difference from the Wan and Turek (2007) coefficients, which stops
 decreasing at about 0.08, the difference between the body-fitted mesh
-solution and the Wan and Turek (2006) coefficients: these lag the converged
-solutions by about 0.015 s. The `cutLink` force from the momentum exchange
+solution and the Wan and Turek (2007) coefficients: these lead the converged
+solutions by about 0.018 s (their drag changes sign earlier). They were
+digitised from a figure of Erzincanli and Sahin (2013) that shows the result
+of Wan and Turek (2007).
+
+The root mean square difference between the `cutLink` lift coefficient from
+the surface traction and a finer moving body-fitted mesh solution (901 120
+cells), relative to the root mean square of its lift coefficient, is 13.2%,
+6.7% and 4.9% for levels 1-3 with the default `tractionQuadrature
+clustered`. With `tractionQuadrature greedy;` (the default of earlier
+versions), it is 140%, 149% and 140% for levels 1-3, with a sign set by the
+order of the facets of the STL file, while the drag differs by less than
+0.001. With 80 cells across the cylinder, the greedy thinning keeps all 256
+candidate points and the lift differs by 4.6%: this is a property of that
+mesh and surface, not a convergence of the greedy quadrature. The origin of
+these values is given in `src/immersedBoundary/README.md`.
+
+The `cutLink` force from the momentum exchange
 (columns 11-13) differs from the body-fitted mesh solution by 0.19, 0.07 and
 0.06: it over-predicts the inertia of the fluid inside the accelerating
 cylinder. With the `penalty` method, the force without the inertia of the
@@ -141,13 +158,17 @@ give 0.104 and 0.045 (see `src/immersedBoundary/README.md`).
 
 With the `incremental` forcing method of `pimpleHFDIBFoam` (`method
 incremental;` and `occupancy vertexFraction;` in `constant/fvOptions`), the
-differences from the Wan and Turek (2006) coefficients, including the
+differences from the Wan and Turek (2007) coefficients, including the
 inertia, are 1.36, 0.53 and 0.49 for levels 1-3;
 the inertia is noisy, as it jumps when cells enter or leave the cylinder.
 
 ## References
 
-- Wan, D., Turek, S. (2006). Fictitious boundary and moving mesh methods for
+- Wan, D., Turek, S. (2007). Fictitious boundary and moving mesh methods for
   the numerical simulation of rigid particulate flows. Journal of
-  Computational Physics, 222, 28-56.
+  Computational Physics, 222(1), 28-56.
   <https://doi.org/10.1016/j.jcp.2006.06.002>
+- Erzincanli, B., Sahin, M. (2013). An arbitrary Lagrangian-Eulerian
+  formulation for solving moving boundary problems with large displacements
+  and rotations. Journal of Computational Physics, 255, 660-679.
+  <https://doi.org/10.1016/j.jcp.2013.08.038>
