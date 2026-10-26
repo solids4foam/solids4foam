@@ -19,7 +19,9 @@ estimator that is invisible in the drag can dominate the lift.
   of solids4foam pull request #595, the mean drag on the finest mesh
   (D/h = 80) differs from the high-precision reference by 0.003 %
   (cutLink), 0.16 % (ghostCell), 1.2 % (penalty) and 2.8 % (legacy
-  incremental, a limit-cycle mean). On the moving
+  incremental, a limit-cycle mean). The cutLink value there is its
+  momentum-exchange estimate; its greedy surface traction, the estimator
+  of this verification, is 1.5 % below the reference on that mesh. On the moving
   cylinder, at the common D/h = 40, the raw drag differs from reference B
   by 1.10 % (cutLink), 1.41 % (penalty), 8.32 % (ghostCell) and 26.45 %
   (legacy incremental), and the raw lift by 139.7 %, 3.7 %, 12.4 % and
