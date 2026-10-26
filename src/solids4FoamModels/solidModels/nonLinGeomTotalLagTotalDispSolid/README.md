@@ -100,6 +100,23 @@ This is a special case and is only supported when `solutionAlgorithm` is
 - the pressure stabilisation sub-model is used;
 - the code enforces the `PETScSNES` path at construction time.
 
+The displacement and pressure unknowns, and the momentum and pressure
+equations, can differ by orders of magnitude, which slows the linear solver.
+The mixed system can be scaled (opt-in; off by default):
+
+| Keyword | Default | Description |
+| --- | --- | --- |
+| `scaleMixedPetScFields` | `false` | Store `pHat = p/s` in the PETSc vector |
+| `pressureUnknownScale` | `twoMu` | `s`: `twoMu`, `user` or `none` |
+| `pressureUnknownScaleValue` | - | `s` when `pressureUnknownScale user` |
+| `pressureScaleByTwoMu` | as `scaleMixedPetScFields` | Rows scaled by 2μ |
+| `pressureScaleFactor` | `1` | Further factor on the pressure rows |
+
+`twoMu` is the volume average of 2μ, taken from the deviatoric implicit
+stiffness, (4/3)μ. The scaling changes the conditioning of the Newton and
+linear solves, not the converged solution. It was ported from Philip Cardiff's
+work on the `fix-pressure-solid` branch.
+
 ### Recommended dictionary setup
 
 Minimal example for `constant/solidProperties`:
