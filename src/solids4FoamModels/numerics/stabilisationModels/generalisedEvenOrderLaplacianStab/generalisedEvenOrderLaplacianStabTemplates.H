@@ -30,7 +30,7 @@ void Foam::generalisedEvenOrderLaplacianStab::computeDiffStencil
     const GeoField& field,
     SurfaceField& faceFlux,
     scalar scaleFactor,
-    const label m        // laplacianPower
+    const label laplacianPower
 ) const
 {
     // Take a reference to the mesh
@@ -41,10 +41,16 @@ void Foam::generalisedEvenOrderLaplacianStab::computeDiffStencil
     fv::orthogonalSnGrad<Type> op(mesh);
 
     // -----------------------------------------------------
-    // Special case m = 0 -> recover the basic Laplacian model
+    // laplacianPower = 0 -> recover the basic Laplacian model
     // -----------------------------------------------------
-    if (m == 0)
+    if (laplacianPower == 0)
     {
+        if (normalise())
+        {
+            faceFlux = scaleFactor*op.snGrad(field);
+            return;
+        }
+
         const surfaceScalarField h2f
         (
             1.0/sqr(mesh.deltaCoeffs())
@@ -58,28 +64,29 @@ void Foam::generalisedEvenOrderLaplacianStab::computeDiffStencil
     }
 
     // -----------------------------------------------------
-    // General case m >= 1
-    // Build tL = Δ^m(field)
+    // General case laplacianPower >= 1
+    // Build tL = Delta^laplacianPower(field)
     // -----------------------------------------------------
 
     tmp<GeoField> tL = field;
 
-    for (label i = 0; i < m; ++i)
+    for (label i = 0; i < laplacianPower; ++i)
     {
         tL = fvc::div(op.snGrad(tL())*mesh.magSf());
     }
 
     // -----------------------------------------------------
-    // h^(2m) scaling
+    // h^(2*laplacianPower) scaling
     // -----------------------------------------------------
 
     const surfaceScalarField h2fPow
     (
-        pow(1.0/sqr(mesh.deltaCoeffs()), m)
+        pow(1.0/sqr(mesh.deltaCoeffs()), laplacianPower)
     );
 
     // Alternating sign ensures damping
-    const scalar sign = (m % 2 == 0) ? 1.0 : -1.0;
+    const scalar sign =
+        (laplacianPower % 2 == 0) ? 1.0 : -1.0;
 
     faceFlux = sign*scaleFactor*h2fPow*op.snGrad(tL());
 }
