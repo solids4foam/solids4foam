@@ -60,14 +60,14 @@ done
 "${SOLIDS4FOAM_SED}" -i 's/^writePrecision.*/writePrecision  14;/' \
     "${CASE_DIR}/system/controlDict"
 
-# The Python scripts shared by the benchmarks: next to this case, or, when
-# this case is a copy (as Alltest-regression makes), in the source tree, which
-# is at the same depth below the repository root
-ARO_SCRIPTS_DIR="${SCRIPT_DIR}/../scripts"
-if [[ ! -d "${ARO_SCRIPTS_DIR}" ]]; then
-    ARO_SCRIPTS_DIR="${SCRIPT_DIR}/../../../../../tutorials/solids/hyperelasticity/ArosticaEtAl2025/scripts"
+# The time-series utility and the plot script shared by the benchmarks: next
+# to this case, or, when this case is a copy (as Alltest-regression makes),
+# in the source tree, which is at the same depth below the repository root
+ARO_DIR="${SCRIPT_DIR}/.."
+if [[ ! -d "${ARO_DIR}/makeArosticaTimeSeries" ]]; then
+    ARO_DIR="${SCRIPT_DIR}/../../../../../tutorials/solids/hyperelasticity/ArosticaEtAl2025"
 fi
-export ARO_SCRIPTS_DIR
+export ARO_DIR
 
 ( cd "${CASE_DIR}" && MESH_NUMBER=1 ./Allrun step1 pressure \
     > "${ALLRUN_LOGFILE}" 2>&1 ) || true

@@ -606,6 +606,35 @@ application is in the `PATH`.
 
 ---
 
+## `solids4Foam::downloadFile()`
+
+Tutorials whose input data is too large for the repository, such as a mesh,
+download it from the solids4foam website (`tutorials/archive`).
+
+- **Function purpose**
+  Downloads a file once, with `curl` or `wget`, and checks its SHA-256 sum
+  with `sha256sum` or `shasum`. A file already present with the right sum is
+  kept, so a case can be run offline by placing the file there first. If no
+  download or checksum tool is found, the case is skipped (exit 0, with a skip
+  message that `regressionCaseSkipped()` recognises). The function returns 1
+  if the download fails or the sum does not match, after removing the file.
+- **Function arguments** The URL, the local file path, and the expected
+  SHA-256 sum.
+- **Example of usage**
+
+  ```bash
+  # Source solids4Foam scripts
+  source solids4FoamScripts.sh
+
+  solids4Foam::downloadFile \
+      "https://www.solids4foam.com/tutorials/archive/ArosticaEtAl2025.zip" \
+      data/ArosticaEtAl2025.zip \
+      c998559b9af72b78ea86f12c28cada94e656818f63068d8fb95ee80ba57742a5 \
+      || exit 1
+  ```
+
+---
+
 ## Field comparison: `internalFieldValues()`, `internalFieldNorms()`, `checkFieldNorms()`
 
 These functions let a regression script compare a written field with a

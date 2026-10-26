@@ -888,22 +888,67 @@ function solids4Foam::requirePetscOrExitSilently()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-# requirePythonOrExitSilently
-#     Exit cleanly (exit 0) if python3 is not available. Used by tutorials
-#     that generate their mesh or input data with Python scripts (standard
-#     library only), e.g. ArosticaEtAl2025.
+# downloadFile
+#     Download a file once, e.g. a tutorial's mesh archive from the solids4foam
+#     website, and check its SHA-256 sum. A file already present with the right
+#     sum is kept, so a case can also be run offline by placing the file there
+#     first. Uses curl or wget, and sha256sum or shasum; exits cleanly (exit 0)
+#     with the usual skip message if none of either is available, and returns
+#     1 if the download fails or the sum does not match.
 # Arguments:
-#     None
+#     1: URL
+#     2: FILE, the local path
+#     3: SHA256, the expected SHA-256 sum
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-function solids4Foam::requirePythonOrExitSilently()
+function solids4Foam::downloadFile()
 {
-    if ! command -v python3 > /dev/null 2>&1
+    local URL=$1
+    local FILE=$2
+    local SHA256=$3
+    local sumCmd
+
+    if command -v sha256sum > /dev/null 2>&1
     then
+        sumCmd="sha256sum"
+    elif command -v shasum > /dev/null 2>&1
+    then
+        sumCmd="shasum -a 256"
+    else
         echo
-        echo "Skipping this case as python3 is not available"
+        echo "sha256sum: command not found, which is required for this case"
         echo
         exit 0
     fi
+
+    if [[ -f "${FILE}" ]] \
+    && [[ "$(${sumCmd} "${FILE}" | cut -d' ' -f1)" == "${SHA256}" ]]
+    then
+        return 0
+    fi
+
+    mkdir -p "$(dirname "${FILE}")"
+    echo "Downloading ${URL}"
+    if command -v curl > /dev/null 2>&1
+    then
+        curl -fsSL -o "${FILE}" "${URL}" || { rm -f "${FILE}"; return 1; }
+    elif command -v wget > /dev/null 2>&1
+    then
+        wget -q -O "${FILE}" "${URL}" || { rm -f "${FILE}"; return 1; }
+    else
+        echo
+        echo "curl: command not found, which is required for this case"
+        echo
+        exit 0
+    fi
+
+    if [[ "$(${sumCmd} "${FILE}" | cut -d' ' -f1)" != "${SHA256}" ]]
+    then
+        echo "${FILE}: SHA-256 sum does not match, download rejected"
+        rm -f "${FILE}"
+        return 1
+    fi
+
+    return 0
 }
 
 
@@ -925,7 +970,7 @@ function solids4Foam::regressionCaseSkipped()
         return 1
     fi
 
-    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed|command not found, which is required for this case|Skipping this case as python3 is not available" "${LOG_FILE}"
+    if grep -Eq "This case currently only runs in foam-extend|This case currently does not run with foam-extend|This case currently does not run with OpenFOAM.org|Skipping this case as it does not currently (working|run) with OpenFOAM.org|OpenFOAM-v[0-9]+ or a newer version is required|Skipping this case as PETSc is not installed|command not found, which is required for this case" "${LOG_FILE}"
     then
         return 0
     fi

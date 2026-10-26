@@ -23,8 +23,9 @@ Prepared by Chanikya Valeti and Philip Cardiff (UCD), with Claude Opus 5.5
 
 ```note
 Like LandEtAl2015/problem3, this case needs solids4foam built with PETSc and
-an OpenFOAM.com version, and `python3` (standard library only) to generate the
-mesh and the time series; otherwise Allrun exits without running.
+an OpenFOAM.com version; otherwise Allrun exits without running. It downloads
+its mesh from the solids4foam website (`curl` or `wget`, and `unzip`), and
+plots its results with `gnuplot`, if available.
 ```
 
 ## Case Overview
@@ -42,22 +43,24 @@ joins the two rims with a straight line in the meridian, so Γ_top is a shallow
 cone (x = 26.5 mm on the endocardium, 24.25 mm on the epicardium), exactly as
 in the reference gmsh script of the benchmark toolkit.
 
-**Mesh.** An all-hexahedral mesh with an O-grid at the apex, written
-directly as `constant/polyMesh` by `../scripts/makeOGridMesh.py`. Endo- and
-epicardium are exact ellipsoids; nodes through the wall interpolate linearly
-between them. Patches: `endo`, `epi`, `base`.
+**Mesh.** An all-hexahedral mesh with an O-grid at the apex, downloaded by
+`Allrun` from the solids4foam website (`ArosticaEtAl2025.zip`, checked
+against its SHA-256 sum, into `data/`). Endo- and epicardium are exact
+ellipsoids; nodes through the wall interpolate linearly between them.
+Patches: `endo`, `epi`, `base`. The archive holds levels 1 to 3 and the
+script that generates them, `makeOGridMesh.py` (Python 3), which also writes
+level 4 into a case.
 
 | `MESH_NUMBER` | square side × ring × wall | cells |
 | --- | --- | --- |
 | 1 | 8 × 18 × 3 | 1 920 |
 | 2 (default) | 16 × 36 × 5 | 12 800 |
 | 3 | 32 × 72 × 10 | 102 400 |
-| 4 | 64 × 144 × 20 | 819 200 |
+| 4 (generated, see above) | 64 × 144 × 20 | 819 200 |
 
-A LandEtAl2015/problem3-style mesh, a meridian slice revolved about the long
-axis, was tried first and dropped: its fan of wedge cells on the axis at the
-apex lost volume (J ≈ 0.84 by t = 0.4 s), and the run failed with a negative
-J near the apex at t = 0.516 s.
+An O-grid is used rather than a meridian slice revolved about the long axis
+(as in LandEtAl2015/problem3), whose fan of wedge cells on the axis
+compresses and inverts at the apex during contraction.
 
 **Fibres** (Section 3.2). `setFibreField`, with `method ellipsoid` in
 `system/setFibreFieldDict`, solves Δt̄ = 0 with
@@ -85,8 +88,9 @@ the reference codes, which differentiate Ψ automatically), κ = 10⁶ Pa,
 η = 100 Pa s, ρ = 1000 kg/m³. Ė is the change of E over the time step.
 
 **Active stress and pressure** (eq. 5–8, Tables 3–4). Both are ODEs in time
-only, so `Allrun` solves them once with `../scripts/makeTimeSeries.py` (an
-exact exponential integrator, h = 10 µs) and tabulates them in
+only, so `Allrun` compiles the `makeArosticaTimeSeries` utility (in the
+parent directory, shared with `benchmark2`), which solves them once (an exact
+exponential integrator, h = 10 µs) and tabulates them in
 `constant/activeStress` and `constant/timeVsPressure`.
 The peaks are τ_max = 118 106 Pa and p_max = 16 074 Pa. The paper quotes
 118 817 and 16 118 Pa; a tightly toleranced Radau solve gives the values
@@ -155,12 +159,10 @@ MESH_NUMBER=3 ./Allrun step2B         # pressure formulation: serial only
 ./Allclean
 ```
 
-The Python scripts in `../scripts` are shared with `benchmark2`. If `numpy`
-(and optionally `matplotlib`) is available, `Allrun` finishes with
-`../scripts/compareWithReference.py <step>`, which prints the
-largest difference from the median of the participants' solutions (one per
-group) and writes
-`verification/<step>.png` in the style of Fig. 8–10 of [1].
+If `gnuplot` is available, `Allrun` finishes by plotting the displacements of
+p0 and p1 against all the participants' solutions, in the style of Fig. 8–10
+of [1], in `verification/<step>.pdf` (`../plotVsReference.gnuplot`, shared
+with `benchmark2`).
 The reference curves in `verification/reference/<step>/` are the submitted
 solutions distributed with the cardiac-benchmark-toolkit (MIT licence) [2].
 

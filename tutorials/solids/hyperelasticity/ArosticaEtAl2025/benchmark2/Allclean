@@ -6,6 +6,9 @@ cd "${0%/*}" || exit 1    # Run from this directory
 
 cleanCase0
 
+# The time-series utility shared by both benchmarks
+wclean "${ARO_DIR:-..}/makeArosticaTimeSeries" > /dev/null 2>&1
+
 # Remove the formulation links created by Allrun
 rm -f system/fvSolution constant/solidProperties
 
@@ -13,6 +16,6 @@ rm -f system/fvSolution constant/solidProperties
 # by Allrun
 rm -rf constant/polyMesh data
 rm -f constant/activeStress constant/pressureLV constant/pressureRV
-rm -f verification/coarse.png verification/fine.png
+rm -f verification/coarse.pdf verification/fine.pdf
 
 #------------------------------------------------------------------------------
