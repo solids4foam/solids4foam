@@ -212,7 +212,7 @@ with 10, 20 and 40 cells across the cylinder gave the following results. The
 static cylinder drag coefficient (reference 5.57-5.59), and the root mean
 square difference of the oscillating cylinder drag coefficient, including the
 inertia of the fluid inside the cylinder, from a moving body-fitted mesh
-solution and from Wan and Turek (2006), over 0.25 < t < 7.5 s (where the root
+solution and from Wan and Turek (2007), over 0.25 < t < 7.5 s (where the root
 mean square of the drag coefficient is 2.05), are:
 
 | Settings | Static `Cd` | Oscillating: body-fitted | Wan and Turek |
@@ -265,9 +265,10 @@ The cylinder forces converge at about first order in the cell size for all the
 methods, except the static `cutLink` drag, which is within 0.6% of the
 reference from 10 cells across the cylinder (the ghost cell method was not
 run with 40 cells across the moving cylinder). The differences from Wan and
-Turek (2006) stop decreasing at about 0.08, the difference between the
-body-fitted mesh solution and Wan and Turek (2006), whose coefficients lag the
-converged solutions by about 0.015 s (see the `oscillatingCylinderInChannel`
+Turek (2007) stop decreasing at about 0.08, the difference between the
+body-fitted mesh solution and Wan and Turek (2007), whose coefficients,
+digitised from a figure of Erzincanli and Sahin (2013), lead the converged
+solutions by about 0.018 s (see the `oscillatingCylinderInChannel`
 tutorial).
 
 ### Fluid-speed surface-rate check
@@ -376,9 +377,10 @@ removed candidate to the nearest kept one, which keeps its own position and
 normal. The kept points are therefore offset from the area they represent,
 in the direction of the facet order: a pressure varying along the drag
 direction produces a lift whose sign depends on the order of the facets
-(for the moving cylinder of `oscillatingCylinderInChannel`, a lift 140-150%
-off the body-fitted reference at every mesh level, reversed with the facets
-of the STL), and on thin bodies the two faces can be merged. It is kept, as
+(for the moving cylinder of `oscillatingCylinderInChannel`, a lift 140%,
+149% and 140% off the body-fitted reference with 10, 20 and 40 cells across
+the cylinder, reversed with the facets of the STL), and on thin bodies the
+two faces can be merged. It is kept, as
 `tractionQuadrature greedy`, to reproduce earlier results: it gives the force
 files of earlier versions unchanged.
 
@@ -525,6 +527,15 @@ of the body-fitted coefficients, are:
 | 10 | 5.36, 5.40, 5.38% | 140, 13.2, 13.2% |
 | 20 | 1.83, 1.86, 1.87% | 149, 6.7, 6.7% |
 | 40 | 1.10, 1.08, 1.10% | 140, 4.9, 4.8% |
+
+The body-fitted solution has 901 120 cells. The `greedy` values come from
+runs of earlier versions; with 80 cells across the cylinder, the greedy
+thinning keeps all 256 candidate points and its lift differs by 4.6%, a
+property of that mesh and surface, not a convergence of the greedy
+quadrature. The `clustered` values come from 8 s runs made while the
+quadrature was developed. This version was compared with those runs with
+10 cells across the cylinder, and with 20 and 40 cells only over the first
+0.5 s; no clustered run was made with 80 cells.
 
 With this version, `clustered` (the default) against `greedy`:
 
