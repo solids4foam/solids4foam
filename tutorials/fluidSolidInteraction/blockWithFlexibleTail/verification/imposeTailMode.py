@@ -105,6 +105,11 @@ def replace_tail_value(path, values):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case", type=Path, default=Path("."))
+    parser.add_argument(
+        "--time",
+        default="0",
+        help="time directory containing the D and pointD fields (default: 0)",
+    )
     parser.add_argument("--mode", type=int, choices=BETAS, required=True)
     parser.add_argument("--amplitude", type=float, required=True)
     args = parser.parse_args()
@@ -133,11 +138,13 @@ def main():
         for face in faces
     ]
 
-    replace_tail_value(case/"0"/"fluid"/"pointD", point_values)
-    replace_tail_value(case/"0"/"fluid"/"D", face_values)
+    time_directory = case/args.time/"fluid"
+    replace_tail_value(time_directory/"pointD", point_values)
+    replace_tail_value(time_directory/"D", face_values)
     print(
         f"Imposed mode {args.mode} with {args.amplitude:g} m tip amplitude "
-        f"on {len(patch_points)} points and {len(faces)} faces"
+        f"at time {args.time} on {len(patch_points)} points and "
+        f"{len(faces)} faces"
     )
 
 

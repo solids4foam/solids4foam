@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Summarise imposed-displacement fluid mesh checks."""
+"""Summarise incrementally imposed fluid mesh-motion checks."""
 
 import argparse
 import re
@@ -26,21 +26,40 @@ def log_value(text, pattern):
     return float(match.group(1)) if match else np.nan
 
 
-def analyse(label, case):
-    log_path = case/"log.checkMesh.moved"
-    initial_volume = case/"0"/"fluid"/"V"
-    moved_volume = case/"1"/"fluid"/"V"
+def metadata(path):
+    result = {}
+    for line in path.read_text().splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            result[key] = value
+    return result
+
+
+def analyse_checkpoint(case_label, path):
+    information = metadata(path/"metadata")
+    log_path = path/"log.checkMesh"
+    initial_volume = path/"V0"
+    moved_volume = path/"V"
+    result = {
+        "label": case_label,
+        "checkpoint": information["checkpoint"],
+        "status": information["status"],
+        "reached": float(information["reached_mm"]),
+    }
     if not log_path.exists() or not moved_volume.exists():
-        return {"label": label, "status": "motion failed"}
+        return result
 
     log = log_path.read_text()
     volumes_0 = internal_scalars(initial_volume)
     volumes_1 = internal_scalars(moved_volume)
     if len(volumes_0) != len(volumes_1):
-        raise ValueError(f"{case}: volume fields have different lengths")
-    return {
-        "label": label,
-        "status": "OK" if "Mesh OK." in log else "checkMesh failed",
+        raise ValueError(f"{path}: volume fields have different lengths")
+    result.update({
+        "status": (
+            information["status"]
+            if "Mesh OK." in log
+            else f"{information['status']}; checkMesh failed"
+        ),
         "ratio": np.min(volumes_1/volumes_0),
         "volume": log_value(
             log,
@@ -50,14 +69,33 @@ def analyse(label, case):
             log, r"Mesh non-orthogonality Max: ([^ ]+)"
         ),
         "skewness": log_value(log, r"Max skewness = ([^ ]+)"),
+    })
+    return result
+
+
+def analyse_case(label, case):
+    checkpoints = []
+    metrics = case/"metrics"
+    if metrics.exists():
+        for path in sorted(metrics.iterdir()):
+            if path.is_dir() and (path/"metadata").exists():
+                checkpoints.append(analyse_checkpoint(label, path))
+    status_path = case/"run-status"
+    status = metadata(status_path) if status_path.exists() else {
+        "status": "not run",
+        "largest_positive_mm": "0",
+        "largest_negative_mm": "0",
     }
+    status["label"] = label
+    return checkpoints, status
 
 
-def markdown(results):
+def markdown(results, summaries):
     lines = [
-        "| Case | Motion/check | Min volume ratio | Min volume (m^3) | "
-        "Max non-orthogonality (deg) | Max skewness |",
-        "| :-- | :--: | --: | --: | --: | --: |",
+        "| Case | Checkpoint | Reached (mm) | Motion/check | "
+        "Min volume ratio | Min volume (m^3) | Max non-orthogonality "
+        "(deg) | Max skewness |",
+        "| :-- | :--: | --: | :--: | --: | --: | --: | --: |",
     ]
     for result in results:
         if "ratio" not in result:
@@ -70,9 +108,39 @@ def markdown(results):
                 f"{result['skewness']:.4g}",
             ]
         lines.append(
-            f"| {result['label']} | {result['status']} | "
+            f"| {result['label']} | {result['checkpoint']} | "
+            f"{result['reached']:.3f} | {result['status']} | "
             + " | ".join(values) + " |"
         )
+    lines.extend([
+        "",
+        "| Case | Run status | Largest positive (mm) | "
+        "Largest negative magnitude (mm) |",
+        "| :-- | :-- | --: | --: |",
+    ])
+    for summary in summaries:
+        lines.append(
+            f"| {summary['label']} | {summary['status']} | "
+            f"{float(summary['largest_positive_mm']):.3f} | "
+            f"{abs(float(summary['largest_negative_mm'])):.3f} |"
+        )
+
+    old_summaries = [
+        summary for summary in summaries if summary["label"].startswith("old")
+    ]
+    representative = len(old_summaries) == 2 and all(
+        float(summary["largest_positive_mm"]) >= 6.2
+        for summary in old_summaries
+    )
+    lines.extend([
+        "",
+        "Old-mesh representativeness check: "
+        + (
+            "**PASS** (both old-mesh mode ramps reached at least 6.2 mm)."
+            if representative
+            else "**FAIL** (an old-mesh mode ramp did not reach 6.2 mm)."
+        ),
+    ])
     return "\n".join(lines) + "\n"
 
 
@@ -88,9 +156,13 @@ def main():
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
-    table = markdown([
-        analyse(label, Path(directory)) for label, directory in args.case
-    ])
+    analyses = [
+        analyse_case(label, Path(directory)) for label, directory in args.case
+    ]
+    table = markdown(
+        [result for checkpoints, _ in analyses for result in checkpoints],
+        [summary for _, summary in analyses],
+    )
     print(table, end="")
     if args.output:
         args.output.write_text(table)
