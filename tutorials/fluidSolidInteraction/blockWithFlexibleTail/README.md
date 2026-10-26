@@ -71,9 +71,13 @@ attributed to it. The suggested Wood et al., Habchi et al. and Olivier et al.
 citations were not used: accessible summaries concern the lighter 51.3 cm/s
 case or did not establish that they used this exact parameter set.
 
-The fluid mesh has 13,020 cells and the tail mesh has 320 cells. Both have 80
-faces along each long tail surface and four faces at the tip, so the interface
-is conformal. This is a shake-down mesh, not a mesh-converged discretisation.
+The partitioned fluid and tail meshes have 13,020 and 320 cells, respectively,
+with four cells through the tail thickness. The quasi-monolithic variant uses
+17,756 fluid cells and an 80 x 8, 640-cell tail. Its fluid topology fans open
+over the first 2 cm downstream of the tail: the 0.06 cm tip opens into a 1 cm
+high swept region, so no thin horizontal block edge ends at the moving tip.
+Both variants have matching subdivisions on their conformal interfaces. These
+are shake-down meshes, not mesh-converged discretisations.
 
 ---
 
@@ -187,6 +191,7 @@ peak-to-peak vertical displacement.**
 | 80 x 4, order 3 | 8--10 | 0.651 | 3.25 | Stopped at 10.316 s |
 | 80 x 4, revised order 1 | 8--10 | 0.650 | 3.18 | Stopped at 10.655 s |
 | 80 x 4, revised order 3 | 8--9.353 | 0.644 | 3.30 | Stopped at 9.353 s |
+| 80 x 8, quasi-monolithic | 8--8.445 | 0.617 | 3.47 | Stopped at 8.446 s |
 | Literature [2--4] | Limit cycle | 0.76--0.81 | 2.97--3.3 | Reference |
 
 Both orders now reproduce the published frequency and give essentially the
@@ -203,6 +208,16 @@ initial value, and one face was incorrectly oriented. Changing to unsquared
 inverse-distance diffusion, filtering IQN-ILS modes, guarding mode reuse and
 rebuilding the solid preconditioner did not delay the failure in fresh runs;
 those changes have therefore been removed.
+
+The first 80 x 8 quasi-monolithic run also failed in the fluid mesh motion.
+At 8.446 s, with maximum tip displacement 0.624 cm, the pseudo-solid
+constitutive law found a deformation-gradient determinant of -0.0527. The
+reported processor-local cell maps to global fluid cell 6719, the final
+streamwise cell immediately below the tail tip. It began in the thin
+0.058--0.059 m row and was strongly sheared as the tip reversed direction.
+The quasi-monolithic C-grid fan described above removes that vulnerable block
+edge. Imposed first- and second-mode checks at 0.8 and 1.0 cm are required
+before the replacement is accepted for another 25 s run.
 
 The `solids4foamSolidModel` motion solver with a total-Lagrangian
 `diffusionHyperElastic` law is a promising replacement and is already used by
@@ -231,13 +246,17 @@ an 80 x 2 tail and `diffStencilLaplacian` stabilisation at scale 0.5; its
 modal check showed errors of approximately 19%. Its half peak-to-peak
 amplitudes were 0.0069 cm over 0--2 s and 0.0728 cm over 2--4 s, with a
 3.78 Hz zero-crossing frequency in the latter window. The old run averaged
-1.77 solid and 2.00 fluid SNES Newton iterations per time step. The selected
-80 x 8, `alpha`-0.01 quasi-monolithic run is still pending, so these timings
-and transient responses are diagnostic only.
+1.77 solid and 2.00 fluid SNES Newton iterations per time step. The 80 x 8,
+`alpha`-0.01 quasi-monolithic run took 7,874 s to reach its mesh failure at
+8.446 s. Its transient response is included in Table 3, but remains diagnostic
+until the replacement mesh completes the imposed-motion checks and a
+limit-cycle run.
 
 The reusable analysis script reports half peak-to-peak amplitude, peak
 magnitude, detrended upward-zero-crossing frequency and Hann-windowed FFT
-frequency over a selected interval. For example:
+frequency over a selected interval. If a run stops before the requested
+window, it reports the equally long final available window instead. For
+example:
 
 ```bash
 python3 verification/analyseTipDisplacement.py \

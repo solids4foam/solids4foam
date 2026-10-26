@@ -4,6 +4,7 @@
 
 import argparse
 from pathlib import Path
+import sys
 
 import numpy as np
 
@@ -83,6 +84,15 @@ def fft_frequency(times, values):
 def analyse(label, path, start, end):
     times, displacement = read_history(path)
     selected = (times >= start) & (times <= end)
+    if np.count_nonzero(selected) < 4:
+        duration = end - start
+        fallback_start = max(times[0], times[-1] - duration)
+        selected = times >= fallback_start
+        print(
+            f"{path}: requested window [{start:g}, {end:g}] s is unavailable; "
+            f"using the final available {duration:g} s window",
+            file=sys.stderr,
+        )
     times = times[selected]
     displacement = displacement[selected]
     if len(times) < 4:
