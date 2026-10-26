@@ -110,11 +110,17 @@ run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
 Allrun consists of creating the mesh using `blockMesh` (`> blockMesh`) followed
 by running the `solids4foam` solver (`> solids4Foam`).
 
+The case can also be run on an unstructured triangular-prism mesh with
+`> ./Allrun triangular`, which creates the mesh with Gmsh from
+`cooksMembrane.geo` and converts it with `gmshToFoam`; Gmsh must be installed.
+The mesh spacing is set by `dx` in `cooksMembrane.geo`.
+
 ## Verification and convergence study
 
 The opt-in [`verification/`](verification/) directory contains the migrated
-mesh-convergence study and published displacement references. It is separate
-from normal regression testing and is not run by `tutorials/Alltest` or
+mesh-convergence study, for the quadrilateral and the triangular meshes, and the
+published per-mesh displacement references. It is separate from normal
+regression testing and is not run by `tutorials/Alltest` or
 `tutorials/Alltest-regression`. See its README for the command, acceptance
 criteria, and expected outputs.
 

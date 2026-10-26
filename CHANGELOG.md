@@ -28,6 +28,16 @@ release. For complete commit-level details and contributor information, see the
   dictionary the utility behaves as before.
 - `solids4Foam::requirePythonOrExitSilently` in `solids4FoamScripts.sh`, for
   tutorials that generate their inputs with Python scripts.
+- Cook's membrane verification studies now store the per-mesh tip
+  displacements of the published references migrated from solid-benchmarks
+  (Simo and Armero, César de Sá et al., Areias and Abaqus for the
+  elastoplastic case; Zienkiewicz and Taylor and Abaqus for the linear-elastic
+  case), list them in the summary and plot them against the sweep. The
+  elastoplastic tutorial gains an unstructured triangular-prism Gmsh mesh
+  (`./Allrun triangular`), which its study sweeps with `--mesh triangular`.
+- The `compressedSpheres` and `twistingHemisphere` READMEs now point to the
+  finer meshes of the original benchmarks in the solids4foam website archive,
+  instead of the solid-benchmarks repository.
 - The fluid-solid interface passes the interface motion to the fluid mesh
   motion solver through a runtime-selectable *fluid mesh motion coupler*,
   selected from the motion solver or with an optional `fluidMeshMotion`
@@ -146,6 +156,18 @@ release. For complete commit-level details and contributor information, see the
   contact penalty models, the cohesive zone models and `elasticWallPressure`
   all depend on, and `cantilever2d`'s `unsCoupled` case is the first
   regression coverage of `coupledUnsLinearGeometryLinearElastic`.
+- The `isotropicFungElastic` mechanical constitutive law: an isotropic
+  Fung-type exponential hyperelastic law for soft tissue,
+  `W = 0.5*c*(exp(a*tr(Ebar & Ebar)) - 1)` on the isochoric strain plus a
+  volumetric penalty, with no fibre direction. It is identical to
+  `GuccioneElastic` with `k = c` and `cf = ct = cfs = a`. The
+  `LandEtAl2015/problem2` README shows how to run the case with it, which
+  reproduces the default Guccione case, and the case's regression test checks
+  that the two agree. It is in the `mechanicalConstitutiveLawChecks` law
+  checks. It is not the removed legacy
+  law of the same name, which was the Demiray law, whose exponent is linear
+  in strain: a legacy dictionary, with `c1` and `c2`, stops with an error
+  rather than being read as this law (#457).
 - `cantilever2d` regression cases for `vertexCentredLinearGeometry`, which no
   regression case ran before, on the PETSc SNES path and a short run of the
   explicit path, which no tutorial exercises.

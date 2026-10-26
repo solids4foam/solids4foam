@@ -1,0 +1,16 @@
+# J.M.A. Cesar de Sa, P.M.A. Areias and R.M. Natal Jorge, Quadrilateral
+# elements for the solution of elasto-plastic finite strain problems,
+# IJNME 51:883-917, 2001; Q4, Q1E4 and Qi6 elements (legacy values in mm,
+# converted to m).
+# Columns: cells per side n, average cell spacing sqrt(1440 mm^2 / n^2) in
+# mm, and the vertical displacement of the top-right corner in m.
+# Migrated from solid-benchmarks/elastoPlasticity/cooksMembrane/plotScripts.
+cells_per_side,spacing_mm,displacement_Q4_m,displacement_Q1E4_m,displacement_Qi6_m
+2,18.97,0.000359,0.0038,0.00463
+5,7.589,0.00136,0.00635,0.00658
+10,3.795,0.00289,0.00682,0.00682
+15,2.53,0.00397,0.00688,0.00688
+20,1.897,0.00471,0.00693,0.00693
+25,1.518,0.00521,0.00695,0.00695
+30,1.265,0.00559,0.00697,0.00697
+35,1.084,0.0058,0.00697,0.00698
