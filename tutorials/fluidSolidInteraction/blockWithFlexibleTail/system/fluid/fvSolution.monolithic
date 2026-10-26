@@ -82,6 +82,9 @@ solvers
         {
             snes_type newtonls;
             snes_linesearch_type basic;
+            // Prevent a full Newton update from crossing J = 0 during the
+            // large-amplitude tail reversal
+            snes_linesearch_damping "0.5";
             snes_rtol "1e-3";
             snes_stol "1e-3";
             snes_max_it "100";

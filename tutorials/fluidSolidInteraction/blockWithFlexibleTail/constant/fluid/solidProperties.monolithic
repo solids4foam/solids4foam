@@ -21,6 +21,9 @@ solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
 nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     solutionAlgorithm    PETScSNES;
+
+    // Write the kinematic state required for a consistent continuation
+    restart yes;
 }
 
 // ************************************************************************* //

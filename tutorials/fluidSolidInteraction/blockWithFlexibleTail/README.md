@@ -75,9 +75,11 @@ The partitioned fluid and tail meshes have 13,020 and 320 cells, respectively,
 with four cells through the tail thickness. The quasi-monolithic variant uses
 17,756 fluid cells and an 80 x 8, 640-cell tail. Its fluid topology fans open
 over the first 2 cm downstream of the tail: the 0.06 cm tip opens into a 1 cm
-high swept region, so no thin horizontal block edge ends at the moving tip.
-Both variants have matching subdivisions on their conformal interfaces. These
-are shake-down meshes, not mesh-converged discretisations.
+high swept region. It retains the original last cell immediately upstream and
+below the tail tip; the large-amplitude tests below show that this cell, not
+the downstream fan, limits the mesh motion. Both variants have matching
+subdivisions on their conformal interfaces. These are shake-down meshes, not
+mesh-converged discretisations.
 
 ---
 
@@ -151,9 +153,12 @@ and conformal tail patches declared in `system/decomposeParDict`.
 
 The default time step is 0.001 s, matching the second-mode study in [2, 3],
 and the case runs to 10 s. Restart state is written every 1 s and the four most
-recent checkpoints are retained. The `solidPointDisplacement` function object writes
-the displacement of the initial tail-tip point `(0.095 0.06 0.0005)`. If
-Gnuplot is installed, `Allrun` writes `deflection.pdf`.
+recent checkpoints are retained. The quasi-monolithic fluid mesh-motion solid
+also writes its kinematic restart fields. Its Newton updates use a 0.5 damping
+factor to keep trial states on the positive-J branch during large-amplitude
+tail reversals. The `solidPointDisplacement` function object writes the
+displacement of the initial tail-tip point `(0.095 0.06 0.0005)`. If Gnuplot
+is installed, `Allrun` writes `deflection.pdf`.
 
 ---
 
@@ -192,6 +197,7 @@ peak-to-peak vertical displacement.**
 | 80 x 4, revised order 1 | 8--10 | 0.650 | 3.18 | Stopped at 10.655 s |
 | 80 x 4, revised order 3 | 8--9.353 | 0.644 | 3.30 | Stopped at 9.353 s |
 | 80 x 8, quasi-monolithic | 8--8.445 | 0.617 | 3.47 | Stopped at 8.446 s |
+| 80 x 8, C-grid monolithic | 8--8.457 | 0.617 | 3.52 | Stopped 8.458 s |
 | Literature [2--4] | Limit cycle | 0.76--0.81 | 2.97--3.3 | Reference |
 
 Both orders now reproduce the published frequency and give essentially the
@@ -209,15 +215,27 @@ inverse-distance diffusion, filtering IQN-ILS modes, guarding mode reuse and
 rebuilding the solid preconditioner did not delay the failure in fresh runs;
 those changes have therefore been removed.
 
-The first 80 x 8 quasi-monolithic run also failed in the fluid mesh motion.
-At 8.446 s, with maximum tip displacement 0.624 cm, the pseudo-solid
-constitutive law found a deformation-gradient determinant of -0.0527. The
-reported processor-local cell maps to global fluid cell 6719, the final
-streamwise cell immediately below the tail tip. It began in the thin
-0.058--0.059 m row and was strongly sheared as the tip reversed direction.
-The quasi-monolithic C-grid fan described above removes that vulnerable block
-edge. Imposed first- and second-mode checks at 0.8 and 1.0 cm are required
-before the replacement is accepted for another 25 s run.
+The first 80 x 8 quasi-monolithic run failed in the fluid mesh motion at
+8.446 s, with maximum tip displacement 0.624 cm. The pseudo-solid constitutive
+law found a deformation-gradient determinant of -0.0527 in global fluid cell
+6719. The C-grid run stopped in the same way at 8.458 s (`J = -0.982`). Its
+reported rank-local cell maps to global cell 7439. Despite the changed global
+number, both are the identical physical cell immediately upstream and below
+the tail tip, with initial bounds 0.0945--0.0950 m by
+0.0579375--0.058525 m. The C-grid changes only the topology downstream of
+0.095 m and therefore did not replace this cell.
+
+At the last written C-grid state, 8 s, this cell is valid: `J = 1.005`, its
+two in-plane principal stretches are 1.040 and 0.967, and its local rotation
+is 9.3 degrees. The fluid and solid tail point clouds agree to within
+1.7e-7 m. The run then converges the physical `Up` solve at 8.457 s, but the
+next mesh-motion solve crosses to negative `J` on its first full Newton
+update. The production mesh-motion solve therefore damps Newton updates by
+0.5. A restart from 8 s must demonstrate that this removes the overshoot
+without loosening convergence tolerances before the 25 s response is
+accepted. A cyclic imposed-motion comparison will separately test squared
+and unsquared inverse-distance stiffening; the current squared choice is
+retained until that comparison supplies evidence for changing it.
 
 The `solids4foamSolidModel` motion solver with a total-Lagrangian
 `diffusionHyperElastic` law is a promising replacement and is already used by
