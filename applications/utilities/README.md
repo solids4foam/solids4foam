@@ -290,3 +290,85 @@ The mesh is overwritten!
   ```
 
 ---
+
+## `updatePrestress`
+
+- **Utility purpose** Performs one pass of the modified updated Lagrangian
+  formulation for prestressing a solid model (see the Prestress section of
+  `src/solids4FoamModels/mechanicalConstitutiveLaw/README.md`). `Fpre`
+  for the next pass is the deformation gradient `F` at the latest time composed
+  with `Fpre` the run used, `FpreNew = F & Fpre`. It is written to
+  the start time (`startTime` in `system/controlDict`) at full precision, and
+  every time directory after the start time is removed, so the next pass
+  starts with zero displacement.
+  `max mag(F - I)` is printed as the convergence measure, and appended, with
+  the pass and the range of `det(Fpre)`, to `prestressHistory` in the case
+  directory.
+  The `Fpre` the start time held is kept as `FprePass<N>`, `N` being the pass
+  that wrote it; copying it back to `Fpre` restores it.
+  For a law with fibre or other directions, which are taken in the
+  stress-free configuration and not mapped back from the imaged geometry, the
+  largest and mean angle between each direction and the law's direction in the
+  imaged geometry are printed, and the largest is added to `prestressHistory`
+  (`-1` where no cell has a non-zero direction). For
+  `HolzapfelGasserOgdenElastic` these are its two fibre families, built from
+  `Ec` and `Ea` and its `fibreAngle` as the law builds them, rather than `Ec`
+  and `Ea` themselves. A direction read by two laws of one material, such as
+  the `f0` of `electroMechanicalLaw` and of its passive law, is reported once
+  when the case gives the field; when it does not and their defaults differ,
+  each is reported separately (`maxAngle(<material>.f0)` and
+  `maxAngle(<material>.passiveMechanicalLaw.f0)`), with a warning that the two
+  laws use different fibre directions.
+
+- **Arguments** None
+
+- **Options/parameters**
+
+  `-parallel` to update a decomposed case (uncollated only). Only the
+  processor directories are updated, and the case directory's `Fpre`, if it
+  has one, is left holding the previous pass, with a warning: run
+  `reconstructPar`, or remove it, before decomposing again. Likewise a serial
+  update of a decomposed case leaves the processor directories stale, with a
+  warning. After a parallel update, the case directory's time directories
+  later than the start time are warned about too, and left in place.
+
+  `-keepPasses` to keep every earlier `Fpre` as `FprePass<N>`, rather than
+  only the one from before this update.
+
+- **Example of usage**
+
+  Run the first pass with `prestress no;` in `constant/mechanicalProperties`
+  (or without the entry): the utility then takes `Fpre` of that pass
+  to be the identity, and reminds you to set `prestress yes;` for every later
+  pass.
+
+  ```bash
+  solids4Foam
+  updatePrestress
+  ```
+
+  Each pass should be a static solve at the target load: `steadyState` for
+  `ddt(D)` and `d2dt2(D)`, and `predictor no;`.
+
+```note
+Every time directory after the start time is removed, and the Fpre in the
+start time is replaced, its previous contents kept as FprePass<N>. Nothing is
+removed until that backup is made and the new Fpre is written and read back,
+on every processor; if any of that fails, the previous Fpre is put back and no
+results are removed. Time directories before the start time, log files and
+postProcessing are kept.
+A case whose ddt or d2dt2 scheme for D is not steadyState is refused before
+anything is changed, and so is a case written with a collated fileHandler.
+A case whose start-time Fpre is not the one the run used, or whose processors
+disagree about which Fpre there is, is refused before anything is changed;
+a difference that rounding to the writePrecision explains, as when
+decomposePar or reconstructPar has written one of them in ascii, gives a
+warning instead, and the latest time's Fpre is used.
+A warning is given if the results are written in ascii with a writePrecision
+below 10.
+A case where a material uses a law that cannot be prestressed (a small-strain
+law, or one with history such as `neoHookeanElasticMisesPlastic`) is refused
+before anything is changed: the laws are asked, as the solver asks them.
+```
+
+---

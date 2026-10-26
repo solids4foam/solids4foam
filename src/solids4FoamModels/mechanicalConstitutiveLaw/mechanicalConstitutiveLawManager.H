@@ -56,6 +56,7 @@ Author
 #include "surfaceFields.H"
 #include "pointFields.H"
 #include "dictionary.H"
+#include "Switch.H"
 #include "autoPtr.H"
 #include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawState.H"
@@ -65,6 +66,7 @@ Author
 #include "mechanicalConstitutiveLawCaseInputs.H"
 #include "mechanicalConstitutiveLawStateSetup.H"
 #include "mechanicalConstitutiveLawInputGatherer.H"
+#include "mechanicalConstitutiveLawPrestress.H"
 
 #ifdef OPENFOAM_ORG
 #include "CompactListList.H"
@@ -275,8 +277,84 @@ class mechanicalConstitutiveLawManager
         //  declared after them
         mechanicalConstitutiveLawStateSetup stateSetup_;
 
+        //- Whether the laws see Fpre composed onto the solver's
+        //  deformation gradient: the prestress switch in mechanicalProperties
+        const Switch prestress_;
+
+        //- The prestress deformation gradient, read as Fpre from the start
+        //  time, from the stress-free configuration to the mesh. Null without
+        //  prestress
+        autoPtr<volTensorField> FprePtr_;
+
+        //- Inverse of Fpre, taken once since Fpre does not change during a run
+        autoPtr<volTensorField> FpreInvPtr_;
+
+        //- Determinant of Fpre, taken once since Fpre does not change during a
+        //  run
+        autoPtr<volScalarField> JprePtr_;
+
+        //- Fpre interpolated to faces made on the first face evaluation
+        mutable autoPtr<surfaceTensorField> FpreSurfacePtr_;
+
+        //- Inverse of Fpre interpolated to faces made on the first face
+        //  evaluation
+        mutable autoPtr<surfaceTensorField> FpreInvSurfacePtr_;
+
+        //- Determinant of Fpre interpolated to faces made on the first face
+        //  evaluation
+        mutable autoPtr<surfaceScalarField> JpreSurfacePtr_;
+
+        //- The time index the face Fpre was made at, so that on a moving
+        //  mesh it is made again at most once per time step
+        mutable label FpreSurfaceTimeIndex_;
+
+        //- The solver's kinematics composed with Fpre, made on the first
+        //  evaluation and recomposed at every later one, so that the
+        //  solver's fields, old times and all, are copied only once
+        mutable autoPtr<finiteStrainPrestressedFields<fvPatchField, volMesh>>
+            volPrestressedPtr_;
+
+        //- The solver's kinematics composed with Fpre, made on the first
+        //  evaluation and recomposed at every later one, so that the
+        //  solver's fields, old times and all, are copied only once
+        mutable autoPtr
+        <
+            finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>
+        > surfacePrestressedPtr_;
+
 
     // Private Member Functions
+
+        //- Read Fpre, check its patch types and that it is invertible
+        void readPrestress();
+
+        //- Make the face Fpre, if it has not been made
+        void makeSurfacePrestress() const;
+
+        //- The kinematics the laws see: step composed with Fpre, into
+        //  fields kept from one evaluation to the next
+        const finiteStrainVolFields& prestressedFields
+        (
+            const finiteStrainVolFields& step
+        ) const;
+
+        const finiteStrainSurfaceFields& prestressedFields
+        (
+            const finiteStrainSurfaceFields& step
+        ) const;
+
+        //- Refuse an evaluation that has no way to apply Fpre,
+        //  rather than evaluate it without one
+        void checkPrestressSupported(const word& context) const;
+
+        //- Refuse a prestressed flat-list evaluation that is not on the
+        //  cell-centred topology, or that asks for a fourth-order tangent
+        void checkCellCentredPrestress
+        (
+            const integrationPointTopology& topo,
+            const UList<mat66>* fourthOrderTangentPtr,
+            const word& context
+        ) const;
 
         //- Check the provided mesh is the same as the mesh used during
         //  construction
@@ -739,6 +817,15 @@ public:
 
         //- Const-access to the bulk modulus field
         const volScalarField& kappa() const;
+
+        //- True if the laws see Fpre
+        bool prestressed() const
+        {
+            return prestress_;
+        }
+
+        //- Fpre; fatal without prestress
+        const volTensorField& Fpre() const;
 
     // Edit
 
