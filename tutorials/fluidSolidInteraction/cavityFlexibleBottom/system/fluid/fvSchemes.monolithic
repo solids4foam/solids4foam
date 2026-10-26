@@ -28,7 +28,8 @@ ddtSchemes
     ddt(U)             Euler;
     ddt(dU)            Euler;
     ddt(p)             Euler;
-    ddt(D)             steadyState;
+    // Used only by the mesh-motion predictor (the motion is quasi-static)
+    ddt(D)             backward;
     d2dt2(D)           steadyState;
 }
 

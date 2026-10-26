@@ -21,6 +21,14 @@ solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
 nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     solutionAlgorithm    PETScSNES;
+
+    // Start each mesh-motion solve from the extrapolated displacement, so
+    // that the interior moves with the interface: without it, the first
+    // iterate carries the whole interface increment in the cells next to the
+    // interface, which fold once the increment exceeds about half their
+    // height, and the Krylov solve with the lagged preconditioner stagnates
+    // (see collapsibleChannel). Needs a ddt(D) scheme in fvSchemes
+    predictor            yes;
 }
 
 // ************************************************************************* //
