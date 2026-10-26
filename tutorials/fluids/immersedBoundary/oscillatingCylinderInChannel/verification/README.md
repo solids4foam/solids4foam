@@ -25,16 +25,19 @@ and time resolution, the time scheme and the crossing of cells by the body
 all affect the drag and, more strongly, the lift. In particular, the
 cutLink surface traction with the greedy quadrature (the only quadrature
 of the tested revision) gives an accurate drag but a lift that differs
-from body-fitted reference B by 140-161 % on D/h = 10-40, because the
-thinning of the surface points in STL-facet order breaks the cancellation
-of the transverse pressure force. On D/h = 80 every candidate point is
-kept and the lift agrees to 4.6 %; this does not establish that the
-greedy quadrature converges in general. `results.md` has the evidence,
-the figures and the limitations.
+from body-fitted reference B by 140 %, 149 % and 140 % on D/h = 10, 20 and
+40, because the thinning of the surface points in STL-facet order breaks
+the cancellation of the transverse pressure force. On D/h = 80 every
+candidate point is kept and the lift agrees to 4.6 %; this does not
+establish that the greedy quadrature converges in general. At the common
+D/h = 40, `penalty` gives both an accurate drag (1.41 %) and an accurate
+lift (3.7 %) at the lowest cost of the four methods; this is a result for
+this case and these settings, not a general ranking. `results.md` has the
+evidence, the figures and the limitations.
 
 | Figure (`images/`) | Content |
 | --- | --- |
-| `force_histories.png` | references; the four methods at D/h = 40 |
+| `force_histories.png` | four methods vs B; penalty vs B and Wan-Turek |
 | `error_vs_resolution.png` | raw Cd and Cl errors against D/h |
 | `cutlink_estimators.png` | cutLink lift: greedy traction, momentum exchange |
 | `error_vs_cost.png`, `cell_crossing.png` | further diagnostics |

@@ -73,15 +73,16 @@ LABEL = {"cutLink": "cutLink", "ghostCell": "ghostCell",
 # Draw the noisiest histories first, so that they do not hide the others
 DRAW_ORDER = ("incremental", "ghostCell", "penalty", "cutLink")
 
-# References: B a wide grey band, A black dashed, digitised open circles
+# References: B, the principal reference, a black line beneath the methods;
+# A a grey dashed line; the digitised curve open circles, every second
+# digitised point drawn (display only: the errors use every point)
 REF_STYLE = {
-    "B": dict(color="#b0b0b0", linewidth=3.2, solid_capstyle="butt",
-              zorder=1),
-    "A": dict(color="black", linewidth=0.8, linestyle=(0, (3.5, 1.8)),
-              zorder=6),
+    "B": dict(color="black", linewidth=0.95, zorder=1.5),
+    "A": dict(color="0.5", linewidth=0.9, linestyle=(0, (4, 2)),
+              zorder=1.6),
     "digitised": dict(color="black", linestyle="none", marker="o",
-                      markersize=2.6, markerfacecolor="none",
-                      markeredgewidth=0.5, zorder=7),
+                      markersize=2.8, markerfacecolor="white",
+                      markeredgewidth=0.55, zorder=8, markevery=2),
 }
 REF_LABEL = {"B": "body-fitted B (901 120 cells)",
              "A": "body-fitted A (282 624 cells)",
@@ -207,52 +208,77 @@ def plot_refs(ax, refs, coeff, names):
     return hs
 
 
+def method_line(ax, method, t, y, marks=True):
+    """Raw history in the method's colour and line pattern, with a sparse
+    marker every second on a recorded sample (staggered between methods)"""
+    st = STYLE[method]
+    every = None
+    if marks:
+        t0 = 0.4 + 0.25*DRAW_ORDER[::-1].index(method)
+        every, k = [], 0
+        for i, ti in enumerate(t):
+            if ti >= t0 + k:
+                every.append(i)
+                k += 1
+    return ax.plot(t, y, color=st["color"], linestyle=st["linestyle"],
+                   linewidth=0.8, marker=st["marker"], markevery=every,
+                   markersize=3.4, markerfacecolor="white",
+                   markeredgewidth=0.8,
+                   zorder=2 + DRAW_ORDER.index(method))
+
+
 def force_histories(plt, cases, data, refs, out, written):
-    """2x2: the references, then the four methods at D/h = 40"""
+    """2x2: (a, b) the four methods at D/h = 40 against reference B;
+    (c, d) penalty at D/h = 40 (one run) against B and the digitised curve"""
     fig, axes = plt.subplots(2, 2, figsize=(7.4, 5.4), sharex=True)
     runs = {m: at_level(cases, m, COMMON_LEVEL) for m in ocv.METHODS}
+    hist = {m: read_history(data, c["case"]) for m, c in runs.items() if c}
     for j, coeff in enumerate(("Cd", "Cl")):
         a, b = axes[0, j], axes[1, j]
-        plot_refs(a, refs, coeff, ("B", "A", "digitised"))
-        a.set_ylim(*window_limits([refs[n][coeff] for n in refs]))
+        plot_refs(a, refs, coeff, ("B",))
+        series = [refs["B"][coeff]]
+        for method in DRAW_ORDER:
+            if method in hist:
+                h = hist[method]
+                method_line(a, method, h["t"], h[f"{coeff}_total"])
+                series.append((h["t"], h[f"{coeff}_total"]))
+        a.set_ylim(*window_limits(series, head=0.1))
         plot_refs(b, refs, coeff, ("B", "digitised"))
         series = [refs[n][coeff] for n in ("B", "digitised") if n in refs]
-        for method in DRAW_ORDER:
-            c = runs[method]
-            if c is None:
-                continue
-            h = read_history(data, c["case"])
-            s = STYLE[method]
-            b.plot(h["t"], h[f"{coeff}_total"], color=s["color"],
-                   linewidth=0.7, zorder=2 + DRAW_ORDER.index(method))
+        if "penalty" in hist:
+            h = hist["penalty"]
+            method_line(b, "penalty", h["t"], h[f"{coeff}_total"])
             series.append((h["t"], h[f"{coeff}_total"]))
-        b.set_ylim(*window_limits(series))
+        b.set_ylim(*window_limits(series, head=0.14))
         for ax in (a, b):
             ax.axvspan(0, WINDOW[0], color="0.9", linewidth=0, zorder=0)
             ax.set_xlim(0, 8)
             ax.set_ylabel(f"$C_{coeff[1]}$")
         b.set_xlabel("$t$ (s)")
-        panel(a, f"({'ab'[j]}) references")
-        panel(b, f"({'cd'[j]}) four methods, $D/h$ = 40")
-    handles = [plt.Line2D([], [], **REF_STYLE[n]) for n in
-               ("B", "A", "digitised") if n in refs]
-    labels = [REF_LABEL[n] for n in ("B", "A", "digitised") if n in refs]
+        panel(a, f"({'ab'[j]}) four methods, $D/h$ = 40")
+        panel(b, f"({'cd'[j]}) penalty, $D/h$ = 40")
+    handles, labels = [], []
     for method in ocv.METHODS:
         s = STYLE[method]
         handles.append(plt.Line2D([], [], color=s["color"],
-                                  linestyle=s["linestyle"], linewidth=1.2))
-        labels.append(LABEL[method] + (" (surface traction, greedy "
-                                       "quadrature)" if method == "cutLink"
-                                       else ""))
+                                  linestyle=s["linestyle"], linewidth=1.2,
+                                  marker=s["marker"], markersize=4,
+                                  markerfacecolor="white"))
+        labels.append(LABEL[method])
+    for n in ("B", "digitised"):
+        if n in refs:
+            kw = {k: v for k, v in REF_STYLE[n].items() if k != "markevery"}
+            handles.append(plt.Line2D([], [], **kw))
+            labels.append(REF_LABEL[n])
     handles.append(plt.Line2D([], [], color="0.9", linewidth=6))
-    labels.append("impulsive start ($t < 0.25$ s, off scale, not in "
-                  "the errors)")
-    fig.tight_layout(rect=(0, 0.13, 1, 1))
-    fig.legend(handles, labels, ncol=3, loc="lower center",
-               bbox_to_anchor=(0.5, 0.0))
+    labels.append("impulsive start ($t < 0.25$ s, not in the errors)")
+    fig.tight_layout(rect=(0, 0.15, 1, 1))
+    fig.legend(handles, labels, ncol=4, loc="lower center",
+               bbox_to_anchor=(0.5, 0.045))
     footnote(fig, SOLVER_NOTE, "D/h = 40, time step 0.000625 s, for all "
-             "four methods (the finest mesh run by all of them)",
-             SAMPLING_NOTE)
+             "four methods (the finest mesh run by all of them); cutLink: "
+             "surface traction, greedy quadrature; others: forcing + "
+             "interior inertia", SAMPLING_NOTE)
     save(fig, out, "force_histories", written)
     plt.close(fig)
 
@@ -263,7 +289,8 @@ def error_vs(plt, cases, out, written, xkey, xlabel, name, logx,
     for k, (ax, coeff) in enumerate(zip(axes, ("Cd", "Cl"))):
         if spread and coeff in spread:
             ax.axhspan(1e-3, 100*spread[coeff], color="0.88", linewidth=0,
-                       zorder=0, label="below the A-B difference")
+                       zorder=0,
+                       label="below the A-B difference (context only)")
         for method in ocv.METHODS:
             s = STYLE[method]
             for dt_level in (True, False):
@@ -310,6 +337,10 @@ def error_vs(plt, cases, out, written, xkey, xlabel, name, logx,
     plt.close(fig)
 
 
+# The second cutLink estimator: a lighter blue of the same family
+ME_COLOR = "#56B4E9"
+
+
 def cutlink_estimators(plt, cases, data, refs, out, written):
     """Cl from the two cutLink estimates of the same runs at D/h = 40, where
     the default (greedy) thinning of the surface-traction points acts, and
@@ -328,8 +359,8 @@ def cutlink_estimators(plt, cases, data, refs, out, written):
         plot_refs(ax, refs, "Cl", ("B",))
         ax.plot(h["t"], h["Cl_surfaceTraction"], color=STYLE["cutLink"][
             "color"], linewidth=1.0, zorder=4)
-        ax.plot(h["t"], h["Cl_momentumExchange"], color="black",
-                linestyle=(0, (4, 1.6)), linewidth=0.9, zorder=5)
+        ax.plot(h["t"], h["Cl_momentumExchange"], color=ME_COLOR,
+                linestyle=(0, (4, 1.6)), linewidth=1.0, zorder=5)
         ax.set_ylabel("$C_l$")
         ax.set_xlim(0, 8)
         series = [refs["B"]["Cl"], (h["t"], h["Cl_surfaceTraction"]),
@@ -344,8 +375,8 @@ def cutlink_estimators(plt, cases, data, refs, out, written):
     handles = [plt.Line2D([], [], **REF_STYLE["B"]),
                plt.Line2D([], [], color=STYLE["cutLink"]["color"],
                           linewidth=1.0),
-               plt.Line2D([], [], color="black", linestyle=(0, (4, 1.6)),
-                          linewidth=0.9)]
+               plt.Line2D([], [], color=ME_COLOR, linestyle=(0, (4, 1.6)),
+                          linewidth=1.0)]
     labels = [REF_LABEL["B"], "cutLink surface traction (greedy "
               "quadrature; the estimator of the tracked results)",
               "cutLink momentum exchange (same run; reported separately, "

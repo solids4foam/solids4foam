@@ -11,48 +11,86 @@ complete force histories.
 ## Summary
 
 The four methods are compared on a body that moves and accelerates through
-a stationary mesh. Drag and lift are both evaluated: the lift of this case
-is about 100 times smaller than the drag, so an error in the force
-estimator that is invisible in the drag can dominate the lift.
+a stationary mesh. The main findings, each specific to this case, these
+settings and the tested revision:
 
-- **Steady accuracy is not enough.** In the static-cylinder verification
-  of solids4foam pull request #595, the mean drag on the finest mesh
-  (D/h = 80) differs from the high-precision reference by 0.003 %
-  (cutLink), 0.16 % (ghostCell), 1.2 % (penalty) and 2.8 % (legacy
+- **Steady drag accuracy is not enough.** In the static-cylinder
+  verification of solids4foam pull request #595, the mean drag on the
+  finest mesh (D/h = 80) differs from the high-precision reference by
+  0.003 % (cutLink), 0.16 % (ghostCell), 1.2 % (penalty) and 2.8 % (legacy
   incremental, a limit-cycle mean). The cutLink value there is its
   momentum-exchange estimate; its greedy surface traction, the estimator
-  of this verification, is 1.5 % below the reference on that mesh. On the moving
-  cylinder, at the common D/h = 40, the raw drag differs from reference B
-  by 1.10 % (cutLink), 1.41 % (penalty), 8.32 % (ghostCell) and 26.45 %
-  (legacy incremental), and the raw lift by 139.7 %, 3.7 %, 12.4 % and
-  12.7 %. The force estimator, the surface quadrature, the resolution, the
-  time scheme and the crossing of cells by the body all matter.
-- **cutLink lift with the greedy quadrature.** The surface-traction drag
-  of cutLink is the most accurate of the four, but its lift differs from
-  the references by 140-161 % on D/h = 10-40. The greedy thinning of the
-  candidate surface points (in the order of the STL facets, with the area
-  of the discarded points given to the kept ones) breaks the cancellation
-  of the transverse pressure force (see Limitations). On D/h = 80 all 256
-  candidate points are kept, the defect is absent and the lift differs by
-  4.6 %. This is a property of this mesh and surface, not a convergence of
-  the greedy quadrature, and it does not make that quadrature reliable for
-  the lift of moving bodies. The momentum-exchange estimate of the same
-  runs, reported separately, gives 17.7 %, 8.7 %, 5.3 % and 4.8 %. A
-  different quadrature is a separate change to the solver (solids4foam
-  pull request #612); every result here uses the greedy quadrature of
-  `f33b244a2`.
+  of this verification, is 1.5 % below the reference on that mesh, so the
+  cutLink errors of the two verifications are not errors of the same
+  estimator. On the moving cylinder, the force estimator, the surface
+  quadrature, the resolution, the time scheme and the crossing of cells by
+  the body all matter.
+- **Drag and lift must both be examined.** The lift of this case is about
+  100 times smaller than the drag, so an error in the force estimator that
+  is invisible in the drag can dominate the lift. At the common D/h = 40
+  the raw drag differs from reference B by 1.10 % (cutLink), 1.41 %
+  (penalty), 8.32 % (ghostCell) and 26.45 % (legacy incremental), and the
+  raw lift by 139.7 %, 3.7 %, 12.4 % and 12.7 %.
+- **penalty is the most balanced method in this comparison.** At
+  D/h = 40 it is the only method whose drag and lift differences are both
+  a few per cent (1.41 % and 3.7 %, the lift close to the A-B difference
+  of 3.0 %), its force has no visible cell-crossing fluctuation, and its
+  run was the least expensive (1.493 allocated CPU hours). This is why it
+  is shown against B and the Wan and Turek result in panels (c, d) of the
+  force-history figure, with the same run for both coefficients. It is not
+  a general ranking: the cutLink drag is more accurate, and the ranking of
+  the lift may change with a corrected cutLink quadrature.
+- **cutLink drag is accurate; its greedy lift is not.** The cutLink surface
+  traction gives the most accurate drag of the four (1.10 % at D/h = 40,
+  0.65 % at D/h = 80). Its lift differs from B by 140 %, 149 % and 140 %
+  on D/h = 10, 20 and 40 (161 % on D/h = 20 with the time step halved).
+  The greedy thinning of the candidate surface points (in the order of the
+  STL facets, with the area of the discarded points given to the kept
+  ones) breaks the cancellation of the transverse pressure force: the
+  spurious lift is -0.013 to -0.014 times Cd, about 1 % of the drag force
+  (small in the drag) but larger than the lift itself; reversing the facet
+  order reverses its sign (see Limitations).
+- **The D/h = 80 result is not a convergence of the greedy quadrature.** On
+  D/h = 80 all 256 candidate points are kept, the defect is absent and the
+  lift differs by 4.6 %. This is a property of this mesh and surface; it
+  does not make the greedy quadrature reliable for the lift of moving
+  bodies on other meshes or surfaces. The momentum-exchange estimate of
+  the same runs, reported separately and never added to the surface
+  traction, gives 17.7 %, 8.7 %, 5.3 % and 4.8 %.
+- **The clustered quadrature is a separate change.** A quadrature without
+  the greedy area transfer is introduced in solids4foam pull request #612.
+  Every result here uses the greedy quadrature of `f33b244a2`, selected
+  explicitly by the driver when the keyword exists; the final form of that
+  pull request has not been run over this 8 s study.
 - **Cell-crossing fluctuations.** ghostCell and the legacy method have
-  force fluctuations at the cell-crossing frequency that do not vanish
-  with more outer correctors and grow when the time step is halved; they
-  dominate their raw errors (the low-passed errors are a diagnostic only).
-- **References.** Both body-fitted references are numerical solutions with
-  a second-order time scheme, and differ from each other by 0.77 % (Cd)
-  and 3.0 % (Cl); the immersed-boundary runs use the first-order Euler
-  scheme. Differences below the A-B difference are not ranked.
-- **Cost.** At D/h = 40 (8 ranks, 8 s simulated) the runs took 3.391
-  (cutLink), 2.731 (ghostCell), 1.493 (penalty) and 14.278 (legacy
-  incremental) allocated CPU hours on one shared node. These are not a
-  scaling measurement or a comparison with the body-fitted solver.
+  force fluctuations at the frequency with which the moving surface
+  crosses cell centres (157 Hz on D/h = 40), from cells changing between
+  solid and fluid (the binary inside test and image-point donors of
+  ghostCell; the occupancy jumps divided by the time step in the inertia
+  of the legacy method). They do not vanish with more outer correctors,
+  grow when the time step is halved, and dominate the raw errors of those
+  methods.
+- **Raw, not filtered, histories are compared.** All errors and figures use
+  the raw force. The 5 Hz low-passed errors are a diagnostic of the slowly
+  varying force only, not a substitute for the raw comparison, and the
+  compact 0.02 s histories of `reference/results/` are for drawing only
+  (they cannot resolve the 39-314 Hz cell crossing).
+- **The references are not exact or interchangeable.** Both body-fitted
+  references are numerical solutions with a second-order time scheme and
+  differ from each other by 0.77 % (Cd) and 3.0 % (Cl), a measure of
+  reference sensitivity, not an uncertainty bound. The digitised Wan and
+  Turek (2007) result leads both by about 18 ms and differs from B by
+  3.3 % and 7.3 %; it is a secondary published comparison and is not
+  shifted. The immersed-boundary runs use the first-order Euler scheme.
+- **Cost figures need care.** At D/h = 40 (8 ranks, 8 s simulated) the runs
+  took 3.391 (cutLink), 2.731 (ghostCell), 1.493 (penalty) and 14.278
+  (legacy incremental) allocated CPU hours (ranks times job wall time) on
+  one shared node. Reference B took about 1.13e3 MPI rank-hours, estimated
+  from its solver elapsed time and 96 ranks; no scheduler accounting
+  exists for it, so its consumed CPU time is unknown. Allocated CPU hours,
+  rank-hours and consumed CPU time are not interchangeable, no scaling
+  study was made, and no speed-up relative to the body-fitted solver is
+  derived.
 
 ## Case and references
 
@@ -229,7 +267,8 @@ The cutLink momentum exchange (columns 11-13, from the same runs):
 
 - penalty: 12.9 %, 8.0 %, 3.7 % and 3.5 % on Levels 1-4.
 - cutLink momentum exchange: 17.7 %, 8.7 %, 5.3 % and 4.8 %.
-- cutLink surface traction: 140-161 % on Levels 1-3 and 4.6 % on Level 4.
+- cutLink surface traction: 140 %, 149 % and 140 % on Levels 1-3 (161 % on
+  Level 2 with the time step halved) and 4.6 % on Level 4.
   This is a property of the default quadrature (see Limitations), not of
   the flow solution.
 - ghostCell: 87 % to 12.4 % on Levels 1-3, and 13.8 % on Level 4, where
@@ -305,15 +344,16 @@ from them. Every error is computed from the complete histories, and
 
 ![Force histories](images/force_histories.png)
 
-**Force histories.** (a, b) Cd and Cl of the references: body-fitted A and
-B and the digitised Wan and Turek (2007) histories, which lead the
-body-fitted solutions by about 18 ms and are not phase-aligned with them.
-(c, d) The four methods at D/h = 40 and `deltaT = 0.000625` s, the finest
-mesh run by all of them, against B and the digitised histories: cutLink
-with its surface traction and the greedy quadrature; the other methods
-with the forcing plus the inertia of the fluid inside. Raw histories, no
-filter or shift. The impulsive start (`t < 0.25` s, shaded) is off scale
-and excluded from the errors.
+**Force histories.** (a, b) Cd and Cl of the four methods at D/h = 40 and
+`deltaT = 0.000625` s, the finest mesh run by all of them, against
+body-fitted reference B: cutLink with its surface traction and the greedy
+quadrature; the other methods with the forcing plus the inertia of the
+fluid inside. (c, d) The same penalty run against B and the digitised
+Wan and Turek (2007) result, which leads B by about 18 ms and is not
+shifted (every second digitised point drawn). Raw histories, no filter
+or shift; a marker every second identifies each method. The impulsive
+start (`t < 0.25` s, shaded) is excluded from the errors. Reference A is
+compared with B in the error figure and in the Summary.
 
 ![Error against resolution](images/error_vs_resolution.png)
 
@@ -321,7 +361,8 @@ and excluded from the errors.
 Cl from reference B against `D/h`. Filled markers: the time step halved
 with the cell size, so that space and time are refined together; open
 markers: D/h = 20 at the D/h = 40 time step (R4), a separate time-step
-sensitivity. The grey band is below the A-B difference. The legacy method
+sensitivity. The grey band is below the A-B difference, shown as context
+for the reference sensitivity, not as an uncertainty bound. The legacy method
 was not run on D/h = 80. No order of convergence is derived.
 
 ![cutLink estimators](images/cutlink_estimators.png)

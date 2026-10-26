@@ -128,7 +128,7 @@ solution, which decrease by about a factor of two with each refinement; the
 last is the difference from the Wan and Turek (2007) coefficients, which stops
 decreasing at about 0.08, the difference between the body-fitted mesh
 solution and the Wan and Turek (2007) coefficients: these lead the converged
-solutions by about 0.015-0.02 s (their drag changes sign earlier). They were
+solutions by about 0.018 s (their drag changes sign earlier). They were
 digitised from a figure of Erzincanli and Sahin (2013) that shows the result
 of Wan and Turek (2007). The `cutLink` force from the momentum exchange
 (columns 11-13) differs from the body-fitted mesh solution by 0.19, 0.07 and
@@ -156,9 +156,14 @@ with fixed time steps, against two moving body-fitted mesh solutions; it is
 not run by the tutorial tests. It shows that an accurate drag does not
 guarantee an accurate lift for a moving body: with the greedy quadrature
 of the tested revision, the `cutLink` surface-traction lift differs from
-the body-fitted solution by 140-161 % on D/h = 10-40, while its drag
-differs by 1.1-5.4 %. See `verification/README.md` and
-`verification/results.md`.
+body-fitted reference B of `verification/` (901 120 cells) by 140 %, 149 %
+and 140 % on D/h = 10, 20 and 40 (161 % on D/h = 20 with the time step
+halved), while its drag differs by 5.4 %, 1.8 % and 1.1 %. On D/h = 80
+every candidate point is kept and the lift differs by 4.6 %; this does
+not establish that the greedy quadrature converges in general. At the
+common D/h = 40, `penalty` differs from reference B by 1.41 % in drag and
+3.7 % in lift, at the lowest cost of the four methods. See
+`verification/README.md` and `verification/results.md`.
 
 ## References
 
