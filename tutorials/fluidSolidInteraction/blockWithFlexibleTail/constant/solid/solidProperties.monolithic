@@ -29,7 +29,7 @@ nonLinearGeometryTotalLagrangianVelocityCoeffs
         momentum
         {
             type            alpha;
-            scaleFactor     0.1;
+            scaleFactor     0.01;
         }
     }
 }
