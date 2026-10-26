@@ -7,3 +7,9 @@ cleanCase0
 
 # Remove the formulation symlinks created by Allrun (displacement/pressure)
 rm -f system/fvSolution constant/solidProperties
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

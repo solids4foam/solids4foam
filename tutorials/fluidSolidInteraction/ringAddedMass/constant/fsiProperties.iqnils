@@ -39,6 +39,10 @@ IQNILSCoeffs
     // Maximum number of outer FSI loop correctors within each time-step
     nOuterCorr           100;
 
+    // Reuse the IQN-ILS secant modes of the previous 5 time steps, which
+    // reduces the number of coupling iterations per time step (#587)
+    couplingReuse        5;
+
     // Enable/disable coupling from the start
     coupled              yes;
 

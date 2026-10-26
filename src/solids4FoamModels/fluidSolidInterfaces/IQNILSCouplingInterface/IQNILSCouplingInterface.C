@@ -47,6 +47,23 @@ label IQNILSCouplingInterface::couplingReuse() const
 }
 
 
+label IQNILSCouplingInterface::firstModesIteration() const
+{
+    if (skipModesOnSolidPredictor_ && predictSolid_ && coupled())
+    {
+        return 2;
+    }
+
+    return 1;
+}
+
+
+bool IQNILSCouplingInterface::skipModesThisIteration() const
+{
+    return outerCorr() < firstModesIteration();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 IQNILSCouplingInterface::IQNILSCouplingInterface
@@ -69,7 +86,7 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
     (
         fsiProperties().lookupOrAddDefault<scalar>
         (
-            "relMinSignificant", -1.0
+            "relMinSignificant", couplingReuse_ > 0 ? 1.0e-3 : -1.0
         )
     ),
     normalizeCouplingColumns_
@@ -150,6 +167,13 @@ IQNILSCouplingInterface::IQNILSCouplingInterface
         )
     ),
     predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true)),
+    skipModesOnSolidPredictor_
+    (
+        fsiProperties().lookupOrAddDefault<bool>
+        (
+            "skipModesOnSolidPredictor", true
+        )
+    ),
     fluidPatchesPointsV_(nGlobalPatches()),
     fluidPatchesPointsW_(nGlobalPatches()),
     solidPatchesFacesTractionW_(nGlobalPatches()),
@@ -210,6 +234,28 @@ void IQNILSCouplingInterface::removeOldCouplingModes
     )
     {
         removeCouplingMode(interfaceI, 0);
+    }
+}
+
+
+void IQNILSCouplingInterface::removeCurrentStepCouplingModes()
+{
+    const label timeIndex = fluid().runTime().timeIndex();
+
+    for (label interfaceI = 0; interfaceI < nInterfaces(); interfaceI++)
+    {
+        while
+        (
+            fluidPatchesPointsT_[interfaceI].size()
+         && fluidPatchesPointsT_[interfaceI].last() == timeIndex
+        )
+        {
+            removeCouplingMode
+            (
+                interfaceI,
+                fluidPatchesPointsT_[interfaceI].size() - 1
+            );
+        }
     }
 }
 
@@ -288,7 +334,7 @@ bool IQNILSCouplingInterface::usePreviousStepModesInSolve
     return
         reusePreviousStepModes_
      && couplingReuse() == 0
-     && outerCorr() == 1
+     && outerCorr() == firstModesIteration()
      && previousStepPatchesPointsV_[interfaceI].size()
         >= minPreviousStepModesForReuse_;
 }
@@ -302,10 +348,26 @@ bool IQNILSCouplingInterface::usePreviousNonEmptyStepModesInSolve
     return
         reusePreviousStepModes_
      && couplingReuse() == 0
-     && outerCorr() == 1
+     && outerCorr() == firstModesIteration()
      && previousStepPatchesPointsV_[interfaceI].size() == 0
      && previousNonEmptyStepPatchesPointsV_[interfaceI].size()
         >= minPreviousStepModesForReuse_;
+}
+
+
+bool IQNILSCouplingInterface::solveUsesPreviousStepModes
+(
+    const label interfaceI
+) const
+{
+    return
+        usePreviousStepModesInSolve(interfaceI)
+     || usePreviousNonEmptyStepModesInSolve(interfaceI)
+     || (
+            fluidPatchesPointsT_[interfaceI].size()
+         && fluidPatchesPointsT_[interfaceI][0]
+          < fluid().runTime().timeIndex()
+        );
 }
 
 
@@ -682,11 +744,13 @@ label IQNILSCouplingInterface::buildPreciceStyleCouplingQR
         solveCouplingMode(interfaceI, i, v, w);
         applyResidualPreconditioning(interfaceI, v);
         const scalar origNorm = Foam::sqrt(sum(v & v));
+        scalar refNorm = origNorm;
 
         if (normalizeCouplingColumns_ && origNorm > VSMALL)
         {
             v /= origNorm;
             w /= origNorm;
+            refNorm = 1.0;
         }
 
         scalarField r;
@@ -699,13 +763,13 @@ label IQNILSCouplingInterface::buildPreciceStyleCouplingQR
             i > 0
          && qrFilterTolerance_ > 0.0
          && origNorm > VSMALL
-         && rho < qrFilterTolerance_*origNorm
+         && rho < qrFilterTolerance_*refNorm
         )
         {
             Info<< "Ignoring IQN-ILS QR2 column (" << patchName
                 << "): |v_orth| = " << rho
                 << " < qrFilterTolerance*|v| = "
-                << qrFilterTolerance_*origNorm << endl;
+                << qrFilterTolerance_*refNorm << endl;
             continue;
         }
 
@@ -750,11 +814,13 @@ label IQNILSCouplingInterface::buildPreciceStyleCombinedCouplingQR
         combinedCouplingMode(i, v, w);
         applyResidualPreconditioningCombined(v);
         const scalar origNorm = Foam::sqrt(sum(v & v));
+        scalar refNorm = origNorm;
 
         if (normalizeCouplingColumns_ && origNorm > VSMALL)
         {
             v /= origNorm;
             w /= origNorm;
+            refNorm = 1.0;
         }
 
         scalarField r;
@@ -767,12 +833,12 @@ label IQNILSCouplingInterface::buildPreciceStyleCombinedCouplingQR
             i > 0
          && qrFilterTolerance_ > 0.0
          && origNorm > VSMALL
-         && rho < qrFilterTolerance_*origNorm
+         && rho < qrFilterTolerance_*refNorm
         )
         {
             Info<< "Ignoring IQN-ILS combined QR2 column: |v_orth| = "
                 << rho << " < qrFilterTolerance*|v| = "
-                << qrFilterTolerance_*origNorm << endl;
+                << qrFilterTolerance_*refNorm << endl;
             continue;
         }
 
@@ -1076,6 +1142,15 @@ bool IQNILSCouplingInterface::evolve()
         }
     }
 
+    // Do not reuse the secants of a step accepted unconverged
+    if (!converged && couplingReuse() > 0)
+    {
+        Info<< "Discarding the IQN-ILS modes of the unconverged time step"
+            << endl;
+
+        removeCurrentStepCouplingModes();
+    }
+
     cacheCurrentStepModes();
 
     solid().updateTotalFields();
@@ -1219,7 +1294,7 @@ void IQNILSCouplingInterface::updateDisplacement()
     {
         const label storedCols = nCombinedCouplingModes();
 
-        if (storedCols > 0)
+        if (storedCols > 0 && !skipModesThisIteration())
         {
             DynamicList<vectorField> solveQ(storedCols);
             DynamicList<vectorField> solveW(storedCols);
@@ -1246,11 +1321,13 @@ void IQNILSCouplingInterface::updateDisplacement()
                     vectorField w;
                     combinedCouplingMode(i, v, w);
                     const scalar origNorm = Foam::sqrt(sum(v & v));
+                    scalar refNorm = origNorm;
 
                     if (normalizeCouplingColumns_ && origNorm > VSMALL)
                     {
                         v /= origNorm;
                         w /= origNorm;
+                        refNorm = 1.0;
                     }
 
                     vectorField vOrth(v);
@@ -1266,12 +1343,12 @@ void IQNILSCouplingInterface::updateDisplacement()
                         qrFilterTolerance_ > 0.0
                      && i > 0
                      && origNorm > VSMALL
-                     && orthNorm < qrFilterTolerance_*origNorm
+                     && orthNorm < qrFilterTolerance_*refNorm
                     )
                     {
                         Info<< "Ignoring IQN-ILS combined solve column: |v_orth| = "
                             << orthNorm << " < qrFilterTolerance*|v| = "
-                            << qrFilterTolerance_*origNorm << endl;
+                            << qrFilterTolerance_*refNorm << endl;
                         continue;
                     }
 
@@ -1297,9 +1374,14 @@ void IQNILSCouplingInterface::updateDisplacement()
 
                 if (useCombinedPreciceStyleCouplingQR())
                 {
+                    // The QR columns are preconditioned, so the residual must
+                    // be too
+                    vectorField scaledResidual(solveResidual);
+                    applyResidualPreconditioningCombined(scaledResidual);
+
                     for (label i = 0; i < cols; i++)
                     {
-                        coeffs[i] = -sum(solveQ[i] & solveResidual);
+                        coeffs[i] = sum(solveQ[i] & scaledResidual);
                     }
 
                     for (label i = 0; i < cols; i++)
@@ -1317,7 +1399,11 @@ void IQNILSCouplingInterface::updateDisplacement()
                     for (label i = 0; i < cols; i++)
                     {
                         R[i][i] = Foam::sqrt(sum(solveQ[i] & solveQ[i]));
-                        solveQ[i] /= R[i][i];
+
+                        if (R[i][i] > VSMALL)
+                        {
+                            solveQ[i] /= R[i][i];
+                        }
 
                         for (label j = i + 1; j < cols; j++)
                         {
@@ -1405,7 +1491,7 @@ void IQNILSCouplingInterface::updateDisplacement()
                 {
                     reusedPreviousStepModes =
                         reusedPreviousStepModes
-                     || usePreviousStepModesInSolve(interfaceI);
+                     || solveUsesPreviousStepModes(interfaceI);
                 }
 
                 if
@@ -1414,30 +1500,27 @@ void IQNILSCouplingInterface::updateDisplacement()
                  && maxReuseUpdateNormRatio_ > 0.0
                 )
                 {
+                    // The interface step is the new fluid displacement,
+                    // solid + correction, minus the current one
+                    vectorField step(couplingCorrection - solveResidual);
                     const scalar residualNorm =
                         Foam::sqrt(sum(solveResidual & solveResidual));
-                    const scalar correctionNorm =
-                        Foam::sqrt(sum(couplingCorrection & couplingCorrection));
-                    const scalar maxCorrectionNorm =
+                    const scalar stepNorm = Foam::sqrt(sum(step & step));
+                    const scalar maxStepNorm =
                         maxReuseUpdateNormRatio_*residualNorm;
 
-                    if
-                    (
-                        residualNorm > VSMALL
-                     && correctionNorm > maxCorrectionNorm
-                    )
+                    if (residualNorm > VSMALL && stepNorm > maxStepNorm)
                     {
-                        const scalar scale =
-                            maxCorrectionNorm/max(correctionNorm, VSMALL);
+                        const scalar scale = maxStepNorm/stepNorm;
 
-                        Info<< "Limiting reused combined IQN-ILS correction: "
-                            << "|du| = " << correctionNorm
+                        Info<< "Limiting reused combined IQN-ILS update: "
+                            << "|dx| = " << stepNorm
                             << " > maxReuseUpdateNormRatio*|r| = "
-                            << maxCorrectionNorm
+                            << maxStepNorm
                             << ", scale = " << scale << endl;
 
-                        couplingCorrection *= scale;
-
+                        step *= scale;
+                        couplingCorrection = step + solveResidual;
                     }
                 }
 
@@ -1474,7 +1557,7 @@ void IQNILSCouplingInterface::updateDisplacement()
     {
         const label storedCols = nSolveCouplingModes(interfaceI);
 
-        if (storedCols > 0)
+        if (storedCols > 0 && !skipModesThisIteration())
         {
             // Previoulsy given in the function:
             // updateDisplacementUsingIQNILS();
@@ -1515,11 +1598,13 @@ void IQNILSCouplingInterface::updateDisplacement()
                     vectorField w;
                     solveCouplingMode(interfaceI, i, v, w);
                     const scalar origNorm = Foam::sqrt(sum(v & v));
+                    scalar refNorm = origNorm;
 
                     if (normalizeCouplingColumns_ && origNorm > VSMALL)
                     {
                         v /= origNorm;
                         w /= origNorm;
+                        refNorm = 1.0;
                     }
 
                     vectorField vOrth(v);
@@ -1535,13 +1620,13 @@ void IQNILSCouplingInterface::updateDisplacement()
                         qrFilterTolerance_ > 0.0
                      && i > 0
                      && origNorm > VSMALL
-                     && orthNorm < qrFilterTolerance_*origNorm
+                     && orthNorm < qrFilterTolerance_*refNorm
                     )
                     {
                         Info<< "Ignoring IQN-ILS solve column (" << patchName
                             << "): |v_orth| = " << orthNorm
                             << " < qrFilterTolerance*|v| = "
-                            << qrFilterTolerance_*origNorm << endl;
+                            << qrFilterTolerance_*refNorm << endl;
                         continue;
                     }
 
@@ -1567,9 +1652,14 @@ void IQNILSCouplingInterface::updateDisplacement()
 
                 if (usePreciceStyleCouplingQR(interfaceI))
                 {
+                    // The QR columns are preconditioned, so the residual must
+                    // be too
+                    vectorField scaledResidual(solveResidual);
+                    applyResidualPreconditioning(interfaceI, scaledResidual);
+
                     for (label i = 0; i < cols; i++)
                     {
-                        coeffs[i] = -sum(solveQ[i] & solveResidual);
+                        coeffs[i] = sum(solveQ[i] & scaledResidual);
                     }
 
                     for (label i = 0; i < cols; i++)
@@ -1588,7 +1678,11 @@ void IQNILSCouplingInterface::updateDisplacement()
                     {
                         // Normalize column i
                         R[i][i] = Foam::sqrt(sum(solveQ[i] & solveQ[i]));
-                        solveQ[i] /= R[i][i];
+
+                        if (R[i][i] > VSMALL)
+                        {
+                            solveQ[i] /= R[i][i];
+                        }
 
                         // Orthogonalize columns to the right of column i
                         for (label j = i+1; j < cols; j++)
@@ -1674,33 +1768,31 @@ void IQNILSCouplingInterface::updateDisplacement()
 
                 if
                 (
-                    usePreviousStepModesInSolve(interfaceI)
+                    solveUsesPreviousStepModes(interfaceI)
                  && maxReuseUpdateNormRatio_ > 0.0
                 )
                 {
+                    // The interface step is the new fluid displacement,
+                    // solid + correction, minus the current one
+                    vectorField step(couplingCorrection - solveResidual);
                     const scalar residualNorm =
                         Foam::sqrt(sum(solveResidual & solveResidual));
-                    const scalar correctionNorm =
-                        Foam::sqrt(sum(couplingCorrection & couplingCorrection));
-                    const scalar maxCorrectionNorm =
+                    const scalar stepNorm = Foam::sqrt(sum(step & step));
+                    const scalar maxStepNorm =
                         maxReuseUpdateNormRatio_*residualNorm;
 
-                    if
-                    (
-                        residualNorm > VSMALL
-                     && correctionNorm > maxCorrectionNorm
-                    )
+                    if (residualNorm > VSMALL && stepNorm > maxStepNorm)
                     {
-                        const scalar scale =
-                            maxCorrectionNorm/max(correctionNorm, VSMALL);
+                        const scalar scale = maxStepNorm/stepNorm;
 
-                        Info<< "Limiting reused IQN-ILS correction ("
-                            << patchName << "): |du| = " << correctionNorm
+                        Info<< "Limiting reused IQN-ILS update ("
+                            << patchName << "): |dx| = " << stepNorm
                             << " > maxReuseUpdateNormRatio*|r| = "
-                            << maxCorrectionNorm
+                            << maxStepNorm
                             << ", scale = " << scale << endl;
 
-                        couplingCorrection *= scale;
+                        step *= scale;
+                        couplingCorrection = step + solveResidual;
                     }
                 }
 
@@ -1749,9 +1841,6 @@ void IQNILSCouplingInterface::updateDisplacement()
             }
         }
     }
-
-    // Update movingWallPressure boundary conditions, if found
-    fluidSolidInterface::updateMovingWallPressureAcceleration();
 
     // Update elasticWallPressure boundary conditions, if found
     fluidSolidInterface::updateElasticWallPressureAcceleration();

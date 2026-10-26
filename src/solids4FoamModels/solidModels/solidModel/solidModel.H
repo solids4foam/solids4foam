@@ -21,6 +21,17 @@ Class
 Description
     Virtual base class for solid mechanics models
 
+    Restarting: set "restart yes;" in the solid model's coefficients
+    dictionary, from the start of the run, to request writing of the fields a
+    run continued from a later time needs: DD and its old-time levels, D_0,
+    D_0_0, pointD_0, pointDD, grad(D), grad(D)_0 and grad(DD). The default is
+    "no"; keep it "yes" in the continued run too. When a run continues from a
+    time without grad(D)_0, this class stops if "restart" is not set at all,
+    and warns if it is "no"; a material with history then still stops. The
+    incremental (DD) models also stop with "restart no" when D is present at
+    the start time. See the "Restarting a Solid Model" section of
+    solidModels/README.md.
+
 Author
     Zeljko Tukovic, FSB Zagreb.
     Philip Cardiff, UCD.
@@ -108,6 +119,9 @@ public:
 private:
 
     // Private data
+
+        //- Is the mesh shared with, and owned by, another model?
+        const bool sharedMesh_;
 
         //- Pointer to the mesh if we created it
         autoPtr<dynamicFvMesh> meshOwnerPtr_;
@@ -301,8 +315,9 @@ private:
         //  not thought about restarting, and the other is one who has
         const Switch restartSpecified_;
 
-        //- Optional: restart flag
-        //  Write out all fields required for a consistent restart
+        //- Optional: restart flag (default: no)
+        //  Write out all fields required for a consistent restart; see the
+        //  class description for the fields and the checks on continuing
         const Switch restart_;
 
         //- Whether a continued run has the kinematic history, the old-time
@@ -433,6 +448,18 @@ private:
 
 protected:
 
+        //- Return the IOobject of a field whose name the owner of a shared
+        //  mesh may also use, e.g. U, p or rho: on a shared mesh, the field
+        //  is private to the solid model, i.e. not registered, read or
+        //  written, so that it does not clash with the owner's field
+        IOobject sharedMeshIOobject
+        (
+            const word& name,
+            const fileName& instance,
+            const IOobject::readOption r,
+            const IOobject::writeOption w
+        ) const;
+
         //- The mechanicalConstitutiveLaw framework, constructed on first use
         mechanicalConstitutiveLawManager& mechanicalManager() const;
 
@@ -454,6 +481,18 @@ protected:
             const volTensorField& gradD,
             pointVectorField& pointD
         );
+
+        //- Enforce small-strain traction boundary conditions on the complete
+        //  mechanical face traction
+        void enforceTractionBoundaries
+        (
+            surfaceVectorField& traction,
+            const volVectorField& D,
+            const surfaceVectorField& n
+        ) const;
+
+        //- Extrapolate solidTraction patch values from adjacent cells
+        void enableTractionBoundaryExtrapolation(volVectorField& D) const;
 
         //- Initial density, from the mechanicalConstitutiveLaw framework.
         //
@@ -762,6 +801,18 @@ public:
                 return *meshPtr_;
             }
 
+            //- Is the mesh shared with, and owned by, another model? e.g.
+            //  the moving fluid mesh, for the solids4foamSolidModel mesh
+            //  motion solver, with the meshMotionTotalDisplacement solid
+            //  model, which never updates the mesh. The solid model then does
+            //  not change the mesh's moving flag or clear the owner's solver
+            //  performance records, and its fields whose names the owner may
+            //  also use, and g, are private (see sharedMeshIOobject)
+            bool sharedMesh() const
+            {
+                return sharedMesh_;
+            }
+
             //- Return dualMesh
             const meshDual& dualMesh() const;
 
@@ -1031,6 +1082,10 @@ public:
             {
                 return twoDCorrector_;
             }
+
+            //- Apply the 2-D point correction to the given points, unless
+            //  this processor holds no points of this region
+            void twoDCorrectPoints(vectorField& points) const;
 
             //- Is the model two-dimensional
             const bool& twoD() const

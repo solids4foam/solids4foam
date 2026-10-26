@@ -1,0 +1,67 @@
+{
+  "description": "Hessenthaler et al. (2017) 3D FSI experiment, Phase I (steady inflow): measured data and published numerical results",
+  "sources": {
+    "experiment": "Hessenthaler A, Gaddum NR, Holub O, Sinkus R, Roehrle O, Nordsletten D. Experiment for validation of fluid-structure interaction models and algorithms. Int J Numer Meth Biomed Eng 2017;33:e2848, https://doi.org/10.1002/cnm.2848 (CC BY 4.0)",
+    "data": "Hessenthaler et al. (2016), FSI benchmark data set, figshare, https://doi.org/10.6084/m9.figshare.4141836.v1 (CC0 1.0)",
+    "cheart": "Hessenthaler A, Roehrle O, Nordsletten D. Validation of a non-conforming monolithic fluid-structure interaction method using phase-contrast MRI. Int J Numer Meth Biomed Eng 2017;33:e2845, https://doi.org/10.1002/cnm.2845 (CC BY 4.0)",
+    "lozovskiy": "Lozovskiy A, Olshanskii MA, Vassilevski YV. Analysis and assessment of a monolithic FSI finite element method. Comput Fluids 2019;179:277-288, https://doi.org/10.1016/j.compfluid.2018.11.004"
+  },
+  "geometry_mm": {
+    "flap": [11.0, 2.0, 65.0],
+    "inlet_diameter": 21.9,
+    "inlet_centres_y": [27.15, -27.15],
+    "inlet_plane_z": -29.5,
+    "outlet_diameter": 76.2,
+    "outlet_plane_z": 89.5,
+    "outlet_extension": 250.0
+  },
+  "materials_phase_I": {
+    "fluid_density_kg_m3": 1163.3,
+    "fluid_viscosity_Pa_s": 0.0125,
+    "solid_density_kg_m3": 1058.3,
+    "gravity_m_s2": 9.81,
+    "uniaxial_neo_hookean_c1_Pa": 96865.09,
+    "cheart_neo_hookean_mu_Pa": 61000.0
+  },
+  "inflow_phase_I": {
+    "profile": "parabolic",
+    "peak_vz_upper_mm_s": 630.0,
+    "peak_vz_lower_mm_s": 615.0,
+    "ramp_time_s": 0.5,
+    "reynolds_number": 1283
+  },
+  "measurement": {
+    "velocity_voxel_mm": [1.302, 1.302, 6.0],
+    "velocity_planes_z_mm": [10.0, 30.0],
+    "venc_mm_s": {"vx": 120.0, "vy": 120.0, "vz": 800.0},
+    "velocity_error_fraction_of_venc": 0.05,
+    "geometry_voxel_mm": [2.0, 0.977, 0.977],
+    "flap_position_uncertainty_mm": 0.977,
+    "velocity_normalisation_mm_s": 630.0
+  },
+  "zero_flow_centreline_fit": {
+    "comment": "e2848 Figure 3 table: Y(z) = yhat*sum_i p_i*(z/zhat)^i, z in [0, zhat]",
+    "p": [-0.123, 2.468, -2.300, 0.978],
+    "yhat_mm": 29.500,
+    "zhat_mm": 57.643,
+    "rmse_mm": 0.339
+  },
+  "phase_I_centreline_fit": {
+    "comment": "e2848 Figure 3 table: y(z) = yhat*sum_i p_i*(z/zhat)^i, z in [0, zhat]",
+    "p": [0.000, 2.417, -2.226, 0.811],
+    "yhat_mm": 16.410,
+    "zhat_mm": 62.528,
+    "rmse_mm": 0.178
+  },
+  "targets": {
+    "zero_flow_tip_y_mm": 29.50,
+    "phase_I_tip_y_mm": 16.41,
+    "phase_I_centreline_rms_mm": 1.0
+  },
+  "published_phase_I_tip_y_mm": {
+    "comment": "Centreline tip position y at z = 62.5 mm, read from the published figures (about +/-0.1 mm for CHeart, +/-0.2 mm for Lozovskiy); not tabulated by the authors",
+    "cheart_inf_sup_stable_rl3": 16.9,
+    "cheart_cG1cG1": 15.6,
+    "lozovskiy2019_upper_surface_minus_1mm": 13.9
+  }
+}

@@ -7,10 +7,16 @@ wclean src
 
 cleanCase
 
-rm -r 0
+rm -rf 0
 
-rm -r postProcessing history
-rm -r logs
+rm -rf postProcessing history
+rm -rf logs
 
-rm *.png
-rm *.dat
+rm -f *.png
+rm -f *.dat
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

@@ -13,3 +13,9 @@ rm -rf constant/polyMesh/boundary VTK case.foam postProcessing 0/analytical* *.p
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

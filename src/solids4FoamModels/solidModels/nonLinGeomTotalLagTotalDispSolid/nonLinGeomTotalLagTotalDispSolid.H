@@ -117,6 +117,9 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Field to provide fvOptions with the correct dimensions
+        volScalarField ds_;
+
 
     // Private Member Functions
 
@@ -202,6 +205,12 @@ class nonLinGeomTotalLagTotalDispSolid
 protected:
 
     // Protected member functions
+
+#ifndef OPENFOAM_COM
+        //- Return optional source per unit reference volume; empty (no
+        //  source) by default
+        virtual tmp<volVectorField> fvOptionsSource() const;
+#endif
 
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const

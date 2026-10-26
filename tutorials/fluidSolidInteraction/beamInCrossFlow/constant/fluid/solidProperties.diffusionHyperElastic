@@ -1,0 +1,39 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Finite strain mesh motion with the diffusionHyperElastic law
+solidModel     meshMotionTotalDisplacement;
+
+meshMotionTotalDisplacementCoeffs
+{
+    // Finite strain kinematics, for the finite strain law
+    finiteStrain    yes;
+
+    // Maximum number of momentum correctors
+    nCorrectors     1000;
+
+    // Relative residual tolerance for each mesh motion solve. Tolerances of
+    // 1e-6 and 1e-4 give the same beam response to six significant figures;
+    // 1e-4 costs about 25% less
+    rTol            1e-04;
+
+    // Write frequency for the residuals
+    infoFrequency   100;
+}
+
+// ************************************************************************* //

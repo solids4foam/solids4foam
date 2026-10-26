@@ -5,3 +5,9 @@
 
 cleanCase
 \rm -rf *.log case.foam constant/polyMesh postProcessing energies.dat
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

@@ -24,6 +24,7 @@ License
 #include "fvMatrices.H"
 #include "addToRunTimeSelectionTable.H"
 #include "solidTractionFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "symmetryFvPatchFields.H"
 #include "slipFvPatchFields.H"
@@ -365,7 +366,7 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             }
             else
             {
-                tracP = tracPatch.traction() - nPatch*tracPatch.pressure();
+                tracP = tracPatch.boundaryTraction(nPatch);
 
                 if (useUndeformedArea)
                 {
@@ -382,6 +383,32 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
                     forceP = tracP*magSfCurrentPatch;
                 }
             }
+        }
+        else if
+        (
+            isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidSpringDashpotFvPatchVectorField& springPatch =
+                refCast<const solidSpringDashpotFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const scalarField& magSfCurrentPatch =
+                magSfCurrent.boundaryField()[patchI];
+
+            // The spring and dashpot act per unit reference area
+            forceP =
+                magSfCurrentPatch
+               *springPatch.springDashpotTraction
+                (
+                    nCurrent.boundaryField()[patchI],
+                    D.mesh().boundary()[patchI].magSf()/magSfCurrentPatch
+                );
         }
         else if
         (
@@ -418,9 +445,24 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
     // Update D boundary conditions
     D().correctBoundaryConditions();
 
-    if (predictor_ && newTimeStep())
+    if (newTimeStep())
     {
-        predict();
+        if (predictor_)
+        {
+            predict();
+        }
+        else if (!smoothHydrostaticStress())
+        {
+            // Without this, the stress is first updated at the end of the
+            // first iteration below, so the first residual would miss a load
+            // that only the law supplies, such as a prescribed temperature,
+            // and the step could be accepted without it. gradD is not
+            // recomputed: new boundary displacements already reach the first
+            // residual through the stabilisation. The smoothing is skipped
+            // because it needs DEqnA, which exists only inside the momentum
+            // loop
+            correctStress();
+        }
     }
 
 #ifdef OPENFOAM_NOT_EXTEND
@@ -483,6 +525,11 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
         tmpRef(tRhsEqn) += fvc::div(force);
         tmpRef(tRhsEqn) += rho()*g();
+        const tmp<volVectorField> tsource(fvOptionsSource());
+        if (tsource.valid())
+        {
+            tmpRef(tRhsEqn) += tsource();
+        }
 
         fvVectorMatrix DEqn
         (
@@ -497,6 +544,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
           - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
           + fvc::div(force)
           + rho()*g()
+          + fvOptions()(ds_, D())
         );
 #endif
 
@@ -832,6 +880,16 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
 }
 
 
+#ifndef OPENFOAM_COM
+Foam::tmp<Foam::volVectorField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::fvOptionsSource() const
+{
+    // An empty tmp means no source, so callers can skip the field operations
+    return tmp<volVectorField>();
+}
+#endif
+
+
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 {
@@ -981,6 +1039,19 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         solvePressure()
       ? label(solidModel::twoD() ? 3 : 4)
       : label(solidModel::twoD() ? 2 : 3)
+    ),
+    ds_
+    (
+        IOobject
+        (
+            "ds",
+            mesh().time().timeName(),
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        mesh(),
+        dimensionedScalar("ds", (dimForce/dimVolume)/dimVelocity, 1.0)
     )
 {
     DisRequired();
@@ -1066,6 +1137,10 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 
         gradD().storeOldTime();
 
+        // The predictor uses the acceleration of the last step: write it, so
+        // that a restart predicts the same first step as the original run
+        A_.writeOpt() = IOobject::AUTO_WRITE;
+
         // The framework restores its own constitutive state through the
         // registered state fields, so there is nothing to tell it here
     }
@@ -1094,30 +1169,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 << " solution algorithm" << abort(FatalError);
         }
 
-        // Set extrapolateValue to true for solidTraction boundaries
-        forAll(D().boundaryField(), patchI)
-        {
-            if
-            (
-                isA<solidTractionFvPatchVectorField>
-                (
-                    D().boundaryField()[patchI]
-                )
-            )
-            {
-                Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the D "
-                    << "field" << endl;
-
-                solidTractionFvPatchVectorField& tracPatch =
-                    refCast<solidTractionFvPatchVectorField>
-                    (
-                        boundaryFieldRef(D())[patchI]
-                    );
-
-                tracPatch.extrapolateValue() = true;
-            }
-        }
+        enableTractionBoundaryExtrapolation(D());
     }
 }
 
@@ -1312,10 +1364,6 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     {
         // Update gradient of displacement
         gradD() = fvc::grad(D);
-
-        // Enforce the boundary conditions again for any conditions that use
-        // gradD
-        D.correctBoundaryConditions();
     }
 
     // Increment of displacement
@@ -1409,6 +1457,18 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         );
     }
 
+    if (!highOrderResidual())
+    {
+        // Enforce the boundary conditions again, now that gradD, Finv, J and
+        // sigma have been updated from x, so that conditions that build their
+        // boundary value from the stress (tractionBoundarySnGrad), such as
+        // solidSpringDashpot, do not use the stress of the previous residual
+        // evaluation. The solidSpringDashpot README states when this makes
+        // the residual a function of x alone. The high-order residual does not
+        // recompute sigma(), so this update would not help there
+        D.correctBoundaryConditions();
+    }
+
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
     const tmp<surfaceVectorField> tSfCurrent(currentSf());
@@ -1477,9 +1537,27 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
 
+#ifdef OPENFOAM_COM
     // Add optional fvOptions, e.g. MMS body force
-    // Note that "source()" is already multiplied by the volumes
-    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+    // The fvOptions enter with the same sign as rho*g, as they are added to
+    // the right-hand side of the segregated momentum equation. The fvOptions
+    // matrix M represents Su + Sp*D, and "M & D" evaluates it per unit
+    // volume. Note that "M.source()" alone is -V*Su (fvMatrix stores explicit
+    // sources with a negative sign) and omits any implicit Sp*D term
+    {
+        const tmp<fvVectorMatrix> tfvOptionsEqn
+        (
+            fvOptions()(ds_, const_cast<volVectorField&>(D))
+        );
+        residual += mesh.V().field()*(tfvOptionsEqn() & D)().primitiveField();
+    }
+#else
+    const tmp<volVectorField> tsource(fvOptionsSource());
+    if (tsource.valid())
+    {
+        residual += mesh.V()*tsource().internalField();
+    }
+#endif
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>
@@ -1659,6 +1737,16 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             transientJ -= dampingCoeff()*rho()*fvmDdtVectorCompat(D);
         }
 
+#ifdef OPENFOAM_COM
+        // Add the linearisation of the implicit fvOptions terms (Sp*D) in the
+        // residual. Only the matrix coefficients are inserted, so the explicit
+        // Su part (held in the source) does not contribute. Note that an
+        // implicit part added with fvm::SuSp and a negative coefficient is
+        // held in the source and is omitted here, which only reduces the
+        // diagonal dominance of this approximate Jacobian
+        transientJ += fvOptions()(ds_, D);
+#endif
+
         foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
         (
             transientJ, jac, 0, 0, solidModel::twoD() ? 2 : 3
@@ -1677,6 +1765,16 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
         {
             approxJ -= dampingCoeff()*rho()*fvm::ddt(D);
         }
+
+#ifdef OPENFOAM_COM
+        // Add the linearisation of the implicit fvOptions terms (Sp*D) in the
+        // residual. Only the matrix coefficients are inserted, so the explicit
+        // Su part (held in the source) does not contribute. Note that an
+        // implicit part added with fvm::SuSp and a negative coefficient is
+        // held in the source and is omitted here, which only reduces the
+        // diagonal dominance of this approximate Jacobian
+        approxJ += fvOptions()(ds_, D);
+#endif
 
         // Optional: under-relaxation of the linear system
         approxJ.relax();

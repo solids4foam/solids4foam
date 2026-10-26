@@ -17,7 +17,9 @@ Prepared by Philip Cardiff
 - Demonstrate the Jacobian-free Newton-Krylov (PETSc SNES) solution algorithm
   for a dynamic, geometrically nonlinear problem, and compare it with the
   segregated algorithm;
-- Compare BDF2, trapezoidal Newmark and damped Bossak-Newmark time integration.
+- Compare BDF2, trapezoidal Newmark and damped Bossak-Newmark time integration;
+- Show, as a non-default option, why the higher-order `BDF` d2dt2 scheme
+  (order 3 and above) is not suitable for an undamped structure.
 
 ## Case Overview
 
@@ -100,6 +102,7 @@ solution algorithm; its optional second argument selects the time scheme:
 ./Allrun segregated            # Segregated algorithm with BDF2
 ./Allrun petscSnes newmark      # Trapezoidal Newmark
 ./Allrun petscSnes bossak       # Damped Bossak-Newmark
+./Allrun petscSnes bdf3         # Third-order BDF (fails)
 ./Allrun petscSnes all          # All three schemes and a comparison plot
 ```
 
@@ -116,6 +119,7 @@ The second-derivative scheme parameters are:
 | `bdf2` | `backward` | — | — | — |
 | `newmark` | `NewmarkBeta` (trapezoidal rule) | 0.25 | 0.5 | 0 |
 | `bossak` | `NewmarkBeta` (Bossak damping) | 0.3025 | 0.6 | -0.1 |
+| `bdf3` | `BDF 3` (not recommended here) | — | — | — |
 
 The `newmark` dictionary omits the coefficients to exercise the scheme's
 defaults. The Bossak coefficients satisfy
@@ -131,10 +135,46 @@ initial guess. If the `ddtSchemes` coefficients differ from those in
 `d2dt2Schemes`, the run stops with a fatal error. Neither form changes the
 scheme for first derivatives.
 
+### The `bdf3` option: a cautionary example
+
+```warning
+The `bdf3` option is not recommended for this case, and it does not reach
+the end time. It is included only to show the deficit of the higher-order
+`BDF` d2dt2 scheme for undamped structural dynamics.
+```
+
+`fvSchemes.bdf3` selects `BDF 3` in `d2dt2Schemes`. The `BDF` scheme applies
+the backward differentiation formula of order 1 to 6 twice, as `backward`
+applies BDF2. It is third-order accurate in time, but, unlike BDF1 and BDF2,
+BDF3 and BDF4 are not dissipative for an undamped oscillation: they
+_amplify_ every resolved mode, by about 4.5% (BDF3) and 0.6% (BDF4) per
+period at 20 time-steps per period. BDF5 and BDF6 damp well-resolved modes
+but amplify modes with fewer than about 9 and 7.5 time-steps per period by
+up to 38% and 58% per time-step. The growth vanishes as the time-step is
+refined, but a mesh always has modes that are poorly resolved in time, and
+in an undamped problem nothing removes the energy that the scheme adds to
+them. The solver prints a warning when order 3 or above is selected.
+
+In this tutorial, which has no physical damping, `bdf3` follows BDF2
+closely up to and through the peak (2.7278 m at 0.315 s, against 2.7247 m at
+0.310 s with BDF2). After about 0.5 s, a high-frequency oscillation grows in
+the tip displacement, and at $$t = 0.54$$ s (108 time-steps) the
+deformation-gradient determinant becomes negative and the run stops. A
+smaller time-step delays the failure in time but not in time-steps: the
+fastest-growing mode always has a similar number of time-steps per period,
+so BDF3 fails after a roughly constant number of time-steps (about 180 at
+$$\Delta t = 0.0003125$$ s). Higher orders fail sooner. Use `backward`
+(BDF2) or `NewmarkBeta` for undamped problems such as this one. The `BDF`
+scheme is intended for problems with enough physical or numerical damping,
+e.g. viscoelastic or damped solids, or some fluid-solid interaction cases.
+
+The `bdf3` option is not part of `all` or the regression test.
+
 For a single run, `Allrun` links `constant/solidProperties` and
 `system/fvSolution` to the selected algorithm's dictionaries and
-`system/fvSchemes` to `fvSchemes.bdf2`, `fvSchemes.newmark` or
-`fvSchemes.bossak`. It then creates the mesh with `blockMesh`, runs
+`system/fvSchemes` to `fvSchemes.bdf2`, `fvSchemes.newmark`,
+`fvSchemes.bossak` or `fvSchemes.bdf3`. It then creates the mesh with
+`blockMesh`, runs
 `solids4Foam` and, if `gnuplot` is installed, plots the selected scheme
 against Abaqus in `tipDisplacement.png`. Run `./Allclean` before changing
 options for a single run to remove previous results.

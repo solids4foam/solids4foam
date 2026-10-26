@@ -21,28 +21,11 @@ License
 #include "volFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "polyPatchID.H"
-#include "primitivePatchInterpolation.H"
 #include "twoDPointCorrector.H"
-#ifndef OPENFOAM_NOT_EXTEND
-    #include "tetPointFields.H"
-    #include "fixedValueTetPolyPatchFields.H"
-    #include "tetPolyPatchInterpolation.H"
-    #include "tetFemMatrices.H"
-    #include "newSubsetMotionSolverFvMesh.H"
-    #include "newSubsetMotionSolverFvMesh.H"
-#endif
-#include "fixedValuePointPatchFields.H"
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
-#include "movingWallPressureFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
-#ifndef S4F_NO_RBF
-    #include "RBFMeshMotionSolver.H"
-#endif
 #include "FieldSumOp.H"
-#ifdef OPENFOAM_COM
-    #include "dynamicMotionSolverFvMesh.H"
-#endif
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -504,6 +487,35 @@ Foam::fluidSolidInterface::accumulatedFluidInterfacesDisplacements()
 }
 
 
+Foam::fluidMeshMotionCoupler& Foam::fluidSolidInterface::fluidMeshMotion()
+{
+    if (fluidMeshMotionPtr_.empty())
+    {
+        // The fluid interface patches, excluding the immersed interfaces
+        DynamicList<label> patchIDs(nGlobalPatches_);
+        forAll(fluid().globalPatches(), interfaceI)
+        {
+            if (!immersedInterfaces_[interfaceI])
+            {
+                patchIDs.append(fluidPatchIndices()[interfaceI]);
+            }
+        }
+
+        fluidMeshMotionPtr_ =
+            fluidMeshMotionCoupler::New
+            (
+                fluidMesh(),
+                labelList(patchIDs),
+                fsiProperties_.found("fluidMeshMotion")
+              ? fsiProperties_.subDict("fluidMeshMotion")
+              : dictionary()
+            );
+    }
+
+    return fluidMeshMotionPtr_();
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::fluidSolidInterface::fluidSolidInterface
@@ -598,6 +610,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
             "requireAllResidualMeasures", false
         )
     ),
+    outerCorrAbsoluteTolerance_
+    (
+        fsiProperties_.lookupOrAddDefault<scalar>
+        (
+            "outerCorrAbsoluteTolerance", 0
+        )
+    ),
     robinPressureTolerance_
     (
         fsiProperties_.lookupOrAddDefault<scalar>
@@ -680,7 +699,8 @@ Foam::fluidSolidInterface::fluidSolidInterface
     (
         fsiProperties_.lookupOrAddDefault<int>("interpolatorUpdateFrequency", 0)
     ),
-    accumulatedFluidInterfacesDisplacementsList_()
+    accumulatedFluidInterfacesDisplacementsList_(),
+    fluidMeshMotionPtr_()
 {
     const word fluidRegion
     (
@@ -987,6 +1007,25 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
     if (fsiPtr->movesFluidInterface())
     {
         fsiPtr->checkFluidInterfaceVelocity();
+
+        // Create the fluid mesh motion coupler now, rather than when the
+        // fluid mesh is first moved, so that its checks of the motion solver
+        // and its boundary conditions fail at start-up and not at the
+        // couplingStartTime. With only immersed interfaces, the fluid mesh
+        // is not moved
+        bool anyFluidPatch = false;
+        forAll(fsiPtr->immersedInterfaces_, interfaceI)
+        {
+            if (!fsiPtr->immersedInterfaces_[interfaceI])
+            {
+                anyFluidPatch = true;
+            }
+        }
+
+        if (anyFluidPatch)
+        {
+            fsiPtr->fluidMeshMotion();
+        }
     }
 
     return fsiPtr;
@@ -1699,245 +1738,24 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     {
         // Move whole fluid mesh
 
-        // Check mesh motion solver type
-
-        // PC: it is not good that this is hard-coded
-        // A better way is to create an fsi point patch boundary condition that
-        // knows how to lookup the motion from the fsi class or similar
-        // For now, we will leave it
-
-        // If the motionU field is in the object registry then we assume that
-        // the fe motion solver is being used
-#ifdef OPENFOAM_NOT_EXTEND
-        const bool feMotionSolver = false;
-#else
-        const bool feMotionSolver =
-            fluidMesh().foundObject<tetPointVectorField>("motionU");
-#endif
-
-        // If the pointMotionU field is in the object registry then we assume
-        // that the fv motion solver is being used
-        const bool fvMotionSolver =
-            fluidMesh().foundObject<pointVectorField>("pointMotionU");
-
-#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
-        // Check for RBF motion solver
-        RBFMeshMotionSolver* rbfMotionSolverPtr = nullptr;
-#ifdef OPENFOAM_COM
-        if (isA<dynamicMotionSolverFvMesh>(fluidMesh()))
+        // Set the motion of the fluid interface patches in the fluid mesh
+        // motion solver
+        forAll(fluid().globalPatches(), interfaceI)
         {
-            motionSolver& motion =
-                const_cast<motionSolver&>
-                (
-                    refCast<const dynamicMotionSolverFvMesh>
-                    (
-                        fluidMesh()
-                    ).motion()
-                );
-
-            if (isA<RBFMeshMotionSolver>(motion))
+            if (immersedInterfaces_[interfaceI])
             {
-                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
-            }
-        }
-#else
-        if (fluidMesh().foundObject<motionSolver>("dynamicMeshDict"))
-        {
-            motionSolver& motion =
-                const_cast<motionSolver&>
-                (
-                    fluidMesh().lookupObject<motionSolver>("dynamicMeshDict")
-                );
-
-            if (isA<RBFMeshMotionSolver>(motion))
-            {
-                rbfMotionSolverPtr = &refCast<RBFMeshMotionSolver>(motion);
-            }
-        }
-#endif
-#endif
-
-        // Set motion on FSI interface
-        if (feMotionSolver)
-        {
-#ifdef OPENFOAM_NOT_EXTEND
-            notImplemented("Not implemented for this version of OpenFOAM/FOAM");
-#else
-            tetPointVectorField& motionU =
-                const_cast<tetPointVectorField&>
-                (
-                    fluidMesh().objectRegistry::
-                    lookupObject<tetPointVectorField>
-                    (
-                        "motionU"
-                    )
-                );
-
-            forAll(fluid().globalPatches(), interfaceI)
-            {
-                if (immersedInterfaces_[interfaceI])
-                {
-                    continue;
-                }
-
-                fixedValueTetPolyPatchVectorField& motionUFluidPatch =
-                    refCast<fixedValueTetPolyPatchVectorField>
-                    (
-                        motionU.boundaryField()[fluidPatchIndices()[interfaceI]]
-                    );
-
-                tetPolyPatchInterpolation tppi
-                (
-                    refCast<const faceTetPolyPatch>(motionUFluidPatch.patch())
-                );
-
-                motionUFluidPatch ==
-                    tppi.pointToPointInterpolate
-                    (
-                        fluidPatchesPointsDispls[interfaceI]
-                      - fluidPatchesPointsDisplsPrev[interfaceI]
-                    )/fluid().runTime().deltaT().value();
-            }
-#endif
-        }
-        else if (fvMotionSolver)
-        {
-            pointVectorField& motionU =
-                const_cast<pointVectorField&>
-                (
-                    fluidMesh().objectRegistry::
-                    lookupObject<pointVectorField>
-                    (
-                        "pointMotionU"
-                    )
-                );
-
-            forAll(fluid().globalPatches(), interfaceI)
-            {
-                if (immersedInterfaces_[interfaceI])
-                {
-                    continue;
-                }
-
-                fixedValuePointPatchVectorField& motionUFluidPatch =
-                    refCast<fixedValuePointPatchVectorField>
-                    (
-                        boundaryFieldRef
-                        (
-                            motionU
-                        )[fluidPatchIndices()[interfaceI]]
-                    );
-
-                motionUFluidPatch ==
-                    (
-                        fluidPatchesPointsDispls[interfaceI]
-                      - fluidPatchesPointsDisplsPrev[interfaceI]
-                    )/fluid().runTime().deltaT().value();
-            }
-        }
-#ifndef OPENFOAM_NOT_EXTEND
-        else if (isA<newSubsetMotionSolverFvMesh>(fluidMesh()))
-        {
-            newSubsetMotionSolverFvMesh& dynMesh =
-                refCast<newSubsetMotionSolverFvMesh>
-                (
-                    fluidMesh()
-                );
-
-            const fvMesh& subMesh = dynMesh.subsetMesh().subMesh();
-
-            const bool fvMotionSolver =
-                subMesh.foundObject<pointVectorField>("pointMotionU");
-
-            if (fvMotionSolver)
-            {
-                pointVectorField& motionU =
-                    const_cast<pointVectorField&>
-                    (
-                        subMesh.objectRegistry::
-                        lookupObject<pointVectorField>
-                        (
-                            "pointMotionU"
-                        )
-                    );
-
-                forAll(fluid().globalPatches(), interfaceI)
-                {
-                    if (immersedInterfaces_[interfaceI])
-                    {
-                        continue;
-                    }
-
-                    fixedValuePointPatchVectorField& motionUFluidPatch =
-                        refCast<fixedValuePointPatchVectorField>
-                        (
-                            motionU.boundaryField()
-                            [
-                                fluidPatchIndices()[interfaceI]
-                            ]
-                        );
-
-                    motionUFluidPatch ==
-                    (
-                        fluidPatchesPointsDispls[interfaceI]
-                      - fluidPatchesPointsDisplsPrev[interfaceI]
-                    )/fluid().runTime().deltaT().value();
-                }
-            }
-        }
-#endif
-#if !defined(OPENFOAM_ORG) && !defined(S4F_NO_RBF)
-        else if (rbfMotionSolverPtr)
-        {
-            // Prepare list of patch motions
-            Field<vectorField> motion(fluidMesh().boundaryMesh().size());
-
-            // Initialise all fields to zero
-            forAll(fluidMesh().boundaryMesh(), patchI)
-            {
-                motion[patchI] = vectorField
-                (
-                    fluidMesh().boundaryMesh()[patchI].size(), vector::zero
-                );
+                continue;
             }
 
-            // Loop through all FSI interfaces
-            forAll(fluid().globalPatches(), interfaceI)
-            {
-                if (immersedInterfaces_[interfaceI])
-                {
-                    continue;
-                }
-
-                // Interpolate the FSI interface point motion to the faces
-                const vectorField interfacePatchMotion
-                (
-                    fluidPatchesPointsDispls[interfaceI]
-                  - fluidPatchesPointsDisplsPrev[interfaceI]
-                );
-
-                // Create interpolator
-                primitivePatchInterpolation interp
-                (
-                    fluidMesh().boundaryMesh()[fluidPatchIndices()[interfaceI]]
-                );
-
-                // Set motion of FSI interface
-                motion[fluidPatchIndices()[interfaceI]] =
-                    interp.pointToFaceInterpolate(interfacePatchMotion);
-            }
-
-            // Set motion field in RBF motion solver
-            // Note: take displacement as opposed to velocity
-            rbfMotionSolverPtr->setMotion(motion);
+            fluidMeshMotion().setPatchMotion
+            (
+                fluidPatchIndices()[interfaceI],
+                fluidPatchesPointsDispls[interfaceI]
+              - fluidPatchesPointsDisplsPrev[interfaceI]
+            );
         }
-#endif
-        else
-        {
-            FatalErrorIn("fluidSolidInterface::moveFluidMesh()")
-                << "Problem with fluid mesh motion solver selection"
-                << abort(FatalError);
-        }
+
+        fluidMeshMotion().commit();
 
         bool meshChanged = fluidMesh().update();
         reduce(meshChanged, orOp<bool>());
@@ -2385,7 +2203,7 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
 
         // Legacy solids4foam behavior uses the minimum of the two residual
         // measures, while stricter convergence requires both to be small.
-        const scalar residualInterfaceI =
+        scalar residualInterfaceI =
             requireAllResidualMeasures_
           ? max(residualNorm1, residualNorm2)
           : min(residualNorm1, residualNorm2);
@@ -2394,6 +2212,44 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         {
             Info<< "FSI combined residual norm for interface " << interfaceI
                 << " (max): " << residualInterfaceI << endl;
+        }
+        else if
+        (
+            min(residualNorm1, residualNorm2) <= outerCorrTolerance_
+         && max(residualNorm1, residualNorm2) > outerCorrTolerance_
+        )
+        {
+            Info<< "FSI legacy minimum test for interface " << interfaceI
+                << " is passed by residual"
+                << (residualNorm1 < residualNorm2 ? "1" : "2")
+                << " only; the other measure is above the tolerance"
+                << " (see requireAllResidualMeasures)" << endl;
+        }
+
+        if (outerCorrAbsoluteTolerance_ > 0)
+        {
+            // Absolute residual: the maximum point mismatch of the interface
+            // [m]
+            const scalar absResidual = gMax(mag(residuals()[interfaceI]));
+
+            Info<< "FSI absolute residual (max point) for interface "
+                << interfaceI << ": " << absResidual << endl;
+
+            if
+            (
+                absResidual < outerCorrAbsoluteTolerance_
+             && residualInterfaceI > outerCorrTolerance_
+            )
+            {
+                Info<< "FSI interface " << interfaceI << " accepted by"
+                    << " outerCorrAbsoluteTolerance: " << absResidual
+                    << " < " << outerCorrAbsoluteTolerance_ << endl;
+
+                // The convergence tests compare the returned residual with
+                // outerCorrTolerance using <=; the factor keeps the accepted
+                // interface converged if a test uses < instead
+                residualInterfaceI = 0.99*outerCorrTolerance_;
+            }
         }
 
         // Update the maximum residual for all interfaces
@@ -2861,89 +2717,6 @@ void Foam::fluidSolidInterface::writeResidualLine(const scalar residualNorm)
     }
 
     residualFile() << endl;
-}
-
-
-void Foam::fluidSolidInterface::updateMovingWallPressureAcceleration()
-{
-    forAll(fluid().globalPatches(), interfaceI)
-    {
-        if (immersedInterfaces_[interfaceI])
-        {
-            continue;
-        }
-
-        if
-        (
-            isA<movingWallPressureFvPatchScalarField>
-            (
-                fluid().solutionP().boundaryField()
-                [
-                    fluidPatchIndices()[interfaceI]
-                ]
-            )
-        )
-        {
-            Info<< "Setting acceleration at fluid side of the interface: "
-                << fluidMesh().boundary()
-                   [
-                       fluidPatchIndices()[interfaceI]
-                   ].name()
-                << endl;
-
-            // Take references to zones
-            const standAlonePatch& fluidZone = this->fluidZone(interfaceI);
-            const standAlonePatch& solidZone = this->solidZone(interfaceI);
-
-            const vectorField solidZoneAcceleration
-            (
-               solid().faceZoneAcceleration(interfaceI)
-            );
-
-            // Initialise the fluid zone acceleration field that is to be
-            // interpolated from the solid zone
-            vectorField fluidZoneAcceleration(fluidZone.size(), vector::zero);
-
-            // Transfer the field from the fluid interface to the solid
-            // interface
-            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
-            (
-                solidZone,                // from zone
-                fluidZone,                // to zone
-                solidZoneAcceleration,    // from field
-                fluidZoneAcceleration     // to field
-            );
-
-            const vectorField fluidPatchAcceleration
-            (
-                fluid().globalPatches()
-                [
-                   interfaceI
-                ].globalFaceToPatch(fluidZoneAcceleration)
-            );
-
-            vectorField& prevAcceleration =
-                const_cast<movingWallPressureFvPatchScalarField&>
-                (
-                    refCast<const movingWallPressureFvPatchScalarField>
-                    (
-                        fluid().solutionP().boundaryField()
-                        [
-                            fluidPatchIndices()[interfaceI]
-                        ]
-                    )
-                ).prevAcceleration();
-
-            if (coupled())
-            {
-                prevAcceleration = fluidPatchAcceleration;
-            }
-            else
-            {
-                prevAcceleration = vector::zero;
-            }
-        }
-    }
 }
 
 

@@ -29,6 +29,9 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fluxCorrectedVelocityFvPatchVectorField.H"
 #include "compatibilityFunctions.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "extrapolatedCalculatedFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -802,6 +805,11 @@ Foam::fluidModel::fluidModel
             ),
             mesh(),
             dimensionedTensor("zero", dimVelocity/dimLength, tensor::zero)
+            // The patch type of the fields created by the gradient schemes,
+            // as the gradient cache updates this field when grad(U) is cached
+#ifdef OPENFOAM_NOT_EXTEND
+          , extrapolatedCalculatedFvPatchTensorField::typeName
+#endif
         )
     ),
     gradpPtr_
@@ -818,6 +826,9 @@ Foam::fluidModel::fluidModel
             ),
             mesh(),
             dimensionedVector("zero", p().dimensions()/dimLength, vector::zero)
+#ifdef OPENFOAM_NOT_EXTEND
+          , extrapolatedCalculatedFvPatchVectorField::typeName
+#endif
         )
     ),
     phiPtr_
@@ -927,6 +938,36 @@ Foam::fluidModel::fluidModel
         // when U and its old-time levels are read on restart; performed before
         // the gradients are calculated so that they see the corrected values
         correctFluxCorrectedVelocityBoundaries();
+
+        // The gradient fields are registered with the names that the gradient
+        // cache uses, so a cached gradient is this class's field
+#if defined(OPENFOAM_COM) && (OPENFOAM >= 2512)
+        // The cache updates a cached gradient in place, unless it is newer
+        // than its field. The gradient fields were created after U and p, so
+        // mark their initial zero values as out of date
+        gradUPtr_().eventNo() = UPtr_().eventNo();
+        gradpPtr_().eventNo() = pPtr_().eventNo();
+#else
+        // The cache deletes a stale cached gradient, which this class owns
+        if
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().cache(gradUPtr_().name())
+         || mesh().cache(gradpPtr_().name())
+#else
+            mesh().solutionDict().cache(gradUPtr_().name())
+         || mesh().solutionDict().cache(gradpPtr_().name())
+#endif
+        )
+        {
+            FatalErrorIn("Foam::fluidModel::fluidModel(...)")
+                << "Caching " << gradUPtr_().name() << " or "
+                << gradpPtr_().name() << " is only supported by the fluid "
+                << "models with OpenFOAM.com v2512 and later. Please remove "
+                << "them from the cache sub-dictionary of fvSolution"
+                << abort(FatalError);
+        }
+#endif
 
         gradUPtr_() = fvc::grad(UPtr_());
         gradpPtr_() = fvc::grad(pPtr_());
