@@ -125,6 +125,12 @@ Run the quasi-monolithic Newton variant with:
 ./Allrun monolithic
 ```
 
+The quasi-monolithic solid uses the same 80 x 4 linear mesh and `alpha`
+stabilisation scale 0.1 as the controlled order-1 path. It remains a distinct
+velocity-based formulation, without the partitioned model's high-order
+residual/Jacobian machinery; its modal response is therefore being validated
+separately.
+
 Append `parallel` to either command for a four-rank run. A parallel
 quasi-monolithic run uses `decomposeParMonolithic`, with the coupled regions
 and conformal tail patches declared in `system/decomposeParDict`.
@@ -209,7 +215,9 @@ and a mesh-convergence study are still required.
 The controlled order-1 10 s run took 3,574 s on four ranks. The earlier 10 s
 partitioned and quasi-monolithic runs took 2,140 s and 8,336 s respectively;
 their approximately 1.2 Hz first-mode response used the original, excessively
-stiff solid setup and is superseded by Table 3. The quasi-monolithic run
+stiff solid setup and is superseded by Table 3. That quasi-monolithic run used
+an 80 x 2 tail and `diffStencilLaplacian` stabilisation at scale 0.5; its
+80 x 4, `alpha`-stabilised replacement has not yet been run. The old run
 averaged 1.77 solid and 2.00 fluid SNES Newton iterations per time step. These
 timings are indicative only.
 

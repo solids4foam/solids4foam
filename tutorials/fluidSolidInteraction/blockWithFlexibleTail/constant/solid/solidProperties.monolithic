@@ -28,8 +28,8 @@ nonLinearGeometryTotalLagrangianVelocityCoeffs
     {
         momentum
         {
-            type            diffStencilLaplacian;
-            scaleFactor     0.5;
+            type            alpha;
+            scaleFactor     0.1;
         }
     }
 }

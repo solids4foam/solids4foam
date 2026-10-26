@@ -18,9 +18,9 @@ FoamFile
 
 scale 1;
 
-// The 0.06 cm tail is resolved with two cells through its thickness. The
+// The 0.06 cm tail is resolved with four cells through its thickness. The
 // fluid and solid have identical interface subdivisions: 80 cells along each
-// tail face and two cells on the tip.
+// tail face and four cells on the tip.
 vertices
 (
     (0     0      0)       // 0
