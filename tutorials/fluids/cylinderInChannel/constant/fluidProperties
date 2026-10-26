@@ -21,4 +21,7 @@ fluidModel pimpleFluid;
 pimpleFluidCoeffs
 {}
 
+newtonIcoFluidCoeffs
+{}
+
 // ************************************************************************* //

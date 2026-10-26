@@ -30,30 +30,34 @@ EPS_MAX=0.021
 P_MIN=5.0e4
 P_MAX=9.0e4
 
-# The final D of the removed legacy mechanicalModel, as the max and mean
-# component magnitude of the field written to fourteen figures, from the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d), per fork. This is the
-# case that exercises the Mohr-Coulomb return mapping and the history it
-# carries, over thirty-eight steps, underneath the poro composite, and the
-# framework reproduced the legacy D field exactly, in every one of those
-# figures. These are
-# recorded numbers, though, and another compiler, CPU or MPI build moves an
+# The final D, as the max and mean component magnitude of the field written
+# to fourteen figures, per fork. This is the case that exercises the
+# Mohr-Coulomb return mapping and the history it carries, over thirty-eight
+# steps, underneath the poro composite. The framework first reproduced the D
+# field of the removed legacy mechanicalModel (mcl-stage8-coverage, c3a92b3d)
+# exactly, in every one of those figures. The values were then re-recorded
+# when poroLinearGeometry started to impose the boundary traction on the
+# complete face traction, stabilisation included (#578): the stabilisation
+# flux is replaced by the prescribed load on the solidTraction patches, and
+# its shear part is removed on the symmetry and fixedDisplacementZeroShear
+# patches, which moved D by about 1e-4 relative (1.5e-3 on foam-extend).
+# These are recorded numbers, though, and another compiler, CPU or MPI build moves an
 # iterative solution by round-off at the solver tolerance: CI measures up to
 # 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
 # largest value, allows for that, and is ten times below the 1e-5 that a
 # 0.001% change in a material constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        REF_D_MAX=0.045900554625415
-        REF_D_MEAN=0.00582265661842307
+        REF_D_MAX=0.045903954645363
+        REF_D_MEAN=0.00582333637744533
         ;;
     org)
-        REF_D_MAX=0.045900554625415
-        REF_D_MEAN=0.00582265661842306
+        REF_D_MAX=0.045903954645363
+        REF_D_MEAN=0.00582333637744533
         ;;
     foamextend)
-        REF_D_MAX=0.047361024905273
-        REF_D_MEAN=0.00607079996386413
+        REF_D_MAX=0.047288500636175
+        REF_D_MEAN=0.00606246311049879
         ;;
 esac
 REF_D_REL_TOL=1e-6
@@ -274,7 +278,14 @@ run_restart_test() {
         return 0
     fi
 
-    if awk "BEGIN {exit !(($epsilon - $eps)^2 <= (1e-6*$epsilon)^2)}"; then
+    # The tolerance is about round-off, not about the restored state. No step
+    # of this case converges: each stops at nCorrectors with a relative
+    # residual near 3e-4. The restarted run follows the continuous one to
+    # 1e-14 in D for fourteen steps, and then the two part abruptly within the
+    # unconverged iterations of a single step, to 1e-6 in D, which moves the
+    # final Max epsilonEq by about 2e-6. The previous assembly also left the
+    # restarted D 2e-7 from the continuous one after its first step
+    if awk "BEGIN {exit !(($epsilon - $eps)^2 <= (1e-5*$epsilon)^2)}"; then
         printf "PASS: restart through the composite reproduces the run (%.8g vs %.8g)\n" \
             "$epsilon" "$eps"
     else

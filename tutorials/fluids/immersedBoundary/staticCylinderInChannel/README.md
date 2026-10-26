@@ -83,15 +83,31 @@ where $$L_z = 0.1$$ m is the thickness of the mesh, i.e. $$C_d = 5000 F_x$$.
 
 ## Running the Case
 
+The `Allrun` script optionally takes the forcing method:
+
 ```bash
-./Allrun
+./Allrun              # The method in constant/fvOptions, cutLink by default
+./Allrun cutLink      # Sharp interface cut-link penalisation
+./Allrun ghostCell    # Sharp interface ghost cell method
+./Allrun penalty      # Diffuse interface volume penalisation
+./Allrun incremental  # Direct forcing of pimpleHFDIBFoam
+./Allrun --help
 ```
+
+With a method, `constant/fvOptions` is linked to `constant/fvOptions.<method>`,
+which holds the settings of that method, and `nOuterCorrectors` in
+`system/fvSolution` is set to 5 for `incremental` and 1 for the other methods,
+as in the verification study (`verification/`); without one, the case is run
+with the current `constant/fvOptions` and `system/fvSolution`. `./Allclean`
+links `constant/fvOptions` back to `fvOptions.cutLink` and sets
+`nOuterCorrectors` back to 1.
 
 The mesh density is set by the `MESH_LEVEL` environment variable (default 1),
 where each level halves the cell size, e.g.
 
 ```bash
 MESH_LEVEL=2 ./Allrun
+MESH_LEVEL=2 ./Allrun ghostCell
 ```
 
 The time step is adjusted to give a maximum Courant number of 0.5. The flow is
@@ -116,22 +132,24 @@ $$C_d$$, and with `MESH_LEVEL=2`, 1 and 4 processors give the same $$C_d$$
 to the written precision. Columns 11-13 of the force file hold the force from
 the surface traction, which gives $$C_d$$ = 5.36, 5.46 and 5.48.
 
-The other forcing methods of `immersedBoundaryForce` can be compared by
-editing `constant/fvOptions` (see `src/immersedBoundary/README.md`):
+The other forcing methods of `immersedBoundaryForce` (see
+`src/immersedBoundary/README.md`) give:
 
-- `method ghostCell;`: $$C_d$$ = 5.42, 5.51 and 5.55 for `MESH_LEVEL` 1, 2
+- `./Allrun ghostCell`: $$C_d$$ = 5.42, 5.51 and 5.55 for `MESH_LEVEL` 1, 2
   and 3;
-- `method penalty;`: $$C_d$$ = 5.24, 5.38 and 5.48;
-- `method penalty;`, `weighting occupancy;` and `occupancy vertexFraction;`:
+- `./Allrun penalty`: $$C_d$$ = 5.24, 5.38 and 5.48;
+- `./Allrun penalty`, with `weighting occupancy;` and
+  `occupancy vertexFraction;` added to `constant/fvOptions.penalty`:
   $$C_d$$ = 5.45, 5.61 and 5.61;
-- `method incremental;`, `couplingCoeff 0.8;` and
-  `occupancy vertexFraction;`: $$C_d$$ = 6.04, 6.42 and 6.60.
+- `./Allrun incremental` (`couplingCoeff 0.2;`, `occupancy vertexFraction;`
+  and `nOuterCorrectors 5;`, the settings of the verification study):
+  $$C_d$$ = 5.52, 5.70 and 5.72.
 
 The `incremental` method is the direct forcing of the `pimpleHFDIBFoam`
-solver from which the option is derived. Its results also depend on the
-coupling coefficient, the time step and the number of pressure correctors: for
-example, with `MESH_LEVEL=1`, a coupling coefficient of 0.2 gives
-$$C_d = 5.99$$, and a fixed time step of 0.00125 s gives $$C_d = 5.79$$.
+solver from which the option is derived. Unlike the other methods, its results
+also depend on the coupling coefficient, the number of outer correctors and
+the time step; the verification study (`verification/README.md`) quantifies
+this sensitivity.
 
 ## References
 
