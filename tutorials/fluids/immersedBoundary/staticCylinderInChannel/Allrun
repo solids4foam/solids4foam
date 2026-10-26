@@ -1,6 +1,46 @@
 #!/bin/bash
 cd "${0%/*}" || exit  # Run from this directory
 
+usage() {
+cat <<'USAGE'
+Usage:
+  ./Allrun [method]
+
+Where [method] is the forcing method of immersedBoundaryForce, one of:
+  cutLink           (the default in constant/fvOptions)
+  ghostCell
+  penalty
+  incremental
+
+With a method, constant/fvOptions is linked to constant/fvOptions.<method>
+and nOuterCorrectors in system/fvSolution is set to 5 for incremental and 1
+for the other methods; without one, the case is run with the current
+constant/fvOptions and system/fvSolution. The mesh density is set by
+MESH_LEVEL (default 1).
+
+Examples:
+  ./Allrun
+  ./Allrun ghostCell
+  MESH_LEVEL=2 ./Allrun penalty
+USAGE
+}
+
+# Parse the method
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    ""|cutLink|ghostCell|penalty|incremental)
+        METHOD="${1:-}"
+        ;;
+    *)
+        echo "Error: Unknown method '$1'"
+        usage
+        exit 1
+        ;;
+esac
+
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
@@ -10,6 +50,24 @@ source solids4FoamScripts.sh
 # The immersed boundary library is only built with OpenFOAM.com
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# Select the forcing method and its number of outer correctors, as in the
+# verification study: 5 for incremental and 1 for the other methods
+if [ -n "$METHOD" ]
+then
+    ln -vnsf "fvOptions.$METHOD" constant/fvOptions
+
+    N_OUTER=1
+    if [ "$METHOD" = "incremental" ]
+    then
+        N_OUTER=5
+    fi
+    sed "s/^\( *nOuterCorrectors *\)[0-9]*;/\1$N_OUTER;/" \
+        system/fvSolution > system/fvSolution.tmp \
+        && mv system/fvSolution.tmp system/fvSolution
+fi
+echo "Using the $(sed -n 's/^ *method *\([A-Za-z]*\);.*/\1/p' \
+    constant/fvOptions | head -n 1) method"
 
 # Create the mesh; the mesh density is set by MESH_LEVEL (default 1)
 solids4Foam::runApplication blockMesh
