@@ -21,6 +21,14 @@ solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
 nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     solutionAlgorithm    PETScSNES;
+
+    // Start each mesh-motion solve from the extrapolated displacement, so
+    // that the interior moves with the wall: without it, the first iterate
+    // carries the whole wall increment in the cells next to the wall, which
+    // fold once the increment exceeds about half their height (fluid level 2
+    // at deltaT 0.025 s), and the Krylov solve with the lagged
+    // preconditioner stagnates. Needs a ddt(D) scheme in fvSchemes
+    predictor            yes;
 }
 
 // ************************************************************************* //
