@@ -8,6 +8,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Cook's membrane verification studies now store the per-mesh tip
+  displacements of the published references migrated from solid-benchmarks
+  (Simo and Armero, César de Sá et al., Areias and Abaqus for the
+  elastoplastic case; Zienkiewicz and Taylor and Abaqus for the linear-elastic
+  case), list them in the summary and plot them against the sweep. The
+  elastoplastic tutorial gains an unstructured triangular-prism Gmsh mesh
+  (`./Allrun triangular`), which its study sweeps with `--mesh triangular`.
+- The `compressedSpheres` and `twistingHemisphere` READMEs now point to the
+  finer meshes of the original benchmarks in the solids4foam website archive,
+  instead of the solid-benchmarks repository.
 - The fluid-solid interface passes the interface motion to the fluid mesh
   motion solver through a runtime-selectable *fluid mesh motion coupler*,
   selected from the motion solver or with an optional `fluidMeshMotion`
