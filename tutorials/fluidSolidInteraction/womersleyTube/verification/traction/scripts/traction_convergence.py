@@ -12,7 +12,7 @@ steps per period and the time series 100/200/400 on m2:
     p = log(|E1 - E2| / |E2 - E4|) / log 2   (reference-free),
   - Richardson limit E_inf = E4 + (E4 - E2)/(2^p_used - 1) with p_used = 2
     (the formal order) and with the observed p, as the estimate of the
-    continuum (model-form) part of the error; their difference is quoted as
+    resolution-independent part of the error; their difference is quoted as
     the uncertainty of that estimate.
 Writes OUT_DIR/traction_convergence.json, .csv, a Markdown table and plots.
 """

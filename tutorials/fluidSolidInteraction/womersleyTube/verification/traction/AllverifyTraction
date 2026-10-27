@@ -58,8 +58,11 @@ prepare amp4 --amplitude 4.0
 prepare tol --coupling-tol-factor 0.01
 
 if [[ $ANALYSIS_ONLY == 0 ]]; then
-    (cd "$WORK/mu5/womersleyTube" && ./verification/Allverify --study all --cores "$CORES") || true
+    failed=()
+    (cd "$WORK/mu5/womersleyTube" && ./verification/Allverify --study all --cores "$CORES") \
+        || failed+=("mu5: verification/Allverify (see its output above)")
     pids=()
+    names=()
     for job in "mu5 robin:4:400" "amp05 robin:2:200" "amp2 robin:2:200" \
                "amp4 robin:2:200 robin:1:200" "tol robin:2:200"; do
         set -- $job
@@ -67,9 +70,36 @@ if [[ $ANALYSIS_ONLY == 0 ]]; then
         python3 -I -u "$SCRIPTS/run_single.py" "$WORK/$name/womersleyTube" "$@" \
             > "$WORK/$name/log.run_single" 2>&1 &
         pids+=($!)
+        names+=("$name")
         while [[ $(jobs -rp | wc -l) -ge $CORES ]]; do sleep 5; done
     done
-    for pid in "${pids[@]}"; do wait "$pid" || true; done
+    for i in "${!pids[@]}"; do
+        wait "${pids[$i]}" \
+            || failed+=("${names[$i]}: run_single.py (see $WORK/${names[$i]}/log.run_single)")
+    done
+    if [[ ${#failed[@]} -gt 0 ]]; then
+        echo "ERROR: ${#failed[@]} required run(s) failed; no analysis made:" >&2
+        printf '  %s\n' "${failed[@]}" >&2
+        exit 1
+    fi
+fi
+
+# Every run the analysis needs must have written the diagnostic output
+missing=()
+for req in "mu5 robin_m1_n200 robin_m2_n200 robin_m4_n200 robin_m4_n400 robin_m2_n100 robin_m2_n400" \
+           "amp05 robin_m2_n200" "amp2 robin_m2_n200" "amp4 robin_m2_n200 robin_m1_n200" \
+           "tol robin_m2_n200"; do
+    set -- $req
+    name="$1"; shift
+    for case in "$@"; do
+        f="$WORK/$name/womersleyTube/verification/work/$case/postProcessing/interfaceTraction/fluid.dat"
+        [[ -s "$f" ]] || missing+=("$name/$case")
+    done
+done
+if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "ERROR: incomplete input, ${#missing[@]} required run(s) missing under $WORK:" >&2
+    printf '  %s\n' "${missing[@]}" >&2
+    exit 1
 fi
 
 for name in mu5 amp2 tol; do
@@ -77,6 +107,7 @@ for name in mu5 amp2 tol; do
 done
 python3 -I "$SCRIPTS/attenuation_limit.py" "$WORK/mu5/womersleyTube" "$WORK/attenuation_limit_mu5.json" robin > /dev/null
 python3 -I "$SCRIPTS/amplitude_series.py" "$WORK" "$WORK/amplitude_series.json"
+python3 -I "$SCRIPTS/amplitude_series.py" "$WORK" "$OUT/amplitude_series_m1.json" robin_m1_n200
 python3 -I "$SCRIPTS/traction_convergence.py" "$OUT" "$WORK/mu5/womersleyTube:robin" > /dev/null
 python3 -I "$SCRIPTS/decomposition_summary.py" "$WORK" "$OUT" > "$OUT/findings_summary.txt"
 cp "$WORK/mu5/womersleyTube/verification/postProcessing/interfaceTraction_cases.csv" "$OUT/"

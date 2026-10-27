@@ -30,11 +30,22 @@ solution. It also decomposes the tutorial's attenuation error.
 Runs are made in `work/`, and results are written to `postProcessing/`. Both
 are git-ignored.
 
+A failed run, or a required run missing from `work/` (also with
+`--analysis-only`), stops the script with a list of the affected runs and exit
+status 1; no partial analysis is made.
+
+The full study has not yet been run end-to-end as the single command
+`./AllverifyTraction --cores 6`. The results below were obtained from the same
+components (`prepare_study.py`, the tutorial's `Allverify`, `run_single.py`)
+run as separate commands, and re-analysed with `--analysis-only`; `--quick` was
+run end-to-end. The CPU-time estimate is the sum of those runs on one machine.
+
 Outputs:
 
 - `interfaceTraction_cases.csv`, `traction_cases_all.csv`: per run;
 - `traction_convergence.{json,md}`;
 - `findings_summary.{json,txt}`;
+- `amplitude_series_m1.json`: amplitude slope on m1 (a = 1 and 4);
 - `traction_checks.txt`;
 - plots, all generated from the JSON/CSV files.
 
@@ -72,7 +83,7 @@ issue #583).
 | Copy | Runs | Purpose |
 |---|---|---|
 | `mu5` | standard study (m1/m2/m4 at 200 steps/period; m2 at 50/100/200/400; IQN-ILS and Robin) plus m4/400 | spatial and temporal error; non-intrusiveness |
-| `amp05`, `amp2`, `amp4` | m2/200 (`amp4` also m1/200) | finite-amplitude part; mesh dependence of its slope |
+| `amp05`, `amp2`, `amp4` | m2/200 (`amp4` also m1/200) | amplitude-dependent part; mesh dependence of its slope |
 | `tol` | m2/200, coupling tolerances × 0.01 | coupling-iteration error |
 <!-- markdownlint-enable MD013 -->
 
@@ -122,9 +133,16 @@ extrapolation.
   therefore (2/3)μ∂u_n/∂n instead of 2μ∂u_n/∂n.
 - The momentum equation uses the same boundary flux, so this is a consistent,
   conservative split.
-- The wall pressure absorbs the difference: in the extrapolated limit the total
-  normal traction agrees with the exact solution along the deficit direction to
-  about 13 % of the deficit.
+- The wall pressure can therefore absorb the difference. This pressure
+  compensation is physically plausible but **not directly established** by
+  these calculations:
+  - at the computed resolutions the total normal traction error (1.0e-3 of
+    \|p\| at m4/400) is larger than the deficit (3.7e-4 of \|p\|), so the
+    compensation cannot be observed there;
+  - the near-agreement applies only to the extrapolated limit (space, time and
+    amplitude). There the residual is nonzero: about 1.2e-4 of \|p\|, roughly
+    one third of the deficit. Along the deficit direction it is −0.13 of the
+    deficit; 1.1e-4 of \|p\| lies across it, origin unidentified.
 - This is a statement about how the normal traction is split between pressure
   and viscous parts. **No error in the transferred total traction is
   demonstrated.**
@@ -136,20 +154,31 @@ extrapolation.
 |---|---|---|
 | temporal error at 200 steps/period | −0.67e-3 | measured m4/200 vs m4/400 with q = 2 |
 | spatial error | −0.07e-3 | m1/m2/m4 series non-monotone (−2.08, −2.18, −1.96e-3): bounded by ±0.22e-3 |
-| finite-amplitude part | −1.09e-3 | linear fit over a = 0.5–4 at m2/200 (observed exponent 1.00, misfit 4e-6); slope on m1 within 2 % |
+| amplitude-dependent part | −1.09e-3 | linear fit over a = 0.5–4 at m2/200 (observed exponent 1.00, misfit 4e-6); the m1 slope (a = 1 and 4) differs by 2.0 % |
 | residual | −0.13e-3 ± 0.24e-3 | remainder |
 <!-- markdownlint-enable MD013 -->
 
-The finite-amplitude part is an **estimated model-form contribution**: the
-difference between the nonlinear problem solved at the tutorial amplitude and
-the linear reference. Assumptions:
+The amplitude-dependent part is an **amplitude-dependent contribution, linear
+in the tested amplitude range, origin unidentified**. Assumptions:
 
 - the slope measured at m2/200 holds at m4 and in the Δt → 0 limit (checked
   for m1 vs m2; not checked in Δt);
 - the error parts are additive.
 
-Its physical mechanism is not identified. The mean wall displacement is O(a²)
-and only 2.7e-4 of the first harmonic.
+Why its origin is open:
+
+- The forcing is a pure harmonic. For a smooth periodic response, reversing
+  the sign of the amplitude is equivalent to a half-period time shift, so the
+  leading relative nonlinear correction to the first harmonic is expected to
+  be O(a²).
+- The observed, approximately linear dependence on positive amplitude is not
+  explained by this simple smooth periodic-response argument. The mean wall
+  displacement is O(a²) and only 2.7e-4 of the first harmonic.
+- The observations are not sufficient to establish a physical or numerical
+  mechanism. One possible explanation is contamination from the initial
+  condition (the linear exact solution) carried into the analysis window by a
+  slowly decaying free mode (see `../womersley_temporal_investigation.md`).
+  **This explanation has not been tested.**
 
 On m2 (the standard study's time series) the attenuation error is −4.24, −2.18,
 −1.69e-3 at 100/200/400 steps/period (time order 2.07). It is mesh-independent
@@ -171,3 +200,5 @@ at fixed 200 steps/period, but not time-step-independent.
   traction, not boundary `sigma`, for interface loads. No defect is implied.
 - Only one geometry, one solid model (linear geometry) and the Robin–Neumann
   coupling were studied in full. IQN-ILS was compared at m2/100 only.
+- The full driver has not been run end-to-end (see Usage); an independent
+  rerun of the full study is still required.

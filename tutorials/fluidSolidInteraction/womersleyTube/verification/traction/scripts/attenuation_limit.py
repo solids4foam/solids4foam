@@ -16,7 +16,7 @@ usage: attenuation_limit.py STUDY_DIR [OUT_JSON] [COUPLING]   (COUPLING: robin |
        (p = 2 if the observed p is not usable);
      - E0 = E(m4,n400) + [E(m4,n400) - E(m4,n200)]/3
             + [E(m4,n200) - E(m2,n200)]/(2^p - 1).
-   E0 is the estimate of the continuum (model-form) discrepancy; the spread
+   E0 is the estimate of the resolution-independent discrepancy; the spread
    between the p = 2 and observed-p variants is quoted as its uncertainty.
 3. Computes, with the study's own exact-solution script, the change of the
    exact wave number and wall response when the interface normal viscous
@@ -40,7 +40,7 @@ ref = json.loads(V.REFERENCE_FILE.read_text())
 CP = sys.argv[3] if len(sys.argv) > 3 else "robin"
 QOIS = ["attenuation", "speed", "wallMid_amp", "wallMid_phase", "flow_amp", "flow_phase"]
 
-rows = {}
+rows, skipped = {}, {}
 for case in sorted((study / "verification/work").iterdir()):
     try:
         coupling, m, n = case.name.split("_")
@@ -49,7 +49,17 @@ for case in sorted((study / "verification/work").iterdir()):
         r = V.analyse(spec, ref)
         rows[case.name] = {q: r[q] for q in QOIS if q in r}
     except Exception as e:  # noqa: BLE001
+        skipped[case.name] = str(e)
         print(f"skip {case.name}: {e}")
+
+# the runs the limits below are built from
+required = [f"{CP}_m{m}_n{s}" for m, s in ((1, 200), (2, 200), (4, 200), (4, 400),
+                                           (2, 100), (2, 400))]
+absent = [n for n in required if n not in rows]
+if absent:
+    sys.exit("attenuation_limit.py: required run(s) missing or not analysable in "
+             f"{study / 'verification/work'}:\n  "
+             + "\n  ".join(f"{n}: {skipped.get(n, 'not found')}" for n in absent))
 
 
 def get(name, q):

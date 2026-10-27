@@ -14,8 +14,8 @@ Attenuation/wave-QoI budget at (m4, 200 steps/period):
   temporal part   E(m4,n200) - E(m4, dt->0), from m4 at 200/400 with q = 2;
   spatial part    -(E(m4) - E(m2))/(2^p - 1) at n200 (p = 2 and observed p);
   amplitude part  slope of the linear fit over a = 0.5, 1, 2, 4 at m2/n200,
-                  times a = 1 (assumed independent of h and dt; the m1 and m2
-                  slopes agree to 2 %);
+                  times a = 1 (assumed independent of h and dt; the m1 slope,
+                  from a = 1 and 4, differs from the m2 slope by 2.0 %);
   residual        the remainder.
 Uncertainty of the residual: spatial part bounded by |E(m4) - E(m2)| when the
 m1/m2/m4 series is non-monotone (Richardson not applicable), otherwise by the
@@ -136,7 +136,7 @@ plt.close(fig)
 
 b = out["waveQoIs"]["attenuation"]
 parts = [("temporal (n200)", b["temporal_error_at_n200"]), ("spatial (m4)", b["spatial_error_m4_p2"]),
-         ("finite amplitude", b["finite_amplitude_part"]), ("residual (linear continuum)", b["residual_linear_continuum"])]
+         ("amplitude-dependent", b["finite_amplitude_part"]), ("residual (linear continuum)", b["residual_linear_continuum"])]
 fig, ax = plt.subplots(figsize=(6.5, 3.6))
 ax.barh([p[0] for p in parts], [p[1] * 1e3 for p in parts], color=["#4c72b0", "#55a868", "#c44e52", "#8172b2"])
 ax.axvline(b["prediction_f1/3_infiniteTube"] * 1e3, color="k", ls="--", lw=0.8, label="f=1/3, infinite tube")

@@ -368,7 +368,7 @@ directories, as does `./Allclean all` in the case directory; the plain case
 `traction/AllverifyTraction` measures the interface traction itself against the
 exact solution: the pressure, the normal and shear viscous parts, the momentum
 equation's wall flux and the traction applied to the solid. It also separates
-the attenuation error into temporal, spatial, finite-amplitude and residual
+the attenuation error into temporal, spatial, amplitude-dependent and residual
 parts. It is opt-in, does not change the tutorial, and is described in
 [traction/README.md](traction/README.md).
 

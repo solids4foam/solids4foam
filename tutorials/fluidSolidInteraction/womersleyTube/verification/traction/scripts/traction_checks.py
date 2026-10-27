@@ -3,7 +3,7 @@
 
 usage: traction_checks.py STUDY_DIR [--quick]
 Checks only implementation consistency and the convergence of the shear
-traction. The normal-viscous ratio, Richardson limits and model-form
+traction. The normal-viscous ratio, Richardson limits and amplitude-series
 estimates are reported by the other scripts and are deliberately NOT
 pass/fail criteria.
   1. viscous traction transferred to the solid = the momentum equation's own
