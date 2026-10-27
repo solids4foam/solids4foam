@@ -629,7 +629,7 @@ download it from the solids4foam website (`tutorials/archive`).
   solids4Foam::downloadFile \
       "https://www.solids4foam.com/tutorials/archive/ArosticaEtAl2025.zip" \
       data/ArosticaEtAl2025.zip \
-      c998559b9af72b78ea86f12c28cada94e656818f63068d8fb95ee80ba57742a5 \
+      08a13aad266f0b30a2c311508769cfa37779a33238ff00399d98019c3befc5a3 \
       || exit 1
   ```
 

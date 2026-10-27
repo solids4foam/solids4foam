@@ -15,12 +15,15 @@
 #     step2B   blinded parameter variation, case B
 #     step2C   blinded parameter variation, case C
 #
-# The mesh density is set with MESH_NUMBER, 1 (coarsest) to 3, default 2. The
+# The mesh density is set with MESH_NUMBER, 1 (coarsest) to 4, default 2. The
 # all-hexahedral meshes, with an O-grid at the apex, are downloaded from the
-# solids4foam website (ArosticaEtAl2025.zip, with the script that generates
-# them, which also writes level 4). The time series of the active stress and
-# the cavity pressure are tabulated by the makeArosticaTimeSeries utility in
-# the parent directory, which Allrun compiles. e.g.
+# solids4foam website (ArosticaEtAl2025.zip). Level 4 is not stored: Allrun
+# extracts the script that generates the meshes, makeOGridMesh.py, and asks
+# for it to be run once (Python 3) before MESH_NUMBER=4.
+#
+# The time series of the active stress and the cavity pressure are tabulated
+# by the makeArosticaTimeSeries utility in the parent directory, which Allrun
+# compiles. e.g.
 #     MESH_NUMBER=3 ./Allrun step1 displacement parallel
 #
 # Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
@@ -52,15 +55,14 @@ fi
 
 # The meshes are downloaded once from the solids4foam website, into data/
 ARCHIVE_URL="https://www.solids4foam.com/tutorials/archive/ArosticaEtAl2025.zip"
-ARCHIVE_SHA256="c998559b9af72b78ea86f12c28cada94e656818f63068d8fb95ee80ba57742a5"
+ARCHIVE_SHA256="08a13aad266f0b30a2c311508769cfa37779a33238ff00399d98019c3befc5a3"
 ARCHIVE="data/ArosticaEtAl2025.zip"
 
 # Mesh level
 MESH_NUMBER="${MESH_NUMBER:-2}"
-if [[ ! "$MESH_NUMBER" =~ ^[1-3]$ ]]
+if [[ ! "$MESH_NUMBER" =~ ^[1-4]$ ]]
 then
-    echo "MESH_NUMBER must be 1, 2 or 3, not '$MESH_NUMBER'. Level 4 is"
-    echo "written by makeOGridMesh.py, in $ARCHIVE once downloaded."
+    echo "MESH_NUMBER must be 1, 2, 3 or 4, not '$MESH_NUMBER'"
     exit 1
 fi
 
@@ -143,10 +145,27 @@ command -v unzip > /dev/null 2>&1 || {
     echo "unzip: command not found, which is required for this case"
     exit 0
 }
-rm -rf constant/polyMesh data/ArosticaEtAl2025/benchmark1
-unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER/*" -d data
-cp -r "data/ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER/constant/polyMesh" \
-    constant/polyMesh
+MESH_DIR="data/ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER"
+rm -rf constant/polyMesh
+if [[ "$MESH_NUMBER" == "4" ]]
+then
+    # Level 4 (819 200 cells) is not stored: it is written once by
+    # makeOGridMesh.py, from the archive, in the same layout as levels 1 to 3
+    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/makeOGridMesh.py" -d data
+    # The owner header holds the mesh sizes: a missing, partial or other
+    # level mesh is not used
+    if ! grep -qs "nCells:819200 " "$MESH_DIR/constant/polyMesh/owner"
+    then
+        echo "Level 4 is not stored in $ARCHIVE. Write it once with"
+        echo "(cd data/ArosticaEtAl2025 && python3 makeOGridMesh.py 4 benchmark1/mesh4)"
+        echo "and run MESH_NUMBER=4 ./Allrun again."
+        exit 1
+    fi
+else
+    rm -rf "$MESH_DIR"
+    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER/*" -d data
+fi
+cp -r "$MESH_DIR/constant/polyMesh" constant/polyMesh
 solids4Foam::runApplication checkMesh
 
 # Transmural coordinate t, fibres f0, sheets s0 and sheet-normals n0

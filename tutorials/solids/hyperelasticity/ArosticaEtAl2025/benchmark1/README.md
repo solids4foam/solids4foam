@@ -48,15 +48,22 @@ in the reference gmsh script of the benchmark toolkit.
 against its SHA-256 sum, into `data/`). Endo- and epicardium are exact
 ellipsoids; nodes through the wall interpolate linearly between them.
 Patches: `endo`, `epi`, `base`. The archive holds levels 1 to 3 and the
-script that generates them, `makeOGridMesh.py` (Python 3), which also writes
-level 4 into a case.
+script that generates them, `makeOGridMesh.py` (Python 3). Level 4 is not
+stored: for `MESH_NUMBER=4`, `Allrun` extracts the script and asks for it to be
+run once, from this directory, with
+
+```bash
+(cd data/ArosticaEtAl2025 && python3 makeOGridMesh.py 4 benchmark1/mesh4)
+```
+
+(`Allclean` removes `data/`, and with it this mesh.)
 
 | `MESH_NUMBER` | square side × ring × wall | cells |
 | --- | --- | --- |
 | 1 | 8 × 18 × 3 | 1 920 |
 | 2 (default) | 16 × 36 × 5 | 12 800 |
 | 3 | 32 × 72 × 10 | 102 400 |
-| 4 (generated, see above) | 64 × 144 × 20 | 819 200 |
+| 4 (generated once, see above) | 64 × 144 × 20 | 819 200 |
 
 An O-grid is used rather than a meridian slice revolved about the long axis
 (as in LandEtAl2015/problem3), whose fan of wedge cells on the axis

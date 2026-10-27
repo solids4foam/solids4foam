@@ -47,11 +47,12 @@ mechanical
         k               100;
 
         // Fibres and sheets from 0/f0 and 0/s0: the rule-based (BT-LDRB)
-        // fibres distributed with the benchmark, see ../scripts/convertBiVMesh.py
+        // fibres distributed with the benchmark, see convertBiVMesh.py in
+        // ArosticaEtAl2025.zip
         uniformFibreField no;
 
         // Active stress tau(t), the solution of eq. (5) with Table 8,
-        // tabulated by ../scripts/makeTimeSeries.py
+        // tabulated by ../makeArosticaTimeSeries
         activeStressSeries
         {
             "file|fileName" "$FOAM_CASE/constant/activeStress";
