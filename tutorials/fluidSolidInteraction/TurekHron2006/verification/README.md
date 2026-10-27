@@ -21,6 +21,8 @@ cd tutorials/fluidSolidInteraction/HronTurek/verification
 ./Allverify --study coupling           # Robin vs IQN-ILS, 1x and 2x meshes
 ./Allverify --quick                    # smoke run to t = 2.3 s, no checks
 ./Allverify --reuse                    # re-evaluate completed runs
+./Allverify --coupling monolithic --levels 1,2,4   # quasi-monolithic coupling
+./Allverify --coupling monolithicAMI   # the same on the tutorial meshes (AMI)
 ```
 
 The driver requires `python3`, `blockMesh` and `solids4Foam`; `gnuplot` is
@@ -284,7 +286,12 @@ negligible against the tolerances below.
   on the 2x mesh or `3%` on the 4x mesh. The tolerances follow from the
   recorded errors below. `u_y` converges at an observed order of about 1.6,
   so its error falls by a factor of about three per level. The 4x tolerance
-  is an extrapolation, because the 4x level has not yet been run.
+  is an extrapolation, because the 4x level has not yet been run. The
+  tolerances belong to the plate resolution, not to the refinement factor:
+  the driver applies those of the tutorial level whose solid mesh the run's
+  matches. The conformal meshes of `--coupling monolithic` have a quarter of
+  the tutorial's solid cells at each factor, so their 4x level is checked
+  against the 2x tolerances.
 - `u_x(A)` (`23 μm`, the axial stretch of the plate) and the lift (`0.76 N/m`,
   set by the small asymmetry of the cylinder position) are reported with a
   `3%` indicative tolerance but do not fail the study. They are small
@@ -541,6 +548,66 @@ The 4x level (`Δt = 0.00025 s`, 16 ranks by default) is reachable with
 `--levels 1,2,4`, but it has not been run. Its end time would first have to
 be checked against the mesh drift described above: the finer mesh
 distorted sooner.
+
+## Quasi-monolithic coupling
+
+`--coupling monolithic` runs the studies with the quasi-monolithic Newton
+coupling (`./Allrun monolithic`), on its conformal interface meshes. These
+have a quarter of the tutorial's solid cells at each refinement factor (5 by
+30 cells on the plate at 1x), so the reference tolerances of a run are those of
+the tutorial level whose plate it matches: conformal 2x and 4x are checked as
+tutorial 1x and 2x. `--coupling monolithicAMI` runs the same variant on the
+tutorial meshes instead, with `interfaceTransferMethod AMI`, so that it can be
+compared with the partitioned couplings on identical meshes and time steps.
+
+The fluid mesh moves with a `diffusionHyperElastic` pseudo-solid stiffened near
+the plate and the cylinder. With a uniform pseudo-solid, linear or
+neo-Hookean, the fluid mesh inverts at `t = 2.76 s` in the FSI3 start-up
+overshoot to about 40 mm, which IQN-ILS shows on the same meshes too.
+
+Recorded with OpenFOAM v2512 on an Apple M1 Ultra shared with other jobs, with
+the `newtonIcoFluid` continuity fix of PR #597, which changed every result:
+before it, the FSI3 amplitude on the tutorial 2x mesh was 7.7% below that of
+IQN-ILS. Every coupled step converged in 2 or 3 Newton iterations (FSI1:
+1.3-1.4).
+
+FSI1, serial, errors against Featflow level 7+0 (both studies pass; "Plate
+as" is the tutorial level of the same plate resolution):
+
+| Meshes | Level | Plate as | `u_x(A)` | `u_y(A)` | drag | lift | Clock (s) |
+|---|---|---:|---:|---:|---:|---:|---:|
+| conformal | 1x | 0.5x | +15.3% | -35.0% | -0.44% | +15.1% | 141 |
+| conformal | 2x | 1x | -0.46% | -13.2% | -0.02% | +6.0% | 669 |
+| conformal | 4x | 2x | -0.35% | -3.81% | +0.07% | +1.8% | 6 239 |
+| tutorial, AMI | 1x | 1x | -1.13% | -12.7% | -0.25% | +5.4% | 448 |
+| tutorial, AMI | 2x | 2x | -0.76% | -3.87% | -0.08% | +1.7% | 2 256 |
+| tutorial, AMI | 4x | 4x | -0.43% | -1.07% | -0.02% | +0.50% | 17 868 |
+
+IQN-ILS on the tutorial 1x and 2x meshes (FSI1 recorded results above) has
+`u_y(A)` errors of -14.2% and -4.6%.
+
+FSI3 (`t = 7 s`, last second), errors against Featflow level 4. The conformal
+4x level ran on 12 ranks in 3.7 h, the AMI levels on 8 ranks in 831 s and
+1.8 h; IQN-ILS on the tutorial 2x mesh took 4.1 h on 8 ranks:
+
+| Quantity | conformal 2x | conformal 4x | AMI 1x | AMI 2x | IQN-ILS 2x |
+|---|---:|---:|---:|---:|---:|
+| `u_x` mean | 2.8% | 0.4% | 25.6% | 8.8% | 3.1% |
+| `u_x` amplitude | 4.6% | 0.0% | 23.8% | 8.1% | 2.1% |
+| `u_y` amplitude | 2.1% | 0.6% | 17.6% | 5.4% | 2.3% |
+| `u_y` frequency | 3.6% | 1.7% | 2.5% | 1.4% | 1.2% |
+| drag mean | 4.2% | 1.7% | 1.4% | 0.3% | 0.3% |
+| drag amplitude | 6.0% | 2.9% | 19.5% | 8.2% | 1.2% |
+| lift amplitude | 46.1% | 12.7% | 44.1% | 10.9% | 13.3% |
+
+The conformal study passes; its finest level, with the plate resolution of the
+tutorial 2x mesh, is within 0.6% of Featflow in `u_y` amplitude. The AMI study
+fails one check: its 2x `u_y` amplitude is 5.4% below Featflow, against a 5%
+tolerance. On the identical tutorial meshes the quasi-monolithic `u_y`
+amplitude is 3.7% (1x) and 3.1% (2x) below that of IQN-ILS, a difference that
+falls slowly with refinement; IQN-ILS is then closer to Featflow in the
+displacements and the drag amplitude, and the quasi-monolithic coupling in
+the lift amplitude.
 
 ## References
 

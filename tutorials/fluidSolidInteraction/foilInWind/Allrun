@@ -1,0 +1,110 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# The fluid mesh is refined with setSet and refineMesh, and the flow is
+# initialised with potentialFoam, which have only been set up for OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# PETSc is required for the solid solver
+solids4Foam::requirePetscOrExitSilently
+
+# Example usage
+# ./Allrun                      # partitioned IQNILS, serial
+# ./Allrun parallel             # partitioned IQNILS, parallel
+# ./Allrun aitken               # partitioned Aitken, serial
+# ./Allrun aitken parallel      # partitioned Aitken, parallel
+# ./Allrun monolithic           # quasi-monolithic Newton, serial
+# ./Allrun monolithic parallel  # quasi-monolithic Newton, parallel
+
+coupling=iqnils
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        aitken|Aitken)
+            coupling=aitken
+            ;;
+        iqnils|IQNILS)
+            coupling=iqnils
+            ;;
+        monolithic|Monolithic)
+            coupling=monolithic
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [iqnils|aitken|monolithic] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling setup"
+
+# Restore 0 directory, as potentialFoam overwrites the fluid velocity
+restore0Dir
+
+# The Aitken and quasi-monolithic files are stored as *.aitken and
+# *.monolithic variants
+if [[ "${coupling}" == "iqnils" ]]; then
+    solids4Foam::restoreCaseVariant .
+else
+    solids4Foam::selectCaseVariant . "${coupling}"
+fi
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Refine the fluid mesh around the flag, so that it conforms to the solid mesh
+solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
+solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
+
+# Initialise the fluid velocity with a potential flow solution; the
+# solids4foam library is loaded for the flag velocity boundary condition
+solids4Foam::runApplication potentialFoam -region fluid -lib solids4FoamModels
+
+# Run solver
+if [[ "${runMode}" == "parallel" ]]; then
+    # Run parallel
+    if [[ "${coupling}" == "monolithic" ]]; then
+        # Decompose the fluid and solid regions together as one graph, so that
+        # some ranks can own only fluid cells; see system/decomposeParDict
+        solids4Foam::runApplication decomposeParMonolithic -force
+    else
+        solids4Foam::runApplication -s fluid decomposePar -region fluid
+        solids4Foam::runApplication -s solid decomposePar -region solid
+    fi
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+    if [ $(find . -name force.dat | wc -l) -eq 1 ]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

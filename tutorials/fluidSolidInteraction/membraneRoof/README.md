@@ -131,6 +131,26 @@ in `system/solid/fvSolution`, which is fine in serial or on a few processes.
 `Allrun` also writes `deflection.pdf` with gnuplot, comparing the roof-centre
 displacement with the reference.
 
+### Quasi-monolithic variant
+
+`./Allrun monolithic` (optionally with `parallel`) runs the case with the
+quasi-monolithic Newton coupling (`fluidSolidInterface NewtonQuasiMonolithic`),
+where the fluid velocity and pressure and the solid velocity are solved
+together with PETSc SNES in every time step; the fluid mesh motion is a
+separate `neoHookeanElastic` solid model in the fluid region. Its files are
+stored as `*.monolithic` variants, which `Allrun` links in and `Allclean`
+removes. The roof is the `nonLinearGeometryTotalLagrangianVelocity` solid model
+with the same St Venant-Kirchhoff law.
+
+On the default mesh, the mean roof-centre displacement between $$1$$ and $$4$$
+s is $$-0.37$$ m, against $$-0.25$$ m for the partitioned coupling, $$-0.35$$ m
+for the partitioned coupling on the finer mesh, and $$-0.36$$ m for the
+reference; the roof oscillates between $$-0.41$$ and $$-0.27$$ m and crosses
+zero at $$t = 4.6$$ s. The velocity solid integrates nearly without numerical
+damping, which is consistent with the sensitivity of the partitioned result to
+the damping of the time schemes described below. A serial monolithic run takes
+about five times as long per time step as the partitioned run.
+
 ## Results
 
 ```warning

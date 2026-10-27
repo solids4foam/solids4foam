@@ -243,4 +243,20 @@ void Foam::interfaceToInterfaceMapping::checkFieldSizes
 }
 
 
+void Foam::interfaceToInterfaceMapping::zoneToZoneFaceWeights
+(
+    const standAlonePatch& fromZone,
+    const standAlonePatch& toZone,
+    labelListList& addressing,
+    scalarListList& weights
+) const
+{
+    FatalErrorInFunction
+        << "The face transfer weights are not available for the "
+        << type() << " interface-to-interface mapping" << nl
+        << "Use directMap for a conformal interface or AMI for a "
+        << "non-conformal interface" << abort(FatalError);
+}
+
+
 // ************************************************************************* //

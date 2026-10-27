@@ -675,28 +675,32 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
         // Use the segregated solver as a predictor
         //evolveImplicitSegregated();
+    }
 
-        // Map the D field to the SNES solution vector
-        foamPetscSnesHelper::InsertFieldComponents<vector>
+    // Seed the SNES solution vector from the current fields on every time
+    // step, as linGeomTotalDispSolid does, so that initial conditions,
+    // restarts and externally set fields (e.g. FSI mesh motion) are not
+    // overwritten by a stale solution vector. On a restart the vector is
+    // otherwise zero, and the first residual is that of a zero displacement
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        primitiveFieldRef(D()),
+        foamPetscSnesHelper::solution(),
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    if (solvePressure())
+    {
+        // Map the p field to the SNES solution vector
+        foamPetscSnesHelper::InsertFieldComponents<scalar>
         (
-            primitiveFieldRef(D()),
+            p(),
             foamPetscSnesHelper::solution(),
-            0, // Location of first component
-            solidModel::twoD()
-          ? makeList<label>({0,1})
-          : makeList<label>({0,1,2})
+            blockSize_ -1 // Location of first component
         );
-
-        if (solvePressure())
-        {
-            // Map the p field to the SNES solution vector
-            foamPetscSnesHelper::InsertFieldComponents<scalar>
-            (
-                p(),
-                foamPetscSnesHelper::solution(),
-                blockSize_ -1 // Location of first component
-            );
-        }
     }
 
     // Solve the nonlinear system and check the convergence
@@ -890,9 +894,80 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::fvOptionsSource() const
 #endif
 
 
+template<class GeoField>
+Foam::tmp<GeoField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::readRestartField
+(
+    const word& name
+) const
+{
+    if (!restart() || mesh().time().startTimeIndex() == 0)
+    {
+        return tmp<GeoField>();
+    }
+
+    IOobject io
+    (
+        name,
+        mesh().time().timeName(),
+        mesh(),
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    if (!io.typeHeaderOk<GeoField>(true))
+#else
+    if (!io.headerOk())
+#endif
+    {
+        return tmp<GeoField>();
+    }
+
+    Info<< "Reading " << name << " of the start time" << endl;
+
+    return tmp<GeoField>(new GeoField(io, mesh()));
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpKf() const
+{
+    // The implicit stiffness and its interpolation are frozen at the start
+    // of the run. On a restart of a solid that moves a fluid mesh, the mesh
+    // read is the deformed mesh of the start time, and the interpolation
+    // weights differ from those of the original run: the values of the
+    // original run are read instead, if they were written
+    // The name is that given by fvc::interpolate, which the scheme names of
+    // the terms with impKf are formed from
+    tmp<surfaceScalarField> tImpKf
+    (
+        readRestartField<surfaceScalarField>("interpolate(impK)")
+    );
+
+    if (tImpKf.valid())
+    {
+        return tImpKf;
+    }
+
+    return fvc::interpolate(impK_);
+}
+
+
 Foam::tmp<Foam::volScalarField>
 Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 {
+    // On a restart, the frozen implicit stiffness of the original run (see
+    // makeImpKf)
+    {
+        tmp<volScalarField> tImpK(readRestartField<volScalarField>("impK"));
+
+        if (tImpK.valid())
+        {
+            return tImpK;
+        }
+    }
+
     // With the mixed displacement-pressure formulation the implicit stiffness
     // is the scalar Laplacian surrogate for div(dev(sigma)), which is
     // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu, as in
@@ -1029,7 +1104,7 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         fvc::d2dt2(D())
     ),
     impK_(makeImpK()),
-    impKf_(fvc::interpolate(impK_)),
+    impKf_(makeImpKf()),
     rImpK_(1.0/impK_),
     rKappaPtr_(),
     dpdtPtr_(),
@@ -1140,6 +1215,12 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         // The predictor uses the acceleration of the last step: write it, so
         // that a restart predicts the same first step as the original run
         A_.writeOpt() = IOobject::AUTO_WRITE;
+
+        // The implicit stiffness is frozen at the start of the run: write it,
+        // so that a restart uses that of the original run (see makeImpKf)
+        const_cast<volScalarField&>(impK_).writeOpt() = IOobject::AUTO_WRITE;
+        const_cast<surfaceScalarField&>(impKf_).writeOpt() =
+            IOobject::AUTO_WRITE;
 
         // The framework restores its own constitutive state through the
         // registered state fields, so there is nothing to tell it here

@@ -11,12 +11,23 @@ source solids4FoamScripts.sh
 # ./Allrun dirichletNeumann
 # ./Allrun sonicLiquidFluid
 # ./Allrun weakCoupling
+# ./Allrun monolithic
 
 # This case requires PETSc to be installed
 solids4Foam::requirePetscOrExitSilently
 
+# Start from the default (partitioned) variant
+solids4Foam::restoreCaseVariant .
+
 # Select approach
-if [[ "$1" == "sonicLiquidFluid" ]]; then
+if [[ "$1" == "monolithic" ]]; then
+    # Quasi-monolithic Newton approach, only implemented for OpenFOAM.com; its
+    # files are stored as *.monolithic variants
+    echo "Using the quasi-monolithic Newton approach"
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    solids4Foam::selectCaseVariant . monolithic
+elif [[ "$1" == "sonicLiquidFluid" ]]; then
     # Dirichlet-Neumann sonicLiquidFluid approach
     echo "Using the Dirichlet-Neumann sonicLiquidFluid approach"
     for file in $(find ./0 ./constant ./system -name '*.sonicLiquidFluid')

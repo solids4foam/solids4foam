@@ -22,7 +22,7 @@ License
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "symmetryPolyPatch.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
 #include "normalDisplacementZeroShearFvPatchVectorField.H"
@@ -46,6 +46,7 @@ License
 #include "zeroGradientFvPatchFields.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "enhancedVolPointInterpolation.H"
+    #include "pointConstraints.H"
 #endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -562,6 +563,49 @@ const Foam::dictionary& Foam::solidModel::pressureHighOrderCoeffs() const
 }
 
 
+Foam::dictionary& Foam::solidModel::stabilisationDict()
+{
+    dictionary defaultStabSubDict;
+    defaultStabSubDict.add("type", "diffStencilLaplacian");
+    defaultStabSubDict.add("scaleFactor", 0.1);
+
+    if (!solidModelDict().found("stabilisation"))
+    {
+        // If the stabilisation sub-dict is not found, we will add it with
+        // default settings
+        dictionary stabDict;
+        stabDict.add("momentum", defaultStabSubDict);
+        stabDict.add("pressure", defaultStabSubDict);
+
+        // Add stabilisation dict
+        solidModelDict().add("stabilisation", stabDict);
+    }
+
+    dictionary& stabDict = solidModelDict().subDict("stabilisation");
+
+    // Check for previous stabilisation definition
+    if (stabDict.found("type") || stabDict.found("scaleFactor"))
+    {
+        FatalErrorInFunction
+            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
+            << "solidProperties: this is the old format. Instead, define a "
+            << "stabilisation/momentum sub-dict" << exit(FatalError);
+    }
+
+    if (!stabDict.found("momentum"))
+    {
+        stabDict.add("momentum", defaultStabSubDict);
+    }
+
+    if (!stabDict.found("pressure"))
+    {
+        stabDict.add("pressure", defaultStabSubDict);
+    }
+
+    return stabDict;
+}
+
+
 const Foam::leastSquaresScheme&
 Foam::solidModel::displacementLeastSquares() const
 {
@@ -698,6 +742,26 @@ void Foam::solidModel::correctPointDisplacement
     const polyMesh& pMesh = pointD.mesh().mesh();
     vectorField& pointDI = pointD;
 
+    // Points whose displacement is set here by a boundary condition or a
+    // symmetry plane, rather than interpolated from the cells
+    boolList constrainedPoint(pMesh.nPoints(), false);
+
+#ifdef OPENFOAM_NOT_EXTEND
+    forAll(pointD.boundaryField(), patchI)
+    {
+        if (pointD.boundaryField()[patchI].fixesValue())
+        {
+            const labelList& meshPoints =
+                pointD.boundaryField()[patchI].patch().meshPoints();
+
+            forAll(meshPoints, pointI)
+            {
+                constrainedPoint[meshPoints[pointI]] = true;
+            }
+        }
+    }
+#endif
+
     forAll(pMesh.boundaryMesh(), patchI)
     {
         if (isA<symmetryPolyPatch>(pMesh.boundaryMesh()[patchI]))
@@ -714,6 +778,8 @@ void Foam::solidModel::correctPointDisplacement
 
             forAll(meshPoints, pointI)
             {
+                constrainedPoint[meshPoints[pointI]] = true;
+
                 vector& pointValue = pointDI[meshPoints[pointI]];
 
                 if (mag(avgN.x()) > 0.95)
@@ -731,6 +797,43 @@ void Foam::solidModel::correctPointDisplacement
             }
         }
     }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    // In parallel, a point on a fixed-value or symmetry patch can be shared
+    // with a processor that holds none of that patch's faces at the point,
+    // e.g. where a processor boundary meets the edge of a patch. That
+    // processor keeps the value interpolated from the cells, so the two copies
+    // of the point differ, and a mesh moved with this field no longer matches
+    // across the processor boundary. Give every copy the constrained value
+    if (Pstream::parRun())
+    {
+        vectorField constrainedValue(pMesh.nPoints(), vector::zero);
+        forAll(constrainedPoint, pointI)
+        {
+            if (constrainedPoint[pointI])
+            {
+                constrainedValue[pointI] = pointDI[pointI];
+            }
+        }
+
+        pointConstraints::syncUntransformedData
+        (
+            pMesh, constrainedPoint, orEqOp<bool>()
+        );
+        pointConstraints::syncUntransformedData
+        (
+            pMesh, constrainedValue, maxMagSqrEqOp<vector>()
+        );
+
+        forAll(constrainedPoint, pointI)
+        {
+            if (constrainedPoint[pointI])
+            {
+                pointDI[pointI] = constrainedValue[pointI];
+            }
+        }
+    }
+#endif
 
     twoDCorrectPoints(pointDI);
 }
@@ -793,6 +896,48 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
+
+Foam::autoPtr<Foam::stabilisationModel> Foam::solidModel::createStabilisation
+(
+    const word& name,
+    const dimensionSet& dims
+)
+{
+    return stabilisationModel::New
+    (
+        mesh(),
+        stabilisationDict().subDict(name),
+        dims
+    );
+}
+
+
+void Foam::solidModel::resetMomentumStabilisation(const dimensionSet& dims)
+{
+    momentumStabilisationPtr_ = createStabilisation("momentum", dims);
+
+    // Only stabilisation models that support high-order residual/Jacobian
+    // calculation are allowed when high-order is enabled
+    if
+    (
+        (highOrderResidual() || highOrderJacobian())
+     && !momentumStabilisationPtr_->supportsHighOrderResidual()
+    )
+    {
+        FatalErrorInFunction
+            << "Momentum stabilisation type "
+            << momentumStabilisationPtr_->type()
+            << " does not support high-order residual or Jacobian "
+            << "calculation" << abort(FatalError);
+    }
+}
+
+
+void Foam::solidModel::resetPressureStabilisation(const dimensionSet& dims)
+{
+    pressureStabilisationPtr_ = createStabilisation("pressure", dims);
+}
+
 
 Foam::IOobject Foam::solidModel::sharedMeshIOobject
 (
@@ -1650,75 +1795,9 @@ Foam::solidModel::solidModel
         }
     }
 
-    // Create momentum stabilisation
-
-    dictionary defaultStabSubDict;
-    defaultStabSubDict.add("type", "diffStencilLaplacian");
-    defaultStabSubDict.add("scaleFactor", 0.1);
-
-    if (!solidModelDict().found("stabilisation"))
-    {
-        // If the stabilisation sub-dict is not found, we will add it with
-        // default settings
-        dictionary stabDict;
-        stabDict.add("momentum", defaultStabSubDict);
-        stabDict.add("pressure", defaultStabSubDict);
-
-        // Add stabilisation dict
-        solidModelDict().add("stabilisation", stabDict);
-    }
-
-    dictionary& stabDict = solidModelDict().subDict("stabilisation");
-
-    // Check for previous stabilisation definition
-    if (stabDict.found("type") || stabDict.found("scaleFactor"))
-    {
-        FatalErrorInFunction
-            << "Found 'type' or 'scaleFactor' in stabilisation subDict of "
-            << "solidProperties: this is the old format. Instead, define a "
-            << "stabilisation/momentum sub-dict" << exit(FatalError);
-    }
-
-    if (!stabDict.found("momentum"))
-    {
-        stabDict.add("momentum", defaultStabSubDict);
-    }
-
-    if (!stabDict.found("pressure"))
-    {
-        stabDict.add("pressure", defaultStabSubDict);
-    }
-
-    momentumStabilisationPtr_ =
-        stabilisationModel::New
-        (
-            mesh(),
-            stabDict.subDict("momentum"),
-            dimless
-        );
-
-    // Only stabilisation models that support high-order residual/Jacobian
-    // calculation are allowed when high-order is enabled
-    if
-    (
-        (highOrderResidual() || highOrderJacobian())
-     && !momentumStabilisationPtr_->supportsHighOrderResidual()
-    )
-    {
-        FatalErrorInFunction
-            << "Momentum stabilisation type "
-            << momentumStabilisationPtr_->type()
-            << " does not support high-order residual or Jacobian "
-            << "calculation" << abort(FatalError);
-    }
-
-    pressureStabilisationPtr_ =
-        stabilisationModel::New
-        (
-            mesh(),
-            stabDict.subDict("pressure"),
-            dimPressure/dimLength
-        );
+    // Create momentum and pressure stabilisation
+    resetMomentumStabilisation(dimless);
+    resetPressureStabilisation(dimPressure/dimLength);
 
 #ifdef OPENFOAM_COM
     if (!fvOptions_.optionList::size())
@@ -2771,7 +2850,8 @@ void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
 (
     mechanicalConstitutiveLawManager& manager,
-    const tangentRequest req
+    const tangentRequest req,
+    const word& fieldName
 ) const
 {
     tmp<volScalarField> tImpK
@@ -2780,7 +2860,7 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
         (
             IOobject
             (
-                "impK",
+                fieldName,
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -2827,6 +2907,100 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
     );
 
     return tImpK;
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::shearModulus() const
+{
+    // The deviatoric scalar tangent is (4/3)*mu
+    tmp<volScalarField> tmu;
+
+    if (nonLinGeom() == nonLinearGeometry::LINEAR_GEOMETRY)
+    {
+        tmu =
+            lawImpK
+            (
+                mechanicalManager(),
+                tangentRequest::scalarDeviatoric,
+                "shearModulus"
+            );
+    }
+    else
+    {
+        // Finite-strain laws may not implement the small-strain tangent, so
+        // evaluate the finite-strain tangent in the undeformed configuration
+        tmu =
+            tmp<volScalarField>
+            (
+                new volScalarField
+                (
+                    IOobject
+                    (
+                        "shearModulus",
+                        mesh().time().timeName(),
+                        mesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    mesh(),
+                    dimensionedScalar("zero", dimForce/dimArea, 0),
+                    calculatedFvPatchScalarField::typeName
+                )
+            );
+
+        const volTensorField identity
+        (
+            IOobject
+            (
+                "identityF",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedTensor("I", dimless, tensor::I)
+        );
+
+        const volScalarField one
+        (
+            IOobject
+            (
+                "identityJ",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh(),
+            dimensionedScalar("one", dimless, 1.0)
+        );
+
+        mechanicalManager().updateScalarTangentFiniteStrain
+        (
+            identity,
+            identity,
+            identity,
+            identity,
+            one,
+            one,
+            mesh().time().deltaTValue(),
+#ifdef OPENFOAM_NOT_EXTEND
+            tmu.ref(),
+#else
+            tmu(),
+#endif
+            tangentRequest::scalarDeviatoric
+        );
+    }
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tmu.ref() *= 0.75;
+#else
+    tmu() *= 0.75;
+#endif
+
+    return tmu;
 }
 
 

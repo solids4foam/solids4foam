@@ -50,6 +50,53 @@ namespace Foam
         }
 
 
+        // Make a fluid field and its old-time levels the objects registered
+        // under their names. A solid model that moves the fluid mesh (e.g.
+        // meshMotionSolidModelFvMotionSolver) lives in the fluid region and is
+        // created with the mesh, before the fluid fields. On a restart with
+        // 'restart yes' it creates its velocity "U" in its constructor, which
+        // reads the fluid's U file and takes the names "U" and "U_0"; the
+        // fluid's U then fails to register. Function objects (e.g. forces)
+        // and boundary conditions that look up "U" then see the mesh motion
+        // velocity, and the fluid's U is no longer written: the "U" of later
+        // times holds the mesh motion velocity
+        template<class GeoField>
+        void takeRegistryNames(const GeoField& field)
+        {
+            const label nOldTimes = field.nOldTimes();
+
+            const GeoField* levelPtr = &field;
+
+            for (label levelI = 0; levelI <= nOldTimes; ++levelI)
+            {
+                if (levelI > 0)
+                {
+                    levelPtr = &levelPtr->oldTime();
+                }
+
+                GeoField& level = const_cast<GeoField&>(*levelPtr);
+
+                const objectRegistry& db = level.db();
+
+                if (db.foundObject<regIOobject>(level.name()))
+                {
+                    const regIOobject& registered =
+                        db.lookupObject<regIOobject>(level.name());
+
+                    if (&registered == &level)
+                    {
+                        continue;
+                    }
+
+                    // Another object holds the name: release it
+                    const_cast<regIOobject&>(registered).checkOut();
+                }
+
+                level.checkIn();
+            }
+        }
+
+
         // Minimal concrete regIOobject, used to read a field file as a
         // dictionary through the file handler, so that the collated and
         // distributed cases are handled and the stream format is taken from
@@ -934,6 +981,11 @@ Foam::fluidModel::fluidModel
 
     if (!constructNull)
     {
+        // The fluid fields own the names "U" and "p" in the fluid region
+        // (see takeRegistryNames)
+        takeRegistryNames(UPtr_());
+        takeRegistryNames(pPtr_());
+
         // Restore the fluxCorrectedVelocity boundary values, which are lost
         // when U and its old-time levels are read on restart; performed before
         // the gradients are calculated so that they see the corrected values

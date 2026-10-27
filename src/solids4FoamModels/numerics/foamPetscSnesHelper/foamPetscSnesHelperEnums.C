@@ -19,40 +19,57 @@ License
 
 #include "foamPetscSnesHelper.H"
 
+// The solution location is defined by foamPetscMeshAssembly when PETSc is
+// available, and by the stub foamPetscSnesHelper otherwise
+#ifdef USE_PETSC
+    #define SOLUTION_LOCATION_CLASS foamPetscMeshAssembly
+#else
+    #define SOLUTION_LOCATION_CLASS foamPetscSnesHelper
+#endif
+
 namespace Foam
 {
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 #ifdef OPENFOAM_COM
-    const Enum<foamPetscSnesHelper::solutionLocation>
-    foamPetscSnesHelper::solutionLocationNames_
+    const Enum<SOLUTION_LOCATION_CLASS::solutionLocation>
+    SOLUTION_LOCATION_CLASS::solutionLocationNames_
     ({
         {
-            foamPetscSnesHelper::solutionLocation::CELLS,
+            SOLUTION_LOCATION_CLASS::solutionLocation::CELLS,
             "cells"
         },
         {
-            foamPetscSnesHelper::solutionLocation::POINTS,
+            SOLUTION_LOCATION_CLASS::solutionLocation::POINTS,
             "points"
         },
         {
-            foamPetscSnesHelper::solutionLocation::NONE,
+            SOLUTION_LOCATION_CLASS::solutionLocation::NONE,
             "none"
         },
     });
 #else
     template<>
-    const char* NamedEnum<foamPetscSnesHelper::solutionLocation, 3>::names[] =
+    const char* NamedEnum<SOLUTION_LOCATION_CLASS::solutionLocation, 3>::names[] =
     {
-     	"cells",
+        "cells",
         "points",
-	"none"
+        "none"
     };
+#endif
+
+#if defined(USE_PETSC) && defined(OPENFOAM_COM)
+    // The helper uses the names of the assembly
+    const Enum<foamPetscSnesHelper::solutionLocation>&
+    foamPetscSnesHelper::solutionLocationNames_ =
+        foamPetscMeshAssembly::solutionLocationNames_;
 #endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
+
+#undef SOLUTION_LOCATION_CLASS
 
 // ************************************************************************* //

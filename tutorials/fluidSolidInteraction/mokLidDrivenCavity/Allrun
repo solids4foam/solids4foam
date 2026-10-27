@@ -11,6 +11,7 @@ source solids4FoamScripts.sh
 # ./Allrun standard             # standard second-order solid
 # ./Allrun aitken               # Aitken coupling
 # ./Allrun parallel             # run in parallel
+# ./Allrun monolithic           # quasi-monolithic Newton coupling
 # ./Allrun aitken standard parallel
 
 # PETSc is required for this case
@@ -18,6 +19,7 @@ solids4Foam::requirePetscOrExitSilently
 
 coupling=iqnils
 solid=highOrder
+variant=partitioned
 runMode=serial
 
 for arg in "$@"
@@ -35,21 +37,37 @@ do
         standard)
             solid=standard
             ;;
+        monolithic|Monolithic)
+            variant=monolithic
+            ;;
         parallel)
             runMode=parallel
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [iqnils|aitken] [highOrder|standard] [parallel]"
+            echo "Usage: ./Allrun [iqnils|aitken] [highOrder|standard] [monolithic] [parallel]"
             exit 1
             ;;
     esac
 done
 
-echo "Using ${coupling} coupling and the ${solid} solid discretisation"
+# Start from the stored (partitioned) case
+solids4Foam::restoreCaseVariant .
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "solidProperties.${solid}" constant/solid/solidProperties
+
+if [[ "${variant}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com; its files are stored as *.monolithic variants, which
+    # replace the coupling and solid selected above
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    echo "Using quasi-monolithic Newton coupling"
+    solids4Foam::selectCaseVariant . monolithic
+else
+    echo "Using ${coupling} coupling and the ${solid} solid discretisation"
+fi
 
 # Build the lid and inlet velocity boundary condition
 (cd src && ./Allwmake) || exit 1

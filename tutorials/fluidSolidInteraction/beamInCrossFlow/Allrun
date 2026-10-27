@@ -14,9 +14,14 @@ source solids4FoamScripts.sh
 # ./Allrun aitken parallel
 # ./Allrun iqnils highOrder
 # ./Allrun iqnils highOrder parallel
+# ./Allrun monolithic
+# ./Allrun monolithic parallel
 # ./Allrun displacementLaplacian   # fluid mesh motion (default velocityLaplacian)
 # ./Allrun diffusionElastic        # solid model mesh motion, small strain
 # ./Allrun diffusionHyperElastic   # solid model mesh motion, finite strain
+#
+# The fluid mesh motion options apply to the partitioned couplings; the
+# monolithic coupling uses its own solid model mesh motion (*.monolithic files)
 
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
@@ -41,6 +46,9 @@ do
             coupling=robin
             interfaceCondition=robin
             ;;
+        monolithic|Monolithic)
+            coupling=monolithic
+            ;;
         parallel)
             runMode=parallel
             ;;
@@ -52,7 +60,7 @@ do
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]" \
+            echo "Usage: ./Allrun [aitken|iqnils|robin|monolithic] [highOrder] [parallel]" \
                  "[velocityLaplacian|displacementLaplacian|diffusionElastic|diffusionHyperElastic]"
             exit 1
             ;;
@@ -78,24 +86,45 @@ fi
 echo "Using ${coupling} coupling setup"
 echo "Using ${meshMotion} fluid mesh motion"
 
-ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
-if [[ "${coupling}" == "robin" ]]; then
-    solutionSetup=iqnils
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com; its files are stored as *.monolithic variants
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    if [[ -n "${solidPropertiesSuffix}" ]]; then
+        echo "The highOrder option is not available with monolithic coupling"
+        exit 1
+    fi
+    if [[ "${meshMotion}" != "velocityLaplacian" ]]; then
+        echo "The ${meshMotion} option is not available with monolithic"\
+             "coupling, which uses its own fluid mesh motion"
+        exit 1
+    fi
+    ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+    ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+    ln -vnsf "controlDict.iqnils" system/controlDict
+    solids4Foam::selectCaseVariant . monolithic
 else
-    solutionSetup=${coupling}
-fi
-ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
-ln -vnsf "controlDict.${solutionSetup}" system/controlDict
-ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
-ln -vnsf "U.${interfaceCondition}" 0/fluid/U
-ln -vnsf "p.${interfaceCondition}" 0/fluid/p
-if [[ "${meshMotion}" == diffusion* ]]; then
-    ln -vnsf dynamicMeshDict.solidModel constant/fluid/dynamicMeshDict
-    ln -vnsf "solidProperties.${meshMotion}" constant/fluid/solidProperties
-    ln -vnsf "mechanicalProperties.${meshMotion}" \
-        constant/fluid/mechanicalProperties
-else
-    ln -vnsf "dynamicMeshDict.${meshMotion}" constant/fluid/dynamicMeshDict
+    solids4Foam::restoreCaseVariant .
+    ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
+    if [[ "${coupling}" == "robin" ]]; then
+        solutionSetup=iqnils
+    else
+        solutionSetup=${coupling}
+    fi
+    ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
+    ln -vnsf "controlDict.${solutionSetup}" system/controlDict
+    ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
+    ln -vnsf "U.${interfaceCondition}" 0/fluid/U
+    ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+    if [[ "${meshMotion}" == diffusion* ]]; then
+        ln -vnsf dynamicMeshDict.solidModel constant/fluid/dynamicMeshDict
+        ln -vnsf "solidProperties.${meshMotion}" constant/fluid/solidProperties
+        ln -vnsf "mechanicalProperties.${meshMotion}" \
+            constant/fluid/mechanicalProperties
+    else
+        ln -vnsf "dynamicMeshDict.${meshMotion}" constant/fluid/dynamicMeshDict
+    fi
 fi
 
 # Check case version is correct

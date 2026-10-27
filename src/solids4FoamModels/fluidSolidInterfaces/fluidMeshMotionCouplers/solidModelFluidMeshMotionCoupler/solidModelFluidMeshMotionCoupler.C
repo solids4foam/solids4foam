@@ -20,6 +20,7 @@ License
 #ifdef OPENFOAM_COM
 
 #include "solidModelFluidMeshMotionCoupler.H"
+#include "meshMotionTotalDispSolid.H"
 #include "displacementFluidMeshMotionCoupler.H"
 #include "fixedDisplacementFvPatchVectorField.H"
 #include "fixedValuePointPatchFields.H"
@@ -57,6 +58,22 @@ Foam::solidModelFluidMeshMotionCoupler::solidModelFluidMeshMotionCoupler
     )
 {
     const solidModel& model = motionSolver_.model();
+
+    // The partitioned coupling sets the total interface displacement from
+    // the reference points, which needs a solid model of the total
+    // displacement on the current mesh, solved with either solution
+    // algorithm. The quasi-monolithic coupling, which does not use this
+    // coupler, checks its own mesh motion solid model, and needs the PETSc
+    // SNES algorithm
+    if (!isA<solidModels::meshMotionTotalDispSolid>(model))
+    {
+        FatalErrorInFunction
+            << "The " << meshMotionSolidModelFvMotionSolver::typeName
+            << " mesh motion solver needs the "
+            << solidModels::meshMotionTotalDispSolid::typeName
+            << " solid model with this coupling, not " << model.type()
+            << exit(FatalError);
+    }
 
     forAll(patchIDs, i)
     {
