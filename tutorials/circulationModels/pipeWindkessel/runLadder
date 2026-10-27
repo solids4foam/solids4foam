@@ -18,5 +18,7 @@ one() {
 }
 export -f one
 
+# The single quotes are intended: the inner bash expands $0, $1 and $2
+# shellcheck disable=SC2016
 for s in $schemes; do for o in $orders; do for d in $dts; do echo "$s $o $d"; done; done; done \
   | xargs -P "$jobs" -L 1 bash -c 'one $0 $1 $2'

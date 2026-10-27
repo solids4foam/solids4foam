@@ -25,11 +25,12 @@ if [ "$np" -gt 1 ]; then
     sed -i.bak "s/^numberOfSubdomains .*/numberOfSubdomains $np;/" system/decomposeParDict && rm system/decomposeParDict.bak
     decomposePar -force > log.decomposePar 2>&1 || { echo "decomposePar failed"; exit 1; }
     echo "--- running pimpleFoam on $np ranks (progress: tail -f log.pimpleFoam) ---"
-    mpirun --oversubscribe -np "$np" pimpleFoam -parallel > log.pimpleFoam 2>&1
+    mpirun --oversubscribe -np "$np" pimpleFoam -parallel > log.pimpleFoam 2>&1 \
+        || { echo "pimpleFoam failed, see log.pimpleFoam"; exit 1; }
 else
     echo "--- running pimpleFoam (progress: tail -f log.pimpleFoam) ---"
-    pimpleFoam > log.pimpleFoam 2>&1
+    pimpleFoam > log.pimpleFoam 2>&1 \
+        || { echo "pimpleFoam failed, see log.pimpleFoam"; exit 1; }
 fi
-[ $? -eq 0 ] || { echo "pimpleFoam failed, see log.pimpleFoam"; exit 1; }
 
 echo "done: postProcessing/circulationCoupling/0/coupling.dat  (python3 plotter.py to plot)"
