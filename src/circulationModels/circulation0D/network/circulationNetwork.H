@@ -311,11 +311,6 @@ public:
         //  names are given, each port's patch is checked against them.
         //  Returns the number of warnings.
         label check(Ostream& os, const wordList* meshPatches = nullptr) const;
-
-        //- Write the circuit as a netlist in JSON (nodes, elements, their
-        //  types, values and ports), the input of tools/circulationSchematic,
-        //  which draws it as a circuit diagram
-        void writeNetlist(Ostream& os) const;
 };
 
 } // End namespace Foam

@@ -22,7 +22,6 @@ available components and the presets are described in
 ```bash
 circulationFoam              # solve the circuit
 circulationFoam -check       # describe and check the set-up, then exit
-circulationFoam -diagram     # draw the circuit, then exit
 ```
 
 A case needs only two files, as there is no mesh:
@@ -45,13 +44,6 @@ for a complete case.
   including the magnitude of the parameters. If the case has a mesh, it also
   checks that the patch of each coupled port exists. It works on any case
   with a `constant/circulationProperties`, CFD cases included.
-* `-diagram`: writes `circuit.json` and, if `circulationSchematic` is on the
-  `PATH`, draws the circuit as an electrical circuit diagram, `circuit.svg`.
-  Then exits.
-
-`circulationSchematic` is in
-[`src/circulationModels/tools`](../../../src/circulationModels/tools); it
-needs only Python 3.
 
 ---
 
@@ -70,7 +62,8 @@ first lines name the units and the columns:
 
 If the circuit has a `metrics` dictionary, the per-cycle metrics are written
 to the same directory. Columns can be plotted by name with `circulationPlot`
-(in the same `tools` directory; it needs gnuplot).
+(in [`src/circulationModels/tools`](../../../src/circulationModels/tools);
+it needs gnuplot).
 
 ---
 

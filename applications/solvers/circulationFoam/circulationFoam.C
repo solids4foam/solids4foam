@@ -50,7 +50,6 @@ Author
 #include "IOdictionary.H"
 #include "circulationNetwork.H"
 #include "circulationMetrics.H"
-#include "OFstream.H"
 #include "OSspecific.H"
 
 #include <fstream>
@@ -174,12 +173,6 @@ int main(int argc, char *argv[])
         "check",
         "Describe the circuit and check the set-up, then exit"
     );
-    argList::addBoolOption
-    (
-        "diagram",
-        "Draw the circuit as an electrical circuit diagram (circuit.json, and"
-        " circuit.svg if circulationSchematic is on the PATH), then exit"
-    );
 
     #include "setRootCase.H"
     #include "createTime.H"
@@ -197,43 +190,6 @@ int main(int argc, char *argv[])
     );
 
     circulationNetwork network(props, runTime.value());
-
-    if (args.found("diagram"))
-    {
-        const fileName json(runTime.path()/"circuit.json");
-        {
-            OFstream os(json);
-            network.writeNetlist(os);
-        }
-        Info<< "Wrote " << json << nl;
-
-        const fileName svg(runTime.path()/"circuit.svg");
-        const int rc = Foam::system
-        (
-            "circulationSchematic \"" + json + "\" \"" + svg + "\""
-        );
-        if (rc == 0)
-        {
-            Info<< "Open it with:  open " << svg << endl;
-        }
-        else if (rc == 127)
-        {
-            Info<< "circulationSchematic was not found on the PATH "
-                   "(it is in src/circulationModels/tools):" << nl
-                << "    export PATH=$PATH:"
-                   "/path/to/solids4foam/src/circulationModels/tools" << nl
-                << "then  circulationSchematic circuit.json circuit.svg"
-                << endl;
-        }
-        else
-        {
-            Info<< "circulationSchematic failed (exit status " << rc
-                << "); run it by hand to see why:" << nl
-                << "    circulationSchematic circuit.json circuit.svg"
-                << endl;
-        }
-        return 0;
-    }
 
     if (args.found("check"))
     {

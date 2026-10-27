@@ -155,13 +155,11 @@ modules
 
 The same circuit from a preset gives identical numbers to the hand-written one.
 
-## Checking and drawing a set-up
+## Checking a set-up
 
 ```bash
 circulationFoam -check
 # elements, nodes, states, ports, solver; warnings; then exit
-circulationFoam -diagram
-# the circuit as an electrical circuit diagram: circuit.json, circuit.svg
 ```
 
 `-check` works on any case with a `circulationProperties`, CFD cases included.
@@ -169,16 +167,7 @@ It lists every element and node, the ODE states with their initial values, the
 coupling ports and, when the case has a mesh, whether each port's patch
 exists. It warns about parameter values outside human-scale ranges, which is
 how a unit mix-up shows up (SI numbers in a `units mmHg_mL;` case, or mmHg
-values in an SI one). `-diagram` draws the circuit as an electrical circuit
-diagram, in the electrical analogy of the model: a resistor is a zigzag, an
-inductor a coil, a valve a diode, a flow source a circle with an arrow, a
-compliance a capacitor to ground, a heart chamber a variable capacitor, a
-fixed pressure a ground symbol, and a CFD port a blue box. Closed loops are
-drawn as a ring, chains left to right. Each label carries the element's name
-and value in the case's units. The drawing is made by
-`tools/circulationSchematic` (put `src/circulationModels/tools` on the PATH;
-it needs only Python 3; Graphviz, if installed, is used for the node
-positions). Open the SVG with `open circuit.svg`.
+values in an SI one).
 
 ## Dimensioned parameters
 

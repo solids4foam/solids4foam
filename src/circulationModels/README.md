@@ -15,9 +15,9 @@ with solids4foam. 1D vessel models are planned and will live here too.
 - `circulationCoupling` (library `libcirculationCoupling`): Coupling of a
   circulation network to a CFD domain: the `circulationPressure` boundary
   condition and the coupler (explicit/implicit, orders 1 to 4)
-- `tools` (no library): `circulationSchematic` (draws a circuit as an SVG),
-  `circulationPlot` (plots result columns, needs gnuplot) and `addHeader`
-  (adds the solids4foam banner to case dictionaries)
+- `tools` (no library): `circulationPlot` (plots result columns, needs
+  gnuplot) and `addHeader` (adds the solids4foam banner to case
+  dictionaries)
 - `docs` (no library): The description of the 0D/3D coupling,
   [docs/COUPLING.md](docs/COUPLING.md)
 
@@ -65,9 +65,6 @@ cd tutorials/circulationModels/healthyHuman
 ./Allrun    # 20 cardiac cycles of a 4-chamber closed loop in under a second
 # results: postProcessing/circulation/0/circulation.dat
 ```
-
-Add `src/circulationModels/tools` to your `PATH` so that
-`circulationFoam -diagram` can call `circulationSchematic` to draw the circuit.
 
 ## Status
 
