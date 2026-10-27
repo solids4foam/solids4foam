@@ -21,3 +21,20 @@ jobs:
         with:
           globs: "ThirdParty/**/*.md,tests/**/*.md,optionalFixes/**/*.md,tutorials/**/*.md,applications/**/*.md,CHANGELOG.md,CONTRIBUTING.md,CONTRIBUTORS.md,README.md,etc/**/*.md,src/**/*.md"
           separator: ','
+
+  # The READMEs link to each other and to the tutorials with relative paths,
+  # which break silently when a case is moved or renamed. They are also
+  # published on www.solids4foam.com, where a broken link is a 404. Check them
+  # offline; external URLs are skipped.
+  relative-links:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check relative links in markdown files
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress '**/*.md'
+          fail: true

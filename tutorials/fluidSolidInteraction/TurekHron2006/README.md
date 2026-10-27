@@ -190,7 +190,7 @@ the tutorial settings.**
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/fluidSolidInteraction/HronTurek`. The case can be run
+`solids4foam/tutorials/fluidSolidInteraction/TurekHron2006`. The case can be run
 using the included `Allrun` script, i.e. `> ./Allrun`, which runs the `FSI3`
 variant. The `Allrun` script first executes `blockMesh` for both `solid` and
 `fluid` domains (`> blockMesh -region fluid` and `> blockMesh -region solid`),

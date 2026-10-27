@@ -119,7 +119,7 @@ mechanical
   `rotatingBlock`, `rotatingCylinder` and `rotatingSphere`
 - [beamInCrossFlow](../../../../../tutorials/fluidSolidInteraction/beamInCrossFlow/README.md)
 - [cavityFlexibleBottom](../../../../../tutorials/fluidSolidInteraction/cavityFlexibleBottom/README.md)
-- [HronTurek](../../../../../tutorials/fluidSolidInteraction/HronTurek/README.md):
+- [TurekHron2006](../../../../../tutorials/fluidSolidInteraction/TurekHron2006/README.md):
   the Turek-Hron FSI1, FSI2 and FSI3 benchmarks
 
 The [3dTube](../../../../../tutorials/fluidSolidInteraction/3dTube/README.md)
