@@ -1,6 +1,29 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Samples the flow at each coupled patch, advances the circulation network
+    with the explicit or implicit coupling scheme of the chosen order, and
+    returns the pressure to impose at each patch. It also writes the results
+    and the restart checkpoint.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "circulationCoupler.H"
@@ -49,26 +72,48 @@ void fpeAdvice(int sig, siginfo_t* info, void* context)
     const int n = std::snprintf
     (
         buf, sizeof(buf),
-        "\n--> circulation coupling: floating point exception in the CFD solution\n"
-        "    after t = %g (last accepted step), %s coupling, order %d, deltaT %g s.\n"
-        "    The largest port pressure at the last exchange was %g Pa. If port pressures\n"
-        "    or flows were growing before this, the coupling is probably unstable here:\n"
-        "      - explicit coupling is only conditionally stable: use  scheme implicit;\n"
+        "\n--> circulation coupling: floating point exception in the CFD "
+        "solution\n"
+        "    after t = %g (last accepted step), %s coupling, order %d, "
+        "deltaT %g s.\n"
+        "    The largest port pressure at the last exchange was %g Pa. "
+        "If port pressures\n"
+        "    or flows were growing before this, the coupling is probably "
+        "unstable here:\n"
+        "      - explicit coupling is only conditionally stable: "
+        "use  scheme implicit;\n"
         "        or a smaller deltaT\n"
-        "      - a high coupling order amplifies noise at a large deltaT: try order 2\n"
+        "      - a high coupling order amplifies noise at a large deltaT: "
+        "try order 2\n"
         "      - check the circuit with  circulationFoam -check\n"
         "    (the original CFD error follows)\n\n",
-        fpe.t, fpe.implicitScheme ? "implicit" : "explicit", fpe.order, fpe.dt, fpe.Pmax
+        fpe.t,
+        fpe.implicitScheme ? "implicit" : "explicit",
+        fpe.order,
+        fpe.dt,
+        fpe.Pmax
     );
-    if (n > 0) { const ssize_t w = ::write(2, buf, static_cast<size_t>(n)); (void)w; }
+    if (n > 0)
+    {
+        const ssize_t w = ::write(2, buf, static_cast<size_t>(n));
+        (void)w;
+    }
 
     // Hand on to the handler that was installed before ours (OpenFOAM's, which
     // prints the stack trace)
     if (previousFpe.sa_flags & SA_SIGINFO)
     {
-        if (previousFpe.sa_sigaction) previousFpe.sa_sigaction(sig, info, context);
+        if (previousFpe.sa_sigaction)
+        {
+            previousFpe.sa_sigaction(sig, info, context);
+        }
     }
-    else if (previousFpe.sa_handler && previousFpe.sa_handler != SIG_IGN && previousFpe.sa_handler != SIG_DFL)
+    else if
+    (
+        previousFpe.sa_handler
+     && previousFpe.sa_handler != SIG_IGN
+     && previousFpe.sa_handler != SIG_DFL
+    )
     {
         previousFpe.sa_handler(sig);
     }
@@ -81,8 +126,14 @@ void fpeAdvice(int sig, siginfo_t* info, void* context)
 void installFpeAdvice()
 {
     struct sigaction cur;
-    if (sigaction(trapSignal, nullptr, &cur) != 0) return;
-    if ((cur.sa_flags & SA_SIGINFO) && cur.sa_sigaction == fpeAdvice) return;
+    if (sigaction(trapSignal, nullptr, &cur) != 0)
+    {
+        return;
+    }
+    if ((cur.sa_flags & SA_SIGINFO) && cur.sa_sigaction == fpeAdvice)
+    {
+        return;
+    }
 
     struct sigaction act;
     std::memset(&act, 0, sizeof(act));
@@ -91,7 +142,10 @@ void installFpeAdvice()
     act.sa_flags = SA_SIGINFO;
 
     struct sigaction before;
-    if (sigaction(trapSignal, &act, &before) == 0) previousFpe = before;
+    if (sigaction(trapSignal, &act, &before) == 0)
+    {
+        previousFpe = before;
+    }
     fpe.installed = true;
 }
 
@@ -197,8 +251,14 @@ Foam::circulationCoupler::circulationCoupler
     const dictionary& cd = props.subDict("coupling");
 
     const word sch = cd.get<word>("scheme");
-    if (sch == "explicit") scheme_ = scheme::explicitScheme;
-    else if (sch == "implicit") scheme_ = scheme::implicitScheme;
+    if (sch == "explicit")
+    {
+        scheme_ = scheme::explicitScheme;
+    }
+    else if (sch == "implicit")
+    {
+        scheme_ = scheme::implicitScheme;
+    }
     else
     {
         FatalIOErrorInFunction(cd)
@@ -228,7 +288,10 @@ Foam::circulationCoupler::circulationCoupler
         for (const entry& e : mesh.schemes().ddtSchemes())
         {
             const ITstream& is = e.stream();
-            if (is.empty() || !is[0].isWord()) continue;
+            if (is.empty() || !is[0].isWord())
+            {
+                continue;
+            }
 
             std::string name = is[0].wordToken();
             label i = 0;
@@ -248,7 +311,10 @@ Foam::circulationCoupler::circulationCoupler
             else
             {
                 const auto it = schemeOrder.find(name);
-                if (it != schemeOrder.end()) cfdOrder = it->second;
+                if (it != schemeOrder.end())
+                {
+                    cfdOrder = it->second;
+                }
             }
 
             if (cfdOrder > 0 && cfdOrder < order_ && Pstream::master())
@@ -318,7 +384,10 @@ Foam::circulationCoupler::circulationCoupler
                 << " port, not '" << how << "'" << exit(FatalIOError);
         }
 
-        for (portData& p : ports_) p.history = 0.0;
+        for (portData& p : ports_)
+        {
+            p.history = 0.0;
+        }
         historyDepth_ = 3;
         historyDt_ = mesh.time().deltaTValue();
     }
@@ -344,10 +413,16 @@ Foam::circulationCoupler::circulationCoupler
                     << exit(FatalIOError);
             }
             depth = q.size();
-            forAll(q, i) p.history[i] = q[i];
+            forAll(q, i)
+            {
+                p.history[i] = q[i];
+            }
         }
         historyDepth_ = depth;
-        for (label i = 0; i < historyDepth_; ++i) historyDt_[i] = sdt;
+        for (label i = 0; i < historyDepth_; ++i)
+        {
+            historyDt_[i] = sdt;
+        }
     }
 
     y_ = network_().state();
@@ -360,11 +435,20 @@ Foam::circulationCoupler::circulationCoupler
     fpe.dt = mesh.time().deltaTValue();
 
     // Pressure before the first exchange: the initial state with no flow
-    for (portData& p : ports_) p.P = network_().portPressure(p.name);
+    for (portData& p : ports_)
+    {
+        p.P = network_().portPressure(p.name);
+    }
 
     // Resume from the checkpoint of the start time, if there is one
-    checkpoint_.reset(new circulationCheckpoint(mesh, "circulationState-" + propertiesName));
-    if (checkpoint_().resumed()) restore();
+    checkpoint_.reset
+    (
+        new circulationCheckpoint(mesh, "circulationState-" + propertiesName)
+    );
+    if (checkpoint_().resumed())
+    {
+        restore();
+    }
 
     if (Pstream::master())
     {
@@ -379,8 +463,14 @@ Foam::circulationCoupler::circulationCoupler
 
         log_() << "# circulationCoupler: " << sch << " order " << order_ << nl
                << "# time updates";
-        for (const word& c : network_().columns()) log_() << ' ' << c;
-        for (const portData& p : ports_) log_() << ' ' << p.name << ".Qsampled";
+        for (const word& c : network_().columns())
+        {
+            log_() << ' ' << c;
+        }
+        for (const portData& p : ports_)
+        {
+            log_() << ' ' << p.name << ".Qsampled";
+        }
         log_() << nl;
 
         if (props.isDict("metrics"))
@@ -389,7 +479,10 @@ Foam::circulationCoupler::circulationCoupler
             (
                 new circulationMetrics
                 (
-                    props.subDict("metrics"), network_().columns(), network_().context(), dir
+                    props.subDict("metrics"),
+                    network_().columns(),
+                    network_().context(),
+                    dir
                 )
             );
         }
@@ -409,7 +502,10 @@ Foam::circulationCoupler::circulationCoupler
 Foam::circulationCoupler::~circulationCoupler()
 {
     // The last accepted step is only logged when the next one begins
-    if (activeTimeIndex_ >= 0 && stepUpdateCount_ > 0) writeRow();
+    if (activeTimeIndex_ >= 0 && stepUpdateCount_ > 0)
+    {
+        writeRow();
+    }
 }
 
 
@@ -439,18 +535,28 @@ Foam::circulationCoupler& Foam::circulationCoupler::lookupOrCreate
 
 void Foam::circulationCoupler::writeRow()
 {
-    if (!log_.valid()) return;
+    if (!log_.valid())
+    {
+        return;
+    }
 
     scalarField values;
     network_().outputValues(values);
 
     log_() << lastT_ << ' ' << stepUpdateCount_;
-    for (const scalar v : values) log_() << ' ' << v;
+    for (const scalar v : values)
+    {
+        log_() << ' ' << v;
+    }
 
     // The flows the CFD delivered, as opposed to the forcing the scheme built
     // from them, in the units of the network description
-    const scalar fQ = network_().context().factor(circulationContext::quantity::flow);
-    for (const portData& p : ports_) log_() << ' ' << p.Q/fQ;
+    const scalar fQ =
+        network_().context().factor(circulationContext::quantity::flow);
+    for (const portData& p : ports_)
+    {
+        log_() << ' ' << p.Q/fQ;
+    }
 
     log_() << nl;
     log_().flush();
@@ -464,7 +570,10 @@ void Foam::circulationCoupler::writeRow()
 
 void Foam::circulationCoupler::updateCheckpoint()
 {
-    if (!checkpoint_.valid()) return;
+    if (!checkpoint_.valid())
+    {
+        return;
+    }
 
     // What the next step expects to find: the history as it will be once the
     // step just accepted has been rolled into it (see beginTimeIndex)
@@ -522,13 +631,19 @@ void Foam::circulationCoupler::restore()
     lastT_ = cp.get<scalar>("time");
     y_ = y;
     network_().setState(lastT_, y_);
-    network_().setStepEstimate(cp.getOrDefault<scalar>("stepEstimate", network_().stepEstimate()));
+    network_().setStepEstimate
+    (
+        cp.getOrDefault<scalar>("stepEstimate", network_().stepEstimate())
+    );
     stepStartY_ = y_;
     stepStartT_ = lastT_;
 
     historyDepth_ = cp.get<label>("historyDepth");
     const List<scalar> hdt(cp.get<List<scalar>>("historyDt"));
-    for (label i = 0; i < 3; ++i) historyDt_[i] = hdt[i];
+    for (label i = 0; i < 3; ++i)
+    {
+        historyDt_[i] = hdt[i];
+    }
 
     const dictionary& pd = cp.subDict("ports");
     for (portData& p : ports_)
@@ -537,7 +652,10 @@ void Foam::circulationCoupler::restore()
         p.Q = d.get<scalar>("Q");
         p.stepStartQ = p.Q;
         const List<scalar> h(d.get<List<scalar>>("history"));
-        for (label i = 0; i < 3; ++i) p.history[i] = h[i];
+        for (label i = 0; i < 3; ++i)
+        {
+            p.history[i] = h[i];
+        }
         p.P = network_().portPressure(p.name);
     }
 
@@ -548,7 +666,10 @@ void Foam::circulationCoupler::restore()
 
 void Foam::circulationCoupler::beginTimeIndex(const label timeIndex)
 {
-    if (timeIndex == activeTimeIndex_) return;
+    if (timeIndex == activeTimeIndex_)
+    {
+        return;
+    }
 
     if (activeTimeIndex_ >= 0)
     {
@@ -579,7 +700,10 @@ void Foam::circulationCoupler::beginTimeIndex(const label timeIndex)
     // forward twice
     stepStartY_ = y_;
     stepStartT_ = lastT_;
-    for (portData& p : ports_) p.stepStartQ = p.Q;
+    for (portData& p : ports_)
+    {
+        p.stepStartQ = p.Q;
+    }
 
     stepUpdateCount_ = 0;
     lastConsumedFluxEvent_ = -1;
@@ -592,7 +716,10 @@ void Foam::circulationCoupler::advance(const Time& runTime)
     const scalar t1 = runTime.value();
     const scalar dt = t1 - t0;
 
-    if (dt <= SMALL) return;
+    if (dt <= SMALL)
+    {
+        return;
+    }
 
     const bool imp = scheme_ == scheme::implicitScheme;
 
@@ -603,7 +730,8 @@ void Foam::circulationCoupler::advance(const Time& runTime)
 
         if (!imp)
         {
-            // Q(t0) and up to order-1 earlier flows, extrapolated across the step
+            // Q(t0) and up to order-1 earlier flows, extrapolated across the
+            // step
             const label n = min(order_, 1 + historyDepth_);
             alpha.setSize(n);
             Q.setSize(n);
@@ -611,7 +739,8 @@ void Foam::circulationCoupler::advance(const Time& runTime)
             Q[0] = p.Q;
             for (label j = 1; j < n; ++j)
             {
-                const scalar h = historyDt_[j-1] > VSMALL ? historyDt_[j-1] : dt;
+                const scalar h =
+                    historyDt_[j-1] > VSMALL ? historyDt_[j-1] : dt;
                 alpha[j] = alpha[j-1] - h/dt;
                 Q[j] = p.history[j-1];
             }
@@ -635,7 +764,8 @@ void Foam::circulationCoupler::advance(const Time& runTime)
             Q[1] = p.stepStartQ;
             for (label j = 2; j < n; ++j)
             {
-                const scalar h = historyDt_[j-2] > VSMALL ? historyDt_[j-2] : dt;
+                const scalar h =
+                    historyDt_[j-2] > VSMALL ? historyDt_[j-2] : dt;
                 alpha[j] = alpha[j-1] - h/dt;
                 Q[j] = p.history[j-2];
             }
@@ -646,8 +776,10 @@ void Foam::circulationCoupler::advance(const Time& runTime)
             Info<< type() << ": only " << historyDepth_ << " earlier flows at"
                 << " time index " << runTime.timeIndex() << ", port " << p.name
                 << "; using order-" << alpha.size() << " forcing."
-                << (historyDepth_ == 0 ? "  If the system starts at rest, \"seed zero;\""
-                    " in the coupling dictionary starts at full order." : "")
+                << (historyDepth_ == 0
+                  ? "  If the system starts at rest, \"seed zero;\""
+                    " in the coupling dictionary starts at full order."
+                  : "")
                 << endl;
         }
 
@@ -657,7 +789,7 @@ void Foam::circulationCoupler::advance(const Time& runTime)
         );
     }
 
-    // ---- Integrate from the start of the step ----------------------------------
+    // ---- Integrate from the start of the step ---------------------------
     network_().setState(t0, stepStartY_);
     network_().advance(t1);
     const scalarField candidate = network_().state();
@@ -668,7 +800,10 @@ void Foam::circulationCoupler::advance(const Time& runTime)
     lastT_ = t1;
     network_().setState(t1, y_);
 
-    for (portData& p : ports_) p.P = network_().portPressure(p.name);
+    for (portData& p : ports_)
+    {
+        p.P = network_().portPressure(p.name);
+    }
 
     // Divergence guard: stop at a clear threshold with advice, rather than
     // when the CFD solver finally overflows
@@ -677,17 +812,25 @@ void Foam::circulationCoupler::advance(const Time& runTime)
         if (!std::isfinite(p.P) || Foam::mag(p.P) > maxPressure_)
         {
             FatalErrorInFunction
-                << "The coupling has diverged: the pressure at port '" << p.name
+                << "The coupling has diverged: the pressure at port '"
+                << p.name
                 << "' is " << p.P << " Pa at t = " << t1 << " (limit "
                 << maxPressure_ << " Pa)." << nl
-                << "    Scheme " << (imp ? "implicit" : "explicit") << ", order "
+                << "    Scheme " << (imp ? "implicit" : "explicit")
+                << ", order "
                 << order_ << ", deltaT " << dt << " s. Likely causes:" << nl
-                << "      - " << (imp ? "the outer iteration is not converging" : "explicit coupling is only conditionally stable")
+                << "      - "
+                << (imp ? "the outer iteration is not converging"
+                        : "explicit coupling is only conditionally stable")
                 << ": " << (imp ? "raise nOuterCorrectors or reduce deltaT"
-                                : "use  scheme implicit;  or reduce deltaT") << nl
-                << "      - a high coupling order amplifies flow noise at a large deltaT: try order 2" << nl
-                << "      - the circuit parameters are unphysical (see circulationFoam -check)" << nl
-                << "    If this pressure is real, raise  maxPressure  in the coupling dictionary."
+                                : "use  scheme implicit;  or reduce deltaT")
+                << nl
+                << "      - a high coupling order amplifies flow noise at a "
+                   "large deltaT: try order 2" << nl
+                << "      - the circuit parameters are unphysical "
+                   "(see circulationFoam -check)" << nl
+                << "    If this pressure is real, raise  maxPressure  in the "
+                   "coupling dictionary."
                 << exit(FatalError);
         }
     }
@@ -697,7 +840,10 @@ void Foam::circulationCoupler::advance(const Time& runTime)
 
     fpe.t = t1;
     fpe.Pmax = 0;
-    for (const portData& p : ports_) fpe.Pmax = std::max(fpe.Pmax, std::abs(double(p.P)));
+    for (const portData& p : ports_)
+    {
+        fpe.Pmax = std::max(fpe.Pmax, std::abs(double(p.P)));
+    }
 
     ++stepUpdateCount_;
     ++totalUpdateCount_;
@@ -706,17 +852,24 @@ void Foam::circulationCoupler::advance(const Time& runTime)
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const Foam::word& Foam::circulationCoupler::portOfPatch(const label patchID) const
+const Foam::word& Foam::circulationCoupler::portOfPatch
+(
+    const label patchID
+) const
 {
     for (const portData& p : ports_)
     {
-        if (p.patchID == patchID) return p.name;
+        if (p.patchID == patchID)
+        {
+            return p.name;
+        }
     }
 
     FatalErrorInFunction
         << "Patch " << mesh_.boundaryMesh()[patchID].name() << " is not"
         << " coupled to any port of the circulation network" << nl
-        << "    (a port needs a \"patch " << mesh_.boundaryMesh()[patchID].name()
+        << "    (a port needs a \"patch "
+        << mesh_.boundaryMesh()[patchID].name()
         << ";\" entry)" << exit(FatalError);
 
     return word::null;
@@ -733,7 +886,10 @@ void Foam::circulationCoupler::sampleAndAdvance(const fvMesh& mesh)
     {
         // One exchange per time step; later evaluations (outer, inner and
         // non-orthogonal correctors) reuse the pressure already computed
-        if (stepUpdateCount_ > 0) return;
+        if (stepUpdateCount_ > 0)
+        {
+            return;
+        }
     }
     else
     {
@@ -745,7 +901,10 @@ void Foam::circulationCoupler::sampleAndAdvance(const fvMesh& mesh)
             mesh.lookupObject<surfaceScalarField>("phi").eventNo();
         bool fresh = (event != lastConsumedFluxEvent_);
         Pstream::broadcast(fresh);
-        if (!fresh) return;
+        if (!fresh)
+        {
+            return;
+        }
     }
 
     const surfaceScalarField& phi =
@@ -775,7 +934,10 @@ Foam::scalar Foam::circulationCoupler::patchPressure(const word& port) const
 {
     for (const portData& p : ports_)
     {
-        if (p.name == port) return p.P;
+        if (p.name == port)
+        {
+            return p.P;
+        }
     }
 
     FatalErrorInFunction << "No port '" << port << "'" << exit(FatalError);

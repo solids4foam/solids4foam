@@ -1,6 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::circulationCoupler
@@ -18,7 +31,8 @@ Description
             scheme      implicit;   // explicit | implicit
             order       2;          // 1..4: degree of the forcing + 1
             rho         1060;       // kg/m3: the CFD solves p/rho
-            maxPressure 1e8;        // optional [Pa]: stop if a port pressure exceeds this
+            maxPressure 1e8;        // optional [Pa]: stop if a port pressure
+                                    // exceeds this
         }
 
     The network sees each coupled port's flow over a step [t0, t1] as a
@@ -41,7 +55,7 @@ Description
     fewer, and the order is reduced for those first steps (a message says so).
     They may be seeded:
 
-        seed        { outlet ( Q(-dt) Q(-2dt) Q(-3dt) ); }    // most recent first
+        seed        { outlet ( Q(-dt) Q(-2dt) Q(-3dt) ); }  // most recent first
         seedDeltaT  0.01;
 
     or, when the system starts at rest so that every earlier flow is zero,
@@ -65,6 +79,9 @@ Description
     time and read back when the case starts from a time that has one, so the
     circuit and the CFD resume together and the run continues exactly as it
     would have. (A "seed" is then ignored.)
+
+Author
+    David Kelly, UCD.
 
 SourceFiles
     circulationCoupler.C
@@ -102,7 +119,11 @@ public:
     //- True if a checkpoint was read at construction
     bool resumed() const { return resumed_; }
 
-    virtual bool writeObject(IOstreamOption streamOpt, const bool writeOnProc) const;
+    virtual bool writeObject
+    (
+        IOstreamOption streamOpt,
+        const bool writeOnProc
+    ) const;
 
 private:
 
@@ -140,10 +161,10 @@ private:
             word name;
             label patchID;
             bool inlet;
-            scalar Q;                       //!< flow most recently sampled
-            scalar stepStartQ;              //!< accepted flow at the step start
-            FixedList<scalar, 3> history;   //!< earlier flows, most recent first
-            scalar P;                       //!< pressure to impose [Pa]
+            scalar Q;                      //!< flow most recently sampled
+            scalar stepStartQ;             //!< accepted flow at the step start
+            FixedList<scalar, 3> history;  //!< earlier flows, most recent first
+            scalar P;                      //!< pressure to impose [Pa]
         };
 
         List<portData> ports_;
@@ -228,3 +249,5 @@ public:
 } // End namespace Foam
 
 #endif
+
+// ************************************************************************* //

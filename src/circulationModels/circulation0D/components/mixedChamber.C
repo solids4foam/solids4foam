@@ -1,6 +1,28 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Reads the parameters of the heart chamber with an active contraction
+    term and a passive exponential filling term, and evaluates its
+    activation and pressure.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "mixedChamber.H"
@@ -11,7 +33,12 @@
 namespace Foam
 {
     defineTypeNameAndDebug(mixedChamber, 0);
-    addToRunTimeSelectionTable(circulationComponent, mixedChamber, dictionary);
+    addToRunTimeSelectionTable
+    (
+        circulationComponent,
+        mixedChamber,
+        dictionary
+    );
 }
 
 Foam::mixedChamber::mixedChamber
@@ -40,7 +67,14 @@ Foam::mixedChamber::mixedChamber
     {
         const dictionary& a = dict.subDict("active");
         E1_ = ctx.read(a, "E1", circulationContext::quantity::elastance, 0);
-        E2_ = ctx.read(a, "E2", circulationContext::quantity::elastanceQuadratic, 0);
+        E2_ =
+            ctx.read
+            (
+                a,
+                "E2",
+                circulationContext::quantity::elastanceQuadratic,
+                0
+            );
     }
 
     if (dict.isDict("passive"))
@@ -59,7 +93,11 @@ Foam::mixedChamber::mixedChamber
         sineSquared_ = true;
         offset_ = act.getOrDefault<scalar>("offset", 0);
         duration_ = act.get<scalar>("duration");
-        if (duration_ <= 0 || duration_ > T_) fail("activation duration must be in (0, T]");
+
+        if (duration_ <= 0 || duration_ > T_)
+        {
+            fail("activation duration must be in (0, T]");
+        }
     }
     else if (type == "halfCosine")
     {
@@ -67,7 +105,11 @@ Foam::mixedChamber::mixedChamber
         Tes_ = act.get<scalar>("Tes");
         Ted_ = act.get<scalar>("Ted");
         Eshift_ = act.getOrDefault<scalar>("Eshift", 0);
-        if (Tes_ <= 0 || Ted_ <= Tes_ || Ted_ > T_) fail("need 0 < Tes < Ted <= T");
+
+        if (Tes_ <= 0 || Ted_ <= Tes_ || Ted_ > T_)
+        {
+            fail("need 0 < Tes < Ted <= T");
+        }
     }
     else
     {
@@ -76,7 +118,13 @@ Foam::mixedChamber::mixedChamber
 
     if (dict.found("initialVolume"))
     {
-        Vinit_ = ctx.read(dict, "initialVolume", circulationContext::quantity::volume);
+        Vinit_ =
+            ctx.read
+            (
+                dict,
+                "initialVolume",
+                circulationContext::quantity::volume
+            );
     }
 }
 
@@ -89,7 +137,10 @@ Foam::scalar Foam::mixedChamber::activation(const scalar t) const
     {
         // fmod keeps the sign of its first argument: shift into [0, T)
         scalar phase = std::fmod(t - offset_, T_);
-        if (phase < 0) phase += T_;
+        if (phase < 0)
+        {
+            phase += T_;
+        }
 
         if (phase >= 0 && phase <= duration_)
         {
@@ -102,8 +153,16 @@ Foam::scalar Foam::mixedChamber::activation(const scalar t) const
     const scalar shifted = t + (1 - Eshift_)*T_;
     const scalar ti = shifted - T_*std::floor(shifted/T_);
 
-    if (ti <= Tes_) return 0.5*(1 - Foam::cos(pi*ti/Tes_));
-    if (ti <= Ted_) return 0.5*(1 + Foam::cos(pi*(ti - Tes_)/(Ted_ - Tes_)));
+    if (ti <= Tes_)
+    {
+        return 0.5*(1 - Foam::cos(pi*ti/Tes_));
+    }
+
+    if (ti <= Ted_)
+    {
+        return 0.5*(1 + Foam::cos(pi*(ti - Tes_)/(Ted_ - Tes_)));
+    }
+
     return 0;
 }
 
@@ -126,3 +185,5 @@ void Foam::mixedChamber::parameters(DynamicList<parameter>& p) const
     p.append({"P0", circulationContext::quantity::pressure, P0_});
     p.append({"K", circulationContext::quantity::inverseVolume, K_});
 }
+
+// ************************************************************************* //

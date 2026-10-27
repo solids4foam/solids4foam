@@ -1,6 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::circulationMetrics
@@ -33,6 +46,9 @@ Description
     One row per cycle is appended to metrics.dat; for each chamber the
     pressure-volume loop of the latest cycle is written to
     <name>.pvLoop.dat. Quantities are in the units of the case.
+
+Author
+    David Kelly, UCD.
 
 SourceFiles
     circulationMetrics.C
@@ -70,11 +86,11 @@ class circulationMetrics
     bool headerWritten_;
 
     //- Samples of the cycle in progress: time, then the monitored columns
-    label cycle_;                           //!< index k of the cycle in progress
+    label cycle_;                    //!< index k of the cycle in progress
     bool cycleStartedOnBoundary_;
     DynamicList<scalar> t_;
-    List<DynamicList<scalar>> v_;           //!< one list per monitored column
-    labelList monitored_;                   //!< column indices of the samples kept
+    List<DynamicList<scalar>> v_;    //!< one list per monitored column
+    labelList monitored_;            //!< column indices of the samples kept
 
     //- Unit labels for the header
     string volumeLabel_, pressureLabel_, flowLabel_;
@@ -102,3 +118,5 @@ public:
 } // End namespace Foam
 
 #endif
+
+// ************************************************************************* //

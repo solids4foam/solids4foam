@@ -1,6 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::circulationComponent
@@ -14,14 +27,19 @@ Description
     "net"). The role of a component says what it contributes to the network:
 
     \table
-        role           | meaning                                   | examples
-        composite      | expands into smaller components           | CR, CRL, valvedChamber, coupledDomain
-        branch         | flow is an algebraic function of dP       | resistor, orificeValve
-        inertia        | flow is a state, dq/dt = dP/L             | inductor
-        fixedFlow      | flow prescribed in time (in -> out)       | flowSource
-        storage        | its net holds a volume state V, P = P(V,t)| compliance, elastanceChamber
-        fixedPressure  | its net pressure is prescribed            | ground, pressureSource
-        portSource     | flow injected into its net from outside   | externalPort
+        role          | meaning                                    | examples
+        composite     | expands into smaller components            |
+                        CR, CRL, valvedChamber, coupledDomain
+        branch        | flow is an algebraic function of dP        |
+                        resistor, orificeValve
+        inertia       | flow is a state, dq/dt = dP/L              | inductor
+        fixedFlow     | flow prescribed in time (in -> out)        | flowSource
+        storage       | its net holds a volume state V, P = P(V,t) |
+                        compliance, elastanceChamber
+        fixedPressure | its net pressure is prescribed             |
+                        ground, pressureSource
+        portSource    | flow injected into its net from outside    |
+                        externalPort
     \endtable
 
     storage, fixedPressure and portSource are one-node elements: their two
@@ -32,6 +50,9 @@ Description
     it minus the flows out of it.
 
     All quantities handed to and returned from the numerical members are SI.
+
+Author
+    David Kelly, UCD.
 
 SourceFiles
     circulationComponent.C
@@ -203,3 +224,5 @@ public:
 } // End namespace Foam
 
 #endif
+
+// ************************************************************************* //

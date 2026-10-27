@@ -1,6 +1,27 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Accumulates the signals of the named output columns over each cardiac
+    cycle, and writes the per-cycle metrics and the pressure-volume loops.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "circulationMetrics.H"
@@ -36,8 +57,8 @@ Foam::circulationMetrics::circulationMetrics
         if (i < 0)
         {
             FatalIOErrorInFunction(d)
-                << "Metrics: there is no output column '" << name << "'. Columns:"
-                << nl << columns << exit(FatalIOError);
+                << "Metrics: there is no output column '" << name
+                << "'. Columns:" << nl << columns << exit(FatalIOError);
         }
         return i;
     };
@@ -74,7 +95,8 @@ Foam::circulationMetrics::circulationMetrics
         {
             FatalIOErrorInFunction(d)
                 << "Metric '" << it.name << "': unknown type '" << it.type
-                << "'. Valid types: chamber pressure flow" << exit(FatalIOError);
+                << "'. Valid types: chamber pressure flow"
+                << exit(FatalIOError);
         }
         items.append(it);
     }
@@ -86,13 +108,19 @@ Foam::circulationMetrics::circulationMetrics
     {
         for (const label c : {it.cVolume, it.cPressure, it.cFlow})
         {
-            if (c >= 0 && !mon.found(c)) mon.append(c);
+            if (c >= 0 && !mon.found(c))
+            {
+                mon.append(c);
+            }
         }
     }
     monitored_ = mon;
     v_.setSize(monitored_.size());
 
-    if (!isDir(dir_)) mkDir(dir_);
+    if (!isDir(dir_))
+    {
+        mkDir(dir_);
+    }
     out_.open(dir_/"metrics.dat");
     out_ << std::setprecision(10);
 }
@@ -110,24 +138,38 @@ void Foam::circulationMetrics::startCycle(const label k)
 {
     cycle_ = k;
     t_.clear();
-    for (auto& l : v_) l.clear();
+    for (auto& l : v_)
+    {
+        l.clear();
+    }
 }
 
 
 void Foam::circulationMetrics::finishCycle()
 {
-    if (t_.size() < 2 || !cycleStartedOnBoundary_) return;
+    if (t_.size() < 2 || !cycleStartedOnBoundary_)
+    {
+        return;
+    }
 
     const scalar span = t_.last() - t_.first();
 
-    auto integral = [&](const DynamicList<scalar>& y, const bool positive, const bool negative)
+    auto integral = [&]
+    (
+        const DynamicList<scalar>& y,
+        const bool positive,
+        const bool negative
+    )
     {
         scalar s = 0;
         for (label i = 1; i < t_.size(); ++i)
         {
             auto f = [&](const scalar q)
             {
-                return positive ? Foam::max(q, scalar(0)) : negative ? Foam::min(q, scalar(0)) : q;
+                return
+                    positive
+                  ? Foam::max(q, scalar(0))
+                  : negative ? Foam::min(q, scalar(0)) : q;
             };
             s += 0.5*(f(y[i]) + f(y[i-1]))*(t_[i] - t_[i-1]);
         }
@@ -140,7 +182,9 @@ void Foam::circulationMetrics::finishCycle()
     DynamicList<scalar> vals;
     auto put = [&](const std::string& n, const std::string& u, const scalar v)
     {
-        names.append(n); units.append(u); vals.append(v);
+        names.append(n);
+        units.append(u);
+        vals.append(v);
     };
 
     for (const item& it : items_)
@@ -162,9 +206,14 @@ void Foam::circulationMetrics::finishCycle()
 
             // Pressure-volume loop of this cycle
             std::ofstream pv(dir_/(it.name + ".pvLoop.dat"));
-            pv << std::setprecision(10) << "# cycle " << cycle_ << ": t " << t_.first() << " .. " << t_.last()
-               << "\n# V P\n# " << volumeLabel_ << ' ' << pressureLabel_ << '\n';
-            for (label i = 0; i < t_.size(); ++i) pv << V[i] << ' ' << P[i] << '\n';
+            pv << std::setprecision(10) << "# cycle " << cycle_ << ": t "
+               << t_.first() << " .. " << t_.last()
+               << "\n# V P\n# " << volumeLabel_ << ' ' << pressureLabel_
+               << '\n';
+            for (label i = 0; i < t_.size(); ++i)
+            {
+                pv << V[i] << ' ' << P[i] << '\n';
+            }
         }
         else if (it.type == "pressure")
         {
@@ -191,16 +240,26 @@ void Foam::circulationMetrics::finishCycle()
 
     if (!headerWritten_)
     {
-        out_ << "# per-cycle metrics, units of the case; cycle k is [k T, (k+1) T]\n# cycle tEnd";
-        for (const auto& n : names) out_ << ' ' << n;
+        out_ << "# per-cycle metrics, units of the case; "
+                "cycle k is [k T, (k+1) T]\n# cycle tEnd";
+        for (const auto& n : names)
+        {
+            out_ << ' ' << n;
+        }
         out_ << "\n# - s";
-        for (const auto& u : units) out_ << ' ' << (u.empty() ? "-" : u);
+        for (const auto& u : units)
+        {
+            out_ << ' ' << (u.empty() ? "-" : u);
+        }
         out_ << '\n';
         headerWritten_ = true;
     }
 
     out_ << cycle_ << ' ' << t_.last();
-    for (const scalar v : vals) out_ << ' ' << v;
+    for (const scalar v : vals)
+    {
+        out_ << ' ' << v;
+    }
     out_ << '\n';
     out_.flush();
 }
@@ -225,7 +284,10 @@ void Foam::circulationMetrics::add(const scalar t, const scalarField& values)
         if (std::abs(t - (cycle_ + 1)*period_) <= tol)
         {
             t_.append(t);
-            forAll(monitored_, i) v_[i].append(values[monitored_[i]]);
+            forAll(monitored_, i)
+            {
+                v_[i].append(values[monitored_[i]]);
+            }
         }
 
         finishCycle();
@@ -234,7 +296,10 @@ void Foam::circulationMetrics::add(const scalar t, const scalarField& values)
     }
 
     t_.append(t);
-    forAll(monitored_, i) v_[i].append(values[monitored_[i]]);
+    forAll(monitored_, i)
+    {
+        v_[i].append(values[monitored_[i]]);
+    }
 }
 
 // ************************************************************************* //

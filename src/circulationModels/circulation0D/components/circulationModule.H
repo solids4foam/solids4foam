@@ -1,6 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::circulationModule
@@ -24,12 +37,15 @@ Description
                 components
                 {
                     Rch    { type resistor;   R @Rch; }
-                    C      { type compliance; C @C; initialPressure @initialPressure; }
+                    C      { type compliance; C @C;
+                             initialPressure @initialPressure; }
                     R      { type resistor;   R @R; }
                     ground { type ground; }
                 }
-                connections ( (Rch C R ground) );     // names relative to the module
-                terminals   { in Rch.in; }            // module terminal -> inner terminal
+                // names relative to the module
+                connections ( (Rch C R ground) );
+                // module terminal -> inner terminal
+                terminals   { in Rch.in; }
             }
         }
 
@@ -41,6 +57,9 @@ Description
     A parameter reference is the parameter name with a leading "@" and may
     stand for any entry value. Modules may use other modules. A module that
     declares "units" can only be used in a case written in those units.
+
+Author
+    David Kelly, UCD.
 
 SourceFiles
     circulationModule.C
@@ -86,3 +105,5 @@ public:
 } // End namespace Foam
 
 #endif
+
+// ************************************************************************* //

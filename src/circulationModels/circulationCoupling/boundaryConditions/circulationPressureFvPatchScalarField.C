@@ -1,6 +1,27 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Sets the patch pressure of the circulationPressure boundary condition
+    from the coupler, and writes the boundary condition.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "circulationPressureFvPatchScalarField.H"
@@ -11,7 +32,8 @@
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarField
+Foam::circulationPressureFvPatchScalarField::
+circulationPressureFvPatchScalarField
 (
     const fvPatch& p,
     const DimensionedField<scalar, volMesh>& iF
@@ -22,7 +44,8 @@ Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarFie
 {}
 
 
-Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarField
+Foam::circulationPressureFvPatchScalarField::
+circulationPressureFvPatchScalarField
 (
     const fvPatch& p,
     const DimensionedField<scalar, volMesh>& iF,
@@ -37,7 +60,8 @@ Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarFie
 {}
 
 
-Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarField
+Foam::circulationPressureFvPatchScalarField::
+circulationPressureFvPatchScalarField
 (
     const circulationPressureFvPatchScalarField& ptf,
     const fvPatch& p,
@@ -50,7 +74,8 @@ Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarFie
 {}
 
 
-Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarField
+Foam::circulationPressureFvPatchScalarField::
+circulationPressureFvPatchScalarField
 (
     const circulationPressureFvPatchScalarField& ptf
 )
@@ -60,7 +85,8 @@ Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarFie
 {}
 
 
-Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarField
+Foam::circulationPressureFvPatchScalarField::
+circulationPressureFvPatchScalarField
 (
     const circulationPressureFvPatchScalarField& ptf,
     const DimensionedField<scalar, volMesh>& iF
@@ -75,7 +101,10 @@ Foam::circulationPressureFvPatchScalarField::circulationPressureFvPatchScalarFie
 
 void Foam::circulationPressureFvPatchScalarField::updateCoeffs()
 {
-    if (updated()) return;
+    if (updated())
+    {
+        return;
+    }
 
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
@@ -87,7 +116,11 @@ void Foam::circulationPressureFvPatchScalarField::updateCoeffs()
     coupler.sampleAndAdvance(mesh);
 
     // The network works in Pa; the incompressible solvers expect p/rho
-    operator==(coupler.patchPressure(coupler.portOfPatch(patch().index()))/coupler.rho());
+    operator==
+    (
+        coupler.patchPressure(coupler.portOfPatch(patch().index()))
+       /coupler.rho()
+    );
 
     fixedValueFvPatchScalarField::updateCoeffs();
 }
@@ -108,7 +141,11 @@ void Foam::circulationPressureFvPatchScalarField::write(Ostream& os) const
 
 namespace Foam
 {
-    makePatchTypeField(fvPatchScalarField, circulationPressureFvPatchScalarField);
+    makePatchTypeField
+    (
+        fvPatchScalarField,
+        circulationPressureFvPatchScalarField
+    );
 }
 
 // ************************************************************************* //

@@ -1,6 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Application
     circulationFoam
@@ -27,6 +40,9 @@ Description
     <time>/circulationState, and is read from the start time if present, so a
     long spin-up can be continued.
 
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "argList.H"
@@ -51,7 +67,10 @@ static wordList readPatchNames(const fileName& path)
 {
     wordList names;
     std::ifstream is(path);
-    if (!is) return names;
+    if (!is)
+    {
+        return names;
+    }
 
     std::stringstream buf;
     buf << is.rdbuf();
@@ -62,7 +81,14 @@ static wordList readPatchNames(const fileName& path)
     if (pos != std::string::npos)
     {
         pos = text.find('}', pos);
-        if (pos != std::string::npos) ++pos; else pos = 0;
+        if (pos != std::string::npos)
+        {
+            ++pos;
+        }
+        else
+        {
+            pos = 0;
+        }
     }
     else
     {
@@ -77,26 +103,65 @@ static wordList readPatchNames(const fileName& path)
         const char c = text[i];
         if (c == '/' && i + 1 < text.size() && text[i+1] == '/')
         {
-            while (i < text.size() && text[i] != '\n') ++i;
+            while (i < text.size() && text[i] != '\n')
+            {
+                ++i;
+            }
             continue;
         }
-        if (std::isspace(static_cast<unsigned char>(c)) || c == '(' || c == ')' || c == '{' || c == '}')
+        if
+        (
+            std::isspace(static_cast<unsigned char>(c))
+         || c == '(' || c == ')' || c == '{' || c == '}'
+        )
         {
-            if (!cur.empty()) { tok.push_back(cur); cur.clear(); }
-            if (!std::isspace(static_cast<unsigned char>(c))) tok.push_back(std::string(1, c));
+            if (!cur.empty())
+            {
+                tok.push_back(cur);
+                cur.clear();
+            }
+            if (!std::isspace(static_cast<unsigned char>(c)))
+            {
+                tok.push_back(std::string(1, c));
+            }
         }
-        else cur += c;
+        else
+        {
+            cur += c;
+        }
     }
-    if (!cur.empty()) tok.push_back(cur);
+    if (!cur.empty())
+    {
+        tok.push_back(cur);
+    }
 
     int depth = 0;
     for (std::size_t i = 0; i + 1 < tok.size(); ++i)
     {
-        if (tok[i] == "(" ) { ++depth; continue; }
-        if (tok[i] == ")" ) { --depth; continue; }
-        if (tok[i] == "{" ) { ++depth; continue; }
-        if (tok[i] == "}" ) { --depth; continue; }
-        if (depth == 1 && tok[i+1] == "{") names.append(word(tok[i], false));
+        if (tok[i] == "(" )
+        {
+            ++depth;
+            continue;
+        }
+        if (tok[i] == ")" )
+        {
+            --depth;
+            continue;
+        }
+        if (tok[i] == "{" )
+        {
+            ++depth;
+            continue;
+        }
+        if (tok[i] == "}" )
+        {
+            --depth;
+            continue;
+        }
+        if (depth == 1 && tok[i+1] == "{")
+        {
+            names.append(word(tok[i], false));
+        }
     }
     return names;
 }
@@ -143,21 +208,29 @@ int main(int argc, char *argv[])
         Info<< "Wrote " << json << nl;
 
         const fileName svg(runTime.path()/"circuit.svg");
-        const int rc = Foam::system("circulationSchematic \"" + json + "\" \"" + svg + "\"");
+        const int rc = Foam::system
+        (
+            "circulationSchematic \"" + json + "\" \"" + svg + "\""
+        );
         if (rc == 0)
         {
             Info<< "Open it with:  open " << svg << endl;
         }
         else if (rc == 127)
         {
-            Info<< "circulationSchematic was not found on the PATH (it is in src/circulationModels/tools):" << nl
-                << "    export PATH=$PATH:/path/to/solids4foam/src/circulationModels/tools" << nl
-                << "then  circulationSchematic circuit.json circuit.svg" << endl;
+            Info<< "circulationSchematic was not found on the PATH "
+                   "(it is in src/circulationModels/tools):" << nl
+                << "    export PATH=$PATH:"
+                   "/path/to/solids4foam/src/circulationModels/tools" << nl
+                << "then  circulationSchematic circuit.json circuit.svg"
+                << endl;
         }
         else
         {
-            Info<< "circulationSchematic failed (exit status " << rc << "); run it by hand to see why:" << nl
-                << "    circulationSchematic circuit.json circuit.svg" << endl;
+            Info<< "circulationSchematic failed (exit status " << rc
+                << "); run it by hand to see why:" << nl
+                << "    circulationSchematic circuit.json circuit.svg"
+                << endl;
         }
         return 0;
     }
@@ -216,9 +289,15 @@ int main(int argc, char *argv[])
 
         log << "# circulationFoam, units " << network.context().name() << nl;
         log << "# t";
-        for (const word& c : cols) log << ' ' << c;
+        for (const word& c : cols)
+        {
+            log << ' ' << c;
+        }
         log << "\n# s";
-        for (const string& u : units) log << ' ' << (u.empty() ? "-" : u);
+        for (const string& u : units)
+        {
+            log << ' ' << (u.empty() ? "-" : u);
+        }
         log << '\n';
     }
 
@@ -230,7 +309,10 @@ int main(int argc, char *argv[])
         (
             new circulationMetrics
             (
-                props.subDict("metrics"), network.columns(), network.context(), outDir
+                props.subDict("metrics"),
+                network.columns(),
+                network.context(),
+                outDir
             )
         );
     }
@@ -241,10 +323,16 @@ int main(int argc, char *argv[])
     {
         network.outputValues(values);
         log << network.time();
-        for (const scalar v : values) log << ' ' << v;
+        for (const scalar v : values)
+        {
+            log << ' ' << v;
+        }
         log << '\n';
 
-        if (metrics.valid()) metrics().add(network.time(), values);
+        if (metrics.valid())
+        {
+            metrics().add(network.time(), values);
+        }
     };
 
     writeRow();
@@ -262,9 +350,10 @@ int main(int argc, char *argv[])
         {
             Info<< "Time = " << runTime.timeName() << endl;
 
-            // The restart state at full double precision whatever writePrecision
-            // the case uses. The values are converted to text when the
-            // dictionary is built, so the precision is raised before that.
+            // The restart state at full double precision whatever
+            // writePrecision the case uses. The values are converted to text
+            // when the dictionary is built, so the precision is raised before
+            // that.
             const unsigned int oldPrecision = IOstream::defaultPrecision
             (
                 std::numeric_limits<scalar>::max_digits10

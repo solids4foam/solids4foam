@@ -1,6 +1,29 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Assembles the circulation network from its dictionary and solves it:
+    classifies the nets, solves the algebraic nodal pressures, provides the
+    derivatives and Jacobian of the ODE system, advances it in time, and
+    handles the port forcing, the restart state and the set-up check.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "circulationNetwork.H"
@@ -23,15 +46,22 @@ bool solveDense(scalarSquareMatrix& A, scalarField& b)
 
     scalar scale = 0;
     for (label i = 0; i < n; ++i)
+    {
         for (label j = 0; j < n; ++j)
+        {
             scale = Foam::max(scale, Foam::mag(A(i, j)));
+        }
+    }
 
     for (label k = 0; k < n; ++k)
     {
         label p = k;
         for (label i = k + 1; i < n; ++i)
         {
-            if (Foam::mag(A(i, k)) > Foam::mag(A(p, k))) p = i;
+            if (Foam::mag(A(i, k)) > Foam::mag(A(p, k)))
+            {
+                p = i;
+            }
         }
 
         if (Foam::mag(A(p, k)) <= 1e-14*scale || scale == 0)
@@ -41,15 +71,24 @@ bool solveDense(scalarSquareMatrix& A, scalarField& b)
 
         if (p != k)
         {
-            for (label j = 0; j < n; ++j) Foam::Swap(A(k, j), A(p, j));
+            for (label j = 0; j < n; ++j)
+            {
+                Foam::Swap(A(k, j), A(p, j));
+            }
             Foam::Swap(b[k], b[p]);
         }
 
         for (label i = k + 1; i < n; ++i)
         {
             const scalar f = A(i, k)/A(k, k);
-            if (f == 0) continue;
-            for (label j = k; j < n; ++j) A(i, j) -= f*A(k, j);
+            if (f == 0)
+            {
+                continue;
+            }
+            for (label j = k; j < n; ++j)
+            {
+                A(i, j) -= f*A(k, j);
+            }
             b[i] -= f*b[k];
         }
     }
@@ -57,7 +96,10 @@ bool solveDense(scalarSquareMatrix& A, scalarField& b)
     for (label i = n - 1; i >= 0; --i)
     {
         scalar s = b[i];
-        for (label j = i + 1; j < n; ++j) s -= A(i, j)*b[j];
+        for (label j = i + 1; j < n; ++j)
+        {
+            s -= A(i, j)*b[j];
+        }
         b[i] = s/A(i, i);
     }
 
@@ -214,7 +256,10 @@ void Foam::circulationNetwork::build(const dictionary& dict)
     // Single-node elements have one node
     forAll(prims, i)
     {
-        if (prims[i].singleNode()) unite(2*i, 2*i + 1);
+        if (prims[i].singleNode())
+        {
+            unite(2*i, 2*i + 1);
+        }
     }
 
     labelList netOfRoot(2*nComps, -1);
@@ -223,7 +268,10 @@ void Foam::circulationNetwork::build(const dictionary& dict)
     forAll(netOfTerminal, t)
     {
         const label r = find(t);
-        if (netOfRoot[r] < 0) netOfRoot[r] = nNets_++;
+        if (netOfRoot[r] < 0)
+        {
+            netOfRoot[r] = nNets_++;
+        }
         netOfTerminal[t] = netOfRoot[r];
     }
 
@@ -239,7 +287,7 @@ void Foam::circulationNetwork::build(const dictionary& dict)
 
     comps_.transfer(prims);
 
-    // ---- 3. Classify nets ----------------------------------------------------
+    // ---- 3. Classify nets -------------------------------------------------
 
     netStorage_.setSize(nNets_, -1);
     netFixed_.setSize(nNets_, -1);
@@ -252,7 +300,10 @@ void Foam::circulationNetwork::build(const dictionary& dict)
         const label n = netIn_[k];
 
         attachments[n]++;
-        if (netOut_[k] != n) attachments[netOut_[k]]++;
+        if (netOut_[k] != n)
+        {
+            attachments[netOut_[k]]++;
+        }
 
         if (roles_[k] == role::storage)
         {
@@ -296,7 +347,7 @@ void Foam::circulationNetwork::build(const dictionary& dict)
         }
     }
 
-    // ---- 3b. Groups of algebraic nets without a pressure reference ------------
+    // ---- 3b. Groups of algebraic nets without a pressure reference --------
 
     groupOfNet_.setSize(nNets_, -1);
     pinned_.setSize(nNets_, false);
@@ -308,7 +359,11 @@ void Foam::circulationNetwork::build(const dictionary& dict)
 
         auto gfind = [&](label a)
         {
-            while (gp[a] != a) { gp[a] = gp[gp[a]]; a = gp[a]; }
+            while (gp[a] != a)
+            {
+                gp[a] = gp[gp[a]];
+                a = gp[a];
+            }
             return a;
         };
 
@@ -316,7 +371,10 @@ void Foam::circulationNetwork::build(const dictionary& dict)
 
         forAll(comps_, k)
         {
-            if (roles_[k] != role::branch) continue;
+            if (roles_[k] != role::branch)
+            {
+                continue;
+            }
 
             const label a = netIn_[k];
             const label b = netOut_[k];
@@ -329,18 +387,30 @@ void Foam::circulationNetwork::build(const dictionary& dict)
 
         forAll(comps_, k)
         {
-            if (roles_[k] != role::branch) continue;
+            if (roles_[k] != role::branch)
+            {
+                continue;
+            }
 
             const label a = netIn_[k];
             const label b = netOut_[k];
 
-            if (algIndex_[a] >= 0 && algIndex_[b] < 0) referenced[gfind(a)] = true;
-            if (algIndex_[b] >= 0 && algIndex_[a] < 0) referenced[gfind(b)] = true;
+            if (algIndex_[a] >= 0 && algIndex_[b] < 0)
+            {
+                referenced[gfind(a)] = true;
+            }
+            if (algIndex_[b] >= 0 && algIndex_[a] < 0)
+            {
+                referenced[gfind(b)] = true;
+            }
         }
 
         for (label n = 0; n < nNets_; ++n)
         {
-            if (algIndex_[n] >= 0) groupOfNet_[n] = gfind(n);
+            if (algIndex_[n] >= 0)
+            {
+                groupOfNet_[n] = gfind(n);
+            }
         }
 
         // A referenced group is solved by its resistors alone. A floating one
@@ -358,7 +428,10 @@ void Foam::circulationNetwork::build(const dictionary& dict)
                 if
                 (
                     roles_[k] == role::inertia
-                 && (groupOfNet_[netIn_[k]] == root || groupOfNet_[netOut_[k]] == root)
+                 && (
+                        groupOfNet_[netIn_[k]] == root
+                     || groupOfNet_[netOut_[k]] == root
+                    )
                 )
                 {
                     inductors.append(k);
@@ -368,9 +441,15 @@ void Foam::circulationNetwork::build(const dictionary& dict)
             string members;
             forAll(comps_, k)
             {
-                if (groupOfNet_[netIn_[k]] == root || groupOfNet_[netOut_[k]] == root)
+                if
+                (
+                    groupOfNet_[netIn_[k]] == root
+                 || groupOfNet_[netOut_[k]] == root
+                )
                 {
-                    members += (members.empty() ? "'" : ", '") + comps_[k].name() + "'";
+                    members +=
+                        (members.empty() ? "'" : ", '")
+                      + comps_[k].name() + "'";
                 }
             }
 
@@ -416,13 +495,16 @@ void Foam::circulationNetwork::build(const dictionary& dict)
         }
     }
 
-    // ---- 4. States -------------------------------------------------------------
+    // ---- 4. States ---------------------------------------------------------
 
     stateOfComp_.setSize(nComps, -1);
     nStates_ = 0;
     forAll(comps_, k)
     {
-        if (roles_[k] == role::storage) stateOfComp_[k] = nStates_++;
+        if (roles_[k] == role::storage)
+        {
+            stateOfComp_[k] = nStates_++;
+        }
     }
     forAll(comps_, k)
     {
@@ -458,7 +540,7 @@ void Foam::circulationNetwork::build(const dictionary& dict)
         }
     }
 
-    // ---- 5. Initial state, columns, solver -------------------------------------
+    // ---- 5. Initial state, columns, solver ---------------------------------
 
     y_.setSize(nStates_);
     forAll(comps_, k)
@@ -510,7 +592,10 @@ void Foam::circulationNetwork::build(const dictionary& dict)
                     break;
             }
         }
-        for (const word& p : probes) cols.append(p + ".P");
+        for (const word& p : probes)
+        {
+            cols.append(p + ".P");
+        }
         columns_ = cols;
     }
 
@@ -518,7 +603,12 @@ void Foam::circulationNetwork::build(const dictionary& dict)
 
     if (!odeDict_.found("solver"))
     {
-        odeDict_.add("solver", odeDict_.getOrDefault<word>("type", "RKDP45"), true);
+        odeDict_.add
+        (
+            "solver",
+            odeDict_.getOrDefault<word>("type", "RKDP45"),
+            true
+        );
     }
     if (!odeDict_.found("absTol") && !odeDict_.found("absTolComponents"))
     {
@@ -545,7 +635,10 @@ Foam::string Foam::circulationNetwork::netMembers(const label net) const
     {
         if (netIn_[k] == net || netOut_[k] == net)
         {
-            if (!s.empty()) s += ", ";
+            if (!s.empty())
+            {
+                s += ", ";
+            }
             s += "'" + comps_[k].name() + "'";
         }
     }
@@ -566,7 +659,10 @@ Foam::scalar Foam::circulationNetwork::branchFlow
         case role::branch:
             return comps_[k].flow(t, P[netIn_[k]] - P[netOut_[k]]);
         case role::inertia:
-            return forcedOfComp_[k] >= 0 ? forcedFlow(k, t) : y[stateOfComp_[k]];
+            return
+                forcedOfComp_[k] >= 0
+              ? forcedFlow(k, t)
+              : y[stateOfComp_[k]];
         case role::fixedFlow:
             return comps_[k].fixedFlow(t);
         default:
@@ -590,8 +686,14 @@ Foam::scalar Foam::circulationNetwork::forcedFlow
         if (roles_[s] == role::fixedFlow)
         {
             const scalar Q = comps_[s].fixedFlow(t);
-            if (groupOfNet_[netOut_[s]] == f.group) inflow += Q;
-            if (groupOfNet_[netIn_[s]] == f.group) inflow -= Q;
+            if (groupOfNet_[netOut_[s]] == f.group)
+            {
+                inflow += Q;
+            }
+            if (groupOfNet_[netIn_[s]] == f.group)
+            {
+                inflow -= Q;
+            }
         }
         else if (roles_[s] == role::portSource)
         {
@@ -632,11 +734,17 @@ void Foam::circulationNetwork::nodalSystem
 {
     forAll(algIndex_, n)
     {
-        if (algIndex_[n] >= 0) P[n] = pa[algIndex_[n]];
+        if (algIndex_[n] >= 0)
+        {
+            P[n] = pa[algIndex_[n]];
+        }
     }
 
     R = Zero;
-    if (J) *J = Zero;
+    if (J)
+    {
+        *J = Zero;
+    }
     flowScale = 0;
 
     forAll(comps_, k)
@@ -652,10 +760,16 @@ void Foam::circulationNetwork::nodalSystem
         {
             case role::branch:
             {
-                if (ai < 0 && ao < 0) continue;
+                if (ai < 0 && ao < 0)
+                {
+                    continue;
+                }
                 const scalar dP = P[ni] - P[no];
                 Q = comps_[k].flow(t, dP);
-                if (J) g = comps_[k].dFlowdDP(t, dP);
+                if (J)
+                {
+                    g = comps_[k].dFlowdDP(t, dP);
+                }
                 break;
             }
             case role::inertia:
@@ -684,7 +798,10 @@ void Foam::circulationNetwork::nodalSystem
             if (J)
             {
                 (*J)(ai, ai) -= g;
-                if (ao >= 0) (*J)(ai, ao) += g;
+                if (ao >= 0)
+                {
+                    (*J)(ai, ao) += g;
+                }
             }
         }
         if (ao >= 0 && !pinned_[no])
@@ -693,7 +810,10 @@ void Foam::circulationNetwork::nodalSystem
             if (J)
             {
                 (*J)(ao, ao) -= g;
-                if (ai >= 0) (*J)(ao, ai) += g;
+                if (ai >= 0)
+                {
+                    (*J)(ao, ai) += g;
+                }
             }
         }
     }
@@ -706,13 +826,20 @@ void Foam::circulationNetwork::nodalSystem
         const scalar LdQ =
             comps_[f.comp].inertance()*forcedFlowRate(f.comp, t);
 
-        // pinned end "in":  P_a - P_b = L Q';  pinned end "out": P_b - P_a = L Q'
+        // pinned end "in":  P_a - P_b = L Q';
+        // pinned end "out": P_b - P_a = L Q'
         R[a] = P[f.pinnedNet] - P[f.otherNet] - f.sign*LdQ;
         if (J)
         {
-            for (label j = 0; j < nAlg_; ++j) (*J)(a, j) = 0;
+            for (label j = 0; j < nAlg_; ++j)
+            {
+                (*J)(a, j) = 0;
+            }
             (*J)(a, a) = 1;
-            if (b >= 0) (*J)(a, b) = -1;
+            if (b >= 0)
+            {
+                (*J)(a, b) = -1;
+            }
         }
     }
 }
@@ -737,7 +864,10 @@ void Foam::circulationNetwork::netPressures
         }
     }
 
-    if (nAlg_ == 0) return;
+    if (nAlg_ == 0)
+    {
+        return;
+    }
 
     scalarSquareMatrix J(nAlg_);
     scalarField R(nAlg_);
@@ -758,9 +888,15 @@ void Foam::circulationNetwork::netPressures
         nodalSystem(t, y, P, pAlg_, R, &J, flowScale);
 
         scalarField delta(-R);
-        if (!solveDense(J, delta)) singular();
+        if (!solveDense(J, delta))
+        {
+            singular();
+        }
 
-        forAll(pAlg_, a) pAlg_[a] += delta[a];
+        forAll(pAlg_, a)
+        {
+            pAlg_[a] += delta[a];
+        }
     }
     else
     {
@@ -786,10 +922,18 @@ void Foam::circulationNetwork::netPressures
 
         scalarField trial(nAlg_), Rt(nAlg_);
 
-        for (label iter = 0; iter < 80 && norm > 1e-13*flowScale + 1e-24; ++iter)
+        for
+        (
+            label iter = 0;
+            iter < 80 && norm > 1e-13*flowScale + 1e-24;
+            ++iter
+        )
         {
             scalarField delta(-R);
-            if (!solveDense(J, delta)) singular();
+            if (!solveDense(J, delta))
+            {
+                singular();
+            }
 
             scalar lambda = 1;
             bool improved = false;
@@ -808,7 +952,10 @@ void Foam::circulationNetwork::netPressures
                 lambda *= 0.5;
             }
 
-            if (!improved) break;
+            if (!improved)
+            {
+                break;
+            }
 
             pAlg_ = trial;
             nodalSystem(t, y, P, pAlg_, R, &J, flowScale);
@@ -834,7 +981,10 @@ void Foam::circulationNetwork::netPressures
 
     forAll(algIndex_, n)
     {
-        if (algIndex_[n] >= 0) P[n] = pAlg_[algIndex_[n]];
+        if (algIndex_[n] >= 0)
+        {
+            P[n] = pAlg_[algIndex_[n]];
+        }
     }
 }
 
@@ -863,7 +1013,8 @@ void Foam::circulationNetwork::derivatives
             case role::inertia:
                 if (forcedOfComp_[k] < 0)
                 {
-                    dydx[stateOfComp_[k]] = (P[ni] - P[no])/comps_[k].inertance();
+                    dydx[stateOfComp_[k]] =
+                        (P[ni] - P[no])/comps_[k].inertance();
                 }
                 // its flow also feeds the nets at its ends
                 [[fallthrough]];
@@ -885,7 +1036,8 @@ void Foam::circulationNetwork::derivatives
             case role::portSource:
                 if (netStorage_[ni] >= 0)
                 {
-                    dydx[stateOfComp_[netStorage_[ni]]] += comps_[k].injectedFlow(t);
+                    dydx[stateOfComp_[netStorage_[ni]]] +=
+                        comps_[k].injectedFlow(t);
                 }
                 break;
             default:
@@ -916,12 +1068,18 @@ void Foam::circulationNetwork::jacobian
         derivatives(x, yp, f1);
         yp[j] = y[j];
 
-        for (label i = 0; i < n; ++i) dfdy(i, j) = (f1[i] - f0[i])/h;
+        for (label i = 0; i < n; ++i)
+        {
+            dfdy(i, j) = (f1[i] - f0[i])/h;
+        }
     }
 
     const scalar hx = 1e-8*Foam::max(Foam::mag(x), scalar(1));
     derivatives(x + hx, y, f1);
-    for (label i = 0; i < n; ++i) dfdx[i] = (f1[i] - f0[i])/hx;
+    for (label i = 0; i < n; ++i)
+    {
+        dfdx[i] = (f1[i] - f0[i])/hx;
+    }
 }
 
 
@@ -929,7 +1087,10 @@ void Foam::circulationNetwork::jacobian
 
 void Foam::circulationNetwork::advance(const scalar t1)
 {
-    if (t1 <= t_) return;
+    if (t1 <= t_)
+    {
+        return;
+    }
 
     // Re-raise solver failures with advice. The solver's own error is made
     // catchable for the duration of the call.
@@ -943,21 +1104,29 @@ void Foam::circulationNetwork::advance(const scalar t1)
         FatalError.throwing(wasThrowing);
 
         const std::string what = e.message();
-        const bool stepCap = what.find("Integration steps greater than maximum") != std::string::npos;
+        const bool stepCap =
+            what.find("Integration steps greater than maximum")
+         != std::string::npos;
 
         FatalErrorInFunction
             << "The circulation ODE solver (" << odeDict_.get<word>("solver")
-            << ") failed integrating from t = " << t_ << " to " << t1 << "." << nl
+            << ") failed integrating from t = " << t_ << " to " << t1 << "."
+            << nl
             << (stepCap
               ? "    It needed more than maxSteps = "
               + std::to_string(odeDict_.getOrDefault<label>("maxSteps", 0))
               + " steps in this interval. Usual causes:\n"
-                "      1. The solution has become unstable at this time step (a coupled explicit\n"
-                "         scheme, or a high coupling order, can diverge): use  scheme implicit;\n"
-                "         order 2;  or a smaller deltaT. The states at failure are given below:\n"
+                "      1. The solution has become unstable at this time step"
+                " (a coupled explicit\n"
+                "         scheme, or a high coupling order, can diverge): use"
+                "  scheme implicit;\n"
+                "         order 2;  or a smaller deltaT. The states at failure"
+                " are given below:\n"
                 "         if they are far from physical this is the cause.\n"
-                "      2. The tolerances are very tight for non-smooth valve switching: raise\n"
-                "         maxSteps, or loosen absTol / relTol in the solver dictionary, or give\n"
+                "      2. The tolerances are very tight for non-smooth valve"
+                " switching: raise\n"
+                "         maxSteps, or loosen absTol / relTol in the solver"
+                " dictionary, or give\n"
                 "         the valves a smoothing  epsilon.\n"
               : std::string("    ") + what + "\n").c_str()
             << "    State at failure: " << y_ << nl
@@ -992,7 +1161,8 @@ Foam::stringList Foam::circulationNetwork::columnUnits() const
     {
         const word& c = columns_[i];
         units[i] =
-            c.ends_with(".P") || c.ends_with(".Ppatch") ? ctx_.label(q::pressure)
+            c.ends_with(".P") || c.ends_with(".Ppatch")
+          ? ctx_.label(q::pressure)
           : c.ends_with(".V") ? ctx_.label(q::volume)
           : ctx_.label(q::flow);
     }
@@ -1034,7 +1204,10 @@ void Foam::circulationNetwork::outputValues(scalarField& values) const
         }
     }
 
-    for (const label n : probeNet_) values[c++] = Pwork_[n]/fP;
+    for (const label n : probeNet_)
+    {
+        values[c++] = Pwork_[n]/fP;
+    }
 }
 
 
@@ -1122,7 +1295,8 @@ bool Foam::circulationNetwork::portInlet(const word& port) const
 
 const Foam::word& Foam::circulationNetwork::portPatch(const word& port) const
 {
-    return dynamic_cast<const externalPort&>(comps_[portLabel(port)]).patchName();
+    return
+        dynamic_cast<const externalPort&>(comps_[portLabel(port)]).patchName();
 }
 
 
@@ -1143,13 +1317,17 @@ void Foam::circulationNetwork::summary(Ostream& os) const
     os  << "circulationNetwork: " << comps_.size() << " elements, "
         << nNets_ << " nodes (" << nAlg_ << " algebraic), "
         << nStates_ << " states" << nl
-        << "  units " << ctx_.name() << ", Tcycle " << ctx_.period() << " s" << nl
+        << "  units " << ctx_.name() << ", Tcycle " << ctx_.period() << " s"
+        << nl
         << "  ODE solver " << odeDict_.get<word>("solver") << nl;
 
     if (!portIndex_.empty())
     {
         os  << "  coupling ports:";
-        for (const word& p : portIndex_.sortedToc()) os << ' ' << p;
+        for (const word& p : portIndex_.sortedToc())
+        {
+            os << ' ' << p;
+        }
         os  << nl;
     }
 }
@@ -1189,50 +1367,69 @@ Foam::label Foam::circulationNetwork::check
         return "?";
     };
 
-    os  << "Units:    " << ctx_.name() << "  (pressure " << ctx_.label(q::pressure).c_str()
+    os  << "Units:    " << ctx_.name() << "  (pressure "
+        << ctx_.label(q::pressure).c_str()
         << ", volume " << ctx_.label(q::volume).c_str() << ", time s)" << nl
         << "Period:   Tcycle = " << ctx_.period() << " s" << nl << nl;
 
-    // ---- elements -------------------------------------------------------------
+    // ---- elements ---------------------------------------------------------
     os  << comps_.size() << " elements:" << nl;
     forAll(comps_, k)
     {
         os  << "  " << comps_[k].name().c_str();
-        for (label pad = comps_[k].name().size(); pad < 24; ++pad) os << ' ';
+        for (label pad = comps_[k].name().size(); pad < 24; ++pad)
+        {
+            os << ' ';
+        }
         os  << comps_[k].type().c_str();
-        for (label pad = comps_[k].type().size(); pad < 18; ++pad) os << ' ';
+        for (label pad = comps_[k].type().size(); pad < 18; ++pad)
+        {
+            os << ' ';
+        }
         os  << roleName(roles_[k]) << ",  node n" << netIn_[k];
-        if (netOut_[k] != netIn_[k]) os << " -> n" << netOut_[k];
+        if (netOut_[k] != netIn_[k])
+        {
+            os << " -> n" << netOut_[k];
+        }
         os  << nl;
     }
 
-    // ---- nodes ----------------------------------------------------------------
-    os  << nl << nNets_ << " nodes (" << nAlg_ << " solved algebraically):" << nl;
+    // ---- nodes ------------------------------------------------------------
+    os  << nl << nNets_ << " nodes (" << nAlg_ << " solved algebraically):"
+        << nl;
     for (label n = 0; n < nNets_; ++n)
     {
         os  << "  n" << n << "  ";
         if (netStorage_[n] >= 0)
         {
-            os  << "stores volume (" << comps_[netStorage_[n]].name().c_str() << ")";
+            os  << "stores volume ("
+                << comps_[netStorage_[n]].name().c_str() << ")";
         }
         else if (netFixed_[n] >= 0)
         {
-            os  << "fixed pressure (" << comps_[netFixed_[n]].name().c_str() << ")";
+            os  << "fixed pressure ("
+                << comps_[netFixed_[n]].name().c_str() << ")";
         }
         else
         {
             os  << "algebraic";
-            if (pinned_[n]) os << ", held by an inductor (no pressure reference)";
+            if (pinned_[n])
+            {
+                os << ", held by an inductor (no pressure reference)";
+            }
         }
         os  << ":  " << netMembers(n).c_str() << nl;
     }
 
-    // ---- states ---------------------------------------------------------------
+    // ---- states -----------------------------------------------------------
     os  << nl << nStates_ << " ODE states:" << nl;
     labelList compOfState(nStates_, -1);
     forAll(stateOfComp_, k)
     {
-        if (stateOfComp_[k] >= 0) compOfState[stateOfComp_[k]] = k;
+        if (stateOfComp_[k] >= 0)
+        {
+            compOfState[stateOfComp_[k]] = k;
+        }
     }
     forAll(compOfState, i)
     {
@@ -1241,28 +1438,39 @@ Foam::label Foam::circulationNetwork::check
         os  << "  y[" << i << "]  " << comps_[k].name().c_str()
             << (volume ? "  volume  " : "  flow    ")
             << ctx_.fromSI(volume ? q::volume : q::flow, y_[i]) << ' '
-            << ctx_.label(volume ? q::volume : q::flow).c_str() << "  (initial)" << nl;
+            << ctx_.label(volume ? q::volume : q::flow).c_str()
+            << "  (initial)" << nl;
     }
     for (const forcedInertia& f : forced_)
     {
-        os  << "  (" << comps_[f.comp].name().c_str() << " carries the flow of nodes with no"
-            << " pressure reference: its flow is not a state, its pressure drop is L dQ/dt)" << nl;
+        os  << "  (" << comps_[f.comp].name().c_str()
+            << " carries the flow of nodes with no"
+            << " pressure reference: its flow is not a state, its pressure"
+               " drop is L dQ/dt)" << nl;
     }
 
-    // ---- coupling ports -------------------------------------------------------
+    // ---- coupling ports ---------------------------------------------------
     if (!portIndex_.empty())
     {
         os  << nl << portIndex_.size() << " coupling port(s):" << nl;
         for (const word& pn : portIndex_.sortedToc())
         {
-            const externalPort& ep = dynamic_cast<const externalPort&>(comps_[portIndex_[pn]]);
-            os  << "  " << pn.c_str() << "  " << (ep.inlet() ? "inlet (flow into the CFD domain)"
-                                               : "outlet (flow leaves the CFD domain)")
+            const externalPort& ep =
+                dynamic_cast<const externalPort&>(comps_[portIndex_[pn]]);
+            os  << "  " << pn.c_str() << "  "
+                << (
+                       ep.inlet()
+                     ? "inlet (flow into the CFD domain)"
+                     : "outlet (flow leaves the CFD domain)"
+                   )
                 << ",  patch ";
             if (ep.patchName().empty())
             {
                 os  << "(none)" << nl;
-                if (!ep.tabulated()) warn("port " + pn + " has no \"patch\" entry");
+                if (!ep.tabulated())
+                {
+                    warn("port " + pn + " has no \"patch\" entry");
+                }
             }
             else
             {
@@ -1270,8 +1478,20 @@ Foam::label Foam::circulationNetwork::check
                 if (meshPatches)
                 {
                     const bool found = meshPatches->found(ep.patchName());
-                    os  << (found ? "  (found in the mesh)" : "  (NOT in the mesh)") << nl;
-                    if (!found) warn("patch '" + ep.patchName() + "' of port " + pn + " is not in the mesh");
+                    os  << (
+                               found
+                             ? "  (found in the mesh)"
+                             : "  (NOT in the mesh)"
+                           )
+                        << nl;
+                    if (!found)
+                    {
+                        warn
+                        (
+                            "patch '" + ep.patchName() + "' of port " + pn
+                          + " is not in the mesh"
+                        );
+                    }
                 }
                 else
                 {
@@ -1285,7 +1505,7 @@ Foam::label Foam::circulationNetwork::check
         }
     }
 
-    // ---- parameter magnitudes -------------------------------------------------
+    // ---- parameter magnitudes ---------------------------------------------
     struct range { q quantity; scalar lo, hi; const char* what; };
     static const range ranges[] =
     {
@@ -1310,27 +1530,37 @@ Foam::label Foam::circulationNetwork::check
         {
             for (const range& r : ranges)
             {
-                if (r.quantity != p.quantity) continue;
+                if (r.quantity != p.quantity)
+                {
+                    continue;
+                }
                 ++nChecked;
 
                 const scalar a = Foam::mag(p.value);
-                if (a == 0) break;              // zero offsets and unstressed volumes are normal
+                // Zero offsets and unstressed volumes are normal
+                if (a == 0)
+                {
+                    break;
+                }
 
                 if (a < r.lo || a > r.hi)
                 {
                     std::ostringstream m;
                     m   << comps_[k].name() << "." << p.name << " = "
                         << ctx_.fromSI(p.quantity, p.value) << ' '
-                        << ctx_.label(p.quantity) << " (" << p.value << " in SI) is outside the usual "
+                        << ctx_.label(p.quantity) << " (" << p.value
+                        << " in SI) is outside the usual "
                         << r.what << " range " << r.lo << " .. " << r.hi
                         << " (SI)";
                     if (ctx_.name() == "SI")
                     {
-                        m << ". Written in mmHg and mL? then use  units mmHg_mL;";
+                        m << ". Written in mmHg and mL? then use  units "
+                             "mmHg_mL;";
                     }
                     else
                     {
-                        m << ". Is this an SI value in a  units " << ctx_.name() << ";  case?";
+                        m << ". Is this an SI value in a  units " << ctx_.name()
+                          << ";  case?";
                     }
                     warn(m.str());
                 }
@@ -1340,11 +1570,16 @@ Foam::label Foam::circulationNetwork::check
     }
     if (nWarnings > nShown)
     {
-        os  << "  ... and " << (nWarnings - nShown) << " more outside the usual ranges" << nl;
+        os  << "  ... and " << (nWarnings - nShown)
+            << " more outside the usual ranges" << nl;
     }
-    if (nWarnings == 0) os << "  " << nChecked << " values checked, none outside the usual ranges" << nl;
+    if (nWarnings == 0)
+    {
+        os  << "  " << nChecked
+            << " values checked, none outside the usual ranges" << nl;
+    }
 
-    // ---- solver ---------------------------------------------------------------
+    // ---- solver -----------------------------------------------------------
     {
         std::ostringstream o;
         o.precision(6);
@@ -1364,8 +1599,6 @@ Foam::label Foam::circulationNetwork::check
 
 void Foam::circulationNetwork::writeNetlist(Ostream& osOut) const
 {
-    typedef circulationContext::quantity q;
-
     // Plain string stream: OpenFOAM's Ostream quotes std::string values
     std::ostringstream os;
     os.precision(6);
@@ -1375,7 +1608,10 @@ void Foam::circulationNetwork::writeNetlist(Ostream& osOut) const
         std::string o;
         for (const char c : in)
         {
-            if (c == '"' || c == '\\') o += '\\';
+            if (c == '"' || c == '\\')
+            {
+                o += '\\';
+            }
             o += c;
         }
         return o;
@@ -1396,7 +1632,8 @@ void Foam::circulationNetwork::writeNetlist(Ostream& osOut) const
         return "?";
     };
 
-    // The parameters of a component as [{"name", "value", "unit"}], in case units
+    // The parameters of a component as [{"name", "value", "unit"}], in case
+    // units
     auto params = [&](const label k)
     {
         DynamicList<circulationComponent::parameter> ps;
@@ -1407,7 +1644,10 @@ void Foam::circulationNetwork::writeNetlist(Ostream& osOut) const
         o << "[";
         forAll(ps, i)
         {
-            if (i) o << ", ";
+            if (i)
+            {
+                o << ", ";
+            }
             o   << "{\"name\": \"" << esc(ps[i].name) << "\", \"value\": "
                 << ctx_.fromSI(ps[i].quantity, ps[i].value) << ", \"unit\": \""
                 << esc(std::string(ctx_.label(ps[i].quantity))) << "\"}";
@@ -1416,7 +1656,8 @@ void Foam::circulationNetwork::writeNetlist(Ostream& osOut) const
         return o.str();
     };
 
-    os  << "{\n  \"units\": \"" << esc(std::string(ctx_.name())) << "\",\n  \"nodes\": [\n";
+    os  << "{\n  \"units\": \"" << esc(std::string(ctx_.name()))
+        << "\",\n  \"nodes\": [\n";
 
     for (label n = 0; n < nNets_; ++n)
     {
@@ -1425,22 +1666,31 @@ void Foam::circulationNetwork::writeNetlist(Ostream& osOut) const
           : netFixed_[n] >= 0   ? "fixed"
           : "algebraic";
 
-        os  << "    {\"id\": " << n << ", \"kind\": \"" << kind << "\", \"parts\": [";
+        os  << "    {\"id\": " << n << ", \"kind\": \"" << kind
+            << "\", \"parts\": [";
 
         bool first = true;
         forAll(comps_, k)
         {
-            if (!comps_[k].singleNode() || netIn_[k] != n) continue;
+            if (!comps_[k].singleNode() || netIn_[k] != n)
+            {
+                continue;
+            }
 
-            os  << (first ? "" : ", ") << "{\"name\": \"" << esc(comps_[k].name())
+            os  << (first ? "" : ", ") << "{\"name\": \""
+                << esc(comps_[k].name())
                 << "\", \"type\": \"" << esc(std::string(comps_[k].type()))
-                << "\", \"role\": \"" << roleName(roles_[k]) << "\", \"params\": " << params(k);
+                << "\", \"role\": \"" << roleName(roles_[k])
+                << "\", \"params\": " << params(k);
 
             if (roles_[k] == role::portSource)
             {
-                const externalPort& ep = dynamic_cast<const externalPort&>(comps_[k]);
-                os  << ", \"direction\": \"" << (ep.inlet() ? "inlet" : "outlet")
-                    << "\", \"patch\": \"" << esc(std::string(ep.patchName())) << "\"";
+                const externalPort& ep =
+                    dynamic_cast<const externalPort&>(comps_[k]);
+                os  << ", \"direction\": \""
+                    << (ep.inlet() ? "inlet" : "outlet")
+                    << "\", \"patch\": \""
+                    << esc(std::string(ep.patchName())) << "\"";
             }
             os  << "}";
             first = false;
@@ -1453,12 +1703,18 @@ void Foam::circulationNetwork::writeNetlist(Ostream& osOut) const
     bool first = true;
     forAll(comps_, k)
     {
-        if (comps_[k].singleNode()) continue;
+        if (comps_[k].singleNode())
+        {
+            continue;
+        }
 
-        os  << (first ? "" : ",\n") << "    {\"name\": \"" << esc(comps_[k].name())
+        os  << (first ? "" : ",\n") << "    {\"name\": \""
+            << esc(comps_[k].name())
             << "\", \"type\": \"" << esc(std::string(comps_[k].type()))
-            << "\", \"role\": \"" << roleName(roles_[k]) << "\", \"from\": " << netIn_[k]
-            << ", \"to\": " << netOut_[k] << ", \"params\": " << params(k) << "}";
+            << "\", \"role\": \"" << roleName(roles_[k])
+            << "\", \"from\": " << netIn_[k]
+            << ", \"to\": " << netOut_[k] << ", \"params\": " << params(k)
+            << "}";
         first = false;
     }
 

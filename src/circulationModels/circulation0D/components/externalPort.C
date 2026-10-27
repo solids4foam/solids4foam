@@ -1,6 +1,28 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    The flow, the injected flow and the imposed patch pressure of an
+    external coupling port, including the valve law between the lumped node
+    and the patch, and the forcing set by the coupling code.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "externalPort.H"
@@ -9,15 +31,27 @@
 namespace Foam
 {
     defineTypeNameAndDebug(externalPort, 0);
-    addToRunTimeSelectionTable(circulationComponent, externalPort, dictionary);
+    addToRunTimeSelectionTable
+    (
+        circulationComponent,
+        externalPort,
+        dictionary
+    );
 }
 
 namespace
 {
     bool readInlet(const Foam::word& direction, const Foam::dictionary& d)
     {
-        if (direction == "inlet") return true;
-        if (direction == "outlet") return false;
+        if (direction == "inlet")
+        {
+            return true;
+        }
+
+        if (direction == "outlet")
+        {
+            return false;
+        }
 
         FatalIOErrorInFunction(d)
             << "direction must be inlet or outlet, not '" << direction << "'"
@@ -27,8 +61,15 @@ namespace
 
     bool readTabulated(const Foam::word& provider, const Foam::dictionary& d)
     {
-        if (provider == "table") return true;
-        if (provider == "external") return false;
+        if (provider == "table")
+        {
+            return true;
+        }
+
+        if (provider == "external")
+        {
+            return false;
+        }
 
         FatalIOErrorInFunction(d)
             << "provider must be external or table, not '" << provider << "'"
@@ -81,7 +122,10 @@ Foam::externalPort::externalPort
         CQ_ = ctx.read(v, "CQ", circulationContext::quantity::valveCoefficient);
         reverseFraction_ = v.getOrDefault<scalar>("reverseFraction", 0.005);
 
-        if (CQ_ <= 0) fail("valve CQ must be positive");
+        if (CQ_ <= 0)
+        {
+            fail("valve CQ must be positive");
+        }
     }
 
     if (tabulated_)
@@ -119,7 +163,10 @@ void Foam::externalPort::setForcing
 
 Foam::scalar Foam::externalPort::portFlow(const scalar t) const
 {
-    if (tabulated_) return table_().value(t);
+    if (tabulated_)
+    {
+        return table_().value(t);
+    }
 
     const scalar dt = t1_ - t0_;
     const scalar a =
@@ -144,9 +191,14 @@ Foam::scalar Foam::externalPort::patchPressure
     const scalar t
 ) const
 {
-    if (!hasValve_) return Pnode;
+    if (!hasValve_)
+    {
+        return Pnode;
+    }
 
     const scalar dP = orificeValve::dPfromQ(CQ_, portFlow(t), reverseFraction_);
 
     return inlet_ ? Pnode - dP : Pnode + dP;
 }
+
+// ************************************************************************* //

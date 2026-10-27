@@ -1,6 +1,27 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Evaluates the waveforms (constant, sine, halfSine and table) used by the
+    sources and by the table provider of the external ports.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "circulationWaveform.H"
@@ -79,13 +100,22 @@ Foam::circulationWaveform::circulationWaveform
         while (std::getline(is, line))
         {
             const auto hash = line.find('#');
-            if (hash != std::string::npos) line.erase(hash);
+            if (hash != std::string::npos)
+            {
+                line.erase(hash);
+            }
 
             std::istringstream ls(line);
             scalarList row;
             double x;
-            while (ls >> x) row.append(x);
-            if (row.empty()) continue;
+            while (ls >> x)
+            {
+                row.append(x);
+            }
+            if (row.empty())
+            {
+                continue;
+            }
 
             if (row.size() <= column)
             {
@@ -150,7 +180,8 @@ Foam::scalar Foam::circulationWaveform::value(const scalar t) const
             const scalar tc = t - period_*std::floor(t/period_);
             return
                 tc < systolicDuration_
-              ? amplitude_*Foam::sin(constant::mathematical::pi*tc/systolicDuration_)
+              ? amplitude_
+               *Foam::sin(constant::mathematical::pi*tc/systolicDuration_)
               : scalar(0);
         }
 
@@ -166,8 +197,14 @@ Foam::scalar Foam::circulationWaveform::value(const scalar t) const
                 tq = t0 + (t - t0) - span*std::floor((t - t0)/span);
             }
 
-            if (tq <= t0) return vTable_.first();
-            if (tq >= t1) return vTable_.last();
+            if (tq <= t0)
+            {
+                return vTable_.first();
+            }
+            if (tq >= t1)
+            {
+                return vTable_.last();
+            }
 
             // Binary search for the bracketing interval
             label lo = 0, hi = tTable_.size() - 1;

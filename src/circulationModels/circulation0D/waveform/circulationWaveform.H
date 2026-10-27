@@ -1,6 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::circulationWaveform
@@ -12,8 +25,10 @@ Description
 
         waveform { type constant; value 5; }
         waveform { type sine;     mean 100; amplitude 100;
-                   period 0.8333; phase -1.5708; }      // mean + A sin(2 pi t/T + phase)
-        waveform { type halfSine; amplitude 400; period 1; systolicDuration 0.3; }
+                   period 0.8333; phase -1.5708; }
+                   // mean + A sin(2 pi t/T + phase)
+        waveform { type halfSine; amplitude 400; period 1;
+                   systolicDuration 0.3; }
         waveform { type table;    file "constant/Qin.dat"; column 1;
                    periodic yes; }
 
@@ -23,6 +38,9 @@ Description
 
     If the component has no "waveform" entry but has "value", it is a
     constant.
+
+Author
+    David Kelly, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -71,3 +89,5 @@ public:
 } // End namespace Foam
 
 #endif
+
+// ************************************************************************* //

@@ -1,12 +1,26 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::CRL
 
 Description
-    compliance, resistor, inductor: in -> C -> R -> L -> out (thesis CRL). A vessel segment with storage, loss and inertia.
+    compliance, resistor, inductor: in -> C -> R -> L -> out (thesis CRL).
+    A vessel segment with storage, loss and inertia.
 
         type CRL;
         C   0.08;  R   0.003;  L   6.2e-5;
@@ -16,6 +30,9 @@ Description
 
     Its parts are named <name>.C, <name>.R (and <name>.L), so their results
     appear as <name>.C.P, <name>.C.V, <name>.R.Q and so on.
+
+Author
+    David Kelly, UCD.
 
 \*---------------------------------------------------------------------------*/
 
@@ -35,7 +52,12 @@ public:
 
     TypeName("CRL");
 
-    CRL(const word& name, const dictionary& dict, const circulationContext& ctx);
+    CRL
+    (
+        const word& name,
+        const dictionary& dict,
+        const circulationContext& ctx
+    );
 
     virtual role kind() const { return role::composite; }
     virtual void expand(circulationBuilder& builder) const;
@@ -44,3 +66,5 @@ public:
 } // End namespace Foam
 
 #endif
+
+// ************************************************************************* //

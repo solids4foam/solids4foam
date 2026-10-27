@@ -1,6 +1,28 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Reads the unit system and the cardiac period, converts dictionary
+    entries to SI, checking their dimensions where given, and provides the
+    unit labels for the output.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "circulationContext.H"
@@ -63,7 +85,8 @@ Foam::circulationContext::circulationContext(const dictionary& dict)
     if (pressureFactor_ <= 0 || volumeFactor_ <= 0 || period_ <= 0)
     {
         FatalIOErrorInFunction(dict)
-            << "Unit factors and Tcycle must be positive" << exit(FatalIOError);
+            << "Unit factors and Tcycle must be positive"
+            << exit(FatalIOError);
     }
 }
 
@@ -101,19 +124,32 @@ Foam::dimensionSet Foam::circulationContext::dimensions(const quantity q)
     // [mass length time temperature moles current luminous intensity]
     switch (q)
     {
-        case quantity::pressure:            return dimensionSet(1, -1, -2, 0, 0, 0, 0);
-        case quantity::volume:              return dimensionSet(0, 3, 0, 0, 0, 0, 0);
-        case quantity::flow:                return dimensionSet(0, 3, -1, 0, 0, 0, 0);
-        case quantity::resistance:          return dimensionSet(1, -4, -1, 0, 0, 0, 0);
-        case quantity::compliance:          return dimensionSet(-1, 4, 2, 0, 0, 0, 0);
-        case quantity::inertance:           return dimensionSet(1, -4, 0, 0, 0, 0, 0);
-        case quantity::elastance:           return dimensionSet(1, -4, -2, 0, 0, 0, 0);
-        case quantity::valveCoefficient:    return dimensionSet(-0.5, 3.5, 0, 0, 0, 0, 0);
-        case quantity::quadraticResistance: return dimensionSet(1, -7, 0, 0, 0, 0, 0);
-        case quantity::elastanceQuadratic:  return dimensionSet(1, -7, -2, 0, 0, 0, 0);
-        case quantity::inverseVolume:       return dimensionSet(0, -3, 0, 0, 0, 0, 0);
-        case quantity::time:                return dimensionSet(0, 0, 1, 0, 0, 0, 0);
-        case quantity::none:                return dimless;
+        case quantity::pressure:
+            return dimensionSet(1, -1, -2, 0, 0, 0, 0);
+        case quantity::volume:
+            return dimensionSet(0, 3, 0, 0, 0, 0, 0);
+        case quantity::flow:
+            return dimensionSet(0, 3, -1, 0, 0, 0, 0);
+        case quantity::resistance:
+            return dimensionSet(1, -4, -1, 0, 0, 0, 0);
+        case quantity::compliance:
+            return dimensionSet(-1, 4, 2, 0, 0, 0, 0);
+        case quantity::inertance:
+            return dimensionSet(1, -4, 0, 0, 0, 0, 0);
+        case quantity::elastance:
+            return dimensionSet(1, -4, -2, 0, 0, 0, 0);
+        case quantity::valveCoefficient:
+            return dimensionSet(-0.5, 3.5, 0, 0, 0, 0, 0);
+        case quantity::quadraticResistance:
+            return dimensionSet(1, -7, 0, 0, 0, 0, 0);
+        case quantity::elastanceQuadratic:
+            return dimensionSet(1, -7, -2, 0, 0, 0, 0);
+        case quantity::inverseVolume:
+            return dimensionSet(0, -3, 0, 0, 0, 0, 0);
+        case quantity::time:
+            return dimensionSet(0, 0, 1, 0, 0, 0, 0);
+        case quantity::none:
+            return dimless;
     }
     return dimless;
 }
@@ -144,7 +180,11 @@ Foam::scalar Foam::circulationContext::read
      && is[0].pToken() == token::BEGIN_SQR
     )
     {
-        return dimensionedScalar(dynamic_cast<const primitiveEntry&>(*e), dimensions(q)).value();
+        return dimensionedScalar
+        (
+            dynamic_cast<const primitiveEntry&>(*e),
+            dimensions(q)
+        ).value();
     }
 
     return d.get<scalar>(key)*factor(q);
@@ -159,15 +199,24 @@ Foam::string Foam::circulationContext::label(const quantity q) const
         case quantity::volume:     return volumeLabel_;
         case quantity::flow:       return volumeLabel_ + "/s";
         case quantity::time:       return "s";
-        case quantity::resistance:        return pressureLabel_ + " s/" + volumeLabel_;
-        case quantity::compliance:        return volumeLabel_ + "/" + pressureLabel_;
-        case quantity::inertance:         return pressureLabel_ + " s2/" + volumeLabel_;
-        case quantity::elastance:         return pressureLabel_ + "/" + volumeLabel_;
-        case quantity::valveCoefficient:  return volumeLabel_ + "/(s sqrt(" + pressureLabel_ + "))";
-        case quantity::quadraticResistance: return pressureLabel_ + " s2/" + volumeLabel_ + "2";
-        case quantity::elastanceQuadratic:  return pressureLabel_ + "/" + volumeLabel_ + "2";
-        case quantity::inverseVolume:     return "1/" + volumeLabel_;
-        default:                   return "";
+        case quantity::resistance:
+            return pressureLabel_ + " s/" + volumeLabel_;
+        case quantity::compliance:
+            return volumeLabel_ + "/" + pressureLabel_;
+        case quantity::inertance:
+            return pressureLabel_ + " s2/" + volumeLabel_;
+        case quantity::elastance:
+            return pressureLabel_ + "/" + volumeLabel_;
+        case quantity::valveCoefficient:
+            return volumeLabel_ + "/(s sqrt(" + pressureLabel_ + "))";
+        case quantity::quadraticResistance:
+            return pressureLabel_ + " s2/" + volumeLabel_ + "2";
+        case quantity::elastanceQuadratic:
+            return pressureLabel_ + "/" + volumeLabel_ + "2";
+        case quantity::inverseVolume:
+            return "1/" + volumeLabel_;
+        default:
+            return "";
     }
 }
 

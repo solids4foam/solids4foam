@@ -1,6 +1,19 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
     Foam::circulationNetwork
@@ -28,7 +41,7 @@ Description
 
         solver { type RKDP45; absTol 1e-12; relTol 1e-8; }
 
-        probes ( Qin.out );        // optional: report the pressure at a terminal
+        probes ( Qin.out );    // optional: report the pressure at a terminal
 
     Components that are connected share one pressure (a net). A net holding
     a compliance or chamber has a volume state; every other net is solved
@@ -42,6 +55,9 @@ Description
     network then exposes its ports (portNames()); the coupling code supplies
     the port flows over each step with setPortForcing(), calls advance(),
     and reads back the pressures to impose with portPressure().
+
+Author
+    David Kelly, UCD.
 
 SourceFiles
     circulationNetwork.C
@@ -140,8 +156,9 @@ class circulationNetwork
 
         void build(const dictionary& dict);
 
-        //- Flow imbalance R at every algebraic node, and optionally its Jacobian,
-        //  for algebraic-node pressures pa (also fills P at those nodes)
+        //- Flow imbalance R at every algebraic node, and optionally its
+        //  Jacobian, for algebraic-node pressures pa (also fills P at those
+        //  nodes)
         void nodalSystem
         (
             const scalar t,
@@ -237,7 +254,8 @@ public:
 
         const circulationContext& context() const { return ctx_; }
 
-        //- Column headings, "<component>.P" etc, with units in the case's system
+        //- Column headings, "<component>.P" etc, with units in the case's
+        //  system
         const wordList& columns() const { return columns_; }
 
         //- Unit label of each column
@@ -303,3 +321,5 @@ public:
 } // End namespace Foam
 
 #endif
+
+// ************************************************************************* //

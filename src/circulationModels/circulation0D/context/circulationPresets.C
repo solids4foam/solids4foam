@@ -1,11 +1,28 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Description
     The sub-circuit modules that ship with the library, written in the same
     dictionary syntax a case uses for its own "modules" (see circulationModule).
     A case's module of the same name replaces a preset.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "circulationContext.H"
@@ -16,7 +33,8 @@ namespace
 
 const char* presetText = R"PRESETS(
 
-// ---- Windkessels (unit-agnostic: give the parameters in the case's units) ----
+// ---- Windkessels (unit-agnostic: give the parameters in the case's
+// units) ----
 // All end on a ground inside the module, so the only terminal is "in".
 
 // C in parallel with R
@@ -67,7 +85,8 @@ windkessel4
     terminals   { in Rch.in; }
 }
 
-// ---- Closed-loop 4-chamber human circulation (Healy / Korakianitis & Shi) ----
+// ---- Closed-loop 4-chamber human circulation
+// (Healy / Korakianitis & Shi) ----
 // Written in mmHg, mL, s: the case must use  units mmHg_mL;  Any parameter may
 // be overridden, e.g.  heart { type healthyHuman; Emax_lv 2.0; }
 healthyHuman
@@ -75,10 +94,14 @@ healthyHuman
     units       mmHg_mL;
     defaults
     {
-        V0_lv 5;  P0_lv 1;  Emin_lv 0.1;  Emax_lv 2.5;  Tes_lv 0.3;  Ted_lv 0.45;  Eshift_lv 0;  Vinit_lv 500;
-        V0_rv 10; P0_rv 1;  Emin_rv 0.1;  Emax_rv 1.15; Tes_rv 0.3;  Ted_rv 0.45;  Eshift_rv 0;  Vinit_rv 500;
-        V0_la 4;  P0_la 1;  Emin_la 0.15; Emax_la 0.25; Tes_la 0.045; Ted_la 0.09; Eshift_la 0.92; Vinit_la 20;
-        V0_ra 4;  P0_ra 1;  Emin_ra 0.15; Emax_ra 0.25; Tes_ra 0.045; Ted_ra 0.09; Eshift_ra 0.92; Vinit_ra 20;
+        V0_lv 5;  P0_lv 1;  Emin_lv 0.1;  Emax_lv 2.5;
+        Tes_lv 0.3;  Ted_lv 0.45;  Eshift_lv 0;  Vinit_lv 500;
+        V0_rv 10; P0_rv 1;  Emin_rv 0.1;  Emax_rv 1.15;
+        Tes_rv 0.3;  Ted_rv 0.45;  Eshift_rv 0;  Vinit_rv 500;
+        V0_la 4;  P0_la 1;  Emin_la 0.15; Emax_la 0.25;
+        Tes_la 0.045; Ted_la 0.09; Eshift_la 0.92; Vinit_la 20;
+        V0_ra 4;  P0_ra 1;  Emin_ra 0.15; Emax_ra 0.25;
+        Tes_ra 0.045; Ted_ra 0.09; Eshift_ra 0.92; Vinit_ra 20;
 
         CQ_av 350; CQ_mv 400; CQ_tv 400; CQ_pv 350;
 
@@ -93,10 +116,30 @@ healthyHuman
     }
     components
     {
-        LV  { type elastanceChamber; V0 @V0_lv; P0 @P0_lv; Emin @Emin_lv; Emax @Emax_lv; Tes @Tes_lv; Ted @Ted_lv; Eshift @Eshift_lv; initialVolume @Vinit_lv; }
-        RV  { type elastanceChamber; V0 @V0_rv; P0 @P0_rv; Emin @Emin_rv; Emax @Emax_rv; Tes @Tes_rv; Ted @Ted_rv; Eshift @Eshift_rv; initialVolume @Vinit_rv; }
-        LA  { type elastanceChamber; V0 @V0_la; P0 @P0_la; Emin @Emin_la; Emax @Emax_la; Tes @Tes_la; Ted @Ted_la; Eshift @Eshift_la; initialVolume @Vinit_la; }
-        RA  { type elastanceChamber; V0 @V0_ra; P0 @P0_ra; Emin @Emin_ra; Emax @Emax_ra; Tes @Tes_ra; Ted @Ted_ra; Eshift @Eshift_ra; initialVolume @Vinit_ra; }
+        LV
+        {
+            type elastanceChamber; V0 @V0_lv; P0 @P0_lv;
+            Emin @Emin_lv; Emax @Emax_lv; Tes @Tes_lv; Ted @Ted_lv;
+            Eshift @Eshift_lv; initialVolume @Vinit_lv;
+        }
+        RV
+        {
+            type elastanceChamber; V0 @V0_rv; P0 @P0_rv;
+            Emin @Emin_rv; Emax @Emax_rv; Tes @Tes_rv; Ted @Ted_rv;
+            Eshift @Eshift_rv; initialVolume @Vinit_rv;
+        }
+        LA
+        {
+            type elastanceChamber; V0 @V0_la; P0 @P0_la;
+            Emin @Emin_la; Emax @Emax_la; Tes @Tes_la; Ted @Ted_la;
+            Eshift @Eshift_la; initialVolume @Vinit_la;
+        }
+        RA
+        {
+            type elastanceChamber; V0 @V0_ra; P0 @P0_ra;
+            Emin @Emin_ra; Emax @Emax_ra; Tes @Tes_ra; Ted @Ted_ra;
+            Eshift @Eshift_ra; initialVolume @Vinit_ra;
+        }
 
         AV  { type orificeValve; CQ @CQ_av; }
         MV  { type orificeValve; CQ @CQ_mv; }
@@ -152,14 +195,16 @@ pipeLoopHeart
         R3 { type resistor;   R @R3; }
         atrium
         {
-            type mixedChamber; V0 @Vau; active { E1 @Ea; } passive { P0 @Pa0; K @Ka; }
+            type mixedChamber; V0 @Vau;
+            active { E1 @Ea; } passive { P0 @Pa0; K @Ka; }
             activation { type sineSquared; offset @tOffset_a; duration @Tsa; }
             initialVolume @Va;
         }
         mitral { type orificeValve; Rhat @Rhat1; }
         ventricle
         {
-            type mixedChamber; V0 @Vvu; active { E1 @Ev1; E2 @Ev2; } passive { P0 @Pv0; K @Kv; }
+            type mixedChamber; V0 @Vvu;
+            active { E1 @Ev1; E2 @Ev2; } passive { P0 @Pv0; K @Kv; }
             activation { type sineSquared; offset @tOffset_v; duration @Tsv; }
             initialVolume @Vv;
         }

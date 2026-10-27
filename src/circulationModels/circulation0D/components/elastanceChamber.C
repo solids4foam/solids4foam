@@ -1,6 +1,27 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    Reads the parameters of the time-varying elastance heart chamber and
+    evaluates its half-cosine elastance.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "elastanceChamber.H"
@@ -10,7 +31,12 @@
 namespace Foam
 {
     defineTypeNameAndDebug(elastanceChamber, 0);
-    addToRunTimeSelectionTable(circulationComponent, elastanceChamber, dictionary);
+    addToRunTimeSelectionTable
+    (
+        circulationComponent,
+        elastanceChamber,
+        dictionary
+    );
 }
 
 Foam::elastanceChamber::elastanceChamber
@@ -31,13 +57,30 @@ Foam::elastanceChamber::elastanceChamber
     T_(dict.getOrDefault<scalar>("T", ctx.period())),
     Vinit_(V0_)
 {
-    if (Emin_ < 0 || Emax_ < Emin_) fail("need 0 <= Emin <= Emax");
-    if (Tes_ <= 0 || Ted_ <= Tes_) fail("need 0 < Tes < Ted");
-    if (Ted_ > T_) fail("Ted exceeds the cycle length T");
+    if (Emin_ < 0 || Emax_ < Emin_)
+    {
+        fail("need 0 <= Emin <= Emax");
+    }
+
+    if (Tes_ <= 0 || Ted_ <= Tes_)
+    {
+        fail("need 0 < Tes < Ted");
+    }
+
+    if (Ted_ > T_)
+    {
+        fail("Ted exceeds the cycle length T");
+    }
 
     if (dict.found("initialVolume"))
     {
-        Vinit_ = ctx.read(dict, "initialVolume", circulationContext::quantity::volume);
+        Vinit_ =
+            ctx.read
+            (
+                dict,
+                "initialVolume",
+                circulationContext::quantity::volume
+            );
     }
 }
 
@@ -70,3 +113,5 @@ void Foam::elastanceChamber::parameters(DynamicList<parameter>& p) const
     p.append({"Emin", circulationContext::quantity::elastance, Emin_});
     p.append({"Emax", circulationContext::quantity::elastance, Emax_});
 }
+
+// ************************************************************************* //

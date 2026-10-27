@@ -1,6 +1,28 @@
 /*---------------------------------------------------------------------------*\
-  Author: David Kelly
-  License: GNU General Public License v3 (as solids4foam)
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Description
+    The flow law of the orifice valve and its derivative, including the
+    smooth-diode, series-resistance and regurgitant-flow options, and its
+    closed-form inverse dPfromQ().
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "orificeValve.H"
@@ -8,7 +30,12 @@
 namespace Foam
 {
     defineTypeNameAndDebug(orificeValve, 0);
-    addToRunTimeSelectionTable(circulationComponent, orificeValve, dictionary);
+    addToRunTimeSelectionTable
+    (
+        circulationComponent,
+        orificeValve,
+        dictionary
+    );
 }
 
 Foam::orificeValve::orificeValve
@@ -22,17 +49,41 @@ Foam::orificeValve::orificeValve
     CQ_
     (
         dict.found("Rhat")
-      ? 1/Foam::sqrt(ctx.read(dict, "Rhat", circulationContext::quantity::quadraticResistance))
+      ? 1/Foam::sqrt
+        (
+            ctx.read
+            (
+                dict,
+                "Rhat",
+                circulationContext::quantity::quadraticResistance
+            )
+        )
       : ctx.read(dict, "CQ", circulationContext::quantity::valveCoefficient)
     ),
     Rs_(ctx.read(dict, "R", circulationContext::quantity::resistance, 0)),
     eps_(ctx.read(dict, "epsilon", circulationContext::quantity::pressure, 0)),
     reverseFraction_(dict.getOrDefault<scalar>("reverseFraction", 0))
 {
-    if (CQ_ <= 0) fail("CQ (or Rhat) must be positive");
-    if (Rs_ < 0) fail("R must not be negative");
-    if (Rs_ > 0 && dict.getOrDefault<scalar>("epsilon", 0) > 0) fail("R and epsilon cannot be combined");
-    if (eps_ < 0) fail("epsilon must not be negative");
+    if (CQ_ <= 0)
+    {
+        fail("CQ (or Rhat) must be positive");
+    }
+
+    if (Rs_ < 0)
+    {
+        fail("R must not be negative");
+    }
+
+    if (Rs_ > 0 && dict.getOrDefault<scalar>("epsilon", 0) > 0)
+    {
+        fail("R and epsilon cannot be combined");
+    }
+
+    if (eps_ < 0)
+    {
+        fail("epsilon must not be negative");
+    }
+
     if (reverseFraction_ < 0 || reverseFraction_ > 1)
     {
         fail("reverseFraction must be in [0,1]");
@@ -44,7 +95,8 @@ Foam::scalar Foam::orificeValve::flow(const scalar, const scalar dP) const
 {
     if (eps_ > 0)
     {
-        // Smooth diode: sqrt of a strictly positive max(dP,0) and a sigmoid gate
+        // Smooth diode: sqrt of a strictly positive max(dP,0) and a sigmoid
+        // gate
         const scalar dPpos = 0.5*(dP + Foam::sqrt(dP*dP + eps_*eps_));
         const scalar a = Foam::min(Foam::max(dP/eps_, scalar(-50)), scalar(50));
         const scalar gate = 1.0/(1.0 + Foam::exp(-a));
@@ -59,6 +111,7 @@ Foam::scalar Foam::orificeValve::flow(const scalar, const scalar dP) const
             const scalar Rhat = 1/(CQ_*CQ_);
             return (-Rs_ + Foam::sqrt(Rs_*Rs_ + 4*Rhat*dP))/(2*Rhat);
         }
+
         return CQ_*Foam::sqrt(dP);
     }
 
@@ -87,6 +140,7 @@ Foam::scalar Foam::orificeValve::dFlowdDP(const scalar t, const scalar dP) const
             const scalar Rhat = 1/(CQ_*CQ_);
             return 1/Foam::sqrt(Rs_*Rs_ + 4*Rhat*dP);
         }
+
         return CQ_/(2*Foam::sqrt(Foam::max(dP, floorP)));
     }
 
@@ -119,5 +173,11 @@ Foam::scalar Foam::orificeValve::dPfromQ
 void Foam::orificeValve::parameters(DynamicList<parameter>& p) const
 {
     p.append({"CQ", circulationContext::quantity::valveCoefficient, CQ_});
-    if (Rs_ > 0) p.append({"R", circulationContext::quantity::resistance, Rs_});
+
+    if (Rs_ > 0)
+    {
+        p.append({"R", circulationContext::quantity::resistance, Rs_});
+    }
 }
+
+// ************************************************************************* //
