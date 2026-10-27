@@ -2,7 +2,10 @@
 # Run this circuit (0D, no mesh): check the set-up, then solve it.
 #   ./Allrun            results: postProcessing/circulation/0/circulation.dat
 cd "$(dirname "$0")" || exit 1
-. /Volumes/OpenFOAM/OpenFOAM-v2412/etc/bashrc >/dev/null 2>&1 || true
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
+source solids4FoamScripts.sh
 
 circulationFoam -check > log.check 2>&1
 grep '^Result' log.check

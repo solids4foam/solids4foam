@@ -45,5 +45,4 @@ order 2. About a minute on 8 free cores (the three-cycle run about 2.5 minutes);
 | higher-order coupling | `order 3;` plus `libs ("libcirculationCoupling.so" "libcirculationDdtSchemes.so");` and `default BDF3;` in `fvSchemes` |
 | a stiffer ventricle | `ventricle { ... active { E1 3.0e9; ... } }` |
 
-The wider study (all schemes and orders against the original couplings and a monolithic
-reference) is in `../README.md` and `../makeCase`, `../runLadder`.
+The wider set of schemes and orders is in `../README.md` and `../makeCase`, `../runLadder`.

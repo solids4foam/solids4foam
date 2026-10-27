@@ -1,11 +1,9 @@
 #!/bin/bash
-# Remove the results of every tutorial (each case's own Allclean) and the
-# temporary directories the verification makes. Case set-up files are never touched.
+# Remove the results of every tutorial (each case's own Allclean).
+# Case set-up files are never touched.
 cd "$(dirname "$0")" || exit 1
 
 for script in */Allclean */*/Allclean; do
     [ -x "$script" ] && "./$script"
 done
 
-rm -rf .verifyTmp .verifyRestart
-find . -name .DS_Store -delete

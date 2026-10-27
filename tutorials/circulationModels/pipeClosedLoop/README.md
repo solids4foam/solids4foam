@@ -41,79 +41,30 @@ resistance on `orificeValve`.
 ## Running
 
 ```bash
-../../Allwmake                                    # once
 ./makeCase implicit 2 5e-3                        # -> runs/implicit/2/5e-3
 ./runLadder "implicit" "2" "5e-3" 1 8             # blockMesh, decomposePar, mpirun -np 8 pimpleFoam
 ./runLadder "explicit implicit" "2 3 4" "5e-3" 1 8
-python3 analyse.py                                # compare with the original runs and the reference
-julia plotPipeClosedLoop.jl                       # plots/pipeClosedLoop_finalCycle.png
 ```
 
 A coupled case at `dt = 5e-3` takes about 2.5 minutes on 8 cores. Orders 3 and
 4 use the BDF3 / BDF4 CFD time schemes (`makeCase` sets them). Every order uses
-`RKDP45` for the circuit, as the original closed-loop studies do. The step cap of
+`RKDP45` for the circuit. The step cap of
 the circuit's ODE solver is raised (`maxSteps 1e8`) because hard-valve
 switching at the very tight tolerances (relTol 1e-13) needs many small steps.
 
-## Verification
+## Checks and known limits
 
-There is no closed form for this problem, so three references are used.
+There is no closed form for this problem. `../pipeClosedLoopMonolithic` is the
+same circuit with the pipe replaced by its rigid Poiseuille R-L surrogate,
+solved as one system by `circulationFoam`. It is a reference for the coupled
+runs, which differ from it by the modelling error of the surrogate, and a
+test of the chamber and valve components and the network assembly on a stiff,
+non-smooth, closed-loop circuit. The comparison of the circuit alone with an
+independent RK4 integrator and of the coupled runs with earlier hand-written
+couplings are not part of this directory yet.
 
-**1. The circuit alone against an independent integrator.** `../pipeClosedLoopMonolithic`
-is the same circuit with the pipe replaced by its rigid Poiseuille R-L surrogate,
-solved as one system by `circulationFoam`. The independent reference is a plain
-RK4 (stdlib Python, `verification/python/closedLoopOdeReference.py`, copied from
-the original study) at `dt = 6.25e-6`:
+Some combinations are unstable at the coarse time steps and stop: explicit
+order 1 at `dt = 1e-3`, and implicit orders 3 and 4 at `dt = 5e-3`. They need a
+smaller `dt`.
 
-| | worst difference over 3 cycles |
-|---|---|
-| all seven states (pressures swing about 4e4 Pa) | 3e-5 % of range (5e-5 Pa, 6e-13 m3/s) |
-
-This validates the new chamber and valve components and the whole network
-assembly on a stiff, non-smooth, closed-loop circuit.
-
-**2. The coupled CFD runs against the stored runs of the original hand-written
-couplings** (`../../verification/reference/pipeClosedLoop`, data only), same
-mesh, settings, decomposition and time step:
-
-| scheme | order | dt | worst state difference (% of range) | max difference in Pi, Po (Pa) | coupling iterations per step equal |
-|---|---|---|---|---|---|
-| explicit | 2 | 5e-3 | 8e-5 | 0.005, 0.03 | 479 / 479 |
-| explicit | 3 | 5e-3 | 6e-5 | 0.007, 0.02 | 479 / 479 |
-| explicit | 4 | 5e-3 | 7e-5 | 0.010, 0.03 | 479 / 479 |
-| implicit | 1 | 5e-3 | 9e-4 | 0.04, 0.35 | 478 / 479 |
-| implicit | 2 | 5e-3 | 1.1e-3 | 0.08, 0.43 | 479 / 479 |
-| implicit | 3 | 2e-3 | 5e-4 | 0.04, 0.21 | 1026 / 1199 |
-| implicit | 4 | 2e-3 | 6e-4 | 0.04, 0.23 | 869 / 1199 |
-| explicit | 1 | 8e-4 | 1.5e-3 | 0.4, 2.8 | 2999 / 2999 |
-
-The explicit schemes match to 1e-4 % because their exchange does not iterate.
-The implicit ones differ at the 1e-3 % level, which is the noise of the CFD
-linear solvers (tolerance 1e-6, relTol 0.01): the same case run twice with
-the solver tolerances at 1e-9 differs from the 1e-6 run by 0.23 Pa in `Po`, the
-same order as the difference from the stored run (0.3-0.4 Pa). Implicit orders 3 and
-4 take a different number of outer iterations in some steps for the same reason.
-
-**The unstable cases fail identically.** Explicit order 1 at `dt = 1e-3`
-(stopped at `t = 1.997`), implicit order 3 at `5e-3` (stopped at `2.06`) and
-implicit order 4 at `5e-3` (stopped at `0.805`) also stop in the original runs,
-at the same step, and the two agree for every step before that. Those
-combinations need a smaller `dt`.
-
-**3. The modelling floor.** The coupled solution differs from the monolithic
-R-L reference because the resolved pipe is not the surrogate; the original study
-reports about 91.5 Pa at `dt = 1e-4`. At the coarse steps here the coupling error
-dominates, and the distance from the reference over the final cycle is the same
-as the original code's to within 0.4 Pa for the stable cases (e.g. explicit
-order 2 at 5e-3: 723.59 vs 723.60 Pa; implicit order 4 at 2e-3: 227.75 vs 227.71 Pa).
-
-![final cycle](plots/pipeClosedLoop_finalCycle.png)
-
-Lines are this code, hollow circles the original runs, dashed the monolithic
-reference. `plots/analysis.txt` is the full table.
-
-## Not ported
-
-The restart checkpoint and the per-update integration log of the original
-couplings; every accepted step is logged in
-`postProcessing/circulationCoupling/0/coupling.dat`.
+Every accepted step is logged in `postProcessing/circulationCoupling/0/coupling.dat`.

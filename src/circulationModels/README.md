@@ -14,7 +14,7 @@ with solids4foam. 1D vessel models are planned and will live here too.
 | `circulationCoupling` | `libcirculationCoupling` | Coupling of a circulation network to a CFD domain: the `circulationPressure` boundary condition and the coupler (explicit/implicit, orders 1 to 4) |
 | `circulationDdtSchemes` | `libcirculationDdtSchemes` | The `BDF3` and `BDF4` `ddtScheme`s, used by the CFD time discretisation at higher coupling orders. See [circulationDdtSchemes/README.md](circulationDdtSchemes/README.md) |
 | `tools` | | `circulationSchematic` (draws a circuit as an SVG), `circulationPlot` (plots result columns, needs gnuplot) and `addHeader` (adds the solids4foam banner to case dictionaries) |
-| `docs` | | A step-by-step tutorial and the description of the 0D/3D coupling |
+| `docs` | | The description of the 0D/3D coupling, [docs/COUPLING.md](docs/COUPLING.md) |
 
 The `circulationCoupling` and `circulationDdtSchemes` libraries are not specific
 to the 0D models. The coupler talks to the network through ports, and the BDF
@@ -62,3 +62,9 @@ cd tutorials/circulationModels/healthyHuman
 
 Add `src/circulationModels/tools` to your `PATH` so that `circulationFoam -diagram`
 can call `circulationSchematic` to draw the circuit.
+
+## Status
+
+The step-by-step tutorial and the verification scripts and reference data for
+these models are not included yet. The tutorials in `tutorials/circulationModels`
+are self-contained.

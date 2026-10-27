@@ -1,4 +1,4 @@
-# Swapping 0D for 3D, and the solids4foam merge
+# Swapping 0D for 3D
 
 ## The idea
 
@@ -19,21 +19,20 @@ LV { type coupledDomain;  provider external;               // 3D
 connections ( (LV SAS SAT SAR SCP SVN RA TV RV PV PAS PAT PAR PCP PVN LA LV) );
 ```
 
-`tutorials/healthyHumanLVModule` and `tutorials/healthyHumanCoupledReplay` differ
-in nothing but that one entry (`diff` them).
+The CFD coupling tutorials in `tutorials/circulationModels` (`pipeWindkessel`,
+`pipeClosedLoop`) use the simplest case of this, an `externalPort` attached to a
+circuit, bound to a patch by name.
 
 ## What crosses the interface
 
 Each `coupledDomain` creates two **ports**, `<name>.inlet` and `<name>.outlet`,
-one per coupled patch. The valves stay in the 0D network, as in your existing
-LV case. At each port:
+one per coupled patch. The valves stay in the 0D network. At each port:
 
 | CFD gives | network returns |
 |---|---|
 | the port flow `Q`, positive in the natural direction of the patch (inlet: into the domain, `Qmv`; outlet: out of the domain, `Qav`) | the pressure to impose on that patch |
 
-with the interface law (the bounded bidirectional inverse valve law of
-the original left-ventricle coupling, identical to `valveDPfromQ`):
+with the interface law (a bounded bidirectional inverse valve law):
 
 ```
 outlet   Ppatch = P_node + dP(Q)        inlet   Ppatch = P_node - dP(Q)
@@ -41,8 +40,7 @@ dP(Q) =  (Q/CQ)^2          Q >= 0
       = -(|Q|/(fr CQ))^2   Q <  0       fr = reverseFraction, clamped to [1e-3, 1]
 ```
 
-C++ interface of `circulationNetwork` (all SI), the same shape as
-`lumpedCircuitODE::setForcing` plus `lumpedCircuitSolver`:
+C++ interface of `circulationNetwork` (all SI):
 
 ```c++
 circulationNetwork net(dict, t0);
@@ -53,52 +51,33 @@ scalar Pav = net.portPressure("LV.outlet");                  // Pa, at the state
 scalar Pmv = net.portPressure("LV.inlet");
 ```
 
-`applications/testPortCoupling` is a complete working example. It is checked
-against the table replay by `verification/Allverify`.
-
-## Why this gives you the coupling algorithms for free
-
-The eight algorithms of the original left-ventricle coupling (`leftVentricle/src/finalAlgorithms`) differ only in
-*what forcing polynomial they pass and when they integrate*. They hold the
-circuit by composition. Swapping `lumpedCircuitSolver` for `circulationNetwork`
-changes the circuit, not the algorithms:
-
-| existing | new |
-|---|---|
-| `lumpedCircuitODE::setForcing(t0,t1,Qav,Qmv)` | `setPortForcing("LV.outlet" / "LV.inlet", ...)`, same polynomial form, so the third and fourth order schemes still apply |
-| `Pav = P1 + dPav(Qav)`, `Pmv = P9 - dPmv(Qmv)` | `portPressure("LV.outlet" / "LV.inlet")` |
-| `lumpedCircuitState` checkpoint | `stateDict()` / `readState()` |
-| `lumpedParameters` (13 hand-coded states) | `circulationProperties` (any circuit) |
+The flow over a step is passed as a polynomial of up to third order, so that
+the coupling schemes of up to fourth order can be built on it. The state of the
+network is saved and restored with `stateDict()` / `readState()`.
+`applications/test/testPortCoupling` is a complete working example.
 
 The pipe case is the same with one port and no valve: a bare `externalPort`
-`{ direction outlet; provider external; }` attached to a Windkessel.
+`{ direction outlet; provider external; }` attached to a Windkessel. The coupling
+algorithms (explicit or implicit, orders 1 to 4) differ only in *what forcing
+polynomial they pass and when they integrate*; they are implemented in
+`circulationCoupling` and chosen in the `coupling` dictionary.
 
-## Order of work from here
+## Possible future work
 
-1. **Reproduce the LV circuit exactly.** Write the old 13-state circuit
-   (smooth tricuspid/pulmonary valves with `epsilon`, atria, SI parameters from
-   `lumpedParameters`) in `circulationProperties` and compare with
-   the original `lv0d.py` of the left-ventricle study. This is the gate for retiring
-   `lumpedCircuitODE`.
-2. **Point the eight algorithms at `circulationNetwork`.** Mechanical: the
-   forcing code is already polynomial. Re-run `meshStudy` and
-   `orderAccuracyTime`; the numbers should not move.
-3. **Pressure-driven ports.** `externalPressurePort` (the network supplies
+1. **Pressure-driven ports.** `externalPressurePort` (the network supplies
    Q, the CFD supplies P) for 3D inlets fed by a lumped upstream. Tried and
    removed: on the closed-loop pipe, at either end, the plain partitioned
    iteration diverges (interface gain about 1.5 C L/dt^2 + 0.75 L/L1 > 1,
    because both sides then differentiate: the pipe's pressure follows dQ/dt and
    the compliance's flow follows dP/dt). Needs an interface acceleration, or a
    domain that is not inertia-dominated; revisit with other geometries.
-4. **solids4foam.** The library has no OpenFOAM-version dependence beyond
-   `ODE` and `OpenFOAM`.
-   * Done: the library is in `solids4foam/src/circulationModels`, built by `src/Allwmake`.
-   * Add a `physicsModel` type `circulation` (0D only; `physicsModel` needs just a
-     `Time`, so the stock `solids4Foam` solver can run a mesh-free case) that wraps
-     `circulationNetwork` and implements `evolve()`.
-   * For fluid and fluid-solid cases, the pressure boundary condition on each
-     patch reads the `portPressure` and posts the patch flux through
-     `setPortForcing`; the network lives in the `fluidModel`, not in the BC.
-5. **Physiology.** Shi's dynamic leaflet valve (`Shi.pdf`, parameters in
-   `ShiParam.jl`) and the passive exponential chamber of ModularCirc as further
-   component types, each a single class.
+2. **A `physicsModel` for solids4foam.** Add a `physicsModel` type `circulation`
+   (0D only; `physicsModel` needs just a `Time`, so the stock `solids4Foam`
+   solver can run a mesh-free case) that wraps `circulationNetwork` and
+   implements `evolve()`. For fluid and fluid-solid cases, the pressure
+   boundary condition on each patch would read the `portPressure` and post the
+   patch flux through `setPortForcing`; the network would live in the
+   `fluidModel`, not in the BC.
+3. **Physiology.** Dynamic leaflet valves (Shi) and the passive exponential
+   chamber of ModularCirc as further component types, each a single class.
+4. **1D vessel models** alongside the 0D ones, in `src/circulationModels`.

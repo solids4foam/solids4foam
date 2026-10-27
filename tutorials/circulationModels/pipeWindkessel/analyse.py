@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Compare the coupled pipe-Windkessel runs with the exact solution and with
-the stored results of the original hand-written Windkessel couplings (data
-copied to verification/reference/pipeWindkessel).
+"""Compare the coupled pipe-Windkessel runs with the exact solution and,
+if they are present in verification/reference/pipeWindkessel, with stored
+results of earlier hand-written Windkessel couplings (not included in solids4foam).
 
     analyse.py [runs-dir]            (default: runs/)
 
@@ -10,12 +10,12 @@ For every runs/<scheme>/<order>/<dt>/ that has postProcessing results:
         Pc(t) = A R/(1+(wRC)^2) [sin wt - wRC cos wt + wRC exp(-t/RC)]
         Po(t) = Pc(t) + Rch A sin wt          (A = 1, w = 2 pi, R = 10,
                                                Rch = 1, C = 0.01, Pc(0) = 0)
-    over the logged steps 0 < t <= 1, exactly as the original study defined it;
-  * the same RMSE from the original run, and the largest difference between
-    the two runs' Pc and Po at every step;
-  * the number of coupling updates per step, which must agree for implicit
-    schemes (it counts outer correctors).
-Also prints the order of accuracy between successive dt, new and old.
+    over the logged steps 0 < t <= 1;
+  * if a stored run is present: the same RMSE from that run, the largest
+    difference between the two runs' Pc and Po at every step, and the number
+    of coupling updates per step, which must agree for implicit schemes (it
+    counts outer correctors).
+Also prints the order of accuracy between successive dt.
 
 Standard library only.
 """

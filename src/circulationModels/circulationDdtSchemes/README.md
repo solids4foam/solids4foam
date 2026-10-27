@@ -57,8 +57,8 @@ large Courant numbers they can be less robust than `backward`.
 
 ## Verification
 
-`tutorials/testCases/windkesselHigherOrder/ddtVerification`: a one-cell ODE
-`dT/dt = 2 pi cos(2 pi t)` whose only error is the ddt scheme's, over twelve
+A one-cell verification case (not included yet) solves the ODE
+`dT/dt = 2 pi cos(2 pi t)`, whose only error is the ddt scheme's, over twelve
 timesteps from 0.1 to 0.002:
 
 | Scheme | Fitted order | Pairwise order at finest pair |

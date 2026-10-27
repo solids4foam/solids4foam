@@ -6,7 +6,10 @@
 cd "$(dirname "$0")" || exit 1
 schemes=${1:-"explicit implicit"}; orders=${2:-"1 2"}; dts=${3:-"5e-3"}; jobs=${4:-1}; np=${5:-8}
 export NP=$np
-. /Volumes/OpenFOAM/OpenFOAM-v2412/etc/bashrc >/dev/null 2>&1 || true
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
+source solids4FoamScripts.sh
 
 one() {
     dir=$(./makeCase "$1" "$2" "$3") || exit 1

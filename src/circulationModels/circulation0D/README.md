@@ -14,17 +14,13 @@ LV -> AV -> SAS -> SAT -> SAR -> SCP -> SVN -> RA -> TV -> RV -> PV
    -> PAS -> PAT -> PAR -> PCP -> PVN -> LA -> MV -> LV            (healthyHuman)
 ```
 
-**New here?** Follow the tutorial: [../docs/TUTORIAL.md](../docs/TUTORIAL.md) builds a Windkessel, a closed loop with a beating ventricle, a reusable
-module and a circulation behind a CFD pipe, step by step.
-
 ## Quick start
 
 ```bash
-# from the solids4foam root, after building solids4foam (or see ../README.md)
+# after building the module, see ../README.md
 cd tutorials/circulationModels/healthyHuman
 circulationFoam                     # 20 cardiac cycles in under a second
 # results: postProcessing/circulation/0/circulation.dat
-../../verification/Allverify        # all verification checks (needs only python3)
 ```
 
 ## Writing a circuit: `constant/circulationProperties`
@@ -92,7 +88,7 @@ volume state. Every other node is solved for its pressure so that the flows
 into it balance (Newton, one step when only resistors meet there). Inductors
 add a flow state. That gives an explicit ODE `dy/dt = f(t,y)` handed to the
 `ODESolver` of your choice. A group of nodes with no pressure reference whose
-flow is carried by one inductor, such as the thesis 4-element Windkessel
+flow is carried by one inductor, such as the 4-element Windkessel
 `source -> r -> L -> C||R`, is handled by pinning it with `L dQ/dt`.
 Implicit solvers use a finite-difference Jacobian; with hard-diode valves
 prefer `RKDP45`, or set `epsilon > 0` on the valves.
@@ -105,7 +101,7 @@ named to set it:
 | `type` | what | parameters |
 |---|---|---|
 | `windkessel2`, `windkessel3`, `windkessel4` | the Windkessels, ending on their own ground; terminal `in` | `R C` (+ `Rch`, `L`), `initialPressure` |
-| `healthyHuman` | the closed 4-chamber loop of the thesis (`units mmHg_mL`) | every chamber, valve and vessel value, e.g. `Emax_lv 2.0;` |
+| `healthyHuman` | the closed 4-chamber healthy-human loop (`units mmHg_mL`; Healy 2024, after Korakianitis & Shi 2006) | every chamber, valve and vessel value, e.g. `Emax_lv 2.0;` |
 | `pipeLoopHeart` | the heart and arteries of the closed-loop pipe study (SI); terminals `in`, `out` | the study's own names (`C1 R1 ... Ea Ev1 ...`) |
 
 ```c++
@@ -133,8 +129,7 @@ modules
 }
 ```
 
-The same circuit from a preset gives identical numbers to the hand-written one
-(checked by `Allverify` on all five presets, to a difference of 0).
+The same circuit from a preset gives identical numbers to the hand-written one.
 
 ## Checking and drawing a set-up
 
@@ -179,7 +174,7 @@ metrics
 Cycles are `[k Tcycle, (k+1) Tcycle]`, and only complete ones are reported (a run that
 starts or stops mid-cycle skips the partial one; a CFD run started at t = 0 reports from
 its second cycle, because the initial state is not an accepted step). The healthy-loop
-values agree with the Julia reference's own metrics to 2e-6 relative.
+values agree with those of an independent reference implementation to 2e-6 relative.
 
 ## Restart
 
@@ -229,39 +224,22 @@ and `libs ("libcirculationCoupling.so");` in `controlDict`. See
 
 | case | what |
 |---|---|
-| `healthyHuman` | 4-chamber closed loop, thesis parameters |
+| `healthyHuman` | 4-chamber closed loop, healthy-human parameters |
 | `pipeClosedLoop` | a CFD pipe with **both** ends coupled to a closed circulation loop (atrium, ventricle, two valves, 7 states): same scheme/order choice; verified against the original runs and an independent RK4 reference |
 | `pipeClosedLoopMonolithic` | the same circuit with the pipe replaced by its R-L surrogate, no CFD (the reference for the above) |
 | `pipeWindkessel` | a CFD pipe (`pimpleFoam`) coupled to a Windkessel; `scheme explicit/implicit` and `order 1..4` chosen in the dictionary, verified against the exact solution and the original hand-written couplings |
 
 ## Verification
 
-The verification scripts and reference data are not included yet. The results
-below were obtained against reference solutions generated from the author's
-thesis code (ModelingToolkit, Vern9 at 1e-9) and against the original
-hand-written couplings. Some of the cases named below are not in
-`tutorials/circulationModels` yet. `analyse.py` in `pipeWindkessel` and
-`pipeClosedLoop` needs that reference data.
-
-| check | result |
-|---|---|
-| 2/3/4-element Windkessel vs first-principles ODEs | 5e-9 mmHg |
-| healthy loop, 20 cycles, 38 signals vs Julia MTK | 0.031 % of range worst (a valve flow), 0.023 % in the last cycle |
-| LV swapped for `coupledDomain` (flows replayed): rest of circulation | 0.094 % of range with hard valves; 0.002 % with smooth valves. The residual is interpolation across the sqrt onset of a hard valve |
-| imposed patch pressure vs lumped LV pressure while a valve is open | 0.06 mmHg at 0.2 ms spacing, converging with spacing |
-| coupling API vs table provider | left heart 4e-8 of range; 0.07 % at a right-heart valve switching instant |
-| closed-loop circuit (pipe as R-L) vs independent stdlib RK4, 3 cycles | 3e-5 % of range (5e-5 Pa of a 4e4 Pa swing) |
-| closed-loop CFD pipe, 8 schemes vs the original runs (same mesh, settings, dt) | explicit 1e-4 % of range, implicit 1e-3 % (= CFD solver noise); unstable cases blow up at the same step as the originals |
-| presets vs hand-written circuits (5 cases); dimensioned vs plain parameters | difference 0 |
-| per-cycle metrics, 21 quantities vs the Julia reference's own | 2e-6 relative |
-| restart: CFD (explicit and implicit) / 0D loop | 1e-15 / 3e-4 % of range |
-| CFD pipe + Windkessel, 8 schemes (explicit/implicit x order 1-4), 5 time steps | RMSE vs exact identical to 6 figures to the original runs; Po within 1e-11 Pa (the precision of the stored logs, with the original ODE solvers); same orders of accuracy |
+During development the models were checked against reference solutions: a
+first-principles Windkessel, an independent implementation of the healthy-human
+loop, and, for the coupled CFD cases, exact solutions or a monolithic
+reference (see the READMEs in `tutorials/circulationModels`). The verification
+scripts and the reference data are not included yet.
 
 Last-cycle healthy loop: LV EDV/ESV 141.7/55.8 mL, SV 85.9 mL, EF 60.6 %, aortic
-129/89 mmHg, MAP 109.5. It matches the Julia model, but note that the thesis
-healthy parameter set is itself hypertensive and high-venous-pressure (see
-`verification/julia/README.md`), so check parameters before trusting
-physiology.
+129/89 mmHg, MAP 109.5. Note that this healthy parameter set is itself hypertensive and
+high-venous-pressure, so check parameters before trusting physiology.
 
 ## Layout
 
@@ -271,9 +249,7 @@ src/circulationModels/circulationCoupling/     CFD coupling: circulationPressure
 src/circulationModels/circulationDdtSchemes/   BDF3 / BDF4 time schemes
 applications/solvers/circulationFoam, applications/test/testPortCoupling
 tutorials/circulationModels/                   cases above
-verification/            Allverify, python comparison tools, Julia reference scripts + data
-                         (julia/thesis holds the thesis model files they include)
-docs/COUPLING.md         swapping 0D for 3D, and the solids4foam merge
+docs/COUPLING.md         swapping 0D for 3D (in ../docs)
 ```
 
 ## Known limits

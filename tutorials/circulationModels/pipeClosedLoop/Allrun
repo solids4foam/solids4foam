@@ -1,9 +1,10 @@
 #!/bin/bash
-# Run one coupled case (closed-loop pipe, implicit order 2, deltaT 5e-3, 8 ranks, about 3 minutes)
-# and compare it with the stored results of the original couplings.
+# Run one coupled case (closed-loop pipe, implicit order 2, deltaT 5e-3, 8 ranks, about 3 minutes).
 # For other schemes, orders and time steps use ./runLadder (see README.md).
 cd "$(dirname "$0")" || exit 1
-. /Volumes/OpenFOAM/OpenFOAM-v2412/etc/bashrc >/dev/null 2>&1 || true
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
+source solids4FoamScripts.sh
 
 ./runLadder "implicit" "2" "5e-3" 1 8 || exit 1
-python3 analyse.py
