@@ -8,7 +8,6 @@ then
 fi
 
 wmake $targetType libso circulation0D
-wmake $targetType libso circulationDdtSchemes
 wmake $targetType libso circulationCoupling
 
 #------------------------------------------------------------------------------

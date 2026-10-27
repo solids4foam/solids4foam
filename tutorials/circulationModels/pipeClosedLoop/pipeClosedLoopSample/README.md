@@ -42,7 +42,7 @@ order 2. About a minute on 8 free cores (the three-cycle run about 2.5 minutes);
 |---|---|
 | three cycles (the periodic state) | `endTime 2.4` in `system/controlDict`, then `python3 plotter.py` (last cycle) |
 | explicit coupling (cheaper, less stable) | `scheme explicit;` |
-| higher-order coupling | `order 3;` plus `libs ("libcirculationCoupling.so" "libcirculationDdtSchemes.so");` and `default BDF3;` in `fvSchemes` |
+| higher-order coupling | `order 3;` (limited to second order by the `backward` CFD time scheme) |
 | a stiffer ventricle | `ventricle { ... active { E1 3.0e9; ... } }` |
 
 The wider set of schemes and orders is in `../README.md` and `../makeCase`, `../runLadder`.

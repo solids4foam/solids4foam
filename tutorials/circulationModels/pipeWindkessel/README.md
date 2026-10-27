@@ -34,9 +34,10 @@ are the eight coupling algorithms.
 | order 3 / 4 | quadratic / cubic through earlier flows, extrapolated | adds one / two earlier flows to order 2 |
 
 Orders 3 and 4 want a higher-order CFD time scheme so that the CFD does not
-dominate the error: `makeCase` switches `ddtSchemes` to `BDF3` / `BDF4` (from
-`libcirculationDdtSchemes`) for them, and seeds the flow history with the exact
-earlier flows so that every order starts at full order.
+dominate the error. The stock `backward` scheme is used here, which limits the
+coupled solution to second order (the coupler prints a warning). `makeCase`
+seeds the flow history with the exact earlier flows so that every order starts
+at full order.
 
 Coupling ports are bound to patches by name: the `outlet` port in the circuit
 has `patch outlet;`. A second coupled patch would be a second port; nothing else
@@ -65,7 +66,10 @@ and the error is the RMSE of `Po` over the steps in `0 < t <= 1`.
 
 All 40 cases (explicit and implicit, orders 1-4, five time steps each) were run
 and compared with the exact solution above (`python3 analyse.py`). The pairwise
-orders of accuracy of the RMSE of `Po` converge to 1, 2, 3 and 4:
+orders of accuracy of the RMSE of `Po` converge to 1, 2, 3 and 4. The orders 3
+and 4 in this table were obtained with third- and fourth-order BDF time schemes
+in the CFD, which are not yet part of solids4foam; with `backward` they are
+limited by the CFD time error:
 
 | dt | explicit 1 | explicit 2 | explicit 3 | explicit 4 | implicit 1 | implicit 2 | implicit 3 | implicit 4 |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|

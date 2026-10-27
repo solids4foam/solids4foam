@@ -93,6 +93,15 @@ release. For complete commit-level details and contributor information, see the
   recommended for undamped structures, and a warning is printed when an
   order of 3 or above is selected. The `cantileverVibration` tutorial has a
   non-default `bdf3` option that shows the effect.
+- Added the `circulationModels` module (`src/circulationModels`): a mesh-free
+  lumped-parameter (0D) network of chambers, valves, resistances and
+  compliances for the circulatory system, solved with the OpenFOAM ODE solvers
+  (`libcirculation0D`), with the `circulationFoam` solver and a
+  `circulationPressure` boundary condition and coupler
+  (`libcirculationCoupling`) that couple a network to a CFD domain with
+  explicit or implicit schemes of order 1 to 4. The tutorials are in
+  `tutorials/circulationModels`. It is currently only available for
+  OpenFOAM.com.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A

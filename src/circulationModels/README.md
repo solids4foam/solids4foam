@@ -12,17 +12,21 @@ with solids4foam. 1D vessel models are planned and will live here too.
 |---|---|---|
 | `circulation0D` | `libcirculation0D` | Lumped-parameter (0D) circulation network: components, waveforms, per-cycle metrics, presets, and the ODE solution of the network. See [circulation0D/README.md](circulation0D/README.md) |
 | `circulationCoupling` | `libcirculationCoupling` | Coupling of a circulation network to a CFD domain: the `circulationPressure` boundary condition and the coupler (explicit/implicit, orders 1 to 4) |
-| `circulationDdtSchemes` | `libcirculationDdtSchemes` | The `BDF3` and `BDF4` `ddtScheme`s, used by the CFD time discretisation at higher coupling orders. See [circulationDdtSchemes/README.md](circulationDdtSchemes/README.md) |
 | `tools` | | `circulationSchematic` (draws a circuit as an SVG), `circulationPlot` (plots result columns, needs gnuplot) and `addHeader` (adds the solids4foam banner to case dictionaries) |
 | `docs` | | The description of the 0D/3D coupling, [docs/COUPLING.md](docs/COUPLING.md) |
 
-The `circulationCoupling` and `circulationDdtSchemes` libraries are not specific
-to the 0D models. The coupler talks to the network through ports, and the BDF
-schemes are general time schemes.
+The `circulationCoupling` library is not specific to the 0D models: the
+coupler talks to the network through ports.
 
-The `BDF3` and `BDF4` schemes here are first-derivative `ddtScheme`s, for
-`fvm::ddt`/`fvc::ddt`. They are unrelated to the solids4foam `bdfD2dt2` scheme,
-which is a second-derivative scheme (`d2dt2Schemes`) for solid dynamics.
+## Time scheme
+
+Coupling orders 3 and 4 want a higher-order time scheme in the CFD, so that the
+CFD time error does not dominate. OpenFOAM and solids4foam have no first-derivative
+`ddtScheme` above second order (the solids4foam `bdfD2dt2` scheme is a
+second-derivative scheme, `d2dt2Schemes`, for solid dynamics), so the tutorials use
+`backward`, which limits the coupled solution to second order. The coupler prints a
+warning when the CFD time scheme is of lower order than the coupling. A `BDF` ddt
+scheme of order 1 to 6 is being proposed separately.
 
 The applications are in:
 
@@ -45,11 +49,10 @@ module, after sourcing OpenFOAM:
 ```
 
 The libraries are written to `$FOAM_MODULE_LIBBIN`, like the other solids4foam
-libraries. For a CFD case, load the coupling library in `system/controlDict`,
-and the BDF schemes if used:
+libraries. For a CFD case, load the coupling library in `system/controlDict`:
 
 ```c++
-libs ("libcirculationCoupling.so" "libcirculationDdtSchemes.so");
+libs ("libcirculationCoupling.so");
 ```
 
 ## Quick start

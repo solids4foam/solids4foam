@@ -1,5 +1,0 @@
-BDFDdtScheme/BDFDdtSchemes.C
-BDF3DdtScheme/BDF3DdtSchemes.C
-BDF4DdtScheme/BDF4DdtSchemes.C
-
-LIB = $(FOAM_MODULE_LIBBIN)/libcirculationDdtSchemes

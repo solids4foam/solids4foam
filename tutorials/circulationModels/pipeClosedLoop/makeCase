@@ -2,7 +2,7 @@
 # Make a runnable copy of base/ for one coupling choice.
 #   ./makeCase <explicit|implicit> <1..4> <deltaT> [directory]
 # Default directory: runs/<scheme>/<order>/<deltaT>. Orders 3 and 4 also use the
-# BDF3 / BDF4 CFD time schemes (libcirculationDdtSchemes); orders 1-2 "backward".
+# The CFD time scheme is "backward" for every order.
 cd "$(dirname "$0")" || exit 1
 scheme=$1; order=$2; dt=$3
 [ -n "$dt" ] || { sed -n 2,5p "$0"; exit 1; }
@@ -17,15 +17,6 @@ s = open(p).read().replace("@SCHEME@", scheme).replace("@ORDER@", str(order))
 open(p, "w").write(s)
 p = d + "/system/controlDict"
 s = open(p).read(); s = re.sub(r"^deltaT .*$", "deltaT          %s;" % dt, s, flags=re.M)
-ddt = {3: "BDF3", 4: "BDF4"}.get(order)
-if ddt:
-    s = s.replace('libs ("libcirculationCoupling.so");',
-                  'libs ("libcirculationCoupling.so" "libcirculationDdtSchemes.so");')
 open(p, "w").write(s)
-if ddt:
-    p = d + "/system/fvSchemes"
-    s = open(p).read()
-    s = re.sub(r"(ddtSchemes\s*\{\s*default\s+)backward;", r"\g<1>" + ddt + ";", s)
-    open(p, "w").write(s)
 PY
 echo "$dir"

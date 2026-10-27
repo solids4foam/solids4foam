@@ -222,7 +222,7 @@ Foam::circulationCoupler::circulationCoupler
         const std::map<std::string, label> schemeOrder =
         {
             {"Euler", 1}, {"localEuler", 1}, {"backward", 2},
-            {"CrankNicolson", 2}, {"BDF3", 3}, {"BDF4", 4}
+            {"CrankNicolson", 2}
         };
 
         for (const entry& e : mesh.schemes().ddtSchemes())
@@ -231,18 +231,35 @@ Foam::circulationCoupler::circulationCoupler
             if (is.empty() || !is[0].isWord()) continue;
 
             std::string name = is[0].wordToken();
-            if (name == "bounded" && is.size() > 1 && is[1].isWord()) name = is[1].wordToken();
+            label i = 0;
+            if (name == "bounded" && is.size() > 1 && is[1].isWord())
+            {
+                i = 1;
+                name = is[1].wordToken();
+            }
 
-            const auto it = schemeOrder.find(name);
-            if (it != schemeOrder.end() && it->second < order_ && Pstream::master())
+            // The BDF scheme takes its order as an argument, e.g. "BDF 3"
+            label cfdOrder = -1;
+            if (name == "BDF" && is.size() > i + 1 && is[i + 1].isLabel())
+            {
+                cfdOrder = is[i + 1].labelToken();
+                name += " " + std::to_string(cfdOrder);
+            }
+            else
+            {
+                const auto it = schemeOrder.find(name);
+                if (it != schemeOrder.end()) cfdOrder = it->second;
+            }
+
+            if (cfdOrder > 0 && cfdOrder < order_ && Pstream::master())
             {
                 WarningInFunction
                     << "The coupling is order " << order_ << " but the CFD time"
                     << " scheme for '" << e.keyword() << "' is " << name
-                    << ", order " << it->second << ". The coupled solution is"
-                    << " limited to order " << it->second << "; use BDF"
-                    << min(order_, label(4)) << " (libcirculationDdtSchemes) or"
-                    << " lower the coupling order." << endl;
+                    << ", order " << cfdOrder << ". The coupled solution is"
+                    << " limited to order " << cfdOrder << "; use a CFD time"
+                    << " scheme of order " << order_ << " (e.g. BDF " << order_
+                    << ", if available) or lower the coupling order." << endl;
             }
         }
     }

@@ -47,7 +47,7 @@ resistance on `orificeValve`.
 ```
 
 A coupled case at `dt = 5e-3` takes about 2.5 minutes on 8 cores. Orders 3 and
-4 use the BDF3 / BDF4 CFD time schemes (`makeCase` sets them). Every order uses
+4 use the same `backward` CFD time scheme, which limits the coupled solution to second order (the coupler prints a warning). Every order uses
 `RKDP45` for the circuit. The step cap of
 the circuit's ODE solver is raised (`maxSteps 1e8`) because hard-valve
 switching at the very tight tolerances (relTol 1e-13) needs many small steps.
