@@ -1,0 +1,115 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale 1;
+
+// Coarse O-grid mesh for lower-cost test runs.
+// Cylinder diameter = 0.04 m, length = 0.30 m.
+// Cell count = 4*(10*7*75) + 7*7*75 = 24,675 cells.
+// The ring blocks are graded from the inner core toward the wall; the radial
+// expansion ratio of 0.1 clusters the smallest cells at the wall.
+
+vertices
+(
+    ( 0.02   0      0)  // 0
+    ( 0      0.02   0)  // 1
+    (-0.02   0      0)  // 2
+    ( 0     -0.02   0)  // 3
+
+    ( 0.02   0     0.3)  // 4
+    ( 0      0.02  0.3)  // 5
+    (-0.02   0     0.3)  // 6
+    ( 0     -0.02  0.3)  // 7
+
+    ( 0.006  0      0)  // 8
+    ( 0      0.006  0)  // 9
+    (-0.006  0      0)  // 10
+    ( 0     -0.006  0)  // 11
+
+    ( 0.006  0     0.3)  // 12
+    ( 0      0.006 0.3)  // 13
+    (-0.006  0     0.3)  // 14
+    ( 0     -0.006 0.3)  // 15
+);
+
+blocks
+(
+    hex ( 8  0  1  9  12  4  5 13) (10 7 75) simpleGrading (0.1 1 1)
+    hex ( 9  1  2 10  13  5  6 14) (10 7 75) simpleGrading (0.1 1 1)
+    hex (10  2  3 11  14  6  7 15) (10 7 75) simpleGrading (0.1 1 1)
+    hex (11  3  0  8  15  7  4 12) (10 7 75) simpleGrading (0.1 1 1)
+    hex ( 8  9 10 11  12 13 14 15) (7 7 75) simpleGrading (1 1 1)
+);
+
+edges
+(
+    arc 0 1 ( 0.014142136   0.014142136  0)
+    arc 1 2 (-0.014142136   0.014142136  0)
+    arc 2 3 (-0.014142136  -0.014142136  0)
+    arc 3 0 ( 0.014142136  -0.014142136  0)
+
+    arc 4 5 ( 0.014142136   0.014142136 0.3)
+    arc 5 6 (-0.014142136   0.014142136 0.3)
+    arc 6 7 (-0.014142136  -0.014142136 0.3)
+    arc 7 4 ( 0.014142136  -0.014142136 0.3)
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+        (
+            ( 8  0  1  9)
+            ( 9  1  2 10)
+            (10  2  3 11)
+            (11  3  0  8)
+            ( 8  9 10 11)
+        );
+    }
+
+    outlet
+    {
+        type patch;
+        faces
+        (
+            (12  4  5 13)
+            (13  5  6 14)
+            (14  6  7 15)
+            (15  7  4 12)
+            (12 13 14 15)
+        );
+    }
+
+    wall
+    {
+        type wall;
+        faces
+        (
+            (0 4 5 1)
+            (1 5 6 2)
+            (2 6 7 3)
+            (3 7 4 0)
+        );
+    }
+);
+
+mergePatchPairs();
+
+// ************************************************************************* //

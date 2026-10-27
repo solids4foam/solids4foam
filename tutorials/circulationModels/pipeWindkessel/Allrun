@@ -1,0 +1,9 @@
+#!/bin/bash
+# Run one coupled case (pipe + Windkessel, implicit order 2, deltaT 0.05, serial, about a minute)
+# and compare it with the stored results of the original couplings.
+# For other schemes, orders and time steps use ./runLadder (see README.md).
+cd "$(dirname "$0")" || exit 1
+. /Volumes/OpenFOAM/OpenFOAM-v2412/etc/bashrc >/dev/null 2>&1 || true
+
+./runLadder "implicit" "2" "0.05" 1 || exit 1
+python3 analyse.py

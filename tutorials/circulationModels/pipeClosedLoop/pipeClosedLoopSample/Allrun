@@ -1,0 +1,28 @@
+#!/bin/bash
+# Demo: a CFD pipe in a closed circulation loop (both ends coupled).
+#   ./Allrun            8 ranks
+#   ./Allrun 4          4 ranks
+#   ./Allrun 1          serial (slow)
+# Then:  python3 plotter.py
+cd "$(dirname "$0")" || exit 1
+. /Volumes/OpenFOAM/OpenFOAM-v2412/etc/bashrc >/dev/null 2>&1 || true
+
+np=${1:-8}
+
+blockMesh > log.blockMesh 2>&1 || { echo "blockMesh failed, see log.blockMesh"; exit 1; }
+
+echo "--- the circuit, as the program understood it ---"
+circulationFoam -check | sed -n '/ODE states/,/^Result/p'
+
+if [ "$np" -gt 1 ]; then
+    sed -i.bak "s/^numberOfSubdomains .*/numberOfSubdomains $np;/" system/decomposeParDict && rm system/decomposeParDict.bak
+    decomposePar -force > log.decomposePar 2>&1 || { echo "decomposePar failed"; exit 1; }
+    echo "--- running pimpleFoam on $np ranks (progress: tail -f log.pimpleFoam) ---"
+    mpirun --oversubscribe -np "$np" pimpleFoam -parallel > log.pimpleFoam 2>&1
+else
+    echo "--- running pimpleFoam (progress: tail -f log.pimpleFoam) ---"
+    pimpleFoam > log.pimpleFoam 2>&1
+fi
+[ $? -eq 0 ] || { echo "pimpleFoam failed, see log.pimpleFoam"; exit 1; }
+
+echo "done: postProcessing/circulationCoupling/0/coupling.dat  (python3 plotter.py to plot)"

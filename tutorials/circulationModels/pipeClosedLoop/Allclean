@@ -1,0 +1,4 @@
+#!/bin/bash
+# Remove every run made by Allrun / runLadder
+cd "$(dirname "$0")" || exit 1
+rm -rf runs runs_check ladder*.log

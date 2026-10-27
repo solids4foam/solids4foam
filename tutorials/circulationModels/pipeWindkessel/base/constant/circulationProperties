@@ -1,0 +1,55 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      circulationProperties;
+}
+
+// Three-element Windkessel on the outlet of a pipe (Healy / thesis WK3):
+//
+//     CFD outlet -> node --Rch--> C || R --> ground         Po = Pc + Rch Qo
+//
+// R = 10, Rch = 1 Pa s/m3, C = 0.01 m3/Pa; the inlet prescribes
+// Q(t) = sin(2 pi t) m3/s, so Pc(t) has the closed form in the README.
+
+units       SI;
+
+components
+{
+    ground  { type ground; }
+
+    outlet                          // the coupled CFD patch
+    {
+        type        externalPort;
+        direction   outlet;         // flow leaves the CFD domain
+        patch       outlet;         // name of the patch in the mesh
+    }
+
+    Rch     { type resistor;   R 1; }
+    C       { type compliance; C 0.01; initialPressure 0; }
+    R       { type resistor;   R 10; }
+}
+
+connections ( (outlet Rch C R ground) );
+
+@SOLVER@
+
+// How the CFD and the circuit exchange flow and pressure
+coupling
+{
+    scheme      @SCHEME@;       // explicit | implicit
+    order       @ORDER@;        // 1 .. 4
+    rho         1060;           // kg/m3: the CFD solves p/rho
+@SEED@
+}

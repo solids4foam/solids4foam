@@ -1,0 +1,22 @@
+#!/bin/bash
+# Run closed-loop pipe cases, each in parallel on NPROCS ranks, a few at a time.
+#   ./runLadder "<schemes>" "<orders>" "<dts>" [concurrent cases] [ranks per case]
+#   ./runLadder "implicit" "2" "5e-3" 1 8
+# Each case is runs/<scheme>/<order>/<dt>: blockMesh, decomposePar, pimpleFoam -parallel.
+cd "$(dirname "$0")" || exit 1
+schemes=${1:-"explicit implicit"}; orders=${2:-"1 2"}; dts=${3:-"5e-3"}; jobs=${4:-1}; np=${5:-8}
+export NP=$np
+. /Volumes/OpenFOAM/OpenFOAM-v2412/etc/bashrc >/dev/null 2>&1 || true
+
+one() {
+    dir=$(./makeCase "$1" "$2" "$3") || exit 1
+    ( cd "$dir" && blockMesh > log.bm 2>&1 \
+      && sed -i.bak "s/numberOfSubdomains .*/numberOfSubdomains $NP;/" system/decomposeParDict && rm -f system/decomposeParDict.bak \
+      && decomposePar -force > log.decomposePar 2>&1 \
+      && mpirun --oversubscribe -np "$NP" pimpleFoam -parallel > log.run 2>&1 )
+    echo "$dir exit=$?"
+}
+export -f one
+
+for s in $schemes; do for o in $orders; do for d in $dts; do echo "$s $o $d"; done; done; done \
+  | xargs -P "$jobs" -L 1 bash -c 'one $0 $1 $2'

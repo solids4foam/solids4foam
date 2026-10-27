@@ -1,0 +1,89 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      circulationProperties;
+}
+
+// A 3D pipe (inlet and outlet patches) in a closed loop with a lumped
+// circulation: both ends of the pipe are coupled to the circuit.
+//
+//   outlet -> C1 -R1-L1- C2 -R2- C3 -R3- atrium -mitral- ventricle
+//                                                  -aortic(+R4)- C4 -> inlet
+//
+// The CFD gives the flow through each patch; the circuit gives back the
+// pressure of the node the patch is attached to (the outlet node C1, the
+// inlet node C4). The same circuit without the CFD, the pipe replaced by its
+// Poiseuille R-L surrogate, is ../../pipeClosedLoopMonolithic.
+
+units       SI;
+Tcycle      0.8;
+
+components
+{
+    // ---- The two coupled CFD patches ----------------------------------------
+    outlet  { type externalPort; direction outlet; patch outlet; }   // flow leaves the pipe
+    inlet   { type externalPort; direction inlet;  patch inlet;  }   // flow enters the pipe
+
+    // ---- Arterial side ----------------------------------------------------------
+    C1      { type compliance; C 1.500e-10; initialPressure 12720; }
+    R1      { type resistor;   R 6.666e6; }
+    L1      { type inductor;   L 5.333e5; }
+    C2      { type compliance; C 1.500e-9; initialPressure 12720; }
+    R2      { type resistor;   R 6.667e8; }
+    C3      { type compliance; C 7.501e-9; initialPressure 12720; }
+    R3      { type resistor;   R 1.200e7; }
+
+    // ---- Heart: P = A(t)(E1 dV + E2 dV^2) + P0 (exp(K dV) - 1) ------------------
+    atrium
+    {
+        type    mixedChamber;
+        V0      1.000e-6;
+        active  { E1 9.800e8; }
+        passive { P0 22.66; K 4.840e5; }
+        activation { type sineSquared; offset 0.544; duration 0.24; }
+        initialVolume 1.4082870749878583e-05;
+    }
+    mitral  { type orificeValve; Rhat 5.333e10; }
+    ventricle
+    {
+        type    mixedChamber;
+        V0      4.000e-6;
+        active  { E1 2.467e9; E2 -5.600e12; }
+        passive { P0 120; K 6.200e4; }
+        activation { type sineSquared; offset 0; duration 0.40; }
+        initialVolume 7.9368207007450098e-05;
+    }
+    aortic  { type orificeValve; Rhat 5.333e9; R 1.200e7; }     // orifice in series with R4
+
+    // ---- Inlet node ---------------------------------------------------------------
+    C4      { type compliance; C 7.501e-10; initialPressure 12720; }
+}
+
+connections
+(
+    (outlet C1 R1 L1 C2 R2 C3 R3 atrium mitral ventricle aortic C4 inlet)
+);
+
+// Tight tolerances (as the original study); hard-valve switching makes the
+// adaptive solver take many small steps, so the step cap is raised
+solver { type RKDP45; absTol 1e-20; relTol 1e-13; maxSteps 100000000; }
+
+// How the CFD and the circuit exchange flow and pressure
+coupling
+{
+    scheme      @SCHEME@;       // explicit | implicit
+    order       @ORDER@;        // 1 .. 4
+    rho         1060;           // kg/m3: the CFD solves p/rho
+}

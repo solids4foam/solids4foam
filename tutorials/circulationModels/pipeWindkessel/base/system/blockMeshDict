@@ -1,0 +1,121 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Cylindrical validation domain: length 5.0 m, radius 0.5 m.
+// Same geometry as the 250,040-cell mesh; only the resolution differs.
+//
+// O-grid divisions Nr = 10, Nt = 7, Nz = 76:
+//     4*(10*7*76) + 7*7*76 = 25,004 cells
+// The radial/tangential ratio 10/7 = 1.43 matches the original 20/14, and the
+// radial grading of 0.1 keeps the wall clustering.
+//
+// The inlet prescribes a volumetric FLOW RATE (see 0/U), and
+// flowRateInletVelocity divides by the true discrete patch area, so the small
+// O-grid area deficit against pi*r^2 does not affect Qo(t) = sin(2*pi*t).
+
+scale 1;
+
+vertices
+(
+    ( 0.5   0     0)  // 0
+    ( 0     0.5   0)  // 1
+    (-0.5   0     0)  // 2
+    ( 0    -0.5   0)  // 3
+
+    ( 0.5   0     5)  // 4
+    ( 0     0.5   5)  // 5
+    (-0.5   0     5)  // 6
+    ( 0    -0.5   5)  // 7
+
+    ( 0.15   0    0)  // 8
+    ( 0      0.15 0)  // 9
+    (-0.15   0    0)  // 10
+    ( 0     -0.15 0)  // 11
+
+    ( 0.15   0    5)  // 12
+    ( 0      0.15 5)  // 13
+    (-0.15   0    5)  // 14
+    ( 0     -0.15 5)  // 15
+);
+
+blocks
+(
+    hex ( 8  0  1  9  12  4  5 13) (10 7 76) simpleGrading (0.1 1 1)
+    hex ( 9  1  2 10  13  5  6 14) (10 7 76) simpleGrading (0.1 1 1)
+    hex (10  2  3 11  14  6  7 15) (10 7 76) simpleGrading (0.1 1 1)
+    hex (11  3  0  8  15  7  4 12) (10 7 76) simpleGrading (0.1 1 1)
+    hex ( 8  9 10 11  12 13 14 15) ( 7 7 76) simpleGrading (1 1 1)
+);
+
+edges
+(
+    arc 0 1 ( 0.35355339059327373   0.35355339059327373 0)
+    arc 1 2 (-0.35355339059327373   0.35355339059327373 0)
+    arc 2 3 (-0.35355339059327373  -0.35355339059327373 0)
+    arc 3 0 ( 0.35355339059327373  -0.35355339059327373 0)
+
+    arc 4 5 ( 0.35355339059327373   0.35355339059327373 5)
+    arc 5 6 (-0.35355339059327373   0.35355339059327373 5)
+    arc 6 7 (-0.35355339059327373  -0.35355339059327373 5)
+    arc 7 4 ( 0.35355339059327373  -0.35355339059327373 5)
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+        (
+            ( 8  0  1  9)
+            ( 9  1  2 10)
+            (10  2  3 11)
+            (11  3  0  8)
+            ( 8  9 10 11)
+        );
+    }
+
+    outlet
+    {
+        type patch;
+        faces
+        (
+            (12  4  5 13)
+            (13  5  6 14)
+            (14  6  7 15)
+            (15  7  4 12)
+            (12 13 14 15)
+        );
+    }
+
+    wall
+    {
+        type wall;
+        faces
+        (
+            (0 4 5 1)
+            (1 5 6 2)
+            (2 6 7 3)
+            (3 7 4 0)
+        );
+    }
+);
+
+mergePatchPairs();
+
+// ************************************************************************* //

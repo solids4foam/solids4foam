@@ -1,0 +1,50 @@
+#!/bin/bash
+# Make a runnable copy of base/ for one coupling choice.
+#   ./makeCase <explicit|implicit> <1..4> <deltaT> [directory]
+# The default directory is  runs/<scheme>/<order>/<deltaT>.
+# The flow history that orders 2-4 extrapolate from is seeded with the exact
+# earlier outlet flows Q(-k dt) = -sin(2 pi k dt), so every order starts at
+# full order, as in the windkesselFinalVerification cases.
+# Orders 3 and 4 also switch the CFD time scheme to BDF3 / BDF4 (from
+# libcirculationDdtSchemes), so that the CFD time error does not dominate;
+# orders 1 and 2 use "backward".
+# The circuit ODE solver follows the original studies: Trapezoid (1e-10) for
+# orders 1 and 2, RKDP45 (1e-12) for orders 3 and 4. The tolerances are on the
+# compliance volume V = C Pc (C = 0.01), so 1e-10 / 1e-12 on Pc are 1e-12 / 1e-14.
+cd "$(dirname "$0")" || exit 1
+scheme=$1; order=$2; dt=$3
+[ -n "$dt" ] || { sed -n 2,7p "$0"; exit 1; }
+dir=${4:-runs/$scheme/$order/$dt}
+
+rm -rf "$dir"; mkdir -p "$(dirname "$dir")"; cp -r base "$dir"
+python3 - "$dir" "$scheme" "$order" "$dt" <<'PY'
+import sys, math, re
+d, scheme, order, dt = sys.argv[1], sys.argv[2], int(sys.argv[3]), float(sys.argv[4])
+nseed = 0
+if scheme == "explicit": nseed = order - 1
+elif order >= 3:         nseed = order - 2
+q = ["%.17g" % (-math.sin(2*math.pi*k*dt)) for k in range(1, nseed+1)]
+seed = ("    seed        { outlet ( %s ); }\n    seedDeltaT  %s;" % (" ".join(q), sys.argv[4])) if q else ""
+p = d + "/constant/circulationProperties"
+solver = ("solver { type Trapezoid; absTol 1e-12; relTol 1e-10; maxSteps 100000000; }"
+          if order <= 2 else
+          "solver { type RKDP45; absTol 1e-14; relTol 1e-12; }")
+s = (open(p).read().replace("@SCHEME@", scheme).replace("@ORDER@", str(order))
+     .replace("@SEED@", seed).replace("@SOLVER@", solver))
+open(p, "w").write(s)
+p = d + "/system/controlDict"
+s = open(p).read(); s = re.sub(r"^deltaT .*$", "deltaT          %s;" % sys.argv[4], s, flags=re.M)
+open(p, "w").write(s)
+
+ddt = {3: "BDF3", 4: "BDF4"}.get(order)
+if ddt:
+    p = d + "/system/fvSchemes"
+    s = open(p).read()
+    s = re.sub(r"(ddtSchemes\s*\{\s*default\s+)backward;", r"\g<1>" + ddt + ";", s)
+    open(p, "w").write(s)
+    p = d + "/system/controlDict"
+    s = open(p).read().replace('libs ( "libcirculationCoupling.so" );',
+                               'libs ( "libcirculationCoupling.so" "libcirculationDdtSchemes.so" );')
+    open(p, "w").write(s)
+PY
+echo "$dir"

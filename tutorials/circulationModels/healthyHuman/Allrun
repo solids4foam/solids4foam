@@ -1,0 +1,10 @@
+#!/bin/bash
+# Run this circuit (0D, no mesh): check the set-up, then solve it.
+#   ./Allrun            results: postProcessing/circulation/0/circulation.dat
+cd "$(dirname "$0")" || exit 1
+. /Volumes/OpenFOAM/OpenFOAM-v2412/etc/bashrc >/dev/null 2>&1 || true
+
+circulationFoam -check > log.check 2>&1
+grep '^Result' log.check
+circulationFoam > log.circulationFoam 2>&1 || { echo "circulationFoam failed:"; tail -15 log.circulationFoam; exit 1; }
+echo "done: postProcessing/circulation/0/circulation.dat"
