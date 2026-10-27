@@ -1,0 +1,3 @@
+testPortCoupling.C
+
+EXE = $(FOAM_MODULE_APPBIN)/testPortCoupling

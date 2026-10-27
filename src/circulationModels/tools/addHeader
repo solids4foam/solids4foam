@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+"""Give OpenFOAM dictionaries the solids4foam banner, as in the solids4foam cases.
+
+    addHeader [file-or-directory ...]        (default: the current directory)
+
+Every file under the given paths that starts with a banner comment or with
+"FoamFile" gets the solids4foam banner as its first lines (an existing banner,
+OpenFOAM's or any other, is replaced). Files that already have it are left
+alone. Results (time directories, postProcessing, processor*, runs*, polyMesh)
+are skipped. Standard library only.
+"""
+import os, re, sys
+
+BANNER = """/*--------------------------------*- C++ -*----------------------------------*\\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\\*---------------------------------------------------------------------------*/
+"""
+SKIP = re.compile(r'(^|/)(runs\w*|postProcessing|processor\d+|polyMesh|\.\w+)(/|$)|/\d[\d.e+-]*/')
+
+
+def fix(path):
+    try:
+        s = open(path, encoding='utf-8').read()
+    except (UnicodeDecodeError, OSError):
+        return None
+    if s.startswith(BANNER):
+        return False
+    lines = s.split('\n')
+    if lines[0].startswith('/*---'):
+        end = next((i for i, l in enumerate(lines[:20])
+                    if l.startswith('\\*---') and l.rstrip().endswith('*/')), None)
+        if end is None or 'FoamFile' not in s[:1200]:
+            return None
+        body = '\n'.join(lines[end + 1:])
+    elif s.lstrip().startswith('FoamFile'):
+        body = s.lstrip()
+    else:
+        return None
+    open(path, 'w', encoding='utf-8').write(BANNER + body)
+    return True
+
+
+def main():
+    paths = sys.argv[1:] or ['.']
+    done = 0
+    for top in paths:
+        files = [top] if os.path.isfile(top) else [
+            os.path.join(r, f) for r, _, fs in os.walk(top) for f in fs]
+        for p in sorted(files):
+            if os.path.isdir(top) and SKIP.search('/' + os.path.relpath(p, top) + '/'):
+                continue
+            if fix(p):
+                print('header added:', p)
+                done += 1
+    print('%d file(s) changed' % done)
+
+
+main()

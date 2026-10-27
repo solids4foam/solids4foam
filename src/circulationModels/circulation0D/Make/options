@@ -1,0 +1,12 @@
+EXE_INC = \
+    -Icontext \
+    -Iwaveform \
+    -Imetrics \
+    -Icomponents \
+    -Inetwork \
+    -I$(LIB_SRC)/OpenFOAM/lnInclude \
+    -I$(LIB_SRC)/ODE/lnInclude
+
+LIB_LIBS = \
+    -L$(FOAM_LIBBIN) -lODE \
+    -L$(FOAM_LIBBIN) -lOpenFOAM

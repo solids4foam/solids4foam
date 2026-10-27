@@ -1,0 +1,10 @@
+EXE_INC = \
+    -IBDFDdtScheme \
+    -IBDF3DdtScheme \
+    -IBDF4DdtScheme \
+    -I$(FOAM_SRC)/finiteVolume/lnInclude \
+    -I$(FOAM_SRC)/meshTools/lnInclude
+
+LIB_LIBS = \
+    -L$(FOAM_LIBBIN) -lfiniteVolume \
+    -L$(FOAM_LIBBIN) -lmeshTools
