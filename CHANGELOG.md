@@ -56,6 +56,49 @@ release. For complete commit-level details and contributor information, see the
   `beamInCrossFlow`, `blobInTreacle` and `cavityFlexibleBottom` have a
   monolithic arm.
 - The `foilInWind` tutorial, a flexible flag behind a block in a wind flow.
+- Cook's membrane verification studies now store the per-mesh tip
+  displacements of the published references migrated from solid-benchmarks
+  (Simo and Armero, César de Sá et al., Areias and Abaqus for the
+  elastoplastic case; Zienkiewicz and Taylor and Abaqus for the linear-elastic
+  case), list them in the summary and plot them against the sweep. The
+  elastoplastic tutorial gains an unstructured triangular-prism Gmsh mesh
+  (`./Allrun triangular`), which its study sweeps with `--mesh triangular`.
+- The `compressedSpheres` and `twistingHemisphere` READMEs now point to the
+  finer meshes of the original benchmarks in the solids4foam website archive,
+  instead of the solid-benchmarks repository.
+- The fluid-solid interface passes the interface motion to the fluid mesh
+  motion solver through a runtime-selectable *fluid mesh motion coupler*,
+  selected from the motion solver or with an optional `fluidMeshMotion`
+  sub-dictionary in `fsiProperties`, in place of the fixed list of supported
+  solvers in `moveFluidMesh`. Existing cases are unchanged. New couplers
+  support displacement-based solvers, e.g. `displacementLaplacian` and
+  `displacementSBRStress`, which set the total interface displacement relative
+  to the reference points from the current geometry, and the
+  `solids4foamSolidModel` solver. Velocity-based solvers are path dependent
+  and the interior mesh can drift under periodic motion, which
+  `displacementLaplacian` avoids.
+- The `meshMotionTotalDisplacement` solid model (OpenFOAM.com) moves a mesh
+  owned by another model: it solves quasi-statically for the total
+  displacement from the reference points on the current mesh, as
+  `displacementLaplacian` does, optionally with current-configuration
+  finite-strain kinematics, so the mesh for a given boundary motion does not
+  depend on its path, without a copy of the reference mesh. The
+  `solids4foamSolidModel` mesh motion solver uses it on the fluid mesh in the
+  partitioned couplings, and calculates the `stiffnessScaleFactor` field from
+  an optional mesh motion `diffusivity`, on the current mesh before each
+  solution. With the other solid models, as in the quasi-monolithic coupling,
+  the factor is calculated once, from the mesh at construction; the optional
+  `updateStiffnessScaleFactor` entry overrides the default. A solid model on a mesh owned by another model
+  (`solidModel::sharedMesh()`) does not clear the mesh's moving flag or the
+  owner's solver performance records, and its `U`, `p`, `rho`, `g`, `rAUf`
+  and `useBoundaryFaceValues_p` fields are private to it.
+- Ported the `diffusionElastic` and `diffusionHyperElastic` laws, removed
+  with the legacy mechanical laws, to the `mechanicalConstitutiveLaw`
+  framework, for mesh motion with `solids4foamSolidModel`: `linearElastic`
+  and `neoHookeanElastic` with the stiffness scaled by `stiffnessScaleFactor`.
+  The `diffusivity` entries move from the law to the `dynamicMeshDict`.
+- `beamInCrossFlow`: `./Allrun displacementLaplacian`, `diffusionElastic`
+  and `diffusionHyperElastic` select the fluid mesh motion.
 - Added the `channelLeaflet` fluid-solid interaction tutorial: a thin
   elastic leaflet, clamped in a 2D channel and wetted on both faces, in a
   pulsatile flow at Re = 200, after the oomph-lib channel-with-leaflet
@@ -144,6 +187,18 @@ release. For complete commit-level details and contributor information, see the
   contact penalty models, the cohesive zone models and `elasticWallPressure`
   all depend on, and `cantilever2d`'s `unsCoupled` case is the first
   regression coverage of `coupledUnsLinearGeometryLinearElastic`.
+- The `isotropicFungElastic` mechanical constitutive law: an isotropic
+  Fung-type exponential hyperelastic law for soft tissue,
+  `W = 0.5*c*(exp(a*tr(Ebar & Ebar)) - 1)` on the isochoric strain plus a
+  volumetric penalty, with no fibre direction. It is identical to
+  `GuccioneElastic` with `k = c` and `cf = ct = cfs = a`. The
+  `LandEtAl2015/problem2` README shows how to run the case with it, which
+  reproduces the default Guccione case, and the case's regression test checks
+  that the two agree. It is in the `mechanicalConstitutiveLawChecks` law
+  checks. It is not the removed legacy
+  law of the same name, which was the Demiray law, whose exponent is linear
+  in strain: a legacy dictionary, with `c1` and `c2`, stops with an error
+  rather than being read as this law (#457).
 - `cantilever2d` regression cases for `vertexCentredLinearGeometry`, which no
   regression case ran before, on the PETSc SNES path and a short run of the
   explicit path, which no tutorial exercises.
@@ -350,6 +405,31 @@ release. For complete commit-level details and contributor information, see the
   print their per-call messages in debug mode only, as the `directMap` point
   transfer already did, which shortens the logs of the fluid-solid
   couplings.
+- `IQNILS` with `couplingReuse` greater than zero is now robust: the reused
+  secant modes are no longer applied to the residual of the solid-only
+  predictor (`predictSolid`), which comes from a solid solve with the previous
+  step's fluid force, not from the fluid-solid coupling the modes describe.
+  The first iteration of a step now uses the predictor update, and the modes
+  are applied from the second iteration, after a complete fluid-solid
+  iteration, as in preCICE and CoCoNuT. `skipModesOnSolidPredictor no`
+  restores the old behaviour. On the `TurekHron2006` FSI3 case, `couplingReuse`
+  5 and 15 previously diverged at the first iteration of a step, 0.01 to
+  2.9 s after the coupling start, with or without a relative filter; they now
+  complete with 3.4 and 2.9 coupling iterations per step, against 6.9 with
+  `couplingReuse 0`. `membraneRoof` and `beamInCrossFlow` with
+  `couplingReuse 5` previously diverged and now complete. In addition, with
+  `couplingReuse` greater than zero, `relMinSignificant` defaults to `1e-3` (a
+  preCICE-QR2-style relative filter), and the secants of a step accepted
+  unconverged (`allowUnconvergedCoupling`) are discarded (#587).
+- The `IQNILS` set-ups of the `TurekHron2006`, `membraneRoof`,
+  `mokLidDrivenCavity`, `ringAddedMass`, `womersleyTube` and `blobInTreacle`
+  tutorials now use `couplingReuse 5`. Over the full tutorial runs
+  (OpenFOAM-v2512, serial), the mean coupling iterations per time step fall
+  from 5.0 to 2.6, 5.9 to 2.7, 4.3 to 2.6, 4.0 to 2.4, 14.6 to 8.4 and 6.2 to
+  4.2, and the regression tests pass unchanged. The results in the
+  `verification/` READMEs of these tutorials were computed without reuse
+  (#587).
+
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes
@@ -365,6 +445,22 @@ release. For complete commit-level details and contributor information, see the
 - `Allwmake` and `Allwclean` now stop with an error when an unsupported
   OpenFOAM version is sourced, listing the supported versions, where before
   they printed a warning and carried on.
+- `thermalLinearGeometry` and `poroLinearGeometry` assemble the explicit
+  part of the momentum equation as a face traction flux, including the
+  stabilisation, and impose the boundary traction on it in the same way as
+  `linearGeometryTotalDisplacement`: the prescribed traction on
+  `solidTraction` and `solidSpringDashpot` patches, and zero shear traction
+  on `fixedDisplacementZeroShear`, `normalDisplacementZeroShear`, symmetry,
+  `symmetryPlane`, `solidSymmetry` and `slip` patches. The stabilisation is
+  now the divergence of a face flux, which differs from the previous
+  cell-based form where the stiffness varies in space. Results of cases with
+  these models change slightly; the `hotSphere`, `stripFooting` and
+  `suctionCaission` regression references were updated (#578).
+- With the implicit coupled or PETSc SNES solution algorithms, a
+  `solidTraction` patch with `secondOrder yes` or
+  `nonOrthogonalCorrections no` is now a fatal error. These algorithms
+  extrapolate the patch value from the adjacent cell, and either setting
+  previously stopped that extrapolation without a message (#578).
 
 - `OgdenElastic` assembles its Cauchy stress along the principal directions
   of the left Cauchy-Green tensor, the spatial ones. It used the right
@@ -643,6 +739,48 @@ release. For complete commit-level details and contributor information, see the
 - The `womersleyTube` patch displacement read the face centres through a
   dangling reference, which gave NaN or a floating point exception with
   Clang.
+- `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
+  and with `combinedCouplingSystem`, had the wrong sign and moved the interface
+  away from the fixed point. With `residualSumPreconditioning`, the residual
+  is now scaled like the secant columns. `maxReuseUpdateNormRatio` now limits
+  the interface displacement update of every solve that uses secants from
+  previous steps, including `couplingReuse` greater than zero, where it
+  previously had no effect. With `normalizeCouplingColumns`, the
+  `qrFilterTolerance` test now compares like with like, and a zero secant
+  column is no longer divided by zero (#587).
+
+- The PETSc SNES residuals of `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the boundary
+  conditions after the stress. `solidSpringDashpot` built its boundary value,
+  and so its spring-dashpot traction, from the stress of the previous
+  residual evaluation, so the residual depended on hidden state: with a stiff
+  spring the matrix-free linear solve diverged or Newton stalled. With
+  `leastSquaresS4f` the residual is now a function of the unknowns alone for
+  this condition; the `solidSpringDashpot` README lists the conditions for
+  which a lag remains. A stiff isotropic spring
+  (`kNormal = kTangential = 2e9 Pa/m`) on a pulmonary artery wall now
+  converges in at most two Newton iterations per solve, and the
+  `cerebralAneurysm` tutorial needs at most two per solve instead of four
+  (110 instead of 142 in its 10-step regression test). The
+  `solidSpringDashpot` README notes that very stiff normal-only springs may
+  still fail to converge.
+
+- With the `implicitSegregated` algorithm,
+  `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the stress
+  once at the start of each time step, before the momentum loop (#570). The
+  stress was first updated at the end of the first iteration, so a load that
+  only the mechanical law supplies, such as a temperature read from
+  `TcaseDirectory` or an active tension, was missing from the first residual,
+  and the step could be accepted without it. The first such step gave
+  `D = 0`, and a step after a tightly converged one could be accepted
+  unchanged, one load step behind. The predictor already updated the stress
+  and is unchanged, and the hydrostatic stress smoothing (`solvePressureEqn`)
+  still skips the update, as it needs the momentum matrix diagonal. Other
+  cases change only within the solution tolerance. The
+  `hotCylinderPredefinedTFieldMultipleMaterials` regression references came
+  from the legacy model, which had the same lag, and are rescaled from the
+  second-last temperature to the last.
 - `leastSquaresS4f` no longer inverts a singular face-stencil tensor. In a
   cell whose face stencil does not span three directions, for example a
   corner cell bounded by traction patches, the tensor's determinant can round
@@ -711,6 +849,18 @@ release. For complete commit-level details and contributor information, see the
   `constant/fsiProperties.aitken` that did not exist. The Aitken setup is now
   in that file, and `constant/fsiProperties` is a link to the selected
   `constant/fsiProperties.<mode>` (`robin` by default).
+- A parallel run in which a region owns no cells on some processors, e.g. an
+  FSI case whose solid region is decomposed onto fewer ranks than the fluid,
+  no longer aborts (#547). At start-up, the constitutive state set-up took the
+  zero-length `cellProcAddressing` and `faceProcAddressing` that
+  `decomposePar` writes for such a processor to be missing files; in 2-D
+  cases, the solid point displacement correction then failed on those
+  processors as they hold no `empty` faces.
+- The constitutive state of a solid region, e.g. `solid` in an FSI case, is
+  now found when a serial run is continued in parallel, or a parallel one is
+  reconstructed and continued in serial. The state files were looked for in
+  `<time>/` rather than `<time>/<region>/`, so such a restart stopped, saying
+  that the state was not there.
 - On a restart, the warning that an `elasticWallPressure` (Robin) interface is
   used with relaxed or accelerated coupling was issued for `fixedRelaxation`
   with `relaxationFactor 1` too, as the check ran during the construction of
@@ -781,6 +931,16 @@ release. For complete commit-level details and contributor information, see the
   be restarted with OpenFOAM.com (#409). The condition read its nonuniform
   `value` a second time, which fails once the base class has read it, and
   rejected the old-time fields, such as `D_0`, read on restart.
+- The thermal stress of `thermoMechanicalLaw` is now correct in plane stress
+  (#137): it was `(1 + 2*nu)/(1 + nu)` times too large, about 23% for
+  `nu = 0.3`, because it used the sub-law's bulk modulus, which is modified in
+  plane stress for the mechanical stress. A new `thermalKappa()` gives the
+  bulk modulus for the thermal stress, `E/(3*(1 - nu))` in plane stress, in
+  `linearElastic`, `linearElasticMohrCoulombPlastic` and
+  `viscousHookeanElastic`. Plane strain, axisymmetric and 3-D results are
+  unchanged. The new `heatedPlatePlaneStress` tutorial checks the
+  displacement of a free plate and the stress of a clamped one against the
+  analytical solution.
 - `leastSquaresS4f`: the warning that cells remain rank-deficient after the
   gradient stencil is widened to point neighbours was repeated every time the
   least-squares vectors were recomputed, which with the updated Lagrangian

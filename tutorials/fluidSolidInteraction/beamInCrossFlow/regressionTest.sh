@@ -31,6 +31,13 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_displacement.dat"
 # Shortened end time for regression efficiency
 REGRESSION_END_TIME=1
 
+# The diffusionElastic fluid mesh motion variant costs about ten times as much
+# as the others, so it is run to a shorter end time, with its own references
+# and tolerances
+SOLID_MESH_MOTION_END_TIME=0.5
+SOLID_MESH_MOTION_DISP_TOL=1e-3
+SOLID_MESH_MOTION_FORCE_TOL=0.1
+
 variant="openfoamcom"
 if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
     variant="foamextend"
@@ -236,6 +243,18 @@ run_case() {
     )
 }
 
+run_mesh_motion_case() {
+    local case_dir="$1"
+    local mesh_motion="$2"
+
+    echo "Running IQNILS ${mesh_motion} fluid mesh motion regression case"
+    (
+        cd "${case_dir}"
+        ./Allclean > /dev/null 2>&1 || true
+        ./Allrun iqnils "${mesh_motion}" > "${ALLRUN_LOGFILE}" 2>&1
+    )
+}
+
 run_high_order_case() {
     local case_dir="$1"
 
@@ -370,6 +389,12 @@ REF_FINAL_FORCE=4.799864
 MONO_REF_MAX_DISP=0.0278474
 MONO_REF_FINAL_DISP=0.0267971
 MONO_REF_FINAL_FORCE=5.11391
+# diffusionElastic fluid mesh motion, to t = 0.5, from the OpenFOAM.com v2512
+# run: the tip displacement is still increasing, so its maximum is its final
+# value. All the fluid mesh motions agree to within 3e-6 and 2e-3 at this time
+REF_SOLID_MESH_MOTION_MAX_DISP=0.0122428
+REF_SOLID_MESH_MOTION_FINAL_DISP=0.0122428
+REF_SOLID_MESH_MOTION_FINAL_FORCE=3.485119
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
@@ -390,6 +415,18 @@ if [[ "${variant}" == "openfoamcom" ]]; then
     monolithic_case=$(prepare_case monolithic)
     run_case "${monolithic_case}" monolithic
 fi
+# The fluid mesh motion variants: displacementLaplacian changes the beam
+# response by much less than the tolerances, so it shares the references;
+# diffusionElastic is run to the shorter end time, and diffusionHyperElastic
+# is not run. Each Allrun declares a skip where its mesh motion is unavailable
+displacement_case=$(prepare_case iqnils displacementLaplacian)
+run_mesh_motion_case "${displacement_case}" displacementLaplacian
+
+solid_mesh_motion_case=$(
+    REGRESSION_END_TIME="${SOLID_MESH_MOTION_END_TIME}" \
+        prepare_case iqnils diffusionElastic
+)
+run_mesh_motion_case "${solid_mesh_motion_case}" diffusionElastic
 
 echo
 
@@ -423,6 +460,18 @@ if [[ "${variant}" == "openfoamcom" ]]; then
 else
     echo "Skipping monolithic regression case: only available on OpenFOAM.com"
 fi
+check_case displacementLaplacian "${displacement_case}" \
+    "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
+    || failures=$((failures + $?))
+
+REGRESSION_END_TIME="${SOLID_MESH_MOTION_END_TIME}" \
+DISP_MAX_TOL="${SOLID_MESH_MOTION_DISP_TOL}" \
+DISP_FINAL_TOL="${SOLID_MESH_MOTION_DISP_TOL}" \
+FORCE_FINAL_TOL="${SOLID_MESH_MOTION_FORCE_TOL}" \
+    check_case diffusionElastic "${solid_mesh_motion_case}" \
+    "${REF_SOLID_MESH_MOTION_MAX_DISP}" "${REF_SOLID_MESH_MOTION_FINAL_DISP}" \
+    "${REF_SOLID_MESH_MOTION_FINAL_FORCE}" \
+    || failures=$((failures + $?))
 
 echo
 if (( failures == 0 )); then

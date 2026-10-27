@@ -80,6 +80,10 @@ class linearElasticMohrCoulombPlasticMechanicalConstitutiveLaw
         //- Bulk modulus
         dimensionedScalar K_;
 
+        //- Bulk modulus that scales the thermal stress: K_ except in plane
+        //  stress, where it is E/(3*(1 - nu))
+        dimensionedScalar thermalK_;
+
         //- Friction angle, in degrees
         dimensionedScalar varPhi_;
 
@@ -165,6 +169,12 @@ public:
         virtual dimensionedScalar kappa() const override
         {
             return K_;
+        }
+
+        //- Return the bulk modulus that scales the thermal stress
+        virtual dimensionedScalar thermalKappa() const override
+        {
+            return thermalK_;
         }
 
         //- The stress variation and the yield flag are history; the initial

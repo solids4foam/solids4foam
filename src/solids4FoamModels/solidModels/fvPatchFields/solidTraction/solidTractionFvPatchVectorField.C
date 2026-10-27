@@ -211,6 +211,7 @@ solidTractionFvPatchVectorField
 
     if (extrapolateValue_)
     {
+        enableExtrapolation();
         Info<< "    extrapolating patch values" << endl;
     }
 
@@ -310,6 +311,37 @@ solidTractionFvPatchVectorField
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+tmp<vectorField> solidTractionFvPatchVectorField::boundaryTraction
+(
+    const vectorField& n
+) const
+{
+    return traction_ - n*pressure_;
+}
+
+
+void solidTractionFvPatchVectorField::enableExtrapolation()
+{
+    if (!nonOrthogonalCorrections_)
+    {
+        FatalErrorInFunction
+            << "Cannot enable patch-value extrapolation on patch "
+            << patch().name() << " because nonOrthogonalCorrections is false"
+            << abort(FatalError);
+    }
+
+    if (secondOrder_)
+    {
+        FatalErrorInFunction
+            << "Cannot enable patch-value extrapolation on patch "
+            << patch().name() << " because secondOrder is true"
+            << abort(FatalError);
+    }
+
+    extrapolateValue_ = true;
+}
+
 
 void solidTractionFvPatchVectorField::setTraction
 (

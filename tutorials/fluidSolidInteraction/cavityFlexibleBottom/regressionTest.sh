@@ -24,7 +24,9 @@ FORCE_AVG_SAMPLES=40
 # fluid pressure is now applied using the deformed interface normals rather than
 # the initial-configuration ones, which shifts every FSI result. See
 # https://github.com/solids4foam/solids4foam/pull/375
-REF_MAX_DISP=-0.2024
+# Monitor point moved from (4 -1 0.5), which snapped to the plate underside, to
+# point A on the top surface, (4 0 0.5); reference regenerated accordingly.
+REF_MAX_DISP=-0.2045
 REF_MEAN_FORCE=-5.150
 
 # The quasi-monolithic Newton coupling, which needs OpenFOAM.com and PETSc, is
