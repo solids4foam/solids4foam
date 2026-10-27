@@ -10,6 +10,10 @@ cd "$(dirname "$0")" || exit 1
 # Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
 source solids4FoamScripts.sh
 
+# The circulation models are currently only built for OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
 np=${1:-8}
 
 blockMesh > log.blockMesh 2>&1 || { echo "blockMesh failed, see log.blockMesh"; exit 1; }
