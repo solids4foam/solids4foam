@@ -1,5 +1,8 @@
 SOLIDS4FOAM_ROOT := ../../..
 
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
 EXE_INC = \
     -I$(SOLIDS4FOAM_ROOT)/src/circulationModels/circulation0D/context \
     -I$(SOLIDS4FOAM_ROOT)/src/circulationModels/circulation0D/waveform \

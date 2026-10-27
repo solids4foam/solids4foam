@@ -1,3 +1,8 @@
+SOLIDS4FOAM_ROOT := ../../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
 EXE_INC = \
     -Icontext \
     -Iwaveform \
