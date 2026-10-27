@@ -93,6 +93,14 @@ release. For complete commit-level details and contributor information, see the
   recommended for undamped structures, and a warning is printed when an
   order of 3 or above is selected. The `cantileverVibration` tutorial has a
   non-default `bdf3` option that shows the effect.
+- Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
+  the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
+  `fvc::ddt`, including the `ddtCorr` flux corrections used by the
+  pressure-velocity coupling. It requires a constant time-step and a static
+  mesh, and it reduces the order during start-up. Orders 3 and above are not
+  A-stable, and a warning is printed when one is selected. It is the
+  first-derivative counterpart of the `BDF` d2dt2 scheme, for fluids, and is
+  currently only available for OpenFOAM.com.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A
