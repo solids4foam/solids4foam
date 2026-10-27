@@ -1,0 +1,184 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  interfaceTractionDiagnostic (optional, womersleyTube verification)
+
+  A coded function object that records, on the FSI interface, every part of
+  the interface traction, without changing the solver:
+
+  fluid patch 'interface' (region fluid), per face:
+    p_b         boundary pressure (kinematic) used by the momentum equation
+                and by patchPressureForce
+    tTr         transferred viscous traction  n & (-devReff_b)  (kinematic),
+                i.e. exactly what pimpleFluid::patchViscousForce passes
+                (before the factor rho), from the registered turbulence model
+    tLap        laplacian wall flux of the momentum matrix,
+                gradientInternalCoeffs*U_P + gradientBoundaryCoeffs
+    tExp        explicit wall flux of the momentum equation,
+                n & dev2(T(grad(U)_b))   (times nuEff)
+                (tLap + tExp)*nuEff is the viscous momentum the fluid loses
+    snGrad      the wall condition's snGrad()
+    trGradU     tr(grad(U)_b)
+  solid patch 'interface' (region solid), per face:
+    tApplied    the traction applied by the solidTraction condition,
+                traction - n*pressure, read from the patch's own written
+                entries (no solids4foam headers needed)
+    tSigma      n & sigma_b. NOTE: with the PETSc SNES solid the boundary
+                value of sigma is NOT the enforced traction (the traction
+                enters the residual as a face force); recorded for reference
+
+  All values are written for t >= timeStart every executeInterval steps to
+  postProcessing/interfaceTraction/{fluid,solid}.dat with 12 significant
+  digits. The Womersley analysis script converts them to wave-projected
+  first-harmonic amplitudes.
+\*---------------------------------------------------------------------------*/
+
+interfaceTractionDiagnostic
+{
+    type            coded;
+    libs            (utilityFunctionObjects);
+    name            interfaceTractionDiagnostic;
+    region          fluid;
+    executeControl  timeStep;
+    executeInterval 5;          // set by the analysis driver
+    writeControl    timeStep;
+    writeInterval   5;
+    timeStart       0;          // set by the analysis driver
+
+    codeInclude
+    #{
+        #include "turbulentTransportModel.H"
+        #include "OFstream.H"
+        #include "OSspecific.H"
+        #include "OStringStream.H"
+        #include "IStringStream.H"
+    #};
+
+    codeOptions
+    #{
+        -I$(LIB_SRC)/finiteVolume/lnInclude \
+        -I$(LIB_SRC)/meshTools/lnInclude \
+        -I$(LIB_SRC)/TurbulenceModels/turbulenceModels/lnInclude \
+        -I$(LIB_SRC)/TurbulenceModels/incompressible/lnInclude \
+        -I$(LIB_SRC)/transportModels \
+        -I$(LIB_SRC)/transportModels/incompressible/singlePhaseTransportModel
+    #};
+
+    codeLibs
+    #{
+        -lfiniteVolume -lmeshTools -lturbulenceModels \
+        -lincompressibleTurbulenceModels -lincompressibleTransportModels
+    #};
+
+    codeData
+    #{
+        autoPtr<OFstream> fluidFile_;
+        autoPtr<OFstream> solidFile_;
+    #};
+
+    codeExecute
+    #{
+        const fvMesh& fm = mesh();
+        const Time& runTime = fm.time();
+        const fvMesh& sm = runTime.lookupObject<fvMesh>("solid");
+        const label fp = fm.boundaryMesh().findPatchID("interface");
+        const label sp = sm.boundaryMesh().findPatchID("interface");
+        if (fp < 0 || sp < 0)
+        {
+            FatalErrorInFunction << "patch 'interface' not found"
+                << exit(FatalError);
+        }
+
+        if (!fluidFile_.valid())
+        {
+            const fileName dir =
+                runTime.globalPath()/"postProcessing"/"interfaceTraction";
+            mkDir(dir);
+            fluidFile_.reset(new OFstream(dir/"fluid.dat"));
+            solidFile_.reset(new OFstream(dir/"solid.dat"));
+            fluidFile_() << "# t face x y z magSf nx ny nz p_b"
+                " tTr_x tTr_y tTr_z tLap_x tLap_y tLap_z tExp_x tExp_y tExp_z"
+                " snGrad_x snGrad_y snGrad_z trGradU nuEff" << nl;
+            solidFile_() << "# t face x y z magSf nx ny nz"
+                " tApplied_x tApplied_y tApplied_z tSigma_x tSigma_y tSigma_z"
+                << nl;
+            fluidFile_().precision(12);
+            solidFile_().precision(12);
+        }
+
+        // Fluid side
+        const volVectorField& U = fm.lookupObject<volVectorField>("U");
+        const volScalarField& p = fm.lookupObject<volScalarField>("p");
+        const incompressible::turbulenceModel& turb =
+            fm.lookupObject<incompressible::turbulenceModel>
+            (
+                turbulenceModel::propertiesName
+            );
+
+        const volSymmTensorField devReff(turb.devReff());
+        const volTensorField gradU(fvc::grad(U));
+        const volScalarField nuEff(turb.nuEff());
+
+        const fvPatch& patch = fm.boundary()[fp];
+        const vectorField nf(patch.nf());
+        const vectorField Cf(patch.Cf());
+        const scalarField magSf(patch.magSf());
+        const fvPatchVectorField& Ub = U.boundaryField()[fp];
+        const vectorField UP(Ub.patchInternalField());
+        const vectorField gic(Ub.gradientInternalCoeffs());
+        const vectorField gbc(Ub.gradientBoundaryCoeffs());
+        const vectorField snG(Ub.snGrad());
+        const tensorField gUb(gradU.boundaryField()[fp]);
+        const symmTensorField dRb(devReff.boundaryField()[fp]);
+        const scalarField pb(p.boundaryField()[fp]);
+        const scalarField nub(nuEff.boundaryField()[fp]);
+
+        forAll(nf, i)
+        {
+            const vector tTr(nf[i] & (-dRb[i]));
+            const vector tLap(cmptMultiply(gic[i], UP[i]) + gbc[i]);
+            const tensor gT(gUb[i].T());
+            const vector tExp(nf[i] & (gT - (2.0/3.0)*tr(gUb[i])*tensor::I));
+            fluidFile_()
+                << runTime.value() << ' ' << i << ' '
+                << Cf[i].x() << ' ' << Cf[i].y() << ' ' << Cf[i].z() << ' '
+                << magSf[i] << ' '
+                << nf[i].x() << ' ' << nf[i].y() << ' ' << nf[i].z() << ' '
+                << pb[i] << ' '
+                << tTr.x() << ' ' << tTr.y() << ' ' << tTr.z() << ' '
+                << tLap.x() << ' ' << tLap.y() << ' ' << tLap.z() << ' '
+                << tExp.x() << ' ' << tExp.y() << ' ' << tExp.z() << ' '
+                << snG[i].x() << ' ' << snG[i].y() << ' ' << snG[i].z() << ' '
+                << tr(gUb[i]) << ' ' << nub[i] << nl;
+        }
+
+        // Solid side: the applied traction from the solidTraction patch's own
+        // written entries, and n & sigma_b for reference
+        const volVectorField& D = sm.lookupObject<volVectorField>("D");
+        const fvPatch& spatch = sm.boundary()[sp];
+        OStringStream os;
+        D.boundaryField()[sp].write(os);
+        IStringStream is(os.str());
+        const dictionary pd(is);
+        const vectorField trac("traction", pd, spatch.size());
+        const scalarField pres("pressure", pd, spatch.size());
+        const volSymmTensorField& sigma =
+            sm.lookupObject<volSymmTensorField>("sigma");
+        const vectorField snf(spatch.nf());
+        const vectorField sCf(spatch.Cf());
+        const scalarField smagSf(spatch.magSf());
+        const symmTensorField sigb(sigma.boundaryField()[sp]);
+        forAll(snf, i)
+        {
+            const vector ta(trac[i] - snf[i]*pres[i]);
+            const vector ts(snf[i] & sigb[i]);
+            solidFile_()
+                << runTime.value() << ' ' << i << ' '
+                << sCf[i].x() << ' ' << sCf[i].y() << ' ' << sCf[i].z() << ' '
+                << smagSf[i] << ' '
+                << snf[i].x() << ' ' << snf[i].y() << ' ' << snf[i].z() << ' '
+                << ta.x() << ' ' << ta.y() << ' ' << ta.z() << ' '
+                << ts.x() << ' ' << ts.y() << ' ' << ts.z() << nl;
+        }
+        fluidFile_().flush();
+        solidFile_().flush();
+    #};
+}
