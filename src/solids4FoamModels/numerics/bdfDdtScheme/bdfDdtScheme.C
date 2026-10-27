@@ -15,6 +15,14 @@ License
     You should have received a copy of the GNU General Public License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
+Description
+    Implementation of the BDF ddt scheme: the coefficients of each order,
+    the start-up handling, the fvm::ddt and fvc::ddt members and the ddtCorr
+    flux corrections.
+
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 #include "bdfDdtScheme.H"
@@ -205,7 +213,10 @@ scalarList bdfDdtScheme<Type>::weights(const label q) const
         case 6:
             return scalarList
             (
-                {49.0/20.0, -6, 15.0/2.0, -20.0/3.0, 15.0/4.0, -6.0/5.0, 1.0/6.0}
+                {
+                    49.0/20.0, -6, 15.0/2.0, -20.0/3.0, 15.0/4.0, -6.0/5.0,
+                    1.0/6.0
+                }
             );
 
         default:

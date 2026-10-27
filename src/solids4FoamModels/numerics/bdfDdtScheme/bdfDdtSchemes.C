@@ -19,6 +19,9 @@ Description
     The scalar specialisations of the flux corrections, which have no meaning
     for a scalar "velocity" and fail as they do in every OpenFOAM ddt scheme.
 
+Author
+    David Kelly, UCD.
+
 \*---------------------------------------------------------------------------*/
 
 // The BDF ddt scheme is currently only implemented for OpenFOAM.com

@@ -51,22 +51,24 @@ Description
 
     Warning: BDF 3 to BDF 6 are not A-stable: their stability regions leave
     out a sector around the imaginary axis, which widens with the order. They
-    are standard for diffusion-dominated, stiff problems. In strongly convection-dominated
-    flow at large Courant numbers they can be less robust than backward. A
-    warning is printed when an order of 3 or above is selected.
+    are standard for diffusion-dominated, stiff problems. In strongly
+    convection-dominated flow at large Courant numbers they can be less robust
+    than backward. A warning is printed when an order of 3 or above is
+    selected.
 
-    Start-up. A q-th order formula needs q old time levels. Each level's
-    time index records the step that filled it; a level created on demand is
-    a copy of the one above and shares its index. The order used on a step is
+    Start-up. A q-th order formula needs q old time levels. Each level's time
+    index records the step that filled it; a level created on demand is a copy
+    of the one above and shares its index. The order used on a step is
     therefore one more than the number of consecutive distinct pairs of old
     levels, up to the maximum, so a fresh start ramps Euler, BDF2, BDF3, ...
-    up to the selected order over its first steps, exactly as OpenFOAM's backward scheme falls back to
-    Euler on its first step. Those start-up steps carry lower-order local
-    errors, so to see the full order in a convergence study either supply the
-    history - write the old-time fields (U_0, U_0_0, ...) into the start time,
-    which OpenFOAM reads back with distinct time indices - or start from a
-    solution whose low derivatives vanish at t = 0. A restart finds the
-    old-time fields the previous run wrote and resumes at full order.
+    up to the selected order over its first steps, exactly as OpenFOAM's
+    backward scheme falls back to Euler on its first step. Those start-up
+    steps carry lower-order local errors, so to see the full order in a
+    convergence study either supply the history - write the old-time fields
+    (U_0, U_0_0, ...) into the start time, which OpenFOAM reads back with
+    distinct time indices - or start from a solution whose low derivatives
+    vanish at t = 0. A restart finds the old-time fields the previous run
+    wrote and resumes at full order.
 
     Every old level up to the maximum is created on the first step, whatever
     order that step uses, so that each is filled as the run advances. Creating
@@ -86,6 +88,9 @@ Description
     The flux corrections used by the pressure-velocity coupling (ddtCorr) are
     the same q-th order combination applied to the old fluxes and the old
     interpolated velocities, the direct generalisation of backward's.
+
+Author
+    David Kelly, UCD.
 
 SourceFiles
     bdfDdtScheme.C
