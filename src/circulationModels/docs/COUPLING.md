@@ -54,7 +54,6 @@ scalar Pmv = net.portPressure("LV.inlet");
 The flow over a step is passed as a polynomial of up to third order, so that
 the coupling schemes of up to fourth order can be built on it. The state of the
 network is saved and restored with `stateDict()` / `readState()`.
-`applications/test/testPortCoupling` is a complete working example.
 
 The pipe case is the same with one port and no valve: a bare `externalPort`
 `{ direction outlet; provider external; }` attached to a Windkessel. The coupling

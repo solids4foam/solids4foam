@@ -246,7 +246,7 @@ high-venous-pressure, so check parameters before trusting physiology.
 ```
 src/circulationModels/circulation0D/           this library (context, waveform, components, network)
 src/circulationModels/circulationCoupling/     CFD coupling: circulationPressure BC and the coupler (scheme, order)
-applications/solvers/circulationFoam, applications/test/testPortCoupling
+applications/solvers/circulationFoam
 tutorials/circulationModels/                   cases above
 docs/COUPLING.md         swapping 0D for 3D (in ../docs)
 ```

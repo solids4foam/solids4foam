@@ -28,11 +28,8 @@ second-derivative scheme, `d2dt2Schemes`, for solid dynamics), so the tutorials 
 warning when the CFD time scheme is of lower order than the coupling. A `BDF` ddt
 scheme of order 1 to 6 is being proposed separately.
 
-The applications are in:
-
-* `applications/solvers/circulationFoam`: solves a circulation network, with no mesh.
-* `applications/test/testPortCoupling`: tests the coupling API by driving a
-  network from tabulated port flows.
+The application is `applications/solvers/circulationFoam`, which solves a
+circulation network with no mesh.
 
 The tutorials are in `tutorials/circulationModels`.
 
@@ -45,7 +42,6 @@ module, after sourcing OpenFOAM:
 ```bash
 (cd src/circulationModels && ./Allwmake)
 (cd applications/solvers/circulationFoam && ./Allwmake)
-(cd applications/test/testPortCoupling && ./Allwmake)
 ```
 
 The libraries are written to `$FOAM_MODULE_LIBBIN`, like the other solids4foam
