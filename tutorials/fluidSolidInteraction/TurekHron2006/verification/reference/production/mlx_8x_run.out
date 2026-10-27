@@ -1,0 +1,14 @@
+start 2026-10-15T20:58:47+02:00 job 5345398 nodes 1 (mel0531) n=128 from 0
+bin /project/home/p201136/philip-ht/s4f-8x/platforms/bin/solids4Foam
+s4f f86411de073c935203474f17a615c70479303b00
+linux64GccDPInt32Opt g++ (GCC) 13.3.0
+Model name:          AMD EPYC 7H12 64-Core Processor
+stopAt writeNow set 2026-10-21T20:18:15+02:00
+exit 0 end 2026-10-21T20:21:44+02:00 log log.solids4Foam.5345398 last 3.98775
+start 2026-10-21T20:23:22+02:00 job 5345399 nodes 1 (mel0538) n=128 from 3.98775
+bin /project/home/p201136/philip-ht/s4f-8x/platforms/bin/solids4Foam
+s4f f86411de073c935203474f17a615c70479303b00
+linux64GccDPInt32Opt g++ (GCC) 13.3.0
+Model name:          AMD EPYC 7H12 64-Core Processor
+exit 0 end 2026-10-27T13:02:51+01:00 log log.solids4Foam.5345399 last 6
+job 5345400: already at 6 (endTime 6), nothing to do 2026-10-27T13:03:47+01:00
