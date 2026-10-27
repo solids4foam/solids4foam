@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Opt-in interface-traction diagnostic for womersleyTube (see README.md).
+#
+#   ./AllverifyTraction [--cores N] [--quick] [--analysis-only]
+#
+# Runs, in copies under verification/traction/work (the tutorial is not
+# modified): the standard verification study with the interfaceTraction
+# function object included (mu5), the 4x mesh at 400 steps per period, three
+# amplitude variants and a 100x tighter coupling tolerance at m2/200, and
+# 4x amplitude on m1; then the analysis. --quick runs one m1/50 case only.
+# Outputs: verification/traction/postProcessing.
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 (with numpy; matplotlib for plots) is required" >&2
+    exit 2
+fi
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TUTORIAL="$(cd "$HERE/../.." && pwd)"
+SCRIPTS="$HERE/scripts"
+WORK="$HERE/work"
+OUT="$HERE/postProcessing"
+CORES=1
+QUICK=0
+ANALYSIS_ONLY=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --cores) CORES="$2"; shift 2 ;;
+        --quick) QUICK=1; shift ;;
+        --analysis-only) ANALYSIS_ONLY=1; shift ;;
+        *) echo "Unknown option $1" >&2; exit 2 ;;
+    esac
+done
+mkdir -p "$WORK" "$OUT"
+
+prepare() {   # name [prepare_study options]
+    local name="$1"; shift
+    [[ -d "$WORK/$name/womersleyTube" ]] || \
+        python3 -I "$SCRIPTS/prepare_study.py" "$TUTORIAL" "$WORK/$name/womersleyTube" "$@"
+}
+
+if [[ $QUICK == 1 ]]; then
+    prepare quick
+    [[ $ANALYSIS_ONLY == 1 ]] || python3 -I -u "$SCRIPTS/run_single.py" "$WORK/quick/womersleyTube" robin:1:50
+    # the quick run covers 6 periods; analyse the last 2
+    python3 -I "$SCRIPTS/womersley_interface_traction.py" "$WORK/quick/womersleyTube"
+    mkdir -p "$OUT/quick"
+    cp "$WORK/quick/womersleyTube/verification/postProcessing/interfaceTraction_"* "$OUT/quick/"
+    python3 -I "$SCRIPTS/traction_checks.py" "$WORK/quick/womersleyTube" --quick
+    exit $?
+fi
+
+prepare mu5
+prepare amp05 --amplitude 0.5
+prepare amp2 --amplitude 2.0
+prepare amp4 --amplitude 4.0
+prepare tol --coupling-tol-factor 0.01
+
+if [[ $ANALYSIS_ONLY == 0 ]]; then
+    failed=()
+    (cd "$WORK/mu5/womersleyTube" && ./verification/Allverify --study all --cores "$CORES") \
+        || failed+=("mu5: verification/Allverify (see its output above)")
+    pids=()
+    names=()
+    for job in "mu5 robin:4:400" "amp05 robin:2:200" "amp2 robin:2:200" \
+               "amp4 robin:2:200 robin:1:200" "tol robin:2:200"; do
+        set -- $job
+        name="$1"; shift
+        python3 -I -u "$SCRIPTS/run_single.py" "$WORK/$name/womersleyTube" "$@" \
+            > "$WORK/$name/log.run_single" 2>&1 &
+        pids+=($!)
+        names+=("$name")
+        while [[ $(jobs -rp | wc -l) -ge $CORES ]]; do sleep 5; done
+    done
+    for i in "${!pids[@]}"; do
+        wait "${pids[$i]}" \
+            || failed+=("${names[$i]}: run_single.py (see $WORK/${names[$i]}/log.run_single)")
+    done
+    if [[ ${#failed[@]} -gt 0 ]]; then
+        echo "ERROR: ${#failed[@]} required run(s) failed; no analysis made:" >&2
+        printf '  %s\n' "${failed[@]}" >&2
+        exit 1
+    fi
+fi
+
+# Every run the analysis needs must have written the diagnostic output
+missing=()
+for req in "mu5 robin_m1_n200 robin_m2_n200 robin_m4_n200 robin_m4_n400 robin_m2_n100 robin_m2_n400" \
+           "amp05 robin_m2_n200" "amp2 robin_m2_n200" "amp4 robin_m2_n200 robin_m1_n200" \
+           "tol robin_m2_n200"; do
+    set -- $req
+    name="$1"; shift
+    for case in "$@"; do
+        f="$WORK/$name/womersleyTube/verification/work/$case/postProcessing/interfaceTraction/fluid.dat"
+        [[ -s "$f" ]] || missing+=("$name/$case")
+    done
+done
+if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "ERROR: incomplete input, ${#missing[@]} required run(s) missing under $WORK:" >&2
+    printf '  %s\n' "${missing[@]}" >&2
+    exit 1
+fi
+
+for name in mu5 amp2 tol; do
+    python3 -I "$SCRIPTS/womersley_interface_traction.py" "$WORK/$name/womersleyTube"
+done
+python3 -I "$SCRIPTS/attenuation_limit.py" "$WORK/mu5/womersleyTube" "$WORK/attenuation_limit_mu5.json" robin > /dev/null
+python3 -I "$SCRIPTS/amplitude_series.py" "$WORK" "$WORK/amplitude_series.json"
+python3 -I "$SCRIPTS/amplitude_series.py" "$WORK" "$OUT/amplitude_series_m1.json" robin_m1_n200
+python3 -I "$SCRIPTS/traction_convergence.py" "$OUT" "$WORK/mu5/womersleyTube:robin" > /dev/null
+python3 -I "$SCRIPTS/decomposition_summary.py" "$WORK" "$OUT" > "$OUT/findings_summary.txt"
+cp "$WORK/mu5/womersleyTube/verification/postProcessing/interfaceTraction_cases.csv" "$OUT/"
+python3 -I "$SCRIPTS/traction_checks.py" "$WORK/mu5/womersleyTube" | tee "$OUT/traction_checks.txt"
