@@ -374,7 +374,7 @@ laws and mesh of its own case: `layeredPipe` (more than one material),
 `perforatedPlate` and `cylinderExpansion` (history-dependent plasticity, where
 a tangent query has history to disturb), `viscoTube` (viscoelasticity),
 `blockPunch`, `longWall`, `rotatingCylinder`, `ratCarotid`,
-`idealisedVentricle` and `LandEtAl2015/problem3` (hyperelasticity).
+`LandEtAl2015/problem2` and `LandEtAl2015/problem3` (hyperelasticity).
 
 Every solid model takes its stress and tangent from this framework, so every
 tutorial's regression test is runtime coverage of it as well.

@@ -159,7 +159,7 @@ The mixed formulation is chosen by the solid model, not by this dictionary.
 
 ### Example
 
-From the `heartTissueBeam` tutorial, used with
+From the `LandEtAl2015/problem1` tutorial, used with
 `coupledPressureDisplacementSolid`:
 
 ```text
@@ -192,8 +192,8 @@ This case gives no `f0` in the dictionary; the fibre field is read from
 
 ## Tutorials
 
-- [`solids/hyperelasticity/heartTissueBeam`](../../../../../tutorials/solids/hyperelasticity/heartTissueBeam)
-- [`solids/hyperelasticity/idealisedVentricle`](../../../../../tutorials/solids/hyperelasticity/idealisedVentricle),
+- [`solids/hyperelasticity/LandEtAl2015/problem1`](../../../../../tutorials/solids/hyperelasticity/LandEtAl2015/problem1)
+- [`solids/hyperelasticity/LandEtAl2015/problem2`](../../../../../tutorials/solids/hyperelasticity/LandEtAl2015/problem2),
   in both `caseOptions/petsc` and `caseOptions/pressureDisplacement`
 - [`solids/hyperelasticity/LandEtAl2015/problem3`](../../../../../tutorials/solids/hyperelasticity/LandEtAl2015/problem3),
   as the passive law inside

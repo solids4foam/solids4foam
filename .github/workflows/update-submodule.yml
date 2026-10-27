@@ -41,6 +41,14 @@ jobs:
               git checkout origin/development
           )
           git add imported/solids4foam
+
+          # Regenerate the files derived from the submodule's READMEs, chiefly
+          # _data/docs_links.yml, which resolves the READMEs' relative links;
+          # otherwise the website's Documentation Symlinks check fails as soon
+          # as a README gains a link
+          ./bin/sync-docs.sh
+          git add -A _data/docs_links.yml _config.yml documentation tutorials
+
           git commit -m "Automated update of submodule to the latest development commit" \
               || echo "No submodule changes to commit"
 
