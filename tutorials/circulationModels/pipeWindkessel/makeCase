@@ -7,7 +7,7 @@
 # full order, as in the windkesselFinalVerification cases.
 # The CFD time scheme is "backward" for every order, so the second-order CFD
 # time error limits the coupled solution of orders 3 and 4.
-# The circuit ODE solver follows the original studies: Trapezoid (1e-10) for
+# The circuit ODE solver is Trapezoid (1e-10) for
 # orders 1 and 2, RKDP45 (1e-12) for orders 3 and 4. The tolerances are on the
 # compliance volume V = C Pc (C = 0.01), so 1e-10 / 1e-12 on Pc are 1e-12 / 1e-14.
 cd "$(dirname "$0")" || exit 1

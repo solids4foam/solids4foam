@@ -26,12 +26,19 @@ outlet { type circulationPressure; value uniform 0; }
 That is the whole interface: the eight combinations of `scheme` and `order`
 are the eight coupling algorithms.
 
-| | explicit | implicit |
-|---|---|---|
-| exchanges per step | one | one per outer corrector (new flux) |
-| order 1 | `Q(t_n)` held over the step | the current iterate held over the step |
-| order 2 | line through `Q(t_n-1)`, `Q(t_n)`, extrapolated | line from the start flow to the current iterate |
-| order 3 / 4 | quadratic / cubic through earlier flows, extrapolated | adds one / two earlier flows to order 2 |
+| | explicit |
+| --- | --- |
+| exchanges per step | one |
+| order 1 | `Q(t_n)` held over the step |
+| order 2 | line through `Q(t_n-1)`, `Q(t_n)`, extrapolated |
+| order 3 / 4 | quadratic / cubic through earlier flows, extrapolated |
+
+| | implicit |
+| --- | --- |
+| exchanges per step | one per outer corrector (new flux) |
+| order 1 | the current iterate held over the step |
+| order 2 | line from the start flow to the current iterate |
+| order 3 / 4 | adds one / two earlier flows to order 2 |
 
 Orders 3 and 4 want a higher-order CFD time scheme so that the CFD does not
 dominate the error. The stock `backward` scheme is used here, which limits the
@@ -46,19 +53,25 @@ changes.
 ## Running
 
 ```bash
-./Allrun                                          # one case: implicit, order 2, deltaT 0.05 (about a minute)
-./makeCase implicit 2 0.01                       # -> runs/implicit/2/0.01
+# one case: implicit, order 2, deltaT 0.05 (about a minute)
+./Allrun
+# -> runs/implicit/2/0.01
+./makeCase implicit 2 0.01
 cd runs/implicit/2/0.01 && blockMesh && pimpleFoam
-./runLadder "explicit implicit" "1 2" "0.1 0.05 0.02 0.01 0.005" 10   # many cases
-python3 analyse.py                               # error against the exact solution, observed orders
+# many cases
+./runLadder "explicit implicit" "1 2" "0.1 0.05 0.02 0.01 0.005" 10
+# error against the exact solution, observed orders
+python3 analyse.py
 ```
 
 ## Exact solution
 
 With `R = 10, Rch = 1, C = 0.01, Pc(0) = 0`, `dPc/dt = (Q - Pc/R)/C` gives
 
-    Pc(t) = A R/(1+(wRC)^2) [ sin wt - wRC cos wt + wRC exp(-t/RC) ]
-    Po(t) = Pc(t) + Rch A sin wt
+```text
+Pc(t) = A R/(1+(wRC)^2) [ sin wt - wRC cos wt + wRC exp(-t/RC) ]
+Po(t) = Pc(t) + Rch A sin wt
+```
 
 and the error is the RMSE of `Po` over the steps in `0 < t <= 1`.
 
@@ -71,10 +84,15 @@ and 4 in this table were obtained with third- and fourth-order BDF time schemes
 in the CFD, which are not yet part of solids4foam; with `backward` they are
 limited by the CFD time error:
 
-| dt | explicit 1 | explicit 2 | explicit 3 | explicit 4 | implicit 1 | implicit 2 | implicit 3 | implicit 4 |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0.02 -> 0.01 | 1.029 | 2.024 | 3.037 | 4.020 | 0.982 | 2.001 | 3.012 | 4.004 |
-| 0.01 -> 0.005 | 1.015 | 2.012 | 3.019 | 4.012 | 0.991 | 2.001 | 3.006 | 4.003 |
+| dt | explicit 1 | explicit 2 | explicit 3 | explicit 4 |
+| --- | ---: | ---: | ---: | ---: |
+| 0.02 -> 0.01 | 1.029 | 2.024 | 3.037 | 4.020 |
+| 0.01 -> 0.005 | 1.015 | 2.012 | 3.019 | 4.012 |
+
+| dt | implicit 1 | implicit 2 | implicit 3 | implicit 4 |
+| --- | ---: | ---: | ---: | ---: |
+| 0.02 -> 0.01 | 0.982 | 2.001 | 3.012 | 4.004 |
+| 0.01 -> 0.005 | 0.991 | 2.001 | 3.006 | 4.003 |
 
 The circuit ODE solver is `Trapezoid` (1e-10) for orders 1 and 2 and `RKDP45`
 (1e-12) for orders 3 and 4 (`makeCase` sets it; the tolerances are on the

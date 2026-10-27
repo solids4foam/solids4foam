@@ -76,7 +76,7 @@ connections
     (outlet C1 R1 L1 C2 R2 C3 R3 atrium mitral ventricle aortic C4 inlet)
 );
 
-// Tight tolerances (as the original study); hard-valve switching makes the
+// Tight tolerances: hard-valve switching makes the
 // adaptive solver take many small steps, so the step cap is raised
 solver { type RKDP45; absTol 1e-20; relTol 1e-13; maxSteps 100000000; }
 

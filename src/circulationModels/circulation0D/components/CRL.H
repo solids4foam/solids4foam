@@ -19,8 +19,8 @@ Class
     Foam::CRL
 
 Description
-    compliance, resistor, inductor: in -> C -> R -> L -> out (thesis CRL).
-    A vessel segment with storage, loss and inertia.
+    compliance, resistor, inductor: in -> C -> R -> L -> out. A vessel segment
+    with storage, loss and inertia.
 
         type CRL;
         C   0.08;  R   0.003;  L   6.2e-5;

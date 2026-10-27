@@ -19,7 +19,7 @@ Class
     Foam::orificeValve
 
 Description
-    An orifice valve (the thesis HeartValve): forward flow Q = CQ sqrt(dP)
+    An orifice valve: forward flow Q = CQ sqrt(dP)
     for dP = Pin - Pout > 0, no flow otherwise.
 
         type orificeValve;

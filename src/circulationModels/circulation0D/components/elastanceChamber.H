@@ -23,7 +23,7 @@ Description
 
         P = (V - V0) E(t) + P0,    E = Emin + (Emax - Emin) f(t)
 
-    with the half-cosine activation of the thesis HeartChamber,
+    with a half-cosine activation,
 
         ti = mod(t + (1 - Eshift) T, T)
         f  = (1 - cos(pi ti/Tes))/2                      ti <= Tes

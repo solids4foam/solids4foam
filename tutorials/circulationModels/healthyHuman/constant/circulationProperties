@@ -17,8 +17,8 @@ FoamFile
 }
 
 // Closed-loop 4-chamber model of the healthy human circulation
-// (Healy 2024 / thesis healthy_human_parameters.jl, after Korakianitis & Shi
-// 2006). Written in the units of the literature; everything is SI inside.
+// (Healy 2024, after Korakianitis & Shi 2006). Written in the units of the
+// literature; everything is SI inside.
 //
 //   LV -> AV -> SAS -> SAT -> SAR -> SCP -> SVN -> RA -> TV -> RV
 //      -> PV -> PAS -> PAT -> PAR -> PCP -> PVN -> LA -> MV -> LV

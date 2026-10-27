@@ -169,7 +169,6 @@ healthyHuman
 //                                    -aortic(+R4)- C4 -> inlet side
 // "in" is the node of C1 (connect the CFD outlet port to it) and "out" the node
 // of C4 (connect it to the CFD inlet port):  (outletPort heart inletPort)
-// Parameters keep the names of the original study's lumpedParameters.
 pipeLoopHeart
 {
     units       SI;

@@ -9,7 +9,8 @@ and the CFD version expose the same terminals `in` (mitral side) and `out`
 
 ```c++
 LV { type valvedChamber;                                   // 0D
-     chamber { V0 5; P0 1; Emin 0.1; Emax 2.5; Tes 0.3; Ted 0.45; initialVolume 500; }
+     chamber { V0 5; P0 1; Emin 0.1; Emax 2.5; Tes 0.3; Ted 0.45;
+               initialVolume 500; }
      inletValve { CQ 400; }  outletValve { CQ 350; } }
 
 LV { type coupledDomain;  provider external;               // 3D
@@ -28,26 +29,29 @@ circuit, bound to a patch by name.
 Each `coupledDomain` creates two **ports**, `<name>.inlet` and `<name>.outlet`,
 one per coupled patch. The valves stay in the 0D network. At each port:
 
-| CFD gives | network returns |
-|---|---|
-| the port flow `Q`, positive in the natural direction of the patch (inlet: into the domain, `Qmv`; outlet: out of the domain, `Qav`) | the pressure to impose on that patch |
+- CFD gives: the port flow `Q`, positive in the natural direction of the
+  patch (inlet: into the domain, `Qmv`; outlet: out of the domain, `Qav`)
+- network returns: the pressure to impose on that patch
 
 with the interface law (a bounded bidirectional inverse valve law):
 
-```
+```text
 outlet   Ppatch = P_node + dP(Q)        inlet   Ppatch = P_node - dP(Q)
 dP(Q) =  (Q/CQ)^2          Q >= 0
-      = -(|Q|/(fr CQ))^2   Q <  0       fr = reverseFraction, clamped to [1e-3, 1]
+      = -(|Q|/(fr CQ))^2   Q <  0
+fr = reverseFraction, clamped to [1e-3, 1]
 ```
 
 C++ interface of `circulationNetwork` (all SI):
 
 ```c++
 circulationNetwork net(dict, t0);
-net.setPortForcing("LV.outlet", t0, t1, {c0, c1, c2, c3});   // Q = c0 + c1 a + c2 a^2 + c3 a^3, a=(t-t0)/(t1-t0)
+// Q = c0 + c1 a + c2 a^2 + c3 a^3, a = (t - t0)/(t1 - t0)
+net.setPortForcing("LV.outlet", t0, t1, {c0, c1, c2, c3});
 net.setPortForcing("LV.inlet",  t0, t1, {...});
 net.advance(t1);
-scalar Pav = net.portPressure("LV.outlet");                  // Pa, at the state now
+// Pa, at the state now
+scalar Pav = net.portPressure("LV.outlet");
 scalar Pmv = net.portPressure("LV.inlet");
 ```
 
@@ -56,8 +60,8 @@ the coupling schemes of up to fourth order can be built on it. The state of the
 network is saved and restored with `stateDict()` / `readState()`.
 
 The pipe case is the same with one port and no valve: a bare `externalPort`
-`{ direction outlet; provider external; }` attached to a Windkessel. The coupling
-algorithms (explicit or implicit, orders 1 to 4) differ only in *what forcing
+`{ direction outlet; provider external; }` attached to a Windkessel. The
+coupling algorithms (explicit or implicit, orders 1 to 4) differ only in *what forcing
 polynomial they pass and when they integrate*; they are implemented in
 `circulationCoupling` and chosen in the `coupling` dictionary.
 

@@ -16,7 +16,7 @@ FoamFile
     object      circulationProperties;
 }
 
-// Three-element Windkessel on the outlet of a pipe (Healy / thesis WK3):
+// Three-element Windkessel on the outlet of a pipe (Healy):
 //
 //     CFD outlet -> node --Rch--> C || R --> ground         Po = Pc + Rch Qo
 //

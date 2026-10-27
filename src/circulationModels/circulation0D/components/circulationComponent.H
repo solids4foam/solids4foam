@@ -45,7 +45,7 @@ Description
     storage, fixedPressure and portSource are one-node elements: their two
     terminals are the same node.
 
-    Sign conventions follow the thesis model: dP = Pin - Pout is positive
+    Sign conventions: dP = Pin - Pout is positive
     for forward flow, and dV/dt of a storage net is the sum of the flows into
     it minus the flows out of it.
 

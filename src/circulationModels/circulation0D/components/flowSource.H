@@ -20,7 +20,7 @@ Class
 
 Description
     Prescribes the flow from "in" to "out" whatever the pressure; see
-    circulationWaveform. The thesis DrivenFlow.
+    circulationWaveform.
 
         type flowSource;
         waveform { type sine; mean 100; amplitude 100; period 0.8333;

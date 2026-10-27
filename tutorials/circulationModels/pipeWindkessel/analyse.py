@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare the coupled pipe-Windkessel runs with the exact solution and,
 if they are present in verification/reference/pipeWindkessel, with stored
-results of earlier hand-written Windkessel couplings (not included in solids4foam).
+reference results of the same problem (not included in solids4foam).
 
     analyse.py [runs-dir]            (default: runs/)
 

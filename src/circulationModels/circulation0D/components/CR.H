@@ -19,8 +19,7 @@ Class
     Foam::CR
 
 Description
-    compliance, then resistor: in -> C -> R -> out (thesis CR). Windkessel-type
-    vessel.
+    compliance, then resistor: in -> C -> R -> out. Windkessel-type vessel.
 
         type CR;
         C   20.5;  R   0.075;
