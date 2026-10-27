@@ -92,6 +92,15 @@ release. For complete commit-level details and contributor information, see the
   (`solidModel::sharedMesh()`) does not clear the mesh's moving flag or the
   owner's solver performance records, and its `U`, `p`, `rho`, `g`, `rAUf`
   and `useBoundaryFaceValues_p` fields are private to it.
+- `meshMotionTotalDisplacement` can be solved with PETSc SNES
+  (`solutionAlgorithm PETScSNES`; the segregated corrector loop stays the
+  default), with the same residual on the current mesh and the implicit
+  stiffness Laplacian as the preconditioner, so the quasi-monolithic coupling
+  can move the fluid mesh with it, with the stiffness scale factor
+  recalculated on the current mesh before each solution. The
+  quasi-monolithic coupling rejects it with the segregated algorithm, and
+  any other mesh motion solid model that is not solved with PETSc SNES, with
+  a message naming the setting.
 - Ported the `diffusionElastic` and `diffusionHyperElastic` laws, removed
   with the legacy mechanical laws, to the `mechanicalConstitutiveLaw`
   framework, for mesh motion with `solids4foamSolidModel`: `linearElastic`
