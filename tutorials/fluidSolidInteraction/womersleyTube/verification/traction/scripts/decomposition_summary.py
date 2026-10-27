@@ -7,8 +7,19 @@ Inputs in WORK_DIR (produced by the other diagnostic scripts):
   attenuation_limit_mu5.json, amplitude_series.json,
   {mu5,amp2,tol}/womersleyTube/verification/postProcessing/
   interfaceTraction_summary.json
-Outputs in OUT_DIR: findings_summary.json, amplitude_linearity.png,
-attenuation_budget.png
+Outputs in OUT_DIR: findings_summary.json, and (if matplotlib is
+available) amplitude_linearity.png, attenuation_budget.png.
+
+Attenuation/wave-QoI budget at (m4, 200 steps/period):
+  temporal part   E(m4,n200) - E(m4, dt->0), from m4 at 200/400 with q = 2;
+  spatial part    -(E(m4) - E(m2))/(2^p - 1) at n200 (p = 2 and observed p);
+  amplitude part  slope of the linear fit over a = 0.5, 1, 2, 4 at m2/n200,
+                  times a = 1 (assumed independent of h and dt; the m1 and m2
+                  slopes agree to 2 %);
+  residual        the remainder.
+Uncertainty of the residual: spatial part bounded by |E(m4) - E(m2)| when the
+m1/m2/m4 series is non-monotone (Richardson not applicable), otherwise by the
+spread between p = 2 and the observed p; plus 2 % of the amplitude part.
 """
 import json
 import math
@@ -16,11 +27,15 @@ import os
 import sys
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", os.environ.get("TMPDIR", "/tmp"))
-import matplotlib  # noqa: E402
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+
+os.environ.setdefault("MPLCONFIGDIR", os.environ.get("TMPDIR", "/tmp"))
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:      # plots are optional
+    plt = None
 
 D = Path(sys.argv[1])
 R = Path(sys.argv[2])
@@ -50,14 +65,19 @@ for q in ("attenuation", "speed", "wallMid_amp", "wallMid_phase"):
     s_err_pobs = -L["space_increment_m4_pobs"]
     amp_part = slope * 1.0                             # tutorial amplitude 1 Pa
     resid = e4 - t_err_n200 - s_err - amp_part
+    e1m, e2m = lim["cases"]["robin_m1_n200"][q], lim["cases"]["robin_m2_n200"][q]
+    monotone = (e1m - e2m) * (e2m - e4) > 0
+    u_space = abs(s_err - s_err_pobs) if monotone else abs(e4 - e2m)
+    u_amp = 0.02 * abs(amp_part)
     out["waveQoIs"][q] = {
         "E_m4_n200": e4, "temporal_error_at_n200": t_err_n200,
         "spatial_error_m4_p2": s_err, "spatial_error_m4_pobs": s_err_pobs,
         "finite_amplitude_part": amp_part, "amplitude_slope_per_Pa_m2": slope,
         "amplitude_fit_misfit": float(np.max(np.abs(X @ [e0m2, slope] - E))),
         "residual_linear_continuum": resid,
-        "residual_uncertainty_estimate": abs(s_err - s_err_pobs) + 0.05 * abs(amp_part)
-        + 1e-4 * (q == "attenuation"),
+        "mesh_series_monotone": bool(monotone),
+        "residual_uncertainty_space": u_space, "residual_uncertainty_amplitude": u_amp,
+        "residual_uncertainty_estimate": u_space + u_amp,
         "prediction_f1/3_infiniteTube": lim["prediction_modified_normal_viscous"]["f=0.333"][q],
         "prediction_f1/3_finiteTube": lim["prediction_modified_normal_viscous"]["f=0.333"]["finiteTube"][q],
     }
@@ -82,6 +102,13 @@ for q in ("Vn_ratio", "VnEst_ratio", "Vn_err/|p|", "P_err/|p|", "Sn_err/|p|", "V
 Vn, P = c(ex["Vn"]), c(ex["P"])
 deficit = (1 / 3 - 1) * Vn / abs(P)
 out["traction"]["uncompensated_deficit_f1/3_rel_p"] = [deficit.real, deficit.imag]
+# total normal traction residual (a -> 0) resolved along / across the deficit:
+# along = 1 means no compensation, 0 full compensation; across is the part of
+# the residual that the viscous split cannot explain
+res = c(out["traction"]["Sn_err/|p|"]["limit_a0"])
+proj = res * deficit.conjugate() / abs(deficit) ** 2
+out["traction"]["Sn_residual_along_deficit_fraction"] = proj.real
+out["traction"]["Sn_residual_across_deficit_rel_p"] = abs(proj.imag) * abs(deficit)
 out["exact"] = {k: v for k, v in ex.items()}
 
 # --- coupling tolerance --------------------------------------------------
@@ -92,6 +119,9 @@ out["amplitude"] = {str(a): amp[a] for a in A}
 (R / "findings_summary.json").write_text(json.dumps(out, indent=1, default=float))
 
 # --- plots -----------------------------------------------------------------
+if plt is None:
+    print("matplotlib not available: plots skipped")
+    sys.exit(0)
 fig, ax = plt.subplots(figsize=(6, 4))
 for q, mk in (("attenuation", "o-"), ("wallMid_phase", "s-"), ("wallMid_amp", "^-"), ("speed", "d-")):
     ax.plot(A, [amp[a][q] for a in A], mk, label=q)
@@ -117,5 +147,7 @@ ax.legend(fontsize=7)
 fig.tight_layout()
 fig.savefig(R / "attenuation_budget.png", dpi=130)
 plt.close(fig)
-print(json.dumps({"waveQoIs": out["waveQoIs"], "traction_limits_a0": {k: v["limit_a0"] for k, v in out["traction"].items() if isinstance(v, dict)},
+print(json.dumps({"Sn_residual_along_deficit_fraction": out["traction"]["Sn_residual_along_deficit_fraction"],
+                  "Sn_residual_across_deficit_rel_p": out["traction"]["Sn_residual_across_deficit_rel_p"],
+                  "waveQoIs": out["waveQoIs"], "traction_limits_a0": {k: v["limit_a0"] for k, v in out["traction"].items() if isinstance(v, dict)},
                   "deficit": out["traction"]["uncompensated_deficit_f1/3_rel_p"], "coupling": out["coupling"]}, indent=1, default=float))

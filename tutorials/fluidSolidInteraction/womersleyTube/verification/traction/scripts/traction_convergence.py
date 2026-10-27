@@ -24,9 +24,12 @@ import sys
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", os.environ.get("TMPDIR", "/tmp"))
-import matplotlib  # noqa: E402
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except ImportError:      # plots are optional
+    plt = None
 
 MEASURES = ["P_err/|p|", "Vn_ratio", "Vn_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|",
             "VnEst_ratio", "mom_vs_transfer_n/|Vn|", "mom_vs_transfer_x/|Vx|",
@@ -98,7 +101,7 @@ def main():
                           f"{lim.real:+.3e}{lim.imag:+.3e}i | {r['limit_uncertainty']:.1e} |")
         md.append("")
         # plots: |error| vs h for the physical measures
-        if rep["mesh"]:
+        if rep["mesh"] and plt is not None:
             fig, ax = plt.subplots(1, 2, figsize=(11, 4.2))
             h = [1, 0.5, 0.25]
             for m in ("P_err/|p|", "Sn_err/|p|", "Vn_err/|p|", "Vx_err/|Vx|"):
