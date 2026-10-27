@@ -297,6 +297,10 @@ public:
         //- Name of the CFD patch the port is coupled to (may be empty)
         const word& portPatch(const word& port) const;
 
+        //- True if the flow of the port is supplied from outside, by the
+        //  coupling code, and not by a table
+        bool portExternal(const word& port) const;
+
         //- Flow through a port at time t [m3/s]
         scalar portFlow(const word& port, const scalar t) const;
 

@@ -1300,6 +1300,13 @@ const Foam::word& Foam::circulationNetwork::portPatch(const word& port) const
 }
 
 
+bool Foam::circulationNetwork::portExternal(const word& port) const
+{
+    return
+       !dynamic_cast<const externalPort&>(comps_[portLabel(port)]).tabulated();
+}
+
+
 Foam::scalar Foam::circulationNetwork::portFlow
 (
     const word& port,

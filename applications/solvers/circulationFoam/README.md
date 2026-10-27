@@ -85,6 +85,11 @@ domain is solved inside the CFD solver (for example `pimpleFoam`), through the
 `circulationFoam -check` still works on those cases, to see what was
 understood from the circuit and that the coupled patches are in the mesh.
 
+Running `circulationFoam` itself on a circuit with external coupling ports
+prints a warning: nothing supplies the flow of those ports, so each carries
+zero flow. A port with a `provider table` is driven by its table and does not
+trigger the warning.
+
 ---
 
 ## Building

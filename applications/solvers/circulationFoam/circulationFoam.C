@@ -211,6 +211,33 @@ int main(int argc, char *argv[])
 
     network.summary(Info);
 
+    // The flow of an external port is supplied by a CFD solver, which
+    // circulationFoam is not: warn that those ports carry no flow
+    {
+        DynamicList<word> externalPorts;
+
+        for (const word& port : network.portNames())
+        {
+            if (network.portExternal(port))
+            {
+                externalPorts.append(port);
+            }
+        }
+
+        if (!externalPorts.empty())
+        {
+            WarningInFunction
+                << "The circuit has " << externalPorts.size()
+                << " external coupling port(s) " << flatOutput(externalPorts)
+                << ", whose flow is supplied by a CFD solver." << nl
+                << "    circulationFoam supplies none, so each port carries"
+                << " zero flow." << nl
+                << "    Run the coupled case with the CFD solver, or give the"
+                << " port a \"provider table\"."
+                << endl;
+        }
+    }
+
     // Continue from a stored state if there is one at the start time
     {
         IOobject stateIO
