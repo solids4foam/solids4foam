@@ -33,9 +33,10 @@ Description
     needed and, because the unknown is the total displacement and not an
     increment, the mesh for a given interface position does not drift with
     the path taken to reach it. The quasi-monolithic coupling
-    (newtonQuasiMonolithicCouplingInterface) instead uses a PETSc SNES solid
-    model, e.g. nonLinearGeometryTotalLagrangianTotalDisplacement, which is
-    formulated on the reference configuration.
+    (newtonQuasiMonolithicCouplingInterface) needs a PETSc SNES solid model:
+    meshMotionTotalDisplacement with solutionAlgorithm PETScSNES, or, e.g.,
+    nonLinearGeometryTotalLagrangianTotalDisplacement, which is formulated on
+    the reference configuration.
 
     The solid model reads its solidProperties and mechanicalProperties from
     constant/<region>, its D and pointD fields from <time>/<region>, and its
