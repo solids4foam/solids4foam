@@ -34,6 +34,7 @@ License
 #include "dynamicMotionSolverFvMesh.H"
 #include "motionSolver.H"
 #include "meshMotionSolidModelFvMotionSolver.H"
+#include "meshMotionTotalDispSolid.H"
 #include "globalIndex.H"
 #include "compatibilityFunctions.H"
 
@@ -2102,6 +2103,51 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             << "The fluid mesh motion solver must be "
             << meshMotionSolidModelFvMotionSolver::typeName
             << exit(FatalError);
+    }
+
+    // The mesh motion solid model must be solved with PETSc SNES
+    {
+        const solidModel& motionModel =
+            refCast<const meshMotionSolidModelFvMotionSolver>
+            (
+                refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
+            ).model();
+
+        if
+        (
+            isA<solidModels::meshMotionTotalDispSolid>(motionModel)
+         && motionModel.solutionAlg()
+         != solidModel::solutionAlgorithm::PETSC_SNES
+        )
+        {
+            FatalErrorInFunction
+                << "The " << solidModels::meshMotionTotalDispSolid::typeName
+                << " fluid mesh motion solid model must be solved with PETSc "
+                << "SNES for the quasi-monolithic coupling: set" << nl
+                << "    solutionAlgorithm    "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << ";" << nl
+                << "in its " << motionModel.type() << "Coeffs in "
+                << "constant/" << fluidMesh().name() << "/solidProperties"
+                << exit(FatalError);
+        }
+
+        if (!isA<foamPetscSnesHelper>(motionModel))
+        {
+            FatalErrorInFunction
+                << "The fluid mesh motion solid model must be solved with "
+                << "PETSc SNES, e.g. "
+                << solidModels::meshMotionTotalDispSolid::typeName
+                << " with solutionAlgorithm "
+                << solidModel::solutionAlgorithmNames_
+                   [
+                       solidModel::solutionAlgorithm::PETSC_SNES
+                   ]
+                << ", not " << motionModel.type() << exit(FatalError);
+        }
     }
 
     const bool interfacePressureGradient =

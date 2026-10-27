@@ -61,8 +61,10 @@ Foam::solidModelFluidMeshMotionCoupler::solidModelFluidMeshMotionCoupler
 
     // The partitioned coupling sets the total interface displacement from
     // the reference points, which needs a solid model of the total
-    // displacement on the current mesh. The quasi-monolithic coupling, which
-    // does not use this coupler, moves the mesh with other solid models
+    // displacement on the current mesh, solved with either solution
+    // algorithm. The quasi-monolithic coupling, which does not use this
+    // coupler, checks its own mesh motion solid model, and needs the PETSc
+    // SNES algorithm
     if (!isA<solidModels::meshMotionTotalDispSolid>(model))
     {
         FatalErrorInFunction
