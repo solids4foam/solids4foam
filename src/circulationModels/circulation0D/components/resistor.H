@@ -37,8 +37,16 @@ public:
 
     virtual role kind() const { return role::branch; }
     virtual bool linear() const { return true; }
-    virtual scalar flow(const scalar, const scalar dP) const { return dP/R_; }
-    virtual scalar dFlowdDP(const scalar, const scalar) const { return 1/R_; }
+
+    virtual scalar flow(const scalar, const scalar dP) const
+    {
+        return dP/R_;
+    }
+
+    virtual scalar dFlowdDP(const scalar, const scalar) const
+    {
+        return 1/R_;
+    }
 };
 
 } // End namespace Foam
