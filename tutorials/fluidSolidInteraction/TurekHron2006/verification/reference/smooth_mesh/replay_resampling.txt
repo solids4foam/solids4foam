@@ -1,0 +1,5 @@
+tip y first-harmonic amplitude 34.302 mm
+sm_1x/constant/plateMotion.tab: 178 points  max deviation 14.42 um (4.20e-04 of the tip amplitude)  rms 4.04 um  tip phasor change 0.0e+00
+sm_2x/constant/plateMotion.tab: 355 points  max deviation 7.23 um (2.11e-04 of the tip amplitude)  rms 1.99 um  tip phasor change 0.0e+00
+sm_3x/constant/plateMotion.tab: 532 points  max deviation 4.83 um (1.41e-04 of the tip amplitude)  rms 1.31 um  tip phasor change 0.0e+00
+sm_4x/constant/plateMotion.tab: 709 points  max deviation 3.55 um (1.03e-04 of the tip amplitude)  rms 0.99 um  tip phasor change 0.0e+00

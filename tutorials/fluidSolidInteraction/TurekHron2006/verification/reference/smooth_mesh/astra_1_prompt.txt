@@ -1,0 +1,469 @@
+Design review before compute (Turek-Hron FSI3, solids4foam / OpenFOAM v2512, cell-centred FV fluid on a moving mesh). One review only; please be concise (<= 800 words), ranked, concrete. Question: does the smoothly graded fluid mesh family below remove the level-independent error sources of the earlier families, and what would you change before we spend ~500 core-hours on a fluid-only replay 1x/2x/3x/4x?
+
+CONTEXT
+- Vehicle: trajectory replay (fluid-only ALE driven by the recorded coupled 2x flag motion), corrected set-up fixed: central convection (Gauss linear), movingWallPressure on the flag (dp/dn = -n.a_wall), displacementLaplacian mesh motion (quadratic inverseDistance), BDF2, PIMPLE 3/3/1, tolerances 1e-6, restart at 25 s from a developed rigid state (mapped), 1 s motion ramp, analysis over five periods ending at 30.2 s on every level, dt 1e-3/5e-4/(1/3000)/2.5e-4 at 1x/2x/3x/4x. QoI: Q_in = in-phase first-harmonic generalised load on the replayed shape (N/m), plus Q_quad, lift fundamental phasor, mean drag.
+- Earlier results: standard tutorial family (5.3k/21k/48k/85k cells): Q_in 43.66, 76.17, 81.22, 81.96 (1x/2x/3x/4x; p 2.5 from 1x/2x/4x, 4.4 from 2x/3x/4x; lift amplitude p 1.2/0.9: inconsistent). Ring+box family (tutorial topology with the ring radial divisions, the flag rows y 0.12-0.28 and the columns x 0.28-1.0 doubled at every level; 11.8k/47k/106k/188k/753k): Q_in 67.18, 79.63, 79.99, 79.27, 77.16 (1x'..8x'), non-monotone; lift phasor rotates ~4-5 deg per level; dt is <10% of the 4x'-8x' change.
+- Coordinator's finding: ring+box doubles only some blocks, so neighbour cell-area ratios of 2:1 to 2.8:1 sit on block-interface lines through the vortex street (y = 0.12 and 0.28 for x 0.28-2.43, x = 1.0, x = 0.28), level-independent (459 faces > 1.9 at 1x', 917 at 2x'). Standard family max ratio 1.43 (level-independent). Hypothesis: a non-vanishing size jump = O(h) local truncation error -> non-monotone convergence.
+- Attribution runs: the coarse-level error sits in the cylinder shedding (ring) and the wake/flag-interaction band, and the aft third of the flag (x 0.46-0.58; second pressure lobe near x 0.56); flag boundary layer, tip corners and flag-cylinder corners did not matter at these levels (with movingWallPressure).
+
+DESIGN (scripts/ht_mesh_smooth.py, source appended)
+- Same 24-block tutorial topology, vertices, arcs, patches: flag surface, plate faces and patch names unchanged (plate points lie on the flag; replay tables interpolate to them).
+- Every vertex carries a target size per grid-line family ('x','y', radial 'r', cylinder-circumferential 'c'; isotropic at the valence-5 ring corners). Every block edge gets a two-section geometric distribution (blockMesh multi-grading via edgeGrading) whose end cells equal the targets at its end vertices, matched in the limit mapping (section length = n * logmean(h0,h1), i.e. the mapping blockMesh converges to when n is doubled with the expansion kept). Division count per topological chain = largest continuum count of its non-cylinder edges; other edges absorb the difference in their interior.
+- Level L multiplies every division by L and keeps every grading (one fixed mapping refined uniformly).
+- Sizes at 1x (mm): cylinder radial first cell 1.32, circumferential on the cylinder 3.2 (at 135/225 deg), 2.2 (at the flag-root vertices 315/45 deg), 1.76 at the flag-cylinder corners; ring outer 6.05 (radial 20 cells, cylinder circumference 28+28+28+15+15 cells); along the flag 4.95 at x 0.30 -> 4.18 at the tip; flag-normal 3.74 (rows y 0.12-0.19 15 cells 6.05->3.74; tip end face/wake row 5 cells); x 0.6->1.0: 4.18->8.8 (64 cells); x 1.0->2.5: 8.8->165 (28 cells, cell ratio 1.11); wall-normal 16.5 at the channel walls (12 cells, ratio 1.10); inlet 16.5. Compare ring+box 1x': cylinder radial 1.32, cylinder circumferential 5.2/3.65, ring outer circ ~11, flag x 5.0-5.3, flag-normal 4.4, x 0.6-1.0 5.7 then a jump to 15 at x=1.0 -> 150 at outlet; walls 10.
+- Cells: 12 568 / 50 272 / 113 112 / 201 088 (1x/2x/3x/4x), ring+box 11 764 / 47 056 / 105 876 / 188 224.
+
+AUDIT (internal faces, neighbour cell-area ratio r = max(Ao/An, An/Ao); checkMesh)
+family_level cells maxr p99.9 n(r>1.1) n(r>1.2) n(r>1.3) nonorth_max skew_max
+std_1 5336 1.425 1.335 2031 683 57 24.5 0.410
+std_2 21344 1.430 1.332 2734 138 116 26.3 0.428
+std_4 85376 1.432 1.338 1568 260 232 27.2 0.437
+rb_1 11764 2.823 2.641 3492 493 485 24.5 0.644
+rb_2 47056 2.846 2.664 1436 970 970 26.3 0.627
+rb_4 188224 2.858 2.574 2870 1940 1940 27.2 0.618
+sm_1 12568 1.158 1.155 5904 0 0 26.0 0.366
+sm_2 50272 1.134 1.081 50 0 0 27.0 0.375
+sm_3 113112 1.133 1.069 73 0 0 27.4 0.378
+sm_4 201088 1.133 1.060 97 0 0 27.5 0.380
+- std and rb maxima at (0.236,0.236), the flag-root cylinder vertex (circumferential 5.2 -> 3.65 mm jump along the radial ring edge); rb lines y=0.119/0.281, x=1.0, x=0.28.
+- sm: at 1x the maximum is the in-block expansion (<= 1.16). From 2x on the maximum 1.13 is at the four valence-5 ring-corner vertices (0.12/0.28, 0.12/0.28) and decays along the straight block interfaces leaving them: x=0.28 and x=0.12 for |y-0.2| > 0.08 (to ~1.05 within 7 cm), y=0.12/0.28 upstream to x=0.03, and y=0.12/0.28 downstream of x=0.28 (1.09 at x 0.29 -> 1.03 at x 0.49), plus ~1.06 at the mid of the ring outer arcs. Cause: the corner angles (B2 Cartesian 90 deg vs 62-74 deg in the four other blocks at each corner) spread by the transfinite interpolation along the interfaces: a Jacobian (direction) kink, not a size mismatch. n(r>1.1) grows ~linearly with level after 2x (line-like, short). Non-orthogonality maxima are at the same corners (converging to ~28 deg); skewness converges to 0.38.
+- Tested and rejected: reshaping the ring arcs so all four non-Cartesian blocks meet at 67.5 deg -> corner jump 1.13 -> 1.08 but the flatter arcs give 1.21 level-independent along the ring outer arcs (transfinite blending mismatch between the ring radial lines and the outer blocks); the tutorial arcs balance both.
+
+PLAN (replay): 1x (4 ranks), 2x (16), 3x (32), 4x (56) and 2x at dt 2.5e-4 (time check) concurrently on one 128-core MeluXina node, same binary as the ring+box 8x' replay (solids4foam aee0c8e3), state mapped from the 4x' ring+box 25 s state, ~4 h wall (~500 core-h). Success: Q_in and lift amplitude monotone with shrinking differences on 1x/2x/4x (and 3x), consistent orders near 2. No Richardson on non-monotone data; nothing tuned toward Featflow or earlier families.
+
+QUESTIONS
+1. Does this design remove the level-independent error sources you would expect to break second-order convergence of Q_in? Is the residual 1.13 Jacobian kink at the four ring corners (and decaying along a few interfaces) a concern for an FV central/linear-interpolation scheme (it is O(1) in a set of measure ~h along short lines)? Would you fix it, and how, with blockMesh?
+2. Resolution placement at ~12.5k/50k/200k: anything you would move (e.g. the far wake x>1 graded 8.8 -> 165 mm with ratio 1.11 at 1x; the aft-flag x size ~4.2-4.5 mm; the 1x cylinder circumference)? Is 1x likely pre-asymptotic again, and should the study be 2x/3x/4x (+1x only as information)?
+3. Protocol: mapping the initial state from the ring+box 4x' state, 4 s of run-in before the window, dt matched (CFL-constant) path; anything that could still give level-dependent non-smooth error (e.g. skewness-corrected interpolation interpolate(U) skewCorrected linear, leastSquares gradients near the corners, mesh motion diffusivity)?
+4. What would make you trust (or distrust) an observed order ~2 from this family? Any additional cheap diagnostic to run alongside (e.g. a 6x level for the finest triplet, a second mapping or window)?
+
+--- ht_mesh_smooth.py ---
+#!/usr/bin/env python3
+"""Smoothly graded fluid blockMeshDict for the HronTurek FSI3 replay/coupled cases.
+
+The tutorial's fluid blockMeshDict (24 blocks, cylinder O-grid ring, flag
+rows, wake columns) is kept: vertices, arcs, block vertex order and patches
+are unchanged, so the flag surface, the patch names and the plate faces are
+those of the tutorial. Only the divisions and gradings are replaced.
+
+Design (all lengths in mm at level 1):
+
+* Every block vertex carries a target cell size for each grid-line family
+  through it ('x', 'y', 'r' radial, 'c' circumferential on the cylinder);
+  the default is isotropic, the walls and the outlet are anisotropic
+  (SIZES below, from the few parameters of --help).
+* Every block edge gets a distribution whose first and last cell sizes are
+  the targets at its two end vertices: two geometric sections whose sizes
+  meet at an interior point (blockMesh multi-grading, written with
+  edgeGrading so that opposite edges of a block may differ). A section with
+  n cells, end sizes h0 and h1 and total expansion e = h1/h0 has length
+  n (h1 - h0)/ln(h1/h0) in the limit n -> inf (the logarithmic mean), which
+  is the mapping blockMesh refines to when the divisions are doubled with
+  the expansion kept. Matching the end sizes of these limit mappings makes
+  the cell-size ratio across every block interface tend to 1 with the
+  level; at level 1 it is 1 + O(1/n).
+* The division count of each topological direction (chain of block edges
+  that must share it) is the largest continuum count of its edges, rounded;
+  the other edges of the chain absorb the difference in the interior
+  sizes (their two sections no longer share one expansion).
+* Level L multiplies every division by L and keeps every grading, so the
+  levels are one fixed mapping refined uniformly by L in-plane.
+
+    python3 ht_mesh_smooth.py --base system/fluid/blockMeshDict --level 2 --out blockMeshDict
+    python3 ht_mesh_smooth.py --base ... --level 1 --report   # chains, sizes, cells
+"""
+from __future__ import annotations
+
+import argparse
+import math
+import re
+from collections import defaultdict
+from pathlib import Path
+
+# Mirror of a vertex about y = 200 mm (the block topology is symmetric)
+MIRROR = {0: 27, 1: 28, 2: 29, 3: 30, 64: 69, 4: 31, 5: 22, 6: 23, 7: 24, 8: 25, 65: 68, 9: 26,
+          10: 16, 11: 17, 12: 18, 13: 19, 14: 20, 66: 67, 15: 21}
+MIRROR.update({v: k for k, v in list(MIRROR.items())})
+
+# Parameters (mm, level 1); see --help
+DEFAULTS = dict(
+    h_band=5.5,      # ring outer corners (6, 7, 23, 24), band edges y = 120/280
+    h_flag=4.5,      # along the flag at the end of the junction blocks (13, 19)
+    h_tip=3.8,       # along x at the flag tip (x = 600)
+    h_normal=3.4,    # normal to the flag faces and in the wake row y 190-210
+    h_wake=8.0,      # along x at x = 1000
+    h_out=150.0,     # along x at the outlet
+    h_inlet=15.0,    # along x at the inlet
+    h_wall=15.0,     # normal to the channel walls
+    h_cyl_r=1.2,     # radial first cell on the cylinder (and along the flag root)
+    h_cyl_c=2.9,     # circumferential on the cylinder at 10/16 (135 and 225 deg)
+    h_root_c=2.0,    # circumferential on the cylinder at 11/17 (45 and 315 deg)
+    h_corner=1.6,    # along the cylinder at the flag-cylinder corners 12/18
+    scale=1.1,       # multiplies every size; 1.1: 12 568 cells at level 1
+    equal_corners=0,  # 1: reshape the ring-corner arcs (CORNER_ARCS), 0: tutorial arcs
+)
+
+
+def vertex_sizes(p: dict) -> dict:
+    """Target sizes per vertex (lower half; the upper half is mirrored)."""
+    s = p["scale"]
+    hb, hf, ht, hn = p["h_band"] * s, p["h_flag"] * s, p["h_tip"] * s, p["h_normal"] * s
+    hw, ho, hi, hwall = p["h_wake"] * s, p["h_out"] * s, p["h_inlet"] * s, p["h_wall"] * s
+    hr, hc, hrc, hcn = p["h_cyl_r"] * s, p["h_cyl_c"] * s, p["h_root_c"] * s, p["h_corner"] * s
+    S = {
+        # channel wall y = 0: x as on the line above, y = wall-normal size
+        0: {"x": hi, "y": hwall}, 1: {"x": hb, "y": hwall}, 2: {"x": hb, "y": hwall},
+        3: {"x": ht, "y": hwall}, 64: {"x": hw, "y": hwall}, 4: {"x": ho, "y": hwall},
+        # band edge y = 120
+        5: {"x": hi, "y": hb}, 6: hb, 7: hb, 8: {"x": ht, "y": hb}, 65: {"x": hw, "y": hb},
+        9: {"x": ho, "y": hb},
+        # cylinder
+        10: {"c": hc, "r": hr}, 11: {"c": hrc, "r": hr}, 12: {"c": hcn, "x": hr},
+        # flag lower face and the wake row
+        13: {"x": hf, "y": hn}, 14: {"x": ht, "y": hn}, 66: {"x": hw, "y": hn}, 15: {"x": ho, "y": hn},
+    }
+    for v in list(S):
+        S[MIRROR[v]] = S[v]
+    return S
+
+
+def edge_class(a: int, b: int, pts: dict, arcs: dict) -> str:
+    cyl = {10, 11, 12, 16, 17, 18}
+    if (a, b) in arcs or (b, a) in arcs:
+        if a in cyl and b in cyl:
+            return "c"
+        pa, pb = pts[a], pts[b]
+        return "x" if abs(pb[0] - pa[0]) > abs(pb[1] - pa[1]) else "y"
+    pa, pb = pts[a], pts[b]
+    dx, dy = abs(pb[0] - pa[0]), abs(pb[1] - pa[1])
+    if (a in cyl) != (b in cyl) and dx > 1e-6 and dy > 1e-6:
+        return "r"
+    return "x" if dx > dy else "y"
+
+
+def size_at(S: dict, v: int, cls: str) -> float:
+    s = S[v]
+    if not isinstance(s, dict):
+        return s
+    if cls in s:
+        return s[cls]
+    # radial edges at the ring outer corners and the flag face edges of the
+    # junction blocks continue the 'x' lines
+    if cls == "r" and "x" in s:
+        return s["x"]
+    raise KeyError(f"no size for vertex {v} class {cls}")
+
+
+def logmean(a: float, b: float) -> float:
+    return a if abs(a - b) < 1e-12 * a else (b - a) / math.log(b / a)
+
+
+def arc_length(p0, pm, p1) -> float:
+    """Length of the circular arc through p0, pm, p1 (2-D)."""
+    ax, ay = p0
+    bx, by = pm
+    cx, cy = p1
+    d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    ux = ((ax**2 + ay**2) * (by - cy) + (bx**2 + by**2) * (cy - ay) + (cx**2 + cy**2) * (ay - by)) / d
+    uy = ((ax**2 + ay**2) * (cx - bx) + (bx**2 + by**2) * (ax - cx) + (cx**2 + cy**2) * (bx - ax)) / d
+    r = math.hypot(ax - ux, ay - uy)
+    t0, tm, t1 = (math.atan2(q[1] - uy, q[0] - ux) for q in (p0, pm, p1))
+
+    def ccw(a, b):
+        return (b - a) % (2 * math.pi)
+    span = ccw(t0, t1)
+    if ccw(t0, tm) > span:  # the mid point is on the other way round
+        span = 2 * math.pi - span
+    return r * span
+
+
+class Dist:
+    """Two-section distribution of n cells on an edge a->b, end sizes ha, hb."""
+
+    def __init__(self, length: float, n: int, ha: float, hb: float):
+        self.L, self.n, self.ha, self.hb = length, n, ha, hb
+        n1 = n // 2
+        n2 = n - n1
+        self.n1, self.n2 = n1, n2
+
+        def f(hm):
+            return n1 * logmean(ha, hm) + n2 * logmean(hm, hb) - length
+        lo, hi = 1e-6, 1e6
+        for _ in range(200):
+            mid = math.sqrt(lo * hi)
+            if f(mid) > 0:
+                hi = mid
+            else:
+                lo = mid
+        self.hm = math.sqrt(lo * hi)
+        self.L1 = n1 * logmean(ha, self.hm)
+        self.e1, self.e2 = self.hm / ha, hb / self.hm
+
+    def per_cell(self) -> float:
+        """Largest cell-to-cell expansion (limit mapping, this level)."""
+        q1 = self.e1 ** (1 / max(self.n1, 1))
+        q2 = self.e2 ** (1 / max(self.n2, 1))
+        return max(q1, 1 / q1, q2, 1 / q2)
+
+    def grading(self, reverse: bool = False) -> str:
+        secs = [(self.L1 / self.L, self.n1 / self.n, self.e1), (1 - self.L1 / self.L, self.n2 / self.n, self.e2)]
+        if reverse:
+            secs = [(fl, fn, 1 / e) for fl, fn, e in reversed(secs)]
+        return "(" + " ".join(f"({fl:.12g} {fn:.12g} {e:.12g})" for fl, fn, e in secs) + ")"
+
+
+def arc_mid(p0, p1, t0_deg: float):
+    """Mid point (on the arc) of the circular arc p0 -> p1 whose tangent at p0 has direction t0_deg."""
+    t = (math.cos(math.radians(t0_deg)), math.sin(math.radians(t0_deg)))
+    d = (p1[0] - p0[0], p1[1] - p0[1])
+    n = (-t[1], t[0])  # left normal
+    nd = n[0] * d[0] + n[1] * d[1]
+    r = (d[0] ** 2 + d[1] ** 2) / (2 * nd)  # signed radius, centre at p0 + r n
+    c = (p0[0] + r * n[0], p0[1] + r * n[1])
+    m = (0.5 * (p0[0] + p1[0]), 0.5 * (p0[1] + p1[1]))
+    v = (m[0] - c[0], m[1] - c[1])
+    lv = math.hypot(*v)
+    return (c[0] + abs(r) * v[0] / lv, c[1] + abs(r) * v[1] / lv)
+
+
+# Option (not the default): reshape the ring outer arcs and the junction arcs
+# so that the four non-Cartesian blocks at each valence-5 ring corner (6, 7,
+# 23, 24) meet at 67.5 deg (tutorial arcs: 61.9 to 73.1 deg next to the 90 deg
+# of the Cartesian block). Tested: it lowers the corner jump (1.13 -> 1.08)
+# but flattens the arcs, so the transfinite blending of the ring and of the
+# outer blocks no longer matches along the arcs (1.21 at the arc mid points,
+# level-independent); the tutorial arcs balance the two and are kept.
+CORNER_ARCS = {  # (a, b): tangent direction at a (deg)
+    (6, 7): -22.5, (6, 23): 112.5, (7, 13): 67.5,
+    (23, 24): 22.5, (24, 19): -67.5,
+}
+
+
+def equalise_corners(base: str) -> str:
+    pts, arcs, _ = parse(base)
+    out = base
+    for (a, b), t in CORNER_ARCS.items():
+        m = arc_mid(pts[a], pts[b], t)
+        for za, zb, z in ((a, b, 0), (a + 32, b + 32, 15)):
+            pat = re.compile(rf"arc\s+({za}\s+{zb}|{zb}\s+{za})\s*\([^)]*\)")
+            new = f"arc {za} {zb} ({m[0]:.6f} {m[1]:.6f} {z})"
+            out, k = pat.subn(new, out)
+            if k != 1:
+                raise SystemExit(f"arc {za} {zb} not found")
+    return out
+
+
+def parse(base: str):
+    vtxt = base[base.index("vertices"):base.index("blocks")]
+    pts = [tuple(float(x) for x in m.groups()) for m in
+           re.finditer(r"\(\s*([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s*\)", vtxt)]
+    etxt = base[base.index("edges"):base.index("patches")]
+    arcs = {}
+    for m in re.finditer(r"arc\s+(\d+)\s+(\d+)\s*\(\s*([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s*\)", etxt):
+        a, b = int(m.group(1)), int(m.group(2))
+        arcs[(a, b)] = (float(m.group(3)), float(m.group(4)))
+    btxt = base[base.index("blocks"):base.index("edges")]
+    blocks = [list(map(int, m.group(1).split())) for m in re.finditer(r"hex\s+\(([\d ]+)\)", btxt)]
+    if len(blocks) != 24:
+        raise SystemExit(f"expected 24 blocks, found {len(blocks)}")
+    return {i: (p[0], p[1]) for i, p in enumerate(pts)}, arcs, blocks
+
+
+def design(base: str, params: dict):
+    if params.get("equal_corners", 0):
+        base = equalise_corners(base)
+    pts, arcs, blocks = parse(base)
+    S = vertex_sizes(params)
+
+    def length(a, b):
+        if (a, b) in arcs:
+            return arc_length(pts[a], arcs[(a, b)], pts[b])
+        if (b, a) in arcs:
+            return arc_length(pts[b], arcs[(b, a)], pts[a])
+        return math.dist(pts[a], pts[b])
+
+    # chains of edges that share a division count (union-find on z = 0 edges)
+    parent = {}
+
+    def key(a, b):
+        return (min(a, b), max(a, b))
+
+    def find(e):
+        parent.setdefault(e, e)
+        while parent[e] != e:
+            parent[e] = parent[parent[e]]
+            e = parent[e]
+        return e
+
+    def union(e, f):
+        parent[find(e)] = find(f)
+    for v in blocks:
+        union(key(v[0], v[1]), key(v[3], v[2]))
+        union(key(v[0], v[3]), key(v[1], v[2]))
+    chains = defaultdict(list)
+    for e in list(parent):
+        chains[find(e)].append(e)
+    # division count per chain: largest continuum count of its edges
+    info = {}
+    nchain = {}
+    for c, edges in chains.items():
+        best, best_c = 0.0, 0.0
+        for a, b in edges:
+            cls = edge_class(a, b, pts, arcs)
+            L = length(a, b)
+            ha, hb = size_at(S, a, cls), size_at(S, b, cls)
+            ncont = L / logmean(ha, hb)
+            info[(a, b)] = (cls, L, ha, hb, ncont)
+            if cls == "c":  # cylinder arcs follow the ring outer edges
+                best_c = max(best_c, ncont)
+            else:
+                best = max(best, ncont)
+        nchain[c] = max(1, round(best or best_c))
+    dists = {}
+    for c, edges in chains.items():
+        for a, b in edges:
+            cls, L, ha, hb, _ = info[(a, b)]
+            dists[(a, b)] = Dist(L, nchain[c], ha, hb)
+    return pts, arcs, blocks, chains, nchain, dists, find, key
+
+
+def build(base: str, level: int, params: dict | None = None) -> str:
+    p = dict(DEFAULTS, **(params or {}))
+    pts, arcs, blocks, chains, nchain, dists, find, key = design(base, p)
+
+    def g(a, b):  # a, b: vertices of the z = 0 face (the first four of each hex)
+        k = key(a, b)
+        return dists[k].grading(reverse=(k != (a, b)))
+
+    lines = []
+    for v in blocks:
+        nx = nchain[find(key(v[0], v[1]))] * level
+        ny = nchain[find(key(v[0], v[3]))] * level
+        eg = [g(v[0], v[1]), g(v[3], v[2]), g(v[3], v[2]), g(v[0], v[1]),
+              g(v[0], v[3]), g(v[1], v[2]), g(v[1], v[2]), g(v[0], v[3]),
+              "1", "1", "1", "1"]
+        lines.append(f"    hex ({' '.join(map(str, v))}) ({nx} {ny} 1)\n        edgeGrading\n        (\n"
+                     + "".join(f"            {x}\n" for x in eg) + "        )")
+    if p.get("equal_corners", 0):
+        base = equalise_corners(base)
+    i0 = base.index("blocks")
+    i1 = base.index("edges", i0)
+    head = base[:i0]
+    tail = base[i1:]
+    return head + "blocks\n(\n" + "\n".join(lines) + "\n);\n\n" + tail
+
+
+def report(base: str, params: dict) -> None:
+    p = dict(DEFAULTS, **params)
+    pts, arcs, blocks, chains, nchain, dists, find, key = design(base, p)
+    cells = 0
+    for v in blocks:
+        cells += nchain[find(key(v[0], v[1]))] * nchain[find(key(v[0], v[3]))]
+    print(f"cells at level 1: {cells}  (x4 per level: {cells * 4}, {cells * 9}, {cells * 16})")
+    for c, edges in sorted(chains.items(), key=lambda kv: kv[0]):
+        print(f"chain {c}: n = {nchain[c]}")
+        for e in sorted(edges):
+            d = dists[e]
+            print(f"   {e[0]:2d}-{e[1]:2d}  L {d.L:7.2f}  h {d.ha:6.2f} -> {d.hm:6.2f} -> {d.hb:6.2f}  "
+                  f"max cell ratio {d.per_cell():.3f}")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--base", type=Path, required=True, help="tutorial fluid blockMeshDict")
+    ap.add_argument("--level", type=int, default=1)
+    ap.add_argument("--out", type=Path)
+    ap.add_argument("--report", action="store_true")
+    for k, v in DEFAULTS.items():
+        ap.add_argument("--" + k.replace("_", "-"), type=float, default=v)
+    a = ap.parse_args()
+    params = {k: getattr(a, k) for k in DEFAULTS}
+    base = a.base.read_text()
+    if a.report:
+        report(base, params)
+    if a.out:
+        a.out.write_text(build(base, a.level, params))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+--- design report (level 1: chains, edge lengths, end/mid sizes in mm, max per-cell expansion) ---
+cells at level 1: 12568  (x4 per level: 50272, 113112, 201088)
+chain (4, 9): n = 12
+    0- 5  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    1- 6  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    2- 7  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    3- 8  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    4- 9  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+   64-65  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+chain (9, 15): n = 15
+    7-13  L   72.93  h   6.05 ->   4.95 ->   3.74  max cell ratio 1.036
+    8-14  L   70.00  h   6.05 ->   4.56 ->   3.74  max cell ratio 1.041
+    9-15  L   70.00  h   6.05 ->   4.56 ->   3.74  max cell ratio 1.041
+   11-12  L   29.20  h   2.20 ->   1.93 ->   1.76  max cell ratio 1.019
+   65-66  L   70.00  h   6.05 ->   4.56 ->   3.74  max cell ratio 1.041
+chain (10, 11): n = 28
+    1- 2  L  160.00  h   6.05 ->   5.39 ->   6.05  max cell ratio 1.008
+    6- 7  L  166.59  h   6.05 ->   5.85 ->   6.05  max cell ratio 1.002
+   10-11  L   78.54  h   3.19 ->   2.93 ->   2.20  max cell ratio 1.021
+chain (10, 16): n = 28
+    5-22  L  160.00  h   6.05 ->   5.39 ->   6.05  max cell ratio 1.008
+    6-23  L  166.59  h   6.05 ->   5.85 ->   6.05  max cell ratio 1.002
+   10-16  L   78.54  h   3.19 ->   2.45 ->   3.19  max cell ratio 1.019
+chain (13, 14): n = 66
+    2- 3  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+    7- 8  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+   13-14  L  300.43  h   4.95 ->   4.54 ->   4.18  max cell ratio 1.003
+chain (15, 21): n = 5
+   14-20  L   20.00  h   3.74 ->   4.27 ->   3.74  max cell ratio 1.069
+   15-21  L   20.00  h   3.74 ->   4.27 ->   3.74  max cell ratio 1.069
+   66-67  L   20.00  h   3.74 ->   4.27 ->   3.74  max cell ratio 1.069
+chain (18, 19): n = 20
+    6-10  L   63.14  h   6.05 ->   2.92 ->   1.32  max cell ratio 1.083
+    7-11  L   63.14  h   6.05 ->   2.92 ->   1.32  max cell ratio 1.083
+   12-13  L   50.58  h   1.32 ->   2.15 ->   4.95  max cell ratio 1.087
+   16-23  L   63.14  h   1.32 ->   2.92 ->   6.05  max cell ratio 1.083
+   17-24  L   63.14  h   1.32 ->   2.92 ->   6.05  max cell ratio 1.083
+   18-19  L   50.58  h   1.32 ->   2.15 ->   4.95  max cell ratio 1.087
+chain (21, 26): n = 15
+   17-18  L   29.20  h   2.20 ->   1.93 ->   1.76  max cell ratio 1.019
+   19-24  L   72.93  h   3.74 ->   4.80 ->   6.05  max cell ratio 1.036
+   20-25  L   70.00  h   3.74 ->   4.42 ->   6.05  max cell ratio 1.040
+   21-26  L   70.00  h   3.74 ->   4.42 ->   6.05  max cell ratio 1.040
+   67-68  L   70.00  h   3.74 ->   4.42 ->   6.05  max cell ratio 1.040
+chain (26, 31): n = 12
+   22-27  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   23-28  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   24-29  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   25-30  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   26-31  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   68-69  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+chain (27, 28): n = 12
+    0- 1  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    5- 6  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+   22-23  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+   27-28  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+chain (28, 29): n = 28
+   16-17  L   78.54  h   3.19 ->   2.93 ->   2.20  max cell ratio 1.021
+   23-24  L  166.59  h   6.05 ->   5.85 ->   6.05  max cell ratio 1.002
+   28-29  L  160.00  h   6.05 ->   5.39 ->   6.05  max cell ratio 1.008
+chain (29, 30): n = 66
+   19-20  L  300.43  h   4.95 ->   4.54 ->   4.18  max cell ratio 1.003
+   24-25  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+   29-30  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+chain (30, 69): n = 64
+    3-64  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+    8-65  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   14-66  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   20-67  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   25-68  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   30-69  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+chain (31, 69): n = 28
+    4-64  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+    9-65  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   15-66  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   21-67  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   26-68  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   31-69  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111

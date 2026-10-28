@@ -1,0 +1,33 @@
+**Conditional go: this removes the dominant size discontinuities, but does not establish second-order consistency.** Keep the present arcs. Before committing the full budget, prioritise the following.
+
+1. **Test the remaining interface defect through the operators.** A persistent area ratio is a persistent geometric irregularity, not necessarily a persistent solution error. Conversely, its confinement to an \(O(h)\)-area strip does not guarantee second-order loads: conservation, cancellation and error propagation matter. The earlier jumps are a plausible contributor to non-monotonicity, not a demonstrated cause.
+
+   The residual 1.13 kink deserves an inexpensive affine/quadratic-field test of face interpolation, gradients and diffusion on 1x/2x/4x, including representative deformed meshes. Measure errors separately along interfaces and elsewhere. Non-vanishing normalised skewness can give plain linear interpolation an \(O(h)\) face-value error.
+
+   I would **not redesign blockMesh now**. Edge grading controls spacing, not matching transverse derivatives. A regular structured mapping cannot pass smoothly through a valence-five vertex. A substantial fix needs repartitioning/transition blocks or coordinated mesh smoothing, validated across entire interfaces—not another arc-angle adjustment.
+
+2. **Check the actual interpolation paths.** `div(phi,U) Gauss linear` selects its own linear interpolation; `interpolate(U) skewCorrected linear` does **not** make convection skew-corrected. Moreover, v2512’s `skewCorrected` explicitly constructs a Gauss gradient internally; your `leastSquares` setting does not replace it. [v2512 source](https://api.openfoam.com/2512/skewCorrected_8H_source.html)
+
+   Least-squares gradients are a reasonable choice, but their local order can fall on irregular stencils without necessarily preventing second-order solution convergence. [Syrakos et al.](https://arxiv.org/abs/1606.05556) Use the operator tests to decide whether a reconstruction change is warranted; retain the fixed schemes for the main comparison unless those tests expose a material problem.
+
+3. **Verify that replay resampling preserves the intended boundary.** The local replay script interpolates harmonic coefficients piecewise linearly along the source 2x polyline. Sampling that function at new vertices does **not** reproduce exactly the same moving wall when new faces straddle source knots. Alignment with the undeformed flag is insufficient.
+
+   Compare displacement, face normals and generalised-load weighting at common material coordinates, especially around the aft pressure lobe. If consequential, preserve source knots or adopt one fixed smooth spatial reconstruction across every level. Check wall velocity/acceleration against the prescribed harmonics and consistency with mesh flux. Convergence remains conditional on this recorded motion.
+
+4. **Use 2x/3x/4x for the principal assessment; retain 1x as diagnostic.** The cylinder’s 114 circumferential cells and roughly 4.5-mm aft-flag spacing are credible starting resolutions, not evidence of asymptotic behaviour. I would preserve the ring and interaction-band allocation, including the aft third.
+
+   The least convincing allocation is the outlet tail: smooth grading removes jumps but cannot resolve vortices with a 165-mm terminal cell. Monitor downstream vorticity, pressure and backflow. If adding a resolution sensitivity, prioritise a 2x tail-only refinement, smoothly reducing the base outlet target toward 80–100 mm. Do not take those cells from the cylinder or aft flag. No wholesale redistribution is justified by the supplied evidence.
+
+5. **Separate temporal, transient and algebraic contamination.** With \(\Delta t\propto h\), \(ah^2+b\Delta t^2\) produces apparent order two regardless of their relative contributions. Keep the proposed 2x timestep check; assess its effect against the **new family’s finest differences**, not the earlier ring+box differences.
+
+   Four seconds of run-in is plausible, not demonstrated. Record cycle-by-cycle complex loads and compare shifted, equal-length windows. First extend a representative run if drift remains; a second mapping is lower priority. Test tighter tolerances and additional PIMPLE corrections on a developed segment. During replay, record mesh quality, mesh Courant number, continuity and wall-relative flux: static `checkMesh` cannot validate the moving family or motion-solver accuracy.
+
+6. **Trust stable complex-error scaling, not just monotone amplitudes.** For \(Q_L=Q_\infty+cL^{-2}\),
+
+   \[
+   \frac{Q_2-Q_3}{Q_3-Q_4}=\frac{20}{7}.
+   \]
+
+   Apply this to signed load components and complex lift differences; a dominant second-order phasor error should also have approximately aligned successive difference vectors. Require window, timestep and iteration sensitivities to be small—preferably below 10% of the finest relevant difference. Distrust unstable extrapolated limits, continuing phase rotation or orders that change sharply when excluding 1x.
+
+   Reserve 6x for an unresolved result: with \(\Delta t\propto h\), it costs roughly **3.4 times one 4x run**, so it is not a cheap first diagnostic.

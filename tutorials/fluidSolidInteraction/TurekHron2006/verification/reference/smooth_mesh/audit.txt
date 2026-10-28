@@ -1,0 +1,92 @@
+mesh/std_1: cells 5336  max ratio 1.425 at (0.236, 0.236)  roi max 1.425  p99.9 1.335  faces >1.2 683  >1.5 0  >1.9 0  non-orth max 24.5 at (0.125, 0.292)
+   line y=0.120  n=92  span 0.141..2.425
+   line y=0.280  n=92  span 0.141..2.425
+   line y=0.190  n=60  span 0.606..2.425
+   line y=0.210  n=60  span 0.606..2.425
+   line x=1.001  n=43  span 0.005..0.405
+   line x=1.015  n=43  span 0.005..0.405
+   line x=1.032  n=43  span 0.005..0.405
+   line x=1.050  n=43  span 0.005..0.405
+   line x=1.071  n=43  span 0.005..0.405
+   line x=1.093  n=43  span 0.005..0.405
+mesh/std_2: cells 21344  max ratio 1.430 at (0.236, 0.236)  roi max 1.430  p99.9 1.332  faces >1.2 138  >1.5 0  >1.9 0  non-orth max 26.3 at (0.122, 0.286)
+   line y=0.120  n=186  span 0.131..2.462
+   line y=0.280  n=186  span 0.131..2.462
+   line y=0.190  n=120  span 0.603..2.462
+   line y=0.210  n=120  span 0.603..2.462
+   line x=1.000  n=86  span 0.003..0.408
+   line x=0.249  n=28  span 0.151..0.249
+   line x=0.251  n=26  span 0.149..0.251
+   line x=0.253  n=26  span 0.149..0.251
+   line x=0.255  n=22  span 0.145..0.255
+   line x=0.252  n=22  span 0.147..0.253
+mesh/std_4: cells 85376  max ratio 1.432 at (0.236, 0.236)  roi max 1.432  p99.9 1.338  faces >1.2 260  >1.5 0  >1.9 0  non-orth max 27.2 at (0.121, 0.283)
+   line y=0.120  n=360  span 0.282..2.481
+   line y=0.280  n=360  span 0.282..2.481
+   line y=0.190  n=240  span 0.601..2.481
+   line y=0.210  n=240  span 0.601..2.481
+   line x=1.000  n=172  span 0.001..0.409
+   line x=0.600  n=44  span 0.143..0.257
+   line x=0.236  n=6  span 0.163..0.237
+   line x=0.299  n=6  span 0.182..0.218
+   line x=0.249  n=4  span 0.150..0.250
+   line x=0.244  n=4  span 0.155..0.245
+mesh/rb_1: cells 11764  max ratio 2.823 at (0.235, 0.236)  roi max 2.823  p99.9 2.641  faces >1.2 493  >1.5 485  >1.9 459  non-orth max 24.5 at (0.125, 0.292)
+   line y=0.119  n=157  span 0.191..2.425
+   line y=0.281  n=157  span 0.191..2.425
+   line y=0.190  n=95  span 0.603..2.425
+   line y=0.210  n=95  span 0.603..2.425
+   line x=1.002  n=61  span 0.005..0.405
+   line x=1.015  n=61  span 0.005..0.405
+   line x=1.032  n=61  span 0.005..0.405
+   line x=1.050  n=61  span 0.005..0.405
+   line x=1.071  n=61  span 0.005..0.405
+   line x=1.093  n=61  span 0.005..0.405
+mesh/rb_2: cells 47056  max ratio 2.846 at (0.235, 0.236)  roi max 2.846  p99.9 2.664  faces >1.2 970  >1.5 970  >1.9 917  non-orth max 26.3 at (0.122, 0.286)
+   line y=0.119  n=310  span 0.282..2.462
+   line y=0.281  n=310  span 0.282..2.462
+   line y=0.190  n=190  span 0.601..2.462
+   line y=0.210  n=190  span 0.601..2.462
+   line x=1.001  n=122  span 0.003..0.407
+   line x=0.279  n=50  span 0.002..0.408
+   line x=0.600  n=44  span 0.143..0.257
+   line y=0.100  n=6  span 0.186..0.214
+   line x=0.100  n=6  span 0.186..0.214
+   line x=0.299  n=6  span 0.182..0.218
+mesh/rb_4: cells 188224  max ratio 2.858 at (0.235, 0.236)  roi max 2.858  p99.9 2.574  faces >1.2 1940  >1.5 1940  >1.9 1830  non-orth max 27.2 at (0.121, 0.283)
+   line y=0.120  n=620  span 0.281..2.481
+   line y=0.280  n=620  span 0.281..2.481
+   line y=0.190  n=380  span 0.601..2.481
+   line y=0.210  n=380  span 0.601..2.481
+   line x=1.001  n=244  span 0.001..0.409
+   line x=0.280  n=100  span 0.001..0.409
+   line x=0.600  n=88  span 0.142..0.258
+   line y=0.100  n=12  span 0.185..0.215
+   line x=0.100  n=12  span 0.185..0.215
+   line x=0.299  n=12  span 0.183..0.217
+mesh/sm_1: cells 12568  max ratio 1.158 at (0.289, 0.160)  roi max 1.158  p99.9 1.155  faces >1.2 0  >1.5 0  >1.9 0  non-orth max 26.0 at (0.123, 0.288)
+   line y=0.055  n=180  span 0.008..2.419
+   line y=0.286  n=176  span 0.008..2.419
+   line y=0.301  n=174  span 0.008..2.419
+   line y=0.016  n=172  span 0.008..2.419
+   line y=0.293  n=172  span 0.008..2.419
+   line y=0.309  n=172  span 0.008..2.419
+   line y=0.319  n=172  span 0.008..2.419
+   line y=0.031  n=170  span 0.008..2.419
+   line y=0.044  n=170  span 0.008..2.419
+   line y=0.066  n=170  span 0.008..2.419
+mesh/sm_2: cells 50272  max ratio 1.134 at (0.280, 0.118)  roi max 1.134  p99.9 1.081  faces >1.2 0  >1.5 0  >1.9 0  non-orth max 27.0 at (0.279, 0.284)
+   line x=0.280  n=18  span 0.090..0.312
+   line x=0.120  n=16  span 0.094..0.307
+   line y=0.120  n=8  span 0.094..0.118
+   line y=0.280  n=8  span 0.094..0.118
+mesh/sm_3: cells 113112  max ratio 1.133 at (0.280, 0.119)  roi max 1.133  p99.9 1.069  faces >1.2 0  >1.5 0  >1.9 0  non-orth max 27.4 at (0.279, 0.282)
+   line x=0.280  n=25  span 0.093..0.311
+   line x=0.120  n=24  span 0.093..0.308
+   line y=0.120  n=12  span 0.093..0.119
+   line y=0.280  n=12  span 0.093..0.119
+mesh/sm_4: cells 201088  max ratio 1.133 at (0.280, 0.119)  roi max 1.133  p99.9 1.060  faces >1.2 0  >1.5 0  >1.9 0  non-orth max 27.5 at (0.121, 0.282)
+   line x=0.280  n=33  span 0.093..0.311
+   line x=0.120  n=32  span 0.093..0.308
+   line y=0.120  n=16  span 0.093..0.119
+   line y=0.280  n=16  span 0.093..0.119

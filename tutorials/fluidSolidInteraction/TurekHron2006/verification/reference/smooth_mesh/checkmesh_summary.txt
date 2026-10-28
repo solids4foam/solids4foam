@@ -1,0 +1,10 @@
+std_1  cells: 5336  Max aspect ratio = 17.2499 OK.  Mesh non-orthogonality Max: 24.4703 average: 4.71757  Max skewness = 0.409801 OK. 
+std_2  cells: 21344  Max aspect ratio = 17.3987 OK.  Mesh non-orthogonality Max: 26.2532 average: 4.83118  Max skewness = 0.42823 OK. 
+std_4  cells: 85376  Max aspect ratio = 17.4716 OK.  Mesh non-orthogonality Max: 27.1585 average: 4.88575  Max skewness = 0.437452 OK. 
+rb_1  cells: 11764  Max aspect ratio = 34.4998 OK.  Mesh non-orthogonality Max: 24.4703 average: 5.05682  Max skewness = 0.643639 OK. 
+rb_2  cells: 47056  Max aspect ratio = 34.7974 OK.  Mesh non-orthogonality Max: 26.2532 average: 5.12117  Max skewness = 0.626695 OK. 
+rb_4  cells: 188224  Max aspect ratio = 34.9432 OK.  Mesh non-orthogonality Max: 27.1585 average: 5.15294  Max skewness = 0.618157 OK. 
+sm_1  cells: 12568  Max aspect ratio = 43.6106 OK.  Mesh non-orthogonality Max: 25.9885 average: 4.91277  Max skewness = 0.365856 OK. 
+sm_2  cells: 50272  Max aspect ratio = 43.8626 OK.  Mesh non-orthogonality Max: 27.0218 average: 4.97698  Max skewness = 0.375163 OK. 
+sm_3  cells: 113112  Max aspect ratio = 43.9482 OK.  Mesh non-orthogonality Max: 27.3702 average: 4.99796  Max skewness = 0.378272 OK. 
+sm_4  cells: 201088  Max aspect ratio = 43.9908 OK.  Mesh non-orthogonality Max: 27.5451 average: 5.00837  Max skewness = 0.379828 OK. 

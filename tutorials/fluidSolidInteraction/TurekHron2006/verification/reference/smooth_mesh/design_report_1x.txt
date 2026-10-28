@@ -1,0 +1,77 @@
+cells at level 1: 12568  (x4 per level: 50272, 113112, 201088)
+chain (4, 9): n = 12
+    0- 5  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    1- 6  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    2- 7  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    3- 8  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    4- 9  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+   64-65  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+chain (9, 15): n = 15
+    7-13  L   72.93  h   6.05 ->   4.95 ->   3.74  max cell ratio 1.036
+    8-14  L   70.00  h   6.05 ->   4.56 ->   3.74  max cell ratio 1.041
+    9-15  L   70.00  h   6.05 ->   4.56 ->   3.74  max cell ratio 1.041
+   11-12  L   29.20  h   2.20 ->   1.93 ->   1.76  max cell ratio 1.019
+   65-66  L   70.00  h   6.05 ->   4.56 ->   3.74  max cell ratio 1.041
+chain (10, 11): n = 28
+    1- 2  L  160.00  h   6.05 ->   5.39 ->   6.05  max cell ratio 1.008
+    6- 7  L  166.59  h   6.05 ->   5.85 ->   6.05  max cell ratio 1.002
+   10-11  L   78.54  h   3.19 ->   2.93 ->   2.20  max cell ratio 1.021
+chain (10, 16): n = 28
+    5-22  L  160.00  h   6.05 ->   5.39 ->   6.05  max cell ratio 1.008
+    6-23  L  166.59  h   6.05 ->   5.85 ->   6.05  max cell ratio 1.002
+   10-16  L   78.54  h   3.19 ->   2.45 ->   3.19  max cell ratio 1.019
+chain (13, 14): n = 66
+    2- 3  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+    7- 8  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+   13-14  L  300.43  h   4.95 ->   4.54 ->   4.18  max cell ratio 1.003
+chain (15, 21): n = 5
+   14-20  L   20.00  h   3.74 ->   4.27 ->   3.74  max cell ratio 1.069
+   15-21  L   20.00  h   3.74 ->   4.27 ->   3.74  max cell ratio 1.069
+   66-67  L   20.00  h   3.74 ->   4.27 ->   3.74  max cell ratio 1.069
+chain (18, 19): n = 20
+    6-10  L   63.14  h   6.05 ->   2.92 ->   1.32  max cell ratio 1.083
+    7-11  L   63.14  h   6.05 ->   2.92 ->   1.32  max cell ratio 1.083
+   12-13  L   50.58  h   1.32 ->   2.15 ->   4.95  max cell ratio 1.087
+   16-23  L   63.14  h   1.32 ->   2.92 ->   6.05  max cell ratio 1.083
+   17-24  L   63.14  h   1.32 ->   2.92 ->   6.05  max cell ratio 1.083
+   18-19  L   50.58  h   1.32 ->   2.15 ->   4.95  max cell ratio 1.087
+chain (21, 26): n = 15
+   17-18  L   29.20  h   2.20 ->   1.93 ->   1.76  max cell ratio 1.019
+   19-24  L   72.93  h   3.74 ->   4.80 ->   6.05  max cell ratio 1.036
+   20-25  L   70.00  h   3.74 ->   4.42 ->   6.05  max cell ratio 1.040
+   21-26  L   70.00  h   3.74 ->   4.42 ->   6.05  max cell ratio 1.040
+   67-68  L   70.00  h   3.74 ->   4.42 ->   6.05  max cell ratio 1.040
+chain (26, 31): n = 12
+   22-27  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   23-28  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   24-29  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   25-30  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   26-31  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+   68-69  L  130.00  h   6.05 ->  10.82 ->  16.50  max cell ratio 1.102
+chain (27, 28): n = 12
+    0- 1  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+    5- 6  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+   22-23  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+   27-28  L  120.00  h  16.50 ->   9.19 ->   6.05  max cell ratio 1.102
+chain (28, 29): n = 28
+   16-17  L   78.54  h   3.19 ->   2.93 ->   2.20  max cell ratio 1.021
+   23-24  L  166.59  h   6.05 ->   5.85 ->   6.05  max cell ratio 1.002
+   28-29  L  160.00  h   6.05 ->   5.39 ->   6.05  max cell ratio 1.008
+chain (29, 30): n = 66
+   19-20  L  300.43  h   4.95 ->   4.54 ->   4.18  max cell ratio 1.003
+   24-25  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+   29-30  L  320.00  h   6.05 ->   4.62 ->   4.18  max cell ratio 1.008
+chain (30, 69): n = 64
+    3-64  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+    8-65  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   14-66  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   20-67  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   25-68  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+   30-69  L  400.00  h   4.18 ->   6.15 ->   8.80  max cell ratio 1.012
+chain (31, 69): n = 28
+    4-64  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+    9-65  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   15-66  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   21-67  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   26-68  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
+   31-69  L 1500.00  h 165.00 ->  38.58 ->   8.80  max cell ratio 1.111
