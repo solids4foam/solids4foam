@@ -80,7 +80,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: regression-test-logs.OpenFOAM-v2606
-          path: tutorialsTest-regression
+          # Only the logs: some cases write fields whose names contain ':'
+          # (e.g. sigma:Transformed), which upload-artifact rejects
+          path: tutorialsTest-regression/**/log.*
           retention-days: 10
 
       - name: Set job status

@@ -78,10 +78,17 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
 fi
 
 # Not a skip: reaching here without a displacement history means the case was
-# expected to run and did not
+# expected to run and did not. The end of log.Allrun is printed, so that the
+# cause is in the test output itself (e.g. in CI, where the logs may not be
+# kept)
 if [[ ! -f "${CASE_DIR}/${DISP_FILE}" ]]; then
-    echo "FAIL: no displacement history, and the tutorial did not report a skip"
-    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE})"
+    if grep -qs "^Could not download" "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
+        echo "FAIL: the mesh archive could not be downloaded"
+    else
+        echo "FAIL: no displacement history, and the tutorial did not report a skip"
+    fi
+    echo "      (see ${CASE_DIR}/${ALLRUN_LOGFILE}, which ends with:)"
+    tail -n 15 "${CASE_DIR}/${ALLRUN_LOGFILE}" 2>/dev/null | sed 's/^/      | /'
     exit 1
 fi
 
