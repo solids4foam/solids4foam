@@ -1,0 +1,72 @@
+level          Q_in      Q_quad   lift1_amp   drag_mean    lift1_re    lift1_im      dt   dQin/dt
+1x           44.814     -15.127     164.358     -12.711       0.144     164.358  1.00e-03    0.019
+2x           71.021      -2.234     152.245     -17.117      68.110     136.160  5.00e-04   -0.004
+3x           75.631      -0.108     155.182     -17.776      78.124     134.083  3.33e-04   -0.010
+4x           76.545       0.778     157.604     -17.757      79.574     136.041  2.50e-04   -0.020
+
+three-point fits Q = Q_inf + c h^p (p, Q_inf) on 1x/2x/3x, 1x/3x/4x, 2x/3x/4x
+  Q_in       123: p  2.09 Q_inf    79.097   134: p  2.69 Q_inf    77.329   234: p  3.56 Q_inf    77.058
+  Q_quad     123: p  2.19 Q_inf     1.375   134: p  1.91 Q_inf     1.985   234: p  1.51 Q_inf     2.401
+  lift1_amp  123: -   134: -   234: -
+  drag_mean  123: p  2.35 Q_inf   -18.188   134: -   234: -
+  lift1_re   123: p  2.38 Q_inf    84.292   134: p  3.19 Q_inf    80.538   234: p  4.40 Q_inf    80.143
+  lift1_im   123: p  3.50 Q_inf   133.419   134: -   234: -
+
+qoi        d21(1x-2x)  d42(2x-4x)  p(1,2,4)   d23      d34     ratio(20/7=2.857)  fit p(2,3,4)  Q_inf
+Q_in           26.208      5.524     2.25    4.609    0.914      5.041           3.56      77.058   monotone True
+Q_quad         12.893      3.011     2.10    2.126    0.886      2.400           1.51       2.401   monotone True
+lift1_amp     -12.113      5.360      nan    2.937    2.422      1.213            -   monotone False
+drag_mean      -4.407     -0.639     2.79   -0.659    0.019    -34.185            -   monotone False
+lift1_re       67.966     11.464     2.57   10.014    1.450      6.904           4.40      80.143   monotone True
+lift1_im      -28.198     -0.119     7.89   -2.077    1.958     -1.061            -   monotone False
+
+lift fundamental phasor differences (N/m, deg)
+  1x->2x: ( 67.966, -28.198)  |d| 73.584  arg   -22.5
+  2x->3x: ( 10.014,  -2.077)  |d| 10.227  arg   -11.7
+  3x->4x: (  1.450,   1.958)  |d|  2.437  arg    53.5
+  1x: phase of the lift fundamental  89.950 deg, amplitude  164.358
+  2x: phase of the lift fundamental  63.425 deg, amplitude  152.245
+  3x: phase of the lift fundamental  59.773 deg, amplitude  155.182
+  4x: phase of the lift fundamental  59.676 deg, amplitude  157.604
+
+checks: change, and as a fraction of |4x-3x| and |4x-2x|
+  time step (2x dt/2 - 2x)
+     Q_in         -0.2383     0.26    0.04
+     Q_quad        0.0404     0.05    0.01
+     lift1_amp     0.3915     0.16    0.07
+     drag_mean     0.0801     4.16    0.13
+     lift1_re     -0.6160     0.42    0.05
+     lift1_im      0.7431     0.38    6.25
+  outlet tail (2x tail90 - 2x)
+     Q_in         -0.0716     0.08    0.01
+     Q_quad        0.0543     0.06    0.02
+     lift1_amp     0.0795     0.03    0.01
+     drag_mean    -0.1240     6.44    0.19
+     lift1_re     -0.0364     0.03    0.00
+     lift1_im      0.1071     0.05    0.90
+  converged solve (1x conv - 1x)
+     Q_in         -0.0160     0.02    0.00
+     Q_quad        0.0039     0.00    0.00
+     lift1_amp     0.0123     0.01    0.00
+     drag_mean     0.0024     0.13    0.00
+     lift1_re     -0.0177     0.01    0.00
+     lift1_im      0.0123     0.01    0.10
+  window-end sensitivity (window ending one period earlier)
+     1x   Q_in -0.006  Q_quad +0.134  lift1_amp +0.203  drag_mean +0.002  lift1_re -0.069  lift1_im +0.203
+     2x   Q_in +0.001  Q_quad +0.056  lift1_amp +0.033  drag_mean -0.003  lift1_re -0.065  lift1_im +0.069
+     3x   Q_in +0.000  Q_quad +0.038  lift1_amp +0.017  drag_mean -0.002  lift1_re -0.047  lift1_im +0.047
+     4x   Q_in -0.002  Q_quad -0.000  lift1_amp +0.001  drag_mean +0.000  lift1_re -0.005  lift1_im +0.004
+
+sliding five-period windows ending in the last second: mean, std, range (max-min)
+  1x  n=6 Q_in 0.003/0.010  Q_quad 0.050/0.134  lift1_amp 0.077/0.210  drag_mean 0.001/0.002
+  2x  n=6 Q_in 0.004/0.011  Q_quad 0.021/0.058  lift1_amp 0.015/0.045  drag_mean 0.001/0.003
+  3x  n=6 Q_in 0.004/0.011  Q_quad 0.017/0.038  lift1_amp 0.007/0.018  drag_mean 0.002/0.004
+  4x  n=6 Q_in 0.006/0.018  Q_quad 0.001/0.004  lift1_amp 0.006/0.016  drag_mean 0.001/0.002
+
+time-corrected values Q - e_t(L), e_t(L) = -(4/3) [Q(2x,dt/2) - Q(2x,dt)] (2/L)^2
+  Q_in       1x    43.543 2x    70.704 3x    75.489 4x    76.466  d23   4.786 d34   0.976  p(2,3,4) 3.48  p(1,2,4) 2.24
+  Q_quad     1x   -14.911 2x    -2.180 3x    -0.084 4x     0.791  d23   2.096 d34   0.875  p(2,3,4) 1.51  p(1,2,4) 2.10
+  lift1_amp  1x   166.446 2x   152.767 3x   155.414 4x   157.735  d23   2.647 d34   2.321  p(2,3,4) -  p(1,2,4) -
+  drag_mean  1x   -12.283 2x   -17.011 3x   -17.729 4x   -17.730  d23  -0.718 d34  -0.002  p(2,3,4) -  p(1,2,4) 2.72
+  lift1_re   1x    -3.142 2x    67.289 3x    77.759 4x    79.369  d23  10.470 d34   1.610  p(2,3,4) 4.24  p(1,2,4) 2.54
+  lift1_im   1x   168.321 2x   137.151 3x   134.523 4x   136.289  d23  -2.627 d34   1.765  p(2,3,4) -  p(1,2,4) 5.18

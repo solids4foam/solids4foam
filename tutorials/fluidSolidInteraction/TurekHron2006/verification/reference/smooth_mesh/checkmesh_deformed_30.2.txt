@@ -1,0 +1,7 @@
+sm_1x  Mesh non-orthogonality Max: 27.0038 average: 6.7978  Max skewness = 0.365821 OK. 
+sm_1x_conv  Mesh non-orthogonality Max: 27.0038 average: 6.7978  Max skewness = 0.365821 OK. 
+sm_2x  Mesh non-orthogonality Max: 28.1023 average: 6.92008  Max skewness = 0.375303 OK. 
+sm_2x_dt2.5e-4  Mesh non-orthogonality Max: 28.0069 average: 6.85658  Max skewness = 0.375241 OK. 
+sm_2x_tail90  Mesh non-orthogonality Max: 28.0514 average: 6.7411  Max skewness = 0.375242 OK. 
+sm_3x  Mesh non-orthogonality Max: 28.252 average: 7.10305  Max skewness = 0.378685 OK. 
+sm_4x  Mesh non-orthogonality Max: 28.2511 average: 7.19163  Max skewness = 0.380273 OK. 

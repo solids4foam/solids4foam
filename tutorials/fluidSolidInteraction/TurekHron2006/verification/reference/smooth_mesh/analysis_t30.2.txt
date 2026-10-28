@@ -1,0 +1,16 @@
+sm_1x                              t_end 30.200  Q_in   44.814  Q_quad  -15.127  lift1   164.36  drag  -12.711  dQin/dt   0.019  ddrag/dt  -0.008
+sm_2x                              t_end 30.200  Q_in   71.021  Q_quad   -2.234  lift1   152.24  drag  -17.117  dQin/dt  -0.004  ddrag/dt  -0.003
+sm_3x                              t_end 30.200  Q_in   75.631  Q_quad   -0.108  lift1   155.18  drag  -17.776  dQin/dt  -0.010  ddrag/dt  -0.000
+sm_4x                              t_end 30.200  Q_in   76.545  Q_quad    0.778  lift1   157.60  drag  -17.757  dQin/dt  -0.020  ddrag/dt   0.001
+sm_2x_dt2.5e-4                     t_end 30.200  Q_in   70.783  Q_quad   -2.193  lift1   152.64  drag  -17.037  dQin/dt  -0.012  ddrag/dt   0.000
+sm_2x_tail90                       t_end 30.200  Q_in   70.950  Q_quad   -2.179  lift1   152.32  drag  -17.241  dQin/dt  -0.004  ddrag/dt  -0.002
+sm_1x_conv                         t_end 30.200  Q_in   44.798  Q_quad  -15.123  lift1   164.37  drag  -12.708  dQin/dt   0.019  ddrag/dt  -0.008
+-- smooth: ['sm_1x', 'sm_2x', 'sm_4x']
+   Q_in          44.814    71.021    76.545  d21   26.208  d32    5.524  p 2.25  lim 78.02
+   Q_quad       -15.127    -2.234     0.778  d21   12.893  d32    3.011  p 2.10  lim 1.70
+   Q_in_p        41.698    68.390    74.056  d21   26.692  d32    5.666  p 2.24  lim 75.58
+   Q_quad_p     -17.174    -4.556    -1.717  d21   12.618  d32    2.839  p 2.15  lim -0.89
+   lift1_re       0.144    68.110    79.574  d21   67.966  d32   11.464  p 2.57  lim 81.90
+   lift1_im     164.358   136.160   136.041  d21  -28.198  d32   -0.119  p 7.89  lim 136.04
+   lift1_amp    164.358   152.245   157.604  d21  -12.113  d32    5.360  p -
+   drag_mean    -12.711   -17.117   -17.757  d21   -4.407  d32   -0.639  p 2.79  lim -17.87

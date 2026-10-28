@@ -1976,3 +1976,364 @@ node-hours (35 980 core-hours; segment 1 143.4 h, segment 2 137.7 h, account p20
 cancelled dt-5e-4 8x' run 4.3 (p201141), build, timing, preconditioner and gate tests 3.0, and
 the control job (platform controls, restart and preconditioner checks) 25.3 (p201136): 313.7
 node-hours, about 40 150 core-hours.
+
+## Smooth graded mesh family
+
+Question: do the level-independent cell-size jumps of the ring+box family
+cause the non-monotone convergence of the replay load, and does a fluid mesh
+family without them converge monotonically, ideally at second order? Tested
+cheaply with the fluid-only trajectory replay before any coupled run.
+Branch `verification/hronturek-smooth-mesh`; the corrected set-up of the
+sections above is unchanged (central convection, `movingWallPressure`,
+`displacementLaplacian` with quadratic inverseDistance diffusivity).
+
+### Smooth family: design
+
+The ring+box family doubles the divisions of only some blocks, so it keeps
+neighbour cell-area ratios of 2:1 to 2.8:1 on block-interface lines through
+the vortex street (y = 0.12 and 0.28 m from x = 0.28 to 2.43 m, x = 1.0 m,
+x = 0.28 m) at every level; the standard family has 1.43, also
+level-independent. A size jump that does not vanish with refinement is an
+O(h) local truncation error.
+
+`scripts/ht_mesh_smooth.py` keeps the tutorial's 24-block topology, its
+vertices, arcs and patches (flag surface, plate faces and patch names are
+those of the tutorial, so the replay tables and case scripts apply
+unchanged) and replaces only the divisions and gradings:
+
+- every block vertex carries a target cell size per grid-line family
+  (x, y, radial, cylinder-circumferential; isotropic at the ring corners,
+  anisotropic at the channel walls and the outlet);
+- every block edge gets a two-section geometric distribution (blockMesh
+  multi-grading through `edgeGrading`) whose first and last cells are the
+  targets at its end vertices, matched for the limit mapping (a section of
+  n cells with end sizes h0, h1 has length n (h1 - h0)/ln(h1/h0), the
+  mapping that blockMesh converges to when n is doubled with the expansion
+  kept), so the size ratio across every block interface tends to 1;
+- the division count of each topological chain of edges is the largest
+  continuum count of its edges; level L multiplies every division by L and
+  keeps every grading (one fixed mapping, refined uniformly in-plane).
+
+Sizes at 1x (mm; the default `--scale 1.1`): radial first cell on the
+cylinder 1.32; circumferential on the cylinder 3.2 at 135 and 225 deg, 2.2
+at the flag-root vertices, 1.76 at the flag-cylinder corners (114 cells
+round the cylinder); ring outer 6.05 (20 radial cells); along the flag 4.95
+at x = 0.30 m to 4.18 at the tip (66 cells); normal to the flag 3.74 (15
+cells from y = 0.12 m, 5 across the end face); x = 0.6 to 1.0 m: 4.18 to
+8.8 (64 cells); x = 1.0 to 2.5 m: 8.8 to 165 (28 cells); normal to the
+channel walls 16.5; inlet 16.5. The ring+box 1x' has 5.2/3.65 mm on the
+cylinder, about 11 mm circumferentially at the ring edge, 5.0-5.3 mm along
+the flag, 4.4 mm normal to it and 5.7 mm in x = 0.6-1.0 m, then a jump to
+15 mm. Cells: 12 568, 50 272, 113 112, 201 088 (1x, 2x, 3x, 4x) against
+11 764, 47 056, 105 876, 188 224 for ring+box.
+
+![Smooth family](reference/smooth_mesh/mesh_audit.png)
+
+### Smooth family: mesh audit
+
+`scripts/ht_mesh_audit.py` (the measure of the coordinator's audit
+script): over the internal faces, r = max(A_o/A_n, A_n/A_o) of the two cell
+areas; `checkMesh` of the undeformed meshes
+(`reference/smooth_mesh/audit.txt`, `audit.json`, `checkmesh_summary.txt`).
+
+| family, level | cells | max r | r>1.1 | r>1.2 | r>1.3 | non-orth | skew |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| standard 1x | 5 336 | 1.425 | 2 031 | 683 | 57 | 24.5 | 0.410 |
+| standard 2x | 21 344 | 1.430 | 2 734 | 138 | 116 | 26.3 | 0.428 |
+| standard 4x | 85 376 | 1.432 | 1 568 | 260 | 232 | 27.2 | 0.437 |
+| ring+box 1x' | 11 764 | 2.823 | 3 492 | 493 | 485 | 24.5 | 0.644 |
+| ring+box 2x' | 47 056 | 2.846 | 1 436 | 970 | 970 | 26.3 | 0.627 |
+| ring+box 4x' | 188 224 | 2.858 | 2 870 | 1 940 | 1 940 | 27.2 | 0.618 |
+| smooth 1x | 12 568 | 1.158 | 5 904 | 0 | 0 | 26.0 | 0.366 |
+| smooth 2x | 50 272 | 1.134 | 50 | 0 | 0 | 27.0 | 0.375 |
+| smooth 3x | 113 112 | 1.133 | 73 | 0 | 0 | 27.4 | 0.378 |
+| smooth 4x | 201 088 | 1.133 | 97 | 0 | 0 | 27.5 | 0.380 |
+
+(Non-orthogonality in degrees, maximum.) Reading:
+
+- The smooth family has no face above 1.2 at any level; at 1x the maximum
+  (1.16) is the in-block expansion, which falls with the level (99.9th
+  percentile 1.155, 1.081, 1.069, 1.060).
+- A residual 1.13 does not fall: it sits at the four valence-5 ring-corner
+  vertices (x = 0.12 and 0.28 m, y = 0.12 and 0.28 m), where the Cartesian
+  outer block meets the corner at 90 deg and the other four blocks at 62 to
+  74 deg. It is a direction kink of the mapping, not a size mismatch, and
+  the transfinite interpolation carries it a short way along the straight
+  block interfaces leaving the corners: to about 1.05 within 7 cm along
+  x = 0.12 and 0.28 m, and from 1.09 at x = 0.29 m to 1.03 at x = 0.49 m
+  along y = 0.12 and 0.28 m, so the count of faces above 1.1 grows
+  linearly with the level (50, 73, 97). The standard family has the same
+  corners; its maxima (1.43) and the ring+box ones (2.8) sit at the
+  flag-root cylinder vertex and on the long interface lines.
+- Reshaping the ring arcs so that the four non-Cartesian blocks meet at
+  67.5 deg (option `--equal-corners 1`) lowers the corner value to 1.08 but
+  flattens the arcs, and the transfinite blending of the ring and the outer
+  blocks then mismatches along the whole arc (1.21, level-independent); the
+  tutorial arcs are kept.
+- The non-orthogonality and skewness maxima are at the same corners and
+  converge (26.0 to 27.5 deg, 0.366 to 0.380) instead of falling. The
+  skewness is below that of both earlier families; the non-orthogonality is
+  0.3 to 1.5 deg above (both grow to the same corner limit of about 28 deg).
+
+Operator test (`scripts/ht_mesh_operator_test.py`,
+`reference/smooth_mesh/optest.txt`): for a smooth field (wavelength 0.2 m)
+the Gauss-linear face interpolation and the leastSquares gradient have
+first-order maxima (rms order 1.5-1.9) in all three families, and the
+divergence of a smooth vector field and the corrected Laplacian have O(1)
+level-independent truncation-error maxima in every family, near the ring
+corners and arcs (ring+box: on the y = 0.28 m line). At 4x the rms of the
+Laplacian truncation error in the near field (x 0.1-1.0 m, y 0.08-0.32 m,
+corners excluded) is 4.2 (smooth), 7.3 (standard) and 20.6 (ring+box),
+falling about as h^0.5 in each: O(1) errors on O(h)-wide strips. So the
+smooth family removes the large interface jumps but, like any block mesh
+with valence-5 vertices, keeps O(1) truncation errors on short strips; FV
+schemes usually still converge at second order on such meshes
+(supraconvergence), but the mesh audit cannot guarantee it, and the replay
+is the test.
+
+Replay boundary (`scripts/replay_resampling_check.py`,
+`reference/smooth_mesh/replay_resampling.txt`): the replayed wall of each
+level, the piecewise-linear interpolant of the 2x table sampled at its plate
+points, departs from the 2x polyline by at most 14, 7.2, 4.8 and 3.6 um
+(1x to 4x; 4e-4 to 1e-4 of the tip amplitude), falling as 1/L; the tip
+phasor is reproduced exactly.
+
+### Smooth family: Astra review
+
+Consulted once before compute (`codex exec -m gpt-6-astra -c
+model_reasoning_effort=xhigh`, `reference/smooth_mesh/astra_1_prompt.txt`,
+`astra_1_answer.txt`). Verdict: a conditional go; the design removes the
+dominant size discontinuities but does not by itself establish second-order
+consistency. Advice and what was done:
+
+1. Test the residual corner defect through the operators rather than the
+   area ratio; do not redesign the blockMesh topology now (a valence-5
+   vertex cannot be passed smoothly by a structured mapping; a real fix
+   needs transition blocks or smoothing). Done (operator test above);
+   topology kept.
+2. `interpolate(U) skewCorrected linear` does not make the convection
+   skew-corrected, and v2512's `skewCorrected` uses its own Gauss gradient.
+   Noted; the schemes are those of every earlier replay and were not
+   changed.
+3. Check that resampling the 2x replay table preserves the wall. Done (above;
+   at most 4e-4 of the amplitude).
+4. Use 2x/3x/4x as the principal triplet and 1x as a diagnostic; keep the
+   ring and band allocation; the 165 mm outlet tail is the least convincing
+   allocation: run a 2x tail-only sensitivity with the outlet target near
+   80-100 mm. Done (2x with `--h-out 90`, 99 mm at the outlet).
+5. With dt proportional to h, a h^2 + b dt^2 gives an apparent order 2
+   whatever the split: keep the 2x time check and judge it against the new
+   family's finest differences; check the run-in, record cycle-by-cycle
+   loads, test tighter solves on a developed segment, and check the moving
+   mesh quality. Done: 2x at dt/2, sliding windows, 1x restarted from
+   27.6 s with tolerances 1e-9 and PIMPLE 6/6/3, `checkMesh` of the
+   deformed mesh at 30.2 s on every run.
+6. Trust stable complex-error scaling: (Q2 - Q3)/(Q3 - Q4) = 20/7 for
+   p = 2, aligned successive difference phasors of the lift, checks below
+   10% of the finest difference; distrust continuing phase rotation or
+   orders that change when 1x is dropped. A 6x level costs about 3.4 times
+   a 4x run; keep it for an unresolved result. Applied in the analysis
+   (`scripts/smooth_family_analysis.py`); no 6x run.
+
+Not applied: a reconstruction-scheme change (item 2) and transition blocks or
+mesh smoothing at the corners (item 1), because they would change the
+discretisation of every earlier comparison; a second mapping of the initial
+state (item 5; the sliding windows are used instead).
+
+### Smooth family: replay results
+
+Protocol of the second-order study, unchanged: the developed rigid state at
+25 s mapped in (`mapFields -consistent`, cellPointInterpolate, from the
+ring+box 4x' state, itself mapped from the 4x CFD3 state), the replay table
+of the coupled 2x motion interpolated to the plate points, central
+convection, `displacementLaplacian`, `movingWallPressure`, `fastp`, PIMPLE
+3/3/1, tolerances 1e-6, the p solver of the 8x' replay (GAMG,
+DICGaussSeidel, 200 coarsest cells), dt 1e-3, 5e-4, 1/3000 and 2.5e-4 at
+1x to 4x (maximum Courant number 1.56-1.59 on every level), five periods
+ending at 30.2 s (`energy_analysis.py`, `second_order_analysis.py`,
+`scripts/smooth_family_analysis.py`). Binary: the study binary of the 8x'
+ring+box replay (solids4foam aee0c8e3, OpenFOAM v2512 source build, GCC
+13.3, MeluXina EPYC 7H12), one node, all runs concurrent
+(`scripts/run_smooth_replays_meluxina.slurm`, job 5392944, account
+p201141). Cases built with `scripts/ht_smooth_case.py` from the 8x' replay
+case. Results: `reference/smooth_mesh/runs.csv`, `smooth_family.json`,
+`smooth_family.txt`, `replay_families.png`.
+
+| level | cells | dt | Q_in | Q_quad | lift | amp. | phase | drag |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: |
+| 1x | 12 568 | 1e-3 | 44.81 | -15.13 | (0.1,164.4) | 164.36 | 90.0 | -12.71 |
+| 2x | 50 272 | 5e-4 | 71.02 | -2.23 | (68.1,136.2) | 152.25 | 63.4 | -17.12 |
+| 3x | 113 112 | 1/3000 | 75.63 | -0.11 | (78.1,134.1) | 155.18 | 59.8 | -17.78 |
+| 4x | 201 088 | 2.5e-4 | 76.55 | 0.78 | (79.6,136.0) | 157.60 | 59.7 | -17.76 |
+
+(N/m and degrees; the lift is the first harmonic of the plate lift, its
+amplitude is the modulus of that Fourier coefficient, not an extremum.)
+
+Differences and observed orders (`fit` is Q = Q_inf + c h^p through three
+levels, h = 1/L; the ratio d23/d34 is 20/7 = 2.86 for p = 2):
+
+| quantity | d12 | d23 | d34 | p 1,2,4 | fit 1,2,3 | fit 2,3,4 | d23/d34 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Q_in | +26.21 | +4.61 | +0.91 | 2.25 | 2.09 | 3.56 | 5.04 |
+| Q_quad | +12.89 | +2.13 | +0.89 | 2.10 | 2.19 | 1.51 | 2.40 |
+| lift amplitude | -12.11 | +2.94 | +2.42 | - | - | none | 1.21 |
+| mean drag | -4.41 | -0.66 | +0.02 | - | 2.35 | - | - |
+| lift phase (deg) | -26.5 | -3.7 | -0.1 | - | - | - | - |
+
+Error controls, against the finest differences:
+
+- **Time step** (2x at dt 2.5e-4 against 5e-4): Q_in -0.24, Q_quad +0.04,
+  lift amplitude +0.39, drag +0.08 N/m, i.e. 0.26, 0.05 and 0.16 of
+  |d34| for the first three. With BDF2 and a level-independent coefficient
+  (an assumption), the temporal part along the constant-Courant path is
+  4/3 x 0.24 (2/L)^2 N/m in Q_in; removing it changes the 2x/3x/4x values to
+  70.70, 75.49, 76.47 (d23 4.79, d34 0.98, three-point p 3.48; 1x/2x/4x
+  p 2.24) and the lift amplitude to 152.77, 155.41, 157.73 (d23 2.65, d34
+  2.32). The temporal error does not explain the inconsistent orders.
+- **Converged solve** (1x from 27.6 s with tolerances 1e-9 and PIMPLE
+  6/6/3): Q_in -0.016, lift amplitude +0.012 N/m.
+- **Outlet tail** (2x with the outlet target 99 instead of 165 mm, 53 104
+  cells): Q_in -0.07, lift amplitude +0.08, drag -0.12 N/m.
+- **Stationarity**: drift of Q_in +0.019, -0.004, -0.010, -0.020 N/m/s;
+  over the six one-period-shifted windows ending in the last second the
+  range of Q_in is at most 0.018 N/m, of the lift amplitude 0.21 (1x) and at
+  most 0.045 N/m (2x-4x), far below its 2.4-2.9 N/m differences.
+- **Window end**: the five-period window is not an integer number of
+  steps; ending it one period earlier moves Q_in by at most 0.006 and the
+  lift amplitude by 0.20 (1x) and at most 0.03 N/m (2x-4x).
+- **Moving mesh**: `checkMesh` of the deformed meshes at 30.2 s: maximum
+  non-orthogonality 27.0, 28.1, 28.3, 28.3 deg, skewness 0.366, 0.375,
+  0.379, 0.380 (1x-4x; `checkmesh_deformed_30.2.txt`).
+
+![Replay families](reference/smooth_mesh/replay_families.png)
+
+### Smooth family: diagnosis
+
+The success criterion (Q_in and the lift amplitude monotone with shrinking
+differences, consistent orders near 2) is not met, so the differences were
+localised before anything else.
+
+Field differences on a common grid (`scripts/snapshot_compare.py`,
+`reference/smooth_mesh/snapshot_compare.*`): the 2x and 3x fields at 30.2 s
+(the same motion phase on every level) carried to the 4x cell centroids by a
+linear reconstruction (cell value plus leastSquares gradient), the 3x-2x
+difference likewise on the 3x mesh; pressure after removing its near-field
+mean (a uniform level change, 22-25 Pa from 3x and 2x to 4x, does not load
+the flag). Ratio of the rms differences d23/d34 by region (2.86 for p = 2):
+
+| region | rms dU, d23 | rms dU, d34 | ratio dU | ratio dp | share of dU^2 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| ring corners (0.03 m) | 0.0125 | 0.0039 | 3.2 | 3.5 | 0.000 |
+| cylinder ring | 0.0032 | 0.0011 | 2.9 | 4.3 | 0.000 |
+| flag rows | 0.0159 | 0.0056 | 2.8 | 2.3 | 0.000 |
+| within 1 cm of the flag | 0.0086 | 0.0033 | 2.6 | 2.1 | 0.000 |
+| near wake, x 0.6-1.0 m | 0.0197 | 0.0121 | 1.6 | 2.0 | 0.002 |
+| far wake, x > 1.0 m | 0.2432 | 0.1241 | 2.0 | 2.4 | 0.85 |
+| outer rows | 0.0791 | 0.0389 | 2.0 | 2.5 | 0.15 |
+
+(m/s; dU of 4x - 3x and 3x - 2x.) The ring corners are not where the
+solutions differ: their differences are small and converge like the ring
+(ratio 3.2), as does the velocity in the flag rows (2.8). The differences
+grow downstream: the near and far wake converge at an apparent order of
+about 1 to 1.5 and carry almost all of the field difference; the wall
+pressure on the flag converges more slowly than the velocity next to it
+(ratio 2.1 against 2.6). Plot: `snapshot_compare.png`.
+
+Where on the flag (`scripts/traction_regions.py` on the per-face first
+harmonics of `plateTraction`, restarts of 2x and 3x from their 27.6 s writes
+that reproduce Q_in, Q_quad, the lift and the drag of the original runs to
+all printed digits; `traction_regions_2x3x.txt`): of the 2x-to-3x change of
+Q_in (+4.61 N/m) 78% sits in the aft flag, x 0.50-0.60 m (both faces), and
+16% at x 0.45-0.50 m; of the change of the lift amplitude (+3.25 N/m along
+the lift phasor) x 0.40-0.50 m carries 126%, partly cancelled by -57% at x
+0.55-0.60 m. So Q_in converges through the aft pressure lobe and the lift
+amplitude through the middle of the flag. The 4x traction restart could
+not be completed within the budget (below); for d34 only the instantaneous
+plate pressure at 30.2 s is available (`scripts/snapshot_plate.py`,
+`snapshot_plate_30.2.txt`; its total equals the plate pressure lift of
+`energy.dat` on every level): net over both faces, 2x to 3x changes the
+lift at that instant by -5.18 N/m, 95% of it at x 0.50-0.58 m, and 3x to 4x
+by +1.29 N/m, as +2.07 at x 0.40-0.50 m against -1.08 at x 0.50-0.58 m.
+The finest change has moved forward from the aft lobe to the middle of the
+flag and its parts have opposite signs, which is why the observed order of
+Q_in rises (2.1 to 3.6) while the lift amplitude converges slowly.
+
+Reading: the near field (ring, corners, flag rows) converges at about
+second order on this family; the loads on the flag are additionally set by
+the vortices convected along it and the wake behind it, whose resolution
+converges more slowly (near wake, far wake), and the outcome is a monotone
+Q_in with a non-constant observed order and a lift amplitude that is still
+growing by about 1.5% per level. The ring-corner kink is not the cause.
+
+### Smooth family: verdict and comparison
+
+- **Q_in: monotone with shrinking differences** on all four levels (44.81,
+  71.02, 75.63, 76.55 N/m), unlike ring+box; but the observed orders are not
+  consistent (2.09, 2.25, 2.69, 3.56 from 1x/2x/3x, 1x/2x/4x, 1x/3x/4x,
+  2x/3x/4x; the frozen 1x/2x/3x prediction for 4x was 77.2 N/m, the run gave
+  76.55). Second order is not demonstrated; no Richardson value is quoted.
+- **Lift amplitude: not monotone** (164.4, 152.2, 155.2, 157.6 N/m; 1x is
+  pre-asymptotic) and, on 2x/3x/4x, still growing with differences that do
+  not shrink like any convergent power law (+2.94, +2.42, ratio 1.21 against
+  at least 1.41 for p > 0). Criterion **not met**.
+- **Lift phase converged** from 3x (63.4, 59.8, 59.7 deg), unlike ring+box
+  (rotation of 4-5 deg per level); the mean drag converged to 0.02 N/m from
+  3x to 4x, below its time-step sensitivity; Q_quad monotone (p 1.5-2.2).
+- **Against the earlier families** (compared only now): smooth 4x (201k
+  cells) gives Q_in 76.55, lift phase 59.7 deg, amplitude 157.6, drag
+  -17.76 N/m; ring+box 8x' (753k) 77.16, 60.2 deg, 160.9, -17.46; standard 4x
+  (85k) 81.96, 49.9 deg, 150.5, -19.70. The smooth family at 4x is within
+  0.8% of ring+box 8x' in Q_in and 0.5 deg in phase at a quarter of the
+  cells, and both families' lift amplitudes are still increasing with
+  refinement.
+
+### Smooth family: cost
+
+On MeluXina, account p201141, billed per 128-core node: replay job 5392944
+3.62 node-hours (all seven runs), plateTraction restarts 3.09 node-hours
+(job 5394067 cancelled after 0.96 h: `srun --exact -n N` with one CPU per
+task placed two ranks on every physical core (SMT); job 5394262 cancelled
+after 0.44 h: with that fixed (`-c 2`), 95 of 96 ranks were blocked in I/O
+on the project file system; job 5394414, 1.69 h, ran from node-local `/tmp`
+(`STAGE=1`) but the 4x restart could not reach the analysis window before
+the limit and was stopped), together 6.72 node-hours, **860 core-hours**.
+Mesh generation, audits, mapping, decomposition and analysis on the Mac.
+
+### Smooth family: reproduce
+
+```bash
+# meshes and audit (any machine with OpenFOAM v2512)
+python3 scripts/ht_mesh_smooth.py --base ../system/fluid/blockMeshDict \
+    --level 2 --out blockMeshDict
+python3 scripts/ht_mesh_smooth.py --base ../system/fluid/blockMeshDict \
+    --report
+python3 scripts/ht_mesh_audit.py <case_1x> <case_2x> <case_4x> \
+    --json audit.json
+python3 scripts/ht_mesh_operator_test.py --levels 1,2,4 \
+    <case_1x> <case_2x> <case_4x>
+# replay cases: template = the 8x' replay case,
+# source = the 4x' state reconstructed at 25 s
+python3 scripts/ht_smooth_case.py --template rb_8x_fastp_mlx --map-from <src4x> \
+    --point-template <src4x>/processor0/25/pointDisplacement --level 4 \
+    --delta-t 2.5e-4 --cores 56 --out work/sm_4x
+python3 scripts/replay_resampling_check.py \
+    --source reference/energy_balance/plateMotion_2x.tab \
+    work/sm_*/constant/plateMotion.tab
+sbatch -J htsm run_smooth_replays_meluxina.slurm <work> \
+    sm_1x sm_2x sm_2x_dt2.5e-4 \
+    sm_2x_tail90 sm_3x sm_4x
+python3 scripts/smooth_family_analysis.py --work <results> \
+    --json smooth_family.json
+python3 scripts/smooth_family_plot.py smooth_family.json \
+    --out replay_families.png
+# diagnosis
+python3 scripts/snapshot_compare.py --time 30.2 --fine sm_4x \
+    --coarse sm_2x sm_3x
+python3 scripts/snapshot_plate.py --time 30.2 sm_2x sm_3x sm_4x
+python3 scripts/tip_localisation.py extract tr_3x faces_3x.csv
+python3 scripts/traction_regions.py --dir . --levels 2x,3x
+```
+
+Run directories on MeluXina: `/project/home/p201136/philip-ht/smooth/work`
+(`sm_*`: inputs, logs, `energy.dat`, processor directories as verified
+tars; `tr_*`: traction restarts).

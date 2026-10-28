@@ -54,7 +54,10 @@ def extract(a):
     idx = np.sort(idx)
     t, rec = t[idx], rec[idx]
     period = 2 * math.pi / omega
-    sel = (t > t[-1] - a.periods * period) & (t <= t[-1])
+    t_end = t[-1] if getattr(a, "t_end", None) is None else t[np.argmin(np.abs(t - a.t_end))]
+    if t_end - a.periods * period < t[0] - 1e-9:
+        raise SystemExit(f"window of {a.periods} periods ending {t_end} starts before the first record {t[0]}")
+    sel = (t > t_end - a.periods * period) & (t <= t_end)
     n = int(sel.sum())
     ph = np.exp(-1j * omega * (t[sel] - t0))
     r = rec[sel].reshape(n, -1, 4)
@@ -70,7 +73,7 @@ def extract(a):
         out.append(row)
     order = sorted(range(len(out)), key=lambda i: (out[i]["y0"] + out[i]["y1"] < 0.4 and 0, out[i]["x0"], out[i]["y0"]))
     out = [out[i] for i in order]
-    meta = dict(case=case.name, omega=omega, d_tip=abs(d_tip), t_window=[float(t[sel][0]), float(t[-1])],
+    meta = dict(case=case.name, omega=omega, d_tip=abs(d_tip), t_window=[float(t[sel][0]), float(t_end)],
                 steps=n, period=period, nfaces=len(out))
     with open(a.out, "w", newline="") as fh:
         fh.write("# " + json.dumps(meta) + "\n")
@@ -258,6 +261,7 @@ def main():
     e.add_argument("case", type=Path)
     e.add_argument("out", type=Path)
     e.add_argument("--periods", type=int, default=5)
+    e.add_argument("--t-end", type=float, help="window end (default: the last record)")
     n = sp.add_parser("analyse")
     n.add_argument("dir", type=Path)
     n.add_argument("--baseline", type=Path)
