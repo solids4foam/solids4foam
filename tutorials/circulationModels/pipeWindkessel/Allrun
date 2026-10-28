@@ -1,7 +1,6 @@
 #!/bin/bash
-# Run one coupled case (pipe + Windkessel, implicit order 2, deltaT 0.05, serial, about a minute)
-# and compare it with the exact solution.
-# For other schemes, orders and time steps use ./runLadder (see README.md).
+# A CFD pipe coupled to a Windkessel (explicit coupling, order 2, deltaT 0.05, serial, about a minute).
+# Then, if python3 is available, compare with the exact solution.
 cd "$(dirname "$0")" || exit 1
 : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 
@@ -12,5 +11,12 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-./runLadder "implicit" "2" "0.05" 1 || exit 1
-python3 analyse.py
+blockMesh > log.blockMesh 2>&1 || { echo "blockMesh failed, see log.blockMesh"; exit 1; }
+pimpleFoam > log.pimpleFoam 2>&1 || { echo "pimpleFoam failed, see log.pimpleFoam"; exit 1; }
+echo "done: postProcessing/circulationCoupling/0/coupling.dat"
+
+if command -v python3 > /dev/null; then
+    python3 analyse.py
+else
+    echo "python3 not found: skipping the comparison with the exact solution (analyse.py)"
+fi

@@ -83,7 +83,7 @@ solver { type RKDP45; absTol 1e-20; relTol 1e-13; maxSteps 100000000; }
 // How the CFD and the circuit exchange flow and pressure
 coupling
 {
-    scheme      @SCHEME@;       // explicit | implicit
-    order       @ORDER@;        // 1 .. 4
+    scheme      explicit;       // explicit | implicit
+    order       2;              // 1 .. 4
     rho         1060;           // kg/m3: the CFD solves p/rho
 }

@@ -1,81 +1,85 @@
 # pipeClosedLoop: a CFD pipe in a closed circulation loop
 
-A 3D pipe (4 cm x 30 cm, 24,675 cells, `pimpleFoam`) whose **both ends** are
-coupled to a lumped circulation: the outlet drains into the arterial side, the
-inlet is fed by the aortic valve, and the heart (atrium, ventricle, two
-valves) closes the loop. The CFD delivers the flow through each patch; the
-circuit returns the pressure of the node each patch is attached to. Three
-cardiac cycles (0.8 s each), `t = 0 .. 2.4 s`.
-
-The circuit is a dictionary, `constant/circulationProperties`:
+A 3D pipe (4 cm x 30 cm, 24,675 cells) whose **both ends** are coupled to a
+lumped closed circulation: the outlet drains into the arterial side (C1, R1,
+L1, C2, R2, C3, R3), the heart (atrium, mitral valve, ventricle, aortic valve)
+pumps, and the blood returns to the pipe inlet (C4).
 
 ```text
 outlet -> C1 -R1-L1- C2 -R2- C3 -R3- atrium -mitral- ventricle
        -aortic(+R4)- C4 -> inlet
 ```
 
-```c++
-components
-{
-    // CFD patch
-    outlet  { type externalPort; direction outlet; patch outlet; }
-    inlet   { type externalPort; direction inlet;  patch inlet;  }
-    C1      { type compliance; C 1.5e-10; initialPressure 12720; }
-    ...
-    atrium  { type mixedChamber; V0 1e-6;
-              active { E1 9.8e8; }  passive { P0 22.66; K 4.84e5; }
-              activation { type sineSquared; offset 0.544; duration 0.24; }
-              initialVolume 1.408e-05; }
-    mitral  { type orificeValve; Rhat 5.333e10; }
-    // orifice in series with R4
-    aortic  { type orificeValve; Rhat 5.333e9; R 1.2e7; }
-}
-connections
-(
-    (outlet C1 R1 L1 C2 R2 C3 R3 atrium mitral ventricle aortic C4 inlet)
-);
-// explicit | implicit, 1..4
-coupling    { scheme implicit; order 2; rho 1060; }
-```
+The CFD gives the flow through each patch; the circuit returns the pressure of
+the node each patch is attached to. The circuit is one dictionary,
+`constant/circulationProperties`.
 
-and `0/p` is `circulationPressure` on both `inlet` and `outlet`. Nothing about
-this circuit is in C++: the seven states, their equations, the valve switching
-and the two-port exchange come from the library. Two general components were
-added for it, `mixedChamber` (activation x active polynomial + exponential
-passive filling; also the form used by ModularCirc and Mynard) and a series
-resistance on `orificeValve`.
-
-## Running
+## Run it
 
 ```bash
-# -> runs/implicit/2/5e-3
-./makeCase implicit 2 5e-3
-# blockMesh, decomposePar, mpirun -np 8 pimpleFoam
-./runLadder "implicit" "2" "5e-3" 1 8
-./runLadder "explicit implicit" "2 3 4" "5e-3" 1 8
+# blockMesh, circuit check, decomposePar, pimpleFoam on 8 ranks
+# (./Allrun 4 for 4)
+./Allrun
+# figures open on screen and are saved to plots/   (--no-show: only save)
+python3 plotter.py
+# back to a clean case
+./Allclean
 ```
 
-A coupled case at `dt = 5e-3` takes about 2.5 minutes on 8 cores. Orders 3 and
-4 use the same `backward` CFD time scheme, which limits the coupled solution
-to second order (the coupler prints a warning). Every order uses `RKDP45` for
-the circuit. The step cap of the circuit's ODE solver is raised
-(`maxSteps 1e8`) because hard-valve switching at the very tight tolerances
-(relTol 1e-13) needs many small steps.
+Only `pimpleFoam` is needed: the coupling library (`libs` in
+`system/controlDict`) builds the circuit inside the solver and integrates its
+ODEs at every exchange. `circulationFoam` is for circuit-only cases; here it is
+used only for `circulationFoam -check` (what the program understood, and that
+both patches exist in the mesh). `plotter.py` needs matplotlib
+(`pip3 install matplotlib`).
+
+Settings for this demo: one cardiac cycle (`endTime 0.8`), `deltaT 5e-3`,
+explicit coupling of order 2. About a minute on 8 free cores (the three-cycle
+run about 2.5 minutes); watch it with `tail -f log.pimpleFoam`.
+
+## Things to show
+
+* `circulationFoam -check`: the circuit as understood (7 states, 7 nodes, 2
+  coupling ports).
+* `constant/circulationProperties`: the whole circuit; change `scheme` /
+  `order` in `coupling`.
+* `0/p`: `circulationPressure` on `inlet` and `outlet`; the only change from an
+  ordinary pipe case.
+* Results: `postProcessing/circulationCoupling/0/coupling.dat`, one row per
+  time step (the flow and imposed pressure at each port, then every element's
+  pressure, volume and flow).
+* `plots/interface.png`, `heart.png`, `circuit.png`.
+
+## Variations
+
+* **three cycles (the periodic state)**: `endTime 2.4` in `system/controlDict`,
+  then `python3 plotter.py` (last cycle)
+* **implicit coupling (iterates the exchange within each step)**: `scheme implicit;`
+* **higher-order coupling**: `order 3;` (limited to second order by the
+  `backward` CFD time scheme)
+* **a stiffer ventricle**: `ventricle { ... active { E1 3.0e9; ... } }`
 
 ## Checks and known limits
 
 There is no closed form for this problem. `../pipeClosedLoopMonolithic` is the
 same circuit with the pipe replaced by its rigid Poiseuille R-L surrogate,
 solved as one system by `circulationFoam`. It is a reference for the coupled
-runs, which differ from it by the modelling error of the surrogate, and a
+run, which differs from it by the modelling error of the surrogate, and a
 test of the chamber and valve components and the network assembly on a stiff,
-non-smooth, closed-loop circuit. Comparisons with an independent RK4
-integrator and with earlier simulations of the same problem are not part of
-this directory yet.
+non-smooth, closed-loop circuit.
 
-Some combinations are unstable at the coarse time steps and stop: explicit
-order 1 at `dt = 1e-3`, and implicit orders 3 and 4 at `dt = 5e-3`. They need a
-smaller `dt`.
+Explicit order 1 is unstable at `deltaT 1e-3` and stops at `t = 1.997`; use
+a smaller `deltaT`. Implicit coupling of orders 2, 3 and 4 runs through three
+cycles at `deltaT 5e-3` with the `backward` CFD time scheme. That scheme limits
+the coupled solution to second order (the coupler prints a warning for orders 3
+and 4). A third- or fourth-order BDF CFD time scheme is not A-stable, so it can
+add energy to the pipe-compliance oscillation of this loop (about 30 Hz) and
+needs a smaller `deltaT`: BDF4 at `deltaT 5e-3` blew up, and was stable at
+`3e-3`.
+
+The circuit's ODE solver is `RKDP45` with very tight tolerances (relTol 1e-13),
+and its step cap is raised (`maxSteps 1e8`) because hard-valve switching needs
+many small steps.
 
 Every accepted step is logged in
 `postProcessing/circulationCoupling/0/coupling.dat`.

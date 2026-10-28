@@ -42,9 +42,7 @@ are the eight coupling algorithms.
 
 Orders 3 and 4 want a higher-order CFD time scheme so that the CFD does not
 dominate the error. The stock `backward` scheme is used here, which limits the
-coupled solution to second order (the coupler prints a warning). `makeCase`
-seeds the flow history with the exact earlier flows so that every order starts
-at full order.
+coupled solution to second order (the coupler prints a warning).
 
 Coupling ports are bound to patches by name: the `outlet` port in the circuit
 has `patch outlet;`. A second coupled patch would be a second port; nothing else
@@ -53,16 +51,38 @@ changes.
 ## Running
 
 ```bash
-# one case: implicit, order 2, deltaT 0.05 (about a minute)
+# blockMesh, pimpleFoam (about a minute), then the comparison with the exact solution
 ./Allrun
-# -> runs/implicit/2/0.01
-./makeCase implicit 2 0.01
-cd runs/implicit/2/0.01 && blockMesh && pimpleFoam
-# many cases
-./runLadder "explicit implicit" "1 2" "0.1 0.05 0.02 0.01 0.005" 10
-# error against the exact solution, observed orders
-python3 analyse.py
+# back to a clean case
+./Allclean
 ```
+
+The case as supplied is explicit coupling of order 2 at `deltaT 0.05`.
+`analyse.py` needs only Python 3 and is skipped by `Allrun` if it is not there.
+
+## Other schemes, orders and time steps
+
+Copy the case and edit it; there is no script to do it for you. Three things go
+together:
+
+* `scheme`, `order` (and `deltaT` in `system/controlDict`).
+* **The flow history** (`seed` and `seedDeltaT` in `coupling`). Orders above 1
+  extrapolate from earlier flows. Seeding them with the exact earlier outlet
+  flows `Q(-k dt) = -sin(2 pi k dt)` gives full order from the first step:
+  explicit needs `order - 1` values, `k = 1..order-1`; implicit order 1 and 2
+  need none, and implicit order 3 and 4 need `order - 2`. `seedDeltaT` is the
+  `deltaT` the values were computed for. For example, explicit order 3 at
+  `deltaT 0.01` is
+  `seed { outlet ( -0.062790519529313374 -0.12533323356430426 ); }`
+  with `seedDeltaT 0.01;`.
+* **The circuit ODE solver**: `Trapezoid` (`absTol 1e-12; relTol 1e-10`) for
+  orders 1 and 2, and `RKDP45` (`absTol 1e-14; relTol 1e-12`) for orders 3 and 4.
+  The tolerances are on the compliance volume `V = C Pc`, so they are scaled by
+  `C = 0.01`.
+
+`analyse.py` compares whichever case you ran with the exact solution; for a
+convergence study, run several `deltaT` in separate copies and compare their
+RMSEs.
 
 ## Exact solution
 
@@ -77,8 +97,9 @@ and the error is the RMSE of `Po` over the steps in `0 < t <= 1`.
 
 ## Results
 
-All 40 cases (explicit and implicit, orders 1-4, five time steps each) were run
-and compared with the exact solution above (`python3 analyse.py`). The pairwise
+All 40 cases of an earlier sweep (explicit and implicit, orders 1-4, five time
+steps each) were run and compared with the exact solution above, using
+`analyse.py`'s formula. The pairwise
 orders of accuracy of the RMSE of `Po` converge to 1, 2, 3 and 4. The orders 3
 and 4 in this table were obtained with third- and fourth-order BDF time schemes
 in the CFD, which are not yet part of solids4foam; with `backward` they are
@@ -95,8 +116,8 @@ limited by the CFD time error:
 | 0.01 -> 0.005 | 0.991 | 2.001 | 3.006 | 4.003 |
 
 The circuit ODE solver is `Trapezoid` (1e-10) for orders 1 and 2 and `RKDP45`
-(1e-12) for orders 3 and 4 (`makeCase` sets it; the tolerances are on the
-compliance volume `V = C Pc`, so they are scaled by `C = 0.01`).
+(1e-12) for orders 3 and 4 (the tolerances are on the compliance
+volume `V = C Pc`, so they are scaled by `C = 0.01`).
 
 The accepted state of every step is logged in
 `postProcessing/circulationCoupling/0/coupling.dat`.

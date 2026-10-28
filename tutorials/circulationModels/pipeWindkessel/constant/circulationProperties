@@ -43,13 +43,17 @@ components
 
 connections ( (outlet Rch C R ground) );
 
-@SOLVER@
+// The circuit's ODE solver; the tolerances are on the compliance volume V = C Pc
+solver { type Trapezoid; absTol 1e-12; relTol 1e-10; maxSteps 100000000; }
 
 // How the CFD and the circuit exchange flow and pressure
 coupling
 {
-    scheme      @SCHEME@;       // explicit | implicit
-    order       @ORDER@;        // 1 .. 4
+    scheme      explicit;       // explicit | implicit
+    order       2;              // 1 .. 4
     rho         1060;           // kg/m3: the CFD solves p/rho
-@SEED@
+    // Explicit order 2 extrapolates from the previous outlet flow Q(-dt) = -sin(2 pi dt):
+    // seeding it with the exact value gives full order from the first step
+    seed        { outlet ( -0.3090169943749474 ); }
+    seedDeltaT  0.05;
 }
