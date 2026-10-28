@@ -1,0 +1,7 @@
+#!/bin/bash
+# Remove everything Allrun made
+cd "$(dirname "$0")" || exit 1
+rm -rf constant/polyMesh postProcessing
+find . -maxdepth 1 -type d -regex './[1-9][0-9.e+-]*' -exec rm -rf {} +
+find . -maxdepth 1 -type d -regex './0\.[0-9][0-9.e+-]*' -exec rm -rf {} +
+rm -f log log.*

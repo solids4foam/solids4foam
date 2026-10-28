@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      circulationProperties;
+}
+
+// Three-element Windkessel on the outlet of a pipe (Healy):
+//
+//     CFD outlet -> node --Rch--> C || R --> ground         Po = Pc + Rch Qo
+//
+// R = 10, Rch = 1 Pa s/m3, C = 0.01 m3/Pa; the inlet prescribes
+// Q(t) = sin(2 pi t) m3/s, so Pc(t) has the closed form in the README.
+
+units       SI;
+
+components
+{
+    ground  { type ground; }
+
+    outlet                          // the coupled CFD patch
+    {
+        type        externalPort;
+        direction   outlet;         // flow leaves the CFD domain
+        patch       outlet;         // name of the patch in the mesh
+    }
+
+    Rch     { type resistor;   R 1; }
+    C       { type compliance; C 0.01; initialPressure 0; }
+    R       { type resistor;   R 10; }
+}
+
+connections ( (outlet Rch C R ground) );
+
+// The circuit's ODE solver; the tolerances are on the compliance volume V = C Pc
+solver { type Trapezoid; absTol 1e-12; relTol 1e-10; maxSteps 100000000; }
+
+// How the CFD and the circuit exchange flow and pressure
+coupling
+{
+    scheme      explicit;       // explicit | implicit
+    order       2;              // 1 .. 4
+    rho         1060;           // kg/m3: the CFD solves p/rho
+    // Explicit order 2 extrapolates from the previous outlet flow Q(-dt) = -sin(2 pi dt):
+    // seeding it with the exact value gives full order from the first step
+    seed        { outlet ( -0.3090169943749474 ); }
+    seedDeltaT  0.05;
+}

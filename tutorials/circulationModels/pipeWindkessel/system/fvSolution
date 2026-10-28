@@ -1,0 +1,99 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    p
+    {
+        solver          GAMG;
+        tolerance       1e-12;
+        relTol          0;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        cacheAgglomeration yes;
+        updateInterval  2;
+    }
+
+    pFinal
+    {
+        $p;
+        tolerance       1e-12;
+        relTol          0;
+    }
+
+    "pcorr.*"
+    {
+        $p;
+        tolerance       1e-12;
+        relTol          0;
+    }
+
+    U
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-12;
+        relTol          0;
+    }
+
+    UFinal
+    {
+        $U;
+        tolerance       1e-12;
+        relTol          0;
+    }
+}
+
+PIMPLE
+{
+    correctPhi              yes;
+    momentumPredictor       yes;
+    nOuterCorrectors        40;
+    nCorrectors             5;
+    nNonOrthogonalCorrectors 2;
+
+    pRefCell                0;
+    pRefValue               0;
+
+    residualControl
+    {
+        p
+        {
+            tolerance       1e-10;
+            relTol          0;
+        }
+        U
+        {
+            tolerance       1e-10;
+            relTol          0;
+        }
+    }
+}
+
+relaxationFactors
+{
+    equations
+    {
+    }
+    fields
+    {
+    }
+}
+
+// ************************************************************************* //

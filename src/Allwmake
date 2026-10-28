@@ -28,4 +28,12 @@ else
     echo; echo "Skipping immersedBoundary: it requires OpenFOAM.com"; echo
 fi
 
+# The circulation models are currently only implemented for OpenFOAM.com
+if [[ "$WM_PROJECT" == "OpenFOAM" && $WM_PROJECT_VERSION == v* ]]
+then
+    (cd circulationModels && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+else
+    echo; echo "Skipping circulationModels: it requires OpenFOAM.com"; echo
+fi
+
 #------------------------------------------------------------------------------

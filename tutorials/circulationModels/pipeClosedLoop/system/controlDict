@@ -1,0 +1,87 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+libs ("libcirculationCoupling.so");
+
+application     pimpleFoam;
+
+startFrom       startTime;
+startTime       0;
+
+stopAt          endTime;
+endTime         0.8;            // one cardiac cycle (set 2.4 for three)
+
+// One cardiac cycle (0.8 s) for a quick demo. For the periodic state use
+// endTime 2.4 (three cycles) and look at the last one.
+deltaT          5e-3;
+adjustTimeStep  no;
+
+writeControl    runTime;
+writeInterval   0.8;
+
+purgeWrite      0;
+writeFormat     binary;
+writePrecision  17;
+writeCompression off;
+
+timeFormat      general;
+timePrecision   12;
+
+runTimeModifiable false;
+
+functions
+{
+    // The boundary pressures and flows at full precision, every step. The
+    // coupled patch values of p are Pi/rho and Po/rho exactly and uniform over
+    // each patch, so their area averages recover the circuit pressures to 17
+    // digits; the patch sums of phi are the interface flows. Use these
+    // function-object records for self-convergence rather than the
+    // lower-precision state logs.
+    boundaryPressure
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        regionType      patch;
+        name            inlet;
+        operation       areaAverage;
+        fields          (p);
+        writeFields     false;
+        writeControl    timeStep;
+        writeInterval   1;
+        writePrecision  17;
+        log             false;
+    }
+    outletPressure
+    {
+        $boundaryPressure;
+        name            outlet;
+    }
+    inletFlow
+    {
+        $boundaryPressure;
+        operation       sum;
+        fields          (phi);
+    }
+    outletFlow
+    {
+        $inletFlow;
+        name            outlet;
+    }
+}
+
+// ************************************************************************* //

@@ -1,0 +1,7 @@
+#!/bin/bash
+# Remove the results of this case
+cd "$(dirname "$0")" || exit 1
+rm -rf postProcessing
+find . -maxdepth 1 -type d -regex './[0-9][0-9.e+-]*' -exec rm -rf {} +
+rm -rf plots
+rm -f log log.*

@@ -1,0 +1,90 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.3                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      circulationProperties;
+}
+
+// Closed-loop 4-chamber model of the healthy human circulation
+// (Healy 2024, after Korakianitis & Shi 2006). Written in the units of the
+// literature; everything is SI inside.
+//
+//   LV -> AV -> SAS -> SAT -> SAR -> SCP -> SVN -> RA -> TV -> RV
+//      -> PV -> PAS -> PAT -> PAR -> PCP -> PVN -> LA -> MV -> LV
+//
+// SAS/SAT/PAS/PAT are CRL vessels, SVN/PVN are CR vessels.
+
+units       mmHg_mL;            // pressure mmHg, volume mL, time s
+Tcycle      1.0;
+
+components
+{
+    // ---- Heart chambers ----------------------------------------------------
+    LV
+    {
+        type elastanceChamber;
+        V0 5;  P0 1;  Emin 0.1;  Emax 2.5;  Tes 0.3;  Ted 0.45;  Eshift 0;
+        initialVolume 500;
+    }
+    RV
+    {
+        type elastanceChamber;
+        V0 10; P0 1;  Emin 0.1;  Emax 1.15; Tes 0.3;  Ted 0.45;  Eshift 0;
+        initialVolume 500;
+    }
+    LA      // Tes = Tpww/2, Ted = Tpww, Eshift = Tpwb
+    {
+        type elastanceChamber;
+        V0 4;  P0 1;  Emin 0.15; Emax 0.25; Tes 0.045; Ted 0.09; Eshift 0.92;
+        initialVolume 20;
+    }
+    RA
+    {
+        type elastanceChamber;
+        V0 4;  P0 1;  Emin 0.15; Emax 0.25; Tes 0.045; Ted 0.09; Eshift 0.92;
+        initialVolume 20;
+    }
+
+    // ---- Valves  Q = CQ sqrt(dP) --------------------------------------------
+    AV      { type orificeValve; CQ 350; }
+    MV      { type orificeValve; CQ 400; }
+    TV      { type orificeValve; CQ 400; }
+    PV      { type orificeValve; CQ 350; }
+
+    // ---- Systemic circulation -------------------------------------------------
+    SAS     { type CRL; C 0.08; R 0.003; L 6.2e-5;  initialPressure 100; }
+    SAT     { type CRL; C 1.6;  R 0.05;  L 0.0017;  initialPressure 100; }
+    SAR     { type resistor; R 0.5; }
+    SCP     { type resistor; R 0.52; }
+    SVN     { type CR;  C 20.5; R 0.075; initialPressure 0; }
+
+    // ---- Pulmonary circulation ------------------------------------------------
+    PAS     { type CRL; C 0.18; R 0.002; L 5.2e-5;  initialPressure 30; }
+    PAT     { type CRL; C 3.8;  R 0.01;  L 0.0017;  initialPressure 30; }
+    PAR     { type resistor; R 0.05; }
+    PCP     { type resistor; R 0.25; }
+    PVN     { type CR;  C 20.5; R 0.006; initialPressure 0; }
+}
+
+connections
+(
+ (LV AV SAS SAT SAR SCP SVN RA TV RV PV PAS PAT PAR PCP PVN LA MV LV)
+);
+
+solver
+{
+    type    RKDP45;
+    absTol  1e-12;      // m3 and m3/s
+    relTol  1e-9;
+}
