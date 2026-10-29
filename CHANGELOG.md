@@ -8,6 +8,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The `beamSolid` solid model runs the geometrically exact beam formulation of
+  beamFoam with `solids4Foam`. The beam models (`libS4FBeamModels`) and the
+  `createBeamMesh` and `setInitialPositionBeam` utilities are copied unchanged
+  from beamFoam, and `src/beamModels/syncBeamFoam.sh` updates them from a
+  beamFoam commit. A beamFoam case runs with `solidModel beamSolid;` and keeps
+  its `constant/beamProperties`. The `beamCantilever`, `beamDynamicCantilever`
+  and `beamFollowerForce` tutorials give the same results as beamFoam. Built
+  for OpenFOAM.com with Eigen.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the

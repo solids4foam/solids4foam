@@ -1,0 +1,58 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| beamFoam: finite volume solver for geometrically exact beams                |
+| Web:         https://github.com/solids4foam/beamFoam                        |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      DTheta;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    left
+    {
+        type fixedValue;
+        value uniform (0 0 0);
+    }
+
+    // right
+    // {
+    //     type momentBeamRotationNR;
+    //     momentSeries
+    //     {
+    //         "fileName|file"        "$FOAM_CASE/constant/timeVsMoment";
+    //         outOfBounds     clamp;
+    //     }
+    // }
+
+    right
+    {
+        type fixedBeamRotation;
+        thetaSeries
+        {
+            "fileName|file"        "$FOAM_CASE/constant/timeVsTheta";
+            outOfBounds     clamp;
+        }
+        value uniform (0 0 0);
+    }
+
+    beam
+    {
+        type empty;
+    }
+}
+
+
+// ************************************************************************* //

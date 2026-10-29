@@ -1,0 +1,59 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| beamFoam: finite volume solver for geometrically exact beams                |
+| Web:         https://github.com/solids4foam/beamFoam                        |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      forceProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+forceType groundContact;
+/*
+forceCoeffs
+{
+
+    rhoFluid rhoFluid [1 -3 0 0 0 0 0] 1000;
+    CM       CM       [0  0 0 0 0 0 0] 1.935;
+    CD       CD       [0  0 0 0 0 0 0] 3.698;
+    Cf       Cf       [0  0 0 0 0 0 0] 0.0;
+
+    posVertDir (0 0 1);
+
+    linearize false;
+};
+*/
+groundContactCoeffs
+{
+  gDamping    0.1;
+  gStiffness    1000;
+  gCoordinate   (0 0 1);
+}
+/*
+streamFunctionUserCoeffsCoeffs
+{
+    #include "../../../../velSignals_freeBound/H040T10_UserCoeffs.txt";
+}
+
+interpolateWaveCoeffs
+{
+    #include "../../../../velSignals/H040T10_interpolate.txt";
+}
+
+userDefinedWaveCoeffs
+{
+    #include "../../../../velSignals/H040T10.txt";
+
+    includeVertical   true;
+    includeWaveNumber true;
+}
+*/
+// ************************************************************************* //

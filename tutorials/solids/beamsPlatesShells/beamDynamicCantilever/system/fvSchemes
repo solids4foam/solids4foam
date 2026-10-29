@@ -1,0 +1,61 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| beamFoam: finite volume solver for geometrically exact beams                |
+| Web:         https://github.com/solids4foam/beamFoam                        |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+ddtSchemes
+{
+    default      Newmark;
+}
+
+d2dt2Schemes
+{
+    default      Newmark;
+
+    // Use the following values for Newmark if you set deltaT = 0.0001
+    // The gamma value is changed from default 0.5 to 0.6.
+    // This helps in damping the high frequency components in energy plots
+    // and also helps the force residuals converge to values below 1e-6.
+    // For deltaT = 0.001, 0.01, 0.05, 0.1 - leave the below lines commented
+    // newmarkBeta(W)  0.25;
+    // newmarkGamma(W) 0.6;
+}
+
+gradSchemes
+{
+    default         none;
+}
+
+divSchemes
+{
+    default         none;
+}
+
+laplacianSchemes
+{
+    default         none;}
+
+interpolationSchemes
+{
+    default         linear;
+}
+
+snGradSchemes
+{
+    default         orthogonal;
+}
+
+
+// ************************************************************************* //
