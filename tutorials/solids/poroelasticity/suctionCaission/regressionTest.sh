@@ -27,11 +27,9 @@ solids4Foam::requireGnuSed
 # not that a particular number came back.
 # ============================================================
 
-# With the leastSquares gradient on every fork: a max sigmaEq of 1.05e6
-# on OpenFOAM.com v2412, 9.0e5 on OpenFOAM.org 9 and 7.3e5 on foam-extend 4.1
 EPS_MIN=0.85
 EPS_MAX=1.25
-SIGMA_MIN=6e5
+SIGMA_MIN=1.5e6
 SIGMA_MAX=2.2e6
 
 # The comparison with the removed legacy mechanicalModel runs to t = 1 rather
@@ -41,35 +39,35 @@ SIGMA_MAX=2.2e6
 COMPARISON_END_TIME=1
 
 # D and porePressure at t = 1, as the max and mean component magnitude of each
-# field written to fourteen figures, per fork, with the leastSquares gradient
-# on every fork: before, OpenFOAM ran pointCellsLeastSquares, which
-# gave a max porePressure of 94942, and foam-extend leastSquares. The forks
-# still differ, by 27% in the max porePressure, so the gradient scheme is not
-# the cause of that difference; this case reaches the corrector limit
-# on every step, as noted above. These are recorded numbers, though, and
-# another compiler, CPU or MPI build moves an iterative solution by round-off
-# at the solver tolerance: CI measures up to 3e-8 relative against values
-# recorded on macOS. The tolerance, 1e-6 of the largest value, allows for
-# that, and is ten times below the 1e-5 that a 0.001% change in a material
-# constant makes
+# field written to fourteen figures, per fork. The framework first reproduced
+# both fields of the removed legacy mechanicalModel (mcl-stage8-coverage,
+# c3a92b3d) exactly, in every one of those figures. The values were then
+# re-recorded when poroLinearGeometry started to impose the boundary traction
+# on the complete face traction, stabilisation included (#578), which moved
+# the mean D by up to 1.6e-3 and the max porePressure by up to 6e-3 relative.
+# These are recorded numbers, though, and another compiler, CPU or MPI build moves an
+# iterative solution by round-off at the solver tolerance: CI measures up to
+# 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
+# largest value, allows for that, and is ten times below the 1e-5 that a
+# 0.001% change in a material constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        REF_D_MAX=0.039971853415323
-        REF_D_MEAN=0.00326804246128935
-        REF_P_MAX=91160.280037436
-        REF_P_MEAN=19082.323226845
+        REF_D_MAX=0.039971175058915
+        REF_D_MEAN=0.00324562697026321
+        REF_P_MAX=94425.610687978
+        REF_P_MEAN=19620.7620978048
         ;;
     org)
-        REF_D_MAX=0.039971831329265
-        REF_D_MEAN=0.00326747514301296
-        REF_P_MAX=91153.098748193
-        REF_P_MEAN=19081.5856382194
+        REF_D_MAX=0.039971184755511
+        REF_D_MEAN=0.00324553463292661
+        REF_P_MAX=94400.985183683
+        REF_P_MEAN=19614.4960676196
         ;;
     foamextend)
-        REF_D_MAX=0.039984257366288
-        REF_D_MEAN=0.00342428784043281
-        REF_P_MAX=66277.760264684
-        REF_P_MEAN=17317.8068986057
+        REF_D_MAX=0.039984255131382
+        REF_D_MEAN=0.00342157412539849
+        REF_P_MAX=66278.066616823
+        REF_P_MEAN=17303.411291521
         ;;
 esac
 REF_REL_TOL=1e-6

@@ -8,6 +8,10 @@
     "relative_tolerance": 0.01
   },
   "published_range_m": [0.03220, 0.03228],
+  "published_mesh_series": [
+    {"label": "Zienkiewicz and Taylor (2000), Q4", "file": "ZienkiewiczTaylor2000_Q4.csv", "column": "displacement_m"},
+    {"label": "Abaqus, CPE4H", "file": "Abaqus_CPE4H.csv", "column": "displacement_m"}
+  ],
   "legacy_study": {
     "repository": "solid-benchmarks/linearElasticity/cooksMembrane",
     "mesh_cells_per_side": [3, 6, 12, 24, 48, 96, 192, 384]

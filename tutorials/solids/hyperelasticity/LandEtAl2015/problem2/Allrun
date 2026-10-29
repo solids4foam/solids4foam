@@ -158,7 +158,7 @@ solids4Foam::convertCaseFormat .
 # -------------------------------------------------------------------------
 
 echo
-if [[ "${APPROACH}" == "petsc" ]]; then
+if [[ "${APPROACH}" != "pressureDisplacement" ]]; then
     solids4Foam::runApplication blockMesh
     solids4Foam::runApplication extrudeMesh
     solids4Foam::runApplication createPatch -overwrite

@@ -277,7 +277,7 @@ Any other algorithm value is treated as unsupported for this class.
 - optionally applies the linear predictor on the first call in a new time step;
 - assembles a linear momentum equation for `D`;
 - adds stabilisation and optional damping;
-- enforces traction boundary conditions with `enforceTractionBoundaries()`;
+- enforces traction boundary conditions;
 - applies any cell-displacement constraints through `solidModel::setCellDisps()`;
 - solves, relaxes, and checks convergence;
 - updates `DD`, `gradD`, `gradDD`, `pointD`, `pointDD`, and `U`;
@@ -317,27 +317,11 @@ the dimensionality.
 
 `setDeltaT()` is responsible for stability control in this mode.
 
-### Traction boundary enforcement
-
-`enforceTractionBoundaries()` is a small but important helper. It recognises the
-standard solids4foam displacement/traction patch types and applies model-specific
-rules:
-
-- `solidTraction`: uses the patch traction and subtracts the pressure term;
-- `solidSpringDashpot`: uses the spring-dashpot traction of the current
-  boundary displacement, plus the patch traction and pressure;
-- `fixedDisplacementZeroShear` and `symmetry`: remove the tangential traction
-  component by projection onto the normal direction.
-
-This means the solver can work with traction BCs without each algorithm having
-to reimplement the patch logic.
-
 ### Extension points
 
 If you extend this model, the main places to consider are:
 
 - `evolve()` for new solution algorithms;
-- `enforceTractionBoundaries()` for new traction-style patches;
 - the constructor if new model-specific checks or options are required.
 
 Keep in mind that this class is intended to remain compatible with the base

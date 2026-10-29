@@ -20,6 +20,7 @@ License
 #ifdef OPENFOAM_COM
 
 #include "meshMotionSolidModelFvMotionSolver.H"
+#include "meshMotionTotalDispSolid.H"
 #include "motionDiffusivity.H"
 #include "fvmLaplacian.H"
 #include "addToRunTimeSelectionTable.H"
@@ -27,6 +28,7 @@ License
 #include "fvcGrad.H"
 #include "surfaceInterpolate.H"
 #include "fvcLaplacian.H"
+#include "fvcAverage.H"
 #include "mapPolyMesh.H"
 #include "fvOptions.H"
 #include "motionInterpolation.H"
@@ -53,6 +55,129 @@ namespace Foam
 }
 
 
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+
+Foam::word Foam::meshMotionSolidModelFvMotionSolver::regionName() const
+{
+    const word regionName
+    (
+        coeffDict().lookupOrDefault<word>("regionName", fvMesh_.name())
+    );
+
+    if (regionName != fvMesh_.name())
+    {
+        FatalErrorInFunction
+            << "The solid model is solved on the moving mesh "
+            << fvMesh_.name() << ", so regionName, if given, must be "
+            << fvMesh_.name()
+            << ", not " << regionName << exit(FatalError);
+    }
+
+    return regionName;
+}
+
+
+Foam::autoPtr<Foam::volScalarField>
+Foam::meshMotionSolidModelFvMotionSolver::makeStiffnessScaleFactor()
+{
+    if (!coeffDict().found("diffusivity"))
+    {
+        return autoPtr<volScalarField>();
+    }
+
+    diffusivityPtr_ =
+        motionDiffusivity::New(fvMesh_, coeffDict().lookup("diffusivity"));
+
+    autoPtr<volScalarField> dPtr
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "stiffnessScaleFactor",
+                fvMesh_.time().timeName(),
+                fvMesh_,
+                IOobject::NO_READ,
+                Switch(coeffDict().lookupOrDefault<Switch>
+                (
+                    "writeStiffScaleFactor", false
+                ))
+              ? IOobject::AUTO_WRITE
+              : IOobject::NO_WRITE
+            ),
+            fvMesh_,
+            dimensionedScalar("one", dimless, 1),
+            "zeroGradient"
+        )
+    );
+
+    return dPtr;
+}
+
+
+void Foam::meshMotionSolidModelFvMotionSolver::updateStiffnessScaleFactor()
+{
+    if (!stiffnessScaleFactorPtr_.valid())
+    {
+        return;
+    }
+
+    const scalar maxFactor =
+        coeffDict().lookupOrDefault<scalar>("maxFactor", 100);
+    const scalar minFactor =
+        coeffDict().lookupOrDefault<scalar>("minFactor", 0.1);
+
+    if (maxFactor < minFactor)
+    {
+        FatalErrorInFunction
+            << "maxFactor cannot be less than minFactor!" << exit(FatalError);
+    }
+
+    diffusivityPtr_->correct();
+
+    // Limit the range of the face diffusivity and normalise it by its average
+    surfaceScalarField df("stiffnessScaleFactorf", diffusivityPtr_()());
+    const dimensionedScalar avDf = average(df);
+
+    if (avDf.value() < SMALL)
+    {
+        FatalErrorInFunction
+            << "The average mesh motion diffusivity must be positive"
+            << exit(FatalError);
+    }
+
+    df = min(maxFactor*avDf, max(minFactor*avDf, df));
+    df /= avDf;
+
+    volScalarField& d = stiffnessScaleFactorPtr_();
+    d = fvc::average(df);
+    d.correctBoundaryConditions();
+
+    Info<< "Stiffness scale factor: min " << gMin(d.primitiveField())
+        << ", max " << gMax(d.primitiveField()) << endl;
+}
+
+
+void Foam::meshMotionSolidModelFvMotionSolver::makeModel()
+{
+    // The stiffness scale factor is needed when the solid model is created
+    updateStiffnessScaleFactor();
+
+    modelPtr_ = solidModel::New
+    (
+        const_cast<Time&>(fvMesh_.time()), regionName()
+    );
+
+    if (!isA<solidModels::meshMotionTotalDispSolid>(modelPtr_()))
+    {
+        FatalErrorInFunction
+            << "The " << typeName << " mesh motion solver needs the "
+            << solidModels::meshMotionTotalDispSolid::typeName
+            << " solid model, not " << modelPtr_->type() << exit(FatalError);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
@@ -63,16 +188,13 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
 :
     displacementMotionSolver(mesh, dict, typeName),
     fvMotionSolver(mesh),
-    modelPtr_
-    (
-        solidModel::New
-        (
-            const_cast<Time&>(fvMesh_.time()),
-            word(coeffDict().lookup("regionName"))
-        )
-    ),
+    diffusivityPtr_(),
+    stiffnessScaleFactorPtr_(makeStiffnessScaleFactor()),
+    modelPtr_(),
     solveEquations_(true)
-{}
+{
+    makeModel();
+}
 
 
 Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
@@ -85,16 +207,13 @@ Foam::meshMotionSolidModelFvMotionSolver::meshMotionSolidModelFvMotionSolver
 :
     displacementMotionSolver(mesh, dict, pointDisplacement, points0, typeName),
     fvMotionSolver(mesh),
-    modelPtr_
-    (
-        solidModel::New
-        (
-            const_cast<Time&>(fvMesh_.time()),
-            word(coeffDict().lookup("regionName"))
-        )
-    ),
+    diffusivityPtr_(),
+    stiffnessScaleFactorPtr_(makeStiffnessScaleFactor()),
+    modelPtr_(),
     solveEquations_(true)
 {
+    makeModel();
+
     // Update pointD
     modelPtr_->pointD().primitiveFieldRef() =
         pointDisplacement.primitiveField();
@@ -139,6 +258,8 @@ void Foam::meshMotionSolidModelFvMotionSolver::solve()
     // Evolve the solid model
     if (solveEquations_)
     {
+        updateStiffnessScaleFactor();
+
         modelPtr_->evolve();
     }
 }

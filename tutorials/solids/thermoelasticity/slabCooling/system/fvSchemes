@@ -38,8 +38,6 @@ gradSchemes
 divSchemes
 {
     default                none;
-    div(sigma)             Gauss linear;
-    div(threeKalphaDeltaT) Gauss linear;
 }
 
 laplacianSchemes

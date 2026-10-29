@@ -1,0 +1,6 @@
+# staticCylinderInChannel verification: historical pimpleHFDIBFoam cases (scaled by 10: D = 1, rho = 1000, Ubar = 1) with the current legacy incremental port and the historical numerical settings; Cd = Fx/(0.5 rho Ubar^2 D Lz), mean over the final 1 s; Cd_historical as saved by pimpleHFDIBFoam
+historical_case,n_cells,inlet,formulation,couplingCoeff,deltaT,end_time,nOuterCorrectors,nCorrectors,nNonOrthogonalCorrectors,Cd_historical,Cd_current,Cd_current_minus_historical,Cl_current,max_co,ranks,wall_s,cpu_hours
+ImmersedCyl-Static-Re20-Mesh20000,20000,canonical,legacy incremental,0.2,0.005,20.0,5,3,2,5.721240,5.807792,8.66e-02,0.010844,0.497,1,4429,1.230
+ImmersedCyl-Static-Re20-Mesh20000,20000,historical,legacy incremental,0.2,0.005,20.0,5,3,2,5.721240,5.721243,3.06e-06,0.012018,0.491,1,4394,1.221
+ImmersedCyl-Static-Re20-Mesh80000,80000,canonical,legacy incremental,0.2,0.005,20.0,5,3,2,5.706180,5.748280,4.21e-02,0.011880,1.054,2,15903,8.835
+ImmersedCyl-Static-Re20-Mesh80000,80000,historical,legacy incremental,0.2,0.005,20.0,5,3,2,5.706180,5.706177,-2.82e-06,0.012450,1.048,2,16224,9.013
