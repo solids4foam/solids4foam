@@ -1,0 +1,27 @@
+SOLIDS4FOAM_ROOT := ../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
+# The sources are copied unchanged from beamFoam; see BEAMFOAM_VERSION
+ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
+    DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-return-type
+else
+    DISABLE_WARNING_FLAGS = -Wno-old-style-cast
+endif
+
+EXE_INC = \
+    $(VERSION_SPECIFIC_INC) \
+    $(DISABLE_WARNING_FLAGS) \
+    -I$(SOLIDS4FOAM_ROOT)/ThirdParty/eigen3 \
+    -I$(SOLIDS4FOAM_ROOT)/ThirdParty/eigen3/unsupported/Eigen/src/IterativeSolvers \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude \
+    -I$(LIB_SRC)/dynamicFvMesh/lnInclude
+
+LIB_LIBS = \
+    -lfiniteVolume \
+    -lmeshTools \
+    -ldynamicFvMesh \
+    -ldynamicMesh \
+    -ltopoChangerFvMesh

@@ -1,0 +1,18 @@
+#!/bin/bash
+cd "${0%/*}" || exit  # Run from this directory
+
+# Parse arguments for application compilation
+if [ -f "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments ]
+then
+    . "$WM_PROJECT_DIR"/wmake/scripts/AllwmakeParseArguments
+fi
+
+# The beam models are built for OpenFOAM.com with Eigen only
+if [[ $WM_PROJECT_VERSION == v* && -z "${S4F_NO_USE_EIGEN:-}" ]]
+then
+    wmake $targetType
+else
+    echo "Skipping ${PWD##*/}: it requires OpenFOAM.com and Eigen"
+fi
+
+#------------------------------------------------------------------------------
