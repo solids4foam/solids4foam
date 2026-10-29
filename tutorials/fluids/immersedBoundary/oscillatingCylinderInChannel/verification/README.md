@@ -58,7 +58,8 @@ limitations.
 | `force_histories.png` | four methods vs B; penalty vs B and Wan-Turek |
 | `error_vs_resolution.png` | raw Cd and Cl errors against D/h |
 | `cutlink_estimators.png` | cutLink lift: greedy traction, momentum exchange |
-| `error_vs_cost.png`, `cell_crossing.png` | further diagnostics |
+| `error_vs_cost.png` | further diagnostic |
+| `cell_crossing.png` | diagnostic; not regenerable from tracked files |
 
 The files:
 
@@ -248,10 +249,18 @@ the earlier runs of the same revision; the earlier results are unchanged.
   `tutorial_revision`, the revision of the tutorial tree that supplied the
   case (`git_sha`, as before). An entry that cannot be determined is empty;
   nothing is guessed. `case.json` also records the tracked baseline.
-- **Not yet checked on v2512:** the tracked results are v2412 results. A
-  run of `./Allverify` (R1A and `check`) on OpenFOAM v2512 is requested in
-  the review of this pull request and has not been made at the time of
-  writing.
+- **OpenFOAM v2512 reproduction of R1A:** `./Allverify` (cutLink Level 1,
+  greedy quadrature, one rank, then `check`) was run once on OpenFOAM
+  v2512 with a clean single-core build of the baseline source `f33b244a2`
+  (gcc 11.4.0, Open MPI 4.1.2, no PETSc; the source compiled without
+  change). The run ended normally, passed the integrity checks, and the
+  five compared metrics (`Cd_nrms_B`, `Cl_nrms_B`, `Cd_nrms_A`,
+  `Cl_nrms_A`, `Cd_hf_rms_above_5Hz`) equal the tracked v2412 values to
+  all stored digits (5 of 5 PASS, tolerances unchanged); 102 s wall time.
+  This covers one case on one platform: Levels 2-4, the other methods and
+  parallel runs were not repeated on v2512. The `mesh_hash` of the v2512
+  case differs from the tracked one; it hashes the mesh files including
+  their headers, is not used by `check`, and was not investigated further.
 
 ### Repository size
 
@@ -262,7 +271,9 @@ O4 (identical metrics to R2A), of the three outer-corrector runs and of the
 smoke run, and the four full-resolution extracts of `cell_crossing`, are not
 tracked (0.40 MB of 1.00 MB removed); the rows of those runs remain in
 `cases.csv`. `./Allverify export --full-resolution` writes the extracts
-again, after rerunning the finest cases of each method.
+again, after rerunning the finest cases of each method. `cell_crossing.png`
+is therefore a preview of the original runs: it is not regenerated from
+the tracked files, and `plot` writes the other four figures only.
 
 ## References
 

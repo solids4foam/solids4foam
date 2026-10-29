@@ -4,9 +4,10 @@ These results were obtained with solids4foam `f33b244a2` and OpenFOAM v2412
 on one shared node. The immersed-boundary, fluid-model and tutorial sources
 of that revision are identical to those of `development` at `8cf077860`,
 the base of this pull request (see `README.md`, Revision and provenance).
-The tracked results are v2412 results; they have not yet been compared with
-a v2512 run. The cutLink surface traction uses the greedy quadrature, the
-only one of that revision (see `README.md`, Quadrature). The values are
+The tracked results are v2412 results; one of them (R1A) was reproduced on
+OpenFOAM v2512 (see `README.md`, Revision and provenance). The cutLink
+surface traction uses the greedy quadrature, the only one of that revision
+(see `README.md`, Quadrature). The values are
 those of `reference/results/cases.csv`, computed by `./Allverify analyse`
 from the complete force histories.
 
@@ -444,8 +445,10 @@ Further diagnostics, not discussed above:
   1, 2, 8 and 8 ranks on Levels 1-4, one shared node; not a speed-up
   measurement or a comparison with body-fitted solvers);
 - [`images/cell_crossing.png`](images/cell_crossing.png): Cd at every time
-  step over 1.8-2.2 s, from the full-resolution extracts, showing the
-  force fluctuations as the cylinder crosses the cells.
+  step over 1.8-2.2 s, from full-resolution extracts of the original runs,
+  showing the force fluctuations as the cylinder crosses the cells. The
+  extracts are not tracked, so this figure cannot be regenerated from the
+  tracked files alone; it needs a rerun of the finest case of each method.
 
 ## Limitations
 
@@ -480,7 +483,8 @@ Further diagnostics, not discussed above:
   run record. The digitised data are secondary.
 - **Solver and platform.** The tracked results are from OpenFOAM v2412 and
   solids4foam `f33b244a2` only (see `README.md`, Revision and provenance).
-  The reproduction on OpenFOAM v2512 has not yet been made.
+  Only R1A was reproduced on OpenFOAM v2512 (`f33b244a2` rebuilt for it;
+  identical metrics, 5 of 5 PASS); the other runs were not repeated there.
 - **Cost.** CPU hours are allocated (ranks times wall time) on a shared
   node, with 1, 2, 8 and 8 ranks on Levels 1-4. They indicate the relative
   cost of the methods on this machine; they are not a speed-up measurement
