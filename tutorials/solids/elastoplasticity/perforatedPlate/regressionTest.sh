@@ -456,7 +456,8 @@ EOD
     fi
 
     if ! ( cd "${d}" \
-        && decomposePar ${decompose_args[@]+"${decompose_args[@]}"} > log.decomposePar 2>&1 )
+        && decomposePar ${decompose_args[@]+"${decompose_args[@]}"} \
+            > log.decomposePar 2>&1 )
     then
         echo "FAIL: parallel restart (decomposePar failed)"
         echo "      (see ${d}/log.decomposePar)"
