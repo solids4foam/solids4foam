@@ -419,6 +419,22 @@ function solids4Foam::applyFoamExtendTweaks()
             "${SOLIDS4FOAM_SED}" -i -E 's/^([[:space:]]*)normal([[:space:]])/\1normalVector\2/g' "${FILE}"
         fi
     done
+
+    # 13. pointCellsLeastSquares does not exist in foam extend: a user case that
+    #     still uses it runs with leastSquaresS4f, the same scheme as on
+    #     OpenFOAM. This is not reversed by undoFoamExtendTweaks, as the
+    #     tutorials use leastSquaresS4f on every version
+    for FILE in "${CASE_DIR}"/system/fvSchemes* \
+        "${CASE_DIR}"/system/solid/fvSchemes*
+    do
+        if [[ -f ${FILE} ]] && grep -q "pointCellsLeastSquares" "${FILE}"
+        then
+            echo "foam extend specific: replacing 'pointCellsLeastSquares' with"
+            echo "'leastSquaresS4f' in ${FILE}"
+            "${SOLIDS4FOAM_SED}" -i "s/ pointCellsLeastSquares;/ leastSquaresS4f;/g" \
+                "${FILE}"
+        fi
+    done
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#

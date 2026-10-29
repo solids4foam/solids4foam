@@ -28,10 +28,12 @@ ddtSchemes
 
 gradSchemes
 {
-    // leastSquaresS4f is not used here: it does not correct the normal
-    // component of the boundary gradient, on which the traction condition
-    // of this solid model depends
+    // leastSquaresS4f needs a list of the patches whose face values enter
+    // the least-squares stencils, which the solid models register for D but
+    // not for the scalar fields
     default            leastSquares;
+    grad(D)            leastSquaresS4f;
+    snGradCorr(D)      leastSquaresS4f;
 }
 
 divSchemes

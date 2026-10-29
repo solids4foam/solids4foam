@@ -420,6 +420,13 @@ path = "postProcessing/surfaces/1/sigma_surface.raw"
 Note that the `OpenFOAM` path is derived from the name of the function object
 entry in the `system/` directory, here `sample`.
 
+**11.** If a `system/fvSchemes` or `system/solid/fvSchemes` file uses the
+`pointCellsLeastSquares` gradient scheme, which does not exist in `foam-extend`,
+it is replaced by `leastSquaresS4f`, the solids4foam scheme that the tutorials
+use on every version. This step is one way: restoring the case does not bring
+`pointCellsLeastSquares` back, so a converted user case keeps solving the same
+discretisation on every version.
+
 ---
 
 ## `solids4foam::foamFlavour()`
