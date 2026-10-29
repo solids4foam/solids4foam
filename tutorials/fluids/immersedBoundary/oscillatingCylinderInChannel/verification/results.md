@@ -2,18 +2,47 @@
 
 These results were obtained with solids4foam `f33b244a2` and OpenFOAM v2412
 on one shared node. The immersed-boundary, fluid-model and tutorial sources
-of that revision are identical to those of `development` at `09b315b3c`.
-The cutLink surface traction uses the greedy quadrature, the only one of
-that revision (see `README.md`, Quadrature). The values are those of
-`reference/results/cases.csv`, computed by `./Allverify analyse` from the
-complete force histories.
+of that revision are identical to those of `development` at `8cf077860`,
+the base of this pull request (see `README.md`, Revision and provenance).
+The tracked results are v2412 results; they have not yet been compared with
+a v2512 run. The cutLink surface traction uses the greedy quadrature, the
+only one of that revision (see `README.md`, Quadrature). The values are
+those of `reference/results/cases.csv`, computed by `./Allverify analyse`
+from the complete force histories.
 
 ## Summary
 
 The four methods are compared on a body that moves and accelerates through
 a stationary mesh. The main findings, each specific to this case, these
-settings and the tested revision:
+settings and the tested revision. Differences smaller than the difference
+between the two body-fitted references (0.77 % in Cd, 3.0 % in Cl) are not
+ranked. Three estimates are kept apart: the cutLink greedy surface
+traction, the cutLink momentum exchange of the same runs, and the penalty
+forcing plus the inertia of the fluid inside the body.
 
+- **The greedy quadrature limits the cutLink lift.** The surface traction
+  of cutLink with the greedy quadrature, the only quadrature of the tested
+  revision, gives an accurate drag but a lift that differs from B by 140 %,
+  149 % and 140 % on D/h = 10, 20 and 40 (161 % on D/h = 20 with the time
+  step halved). The greedy thinning of the candidate surface points (in the
+  order of the STL facets, with the area of the discarded points given to
+  the kept ones) breaks the cancellation of the transverse pressure force:
+  the spurious lift is -0.013 to -0.014 times Cd, about 1 % of the drag
+  force (small in the drag) but larger than the lift itself; reversing the
+  facet order reverses its sign (see Limitations). This is a property of the
+  quadrature, not of the flow solution or of the cutLink method as such.
+  On D/h = 80 all 256 candidate points are kept, the defect is absent and
+  the lift differs by 4.6 %; this is a property of this mesh and surface,
+  and does not make the greedy quadrature reliable for the lift of moving
+  bodies on other meshes or surfaces. The momentum-exchange estimate of the
+  same runs, reported separately and never added to the surface traction,
+  gives 17.7 %, 8.7 %, 5.3 % and 4.8 %.
+- **The clustered quadrature is a separate change.** A quadrature without
+  the greedy area transfer is introduced in solids4foam pull request #612.
+  Every result here uses the greedy quadrature of `f33b244a2`, selected
+  explicitly by the driver; the final form of that pull request has not
+  been run over this 8 s study, so no comparison of the cutLink lift with
+  the clustered quadrature is made.
 - **Steady drag accuracy is not enough.** In the static-cylinder
   verification of solids4foam pull request #595, the mean drag on the
   finest mesh (D/h = 80) differs from the high-precision reference by
@@ -31,37 +60,33 @@ settings and the tested revision:
   the raw drag differs from reference B by 1.10 % (cutLink), 1.41 %
   (penalty), 8.32 % (ghostCell) and 26.45 % (legacy incremental), and the
   raw lift by 139.7 %, 3.7 %, 12.4 % and 12.7 %.
-- **penalty is the most balanced method in this comparison.** At
-  D/h = 40 it is the only method whose drag and lift differences are both
-  a few per cent (1.41 % and 3.7 %, the lift close to the A-B difference
-  of 3.0 %), its force has no visible cell-crossing fluctuation, and its
-  run was the least expensive (1.493 allocated CPU hours). This is why it
-  is shown against B and the Wan and Turek result in panels (c, d) of the
-  force-history figure, with the same run for both coefficients. It is not
-  a general ranking: the cutLink drag is more accurate, and the ranking of
-  the lift may change with a corrected cutLink quadrature.
-- **cutLink drag is accurate; its greedy lift is not.** The cutLink surface
-  traction gives the most accurate drag of the four (1.10 % at D/h = 40,
-  0.65 % at D/h = 80). Its lift differs from B by 140 %, 149 % and 140 %
-  on D/h = 10, 20 and 40 (161 % on D/h = 20 with the time step halved).
-  The greedy thinning of the candidate surface points (in the order of the
-  STL facets, with the area of the discarded points given to the kept
-  ones) breaks the cancellation of the transverse pressure force: the
-  spurious lift is -0.013 to -0.014 times Cd, about 1 % of the drag force
-  (small in the drag) but larger than the lift itself; reversing the facet
-  order reverses its sign (see Limitations).
-- **The D/h = 80 result is not a convergence of the greedy quadrature.** On
-  D/h = 80 all 256 candidate points are kept, the defect is absent and the
-  lift differs by 4.6 %. This is a property of this mesh and surface; it
-  does not make the greedy quadrature reliable for the lift of moving
-  bodies on other meshes or surfaces. The momentum-exchange estimate of
-  the same runs, reported separately and never added to the surface
-  traction, gives 17.7 %, 8.7 %, 5.3 % and 4.8 %.
-- **The clustered quadrature is a separate change.** A quadrature without
-  the greedy area transfer is introduced in solids4foam pull request #612.
-  Every result here uses the greedy quadrature of `f33b244a2`, selected
-  explicitly by the driver when the keyword exists; the final form of that
-  pull request has not been run over this 8 s study.
+- **cutLink and penalty are not distinguished within the reference
+  spread at fine resolution.** At D/h = 40 and 80 the raw drag differs from
+  B by 1.10 % and 0.65 % (cutLink) and 1.41 % and 1.08 % (penalty), gaps of
+  0.31 and 0.43 points, below the A-B difference of 0.77 %. The lift of
+  penalty (3.7 % and 3.5 %) and the cutLink momentum exchange (5.3 % and
+  4.8 %) differ by 1.6 and 1.3 points, below the A-B difference of 3.0 %.
+  Both are clearly closer to B than ghostCell and the legacy incremental
+  method in drag at all the levels run, and penalty and the momentum
+  exchange are in lift (ghostCell 12.4 % and 13.8 % on D/h = 40 and 80,
+  incremental 12.7 % on D/h = 40). A ranking between cutLink and penalty is
+  not supported by the available reference sensitivity.
+- **penalty combines accuracy and low cost under the tested
+  configuration.** At D/h = 40 its drag and lift (1.41 % and 3.7 %, the
+  lift close to the A-B difference of 3.0 %) are both within a few per cent
+  of B, as are those of the cutLink momentum exchange (2.1 % and 5.3 %),
+  its force has no visible cell-crossing fluctuation, and its run was the
+  least expensive (1.493 allocated CPU hours). This is why it is shown
+  against B and the Wan and Turek result in panels (c, d) of the
+  force-history figure, with the same run for both coefficients. This is a
+  result for this case and these settings, not a general ranking: the
+  differences from cutLink at fine resolution are not resolved (above), the
+  cutLink lift may change with another quadrature, and the cost is that of
+  one shared machine.
+- **ghostCell is documented for static bodies.** Its moving-body results,
+  for example the 13.8 % lift error on D/h = 80, are informative about its
+  behaviour in a setting it was not designed for, not a general failure of
+  the method.
 - **Cell-crossing fluctuations.** ghostCell and the legacy method have
   force fluctuations at the frequency with which the moving surface
   crosses cell centres (157 Hz on D/h = 40), from cells changing between
@@ -82,6 +107,16 @@ settings and the tested revision:
   Turek (2007) result leads both by about 18 ms and differs from B by
   3.3 % and 7.3 %; it is a secondary published comparison and is not
   shifted. The immersed-boundary runs use the first-order Euler scheme.
+- **Space and time are refined together.** The principal sequence (R1, R2,
+  R3, R5) halves the time step with the cell size, so a change of an error
+  along it is the effect of both. The monotonic decrease of the errors
+  holds along this sequence only; at fixed mesh, halving the time step can
+  increase them (R2 to R4 for penalty: Cd 2.73 % to 3.26 %, Cl 8.0 % to
+  10.4 %). No independent spatial or temporal convergence is shown, and no
+  order is derived. The Euler scheme of the immersed-boundary runs and the
+  backward scheme of both references differ, so an error floor against the
+  references may include time-scheme error (see Suggested additional
+  experiment).
 - **Cost figures need care.** At D/h = 40 (8 ranks, 8 s simulated) the runs
   took 3.391 (cutLink), 2.731 (ghostCell), 1.493 (penalty) and 14.278
   (legacy incremental) allocated CPU hours (ranks times job wall time) on
@@ -210,9 +245,12 @@ which is the resolution of the comparison.
 
 ## Agreement with the references
 
-The cutLink rows use its `forceEstimator surfaceTraction`. The ghostCell,
-penalty and incremental rows use the forcing plus the inertia of the fluid
-inside.
+The cutLink rows use its `forceEstimator surfaceTraction` with the greedy
+quadrature (see Limitations). The ghostCell, penalty and incremental rows
+use the forcing plus the inertia of the fluid inside. The ghostCell rows
+are those of a method documented for static bodies, and are not a general
+assessment of it. Differences smaller than the A-B difference (0.77 % in
+Cd, 3.0 % in Cl) are not ranked.
 
 | Run | Cd vs A | Cd vs B | Cd vs B, < 5 Hz | Cl vs B | Cl vs B, < 5 Hz |
 | --- | --- | --- | --- | --- | --- |
@@ -248,31 +286,52 @@ The cutLink momentum exchange (columns 11-13, from the same runs):
 
 ### Drag
 
-- cutLink and penalty: the raw drag error decreases monotonically with
-  refinement against B. cutLink reaches 0.65 % on Level 4, within the A-B
-  difference; penalty reaches 1.08 %. Against A, the penalty error is 1.51 %
-  on Level 3 and 1.56 % on Level 4: at these levels the comparison is
-  limited by the references.
+The raw drag errors of cutLink and penalty decrease along the principal
+mesh and time-step sequence, not independently in space or time:
+
+- cutLink and penalty: against B the error decreases along the sequence
+  (cutLink 5.4 %, 1.8 %, 1.1 %, 0.65 %; penalty 5.0 %, 2.7 %, 1.4 %,
+  1.1 %). cutLink reaches 0.65 % on Level 4, within the A-B difference
+  (0.77 %); penalty reaches 1.08 %, and the two are not distinguished at
+  Levels 3 and 4 (gaps 0.31 and 0.43 points). Against A, the penalty error
+  is 1.51 % on Level 3 and 1.56 % on Level 4: at these levels the
+  comparison is limited by the references, or by the time scheme (see
+  below).
 - At the common time step of 0.000625 s, from Level 2 to Level 3 (R4 to R3),
   the error decreases from 1.68 % to 1.10 % (cutLink) and from 3.26 % to
-  1.41 % (penalty).
-- ghostCell and incremental: the raw error decreases with refinement
+  1.41 % (penalty): this is a change of the mesh alone. At the fixed
+  Level 2 mesh, halving the time step (R2 to R4) increases the raw penalty
+  error from 2.73 % to 3.26 %, and decreases that of cutLink from 1.83 % to
+  1.68 %. The increase for penalty comes with the `rho (M - M0)/dt` inertia
+  term, whose occupancy jumps are divided by the time step (see Force
+  fluctuations).
+- ghostCell and incremental: the raw error decreases along the sequence
   (ghostCell 37 % to 4.6 %, incremental 73 % to 26 %). It is dominated by
   force fluctuations above 5 Hz (see below); the low-passed drag is within
   0.8-2.4 % (ghostCell) and 3.8-8.3 % (incremental) of B.
 - No order of convergence is derived: space and time are refined together,
-  with a first-order time scheme and four levels.
+  with a first-order time scheme and four levels. The apparent plateau of
+  the penalty error from Level 3 to Level 4 may involve temporal-scheme
+  error or the reference floor; these are not separated by these runs.
 
 ### Lift
 
-- penalty: 12.9 %, 8.0 %, 3.7 % and 3.5 % on Levels 1-4.
-- cutLink momentum exchange: 17.7 %, 8.7 %, 5.3 % and 4.8 %.
+- penalty: 12.9 %, 8.0 %, 3.7 % and 3.5 % on Levels 1-4. Against B the
+  error decreases along the sequence, but at the fixed Level 2 mesh halving
+  the time step increases it from 8.0 % to 10.4 % (R2 to R4), and against A
+  it increases from Level 3 to Level 4 (Cl 5.2 % to 5.8 %). The decrease is
+  therefore not a space-time convergence.
+- cutLink momentum exchange: 17.7 %, 8.7 %, 5.3 % and 4.8 %. On Levels 3
+  and 4 the gaps from penalty (1.6 and 1.3 points) are below the A-B
+  difference (3.0 %), and the two are not distinguished.
 - cutLink surface traction: 140 %, 149 % and 140 % on Levels 1-3 (161 % on
   Level 2 with the time step halved) and 4.6 % on Level 4.
-  This is a property of the default quadrature (see Limitations), not of
-  the flow solution.
+  This is a property of the greedy quadrature (see Limitations), not of the
+  flow solution.
 - ghostCell: 87 % to 12.4 % on Levels 1-3, and 13.8 % on Level 4, where
-  its lift fluctuation no longer decreases.
+  its lift fluctuation no longer decreases. ghostCell is documented for
+  static bodies: this is its behaviour on a moving body, not a general
+  failure of the method.
 - incremental: 51.6 %, 26.2 % and 12.7 % on Levels 1-3.
 
 ### Inertia of the fluid inside
@@ -340,15 +399,18 @@ force histories are drawn from the compact histories there, sampled every
 0.02 s: the fluctuations above 25 Hz (the cell-crossing frequencies are
 39-314 Hz) are aliased in the drawing, and no frequency content is read
 from them. Every error is computed from the complete histories, and
-`cell_crossing` uses the full-resolution extracts (`zoom-*.csv`).
+`cell_crossing` was drawn from full-resolution extracts (`zoom-*.csv`) of
+the finest runs, which are no longer tracked (see `README.md`, Repository
+size).
 
 ![Force histories](images/force_histories.png)
 
 **Force histories.** (a, b) Cd and Cl of the four methods at D/h = 40 and
 `deltaT = 0.000625` s, the finest mesh run by all of them, against
 body-fitted reference B: cutLink with its surface traction and the greedy
-quadrature; the other methods with the forcing plus the inertia of the
-fluid inside. (c, d) The same penalty run against B and the digitised
+quadrature (its lift here is dominated by the quadrature defect); the other
+methods with the forcing plus the inertia of the fluid inside; ghostCell is
+documented for static bodies. (c, d) The same penalty run against B and the digitised
 Wan and Turek (2007) result, which leads B by about 18 ms and is not
 shifted (every second digitised point drawn). Raw histories, no filter
 or shift; a marker every second identifies each method. The impulsive
@@ -361,7 +423,8 @@ compared with B in the error figure and in the Summary.
 Cl from reference B against `D/h`. Filled markers: the time step halved
 with the cell size, so that space and time are refined together; open
 markers: D/h = 20 at the D/h = 40 time step (R4), a separate time-step
-sensitivity. The grey band is below the A-B difference, shown as context
+sensitivity (for penalty, halving the time step at fixed mesh increases
+the error). The grey band is below the A-B difference, shown as context
 for the reference sensitivity, not as an uncertainty bound. The legacy method
 was not run on D/h = 80. No order of convergence is derived.
 
@@ -405,13 +468,30 @@ Further diagnostics, not discussed above:
   with one time-step comparison (R4) and one matched-time-step spatial
   comparison (R4 to R3). The legacy method was not run on Level 4, and
   ghostCell only with its default settings.
+- **ghostCell.** It is documented for static bodies; its moving-body
+  results here are informative, not a general failure of the method, and
+  were run with its settings only (no tuning for moving bodies).
 - **ghostCell on Level 4.** Its lift fluctuation does not decrease from
   Level 3 to Level 4, and its drag fluctuation peaks at twice the
   cell-crossing frequency there. Neither effect is explained.
 - **References.** They are numerical solutions with a second-order time
-  scheme. B is a single solution whose solids4foam revision is not
-  recorded, and A has no run record. The digitised data are secondary.
+  scheme (backward), whereas the immersed-boundary runs use Euler. B is a
+  single solution whose solids4foam revision is not recorded, and A has no
+  run record. The digitised data are secondary.
+- **Solver and platform.** The tracked results are from OpenFOAM v2412 and
+  solids4foam `f33b244a2` only (see `README.md`, Revision and provenance).
+  The reproduction on OpenFOAM v2512 has not yet been made.
 - **Cost.** CPU hours are allocated (ranks times wall time) on a shared
   node, with 1, 2, 8 and 8 ranks on Levels 1-4. They indicate the relative
   cost of the methods on this machine; they are not a speed-up measurement
   or a comparison with body-fitted solvers.
+
+## Suggested additional experiment
+
+Not run. The penalty error does not decrease from Level 3 to Level 4
+(against B, Cl 3.7 % to 3.5 %; against A, Cd 1.51 % to 1.56 % and Cl 5.2 %
+to 5.8 %), the immersed-boundary runs use Euler and both references use
+backward. One penalty Level 3 run with the `backward` time scheme (about
+1.5 CPU hours) would show whether this plateau is Euler time error or the
+reference floor. Until then, "penalty's drag converges to about 1 %" is not
+established by the refinement along the diagonal.

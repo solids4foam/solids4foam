@@ -257,7 +257,7 @@ class Generation(Sandbox):
         ranks = 0
         force = False
         dry_run = False
-        traction_quadrature = "auto"
+        traction_quadrature = "greedy"
 
     def test_generate_settings(self):
         ocv.cmd_generate(self.A)
@@ -272,12 +272,8 @@ class Generation(Sandbox):
         fv = (case / "constant/fvOptions").read_text()
         self.assertRegex(fv, r"method\s+cutLink;")
         self.assertRegex(fv, r"forceEstimator\s+surfaceTraction;")
-        # The quadrature entry follows the solver source of this repository
-        expected = ocv.traction_quadrature("auto")
-        if expected:
-            self.assertRegex(fv, rf"tractionQuadrature\s+{expected};")
-        else:
-            self.assertNotIn("tractionQuadrature", fv)
+        # The historical quadrature is written explicitly
+        self.assertRegex(fv, r"tractionQuadrature\s+greedy;")
         self.assertRegex(fv, r"amplitude\s+0\.25;")
         self.assertRegex(fv, r"period\s+4;")
         sol = (case / "system/fvSolution").read_text()
@@ -343,48 +339,44 @@ class Generation(Sandbox):
             self.assertEqual((meta["nOuterCorrectors"], meta["end_time"],
                               meta["ranks"]), (n, 2.25, 2))
 
-    def test_traction_quadrature_selection(self):
-        src = self.tmp / "immersedBoundaryForce.C"
-        src.write_text('coeffs_.readIfPresent("forceEstimator", e);\n')
-        self.assertEqual(ocv.traction_quadrature("auto", src), "")
-        src.write_text('tractionQuadrature_("greedy"); "none" "clustered"')
-        self.assertEqual(ocv.traction_quadrature("auto", src), "greedy")
-        src.write_text('tractionQuadrature_("clustered"); "none"')
-        with self.assertRaises(RuntimeError):
-            ocv.traction_quadrature("auto", src)
-        self.assertEqual(ocv.traction_quadrature("clustered", src),
-                         "clustered")
-        self.assertEqual(ocv.traction_quadrature("auto",
-                                                 self.tmp / "missing.C"), "")
-        # Keyword and names in different files of a source directory, as
-        # when the names are an Enum of immersedSurfaceTraction
-        src_dir = self.tmp / "immersedBoundary"
-        (src_dir / "fvOptions").mkdir(parents=True)
-        (src_dir / "fvOptions/immersedBoundaryForce.C").write_text(
-            'tractionQuadrature_(immersedSurfaceTraction::clustered);')
-        (src_dir / "immersedSurfaceTraction.C").write_text(
-            '{ quadratureType::greedy, "greedy" },')
-        self.assertEqual(ocv.traction_quadrature("auto", src_dir), "greedy")
-        (src_dir / "immersedSurfaceTraction.C").write_text(
-            '{ quadratureType::clustered, "clustered" },')
-        (src_dir / "test").mkdir()
-        (src_dir / "test/Test.C").write_text('"greedy"')
-        with self.assertRaises(RuntimeError):
-            ocv.traction_quadrature("auto", src_dir)
+    def test_quadrature_is_explicit_not_read_from_source(self):
+        # No solver source is searched: the default option is greedy and
+        # the entry is written whatever the sources say
+        self.assertFalse(hasattr(ocv, "SOLVER_SOURCE"))
+        self.assertEqual(ocv.HISTORICAL_QUADRATURE, "greedy")
+        self.assertEqual(ocv.quadrature_tag("cutLink", "greedy"), "")
         self.assertEqual(ocv.quadrature_tag("cutLink", "clustered"),
                          "clustered")
-        self.assertEqual(ocv.quadrature_tag("cutLink", "greedy"), "")
         self.assertEqual(ocv.quadrature_tag("penalty", "clustered"), "")
+        self.assertIn("greedy", ocv.QUADRATURES)
+        ocv.cmd_generate(self.A)
+        meta = json.loads((ocv.CASES_DIR / "cutLink-L1-dt0p0025-t0p5"
+                           / "case.json").read_text())
+        self.assertEqual(meta["traction_quadrature"], "greedy")
+        self.assertEqual(meta["fvOptions"]["tractionQuadrature"], "greedy")
+
+    def test_default_option_is_greedy(self):
+        # The default of the command line is the historical quadrature, not
+        # that of the solver (clustered after solids4foam pull request #612)
+        with mock.patch.object(ocv, "cmd_dry_run", return_value=0) as m:
+            ocv.main(["dry-run"])
+        self.assertEqual(m.call_args[0][0].traction_quadrature, "greedy")
 
     def test_other_quadrature_tags_case(self):
         class Q(self.A):
-            traction_quadrature = "none"
-        with mock.patch.object(ocv, "traction_quadrature",
-                               side_effect=lambda c, s=None: c):
-            ocv.cmd_generate(Q)
-        case = ocv.CASES_DIR / "cutLink-L1-dt0p0025-t0p5-none"
+            traction_quadrature = "clustered"
+        ocv.cmd_generate(Q)
+        case = ocv.CASES_DIR / "cutLink-L1-dt0p0025-t0p5-clustered"
         self.assertRegex((case / "constant/fvOptions").read_text(),
-                         r"tractionQuadrature\s+none;")
+                         r"tractionQuadrature\s+clustered;")
+
+    def test_other_methods_have_no_quadrature(self):
+        class P(self.A):
+            runs = ["R1B"]
+        ocv.cmd_generate(P)
+        fv = (ocv.CASES_DIR / "penalty-L1-dt0p0025"
+              / "constant/fvOptions").read_text()
+        self.assertNotIn("tractionQuadrature", fv)
 
     def test_existing_case_protected(self):
         ocv.cmd_generate(self.A)
@@ -467,9 +459,24 @@ class Submission(Sandbox):
         ocv.save_manifest(m)
         with mock.patch.object(ocv, "queue_jobs",
                                return_value={"77": ("RUNNING", 1)}), \
+                mock.patch.object(ocv.shutil, "which", return_value=None), \
                 mock.patch.object(ocv.subprocess, "run",
                                   side_effect=AssertionError("submitted")):
-            ocv.cmd_submit(self.S)
+            # Nothing to submit succeeds, with or without --yes, without
+            # sbatch
+            self.assertEqual(ocv.cmd_submit(self.S), 0)
+
+            class NoYes(self.S):
+                yes = False
+            self.assertEqual(ocv.cmd_submit(NoYes), 0)
+
+    def test_nonempty_submission_needs_sbatch(self):
+        with mock.patch.object(ocv, "queue_jobs", return_value={}), \
+                mock.patch.object(ocv.shutil, "which", return_value=None), \
+                mock.patch.object(ocv.subprocess, "run",
+                                  side_effect=AssertionError("submitted")):
+            with self.assertRaisesRegex(RuntimeError, "sbatch is unavailable"):
+                ocv.cmd_submit(self.S)
 
     def test_cpu_cap(self):
         with mock.patch.object(ocv, "queue_jobs",
@@ -569,11 +576,192 @@ class Check(Sandbox):
         self.write_current([r])
         self.assertEqual(ocv.cmd_check(None), 1)
 
+    def scipy_absent(self):
+        return mock.patch.object(ocv, "have_scipy", return_value=False)
+
+    def test_nan_filtered_metric_skipped_without_scipy(self):
+        r = self.tracked("cutLink-L1-dt0p0025")
+        r["Cd_hf_rms_above_5Hz"] = "nan"
+        self.write_current([r])
+        with self.scipy_absent(), mock.patch("builtins.print") as out:
+            self.assertEqual(ocv.cmd_check(None), 0)
+        lines = "\n".join(str(c.args[0]) for c in out.call_args_list)
+        self.assertIn("SKIP cutLink-L1-dt0p0025: Cd_hf_rms_above_5Hz", lines)
+        self.assertIn("1 skipped (scipy)", lines)
+        # The raw-force metrics were still compared
+        self.assertIn("PASS cutLink-L1-dt0p0025: Cd_nrms_B", lines)
+
+    def test_nan_filtered_metric_fails_with_scipy(self):
+        r = self.tracked("cutLink-L1-dt0p0025")
+        r["Cd_hf_rms_above_5Hz"] = "nan"
+        self.write_current([r])
+        with mock.patch.object(ocv, "have_scipy", return_value=True):
+            self.assertEqual(ocv.cmd_check(None), 1)
+
+    def test_nan_primary_metric_fails_even_without_scipy(self):
+        for key in ("Cd_nrms_B", "Cl_nrms_B", "Cd_nrms_A", "Cl_nrms_A"):
+            r = self.tracked("cutLink-L1-dt0p0025")
+            r[key] = "nan"
+            self.write_current([r])
+            with self.scipy_absent():
+                self.assertEqual(ocv.cmd_check(None), 1, key)
+
+    def test_wrong_filtered_metric_still_fails_without_scipy(self):
+        # Only a nonfinite value is skipped: a finite one is compared
+        r = self.tracked("cutLink-L1-dt0p0025")
+        r["Cd_hf_rms_above_5Hz"] = str(float(r["Cd_hf_rms_above_5Hz"])*3)
+        self.write_current([r])
+        with self.scipy_absent():
+            self.assertEqual(ocv.cmd_check(None), 1)
+
+    def test_integrity_failure_fails_without_scipy(self):
+        r = self.tracked("penalty-L1-dt0p0025")
+        r["integrity"], r["integrity_notes"] = "FAIL", "non-finite force"
+        r["Cd_hf_rms_above_5Hz"] = "nan"
+        self.write_current([r])
+        with self.scipy_absent():
+            self.assertEqual(ocv.cmd_check(None), 1)
+
+    def test_filters_without_scipy_are_nan_not_numbers(self):
+        t = [i*0.01 for i in range(1000)]
+        y = [math.sin(i) for i in range(1000)]
+        real = __import__
+        def no_scipy(name, *a, **k):
+            if name.startswith("scipy"):
+                raise ImportError(name)
+            return real(name, *a, **k)
+        with mock.patch("builtins.__import__", side_effect=no_scipy):
+            self.assertFalse(ocv.have_scipy())
+            self.assertTrue(math.isnan(ocv.high_frequency_rms(t, y, 5.0)))
+            self.assertEqual(ocv.low_pass(t, y, 5.0), ([], []))
+
     def test_untracked_case_not_checked(self):
         r = self.tracked("cutLink-L1-dt0p0025")
         r["case"] = "cutLink-L1-dt0p0025-clustered"
         self.write_current([r])
         self.assertEqual(ocv.cmd_check(None), 0)
+
+
+class Provenance(Sandbox):
+    def test_variant(self):
+        self.assertEqual(ocv.openfoam_variant("v2512"), "OpenFOAM.com")
+        self.assertEqual(ocv.openfoam_variant("12"), "openfoam.org")
+        self.assertEqual(ocv.openfoam_variant("", ""), "")
+        self.assertEqual(ocv.openfoam_variant("4.1", "extend"), "extend")
+
+    def make_build(self, with_info=True):
+        root = self.tmp / "build"
+        exe = root / "platforms/linux64GccDPInt32Opt/bin/solids4Foam"
+        exe.parent.mkdir(parents=True)
+        exe.write_bytes(b"binary")
+        if with_info:
+            (root / "BUILD_INFO.txt").write_text(
+                "SHA=0123456789abcdef\nWM_PROJECT_VERSION=v2512\n")
+        return exe
+
+    def test_build_with_record(self):
+        exe = self.make_build()
+        b = ocv.solver_build(str(exe))
+        self.assertEqual(b["solver_build"], "0123456789abcdef")
+        self.assertEqual(len(b["solver_binary_sha256"]), 64)
+
+    def test_build_without_record_is_not_invented(self):
+        exe = self.make_build(with_info=False)
+        b = ocv.solver_build(str(exe))
+        self.assertEqual(b["solver_build"], "")
+        self.assertEqual(len(b["solver_binary_sha256"]), 64)
+        with mock.patch.object(ocv.shutil, "which", return_value=None):
+            self.assertEqual(ocv.solver_build(), {
+                "solver_executable": "", "solver_binary_sha256": "",
+                "solver_build": ""})
+
+    def test_case_json_records_provenance_separately(self):
+        env = {"WM_PROJECT_VERSION": "v2512"}
+        with mock.patch.dict(ocv.os.environ, env), \
+                mock.patch.object(ocv.shutil, "which", return_value=None):
+            class A:
+                runs = ["smoke"]
+                ranks = 0
+                force = False
+                traction_quadrature = "greedy"
+            ocv.cmd_generate(A)
+        meta = json.loads((ocv.CASES_DIR / "cutLink-L1-dt0p0025-t0p5"
+                           / "case.json").read_text())
+        p = meta["provenance"]
+        self.assertEqual(p["openfoam_version"], "v2512")
+        self.assertEqual(p["openfoam_variant"], "OpenFOAM.com")
+        self.assertEqual(p["solver_build"], "")
+        self.assertEqual(p["tutorial_revision"], meta["git_sha"])
+        self.assertEqual(meta["tracked_baseline"],
+                         {"openfoam": "v2412", "solids4foam": "f33b244a2"})
+        self.assertEqual(set(ocv.PROVENANCE_COLUMNS) - set(p), set())
+
+    def test_check_reports_solver_of_the_run(self):
+        r = next(dict(r, integrity_notes="", openfoam_version="v2512",
+                      solver_build="abc123")
+                 for r in csv.DictReader((RESULTS_DIR / "cases.csv").open())
+                 if r["case"] == "cutLink-L1-dt0p0025")
+        ocv.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        keys = ["case", "integrity", "integrity_notes", "openfoam_version",
+                "solver_build"] + list(ocv.CHECK_METRICS)
+        with (ocv.OUTPUT_DIR / "cases.csv").open("w", newline="") as h:
+            w = csv.DictWriter(h, fieldnames=keys, extrasaction="ignore")
+            w.writeheader()
+            w.writerow(r)
+        with mock.patch("builtins.print") as out:
+            self.assertEqual(ocv.cmd_check(None), 0)
+        text = "\n".join(str(c.args[0]) for c in out.call_args_list)
+        self.assertIn("OpenFOAM v2512, solids4foam build abc123; tracked "
+                      "results: OpenFOAM v2412, solids4foam f33b244a2", text)
+
+
+class Export(Sandbox):
+    """./Allverify export: which histories are written"""
+
+    def setUp(self):
+        super().setUp()
+        patch = mock.patch.object(ocv, "REFERENCE_DIR", self.tmp / "reference")
+        patch.start()
+        self.addCleanup(patch.stop)
+        ocv.OUTPUT_DIR.mkdir(parents=True)
+        cases = [("cutLink-L2-dt0p00125", "R2A", 8.0, 2),
+                 ("cutLink-L2-dt0p00125-np1", "O4", 8.0, 2),
+                 ("cutLink-L1-dt0p0025-t0p5", "smoke", 0.5, 1)]
+        with (ocv.OUTPUT_DIR / "cases.csv").open("w", newline="") as h:
+            w = csv.writer(h)
+            w.writerow(["case", "run", "method", "level", "deltaT",
+                        "end_time", "integrity", "openfoam_version"])
+            for name, run, end, level in cases:
+                w.writerow([name, run, "cutLink", level, 0.00125, end,
+                            "PASS", "v2512"])
+                with (ocv.OUTPUT_DIR / f"history-{name}.csv").open(
+                        "w", newline="") as hh:
+                    hw = csv.writer(hh)
+                    hw.writerow(["t", "Cd_total"])
+                    for i in range(0, 1601):
+                        hw.writerow([f"{i*0.005:.10g}", "1"])
+
+    def exported(self):
+        out = ocv.REFERENCE_DIR / "results"
+        return sorted(p.name for p in out.iterdir())
+
+    def test_histories_of_figure_runs_only(self):
+        class A:
+            full_resolution = False
+        ocv.cmd_export(A)
+        self.assertEqual(self.exported(), [
+            "cases.csv", "history-cutLink-L2-dt0p00125.csv"])
+        with (ocv.REFERENCE_DIR / "results/cases.csv").open() as h:
+            rows = list(csv.DictReader(h))
+        # All the cases keep their rows; provenance only if recorded
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0]["openfoam_version"], "v2512")
+
+    def test_full_resolution_is_optional(self):
+        class A:
+            full_resolution = True
+        ocv.cmd_export(A)
+        self.assertIn("zoom-cutLink-L2-dt0p00125.csv", self.exported())
 
 
 def markdown_table(text: str, after: str) -> list:
@@ -626,8 +814,13 @@ class TrackedResults(unittest.TestCase):
         for r in self.rows:
             self.assertEqual(r["integrity"], "PASS")
             self.assertAlmostEqual(float(r["t_final"]), float(r["end_time"]))
-            self.assertTrue(
-                (RESULTS_DIR / f"history-{r['case']}.csv").exists())
+            # The histories of the 8 s runs that the figures draw (not the
+            # serial repeat O4 and the shorter runs, whose metrics are here)
+            drawn = (float(r["end_time"]) == ocv.END_TIME
+                     and r["run"] not in ocv.HISTORY_NOT_TRACKED)
+            self.assertEqual(
+                (RESULTS_DIR / f"history-{r['case']}.csv").exists(), drawn,
+                r["case"])
             hashes.setdefault(r["level"], set()).add(r["mesh_hash"])
         self.assertTrue(all(len(h) == 1 for h in hashes.values()))
 
@@ -700,10 +893,14 @@ class TrackedResults(unittest.TestCase):
             [sys.executable, str(SCRIPT.parent / "plot_verification.py"),
              "--data", str(RESULTS_DIR), "--out", str(out), "--dpi", "40",
              "--png-only"], check=True, capture_output=True, timeout=300)
+        # cell_crossing needs the full-resolution extracts, which are not
+        # tracked (./Allverify export --full-resolution)
+        self.assertFalse(list(RESULTS_DIR.glob("zoom-*.csv")))
         self.assertEqual(
             sorted(p.name for p in out.iterdir()),
             sorted(p.name for p in
-                   (ocv.VERIFICATION_DIR / "images").glob("*.png")))
+                   (ocv.VERIFICATION_DIR / "images").glob("*.png")
+                   if p.name != "cell_crossing.png"))
 
 
 if __name__ == "__main__":

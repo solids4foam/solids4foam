@@ -162,7 +162,10 @@ halved), while its drag differs by 5.4 %, 1.8 % and 1.1 %. On D/h = 80
 every candidate point is kept and the lift differs by 4.6 %; this does
 not establish that the greedy quadrature converges in general. At the
 common D/h = 40, `penalty` differs from reference B by 1.41 % in drag and
-3.7 % in lift, at the lowest cost of the four methods. See
+3.7 % in lift, at the lowest cost of the four methods; differences between
+`penalty` and `cutLink` (drag, or the lift from its momentum exchange) at
+D/h = 40 and 80 are smaller than the 0.77 % (Cd) and 3.0 % (Cl) difference
+between the two references and are not ranked. See
 `verification/README.md` and `verification/results.md`.
 
 ## References

@@ -14,10 +14,10 @@ work/manifest.json, records every case, its settings, its SLURM job (if
 submitted) and its state, so that a campaign can be resumed.
 
 The cutLink surface-traction estimator is run with the quadrature of the
-tracked results, the greedy thinning of the candidate points, selected
-explicitly (tractionQuadrature greedy) when the solver has that keyword, so
-that a change of the solver default does not change the verification
-silently (see traction_quadrature()).
+tracked results, the greedy thinning of the candidate points, always written
+explicitly (tractionQuadrature greedy), so that a change of the solver
+default does not change the verification silently (see
+--traction-quadrature).
 
 Usage:
     ./Allverify [run] [--runs ...]   generate, run locally, analyse, check
@@ -36,6 +36,7 @@ core); './Allverify --runs smoke' runs the first 0.5 s only.
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
@@ -113,8 +114,10 @@ DEFAULT_RUNS = ("R1A",)
 # Analysis window (s), excluding the impulsive start
 WINDOW = (0.25, 7.5)
 
-# Settings of each method in constant/fvOptions (the defaults of
-# immersedBoundaryForce, written explicitly) and of the body
+# Settings of each method in constant/fvOptions, those of the static-cylinder
+# verification (solids4foam pull request #595), written explicitly, and of the
+# body. They are not all source defaults: couplingCoeff 0.2 is the value of
+# #595, the default of immersedBoundaryForce is 0.8
 METHOD_SETTINGS = {
     "cutLink": (
         [
@@ -270,7 +273,7 @@ def selected(args) -> list:
             fail(f"unknown run {run}; choose from {', '.join(RUNS)}")
         method, level, dt, end = RUNS[run][:4]
         tag = quadrature_tag(method, getattr(args, "traction_quadrature",
-                                             "auto"))
+                                             HISTORICAL_QUADRATURE))
         out.append((run, method, level, dt, end,
                     case_name(method, level, dt, end, run_ranks(run),
                               run_n_outer(run), tag)))
@@ -292,51 +295,19 @@ def run_n_outer(run: str) -> int:
 # -----------------------------------------------------------------------------
 
 # The quadrature of the tracked results: the greedy thinning of the
-# candidate points, the only quadrature of the solver revisions that have no
-# tractionQuadrature keyword
+# candidate points. The cutLink cases always select it explicitly. A solver
+# without the tractionQuadrature keyword ignores the entry, and its only
+# quadrature is greedy; a solver with the keyword and a different default
+# (clustered) runs greedy because of the entry; a solver that does not know
+# the chosen name stops with an error
 HISTORICAL_QUADRATURE = "greedy"
-SOLVER_SOURCE = TUTORIAL_DIR.parents[3] / "src/immersedBoundary"
-
-
-def source_text(source: Path) -> str:
-    """The text of a source file, or of the .C and .H files of a source
-    directory (its test/ directories excluded); '' if absent"""
-    if source.is_file():
-        return source.read_text(errors="replace")
-    if not source.is_dir():
-        return ""
-    return "\n".join(
-        f.read_text(errors="replace") for f in sorted(source.rglob("*"))
-        if f.suffix in (".C", ".H") and "test" not in f.relative_to(
-            source).parts)
-
-
-def traction_quadrature(choice: str = "auto", source: Path = None) -> str:
-    """The tractionQuadrature entry to write for cutLink, '' for none.
-    'auto' selects the historical (greedy) quadrature explicitly if the
-    immersed-boundary sources of this repository (src/immersedBoundary)
-    have the tractionQuadrature keyword, writes nothing if they have not
-    (their only quadrature is greedy), and fails if the keyword exists
-    without a greedy choice, rather than comparing another quadrature with
-    the tracked results. Any other choice is written as given (and tags the
-    case name, see quadrature_tag())"""
-    if choice != "auto":
-        return choice
-    text = source_text(SOLVER_SOURCE if source is None else source)
-    if "tractionQuadrature" not in text:
-        return ""
-    if f'"{HISTORICAL_QUADRATURE}"' not in text:
-        fail("this solver has no tractionQuadrature "
-             f"{HISTORICAL_QUADRATURE}, the quadrature of the tracked "
-             "results: choose one with --traction-quadrature (the cases "
-             "are then tagged and not compared with the tracked results)")
-    return HISTORICAL_QUADRATURE
+QUADRATURES = ("greedy", "none", "clustered")
 
 
 def quadrature_tag(method: str, choice: str) -> str:
     """Case-name tag of a cutLink case run with a quadrature chosen on the
     command line; '' for the historical one"""
-    if method != "cutLink" or choice in ("auto", HISTORICAL_QUADRATURE):
+    if method != "cutLink" or choice == HISTORICAL_QUADRATURE:
         return ""
     return choice
 
@@ -436,14 +407,76 @@ PARALLEL_BODY = """\
 
 
 def git_sha() -> str:
+    """Revision of the tutorial tree: the sources of the cases, not
+    necessarily the build of the solver that runs them"""
     return subprocess.run(["git", "-C", str(TUTORIAL_DIR), "rev-parse",
                            "HEAD"], capture_output=True, text=True,
                           check=False).stdout.strip()
 
 
+# The solver of the tracked results. They record no per-case provenance:
+# this is the build record of the runs that produced them, stated in
+# README.md, and is not written into any case
+BASELINE = {"openfoam": "v2412", "solids4foam": "f33b244a2"}
+PROVENANCE_COLUMNS = ("openfoam_version", "openfoam_variant", "solver_build",
+                      "solver_binary_sha256", "tutorial_revision")
+
+
+def openfoam_variant(version: str, fork: str = "") -> str:
+    """OpenFOAM variant from WM_PROJECT_VERSION (and WM_FORK): v2512 is
+    OpenFOAM.com, a number such as 12 the OpenFOAM Foundation; '' if
+    unknown"""
+    if fork:
+        return fork
+    if re.fullmatch(r"v\d{4}", version):
+        return "OpenFOAM.com"
+    if re.fullmatch(r"\d+(\.\d+)?", version):
+        return "openfoam.org"
+    return ""
+
+
+def solver_build(executable: str = "") -> dict:
+    """What is known of the solids4foam build that runs the cases: the
+    executable, its SHA-256 and, if a BUILD_INFO.txt with a 'SHA=' line is in
+    the root of its build (<root>/platforms/<options>/bin/solids4Foam), that
+    revision. Nothing is guessed: an unknown entry is ''"""
+    executable = executable or shutil.which("solids4Foam") or ""
+    out = {"solver_executable": "", "solver_binary_sha256": "",
+           "solver_build": ""}
+    if not executable or not Path(executable).is_file():
+        return out
+    path = Path(executable).resolve()
+    out["solver_executable"] = str(path)
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    out["solver_binary_sha256"] = digest.hexdigest()
+    info = path.parents[3] / "BUILD_INFO.txt" if len(path.parents) > 3 \
+        else Path()
+    if info.is_file():
+        for line in info.read_text(errors="replace").splitlines():
+            if line.startswith("SHA="):
+                out["solver_build"] = line[4:].strip()
+                break
+    return out
+
+
+def provenance(executable: str = "") -> dict:
+    """OpenFOAM version and variant, solids4foam build and tutorial revision
+    of the environment that generates a case"""
+    version = os.environ.get("WM_PROJECT_VERSION", "")
+    out = {"openfoam_version": version,
+           "openfoam_variant": openfoam_variant(
+               version, os.environ.get("WM_FORK", ""))}
+    out.update(solver_build(executable))
+    out["tutorial_revision"] = git_sha()
+    return out
+
+
 def generate_case(run: str, method: str, level: int, dt: float, end: float,
                   name: str, ranks: int, force: bool,
-                  quadrature_choice: str = "auto") -> Path:
+                  quadrature_choice: str = HISTORICAL_QUADRATURE) -> Path:
     case = CASES_DIR / name
     if case.exists():
         if not force:
@@ -468,8 +501,7 @@ def generate_case(run: str, method: str, level: int, dt: float, end: float,
     replace_entry(control, "timePrecision", "10")
 
     motion = parameters(TUTORIAL_DIR)
-    quadrature = traction_quadrature(quadrature_choice) \
-        if method == "cutLink" else ""
+    quadrature = quadrature_choice if method == "cutLink" else ""
     write_fv_options(case / "constant/fvOptions", method, motion,
                      quadrature)
     fv_solution = case / "system/fvSolution"
@@ -492,11 +524,11 @@ def generate_case(run: str, method: str, level: int, dt: float, end: float,
         "fvOptions": dict(METHOD_SETTINGS[method][0]
                           + ([("tractionQuadrature", quadrature)]
                              if quadrature else [])),
-        "traction_quadrature": (
-            (quadrature or f"{HISTORICAL_QUADRATURE} (solver without the "
-             "tractionQuadrature keyword)") if method == "cutLink" else ""),
+        "traction_quadrature": quadrature,
         "body": dict(METHOD_SETTINGS[method][1]),
         "git_sha": git_sha(),
+        "provenance": provenance(),
+        "tracked_baseline": BASELINE,
         "generated": datetime.now().isoformat(timespec="seconds"),
     }
     (case / "case.json").write_text(json.dumps(meta, indent=2) + "\n")
@@ -577,7 +609,8 @@ def cmd_generate(args) -> int:
                  "use --force to regenerate it")
         generate_case(run, method, level, dt, end, name,
                       ranks_for(level, args, run), args.force,
-                      getattr(args, "traction_quadrature", "auto"))
+                      getattr(args, "traction_quadrature",
+                              HISTORICAL_QUADRATURE))
         manifest["cases"][name] = {
             "run": run, "method": method, "level": level, "deltaT": dt,
             "end_time": end, "ranks": ranks_for(level, args, run),
@@ -616,7 +649,8 @@ def cmd_run(args) -> int:
             continue
         generate_case(run, method, level, dt, end, name,
                       ranks_for(level, args, run), True,
-                      getattr(args, "traction_quadrature", "auto"))
+                      getattr(args, "traction_quadrature",
+                              HISTORICAL_QUADRATURE))
         manifest["cases"][name] = {
             "run": run, "method": method, "level": level, "deltaT": dt,
             "end_time": end, "ranks": ranks_for(level, args, run),
@@ -662,6 +696,8 @@ def cmd_submit(args) -> int:
     if args.max_cpus and queued_cpus + requested > args.max_cpus:
         fail(f"{queued_cpus} + {requested} CPUs would exceed --max-cpus "
              f"{args.max_cpus}")
+    if not todo:
+        return 0
     for name, entry in todo:
         level = entry["level"]
         print(f"  {name}: {entry['ranks']} rank(s), "
@@ -1102,6 +1138,8 @@ def analyse_case(case: Path, refs: dict) -> tuple:
            "nOuterCorrectors": meta["nOuterCorrectors"],
            "nCorrectors": meta["nCorrectors"], "solver": problem or "End",
            "mesh_hash": mesh_hash(case)}
+    row.update({k: meta.get("provenance", {}).get(k, "")
+                for k in PROVENANCE_COLUMNS})
     histories = {}
     checks = []
     if not files:
@@ -1255,15 +1293,29 @@ def cmd_analyse(args) -> int:
 # accuracy targets
 CHECK_METRICS = ("Cd_nrms_B", "Cl_nrms_B", "Cd_nrms_A", "Cl_nrms_A",
                  "Cd_hf_rms_above_5Hz")
+# Metrics that need scipy (a Butterworth filter); without it they are nan and
+# are skipped, never compared. The raw-force metrics do not need scipy
+SCIPY_METRICS = ("Cd_hf_rms_above_5Hz",)
 CHECK_RTOL = 0.05
 CHECK_ATOL = 0.002
+
+
+def have_scipy() -> bool:
+    try:
+        import scipy.signal  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def cmd_check(args) -> int:
     """PASS/FAIL of the analysed cases (postProcessing/cases.csv) against
     the tracked results: numerical integrity and the reproduction of the
     normalised RMS differences and the fluctuation level; cases without a
-    tracked result (e.g. another quadrature) are reported, not checked"""
+    tracked result (e.g. another quadrature) are reported, not checked.
+    The metrics that need scipy are skipped, and reported as skipped, only
+    if scipy is not installed; a nonfinite value of any other metric (or of
+    one of them with scipy installed) is a failure"""
     current = OUTPUT_DIR / "cases.csv"
     tracked = REFERENCE_DIR / "results" / "cases.csv"
     if not current.exists():
@@ -1272,7 +1324,15 @@ def cmd_check(args) -> int:
         rows = list(csv.DictReader(handle))
     with tracked.open() as handle:
         reference = {r["case"]: r for r in csv.DictReader(handle)}
-    failures, checked = 0, 0
+    failures, checked, skipped = 0, 0, 0
+    recorded = {(r.get("openfoam_version", ""), r.get("solver_build", ""))
+                for r in rows if r.get("openfoam_version")}
+    for version, build in sorted(recorded):
+        print(f"Solver of the analysed cases: OpenFOAM {version}, "
+              f"solids4foam build {build or 'not recorded'}; tracked "
+              f"results: OpenFOAM {BASELINE['openfoam']}, solids4foam "
+              f"{BASELINE['solids4foam']}")
+    scipy_installed = have_scipy()
     for r in rows:
         if r["integrity"] != "PASS":
             print(f"FAIL {r['case']}: numerical integrity "
@@ -1287,6 +1347,13 @@ def cmd_check(args) -> int:
             if not ref.get(key) or not r.get(key):
                 continue
             value, expected = float(r[key]), float(ref[key])
+            if (key in SCIPY_METRICS and not scipy_installed
+                    and not math.isfinite(value)):
+                skipped += 1
+                print(f"SKIP {r['case']}: {key} needs scipy, which is not "
+                      "installed (tracked "
+                      f"{expected:.5g}); not compared")
+                continue
             ok = abs(value - expected) <= max(CHECK_RTOL*abs(expected),
                                               CHECK_ATOL)
             checked += 1
@@ -1295,6 +1362,7 @@ def cmd_check(args) -> int:
             print(f"{'PASS' if ok else 'FAIL'} {r['case']}: {key} "
                   f"{value:.5g} (tracked {expected:.5g})")
     print(f"Check: {checked} comparisons, {failures} failure(s)"
+          f"{f', {skipped} skipped (scipy)' if skipped else ''}"
           f"{'' if checked else ' (nothing compared: SKIPPED)'}")
     return 1 if failures else 0
 
@@ -1312,16 +1380,21 @@ EXPORT_COLUMNS = (
     "Cd_ST_minus_ME_rms", "Cl_ST_minus_ME_rms", "Cd_inertia_max_abs",
     "Cd_forcing_only_nrms_B", "mesh_hash")
 EXPORT_STEP = 0.02
+# Run whose history is not exported: the serial repeat of R2A (identical
+# metrics, kept in cases.csv)
+HISTORY_NOT_TRACKED = ("O4",)
 ZOOM = (1.8, 2.2)
 
 
 def cmd_export(args) -> int:
     """Compact results of the analysed complete cases for reference/results/:
     cases.csv (selected columns, computed from the full histories, also of
-    the shorter runs), each history decimated to 0.02 s, and a
-    full-resolution window of 1.8-2.2 s of the finest 8 s case of each
-    method; the figures and the check can be regenerated from them without
-    work/"""
+    the shorter runs) and the 0.02 s histories of the 8 s runs that the
+    figures draw (not the serial repeat O4, whose metrics are in cases.csv,
+    nor the shorter runs). With --full-resolution, also a window of 1.8-2.2 s
+    of the finest 8 s case of each method, for cell_crossing only; these
+    files are not tracked. The figures other than cell_crossing and the check
+    can be regenerated from the tracked files without work/"""
     src = OUTPUT_DIR / "cases.csv"
     if not src.exists():
         fail("no postProcessing/cases.csv: run ./Allverify analyse first")
@@ -1332,20 +1405,26 @@ def cmd_export(args) -> int:
     out.mkdir(parents=True, exist_ok=True)
     with (out / "cases.csv").open("w", newline="") as handle:
         w = csv.writer(handle, lineterminator="\n")
-        w.writerow(EXPORT_COLUMNS)
+        # Provenance columns only where the analysed cases recorded them
+        columns = list(EXPORT_COLUMNS) + [
+            k for k in PROVENANCE_COLUMNS if any(r.get(k) for r in rows)]
+        w.writerow(columns)
         for r in rows:
-            w.writerow([r.get(k, "") for k in EXPORT_COLUMNS])
+            w.writerow([r.get(k, "") for k in columns])
+    full = [r for r in rows if abs(float(r["end_time"]) - END_TIME) < 1e-9]
     # The full-resolution window of the finest case of each method only
     finest = {}
-    for r in [r for r in rows
-              if abs(float(r["end_time"]) - END_TIME) < 1e-9]:
+    for r in full:
         key = (int(r["level"]), -float(r["deltaT"]))
         if r["method"] not in finest or key > finest[r["method"]][0]:
             finest[r["method"]] = (key, r["case"])
-    zoom_cases = {c for _, c in finest.values()}
-    for old in out.glob("zoom-*.csv"):
+    zoom_cases = {c for _, c in finest.values()} \
+        if getattr(args, "full_resolution", False) else set()
+    for old in list(out.glob("zoom-*.csv")) + list(out.glob("history-*.csv")):
         old.unlink()
-    for r in rows:
+    for r in full:
+        if r["run"] in HISTORY_NOT_TRACKED:
+            continue
         with (OUTPUT_DIR / f"history-{r['case']}.csv").open() as handle:
             hist = list(csv.reader(handle))
         keys, data = hist[0], hist[1:]
@@ -1392,13 +1471,14 @@ def main(argv=None) -> int:
                             "1, 2, 8, 8)")
         parser.add_argument("--force", action="store_true",
                             help="regenerate or resubmit existing cases")
-        parser.add_argument("--traction-quadrature", default="auto",
-                            choices=("auto", "greedy", "none", "clustered"),
-                            help="cutLink surface-traction quadrature: auto "
-                            "(default) selects greedy, that of the tracked "
-                            "results, if the solver has the "
-                            "tractionQuadrature keyword; another choice tags "
-                            "the case names")
+        parser.add_argument("--traction-quadrature",
+                            default=HISTORICAL_QUADRATURE,
+                            choices=QUADRATURES,
+                            help="cutLink surface-traction quadrature, "
+                            "written in fvOptions: greedy (default) is that "
+                            "of the tracked results; another choice tags "
+                            "the case names and needs a solver with the "
+                            "tractionQuadrature keyword")
     if command == "run":
         parser.add_argument("--dry-run", action="store_true",
                             help="list the cases; run nothing")
@@ -1416,6 +1496,11 @@ def main(argv=None) -> int:
                             help="further sbatch options")
         parser.add_argument("--yes", action="store_true",
                             help="submit (otherwise only a summary)")
+    if command == "export":
+        parser.add_argument("--full-resolution", action="store_true",
+                            help="also write the 1.8-2.2 s window of the "
+                            "finest case of each method (zoom-*.csv, for "
+                            "cell_crossing)")
     if command == "plot":
         parser.add_argument("extra", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)

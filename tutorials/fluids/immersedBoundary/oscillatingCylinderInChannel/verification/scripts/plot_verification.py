@@ -25,7 +25,9 @@ Further diagnostics:
                            used; not a scaling study)
     cell_crossing          Cd(t) at full time resolution over 0.4 s,
                            showing the force fluctuations as the cylinder
-                           crosses the cells
+                           crosses the cells; drawn only if the
+                           full-resolution extracts (zoom-*.csv, not
+                           tracked) exist
 
 The compact histories of reference/results/ are sampled every 0.02 s
 (Nyquist frequency 25 Hz). They are used for display only: the cell-
@@ -33,7 +35,7 @@ crossing fluctuations (39-314 Hz at the maximum velocity on D/h = 10-80)
 are aliased in them, so no frequency content or fluctuation level is read
 from them. Every error in the figures is read from cases.csv, computed by
 './Allverify analyse' from the complete histories, and cell_crossing uses
-the full-resolution extracts (zoom-<case>.csv).
+the full-resolution extracts (zoom-<case>.csv, not tracked).
 
 The style follows the staticCylinderInChannel verification: one colour,
 marker and line pattern per method (Okabe-Ito colours), the references in
@@ -140,8 +142,12 @@ def setup(dpi=200):
 PNG_ONLY = False
 
 # Footnotes printed under the figures
-SOLVER_NOTE = ("solids4foam f33b244a2 (unmodified); immersed boundary: Euler "
-               "(first order); references: backward (second order)")
+SOLVER_NOTE = ("OpenFOAM v2412, solids4foam f33b244a2 (unmodified); immersed "
+               "boundary: Euler (first order); references: backward (second "
+               "order)")
+GHOSTCELL_NOTE = ("ghostCell is documented for static bodies: its "
+                  "moving-body result is informative, not a general failure "
+                  "of the method")
 SAMPLING_NOTE = ("histories drawn from the compact files (every 0.02 s): "
                  "fluctuations above 25 Hz are aliased in the drawing; the "
                  "errors are computed from the complete histories")
@@ -278,7 +284,7 @@ def force_histories(plt, cases, data, refs, out, written):
     footnote(fig, SOLVER_NOTE, "D/h = 40, time step 0.000625 s, for all "
              "four methods (the finest mesh run by all of them); cutLink: "
              "surface traction, greedy quadrature; others: forcing + "
-             "interior inertia", SAMPLING_NOTE)
+             "interior inertia", GHOSTCELL_NOTE, SAMPLING_NOTE)
     save(fig, out, "force_histories", written)
     plt.close(fig)
 
@@ -327,9 +333,10 @@ def error_vs(plt, cases, out, written, xkey, xlabel, name, logx,
     fig.tight_layout(rect=(0, 0.12, 1, 1))
     fig.legend(handles, labels, ncol=3, loc="lower center",
                bbox_to_anchor=(0.5, 0.0))
-    notes = [SOLVER_NOTE, "raw forces; filled markers: time step halved with "
-             "the cell size (space and time refined together); legacy "
-             "incremental not run on D/h = 80"]
+    notes = [SOLVER_NOTE, GHOSTCELL_NOTE,
+             "raw forces; filled markers: time step halved with the cell "
+             "size (space and time refined together); legacy incremental "
+             "not run on D/h = 80"]
     if xkey == "cpu_hours":
         notes.append(COST_NOTE)
     footnote(fig, *notes)
@@ -391,12 +398,12 @@ def cutlink_estimators(plt, cases, data, refs, out, written):
     plt.close(fig)
 
 
-def read_zoom(data: Path, case: str) -> dict:
-    """The full-resolution window of a history if exported, else the
-    history"""
+def read_zoom(data: Path, case: str):
+    """The full-resolution window of a history, None if it is not exported
+    (the 0.02 s histories cannot show the cell crossing)"""
     path = data / f"zoom-{case}.csv"
     if not path.exists():
-        return read_history(data, case)
+        return None
     with path.open() as handle:
         rows = list(csv.reader(handle))
     cols = list(zip(*[[float(x) for x in r] for r in rows[1:]]))
@@ -411,6 +418,11 @@ def finest(cases: list, method: str):
 
 
 def cell_crossing(plt, cases, data, refs, out, written, window=(1.8, 2.2)):
+    if not any((data / f"zoom-{c['case']}.csv").exists() for c in cases):
+        print("cell_crossing skipped: no full-resolution extracts "
+              "(zoom-*.csv; './Allverify export --full-resolution' after "
+              "rerunning the finest cases)")
+        return
     fig, ax = plt.subplots(figsize=(7.4, 3.0))
     if "B" in refs:
         t, y = refs["B"]["Cd"]
@@ -422,6 +434,8 @@ def cell_crossing(plt, cases, data, refs, out, written, window=(1.8, 2.2)):
         if c is None:
             continue
         h = read_zoom(data, c["case"])
+        if h is None:
+            continue
         sel = [(a, b) for a, b in zip(h["t"], h["Cd_total"])
                if window[0] <= a <= window[1]]
         s = STYLE[method]
