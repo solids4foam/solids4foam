@@ -344,6 +344,25 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
+  `leastSquaresS4f`, which is implemented in solids4foam and so is the same
+  scheme in all OpenFOAM variants. The case conversion script no longer
+  replaces `pointCellsLeastSquares` with `leastSquares` on foam-extend, which
+  made foam-extend solve a different discretisation from OpenFOAM.com and
+  OpenFOAM.org in those tutorials (#549). The regression references of these
+  tutorials were re-recorded, and `blockPunch` now compares the cell
+  displacement field rather than the point-A displacement, which depends on
+  the fork's volume-to-point interpolation. The thermal and poroelastic
+  tutorials use `leastSquaresS4f` for `grad(D)` only, with `leastSquares` for
+  the scalar fields, for which the solid models register no boundary-face
+  list; `hotSphere` and `suctionCaission` keep `leastSquares` for `D` too, as
+  `leastSquaresS4f` moves their peak stress outside the regression bands
+  until the least-squares treatment of the symmetry and zero-shear patches is
+  settled.
+  The tutorials that run only on foam-extend keep `leastSquares`, which they
+  used before. On foam-extend, the case conversion now replaces
+  `pointCellsLeastSquares` with `leastSquaresS4f` in a user case, one way, so
+  that an old case runs with the same scheme as on OpenFOAM.
 - `IQNILS` with `couplingReuse` greater than zero is now robust: the reused
   secant modes are no longer applied to the residual of the solid-only
   predictor (`predictSolid`), which comes from a solid solve with the previous
@@ -368,7 +387,6 @@ release. For complete commit-level details and contributor information, see the
   4.2, and the regression tests pass unchanged. The results in the
   `verification/` READMEs of these tutorials were computed without reuse
   (#587).
-
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes

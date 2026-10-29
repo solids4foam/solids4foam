@@ -90,11 +90,13 @@ simply consists of creating the mesh using blockMesh (`./blockMesh`) followed by
 running the solids4foam solver (`./solids4Foam`).
 
 ```warning
-For OpenFOAM.com and OpenFOAM.org, the `pointCellsLeastSquares` or
-`edgeCellsLeastSquares` gradient schemes should be used for calculating the
-gradient of displacement; these are the only gradient schemes available in
-these versions, which are consistent with the required boundary non-orthogonal
-corrections.
+The `leastSquaresS4f` gradient scheme should be used for calculating the
+gradient of displacement. It is implemented in solids4foam, so it is the same
+scheme in all supported OpenFOAM variants, and it is consistent with the
+required boundary non-orthogonal corrections. In OpenFOAM.com and
+OpenFOAM.org, the `pointCellsLeastSquares` and `edgeCellsLeastSquares`
+schemes are also consistent with these corrections, but they do not exist in
+foam-extend.
 ```
 
 ---

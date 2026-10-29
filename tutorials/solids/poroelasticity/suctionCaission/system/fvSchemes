@@ -30,7 +30,11 @@ ddtSchemes
 
 gradSchemes
 {
-    default            pointCellsLeastSquares;
+    // leastSquaresS4f is not used here yet: with it for D, the max sigmaEq
+    // falls by about 50% and the max porePressure by 7% on foam-extend 4.1,
+    // outside the bands below, until the least-squares treatment of the
+    // zero-shear patches is settled (#578)
+    default            leastSquares;
 }
 
 divSchemes

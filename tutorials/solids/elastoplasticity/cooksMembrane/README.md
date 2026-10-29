@@ -68,7 +68,9 @@ displacement in the top right corner tends to a value of 7.4 mm, which is close
 to the values reported in
 [[1](https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705),
 [2](http://www.simplassoftware.com/benchmarks.html),
-[3](https://repositorio-aberto.up.pt/handle/10216/438)].
+[3](https://repositorio-aberto.up.pt/handle/10216/438)]. The tutorial case
+uses a coarse 12 x 12 cell mesh, which gives a vertical displacement of about
+6 mm.
 
 In the `solids4foam` case, the vertical displacement at the top right corner is
 extracted using the `solidPointDisplacement` function object placed in the

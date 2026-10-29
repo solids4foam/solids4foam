@@ -28,7 +28,10 @@ ddtSchemes
 
 gradSchemes
 {
-    default            pointCellsLeastSquares;
+    // leastSquaresS4f is not used here yet: with it, the max sigmaEq falls
+    // by about 30% on foam-extend 4.1 and D moves by about 1% (#578), until
+    // the least-squares treatment of the symmetry patches is settled
+    default            leastSquares;
 }
 
 divSchemes
