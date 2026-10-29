@@ -35,15 +35,15 @@ SIGMA_MIN=40e3
 SIGMA_MAX=58e3
 
 # The final D, as the max and mean component magnitude of the field written
-# to fourteen figures, with the leastSquares gradient on every fork:
-# before, OpenFOAM ran pointCellsLeastSquares, which moved the max by 5e-4.
-# The case as it ships is poroMechanicalLaw over anisotropicBiotElastic. These
-# are OpenFOAM.com v2412's; OpenFOAM.org 9 agrees to 1e-7, and foam-extend 4.1
-# gives a max 2e-4 larger and a mean 4e-4 of the max smaller. The tolerance,
-# 1e-3 of the largest value, covers that
-REF_D_MAX=0.024491259368787
-REF_D_MEAN=0.00530036045400924
-REF_D_REL_TOL=1e-3
+# to fourteen figures, with the leastSquaresS4f gradient for D on every fork
+# (#572): before, OpenFOAM ran pointCellsLeastSquares and foam-extend
+# leastSquares, which gave a max 8e-4 smaller. The case as it ships is
+# poroMechanicalLaw over anisotropicBiotElastic. These are OpenFOAM.com
+# v2412's; OpenFOAM.org 9 agrees to 2e-7, and foam-extend 4.1 gives a max
+# 1.8e-6 larger. The tolerance, 1e-5 of the largest value, covers that
+REF_D_MAX=0.024511194530932
+REF_D_MEAN=0.00528910987631167
+REF_D_REL_TOL=1e-5
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"

@@ -37,9 +37,26 @@ SIGMA_MAX=2.2e8
 YIELD_MIN=38
 YIELD_MAX=44
 
-REF_EPS=0.00547495
-REF_SIG=1.87848e+08
-REF_REL_TOL=2e-3
+# The final extrema with the leastSquaresS4f gradient on every fork, from the
+# tutorial log, per fork. The log gives six figures, so a round-off
+# difference on another machine can move the last one; the tolerance, 1e-5
+# relative, is a few units in that digit. A plastic history error would show
+# here as a difference the unit checks cannot see
+case "$(solids4Foam::foamFlavour)" in
+    com)
+        REF_EPS=0.00547495
+        REF_SIG=1.87848e+08
+        ;;
+    org)
+        REF_EPS=0.00547495
+        REF_SIG=1.87848e+08
+        ;;
+    foamextend)
+        REF_EPS=0.00547921
+        REF_SIG=1.87903e+08
+        ;;
+esac
+REF_REL_TOL=1e-5
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -439,7 +456,7 @@ EOD
     fi
 
     if ! ( cd "${d}" \
-        && decomposePar "${decompose_args[@]}" > log.decomposePar 2>&1 )
+        && decomposePar ${decompose_args[@]+"${decompose_args[@]}"} > log.decomposePar 2>&1 )
     then
         echo "FAIL: parallel restart (decomposePar failed)"
         echo "      (see ${d}/log.decomposePar)"

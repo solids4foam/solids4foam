@@ -20,8 +20,9 @@ fi
 # Regression tolerances
 # ------------------------------------------------------------
 
-# Stress should be ~0 (numerical noise only): 1033 Pa with the leastSquares
-# gradient on every fork
+# Stress should be ~0 (numerical noise only): 576 Pa on OpenFOAM.com v2412 and
+# OpenFOAM.org 9 and 698 Pa on foam-extend 4.1, with the leastSquaresS4f
+# gradient for D
 SIGMA_MAX=1.1e3    # Pa
 
 # Strain should be O(1e-8)
@@ -39,12 +40,14 @@ ALLRUN_LOGFILE="log.Allrun"
 # as written. thermoMechanicalLaw is a composite: it owns a sub-law, delegates
 # to it, and subtracts the thermal term, and the framework reproduced the
 # removed legacy mechanicalModel's D field exactly, in every figure written, on
-# every fork (mcl-stage8-coverage, c3a92b3d). These are OpenFOAM.com v2512's,
-# the same as OpenFOAM.org 9's; foam-extend 4.1 gives a max 1.8e-3 smaller,
-# and the tolerance, 3e-3 of the largest value, covers that
-REF_D_MAX=0.0484734
-REF_D_MEAN=0.0120319022347934
-REF_D_REL_TOL=3e-3
+# every fork (mcl-stage8-coverage, c3a92b3d). They were re-recorded when the
+# gradient scheme changed from pointCellsLeastSquares to leastSquaresS4f for D
+# (#572), which moved the max by 3e-3 (0.0484734 before). These are
+# OpenFOAM.com v2412's, the same as OpenFOAM.org 9's; foam-extend 4.1 gives a
+# max 7.4e-4 larger, and the tolerance, 2e-3 of the largest value, covers that
+REF_D_MAX=0.0483273
+REF_D_MEAN=0.0120251053114136
+REF_D_REL_TOL=2e-3
 
 echo "============================================================"
 echo "slabCooling regression test"
