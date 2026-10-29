@@ -188,6 +188,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
     "fluidSolidInteraction/womersleyTube"
+    "fluidSolidInteraction/radialTorsionalRing"
     # Not tutorials: a test application's case, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
 )

@@ -1,0 +1,27 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+fluidSolidInterface    IQNILS;
+IQNILSCoeffs
+{
+    solidPatch interface;
+    fluidPatch interface;
+    predictor            yes;
+    predictSolid         yes;
+    relaxationFactor     0.05;
+    outerCorrTolerance   1e-06;
+    // absolute interface point-mismatch tolerance [m]: the C-inf ramp starts with signals at
+    // round-off level, where the relative residual (normalised by the largest residual seen so
+    // far) cannot reach 1e-6 (pilot R1 attempt 1 stalled at t = 0.035 s); 1e-12 m is 1e-11 of the
+    // expected interface displacement
+    outerCorrAbsoluteTolerance 1e-12;
+    nOuterCorr           100;
+    couplingReuse        5;
+    coupled              yes;
+    interfaceTransferMethod directMap;
+    writeResidualsToFile yes;
+}

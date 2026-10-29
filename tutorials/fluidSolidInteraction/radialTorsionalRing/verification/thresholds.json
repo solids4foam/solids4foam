@@ -1,0 +1,535 @@
+{
+  "_comment": "Thresholds of verify.py. Every entry has a value and the provenance of the value. Edit here only; the scripts read no other thresholds.",
+  "layerA": {
+    "outerCorrTolerance_default": {
+      "value": 1e-06,
+      "provenance": "constant/fsiProperties of all accepted cases (read from the case when present)"
+    },
+    "nOuterCorr_default": {
+      "value": 100,
+      "provenance": "constant/fsiProperties of all accepted cases; the solver aborts (FOAM FATAL) at this limit when allowUnconvergedCoupling is unset"
+    },
+    "max_fsi_iterations": {
+      "value": 30,
+      "provenance": "an independent audit of the accepted runs (max FSI iterations <= 30)"
+    },
+    "max_fsi_iterations_from_t": {
+      "value": 0.25,
+      "provenance": "independent audit recommendation: start-up window (t < 0.25 s, where abs-accepted steps and the 34-iteration M2 combined step occur) excluded"
+    },
+    "abs_accept_startup_end_t": {
+      "value": 0.35,
+      "provenance": "independent audits: absolute-tolerance acceptances lie in 0.03-0.34 s; later ones are flagged CONDITIONAL"
+    },
+    "p_solves_per_continuity": {
+      "value": "nNonOrthogonalCorrectors + 1",
+      "provenance": "independent audits: 3.0 with nNonOrthogonalCorrectors 2 (read from system/fluid/fvSolution when present, else 3)"
+    },
+    "p_final_residual_max": {
+      "value": 1e-12,
+      "provenance": "system/fluid/fvSolution tolerance of p; independent audits: 9.99999e-13"
+    },
+    "U_final_residual_max": {
+      "value": 1e-13,
+      "provenance": "system/fluid/fvSolution tolerance of U; independent audits: 9.998e-14"
+    },
+    "final_residual_slack": {
+      "value": 1e-06,
+      "provenance": "relative slack for printed-digit rounding of the final residual"
+    },
+    "continuity_sum_local_max_torsion": {
+      "value": 1e-16,
+      "provenance": "an independent audit (informational): 8.2e-17"
+    },
+    "continuity_sum_local_max_radial_flow": {
+      "value": 2e-16,
+      "provenance": "an independent audit rebase for radial/combined (informational): 1.33e-16 in the accepted iterate; 1.24e-15 in non-accepted iterations"
+    },
+    "contraction_start_t": {
+      "value": 0.5,
+      "provenance": "start-up excluded up to 0.5 s; an independent audit: 0-0.5 s window GM 0.920 is start-up"
+    },
+    "contraction_audit_start_t": {
+      "value": 1.5,
+      "provenance": "applied from 1.5 s; windows between contraction_start_t and this time can only be CONDITIONAL"
+    },
+    "contraction_window_gm_max": {
+      "value": 0.9,
+      "provenance": "an independent audit of the accepted runs: geometric-mean contraction of a window <= 0.90"
+    },
+    "contraction_run_max": {
+      "value": 2,
+      "provenance": "independent audits: no run of >= 3 consecutive steps with contraction > 1 (from the start of the enforced window)"
+    },
+    "solid_Jmin_min": {
+      "value": 0.99,
+      "provenance": "independent audits: solid Jmin > 0.99"
+    },
+    "balance_window_max": {
+      "value": 0.01,
+      "provenance": "independent audits: AM and energy residual per window <= 1e-2. INFORMATIONAL: exceeded in most accepted runs, decreasing with mesh refinement in torsion"
+    },
+    "linear_finals_startup_end_t": {
+      "value": 0.25,
+      "provenance": "found while validating: M1 combined p solves stop at maxIter 1000 with final residual ~2e-9 in start-up steps (signals at round-off); report the M3 runs only. Same start-up end as the iteration criterion"
+    }
+  },
+  "layerB_deterministic": {
+    "primary_qoi": {
+      "value": [
+        "alpha_B",
+        "w_wall",
+        "T_B",
+        "sig_rt",
+        "T_A",
+        "H_s",
+        "H_f",
+        "P_wall",
+        "KE_s"
+      ],
+      "provenance": "the primary rotational set of the verification"
+    },
+    "secondary_qoi_excluded_from_orders": {
+      "value": [
+        "sig_rr",
+        "p_b",
+        "u_B"
+      ],
+      "provenance": "normal-traction discrepancy, excluded from order claims"
+    },
+    "torsion_order_band": {
+      "value": [
+        1.65,
+        2.1
+      ],
+      "provenance": "measured 1.72-2.07 (nNonOrthogonalCorrectors 2 family, 0-2 and 0-1.8 s); auditor ranges down to 1.68 for H_f"
+    },
+    "torsion_order_headline_band": {
+      "value": [
+        1.8,
+        2.0
+      ],
+      "provenance": "claim boundary wording; QoIs outside are listed, not hidden"
+    },
+    "combined_floor_band_M3": {
+      "value": [
+        0.0025,
+        0.0053
+      ],
+      "provenance": "the three-mesh combined study: M3 combined max-norm error 3.1e-3 (alpha_B), 4.3e-3 (T_B), 5.2e-3 (sig_rt), 3.1e-3 (T_A), 3.06e-3 (H_f). The floor statement 'about 2.5-5.2e-3' holds only for these five quantities; 2.5e-3 is the lower edge of the band, the lowest measured value is 3.06e-3 (H_f). Not for H_s (6.9e-3), w_wall (6.3e-3), KE_s (1.06e-2), P_wall (4.8e-2)",
+      "qoi": [
+        "alpha_B",
+        "T_B",
+        "sig_rt",
+        "T_A",
+        "H_f"
+      ]
+    },
+    "combined_self_order_band": {
+      "value": [
+        1.8,
+        2.15
+      ],
+      "provenance": "the three-mesh combined study self-convergence: sharp for alpha_B (1.97) and H_f (1.94); nominal 2.00 (T_B), 1.97 (sig_rt), 2.09 (T_A) with noise-limited intervals 1.39-2.60, 1.39-2.54, 1.63-2.55. The band is a qualifying range, not a proof of order"
+    },
+    "mixed_term_max_error_over_signal_M3_0_2": {
+      "value": {
+        "d_alpha": 0.025,
+        "d_T": 0.03,
+        "d_sig_rt": 0.03
+      },
+      "provenance": "measured on M3 over 0-2 s: 1.5%, 2.5%, 2.2% (stated 1.5-2.5%)"
+    },
+    "mixed_term_max_error_over_signal_M3_0_1p8": {
+      "value": {
+        "d_alpha": 0.025,
+        "d_T": 0.03,
+        "d_sig_rt": 0.036
+      },
+      "provenance": "measured over 0-1.8 s: 1.5%, 2.6%, 3.4% (d_sigma_rt up to 3.4%)"
+    },
+    "band_conditional_margin": {
+      "value": 0.2,
+      "provenance": "outside a band by less than this fraction: CONDITIONAL; further: FAIL"
+    },
+    "combined_second_order_qoi": {
+      "value": [
+        "alpha_B",
+        "T_B",
+        "sig_rt",
+        "T_A",
+        "H_f"
+      ],
+      "provenance": "the three-mesh combined study (0-2 s): self-orders 1.97, 2.00, 1.97, 2.09, 1.94, of which only alpha_B (1.96-1.97) and H_f (1.93-1.94) have sharp intervals while T_B, sig_rt and T_A are noise-limited (1.39-2.60, 1.39-2.54, 1.63-2.55); the other primary QoIs are not second order (H_s 1.63, w_wall 1.66, P_wall 0.70) and are reported as such"
+    },
+    "_comment": "DETERMINISTIC scientific bands from the accepted results. They are not widened to make a result pass. Statuses derived from them are further qualified by the numerical-noise section."
+  },
+  "numerical_noise": {
+    "_comment": "NUMERICAL-NOISE allowances (decomposition, restart and iteration noise), kept apart from the deterministic bands. They only qualify or downgrade: a value inside a deterministic band but closer to an edge than the allowance cannot be reported PASS (CONDITIONAL), and an allowance never creates a PASS. One consistent statement: the noise of a max-norm error is about 2.4e-4 of max|ref| for the torsion runs and about 1.3e-3 of max|ref| for the combined runs (torque 1.26e-3, shear 1.21e-3, T_A 8.9e-4; rotation and angular momentum are three orders smaller). The audits' '~1e-3 torque/shear band' is the combined-run value.",
+    "torsion_max_norm_noise_of_E": {
+      "value": 0.00024,
+      "provenance": "the M3 torsion run against its earlier attempt torque 1.8e-4 (an independent audit of the M3 torsion run); a restarted M3 torsion run against its earlier attempt 2.4e-4 (restart noise floor); an independent audit of the M1 and M2 torsion runs: torque-level difference up to 1.8e-4 on M3, high-pass torque error <= 1.6e-4. Fractions of max|ref|; TORSION runs"
+    },
+    "combined_max_norm_noise_of_E": {
+      "value": 0.0013,
+      "provenance": "serial vs 4-rank M2 combined (n = 0 pilot): T_B 1.26e-3, sig_rt 1.21e-3, T_A 8.9e-4 of max|ref| (an earlier serial-against-4-rank comparison of an M2 combined pilot); the absolute-tolerance test run against its baseline (absTol 1e-12 -> 1e-10): T_B 8.8e-4, sig_rt 8.6e-4, T_A 5.8e-4 (recomputed from the raw series of the runs). Fractions of max|ref|; COMBINED runs; the generic value for torque/shear-type quantities"
+    },
+    "scotch_partition": {
+      "value": "not reproducible",
+      "provenance": "two fresh decompositions of the same M3 mesh differ; the accepted M3 torsion and combined runs used different partitions "
+    },
+    "pressure_solver_cap_steps": {
+      "value": "51 p solves at maxIter 1000 in t = 0.0275-0.0325 s of every radial/combined run",
+      "provenance": "an independent audit of the pressure-solver cap: |p| 1e-16 to 1e-13 of max, 0.8-1.7% of run time, immaterial"
+    },
+    "noise_E_by_qoi_combined": {
+      "value": {
+        "T_B": 0.0013,
+        "sig_rt": 0.00121,
+        "alpha_B": 5.7e-06,
+        "H_f": 1.11e-05
+      },
+      "provenance": "fractions of max|ref| of the combined runs: T_B 1.26e-3 (serial vs 4 ranks; rounded up to 1.3e-3; the absolute-tolerance test run change 8.8e-4); sig_rt 1.21e-3 (serial vs 4 ranks; the absolute-tolerance test run 8.6e-4); alpha_B max(3.4e-6 serial vs 4 ranks, 5.7e-6 the absolute-tolerance test run change); H_f max(1.1e-5 serial vs 4 ranks, 6.9e-6 the absolute-tolerance test run change)"
+    },
+    "mixed_term_allowance": {
+      "formula": "allowance(d_q) = noise_E_by_qoi_combined[q] x max|q_ref, combined| / max|mixed-term reference signal|   (error/signal units)",
+      "qoi_of_term": {
+        "d_alpha": "alpha_B",
+        "d_T": "T_B",
+        "d_sig_rt": "sig_rt",
+        "d_Hf": "H_f"
+      },
+      "magnitudes_from_reference_json": {
+        "max_abs_T_B_combined": 453.98,
+        "max_abs_T_B_torsion": 443.28,
+        "max_abs_sig_rt_combined": 418.38,
+        "max_abs_sig_rt_torsion": 442.72,
+        "max_abs_alpha_B_combined": 0.11257,
+        "max_abs_H_f_combined": 169.32,
+        "signal_d_T": 74.427,
+        "signal_d_sig_rt": 90.315,
+        "signal_d_alpha": 0.018095,
+        "signal_d_Hf": 21.522,
+        "units": "T_B, H_f per radian per metre of depth (N m m-1 rad-1); sig_rt in Pa; alpha_B in rad"
+      },
+      "documented_values": {
+        "d_T": 0.00793,
+        "d_sig_rt": 0.0056,
+        "d_alpha": 3.5e-05,
+        "d_Hf": 8.7e-05
+      },
+      "documented_values_check": "1.3e-3 x 453.98 / 74.427 = 7.93e-3; 1.21e-3 x 418.38 / 90.315 = 5.60e-3; 5.7e-6 x 0.11257 / 0.018095 = 3.5e-5; 1.11e-5 x 169.32 / 21.522 = 8.7e-5. The earlier value 2.6e-3 used max|T_B| of about 155 instead of 454 and was wrong.",
+      "torsion_member_in_quadrature": {
+        "d_T": 0.00806,
+        "d_sig_rt": 0.00573,
+        "note": "adding the torsion member (2.4e-4 x max|q_ref, torsion|) in quadrature changes the allowance by 1.6% and 2.3%; not used, reported for completeness"
+      },
+      "cross_check_absolute_tolerance_test_run": "changing the absolute tolerance on M2 (the absolute-tolerance test run against its baseline) moves d_T by 5.35e-3 and d_sig_rt by 4.0e-3 of the signal, below the allowances"
+    },
+    "order_uncertainty": {
+      "method": "first-order propagation: sigma_p23 = (1/ln 2) sqrt((delta/E2)^2 + (delta/E3)^2), first pair analogously; interval = nominal +/- sigma; delta = the max-norm noise of the family (torsion_max_norm_noise_of_E or combined_max_norm_noise_of_E, in units of max|ref|). Self-orders: delta replaced by sqrt(2) delta on the differences d12, d23. The worst-case combination (+/- delta on every error) is also reported.",
+      "provenance": "reproduces the audit's T_B 1.76-2.13 (second pair, torsion, 0-2 s: 1.75-2.13). L2-in-time orders: the noise is documented only in the max-norm, so no L2 interval is given.",
+      "never_manufactures_pass": true,
+      "noise_limited_halfwidth": {
+        "value": 0.15,
+        "provenance": "an order interval whose half-width exceeds 0.15 is labelled noise-limited in the driver output: the torsion torque-type orders (+/-0.19 to +/-0.31) and the combined torque, shear and T_A self-orders (+/-0.46 to +/-0.60) exceed it, alpha_B and H_f (+/-0.01) do not"
+      }
+    },
+    "noise_E_by_qoi": {
+      "value": {
+        "torsion": {
+          "alpha_B": 6.9e-07,
+          "H_f": 8.6e-07,
+          "default": 0.00024
+        },
+        "combined": {
+          "alpha_B": 5.7e-06,
+          "H_f": 1.11e-05,
+          "T_B": 0.0013,
+          "sig_rt": 0.00121,
+          "T_A": 0.00089,
+          "H_s": 1.2e-05,
+          "w_wall": 0.000113,
+          "P_wall": 0.00064,
+          "default": 0.0013
+        }
+      },
+      "provenance": "fractions of max|ref|, max-norm. Torsion: the M3 torsion run against its earlier attempt alpha 4.9e-7, H_f 8.6e-7, torque and shear 1.8e-4; the M3 torsion run against a restart alpha 6.9e-7, torque 2.2e-4; a restarted M3 torsion run against its earlier attempt torque 2.4e-4 (an independent audit of the M3 torsion run and an independent audit of the earlier M3 restarts); quantities without a measurement (T_B, sig_rt, T_A, H_s, w_wall, P_wall, KE_s) use the torque value 2.4e-4. Combined: serial vs 4 ranks (an earlier serial-against-4-rank comparison of an M2 combined pilot) T_B 1.26e-3, sig_rt 1.21e-3, T_A 8.85e-4, P_wall 6.4e-4, w_wall 1.13e-4, H_s 9.8e-6, H_f 1.11e-5, alpha_B 3.4e-6; the absolute-tolerance test run against its baseline alpha_B 5.7e-6, H_s 1.2e-5, H_f 6.9e-6, w_wall 8.7e-5, T_B 8.8e-4; KE_s unmeasured: default 1.3e-3"
+    }
+  },
+  "family_consistency": {
+    "_comment": "Checks done before any spatial-convergence or mixed-term assessment, from the actual dictionaries (never from metadata).",
+    "expected_mesh_ntheta_nrs_nrf": {
+      "value": {
+        "M1": [
+          64,
+          8,
+          16
+        ],
+        "M2": [
+          128,
+          16,
+          32
+        ],
+        "M3": [
+          256,
+          32,
+          64
+        ]
+      },
+      "provenance": "study meshes; refinement ratio 2 per level"
+    },
+    "expected_refinement_ratio": {
+      "value": 2,
+      "provenance": "M1-M2-M3"
+    },
+    "documented_absTol_by_mesh": {
+      "value": {
+        "M1": 1e-12,
+        "M2": 1e-12,
+        "M3": 1e-10
+      },
+      "provenance": "accepted runs; effect bounded on M2 only (the absolute-tolerance test run against its baseline), M3 not bounded -> CONDITIONAL"
+    },
+    "physics": {
+      "value": {
+        "E": 20000.0,
+        "nu_s": 0.3,
+        "rho_s": 1000.0,
+        "nu_f": 0.3,
+        "rho_f": 1000.0,
+        "deltaT": 0.0025,
+        "endTime": 2.0,
+        "nNonOrthogonalCorrectors": 2,
+        "nOuterCorrectors": 2,
+        "nCorrectors": 3
+      },
+      "provenance": "README Table 1; accepted runs"
+    },
+    "drives": {
+      "value": {
+        "torsion": {
+          "theta0": 0.1,
+          "P0": 0.0
+        },
+        "radial": {
+          "theta0": 0.0,
+          "P0": -3000.0
+        },
+        "combined": {
+          "theta0": 0.1,
+          "P0": -3000.0
+        },
+        "Omega": 3.0,
+        "T_ramp": 1.0
+      },
+      "provenance": "checked by recomputing the tables with rt_reference.py and comparing with constant/timeVsAngle and constant/pcTable"
+    },
+    "coupling": {
+      "value": {
+        "outerCorrTolerance": 1e-06,
+        "relaxationFactor": 0.05,
+        "couplingReuse": 5,
+        "nOuterCorr": 100
+      },
+      "provenance": "constant/fsiProperties of the accepted runs"
+    },
+    "table_relative_tolerance": {
+      "value": 1e-09,
+      "provenance": "tables are written with 12-17 significant digits"
+    },
+    "documented_benchmark_settings": {
+      "value": {
+        "fluidSolidInterface": "IQNILS",
+        "interfaceTransferMethod": "directMap",
+        "predictor": "yes",
+        "predictSolid": "yes",
+        "coupled": "yes",
+        "solidModel": "nonLinearGeometryTotalLagrangianTotalDisplacement",
+        "solutionAlgorithm": "PETScSNES",
+        "solid_predictor": "yes",
+        "stabilisation_type": "diffStencilLaplacian",
+        "stabilisation_scaleFactor": 0.5,
+        "law": "neoHookeanElastic",
+        "planeStress": "no",
+        "momentumPredictor": "on",
+        "fluxConsistentPatches": "outer",
+        "fluidModel": "pimpleFluid",
+        "simulationType": "laminar",
+        "dynamicFvMesh": "dynamicMotionSolverFvMesh",
+        "motionSolver": "displacementLaplacian",
+        "diffusivity": "quadratic inverseDistance ( interface )"
+      },
+      "provenance": "constant/fsiProperties, solidProperties, mechanicalProperties, fluid dictionaries and system/fluid/fvSolution of the accepted runs (identical in all; read from an accepted M1 combined run and the tutorial's stored set)"
+    },
+    "documented_solver_text": {
+      "value": {
+        "p_solver": "maxIter 1000 minIter 1 relTol 0 smoother GaussSeidel solver GAMG tolerance 1e-12",
+        "U_solver": "minIter 1 preconditioner DILU relTol 0 solver PBiCG tolerance 1e-13"
+      },
+      "provenance": "system/fluid/fvSolution of the accepted runs (comments and whitespace normalised)"
+    },
+    "documented_bc_types": {
+      "value": {
+        "0/fluid/U": [
+          [
+            "frontAndBack",
+            "empty"
+          ],
+          [
+            "interface",
+            "newMovingWallVelocity"
+          ],
+          [
+            "outer",
+            "codedMixed"
+          ]
+        ],
+        "0/fluid/p": [
+          [
+            "frontAndBack",
+            "empty"
+          ],
+          [
+            "interface",
+            "zeroGradient"
+          ],
+          [
+            "outer",
+            "codedFixedValue"
+          ]
+        ],
+        "0/fluid/pointDisplacement": [
+          [
+            "frontAndBack",
+            "empty"
+          ],
+          [
+            "interface",
+            "fixedValue"
+          ],
+          [
+            "outer",
+            "fixedValue"
+          ]
+        ],
+        "0/solid/D": [
+          [
+            "frontAndBack",
+            "empty"
+          ],
+          [
+            "inner",
+            "fixedRotation"
+          ],
+          [
+            "interface",
+            "solidTraction"
+          ]
+        ]
+      },
+      "provenance": "0/ dictionaries of the accepted runs"
+    },
+    "documented_code_hashes": {
+      "value": {
+        "0/fluid/U": {
+          "current": [
+            "69ba034b1551d255"
+          ]
+        },
+        "0/fluid/p": {
+          "current": [
+            "6bc8bc132720b3aa",
+            "3f819d87c93a4250"
+          ],
+          "legacy": [
+            "36390a6890314da4",
+            "3f819d87c93a4250"
+          ]
+        }
+      },
+      "provenance": "sha256[:16] of the whitespace- and comment-normalised #{ #} blocks (case paths do not occur in them). current: M1, M3 accepted runs and the tutorial; legacy: the M2 accepted runs (seed 0 => identical boundary values, an independent audit of the legacy diagnostics and the seed-0 pressure code)"
+    },
+    "documented_fingerprints": {
+      "value": {
+        "constant/physicsProperties": "c6e491223553ec40",
+        "constant/g": "0f76371cc9b32c67",
+        "constant/fluid/fluidProperties": "19a5fa8ad6089a6b",
+        "constant/fluid/transportProperties": "98340a3b225bf9b2",
+        "constant/fluid/momentumTransport": "d1a8f6bf43f954e7",
+        "constant/fluid/turbulenceProperties": "d1a8f6bf43f954e7",
+        "constant/fluid/dynamicMeshDict": "844ab51998cab68c",
+        "constant/fluid/g": "0f76371cc9b32c67",
+        "constant/solid/solidProperties": "802ee9881efbfe30",
+        "constant/solid/mechanicalProperties": "56c26e3f149dedcc",
+        "constant/solid/dynamicMeshDict": "827414a68f82fff8",
+        "constant/solid/g": "0f76371cc9b32c67",
+        "system/fluid/fvSchemes": "b7d2ca58a159163f",
+        "system/fluid/fvSolution": "032577e336bfceef",
+        "system/solid/fvSchemes": "bd159a8a3fedb76f",
+        "system/solid/fvSolution": "9809dcc433371b6f",
+        "constant/fsiProperties": "d0dc86f2b44620be",
+        "0/fluid/U": "4b3049314530d8f3",
+        "0/fluid/p": "0b93b0d7bc01718f",
+        "0/fluid/pointDisplacement": "97d5c4ca5255a34c",
+        "0/solid/D": "234c940d7f63bda9"
+      },
+      "provenance": "semantic fingerprint (canonical form of the parsed dictionary: comments, whitespace, number formats and entry order ignored; code blocks, the absolute tolerance value masked) of each small dictionary; identical in the accepted M1, M2, M3 runs and the tutorial's stored set"
+    },
+    "documented_controlDict": {
+      "value": {
+        "entries": {
+          "application": "solids4Foam",
+          "startFrom": "startTime",
+          "startTime": "0",
+          "stopAt": "endTime",
+          "deltaT": "0.0025",
+          "writeControl": "adjustableRunTime",
+          "purgeWrite": "0",
+          "writeFormat": "ascii",
+          "writePrecision": "14",
+          "writeCompression": "off",
+          "timeFormat": "general",
+          "timePrecision": "10",
+          "runTimeModifiable": "no"
+        },
+        "fingerprint": "daff9d62cd993064",
+        "diag_code_current": [
+          "1b2cf5b32d1048f8",
+          "1b2cf5b32d1048f8",
+          "6a4d3fba40ca8695",
+          "8a5b2f150741c458"
+        ],
+        "diag_code_legacy": [
+          "1b2cf5b32d1048f8",
+          "1b2cf5b32d1048f8",
+          "3d24e5df1e837442",
+          "7a477a2921b3ad93"
+        ]
+      },
+      "provenance": "canonical form (semantic, order- and comment-insensitive) of the controlDict of the accepted runs: every top-level entry before and after the functions block except endTime and writeInterval, the function-object parameters, and the hashes of the normalised function-object code (current: M1 and M3 runs; older serial-only version: M2 runs)"
+    },
+    "documented_geometry": {
+      "value": {
+        "A": 0.5,
+        "B": 1.0,
+        "c": 2.0,
+        "depth": 0.1
+      },
+      "provenance": "geometry of the benchmark: solid ring A <= R <= B, fluid B <= r <= c, depth 0.1 m (all vertex and arc radii of the blockMeshDicts)"
+    },
+    "documented_mesh_fingerprints": {
+      "value": {
+        "solid": [
+          "e923aec412688e33",
+          "231abcc148b9af4b"
+        ],
+        "fluid": [
+          "c11afd07249b0c1f",
+          "98c7d4ebaca82b0b"
+        ]
+      },
+      "provenance": "semantic fingerprint of vertices, arcs, block topology and patch definitions of the blockMeshDicts (cell counts excluded); identical for the three meshes of every accepted run"
+    }
+  }
+}

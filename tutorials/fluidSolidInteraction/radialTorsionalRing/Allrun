@@ -1,0 +1,130 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun                          # the STORED dictionaries (M1, combined, serial); nothing is regenerated,
+#                                   # only the reference solution is written (safe under tutorials/Alltest)
+# ./Allrun M2 torsion               # M2 mesh, torsion only, serial
+# ./Allrun M3 combined parallel     # M3 mesh, combined, 4 ranks
+# ./Allrun M3 torsion parallel np=4
+# ./Allrun M1 radial endTime=0.5    # shortened run
+#
+# Options (any order):
+#   M1 | M2 | M3                 mesh level, ntheta x nrs x nrf = 64x8x16, 128x16x32, 256x32x64
+#   torsion | radial | combined  drive configuration
+#   serial | parallel            run mode (default serial)
+#   np=N                         number of ranks in parallel mode (default 4)
+#   nNonOrth=N                   nNonOrthogonalCorrectors (default 2, the verification setting)
+#   absTol=X                     outerCorrAbsoluteTolerance (default 1e-12 for M1/M2, 1e-10 for M3)
+#   endTime=T                    end time in s (default 2)
+#   reconstruct                  reconstructPar the last time after a parallel run
+#   regenerate                   rewrite all dictionaries with makeCase.py even with no other option
+#
+# Without any of M1|M2|M3, torsion|radial|combined, nNonOrth=, absTol=, endTime=, np=N (parallel) or
+# regenerate, the stored dictionaries are used as they are, so a script that edits them (for example
+# tutorials/Alltest, which cuts the run to one step) is respected. Any of those options rewrites the
+# dictionaries (makeCase.py), including controlDict. ./Allclean restores the stored M1 set.
+
+# The exact boundary conditions and the conservation function objects use
+# coded (dynamicCode) conditions, which foam-extend lacks
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# PETSc is required for the solid solver (SNES)
+solids4Foam::requirePetscOrExitSilently
+
+# python3 with numpy and scipy generates the case and the reference solution
+if ! command -v python3 >/dev/null 2>&1 || ! python3 -c "import numpy, scipy" >/dev/null 2>&1; then
+    echo "python3 with numpy and scipy: command not found, which is required for this case"
+    exit 0
+fi
+
+mesh=M1
+config=combined
+runMode=serial
+np=4
+nNonOrth=2
+absTol=""
+endTime=2
+reconstruct=no
+regenerate=no
+npGiven=no
+
+for arg in "$@"
+do
+    case "$arg" in
+        M1|M2|M3) mesh="$arg"; regenerate=yes ;;
+        torsion|radial|combined) config="$arg"; regenerate=yes ;;
+        regenerate) regenerate=yes ;;
+        serial) runMode=serial ;;
+        parallel) runMode=parallel ;;
+        np=*) np="${arg#np=}"; npGiven=yes ;;
+        nNonOrth=*) nNonOrth="${arg#nNonOrth=}"; regenerate=yes ;;
+        absTol=*) absTol="${arg#absTol=}"; regenerate=yes ;;
+        endTime=*) endTime="${arg#endTime=}"; regenerate=yes ;;
+        reconstruct) reconstruct=yes ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [M1|M2|M3] [torsion|radial|combined] [serial|parallel] [np=N] [nNonOrth=N] [absTol=X] [endTime=T] [regenerate] [reconstruct]"
+            exit 1
+            ;;
+    esac
+done
+
+if [[ "$runMode" == "serial" ]]; then np=1; fi
+# the stored decomposeParDict has 4 subdomains: any other rank count needs a rewrite
+if [[ "$runMode" == "parallel" && "$npGiven" == "yes" && "$np" != "4" ]]; then regenerate=yes; fi
+
+if [[ "$regenerate" == "yes" ]]; then
+    echo "Mesh ${mesh}, configuration ${config}, ${runMode} (np = ${np}), nNonOrthogonalCorrectors ${nNonOrth}, endTime ${endTime}: regenerating the dictionaries"
+    # Write the meshes, the drive tables, the coupling/solver settings and the
+    # semi-analytical reference for the selected mesh, configuration and rank count
+    genArgs=(--mesh "$mesh" --config "$config" --np "$np" --nNonOrth "$nNonOrth" --tend "$endTime")
+    if [[ -n "$absTol" ]]; then genArgs+=(--absTol "$absTol"); fi
+    python3 -B -I verification/scripts/makeCase.py . "${genArgs[@]}" || exit 1
+else
+    echo "Using the stored dictionaries (M1, combined; nothing regenerated); writing the reference solution only"
+    # the stored set must be the M1 one (./Allclean restores it)
+    if ! grep -q "(8 16 1)" system/solid/blockMeshDict || ! grep -q "(16 16 1)" system/fluid/blockMeshDict; then
+        echo "ERROR: the stored dictionaries are not the M1 set; run ./Allclean or give an option (M1|M2|M3, regenerate)" >&2
+        exit 1
+    fi
+    python3 -B -I verification/scripts/make_reference.py . --config combined --mesh M1 || exit 1
+fi
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+solids4Foam::runApplication -s fluid checkMesh -region fluid
+solids4Foam::runApplication -s solid checkMesh -region solid
+
+# Run solver
+if [[ "$runMode" == "parallel" ]]; then
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    solids4Foam::runParallel -np "$np" solids4Foam
+    if [[ "$reconstruct" == "yes" ]]; then
+        solids4Foam::runApplication -s fluid reconstructPar -region fluid -latestTime
+        solids4Foam::runApplication -s solid reconstructPar -region solid -latestTime
+    fi
+else
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Quantities of interest, errors against the reference, conservation balances
+# and coupling statistics (writes analysis.json and series.csv)
+if [[ -f rtDiagSolid.dat && $(wc -l < rtDiagSolid.dat) -ge 10 ]]; then
+    python3 -B -I verification/scripts/analyse_case.py . > log.analyse_case 2>&1 \
+        && echo "Analysis written to analysis.json (summary in log.analyse_case)" \
+        || echo "No analysis written (see log.analyse_case)"
+else
+    echo "Fewer than 10 diagnostic rows (shortened run): analysis skipped"
+fi

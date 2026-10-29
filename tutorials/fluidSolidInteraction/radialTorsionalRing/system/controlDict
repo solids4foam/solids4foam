@@ -1,0 +1,212 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+application     solids4Foam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         2.0;
+deltaT          0.0025;
+writeControl    adjustableRunTime;
+writeInterval   0.1;
+purgeWrite      0;
+writeFormat     ascii;
+writePrecision  14;
+writeCompression off;
+timeFormat      general;
+timePrecision   10;
+runTimeModifiable no;
+functions
+{
+
+    rtDiag
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        region          fluid;
+        name            rtDiagFluid;
+        executeControl  timeStep;
+        writeControl    timeStep;
+        codeInclude
+        #{
+            #include "fvc.H"
+            #include <fstream>
+        #};
+        codeExecute
+        #{
+            const scalar rho = 1000.0;
+            const scalar nu = 0.3;
+            const fvMesh& m = refCast<const fvMesh>(obr_);
+            const volVectorField& U = m.lookupObject<volVectorField>("U");
+            const volScalarField& p = m.lookupObject<volScalarField>("p");
+            const surfaceScalarField& phi = m.lookupObject<surfaceScalarField>("phi");
+            const volTensorField gradU(fvc::grad(U));
+            const label iI = m.boundaryMesh().findPatchID("interface");
+            const label iO = m.boundaryMesh().findPatchID("outer");
+            // in-plane unit vectors from the x,y components of the face centre
+            scalar A = 0, Rm = 0, pm = 0, srr = 0, snv = 0, srt = 0, Tq = 0, Pw = 0, wB = 0, ubn = 0;
+            {
+                const vectorField& Sf = m.Sf().boundaryField()[iI];
+                const scalarField& mS = m.magSf().boundaryField()[iI];
+                const vectorField& Cf = m.Cf().boundaryField()[iI];
+                const tensorField& gb = gradU.boundaryField()[iI];
+                const scalarField& pb = p.boundaryField()[iI];
+                const vectorField& Ub = U.boundaryField()[iI];
+                forAll(Cf, i)
+                {
+                    const symmTensor dRR(-rho*nu*dev(twoSymm(gb[i])));
+                    const vector fP(rho*Sf[i]*pb[i]);
+                    const vector fV(Sf[i] & dRR);
+                    const scalar rxy = Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y()));
+                    const vector er(Cf[i].x()/rxy, Cf[i].y()/rxy, 0);
+                    const vector et(-er.y(), er.x(), 0);
+                    A += mS[i];
+                    Rm += rxy*mS[i];
+                    pm += rho*pb[i]*mS[i];
+                    srr += (er & (fP + fV));
+                    snv += (er & fV);
+                    srt += (et & fV);
+                    Tq += (Cf[i] ^ (fP + fV)).z();
+                    Pw += ((fP + fV) & Ub[i]);
+                    wB += (et & Ub[i])*mS[i];
+                    ubn += (er & Ub[i])*mS[i];
+                }
+            }
+            scalar Hf = 0, KEf = 0, Df = 0;
+            forAll(U, c)
+            {
+                const vector Uc = U[c];
+                Hf += rho*((m.C()[c] ^ Uc).z())*m.V()[c];
+                KEf += 0.5*rho*magSqr(Uc)*m.V()[c];
+                const symmTensor Dc(symm(gradU[c]));
+                Df += 2.0*rho*nu*(Dc && Dc)*m.V()[c];
+            }
+            scalar Fc = 0, Tc = 0, Qo = 0, Pc = 0;
+            {
+                const vectorField& Sf = m.Sf().boundaryField()[iO];
+                const vectorField& Cf = m.Cf().boundaryField()[iO];
+                const tensorField& gb = gradU.boundaryField()[iO];
+                const vectorField& Ub = U.boundaryField()[iO];
+                const scalarField& pb = p.boundaryField()[iO];
+                const scalarField& ph = phi.boundaryField()[iO];
+                forAll(Cf, i)
+                {
+                    const symmTensor dRR(-rho*nu*dev(twoSymm(gb[i])));
+                    const vector fOn(-rho*pb[i]*Sf[i] - (Sf[i] & dRR));   // force by exterior on fluid
+                    Fc += rho*((Cf[i] ^ Ub[i]).z())*ph[i];
+                    Tc += (Cf[i] ^ (-(Sf[i] & dRR))).z();
+                    Qo += ph[i];
+                    Pc += (fOn & Ub[i]) - 0.5*rho*magSqr(Ub[i])*ph[i];   // power in, minus KE convected out
+                }
+            }
+            // parallel: global sums (serial: no-op)
+            reduce(A, sumOp<scalar>()); reduce(Rm, sumOp<scalar>()); reduce(pm, sumOp<scalar>());
+            reduce(srr, sumOp<scalar>()); reduce(snv, sumOp<scalar>()); reduce(srt, sumOp<scalar>());
+            reduce(Tq, sumOp<scalar>()); reduce(Pw, sumOp<scalar>()); reduce(wB, sumOp<scalar>());
+            reduce(ubn, sumOp<scalar>()); reduce(Hf, sumOp<scalar>()); reduce(KEf, sumOp<scalar>());
+            reduce(Df, sumOp<scalar>()); reduce(Fc, sumOp<scalar>()); reduce(Tc, sumOp<scalar>());
+            reduce(Qo, sumOp<scalar>()); reduce(Pc, sumOp<scalar>());
+            if (!Pstream::master()) return true;
+            std::ofstream os((m.time().globalPath()/"rtDiagFluid.dat").c_str(), std::ios::app);
+            os.precision(16);
+            os << m.time().value() << ' ' << A << ' ' << Rm/A << ' ' << pm/A << ' ' << srr/A << ' '
+               << snv/A << ' ' << srt/A << ' ' << Tq << ' ' << Pw << ' ' << Hf << ' ' << KEf << ' '
+               << Df << ' ' << Fc << ' ' << Tc << ' ' << Qo << ' ' << Pc << ' ' << wB/A << ' ' << ubn/A
+               << std::endl;
+        #};
+    }
+
+    rtSolid
+    {
+        type            coded;
+        libs            (utilityFunctionObjects);
+        region          solid;
+        name            rtDiagSolid;
+        executeControl  timeStep;
+        writeControl    timeStep;
+        codeInclude
+        #{
+            #include "fvc.H"
+            #include <fstream>
+        #};
+        codeExecute
+        #{
+            const scalar rho = 1000.0;
+            const scalar mu = 7692.307692307692;
+            const scalar kappa = 16666.666666666664;
+            const fvMesh& m = refCast<const fvMesh>(obr_);
+            const volVectorField& D = m.lookupObject<volVectorField>("D");
+            const scalar dt = m.time().deltaTValue();
+            const volVectorField& D0 = D.oldTime();
+            const volVectorField& D00 = D.oldTime().oldTime();
+            const volTensorField gD(fvc::grad(D));
+            // interface (R = B) and inner (R = A) patches: radius, rotation, n = 2 Fourier modes
+            scalar out[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
+            scalar hi[4] = {0,0,0,0};
+            const char* pn[2] = {"interface", "inner"};
+            for (label k = 0; k < 2; ++k)
+            {
+                const label pI = m.boundaryMesh().findPatchID(pn[k]);
+                const vectorField& Cf = m.Cf().boundaryField()[pI];
+                const scalarField& mS = m.magSf().boundaryField()[pI];
+                const vectorField& Db = D.boundaryField()[pI];
+                scalar A = 0, ur = 0, al = 0, c2 = 0, s2 = 0, R0 = 0, c3 = 0, s3 = 0, c4 = 0, s4 = 0;
+                forAll(Cf, i)
+                {
+                    const scalar X = Cf[i].x(), Y = Cf[i].y();
+                    const scalar R = Foam::sqrt(X*X + Y*Y);
+                    const scalar th = Foam::atan2(Y, X);
+                    const scalar x = X + Db[i].x(), y = Y + Db[i].y();
+                    const scalar r = Foam::sqrt(x*x + y*y);
+                    scalar da = Foam::atan2(y, x) - th;
+                    if (da > constant::mathematical::pi) da -= constant::mathematical::twoPi;
+                    if (da < -constant::mathematical::pi) da += constant::mathematical::twoPi;
+                    A += mS[i]; ur += (r - R)*mS[i]; al += da*mS[i]; R0 += R*mS[i];
+                    c2 += (r - R)*Foam::cos(2*th)*mS[i]; s2 += (r - R)*Foam::sin(2*th)*mS[i];
+                    c3 += (r - R)*Foam::cos(3*th)*mS[i]; s3 += (r - R)*Foam::sin(3*th)*mS[i];
+                    c4 += (r - R)*Foam::cos(4*th)*mS[i]; s4 += (r - R)*Foam::sin(4*th)*mS[i];
+                }
+                reduce(A, sumOp<scalar>()); reduce(ur, sumOp<scalar>()); reduce(al, sumOp<scalar>());
+                reduce(c2, sumOp<scalar>()); reduce(s2, sumOp<scalar>()); reduce(R0, sumOp<scalar>());
+                reduce(c3, sumOp<scalar>()); reduce(s3, sumOp<scalar>()); reduce(c4, sumOp<scalar>()); reduce(s4, sumOp<scalar>());
+                if (k == 0) { hi[0] = 2*c3/A; hi[1] = 2*s3/A; hi[2] = 2*c4/A; hi[3] = 2*s4/A; }
+                out[6*k + 0] = R0/A; out[6*k + 1] = ur/A; out[6*k + 2] = al/A;
+                out[6*k + 3] = 2*c2/A; out[6*k + 4] = 2*s2/A; out[6*k + 5] = A;
+            }
+            scalar Hs = 0, KEs = 0, Ws = 0, lmin = GREAT, Jmin = GREAT, Jmax = 0;
+            forAll(D, c)
+            {
+                const vector V((1.5*D[c] - 2.0*D0[c] + 0.5*D00[c])/dt);
+                const vector x(m.C()[c] + D[c]);
+                Hs += rho*((x ^ V).z())*m.V()[c];
+                KEs += 0.5*rho*magSqr(V)*m.V()[c];
+                tensor F(I + gD[c].T());
+                F.zz() = 1.0; F.xz() = 0; F.yz() = 0; F.zx() = 0; F.zy() = 0;
+                const scalar J = det(F);
+                const symmTensor C(symm(F.T() & F));
+                const scalar trC = tr(C);
+                Ws += (0.5*mu*(Foam::pow(J, -2.0/3.0)*trC - 3.0)
+                     + 0.25*kappa*(J*J - 1.0 - 2.0*Foam::log(J)))*m.V()[c];
+                // in-plane principal stretches of C
+                const scalar a = C.xx(), b = C.yy(), d = C.xy();
+                const scalar lmn = 0.5*(a + b) - Foam::sqrt(0.25*sqr(a - b) + d*d);
+                lmin = min(lmin, Foam::sqrt(max(lmn, 0.0)));
+                Jmin = min(Jmin, J); Jmax = max(Jmax, J);
+            }
+            reduce(Hs, sumOp<scalar>()); reduce(KEs, sumOp<scalar>()); reduce(Ws, sumOp<scalar>());
+            reduce(lmin, minOp<scalar>()); reduce(Jmin, minOp<scalar>()); reduce(Jmax, maxOp<scalar>());
+            if (!Pstream::master()) return true;
+            std::ofstream os((m.time().globalPath()/"rtDiagSolid.dat").c_str(), std::ios::app);
+            os.precision(16);
+            os << m.time().value();
+            for (label k = 0; k < 12; ++k) os << ' ' << out[k];
+            os << ' ' << Hs << ' ' << KEs << ' ' << Ws << ' ' << lmin << ' ' << Jmin << ' ' << Jmax
+               << ' ' << hi[0] << ' ' << hi[1] << ' ' << hi[2] << ' ' << hi[3] << std::endl;
+        #};
+    }
+
+}
