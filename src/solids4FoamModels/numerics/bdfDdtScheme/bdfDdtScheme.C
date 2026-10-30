@@ -88,18 +88,17 @@ bdfDdtScheme<Type>::bdfDdtScheme(const fvMesh& mesh, Istream& is)
         is >> this->ddtPhiCoeff_;
     }
 
-    static bool warned = false;
-
-    if (order_ >= 3 && !warned)
+    if (order_ >= 3 && !bdfDdtSchemeWarned)
     {
-        warned = true;
+        bdfDdtSchemeWarned = true;
 
         WarningInFunction
             << "The " << type() << " " << order_ << " ddt scheme is not "
-            << "A-stable, and its stability region is smaller for higher "
-            << "orders. It suits diffusion-dominated, stiff problems; "
-            << "in strongly convection-dominated flow at large Courant "
-            << "numbers it can be less robust than backward"
+            << "A-stable, only A(alpha)-stable, and its stability region is "
+            << "smaller for higher orders. It suits diffusion-dominated, "
+            << "stiff problems; in strongly convection-dominated flow at "
+            << "large Courant numbers it can be less robust than backward, "
+            << "and BDF 5 and 6 are not recommended for it"
             << endl;
     }
 
@@ -171,14 +170,101 @@ label bdfDdtScheme<Type>::order(const GeoField& vf) const
 
 
 template<class Type>
+template<class GeoField1, class GeoField2>
+label bdfDdtScheme<Type>::order(const GeoField1& f1, const GeoField2& f2) const
+{
+    return min(order(f1), order(f2));
+}
+
+
+template<class Type>
+template<class GeoField1, class GeoField2, class GeoField3>
+label bdfDdtScheme<Type>::order
+(
+    const GeoField1& f1,
+    const GeoField2& f2,
+    const GeoField3& f3
+) const
+{
+    return min(order(f1, f2), order(f3));
+}
+
+
+template<class Type>
+scalar bdfDdtScheme<Type>::deltaT0() const
+{
+    const Time& runTime = mesh().time();
+    const scalar deltaT0 = runTime.deltaT0Value();
+
+    // On the first step after a restart with adjustTimeStep no, Time has set
+    // deltaT0 to the deltaT of controlDict, not the step the old levels were
+    // stored with. That step is in <startTime>/uniform/time, which the
+    // previous run wrote.
+    if (runTime.timeIndex() == runTime.startTimeIndex() + 1)
+    {
+        const IOdictionary timeDict
+        (
+            IOobject
+            (
+                "time",
+                runTime.timeName(runTime.startTime().value()),
+                "uniform",
+                runTime,
+                IOobject::READ_IF_PRESENT,
+                IOobject::NO_WRITE,
+                IOobject::NO_REGISTER
+            )
+        );
+
+        scalar storedDeltaT = deltaT0;
+
+        // The stored value has only writePrecision digits: use it only if
+        // it differs by more than that, so that an unchanged step keeps the
+        // exact deltaT0 and a restart reproduces a continuous run
+        if
+        (
+            timeDict.readIfPresent("deltaT", storedDeltaT)
+         && mag(storedDeltaT - deltaT0) > deltaTTol_*deltaT0
+        )
+        {
+            return storedDeltaT;
+        }
+    }
+
+    return deltaT0;
+}
+
+
+template<class Type>
 scalarList bdfDdtScheme<Type>::weights(const label q) const
 {
     if (q > 1)
     {
         const scalar deltaT = mesh().time().deltaTValue();
-        const scalar deltaT0 = mesh().time().deltaT0Value();
+        const scalar deltaT0 = this->deltaT0();
 
-        if (mag(deltaT - deltaT0) > 1e-8*deltaT)
+        if (order_ == 2)
+        {
+            // Variable-step BDF2, which needs only deltaT and deltaT0. These
+            // are backward's coefficients, and reduce to 3/2, -2, 1/2 for a
+            // constant step.
+            const scalar omega = deltaT/deltaT0;
+
+            return scalarList
+            (
+                {
+                    (1 + 2*omega)/(1 + omega),
+                    -(1 + omega),
+                    sqr(omega)/(1 + omega)
+                }
+            );
+        }
+
+        // From order 3 the step ratios of older steps are needed as well,
+        // which Time does not record, so the step must be constant. This
+        // also applies to the BDF2 start-up steps of a higher order, whose
+        // levels are reused by the full-order formula later.
+        if (mag(deltaT - deltaT0) > deltaTTol_*deltaT)
         {
             FatalErrorInFunction
                 << "BDF " << order_ << " ddt requires a constant time step,"
@@ -186,7 +272,9 @@ scalarList bdfDdtScheme<Type>::weights(const label q) const
                 << " at time " << mesh().time().timeName() << "." << nl
                 << "    Its coefficients are for a uniform step; applying"
                 << " them to a non-uniform stencil would silently lose the"
-                << " order of accuracy." << exit(FatalError);
+                << " order of accuracy. BDF 1 and BDF 2 support a variable"
+                << " time step, including a change of deltaT on restart."
+                << exit(FatalError);
         }
     }
 
@@ -303,6 +391,37 @@ tmp<GeometricField<Type, fvPatchField, volMesh>> bdfDdtScheme<Type>::history
 
 
 template<class Type>
+template<class GeoField, class Reconstruct>
+tmp<GeoField> bdfDdtScheme<Type>::fluxHistory
+(
+    const GeoField& flux,
+    const scalarList& a,
+    const Reconstruct& reconstruct
+) const
+{
+    // Levels 1 to stored are genuine; older ones are copies of the level
+    // above, made because the flux was not stored that far back
+    const label stored = order(flux);
+
+    tmp<GeoField> tsum(-a[1]*level(flux, 1));
+
+    for (label k = 2; k < a.size(); ++k)
+    {
+        if (k <= stored)
+        {
+            tsum.ref() -= a[k]*level(flux, k);
+        }
+        else
+        {
+            tsum.ref() -= a[k]*reconstruct(k);
+        }
+    }
+
+    return tsum;
+}
+
+
+template<class Type>
 IOobject bdfDdtScheme<Type>::ddtIOobject(const word& name) const
 {
     return IOobject
@@ -386,7 +505,7 @@ bdfDdtScheme<Type>::fvcDdt
 )
 {
     const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
-    const scalarList a(weights(order(vf)));
+    const scalarList a(weights(order(rho, vf)));
 
     return tmp<GeometricField<Type, fvPatchField, volMesh>>
     (
@@ -409,7 +528,7 @@ bdfDdtScheme<Type>::fvcDdt
 )
 {
     const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
-    const scalarList a(weights(order(vf)));
+    const scalarList a(weights(order(alpha, rho, vf)));
 
     return tmp<GeometricField<Type, fvPatchField, volMesh>>
     (
@@ -502,7 +621,7 @@ bdfDdtScheme<Type>::fvmDdt
     fvMatrix<Type>& fvm = tfvm.ref();
 
     const scalar rDeltaT = 1.0/mesh().time().deltaTValue();
-    const scalarList a(weights(order(vf)));
+    const scalarList a(weights(order(rho, vf)));
 
     fvm.diag() = (a[0]*rDeltaT)*rho.primitiveField()*mesh().V();
 
@@ -534,7 +653,7 @@ bdfDdtScheme<Type>::fvmDdt
     fvMatrix<Type>& fvm = tfvm.ref();
 
     const scalar rDeltaT = 1.0/mesh().time().deltaTValue();
-    const scalarList a(weights(order(vf)));
+    const scalarList a(weights(order(alpha, rho, vf)));
 
     fvm.diag() =
         (a[0]*rDeltaT)*alpha.primitiveField()*rho.primitiveField()*mesh().V();
@@ -571,7 +690,18 @@ bdfDdtScheme<Type>::fvcDdtUfCorr
            *rDeltaT
            *(
                 mesh().Sf()
-              & (history(Uf, a) - fvc::interpolate(history(U, a)))
+              & (
+                    fluxHistory
+                    (
+                        Uf,
+                        a,
+                        [&](const label k)
+                        {
+                            return fvc::interpolate(level(U, k));
+                        }
+                    )
+                  - fvc::interpolate(history(U, a))
+                )
             )
         )
     );
@@ -602,7 +732,15 @@ bdfDdtScheme<Type>::fvcDdtPhiCorr
             this->fvcDdtPhiCoeff(U.oldTime(), phi.oldTime())
            *rDeltaT
            *(
-                history(phi, a)
+                fluxHistory
+                (
+                    phi,
+                    a,
+                    [&](const label k)
+                    {
+                        return fvc::dotInterpolate(mesh().Sf(), level(U, k));
+                    }
+                )
               - fvc::dotInterpolate(mesh().Sf(), history(U, a))
             )
         )
@@ -620,7 +758,7 @@ bdfDdtScheme<Type>::fvcDdtUfCorr
 )
 {
     const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
-    const scalarList a(weights(order(U)));
+    const scalarList a(weights(order(rho, U)));
 
     const word name
     (
@@ -654,7 +792,18 @@ bdfDdtScheme<Type>::fvcDdtUfCorr
                *(
                     mesh().Sf()
                   & (
-                        history(Uf, a)
+                        fluxHistory
+                        (
+                            Uf,
+                            a,
+                            [&](const label k)
+                            {
+                                return fvc::interpolate
+                                (
+                                    level(rho, k)*level(U, k)
+                                );
+                            }
+                        )
                       - fvc::interpolate(history(rho, U, a))
                     )
                 )
@@ -681,7 +830,18 @@ bdfDdtScheme<Type>::fvcDdtUfCorr
                *rDeltaT
                *(
                     mesh().Sf()
-                  & (history(Uf, a) - fvc::interpolate(history(U, a)))
+                  & (
+                        fluxHistory
+                        (
+                            Uf,
+                            a,
+                            [&](const label k)
+                            {
+                                return fvc::interpolate(level(U, k));
+                            }
+                        )
+                      - fvc::interpolate(history(U, a))
+                    )
                 )
             )
         );
@@ -705,7 +865,7 @@ bdfDdtScheme<Type>::fvcDdtPhiCorr
 )
 {
     const dimensionedScalar rDeltaT = 1.0/mesh().time().deltaT();
-    const scalarList a(weights(order(U)));
+    const scalarList a(weights(order(rho, U)));
 
     const word name
     (
@@ -732,7 +892,19 @@ bdfDdtScheme<Type>::fvcDdtPhiCorr
                 this->fvcDdtPhiCoeff(rhoU0, phi.oldTime(), rho.oldTime())
                *rDeltaT
                *(
-                    history(phi, a)
+                    fluxHistory
+                    (
+                        phi,
+                        a,
+                        [&](const label k)
+                        {
+                            return fvc::dotInterpolate
+                            (
+                                mesh().Sf(),
+                                level(rho, k)*level(U, k)
+                            );
+                        }
+                    )
                   - fvc::dotInterpolate(mesh().Sf(), history(rho, U, a))
                 )
             )
@@ -752,7 +924,19 @@ bdfDdtScheme<Type>::fvcDdtPhiCorr
                 this->fvcDdtPhiCoeff(U.oldTime(), phi.oldTime(), rho.oldTime())
                *rDeltaT
                *(
-                    history(phi, a)
+                    fluxHistory
+                    (
+                        phi,
+                        a,
+                        [&](const label k)
+                        {
+                            return fvc::dotInterpolate
+                            (
+                                mesh().Sf(),
+                                level(U, k)
+                            );
+                        }
+                    )
                   - fvc::dotInterpolate(mesh().Sf(), history(U, a))
                 )
             )
@@ -774,12 +958,13 @@ tmp<surfaceScalarField> bdfDdtScheme<Type>::meshPhi
 )
 {
     // Unreachable in practice: construction already fails on a moving mesh,
-    // the only case in which the mesh flux is asked for.
+    // the only case in which the mesh flux is asked for. The name is given
+    // literally, as mesh().phi() is fatal on a static mesh.
     checkStaticMesh();
 
     return surfaceScalarField::New
     (
-        mesh().phi().name(),
+        "meshPhi",
         IOobject::NO_REGISTER,
         mesh(),
         dimensionedScalar(dimVolume/dimTime, Zero)

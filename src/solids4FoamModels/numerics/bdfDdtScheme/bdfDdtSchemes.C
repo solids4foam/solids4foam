@@ -38,6 +38,9 @@ namespace Foam
 namespace fv
 {
 
+bool bdfDdtSchemeWarned = false;
+
+
 template<>
 tmp<surfaceScalarField> bdfDdtScheme<scalar>::fvcDdtUfCorr
 (
