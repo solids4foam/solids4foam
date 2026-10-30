@@ -15,6 +15,12 @@ is filtered or shifted.
     bodyfitted_control   the body-fitted case at two time steps (R1 control)
     observed_cost        observed cost per time step of matched cutLink and
                          penalty runs, after the CPU-affinity correction
+    mesh_refinement      Cd nRMS, Cl nRMS, Cd second harmonic and the peak
+                         exterior-flux residual of the four methods on
+                         Levels 1 to 3 (and the Level 4 flux test of cutLink)
+    histories_L2         Cd(t) and Cl(t), 1 < t < 3 s, of the four methods
+    histories_L3         against the body-fitted series, Levels 2 and 3
+                         (the tracked series every 0.02 s, unfiltered)
 
 Style of the immersed-boundary verifications: one colour, marker and line
 pattern per method (Okabe-Ito colours), references in black and grey. Only
@@ -42,8 +48,9 @@ MARKER = {"cutLink": "o", "ghostCell": "s", "penalty": "^",
           "incremental": "D"}
 DASH = {"cutLink": "-", "ghostCell": (0, (4, 1.6)),
         "penalty": (0, (5, 1.5, 1.2, 1.5)), "incremental": (0, (1.2, 1.2))}
-LABEL = {"cutLink": "cutLink", "ghostCell": "ghostCell", "penalty": "penalty",
-         "incremental": "legacy incremental"}
+LABEL = {"cutLink": "cutLink", "ghostCell": "ghostCell (exploratory)",
+         "penalty": "penalty", "incremental": "legacy incremental"}
+COLOR_ME = "#56B4E9"
 REF = dict(color="black", lw=0.95, zorder=1.5)
 
 
@@ -154,8 +161,7 @@ def force_histories(plt, data, out):
     from_cases = {}
     for r in cases:
         if r["coefficient"] == "Cd" and r["study"] == "A" and r["nrms_pct"] \
-                and r["estimator"] in ("cutLink ST", "total") \
-                and r["method"] != "ghostCell":
+                and r["estimator"] in ("cutLink ST", "total"):
             from_cases.setdefault(r["method"], []).append(
                 (int(r["level"]), float(r["A2"])))
     for method, pts in from_cases.items():
@@ -287,10 +293,139 @@ def observed_cost(plt, data, out):
     return fig
 
 
+
+def titled(ax, text):
+    ax.set_title(text, loc="left", fontsize=8.5, fontweight="bold")
+    ax.grid(True, ls="--", lw=0.4, color="0.75")
+
+
+def estimator_lines():
+    """(label, method, estimator column suffix, colour, dash, marker)"""
+    return (("cutLink, surface traction", "cutLink", "cutLink ST",
+             COLOR["cutLink"], "-", "o"),
+            ("cutLink, momentum exchange", "cutLink", "cutLink ME",
+             COLOR_ME, (0, (4, 1.6)), "s"),
+            ("penalty", "penalty", "total", COLOR["penalty"],
+             DASH["penalty"], "^"),
+            ("legacy incremental", "incremental", "total",
+             COLOR["incremental"], DASH["incremental"], "D"),
+            ("ghostCell (exploratory)", "ghostCell", "total",
+             COLOR["ghostCell"], DASH["ghostCell"], "v"))
+
+
+def mesh_refinement(plt, data, out):
+    cases = [r for r in read_csv(data / "cases.csv") if r["study"] == "A"]
+    fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.6))
+    spec = ((axes[0, 0], "Cd", "nrms_pct", "$C_d$ nRMS (%)", "(a)"),
+            (axes[0, 1], "Cl", "nrms_pct", "$C_l$ nRMS (%)", "(b)"),
+            (axes[1, 0], "Cd", "A2", "$C_d$ second harmonic", "(c)"))
+    ref_a2 = None
+    t, cd = [], []
+    for r in read_csv_rows(REFERENCE_DIR / "CdBodyFitted.dat"):
+        t.append(r[0])
+        cd.append(r[1])
+    ref_a2 = reference_second_harmonic(t, cd)
+    for ax, coef, key, ylab, tag in spec:
+        for lab, method, est, col, dash, mark in estimator_lines():
+            pts = sorted((int(r["level"]), float(r[key])) for r in cases
+                         if r["method"] == method and r["estimator"] == est
+                         and r["coefficient"] == coef and r[key]
+                         and int(r["level"]) <= 3)
+            if pts:
+                ax.plot([p[0] for p in pts], [p[1] for p in pts], color=col,
+                        ls=dash, marker=mark, ms=4.2, lw=1.0, label=lab)
+        if key == "A2":
+            ax.axhline(ref_a2, **REF)
+            ax.text(1.05, ref_a2 + 0.15, "body-fitted", fontsize=7)
+            ax.set_ylim(0, 7.5)
+        ax.set_xticks([1, 2, 3], ["L1\n20,020", "L2\n80,080", "L3\n320,320"])
+        ax.set_xlabel("mesh level and cells")
+        ax.set_ylabel(ylab)
+        titled(ax, tag)
+    ax = axes[1, 1]
+    flux = sorted((int(r["level"]), float(r["flux_peak_residual_pct"]),
+                   int(r["cells"])) for r in cases
+                  if r["method"] == "cutLink" and r["estimator"] == "cutLink ST"
+                  and r["coefficient"] == "Cd" and r["flux_peak_residual_pct"])
+    ax.plot([f[2] for f in flux if f[0] <= 3],
+            [f[1] for f in flux if f[0] <= 3], color=COLOR["cutLink"],
+            marker="o", ms=4.2, lw=1.0)
+    ax.plot([f[2] for f in flux if f[0] == 4],
+            [f[1] for f in flux if f[0] == 4], color=COLOR["cutLink"],
+            marker="*", ms=8, ls="none")
+    for lab, method, est, col, dash, mark in estimator_lines()[2:]:
+        pts = sorted((int(r["cells"]), float(r["flux_peak_residual_pct"]))
+                     for r in cases if r["method"] == method
+                     and r["estimator"] == est and r["coefficient"] == "Cd"
+                     and r["flux_peak_residual_pct"])
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], color=col,
+                marker=mark, ms=4.2, ls="none")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("cells (star: Level 4, 0.5 s flux test only)")
+    ax.set_ylabel("peak flux residual (% of peak)")
+    ax.text(0.04, 0.5, "penalty, incremental, ghostCell: net flux zero\n"
+            "to the solver tolerance (residual = peak)", transform=ax.transAxes,
+            fontsize=6.8, color="0.25")
+    titled(ax, "(d)")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=3,
+               bbox_to_anchor=(0.5, -0.07))
+    fig.tight_layout()
+    return fig
+
+
+def history_figure(level):
+    def draw(plt, data, out):
+        t_ref, cd_ref, cl_ref = [], [], []
+        for r in read_csv_rows(REFERENCE_DIR / "CdBodyFitted.dat"):
+            t_ref.append(r[0])
+            cd_ref.append(r[1])
+            cl_ref.append(r[2])
+        fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.6), sharex=True)
+        groups = ((0, [e for e in estimator_lines() if e[1] == "cutLink"],
+                   "cutLink"),
+                  (1, [e for e in estimator_lines() if e[1] != "cutLink"],
+                   "penalty, incremental, ghostCell"))
+        for row, (coef, ref, lab) in enumerate((("Cd", cd_ref, "$C_d$"),
+                                                ("Cl", cl_ref, "$C_l$"))):
+            for col, members, title in groups:
+                ax = axes[row, col]
+                ax.plot([x for x in t_ref if 1 <= x <= 3],
+                        [y for x, y in zip(t_ref, ref) if 1 <= x <= 3],
+                        label="body-fitted", **REF)
+                for elab, method, est, colr, dash, mark in members:
+                    hist = read_csv(data / f"history-{method}-L{level}.csv")
+                    key = (f"{coef}_cutLink_{est.split()[-1]}"
+                           if method == "cutLink" else f"{coef}_total")
+                    t = floats(hist, "t")
+                    y = floats(hist, key)
+                    ax.plot([a for a in t if 1 <= a <= 3],
+                            [b for a, b in zip(t, y) if 1 <= a <= 3],
+                            color=colr, ls=dash, lw=0.8, label=elab)
+                ax.set_ylabel(lab)
+                titled(ax, f"({'abcd'[2 * row + col]}) {title}")
+                lo, hi = ax.get_ylim()
+                ax.set_ylim(lo, hi + 0.3 * (hi - lo))
+                ax.legend(loc="upper right", fontsize=6.3, ncol=1)
+        for ax in axes[1]:
+            ax.set_xlabel("$t$ (s)")
+            ax.set_xlim(1, 3)
+        axes[1, 1].text(0.98, 0.04, "reference lift unverified", ha="right",
+                        transform=axes[1, 1].transAxes, fontsize=6.8,
+                        color="0.3")
+        fig.suptitle(f"Level {level}: tracked series every 0.02 s, "
+                     "unfiltered and unshifted", fontsize=8.5, y=1.0)
+        fig.tight_layout()
+        return fig
+    return draw
+
 FIGURES = {"flux_vs_level": flux_vs_level, "force_histories": force_histories,
            "fv_sensitivity": fv_sensitivity,
            "bodyfitted_control": bodyfitted_control,
-           "observed_cost": observed_cost}
+           "observed_cost": observed_cost, "mesh_refinement": mesh_refinement,
+           "histories_L2": history_figure(2),
+           "histories_L3": history_figure(3)}
 
 
 def main(argv=None) -> int:

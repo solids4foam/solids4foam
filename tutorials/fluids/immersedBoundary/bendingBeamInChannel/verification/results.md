@@ -14,6 +14,60 @@ is claimed, no ranking of the lift is made, and no method is declared
 superior.** What was observed, what is interpreted and what is not shown are
 kept apart in each section.
 
+## Summary of the comparison
+
+Study A, Levels 1 to 3, every run to 8 s on the adaptive time step; the three
+groups of columns answer different questions and are not combined:
+
+- **Flux residual (exact reference).** The peak residual of the net exterior
+  flux in per cent of the peak of the exact analytic rate
+  $dV/dt = 0.028306 \sin(4 \pi t)$ m$^3$/s. penalty, incremental and
+  ghostCell have a net flux of zero to the solver tolerance, so their residual
+  is the whole peak: the flux of the volume change is not represented.
+- **$C_d$ and $C_l$ nRMS, $C_d$ second harmonic (numerical reference).**
+  Differences from the tracked body-fitted series, which has unresolved
+  uncertainty (Section 2.1) and an unverified lift: agreement with it, not
+  accuracy, and no lift ranking.
+- **ghostCell is exploratory** (documented for static bodies) and its forces
+  carry a decomposition scatter (Section 2.2).
+
+cutLink's surface traction and momentum exchange are two estimators of one run
+(one flux value, one cost).
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+| Method | Mesh | Flux residual, % of the exact peak | $C_d$ nRMS (%) | $C_l$ nRMS (%) | $C_d$ second harmonic (reference 5.889) |
+| --- | --- | --- | --- | --- | --- |
+| cutLink, surface traction | L1 20,020 | 7.62 | 8.59 | 17.17 | 5.332 |
+| cutLink, surface traction | L2 80,080 | 4.96 | 5.04 | 10.23 | 5.716 |
+| cutLink, surface traction | L3 320,320 | 2.45 | 3.20 | 6.00 | 5.818 |
+| cutLink, momentum exchange | L1 20,020 | 7.62 | 7.31 | 36.35 | 5.197 |
+| cutLink, momentum exchange | L2 80,080 | 4.96 | 4.69 | 37.11 | 5.566 |
+| cutLink, momentum exchange | L3 320,320 | 2.45 | 3.42 | 38.20 | 5.717 |
+| penalty | L1 20,020 | 100.00 (zero to solver tolerance) | 10.94 | 26.00 | 1.814 |
+| penalty | L2 80,080 | 100.00 (zero to solver tolerance) | 7.38 | 24.57 | 1.844 |
+| penalty | L3 320,320 | 100.00 (zero to solver tolerance) | 6.72 | 25.09 | 1.911 |
+| legacy incremental | L1 20,020 | 100.00 (zero to solver tolerance) | 14.02 | 59.54 | 1.208 |
+| legacy incremental | L2 80,080 | 100.00 (zero to solver tolerance) | 7.56 | 43.46 | 1.844 |
+| legacy incremental | L3 320,320 | 100.00 (zero to solver tolerance) | 6.84 | 36.52 | 1.834 |
+| ghostCell (exploratory) | L1 20,020 | 100.00 (zero to solver tolerance) | 12.04 | 35.58 | 2.080 |
+| ghostCell (exploratory) | L2 80,080 | 100.00 (zero to solver tolerance) | 9.82 | 31.27 | 2.155 |
+| ghostCell (exploratory) | L3 320,320 | 100.00 (zero to solver tolerance) | 8.15 | 31.96 | 2.031 |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+![mesh refinement](images/mesh_refinement.png)
+
+*Mesh refinement of the four methods on Levels 1 to 3 (20,020, 80,080 and
+320,320 cells): (a) $C_d$ nRMS, (b) $C_l$ nRMS, (c) $C_d$ second harmonic, (d)
+peak flux residual (the star is the Level 4 flux test of cutLink, 0.5 s, not a
+force simulation). Differences from a numerical reference of unresolved
+uncertainty; no order of convergence is implied by three levels.*
+
 ## 1. A. Exact volume balance
 
 **Observed.** The net flux $Q$ through the inlet and the outlet (outward
@@ -25,12 +79,24 @@ against $dV/dt = 0.028306 \sin(4 \pi t)$ m$^3$/s. Study A is the tutorial
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Level | Cells | cutLink $Q$/peak at the extremes | peak residual, % of the peak | Study B: max $\lvert Q \rvert$ ($10^{-3}$ m$^3$/s) | Study B, % of the Study A peak |
 | --- | --- | --- | --- | --- | --- |
 | L1 | 20,020 | 0.9238 | 7.62 | 2.534 | 8.95 |
 | L2 | 80,080 | 0.9504 | 4.96 | 1.327 | 4.69 |
 | L3 | 320,320 | 0.9755 | 2.45 | 0.691 | 2.44 |
 | L4 | 1,281,280 | 0.9878 | 1.22 | - | - |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -57,8 +123,8 @@ against $dV/dt = 0.028306 \sin(4 \pi t)$ m$^3$/s. Study A is the tutorial
 | Method | max $\lvert Q \rvert$ |
 | --- | --- |
 | penalty | L1: 2.7e-09, L2: 2.7e-09, L3: 2.0e-09 |
-| incremental | L1: 7.9e-09, L2: 2.3e-09 |
-| ghostCell | L1: 1.2e-09 |
+| incremental | L1: 7.9e-09, L2: 2.3e-09, L3: 1.5e-09 |
+| ghostCell | L1: 2.9e-09, L2: 1.8e-09, L3: 1.3e-09 |
 
 **Interpretation, not shown by a controlled test.** The continuity treatment of
 penalty and incremental, enforced in every cell including the interior of the
@@ -85,32 +151,55 @@ and the nRMS and $A_2$ of $C_l$. Adaptive time step, as in the tutorial.
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Method (estimator) | Level | $C_d$ nRMS (%) | $C_d$ mean | $C_d$ RMS | $C_d$ $A_1$ | $C_d$ $A_2$ | $C_d$ noise | $C_l$ nRMS (%) | $C_l$ $A_2$ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| cutLink, surface traction | L1 | 8.59 | 18.58 | 55.14 | 73.13 | 5.332 | 2.48 | 17.17 | 7.456 |
-| cutLink, surface traction | L2 | 5.04 | 17.71 | 53.51 | 71.10 | 5.716 | 1.70 | 10.23 | 7.775 |
-| cutLink, surface traction | L3 | 3.20 | 17.23 | 53.20 | 70.87 | 5.818 | 1.91 | 6.00 | 7.804 |
-| cutLink, momentum exchange | L1 | 7.31 | 16.63 | 52.33 | 69.89 | 5.197 | 2.02 | 36.35 | 10.568 |
-| cutLink, momentum exchange | L2 | 4.69 | 16.84 | 52.68 | 70.29 | 5.566 | 1.62 | 37.11 | 10.618 |
-| cutLink, momentum exchange | L3 | 3.42 | 17.05 | 52.92 | 70.55 | 5.717 | 1.93 | 38.20 | 10.683 |
-| penalty | L1 | 10.94 | 17.21 | 52.60 | 70.01 | 1.814 | 5.78 | 26.00 | 9.506 |
-| penalty | L2 | 7.38 | 17.18 | 52.49 | 70.07 | 1.844 | 1.34 | 24.57 | 9.553 |
-| penalty | L3 | 6.72 | 17.19 | 52.64 | 70.31 | 1.911 | 1.32 | 25.09 | 9.581 |
-| legacy incremental | L1 | 14.02 | 16.90 | 55.50 | 74.58 | 1.208 | 3.15 | 59.54 | 10.651 |
-| legacy incremental | L2 | 7.56 | 17.22 | 54.41 | 72.87 | 1.844 | 2.79 | 43.46 | 10.194 |
-| ghostCell (exploratory) | L1 | 11.58 | 16.57 | 52.58 | 69.74 | 2.044 | 10.65 | 35.10 | 10.033 |
+| cutLink, surface traction | L1 | 8.59 | 18.57 | 55.13 | 73.13 | 5.332 | 2.48 | 17.17 | 7.456 |
+| cutLink, surface traction | L2 | 5.04 | 17.71 | 53.50 | 71.10 | 5.716 | 1.70 | 10.23 | 7.775 |
+| cutLink, surface traction | L3 | 3.20 | 17.21 | 53.19 | 70.87 | 5.818 | 1.91 | 6.00 | 7.804 |
+| cutLink, momentum exchange | L1 | 7.31 | 16.61 | 52.32 | 69.89 | 5.197 | 2.02 | 36.35 | 10.568 |
+| cutLink, momentum exchange | L2 | 4.69 | 16.83 | 52.67 | 70.29 | 5.566 | 1.62 | 37.11 | 10.618 |
+| cutLink, momentum exchange | L3 | 3.42 | 17.04 | 52.92 | 70.55 | 5.717 | 1.93 | 38.20 | 10.683 |
+| penalty | L1 | 10.94 | 17.20 | 52.59 | 70.01 | 1.814 | 5.78 | 26.00 | 9.506 |
+| penalty | L2 | 7.38 | 17.17 | 52.48 | 70.07 | 1.844 | 1.34 | 24.57 | 9.553 |
+| penalty | L3 | 6.72 | 17.18 | 52.64 | 70.31 | 1.911 | 1.32 | 25.09 | 9.581 |
+| legacy incremental | L1 | 14.02 | 16.88 | 55.49 | 74.58 | 1.208 | 3.15 | 59.54 | 10.651 |
+| legacy incremental | L2 | 7.56 | 17.20 | 54.40 | 72.87 | 1.844 | 2.79 | 43.46 | 10.194 |
+| legacy incremental | L3 | 6.84 | 17.16 | 53.98 | 72.29 | 1.834 | 1.35 | 36.52 | 9.972 |
+| ghostCell (exploratory) | L1 | 12.04 | 16.60 | 52.60 | 69.78 | 2.080 | 10.52 | 35.58 | 10.037 |
+| ghostCell (exploratory) | L2 | 9.82 | 16.70 | 52.43 | 70.03 | 2.155 | 3.97 | 31.27 | 9.875 |
+| ghostCell (exploratory) | L3 | 8.15 | 16.95 | 52.94 | 70.71 | 2.031 | 4.93 | 31.96 | 9.759 |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
 - **Observed.** The cutLink $C_d$ difference falls with the mesh level, 8.6, 5.0
-  and 3.2 % (surface traction); that of penalty and incremental is larger at the
-  same level (10.9 and 14.0 % on Level 1, 7.4 and 7.6 % on Level 2) and falls
-  little from Level 2 to 3 (7.4 to 6.7 %). The second harmonic of cutLink is
-  within 10 % of the reference's on every level (5.33, 5.72 and 5.82 against
-  5.89); that of penalty, incremental and ghostCell is 1.2 to 2.0, at most a
-  third of it.
+  and 3.2 % (surface traction). That of penalty is larger at the same level
+  (10.9, 7.4, 6.7 %), of legacy incremental 14.0, 7.6 and 6.8 %, and of
+  ghostCell 12.0, 9.8 and 8.1 %; the decrease from Level 2 to 3 is 9 % of the
+  Level 2 value for penalty, 10 % for incremental, 17 % for ghostCell and 36 %
+  for cutLink. The second harmonic of cutLink is within 10 % of the reference's
+  on
+  every level (5.33, 5.72 and 5.82 against 5.89); that of penalty, incremental
+  and ghostCell is 1.2 to 2.2, at most 37 % of it, and incremental does not
+  recover any more of it on Level 3 (1.21, 1.84, 1.83).
+- **Lift (not ranked).** The $C_l$ nRMS of incremental falls on Levels 1 to 3
+  (59.5, 43.5, 36.5 %) and that of ghostCell is nearly flat after Level 1
+  (35.6, 31.3, 32.0 %), against 26.0, 24.6, 25.1 % for penalty. The reference
+  lift is unverified, so these are differences from that series and not a lift
+  accuracy ranking.
 - **Time step and mesh are not separated except on Level 2.** On Level 2 a
   factor
   2 in the time step changes the $C_d$ nRMS by 0.2 to 0.8 point (Section 3),
@@ -129,6 +218,18 @@ and the nRMS and $A_2$ of $C_l$. Adaptive time step, as in the tutorial.
 
 ![force histories](images/force_histories.png)
 
+![Level 2 histories](images/histories_L2.png)
+
+![Level 3 histories](images/histories_L3.png)
+
+*$C_d(t)$ and $C_l(t)$, $1 < t < 3$ s (two periods), of the four methods at
+Levels 2 and 3 against the tracked body-fitted series (black): (a, c) cutLink,
+surface traction and momentum exchange; (b, d) penalty, legacy incremental and
+exploratory ghostCell. The tracked series are sampled every 0.02 s (the
+spikes of ghostCell and incremental are partly undersampled; the raw
+time-step series are in the research archive). Unfiltered and unshifted. The
+reference lift is unverified.*
+
 ### 2.1 The body-fitted case at two time steps
 
 The archived body-fitted case (24,720 cells) was run with the time step of its
@@ -139,6 +240,12 @@ and the decomposition changed (a complete diff of the inputs of B and C shows
 those and nothing else). Same sample times and interval ($1 < t < 8$ s); no
 phase
 alignment.
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
 
 <!-- markdownlint-disable MD013 -->
 
@@ -173,6 +280,12 @@ alignment.
 
 <!-- markdownlint-enable MD013 -->
 
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
 - **B against C is the controlled time-step comparison**: $C_d$ differs by 2.9 %
   and $C_l$ by 6.2 % (normalised by C); in each of the windows 1-2, 2-4, 4-6
   and 6-8 s it is 2.7 to 2.9 % and 5.8 %, i.e. not a start-up effect.
@@ -195,6 +308,85 @@ alignment.
 
 ![body-fitted time-step control](images/bodyfitted_control.png)
 
+### 2.2 Levels 2 and 3 of incremental and ghostCell, and the time-step history
+
+Legacy incremental was run on Level 3 (8 ranks) and ghostCell on Levels 1 to 3
+(1, 4 and 8 ranks), with the settings of Levels 1 and 2 of the baseline matrix
+and no parameter changed. The earlier ghostCell Level 1 run wrote fields every
+2 s, not every 0.125 s as the other runs, so it was repeated with the matched
+write interval and the new run is the one tabulated (the 2 s run gave nRMS
+11.58 % and $A_2$ 2.044 against 12.04 % and 2.080: a difference of 0.46 point,
+below the threshold of 1.0 point). The number of steps and the mean time step of
+every method on
+a level agree within 3 % (table), so the differences in the nRMS are not due to
+different time-step histories. The last column is a **filtered diagnostic**
+(the force is replaced by its 0.0104 s moving mean before the comparison; the
+unfiltered comparison above is the result): it shows how much of the nRMS is
+high-frequency content.
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+| Method | Level | steps | mean $\Delta t$ (ms) | $C_d$ nRMS (%) | filtered $C_d$ nRMS (%) |
+| --- | --- | --- | --- | --- | --- |
+| cutLink, surface traction | L1 | 1234 | 6.495 | 8.59 | 7.69 |
+| cutLink, surface traction | L2 | 2559 | 3.100 | 5.04 | 3.86 |
+| cutLink, surface traction | L3 | 5216 | 1.519 | 3.20 | 2.47 |
+| penalty | L1 | 1235 | 6.483 | 10.94 | 8.83 |
+| penalty | L2 | 2554 | 3.107 | 7.38 | 7.08 |
+| penalty | L3 | 5202 | 1.522 | 6.72 | 6.61 |
+| legacy incremental | L1 | 1222 | 6.562 | 14.02 | 12.66 |
+| legacy incremental | L2 | 2551 | 3.110 | 7.56 | 6.70 |
+| legacy incremental | L3 | 5195 | 1.525 | 6.84 | 6.48 |
+| ghostCell (exploratory) | L1 | 1264 | 6.348 | 12.04 | 9.81 |
+| ghostCell (exploratory) | L2 | 2572 | 3.089 | 9.82 | 7.74 |
+| ghostCell (exploratory) | L3 | 5203 | 1.524 | 8.15 | 6.62 |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+- **Observed.** The filtered nRMS of penalty, incremental and ghostCell on
+  Level 3 is the same, 6.6, 6.5 and 6.6 %, and that of cutLink is 2.5 %. The
+  unfiltered difference of ghostCell (8.1 %) is larger than that of the others
+  (6.7 and 6.8 %) because of its force fluctuations: the high-frequency
+  residual of $C_d$ is 10.5, 4.0 and 4.9 on Levels 1 to 3 (penalty 5.8, 1.3,
+  1.3; incremental 3.1, 2.8, 1.4; the reference 0.1). The ghostCell residual
+  falls from Level 1 to 2 and rises again on Level 3, with isolated downward
+  spikes of the drag that persist in amplitude with refinement (appendix figure
+  of the close-up).
+- **Observed.** The net exterior flux of ghostCell and incremental is zero to
+  the solver tolerance on every level (largest $\lvert Q \rvert$ 2.9e-09 and
+  7.9e-09 m$^3$/s).
+- **Decomposition scatter of ghostCell.** On Level 1, 1 s, the serial run and
+  the runs on 2 and 4 ranks have the same steps and time steps; the force
+  differs between them by 0.5 to 1.0 % of its RMS (the largest instantaneous
+  difference of $C_d$ is 3.5 to 5.4 % of it, at spikes), and the means differ by
+  0.1 to 0.3 %. The same comparison for penalty (2 against 4 ranks, Level 2) and
+  incremental (serial against 2 ranks, Level 1) gave 0.7 % and 0.02 % at the
+  largest instantaneous difference. The ghostCell forces on Levels 2 and 3 were
+  run on 4 and 8 ranks and carry this scatter; no replicate was made. The
+  cross-processor search for donor cells was exercised (up to 55 ghost cells
+  with
+  a donor on another processor on Level 3) and the flux is unchanged.
+- **Interpretation (not tested).** The unfiltered nRMS of ghostCell falls with
+  the mesh, and so does the filtered one (9.8, 7.7, 6.6 %), so the improvement
+  is not only a reduction of noise; its excess over penalty and incremental on
+  Level 3 (1.4 point) disappears after filtering. The persistence of the
+  second-harmonic deficit of incremental and ghostCell on Level 3, like that of
+  penalty, is consistent with a property of the formulations. That the missing
+  flux causes the deficit is not shown, and no order of convergence is claimed
+  from three levels.
+
 ## 3. C. Finite-volume sensitivity
 
 Level 2, Study A, fixed time step $\Delta t$ = 0.125/96 (the control), 0 to 8 s,
@@ -205,6 +397,12 @@ thresholds, set before the runs and not changed: a change of 1.0 point of the
 $C_d$
 nRMS or 0.1 of $C_d$ $A_2$ is material (0.5 and 0.05 for the solver-convergence
 controls). Changes of the nRMS and $A_2$ are test minus control.
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
 
 <!-- markdownlint-disable MD013 -->
 
@@ -232,6 +430,12 @@ controls). Changes of the nRMS and $A_2$ are test minus control.
 | Q4 | upwind vs linearUpwind (diagnostic, N96) | total | -0.52 | +0.072 | 0.992 | no |
 | Q6 | penaltyCoeff 1e2 vs 1e3 (N96) | total | -0.48 | -0.005 | 0.635 | no |
 | Q6 | penaltyCoeff 1e4 vs 1e3 (N96) | total | +0.31 | +0.005 | 1.164 | no |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -303,8 +507,8 @@ controls). Changes of the nRMS and $A_2$ are test minus control.
 - The tutorial motion is horizontal bending with a rotation of the sections;
   with $A_y$ = 0 the volume does not change, and the cutLink flux bias then is a
   discretisation property of the aperture treatment, not of the volume change.
-- ghostCell is documented for static bodies; its single result here is
-  exploratory and it is not in any comparison.
+- ghostCell is documented for static bodies; its Levels 1 to 3 results here are
+  exploratory and are shown beside the others, not as a validated comparison.
 - Applicability beyond this tutorial (turbulence, three dimensions, other
   Reynolds numbers, FSI) was not tested.
 
@@ -325,12 +529,24 @@ quoted at the rate of their last 40 % of steps:
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Run | allocated rank-h | at the unaffected rate | share of steps while pinned |
 | --- | --- | --- | --- |
 | T-cutLink-Euler-N48 | 1.8261 | 0.525 | 0.19 |
 | T-penalty-backward-N96 | 1.835 | 0.496 | 0.19 |
 | T-penalty-Euler-N96 | 1.3356 | 0.481 | 0.18 |
 | T-cutLink-Euler-N96 | 2.3144 | 1.003 | 0.18 |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -346,6 +562,12 @@ excluded):
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Settings | cutLink s/step | penalty s/step | ratio | other campaign ranks (cutLink / penalty) |
 | --- | --- | --- | --- | --- |
 | Euler N96 | 0.2939 | 0.1408 | 2.09 | 6.0 / 6.0 |
@@ -354,6 +576,12 @@ excluded):
 | backward N48 | 0.2695 | 0.1669 | 1.61 | 6.0 / 2.0 |
 | limitedLinear N96 | 0.2507 | 0.153 | 1.64 | 4.0 / 4.0 |
 | nOuter 2 N96 | 0.3675 | 0.2458 | 1.5 | 4.1 / 4.0 |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 

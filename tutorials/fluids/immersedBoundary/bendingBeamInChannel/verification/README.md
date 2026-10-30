@@ -17,11 +17,19 @@ not run by `tutorials/Alltest` or `tutorials/Alltest-regression`.
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | | Question | Needs a reference? |
 | --- | --- | --- |
 | A | How does the net flux through the inlet and the outlet compare with the exact rate of change of the volume of the beam? | no: the analytic rate is exact |
 | B | How far are $C_d$ and $C_l$ from the tracked body-fitted series? | yes, of uncertain provenance |
 | F | What does a run cost? | no, it is observed |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -72,19 +80,28 @@ unverified and no lift ranking is made.
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Method (estimator) | $C_d$ nRMS, Level 1 / 2 / 3 | $C_d$ second harmonic, Level 1 / 2 / 3 (reference 5.89) |
 | --- | --- | --- |
 | cutLink, surface traction | 8.6 / 5.0 / 3.2 % | 5.33 / 5.72 / 5.82 |
 | cutLink, momentum exchange | 7.3 / 4.7 / 3.4 % | 5.20 / 5.57 / 5.72 |
 | penalty | 10.9 / 7.4 / 6.7 % | 1.81 / 1.84 / 1.91 |
-| incremental | 14.0 / 7.6 % | 1.21 / 1.84 |
-| ghostCell (exploratory) | 11.6 % (Level 1) | 2.04 |
+| incremental | 14.0 / 7.6 / 6.8 % | 1.21 / 1.84 / 1.83 |
+| ghostCell (exploratory) | 12.0 / 9.8 / 8.1 % | 2.08 / 2.15 / 2.03 |
 
 <!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
-The persistent deficit of the second harmonic of penalty and incremental is
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
+
+The persistent deficit of the second harmonic of penalty, incremental and
+ghostCell is
 not changed by any of the finite-volume settings tested (a property of the
 formulations as implemented, within those settings): it is 1.84 to 2.02 in every
 penalty run, 11 of them with two
@@ -98,13 +115,23 @@ evidence, the figures and the limitations.
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Figure (`images/`) | Content |
 | --- | --- |
 | `flux_vs_level.png` | net exterior flux against the exact rate, Levels 1-4, Studies A and B |
-| `force_histories.png` | $C_d$ and $C_l$ of three methods against the body-fitted series; $C_d$ second harmonic |
+| `force_histories.png` | $C_d$ and $C_l$ of three methods against the body-fitted series; $C_d$ second harmonic of all four |
 | `fv_sensitivity.png` | change of the $C_d$ nRMS and second harmonic with each finite-volume setting |
 | `bodyfitted_control.png` | the body-fitted case at two time steps |
 | `observed_cost.png` | observed time per step of matched cutLink and penalty runs |
+| `mesh_refinement.png` | $C_d$ and $C_l$ nRMS, $C_d$ second harmonic and flux residual of the four methods, Levels 1-3 |
+| `histories_L2.png`, `histories_L3.png` | $C_d(t)$ and $C_l(t)$, $1 < t < 3$ s, of the four methods against the body-fitted series |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -162,12 +189,20 @@ cylinder verifications:
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Method | Settings | `nOuterCorrectors` |
 | --- | --- | --- |
 | cutLink | `forceEstimator surfaceTraction` (the momentum exchange is written to the same file) | 1 |
 | penalty | `penaltyCoeff 1e3`, `weighting volumeFraction`, `surfaceRateCoeff 3`, `occupancy signedDistance` | 1 |
 | incremental | `couplingCoeff 0.2`, `occupancy vertexFraction` | 5 |
 | ghostCell | `penaltyCoeff 1e3`, `imageDistance 1.5`, `imageInterpolation cellPoint` | 1 |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -219,6 +254,10 @@ alignment.
 
 <!-- markdownlint-disable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
+
+<!-- markdownlint-disable MD013 -->
+
 | Check | Tolerance |
 | --- | --- |
 | closed-form volume rate against the area of the deformed outline | $10^{-4}$ of the peak |
@@ -227,6 +266,10 @@ alignment.
 | penalty, incremental, ghostCell net exterior flux | $10^{-6}$ of the analytic peak |
 | $C_d$ nRMS against the tracked value | 1.0 point |
 | $C_d$ second harmonic against the tracked value | 0.1 |
+
+<!-- markdownlint-enable MD013 -->
+
+<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -264,8 +307,10 @@ established.
 ## Provenance and data availability
 
 - **Solver of the tracked results**: solids4foam `f33b244a2` (the
-  `development` branch before this verification), OpenFOAM v2412, serial runs
-  at Levels 1 and 2, two ranks at Level 3, SLURM or direct MPI.
+  `development` branch before this verification), OpenFOAM v2412, serial runs at
+  Level 1 and mostly at Level 2, two to eight ranks at Levels 2 and 3, SLURM or
+  direct MPI; the ghostCell Level 1 run is a repeat with the write interval
+  0.125 s of the other runs (the first run wrote every 2 s).
 - **Cases**: generated from the tutorial by this driver; Study A is the
   tutorial ($A_y$ = 0.8 m), Study B has $A_y$ = 0.
 - **Body-fitted series** `reference/CdBodyFitted.dat`: see the tutorial README.
@@ -295,6 +340,8 @@ established.
 - mesh and time step were not varied independently except at Level 2: no
   formal order of convergence is claimed for the forces or for the flux;
 - the cost is observed, from single runs;
-- ghostCell is exploratory, and incremental was run on two levels;
+- ghostCell is exploratory (its forces are noisier and carry a decomposition
+  scatter of about 1 % of their RMS), and incremental and ghostCell were run
+  once per level;
 - the surface-traction quadrature options of other pull requests are not
   evaluated here.

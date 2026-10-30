@@ -571,6 +571,37 @@ class Documentation(unittest.TestCase):
                      and r["study"] == "A" and int(r["level"]) == l][0]
             self.assertIn(f"{float(ratio['flux_ratio_at_peaks']):.3f}", text)
 
+    def test_summary_table_agrees_with_the_data(self):
+        text = (bbv.VERIFICATION_DIR / "results.md").read_text()
+        by = {(r["method"], int(r["level"]), r["estimator"],
+               r["coefficient"]): r for r in self.rows()
+              if r["study"] == "A"}
+        names = (("cutLink", "cutLink ST", "cutLink, surface traction"),
+                 ("cutLink", "cutLink ME", "cutLink, momentum exchange"),
+                 ("penalty", "total", "penalty"),
+                 ("incremental", "total", "legacy incremental"),
+                 ("ghostCell", "total", "ghostCell (exploratory)"))
+        for method, est, label in names:
+            for l in (1, 2, 3):
+                cd = by[(method, l, est, "Cd")]
+                cl = by[(method, l, est, "Cl")]
+                flux = f"{float(cd['flux_peak_residual_pct']):.2f}"
+                if method != "cutLink":
+                    flux += " (zero to solver tolerance)"
+                line = (f"| {label} | L{l} {int(cd['cells']):,} | {flux} | "
+                        f"{float(cd['nrms_pct']):.2f} | "
+                        f"{float(cl['nrms_pct']):.2f} | "
+                        f"{float(cd['A2']):.3f} |")
+                self.assertIn(line, text)
+
+    def test_all_four_methods_have_three_levels(self):
+        have = {(r["method"], int(r["level"])) for r in self.rows()
+                if r["study"] == "A" and r["coefficient"] == "Cd"
+                and r["nrms_pct"]}
+        for method in ("cutLink", "penalty", "incremental", "ghostCell"):
+            for l in (1, 2, 3):
+                self.assertIn((method, l), have)
+
     def test_included_figures_exist(self):
         for name in ("README.md", "results.md"):
             text = (bbv.VERIFICATION_DIR / name).read_text()
