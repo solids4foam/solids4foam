@@ -1,0 +1,44 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+solvers
+{
+    "p|pFinal"
+    {
+        solver          GAMG;
+        tolerance       1e-12;
+        relTol          0;
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+    }
+    "cellDisplacement|cellDisplacementFinal"
+    {
+        solver          GAMG;
+        tolerance       1e-13;
+        relTol          0;
+        minIter         1;
+        maxIter         200;
+        smoother        GaussSeidel;
+    }
+    "U|UFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-13;
+        relTol          0;
+        minIter         1;
+    }
+}
+PIMPLE
+{
+    fluxConsistentPatches (outer);
+    momentumPredictor   on;
+    nOuterCorrectors    2;
+    nCorrectors         3;
+    nNonOrthogonalCorrectors 2;
+}
