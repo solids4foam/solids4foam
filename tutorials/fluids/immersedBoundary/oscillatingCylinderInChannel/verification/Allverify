@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Opt-in verification driver for the oscillatingCylinderInChannel tutorial:
+# the cutLink, ghostCell, penalty and legacy incremental methods on the
+# tutorial mesh levels, compared with moving body-fitted mesh solutions. See
+# README.md.
+#
+#     ./Allverify                        # cutLink Level 1: run, analyse, check
+#     ./Allverify --runs smoke           # its first 0.5 s
+#     ./Allverify dry-run --runs R1A R1B R1C R1D
+#     ./Allverify status
+#     ./Allverify --help
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for oscillatingCylinderInChannel verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 -u "${SCRIPT_DIR}/scripts/oscillating_cylinder_verification.py" "$@"
