@@ -71,6 +71,12 @@ Description
          gives on the face-centred topology, on the internal faces and on
          every patch that holds values.
 
+    electroMechanicalLaw is also built from inline dictionaries, to check its
+    defaults: the Ta field is required when no activeTension is given, the
+    constant is used unramped when only activeTension is given, the field
+    replaces a given constant when activeTensionFromField is on, and a law
+    with neither a constant nor the field, or a negative rampTime, is refused.
+
 Author
     Philip Cardiff, UCD.
 
@@ -180,6 +186,235 @@ tensor testGradD(const vector& p)
             0.40 - 0.20*x,   -0.50 + 0.25*y*y,  0.30 - 0.10*z,
             0.15 + 0.10*x*y,  0.25 - 0.05*y*z,  0.60 + 0.20*z*z
         );
+}
+
+
+//- Check the electroMechanicalLaw options on laws built from inline
+//  dictionaries. Every tutorial gives a constant activeTension with the field
+//  off, so the defaults and the field path are checked here. At F = I the
+//  passive stress is zero and the active stress is Ta along the fibre, so
+//  sigma_xx is the tension used
+void checkElectroMechanicalLawOptions()
+{
+    Info<< nl << "electroMechanicalLaw options" << nl;
+
+    // An electroMechanicalLaw over neoHookeanElastic, with the given
+    // entries added
+    auto emDict = [](const dictionary& extra)
+    {
+        dictionary passive;
+        passive.add("type", word("neoHookeanElastic"));
+        passive.add("rho", dimensionedScalar("rho", dimDensity, 1000.0));
+        passive.add("E", dimensionedScalar("E", dimPressure, 1e5));
+        passive.add("nu", dimensionedScalar("nu", dimless, 0.3));
+
+        dictionary d;
+        d.add("type", word("electroMechanicalLaw"));
+        d.add("passiveMechanicalLaw", passive);
+        d.merge(extra);
+
+        return d;
+    };
+
+    const dimensionedScalar Ta0("activeTension", dimPressure, 1e3);
+
+    // sigma_xx at F = I, fibre along x, at the given time and with the
+    // given Ta field, if any
+    auto activeStress = []
+    (
+        const mechanicalConstitutiveLaw& law,
+        const scalar time,
+        const scalarField* TaField
+    )
+    {
+        const List<tensor> Fs(1, tensor::I);
+        const List<scalar> Js(1, 1.0);
+        const labelList pts(1, label(0));
+
+        const UIndirectList<tensor> FView(Fs, pts);
+        const UIndirectList<scalar> JView(Js, pts);
+
+        const finiteStrainMechanicalConstitutiveLawKinematics kin
+        (
+            FView, FView, FView, FView, JView, JView
+        );
+
+        mechanicalConstitutiveLawState state(1);
+        state.vectorField0("f0") = vector(1, 0, 0);
+
+        symmTensorField sigma(1, symmTensor::zero);
+        UIndirectList<symmTensor> sigmaView(sigma, pts);
+        mechanicalConstitutiveLawResponse response(sigmaView);
+
+        // The inputs hold a pointer to the field, not a copy
+        mechanicalConstitutiveLawInputs inputs(1.0, time);
+        if (TaField)
+        {
+            inputs.setScalar("Ta", *TaField);
+        }
+
+        law.evaluate(kin, inputs, state, response);
+
+        return sigma[0].xx();
+    };
+
+    // Whether constructing the law from this dictionary is refused
+    auto refused = [](const dictionary& d)
+    {
+        bool threw = false;
+        try
+        {
+            autoPtr<mechanicalConstitutiveLaw> lawPtr
+            (
+                mechanicalConstitutiveLaw::New(d)
+            );
+        }
+        catch (const Foam::error&)
+        {
+            threw = true;
+        }
+
+        return threw;
+    };
+
+    FatalError.throwExceptions();
+    FatalIOError.throwExceptions();
+
+    // No constant: the field is asked for by default
+    {
+        autoPtr<mechanicalConstitutiveLaw> lawPtr
+        (
+            mechanicalConstitutiveLaw::New(emDict(dictionary()))
+        );
+
+        report
+        (
+            "with no activeTension the Ta field is required",
+            lawPtr->requiredScalarInputs() == wordList(1, word("Ta"))
+         && lawPtr->optionalScalarInputs().empty()
+        );
+
+        const scalarField TaField(1, 2e3);
+
+        const scalar sxx = activeStress(lawPtr(), 0.5, &TaField);
+
+        report
+        (
+            "the field tension is used, unramped",
+            mag(sxx - 2e3) < 1e-9*2e3,
+            "sigma_xx " + Foam::name(sxx)
+        );
+
+        bool threw = false;
+        try
+        {
+            activeStress(lawPtr(), 0.5, nullptr);
+        }
+        catch (const Foam::error&)
+        {
+            threw = true;
+        }
+
+        report("a required Ta field that is missing is fatal", threw);
+    }
+
+    // A constant and no activeTensionFromField: the constant is used, and
+    // rampTime defaults to 0, so there is no ramp at t < 1
+    {
+        dictionary extra;
+        extra.add("activeTension", Ta0);
+
+        autoPtr<mechanicalConstitutiveLaw> lawPtr
+        (
+            mechanicalConstitutiveLaw::New(emDict(extra))
+        );
+
+        report
+        (
+            "with activeTension the field is off by default",
+            lawPtr->requiredScalarInputs().empty()
+         && lawPtr->optionalScalarInputs() == wordList(1, word("Ta"))
+        );
+
+        const scalar sxx = activeStress(lawPtr(), 0.5, nullptr);
+
+        report
+        (
+            "rampTime defaults to 0: the constant is not ramped",
+            mag(sxx - Ta0.value()) < 1e-9*Ta0.value(),
+            "sigma_xx " + Foam::name(sxx)
+        );
+
+        extra.add("rampTime", 1.0);
+
+        autoPtr<mechanicalConstitutiveLaw> rampedPtr
+        (
+            mechanicalConstitutiveLaw::New(emDict(extra))
+        );
+
+        const scalar sxxRamped = activeStress(rampedPtr(), 0.5, nullptr);
+
+        report
+        (
+            "with rampTime 1 the constant is halved at t = 0.5",
+            mag(sxxRamped - 0.5*Ta0.value()) < 1e-9*Ta0.value(),
+            "sigma_xx " + Foam::name(sxxRamped)
+        );
+    }
+
+    // A constant with the field on, as the cardiacFoam cases give it: the
+    // field is required and the constant is not used
+    {
+        dictionary extra;
+        extra.add("activeTension", Ta0);
+        extra.add("activeTensionFromField", Switch(true));
+
+        autoPtr<mechanicalConstitutiveLaw> lawPtr
+        (
+            mechanicalConstitutiveLaw::New(emDict(extra))
+        );
+
+        report
+        (
+            "with activeTension and the field on, Ta is required",
+            lawPtr->requiredScalarInputs() == wordList(1, word("Ta"))
+        );
+
+        const scalarField TaField(1, 2e3);
+
+        const scalar sxx = activeStress(lawPtr(), 0.5, &TaField);
+
+        report
+        (
+            "with the field on the constant is not used",
+            mag(sxx - 2e3) < 1e-9*2e3,
+            "sigma_xx " + Foam::name(sxx)
+        );
+    }
+
+    // The field off and no constant leaves no tension to use
+    {
+        dictionary extra;
+        extra.add("activeTensionFromField", Switch(false));
+
+        report
+        (
+            "activeTensionFromField no without activeTension is refused",
+            refused(emDict(extra))
+        );
+    }
+
+    // A negative rampTime
+    {
+        dictionary extra;
+        extra.add("activeTension", Ta0);
+        extra.add("rampTime", -1.0);
+
+        report("a negative rampTime is refused", refused(emDict(extra)));
+    }
+
+    FatalIOError.dontThrowExceptions();
+    FatalError.dontThrowExceptions();
 }
 
 
@@ -1639,6 +1874,8 @@ int main(int argc, char *argv[])
     }
 
 
+    // electroMechanicalLaw is checked on laws built here, whatever the case
+    checkElectroMechanicalLawOptions();
 
     if (!smallStrainCapable)
     {

@@ -294,6 +294,101 @@ if ! run_mixed_framework; then
     failures=$((failures + 1))
 fi
 
+# ------------------------------------------------------------
+# The active tension from a field
+# ------------------------------------------------------------
+# Every tutorial gives electroMechanicalLaw a constant activeTension, so this
+# is the only run of the field path: the constant and rampTime are removed,
+# which turns activeTensionFromField on by default, and Ta is read through
+# inputCaseDirectories from a side case holding the same ramp at every time
+# step. The case is dynamic, so only an identical load history gives the
+# same answer, and the final probe |D| must then match the constant run
+run_field_framework() {
+    local d="${REGRESSION_ROOT}/field"
+
+    rm -rf "${d}"; mkdir -p "${d}"
+    for item in "${SCRIPT_DIR}"/*; do
+        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
+        cp -a "${item}" "${d}/"
+    done
+    "${SOLIDS4FOAM_SED}" -i 's/^writePrecision.*/writePrecision  14;/' "${d}/system/controlDict"
+
+    # Drop the constant and its ramp, and name the side case for Ta
+    "${SOLIDS4FOAM_SED}" -i \
+        -e '/^ *activeTension /d' \
+        -e '/^ *rampTime /d' \
+        -e 's/^\( *\)passiveMechanicalLaw$/\1inputCaseDirectories { Ta "TaCase"; }\n\1passiveMechanicalLaw/' \
+        "${d}/constant/mechanicalProperties"
+
+    # The side case shares the mesh and settings, and holds Ta = 60 kPa*t
+    # at every time step, as the constant 60 kPa ramped over 1 s
+    mkdir -p "${d}/TaCase/constant"
+    ln -s ../system "${d}/TaCase/system"
+    ln -s ../../constant/polyMesh "${d}/TaCase/constant/polyMesh"
+    local i t
+    for (( i = 0; i <= 100; i++ )); do
+        t=$(awk "BEGIN {printf \"%g\", ${i}/100}")
+        mkdir -p "${d}/TaCase/${t}"
+        cat > "${d}/TaCase/${t}/Ta" <<EOF
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      Ta;
+}
+dimensions      [1 -1 -2 0 0 0 0];
+internalField   uniform $(awk "BEGIN {printf \"%.17g\", 60.0e3*${i}/100}");
+boundaryField
+{
+    ".*"
+    {
+        type            calculated;
+        value           \$internalField;
+    }
+}
+EOF
+    done
+
+    ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+
+    if solids4Foam::regressionCaseSkipped "${d}/${ALLRUN_LOGFILE}"; then
+        echo "SKIP: field arm (the tutorial skipped here)"
+        return 0
+    fi
+
+    if ! grep -q "from field Ta" "${d}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: the field arm did not read the active tension from Ta"
+        return 1
+    fi
+
+    if ! grep -q "^End" "${d}/${SOLVER_LOGFILE}"; then
+        echo "FAIL: the field arm did not run to completion"
+        return 1
+    fi
+
+    local m
+    m=$(awk 'END {print $5}' "${d}/${DISP_FILE}" 2>/dev/null)
+
+    if [[ -z "${m}" ]]; then
+        echo "FAIL: the field arm produced no displacement history"
+        return 1
+    fi
+
+    if ! awk "BEGIN {exit !((${m} - ${magD})^2 <= (1e-6*${magD})^2)}"; then
+        printf "FAIL: field arm differs from the constant run (%.10g vs %.10g)\n" \
+            "${m}" "${magD}"
+        return 1
+    fi
+    printf "PASS: field arm matches the constant run (%.10g)\n" "${m}"
+
+    return 0
+}
+
+if [[ -n "${magD}" ]] && ! run_field_framework; then
+    failures=$((failures + 1))
+fi
+
 echo
 if (( failures == 0 )); then
     echo "============================================================"

@@ -50,17 +50,19 @@ none, so it can be given once, on the outer dictionary.
 | Entry | Required | Default | Description |
 | --- | --- | --- | --- |
 | `passiveMechanicalLaw` | yes | - | Sub-dictionary selecting the passive law |
-| `activeTension` | yes | - | Constant active tension, pressure units |
-| `rampTime` | yes | - | Ramp duration for `activeTension`, `>= 0` |
-| `activeTensionFromField` | no | `no` | Read `Ta` as a coupling input field |
+| `activeTension` | no | - | Constant active tension, pressure units |
+| `rampTime` | no | `0` | Ramp duration for `activeTension`, `>= 0` |
+| `activeTensionFromField` | no | `yes` if no `activeTension`, else `no` | Read `Ta` as a coupling input field |
 | `activeTensionFieldName` | no | `Ta` | Name of the active tension field |
 | `uniformFibreField` | no | `no` | Take the default `f0` from this dictionary |
 | `f0` | if uniform | - | Fibre vector; required if `uniformFibreField yes` |
 | `rho` | see text | - | Density, passed to the passive law if absent there |
 | `inputCaseDirectories` | no | - | Read `Ta` from another case directory |
 
-`activeTension` and `rampTime` are required even when the tension comes from
-a field. A negative `rampTime` is a fatal error.
+`activeTension` and `rampTime` are used only when `activeTensionFromField`
+is `no`. With the field on they are not used, and giving either prints a
+warning. Setting `activeTensionFromField no` without an `activeTension` is a
+fatal error, as is a negative `rampTime`.
 
 The `passiveMechanicalLaw` sub-dictionary holds the passive law's `type` and
 all of its entries. Any finite-strain law can be used; the tutorials use
@@ -82,7 +84,7 @@ first of:
 
 If none exists the run stops with an error.
 
-With `activeTensionFromField no` (the default) the field is not read, even
+With `activeTensionFromField no` the field is not read, even
 if one is registered. In that case the manager prints a warning, once, if a
 `volScalarField` with the `activeTensionFieldName` name is registered, since
 the case is then running on the constant rather than on that field. An
