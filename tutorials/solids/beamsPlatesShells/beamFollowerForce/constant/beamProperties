@@ -1,0 +1,56 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| beamFoam: finite volume solver for geometrically exact beams                |
+| Web:         https://github.com/solids4foam/beamFoam                        |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      beamProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+beams
+(
+    beam_0
+    {
+
+        crossSectionModel circle;
+
+        circleCrossSectionModelDict
+        {
+            radius  0.65828153; //0.65828153;//0.65; //mm
+        }
+
+        length 100; // mm
+        nSegments 40;
+        E  2.3731844e8;
+        G  1.1865922e8; //nu = 0
+
+    }
+ );
+
+
+beamModel coupledTotalLagNewtonRaphsonBeam;
+
+"coupledTotalLagNewtonRaphsonBeamCoeffs"
+{
+    // E E [1 -1 -2 0 0 0 0] 2.3731844e8;
+    // G G [1 -1 -2 0 0 0 0] 1.1865922e8; //nu = 0
+
+    // Convergence tolerance and max allowed iterations
+    nCorrectors 1000;
+    solutionTol 1e-10;
+    residualTol 1e-8;
+
+    debug no;
+
+}
+
+// ************************************************************************* //

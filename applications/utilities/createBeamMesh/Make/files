@@ -1,0 +1,3 @@
+createBeamMesh.C
+
+EXE = $(FOAM_MODULE_APPBIN)/createBeamMesh

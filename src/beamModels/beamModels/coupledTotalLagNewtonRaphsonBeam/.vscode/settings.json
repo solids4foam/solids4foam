@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "coupledWThetaEqn_TLNR.H": "cpp",
+        "coupledTotalLagNewtonRaphsonBeam.H": "cpp",
+        "coupledTotalLagNewtonRaphsonBeam.C": "cpp",
+        "beamContactModel.C": "cpp",
+        "applyContacts.C": "cpp"
+    }
+}
