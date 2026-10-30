@@ -3,23 +3,38 @@ SOLIDS4FOAM_ROOT := ../..
 sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
-# The sources are copied unchanged from beamFoam; see BEAMFOAM_VERSION
+/* The sources are copied unchanged from beamFoam; see BEAMFOAM_VERSION */
 ifeq (Gcc,$(findstring Gcc,$(WM_COMPILER)))
     DISABLE_WARNING_FLAGS = -Wno-old-style-cast -Wno-return-type
 else
     DISABLE_WARNING_FLAGS = -Wno-old-style-cast
 endif
 
+/* -D__restrict__= : OpenFOAM's field loops (ListLoopM.H) mark their pointers
+   __restrict__, but expressions such as tmp(A) & B reuse A's storage for the
+   result, so input and output alias. GCC 11+ then miscompiles Tensor::inner
+   at -O3 (v2412+ masks this with no-tree-vectorize in TensorI.H; v2312 does
+   not), corrupting the Jacobian and making the tutorials diverge. Same flag as
+   beamFoam (solids4foam/beamFoam#71). */
 EXE_INC = \
     $(VERSION_SPECIFIC_INC) \
-    $(DISABLE_WARNING_FLAGS) \
+    $(DISABLE_WARNING_FLAGS) -D__restrict__= \
     -I$(SOLIDS4FOAM_ROOT)/ThirdParty/eigen3 \
     -I$(SOLIDS4FOAM_ROOT)/ThirdParty/eigen3/unsupported/Eigen/src/IterativeSolvers \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/dynamicFvMesh/lnInclude
 
+/* -Bsymbolic-functions: calls from this library to template functions that
+   other libraries also instantiate (e.g. the tmp tensor operator& above) bind
+   to this library's copies, built with -D__restrict__=, rather than to the
+   copies in a library loaded earlier, such as libsolids4FoamModels. */
+ifneq (,$(findstring linux,$(WM_ARCH)))
+    BIND_LOCAL_FLAGS = -Wl,-Bsymbolic-functions
+endif
+
 LIB_LIBS = \
+    $(BIND_LOCAL_FLAGS) \
     -lfiniteVolume \
     -lmeshTools \
     -ldynamicFvMesh \
