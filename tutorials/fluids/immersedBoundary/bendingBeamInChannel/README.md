@@ -114,3 +114,12 @@ size (8.8%, 7.1% and 7.0% for the momentum exchange). Without the rotation of
 the sections (`amplitudeY 0`), the body velocity is solenoidal, and the
 differences of the momentum exchange from the corresponding body-fitted
 solution are 7.0%, 3.8% and 3.2%.
+
+## Verification
+
+`verification/` holds an opt-in verification of the immersed boundary methods
+on this case, run with `verification/Allverify` (it is not part of
+`Alltest`): the exact volume balance of the prescribed bending, the force
+coefficients of `cutLink`, `penalty` and the legacy `incremental` method
+against the body-fitted series, the sensitivity to the finite-volume settings,
+and the observed cost. See `verification/README.md`.

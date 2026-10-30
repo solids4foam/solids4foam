@@ -1,0 +1,23 @@
+quantity,coefficient,A_archive_dt0.01,B_R1_dt0.0025,C_control_dt0.01
+"mean (1<t<8, native samples)",Cd,17.5467,16.8736,16.7882
+"RMS (1<t<8, native samples)",Cd,54.1821,52.5478,53.6562
+"fundamental amplitude (direct LSQ, 0.1 s grid)",Cd,71.7766,70.0404,71.6641
+"second harmonic amplitude (direct LSQ, 0.1 s grid)",Cd,6.2533,5.8566,6.3255
+"second harmonic phase (deg, direct LSQ)",Cd,70.02,65.47,69.0
+"nRMS to tracked reference (%), same sample times, no interpolation of the force",Cd,1.354,3.047,1.053
+"nRMS to tracked reference (%), 0.01 s grid",Cd,,3.035,0.994
+"nRMS difference B-C (%), 0.1 s grid, normalised by the second",Cd,2.906,,
+"nRMS difference A-C (%), 0.1 s grid, normalised by the second",Cd,0.989,,
+"nRMS difference A-B (%), 0.1 s grid, normalised by the second",Cd,2.886,,
+"nRMS difference B-C (%), 0.01 s grid",Cd,2.767,,
+"mean (1<t<8, native samples)",Cl,0.501,0.5367,0.5717
+"RMS (1<t<8, native samples)",Cl,6.4693,6.2658,6.447
+"fundamental amplitude (direct LSQ, 0.1 s grid)",Cl,4.2229,4.4592,4.2389
+"second harmonic amplitude (direct LSQ, 0.1 s grid)",Cl,7.9518,7.5727,7.9752
+"second harmonic phase (deg, direct LSQ)",Cl,69.52,68.04,70.2
+"nRMS to tracked reference (%), same sample times, no interpolation of the force",Cl,2.338,4.874,2.317
+"nRMS to tracked reference (%), 0.01 s grid",Cl,,4.916,1.886
+"nRMS difference B-C (%), 0.1 s grid, normalised by the second",Cl,6.157,,
+"nRMS difference A-C (%), 0.1 s grid, normalised by the second",Cl,1.405,,
+"nRMS difference A-B (%), 0.1 s grid, normalised by the second",Cl,5.713,,
+"nRMS difference B-C (%), 0.01 s grid",Cl,5.814,,

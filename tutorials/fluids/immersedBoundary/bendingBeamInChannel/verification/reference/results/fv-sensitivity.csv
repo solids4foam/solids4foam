@@ -1,0 +1,21 @@
+question,comparison,method,estimator,control_run,test_run,Cd_nrms_control,Cd_nrms_test,d_Cd_nrms,Cd_A2_control,Cd_A2_test,d_Cd_A2,noise_ratio,d_Cl_nrms,thr_nrms,thr_A2,material
+Q1,dt: N48 vs N96 (Euler),cutLink,cutLink ST,T-cutLink-Euler-N96,T-cutLink-Euler-N48,4.645,4.991,0.346,5.7013,5.7052,0.0038,1.037,0.413,1.0,0.1,False
+Q1,dt: N48 vs N96 (Euler),cutLink,cutLink ME,T-cutLink-Euler-N96,T-cutLink-Euler-N48,4.446,4.644,0.198,5.5952,5.5721,-0.0232,1.058,-0.103,1.0,0.1,False
+Q1,dt: N48 vs N96 (Euler),penalty,total,T-penalty-Euler-N96,T-penalty-Euler-N48,8.102,7.337,-0.764,1.9471,1.9273,-0.0198,0.587,-2.613,1.0,0.1,False
+Q2,"backward vs Euler, N96",cutLink,cutLink ST,T-cutLink-Euler-N96,T-cutLink-backward-N96,4.645,4.772,0.128,5.7013,5.6748,-0.0265,1.154,3.478,1.0,0.1,False
+Q2,"backward vs Euler, N96",cutLink,cutLink ME,T-cutLink-Euler-N96,T-cutLink-backward-N96,4.446,4.542,0.096,5.5952,5.5973,0.0021,1.146,0.422,1.0,0.1,False
+Q2,"backward vs Euler, N96",penalty,total,T-penalty-Euler-N96,T-penalty-backward-N96,8.102,9.029,0.927,1.9471,1.9394,-0.0077,1.6,0.935,1.0,0.1,False
+Q2,"backward vs Euler, N48",cutLink,cutLink ST,T-cutLink-Euler-N48,T-cutLink-backward-N48,4.991,5.495,0.504,5.7052,5.6657,-0.0395,1.165,2.009,1.0,0.1,False
+Q2,"backward vs Euler, N48",cutLink,cutLink ME,T-cutLink-Euler-N48,T-cutLink-backward-N48,4.644,5.063,0.419,5.5721,5.5599,-0.0122,1.147,0.653,1.0,0.1,False
+Q2,"backward vs Euler, N48",penalty,total,T-penalty-Euler-N48,T-penalty-backward-N48,7.337,7.986,0.649,1.9273,1.9037,-0.0236,1.663,-0.469,1.0,0.1,False
+Q4,limitedLinear vs linearUpwind (N96),cutLink,cutLink ST,T-cutLink-Euler-N96,S-cutLink-limitedLinear-N96,4.645,4.494,-0.151,5.7013,5.6819,-0.0194,0.978,1.498,1.0,0.1,False
+Q4,limitedLinear vs linearUpwind (N96),cutLink,cutLink ME,T-cutLink-Euler-N96,S-cutLink-limitedLinear-N96,4.446,4.242,-0.204,5.5952,5.5928,-0.0024,0.987,0.707,1.0,0.1,False
+Q4,limitedLinear vs linearUpwind (N96),penalty,total,T-penalty-Euler-N96,S-penalty-limitedLinear-N96,8.102,7.956,-0.146,1.9471,1.9268,-0.0203,0.989,0.221,1.0,0.1,False
+Q5,nOuter 2 vs 1 (N96),cutLink,cutLink ST,T-cutLink-Euler-N96,P-cutLink-nOuter2-r2,4.645,4.508,-0.136,5.7013,5.7277,0.0264,0.95,-0.129,0.5,0.05,False
+Q5,nOuter 2 vs 1 (N96),cutLink,cutLink ME,T-cutLink-Euler-N96,P-cutLink-nOuter2-r2,4.446,4.406,-0.04,5.5952,5.6179,0.0226,0.942,-0.178,0.5,0.05,False
+Q5,nOuter 2 vs 1 (N96),penalty,total,T-penalty-Euler-N96,P-penalty-nOuter2,8.102,8.083,-0.018,1.9471,1.9731,0.026,0.995,0.026,0.5,0.05,False
+Q5,nCorr 6 vs 3 (N96),penalty,total,T-penalty-Euler-N96,P-penalty-nCorr6,8.102,8.097,-0.005,1.9471,1.9481,0.0011,1.0,-0.003,0.5,0.05,False
+Q5,pressure relTol 1e-3 vs 1e-2 (N96),penalty,total,T-penalty-Euler-N96,P-penalty-prelTol0.001,8.102,8.098,-0.004,1.9471,1.9481,0.0011,1.001,0.005,0.5,0.05,False
+Q4,"upwind vs linearUpwind (diagnostic, N96)",penalty,total,T-penalty-Euler-N96,S-penalty-upwind-N96,8.102,7.58,-0.522,1.9471,2.0196,0.0725,0.992,1.204,1.0,0.1,False
+Q6,penaltyCoeff 1e2 vs 1e3 (N96),penalty,total,T-penalty-Euler-N96,S3-penalty-coeff1e2-L2-N96,8.102,7.619,-0.482,1.9471,1.9421,-0.0049,0.635,-0.427,1.0,0.1,False
+Q6,penaltyCoeff 1e4 vs 1e3 (N96),penalty,total,T-penalty-Euler-N96,S3-penalty-coeff1e4-L2-N96,8.102,8.415,0.314,1.9471,1.9521,0.005,1.164,1.31,1.0,0.1,False
