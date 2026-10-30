@@ -1,0 +1,196 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Arostica et al. (2025) benchmark 1: elastodynamics of an idealised left
+# ventricle with visco-active Holzapfel-Ogden myocardium, a follower cavity
+# pressure and spring-dashpot (pericardium/base) boundary conditions.
+#
+# Usage:
+#     ./Allrun [step] [pressure|displacement] [parallel]
+#
+# where step is one of
+#     step0A   active response only (zero pressure)       Section 3.3.1
+#     step0B   passive response only (no active stress)   Section 3.3.2
+#     step1    active and passive response (default)      Section 3.4
+#     step2A   blinded parameter variation, case A        Section 3.5, Table 5
+#     step2B   blinded parameter variation, case B
+#     step2C   blinded parameter variation, case C
+#
+# The mesh density is set with MESH_NUMBER, 1 (coarsest) to 4, default 2. The
+# all-hexahedral meshes, with an O-grid at the apex, are downloaded from the
+# solids4foam website (ArosticaEtAl2025.zip). Level 4 is not stored: Allrun
+# extracts the script that generates the meshes, makeOGridMesh.py, and asks
+# for it to be run once (Python 3) before MESH_NUMBER=4.
+#
+# The time series of the active stress and the cavity pressure are tabulated
+# by the makeArosticaTimeSeries utility in the parent directory, which Allrun
+# compiles. e.g.
+#     MESH_NUMBER=3 ./Allrun step1 displacement parallel
+#
+# Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
+#------------------------------------------------------------------------------
+cd "${0%/*}" || exit 1    # Run from this directory
+
+# Source tutorial run functions
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# The case is solved with PETSc SNES
+solids4Foam::requirePetscOrExitSilently
+
+# The case has only been run with OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# The time-series utility, makeArosticaTimeSeries, is shared by both
+# benchmarks, in the parent directory, or where ARO_DIR points (the regression
+# test runs a copy of this case elsewhere)
+ARO_DIR="${ARO_DIR:-..}"
+if [[ ! -d "$ARO_DIR/makeArosticaTimeSeries" ]]
+then
+    echo "makeArosticaTimeSeries was not found in $ARO_DIR"
+    exit 1
+fi
+
+# The meshes are downloaded once from the solids4foam website, into data/
+ARCHIVE_URL="https://www.solids4foam.com/tutorials/archive/ArosticaEtAl2025.zip"
+ARCHIVE_SHA256="08a13aad266f0b30a2c311508769cfa37779a33238ff00399d98019c3befc5a3"
+ARCHIVE="data/ArosticaEtAl2025.zip"
+
+# Mesh level
+MESH_NUMBER="${MESH_NUMBER:-2}"
+if [[ ! "$MESH_NUMBER" =~ ^[1-4]$ ]]
+then
+    echo "MESH_NUMBER must be 1, 2, 3 or 4, not '$MESH_NUMBER'"
+    exit 1
+fi
+
+# Select the benchmark step and the formulation
+STEP="step1"
+FORMULATION="pressure"
+PARALLEL="no"
+for arg in "$@"
+do
+    case "$arg" in
+        step0A|step0B|step1|step2A|step2B|step2C) STEP="$arg" ;;
+        pressure|displacement) FORMULATION="$arg" ;;
+        parallel) PARALLEL="yes" ;;
+        *) echo "Unknown argument: $arg"; exit 1 ;;
+    esac
+done
+
+echo "Benchmark step: $STEP, mesh level: $MESH_NUMBER"
+
+# Material parameters of the selected step
+ln -vnsf "benchmarkParameters.$STEP" constant/benchmarkParameters
+
+# Active stress tau(t) and cavity pressure p(t): ODEs in time only, tabulated
+# once here
+SIGMA0=$(awk '/^activeStressSigma0/ {gsub(";", "", $2); print $2}' \
+    "constant/benchmarkParameters.$STEP")
+PRESSURE=$(awk '/^pressureTable/ {gsub(";", "", $2); print $2}' \
+    "constant/benchmarkParameters.$STEP")
+
+if [[ "$SIGMA0" == "0" ]]
+then
+    ACTIVE_ARGS=(-zero)
+else
+    ACTIVE_ARGS=(-sigma0 "$SIGMA0")
+fi
+if [[ "$PRESSURE" == "zero" ]]
+then
+    PRESSURE_ARGS=(-pressure benchmark1 -zero)
+else
+    PRESSURE_ARGS=(-pressure "$PRESSURE")
+fi
+
+wmake "$ARO_DIR/makeArosticaTimeSeries" > log.wmake 2>&1 \
+    || { echo "Building makeArosticaTimeSeries failed: see log.wmake"; exit 1; }
+{
+    makeArosticaTimeSeries -active "${ACTIVE_ARGS[@]}" \
+        -out constant/activeStress \
+ && makeArosticaTimeSeries "${PRESSURE_ARGS[@]}" -out constant/timeVsPressure
+} > log.makeArosticaTimeSeries 2>&1 \
+    || { echo "makeArosticaTimeSeries failed: see log.makeArosticaTimeSeries"; exit 1; }
+
+# Solid formulation: "pressure" (default), the mixed displacement-pressure
+# formulation, or "displacement", with the bulk modulus as a penalty in the
+# momentum equation. The selected fvSolution and solidProperties variants are
+# linked into place, as in LandEtAl2015/problem3
+echo "Formulation: $FORMULATION"
+
+# The mixed formulation's Jacobian has no processor-boundary (coupled patch)
+# coupling of the pressure to the displacement
+# (foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix: "patch.coupled(): D-in-p
+# not implemented"), so it only runs in serial
+if [[ "$FORMULATION" == "pressure" && "$PARALLEL" == "yes" ]]
+then
+    echo "The pressure formulation cannot currently run in parallel:"
+    echo "run it in serial, or use the displacement formulation in parallel."
+    exit 1
+fi
+for file in system/fvSolution.$FORMULATION constant/solidProperties.$FORMULATION
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
+
+# Restore 0 directory from 0.orig
+restore0Dir
+
+# All-hexahedral mesh with an O-grid at the apex, from the archive
+solids4Foam::downloadFile "$ARCHIVE_URL" "$ARCHIVE" "$ARCHIVE_SHA256" \
+    || { echo "Could not download $ARCHIVE_URL"; exit 1; }
+command -v unzip > /dev/null 2>&1 || {
+    echo "unzip: command not found, which is required for this case"
+    exit 0
+}
+MESH_DIR="data/ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER"
+rm -rf constant/polyMesh
+if [[ "$MESH_NUMBER" == "4" ]]
+then
+    # Level 4 (819 200 cells) is not stored: it is written once by
+    # makeOGridMesh.py, from the archive, in the same layout as levels 1 to 3
+    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/makeOGridMesh.py" -d data
+    # The owner header holds the mesh sizes: a missing, partial or other
+    # level mesh is not used
+    if ! grep -qs "nCells:819200 " "$MESH_DIR/constant/polyMesh/owner"
+    then
+        echo "Level 4 is not stored in $ARCHIVE. Write it once with"
+        echo "(cd data/ArosticaEtAl2025 && python3 makeOGridMesh.py 4 benchmark1/mesh4)"
+        echo "and run MESH_NUMBER=4 ./Allrun again."
+        exit 1
+    fi
+else
+    rm -rf "$MESH_DIR"
+    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER/*" -d data
+fi
+cp -r "$MESH_DIR/constant/polyMesh" constant/polyMesh
+solids4Foam::runApplication checkMesh
+
+# Transmural coordinate t, fibres f0, sheets s0 and sheet-normals n0
+# (system/setFibreFieldDict selects the ellipsoid method)
+solids4Foam::runApplication setFibreField
+
+# Run the solver
+if [[ "$PARALLEL" == "yes" ]]
+then
+    solids4Foam::runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication reconstructPar
+else
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Plot the displacements of p0 and p1 against the benchmark participants
+if command -v gnuplot > /dev/null 2>&1
+then
+    echo "Writing verification/$STEP.pdf with gnuplot"
+    gnuplot -e "refDir='verification/reference/$STEP'; points='p0 p1'; \
+output='verification/$STEP.pdf'" "$ARO_DIR/plotVsReference.gnuplot" \
+        > log.gnuplot 2>&1
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
+
+#------------------------------------------------------------------------------

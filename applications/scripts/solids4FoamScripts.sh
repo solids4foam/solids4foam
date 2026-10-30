@@ -888,6 +888,71 @@ function solids4Foam::requirePetscOrExitSilently()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# downloadFile
+#     Download a file once, e.g. a tutorial's mesh archive from the solids4foam
+#     website, and check its SHA-256 sum. A file already present with the right
+#     sum is kept, so a case can also be run offline by placing the file there
+#     first. Uses curl or wget, and sha256sum or shasum; exits cleanly (exit 0)
+#     with the usual skip message if none of either is available, and returns
+#     1 if the download fails or the sum does not match.
+# Arguments:
+#     1: URL
+#     2: FILE, the local path
+#     3: SHA256, the expected SHA-256 sum
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+function solids4Foam::downloadFile()
+{
+    local URL=$1
+    local FILE=$2
+    local SHA256=$3
+    local sumCmd
+
+    if command -v sha256sum > /dev/null 2>&1
+    then
+        sumCmd="sha256sum"
+    elif command -v shasum > /dev/null 2>&1
+    then
+        sumCmd="shasum -a 256"
+    else
+        echo
+        echo "sha256sum: command not found, which is required for this case"
+        echo
+        exit 0
+    fi
+
+    if [[ -f "${FILE}" ]] \
+    && [[ "$(${sumCmd} "${FILE}" | cut -d' ' -f1)" == "${SHA256}" ]]
+    then
+        return 0
+    fi
+
+    mkdir -p "$(dirname "${FILE}")"
+    echo "Downloading ${URL}"
+    if command -v curl > /dev/null 2>&1
+    then
+        curl -fsSL -o "${FILE}" "${URL}" || { rm -f "${FILE}"; return 1; }
+    elif command -v wget > /dev/null 2>&1
+    then
+        wget -q -O "${FILE}" "${URL}" || { rm -f "${FILE}"; return 1; }
+    else
+        echo
+        echo "curl: command not found, which is required for this case"
+        echo
+        exit 0
+    fi
+
+    if [[ "$(${sumCmd} "${FILE}" | cut -d' ' -f1)" != "${SHA256}" ]]
+    then
+        echo "${FILE}: SHA-256 sum does not match, download rejected"
+        rm -f "${FILE}"
+        return 1
+    fi
+
+    return 0
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 # regressionCaseSkipped
 #     Return success when an Allrun log contains a known case-skip message.
 #     Regression scripts use this to exit cleanly when a tutorial is not

@@ -1,0 +1,69 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         1;
+
+// 1 ms, as used by all benchmark participants (Table 10)
+deltaT          0.001;
+
+writeControl    runTime;
+
+writeInterval   0.01;
+
+cycleWrite      0;
+
+writeFormat     ascii;
+
+writePrecision  8;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+functions
+{
+    // The two particles of the benchmark (Section 3.3.1). Written to
+    // postProcessing/0/solidPointDisplacement_<name>.dat as
+    //     time  ux  uy  uz  |u|
+    p0
+    {
+        type          solidPointDisplacement;
+        point         (0.025 0.03 0);
+    }
+
+    p1
+    {
+        type          solidPointDisplacement;
+        point         (0 0.03 0);
+    }
+}
+
+// ************************************************************************* //
