@@ -113,6 +113,24 @@ else
     failures=$((failures + 1))
 fi
 
+# Check the order of accuracy and the time-level handling of the BDF ddt
+# scheme on the mesh of the case. Test-fvcDdt uses its own fields and
+# schemes, so it does not read or change the solver results.
+test_log="${CASE_DIR}/log.Test-fvcDdt"
+if [ "$CHECK_ONLY" = false ]; then
+    ( cd "${CASE_DIR}" && Test-fvcDdt > log.Test-fvcDdt 2>&1 ) || true
+fi
+
+if grep -q '^Test-fvcDdt: SKIPPED' "${test_log}" 2>/dev/null; then
+    echo "SKIP: Test-fvcDdt, the BDF ddt scheme is not built here"
+elif grep -q '^Test-fvcDdt: PASSED' "${test_log}" 2>/dev/null; then
+    echo "PASS: Test-fvcDdt, BDF ddt order of accuracy and time levels"
+else
+    echo "FAIL: Test-fvcDdt; see ${test_log}"
+    grep '^FAIL' "${test_log}" 2>/dev/null || true
+    failures=$((failures + 1))
+fi
+
 if [ "$CHECK_ONLY" = false ]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
