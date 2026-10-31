@@ -344,16 +344,23 @@ tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
 
     const vectorField& DoldP = DoldExtrap_;
 
+    // The tensors and the velocity are named fields on purpose. Written inline,
+    // "symmTensorField & (DP - DoldP)" hands OpenFOAM a temporary vector field
+    // whose storage it reuses for the result of the inner product, so the
+    // result aliases its own input: the z component is then formed from x and
+    // y components that have already been overwritten. Whether a face is hit
+    // depends on how the loop is vectorised, so it changes from run to run
+    // and, in parallel, with the decomposition
+    const symmTensorField K(kNormal_*nn + kTangential_*(I - nn));
+    const symmTensorField C(cNormal_*nn + cTangential_*(I - nn));
+    const vectorField dD(DP - DoldP);
+
     return tmp<vectorField>
     (
         new vectorField
         (
             traction_ - nPressure*pressure_
-          - areaRatio
-           *(
-                ((kNormal_*nn + kTangential_*(I - nn)) & DP)
-              + rDeltaT*((cNormal_*nn + cTangential_*(I - nn)) & (DP - DoldP))
-            )
+          - areaRatio*((K & DP) + rDeltaT*(C & dD))
         )
     );
 }

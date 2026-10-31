@@ -275,6 +275,16 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::declareState
         mechanicalConstitutiveLawStateSpec::stateRole::prescribed,
         s0Default_
     );
+
+    // Optional spatial scaling of the active stress, e.g. 0 in non-contracting
+    // (fibrous) tissue near the valve rings of a patient geometry. Prescribed
+    // with a default of 1: a case without an activeScale field is unchanged
+    spec.addScalar
+    (
+        "activeScale",
+        mechanicalConstitutiveLawStateSpec::stateRole::prescribed,
+        1.0
+    );
 }
 
 
@@ -295,6 +305,7 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
     // mechanicalConstitutiveLawStateSpec
     const Field<vector>& f0 = state.getVectorField0("f0");
     const Field<vector>& s0 = state.getVectorField0("s0");
+    const Field<scalar>& activeScale = state.getScalarField0("activeScale");
 
     const scalar a = a_.value();
     const scalar af = af_.value();
@@ -384,7 +395,7 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
         // Active stress: S = tau f0 (x) f0, pushed forward
         if (mag(tau) > 0)
         {
-            sigmaI += rJ*tau*sqr(ff);
+            sigmaI += rJ*tau*activeScale[i]*sqr(ff);
         }
 
         // Viscous stress: S = eta Edot, with Edot over the time step
