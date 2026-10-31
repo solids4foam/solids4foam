@@ -447,6 +447,14 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
 
     if (newTimeStep())
     {
+        // The implicit stiffness follows the material state, if asked to:
+        // taken here from the converged state of the previous step, so that
+        // it is fixed within the step
+        if (impKUpdate_ == "timeStep")
+        {
+            updateImpK();
+        }
+
         if (predictor_)
         {
             predict();
@@ -667,6 +675,14 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
     // Update D boundary conditions
     D().correctBoundaryConditions();
+
+    // The implicit stiffness follows the material state, if asked to: taken
+    // here from the converged state of the previous step, so that it, and
+    // the stabilisation and Jacobian it scales, are fixed within the step
+    if (impKUpdate_ == "timeStep" && newTimeStep())
+    {
+        updateImpK();
+    }
 
     // Solution predictor
     if (predictor_ && newTimeStep())
@@ -961,6 +977,71 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 }
 
 
+void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::updateImpK()
+{
+    // The same tangent as makeImpK, evaluated again at the current
+    // deformation gradient. A tangent query: it neither writes a stress nor
+    // disturbs history
+    const tangentRequest req =
+        solvePressure()
+      ? tangentRequest::scalarDeviatoric
+      : tangentRequest::scalar;
+
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK_,
+        req
+    );
+
+    impKf_ = fvc::interpolate(impK_);
+    rImpK_ = 1.0/impK_;
+
+    Info<< "    impK: min " << gMin(impK_.primitiveField())
+        << ", max " << gMax(impK_.primitiveField()) << endl;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::
+pressureStabilisationStiffnessField() const
+{
+    tmp<surfaceScalarField> tK;
+
+    if (pressureStabilisationStiffness_ == "momentum")
+    {
+        // What the stabilised momentum operator carries: the Laplacian
+        // surrogate plus the difference-of-stencils term scaled by the same
+        // impK, so the two stabilisations are weighed against each other
+        // consistently
+        tK = (1.0 + momentumStabilisation().scaleFactor())*impKf_;
+    }
+    else if (pressureStabilisationStiffness_ == "bulk")
+    {
+        // The penalty the pressure equation enforces: its coefficient is
+        // then no larger than the penalty term it stabilises
+        tK = max(impKf_, fvc::interpolate(1.0/rKappa()));
+    }
+    else
+    {
+        tK = tmp<surfaceScalarField>(new surfaceScalarField(impKf_));
+    }
+
+    if (pressureStabilisationStiffnessFactor_ != 1.0)
+    {
+        tK.ref() *= pressureStabilisationStiffnessFactor_;
+    }
+
+    return tK;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
@@ -1065,6 +1146,24 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     twoMuRef_(1.0),
     pressureEqnScale_(1.0),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    impKUpdate_
+    (
+        solidModelDict().lookupOrDefault<word>("impKUpdate", "frozen")
+    ),
+    pressureStabilisationStiffness_
+    (
+        solidModelDict().lookupOrDefault<word>
+        (
+            "pressureStabilisationStiffness", "impK"
+        )
+    ),
+    pressureStabilisationStiffnessFactor_
+    (
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            "pressureStabilisationStiffnessFactor", 1.0
+        )
+    ),
     blockSize_
     (
         solvePressure()
@@ -1100,9 +1199,42 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         correctStress();
     }
 
+    if (impKUpdate_ != "frozen" && impKUpdate_ != "timeStep")
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "Unknown impKUpdate '" << impKUpdate_ << "'. Valid options "
+            << "are frozen and timeStep." << exit(FatalIOError);
+    }
+
+    if
+    (
+        pressureStabilisationStiffness_ != "impK"
+     && pressureStabilisationStiffness_ != "momentum"
+     && pressureStabilisationStiffness_ != "bulk"
+    )
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "Unknown pressureStabilisationStiffness '"
+            << pressureStabilisationStiffness_ << "'. Valid options are "
+            << "impK, momentum and bulk." << exit(FatalIOError);
+    }
+
+    if (pressureStabilisationStiffnessFactor_ <= 0)
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "pressureStabilisationStiffnessFactor must be positive."
+            << exit(FatalIOError);
+    }
+
+    Info<< "impKUpdate = " << impKUpdate_ << endl;
+
     Info<< "solvePressure = " << solvePressure() << endl;
     if (solvePressure())
     {
+        Info<< "pressureStabilisationStiffness = "
+            << pressureStabilisationStiffness_ << ", factor "
+            << pressureStabilisationStiffnessFactor_ << endl;
+
         if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
         {
             FatalErrorInFunction
@@ -1531,7 +1663,10 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         {
             fvVectorMatrix approxMomJ
             (
-                fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+                fvm::laplacian
+                (
+                    pressureStabilisationStiffnessField(), D, "laplacian(DD,D)"
+                )
               - rho()*fvm::d2dt2(D)
             );
             approxMomJ.relax();
@@ -1723,7 +1858,12 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             {
                 fvVectorMatrix approxMomJ
                 (
-                    fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+                    fvm::laplacian
+                    (
+                        pressureStabilisationStiffnessField(),
+                        D,
+                        "laplacian(DD,D)"
+                    )
                   - rho()*fvm::d2dt2(D)
                 );
                 approxMomJ.relax();

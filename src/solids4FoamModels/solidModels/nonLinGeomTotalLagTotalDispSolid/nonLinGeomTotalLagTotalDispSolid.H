@@ -80,16 +80,17 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
-        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        const volScalarField impK_;
+        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum.
+        //  Frozen at construction unless impKUpdate asks for a refresh
+        volScalarField impK_;
 
         //- Implicit stiffness surface field
-        const surfaceScalarField impKf_;
+        surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
         //  will store the reciprocal for effficiency
-        const volScalarField rImpK_;
+        volScalarField rImpK_;
 
         //- Reciprocal of the bulk modulus
         //  Used in the pressure equation when solvePressure is enabled
@@ -143,6 +144,23 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- When the implicit stiffness is taken from the law: frozen (at
+        //  construction, the default) or timeStep (again at the start of
+        //  every time step, from the converged state of the previous one).
+        //  With a law whose scalar tangent follows its state, the FV
+        //  stabilisation then follows the material too
+        const word impKUpdate_;
+
+        //- Stiffness behind the pressure stabilisation coefficient (the
+        //  solid analogue of rAUf) of the mixed formulation: impK (the
+        //  default), momentum (impK times one plus the momentum
+        //  stabilisation scale factor, the implicit stiffness the momentum
+        //  operator actually carries) or bulk (the larger of impK and kappa)
+        const word pressureStabilisationStiffness_;
+
+        //- Factor applied to that stiffness
+        const scalar pressureStabilisationStiffnessFactor_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
@@ -178,6 +196,14 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
+
+        //- Re-evaluate impK, impKf and rImpK from the framework at the
+        //  current deformation
+        void updateImpK();
+
+        //- Face stiffness behind the pressure stabilisation coefficient,
+        //  selected by pressureStabilisationStiffness
+        tmp<surfaceScalarField> pressureStabilisationStiffnessField() const;
 
         //- Calculate the current face-area vectors
         tmp<surfaceVectorField> currentSf() const;
