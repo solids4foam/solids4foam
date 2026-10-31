@@ -1648,32 +1648,42 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
                     sign*internalCoeffs[faceI][cmptI]*Sf[faceI][cmptI];
             }
 
-            if (patch.coupled())
+            if (patch.type() == "processor")
             {
-                // Todo: add off-core coeffs
-                notImplemented("patch.coupled(): D-in-p");
-
-                // CoeffField<vector>::linearTypeField& pcoupleUpper =
-                //     bs.coupleUpper()[patchI].asLinear();
-                // CoeffField<vector>::linearTypeField& pcoupleLower =
-                //     bs.coupleLower()[patchI].asLinear();
-
-                // const vectorField pcl = -pw*Sf;
-                // const vectorField pcu = pcl + Sf;
-
-                // // Coupling  contributions
-                // pcoupleLower -= pcl;
-                // pcoupleUpper -= pcu;
+                // The face value is w*U_own + (1 - w)*U_nei: the w*U_own part
+                // is the diagonal contribution above, while the
+                // (1 - w)*U_nei part couples to the neighbour cell on the
+                // other processor, i.e. the off-processor analogue of the
+                // upper coefficient (lower - Sf = -(1 - w)*Sf). As in the
+                // D-in-D block, it is passed through boundaryCoeffs, which
+                // InsertFvMatrixIntoPETScMatrix inserts with a flipped sign
+                // in the column of the neighbour cell; the internalCoeffs
+                // stay zero, as the diagonal is already complete
+                divUCoeffs.boundaryCoeffs()[patchI] =
+                    sign*(1.0 - pw)*Sf.component(cmptI);
+            }
+            else if (patch.coupled())
+            {
+                notImplemented
+                (
+                    "patch.coupled(): D-in-p for coupled patches other than "
+                    "processor patches"
+                );
             }
         }
 
         // Scale the coefficients, e.g. by the scale of a scaled pressure
-        // equation row
+        // equation row (the processor coupling coefficients included, so the
+        // rows stay consistent in parallel)
         if (scale != 1.0)
         {
             divUCoeffs.diag() *= scale;
             divUCoeffs.upper() *= scale;
             divUCoeffs.lower() *= scale;
+            forAll(divUCoeffs.boundaryCoeffs(), patchI)
+            {
+                divUCoeffs.boundaryCoeffs()[patchI] *= scale;
+            }
         }
 
         // Insert component coeffs
