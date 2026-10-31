@@ -148,6 +148,18 @@ viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw
             a_.value() + (af_.value() + as_.value() + afs_.value())/6.0
         )
     ),
+    localTangentShearModulus_
+    (
+        dict.lookupOrDefault<Switch>("localTangentShearModulus", false)
+    ),
+    tangentShearModulusMin_
+    (
+        dict.lookupOrDefault<scalar>("tangentShearModulusMin", a_.value())
+    ),
+    tangentShearModulusMax_
+    (
+        dict.lookupOrDefault<scalar>("tangentShearModulusMax", VGREAT)
+    ),
     activeStressSeries_(),
     f0Default_
     (
@@ -206,6 +218,18 @@ viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw
             << "tangentShearModulus must be positive." << exit(FatalIOError);
     }
 
+    if
+    (
+        tangentShearModulusMin_ <= 0
+     || tangentShearModulusMax_ < tangentShearModulusMin_
+    )
+    {
+        FatalIOErrorInFunction(dict)
+            << "tangentShearModulusMin must be positive and no larger than "
+            << "tangentShearModulusMax: found " << tangentShearModulusMin_
+            << " and " << tangentShearModulusMax_ << exit(FatalIOError);
+    }
+
     if (eta_.value() < 0)
     {
         FatalIOErrorInFunction(dict)
@@ -223,6 +247,12 @@ viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw
         << ", afs = " << afs_.value() << ", kappa = " << bulkModulus_.value()
         << ", eta = " << eta_.value() << ", fibreSwitch = " << switchName
         << ", tangentShearModulus = " << tangentShearModulus_;
+
+    if (localTangentShearModulus_)
+    {
+        Info<< " (local, bounded by " << tangentShearModulusMin_ << " and "
+            << tangentShearModulusMax_ << ")";
+    }
 
     if (activeStressSeries_.size())
     {
@@ -327,6 +357,12 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
     UIndirectList<scalar>* volumetricPtr =
         wantsSplit ? &response.volumetric() : nullptr;
 
+    // Whether the scalar tangent follows the local material state. It is
+    // accumulated per point below and handed over after the loop
+    const bool localTangent =
+        localTangentShearModulus_ && response.wantsScalarTangent();
+    scalarField muLocal(localTangent ? sigma.size() : 0, 0.0);
+
     forAll(sigma, i)
     {
         const scalar Ji = J[i];
@@ -383,6 +419,41 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
 
         sigmaI += 2.0*rJ*dPsidI8*symm(ff*ss);
 
+        // Local tangent shear modulus: the shear modulus of the isotropic
+        // term at this stretch, 2 dPsi/dI1bar = a exp(b (I1bar - 3)), plus
+        // the fibre, sheet and coupling shares of the default estimate
+        // (a_i/6), each multiplied by its own normalised tangent
+        // d2Psi_i/dI_i^2 / a_i and, for the fibre and sheet, by the switch so
+        // that a slack family contributes nothing. At the reference state it
+        // equals the default a + (af + as + afs)/6
+        if (localTangent)
+        {
+            scalar Hf = 0;
+            scalar dHf = 0;
+            scalar Hs = 0;
+            scalar dHs = 0;
+            fibreSwitch(I4f, Hf, dHf);
+            fibreSwitch(I4s, Hs, dHs);
+
+            const scalar gf =
+                (1.0 + 2.0*bf_*sqr(I4f - 1.0))*boundedExp(bf_*sqr(I4f - 1.0));
+            const scalar gs =
+                (1.0 + 2.0*bs_*sqr(I4s - 1.0))*boundedExp(bs_*sqr(I4s - 1.0));
+            const scalar gfs =
+                (1.0 + 2.0*bfs_*sqr(I8fs))*boundedExp(bfs_*sqr(I8fs));
+
+            const scalar mu =
+                a*boundedExp(b_*(I1bar - 3.0))
+              + (
+                    min(1.0, 2.0*Hf)*af*gf
+                  + min(1.0, 2.0*Hs)*as*gs
+                  + afs*gfs
+                )/6.0;
+
+            muLocal[i] =
+                min(max(mu, tangentShearModulusMin_), tangentShearModulusMax_);
+        }
+
         // Volumetric penalty, dU/dJ of U = kappa/4 (J^2 - 1 - 2 ln J). Kept
         // apart until the end, so that a mixed formulation can be handed it
         // separately
@@ -436,12 +507,38 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
     // directly with tangentShearModulus
     const scalar mu = tangentShearModulus_;
 
-    fillScalarTangent
-    (
-        response,
-        (4.0/3.0)*mu + kappa,
-        (4.0/3.0)*mu
-    );
+    if (localTangent)
+    {
+        // The same (4/3)*mu (+ kappa) as below, per point
+        UIndirectList<scalar>& K = response.scalarTangent();
+
+        if (K.size() != muLocal.size())
+        {
+            FatalErrorInFunction
+                << "The scalar tangent has " << K.size() << " entries but "
+                << "the stress has " << muLocal.size() << '.'
+                << exit(FatalError);
+        }
+
+        const scalar Kvol =
+            response.tangentReq() == tangentRequest::scalarDeviatoric
+          ? 0.0
+          : kappa;
+
+        forAll(K, i)
+        {
+            K[i] = (4.0/3.0)*muLocal[i] + Kvol;
+        }
+    }
+    else
+    {
+        fillScalarTangent
+        (
+            response,
+            (4.0/3.0)*mu + kappa,
+            (4.0/3.0)*mu
+        );
+    }
 
     // No analytical fourth-order tangent has been derived for this law
     fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);

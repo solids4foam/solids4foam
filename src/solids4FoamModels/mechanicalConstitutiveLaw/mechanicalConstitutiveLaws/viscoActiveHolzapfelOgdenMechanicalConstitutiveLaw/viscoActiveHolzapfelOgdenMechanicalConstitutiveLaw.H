@@ -119,6 +119,7 @@ SourceFiles
 #include "mechanicalConstitutiveLaw.H"
 #include "dimensionedScalar.H"
 #include "interpolationTable.H"
+#include "Switch.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -182,6 +183,16 @@ private:
         //- Shear modulus behind the scalar tangent (implicit stiffness,
         //  preconditioner and the scale of the FV stabilisation)
         const scalar tangentShearModulus_;
+
+        //- Take the scalar tangent from the local material state instead:
+        //  the isotropic term's a exp(b (I1bar - 3)) plus the fibre, sheet
+        //  and coupling shares of the default estimate, each scaled by its
+        //  own tangent and switched off as its family goes slack
+        const Switch localTangentShearModulus_;
+
+        //- Bounds of the local tangent shear modulus, Pa
+        const scalar tangentShearModulusMin_;
+        const scalar tangentShearModulusMax_;
 
         //- Active stress tau(t); empty for a passive material
         interpolationTable<scalar> activeStressSeries_;
