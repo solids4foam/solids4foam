@@ -74,6 +74,97 @@
       "provenance": "found while validating: M1 combined p solves stop at maxIter 1000 with final residual ~2e-9 in start-up steps (signals at round-off); report the M3 runs only. Same start-up end as the iteration criterion"
     }
   },
+  "benchmark_scope": {
+    "_comment": "Quantity classification of the benchmark (documentation data read by verify.py for the report only; it changes no status and no threshold). A quantity is moved between classes only with a documented change of evidence. EXCLUDED quantities are still extracted, still printed with their errors and orders, and are never counted as PASS: excluding a quantity from the verification CLAIMS does not remove it from the report. Rules: CORE = monotone near-second-order convergence to the reference on both mesh pairs, error above the measured uncertainty, Layer A not FAIL; SUPPLEMENTARY = converges with a disclosed floor / lower order / derived or quadratic observable / Layer-A FAIL in the family; OPTIONAL_DIAGNOSTIC = first-order or formulation-limited convergence with an identified mechanism, no verification claim; EXCLUDED = plateau or order < ~0.8, unresolved against the coupling/partition/temporal spread, formulation-dependent, or no refinement sequence.",
+    "numerical_configuration": {
+      "value": "This scope describes the tutorial as stored: gradSchemes default leastSquares (p and U), stock newMovingWallVelocity at the interface. It must NOT be applied to a Gauss-pressure variant, to research wall formulations or to a modified velocity-gradient scheme without a separate comparison; those are separate formulations (see gauss_pressure_variant_proposed).",
+      "provenance": "tutorial dictionaries compared with the dictionaries of the accepted M1-M3 runs: identical up to formatting (independent consolidation, outside the tutorial)"
+    },
+    "production_pr637": {
+      "torsion": {
+        "CORE": [
+          "alpha_B",
+          "w_wall",
+          "H_f",
+          "H_s",
+          "T_B",
+          "sig_rt",
+          "T_A"
+        ],
+        "SUPPLEMENTARY": [
+          "P_wall",
+          "KE_s",
+          "KE_f"
+        ],
+        "OPTIONAL_DIAGNOSTIC": [],
+        "EXCLUDED": [
+          "u_B",
+          "bdot",
+          "Q",
+          "sig_rr",
+          "p_b",
+          "sig_nv"
+        ]
+      },
+      "combined": {
+        "CORE": [],
+        "SUPPLEMENTARY": [
+          "alpha_B",
+          "H_f",
+          "T_B",
+          "sig_rt",
+          "T_A",
+          "H_s",
+          "w_wall",
+          "KE_s"
+        ],
+        "OPTIONAL_DIAGNOSTIC": [],
+        "EXCLUDED": [
+          "P_wall",
+          "KE_f",
+          "u_B",
+          "bdot",
+          "Q",
+          "sig_rr",
+          "p_b",
+          "sig_nv"
+        ]
+      },
+      "radial": {
+        "CORE": [],
+        "SUPPLEMENTARY": [],
+        "OPTIONAL_DIAGNOSTIC": [],
+        "EXCLUDED": [
+          "all (M1 only; M2 stalled at 0.1 s; M3 not run; no convergence claim)"
+        ]
+      },
+      "interaction": {
+        "three_way_C_minus_R_minus_T": "EXCLUDED (needs the radial family)",
+        "mixed_term_C_minus_T_rotational": "SUPPLEMENTARY (error/signal 1.5-2.5% on M3 against allowances 0.6-0.8%; no order claimed)",
+        "normal_stress_interaction": "EXCLUDED"
+      }
+    },
+    "gauss_pressure_variant_proposed": {
+      "status": "PROPOSED OPTION, NOT THE TUTORIAL DEFAULT. Only grad(p) changes (Gauss linear). Not applied to any stored dictionary.",
+      "evidence": "runs with only grad(p) changed to Gauss linear, recomputed from raw diagnostics in an independent consolidation outside the tutorial",
+      "would_change": {
+        "combined_rotational": "stays SUPPLEMENTARY by the classification rule although the floor is not seen (M3 alpha_B error 3.1e-3 -> 7.6e-4; orders 1.6-2.4 on both pairs) because the M3 combined runs fail numerical acceptance (34 and 56 iterations, contraction 0.905 and 0.901); it could become CORE only with a Layer-A-clean M3 run; torque-type M3 error is of the size of the partition spread",
+        "radial_and_combined_normal": "u_B, bdot, Q, sig_rr, P_wall, KE_f, KE_s: EXCLUDED -> SUPPLEMENTARY (orders 1.2-2.0), but Layer A FAILS for radial M2/M3 (contraction GM 1.23/1.36) and combined M3 (56 iterations)",
+        "still_excluded": "p_b and sig_nv (stock wall BC transmits ~1/3 of the viscous normal stress; error plateau 1.9e-2 and 0.68 of peak)"
+      },
+      "invalidates": [
+        "README Tables 5-7 numbers for the combined member and the floor band 2.5-5.2e-3 (thresholds combined_floor_band_M3, combined_second_order_qoi)",
+        "documented_fingerprints['system/fluid/fvSchemes']",
+        "the accepted-run comparison of every combined/radial table"
+      ],
+      "tests_to_update": [
+        "family consistency fvSchemes fingerprint",
+        "test_readme_thresholds_driver_agree (README numbers)",
+        "combined floor band tests",
+        "any test that pins the README Tables"
+      ]
+    }
+  },
   "layerB_deterministic": {
     "primary_qoi": {
       "value": [
@@ -93,9 +184,12 @@
       "value": [
         "sig_rr",
         "p_b",
-        "u_B"
+        "u_B",
+        "sig_nv",
+        "Q",
+        "bdot"
       ],
-      "provenance": "normal-traction discrepancy, excluded from order claims"
+      "provenance": "normal-traction discrepancy, excluded from order claims. PROPOSED CHANGE: sig_nv, Q and bdot added (reported by analyse_case.py but not listed before). Evidence: production-configuration errors on M3 of 0.68-0.81 of peak for sig_nv (orders 0.0-0.4) and 3.4-3.5e-2 for Q and bdot (orders 0.2-1.3), recomputed from the raw diagnostics of the accepted runs in an independent consolidation. No threshold value, band or noise allowance was changed."
     },
     "torsion_order_band": {
       "value": [

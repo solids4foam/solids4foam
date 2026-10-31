@@ -41,6 +41,16 @@ import convergence as CV  # noqa: E402
 CONFIGS = ("torsion", "radial", "combined")
 MESHES = ("M1", "M2", "M3")
 
+def _load_scope():
+    try:
+        with open(os.path.join(HERE, "..", "thresholds.json")) as fh:
+            return json.load(fh).get("benchmark_scope", {})
+    except (OSError, ValueError):
+        return {}
+
+
+SCOPE = _load_scope()
+
 NOT_VERIFIED = [
     "radial-only M1-M3 family: INCOMPLETE (at nNonOrthogonalCorrectors 2 only M1 completed, M2 stalled at t = 0.11 s, M3 not run); no radial convergence claim",
     "three-way radial term d_u3 = u_C - u_R - u_T (needs the radial family)",
@@ -49,7 +59,9 @@ NOT_VERIFIED = [
     "origin of the combined reference-error floor (only partially explained)",
     "effect of the absolute coupling tolerance on M3 (quantified on M2 only; 1e-12 on M1/M2 and 1e-10 on M3)",
     "field-level checks: swept-volume GCL, ALE consecutive-save, A_mode growth, minimum cell volume (need field scripts that are not in the tutorial)",
-    "independent validation of the reference (it is only numerically resolved)",
+    "reference classification: PROVISIONAL Category A. Independent symbolic and closed coupled cross-checks exist; the near-round-off plateau (about 1e-11 of peak) has NOT been shown to be round-off and no extended-precision check has been run",
+    "normal-stress quantities (sig_nv, p_b, sig_rr, u_B, Q, bdot) in the production configuration: reported, excluded from the verification claims (see thresholds.json benchmark_scope)",
+    "the results of this driver apply to the tutorial's numerical configuration (grad default leastSquares, stock newMovingWallVelocity); they do not transfer to a Gauss-pressure variant or to research wall formulations",
 ]
 
 
@@ -372,6 +384,13 @@ def summary(runs, extra, layerb):
     for x in NOT_VERIFIED:
         L.append("  - " + x)
     L.append("")
+    scope = SCOPE.get("production_pr637")
+    if scope:
+        L.append("BENCHMARK SCOPE (documentation; excluded quantities remain in the report and are never PASS):")
+        for mem in ("torsion", "combined", "radial"):
+            sc = scope.get(mem, {})
+            L.append(f"  {mem}: CORE {sc.get('CORE') or '-'}; SUPPLEMENTARY {sc.get('SUPPLEMENTARY') or '-'}; EXCLUDED {sc.get('EXCLUDED') or '-'}")
+        L.append("")
     return "\n".join(L)
 
 

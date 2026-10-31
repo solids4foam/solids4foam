@@ -74,9 +74,14 @@ What the tutorial supports, and no more:
   second-order self-convergence for $$H_s$$ (1.63), $$b\omega_B$$ (1.66) and
   $$P_{wall}$$ (0.70), and $$KE_s$$ (2.17, noise-limited interval 1.42-2.92) has
   a reference error above the floor. The origin of the floor is only **partially
-  explained**: about one third of the rotation excess follows from the radial
-  wall-traction (viscous normal stress) discrepancy, which is not a proven
-  unique mechanism.
+  explained**, and the earlier attribution is revised: a separate study
+  (Optional variant below) found that replacing only the pressure-gradient
+  scheme by Gauss linear lowers the M3 error of $$\alpha_B$$ from 3.1e-3 to
+  7.6e-4 and restores second-order orders in the combined member, while the wall
+  viscous normal stress stays at about one third of the reference. The floor is
+  therefore attributed mainly to the cell-`leastSquares` pressure gradient (a
+  spurious torque, see Known Caveats) and not to the viscous normal-stress
+  discrepancy; this rests on one mesh sequence and one time step.
 - **Mixed terms.** $$\Delta\alpha$$, $$\Delta T$$ and $$\Delta\sigma_{r\theta}$$
   (combined minus torsion-only) are reproduced to about 1.5-2.5% of the signal
   on M3 over 0-2 s ($$\Delta\sigma_{r\theta}$$ up to about 3.4% over 0-1.8 s).
@@ -109,8 +114,50 @@ What the tutorial supports, and no more:
     radial M1) without mesh convergence (see Known Caveats). It is excluded from
     every order claim.
   - The ALE/GCL consecutive-save checks are incomplete.
-  - The reference is only numerically resolved. No second, independent nonlinear
-    implementation has validated it.
+  - The reference is classified PROVISIONAL Category A. It is numerically
+    resolved (the stored Ns 20 and refined Ns 48-80 solutions differ by at most
+    3.1e-8 of peak) and it has been cross-checked by a symbolic derivation and
+    by an independently coded closed coupled solve (agreement at most 1.8e-5 of
+    peak after extrapolation). The roughly 1e-11 stagnation of its refinement
+    has **not** been shown to be round-off and no extended-precision check has
+    been run. These checks concern the reference, not the CFD solver.
+
+## Benchmark Scope: Quantity Classification
+
+This classification describes the tutorial **as stored** (`gradSchemes { default
+leastSquares; }`,
+stock `newMovingWallVelocity`). It must not be applied to a Gauss-pressure
+variant or to research
+wall formulations without a separate comparison. The machine-readable version is
+`benchmark_scope` in `verification/thresholds.json`; excluding a quantity from
+the verification
+claims does not remove it from the driver report, where it is still printed with
+its errors and
+never counted as a pass.
+
+<!-- markdownlint-disable MD013 -->
+
+| Quantity | Torsion | Combined | Radial |
+| :-- | :-- | :-- | :-- |
+| $$\alpha_B$$, $$b\omega_B$$, $$H_f$$, $$H_s$$, $$T_B$$, $$\sigma_{r\theta}$$, $$T_A$$ | CORE (orders 1.7-2.1; torque-type second-pair orders noise-limited) | SUPPLEMENTARY (reference-error floor 3-7e-3 of peak, orders 0.4-1.1 on M2-M3) | not applicable (zero in the radial member) |
+| $$P_{wall}$$, $$KE_s$$, $$KE_f$$ | SUPPLEMENTARY (derived, quadratic observables) | $$KE_s$$ SUPPLEMENTARY; $$P_{wall}$$, $$KE_f$$ EXCLUDED (errors 4.8e-2, 3.2e-2, no convergence) | EXCLUDED (M1 only) |
+| $$u_B$$, $$\dot b$$, $$Q$$, $$\sigma_{rr}$$ | EXCLUDED (orders 0.7-1.3, errors 2-7e-2) | EXCLUDED (errors 0.9-3.5e-2, orders below 0.5 on M2-M3) | EXCLUDED (M1 only) |
+| $$p_b$$, $$\sigma_{nv}$$ | EXCLUDED | EXCLUDED | EXCLUDED |
+| mixed term $$C-T$$ (rotational) | SUPPLEMENTARY (1.5-2.5% of the signal on M3, no order claimed) | | |
+| three-way term $$C-R-T$$, normal-stress interaction | EXCLUDED (the three-way term needs the radial family) | | |
+
+<!-- markdownlint-enable MD013 -->
+
+Classes: CORE = monotone near-second-order convergence to the reference on both
+mesh pairs, error
+above the measured uncertainty, numerical acceptance not FAIL. SUPPLEMENTARY =
+converges with a
+disclosed floor, a lower order or as a derived/quadratic observable. EXCLUDED =
+no convergence,
+unresolved against the coupling, partition or temporal spread, or no refinement sequence.
+Every class is conditional on the reference being PROVISIONAL Category A, on a
+single time step
+(no temporal order) and on a single partition per mesh.
 
 ---
 
@@ -426,13 +473,13 @@ FSI tolerances, the solid model, solution algorithm, stabilisation (type and
 `pointDisplacement` and `0/solid/D` (patch types and the normalised text of the
 coded conditions, case paths and comments ignored), and a semantic fingerprint
 of every small dictionary against the documented benchmark set and against the
-other meshes (so that a changed entry without a named check is still found). Not
-checked: the solver binary and library versions, the points of the generated
+other meshes (so that a changed entry without a named check is still found).
+Not checked: the solver binary and library versions, the points of the generated
 `polyMesh` (the `blockMeshDict`s that generate them are checked),
 function-object code other than the two documented versions, and the log files
 (layer A). A missing run, or a missing, empty, unreadable or garbled dictionary,
-or a truncated drive table gives **INCOMPLETE** or **INVALID-INPUT**, never a
-crash and never PASS. An inconsistent setting between the meshes, or a uniform
+or a truncated drive table gives **INCOMPLETE** or **INVALID-INPUT**,
+never a crash and never PASS. An inconsistent setting between the meshes, or a uniform
 departure from the documented benchmark set (for example Aitken instead of
 IQN-ILS, a different outer radius, a changed `deltaT` anywhere in the
 `controlDict`), is **INVALID-INPUT** and stops the assessment.
@@ -580,6 +627,8 @@ fractions of max|ref|, with $$\Delta t = 0.0025$$ s and
 quantities** (torsion; max-norm and L2-in-time, 0-2 s and 0-1.8 s; each cell is
 $$p_{12}$$, $$p_{23}$$):
 
+<!-- markdownlint-disable MD013 -->
+
 | QoI | max-norm, 0-2 s | L2, 0-2 s | max-norm, 0-1.8 s | L2, 0-1.8 s |
 | :-- | :-: | :-: | :-: | :-: |
 | $$\alpha_B$$ | 1.98, 1.98 | 2.01, 2.03 | 1.98, 1.98 | 1.98, 1.98 |
@@ -591,6 +640,8 @@ $$p_{12}$$, $$p_{23}$$):
 | $$H_f$$ | 1.90, 1.72 | 1.91, 1.71 | 1.90, 1.72 | 1.90, 1.71 |
 | $$P_{wall}$$ | 1.96, 1.93 | 1.99, 2.00 | 1.96, 1.93 | 2.00, 2.01 |
 | $$KE_s$$ | 1.93, 1.93 | 1.97, 2.01 | 1.93, 1.93 | 1.97, 2.01 |
+
+<!-- markdownlint-enable MD013 -->
 
 The max-norm range is 1.72-2.07 and the L2 range 1.71-2.04 (1.68 is the
 dt-corrected $$H_f$$, a different quantity). In the max-norm, the values outside
@@ -653,12 +704,16 @@ $$\alpha_B$$ and $$H_f$$; $$T_B$$, $$\sigma_{r\theta}$$ and $$T_A$$ have nominal
 orders near 2 with broad noise-limited intervals; the floor statement covers the
 same five quantities):
 
+<!-- markdownlint-disable MD013 -->
+
 | QoI | M1 | M2 | M3 | self order |
 | :-- | :-: | :-: | :-: | :-: |
 | rotation $$\alpha_B$$ | 1.27e-2 | 5.14e-3 | 3.1e-3 | 1.97 |
 | wall torque $$T_B$$ | 2.28e-2 | 6.33e-3 | 4.3e-3 | 2.00 |
 | shear traction $$\sigma_{r\theta}$$ | 2.28e-2 | 6.95e-3 | 5.2e-3 | 1.97 |
 | drive torque $$T_A$$ | 2.16e-2 | 6.14e-3 | 3.1e-3 | 2.09 |
+
+<!-- markdownlint-enable MD013 -->
 
 The M2-to-M3 reduction is far below a factor of four: for these four quantities
 (and $$H_f$$) the errors at M3 sit on a floor of about 2.5-5.2e-3 of max|ref|,
@@ -734,6 +789,52 @@ analysis.
 
 ---
 
+## Optional variant (proposed, not the default): Gauss linear pressure gradient
+
+Only `grad(p)` changes: `gradSchemes { default leastSquares; grad(p) Gauss
+linear; }`. A
+ready-to-review dictionary is `system/fluid/fvSchemes.gaussPressure` (not used
+by `Allrun`, not part
+of the family fingerprints). It is **not** the default because it changes the
+intended benchmark
+specification and because its numerical-acceptance evidence is incomplete.
+
+Evidence (max-norm error over 0-2 s as a fraction of max|ref|, M1/M2/M3,
+$$\Delta t=0.0025$$ s;
+tutorial default, then Gauss variant; recomputed from the raw diagnostics of the
+runs):
+
+<!-- markdownlint-disable MD013 -->
+
+| Quantity | Default | Gauss variant |
+| :-- | :-: | :-: |
+| combined $$\alpha_B$$ | 1.27e-2 / 5.14e-3 / 3.11e-3 | 1.10e-2 / 2.92e-3 / 7.6e-4 |
+| combined $$H_f$$ | 2.05e-2 / 6.61e-3 / 3.06e-3 | 1.75e-2 / 4.06e-3 / 7.7e-4 |
+| combined $$P_{wall}$$ | 7.17e-2 / 5.43e-2 / 4.78e-2 | 2.30e-2 / 8.1e-3 / 3.2e-3 |
+| combined $$\sigma_{rr}$$ | 1.48e-2 / 1.07e-2 / 8.50e-3 | 4.9e-3 / 1.9e-3 / 8.9e-4 |
+| torsion rotational set | orders 1.7-2.1 | orders 1.8-2.1, M3 errors within 11% of the default except $$H_f$$ (1.8e-3 to 1.2e-3) |
+| combined $$p_b$$, $$\sigma_{nv}$$ | 2.43e-2, 0.68 (plateau) | 1.95e-2, 0.68 (plateau) |
+
+<!-- markdownlint-enable MD013 -->
+
+What would change if it were adopted: the combined floor statement and Tables
+5-7 become invalid;
+the fvSchemes family fingerprint, the floor and self-order bands of
+`thresholds.json` and the
+README-consistency tests must be regenerated from new accepted runs; the
+reference comparisons of
+every combined and radial table would have to be repeated. What stands against
+adopting it now:
+Layer A is not clean for the variant (radial M2/M3 contraction 1.23 and 1.36,
+combined M3 56
+iterations, torsion M2 35 start-up iterations), $$p_b$$ and $$\sigma_{nv}$$
+remain excluded, only one
+partition and one time step were examined, and no maintainer review has taken
+place. It is
+therefore offered as a separately reviewed option.
+
+---
+
 ## Known Caveats
 
 - M1 and M2 results are from serial runs, M3 results from 4-rank runs. The
@@ -757,10 +858,19 @@ analysis.
   error of about 0.70, and the note in its output says so. It is a documented
   discrepancy of the fluid treatment of the moving wall, not a bug of the
   analysis; the normal-traction quantities ($$u_B$$, $$\sigma_{rr}$$, $$p_b$$)
-  inherit it and are excluded from every order claim. A reference run with a
-  transmitted fraction of about one third reproduces about one third of the
-  rotation excess of the combined case; this is partial evidence, not a proven
-  unique mechanism, and the combined reference-error floor stays disclosed.
+  inherit it and are excluded from every order claim. Source analysis
+  (solids4foam commit 1576edcc4): the stock `newMovingWallVelocity` removes the
+  wall-normal component of the velocity gradient consistently in `snGrad`, in
+  the matrix coefficients and in the explicit viscous term, so the discrete wall
+  gradient does not carry the continuity part of the normal gradient and the
+  deviatoric normal stress is transmitted at one third. A research wall
+  condition that keeps the full gradient (not in solids4foam, not part of this
+  tutorial) transmits it fully in the radial and combined members. A reference
+  run with a transmitted fraction of about one third reproduces about one third
+  of the rotation excess of the combined case, which shows a sensitivity of the
+  rotation to this stress; it is not the cause of the combined floor (see
+  Scope). For torsion the wall-normal viscous stress is additionally affected by
+  an inconsistency of the stock `leastSquares` gradient on the twisted wall.
 - The reference-error floor in the combined configuration is not removed by mesh
   refinement at this time step.
 - The earlier diagnostics function objects (serial-only, without the

@@ -1502,5 +1502,66 @@ class ThresholdsProvenanceText(unittest.TestCase):
         self.assertNotIn("KE_s self-order 2.17 but", src)
 
 
+class BenchmarkScope(unittest.TestCase):
+    """PROPOSED additions: the quantity classification is consistent, changes no threshold, and never hides a failed diagnostic."""
+
+    def test_scope_classes_are_disjoint_and_complete(self):
+        sc = THR["benchmark_scope"]["production_pr637"]
+        for mem in ("torsion", "combined", "radial"):
+            classes = [set(sc[mem][k]) for k in ("CORE", "SUPPLEMENTARY", "OPTIONAL_DIAGNOSTIC")]
+            for i in range(3):
+                for j in range(i + 1, 3):
+                    self.assertFalse(classes[i] & classes[j], (mem, i, j))
+            self.assertFalse(set(sc[mem]["EXCLUDED"]) & set().union(*classes), mem)
+
+    def test_core_quantities_are_primary_and_excluded_are_not_core(self):
+        prim = set(THR["layerB_deterministic"]["primary_qoi"]["value"])
+        sc = THR["benchmark_scope"]["production_pr637"]
+        for mem in ("torsion", "combined"):
+            self.assertTrue(set(sc[mem]["CORE"]) <= prim)
+        sec = set(THR["layerB_deterministic"]["secondary_qoi_excluded_from_orders"]["value"])
+        for mem in ("torsion", "combined"):
+            self.assertFalse(sec & set(sc[mem]["CORE"]))
+            self.assertFalse(sec & set(sc[mem]["SUPPLEMENTARY"]))
+        self.assertTrue({"sig_nv", "sig_rr", "p_b", "u_B"} <= sec)
+
+    def test_no_layer_a_threshold_or_noise_value_was_weakened(self):
+        A = THR["layerA"]
+        self.assertEqual(A["max_fsi_iterations"]["value"], 30)
+        self.assertEqual(A["contraction_window_gm_max"]["value"], 0.9)
+        self.assertEqual(A["p_final_residual_max"]["value"], 1e-12)
+        self.assertEqual(THR["numerical_noise"]["torsion_max_norm_noise_of_E"]["value"], 0.00024)
+        self.assertEqual(THR["numerical_noise"]["combined_max_norm_noise_of_E"]["value"], 0.0013)
+        self.assertEqual(THR["layerB_deterministic"]["torsion_order_band"]["value"], [1.65, 2.1])
+
+    def test_scope_is_printed_and_excluded_quantities_remain_reported(self):
+        import verify
+        d = tempfile.mkdtemp(dir=os.environ.get("TMPDIR"))
+        os.makedirs(os.path.join(d, "torsion_M1"))
+        with open(os.path.join(d, "torsion_M1", "log.solids4Foam"), "w") as fh:
+            fh.write(make_log(accept="both"))
+        out = subprocess.run([sys.executable, "-I", os.path.join(HERE, "scripts", "verify.py"), d, "--out", os.path.join(d, "o")],
+                             capture_output=True, text=True)
+        self.assertIn("BENCHMARK SCOPE", out.stdout)
+        self.assertIn("PROVISIONAL Category A", out.stdout)
+        self.assertIn("do not transfer to a Gauss-pressure variant", out.stdout)
+
+    def test_gauss_variant_is_not_the_default(self):
+        with open(os.path.join(TUT, "system", "fluid", "fvSchemes")) as fh:
+            txt = fh.read()
+        self.assertIn("gradSchemes { default leastSquares; }", txt)
+        with open(os.path.join(TUT, "system", "fluid", "fvSchemes.gaussPressure")) as fh:
+            self.assertIn("grad(p) Gauss linear", fh.read())
+        with open(os.path.join(TUT, "Allrun")) as fh:
+            self.assertNotIn("gaussPressure", fh.read())
+        self.assertIn("not the tutorial default", THR["benchmark_scope"]["gauss_pressure_variant_proposed"]["status"].lower())
+
+    def test_readme_has_scope_and_variant_sections(self):
+        with open(os.path.join(TUT, "README.md")) as fh:
+            txt = " ".join(fh.read().split())
+        for key in ("Benchmark Scope: Quantity Classification", "Optional variant (proposed, not the default)", "PROVISIONAL Category A", "Not checked: the solver binary"):
+            self.assertIn(key, txt, key)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
