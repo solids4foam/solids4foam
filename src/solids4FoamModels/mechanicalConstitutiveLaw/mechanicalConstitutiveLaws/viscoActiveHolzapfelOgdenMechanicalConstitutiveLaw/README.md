@@ -78,6 +78,9 @@ run.
 | `fibreSwitch` | no | `smooth` | `smooth`, `sharp` or `none` |
 | `k` | no | `100` | Steepness of the smooth switch |
 | `tangentShearModulus` | no | see below | Scalar tangent shear modulus, Pa |
+| `localTangentShearModulus` | no | `no` | Scalar tangent from the local state, see below |
+| `tangentShearModulusMin` | no | `a` | Lower bound of the local tangent, Pa |
+| `tangentShearModulusMax` | no | unbounded | Upper bound of the local tangent, Pa |
 | `activeStressSeries` | no | - | Interpolation table of `tau(t)`, Pa |
 | `uniformFibreField` | no | `no` | Take `f0` and `s0` from this dictionary |
 | `f0`, `s0` | if uniform | - | Fibre and sheet vectors |
@@ -102,6 +105,17 @@ ellipsoid.
   `mu = tangentShearModulus`. It is not a tangent of the exponential energy.
   The default is the linearised passive shear modulus, without the viscous
   `eta/dt`.
+- With `localTangentShearModulus yes`, `mu` is evaluated at each point from
+  the current state instead:
+  `a exp(b (I1bar - 3)) + (wf af gf + ws as gs + afs gfs)/6`, where
+  `g = (1 + 2 b (I4 - 1)^2) exp(b (I4 - 1)^2)` is the normalised tangent
+  `d2Psi/dI4^2 / a` of each family (`(1 + 2 bfs I8^2) exp(bfs I8^2)` for the
+  coupling) and `w = min(1, 2 chi(I4))` switches the fibre and sheet shares
+  off as the family goes slack. It equals the default at the reference
+  state, and is bounded by `tangentShearModulusMin` and
+  `tangentShearModulusMax`. The solid model only sees it where it asks for
+  the tangent again: see `impKUpdate` in
+  [`nonLinGeomTotalLagTotalDispSolid`](../../../solidModels/nonLinGeomTotalLagTotalDispSolid/README.md).
 - `fourthOrderFiniteDifference`: supported, through the base class.
 - `fourthOrder` (analytical): not implemented; requesting it is a fatal
   error.
