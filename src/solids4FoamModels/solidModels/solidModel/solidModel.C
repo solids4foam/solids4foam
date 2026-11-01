@@ -471,6 +471,22 @@ namespace
         {
             includePatchInStencils[patchI] =
                 field.boundaryField()[patchI].fixesValue();
+
+            // A Robin condition fixes its value only through a closure that
+            // uses the stress of the previous evaluation; the reconstruction
+            // treats it as a traction patch and extrapolates across it, so
+            // the high-order residual depends on the cell unknowns alone, as
+            // leastSquaresS4f does for this condition in the low-order path
+            if
+            (
+                Foam::isA<Foam::solidSpringDashpotFvPatchVectorField>
+                (
+                    field.boundaryField()[patchI]
+                )
+            )
+            {
+                includePatchInStencils[patchI] = false;
+            }
         }
 
         return includePatchInStencils;

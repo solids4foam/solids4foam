@@ -401,14 +401,70 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             const scalarField& magSfCurrentPatch =
                 magSfCurrent.boundaryField()[patchI];
 
-            // The spring and dashpot act per unit reference area
-            forceP =
-                magSfCurrentPatch
-               *springPatch.springDashpotTraction
+            if (highOrderResidual())
+            {
+                // The spring and dashpot act per unit reference area, and
+                // the quadrature weights include the reference area, so
+                // their traction at the quadrature points is integrated as
+                // it is. The additional traction and pressure act per unit
+                // current area and are treated as for solidTraction: the
+                // pressure is constant over the face, so it uses the face's
+                // deformed area and normal; the traction uses Nanson's
+                // relation at each quadrature point
+                auto& faceQuadWeights = compactListListCRef
                 (
-                    nCurrent.boundaryField()[patchI],
-                    D.mesh().boundary()[patchI].magSf()/magSfCurrentPatch
+                    displacementLeastSquares().quadrature().faceQuadWeights()
                 );
+                auto& faceGradD = compactListListCRef(gradDQuad());
+
+                const vectorField nRef
+                (
+                    mesh().boundary()[patchI].Sf()
+                   /mesh().boundary()[patchI].magSf()
+                );
+
+                autoPtr<CompactListList<vector>> springQuadPtr =
+                    springPatch.springDashpotTractionQuadrature();
+                auto& springQuad = compactListListCRef(springQuadPtr());
+
+                const vectorField& tractionP = springPatch.traction();
+                const scalarField& pressureP = springPatch.pressure();
+                const vectorField& nPatch = nCurrent.boundaryField()[patchI];
+                const label start = mesh().boundaryMesh()[patchI].start();
+
+                forAll(forceP, faceI)
+                {
+                    forceP[faceI] =
+                       -pressureP[faceI]*nPatch[faceI]*magSfCurrentPatch[faceI];
+
+                    const label faceID = start + faceI;
+
+                    forAll(faceQuadWeights[faceID], qpI)
+                    {
+                        const scalar weight = faceQuadWeights[faceID][qpI];
+                        const tensor F(I + faceGradD[faceID][qpI].T());
+                        const vector areaMap(cof(F) & nRef[faceI]);
+
+                        forceP[faceI] +=
+                            weight
+                           *(
+                                springQuad[faceI][qpI]
+                              + mag(areaMap)*tractionP[faceI]
+                            );
+                    }
+                }
+            }
+            else
+            {
+                // The spring and dashpot act per unit reference area
+                forceP =
+                    magSfCurrentPatch
+                   *springPatch.springDashpotTraction
+                    (
+                        nCurrent.boundaryField()[patchI],
+                        D.mesh().boundary()[patchI].magSf()/magSfCurrentPatch
+                    );
+            }
         }
         else if
         (

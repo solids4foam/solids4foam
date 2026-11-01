@@ -499,6 +499,22 @@ void leastSquaresScheme::faceCentreValues
 }
 
 
+autoPtr<CompactListList<vector>>
+leastSquaresScheme::extrapolatedPatchFaceQuadValues
+(
+    const volVectorField& vf,
+    const label patchI
+) const
+{
+    FatalErrorInFunction
+        << "Extrapolated patch quadrature values are not implemented for the "
+        << type() << " reconstruction (field " << vf.name() << ", patch "
+        << mesh_.boundaryMesh()[patchI].name() << ")" << abort(FatalError);
+
+    return autoPtr<CompactListList<vector>>();
+}
+
+
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam

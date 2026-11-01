@@ -28,6 +28,7 @@ License
 #include "IStringStream.H"
 #include "patchCorrectionVectors.H"
 #include "fvcGrad.H"
+#include "leastSquaresScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -76,7 +77,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     DoldExtrap_(),
-    DoldExtrapTimeIndex_(-1)
+    DoldExtrapTimeIndex_(-1),
+    DoldQuadPtr_(),
+    DoldQuadTimeIndex_(-1)
 {}
 
 
@@ -95,7 +98,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     traction_(p.size(), vector::zero),
     pressure_(p.size(), 0.0),
     DoldExtrap_(),
-    DoldExtrapTimeIndex_(-1)
+    DoldExtrapTimeIndex_(-1),
+    DoldQuadPtr_(),
+    DoldQuadTimeIndex_(-1)
 {
     Info<< "Creating " << type() << " boundary condition" << endl;
 
@@ -237,7 +242,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     traction_(mapper(pvf.traction_)),
     pressure_(mapper(pvf.pressure_)),
     DoldExtrap_(),
-    DoldExtrapTimeIndex_(-1)
+    DoldExtrapTimeIndex_(-1),
+    DoldQuadPtr_(),
+    DoldQuadTimeIndex_(-1)
 #else
     kNormal_(pvf.kNormal_, mapper),
     kTangential_(pvf.kTangential_, mapper),
@@ -246,7 +253,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     traction_(pvf.traction_, mapper),
     pressure_(pvf.pressure_, mapper),
     DoldExtrap_(),
-    DoldExtrapTimeIndex_(-1)
+    DoldExtrapTimeIndex_(-1),
+    DoldQuadPtr_(),
+    DoldQuadTimeIndex_(-1)
 #endif
 {}
 
@@ -265,7 +274,9 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
     traction_(pvf.traction_),
     pressure_(pvf.pressure_),
     DoldExtrap_(),
-    DoldExtrapTimeIndex_(-1)
+    DoldExtrapTimeIndex_(-1),
+    DoldQuadPtr_(),
+    DoldQuadTimeIndex_(-1)
 {}
 
 
@@ -366,6 +377,73 @@ tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
 }
 
 
+autoPtr<CompactListList<vector>>
+solidSpringDashpotFvPatchVectorField::springDashpotTractionQuadrature() const
+{
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const solidModel& solMod = lookupSolidModel(mesh);
+    const leastSquaresScheme& scheme = solMod.displacementLeastSquares();
+    const label patchID = patch().index();
+
+    const volVectorField& D =
+        db().lookupObject<volVectorField>(internalFieldName(*this));
+
+    // Both time levels come from the owner cell's reconstruction, so the
+    // dashpot velocity compares like with like, as springDashpotTraction
+    // does with the cell gradient. The old-time values are constant within
+    // the step
+    autoPtr<CompactListList<vector>> DQuadPtr =
+        scheme.extrapolatedPatchFaceQuadValues(D, patchID);
+
+    if (DoldQuadTimeIndex_ != db().time().timeIndex())
+    {
+        DoldQuadPtr_ = scheme.extrapolatedPatchFaceQuadValues
+        (
+            D.oldTime(), patchID
+        );
+        DoldQuadTimeIndex_ = db().time().timeIndex();
+    }
+
+    auto& DQuad = compactListListCRef(DQuadPtr());
+    auto& DoldQuad = compactListListCRef(DoldQuadPtr_());
+
+    // Reference unit normal (mesh is not moved); K and C act per reference
+    // area, so no area ratio enters
+    const vectorField n(patch().nf());
+    const symmTensorField nn(sqr(n));
+    const symmTensorField K(kNormal_*nn + kTangential_*(I - nn));
+    const symmTensorField C(cNormal_*nn + cTangential_*(I - nn));
+    const scalar rDeltaT = 1.0/db().time().deltaTValue();
+
+    labelList nQpPerFace(size(), 0);
+    forAll(nQpPerFace, faceI)
+    {
+        nQpPerFace[faceI] = DQuad[faceI].size();
+    }
+
+    autoPtr<CompactListList<vector>> resultPtr
+    (
+        new CompactListList<vector>(nQpPerFace)
+    );
+    CompactListList<vector>& result = resultPtr();
+
+    forAll(result, faceI)
+    {
+        forAll(result[faceI], qpI)
+        {
+            // Named temporaries: see springDashpotTraction for the aliasing
+            // OpenFOAM's inner product of a temporary field is prone to
+            const vector Dq(DQuad[faceI][qpI]);
+            const vector dDq(Dq - DoldQuad[faceI][qpI]);
+
+            result[faceI][qpI] = -((K[faceI] & Dq) + rDeltaT*(C[faceI] & dDq));
+        }
+    }
+
+    return resultPtr;
+}
+
+
 void solidSpringDashpotFvPatchVectorField::autoMap
 (
     const fvPatchFieldMapper& m
@@ -390,6 +468,8 @@ void solidSpringDashpotFvPatchVectorField::autoMap
 #endif
 
     DoldExtrapTimeIndex_ = -1;
+    DoldQuadPtr_.clear();
+    DoldQuadTimeIndex_ = -1;
 }
 
 
@@ -412,6 +492,8 @@ void solidSpringDashpotFvPatchVectorField::rmap
     pressure_.rmap(rpvf.pressure_, addr);
 
     DoldExtrapTimeIndex_ = -1;
+    DoldQuadPtr_.clear();
+    DoldQuadTimeIndex_ = -1;
 }
 
 
@@ -441,15 +523,27 @@ void solidSpringDashpotFvPatchVectorField::updateCoeffs()
             << patch().name() << ")" << exit(FatalError);
     }
 
-    // The high-order residual has no quadrature treatment of this condition,
-    // and the high-order Jacobian assembles it as a fixed-value patch
-    // (directionMixed::fixesValue() is true)
-    if (solMod.highOrderResidual() || solMod.highOrderJacobian())
+    // The high-order Jacobian assembles this condition as a fixed-value patch
+    // (directionMixed::fixesValue() is true). The high-order residual
+    // integrates it at the face quadrature points
+    // (springDashpotTractionQuadrature), but only the total Lagrangian model
+    // does so
+    if
+    (
+        solMod.highOrderJacobian()
+     || (
+            solMod.highOrderResidual()
+         && !isA<solidModels::nonLinGeomTotalLagTotalDispSolid>(solMod)
+        )
+    )
     {
         FatalErrorIn("solidSpringDashpotFvPatchVectorField::updateCoeffs()")
-            << "solidSpringDashpot does not support the high-order residual "
-            << "or Jacobian of the PETSc SNES algorithm (patch "
-            << patch().name() << ")" << exit(FatalError);
+            << "solidSpringDashpot does not support the high-order Jacobian "
+            << "of the PETSc SNES algorithm, nor the high-order residual "
+            << "outside the "
+            << solidModels::nonLinGeomTotalLagTotalDispSolid::typeName
+            << " solid model (patch " << patch().name() << ")"
+            << exit(FatalError);
     }
 
     // Reference unit normal (mesh is not moved)

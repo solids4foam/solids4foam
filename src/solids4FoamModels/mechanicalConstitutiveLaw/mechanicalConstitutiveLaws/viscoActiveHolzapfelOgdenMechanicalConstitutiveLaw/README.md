@@ -60,6 +60,14 @@ reference implementations, which differentiate the energy automatically.
   interpolation table (`activeStressSeries`), for example the solution of the
   benchmark's ODE, eq. (5), tabulated once in time. Without a table the law
   is passive.
+- **Face quadrature points** (the high-order residual of the PETSc SNES
+  algorithm): the law is evaluated at the quadrature points as at the cell
+  centres, with its own state there. `f0` and `s0` are cell fields; a point
+  on a face takes the linearly interpolated face value (the patch value on a
+  boundary face), the same for every point of the face, and the law
+  normalises it. `F0` for `Edot` is the old-time gradient at the same points,
+  which the solid model stores at the end of each step and rebuilds from the
+  old-time displacement on a restart.
 
 The exponentials are evaluated with their argument clamped at 500, so that an
 extreme trial state in a Newton line search gives a large, finite stress

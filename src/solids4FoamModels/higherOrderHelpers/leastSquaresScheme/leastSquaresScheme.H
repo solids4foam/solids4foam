@@ -288,6 +288,19 @@ public:
             const label patchI
         ) const = 0;
 
+        //- Vector field values at the face quadrature points of a patch that
+        //  prescribes no value, from the owner cell's own reconstruction
+        //  (the one-sided evaluation the face gradient uses on such a patch).
+        //  A Robin condition, such as solidSpringDashpot, builds its traction
+        //  from these so that the high-order residual depends on the cell
+        //  unknowns alone. Collective: every processor calls it for the
+        //  same patch, whether or not it holds any of its faces
+        virtual autoPtr<CompactListList<vector>> extrapolatedPatchFaceQuadValues
+        (
+            const volVectorField& vf,
+            const label patchI
+        ) const;
+
         //- Cell-centre gradient of a scalar field
         virtual tmp<volVectorField> grad(const volScalarField& vf) const = 0;
 
