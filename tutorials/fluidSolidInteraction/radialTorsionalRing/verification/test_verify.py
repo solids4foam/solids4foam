@@ -11,6 +11,7 @@ import hashlib
 import math
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -1561,6 +1562,65 @@ class BenchmarkScope(unittest.TestCase):
             txt = " ".join(fh.read().split())
         for key in ("Benchmark Scope: Quantity Classification", "Optional variant (proposed, not the default)", "PROVISIONAL Category A", "Not checked: the solver binary"):
             self.assertIn(key, txt, key)
+
+
+class FiguresAndEvidence(unittest.TestCase):
+    """Added with the three result figures: the README embeds existing images, the figure source tables agree with the README
+    tables, and the plotted traction data obey the sign convention sigma_rr = -p_b + sigma_nv (to the 6 printed digits). Documentation consistency only:
+    no threshold, status or acceptance rule is involved."""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(TUT, "README.md")) as fh:
+            cls.readme = fh.read()
+        cls.figdir = os.path.join(TUT, "figures")
+
+    def test_readme_embeds_three_existing_figures(self):
+        imgs = re.findall(r"!\[[^\]]+\]\((figures/[^)\s]+)\)", self.readme)
+        self.assertGreaterEqual(len(set(imgs)), 3)
+        for p in set(imgs):
+            self.assertTrue(os.path.isfile(os.path.join(TUT, p)), p)
+            self.assertLess(os.path.getsize(os.path.join(TUT, p)), 400000, p)       # keep the tutorial light
+
+    def test_figure_two_table_matches_readme_table_seven(self):
+        import csv
+        rows = list(csv.DictReader(open(os.path.join(self.figdir, "data", "fig2_convergence.csv"))))
+        sec = self.readme[self.readme.index("**Table 7: combined configuration by quantity"):]
+        for q, sym in (("alpha_B", r"\alpha_B"), ("T_B", "T_B"), ("sig_rt", r"\sigma_{r\theta}"), ("T_A", "T_A"), ("H_f", "H_f")):
+            m = re.search(r"\| \$\$" + re.escape(sym) + r"\$\$ \| ([0-9.e+-]+) \| ([0-9.e+-]+) \| ([0-9.e+-]+) \|", sec)
+            self.assertIsNotNone(m, sym)
+            for mesh, shown in zip(("M1", "M2", "M3"), m.groups()):
+                v = [float(r["E_max_over_peak"]) for r in rows if r["formulation"] == "A" and r["member"] == "combined" and r["mesh"] == mesh and r["qoi"] == q][0]
+                self.assertEqual(float(f"{v:.2e}"), float(shown), (q, mesh, v, shown))
+
+    def test_figure_three_traction_sign_convention(self):
+        import csv
+        rows = list(csv.DictReader(open(os.path.join(self.figdir, "data", "fig3_traction_timeseries.csv"))))
+        self.assertGreater(len(rows), 700)
+        pk = max(abs(float(r["ref_sig_rr"])) for r in rows)
+        for r in rows:
+            self.assertLess(abs(float(r["ref_sig_rr"]) - (-float(r["ref_p_b"]) + float(r["ref_sig_nv"]))), 1e-5 * pk)
+            self.assertLess(abs(float(r["cfd_sig_rr"]) - (-float(r["cfd_p_b"]) + float(r["cfd_sig_nv"]))), 1e-5 * pk)
+
+    def test_normal_stress_still_extracted_and_excluded(self):
+        sc = THR["benchmark_scope"]["production_pr637"]
+        for mem in ("torsion", "combined", "radial"):
+            self.assertIn("sig_nv", sc[mem]["EXCLUDED"] if mem != "radial" else ["sig_nv"] + sc[mem]["EXCLUDED"])
+        import analyse_case as AC_
+        src = open(os.path.join(HERE, "scripts", "analyse_case.py")).read()
+        self.assertIn("sig_nv", src)
+
+    def test_timestep_table_matches_figure_data(self):
+        import csv
+        d = list(csv.DictReader(open(os.path.join(self.figdir, "data", "fig2_timestep_strict.csv"))))
+        sec = self.readme[self.readme.index("## Time-step and coupling checks of the combined error floor"):]
+        for q, sym in (("alpha_B", r"\\alpha_B"), ("T_B", "T_B"), ("sig_rt", r"\\sigma_{r\\theta}"), ("T_A", "T_A"), ("H_f", "H_f")):
+            m = re.search(r"\| \$\$" + sym + r"\$\$ \| ([0-9.e+-]+) \| ([0-9.e+-]+) \| ([0-9.e+-]+) \| ([0-9.e+-]+) \| ([0-9.e+-]+) \| ([0-9.e+-]+) \|", sec)
+            self.assertIsNotNone(m, sym)
+            shown = m.groups()
+            for run, k in (("P0", 1), ("P1", 2), ("P2", 3), ("P3", 4)):
+                v = float([r for r in d if r["run"] == run and r["qoi"] == q][0]["E_max_over_peak"])
+                self.assertEqual(float(f"{v:.3e}"), float(shown[k]), (q, run, v, shown[k]))
 
 
 if __name__ == "__main__":
