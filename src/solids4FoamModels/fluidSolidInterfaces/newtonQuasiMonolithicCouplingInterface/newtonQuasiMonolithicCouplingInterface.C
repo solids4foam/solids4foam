@@ -37,6 +37,7 @@ License
 #include "meshMotionTotalDispSolid.H"
 #include "globalIndex.H"
 #include "compatibilityFunctions.H"
+#include "fvcMeshPhi.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -1498,9 +1499,14 @@ newtonQuasiMonolithicCouplingInterface::currentInterfaceMeshPhi() const
 {
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
 
+    // The mesh flux of the fluid velocity's time scheme, as subtracted in the
+    // ALE convective flux (fvc::makeRelative): for backward, the BDF2
+    // combination of the swept volumes of the last two steps. The mesh
+    // phi() alone is the swept volume of the last step over deltaT (Euler),
+    // which differs from the interface velocity flux by O(deltaT)
     return scalarField
     (
-        fluidMesh().phi().boundaryField()[fluidPatchID]
+        fvc::meshPhi(fluid().U())().boundaryField()[fluidPatchID]
     );
 }
 
