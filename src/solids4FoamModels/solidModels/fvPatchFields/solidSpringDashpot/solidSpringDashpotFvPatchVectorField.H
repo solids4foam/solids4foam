@@ -38,6 +38,8 @@ SourceFiles
 
 #include "fvPatchFields.H"
 #include "solidDirectionMixedFvPatchVectorField.H"
+#include "CompactListList.H"
+#include "autoPtr.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -71,6 +73,21 @@ class solidSpringDashpotFvPatchVectorField
 
         //- Additional pressure [Pa]
         scalarField pressure_;
+
+        //- Old-time displacement extrapolated to the faces, for the dashpot
+        //  velocity in springDashpotTraction; computed once per time step
+        mutable vectorField DoldExtrap_;
+
+        //- Time index at which DoldExtrap_ was computed
+        mutable label DoldExtrapTimeIndex_;
+
+        //- Old-time displacement at the face quadrature points of the
+        //  high-order residual, for the dashpot velocity in
+        //  springDashpotTractionQuadrature; computed once per time step
+        mutable autoPtr<CompactListList<vector>> DoldQuadPtr_;
+
+        //- Time index at which DoldQuadPtr_ was computed
+        mutable label DoldQuadTimeIndex_;
 
 public:
 
@@ -160,6 +177,27 @@ public:
                 const vectorField& nPressure,
                 const scalarField& areaRatio
             ) const;
+
+            //- Spring-dashpot part of the nominal traction, per unit
+            //  reference area, at the face quadrature points of the
+            //  high-order residual: -(K D + C (D - D_old)/deltaT), with D
+            //  and D_old reconstructed from the owner cell. The additional
+            //  traction and pressure are not included; the solid model
+            //  integrates them with the current area, as for solidTraction
+            autoPtr<CompactListList<vector>>
+            springDashpotTractionQuadrature() const;
+
+            //- Additional traction per unit current area
+            const vectorField& traction() const
+            {
+                return traction_;
+            }
+
+            //- Additional pressure
+            const scalarField& pressure() const
+            {
+                return pressure_;
+            }
 
         // Mapping functions
 

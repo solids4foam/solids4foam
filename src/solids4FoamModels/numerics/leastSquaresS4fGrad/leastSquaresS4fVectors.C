@@ -22,6 +22,8 @@ License
 #include "symmetryPolyPatch.H"
 #include "compatibilityFunctions.H"
 #include "cellZoneInterface.H"
+#include "processorFvPatch.H"
+#include "globalIndex.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "symmetryPlanePolyPatch.H"
 #endif
@@ -675,6 +677,9 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 {
     const fvMesh& mesh = this->mesh();
 
+    // Set below once there is a wide stencil to build
+    wideCompact_ = false;
+
     // Set local references to mesh data
     const labelUList& owner = mesh.owner();
     const labelUList& neighbour = mesh.neighbour();
@@ -761,12 +766,6 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         }
     }
 
-    // Collect the cells sharing at least one point with each flagged cell.
-    // Unlike a face neighbour, a point neighbour is not removed by the
-    // traction rule, as it is not reached across a boundary face
-    const labelListList& cellPoints = mesh.cellPoints();
-    const labelListList& pointCells = mesh.pointCells();
-
     // A point neighbour of a different material is no more admissible than a
     // face neighbour of one: either way the gradient would be built from two
     // materials at once. Every cell is -1 when the case has a single material,
@@ -777,28 +776,123 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
     // boundary has to be skipped explicitly
     const List<boolList> interfaceCoupled(cellZoneInterfaceCoupled(mesh));
 
-    forAll(wideCells_, wcI)
+    // Collect the cells sharing at least one point with each flagged cell.
+    // Unlike a face neighbour, a point neighbour is not removed by the
+    // traction rule, as it is not reached across a boundary face.
+    //
+    // In parallel the point neighbours on the other side of a processor
+    // boundary belong to the stencil as much as the local ones: without them
+    // every cell touching a processor boundary, which on a tetrahedral mesh is
+    // every cell next to it as all simplex cells take this stencil, gets a
+    // different gradient from the one it has in serial, and the solution
+    // depends on the decomposition. The cell-point-cell stencil of OpenFOAM
+    // collects them. It is not used with cyclic patches, whose transforms it
+    // does not apply to the cell centres
+    wideCompact_ = false;
+#ifdef OPENFOAM_NOT_EXTEND
     {
-        const label cellI = wideCells_[wcI];
-        const labelList& curCellPoints = cellPoints[cellI];
-        const label cellMaterial = materialID[cellI];
-
-        labelHashSet stencil;
-        forAll(curCellPoints, cpI)
+        bool nonProcessorCoupled = false;
+        forAll(mesh.boundary(), patchi)
         {
-            const labelList& curPointCells = pointCells[curCellPoints[cpI]];
-
-            forAll(curPointCells, pcI)
+            if
+            (
+                mesh.boundary()[patchi].coupled()
+             && !isA<processorFvPatch>(mesh.boundary()[patchi])
+            )
             {
-                if (materialID[curPointCells[pcI]] == cellMaterial)
-                {
-                    stencil.insert(curPointCells[pcI]);
-                }
+                nonProcessorCoupled = true;
             }
         }
-        stencil.erase(cellI);
+        reduce(nonProcessorCoupled, orOp<bool>());
 
-        wideStencil_[wcI] = stencil.toc();
+        wideCompact_ = !nonProcessorCoupled;
+    }
+#endif
+
+    if (wideCompact_)
+    {
+#ifdef OPENFOAM_NOT_EXTEND
+        const extendedCentredCellToCellStencil& cpc =
+            centredCPCCellToCellStencilObject::New(mesh);
+        const mapDistribute& map = cpc.map();
+
+        // The stencil also holds boundary faces and the cell itself: mark the
+        // cells with their global index and the rest with -1
+        const globalIndex globalCells(mesh.nCells());
+
+        List<label> flatID(map.constructSize(), -1);
+        List<label> flatMaterial(map.constructSize(), -1);
+        wideC_.setSize(map.constructSize());
+        wideC_ = vector::zero;
+
+        forAll(C, cellI)
+        {
+            flatID[cellI] = globalCells.toGlobal(cellI);
+            flatMaterial[cellI] = materialID[cellI];
+            wideC_[cellI] = C[cellI];
+        }
+
+        map.distribute(flatID);
+        map.distribute(flatMaterial);
+        map.distribute(wideC_);
+
+        forAll(wideCells_, wcI)
+        {
+            const label cellI = wideCells_[wcI];
+            const label self = globalCells.toGlobal(cellI);
+            const label cellMaterial = materialID[cellI];
+            const labelList& cpcStencil = cpc.stencil()[cellI];
+
+            DynamicList<label> stencil(cpcStencil.size());
+            forAll(cpcStencil, i)
+            {
+                const label k = cpcStencil[i];
+
+                if
+                (
+                    flatID[k] != -1
+                 && flatID[k] != self
+                 && flatMaterial[k] == cellMaterial
+                )
+                {
+                    stencil.append(k);
+                }
+            }
+
+            wideStencil_[wcI].transfer(stencil);
+        }
+#endif
+    }
+    else
+    {
+        const labelListList& cellPoints = mesh.cellPoints();
+        const labelListList& pointCells = mesh.pointCells();
+
+        wideC_ = C.primitiveField();
+
+        forAll(wideCells_, wcI)
+        {
+            const label cellI = wideCells_[wcI];
+            const labelList& curCellPoints = cellPoints[cellI];
+            const label cellMaterial = materialID[cellI];
+
+            labelHashSet stencil;
+            forAll(curCellPoints, cpI)
+            {
+                const labelList& curPointCells = pointCells[curCellPoints[cpI]];
+
+                forAll(curPointCells, pcI)
+                {
+                    if (materialID[curPointCells[pcI]] == cellMaterial)
+                    {
+                        stencil.insert(curPointCells[pcI]);
+                    }
+                }
+            }
+            stencil.erase(cellI);
+
+            wideStencil_[wcI] = stencil.toc();
+        }
     }
 
     // Assemble the wide moment tensor. All contributions use an inverse
@@ -813,7 +907,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
         forAll(stencil, i)
         {
-            const vector d = C[stencil[i]] - C[cellI];
+            const vector d = wideC_[stencil[i]] - C[cellI];
 
             wideDd[wcI] += (1.0/magSqr(d))*sqr(d);
         }
@@ -837,7 +931,14 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
             {
                 const label wcI = cellToWide[faceCells[patchFacei]];
 
-                if (wcI != -1 && !interfaceCoupled[patchi][patchFacei])
+                // With the parallel stencil the cell across the face is
+                // already a point neighbour
+                if
+                (
+                    wcI != -1
+                 && !wideCompact_
+                 && !interfaceCoupled[patchi][patchFacei]
+                )
                 {
                     const vector& d = pd[patchFacei];
 
@@ -1040,7 +1141,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
         forAll(stencil, i)
         {
-            const vector d = C[stencil[i]] - C[cellI];
+            const vector d = wideC_[stencil[i]] - C[cellI];
 
             lsVecs[i] = (1.0/magSqr(d))*(wideInvDd[wcI] & d);
         }
@@ -1082,7 +1183,12 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
             {
                 const label wcI = cellToWide[faceCells[patchFacei]];
 
-                if (wcI != -1 && !interfaceCoupled[patchi][patchFacei])
+                if (wcI != -1 && wideCompact_)
+                {
+                    // Counted in the parallel stencil
+                    patchLsP[patchFacei] = vector::zero;
+                }
+                else if (wcI != -1 && !interfaceCoupled[patchi][patchFacei])
                 {
                     const vector& d = pd[patchFacei];
 

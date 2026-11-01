@@ -26,6 +26,11 @@ Description
     and is intended to damp grid-scale oscillations while remaining
     consistent for smooth solutions.
 
+    On uniform Cartesian meshes with a centred cell gradient and linear
+    interpolation, its spectral shape is proportional to sum_q a_q^2 and
+    coincides with the directionally split m=2 spectral shape. The generalised
+    directionally split family is not implemented here.
+
 SourceFiles
     diffStencilLaplacianStab.C
     diffStencilLaplacianStabTemplates.H
@@ -64,6 +69,10 @@ class diffStencilLaplacianStab
 
 
     // Private Member Functions
+
+        //- Return the operator-specific reference-mode normalisation
+        //  1/(4*rStar) for the raw diffStencil/Rhie-Chow response 4*rStar
+        scalar diffStencilNormalisation() const;
 
         //- Template calculation of the stabilisation
         template<class GeoField, class GradField, class SurfaceField>
@@ -105,6 +114,12 @@ public:
     // Member Functions
 
         // Access
+
+            //- Return true: spectral normalisation is supported
+            virtual bool supportsSpectralNormalisation() const
+            {
+                return true;
+            }
 
             //- Re-calculate the scalar stabilisation
             //  Provide the primary variable field and optionally its gradient

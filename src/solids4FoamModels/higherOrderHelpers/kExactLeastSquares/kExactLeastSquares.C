@@ -2387,6 +2387,17 @@ vector kExactLeastSquares::valueAtPoint
 }
 
 
+autoPtr<CompactListList<vector>>
+kExactLeastSquares::extrapolatedPatchFaceQuadValues
+(
+    const volVectorField& vf,
+    const label patchI
+) const
+{
+    return this->extrapolatedPatchFaceQuadValues<vector>(vf, patchI);
+}
+
+
 tmp<volVectorField> kExactLeastSquares::grad
 (
     const volScalarField& vf

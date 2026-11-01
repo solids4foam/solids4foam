@@ -67,6 +67,7 @@ The following `solidModel` options are particularly relevant here:
 | `solutionAlgorithm` | `implicitSegregated` | Selects the solver path |
 | `dampingCoeff` | `0` | Damping in the momentum equation |
 | `predictor` | `false` | Linear predictor for `D` at new time steps |
+| `impKUpdate` | `frozen` | `frozen`: implicit stiffness from the law at construction; `timeStep`: again at the start of every time step, from the converged state of the previous one |
 | `optionsFile` | `petscOptions` | PETSc options file |
 | `stopOnPetscError` | `true` | Stop if PETSc reports an error |
 | `relaxationMethod` | `fixed` | Under-relaxation method |
@@ -99,6 +100,42 @@ This is a special case and is only supported when `solutionAlgorithm` is
 - the PETSc solution vector includes `p` as an extra unknown;
 - the pressure stabilisation sub-model is used;
 - the code enforces the `PETScSNES` path at construction time.
+
+The displacement and pressure unknowns, and the momentum and pressure
+equations, can differ by orders of magnitude, which slows the linear solver.
+The mixed system can be scaled (opt-in; off by default):
+
+| Keyword | Default | Description |
+| --- | --- | --- |
+| `scaleMixedPetScFields` | `false` | Store `pHat = p/s` in the PETSc vector |
+| `pressureUnknownScale` | `twoMu` | `s`: `twoMu`, `user` or `none` |
+| `pressureUnknownScaleValue` | - | `s` when `pressureUnknownScale user` |
+| `pressureScaleByTwoMu` | as `scaleMixedPetScFields` | Rows scaled by 2μ |
+| `pressureScaleFactor` | `1` | Further factor on the pressure rows |
+
+`twoMu` is the volume average of 2μ, taken from the deviatoric implicit
+stiffness, (4/3)μ. The scaling changes the conditioning of the Newton and
+linear solves, not the converged solution. It was ported from Philip Cardiff's
+work on the `fix-pressure-solid` branch.
+
+The pressure equation, `-p/kappa + stab(p) - 0.5 (J^2 - 1)/J = 0`, carries a
+Rhie-Chow-like stabilisation whose coefficient is the reciprocal of the
+diagonal of an approximate momentum operator (the solid analogue of `rAUf`).
+That operator is built from a stiffness chosen by (opt-in; the default is the
+previous behaviour):
+
+| Keyword | Default | Description |
+| --- | --- | --- |
+| `pressureStabilisationStiffness` | `impK` | `impK`, `momentum` or `bulk` |
+| `pressureStabilisationStiffnessFactor` | `1` | Factor on that stiffness |
+
+`impK` is the deviatoric implicit stiffness, (4/3)μ. When it is far below
+`kappa` (a soft matrix under a stiff penalty), the stabilisation term
+outweighs the penalty term by `kappa/impK` and the pressure no longer follows
+`-0.5 kappa (J - 1/J)` at the cell scale, so `J` can stray far from one.
+`momentum` uses `impK` times one plus the momentum stabilisation
+`scaleFactor`, the implicit stiffness the stabilised momentum operator
+actually carries; `bulk` uses the larger of `impK` and `kappa`.
 
 ### Recommended dictionary setup
 

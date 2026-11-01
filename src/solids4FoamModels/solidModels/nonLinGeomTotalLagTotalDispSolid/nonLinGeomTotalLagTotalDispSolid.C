@@ -401,14 +401,70 @@ void nonLinGeomTotalLagTotalDispSolid::enforceTractionBoundaries
             const scalarField& magSfCurrentPatch =
                 magSfCurrent.boundaryField()[patchI];
 
-            // The spring and dashpot act per unit reference area
-            forceP =
-                magSfCurrentPatch
-               *springPatch.springDashpotTraction
+            if (highOrderResidual())
+            {
+                // The spring and dashpot act per unit reference area, and
+                // the quadrature weights include the reference area, so
+                // their traction at the quadrature points is integrated as
+                // it is. The additional traction and pressure act per unit
+                // current area and are treated as for solidTraction: the
+                // pressure is constant over the face, so it uses the face's
+                // deformed area and normal; the traction uses Nanson's
+                // relation at each quadrature point
+                auto& faceQuadWeights = compactListListCRef
                 (
-                    nCurrent.boundaryField()[patchI],
-                    D.mesh().boundary()[patchI].magSf()/magSfCurrentPatch
+                    displacementLeastSquares().quadrature().faceQuadWeights()
                 );
+                auto& faceGradD = compactListListCRef(gradDQuad());
+
+                const vectorField nRef
+                (
+                    mesh().boundary()[patchI].Sf()
+                   /mesh().boundary()[patchI].magSf()
+                );
+
+                autoPtr<CompactListList<vector>> springQuadPtr =
+                    springPatch.springDashpotTractionQuadrature();
+                auto& springQuad = compactListListCRef(springQuadPtr());
+
+                const vectorField& tractionP = springPatch.traction();
+                const scalarField& pressureP = springPatch.pressure();
+                const vectorField& nPatch = nCurrent.boundaryField()[patchI];
+                const label start = mesh().boundaryMesh()[patchI].start();
+
+                forAll(forceP, faceI)
+                {
+                    forceP[faceI] =
+                       -pressureP[faceI]*nPatch[faceI]*magSfCurrentPatch[faceI];
+
+                    const label faceID = start + faceI;
+
+                    forAll(faceQuadWeights[faceID], qpI)
+                    {
+                        const scalar weight = faceQuadWeights[faceID][qpI];
+                        const tensor F(I + faceGradD[faceID][qpI].T());
+                        const vector areaMap(cof(F) & nRef[faceI]);
+
+                        forceP[faceI] +=
+                            weight
+                           *(
+                                springQuad[faceI][qpI]
+                              + mag(areaMap)*tractionP[faceI]
+                            );
+                    }
+                }
+            }
+            else
+            {
+                // The spring and dashpot act per unit reference area
+                forceP =
+                    magSfCurrentPatch
+                   *springPatch.springDashpotTraction
+                    (
+                        nCurrent.boundaryField()[patchI],
+                        D.mesh().boundary()[patchI].magSf()/magSfCurrentPatch
+                    );
+            }
         }
         else if
         (
@@ -447,6 +503,14 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
 
     if (newTimeStep())
     {
+        // The implicit stiffness follows the material state, if asked to:
+        // taken here from the converged state of the previous step, so that
+        // it is fixed within the step
+        if (impKUpdate_ == "timeStep")
+        {
+            updateImpK();
+        }
+
         if (predictor_)
         {
             predict();
@@ -668,6 +732,14 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
     // Update D boundary conditions
     D().correctBoundaryConditions();
 
+    // The implicit stiffness follows the material state, if asked to: taken
+    // here from the converged state of the previous step, so that it, and
+    // the stabilisation and Jacobian it scales, are fixed within the step
+    if (impKUpdate_ == "timeStep" && newTimeStep())
+    {
+        updateImpK();
+    }
+
     // Solution predictor
     if (predictor_ && newTimeStep())
     {
@@ -689,10 +761,15 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
         if (solvePressure())
         {
-            // Map the p field to the SNES solution vector
+            // Map the p field to the SNES solution vector, as the scaled
+            // unknown pHat = p/pressureUnknownScale_
+            const scalarField pHat
+            (
+                Foam::primitiveField(p())/pressureUnknownScale_
+            );
             foamPetscSnesHelper::InsertFieldComponents<scalar>
             (
-                p(),
+                pHat,
                 foamPetscSnesHelper::solution(),
                 blockSize_ -1 // Location of first component
             );
@@ -728,6 +805,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
             pI,
             blockSize_ - 1 // Location of p component
         );
+        pI *= pressureUnknownScale_;
 
         p().correctBoundaryConditions();
 
@@ -955,6 +1033,71 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 }
 
 
+void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::updateImpK()
+{
+    // The same tangent as makeImpK, evaluated again at the current
+    // deformation gradient. A tangent query: it neither writes a stress nor
+    // disturbs history
+    const tangentRequest req =
+        solvePressure()
+      ? tangentRequest::scalarDeviatoric
+      : tangentRequest::scalar;
+
+    mechanicalManager().updateScalarTangentFiniteStrain
+    (
+        F_,
+        F_.oldTime(),
+        Finv_,
+        Finv_.oldTime(),
+        J_,
+        J_.oldTime(),
+        mesh().time().deltaTValue(),
+        impK_,
+        req
+    );
+
+    impKf_ = fvc::interpolate(impK_);
+    rImpK_ = 1.0/impK_;
+
+    Info<< "    impK: min " << gMin(impK_.primitiveField())
+        << ", max " << gMax(impK_.primitiveField()) << endl;
+}
+
+
+Foam::tmp<Foam::surfaceScalarField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::
+pressureStabilisationStiffnessField() const
+{
+    tmp<surfaceScalarField> tK;
+
+    if (pressureStabilisationStiffness_ == "momentum")
+    {
+        // What the stabilised momentum operator carries: the Laplacian
+        // surrogate plus the difference-of-stencils term scaled by the same
+        // impK, so the two stabilisations are weighed against each other
+        // consistently
+        tK = (1.0 + momentumStabilisation().scaleFactor())*impKf_;
+    }
+    else if (pressureStabilisationStiffness_ == "bulk")
+    {
+        // The penalty the pressure equation enforces: its coefficient is
+        // then no larger than the penalty term it stabilises
+        tK = max(impKf_, fvc::interpolate(1.0/rKappa()));
+    }
+    else
+    {
+        tK = tmp<surfaceScalarField>(new surfaceScalarField(impKf_));
+    }
+
+    if (pressureStabilisationStiffnessFactor_ != 1.0)
+    {
+        tK.ref() *= pressureStabilisationStiffnessFactor_;
+    }
+
+    return tK;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
@@ -1033,7 +1176,50 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     rImpK_(1.0/impK_),
     rKappaPtr_(),
     dpdtPtr_(),
+    scaleMixedPetScFields_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "scaleMixedPetScFields", false
+        )
+    ),
+    pressureUnknownScaleType_
+    (
+        solidModelDict().lookupOrDefault<word>("pressureUnknownScale", "twoMu")
+    ),
+    pressureUnknownScale_(1.0),
+    pressureScaleFactor_
+    (
+        solidModelDict().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
+    ),
+    pressureScaleByTwoMu_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "pressureScaleByTwoMu", scaleMixedPetScFields_
+        )
+    ),
+    twoMuRef_(1.0),
+    pressureEqnScale_(1.0),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
+    impKUpdate_
+    (
+        solidModelDict().lookupOrDefault<word>("impKUpdate", "frozen")
+    ),
+    pressureStabilisationStiffness_
+    (
+        solidModelDict().lookupOrDefault<word>
+        (
+            "pressureStabilisationStiffness", "impK"
+        )
+    ),
+    pressureStabilisationStiffnessFactor_
+    (
+        solidModelDict().lookupOrDefault<scalar>
+        (
+            "pressureStabilisationStiffnessFactor", 1.0
+        )
+    ),
     blockSize_
     (
         solvePressure()
@@ -1069,9 +1255,42 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
         correctStress();
     }
 
+    if (impKUpdate_ != "frozen" && impKUpdate_ != "timeStep")
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "Unknown impKUpdate '" << impKUpdate_ << "'. Valid options "
+            << "are frozen and timeStep." << exit(FatalIOError);
+    }
+
+    if
+    (
+        pressureStabilisationStiffness_ != "impK"
+     && pressureStabilisationStiffness_ != "momentum"
+     && pressureStabilisationStiffness_ != "bulk"
+    )
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "Unknown pressureStabilisationStiffness '"
+            << pressureStabilisationStiffness_ << "'. Valid options are "
+            << "impK, momentum and bulk." << exit(FatalIOError);
+    }
+
+    if (pressureStabilisationStiffnessFactor_ <= 0)
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "pressureStabilisationStiffnessFactor must be positive."
+            << exit(FatalIOError);
+    }
+
+    Info<< "impKUpdate = " << impKUpdate_ << endl;
+
     Info<< "solvePressure = " << solvePressure() << endl;
     if (solvePressure())
     {
+        Info<< "pressureStabilisationStiffness = "
+            << pressureStabilisationStiffness_ << ", factor "
+            << pressureStabilisationStiffnessFactor_ << endl;
+
         if (solutionAlg() != solutionAlgorithm::PETSC_SNES)
         {
             FatalErrorInFunction
@@ -1102,6 +1321,71 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 fvc::ddt(p())
             )
         );
+
+        // Scaling of the mixed system, after Philip Cardiff's a4a9c07f and
+        // 7b01886d. The pressure unknown is stored in the PETSc solution
+        // vector as pHat = p/pressureUnknownScale_, and the pressure equation
+        // rows are multiplied by pressureEqnScale_, so that both are of the
+        // order of the displacement unknowns and momentum equations. The
+        // physical scale is a volume-averaged 2*mu; impK_ is the deviatoric
+        // implicit stiffness (4/3)*mu here, so 2*mu = 1.5*impK_
+        {
+            const scalarField& impKI = impK_;
+            const scalarField& V = mesh().V();
+            scalar twoMuV = 0;
+            scalar Vtot = 0;
+            forAll(impKI, cellI)
+            {
+                twoMuV += 1.5*impKI[cellI]*V[cellI];
+                Vtot += V[cellI];
+            }
+            reduce(twoMuV, sumOp<scalar>());
+            reduce(Vtot, sumOp<scalar>());
+            twoMuRef_ = twoMuV/max(Vtot, VSMALL);
+        }
+
+        pressureEqnScale_ =
+            pressureScaleFactor_*(pressureScaleByTwoMu_ ? twoMuRef_ : 1.0);
+
+        if (scaleMixedPetScFields_)
+        {
+            if
+            (
+                pressureUnknownScaleType_ == "twoMu"
+             || pressureUnknownScaleType_ == "2mu"
+            )
+            {
+                pressureUnknownScale_ = twoMuRef_;
+            }
+            else if (pressureUnknownScaleType_ == "user")
+            {
+                pressureUnknownScale_ =
+                    readScalar
+                    (
+                        solidModelDict().lookup("pressureUnknownScaleValue")
+                    );
+            }
+            else if (pressureUnknownScaleType_ != "none")
+            {
+                FatalErrorInFunction
+                    << "Unknown pressureUnknownScale "
+                    << pressureUnknownScaleType_ << nl
+                    << "Valid options are twoMu, user and none"
+                    << abort(FatalError);
+            }
+        }
+
+        if (pressureUnknownScale_ <= VSMALL || pressureEqnScale_ <= VSMALL)
+        {
+            FatalErrorInFunction
+                << "The pressure unknown and equation scales must be "
+                << "positive: found " << pressureUnknownScale_ << " and "
+                << pressureEqnScale_ << abort(FatalError);
+        }
+
+        Info<< "Mixed system scaling: pressure unknown scale = "
+            << pressureUnknownScale_ << ", pressure equation scale = "
+            << pressureEqnScale_ << " (2*mu = " << twoMuRef_ << ")" << endl;
     }
 
     if (predictor_)
@@ -1405,6 +1689,9 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale_
+        pI *= pressureUnknownScale_;
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1432,7 +1719,10 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         {
             fvVectorMatrix approxMomJ
             (
-                fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+                fvm::laplacian
+                (
+                    pressureStabilisationStiffnessField(), D, "laplacian(DD,D)"
+                )
               - rho()*fvm::d2dt2(D)
             );
             approxMomJ.relax();
@@ -1447,8 +1737,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
 
-        // Make residual extensive
-        pressureResidual *= mesh.V();
+        // Make residual extensive, and scale the pressure equation rows
+        pressureResidual *= pressureEqnScale_*mesh.V();
 
         // Copy the pressureResidual into the f field as the final equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -1606,6 +1896,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale_
+        pI *= pressureUnknownScale_;
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1621,7 +1914,12 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             {
                 fvVectorMatrix approxMomJ
                 (
-                    fvm::laplacian(impKf_, D, "laplacian(DD,D)")
+                    fvm::laplacian
+                    (
+                        pressureStabilisationStiffnessField(),
+                        D,
+                        "laplacian(DD,D)"
+                    )
                   - rho()*fvm::d2dt2(D)
                 );
                 approxMomJ.relax();
@@ -1632,6 +1930,15 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             (
               - fvm::Sp(rKappa(), p)
               + one*pressureStabilisation().scalarJacobian(p, &rAUf())
+            );
+
+            // The pressure rows are scaled by pressureEqnScale_ and the
+            // pressure columns by pressureUnknownScale_ (d/dpHat)
+            approxPressureJ *= dimensionedScalar
+            (
+                "pressureScale",
+                dimless,
+                pressureEqnScale_*pressureUnknownScale_
             );
 
             // Insert the pressure equation
@@ -1646,9 +1953,11 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 p,
                 D,
                 jac,
-                blockSize_ - 1,            // row offset
-                0,                         // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar components of D
+                blockSize_ - 1,             // row offset
+                0,                          // column offset
+                solidModel::twoD() ? 2 : 3, // number of scalar components of D
+                false,                      // flipSign
+                pressureEqnScale_           // pressure equation row scale
             );
 
             // Insert p-in-D term
@@ -1657,9 +1966,11 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             (
                 p,
                 jac,
-                0,                         // row offset
-                blockSize_ - 1,            // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+                0,                          // row offset
+                blockSize_ - 1,             // column offset
+                solidModel::twoD() ? 2 : 3, // number of scalar equations
+                true,                       // flipSign
+                pressureUnknownScale_       // d/dpHat of the pressure columns
             );
         }
     }

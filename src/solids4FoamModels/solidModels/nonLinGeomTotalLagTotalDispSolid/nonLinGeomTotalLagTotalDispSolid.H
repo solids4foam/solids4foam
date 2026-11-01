@@ -80,16 +80,17 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Implicit stiffness; coefficient of the Laplacian term
         //  The value of this term only affects convergence and not the answer
-        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
-        const volScalarField impK_;
+        //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum.
+        //  Frozen at construction unless impKUpdate asks for a refresh
+        volScalarField impK_;
 
         //- Implicit stiffness surface field
-        const surfaceScalarField impKf_;
+        surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
         //  will store the reciprocal for effficiency
-        const volScalarField rImpK_;
+        volScalarField rImpK_;
 
         //- Reciprocal of the bulk modulus
         //  Used in the pressure equation when solvePressure is enabled
@@ -111,8 +112,54 @@ class nonLinGeomTotalLagTotalDispSolid
         //  the volumetric energy the pressure equation was written for
         mutable autoPtr<volScalarField> volumetricResponsePtr_;
 
+        // Scaling of the mixed displacement-pressure system (solvePressure)
+        // Ported from Philip Cardiff's a4a9c07f and 7b01886d on the
+        // fix-pressure-solid branch
+
+            //- Store the pressure in the PETSc solution vector as
+            //  pHat = p/pressureUnknownScale_
+            const Switch scaleMixedPetScFields_;
+
+            //- Type of the pressure unknown scale: twoMu, user or none
+            const word pressureUnknownScaleType_;
+
+            //- Scale of the PETSc pressure unknown
+            scalar pressureUnknownScale_;
+
+            //- Dimensionless factor applied to the pressure equation rows
+            const scalar pressureScaleFactor_;
+
+            //- Multiply pressureScaleFactor_ by a representative 2*mu, so
+            //  that the pressure residual has the units and magnitude of the
+            //  momentum residual
+            const Switch pressureScaleByTwoMu_;
+
+            //- Volume-averaged 2*mu, from the deviatoric implicit stiffness
+            scalar twoMuRef_;
+
+            //- Scale of the pressure equation rows (residual and Jacobian):
+            //  pressureScaleFactor_*(pressureScaleByTwoMu_ ? twoMuRef_ : 1)
+            scalar pressureEqnScale_;
+
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
+
+        //- When the implicit stiffness is taken from the law: frozen (at
+        //  construction, the default) or timeStep (again at the start of
+        //  every time step, from the converged state of the previous one).
+        //  With a law whose scalar tangent follows its state, the FV
+        //  stabilisation then follows the material too
+        const word impKUpdate_;
+
+        //- Stiffness behind the pressure stabilisation coefficient (the
+        //  solid analogue of rAUf) of the mixed formulation: impK (the
+        //  default), momentum (impK times one plus the momentum
+        //  stabilisation scale factor, the implicit stiffness the momentum
+        //  operator actually carries) or bulk (the larger of impK and kappa)
+        const word pressureStabilisationStiffness_;
+
+        //- Factor applied to that stiffness
+        const scalar pressureStabilisationStiffnessFactor_;
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
@@ -149,6 +196,14 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
+
+        //- Re-evaluate impK, impKf and rImpK from the framework at the
+        //  current deformation
+        void updateImpK();
+
+        //- Face stiffness behind the pressure stabilisation coefficient,
+        //  selected by pressureStabilisationStiffness
+        tmp<surfaceScalarField> pressureStabilisationStiffnessField() const;
 
         //- Calculate the current face-area vectors
         tmp<surfaceVectorField> currentSf() const;

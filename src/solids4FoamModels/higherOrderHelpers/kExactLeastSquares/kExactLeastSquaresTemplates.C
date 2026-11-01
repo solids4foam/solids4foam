@@ -125,6 +125,91 @@ Type kExactLeastSquares::evaluateAtPoint
 
 
 template<class Type>
+Foam::autoPtr<Foam::CompactListList<Type>>
+kExactLeastSquares::extrapolatedPatchFaceQuadValues
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    const label patchI
+) const
+{
+    const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+    const labelUList& faceCells = mesh_.boundary()[patchI].faceCells();
+
+    auto& faceQuadPoints = compactListListCRef(quadrature().faceQuadPoints());
+
+    const globalIndex& globalCells = stencil().globalCells();
+    const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
+    auto& stencils = compactListListCRef(stencil().cellsStencil());
+
+    // The coefficient tables and the field exchange are collective, so they
+    // are built before any rank can find it has no faces on this patch, as
+    // in evaluateAtPoint
+    (void)cellGradCoeffs();
+    if (polynomialOrder() >= 2)
+    {
+        (void)cellSecondGradCoeffs();
+        (void)secondOrderCellMoments();
+    }
+    if (polynomialOrder() >= 3)
+    {
+        (void)cellThirdGradCoeffs();
+        (void)thirdOrderCellMoments();
+    }
+
+    const UList<Type>& vfI = vf.internalField();
+    const List<Field<Type>> remoteField = stencil().remoteFieldPerProc(vfI);
+
+    labelList nQpPerFace(pp.size(), 0);
+    forAll(pp, patchFaceI)
+    {
+        nQpPerFace[patchFaceI] = faceQuadPoints[pp.start() + patchFaceI].size();
+    }
+
+    autoPtr<CompactListList<Type>> resultPtr
+    (
+        new CompactListList<Type>(nQpPerFace)
+    );
+    CompactListList<Type>& result = resultPtr();
+
+    forAll(pp, patchFaceI)
+    {
+        const label faceI = pp.start() + patchFaceI;
+        const label cellI = faceCells[patchFaceI];
+        const UList<label>& cellStencil = stencils[cellI];
+        scalarField valueCoeffs(cellStencil.size() + 1);
+
+        forAll(faceQuadPoints[faceI], qpI)
+        {
+            cellValueCoeffsAtPoint
+            (
+                cellI, faceQuadPoints[faceI][qpI], valueCoeffs
+            );
+
+            Type value = valueCoeffs[cellStencil.size()]*vfI[cellI];
+
+            forAll(cellStencil, cI)
+            {
+                value +=
+                    valueCoeffs[cI]
+                   *fieldValue
+                    (
+                        cellStencil[cI],
+                        globalCells,
+                        remoteLoc,
+                        vfI,
+                        remoteField
+                    );
+            }
+
+            result[patchFaceI][qpI] = value;
+        }
+    }
+
+    return resultPtr;
+}
+
+
+template<class Type>
 void kExactLeastSquares::exchangeProcessorPatchField
 (
     const processorFvPatch& procPatch,

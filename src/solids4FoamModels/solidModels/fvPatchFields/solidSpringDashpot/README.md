@@ -84,7 +84,15 @@ stiffness, including `2μ` when `solvePressure` is used.
   `nonLinearGeometryTotalLagrangianTotalDisplacement` impose
   `-K·D - C·(D - D_old)/Δt + t - p n` directly on the boundary faces,
   through `springDashpotTraction()`, as they do for `solidTraction`. This is
-  used by the implicit segregated, explicit and PETSc SNES algorithms.
+  used by the implicit segregated, explicit and PETSc SNES algorithms. `D`
+  and `D_old` here are not the patch values but the cell values extrapolated
+  to the face with `grad(D)` and its old-time value, as `solidTraction` does
+  with `extrapolateValue`. The patch value comes from the Robin closure,
+  which lags by one evaluation, so with it the SNES residual is not a
+  function of the unknowns alone and the matrix-free Jacobian fails: Newton
+  diverged on the first step of the total Lagrangian `ArosticaEtAl2025`
+  benchmark. Extrapolating both time levels keeps the dashpot velocity
+  consistent.
 - **Least-squares gradient:** the `leastSquaresS4f` gradient scheme
   extrapolates to the faces of this condition, as it does for
   `solidTraction`, instead of using the boundary value. The boundary value
@@ -108,6 +116,20 @@ stiffness, including `2μ` when `solvePressure` is used.
   `displacementOrTraction` and `tractionPressureDisplacement`, whose boundary
   values `leastSquaresS4f` uses; for those the dependence on the previous
   evaluation is reduced, not removed.
+- **High-order residual:** with `highOrderResidual`, the total Lagrangian
+  model integrates `-K·D - C·(D - D_old)/Δt` at the face quadrature points of
+  the `kExactLeastSquares` reconstruction (`springDashpotTractionQuadrature`),
+  with `D` and `D_old` evaluated from the owner cell's polynomial; the
+  quadrature weights carry the reference area, so no area ratio enters. The
+  optional `traction` and `pressure` are integrated with the current area, as
+  for `solidTraction`: the pressure with the face's deformed area and normal
+  from Nanson's relation, the traction with `|cof(F)·N|` at each point. The
+  displacement reconstruction treats this patch as a traction patch and
+  extrapolates across it, as `leastSquaresS4f` does in the low-order path:
+  `directionMixed` reports `fixesValue`, but the value comes from the Robin
+  closure, which uses the stress of the previous evaluation. The Robin
+  closure still sets the patch value, which the preconditioner matrix and
+  the stabilisation see; the residual itself does not use it.
 - **Area ratio:** in the total Lagrangian model, `dA/da` is taken from `J` and
   `Finv`, because `tractionBoundarySnGrad` expects a traction per unit current
   area there.
@@ -117,9 +139,10 @@ Supported solid models: `linearGeometryTotalDisplacement` and
 the spring-dashpot traction on the boundary faces. Other solid models are
 refused with a fatal error: incremental models solve for `DD`, updated
 Lagrangian patch normals are not reference normals, and the remaining models
-would ignore the imposed traction. The high-order residual and Jacobian of the
-PETSc SNES algorithm are also refused, because they have no treatment of this
-condition.
+would ignore the imposed traction. The high-order residual of the PETSc SNES
+algorithm (`highOrderResidual`) is supported by the total Lagrangian model
+only; the high-order Jacobian is refused, because it assembles this condition
+as a fixed-value patch.
 
 The `nonOrthogonalCorrections` and `limitCoeff` entries of `solidDirectionMixed`
 are read. `secondOrder yes` is refused, because the valueFraction above assumes
@@ -203,9 +226,14 @@ v2512:
   condition): inner radial displacement errors 1.7e-3, 4.0e-4 and 9.8e-5 on
   10×20, 20×40 and 40×80 cells, with 51–64 outer iterations on all meshes
   and k = 1e5 … 1e8 Pa/m.
-- **Refusals:** `secondOrder yes`, an unsupported solid model and the
-  high-order SNES residual or Jacobian stop with a fatal error; a dashpot in
-  a `steadyState` run prints the warning.
+- **Refusals:** `secondOrder yes`, an unsupported solid model, the
+  high-order SNES Jacobian and the high-order residual outside the total
+  Lagrangian model stop with a fatal error; a dashpot in a `steadyState` run
+  prints the warning.
+- **High-order residual:** the `ArosticaEtAl2025` benchmark 1 (quadratic
+  `kExactLeastSquares` reconstruction, alpha stabilisation, PETSc SNES) runs
+  with the epicardial normal spring-dashpot and the isotropic basal one; a
+  low-order run is bitwise unchanged by the change.
 
 Outer iterations to a step-norm tolerance of 1e-10, against the same
 condition with the base-class diagonal and without the imposed traction:

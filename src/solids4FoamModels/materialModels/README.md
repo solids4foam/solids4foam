@@ -96,6 +96,7 @@ use it:
 | [`isotropicFungElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/isotropicFungElasticMechanicalConstitutiveLaw/README.md) | finite | Isotropic Fung-type exponential soft tissue |
 | [`HolzapfelGasserOgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Fibre-reinforced arterial tissue (HGO) |
 | [`electroMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/electroMechanicalLawMechanicalConstitutiveLaw/README.md) | finite | Active fibre tension over a passive sub-law |
+| [`viscoActiveHolzapfelOgden`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw/README.md) | finite | Orthotropic Holzapfel-Ogden myocardium with viscosity and active stress |
 
 `rho`, the density, is read by every law. The optional `solvePressureEqn` and
 `pressureSmoothingScaleFactor` (default `100`) entries of a law ask the solid
