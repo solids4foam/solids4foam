@@ -477,7 +477,10 @@ void newtonIcoFluid::setWallViscousStressTranspose
     // the momentum residual's wall flux and the traction, which only use
     // n & (boundary value), both get q. (The trace of n*q is not zero; the
     // tensor is only constructed for this normal flux.)
-    if (!fitGeometryCurrent())
+    // All processors must take the same decision: the fits are rebuilt with
+    // collective operations, and the points may change on some processors
+    // only (#653)
+    if (returnReduce(!fitGeometryCurrent(), orOp<bool>()))
     {
         updateWallVelocityFits();
     }
