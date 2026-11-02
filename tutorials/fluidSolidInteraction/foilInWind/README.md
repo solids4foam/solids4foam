@@ -140,9 +140,10 @@ The PETSc options of the quasi-monolithic system are in
 search and matrix-free Jacobian-vector products, and an LGMRES linear solver
 with a multiplicative fluid/solid field-split preconditioner. The fluid block
 uses a Schur complement split of velocity and pressure, with ILU(0) for the
-velocity and hypre BoomerAMG for the pressure; the solid block is gathered
-onto one rank and factorised with LU (`redundant`), which keeps the solid
-preconditioner exact for any number of ranks.
+velocity and hypre BoomerAMG for the pressure; every rank gathers the whole
+solid block and factorises it serially with LU (`redundant`, with its default
+of one copy per rank), which keeps the solid preconditioner exact for any
+number of ranks, but its cost and memory do not fall as ranks are added.
 
 The quasi-monolithic setup uses a quarter of the partitioned time step
 (`system/controlDict.monolithic`). With $$0.01$$ s, the Newton method stagnates
