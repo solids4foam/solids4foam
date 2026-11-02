@@ -52,17 +52,18 @@ none, so it can be given once, on the outer dictionary.
 | `passiveMechanicalLaw` | yes | - | Sub-dictionary selecting the passive law |
 | `activeTension` | no | - | Constant active tension, pressure units |
 | `rampTime` | no | `0` | Ramp duration for `activeTension`, `>= 0` |
-| `activeTensionFromField` | no | `yes` if no `activeTension`, else `no` | Read `Ta` as a coupling input field |
+| `activeTensionFromField` | no | see below | Read `Ta` as a coupling input |
 | `activeTensionFieldName` | no | `Ta` | Name of the active tension field |
 | `uniformFibreField` | no | `no` | Take the default `f0` from this dictionary |
 | `f0` | if uniform | - | Fibre vector; required if `uniformFibreField yes` |
 | `rho` | see text | - | Density, passed to the passive law if absent there |
 | `inputCaseDirectories` | no | - | Read `Ta` from another case directory |
 
-`activeTension` and `rampTime` are used only when `activeTensionFromField`
-is `no`. With the field on they are not used, and giving either prints a
-warning. Setting `activeTensionFromField no` without an `activeTension` is a
-fatal error, as is a negative `rampTime`.
+`activeTensionFromField` defaults to `yes` without an `activeTension` and to
+`no` with one. `activeTension` and `rampTime` are used only when
+`activeTensionFromField` is `no`. With the field on they are not used, and
+giving either prints a warning. Setting `activeTensionFromField no` without an
+`activeTension` is a fatal error, as is a negative `rampTime`.
 
 The `passiveMechanicalLaw` sub-dictionary holds the passive law's `type` and
 all of its entries. Any finite-strain law can be used; the tutorials use
