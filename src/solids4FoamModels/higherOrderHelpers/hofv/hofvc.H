@@ -43,13 +43,37 @@ Author
 namespace Foam
 {
 
+class leastSquaresScheme;
+
 namespace hofvc
 {
-    //- Update the gradient of displacement for face quadrature points
+    //- Update the gradient of a vector field for face quadrature points,
+    //  using the given least squares scheme
+    void fGrad
+    (
+        const leastSquaresScheme& ls,
+        const volVectorField& vf,
+        CompactListList<tensor>& gradQuad
+    );
+
+    //- Update the gradient of displacement for face quadrature points,
+    //  using the displacement least squares scheme of the solid model
     void fGrad
     (
         const volVectorField& D,
         CompactListList<tensor>& gradDQuad
+    );
+
+    //- Surface integration of sigma using the quadrature points and weights
+    //  of the given least squares scheme
+    //  Integration of stress at quadrature points results with surface traction
+    //  with dimensions dims
+    tmp<surfaceVectorField> surfaceIntegrate
+    (
+        const leastSquaresScheme& ls,
+        const CompactListList<symmTensor>& quadSigma,
+        const fvMesh& mesh,
+        const dimensionSet& dims = dimPressure
     );
 
     //- Surface integration of sigma using quadrature points and their weights
@@ -57,6 +81,19 @@ namespace hofvc
     tmp<surfaceVectorField> surfaceIntegrate
     (
         const CompactListList<symmTensor>& quadSigma,
+        const fvMesh& mesh
+    );
+
+    //- Surface integration of the first Piola-Kirchhoff stress using the
+    //  quadrature points and weights of the given least squares scheme
+    //  The Cauchy stress and the displacement gradient at the quadrature points
+    //  are given, and the integration results with the nominal traction, i.e.
+    //  the force per unit undeformed area
+    tmp<surfaceVectorField> surfaceIntegrate
+    (
+        const leastSquaresScheme& ls,
+        const CompactListList<symmTensor>& quadSigma,
+        const CompactListList<tensor>& quadGradD,
         const fvMesh& mesh
     );
 
