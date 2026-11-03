@@ -1,0 +1,41 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+dimensions      [0 1 -1 0 0 0 0];
+internalField   uniform (0 0 0);
+boundaryField
+{
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+    outer
+    {
+        type            codedMixed;
+        refValue        uniform (0 0 0);
+        refGradient     uniform (0 0 0);
+        valueFraction   uniform 0;
+        value           uniform (0 0 0);
+        name            openRadialSwirlFsi;
+        code
+        #{
+            const vectorField nf(this->patch().nf());
+            const vectorField Cf(this->patch().Cf());
+            scalarField rf(Cf.size());
+            forAll(Cf, i) { rf[i] = Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y())); }
+            const vectorField Up(*this);
+            this->refGrad() = (Up - 2.0*nf*(nf & Up))/rf;
+            this->refValue() = Up;
+            this->valueFraction() = 0.0;
+        #};
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}

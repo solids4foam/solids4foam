@@ -1,0 +1,33 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+solvers
+{
+    D
+    {
+        solver petsc;
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type basic;
+            snes_rtol "1e-10";
+            snes_atol "1e-11";
+            snes_stol "1e-12";
+            snes_max_it "200";
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+            pc_type bjacobi;
+            sub_pc_type lu;
+        }
+    }
+}
+relaxationFactors {}

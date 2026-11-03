@@ -1,0 +1,56 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+dimensions      [0 2 -2 0 0 0 0];
+internalField   uniform 0;
+boundaryField
+{
+    interface
+    {
+        type            zeroGradient;
+    }
+    outer
+    {
+        type            codedFixedValue;
+        value           uniform 0;
+        name            outerPressureSeeded;
+        codeInclude
+        #{
+            #include "interpolationTable.H"
+        #};
+        code
+        #{
+            // p_c(t)/rho from the reference table; optional n = 2 pulse (stability screen):
+            // seed*cos(2 theta)*B(t), B = C-inf bump on [0.1, 0.5] s, peak 1 at 0.3 s
+            const scalar t = this->db().time().value();
+            interpolationTable<scalar> pTab(fileName("$FOAM_CASE/constant/pcTable").expand());
+            const scalar pc = pTab(t);
+            const scalar seed = 0.0;
+            const labelList modes({2});
+            scalar bump = 0;
+            const scalar tau = (t - 0.1)/0.4;
+            if (tau > 0 && tau < 1)
+            {
+                bump = Foam::exp(1.0 - 1.0/(1.0 - sqr(2*tau - 1)));
+            }
+            const vectorField Cf(this->patch().Cf());
+            scalarField pv(Cf.size());
+            forAll(Cf, i)
+            {
+                const scalar th = Foam::atan2(Cf[i].y(), Cf[i].x());
+                scalar pert = 0;
+                forAll(modes, j) { pert += Foam::cos(modes[j]*th); }
+                pv[i] = pc + seed*bump*pert;
+            }
+            this->operator==(pv);
+        #};
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}

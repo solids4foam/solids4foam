@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Opt-in verification driver for radialTorsionalRing.
+#
+# Runs the selected meshes and configurations as separate cases in
+# verification/work/<config>_<mesh> (a copy of the tutorial), then runs the
+# convergence and mixed-term analysis. The M2 runs take 330-410 s and the M3
+# runs 810-1180 s on 4 ranks, so the default is the cheap set.
+#
+#   ./Allverify                       # M1 torsion, radial, combined (about 5 min in total)
+#   ./Allverify torsion M1 M2         # given configurations and meshes
+#   ./Allverify combined M1 M2 M3 np=4
+#   ./Allverify analyse               # only analyse existing cases in work/
+#
+# Output: work/verification_report/{summary.txt,verification_report.json,layerA_*.csv,layerB_errors.csv};
+# exit code 1 if any run is FAIL or INCOMPLETE in the numerical layer.
+# Meshes M1 and M2 run in serial, M3 in parallel (np, default 4).
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TUTORIAL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORK="${SCRIPT_DIR}/work"
+np=4
+configs=()
+meshes=()
+analyseOnly=no
+failed=0
+
+for arg in "$@"; do
+    case "$arg" in
+        torsion|radial|combined) configs+=("$arg") ;;
+        M1|M2|M3) meshes+=("$arg") ;;
+        np=*) np="${arg#np=}" ;;
+        analyse) analyseOnly=yes ;;
+        *) echo "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+[[ ${#configs[@]} -gt 0 ]] || configs=(torsion radial combined)
+[[ ${#meshes[@]} -gt 0 ]] || meshes=(M1)
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for radialTorsionalRing verification." >&2
+    exit 2
+fi
+
+if [[ "$analyseOnly" == "no" ]]; then
+    for config in "${configs[@]}"; do
+        for mesh in "${meshes[@]}"; do
+            case_dir="${WORK}/${config}_${mesh}"
+            echo "=== ${config} ${mesh}"
+            rm -rf "${case_dir}"
+            mkdir -p "${case_dir}"
+            for item in "${TUTORIAL_DIR}"/*; do
+                b=$(basename "${item}")
+                if [[ "$b" == "verification" || "$b" == "regressionTests" ]]; then continue; fi
+                cp -a "${item}" "${case_dir}/"
+            done
+            mkdir -p "${case_dir}/verification"
+            cp -a "${SCRIPT_DIR}/scripts" "${case_dir}/verification/"
+            mode=serial
+            [[ "$mesh" == "M3" ]] && mode="parallel np=${np}"
+            # cd must succeed; a failed Allclean is harmless, a failed cd is not
+            if ! cd "${case_dir}"; then
+                echo "  cannot enter ${case_dir}" >&2
+                failed=1
+                continue
+            fi
+            ./Allclean > /dev/null 2>&1 || true
+            # the overrides below always rewrite the dictionaries for the selected mesh and configuration
+            ./Allrun ${mesh} ${config} ${mode} > log.Allrun 2>&1 \
+                || { echo "  run of ${config} ${mesh} failed (see ${case_dir}/log.Allrun)"; failed=1; }
+            cd "${SCRIPT_DIR}" || exit 1
+        done
+    done
+fi
+
+# Two layers: A numerical acceptance per run, B scientific reference-error expectations.
+# Exit code 1 if any run is FAIL or INCOMPLETE in layer A (see scripts/verify.py).
+rc=0
+python3 -B -I "${SCRIPT_DIR}/scripts/verify.py" "${WORK}" --out "${WORK}/verification_report" || rc=$?
+python3 -B -I "${SCRIPT_DIR}/scripts/convergence.py" "${WORK}" > "${WORK}/convergence.txt" 2>&1 || true
+if [[ ${failed} -ne 0 && ${rc} -eq 0 ]]; then rc=1; fi
+exit ${rc}

@@ -1,0 +1,6 @@
+E = 2.0e+08 Pa: checks: |b - B| max 2.99e-12 m; wall omega vs prescribed rigid rotation: max|omega_B - omega_A|/max|omega_A| = 2.61e-04
+convention: median reference T_B / (B^2 sig_rt_b) = 1.000000000
+sigma_r-theta(B) peak(closed form) 4.950895e+00   max|reference - closed form| / peak = 5.867e-04
+T_B              peak(closed form) 4.950895e+00   max|reference - closed form| / peak = 5.867e-04
+H_f              peak(closed form) 1.317775e+00   max|reference - closed form| / peak = 3.479e-03
+solve wall 349.3 s, 40 output times in 0.05-2 s
