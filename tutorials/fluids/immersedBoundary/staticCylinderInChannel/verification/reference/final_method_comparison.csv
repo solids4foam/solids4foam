@@ -1,0 +1,18 @@
+# staticCylinderInChannel verification: solids4foam f33b244a2, OpenFOAM v2412; Cd and Cl are time-weighted means over the final 2 s; wall_s and cpu_hours (ranks x wall time of the job script) are machine-dependent (2 x AMD EPYC 9684X)
+study,case,method,formulation,level,cells_per_D,n_cells,ranks,couplingCoeff,occupancy,deltaT,nOuterCorrectors,nCorrectors,end_time,max_co,max_co_developed,Cd_mean,Cd_range,Cd_rel_range,Cd_rel_drift_10s,Cl_mean,Cl_range,Cd_range_ratio,Cl_range_ratio,Cl_step_alternation,status,Cd_surface_traction_last,p_iters_per_step,n_steps,wall_s,cpu_hours
+mesh,cutLink-L1,cutLink,cutLink,1,10,4510,1,,,0.001,1,3,15,0.052,0.052,5.601032,2.000e-08,3.57e-09,1.02e-08,0.007889,4.89e-07,0.667,0.392,0.13,steady,5.28850,4.5,15000,101,0.028
+mesh,cutLink-L2,cutLink,cutLink,2,20,18040,1,,,0.001,1,3,15,0.105,0.105,5.576002,1.000e-08,1.79e-09,7.32e-09,0.010175,4.30e-07,1.000,0.394,0.10,steady,5.44157,7.7,15000,432,0.120
+mesh,cutLink-L3,cutLink,cutLink,3,40,72160,2,,,0.001,1,3,15,0.210,0.210,5.579090,2.500e-08,4.48e-09,8.56e-09,0.010541,4.30e-07,0.600,0.399,0.75,steady,5.49548,14.1,15000,1227,0.682
+mesh,cutLink-L4,cutLink,cutLink,4,80,288640,8,,,0.001,1,3,15,0.420,0.420,5.579376,1.500e-08,2.69e-09,1.03e-08,0.010594,3.69e-07,0.333,0.382,0.18,steady,5.49586,24.5,15000,1852,4.116
+mesh,ghostCell-L1,ghostCell,ghostCell,1,10,4510,1,,,0.001,1,3,15,0.053,0.053,5.431424,6.000e-08,1.10e-08,1.01e-08,0.011864,3.26e-07,1.500,0.473,0.24,steady,,3.4,15000,70,0.019
+mesh,ghostCell-L2,ghostCell,ghostCell,2,20,18040,1,,,0.001,1,3,15,0.106,0.106,5.515370,9.450e-07,1.71e-07,8.55e-09,0.011887,1.95e-06,7.560,5.371,0.46,steady,,7.2,15000,319,0.089
+mesh,ghostCell-L3,ghostCell,ghostCell,3,40,72160,2,,,0.001,1,3,15,0.210,0.210,5.549261,1.000e-08,1.80e-09,1.00e-08,0.010952,3.24e-07,1.000,0.366,0.27,steady,,19.0,15000,1165,0.647
+mesh,ghostCell-L4,ghostCell,ghostCell,4,80,288640,8,,,0.001,1,3,15,0.420,0.420,5.570778,5.000e-08,8.98e-09,4.07e-08,0.010799,2.92e-07,0.429,0.438,0.25,steady,,39.2,15000,2203,4.896
+mesh,penalty-L1,penalty,penalty,1,10,4510,1,,signedDistance,0.001,1,3,15,0.051,0.051,5.304363,1.000e-08,1.89e-09,8.71e-09,0.004930,3.08e-07,1.000,0.394,0.15,steady,,5.7,15000,83,0.023
+mesh,penalty-L2,penalty,penalty,2,20,18040,1,,signedDistance,0.001,1,3,15,0.104,0.104,5.394955,1.000e-08,1.85e-09,9.75e-09,0.009109,2.87e-07,1.000,0.393,0.06,steady,,12.2,15000,425,0.118
+mesh,penalty-L3,penalty,penalty,3,40,72160,2,,signedDistance,0.001,1,3,15,0.209,0.209,5.482845,1.500e-08,2.74e-09,8.24e-09,0.010239,2.96e-07,0.500,0.372,0.18,steady,,24.9,15000,1429,0.794
+mesh,penalty-L4,penalty,penalty,4,80,288640,8,,signedDistance,0.001,1,3,15,0.419,0.419,5.513867,4.500e-08,8.16e-09,3.97e-08,0.010090,2.22e-07,0.500,0.372,0.10,steady,,44.9,15000,2469,5.487
+final-F,incremental-L1-cc0p2-n5,incremental,legacy incremental,1,10,4510,1,0.2,vertexFraction,0.001,5,3,15,0.053,0.053,5.479757,1.500e-08,2.74e-09,6.72e-09,0.016603,1.68e-07,0.500,0.395,0.00,steady,,174.9,15000,972,0.270
+final-A,incremental-L2-cc0p2-n5,incremental,legacy incremental,2,20,18040,1,0.2,vertexFraction,0.001,5,3,15,0.109,0.106,5.663897,1.000e-08,1.77e-09,8.87e-09,0.018711,2.60e-07,1.000,0.397,0.00,steady,,266.3,15000,5519,1.533
+final-F,incremental-L3-cc0p2-n5,incremental,legacy incremental,3,40,72160,2,0.2,vertexFraction,0.001,5,3,15,0.213,0.211,5.692606,1.000e-08,1.76e-09,6.72e-09,0.014111,3.43e-07,0.000,0.394,0.00,steady,,345.8,15000,15515,8.619
+final-A,incremental-L4-cc0p2-n5,incremental,legacy incremental,4,80,288640,8,0.2,vertexFraction,0.001,5,3,15,0.420,0.420,5.733871,3.237e-04,5.64e-05,4.47e-07,0.012273,6.65e-05,1.000,0.997,0.40,limit cycle,,389.7,15000,19898,44.218

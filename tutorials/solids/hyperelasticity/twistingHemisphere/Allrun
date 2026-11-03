@@ -13,6 +13,9 @@ solids4Foam::caseOnlyRunsWithFoamExtend
 solids4Foam::convertCaseFormat .
 
 # Unpack the coarse mesh (2 349 cells)
+# Finer meshes (24 000, 35 424 and 43 488 cells) are available at
+# https://www.solids4foam.com/tutorials/archive/; they are stored with L = 2,
+# so they do not need the scaling below
 echo "Unpacking constant/polyMesh_coarse.tar.xz"
 \rm -rf constant/polyMesh
 tar -xJf constant/polyMesh_coarse.tar.xz -C constant

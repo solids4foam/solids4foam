@@ -13,6 +13,8 @@ sort: 5
 - Show two solution approaches available in solids4foam:
   - PETSc SNES (default), as used in [1].
   - Block-coupled pressure-displacement (foam-extend), as used in [2].
+- Show how the material law of the case can be changed, using the
+  equivalent `isotropicFungElastic` law as an example.
 
 ---
 
@@ -24,7 +26,7 @@ ventricle under an internal endocardial pressure that ramps linearly from
 nearly-incompressible Guccione passive law; for the pressure-displacement
 approach, an isotropic Guccione form is used (`cf = ct = cfs = 1`).
 
-Two solution approaches are provided:
+Two options are provided:
 
 - `petsc` (default): solved with the
   `nonLinearGeometryTotalLagrangianTotalDisplacement` solid model and the
@@ -64,6 +66,38 @@ The default approach can also be run in parallel using:
 ```bash
 ./Allrun parallel
 ```
+
+## Changing the Material Law
+
+The material is defined in `constant/mechanicalProperties`, which `Allrun`
+copies from `caseOptions/petsc/constant/mechanicalProperties`. To run the case
+with a different law, edit that file. For example,
+`caseOptions/isotropicFung/constant/mechanicalProperties` describes the
+material with the isotropic Fung-type `isotropicFungElastic` law instead of
+`GuccioneElastic`:
+
+```text
+heartTissue
+{
+    type            isotropicFungElastic;
+    rho             rho [1 -3 0 0 0 0 0] 3000;
+    c               c [1 -1 -2 0 0 0 0] 10e3;
+    a               1.0;
+    bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
+}
+```
+
+To run it, in a copy of the tutorial:
+
+```bash
+cp caseOptions/isotropicFung/constant/mechanicalProperties \
+    caseOptions/petsc/constant/
+./Allrun
+```
+
+With `c = k` and `a = cf = ct = cfs`, `isotropicFungElastic` is identical to
+`GuccioneElastic`, so this gives the same results as the default case. The
+regression test runs this variant to check that the two laws agree.
 
 ## Verification and Convergence Study
 

@@ -112,6 +112,12 @@ class IQNILSCouplingInterface
         //- Predict solid
         const bool predictSolid_;
 
+        //- Do not apply the IQN-ILS modes to the residual of the solid-only
+        //  predictor: the first iteration of each time-step uses the
+        //  under-relaxation/predictor update instead, and the modes are first
+        //  applied to the residual of a complete fluid-solid iteration
+        const bool skipModesOnSolidPredictor_;
+
         //- List of coupling field V
         List<DynamicList<vectorField> > fluidPatchesPointsV_;
 
@@ -157,6 +163,14 @@ class IQNILSCouplingInterface
         //- Reuse coupling
         label couplingReuse() const;
 
+        //- First outer iteration of a time-step whose update may use the
+        //  secant modes: 2 when the modes are not applied to the residual of
+        //  the solid-only predictor, otherwise 1
+        label firstModesIteration() const;
+
+        //- True if the current update must not use the secant modes
+        bool skipModesThisIteration() const;
+
         //- Remove a stored coupling mode for the given interface
         void removeCouplingMode(const label interfaceI, const label modeI);
 
@@ -166,6 +180,9 @@ class IQNILSCouplingInterface
             const label interfaceI,
             const label minTimeIndexToKeep
         );
+
+        //- Remove the coupling modes created in the current time-step
+        void removeCurrentStepCouplingModes();
 
         //- Clear all active coupling modes for the given interface
         void clearCouplingModes(const label interfaceI);
@@ -181,6 +198,10 @@ class IQNILSCouplingInterface
         //  because the immediately previous time step converged without
         //  generating secant modes
         bool usePreviousNonEmptyStepModesInSolve(const label interfaceI) const;
+
+        //- True if the current IQN-ILS solve for this interface uses secant
+        //  modes from previous time-steps
+        bool solveUsesPreviousStepModes(const label interfaceI) const;
 
         //- Number of secant modes available to the current IQN-ILS solve,
         //  combining active and optionally cached previous-step modes

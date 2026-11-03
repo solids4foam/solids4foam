@@ -71,6 +71,9 @@ link_files_for_suffix "${CONTACT}"
 solids4Foam::convertCaseFormat .
 
 # Extract the mesh (coarse quarter-symmetry mesh, dimensions in m)
+# Finer meshes (2 122 and 4 042 cells) are available at
+# https://www.solids4foam.com/tutorials/archive/; they are stored in mm, so
+# scale them with: transformPoints -scale "(0.001 0.001 0.001)"
 echo "Extracting the mesh from coarseMesh.tar.xz"
 rm -rf constant/polyMesh
 tar -xJf coarseMesh.tar.xz -C constant

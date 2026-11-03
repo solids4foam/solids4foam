@@ -1,0 +1,16 @@
+# Abaqus, CPE4H (plane-strain hybrid quadrilateral) elements, structured
+# meshes of the same family as the solids4foam sweep.
+# Columns: cells per side n, average cell spacing sqrt(1440 mm^2 / n^2) in
+# mm, and the vertical displacement of the top-right corner in m.
+# Migrated from solid-benchmarks/linearElasticity/cooksMembrane/plotScripts.
+# The legacy benchmark applied a shear traction of 6.25 kPa, 1000 times
+# smaller than the 6.25 MPa of this tutorial with the same material, so the
+# legacy displacements are multiplied by 1000 here (the case is linear).
+cells_per_side,spacing_mm,displacement_m
+3,12.65,0.0254
+6,6.325,0.0298
+12,3.162,0.0314
+24,1.581,0.0319
+48,0.7906,0.0321
+96,0.3953,0.0322
+192,0.1976,0.0323
