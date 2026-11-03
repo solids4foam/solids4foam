@@ -410,6 +410,14 @@ release. For complete commit-level details and contributor information, see the
   numbering and matrix assembly for one mesh); the helper keeps its interface
   and creates its solver on first use. A class that customises the solver
   must now override `customiseSolver(SNES)`, which takes the SNES object.
+- The high-order least-squares schemes (`kExactLeastSquares` and
+  `movingLeastSquares`) take the boundary values at the face quadrature
+  points from any patch field that derives from the new
+  `quadratureValuePatchField` interface, not only from `fixedDisplacement`
+  and `fixedRotation`; another fixed-value patch is accepted when its value is
+  uniform, and stops with an error otherwise. The `hofvc` functions take the
+  least-squares scheme as an argument (the solid-model versions are kept), so
+  that models other than solids can use them. Solid results are unchanged.
 - The interface-to-interface mappings (`AMI`, `directMap`, `GGI` and `RBF`)
   print their per-call messages in debug mode only, as the `directMap` point
   transfer already did, which shortens the logs of the fluid-solid

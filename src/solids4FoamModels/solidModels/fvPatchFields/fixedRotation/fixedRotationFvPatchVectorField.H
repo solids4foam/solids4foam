@@ -39,6 +39,7 @@ Author
 #include "fixedValueFvPatchFields.H"
 #include "interpolationTable.H"
 #include "CompactListList.H"
+#include "quadratureValuePatchField.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -51,7 +52,8 @@ namespace Foam
 
 class fixedRotationFvPatchVectorField
 :
-    public fixedValueFvPatchVectorField
+    public fixedValueFvPatchVectorField,
+    public quadratureValuePatchField<vector>
 {
 
     // Private Data
@@ -179,6 +181,15 @@ public:
             //  quadrature point rather than assumed constant over the face
             virtual autoPtr<CompactListList<vector>>
             evaluateQuadrature() const;
+
+            //- Return the values at the face quadrature points of the
+            //  high-order least-squares scheme
+            //  This returns evaluateQuadrature(), which derived patch fields
+            //  may override, so it uses the quadrature of the solid model
+            virtual autoPtr<CompactListList<vector>> quadratureValues
+            (
+                const fvMeshQuadrature&
+            ) const;
 
         //- Write
         virtual void write(Ostream&) const;
