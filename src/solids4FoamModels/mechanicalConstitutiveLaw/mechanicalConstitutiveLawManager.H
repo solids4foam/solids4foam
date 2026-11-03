@@ -281,32 +281,9 @@ class mechanicalConstitutiveLawManager
         //  deformation gradient: the prestress switch in mechanicalProperties
         const Switch prestress_;
 
-        //- The prestress deformation gradient, read as Fpre from the start
-        //  time, from the stress-free configuration to the mesh. Null without
-        //  prestress
-        autoPtr<volTensorField> FprePtr_;
-
-        //- Inverse of Fpre, taken once since Fpre does not change during a run
-        autoPtr<volTensorField> FpreInvPtr_;
-
-        //- Determinant of Fpre, taken once since Fpre does not change during a
-        //  run
-        autoPtr<volScalarField> JprePtr_;
-
-        //- Fpre interpolated to faces made on the first face evaluation
-        mutable autoPtr<surfaceTensorField> FpreSurfacePtr_;
-
-        //- Inverse of Fpre interpolated to faces made on the first face
-        //  evaluation
-        mutable autoPtr<surfaceTensorField> FpreInvSurfacePtr_;
-
-        //- Determinant of Fpre interpolated to faces made on the first face
-        //  evaluation
-        mutable autoPtr<surfaceScalarField> JpreSurfacePtr_;
-
-        //- The time index the face Fpre was made at, so that on a moving
-        //  mesh it is made again at most once per time step
-        mutable label FpreSurfaceTimeIndex_;
+        //- The prestress: Fpre, its inverse and determinant, at the cells
+        //  and the faces. Null without prestress
+        autoPtr<mechanicalConstitutiveLawPrestress> prestressPtr_;
 
         //- The solver's kinematics composed with Fpre, made on the first
         //  evaluation and recomposed at every later one, so that the
@@ -324,12 +301,6 @@ class mechanicalConstitutiveLawManager
 
 
     // Private Member Functions
-
-        //- Read Fpre, check its patch types and that it is invertible
-        void readPrestress();
-
-        //- Make the face Fpre, if it has not been made
-        void makeSurfacePrestress() const;
 
         //- The kinematics the laws see: step composed with Fpre, into
         //  fields kept from one evaluation to the next

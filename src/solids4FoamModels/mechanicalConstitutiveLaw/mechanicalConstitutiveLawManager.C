@@ -32,9 +32,7 @@ License
 #include "CompactListList.H"
 #include "mechanicalConstitutiveLawPrestress.H"
 #include "mechanicalConstitutiveLawGather.H"
-#include "surfaceInterpolate.H"
 #include <cstdint>
-#include <cctype>
 
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -51,35 +49,6 @@ namespace Foam
 {
 namespace
 {
-
-// Fpre, written at full round-trip precision whatever writePrecision the case
-// asks for, as the constitutive state is: a continued run reads Fpre back from
-// the time it continues from, and a rounding of it would move the stress the
-// laws see. writeData is overridden rather than writeObject, whose signature
-// differs between the three forks
-class fullPrecisionVolTensorField
-:
-    public volTensorField
-{
-public:
-
-    fullPrecisionVolTensorField(const IOobject& io, const fvMesh& mesh)
-    :
-        volTensorField(io, mesh)
-    {}
-
-    virtual bool writeData(Ostream& os) const override
-    {
-        const int oldPrecision = os.precision(17);
-
-        const bool ok = volTensorField::writeData(os);
-
-        os.precision(oldPrecision);
-
-        return ok;
-    }
-};
-
 
 // The flat-list twin of finiteStrainPrestressedFields: the solver's
 // kinematics at cell-centred integration points composed with Fpre
@@ -1329,13 +1298,7 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         restartKinematicsAvailable_
     ),
     prestress_(dict.lookupOrDefault<Switch>("prestress", false)),
-    FprePtr_(),
-    FpreInvPtr_(),
-    JprePtr_(),
-    FpreSurfacePtr_(),
-    FpreInvSurfacePtr_(),
-    JpreSurfacePtr_(),
-    FpreSurfaceTimeIndex_(-1),
+    prestressPtr_(),
     volPrestressedPtr_(),
     surfacePrestressedPtr_()
 {
@@ -1575,10 +1538,13 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
         {
             string lowerKey(keys[keyI]);
 
+            // Lower-cased by hand, as only OpenFOAM.com has a helper for it
             for (std::size_t charI = 0; charI < lowerKey.size(); charI++)
             {
-                lowerKey[charI] =
-                    std::tolower(static_cast<unsigned char>(lowerKey[charI]));
+                if (lowerKey[charI] >= 'A' && lowerKey[charI] <= 'Z')
+                {
+                    lowerKey[charI] += 'a' - 'A';
+                }
             }
 
             if (lowerKey == "prestress" && keys[keyI] != "prestress")
@@ -1615,64 +1581,9 @@ Foam::mechanicalConstitutiveLawManager::mechanicalConstitutiveLawManager
 
     if (prestress_)
     {
-        // Refused before Fpre is read, so that a case that cannot be
-        // prestressed says so whatever is in the start time
-        OStringStream refused;
+        mechanicalConstitutiveLawPrestress::checkLaws(laws_, lawNames);
 
-        forAll(laws_, lawI)
-        {
-            if (!laws_[lawI].admitsPrestress())
-            {
-                refused
-                    << "    material " << lawNames[lawI] << " uses "
-                    << laws_[lawI].type() << nl;
-            }
-        }
-
-        if (!refused.str().empty())
-        {
-            FatalErrorInFunction
-                << "prestress is on, but these laws cannot be prestressed:"
-                << nl << refused.str().c_str()
-                << "Prestress applies to finite-strain laws whose stress is a "
-                << "function of the total deformation gradient. A law that "
-                << "integrates an increment from a history variable, such as "
-                << "a plastic one, cancels Fpre out of the increment, and a "
-                << "small-strain law has no deformation gradient to compose "
-                << "it with" << exit(FatalError);
-        }
-
-        // A law with directions, such as fibres, takes them in the
-        // stress-free configuration, and they are not mapped back from the
-        // imaged geometry they were usually built on
-        forAll(laws_, lawI)
-        {
-            const wordList directions(laws_[lawI].stressFreeDirections());
-
-            if (directions.size())
-            {
-                // Written as "Ec Ea" rather than as the list "2(Ec Ea)"
-                string names;
-
-                forAll(directions, dirI)
-                {
-                    names += (dirI ? " " : "") + directions[dirI];
-                }
-
-                WarningInFunction
-                    << "Material " << lawNames[lawI] << " uses "
-                    << laws_[lawI].type() << ", which takes "
-                    << names.c_str() << " as directions in the stress-free "
-                    << "configuration." << nl
-                    << "    With prestress they are not mapped back from the "
-                    << "imaged geometry, so in the imaged geometry the law's "
-                    << "directions lie along Fpre & d rather than along d. "
-                    << "updatePrestress reports the angle between the two on "
-                    << "each pass" << nl << endl;
-            }
-        }
-
-        readPrestress();
+        prestressPtr_.reset(new mechanicalConstitutiveLawPrestress(mesh_));
     }
 }
 
@@ -1801,259 +1712,14 @@ Foam::mechanicalConstitutiveLawManager::kappa() const
 
 const Foam::volTensorField& Foam::mechanicalConstitutiveLawManager::Fpre() const
 {
-    if (!FprePtr_.valid())
+    if (!prestressPtr_.valid())
     {
         FatalErrorInFunction
             << "There is no Fpre: prestress is off in "
             << "mechanicalProperties" << exit(FatalError);
     }
 
-    return autoPtrRef(FprePtr_);
-}
-
-
-void Foam::mechanicalConstitutiveLawManager::readPrestress()
-{
-    Info<< "Prestress: the mechanical constitutive laws see the deformation "
-        << "gradient composed with the prestress deformation gradient Fpre, "
-        << "read from time "
-        << mesh_.time().timeName() << endl;
-
-    // Written at every write time, at full precision, so that a continued run
-    // reads back the Fpre it was started with
-    FprePtr_.reset
-    (
-        new fullPrecisionVolTensorField
-        (
-            IOobject
-            (
-                "Fpre",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::MUST_READ,
-                IOobject::AUTO_WRITE
-            ),
-            mesh_
-        )
-    );
-
-    volTensorField& Fpre = autoPtrRef(FprePtr_);
-
-    if (Fpre.dimensions() != dimless)
-    {
-        FatalErrorInFunction
-            << "Fpre is a deformation gradient and must be dimensionless, "
-            << "but it has dimensions " << Fpre.dimensions()
-            << exit(FatalError);
-    }
-
-    // The patch values of Fpre are composed with the solver's, as
-    // updatePrestress writes them, and a patch type that evaluates its own
-    // value, such as zeroGradient or fixedValue, would replace or freeze them.
-    // So Fpre is calculated on every patch but the constraint ones (coupled,
-    // empty, symmetry, wedge), whose values follow from the cells
-    {
-        OStringStream refused;
-
-        forAll(Fpre.boundaryField(), patchI)
-        {
-            const fvPatchTensorField& pFpre = Fpre.boundaryField()[patchI];
-
-            if
-            (
-                !polyPatch::constraintType(pFpre.patch().type())
-             && pFpre.type() != calculatedFvPatchField<tensor>::typeName
-            )
-            {
-                refused
-                    << "    patch " << pFpre.patch().name() << " is "
-                    << pFpre.type() << nl;
-            }
-        }
-
-        if (!refused.str().empty())
-        {
-            FatalErrorInFunction
-                << "Fpre must be calculated on every patch but the "
-                << "constraint ones, and here:" << nl
-                << refused.str().c_str()
-                << "A patch type that sets its own value would replace the "
-                << "patch values of Fpre that updatePrestress composes"
-                << exit(FatalError);
-        }
-    }
-
-    // Fills the processor patches, which the file does not decide
-    Fpre.correctBoundaryConditions();
-
-    JprePtr_.reset
-    (
-        new volScalarField
-        (
-            IOobject
-            (
-                "Jpre",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            det(Fpre)
-        )
-    );
-
-    // Checked before the inverse is taken: an Fpre that turns an element
-    // inside out has no inverse, and one that is singular has no stress-free
-    // configuration to refer to
-    scalar minJpre = gMin(Foam::primitiveField(autoPtrRef(JprePtr_)));
-
-    forAll(JprePtr_->boundaryField(), patchI)
-    {
-        const scalarField& Jp = JprePtr_->boundaryField()[patchI];
-
-        if (Jp.size())
-        {
-            minJpre = min(minJpre, min(Jp));
-        }
-    }
-
-    reduce(minJpre, minOp<scalar>());
-
-    if (minJpre <= SMALL)
-    {
-        FatalErrorInFunction
-            << "det(Fpre) must be positive everywhere, but its minimum is "
-            << minJpre << exit(FatalError);
-    }
-
-    FpreInvPtr_.reset
-    (
-        new volTensorField
-        (
-            IOobject
-            (
-                "FpreInv",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            inv(Fpre)
-        )
-    );
-
-    Info<< "    det(Fpre) ranges from " << minJpre << " to "
-        << gMax(Foam::primitiveField(autoPtrRef(JprePtr_))) << nl << endl;
-}
-
-
-void Foam::mechanicalConstitutiveLawManager::makeSurfacePrestress() const
-{
-    // Made once on a static mesh. On a moving one the interpolation weights
-    // change, so it is made again, and the faces checked again, once in each
-    // time step
-    if
-    (
-        FpreSurfacePtr_.valid()
-     && (
-            !mesh_.moving()
-         || FpreSurfaceTimeIndex_ == mesh_.time().timeIndex()
-        )
-    )
-    {
-        return;
-    }
-
-    FpreSurfaceTimeIndex_ = mesh_.time().timeIndex();
-
-    // The inverse and determinant are taken of the interpolated Fpre,
-    // not interpolated themselves, so that the three agree with one another
-    // on every face
-    FpreSurfacePtr_.reset
-    (
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "Fpref",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            fvc::interpolate(autoPtrRef(FprePtr_))
-        )
-    );
-
-    JpreSurfacePtr_.reset
-    (
-        new surfaceScalarField
-        (
-            IOobject
-            (
-                "Jpref",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            det(autoPtrRef(FpreSurfacePtr_))
-        )
-    );
-
-    // A positive det(Fpre) in every cell does not make it positive on every
-    // face: I and diag(-3, -1/3, 1) both have det 1, and their mean has
-    // det -1/3. So the faces are checked, processor patches included,
-    // before the face Fpre is inverted
-    {
-        const surfaceScalarField& Jpref = autoPtrRef(JpreSurfacePtr_);
-
-        scalar minJpref = gMin(Foam::primitiveField(Jpref));
-
-        forAll(Jpref.boundaryField(), patchI)
-        {
-            const scalarField& Jp = Jpref.boundaryField()[patchI];
-
-            if (Jp.size())
-            {
-                minJpref = min(minJpref, min(Jp));
-            }
-        }
-
-        reduce(minJpref, minOp<scalar>());
-
-        if (minJpref <= SMALL)
-        {
-            FatalErrorInFunction
-                << "det(Fpre) must be positive on every face, but the minimum "
-                << "of det(Fpre) interpolated to the faces is " << minJpref
-                << "." << nl
-                << "Fpre is positive in every cell but changes too sharply "
-                << "between neighbouring cells to be interpolated"
-                << exit(FatalError);
-        }
-    }
-
-    FpreInvSurfacePtr_.reset
-    (
-        new surfaceTensorField
-        (
-            IOobject
-            (
-                "FpreInvf",
-                mesh_.time().timeName(),
-                mesh_,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            inv(autoPtrRef(FpreSurfacePtr_))
-        )
-    );
+    return prestressPtr_->Fpre();
 }
 
 
@@ -2068,9 +1734,9 @@ Foam::mechanicalConstitutiveLawManager::prestressedFields
         volPrestressedPtr_->update
         (
             step,
-            autoPtrRef(FprePtr_),
-            autoPtrRef(FpreInvPtr_),
-            autoPtrRef(JprePtr_)
+            prestressPtr_->Fpre(),
+            prestressPtr_->FpreInv(),
+            prestressPtr_->Jpre()
         );
     }
     else
@@ -2080,9 +1746,9 @@ Foam::mechanicalConstitutiveLawManager::prestressedFields
             new finiteStrainPrestressedFields<fvPatchField, volMesh>
             (
                 step,
-                autoPtrRef(FprePtr_),
-                autoPtrRef(FpreInvPtr_),
-                autoPtrRef(JprePtr_)
+                prestressPtr_->Fpre(),
+                prestressPtr_->FpreInv(),
+                prestressPtr_->Jpre()
             )
         );
     }
@@ -2099,16 +1765,16 @@ Foam::mechanicalConstitutiveLawManager::prestressedFields
 {
     // Fpre is held at cell centres and reaches the faces interpolated, so no
     // face values of it need be written
-    makeSurfacePrestress();
+    const mechanicalConstitutiveLawPrestress& prestress = prestressPtr_();
 
     if (surfacePrestressedPtr_.valid())
     {
         surfacePrestressedPtr_->update
         (
             step,
-            autoPtrRef(FpreSurfacePtr_),
-            autoPtrRef(FpreInvSurfacePtr_),
-            autoPtrRef(JpreSurfacePtr_)
+            prestress.FpreSurface(),
+            prestress.FpreInvSurface(),
+            prestress.JpreSurface()
         );
     }
     else
@@ -2118,9 +1784,9 @@ Foam::mechanicalConstitutiveLawManager::prestressedFields
             new finiteStrainPrestressedFields<fvsPatchField, surfaceMesh>
             (
                 step,
-                autoPtrRef(FpreSurfacePtr_),
-                autoPtrRef(FpreInvSurfacePtr_),
-                autoPtrRef(JpreSurfacePtr_)
+                prestress.FpreSurface(),
+                prestress.FpreInvSurface(),
+                prestress.JpreSurface()
             )
         );
     }
@@ -2719,9 +2385,9 @@ void Foam::mechanicalConstitutiveLawManager::updateStressFiniteStrain
             new prestressedLists
             (
                 F, F0, Finv, Finv0, J, J0,
-                autoPtrRef(FprePtr_),
-                autoPtrRef(FpreInvPtr_),
-                autoPtrRef(JprePtr_)
+                prestressPtr_->Fpre(),
+                prestressPtr_->FpreInv(),
+                prestressPtr_->Jpre()
             )
         );
     }
@@ -2830,9 +2496,9 @@ void Foam::mechanicalConstitutiveLawManager::updateTangentFiniteStrain
             new prestressedLists
             (
                 F, F0, Finv, Finv0, J, J0,
-                autoPtrRef(FprePtr_),
-                autoPtrRef(FpreInvPtr_),
-                autoPtrRef(JprePtr_)
+                prestressPtr_->Fpre(),
+                prestressPtr_->FpreInv(),
+                prestressPtr_->Jpre()
             )
         );
     }

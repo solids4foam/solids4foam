@@ -16,13 +16,25 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-    Foam::finiteStrainPrestressedFields
+    Foam::mechanicalConstitutiveLawPrestress
 
 Description
-    The finite-strain kinematics a constitutive law sees when the solid is
-    prestressed: the solver's deformation gradient composed with a fixed
-    prestress deformation gradient Fpre, which maps a stress-free
-    configuration onto the mesh the solver is solving on.
+    The prestress of a mechanicalConstitutiveLawManager, made when
+    "prestress yes;" is given in mechanicalProperties: the prestress
+    deformation gradient Fpre, read from the start time, which maps a
+    stress-free configuration onto the mesh the solver is solving on, with
+    its inverse and determinant, and the same interpolated to the faces.
+
+    Fpre is checked when read: it must be dimensionless, calculated on every
+    patch but the constraint ones, and have a positive determinant in every
+    cell, and on every face once interpolated there. It is written at every
+    write time at full precision, so that a continued run reads back the Fpre
+    it was started with. checkLaws refuses the laws that cannot be
+    prestressed, and is called by the manager before Fpre is read.
+
+    Also declared here is finiteStrainPrestressedFields, the finite-strain
+    kinematics a constitutive law sees when the solid is prestressed: the
+    solver's deformation gradient composed with Fpre,
 
         F    = Fstep & Fpre
         Finv = inv(Fpre) & FinvStep
@@ -47,7 +59,7 @@ Description
     later evaluation, rather than copying the solver's fields each time.
 
 SourceFiles
-    (header only)
+    mechanicalConstitutiveLawPrestress.C
 
 Author
     Conor Moore, UCD.
@@ -57,6 +69,11 @@ Author
 #ifndef mechanicalConstitutiveLawPrestress_H
 #define mechanicalConstitutiveLawPrestress_H
 
+#include "fvMesh.H"
+#include "volFields.H"
+#include "surfaceFields.H"
+#include "autoPtr.H"
+#include "mechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawKinematicsFields.H"
 #include "compatibilityFunctions.H"
 
@@ -85,11 +102,22 @@ private:
 
         // Declared before fields below, which refers to them
 
+        //- Deformation gradient, Fstep & Fpre
         tensorFieldType F_;
+
+        //- Old-time deformation gradient, F0step & Fpre
         tensorFieldType F0_;
+
+        //- Inverse deformation gradient, inv(Fpre) & FinvStep
         tensorFieldType Finv_;
+
+        //- Old-time inverse deformation gradient, inv(Fpre) & Finv0Step
         tensorFieldType Finv0_;
+
+        //- Jacobian, Jstep*det(Fpre)
         scalarFieldType J_;
+
+        //- Old-time Jacobian, J0step*det(Fpre)
         scalarFieldType J0_;
 
 
@@ -219,6 +247,147 @@ public:
             compose(J_, step.J, Jpre);
             compose(J0_, step.J0, Jpre);
         }
+};
+
+
+/*---------------------------------------------------------------------------*\
+              Class mechanicalConstitutiveLawPrestress Declaration
+\*---------------------------------------------------------------------------*/
+
+class mechanicalConstitutiveLawPrestress
+{
+    // Private Classes
+
+        //- Fpre, written at full round-trip precision whatever
+        //  writePrecision the case asks for, as the constitutive state is: a
+        //  continued run reads Fpre back from the time it continues from, and
+        //  a rounding of it would move the stress the laws see. writeData is
+        //  overridden rather than writeObject, whose signature differs
+        //  between the three forks
+        class fullPrecisionVolTensorField
+        :
+            public volTensorField
+        {
+        public:
+
+            fullPrecisionVolTensorField(const IOobject& io, const fvMesh& mesh)
+            :
+                volTensorField(io, mesh)
+            {}
+
+            virtual bool writeData(Ostream& os) const override
+            {
+                const int oldPrecision = os.precision(17);
+
+                const bool ok = volTensorField::writeData(os);
+
+                os.precision(oldPrecision);
+
+                return ok;
+            }
+        };
+
+
+    // Private Data
+
+        //- Reference to the mesh
+        const fvMesh& mesh_;
+
+        //- Prestress deformation gradient, read from the start time, from
+        //  the stress-free configuration to the mesh
+        fullPrecisionVolTensorField Fpre_;
+
+        //- inv(Fpre), taken once since Fpre does not change during a run
+        volTensorField FpreInv_;
+
+        //- det(Fpre), taken once since Fpre does not change during a run
+        volScalarField Jpre_;
+
+        //- Face Fpre, interpolated from the cells, made on demand
+        mutable autoPtr<surfaceTensorField> FpreSurfacePtr_;
+
+        //- Face inv(Fpre), the inverse of the face Fpre
+        mutable autoPtr<surfaceTensorField> FpreInvSurfacePtr_;
+
+        //- Face det(Fpre), the determinant of the face Fpre
+        mutable autoPtr<surfaceScalarField> JpreSurfacePtr_;
+
+        //- Time index at which the face fields were last made, so that on a
+        //  moving mesh they are made again at most once per time step
+        mutable label surfaceTimeIndex_;
+
+
+    // Private Member Functions
+
+        //- Check that Fpre is dimensionless and calculated on every patch
+        //  but the constraint ones
+        void check() const;
+
+        //- Make the face fields, rebuilt when the mesh has moved, and check
+        //  det(Fpre) on every face
+        void makeSurfaceFields() const;
+
+        //- The minimum of fld over its internal and boundary values on every
+        //  processor
+        template<class GeoField>
+        static scalar gMinAll(const GeoField& fld);
+
+        //- No copy construct
+        mechanicalConstitutiveLawPrestress
+        (
+            const mechanicalConstitutiveLawPrestress&
+        ) = delete;
+
+        //- No copy assignment
+        void operator=(const mechanicalConstitutiveLawPrestress&) = delete;
+
+
+public:
+
+    // Constructors
+
+        //- Construct from the mesh, reading Fpre from the start time
+        explicit mechanicalConstitutiveLawPrestress(const fvMesh& mesh);
+
+
+    // Member Functions
+
+        //- Refuse the laws that cannot be prestressed, and warn about the
+        //  directions of those that take them in the stress-free
+        //  configuration. Called before Fpre is read, so that a case that
+        //  cannot be prestressed says so whatever is in the start time
+        static void checkLaws
+        (
+            const PtrList<mechanicalConstitutiveLaw>& laws,
+            const wordList& lawNames
+        );
+
+        //- Prestress deformation gradient
+        const volTensorField& Fpre() const
+        {
+            return Fpre_;
+        }
+
+        //- inv(Fpre)
+        const volTensorField& FpreInv() const
+        {
+            return FpreInv_;
+        }
+
+        //- det(Fpre)
+        const volScalarField& Jpre() const
+        {
+            return Jpre_;
+        }
+
+        //- Face Fpre
+        const surfaceTensorField& FpreSurface() const;
+
+        //- Face inv(Fpre)
+        const surfaceTensorField& FpreInvSurface() const;
+
+        //- Face det(Fpre)
+        const surfaceScalarField& JpreSurface() const;
 };
 
 

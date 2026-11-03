@@ -19,8 +19,8 @@ Application
     updatePrestress
 
 Description
-    One pass of the modified updated Lagrangian formulation (Gee, Förster
-    and Wall, 2010) for prestressing a solid model.
+    Applies one pass of a modified version of the modified updated Lagrangian
+    formulation for prestressing vascular geometries.
 
     After a prestressed run of a solid model (prestress yes; in
     mechanicalProperties), the deformation gradient F written at the latest
@@ -112,6 +112,13 @@ Description
     written or removed: the laws are constructed from mechanicalProperties
     and asked, as the mechanicalConstitutiveLawManager asks them, so the
     utility and the solver refuse the same laws.
+
+    Reference:
+    Gee, M. W., Förster, C., & Wall, W. A. (2010). A computational strategy for
+    prestressing patient‐specific biomechanical problems under finite
+    deformation. International journal for numerical methods in biomedical
+    engineering, 26(1), 52-72.
+
 
 Usage
     updatePrestress [-parallel] [-keepPasses]
