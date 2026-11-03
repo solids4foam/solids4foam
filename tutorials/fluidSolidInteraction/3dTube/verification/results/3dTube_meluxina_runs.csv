@@ -1,0 +1,7 @@
+# Cross-platform runs on MeluXina (AMD EPYC 7H12, OpenFOAM v2412 foss-2024a EasyBuild, PETSc 3.22.0 + Hypre 2.31.0, GCC 13.3.0, solids4foam built -O2),
+# solids4foam verification/3dtube-level3 at 0ff7f462b (both fixes); values are the Allverify table rows of each run (mm, ms, m/s). Probes shifted 7.8125e-5 m except m2_fx3.
+run,level,fluid_cells,solid_cells,delta_t_s,ranks,probe_z_shift_m,options,ur_max_mm,t_ur_max_ms,uz_min_mm,ur_min_late_mm,t_arr_ms,c_wall_m_s,c_p_m_s,mean_fsi_iter,clock_s
+m2_l1,1,16000,6400,2.5e-05,8,7.8125e-05,,0.15978,7.201,-0.08819,-0.1001,5.873,5.066,4.654,4.78,454
+m2_l2,2,128000,51200,1.25e-05,32,7.8125e-05,,0.15946,7.215,-0.08659,-0.09409,5.843,5.138,4.634,3.87,2565
+m2_l3,3,1024000,409600,6.25e-06,128,7.8125e-05,,0.15851,7.252,-0.08571,-0.09603,5.825,5.066,4.594,3.18,15317
+m2_fx3,3,1024000,409600,2.5e-05,128,0,fixed dt,0.15835,7.259,-0.08554,-0.09618,5.815,5.122,4.660,3.11,4979

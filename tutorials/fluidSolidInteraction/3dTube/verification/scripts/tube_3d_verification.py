@@ -170,11 +170,51 @@ def configure_solid_preconditioner(case: Path, preconditioner: str) -> None:
     path.write_text(text)
 
 
+def configure_tight_tolerances(case: Path, coupling: str) -> None:
+    """Tighten every iterative tolerance, to bound the iterative error.
+
+    A diagnostic, not the benchmark setup: the fluid linear solvers go from
+    relTol 1e-3 to 1e-6 (and the pressure tolerance from 1e-6 to 1e-9), the
+    PIMPLE residual control from 1e-5 to 1e-7, the solid Newton tolerance
+    from 1e-6 to 1e-9 with a linear tolerance of 1e-8, and the FSI
+    outerCorrTolerance from 1e-6 to 1e-8.
+    """
+    fluid = case / "system/fluid/fvSolution"
+    text = fluid.read_text()
+    text, count = re.subn(r"(relTol\s+)(1e-03|0\.001)\s*;", r"\g<1>1e-06;", text)
+    if count != 3:
+        fail(f"Expected three relTol 1e-3 entries in {fluid}, found {count}")
+    text, count = re.subn(r"(tolerance\s+)1e-06\s*;", r"\g<1>1e-09;", text)
+    if count != 1:
+        fail(f"Expected one pressure tolerance 1e-6 in {fluid}")
+    text, count = re.subn(r"((?:relTol|tolerance)\s+)1e-5\s*;", r"\g<1>1e-7;", text)
+    if count != 2:
+        fail(f"Expected the PIMPLE residualControl in {fluid}")
+    fluid.write_text(text)
+    solid = case / "system/solid/fvSolution"
+    text, count = re.subn(
+        r'snes_rtol\s+"1e-6"\s*;',
+        'snes_rtol "1e-9";\n            ksp_rtol "1e-8";', solid.read_text()
+    )
+    if count != 1:
+        fail(f"Expected one snes_rtol in {solid}")
+    solid.write_text(text)
+    properties = case / COUPLINGS[coupling]["fsiProperties"]
+    text, count = re.subn(
+        r"(outerCorrTolerance\s+)1e-6\s*;", r"\g<1>1e-8;",
+        properties.read_text()
+    )
+    if count < 1:
+        fail(f"Expected outerCorrTolerance 1e-6 in {properties}")
+    properties.write_text(text)
+
+
 def station_name(z: float) -> str:
     return f"verificationWallZ{round(z * 1.0e4):03d}"
 
 
-def add_monitors(case: Path, reference: dict) -> None:
+def add_monitors(case: Path, reference: dict, probe_z_shift: float = 0.0
+                 ) -> None:
     """Add wall-displacement and axis-pressure monitors along the tube."""
     geometry = reference["geometry"]
     radius = float(geometry["inner_radius_m"])
@@ -189,7 +229,7 @@ def add_monitors(case: Path, reference: dict) -> None:
         )
     offset = float(reference["pressure_probe_offset_m"])
     locations = " ".join(
-        f"({offset:.10g} {offset:.10g} {z:.10g})"
+        f"({offset:.10g} {offset:.10g} {z + probe_z_shift:.10g})"
         for z in reference["stations_z_m"]
     )
     entries.append(
@@ -288,7 +328,9 @@ def prepare_case(name: str, coupling: str, factor: int, delta_t: float,
     configure_time_scheme(case, args.time_scheme)
     configure_solid_preconditioner(case, args.solid_preconditioner)
     configure_coupling(case, coupling)
-    add_monitors(case, reference)
+    if args.tight_tolerances:
+        configure_tight_tolerances(case, coupling)
+    add_monitors(case, reference, args.probe_z_shift)
     configure_parallel(case, cores)
     return case
 
@@ -427,12 +469,22 @@ def require_complete(path: Path, rows: list[list[float]], end_time: float,
         reached = times[-1] if times else 0.0
         fail(f"{path} ends at t={reached:g}, not at the end time "
              f"t={end_time:g}")
-    if len(times) != expected or any(
-        not math.isclose(later - earlier, delta_t, rel_tol=1e-3)
-        for earlier, later in zip(times, times[1:])
+    # The function objects write the time with the case's timePrecision
+    # (6 significant digits), which does not resolve dt = 6.25e-6 s beyond
+    # t = 10 ms; each time must therefore round to the next multiple of dt,
+    # and is then replaced by that exact multiple, so that the histories
+    # are equally spaced for the peak and arrival interpolation.
+    steps = [round(time / delta_t) for time in times]
+    if len(times) != expected or steps != list(
+        range(steps[0], steps[0] + expected)
+    ) or any(
+        abs(time - step * delta_t) > 1e-5 * abs(time) + 1e-3 * delta_t
+        for time, step in zip(times, steps)
     ):
         fail(f"{path} has {len(times)} time levels, expected {expected} "
              f"at dt = {delta_t:g}")
+    for row, step in zip(rows, steps):
+        row[0] = step * delta_t
     if any(not math.isfinite(value) for row in rows for value in row):
         fail(f"{path} contains non-finite values")
 
@@ -713,13 +765,14 @@ def coupling_summary(case: Path, coupling: str, end_time: float
     # The residual evaluated for each step must be that of its last
     # FSI iteration, as recorded independently in fsiConvergenceData.dat.
     _, residuals = residual_rows(case, end_time)
+    delta_t = dictionary_scalar(case / "system/controlDict", "deltaT")
     iterations = {
-        row[0]: row[1] for row in last_per_time(numeric_rows(next(
-            case.glob("postProcessing/**/fsiConvergenceData.dat")
-        )))
+        round(row[0] / delta_t): row[1] for row in last_per_time(numeric_rows(
+            next(case.glob("postProcessing/**/fsiConvergenceData.dat"))
+        ))
     }
     mismatched = [row[0] for row in residuals
-                  if iterations.get(row[0]) != row[1]]
+                  if iterations.get(round(row[0] / delta_t)) != row[1]]
     if mismatched:
         fail(f"{len(mismatched)} step(s) in {case} have a final residual row "
              "that is not their last FSI iteration, starting at "
@@ -880,6 +933,10 @@ def run_settings(coupling: str, factor: int, delta_t: float, end_time: float,
         "openfoam": os.environ.get("WM_PROJECT", "") + "-"
         + os.environ.get("WM_PROJECT_VERSION", ""),
         "tutorial_inputs": tutorial_fingerprint(),
+        # Recorded only when used, so runs without a shift stay reusable
+        **({"pressure_probe_z_shift_m": args.probe_z_shift}
+           if args.probe_z_shift else {}),
+        **({"tight_tolerances": True} if args.tight_tolerances else {}),
     }
 
 
@@ -927,7 +984,11 @@ def sweep_levels(args: argparse.Namespace, reference: dict, study: str
     for level in levels:
         if study == "mesh":
             factor = 2 ** (level - 1)
-            members.append((level, factor, float(spec["base_delta_t_s"]) / factor))
+            # --delta-t holds the time step fixed, so that the mesh alone is
+            # refined; by default it is halved with the mesh spacing.
+            delta_t = (args.delta_t if args.delta_t
+                       else float(spec["base_delta_t_s"]) / factor)
+            members.append((level, factor, delta_t))
         else:
             if level > len(spec["delta_t_s"]):
                 fail(f"{study} level {level} is not defined")
@@ -1002,6 +1063,12 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
     end_time = float(reference["quick"]["end_time_s"] if args.quick
                      else reference["end_time_s"])
     suffix = "_quick" if args.quick else ""
+    if args.delta_t:
+        suffix = f"_dt{args.delta_t:g}" + suffix
+    if args.probe_z_shift:
+        suffix = f"_pz{args.probe_z_shift:g}" + suffix
+    if args.tight_tolerances:
+        suffix = "_tight" + suffix
     rows, history_files = [], []
     for level, factor, delta_t in sweep_levels(args, reference, study):
         cores = study_cores(args.cores, study, level, reference)
@@ -1102,6 +1169,8 @@ def run_sweep(args: argparse.Namespace, reference: dict) -> bool:
         "timestep": "Time-step study (tutorial mesh",
         "literature": "Published-discretisation study (tutorial mesh",
     }[study]
+    if args.delta_t:
+        title = f"Mesh study (fixed Δt = {args.delta_t:g} s"
     lines = [
         f"## {title}; {args.coupling}, {args.time_scheme}"
         f"{', quick smoke test' if args.quick else ''})",
@@ -1315,6 +1384,23 @@ def main() -> int:
         help="comma-separated levels; mesh level 1 is the tutorial mesh",
     )
     parser.add_argument(
+        "--delta-t", type=float,
+        help="mesh study only: use this time step on every level instead of "
+             "halving it with the mesh (separates the spatial error)",
+    )
+    parser.add_argument(
+        "--tight-tolerances", action="store_true",
+        help="diagnostic: tighten the fluid, solid and FSI tolerances to "
+             "bound the iterative error",
+    )
+    parser.add_argument(
+        "--probe-z-shift", type=float, default=0.0,
+        help="shift the axis pressure probes axially by this distance (m); "
+             "the stations lie on cell faces of every mesh level, where the "
+             "containing cell is ambiguous, so a shift of half a level-3 "
+             "cell (7.8125e-5) samples each probe inside one cell",
+    )
+    parser.add_argument(
         "--time-scheme", choices=("backward", "Euler"), default="backward",
         help="time scheme of the fluid and solid (default: backward; the "
              "tutorial uses Euler)",
@@ -1345,6 +1431,11 @@ def main() -> int:
             b <= a for a, b in zip(args.levels, args.levels[1:])
         ):
             parser.error("--levels must be strictly increasing positive integers")
+    if args.delta_t is not None and (
+        args.study != "mesh" or not args.delta_t > 0.0
+    ):
+        parser.error("--delta-t takes a positive time step and applies only "
+                     "to the mesh study")
     if args.couplings:
         args.couplings = [value.strip() for value in args.couplings.split(",")]
         invalid = [name for name in args.couplings if name not in COUPLINGS]
