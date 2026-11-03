@@ -505,6 +505,16 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
 }
 
 
+autoPtr<CompactListList<vector>>
+fixedRotationFvPatchVectorField::quadratureValues
+(
+    const fvMeshQuadrature&
+) const
+{
+    return evaluateQuadrature();
+}
+
+
 void fixedRotationFvPatchVectorField::write(Ostream& os) const
 {
     fixedValueFvPatchVectorField::write(os);
