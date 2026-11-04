@@ -25,6 +25,8 @@
                 value of sigma is NOT the enforced traction (the traction
                 enters the residual as a face force); recorded for reference
 
+  Serial runs only: it stops with a fatal error if Pstream::parRun().
+
   All values are written for t >= timeStart every executeInterval steps to
   postProcessing/interfaceTraction/{fluid,solid}.dat with 12 significant
   digits. The Womersley analysis script converts them to wave-projected
@@ -76,6 +78,18 @@ interfaceTractionDiagnostic
 
     codeExecute
     #{
+        // Every rank would open and write the same files with processor-local
+        // face indices: serial only
+        if (Pstream::parRun())
+        {
+            FatalErrorInFunction
+                << "interfaceTractionDiagnostic is serial only: it writes "
+                << "the interface faces of the whole patch to "
+                << "postProcessing/interfaceTraction. Run the study copy "
+                << "without decomposing it."
+                << exit(FatalError);
+        }
+
         const fvMesh& fm = mesh();
         const Time& runTime = fm.time();
         const fvMesh& sm = runTime.lookupObject<fvMesh>("solid");

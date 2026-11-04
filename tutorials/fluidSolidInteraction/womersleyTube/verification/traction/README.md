@@ -19,7 +19,9 @@ solution. It also decomposes the tutorial's attenuation error.
 - python3 with numpy. matplotlib is optional: without it, the plots are
   skipped.
 - The `coded` function object is compiled at run time (the usual OpenFOAM
-  `dynamicCode` requirements).
+  `dynamicCode` requirements). It is serial only: it stops with a fatal error
+  in a decomposed run, because every rank would write the same files with
+  processor-local face indices.
 
 ## Usage
 
@@ -38,7 +40,8 @@ is prepared again if it holds no runs; if it holds runs, the script stops
 (exit status 3) and keeps them unless `--force` is given.
 
 Runs are made in `work/`, and results are written to `postProcessing/`. Both
-are git-ignored.
+are git-ignored by the repository's root `.gitignore` and removed by
+`../Allclean` (and so `./Allclean all`).
 
 Completed runs in `work/` are reused, not repeated, when their stored settings
 (case, mesh, reference parameters, content hashes of the study copy's tutorial
