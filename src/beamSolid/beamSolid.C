@@ -125,6 +125,14 @@ void beamSolid::writeFields(const Time& runTime)
 }
 
 
+void beamSolid::end()
+{
+    // The solidModel settings and momentum convergence summary do not apply
+    // to the beam, which reports its own convergence
+    physicsModel::end();
+}
+
+
 tmp<vectorField> beamSolid::tractionBoundarySnGrad
 (
     const vectorField& traction,

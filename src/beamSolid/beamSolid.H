@@ -91,6 +91,10 @@ public:
         //- Write beam fields without continuum stress post-processing
         virtual void writeFields(const Time& runTime);
 
+        //- End of the run, without the solidModel settings and momentum
+        //  convergence summary, which do not apply to the beam
+        virtual void end();
+
         //- Continuum traction boundary conditions are not beam loads
         virtual tmp<vectorField> tractionBoundarySnGrad
         (
