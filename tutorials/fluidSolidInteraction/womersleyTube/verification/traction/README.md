@@ -41,12 +41,12 @@ the old copy by renaming only: the old copy is renamed aside and deleted after
 success, so an interrupted preparation leaves a complete copy (an absent one,
 for an instant between the two renames, is restored from the renamed one at the
 next call). An existing copy is kept if the record is complete and matches. If
-only the analysis files changed it is rebuilt and its runs are moved into the new
-copy (they are reused only if their solver-run key, below, still matches). A copy
-that differs in what the solver reads, or lacks a complete record, is prepared
-again if it holds no runs; if it holds runs the script stops (exit status 3) and
-keeps them unless `--force` is given. `--force` only re-prepares such a copy
-(discarding its runs); it does not rerun valid runs elsewhere.
+only the analysis files changed it is rebuilt and its runs are moved into the
+new copy (they are reused only if their solver-run key, below, still matches).
+A copy that differs in what the solver reads, or lacks a complete record, is
+prepared again if it holds no runs; if it holds runs the script stops (exit
+status 3) and keeps them unless `--force` is given. `--force` only re-prepares
+such a copy (discarding its runs); it does not rerun valid runs elsewhere.
 
 Runs are made in `work/`, and results are written to `postProcessing/`. Both
 are git-ignored by the repository's root `.gitignore` and removed by
@@ -65,12 +65,13 @@ written with the solver-run keys to `postProcessing/analysis_provenance.json`.
 Runs are made by `run_single.py` without analysing them, so one failed case does
 not prevent the remaining runs.
 
-Before any analysis (also with `--analysis-only`) `scripts/check_runs.py` applies
-the same validation to every required run (stored settings, tutorial files,
-solver build, log, diagnostic output), and stops the script with a list of the
-affected runs and exit status 1 if one is missing or not valid; no partial
-analysis is made. `--skip-build-check` omits only the build comparison, for
-analysing stored runs where the solver environment is not available.
+Before any analysis (also with `--analysis-only`) `scripts/check_runs.py`
+applies the same validation to every required run (stored settings, tutorial
+files, solver build, log, diagnostic output), and stops the script with a list
+of the affected runs and exit status 1 if one is missing or not valid; no
+partial analysis is made. `--skip-build-check` omits only the build
+comparison, for analysing stored runs where the solver environment is not
+available.
 
 The full study has not yet been run end-to-end as the single command
 `./AllverifyTraction --cores 6`. The results below were obtained from the same
@@ -156,6 +157,25 @@ flagged.
 
 ## Results (OpenFOAM v2512, development 1576edcc4, Robin–Neumann, μ = 5 Pa s)
 
+**Status: pending regeneration.** The numbers in this section and in the
+attenuation budget below were produced by the analysis code of the first
+version of this diagnostic (projection on the deformed fluid face centres of
+the last sample, no check of the phase of the Richardson ratio). The run
+outputs they came from are not stored in the repository, so they have not been
+regenerated with the current scripts, and none has been replaced or invented
+here. Expected effect, not yet measured: the directly measured values change by
+about 1e-6 through the projection; the observed orders and every extrapolated
+value can change, because an order is now accepted only if p > 0.3 and |arg
+ratio| <= 30 deg (so the check on the shear order can turn from PASS to FAIL).
+To regenerate (needs the solver, about 2-3 CPU-hours), run the command below
+and take the numbers from `postProcessing/findings_summary.txt`,
+`traction_convergence.md`, `amplitude_series_m1.json` and
+`traction_checks.txt`:
+
+```bash
+./AllverifyTraction --cores 6           # or --analysis-only if the runs are in work/
+```
+
 The table separates directly measured values from those obtained by
 extrapolation.
 
@@ -197,6 +217,9 @@ extrapolation.
   demonstrated.**
 
 ## Attenuation error budget (m4, 200 steps/period: −1.961e-3)
+
+Pending regeneration, as for the results above (the fit and the Richardson
+parts depend on the current guards).
 
 <!-- markdownlint-disable MD013 -->
 | Part | Value | Basis |
