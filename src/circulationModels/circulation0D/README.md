@@ -7,7 +7,7 @@ with OpenFOAM's own ODE solvers (`RKDP45`, `Rosenbrock34`, `seulex`, ...),
 needs no mesh, and is part of the solids4foam `circulationModels` module, see
 [../README.md](../README.md). Any lumped piece of the circuit, such as the
 left ventricle, can be swapped for a 3D CFD domain by changing one entry; see
-[../docs/COUPLING.md](../docs/COUPLING.md).
+[../README.md](../README.md#swapping-0d-for-3d).
 
 ```text
 LV -> AV -> SAS -> SAT -> SAR -> SCP -> SVN -> RA -> TV -> RV -> PV
@@ -70,7 +70,7 @@ probes ( Qin.out );             // optional: also report the pressure at a termi
   `passive {P0 K}`, `activation {...}`, `initialVolume`.
 * `orificeValve`: `Q = CQ sqrt(dP)` forward, closed otherwise. Parameters:
   `CQ` or `Rhat` (`dP = Rhat Q^2`), `R` (resistance in series), `epsilon`
-  (smooth switch), `reverseFraction` (leak).
+  (smooth switch), `reverseFraction` (leak, smoothed too when `epsilon > 0`).
 * `flowSource`: prescribed flow in -> out. Parameters: `waveform {...}`.
 * `pressureSource`, `ground`: node at prescribed / fixed pressure.
   Parameters: `waveform {...}` / `P`.
@@ -203,10 +203,20 @@ reference implementation to 2e-6 relative.
 
 ## Restart
 
-At every output time the 0D solver writes `<time>/circulationState`, and the
-CFD coupler `<time>/circulationState-circulationProperties` (the state, the
-flow history and the ODE step estimate, at full precision). A case that starts
-from a time holding one resumes the circuit with the fields. A CFD run resumed
+At every output time the 0D solver and the CFD coupler write
+`<time>/uniform/circulationState-circulationProperties`: the state of each
+component by name and the ODE step estimate, at full precision, and, from the
+coupler, the flow history. A case that starts from a time holding one resumes
+the circuit with the fields. Either solver reads the other's file, so a 0D
+spin-up can start a coupled run: copy the file to `<start time>/uniform/` of
+the CFD case. The state of a component that the coupled circuit does not have
+(the pipe of `pipeClosedLoop0D`, which the CFD domain of
+`pipeClosedLoop` replaces) is ignored. A state written at another time is
+taken at the start time, so spin up whole cycles of a periodic circuit. The
+coupler's checkpoint is written by the master; `decomposePar` and
+`reconstructPar` carry it with the `uniform` directory. A CFD case that starts
+after an earlier time without a checkpoint stops with an error rather than
+restarting the circuit from its initial conditions. A CFD run resumed
 this way continues to 1e-15 of the continuous run, with identical coupling
 iterations (with time schemes that need only the old time, e.g. Euler;
 `backward` and BDF also need their extra old-time fields, which is a CFD
@@ -219,10 +229,6 @@ slightly differently.
 * **ODE solver step cap**: the message says which interval failed, lists the
   usual causes (an unstable coupling, tolerances too tight for hard valves)
   and prints the state.
-* **A floating point exception in the CFD solution** (the usual sign of an
-  unstable coupling, e.g. explicit order 1 at a large step) is preceded by an
-  explanation naming the scheme, the order, the time step and the last port
-  pressure.
 * **Divergence**: if a port pressure becomes non-finite or exceeds
   `coupling { maxPressure 1e8; }` (Pa) the run stops with advice.
 * **A CFD time scheme of lower order than the coupling** (for example
@@ -259,17 +265,19 @@ and `libs ("libcirculationCoupling.so");` in `controlDict`. See
 * `pipeClosedLoop`: a CFD pipe with **both** ends coupled to a closed
   circulation loop (atrium, ventricle, two valves, 7 states): same
   scheme/order choice.
-* `pipeClosedLoopMonolithic`: the same circuit with the pipe replaced by its
+* `pipeClosedLoop0D`: the same circuit with the pipe replaced by its
   R-L surrogate, no CFD (the reference for the above).
 * `pipeWindkessel`: a CFD pipe (`pimpleFoam`) coupled to a Windkessel;
   `scheme explicit/implicit` and `order 1..4` chosen in the dictionary,
   compared with the exact solution.
+* `pipeWindkesselSolids4Foam`: the same case solved by `solids4Foam` with the
+  `pimpleFluid` fluid model.
 
 ## Verification
 
 During development the models were checked against reference solutions: a
 first-principles Windkessel, an independent implementation of the healthy-human
-loop, and, for the coupled CFD cases, exact solutions or a monolithic
+loop, and, for the coupled CFD cases, exact solutions or a lumped (0D)
 reference (see the READMEs in `tutorials/circulationModels`). The verification
 scripts and the reference data are not included yet.
 
@@ -287,7 +295,6 @@ src/circulationModels/circulationCoupling/
     CFD coupling: circulationPressure BC and the coupler (scheme, order)
 applications/solvers/circulationFoam
 tutorials/circulationModels/                   cases above
-docs/COUPLING.md         swapping 0D for 3D (in ../docs)
 ```
 
 ## Known limits

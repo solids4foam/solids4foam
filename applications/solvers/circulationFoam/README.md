@@ -70,8 +70,13 @@ it needs gnuplot).
 ## Restart
 
 At each write time the state is written, at full precision, to
-`<time>/circulationState`. If this file exists in the start time, the solver
-reads it, so a long spin-up can be continued.
+`<time>/uniform/circulationState-circulationProperties`. If this file exists
+in the start time, the solver reads it, so a long spin-up can be continued.
+The CFD coupler writes and reads the same file, so a spin-up can start a
+coupled run by copying the file to `<start time>/uniform/` of the CFD case
+(components are matched by name, and a state written at another time is taken
+at the start time). See
+[`src/circulationModels/circulation0D`](../../../src/circulationModels/circulation0D).
 
 ---
 
