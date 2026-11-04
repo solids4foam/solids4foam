@@ -388,10 +388,32 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
     List<scalarField> recvWeights(nProcs);
 
 #ifdef FOAMEXTEND
-    labelListList sizes;
-    Pstream::exchange<labelList, label>(sendSizes, recvSizes, sizes);
-    Pstream::exchange<pointField, point>(sendPoints, recvPoints, sizes);
-    Pstream::exchange<scalarField, scalar>(sendWeights, recvWeights, sizes);
+    // Each exchange takes its own size table: foam-extend fills the table
+    // with a listEq combine, so entries left from a previous call would be
+    // taken as the sizes of this one
+    labelListList sizesSizes;
+    Pstream::exchange<labelList, label>
+    (
+        sendSizes,
+        recvSizes,
+        sizesSizes
+    );
+
+    labelListList pointSizes;
+    Pstream::exchange<pointField, point>
+    (
+        sendPoints,
+        recvPoints,
+        pointSizes
+    );
+
+    labelListList weightSizes;
+    Pstream::exchange<scalarField, scalar>
+    (
+        sendWeights,
+        recvWeights,
+        weightSizes
+    );
 #else
     PstreamBuffers pBufs(Pstream::commsTypes::nonBlocking);
 
