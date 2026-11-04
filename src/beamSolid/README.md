@@ -80,7 +80,11 @@ must then follow.
 
 ## Limitations
 
-- Only OpenFOAM.com has been tested (v2412), in serial, with one beam region.
+- Only OpenFOAM.com has been tested (v2312 and v2412), in serial, with one
+  beam region.
+- The `polygon` and `polyline` cross-sections are copied from beamFoam but are
+  not compiled, because beamFoam's own `Make/files` does not list them, so
+  they cannot be selected in `beamProperties`.
 - Fluid-beam coupling is not available yet.
 - The optional beam momentum contributions (for example Morison drag and ground
   contact) are compiled but have not been tested through `beamSolid`.
