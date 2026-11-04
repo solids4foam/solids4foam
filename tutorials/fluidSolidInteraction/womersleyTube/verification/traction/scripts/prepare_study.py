@@ -68,7 +68,8 @@ def scale_tolerances(text: str, keys, factor: float, label: str = "file") -> str
 
 def source_hash(src: Path) -> str:
     """Hash of everything a copy is made from: the files copied from SRC (path
-    and content, symlink targets) and the diagnostic and this script."""
+    and content, symlink targets; not documentation, images or
+    verification/traction) and the diagnostic and this script."""
     h = hashlib.sha256()
     ignore = shutil.ignore_patterns(*IGNORE)
 
@@ -80,6 +81,9 @@ def source_hash(src: Path) -> str:
                 continue
             path = directory / name
             r = rel / name
+            if r.suffix == ".md" or r.parts[:1] == ("images",) \
+                    or r.parts[:2] == ("verification", "traction"):
+                continue    # documentation and this diagnostic's own files
             if path.is_symlink():
                 h.update(f"L {r} {path.readlink()}\n".encode())
             elif path.is_dir():

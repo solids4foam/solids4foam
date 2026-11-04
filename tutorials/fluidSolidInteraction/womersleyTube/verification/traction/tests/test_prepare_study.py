@@ -124,6 +124,16 @@ class PrepareCopies(unittest.TestCase):
         self.assertFalse(run.exists())
         self.assertIn("a 2;", (self.dest / "system/controlDict").read_text())
 
+    def test_documentation_changes_do_not_make_a_copy_stale(self):
+        self.ensure()
+        run = self.dest / "verification/work/c1"
+        run.mkdir(parents=True)
+        (self.src / "README.md").write_text("docs")
+        (self.src / "verification/traction").mkdir()
+        (self.src / "verification/traction/README.md").write_text("docs")
+        self.ensure()                      # still current: no exit, run kept
+        self.assertTrue(run.is_dir())
+
     def test_changed_source_without_runs_is_refreshed(self):
         self.ensure()
         (self.src / "system/controlDict").write_text("a 3;\nfunctions\n{\n}\n")
