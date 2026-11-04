@@ -35,6 +35,7 @@ A beamFoam case runs with `solids4Foam` after three additions:
   {
   }
   ```
+      restart         no;
 
 The solid model base class also needs `constant/g`; use zero for no gravity.
 
@@ -88,7 +89,9 @@ must then follow.
 - Fluid-beam coupling is not available yet.
 - The optional beam momentum contributions (for example Morison drag and ground
   contact) are compiled but have not been tested through `beamSolid`.
-- Continuing a run from a later time is stopped by the `solidModel` restart
-  check unless `restart no;` is set in `beamSolidCoeffs`. The beam writes the
-  state that it needs to continue, and a run continued with `restart no;` gives
-  the same answer as an uninterrupted run, to the written precision.
+- `restart yes;` is not supported: the `solidModel` restart fields are
+  continuum fields, and a continued run would register the solid model's `U`
+  in place of the beam velocity. Set `restart no;` in `beamSolidCoeffs`, as
+  the tutorials do. The beam writes the state that it needs to continue, and a
+  run continued with `restart no;` gives the same answer as an uninterrupted
+  run, to the written precision.

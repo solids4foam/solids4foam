@@ -21,4 +21,5 @@ solidModel beamSolid;
 // constant/beamProperties
 beamSolidCoeffs
 {
+    restart         no;
 }

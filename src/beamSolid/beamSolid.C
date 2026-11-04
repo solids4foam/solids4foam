@@ -49,6 +49,19 @@ beamSolid::beamSolid(Time& runTime, const word& region)
     solidModel(typeName, runTime, region),
     beam_(beamModel::New(runTime, region))
 {
+    // The beam writes and reads the state it needs to continue. The solidModel
+    // restart fields are continuum fields, and on a continued run solidModel
+    // registers its own U before the beam can register the beam velocity
+    if (restart())
+    {
+        FatalErrorInFunction
+            << "'restart yes' is not supported by " << typeName << nl
+            << "    The beam writes the fields it needs to continue a run. "
+            << "Set" << nl << nl
+            << "        restart no;" << nl << nl
+            << "    in " << typeName << "Coeffs" << exit(FatalError);
+    }
+
     // The beam model always uses its own Newton-Raphson solver, configured
     // in constant/beamProperties
     if (solidModelDict().found("solutionAlgorithm"))
