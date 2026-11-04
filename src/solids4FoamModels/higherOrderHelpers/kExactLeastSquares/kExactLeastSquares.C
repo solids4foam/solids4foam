@@ -740,13 +740,11 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
         factorials[n] = factorials[n - 1]*n;
     }
 
-    // Integer powers, up to the polynomial order, of the scaling factor h, of
-    // the cell-centre offsets and of the zero owner offset
+    // Integer powers, up to the polynomial order, of the scaling factor h and
+    // of the cell-centre offsets
     scalarList hPow(polynomialOrder_ + 1);
     FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
     FixedList<scalarList, 3> rPow(scalarList(polynomialOrder_ + 1));
-    FixedList<scalarList, 3> ownerPow(scalarList(polynomialOrder_ + 1));
-    componentPowers(vector::zero, ownerPow);
 
     const List<symmTensor>* secondMomentsPtr = nullptr;
     const List<symmTensor3rdOrder>* thirdMomentsPtr = nullptr;
@@ -1109,16 +1107,15 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                 numberOfObservations
             );
 
-            // The owner-cell monomial averages do not depend on the stencil
-            // cell
+            // The owner-cell monomial averages are its central moments and do
+            // not depend on the stencil cell
             scalarList ownerAverages(Np);
             forAll(exponents, p)
             {
                 const FixedList<label, 3>& exponent = exponents[p];
-                ownerAverages[p] = averageMonomial
+                ownerAverages[p] = centralMoment
                 (
                     ownerGlobalCellID,
-                    ownerPow,
                     exponent[0],
                     exponent[1],
                     twoD ? 0 : exponent[2]
@@ -1337,16 +1334,15 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             Eigen::MatrixXd Q(Np, Nn + Nc);
             Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn + Nc);
 
-            // The owner-cell monomial averages do not depend on the stencil
-            // cell
+            // The owner-cell monomial averages are its central moments and do
+            // not depend on the stencil cell
             scalarList ownerAverages(Np);
             forAll(exponents, p)
             {
                 const FixedList<label, 3>& exponent = exponents[p];
-                ownerAverages[p] = averageMonomial
+                ownerAverages[p] = centralMoment
                 (
                     ownerGlobalCellID,
-                    ownerPow,
                     exponent[0],
                     exponent[1],
                     twoD ? 0 : exponent[2]
@@ -1819,12 +1815,10 @@ void kExactLeastSquares::calcCellCoeffs() const
         factorials[n] = factorials[n - 1]*n;
     }
 
-    // Integer powers, up to the polynomial order, of the scaling factor h, of
-    // the cell-centre offsets and of the zero owner offset
+    // Integer powers, up to the polynomial order, of the scaling factor h and
+    // of the cell-centre offsets
     scalarList hPow(polynomialOrder_ + 1);
     FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
-    FixedList<scalarList, 3> ownerPow(scalarList(polynomialOrder_ + 1));
-    componentPowers(vector::zero, ownerPow);
 
     // Reference to remote centres
     const Map<vector>& remoteCI = stencil().remoteCentresMap();
@@ -2016,15 +2010,15 @@ void kExactLeastSquares::calcCellCoeffs() const
                 << abort(FatalError);
         }
 
-        // The owner-cell monomial averages do not depend on the stencil cell
+        // The owner-cell monomial averages are its central moments and do not
+        // depend on the stencil cell
         scalarList ownerAverages(Np);
         forAll(exponents, p)
         {
             const FixedList<label, 3>& exponent = exponents[p];
-            ownerAverages[p] = averageMonomial
+            ownerAverages[p] = centralMoment
             (
                 ownerGlobalCellID,
-                ownerPow,
                 exponent[0],
                 exponent[1],
                 twoD ? 0 : exponent[2]
