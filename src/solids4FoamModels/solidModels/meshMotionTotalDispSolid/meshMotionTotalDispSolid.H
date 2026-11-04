@@ -39,6 +39,24 @@ Description
     With finiteStrain no (the default), the small-strain law is evaluated
     from gradD on the current mesh.
 
+    With incremental yes, the small-strain law is instead evaluated from the
+    increment of the time step, DD = D - D.oldTime(), on the mesh of the start
+    of the time step, which the owner moves to the reference points plus
+    pointD.oldTime(). The mesh is then stress free at the start of each time
+    step, and the point displacement accumulates the interpolated increment:
+
+        pointD = pointD.oldTime() + interpolate(DD)
+
+    as velocityLaplacian does, so the mesh for a given boundary motion depends
+    on how the boundary got there. A total-displacement law redistributes the
+    whole accumulated displacement at each solution and inverts cells next to
+    a boundary that moves by many cell sizes, e.g. a bending flap, where the
+    incremental form keeps them valid. The unknown remains the total D, so
+    the boundary conditions are the same. The incremental form assumes one
+    solution per time step, as the solids4foamSolidModel mesh motion solver
+    and the quasi-monolithic coupling do, and it is not available with
+    finiteStrain yes.
+
     The model has no inertia and no gravity, and it never updates the mesh:
     the mesh is moved by its owner, to the reference points plus pointD.
     Only history-independent (elastic) laws are supported.
@@ -59,6 +77,10 @@ Description
         // Finite-strain kinematics, for a finite-strain law, e.g.
         // diffusionHyperElastic (default no)
         finiteStrain        yes;
+
+        // Small-strain law from the increment of the time step, with
+        // finiteStrain no (default no)
+        // incremental         yes;
 
         nCorrectors         1000;
         rTol                1e-4;
@@ -111,6 +133,12 @@ class meshMotionTotalDispSolid
 
         //- Use finite-strain kinematics
         const Switch finiteStrain_;
+
+        //- Evaluate the small-strain law from the increment of displacement
+        //  of the time step, D - D.oldTime(), instead of the total
+        //  displacement, so the mesh is stress free at the start of each
+        //  time step
+        const Switch incremental_;
 
         //- Total deformation gradient
         volTensorField F_;

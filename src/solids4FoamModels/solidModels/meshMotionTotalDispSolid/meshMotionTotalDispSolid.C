@@ -53,6 +53,15 @@ void meshMotionTotalDispSolid::updateKinematics()
     // Gradient of the total displacement on the current mesh
     gradD() = fvc::grad(D());
 
+    if (incremental_)
+    {
+        // Increment of the time step on the current mesh, which is that of
+        // the start of the time step, at the reference points plus
+        // pointD.oldTime()
+        DD() = D() - D().oldTime();
+        gradDD() = fvc::grad(DD());
+    }
+
     if (!finiteStrain_)
     {
         return;
@@ -96,10 +105,13 @@ void meshMotionTotalDispSolid::correctStress()
     }
     else
     {
+        // The incremental form is stress free at the start of the time step
+        const volTensorField& gradDisp = incremental_ ? gradDD() : gradD();
+
         mechanicalManager().updateStressSmallStrain
         (
-            gradD(),
-            gradD().oldTime(),
+            gradDisp,
+            gradDisp.oldTime(),
             mesh().time().deltaTValue(),
             sigma()
         );
@@ -127,10 +139,12 @@ void meshMotionTotalDispSolid::updateImpK()
     }
     else
     {
+        const volTensorField& gradDisp = incremental_ ? gradDD() : gradD();
+
         mechanicalManager().updateScalarTangent
         (
-            gradD(),
-            gradD().oldTime(),
+            gradDisp,
+            gradDisp.oldTime(),
             mesh().time().deltaTValue(),
             impK_,
             tangentRequest::scalar
@@ -187,7 +201,14 @@ tmp<surfaceVectorField> meshMotionTotalDispSolid::faceForce()
     // Add stabilisation to the traction
     // We add this before enforcing the traction condition as the
     // stabilisation is set to zero on traction boundaries
-    momentumStabilisation().updateVector(D(), &gradD());
+    if (incremental_)
+    {
+        momentumStabilisation().updateVector(DD(), &gradDD());
+    }
+    else
+    {
+        momentumStabilisation().updateVector(D(), &gradD());
+    }
     traction += impKf_*momentumStabilisation().faceVector();
 
     // Enforce traction boundary conditions
@@ -202,6 +223,25 @@ tmp<surfaceVectorField> meshMotionTotalDispSolid::faceForce()
 
 void meshMotionTotalDispSolid::updateDerivedFields()
 {
+    if (incremental_)
+    {
+        // Interpolate the increment on the mesh of the start of the time
+        // step and accumulate it, rather than interpolate the total
+        // displacement, so the points follow the increments as the mesh
+        // deforms
+        DD() = D() - D().oldTime();
+        gradDD() = fvc::grad(DD());
+        interpolatePointDisplacement(DD(), gradDD(), pointDD());
+
+        pointD() = pointD().oldTime() + pointDD();
+        pointD().correctBoundaryConditions();
+
+        // The increment including the boundary point values
+        pointDD() = pointD() - pointD().oldTime();
+
+        return;
+    }
+
     // Increments of displacement
     DD() = D() - D().oldTime();
     gradDD() = gradD() - gradD().oldTime();
@@ -409,6 +449,10 @@ meshMotionTotalDispSolid::meshMotionTotalDispSolid
     (
         solidModelDict().lookupOrDefault<Switch>("finiteStrain", false)
     ),
+    incremental_
+    (
+        solidModelDict().lookupOrDefault<Switch>("incremental", false)
+    ),
     F_
     (
         IOobject
@@ -536,7 +580,19 @@ meshMotionTotalDispSolid::meshMotionTotalDispSolid
             << "the " << typeName << " solid model" << exit(FatalError);
     }
 
+    if (incremental_ && finiteStrain_)
+    {
+        FatalErrorInFunction
+            << "incremental is only available with finiteStrain no, in "
+            << "the " << typeName << " solid model" << exit(FatalError);
+    }
+
+    // The incremental form measures the increment from the old-time fields
+    D().oldTime();
+    pointD().oldTime();
+
     Info<< "finiteStrain = " << finiteStrain_ << nl
+        << "incremental = " << incremental_ << nl
         << "solutionAlgorithm = "
         << solutionAlgorithmNames_[solutionAlg()] << endl;
 
@@ -685,14 +741,33 @@ tmp<vectorField> meshMotionTotalDispSolid::tractionBoundarySnGrad
     // Patch reciprocal implicit stiffness
     const scalarField& rImpK = rImpK_.boundaryField()[patchID];
 
-    // Patch gradient
-    const tensorField& pGradD = gradD().boundaryField()[patchID];
-
     // Patch Cauchy stress
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals of the current mesh
     const vectorField n(patch.nf());
+
+    if (incremental_)
+    {
+        // The stress is that of the increment, so the condition sets the
+        // snGrad of the increment, added to that of the old-time D
+        const tensorField& pGradDD = gradDD().boundaryField()[patchID];
+
+        return tmp<vectorField>
+        (
+            new vectorField
+            (
+                D().oldTime().boundaryField()[patchID].snGrad()
+              + (
+                    (traction - n*pressure)
+                  - (n & (pSigma - impK*pGradDD))
+                )*rImpK
+            )
+        );
+    }
+
+    // Patch gradient
+    const tensorField& pGradD = gradD().boundaryField()[patchID];
 
     // Return patch snGrad
     return tmp<vectorField>
