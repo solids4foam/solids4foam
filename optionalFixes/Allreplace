@@ -27,7 +27,8 @@ replaceFile()
 }
 
 
-# Different checks required for each version of OpenFOAM/foam
+# Different checks required for each version of OpenFOAM/foam; no fixes are
+# required for OpenFOAM.com
 if [ "$WM_PROJECT" = "foam" ]
 then
     # This fixes segmentation errors related to point fields when mesh
@@ -38,52 +39,20 @@ then
         "$FOAM_SRC/foam/meshes/pointMesh/pointBoundaryMesh" \
         "$FOAM_SRC/foam"
 
-    # This fixes consistent Rhie-Chow interpolation
-    # for Euler scheme
-    replaceFile \
-        "foam-extend-4.1" \
-        "EulerDdtScheme.C" \
-        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/EulerDdtScheme" \
-        "$FOAM_SRC/finiteVolume"
-
-    # This corrects the backward scheme for a moving mesh
-    replaceFile \
-        "foam-extend-4.1" \
-        "backwardDdtScheme.C" \
-        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-        "$FOAM_SRC/finiteVolume"
-
     # Fix time index storage in the storeOldTimes function
     replaceFile \
         "foam-extend-4.1" \
         "GeometricField.C" \
         "$FOAM_SRC/foam/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/foam"
-elif [[ $WM_PROJECT_VERSION == v* ]]
+elif [[ $WM_PROJECT_VERSION != v* ]]
 then
-    # Fix the start-up of the backward scheme: use Euler only while the
-    # field has no old-old time level, rather than for the first time step
-    # of the run. The same file is used for all supported OpenFOAM.com
-    # versions (v2312 to v2606), where the upstream file is identical.
-    replaceFile \
-        "OpenFOAM.com" \
-        "backwardDdtScheme.C" \
-        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-        "$FOAM_SRC/finiteVolume"
-else
     # Fix time index storage in the storeOldTimes function
     replaceFile \
         "OpenFOAM-9" \
         "GeometricField.C" \
         "$FOAM_SRC/OpenFOAM/fields/GeometricFields/GeometricField" \
         "$FOAM_SRC/OpenFOAM"
-
-    # This corrects the backward scheme for a moving mesh
-    replaceFile \
-        "OpenFOAM-9" \
-        "backwardDdtScheme.C" \
-        "$FOAM_SRC/finiteVolume/finiteVolume/ddtSchemes/backwardDdtScheme" \
-        "$FOAM_SRC/finiteVolume"
 fi
 
 echo

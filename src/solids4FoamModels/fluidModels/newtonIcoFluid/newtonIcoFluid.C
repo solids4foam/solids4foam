@@ -551,6 +551,9 @@ bool newtonIcoFluid::evolve()
     // motion
     if (mesh.changing())
     {
+        // Stop if the backward meshPhi would be inconsistent
+        fluidModel::checkBackwardMeshPhi();
+
         // Make the flux relative to the mesh motion
         fvc::makeRelative(phi, U);
     }
