@@ -33,9 +33,9 @@ A beamFoam case runs with `solids4Foam` after three additions:
 
   beamSolidCoeffs
   {
+      restart         no;
   }
   ```
-      restart         no;
 
 The solid model base class also needs `constant/g`; use zero for no gravity.
 
