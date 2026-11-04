@@ -128,11 +128,10 @@ void Foam::solidModel::makeRAUf() const
     (
         new surfaceScalarField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "rAUf",
                 runTime().timeName(),
-                mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
@@ -412,11 +411,10 @@ void Foam::solidModel::makeU() const
     (
         new volVectorField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "U",
                 runTime().timeName(),
-                mesh(),
                 IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
             ),
@@ -439,11 +437,10 @@ void Foam::solidModel::makeP() const
     (
         new volScalarField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "p",
                 mesh().time().timeName(),
-                mesh(),
                 IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
             ),
@@ -797,6 +794,31 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
 
+Foam::IOobject Foam::solidModel::sharedMeshIOobject
+(
+    const word& name,
+    const fileName& instance,
+    const IOobject::readOption r,
+    const IOobject::writeOption w
+) const
+{
+    if (sharedMesh_)
+    {
+        return IOobject
+        (
+            name,
+            instance,
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false  // Do not register
+        );
+    }
+
+    return IOobject(name, instance, mesh(), r, w);
+}
+
+
 const Foam::meshDual& Foam::solidModel::dualMesh() const
 {
     if (dualMeshPtr_.empty())
@@ -883,12 +905,20 @@ void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 
 void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
-    // Hack to avoid expensive copy of residuals
+    // Hack to avoid expensive copy of residuals. On a shared mesh, only the
+    // residuals of D are removed, as the others belong to the mesh's owner
 #ifdef OPENFOAM_COM
-    const_cast<dictionary&>
-    (
-        D.mesh().data().solverPerformanceDict()
-    ).clear();
+    dictionary& solverPerf =
+        const_cast<dictionary&>(D.mesh().data().solverPerformanceDict());
+
+    if (sharedMesh_)
+    {
+        solverPerf.remove(D.name());
+    }
+    else
+    {
+        solverPerf.clear();
+    }
 #endif
 
     if (relaxationMethod_ == "fixed")
@@ -1052,9 +1082,10 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    sharedMesh_(runTime.foundObject<dynamicFvMesh>(region)),
     meshOwnerPtr_
     (
-        runTime.foundObject<dynamicFvMesh>(region)
+        sharedMesh_
       ? Foam::autoPtr<Foam::dynamicFvMesh>()
       : dynamicFvMesh::New
         (
@@ -1136,11 +1167,10 @@ Foam::solidModel::solidModel
     ),
     useBoundaryFaceValuesp_
     (
-        IOobject
+        sharedMeshIOobject
         (
             "useBoundaryFaceValues_p",
             runTime.constant(),
-            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -1248,13 +1278,16 @@ Foam::solidModel::solidModel
     rhoPtr_(),
     g_
     (
+        // On a shared mesh, the owner's g, e.g. that of a buoyant fluid, is
+        // neither required nor registered over
         IOobject
         (
             "g",
             runTime.constant(),
             mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
+            sharedMesh_ ? IOobject::READ_IF_PRESENT : IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            !sharedMesh_
         )
     ),
     dampingCoeff_
@@ -1363,8 +1396,12 @@ Foam::solidModel::solidModel
     // On a restart, however, the fvMesh constructor marks the mesh as moving if
     // it finds a 'meshPhi' or 'V0' field in the start time directory, and then,
     // for example, backwardD2dt2Scheme stops with a "not implemented for a
-    // moving mesh" error (issue #184). So the flag is cleared here
-    mesh().moving(false);
+    // moving mesh" error (issue #184). So the flag is cleared here, unless the
+    // mesh belongs to another model, e.g. the moving fluid mesh
+    if (!sharedMesh_)
+    {
+        mesh().moving(false);
+    }
 
     checkRemovedMechanicalModelEntries();
 
@@ -2668,11 +2705,10 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
     (
         new volScalarField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "rho",
                 mesh().time().timeName(),
-                mesh(),
                 IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),

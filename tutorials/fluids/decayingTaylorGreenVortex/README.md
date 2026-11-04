@@ -523,6 +523,14 @@ Plotting these errors on a log-log plot demonstrates that second-order is
 
 **Figure 2: The velocity error norms as a function of mesh spacing.**
 
+The regression test also runs `Test-fvcDdt` on the mesh of the case. It checks
+ the `BDF` ddt scheme for orders 1 to 6: the start-up order ramp, exactness
+ for time polynomials, the observed order of accuracy for $$dy/dt = \lambda y$$,
+ that a restart reproduces an uninterrupted run, and the handling of a density
+ or flux without stored old-time levels. It uses its own fields and schemes,
+ so the solver results are unaffected, and it must be built and available on
+ `PATH`.
+
 ## References
 
 [^erzincanli2013]: [Erzincanli, B. and Sahin, M. (2013). An arbitrary

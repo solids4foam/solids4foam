@@ -8,6 +8,46 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Cook's membrane verification studies now store the per-mesh tip
+  displacements of the published references migrated from solid-benchmarks
+  (Simo and Armero, César de Sá et al., Areias and Abaqus for the
+  elastoplastic case; Zienkiewicz and Taylor and Abaqus for the linear-elastic
+  case), list them in the summary and plot them against the sweep. The
+  elastoplastic tutorial gains an unstructured triangular-prism Gmsh mesh
+  (`./Allrun triangular`), which its study sweeps with `--mesh triangular`.
+- The `compressedSpheres` and `twistingHemisphere` READMEs now point to the
+  finer meshes of the original benchmarks in the solids4foam website archive,
+  instead of the solid-benchmarks repository.
+- The fluid-solid interface passes the interface motion to the fluid mesh
+  motion solver through a runtime-selectable *fluid mesh motion coupler*,
+  selected from the motion solver or with an optional `fluidMeshMotion`
+  sub-dictionary in `fsiProperties`, in place of the fixed list of supported
+  solvers in `moveFluidMesh`. Existing cases are unchanged. New couplers
+  support displacement-based solvers, e.g. `displacementLaplacian` and
+  `displacementSBRStress`, which set the total interface displacement relative
+  to the reference points from the current geometry, and the
+  `solids4foamSolidModel` solver. Velocity-based solvers are path dependent
+  and the interior mesh can drift under periodic motion, which
+  `displacementLaplacian` avoids.
+- The `meshMotionTotalDisplacement` solid model (OpenFOAM.com) moves a mesh
+  owned by another model: it solves quasi-statically for the total
+  displacement from the reference points on the current mesh, as
+  `displacementLaplacian` does, optionally with current-configuration
+  finite-strain kinematics, so the mesh for a given boundary motion does not
+  depend on its path, without a copy of the reference mesh. The
+  `solids4foamSolidModel` mesh motion solver uses it on the fluid mesh, and
+  calculates the `stiffnessScaleFactor` field from an optional mesh motion
+  `diffusivity`. A solid model on a mesh owned by another model
+  (`solidModel::sharedMesh()`) does not clear the mesh's moving flag or the
+  owner's solver performance records, and its `U`, `p`, `rho`, `g`, `rAUf`
+  and `useBoundaryFaceValues_p` fields are private to it.
+- Ported the `diffusionElastic` and `diffusionHyperElastic` laws, removed
+  with the legacy mechanical laws, to the `mechanicalConstitutiveLaw`
+  framework, for mesh motion with `solids4foamSolidModel`: `linearElastic`
+  and `neoHookeanElastic` with the stiffness scaled by `stiffnessScaleFactor`.
+  The `diffusivity` entries move from the law to the `dynamicMeshDict`.
+- `beamInCrossFlow`: `./Allrun displacementLaplacian`, `diffusionElastic`
+  and `diffusionHyperElastic` select the fluid mesh motion.
 - Added the `channelLeaflet` fluid-solid interaction tutorial: a thin
   elastic leaflet, clamped in a 2D channel and wetted on both faces, in a
   pulsatile flow at Re = 200, after the oomph-lib channel-with-leaflet
@@ -53,6 +93,21 @@ release. For complete commit-level details and contributor information, see the
   recommended for undamped structures, and a warning is printed when an
   order of 3 or above is selected. The `cantileverVibration` tutorial has a
   non-default `bdf3` option that shows the effect.
+- Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
+  the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
+  `fvc::ddt`, including the `ddtCorr` flux corrections used by the
+  pressure-velocity coupling. It requires a static mesh, and it reduces the
+  order during start-up. `BDF 1` and `BDF 2` support a variable time-step
+  (`adjustTimeStep yes`), with `BDF 2` using the same variable-step
+  coefficients as `backward`; orders 3 and above require a constant
+  time-step, so `adjustTimeStep` cannot be used with them. They are also not
+  A-stable, and a warning is printed when one is selected. It is the
+  first-derivative counterpart of the `BDF` d2dt2 scheme, for fluids, and is
+  currently only available for OpenFOAM.com (#638). `Test-fvcDdt`, run by
+  the `decayingTaylorGreenVortex` regression test, checks the start-up order
+  ramp, exactness for time polynomials and the observed order of accuracy
+  for orders 1 to 6, restart, and a density or flux without stored old-time
+  levels.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A
@@ -96,6 +151,18 @@ release. For complete commit-level details and contributor information, see the
   contact penalty models, the cohesive zone models and `elasticWallPressure`
   all depend on, and `cantilever2d`'s `unsCoupled` case is the first
   regression coverage of `coupledUnsLinearGeometryLinearElastic`.
+- The `isotropicFungElastic` mechanical constitutive law: an isotropic
+  Fung-type exponential hyperelastic law for soft tissue,
+  `W = 0.5*c*(exp(a*tr(Ebar & Ebar)) - 1)` on the isochoric strain plus a
+  volumetric penalty, with no fibre direction. It is identical to
+  `GuccioneElastic` with `k = c` and `cf = ct = cfs = a`. The
+  `LandEtAl2015/problem2` README shows how to run the case with it, which
+  reproduces the default Guccione case, and the case's regression test checks
+  that the two agree. It is in the `mechanicalConstitutiveLawChecks` law
+  checks. It is not the removed legacy
+  law of the same name, which was the Demiray law, whose exponent is linear
+  in strain: a legacy dictionary, with `c1` and `c2`, stops with an error
+  rather than being read as this law (#457).
 - `cantilever2d` regression cases for `vertexCentredLinearGeometry`, which no
   regression case ran before, on the PETSc SNES path and a short run of the
   explicit path, which no tutorial exercises.
@@ -291,6 +358,31 @@ release. For complete commit-level details and contributor information, see the
   consistent to O(Δt h). It is empty by default, so no other case changes.
 
 ### Changed
+
+- `IQNILS` with `couplingReuse` greater than zero is now robust: the reused
+  secant modes are no longer applied to the residual of the solid-only
+  predictor (`predictSolid`), which comes from a solid solve with the previous
+  step's fluid force, not from the fluid-solid coupling the modes describe.
+  The first iteration of a step now uses the predictor update, and the modes
+  are applied from the second iteration, after a complete fluid-solid
+  iteration, as in preCICE and CoCoNuT. `skipModesOnSolidPredictor no`
+  restores the old behaviour. On the `TurekHron2006` FSI3 case, `couplingReuse`
+  5 and 15 previously diverged at the first iteration of a step, 0.01 to
+  2.9 s after the coupling start, with or without a relative filter; they now
+  complete with 3.4 and 2.9 coupling iterations per step, against 6.9 with
+  `couplingReuse 0`. `membraneRoof` and `beamInCrossFlow` with
+  `couplingReuse 5` previously diverged and now complete. In addition, with
+  `couplingReuse` greater than zero, `relMinSignificant` defaults to `1e-3` (a
+  preCICE-QR2-style relative filter), and the secants of a step accepted
+  unconverged (`allowUnconvergedCoupling`) are discarded (#587).
+- The `IQNILS` set-ups of the `TurekHron2006`, `membraneRoof`,
+  `mokLidDrivenCavity`, `ringAddedMass`, `womersleyTube` and `blobInTreacle`
+  tutorials now use `couplingReuse 5`. Over the full tutorial runs
+  (OpenFOAM-v2512, serial), the mean coupling iterations per time step fall
+  from 5.0 to 2.6, 5.9 to 2.7, 4.3 to 2.6, 4.0 to 2.4, 14.6 to 8.4 and 6.2 to
+  4.2, and the regression tests pass unchanged. The results in the
+  `verification/` READMEs of these tutorials were computed without reuse
+  (#587).
 
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
@@ -567,8 +659,24 @@ release. For complete commit-level details and contributor information, see the
   any test. solids4foam's preCICE cases are now maintained upstream in the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
+- The `FixedList.C` (OpenFOAM.org and foam-extend) and `meshObjectBase.H`
+  (foam-extend) optional fixes are removed. `FixedList.C` is needed to build
+  OpenFOAM itself with Clang 17 or newer, so it is not a solids4foam fix, and
+  `meshObjectBase.H` only avoids a segmentation fault at the end of a
+  foam-extend run, after the results are written. `Allcheck` no longer
+  reports them, and `Allreplace` no longer copies them.
 
 ### Fixed
+
+- `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
+  and with `combinedCouplingSystem`, had the wrong sign and moved the interface
+  away from the fixed point. With `residualSumPreconditioning`, the residual
+  is now scaled like the secant columns. `maxReuseUpdateNormRatio` now limits
+  the interface displacement update of every solve that uses secants from
+  previous steps, including `couplingReuse` greater than zero, where it
+  previously had no effect. With `normalizeCouplingColumns`, the
+  `qrFilterTolerance` test now compares like with like, and a zero secant
+  column is no longer divided by zero (#587).
 
 - The PETSc SNES residuals of `linearGeometryTotalDisplacement` and
   `nonLinearGeometryTotalLagrangianTotalDisplacement` now update the boundary
@@ -697,6 +805,10 @@ release. For complete commit-level details and contributor information, see the
   `Allcheck` and `Allreplace` no longer select a directory by version (#519).
   Installations patched with the earlier file are reported by `Allcheck`
   (with `S4F_NO_FILE_FIXES=0`), and `Allreplace` updates them.
+- The files in `optionalFixes` had their OpenFOAM and foam-extend copyright
+  and licence headers replaced by the solids4foam header. They now keep the
+  upstream headers, with a note on what solids4foam changed, and the file
+  header check skips `optionalFixes`.
 - The high-order least-squares reconstruction now rejects axisymmetric
   (wedge) meshes when the solid model is constructed, with an error that
   names the limitation, instead of stopping later with the misleading

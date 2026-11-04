@@ -1,0 +1,15 @@
+# O.C. Zienkiewicz and R.L. Taylor, The Finite Element Method, 5th ed.,
+# 2000; four-node quadrilateral (Q4) elements.
+# Columns: cells per side n, average cell spacing sqrt(1440 mm^2 / n^2) in
+# mm, and the vertical displacement of the top-right corner in m.
+# Migrated from solid-benchmarks/linearElasticity/cooksMembrane/plotScripts.
+# The legacy benchmark applied a shear traction of 6.25 kPa, 1000 times
+# smaller than the 6.25 MPa of this tutorial with the same material, so the
+# legacy displacements are multiplied by 1000 here (the case is linear).
+cells_per_side,spacing_mm,displacement_m
+2,18.97,0.0148981
+4,9.487,0.0232216
+8,4.743,0.0286321
+16,2.372,0.0307829
+32,1.186,0.0316557
+64,0.5929,0.0319132

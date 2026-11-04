@@ -162,6 +162,26 @@ differences from the Wan and Turek (2007) coefficients, including the
 inertia, are 1.36, 0.53 and 0.49 for levels 1-3;
 the inertia is noisy, as it jumps when cells enter or leave the cylinder.
 
+## Verification
+
+`verification/` holds an opt-in verification of the `cutLink`, `ghostCell`,
+`penalty` and legacy incremental methods on this case, on four mesh levels
+with fixed time steps, against two moving body-fitted mesh solutions; it is
+not run by the tutorial tests. It shows that an accurate drag does not
+guarantee an accurate lift for a moving body: with the greedy quadrature
+of the tested revision, the `cutLink` surface-traction lift differs from
+body-fitted reference B of `verification/` (901 120 cells) by 140 %, 149 %
+and 140 % on D/h = 10, 20 and 40 (161 % on D/h = 20 with the time step
+halved), while its drag differs by 5.4 %, 1.8 % and 1.1 %. On D/h = 80
+every candidate point is kept and the lift differs by 4.6 %; this does
+not establish that the greedy quadrature converges in general. At the
+common D/h = 40, `penalty` differs from reference B by 1.41 % in drag and
+3.7 % in lift, at the lowest cost of the four methods; differences between
+`penalty` and `cutLink` (drag, or the lift from its momentum exchange) at
+D/h = 40 and 80 are smaller than the 0.77 % (Cd) and 3.0 % (Cl) difference
+between the two references and are not ranked. See
+`verification/README.md` and `verification/results.md`.
+
 ## References
 
 - Wan, D., Turek, S. (2007). Fictitious boundary and moving mesh methods for

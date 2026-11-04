@@ -24,6 +24,41 @@ Group
 Description
     Mesh motion solver for an fvMesh using a solids4foam solidModel.
 
+    The solid model, which must be meshMotionTotalDisplacement, is solved on
+    the moving mesh itself, for the total displacement from the reference
+    points, points0, and the mesh points are the reference points plus the
+    solid model point displacement, pointD. As with displacementLaplacian, the
+    equations are discretised on the current mesh, so no copy of the mesh is
+    needed and, because the unknown is the total displacement and not an
+    increment, the mesh for a given interface position does not drift with
+    the path taken to reach it.
+
+    The solid model reads its solidProperties and mechanicalProperties from
+    constant/<region>, its D and pointD fields from <time>/<region>, and its
+    schemes and solver settings from system/<region> of the moving mesh. Its
+    fields whose names other models also use, e.g. U, p and rho, are private
+    to it (see solidModel::sharedMesh()).
+
+    The optional diffusivity entry, as for displacementLaplacian, sets the
+    stiffnessScaleFactor field, which the diffusionElastic and
+    diffusionHyperElastic mechanical laws use to scale their stiffness: the
+    face diffusivity, limited to between minFactor and maxFactor times its
+    average, divided by its average, and averaged to the cells. It is
+    recalculated on the current mesh before each solution:
+
+    \verbatim
+    motionSolver    solids4foamSolidModel;
+
+    // Optional
+    diffusivity     quadratic inverseDistance (interface);
+    maxFactor       100;
+    minFactor       0.1;
+    writeStiffScaleFactor no;
+    \endverbatim
+
+    If the solveEquations flag is false, the solid model pointD field is
+    expected to be set by external functions.
+
 SourceFiles
     meshMotionSolidModelFvMotionSolver.C
 
@@ -56,6 +91,12 @@ class meshMotionSolidModelFvMotionSolver
 {
     // Private data
 
+        //- Mesh motion diffusivity, if specified
+        autoPtr<motionDiffusivity> diffusivityPtr_;
+
+        //- Stiffness scale factor, if a diffusivity is specified
+        autoPtr<volScalarField> stiffnessScaleFactorPtr_;
+
         //- Solid model
         mutable autoPtr<solidModel> modelPtr_;
 
@@ -66,6 +107,19 @@ class meshMotionSolidModelFvMotionSolver
 
 
     // Private Member Functions
+
+        //- Check that the solid model region is the region of the moving
+        //  mesh, and return it
+        word regionName() const;
+
+        //- Create the stiffness scale factor, if a diffusivity is specified
+        autoPtr<volScalarField> makeStiffnessScaleFactor();
+
+        //- Update the stiffness scale factor on the current mesh
+        void updateStiffnessScaleFactor();
+
+        //- Create the solid model, which must be meshMotionTotalDisplacement
+        void makeModel();
 
         //- No copy construct
         meshMotionSolidModelFvMotionSolver
@@ -110,6 +164,12 @@ public:
 
         //- Access to the solid model
         const solidModel& model() const
+        {
+            return modelPtr_();
+        }
+
+        //- Non-const access to the solid model
+        solidModel& model()
         {
             return modelPtr_();
         }

@@ -16,6 +16,10 @@ jobs:
       - name: Get changed files
         id: changed-files
         uses: tj-actions/changed-files@v38
+        with:
+          # optionalFixes holds copies of OpenFOAM and foam-extend files,
+          # which keep their upstream headers
+          files_ignore: optionalFixes/**
 
       - name: Run the solids4FoamChangeCopyright.sh script on added files
         run: |
