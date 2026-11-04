@@ -386,8 +386,9 @@ computed from, so the two agree without the solver knowing about `Fpre`.
 That holds for a law whose stress is a function of the total `F`, and a law
 says so through `admitsPrestress()`: the hyperelastic laws (`neoHookeanElastic`,
 `MooneyRivlinElastic`, `OgdenElastic`, `StVenantKirchhoffElastic`,
-`GuccioneElastic`, `HolzapfelGasserOgdenElastic`) do, and `electroMechanicalLaw`
-does when its passive law does. The answer is no by default, and the manager
+`GuccioneElastic`, `HolzapfelGasserOgdenElastic`, `isotropicFungElastic`) do,
+and `electroMechanicalLaw` does when its passive law does. The answer is no by
+default, and the manager
 refuses to start with prestress on and a law that answers no, naming it. A law
 that integrates an increment `F & Finv0` onto a history variable, such as
 `neoHookeanElasticMisesPlastic`, would otherwise cancel `Fpre` out of the
