@@ -15,20 +15,31 @@ usage: prepare_study.py SRC_TUTORIAL DEST [--mu MU] [--amplitude A]
 - --coupling-tol-factor: multiply the Robin and IQN-ILS coupling tolerances.
 Nothing in SRC is modified.
 
-The copy is built under DEST.partial and renamed to DEST only when complete, and
-diagnostic_settings.json (written last) records a hash of everything copied
-and the requested settings. With --ensure, an existing DEST is kept only if
-that record matches; a stale or unrecorded DEST is re-prepared if it has no
-runs, and otherwise refused (exit status 3) unless --force, so valid runs are
-never deleted silently. --overwrite-diagnostic allows replacing a different
-system/interfaceTractionDiagnostic in SRC.
+The copy is built in a staging directory DEST.partial (any leftover one is
+discarded), every copied file and every substitution is checked, the marker
+diagnostic_settings.json is written last, and the staging directory is then
+published with renames only: an existing DEST is first renamed aside to
+DEST.old-<time> and deleted only after the new one is in place. A crash can
+therefore leave DEST complete (old or new) or, for an instant between the two
+renames, absent with DEST.old-* intact, which --ensure puts back. The marker
+records two hashes: the solver hash (everything the solver reads, the
+diagnostic and this script) and the analysis hash (verification/scripts/*.py
+and the reference JSON). With --ensure, an existing DEST is kept if both match;
+if only the analysis hash differs it is rebuilt and its runs moved into the new
+copy (whether a run is still valid is decided by its solver-run key, see
+study_runs.py); a copy that differs in the solver hash or lacks a complete
+marker is re-prepared if it has no runs, and otherwise refused (exit status 3)
+unless --force, so valid runs are never deleted silently. --overwrite-diagnostic
+allows replacing a different system/interfaceTractionDiagnostic in SRC.
 """
 import argparse
 import hashlib
 import json
+import os
 import re
 import shutil
 import sys
+import time
 from pathlib import Path
 
 DIAGNOSTIC = Path(__file__).resolve().parent / "interfaceTractionDiagnostic"
@@ -66,11 +77,19 @@ def scale_tolerances(text: str, keys, factor: float, label: str = "file") -> str
     return text
 
 
-def source_hash(src: Path) -> str:
-    """Hash of everything a copy is made from: the files copied from SRC (path
-    and content, symlink targets; not documentation, images or
-    verification/traction) and the diagnostic and this script."""
-    h = hashlib.sha256()
+def is_analysis_file(rel: Path) -> bool:
+    """Files that only determine how results are analysed or checked."""
+    return rel.parts[:2] == ("verification", "scripts") and rel.suffix == ".py" \
+        or rel.parts[:2] == ("verification", "reference")
+
+
+def source_hashes(src: Path):
+    """(solver hash, analysis hash). The solver hash covers the files copied
+    from SRC (path and content, symlink targets; not documentation, images,
+    verification/traction, or the analysis files) and the diagnostic and this
+    script. The analysis hash covers verification/scripts/*.py and the
+    reference JSON."""
+    solver, analysis = hashlib.sha256(), hashlib.sha256()
     ignore = shutil.ignore_patterns(*IGNORE)
 
     def walk(directory: Path, rel: Path):
@@ -84,6 +103,7 @@ def source_hash(src: Path) -> str:
             if r.suffix == ".md" or r.parts[:1] == ("images",) \
                     or r.parts[:2] == ("verification", "traction"):
                 continue    # documentation and this diagnostic's own files
+            h = analysis if is_analysis_file(r) else solver
             if path.is_symlink():
                 h.update(f"L {r} {path.readlink()}\n".encode())
             elif path.is_dir():
@@ -94,8 +114,49 @@ def source_hash(src: Path) -> str:
 
     walk(src, Path("."))
     for extra in (DIAGNOSTIC, Path(__file__).resolve()):
-        h.update(f"X {extra.name} {hashlib.sha256(extra.read_bytes()).hexdigest()}\n".encode())
-    return h.hexdigest()
+        solver.update(f"X {extra.name} {hashlib.sha256(extra.read_bytes()).hexdigest()}\n".encode())
+    return solver.hexdigest(), analysis.hexdigest()
+
+
+def expected_paths(src: Path):
+    """Relative paths of the files and symlinks copytree must have made."""
+    ignore = shutil.ignore_patterns(*IGNORE)
+    found = set()
+
+    def walk(directory: Path, rel: Path):
+        names = [p.name for p in directory.iterdir()]
+        skipped = ignore(str(directory), names)
+        for name in names:
+            if name in skipped:
+                continue
+            path = directory / name
+            if path.is_dir() and not path.is_symlink():
+                walk(path, rel / name)
+            else:
+                found.add(rel / name)
+
+    walk(src, Path("."))
+    return found
+
+
+def validate_copy(src: Path, d: Path, requested: dict):
+    """Every file of SRC is in the copy, and the preparation's edits are in
+    place; raises SystemExit otherwise."""
+    missing = sorted(str(r) for r in expected_paths(src)
+                     if not (d / r).exists() and not (d / r).is_symlink())
+    if missing:
+        raise SystemExit(f"incomplete copy, missing: {', '.join(missing[:5])}"
+                         + (" ..." if len(missing) > 5 else ""))
+    control = (d / "system/controlDict").read_text()
+    if control.count('#include "interfaceTractionDiagnostic"') != 1:
+        raise SystemExit("system/controlDict does not include the diagnostic exactly once")
+    diag = (d / "system/interfaceTractionDiagnostic").read_text()
+    for key in ("executeInterval", "writeInterval"):
+        if len(re.findall(rf"^\s*{key}\s+1;", diag, re.MULTILINE)) != 1:
+            raise SystemExit(f"diagnostic: {key} is not 1")
+    if requested.get("amplitude") is not None or requested.get("mu") is not None:
+        if not (d / "constant/womersleyProperties").is_file():
+            raise SystemExit("constant/womersleyProperties was not regenerated")
 
 
 def has_runs(dest: Path) -> bool:
@@ -103,10 +164,12 @@ def has_runs(dest: Path) -> bool:
     return work.is_dir() and any(work.iterdir())
 
 
-def ensure_state(dest: Path, wanted: dict) -> str:
-    """'missing', 'current' (complete and matching the requested hash and
-    settings), 'stale-empty' (to be re-prepared; no runs would be lost) or
-    'stale-runs' (has runs: only with --force)."""
+def ensure_state(dest: Path, wanted: dict, analysis_hash: str) -> str:
+    """'missing', 'current' (complete and matching the requested solver hash
+    and settings, and the analysis hash), 'refresh-analysis' (complete, solver
+    side matching, analysis files changed: rebuilt, runs moved over),
+    'stale-empty' (to be re-prepared; no runs would be lost) or 'stale-runs'
+    (has runs: only with --force)."""
     if not dest.exists():
         return "missing"
     marker = dest / MARKER
@@ -115,19 +178,67 @@ def ensure_state(dest: Path, wanted: dict) -> str:
     except (OSError, json.JSONDecodeError):
         record = {}
     if record.get("complete") is True and all(record.get(k) == v for k, v in wanted.items()):
-        return "current"
+        return "current" if record.get("analysisHash") == analysis_hash else "refresh-analysis"
     return "stale-runs" if has_runs(dest) else "stale-empty"
 
 
+def recover_interrupted(dest: Path):
+    """If a preparation was interrupted between moving DEST aside and
+    publishing the new copy, DEST is absent and DEST.old-* holds the previous
+    copy: put the newest back."""
+    if dest.exists():
+        return
+    olds = sorted(dest.parent.glob(dest.name + ".old-*"))
+    if olds:
+        os.rename(olds[-1], dest)
+        print(f"{dest}: restored the previous copy from {olds[-1].name} "
+              "(an earlier preparation was interrupted)")
+
+
+def publish(staging: Path, dest: Path, keep_runs: bool):
+    """Replace DEST by the complete staging directory using renames only. The
+    previous DEST is renamed aside and deleted after success. With keep_runs
+    its verification/work is moved into the new copy first."""
+    old = None
+    if dest.exists():
+        old = dest.with_name(f"{dest.name}.old-{time.strftime('%Y%m%dT%H%M%S')}-{os.getpid()}")
+        os.rename(dest, old)
+    try:
+        os.replace(staging, dest)
+    except BaseException:
+        if old is not None and not dest.exists():
+            os.rename(old, dest)
+        raise
+    if old is not None:
+        runs = old / "verification/work"
+        if keep_runs and runs.is_dir():
+            os.rename(runs, dest / "verification/work")
+        shutil.rmtree(old)
+
+
 def prepare(src: Path, dest: Path, mu=None, amplitude=None, coupling_tol_factor=None,
-            overwrite_diagnostic=False):
+            overwrite_diagnostic=False, keep_runs=False):
     src, dest = src.resolve(), dest.resolve()
-    wanted = {"sourceHash": source_hash(src),
+    staging = dest.with_name(dest.name + ".partial")
+    if staging.exists():
+        shutil.rmtree(staging)  # an unfinished earlier preparation, holds no runs
+    try:
+        build(src, staging, mu, amplitude, coupling_tol_factor, overwrite_diagnostic)
+        publish(staging, dest, keep_runs)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    changes = json.loads((dest / MARKER).read_text())["changes"]
+    print(f"prepared {dest} with {changes or 'tutorial parameters'}")
+
+
+def build(src: Path, work: Path, mu, amplitude, coupling_tol_factor, overwrite_diagnostic):
+    """Build the study copy in the staging directory `work`; the marker is
+    written last, after the copy and the edits have been validated."""
+    solver_hash, analysis_hash = source_hashes(src)
+    wanted = {"solverHash": solver_hash,
               "requested": {"mu": mu, "amplitude": amplitude,
                             "couplingTolFactor": coupling_tol_factor}}
-    work = dest.with_name(dest.name + ".partial")
-    if work.exists():
-        shutil.rmtree(work)     # an unfinished earlier preparation, holds no runs
     shutil.copytree(src, work, symlinks=True, ignore=shutil.ignore_patterns(*IGNORE))
     d = work
     # diagnostic function object: always the one next to this script. A
@@ -135,7 +246,6 @@ def prepare(src: Path, dest: Path, mu=None, amplitude=None, coupling_tol_factor=
     installed = d / "system/interfaceTractionDiagnostic"
     if installed.exists() and installed.read_bytes() != DIAGNOSTIC.read_bytes() \
             and not overwrite_diagnostic:
-        shutil.rmtree(work)
         raise SystemExit(f"{src}/system/interfaceTractionDiagnostic differs from "
                          f"{DIAGNOSTIC}; use --overwrite-diagnostic to replace it")
     shutil.copy(DIAGNOSTIC, d / "system")
@@ -185,12 +295,10 @@ def prepare(src: Path, dest: Path, mu=None, amplitude=None, coupling_tol_factor=
             p.write_text(scale_tolerances(p.read_text(), keys, coupling_tol_factor,
                                           str(p.relative_to(d))))
         changes["couplingTolFactor"] = coupling_tol_factor
+    validate_copy(src, d, wanted["requested"])
     (d / MARKER).write_text(json.dumps(
-        dict(wanted, complete=True, source=str(src), changes=changes), indent=2))
-    if dest.exists():
-        shutil.rmtree(dest)
-    work.rename(dest)
-    print(f"prepared {dest} with {changes or 'tutorial parameters'}")
+        dict(wanted, analysisHash=analysis_hash, complete=True, source=str(src),
+             changes=changes), indent=2))
 
 
 def main(argv=None):
@@ -212,10 +320,12 @@ def main(argv=None):
         if a.dest.exists():
             raise SystemExit(f"{a.dest} exists")
         return prepare(a.src, a.dest, **kw)
-    wanted = {"sourceHash": source_hash(a.src.resolve()),
+    recover_interrupted(a.dest.resolve())
+    solver_hash, analysis_hash = source_hashes(a.src.resolve())
+    wanted = {"solverHash": solver_hash,
               "requested": {"mu": a.mu, "amplitude": a.amplitude,
                             "couplingTolFactor": a.coupling_tol_factor}}
-    state = ensure_state(a.dest, wanted)
+    state = ensure_state(a.dest, wanted, analysis_hash)
     if state == "current":
         print(f"{a.dest}: up to date")
         return
@@ -224,9 +334,12 @@ def main(argv=None):
               "and holds runs; they are kept. Re-run with --force to discard it.",
               file=sys.stderr)
         raise SystemExit(3)
-    if state.startswith("stale"):
+    if state == "refresh-analysis":
+        print(f"{a.dest}: the analysis files changed, preparing again and keeping the runs "
+              "(a run is reused only if its solver-run key still matches)")
+    elif state.startswith("stale"):
         print(f"{a.dest}: stale or incomplete, preparing again")
-    prepare(a.src, a.dest, **kw)
+    prepare(a.src, a.dest, keep_runs=(state == "refresh-analysis"), **kw)
 
 
 if __name__ == "__main__":

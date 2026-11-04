@@ -4,6 +4,7 @@ diagnostic taken from the scripts directory."""
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -152,6 +153,146 @@ class PrepareCopies(unittest.TestCase):
         self.assertFalse(d2.exists())
         quiet(P.main, [str(self.src), str(d2), "--overwrite-diagnostic"])
         self.assertEqual((d2 / "system/interfaceTractionDiagnostic").read_bytes(), installed)
+
+
+class AtomicPublication(unittest.TestCase):
+    """Interrupted, failing and concurrent-with-runs preparations."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.src = self.root / "tut"
+        make_tutorial(self.src)
+        (self.src / "verification/scripts").mkdir()
+        (self.src / "verification/scripts/driver.py").write_text("# analysis v1\n")
+        self.dest = self.root / "work/a/womersleyTube"
+        self.dest.parent.mkdir(parents=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def ensure(self, *args):
+        return quiet(P.main, ["--ensure", str(self.src), str(self.dest), *args])
+
+    def make_run(self):
+        run = self.dest / "verification/work/c1"
+        run.mkdir(parents=True)
+        (run / "x").write_text("run")
+        return run
+
+    def leftovers(self):
+        return sorted(p.name for p in self.dest.parent.iterdir())
+
+    def test_no_dest_is_touched_before_the_new_copy_is_complete(self):
+        self.ensure()
+        (self.dest / "marker_of_old").write_text("old")
+        (self.src / "system/controlDict").write_text("a 5;\nfunctions\n{\n}\n")
+        real = P.validate_copy
+
+        def broken(*a, **k):
+            raise KeyboardInterrupt        # interrupted during validation
+        P.validate_copy = broken
+        try:
+            with self.assertRaises(KeyboardInterrupt):
+                self.ensure()
+        finally:
+            P.validate_copy = real
+        self.assertTrue((self.dest / "marker_of_old").exists())   # old copy intact
+        self.assertEqual(self.leftovers(), ["womersleyTube"])      # staging cleaned
+        self.ensure()
+        self.assertIn("a 5;", (self.dest / "system/controlDict").read_text())
+
+    def test_interrupted_between_the_two_renames_is_recovered(self):
+        self.ensure()
+        run = self.make_run()
+        (self.src / "system/controlDict").write_text("a 6;\nfunctions\n{\n}\n")
+        real = os.replace
+
+        def crash(a, b):
+            raise KeyboardInterrupt        # dest already renamed aside
+        P.os.replace = crash
+        try:
+            with self.assertRaises(KeyboardInterrupt):
+                self.ensure("--force")
+        finally:
+            P.os.replace = real
+        # publish() undid its own rename: the previous complete copy is back
+        self.assertTrue(run.is_dir())
+        self.assertEqual(self.leftovers(), ["womersleyTube"])
+        # a hard kill in the same window leaves DEST absent and DEST.old-*:
+        old = self.dest.with_name("womersleyTube.old-20260101T000000-1")
+        os.rename(self.dest, old)
+        self.assertFalse(self.dest.exists())
+        with self.assertRaises(SystemExit) as cm:      # restored, then judged: stale with runs
+            self.ensure()
+        self.assertEqual(cm.exception.code, 3)
+        self.assertTrue(run.is_dir())
+        self.assertEqual(self.leftovers(), ["womersleyTube"])
+
+    def test_leftover_staging_directory_is_discarded(self):
+        part = self.dest.with_name("womersleyTube.partial")
+        part.mkdir()
+        (part / "junk").write_text("x")
+        self.ensure()
+        self.assertEqual(self.leftovers(), ["womersleyTube"])
+        self.assertTrue(json.loads((self.dest / P.MARKER).read_text())["complete"])
+
+    def test_copy_without_marker_is_rebuilt_or_refused_when_it_has_runs(self):
+        self.ensure()
+        (self.dest / P.MARKER).unlink()                  # an incomplete copy
+        self.ensure()                                    # no runs: rebuilt
+        self.assertTrue((self.dest / P.MARKER).is_file())
+        (self.dest / P.MARKER).unlink()
+        run = self.make_run()
+        with self.assertRaises(SystemExit) as cm:
+            self.ensure()
+        self.assertEqual(cm.exception.code, 3)
+        self.assertTrue(run.is_dir())
+        self.ensure("--force")
+        self.assertFalse(run.exists())
+        self.assertEqual(self.leftovers(), ["womersleyTube"])   # old one deleted after success
+
+    def test_changed_analysis_files_refresh_the_copy_and_keep_the_runs(self):
+        self.ensure()
+        run = self.make_run()
+        (self.src / "verification/scripts/driver.py").write_text("# analysis v2\n")
+        self.ensure()
+        self.assertEqual((self.dest / "verification/scripts/driver.py").read_text(),
+                         "# analysis v2\n")
+        self.assertTrue((run / "x").exists())
+        self.assertEqual(self.leftovers(), ["womersleyTube"])
+        self.ensure()                                    # and is current now
+
+    def test_missing_file_after_copy_is_detected(self):
+        real = P.shutil.copytree
+
+        def lossy(src, dst, **kw):
+            P.shutil.copytree = real          # copytree recurses through this name
+            real(src, dst, **kw)
+            (Path(dst) / "constant/fsiProperties.iqnils").unlink()
+        P.shutil.copytree = lossy
+        try:
+            with self.assertRaises(SystemExit):
+                self.ensure()
+        finally:
+            P.shutil.copytree = real
+        self.assertFalse(self.dest.exists())
+        self.assertEqual(self.leftovers(), [])
+
+    def test_marker_is_written_last(self):
+        order = []
+        real_val = P.validate_copy
+
+        def spy(src, d, req):
+            order.append(("validate", (d / P.MARKER).exists()))
+            return real_val(src, d, req)
+        P.validate_copy = spy
+        try:
+            self.ensure()
+        finally:
+            P.validate_copy = real_val
+        self.assertEqual(order, [("validate", False)])
+        self.assertTrue((self.dest / P.MARKER).exists())
 
 
 if __name__ == "__main__":

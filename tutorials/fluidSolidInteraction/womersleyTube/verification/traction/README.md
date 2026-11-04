@@ -32,12 +32,21 @@ solution. It also decomposes the tutorial's attenuation error.
 ./AllverifyTraction --force ...        # discard stale study copies (and their runs)
 ```
 
-Each study copy in `work/` is built in a temporary directory and recorded in
-`diagnostic_settings.json` (written last) with a hash of the tutorial, the
-diagnostic and `prepare_study.py`, and the requested settings. An existing copy
-is kept only if the record is complete and matches. A stale or unfinished copy
-is prepared again if it holds no runs; if it holds runs, the script stops
-(exit status 3) and keeps them unless `--force` is given.
+Each study copy in `work/` is built in a staging directory (`<name>.partial`),
+every copied file and edit is validated, and `diagnostic_settings.json` is
+written last with a hash of what the solver reads, a hash of the analysis files
+(`verification/scripts/*.py`, reference JSON), the diagnostic and
+`prepare_study.py`, and the requested settings. The staging directory replaces
+the old copy by renaming only: the old copy is renamed aside and deleted after
+success, so an interrupted preparation leaves a complete copy (an absent one,
+for an instant between the two renames, is restored from the renamed one at the
+next call). An existing copy is kept if the record is complete and matches. If
+only the analysis files changed it is rebuilt and its runs are moved into the new
+copy (they are reused only if their solver-run key, below, still matches). A copy
+that differs in what the solver reads, or lacks a complete record, is prepared
+again if it holds no runs; if it holds runs the script stops (exit status 3) and
+keeps them unless `--force` is given. `--force` only re-prepares such a copy
+(discarding its runs); it does not rerun valid runs elsewhere.
 
 Runs are made in `work/`, and results are written to `postProcessing/`. Both
 are git-ignored by the repository's root `.gitignore` and removed by
