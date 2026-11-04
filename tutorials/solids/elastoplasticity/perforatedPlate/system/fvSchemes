@@ -28,7 +28,7 @@ ddtSchemes
 
 gradSchemes
 {
-    default            pointCellsLeastSquares;
+    default            leastSquaresS4f;
 }
 
 divSchemes
