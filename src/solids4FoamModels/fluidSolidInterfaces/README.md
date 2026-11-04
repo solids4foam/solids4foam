@@ -369,7 +369,9 @@ by the solid differed from the fluid force by 5–150 % (#665).
 and the pressure variation about the area-weighted interface-mean pressure
 separately, and applies the pressure along the solid face normals:
 
-    t_solid = -T(t_viscous) - (T(p - p_mean) + p_mean) n_solid
+```text
+t_solid = -T(t_viscous) - (T(p - p_mean) + p_mean) n_solid
+```
 
 where `T()` is the interface transfer. The mean pressure is applied exactly on
 the solid geometry and only the variation is interpolated, so the load of a
@@ -392,4 +394,3 @@ corners are captured.
 ```c++
 separatePressureTransfer yes;
 ```
-
