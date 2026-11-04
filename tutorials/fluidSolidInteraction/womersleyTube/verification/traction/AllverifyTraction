@@ -59,7 +59,7 @@ prepare tol --coupling-tol-factor 0.01
 
 if [[ $ANALYSIS_ONLY == 0 ]]; then
     failed=()
-    (cd "$WORK/mu5/womersleyTube" && ./verification/Allverify --study all --cores "$CORES") \
+    (cd "$WORK/mu5/womersleyTube" && ./verification/Allverify --study all --reuse --cores "$CORES") \
         || failed+=("mu5: verification/Allverify (see its output above)")
     pids=()
     names=()

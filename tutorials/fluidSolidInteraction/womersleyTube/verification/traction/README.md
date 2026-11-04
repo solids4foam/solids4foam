@@ -30,6 +30,13 @@ solution. It also decomposes the tutorial's attenuation error.
 Runs are made in `work/`, and results are written to `postProcessing/`. Both
 are git-ignored.
 
+Completed runs in `work/` are reused, not repeated, when their stored settings
+(case, mesh, reference parameters, content hashes of the study copy's tutorial
+files, solver build signature) match and the solver log and diagnostic output
+are complete; a run that does not match is run again. Runs are made by
+`run_single.py` without analysing them, so one failed case does not prevent
+the remaining runs.
+
 A failed run, or a required run missing from `work/` (also with
 `--analysis-only`), stops the script with a list of the affected runs and exit
 status 1; no partial analysis is made.
