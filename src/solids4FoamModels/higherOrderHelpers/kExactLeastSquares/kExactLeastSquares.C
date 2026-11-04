@@ -746,6 +746,9 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
     FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
     FixedList<scalarList, 3> rPow(scalarList(polynomialOrder_ + 1));
 
+    // Owner-cell monomial averages, refilled for each face
+    scalarList ownerAverages(Np);
+
     const List<symmTensor>* secondMomentsPtr = nullptr;
     const List<symmTensor3rdOrder>* thirdMomentsPtr = nullptr;
     Map<symmTensor> remoteSecondMoments;
@@ -890,6 +893,27 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
         }
 
         return average;
+    };
+
+    // Fill ownerAverages with the central moments of the owner cell: with a
+    // zero offset the monomial average reduces to the central moment
+    const auto fillOwnerAverages =
+    [&]
+    (
+        const label ownerGlobalCellID
+    )
+    {
+        forAll(exponents, p)
+        {
+            const FixedList<label, 3>& exponent = exponents[p];
+            ownerAverages[p] = centralMoment
+            (
+                ownerGlobalCellID,
+                exponent[0],
+                exponent[1],
+                twoD ? 0 : exponent[2]
+            );
+        }
     };
 
     // Return a central moment of a cell after reflection with tensor R.
@@ -1107,20 +1131,8 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                 numberOfObservations
             );
 
-            // The owner-cell monomial averages are its central moments and do
-            // not depend on the stencil cell
-            scalarList ownerAverages(Np);
-            forAll(exponents, p)
-            {
-                const FixedList<label, 3>& exponent = exponents[p];
-                ownerAverages[p] = centralMoment
-                (
-                    ownerGlobalCellID,
-                    exponent[0],
-                    exponent[1],
-                    twoD ? 0 : exponent[2]
-                );
-            }
+            // The owner-cell averages do not depend on the stencil cell
+            fillOwnerAverages(ownerGlobalCellID);
 
             forAll(cellStencil, stencilI)
             {
@@ -1334,20 +1346,8 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             Eigen::MatrixXd Q(Np, Nn + Nc);
             Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn + Nc);
 
-            // The owner-cell monomial averages are its central moments and do
-            // not depend on the stencil cell
-            scalarList ownerAverages(Np);
-            forAll(exponents, p)
-            {
-                const FixedList<label, 3>& exponent = exponents[p];
-                ownerAverages[p] = centralMoment
-                (
-                    ownerGlobalCellID,
-                    exponent[0],
-                    exponent[1],
-                    twoD ? 0 : exponent[2]
-                );
-            }
+            // The owner-cell averages do not depend on the stencil cell
+            fillOwnerAverages(ownerGlobalCellID);
 
             forAll(cellStencil, stencilI)
             {
@@ -1820,6 +1820,9 @@ void kExactLeastSquares::calcCellCoeffs() const
     scalarList hPow(polynomialOrder_ + 1);
     FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
 
+    // Owner-cell monomial averages, refilled for each cell
+    scalarList ownerAverages(Np);
+
     // Reference to remote centres
     const Map<vector>& remoteCI = stencil().remoteCentresMap();
 
@@ -1974,6 +1977,27 @@ void kExactLeastSquares::calcCellCoeffs() const
         return average;
     };
 
+    // Fill ownerAverages with the central moments of the owner cell: with a
+    // zero offset the monomial average reduces to the central moment
+    const auto fillOwnerAverages =
+    [&]
+    (
+        const label ownerGlobalCellID
+    )
+    {
+        forAll(exponents, p)
+        {
+            const FixedList<label, 3>& exponent = exponents[p];
+            ownerAverages[p] = centralMoment
+            (
+                ownerGlobalCellID,
+                exponent[0],
+                exponent[1],
+                twoD ? 0 : exponent[2]
+            );
+        }
+    };
+
     forAll(stencils, cellI)
     {
         const labelUList stencil = stencils[cellI];
@@ -2010,20 +2034,8 @@ void kExactLeastSquares::calcCellCoeffs() const
                 << abort(FatalError);
         }
 
-        // The owner-cell monomial averages are its central moments and do not
-        // depend on the stencil cell
-        scalarList ownerAverages(Np);
-        forAll(exponents, p)
-        {
-            const FixedList<label, 3>& exponent = exponents[p];
-            ownerAverages[p] = centralMoment
-            (
-                ownerGlobalCellID,
-                exponent[0],
-                exponent[1],
-                twoD ? 0 : exponent[2]
-            );
-        }
+        // The owner-cell averages do not depend on the stencil cell
+        fillOwnerAverages(ownerGlobalCellID);
 
         // Loop over stencil cells and compute their cell-average equations
         for (label cI = 0; cI < stencil.size(); ++cI)

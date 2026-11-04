@@ -182,8 +182,7 @@ public:
         static void checkMeshSupported(const fvMesh& mesh);
 
         //- Fill xPow[n] with x to the power n, for n from 0 to
-        //  xPow.size() - 1, by repeated multiplication. This replaces the
-        //  integer-exponent pow calls in the coefficient loops
+        //  xPow.size() - 1, by repeated multiplication
         static void integerPowers(const scalar x, UList<scalar>& xPow);
 
         //- Fill dPow[cmpt] with the integer powers of component cmpt of d
