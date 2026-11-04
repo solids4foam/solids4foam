@@ -98,6 +98,9 @@ Common `IQNILS` controls in `constant/fsiProperties` include:
 - `outerCorrAbsoluteTolerance`: optional absolute interface residual
   tolerance in metres, used by the strong coupling schemes (see
   [Absolute residual tolerance](#absolute-residual-tolerance)).
+- `separatePressureTransfer`: optionally transfer the fluid viscous traction
+  and pressure separately and apply the pressure along the solid face normals
+  (see [Pressure transfer](#pressure-transfer)).
 - `qrSolveTolerance`: relative cutoff used to ignore nearly singular
   directions during the triangular back-substitution.
 - `reorthogonalizeCouplingColumns`: optionally apply a second
@@ -345,3 +348,48 @@ outerCorrAbsoluteTolerance 1e-9; // m
 Choose a small fraction of the smallest interface cell size, or of the
 displacement accuracy you need, e.g. 1e-3 of the cell size or below. With the
 option unset the behaviour is unchanged.
+
+---
+
+## Pressure transfer
+
+By default the total fluid traction (viscous traction minus pressure times the
+fluid face normal) is interpolated onto the solid faces, and the solid
+integrates it over its own faces. The total force is then conserved only if
+the fluid and solid interfaces describe the same surface. When they do not,
+for example when the fluid mesher chamfers edges and corners or the faceted
+fluid surface has a different area, a uniform pressure produces a spurious net
+load on the solid. The error scales with the absolute pressure level, not the
+pressure variation, so it matters most on thin structures, where the net load
+is a small difference between large pressure forces on opposite faces. On
+`hessenthalerFsi` with a fluid mesh that rounds the flap, the force received
+by the solid differed from the fluid force by 5–150 % (#665).
+
+`separatePressureTransfer yes` (default `no`) transfers the viscous traction
+and the pressure variation about the area-weighted interface-mean pressure
+separately, and applies the pressure along the solid face normals:
+
+    t_solid = -T(t_viscous) - (T(p - p_mean) + p_mean) n_solid
+
+where `T()` is the interface transfer. The mean pressure is applied exactly on
+the solid geometry and only the variation is interpolated, so the load of a
+uniform pressure is exact whatever the shape of the fluid interface, on open
+(wall-attached) and closed interfaces and on structures wetted on one side or
+both. With matching interface geometry the result agrees with the default to
+the interpolation error. The log prints the relative imbalance
+`|F_fluid + F_solid|/|F_fluid|` after the interface totals; with the option on
+it no longer measures the conservation of the transfer of a uniform pressure,
+which is exact by construction, but the remaining differences.
+
+The option applies to the strong and weak coupling schemes that use the total
+traction (`fixedRelaxation`, `Aitken`, `IQNILS`, `weakCoupling`); interfaces
+that transfer the viscous force and pressure separately already apply the
+pressure on the solid faces. Fluid meshes should still reproduce the solid
+surface: with cfMesh, extract the feature edges into a `.fms` surface
+(`surfaceFeatureEdges -angle 45 surface.stl surface.fms`) so that edges and
+corners are captured.
+
+```c++
+separatePressureTransfer yes;
+```
+

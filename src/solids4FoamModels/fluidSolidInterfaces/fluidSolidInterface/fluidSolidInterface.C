@@ -617,6 +617,13 @@ Foam::fluidSolidInterface::fluidSolidInterface
             "outerCorrAbsoluteTolerance", 0
         )
     ),
+    separatePressureTransfer_
+    (
+        fsiProperties_.lookupOrAddDefault<Switch>
+        (
+            "separatePressureTransfer", false
+        )
+    ),
     robinPressureTolerance_
     (
         fsiProperties_.lookupOrAddDefault<scalar>
@@ -1878,17 +1885,83 @@ void Foam::fluidSolidInterface::updateForce()
         // from the fluid zone
         vectorField solidZoneTotalTraction(solidZone.size(), vector::zero);
 
-        // Transfer the field frm the fluid interface to the solid interface
-        interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
-        (
-            fluidZone,                 // from zone
-            solidZone,                 // to zone
-            fluidZoneTotalTraction,    // from field
-            solidZoneTotalTraction     // to field
-        );
+        if (separatePressureTransfer_)
+        {
+            // Transfer the viscous traction and the pressure variation about
+            // the interface-mean pressure, and apply the pressure along the
+            // solid normals: the mean pressure, which on a thin structure
+            // can be much larger than the net load, is then exact on the
+            // solid surface whatever the faceting of the fluid interface
+            const vectorField fluidZoneViscousTraction
+            (
+                fluid().faceZoneViscousForce(interfaceI)
+            );
+            const scalarField fluidZonePressure
+            (
+                fluid().faceZonePressureForce(interfaceI)
+            );
 
-        // Flip traction sign after transferring from fluid to solid
-        solidZoneTotalTraction = -solidZoneTotalTraction;
+            // Area-weighted mean pressure (the zone is global, so no
+            // parallel reduction is needed)
+            const pointField& fluidZonePoints = fluidZone.localPoints();
+            const faceList& fluidZoneFaces = fluidZone.localFaces();
+            scalarField fluidZoneMagSf(fluidZoneFaces.size(), 0);
+            forAll(fluidZoneMagSf, faceI)
+            {
+#ifdef OPENFOAM_ORG
+                fluidZoneMagSf[faceI] =
+                    mag(fluidZoneFaces[faceI].area(fluidZonePoints));
+#else
+                fluidZoneMagSf[faceI] =
+                    mag(fluidZoneFaces[faceI].normal(fluidZonePoints));
+#endif
+            }
+            const scalar meanPressure =
+                sum(fluidZonePressure*fluidZoneMagSf)
+               /max(sum(fluidZoneMagSf), VSMALL);
+
+            vectorField solidZoneViscousTraction
+            (
+                solidZone.size(), vector::zero
+            );
+            scalarField solidZonePressure(solidZone.size(), 0);
+
+            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
+            (
+                fluidZone,                 // from zone
+                solidZone,                 // to zone
+                fluidZoneViscousTraction,  // from field
+                solidZoneViscousTraction   // to field
+            );
+            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
+            (
+                fluidZone,                          // from zone
+                solidZone,                          // to zone
+                scalarField(fluidZonePressure - meanPressure), // from field
+                solidZonePressure                   // to field
+            );
+
+            // The solid faces receive minus the fluid viscous traction and
+            // the pressure acting against their outward normals
+            solidZoneTotalTraction =
+              - solidZoneViscousTraction
+              - (solidZonePressure + meanPressure)*solidZone.faceNormals();
+        }
+        else
+        {
+            // Transfer the field frm the fluid interface to the solid
+            // interface
+            interfaceToInterfaceList()[interfaceI].transferFacesZoneToZone
+            (
+                fluidZone,                 // from zone
+                solidZone,                 // to zone
+                fluidZoneTotalTraction,    // from field
+                solidZoneTotalTraction     // to field
+            );
+
+            // Flip traction sign after transferring from fluid to solid
+            solidZoneTotalTraction = -solidZoneTotalTraction;
+        }
 
         solidZonesTractions()[interfaceI] = solidZoneTotalTraction;
 
@@ -1903,11 +1976,23 @@ void Foam::fluidSolidInterface::updateForce()
             );
         }
 
-        // Print total force on solid and fluid interfaces
+        // Print total force on solid and fluid interfaces, and their
+        // imbalance: the two should be equal and opposite, and differ when
+        // the transfer does not conserve the force
+        const vector fluidForce
+        (
+            totalForceOnInterface(fluidZone, fluidZoneTotalTraction)
+        );
+        const vector solidForce
+        (
+            totalForceOnInterface(solidZone, solidZoneTotalTraction)
+        );
+
         Info<< "Total force on fluid interface " << interfaceI << ": "
-            << totalForceOnInterface(fluidZone, fluidZoneTotalTraction) << nl
+            << fluidForce << nl
             << "Total force on solid interface " << interfaceI << ": "
-            << totalForceOnInterface(solidZone, solidZoneTotalTraction) << nl
+            << solidForce << ", relative imbalance "
+            << mag(fluidForce + solidForce)/(mag(fluidForce) + SMALL) << nl
             << endl;
 
         // ZT: move this part of the code into
