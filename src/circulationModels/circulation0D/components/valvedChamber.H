@@ -43,8 +43,14 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                        Class valvedChamber Declaration
+\*---------------------------------------------------------------------------*/
 
 class valvedChamber
 :
@@ -52,20 +58,37 @@ class valvedChamber
 {
 public:
 
+    //- Runtime type information
     TypeName("valvedChamber");
 
-    valvedChamber
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual role kind() const { return role::composite; }
-    virtual void expand(circulationBuilder& builder) const;
+    // Constructors
+
+        //- Construct from dictionary
+        valvedChamber
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Role: composite
+        virtual role kind() const { return role::composite; }
+
+        //- Add the orificeValve <name>.inletValve, the elastanceChamber
+        //  <name>.chamber and the orificeValve <name>.outletValve in series
+        virtual void expand(circulationBuilder& builder) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

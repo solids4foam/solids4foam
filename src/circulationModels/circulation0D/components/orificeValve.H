@@ -56,40 +56,76 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                        Class orificeValve Declaration
+\*---------------------------------------------------------------------------*/
 
 class orificeValve
 :
     public circulationComponent
 {
-    scalar CQ_;
-    scalar Rs_;                 //!< series resistance [Pa s/m3]
-    scalar eps_;
-    scalar reverseFraction_;
+    // Private Data
+
+        //- Valve coefficient CQ [m3/s/Pa^0.5]
+        scalar CQ_;
+
+        //- Series resistance [Pa s/m3]
+        scalar Rs_;
+
+        //- Smoothing pressure epsilon; 0 = hard diode [Pa]
+        scalar eps_;
+
+        //- Regurgitant orifice fraction CQ_r/CQ
+        scalar reverseFraction_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("orificeValve");
 
-    orificeValve
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual void parameters(DynamicList<parameter>&) const;
+    // Constructors
 
-    virtual role kind() const { return role::branch; }
-    virtual scalar flow(const scalar t, const scalar dP) const;
-    virtual scalar dFlowdDP(const scalar t, const scalar dP) const;
+        //- Construct from dictionary
+        orificeValve
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
 
-    //- Pressure drop that carries flow Q through the valve [Pa]
-    static scalar dPfromQ(const scalar CQ, const scalar Q, const scalar fr);
+
+    // Member Functions
+
+        //- Report CQ, and R if positive, for the setup check
+        virtual void parameters(DynamicList<parameter>&) const;
+
+        //- Role: branch
+        virtual role kind() const { return role::branch; }
+
+        //- Flow in -> out for dP = Pin - Pout [m3/s]
+        virtual scalar flow(const scalar t, const scalar dP) const;
+
+        //- d flow / d dP, kept finite where the valve opens and nonzero
+        //  where it is shut [m3/s/Pa]
+        virtual scalar dFlowdDP(const scalar t, const scalar dP) const;
+
+        //- Pressure drop that carries flow Q through the valve [Pa]
+        static scalar dPfromQ(const scalar CQ, const scalar Q, const scalar fr);
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

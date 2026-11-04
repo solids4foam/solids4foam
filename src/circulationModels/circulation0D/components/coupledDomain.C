@@ -29,11 +29,16 @@ Author
 #include "circulationBuilder.H"
 #include "externalPort.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(coupledDomain, 0);
     addToRunTimeSelectionTable(circulationComponent, coupledDomain, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::coupledDomain::coupledDomain
 (
@@ -44,6 +49,9 @@ Foam::coupledDomain::coupledDomain
 :
     circulationComponent(name, dict, ctx)
 {}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 void Foam::coupledDomain::expand(circulationBuilder& b) const
 {
@@ -81,5 +89,6 @@ void Foam::coupledDomain::expand(circulationBuilder& b) const
     b.alias(name_ + ".in", name_ + ".inlet.in");
     b.alias(name_ + ".out", name_ + ".outlet.out");
 }
+
 
 // ************************************************************************* //

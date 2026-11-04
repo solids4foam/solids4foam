@@ -50,109 +50,165 @@ Author
 #include "string.H"
 #include "dimensionSet.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
 
 //- Built-in sub-circuit modules (windkessel2/3/4, healthyHuman, pipeLoopHeart)
+//  as a dictionary of module definitions; defined in circulationPresets.C
 dictionary circulationPresets();
+
+
+/*---------------------------------------------------------------------------*\
+                      Class circulationContext Declaration
+\*---------------------------------------------------------------------------*/
 
 class circulationContext
 {
 public:
 
-    //- Physical quantities that carry units
-    enum class quantity
-    {
-        pressure,           //!< P
-        volume,             //!< V
-        flow,               //!< Q = V/t
-        resistance,         //!< R = P t / V
-        compliance,         //!< C = V / P
-        inertance,          //!< L = P t^2 / V
-        elastance,          //!< E = P / V
-        valveCoefficient,   //!< CQ = V / (t sqrt(P))
-        quadraticResistance,//!< Rhat = P t^2 / V^2   (dP = Rhat Q^2)
-        elastanceQuadratic, //!< E2 = P / V^2
-        inverseVolume,      //!< K = 1 / V
-        time,               //!< seconds, never converted
-        none
-    };
+    // Public Data Types
+
+        //- Physical quantities that carry units
+        enum class quantity
+        {
+            //- P
+            pressure,
+            //- V
+            volume,
+            //- Q = V/t
+            flow,
+            //- R = P t / V
+            resistance,
+            //- C = V / P
+            compliance,
+            //- L = P t^2 / V
+            inertance,
+            //- E = P / V
+            elastance,
+            //- CQ = V / (t sqrt(P))
+            valveCoefficient,
+            //- Rhat = P t^2 / V^2   (dP = Rhat Q^2)
+            quadraticResistance,
+            //- E2 = P / V^2
+            elastanceQuadratic,
+            //- K = 1 / V
+            inverseVolume,
+            //- seconds, never converted
+            time,
+            //- Dimensionless, never converted
+            none
+        };
 
 
 private:
 
-    //- Sub-circuit templates: the built-in presets, overridden by the case's
-    //  "modules" dictionary
-    dictionary modules_;
+    // Private Data
 
-    word name_;
-    scalar pressureFactor_;     //!< Pa per pressure unit
-    scalar volumeFactor_;       //!< m3 per volume unit
-    word pressureLabel_;
-    word volumeLabel_;
-    scalar period_;             //!< cardiac period [s]
+        //- Sub-circuit templates: the built-in presets, overridden by the
+        //  case's "modules" dictionary
+        dictionary modules_;
+
+        //- Name of the unit system: SI, mmHg_mL or custom
+        word name_;
+
+        //- Pa per pressure unit
+        scalar pressureFactor_;
+
+        //- m3 per volume unit
+        scalar volumeFactor_;
+
+        //- Pressure unit label used in the output, e.g. "mmHg"
+        word pressureLabel_;
+
+        //- Volume unit label used in the output, e.g. "mL"
+        word volumeLabel_;
+
+        //- Cardiac period [s]
+        scalar period_;
 
 
 public:
 
-    //- Read "units" and "Tcycle" from the top-level circulationProperties
-    explicit circulationContext(const dictionary& dict);
+    // Constructors
 
-    //- SI per user unit
-    scalar factor(const quantity q) const;
+        //- Read "units", "Tcycle" and "modules" from the top-level
+        //  circulationProperties
+        explicit circulationContext(const dictionary& dict);
 
-    scalar toSI(const quantity q, const scalar v) const
-    {
-        return v*factor(q);
-    }
 
-    scalar fromSI(const quantity q, const scalar v) const
-    {
-        return v/factor(q);
-    }
+    // Member Functions
 
-    //- The dimensions of a quantity in SI base units
-    static dimensionSet dimensions(const quantity q);
+        //- SI per user unit of quantity q
+        scalar factor(const quantity q) const;
 
-    //- Read a required entry as SI. A plain number is in the case's units
-    //  (converted); an entry with dimensions, "R [1 -4 -1 0 0 0 0] 10", is
-    //  checked against the dimensions the parameter must have, and is SI.
-    scalar read(const dictionary& d, const word& key, const quantity q) const;
+        //- Convert a value of quantity q from the case's units to SI
+        scalar toSI(const quantity q, const scalar v) const
+        {
+            return v*factor(q);
+        }
 
-    //- Read an optional entry (default given in user units) as SI
-    scalar read
-    (
-        const dictionary& d,
-        const word& key,
-        const quantity q,
-        const scalar defaultUserValue
-    ) const
-    {
-        return
-            d.found(key)
-          ? read(d, key, q)
-          : defaultUserValue*factor(q);
-    }
+        //- Convert an SI value of quantity q to the case's units
+        scalar fromSI(const quantity q, const scalar v) const
+        {
+            return v/factor(q);
+        }
 
-    //- Unit label used in output headings, e.g. "mmHg", "mL/s"
-    string label(const quantity q) const;
+        //- The dimensions of a quantity in SI base units
+        static dimensionSet dimensions(const quantity q);
 
-    const word& name() const { return name_; }
+        //- Read a required entry as SI. A plain number is in the case's
+        //  units (converted); an entry with dimensions,
+        //  "R [1 -4 -1 0 0 0 0] 10", is checked against the dimensions the
+        //  parameter must have, and is SI.
+        scalar read
+        (
+            const dictionary& d,
+            const word& key,
+            const quantity q
+        ) const;
 
-    //- Cardiac period [s]
-    scalar period() const { return period_; }
+        //- Read an optional entry (default given in user units) as SI
+        scalar read
+        (
+            const dictionary& d,
+            const word& key,
+            const quantity q,
+            const scalar defaultUserValue
+        ) const
+        {
+            return
+                d.found(key)
+              ? read(d, key, q)
+              : defaultUserValue*factor(q);
+        }
 
-    //- The module definition of that name, or null
-    const dictionary* findModule(const word& type) const
-    {
-        return modules_.isDict(type) ? &modules_.subDict(type) : nullptr;
-    }
+        //- Unit label used in output headings, e.g. "mmHg", "mL/s"
+        string label(const quantity q) const;
 
-    //- Names of all modules available
-    wordList moduleNames() const { return modules_.sortedToc(); }
+        //- Name of the unit system: SI, mmHg_mL or custom
+        const word& name() const { return name_; }
+
+        //- Cardiac period [s]
+        scalar period() const { return period_; }
+
+        //- The module definition of that name, or null
+        const dictionary* findModule(const word& type) const
+        {
+            return modules_.isDict(type) ? &modules_.subDict(type) : nullptr;
+        }
+
+        //- Names of all modules available
+        wordList moduleNames() const { return modules_.sortedToc(); }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

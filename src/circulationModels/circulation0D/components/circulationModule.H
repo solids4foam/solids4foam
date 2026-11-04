@@ -71,38 +71,61 @@ SourceFiles
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                      Class circulationModule Declaration
+\*---------------------------------------------------------------------------*/
 
 class circulationModule
 :
     public circulationComponent
 {
-    //- Name of the module this is an instance of
-    const word moduleType_;
+    // Private Data
 
-    //- The module definition with the parameters substituted
-    dictionary resolved_;
+        //- Name of the module this is an instance of
+        const word moduleType_;
+
+        //- The module definition with the parameters substituted
+        dictionary resolved_;
+
 
 public:
 
-    //- Construct for an instance "dict" of the module "definition"
-    circulationModule
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx,
-        const dictionary& definition
-    );
+    // Constructors
 
-    virtual role kind() const { return role::composite; }
+        //- Construct for an instance "dict" of the module "definition"
+        circulationModule
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx,
+            const dictionary& definition
+        );
 
-    virtual const word& type() const;
 
-    virtual void expand(circulationBuilder& builder) const;
+    // Member Functions
+
+        //- Role: composite
+        virtual role kind() const { return role::composite; }
+
+        //- Type name: the name of the module
+        virtual const word& type() const;
+
+        //- Add the components, connections and terminals of the module,
+        //  named relative to this instance
+        virtual void expand(circulationBuilder& builder) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

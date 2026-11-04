@@ -50,44 +50,77 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                      Class elastanceChamber Declaration
+\*---------------------------------------------------------------------------*/
 
 class elastanceChamber
 :
     public circulationComponent
 {
-    scalar V0_, P0_, Emin_, Emax_;
-    scalar Tes_, Ted_, Eshift_, T_;
-    scalar Vinit_;
+    // Private Data
+
+        //- Unstressed volume V0 [m3], pressure offset P0 [Pa], and minimum
+        //  and maximum elastance Emin, Emax [Pa/m3]
+        scalar V0_, P0_, Emin_, Emax_;
+
+        //- End of contraction Tes, end of relaxation Ted, activation shift
+        //  Eshift (as a fraction of T) and cycle length T; times in [s]
+        scalar Tes_, Ted_, Eshift_, T_;
+
+        //- Initial volume [m3]
+        scalar Vinit_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("elastanceChamber");
 
-    elastanceChamber
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual void parameters(DynamicList<parameter>&) const;
+    // Constructors
 
-    virtual role kind() const { return role::storage; }
+        //- Construct from dictionary
+        elastanceChamber
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
 
-    //- Elastance at time t [Pa/m3]
-    scalar elastance(const scalar t) const;
 
-    virtual scalar pressure(const scalar t, const scalar V) const
-    {
-        return (V - V0_)*elastance(t) + P0_;
-    }
+    // Member Functions
 
-    virtual scalar initialVolume() const { return Vinit_; }
+        //- Report V0, P0, Emin and Emax for the setup check
+        virtual void parameters(DynamicList<parameter>&) const;
+
+        //- Role: storage
+        virtual role kind() const { return role::storage; }
+
+        //- Elastance at time t [Pa/m3]
+        scalar elastance(const scalar t) const;
+
+        //- Pressure for volume V at time t, (V - V0) E(t) + P0 [Pa]
+        virtual scalar pressure(const scalar t, const scalar V) const
+        {
+            return (V - V0_)*elastance(t) + P0_;
+        }
+
+        //- Initial volume [m3]
+        virtual scalar initialVolume() const { return Vinit_; }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

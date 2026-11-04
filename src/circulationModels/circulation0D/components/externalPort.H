@@ -67,8 +67,14 @@ Author
 #include "circulationWaveform.H"
 #include "FixedList.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                        Class externalPort Declaration
+\*---------------------------------------------------------------------------*/
 
 class externalPort
 :
@@ -76,84 +82,139 @@ class externalPort
 {
 public:
 
-    typedef FixedList<scalar, 4> forcingCoeffs;
+    // Public Typedefs
+
+        //- Coefficients c0..c3 of the forcing polynomial in alpha
+        typedef FixedList<scalar, 4> forcingCoeffs;
+
 
 private:
 
-    const bool inlet_;
-    const bool tabulated_;
-    const word patch_;          //!< name of the coupled patch, if given
+    // Private Data
 
-    bool hasValve_;
-    scalar CQ_;
-    scalar reverseFraction_;
+        //- True for an inlet port, false for an outlet port
+        const bool inlet_;
 
-    autoPtr<circulationWaveform> table_;
+        //- True if the flow is read from a waveform table (provider table)
+        const bool tabulated_;
 
-    // External forcing over [t0, t1], coefficients in ascending alpha powers
-    scalar t0_, t1_;
-    forcingCoeffs c_;
+        //- Name of the coupled patch, if given
+        const word patch_;
+
+        //- True if a valve law stands between the node and the patch
+        bool hasValve_;
+
+        //- Valve coefficient CQ [m3/s/Pa^0.5]
+        scalar CQ_;
+
+        //- Regurgitant orifice fraction CQ_r/CQ of the valve
+        scalar reverseFraction_;
+
+        //- Flow waveform, for provider table
+        autoPtr<circulationWaveform> table_;
+
+        //- Interval [t0, t1] of the external forcing [s]
+        scalar t0_, t1_;
+
+        //- External forcing over [t0, t1], coefficients in ascending powers
+        //  of alpha
+        forcingCoeffs c_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("externalPort");
 
-    //- Construct reading direction and provider from the dictionary
-    externalPort
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    //- Construct with direction and provider given
-    externalPort
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx,
-        const word& direction,
-        const word& provider
-    );
+    // Constructors
 
-    virtual role kind() const { return role::portSource; }
+        //- Construct reading direction and provider from the dictionary
+        externalPort
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
 
-    virtual void parameters(DynamicList<parameter>& p) const
-    {
-        if (hasValve_)
+        //- Construct with direction and provider given
+        externalPort
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx,
+            const word& direction,
+            const word& provider
+        );
+
+
+    // Member Functions
+
+        //- Role: portSource
+        virtual role kind() const { return role::portSource; }
+
+        //- Report the valve coefficient, if there is a valve, for the setup
+        //  check
+        virtual void parameters(DynamicList<parameter>& p) const
         {
-            p.append
-            (
-                {
-                    "valve CQ",
-                    circulationContext::quantity::valveCoefficient,
-                    CQ_
-                }
-            );
+            if (hasValve_)
+            {
+                p.append
+                (
+                    {
+                        "valve CQ",
+                        circulationContext::quantity::valveCoefficient,
+                        CQ_
+                    }
+                );
+            }
         }
-    }
 
-    bool inlet() const { return inlet_; }
+        //- True for an inlet port
+        bool inlet() const { return inlet_; }
 
-    //- Name of the CFD patch this port is coupled to ("patch" entry), or empty
-    const word& patchName() const { return patch_; }
-    bool tabulated() const { return tabulated_; }
+        //- Name of the CFD patch this port is coupled to ("patch" entry), or
+        //  empty
+        const word& patchName() const { return patch_; }
 
-    //- Supply the flow over [t0, t1] (SI, polynomial coefficients)
-    void setForcing(const scalar t0, const scalar t1, const forcingCoeffs& c);
+        //- True if the flow is read from a waveform table
+        bool tabulated() const { return tabulated_; }
 
-    virtual scalar portFlow(const scalar t) const;
+        //- Supply the flow over [t0, t1] (SI, polynomial coefficients)
+        void setForcing
+        (
+            const scalar t0,
+            const scalar t1,
+            const forcingCoeffs& c
+        );
 
-    //- Time derivative of portFlow, from the forcing polynomial [m3/s2]. At
-    //  and beyond the ends of [t0, t1] it is the one-sided derivative there.
-    scalar portFlowRate(const scalar t) const;
+        //- Flow through the patch in its natural direction at time t, from
+        //  the table or the forcing polynomial [m3/s]
+        virtual scalar portFlow(const scalar t) const;
 
-    virtual scalar injectedFlow(const scalar t) const;
-    virtual scalar injectedFlowRate(const scalar t) const;
-    virtual scalar patchPressure(const scalar Pnode, const scalar t) const;
+        //- Time derivative of portFlow, from the forcing polynomial [m3/s2].
+        //  At and beyond the ends of [t0, t1] it is the one-sided derivative
+        //  there.
+        scalar portFlowRate(const scalar t) const;
+
+        //- Flow injected into the node: -portFlow (inlet) or +portFlow
+        //  (outlet) [m3/s]
+        virtual scalar injectedFlow(const scalar t) const;
+
+        //- Time derivative of injectedFlow [m3/s2]
+        virtual scalar injectedFlowRate(const scalar t) const;
+
+        //- Pressure to impose at the patch: Pnode, minus (inlet) or plus
+        //  (outlet) the valve pressure drop if there is a valve [Pa]
+        virtual scalar patchPressure(const scalar Pnode, const scalar t) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

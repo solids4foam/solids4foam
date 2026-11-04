@@ -35,34 +35,60 @@ Author
 #include "circulationComponent.H"
 #include "circulationWaveform.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                       Class pressureSource Declaration
+\*---------------------------------------------------------------------------*/
 
 class pressureSource
 :
     public circulationComponent
 {
-    circulationWaveform wave_;
+    // Private Data
+
+        //- Waveform of the prescribed pressure [Pa]
+        circulationWaveform wave_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("pressureSource");
 
-    pressureSource
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual role kind() const { return role::fixedPressure; }
-    virtual scalar fixedPressure(const scalar t) const
-    {
-        return wave_.value(t);
-    }
+    // Constructors
+
+        //- Construct from dictionary
+        pressureSource
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Role: fixedPressure
+        virtual role kind() const { return role::fixedPressure; }
+
+        //- Prescribed pressure of the node at time t [Pa]
+        virtual scalar fixedPressure(const scalar t) const
+        {
+            return wave_.value(t);
+        }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

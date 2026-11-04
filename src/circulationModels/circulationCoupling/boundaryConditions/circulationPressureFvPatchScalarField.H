@@ -49,79 +49,117 @@ Author
 
 #include "fixedValueFvPatchFields.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+            Class circulationPressureFvPatchScalarField Declaration
+\*---------------------------------------------------------------------------*/
 
 class circulationPressureFvPatchScalarField
 :
     public fixedValueFvPatchScalarField
 {
-    word propertiesName_;
+    // Private Data
 
-    //- Name of the volumetric flux the coupler samples
-    word phiName_;
+        //- Name of the network description dictionary in constant/
+        //  (default: circulationProperties)
+        word propertiesName_;
+
+        //- Name of the volumetric flux the coupler samples
+        word phiName_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("circulationPressure");
 
-    circulationPressureFvPatchScalarField
-    (
-        const fvPatch&,
-        const DimensionedField<scalar, volMesh>&
-    );
 
-    circulationPressureFvPatchScalarField
-    (
-        const fvPatch&,
-        const DimensionedField<scalar, volMesh>&,
-        const dictionary&
-    );
+    // Constructors
 
-    circulationPressureFvPatchScalarField
-    (
-        const circulationPressureFvPatchScalarField&,
-        const fvPatch&,
-        const DimensionedField<scalar, volMesh>&,
-        const fvPatchFieldMapper&
-    );
-
-    circulationPressureFvPatchScalarField
-    (
-        const circulationPressureFvPatchScalarField&
-    );
-
-    circulationPressureFvPatchScalarField
-    (
-        const circulationPressureFvPatchScalarField&,
-        const DimensionedField<scalar, volMesh>&
-    );
-
-    virtual tmp<fvPatchScalarField> clone() const
-    {
-        return tmp<fvPatchScalarField>
+        //- Construct from patch and internal field
+        circulationPressureFvPatchScalarField
         (
-            new circulationPressureFvPatchScalarField(*this)
+            const fvPatch&,
+            const DimensionedField<scalar, volMesh>&
         );
-    }
 
-    virtual tmp<fvPatchScalarField> clone
-    (
-        const DimensionedField<scalar, volMesh>& iF
-    ) const
-    {
-        return tmp<fvPatchScalarField>
+        //- Construct from patch, internal field and dictionary
+        circulationPressureFvPatchScalarField
         (
-            new circulationPressureFvPatchScalarField(*this, iF)
+            const fvPatch&,
+            const DimensionedField<scalar, volMesh>&,
+            const dictionary&
         );
-    }
 
-    virtual void updateCoeffs();
+        //- Construct by mapping given circulationPressureFvPatchScalarField
+        //  onto a new patch
+        circulationPressureFvPatchScalarField
+        (
+            const circulationPressureFvPatchScalarField&,
+            const fvPatch&,
+            const DimensionedField<scalar, volMesh>&,
+            const fvPatchFieldMapper&
+        );
 
-    virtual void write(Ostream&) const;
+        //- Construct as copy
+        circulationPressureFvPatchScalarField
+        (
+            const circulationPressureFvPatchScalarField&
+        );
+
+        //- Construct as copy setting internal field reference
+        circulationPressureFvPatchScalarField
+        (
+            const circulationPressureFvPatchScalarField&,
+            const DimensionedField<scalar, volMesh>&
+        );
+
+        //- Construct and return a clone
+        virtual tmp<fvPatchScalarField> clone() const
+        {
+            return tmp<fvPatchScalarField>
+            (
+                new circulationPressureFvPatchScalarField(*this)
+            );
+        }
+
+        //- Construct and return a clone setting internal field reference
+        virtual tmp<fvPatchScalarField> clone
+        (
+            const DimensionedField<scalar, volMesh>& iF
+        ) const
+        {
+            return tmp<fvPatchScalarField>
+            (
+                new circulationPressureFvPatchScalarField(*this, iF)
+            );
+        }
+
+
+    // Member Functions
+
+        // Evaluation functions
+
+            //- Update the coefficients associated with the patch field:
+            //  sample the flux through the coupler, advancing the network
+            //  on a new exchange, and impose the port pressure (divided by
+            //  the coupling rho for a kinematic pressure)
+            virtual void updateCoeffs();
+
+        //- Write
+        virtual void write(Ostream&) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

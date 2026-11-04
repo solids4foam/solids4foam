@@ -101,4 +101,5 @@ Foam::word Foam::circulationBuilder::resolve(const word& terminal) const
     return t;
 }
 
+
 // ************************************************************************* //

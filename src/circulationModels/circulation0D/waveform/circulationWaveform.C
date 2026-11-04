@@ -274,4 +274,5 @@ Foam::scalar Foam::circulationWaveform::derivative(const scalar t) const
     return 0;
 }
 
+
 // ************************************************************************* //

@@ -25,11 +25,16 @@ Author
 
 #include "ground.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(ground, 0);
     addToRunTimeSelectionTable(circulationComponent, ground, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::ground::ground
 (
@@ -41,5 +46,6 @@ Foam::ground::ground
     circulationComponent(name, dict, ctx),
     P_(ctx.read(dict, "P", circulationContext::quantity::pressure, 0))
 {}
+
 
 // ************************************************************************* //

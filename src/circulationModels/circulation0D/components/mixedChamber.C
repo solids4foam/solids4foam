@@ -30,6 +30,8 @@ Author
 
 #include <cmath>
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(mixedChamber, 0);
@@ -40,6 +42,9 @@ namespace Foam
         dictionary
     );
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::mixedChamber::mixedChamber
 (
@@ -129,6 +134,8 @@ Foam::mixedChamber::mixedChamber
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 Foam::scalar Foam::mixedChamber::activation(const scalar t) const
 {
     using constant::mathematical::pi;
@@ -185,5 +192,6 @@ void Foam::mixedChamber::parameters(DynamicList<parameter>& p) const
     p.append({"P0", circulationContext::quantity::pressure, P0_});
     p.append({"K", circulationContext::quantity::inverseVolume, K_});
 }
+
 
 // ************************************************************************* //

@@ -28,11 +28,16 @@ Author
 #include "compliance.H"
 #include "resistor.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(CR, 0);
     addToRunTimeSelectionTable(circulationComponent, CR, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::CR::CR
 (
@@ -43,6 +48,9 @@ Foam::CR::CR
 :
     circulationComponent(name, dict, ctx)
 {}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 void Foam::CR::expand(circulationBuilder& b) const
 {
@@ -66,5 +74,6 @@ void Foam::CR::expand(circulationBuilder& b) const
     b.alias(name_ + ".in", name_ + ".C.in");
     b.alias(name_ + ".out", name_ + ".R.out");
 }
+
 
 // ************************************************************************* //

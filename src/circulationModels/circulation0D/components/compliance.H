@@ -38,42 +38,75 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                         Class compliance Declaration
+\*---------------------------------------------------------------------------*/
 
 class compliance
 :
     public circulationComponent
 {
-    scalar C_;
-    scalar V0_;
-    scalar P0_;
-    scalar Vinit_;
+    // Private Data
+
+        //- Compliance C [m3/Pa]
+        scalar C_;
+
+        //- Unstressed volume V0 [m3]
+        scalar V0_;
+
+        //- Pressure offset P0 [Pa]
+        scalar P0_;
+
+        //- Initial volume [m3]
+        scalar Vinit_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("compliance");
 
-    compliance
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual void parameters(DynamicList<parameter>&) const;
+    // Constructors
 
-    virtual role kind() const { return role::storage; }
+        //- Construct from dictionary
+        compliance
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
 
-    virtual scalar pressure(const scalar, const scalar V) const
-    {
-        return (V - V0_)/C_ + P0_;
-    }
 
-    virtual scalar initialVolume() const { return Vinit_; }
+    // Member Functions
+
+        //- Report C, V0 and P0 for the setup check
+        virtual void parameters(DynamicList<parameter>&) const;
+
+        //- Role: storage
+        virtual role kind() const { return role::storage; }
+
+        //- Pressure for volume V, (V - V0)/C + P0 [Pa]
+        virtual scalar pressure(const scalar, const scalar V) const
+        {
+            return (V - V0_)/C_ + P0_;
+        }
+
+        //- Initial volume [m3]
+        virtual scalar initialVolume() const { return Vinit_; }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

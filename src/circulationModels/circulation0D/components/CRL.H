@@ -41,8 +41,14 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                             Class CRL Declaration
+\*---------------------------------------------------------------------------*/
 
 class CRL
 :
@@ -50,20 +56,37 @@ class CRL
 {
 public:
 
+    //- Runtime type information
     TypeName("CRL");
 
-    CRL
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual role kind() const { return role::composite; }
-    virtual void expand(circulationBuilder& builder) const;
+    // Constructors
+
+        //- Construct from dictionary
+        CRL
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Role: composite
+        virtual role kind() const { return role::composite; }
+
+        //- Add the compliance <name>.C, the resistor <name>.R and the
+        //  inductor <name>.L in series
+        virtual void expand(circulationBuilder& builder) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

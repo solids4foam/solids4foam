@@ -28,6 +28,8 @@ Author
 #include "mathematicalConstants.H"
 #include <cmath>
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(elastanceChamber, 0);
@@ -38,6 +40,9 @@ namespace Foam
         dictionary
     );
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::elastanceChamber::elastanceChamber
 (
@@ -85,6 +90,8 @@ Foam::elastanceChamber::elastanceChamber
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 Foam::scalar Foam::elastanceChamber::elastance(const scalar t) const
 {
     using constant::mathematical::pi;
@@ -113,5 +120,6 @@ void Foam::elastanceChamber::parameters(DynamicList<parameter>& p) const
     p.append({"Emin", circulationContext::quantity::elastance, Emin_});
     p.append({"Emax", circulationContext::quantity::elastance, Emax_});
 }
+
 
 // ************************************************************************* //

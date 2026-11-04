@@ -125,7 +125,7 @@ Foam::circulationMetrics::circulationMetrics
 }
 
 
-// * * * * * * * * * * * * * * * Private Functions * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 Foam::label Foam::circulationMetrics::slot(const label column) const
 {
@@ -323,5 +323,6 @@ void Foam::circulationMetrics::add(const scalar t, const scalarField& values)
         v_[i].append(values[monitored_[i]]);
     }
 }
+
 
 // ************************************************************************* //

@@ -29,11 +29,16 @@ Author
 #include "elastanceChamber.H"
 #include "orificeValve.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(valvedChamber, 0);
     addToRunTimeSelectionTable(circulationComponent, valvedChamber, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::valvedChamber::valvedChamber
 (
@@ -44,6 +49,9 @@ Foam::valvedChamber::valvedChamber
 :
     circulationComponent(name, dict, ctx)
 {}
+
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 void Foam::valvedChamber::expand(circulationBuilder& b) const
 {
@@ -79,5 +87,6 @@ void Foam::valvedChamber::expand(circulationBuilder& b) const
     b.alias(name_ + ".in", mv + ".in");
     b.alias(name_ + ".out", av + ".out");
 }
+
 
 // ************************************************************************* //

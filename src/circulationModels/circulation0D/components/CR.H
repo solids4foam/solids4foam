@@ -39,8 +39,14 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                             Class CR Declaration
+\*---------------------------------------------------------------------------*/
 
 class CR
 :
@@ -48,20 +54,36 @@ class CR
 {
 public:
 
+    //- Runtime type information
     TypeName("CR");
 
-    CR
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual role kind() const { return role::composite; }
-    virtual void expand(circulationBuilder& builder) const;
+    // Constructors
+
+        //- Construct from dictionary
+        CR
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Role: composite
+        virtual role kind() const { return role::composite; }
+
+        //- Add the compliance <name>.C and the resistor <name>.R in series
+        virtual void expand(circulationBuilder& builder) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

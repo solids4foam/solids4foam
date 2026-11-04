@@ -26,6 +26,8 @@ Author
 
 #include "pressureSource.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(pressureSource, 0);
@@ -37,6 +39,9 @@ namespace Foam
     );
 }
 
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+
 Foam::pressureSource::pressureSource
 (
     const word& name,
@@ -47,5 +52,6 @@ Foam::pressureSource::pressureSource
     circulationComponent(name, dict, ctx),
     wave_(dict, ctx, circulationContext::quantity::pressure)
 {}
+
 
 // ************************************************************************* //

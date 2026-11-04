@@ -70,85 +70,131 @@ SourceFiles
 #include "addToRunTimeSelectionTable.H"
 #include "typeInfo.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
 
+// Forward declarations
 class circulationBuilder;
+
+/*---------------------------------------------------------------------------*\
+                    Class circulationComponent Declaration
+\*---------------------------------------------------------------------------*/
 
 class circulationComponent
 {
 public:
 
-    enum class role
-    {
-        composite,
-        branch,
-        inertia,
-        fixedFlow,
-        storage,
-        fixedPressure,
-        portSource
-    };
+    // Public Data Types
+
+        //- What a component contributes to the network (see the table in
+        //  the class description)
+        enum class role
+        {
+            composite,
+            branch,
+            inertia,
+            fixedFlow,
+            storage,
+            fixedPressure,
+            portSource
+        };
 
 
 protected:
 
-    const word name_;
-    const dictionary dict_;
-    const circulationContext& ctx_;
+    // Protected Data
 
-    //- Fatal error with the component name and its dictionary location
-    [[noreturn]] void fail(const string& message) const;
+        //- Name of the component in the network
+        const word name_;
+
+        //- Dictionary the component was constructed from
+        const dictionary dict_;
+
+        //- Global settings of the network: units, cardiac period, modules
+        const circulationContext& ctx_;
+
+
+    // Protected Member Functions
+
+        //- Fatal error with the component name and its dictionary location
+        [[noreturn]] void fail(const string& message) const;
 
 
 public:
 
-    //- A physical parameter of a component, for the check mode
-    struct parameter
-    {
-        word name;
-        circulationContext::quantity quantity;
-        scalar value;       //!< SI
-    };
+    // Public Data Types
 
+        //- A physical parameter of a component, for the check mode
+        struct parameter
+        {
+            //- Name of the parameter
+            word name;
+
+            //- Physical quantity, which sets its units
+            circulationContext::quantity quantity;
+
+            //- Value [SI]
+            scalar value;
+        };
+
+
+    //- Runtime type information
     TypeName("circulationComponent");
 
-    declareRunTimeSelectionTable
-    (
-        autoPtr,
-        circulationComponent,
-        dictionary,
+
+    // Declare run-time constructor selection table
+
+        declareRunTimeSelectionTable
+        (
+            autoPtr,
+            circulationComponent,
+            dictionary,
+            (
+                const word& name,
+                const dictionary& dict,
+                const circulationContext& ctx
+            ),
+            (name, dict, ctx)
+        );
+
+
+    // Constructors
+
+        //- Construct from components
+        circulationComponent
         (
             const word& name,
             const dictionary& dict,
             const circulationContext& ctx
-        ),
-        (name, dict, ctx)
-    );
+        );
 
-    //- Construct from components
-    circulationComponent
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    //- Select by dict.get<word>("type")
-    static autoPtr<circulationComponent> New
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
+    // Selectors
 
-    virtual ~circulationComponent() = default;
+        //- Select by dict.get<word>("type"): a C++ component, or else a
+        //  module of that name
+        static autoPtr<circulationComponent> New
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Destructor
+
+        //- Destructor
+        virtual ~circulationComponent() = default;
 
 
     // Member Functions
 
+        //- Name of the component
         const word& name() const { return name_; }
 
+        //- Role of the component in the network
         virtual role kind() const = 0;
 
         //- Terminals "in" and "out" are one node
@@ -201,10 +247,12 @@ public:
             //- Pressure for volume V [Pa]
             virtual scalar pressure(const scalar t, const scalar V) const;
 
+            //- Initial volume of the node [m3]
             virtual scalar initialVolume() const;
 
         // fixedPressure
 
+            //- Prescribed pressure of the node at time t [Pa]
             virtual scalar fixedPressure(const scalar t) const;
 
         // portSource
@@ -227,7 +275,12 @@ public:
             ) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

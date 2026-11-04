@@ -35,31 +35,57 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                           Class ground Declaration
+\*---------------------------------------------------------------------------*/
 
 class ground
 :
     public circulationComponent
 {
-    scalar P_;
+    // Private Data
+
+        //- Fixed pressure of the node [Pa]
+        scalar P_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("ground");
 
-    ground
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual role kind() const { return role::fixedPressure; }
-    virtual scalar fixedPressure(const scalar) const { return P_; }
+    // Constructors
+
+        //- Construct from dictionary
+        ground
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Role: fixedPressure
+        virtual role kind() const { return role::fixedPressure; }
+
+        //- Fixed pressure of the node [Pa]
+        virtual scalar fixedPressure(const scalar) const { return P_; }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

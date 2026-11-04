@@ -31,7 +31,7 @@ Author
 #include <numeric>
 #include <sstream>
 
-// * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
 
 namespace
 {
@@ -129,7 +129,7 @@ Foam::circulationNetwork::circulationNetwork
 }
 
 
-// * * * * * * * * * * * * * * * Private Functions * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 void Foam::circulationNetwork::build(const dictionary& dict)
 {
@@ -1115,6 +1115,8 @@ void Foam::circulationNetwork::netPressures
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 // * * * * * * * * * * * * * * * ODESystem * * * * * * * * * * * * * * * * * //
 
 void Foam::circulationNetwork::derivatives
@@ -1464,6 +1466,7 @@ void Foam::circulationNetwork::summary(Ostream& os) const
         os  << nl;
     }
 }
+
 
 Foam::label Foam::circulationNetwork::check
 (

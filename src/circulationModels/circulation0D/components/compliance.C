@@ -26,11 +26,16 @@ Author
 
 #include "compliance.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(compliance, 0);
     addToRunTimeSelectionTable(circulationComponent, compliance, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::compliance::compliance
 (
@@ -78,11 +83,14 @@ Foam::compliance::compliance
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 void Foam::compliance::parameters(DynamicList<parameter>& p) const
 {
     p.append({"C", circulationContext::quantity::compliance, C_});
     p.append({"V0", circulationContext::quantity::volume, V0_});
     p.append({"P0", circulationContext::quantity::pressure, P0_});
 }
+
 
 // ************************************************************************* //

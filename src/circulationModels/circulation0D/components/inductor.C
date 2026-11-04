@@ -26,11 +26,16 @@ Author
 
 #include "inductor.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(inductor, 0);
     addToRunTimeSelectionTable(circulationComponent, inductor, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::inductor::inductor
 (
@@ -50,9 +55,12 @@ Foam::inductor::inductor
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 void Foam::inductor::parameters(DynamicList<parameter>& p) const
 {
     p.append({"L", circulationContext::quantity::inertance, L_});
 }
+
 
 // ************************************************************************* //

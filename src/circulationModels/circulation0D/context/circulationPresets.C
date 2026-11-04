@@ -28,6 +28,8 @@ Author
 #include "circulationContext.H"
 #include "IStringStream.H"
 
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
 namespace
 {
 
@@ -219,10 +221,13 @@ pipeLoopHeart
 } // End anonymous namespace
 
 
+// * * * * * * * * * * * * * * * Global Functions  * * * * * * * * * * * * * //
+
 Foam::dictionary Foam::circulationPresets()
 {
     IStringStream is(presetText);
     return dictionary(is);
 }
+
 
 // ************************************************************************* //

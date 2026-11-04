@@ -48,8 +48,14 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                        Class coupledDomain Declaration
+\*---------------------------------------------------------------------------*/
 
 class coupledDomain
 :
@@ -57,20 +63,37 @@ class coupledDomain
 {
 public:
 
+    //- Runtime type information
     TypeName("coupledDomain");
 
-    coupledDomain
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual role kind() const { return role::composite; }
-    virtual void expand(circulationBuilder& builder) const;
+    // Constructors
+
+        //- Construct from dictionary
+        coupledDomain
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Role: composite
+        virtual role kind() const { return role::composite; }
+
+        //- Add the externalPorts <name>.inlet and <name>.outlet and alias
+        //  <name>.in to the inlet and <name>.out to the outlet
+        virtual void expand(circulationBuilder& builder) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

@@ -27,6 +27,8 @@ Author
 
 #include "orificeValve.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(orificeValve, 0);
@@ -37,6 +39,9 @@ namespace Foam
         dictionary
     );
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::orificeValve::orificeValve
 (
@@ -90,6 +95,8 @@ Foam::orificeValve::orificeValve
     }
 }
 
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 Foam::scalar Foam::orificeValve::flow(const scalar, const scalar dP) const
 {
@@ -197,5 +204,6 @@ void Foam::orificeValve::parameters(DynamicList<parameter>& p) const
         p.append({"R", circulationContext::quantity::resistance, Rs_});
     }
 }
+
 
 // ************************************************************************* //

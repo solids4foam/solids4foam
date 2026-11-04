@@ -52,6 +52,8 @@ Foam::circulationComponent::circulationComponent
 {}
 
 
+// * * * * * * * * * * * * * * * * Selectors * * * * * * * * * * * * * * * * //
+
 Foam::autoPtr<Foam::circulationComponent> Foam::circulationComponent::New
 (
     const word& name,
@@ -88,7 +90,7 @@ Foam::autoPtr<Foam::circulationComponent> Foam::circulationComponent::New
 }
 
 
-// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+// * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * * //
 
 void Foam::circulationComponent::fail(const string& message) const
 {
@@ -100,14 +102,19 @@ void Foam::circulationComponent::fail(const string& message) const
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+// Default for a component whose role does not provide the member: stop
 #define CIRC_NOT_IMPLEMENTED(what)                                            \
     fail(string("'") + type() + "' does not provide " what);                  \
     return 0
+
 
 Foam::scalar Foam::circulationComponent::flow(const scalar, const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("flow()");
 }
+
 
 Foam::scalar Foam::circulationComponent::dFlowdDP
 (
@@ -118,20 +125,24 @@ Foam::scalar Foam::circulationComponent::dFlowdDP
     CIRC_NOT_IMPLEMENTED("dFlowdDP()");
 }
 
+
 Foam::scalar Foam::circulationComponent::inertance() const
 {
     CIRC_NOT_IMPLEMENTED("inertance()");
 }
+
 
 Foam::scalar Foam::circulationComponent::fixedFlow(const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("fixedFlow()");
 }
 
+
 Foam::scalar Foam::circulationComponent::fixedFlowRate(const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("fixedFlowRate()");
 }
+
 
 Foam::scalar Foam::circulationComponent::pressure
 (
@@ -142,30 +153,36 @@ Foam::scalar Foam::circulationComponent::pressure
     CIRC_NOT_IMPLEMENTED("pressure()");
 }
 
+
 Foam::scalar Foam::circulationComponent::initialVolume() const
 {
     CIRC_NOT_IMPLEMENTED("initialVolume()");
 }
+
 
 Foam::scalar Foam::circulationComponent::fixedPressure(const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("fixedPressure()");
 }
 
+
 Foam::scalar Foam::circulationComponent::injectedFlow(const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("injectedFlow()");
 }
+
 
 Foam::scalar Foam::circulationComponent::injectedFlowRate(const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("injectedFlowRate()");
 }
 
+
 Foam::scalar Foam::circulationComponent::portFlow(const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("portFlow()");
 }
+
 
 Foam::scalar Foam::circulationComponent::patchPressure
 (
@@ -176,6 +193,8 @@ Foam::scalar Foam::circulationComponent::patchPressure
     CIRC_NOT_IMPLEMENTED("patchPressure()");
 }
 
+
 #undef CIRC_NOT_IMPLEMENTED
+
 
 // ************************************************************************* //

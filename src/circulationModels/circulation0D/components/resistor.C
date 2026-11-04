@@ -26,11 +26,16 @@ Author
 
 #include "resistor.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(resistor, 0);
     addToRunTimeSelectionTable(circulationComponent, resistor, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::resistor::resistor
 (
@@ -49,9 +54,12 @@ Foam::resistor::resistor
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 void Foam::resistor::parameters(DynamicList<parameter>& p) const
 {
     p.append({"R", circulationContext::quantity::resistance, R_});
 }
+
 
 // ************************************************************************* //

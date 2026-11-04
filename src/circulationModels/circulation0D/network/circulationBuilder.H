@@ -46,46 +46,73 @@ SourceFiles
 #include "HashSet.H"
 #include "Pair.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
 
+/*---------------------------------------------------------------------------*\
+                      Class circulationBuilder Declaration
+\*---------------------------------------------------------------------------*/
+
 class circulationBuilder
 {
-    const circulationContext& ctx_;
+    // Private Data
 
-    PtrList<circulationComponent> primitives_;
+        //- Unit system and cardiac period of the case
+        const circulationContext& ctx_;
 
-    //- Every name used so far, composite or primitive
-    HashSet<word> names_;
+        //- Primitive components added so far
+        PtrList<circulationComponent> primitives_;
 
-    DynamicList<Pair<word>> links_;
+        //- Every name used so far, composite or primitive
+        HashSet<word> names_;
 
-    HashTable<word> aliases_;
+        //- Connections between terminals, (from, to)
+        DynamicList<Pair<word>> links_;
+
+        //- Composite terminal -> the inner terminal it stands for
+        HashTable<word> aliases_;
+
 
 public:
 
-    explicit circulationBuilder(const circulationContext& ctx);
+    // Constructors
 
-    const circulationContext& ctx() const { return ctx_; }
+        //- Construct for the given context
+        explicit circulationBuilder(const circulationContext& ctx);
 
-    //- Add a component; a composite is expanded immediately
-    void add(autoPtr<circulationComponent> component);
 
-    //- Join two terminals ("A.out", "B.in")
-    void connect(const word& from, const word& to);
+    // Member Functions
 
-    //- Declare terminal "<composite>.in" to be the inner terminal
-    void alias(const word& moduleTerminal, const word& innerTerminal);
+        //- Unit system and cardiac period of the case
+        const circulationContext& ctx() const { return ctx_; }
 
-    //- Follow aliases down to a primitive terminal name
-    word resolve(const word& terminal) const;
+        //- Add a component; a composite is expanded immediately
+        void add(autoPtr<circulationComponent> component);
 
-    PtrList<circulationComponent>& primitives() { return primitives_; }
+        //- Join two terminals ("A.out", "B.in")
+        void connect(const word& from, const word& to);
 
-    const DynamicList<Pair<word>>& links() const { return links_; }
+        //- Declare terminal "<composite>.in" to be the inner terminal
+        void alias(const word& moduleTerminal, const word& innerTerminal);
+
+        //- Follow aliases down to a primitive terminal name
+        word resolve(const word& terminal) const;
+
+        //- Primitive components added so far
+        PtrList<circulationComponent>& primitives() { return primitives_; }
+
+        //- Connections between terminals, as given
+        const DynamicList<Pair<word>>& links() const { return links_; }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

@@ -291,4 +291,5 @@ void Foam::circulationModule::expand(circulationBuilder& b) const
     }
 }
 
+
 // ************************************************************************* //

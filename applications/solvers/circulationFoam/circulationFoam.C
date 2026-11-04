@@ -61,6 +61,8 @@ Author
 
 using namespace Foam;
 
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
 //- Patch names of constant/polyMesh/boundary, read without building the
 //  mesh. Empty if the case has no mesh.
 static wordList readPatchNames(const Time& runTime)
@@ -87,6 +89,9 @@ static wordList readPatchNames(const Time& runTime)
     }
     return names;
 }
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
 {
@@ -311,5 +316,6 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
 
 // ************************************************************************* //

@@ -28,6 +28,8 @@ Author
 #include "externalPort.H"
 #include "orificeValve.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(externalPort, 0);
@@ -39,8 +41,13 @@ namespace Foam
     );
 }
 
+
+// * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * * //
+
 namespace
 {
+    //- True for direction "inlet", false for "outlet"; anything else is an
+    //  error
     bool readInlet(const Foam::word& direction, const Foam::dictionary& d)
     {
         if (direction == "inlet")
@@ -59,6 +66,9 @@ namespace
         return false;
     }
 
+
+    //- True for provider "table", false for "external"; anything else is an
+    //  error
     bool readTabulated(const Foam::word& provider, const Foam::dictionary& d)
     {
         if (provider == "table")
@@ -77,6 +87,9 @@ namespace
         return false;
     }
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::externalPort::externalPort
 (
@@ -142,6 +155,8 @@ Foam::externalPort::externalPort
     }
 }
 
+
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 void Foam::externalPort::setForcing
 (
@@ -226,5 +241,6 @@ Foam::scalar Foam::externalPort::patchPressure
 
     return inlet_ ? Pnode - dP : Pnode + dP;
 }
+
 
 // ************************************************************************* //

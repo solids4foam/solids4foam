@@ -34,43 +34,72 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                          Class resistor Declaration
+\*---------------------------------------------------------------------------*/
 
 class resistor
 :
     public circulationComponent
 {
-    scalar R_;      //!< [Pa s/m3]
+    // Private Data
+
+        //- Resistance R [Pa s/m3]
+        scalar R_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("resistor");
 
-    resistor
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual void parameters(DynamicList<parameter>&) const;
+    // Constructors
 
-    virtual role kind() const { return role::branch; }
-    virtual bool linear() const { return true; }
+        //- Construct from dictionary
+        resistor
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
 
-    virtual scalar flow(const scalar, const scalar dP) const
-    {
-        return dP/R_;
-    }
 
-    virtual scalar dFlowdDP(const scalar, const scalar) const
-    {
-        return 1/R_;
-    }
+    // Member Functions
+
+        //- Report R for the setup check
+        virtual void parameters(DynamicList<parameter>&) const;
+
+        //- Role: branch
+        virtual role kind() const { return role::branch; }
+
+        //- The flow is linear in dP
+        virtual bool linear() const { return true; }
+
+        //- Flow in -> out, dP/R [m3/s]
+        virtual scalar flow(const scalar, const scalar dP) const
+        {
+            return dP/R_;
+        }
+
+        //- d flow / d dP, 1/R [m3/s/Pa]
+        virtual scalar dFlowdDP(const scalar, const scalar) const
+        {
+            return 1/R_;
+        }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

@@ -120,11 +120,17 @@ SourceFiles
 #include "IOstreamOption.H"
 #include "surfaceFieldsFwd.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
 
 class fvMesh;
 class Time;
+
+/*---------------------------------------------------------------------------*\
+                    Class circulationCheckpoint Declaration
+\*---------------------------------------------------------------------------*/
 
 //- The restart checkpoint: a dictionary kept up to date at every exchange and
 //  written automatically by the master, at full precision, with every output
@@ -135,22 +141,41 @@ class circulationCheckpoint
 {
 public:
 
-    circulationCheckpoint(const fvMesh& mesh, const word& name);
+    // Constructors
 
-    //- True if a checkpoint was read at construction
-    bool resumed() const { return resumed_; }
+        //- Construct for the mesh, reading the checkpoint "name" from
+        //  <start time>/uniform/ if present; in parallel the master's copy
+        //  is broadcast to every rank
+        circulationCheckpoint(const fvMesh& mesh, const word& name);
 
-    virtual bool writeObject
-    (
-        IOstreamOption streamOpt,
-        const bool writeOnProc
-    ) const;
+
+    // Member Functions
+
+        //- True if a checkpoint was read at construction
+        bool resumed() const { return resumed_; }
+
+        //- Write the checkpoint, on the master only, in ASCII at full
+        //  precision whatever the case's write format and precision
+        virtual bool writeObject
+        (
+            IOstreamOption streamOpt,
+            const bool writeOnProc
+        ) const;
+
 
 private:
 
-    bool resumed_;
+    // Private Data
+
+        //- True if a checkpoint (with a "state" entry) was read at
+        //  construction
+        bool resumed_;
 };
 
+
+/*---------------------------------------------------------------------------*\
+                     Class circulationCoupler Declaration
+\*---------------------------------------------------------------------------*/
 
 class circulationCoupler
 :
@@ -158,54 +183,92 @@ class circulationCoupler
 {
 public:
 
+    //- Coupling scheme: explicit (one exchange per time step) or implicit
+    //  (one exchange per new flux field, re-integrating the step)
     enum class scheme { explicitScheme, implicitScheme };
 
 private:
 
     // Private Data
 
+        //- Reference to the mesh
         const fvMesh& mesh_;
 
         //- Name of the volumetric flux sampled at the coupled patches
         word phiName_;
 
+        //- Coupling scheme
         scheme scheme_;
+
+        //- Coupling order (1 to 4): degree of the forcing polynomial + 1
         label order_;
+
+        //- Density used to convert Pa to a kinematic pressure [kg/m3]
         scalar rho_;
 
         //- Pressure at a port beyond which the coupling is taken to have
         //  diverged [Pa]
         scalar maxPressure_;
 
+        //- The circulation network
         autoPtr<circulationNetwork> network_;
 
         //- One coupled patch
         struct portData
         {
+            //- Name of the port
             word name;
+
+            //- Index of the patch coupled to the port
             label patchID;
+
+            //- True for an inlet: its flow is minus the sum of phi
             bool inlet;
-            scalar Q;                      //!< flow most recently sampled
-            scalar stepStartQ;             //!< accepted flow at the step start
-            FixedList<scalar, 3> history;  //!< earlier flows, most recent first
-            scalar P;                      //!< pressure to impose [Pa]
+
+            //- Flow most recently sampled
+            scalar Q;
+
+            //- Accepted flow at the step start
+            scalar stepStartQ;
+
+            //- Earlier flows, most recent first
+            FixedList<scalar, 3> history;
+
+            //- Pressure to impose [Pa]
+            scalar P;
         };
 
+        //- The coupled ports
         List<portData> ports_;
 
-        //- Interval belonging to each history entry, and how many are valid
+        //- Interval belonging to each history entry
         FixedList<scalar, 3> historyDt_;
+
+        //- Number of valid history entries
         label historyDepth_;
 
-        //- Accepted network state and its time; and at the start of this step
+        //- Accepted network state
         scalarField y_;
+
+        //- Time of the accepted network state
         scalar lastT_;
+
+        //- Accepted network state at the start of this step
         scalarField stepStartY_;
+
+        //- Time at the start of this step
         scalar stepStartT_;
 
+        //- Time index of the step in progress (-1 before the first)
         label activeTimeIndex_;
+
+        //- Event number of the flux field consumed by the last exchange
         label lastConsumedFluxEvent_;
+
+        //- Number of exchanges in this step
         label stepUpdateCount_;
+
+        //- Number of exchanges in the run
         label totalUpdateCount_;
 
         //- The state accepted last has not been logged yet
@@ -218,7 +281,10 @@ private:
         //- Restart checkpoint, <time>/uniform/circulationState-<name>
         autoPtr<circulationCheckpoint> checkpoint_;
 
+        //- Results file, coupling.dat (master only)
         autoPtr<OFstream> log_;
+
+        //- Cycle metrics, if a "metrics" dictionary is given (master only)
         autoPtr<circulationMetrics> metrics_;
 
 
@@ -231,10 +297,18 @@ private:
             const portData& p
         ) const;
 
+        //- Start a new time step if timeIndex is new: roll the previous
+        //  step into the flow history, log it, and freeze the accepted
+        //  state and flows as the start of this step
         void beginTimeIndex(const label timeIndex);
 
+        //- Build the forcing polynomial of each port and integrate the
+        //  network from the start of the step to the current time, on the
+        //  master; broadcast the state and port pressures, and stop if a
+        //  pressure exceeds maxPressure
         void advance(const Time& runTime);
 
+        //- Write a row of the results file (and add it to the metrics)
         void writeRow();
 
         //- Log the state accepted last, if it has not been
@@ -246,59 +320,84 @@ private:
         //- Resume from a checkpoint found at the start time
         void restore();
 
+        //- No copy construct
         circulationCoupler(const circulationCoupler&) = delete;
+
+        //- No copy assignment
         void operator=(const circulationCoupler&) = delete;
 
 
 public:
 
+    //- Runtime type information
     TypeName("circulationCoupler");
 
-    //- Construct reading the circulation description "propertiesName"
-    //  from constant/, sampling the flux "phiName"
-    circulationCoupler
-    (
-        const word& propertiesName,
-        const fvMesh& mesh,
-        const word& phiName = "phi"
-    );
 
-    virtual ~circulationCoupler();
+    // Constructors
 
-    //- The coupler registered with the mesh, constructed on first use.
-    //  Every patch of one coupler must name the same flux.
-    static circulationCoupler& lookupOrCreate
-    (
-        const fvMesh& mesh,
-        const word& propertiesName = "circulationProperties",
-        const word& phiName = "phi"
-    );
+        //- Construct reading the circulation description "propertiesName"
+        //  from constant/, sampling the flux "phiName"
+        circulationCoupler
+        (
+            const word& propertiesName,
+            const fvMesh& mesh,
+            const word& phiName = "phi"
+        );
 
-    //- Name of the port coupled to a patch; fatal if there is none
-    const word& portOfPatch(const label patchID) const;
 
-    //- Sample the flows and, on a new exchange, advance the network
-    void sampleAndAdvance(const fvMesh& mesh);
+    // Destructor
 
-    //- Pressure to impose at a port [Pa]
-    scalar patchPressure(const word& port) const;
+        //- Destructor: logs the state accepted last, if it has not been
+        virtual ~circulationCoupler();
 
-    scalar rho() const { return rho_; }
 
-    const circulationNetwork& network() const { return network_(); }
+    // Selectors
 
-    //- Called at every write time, when the step is complete: logs its
-    //  row. Writes no file.
-    virtual bool writeObject
-    (
-        IOstreamOption streamOpt,
-        const bool writeOnProc
-    ) const;
+        //- The coupler registered with the mesh, constructed on first use.
+        //  Every patch of one coupler must name the same flux.
+        static circulationCoupler& lookupOrCreate
+        (
+            const fvMesh& mesh,
+            const word& propertiesName = "circulationProperties",
+            const word& phiName = "phi"
+        );
 
-    virtual bool writeData(Ostream&) const { return true; }
+
+    // Member Functions
+
+        //- Name of the port coupled to a patch; fatal if there is none
+        const word& portOfPatch(const label patchID) const;
+
+        //- Sample the flows and, on a new exchange, advance the network
+        void sampleAndAdvance(const fvMesh& mesh);
+
+        //- Pressure to impose at a port [Pa]
+        scalar patchPressure(const word& port) const;
+
+        //- Density used to convert Pa to a kinematic pressure [kg/m3]
+        scalar rho() const { return rho_; }
+
+        //- Const access to the circulation network
+        const circulationNetwork& network() const { return network_(); }
+
+        //- Called at every write time, when the step is complete: logs its
+        //  row. Writes no file.
+        virtual bool writeObject
+        (
+            IOstreamOption streamOpt,
+            const bool writeOnProc
+        ) const;
+
+        //- Write data: nothing to write
+        virtual bool writeData(Ostream&) const { return true; }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

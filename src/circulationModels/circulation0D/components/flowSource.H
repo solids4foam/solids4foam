@@ -37,36 +37,66 @@ Author
 #include "circulationComponent.H"
 #include "circulationWaveform.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                         Class flowSource Declaration
+\*---------------------------------------------------------------------------*/
 
 class flowSource
 :
     public circulationComponent
 {
-    circulationWaveform wave_;
+    // Private Data
+
+        //- Waveform of the prescribed flow [m3/s]
+        circulationWaveform wave_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("flowSource");
 
-    flowSource
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual role kind() const { return role::fixedFlow; }
-    virtual scalar fixedFlow(const scalar t) const { return wave_.value(t); }
+    // Constructors
 
-    virtual scalar fixedFlowRate(const scalar t) const
-    {
-        return wave_.derivative(t);
-    }
+        //- Construct from dictionary
+        flowSource
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Role: fixedFlow
+        virtual role kind() const { return role::fixedFlow; }
+
+        //- Prescribed flow in -> out at time t [m3/s]
+        virtual scalar fixedFlow(const scalar t) const
+        {
+            return wave_.value(t);
+        }
+
+        //- Time derivative of the prescribed flow [m3/s2]
+        virtual scalar fixedFlowRate(const scalar t) const
+        {
+            return wave_.derivative(t);
+        }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

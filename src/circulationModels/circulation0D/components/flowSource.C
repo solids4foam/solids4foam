@@ -26,11 +26,16 @@ Author
 
 #include "flowSource.H"
 
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+
 namespace Foam
 {
     defineTypeNameAndDebug(flowSource, 0);
     addToRunTimeSelectionTable(circulationComponent, flowSource, dictionary);
 }
+
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::flowSource::flowSource
 (
@@ -42,5 +47,6 @@ Foam::flowSource::flowSource
     circulationComponent(name, dict, ctx),
     wave_(dict, ctx, circulationContext::quantity::flow)
 {}
+
 
 // ************************************************************************* //

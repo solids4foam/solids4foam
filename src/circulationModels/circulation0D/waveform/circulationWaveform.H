@@ -52,45 +52,88 @@ Author
 #include "DynamicList.H"
 #include "scalarList.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                      Class circulationWaveform Declaration
+\*---------------------------------------------------------------------------*/
 
 class circulationWaveform
 {
 public:
 
-    enum class kind { constant, sine, halfSine, table };
+    // Public Data Types
+
+        //- Type of waveform
+        enum class kind { constant, sine, halfSine, table };
+
 
 private:
 
-    kind kind_;
-    scalar value_;          //!< constant value / mean   [SI]
-    scalar amplitude_;      //!< [SI]
-    scalar period_;         //!< [s]
-    scalar phase_;          //!< [rad]
-    scalar systolicDuration_;
-    bool periodic_;
-    scalarList tTable_;
-    scalarList vTable_;
+    // Private Data
+
+        //- Type of waveform
+        kind kind_;
+
+        //- Constant value, or mean of the sine [SI]
+        scalar value_;
+
+        //- Amplitude of the sine or half-sine [SI]
+        scalar amplitude_;
+
+        //- Period of the sine or half-sine [s]
+        scalar period_;
+
+        //- Phase of the sine [rad]
+        scalar phase_;
+
+        //- Duration of the half-sine pulse at the start of each period [s]
+        scalar systolicDuration_;
+
+        //- Whether the table is wrapped in time
+        bool periodic_;
+
+        //- Times of the table rows [s]
+        scalarList tTable_;
+
+        //- Values of the table rows [SI]
+        scalarList vTable_;
+
 
 public:
 
-    circulationWaveform
-    (
-        const dictionary& componentDict,
-        const circulationContext& ctx,
-        const circulationContext::quantity q
-    );
+    // Constructors
 
-    //- Value at time t [SI]
-    scalar value(const scalar t) const;
+        //- Construct from the "waveform" sub-dictionary of the component
+        //  (or its "value" entry if there is none), reading values of
+        //  quantity q in the units of the case
+        circulationWaveform
+        (
+            const dictionary& componentDict,
+            const circulationContext& ctx,
+            const circulationContext::quantity q
+        );
 
-    //- Time derivative at time t [SI/s]: of a table, the slope of the
-    //  interval holding t (zero where it is extrapolated)
-    scalar derivative(const scalar t) const;
+
+    // Member Functions
+
+        //- Value at time t [SI]
+        scalar value(const scalar t) const;
+
+        //- Time derivative at time t [SI/s]: of a table, the slope of the
+        //  interval holding t (zero where it is extrapolated)
+        scalar derivative(const scalar t) const;
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

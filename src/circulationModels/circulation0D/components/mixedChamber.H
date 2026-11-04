@@ -54,44 +54,82 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                        Class mixedChamber Declaration
+\*---------------------------------------------------------------------------*/
 
 class mixedChamber
 :
     public circulationComponent
 {
-    scalar V0_, E1_, E2_, P0_, K_;
-    scalar Vinit_;
+    // Private Data
 
-    bool sineSquared_;
-    scalar offset_, duration_, T_;
-    scalar Tes_, Ted_, Eshift_;
+        //- Unstressed volume V0 [m3], active coefficients E1 [Pa/m3] and
+        //  E2 [Pa/m6], passive pressure scale P0 [Pa] and exponent K [1/m3]
+        scalar V0_, E1_, E2_, P0_, K_;
+
+        //- Initial volume [m3]
+        scalar Vinit_;
+
+        //- True for the sineSquared activation, false for halfCosine
+        bool sineSquared_;
+
+        //- sineSquared activation: offset and duration [s]; and the cardiac
+        //  period T used by both activations [s]
+        scalar offset_, duration_, T_;
+
+        //- halfCosine activation: Tes and Ted [s], and the shift Eshift as
+        //  a fraction of T
+        scalar Tes_, Ted_, Eshift_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("mixedChamber");
 
-    mixedChamber
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual void parameters(DynamicList<parameter>&) const;
+    // Constructors
 
-    virtual role kind() const { return role::storage; }
+        //- Construct from dictionary
+        mixedChamber
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
 
-    //- Activation 0..1 at time t
-    scalar activation(const scalar t) const;
 
-    virtual scalar pressure(const scalar t, const scalar V) const;
+    // Member Functions
 
-    virtual scalar initialVolume() const { return Vinit_; }
+        //- Report V0, E1, E2, P0 and K for the setup check
+        virtual void parameters(DynamicList<parameter>&) const;
+
+        //- Role: storage
+        virtual role kind() const { return role::storage; }
+
+        //- Activation 0..1 at time t
+        scalar activation(const scalar t) const;
+
+        //- Pressure for volume V at time t,
+        //  A(t) (E1 dV + E2 dV^2) + P0 (exp(K dV) - 1) [Pa]
+        virtual scalar pressure(const scalar t, const scalar V) const;
+
+        //- Initial volume [m3]
+        virtual scalar initialVolume() const { return Vinit_; }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

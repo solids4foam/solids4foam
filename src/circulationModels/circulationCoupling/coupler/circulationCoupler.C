@@ -94,6 +94,8 @@ Foam::circulationCheckpoint::circulationCheckpoint
 }
 
 
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
 bool Foam::circulationCheckpoint::writeObject
 (
     IOstreamOption streamOpt,
@@ -118,6 +120,8 @@ bool Foam::circulationCheckpoint::writeObject
     return ok;
 }
 
+
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::circulationCoupler::circulationCoupler
 (
@@ -477,6 +481,8 @@ Foam::circulationCoupler::circulationCoupler
 }
 
 
+// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
+
 Foam::circulationCoupler::~circulationCoupler()
 {
     flushRow();
@@ -519,7 +525,7 @@ Foam::circulationCoupler& Foam::circulationCoupler::lookupOrCreate
 }
 
 
-// * * * * * * * * * * * * * * * Private Functions * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 void Foam::circulationCoupler::writeRow()
 {
@@ -1012,5 +1018,6 @@ Foam::scalar Foam::circulationCoupler::patchPressure(const word& port) const
     FatalErrorInFunction << "No port '" << port << "'" << exit(FatalError);
     return 0;
 }
+
 
 // ************************************************************************* //

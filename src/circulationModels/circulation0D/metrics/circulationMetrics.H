@@ -67,57 +67,120 @@ SourceFiles
 #include "OFstream.H"
 #include "autoPtr.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
 
+/*---------------------------------------------------------------------------*\
+                      Class circulationMetrics Declaration
+\*---------------------------------------------------------------------------*/
+
 class circulationMetrics
 {
-    struct item
-    {
-        word name;
-        word type;
-        label cVolume = -1;
-        label cPressure = -1;
-        label cFlow = -1;
-    };
+    // Private Data Types
 
-    List<item> items_;
-    scalar period_;
-    fileName dir_;
-    autoPtr<OFstream> out_;
-    bool headerWritten_;
+        //- A metric from the dictionary: its name and type, and the output
+        //  columns it monitors
+        struct item
+        {
+            //- Name of the metric, the prefix of its output headings
+            word name;
 
-    //- Samples of the cycle in progress: time, then the monitored columns
-    label cycle_;                    //!< index k of the cycle in progress
-    bool cycleStartedOnBoundary_;
-    DynamicList<scalar> t_;
-    List<DynamicList<scalar>> v_;    //!< one list per monitored column
-    labelList monitored_;            //!< column indices of the samples kept
+            //- Type of the metric: chamber, pressure or flow
+            word type;
 
-    //- Unit labels for the header
-    string volumeLabel_, pressureLabel_, flowLabel_;
+            //- Column of the volume (chamber), or -1
+            label cVolume = -1;
 
-    label slot(const label column) const;
+            //- Column of the pressure (chamber, pressure), or -1
+            label cPressure = -1;
 
-    void finishCycle();
+            //- Column of the flow (flow), or -1
+            label cFlow = -1;
+        };
 
-    void startCycle(const label k);
+
+    // Private Data
+
+        //- The metrics to evaluate
+        List<item> items_;
+
+        //- Cardiac period [s]
+        scalar period_;
+
+        //- Directory that metrics.dat and the pressure-volume loops are
+        //  written to
+        fileName dir_;
+
+        //- Stream of metrics.dat
+        autoPtr<OFstream> out_;
+
+        //- Whether the header of metrics.dat has been written
+        bool headerWritten_;
+
+        //- Index k of the cycle in progress (-1 before the first sample)
+        label cycle_;
+
+        //- Whether the cycle in progress was sampled from its first instant
+        //  (only such cycles are reported)
+        bool cycleStartedOnBoundary_;
+
+        //- Sample times of the cycle in progress
+        DynamicList<scalar> t_;
+
+        //- Samples of the cycle in progress, one list per monitored column
+        List<DynamicList<scalar>> v_;
+
+        //- Column indices of the samples kept
+        labelList monitored_;
+
+        //- Unit labels for the header
+        string volumeLabel_, pressureLabel_, flowLabel_;
+
+
+    // Private Member Functions
+
+        //- Index in v_ of the samples of an output column (-1 if the
+        //  column is not monitored)
+        label slot(const label column) const;
+
+        //- Evaluate the metrics of the cycle in progress, append its row to
+        //  metrics.dat and write the pressure-volume loops of the chambers;
+        //  a cycle not sampled from its first instant is skipped
+        void finishCycle();
+
+        //- Start cycle k, clearing the samples
+        void startCycle(const label k);
+
 
 public:
 
-    circulationMetrics
-    (
-        const dictionary& dict,
-        const wordList& columns,
-        const circulationContext& ctx,
-        const fileName& outDir
-    );
+    // Constructors
 
-    //- Add a sample (t, the output values in the order of the columns)
-    void add(const scalar t, const scalarField& values);
+        //- Construct from the metrics dictionary, the names of the output
+        //  columns, the context and the output directory
+        circulationMetrics
+        (
+            const dictionary& dict,
+            const wordList& columns,
+            const circulationContext& ctx,
+            const fileName& outDir
+        );
+
+
+    // Member Functions
+
+        //- Add a sample (t, the output values in the order of the columns)
+        void add(const scalar t, const scalarField& values);
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

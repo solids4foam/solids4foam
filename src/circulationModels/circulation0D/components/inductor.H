@@ -35,35 +35,66 @@ Author
 
 #include "circulationComponent.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                          Class inductor Declaration
+\*---------------------------------------------------------------------------*/
 
 class inductor
 :
     public circulationComponent
 {
-    scalar L_;
-    scalar q0_;
+    // Private Data
+
+        //- Inertance L [Pa s2/m3]
+        scalar L_;
+
+        //- Initial flow [m3/s]
+        scalar q0_;
+
 
 public:
 
+    //- Runtime type information
     TypeName("inductor");
 
-    inductor
-    (
-        const word& name,
-        const dictionary& dict,
-        const circulationContext& ctx
-    );
 
-    virtual void parameters(DynamicList<parameter>&) const;
+    // Constructors
 
-    virtual role kind() const { return role::inertia; }
-    virtual scalar inertance() const { return L_; }
-    virtual scalar initialFlow() const { return q0_; }
+        //- Construct from dictionary
+        inductor
+        (
+            const word& name,
+            const dictionary& dict,
+            const circulationContext& ctx
+        );
+
+
+    // Member Functions
+
+        //- Report L for the setup check
+        virtual void parameters(DynamicList<parameter>&) const;
+
+        //- Role: inertia
+        virtual role kind() const { return role::inertia; }
+
+        //- Inertance L [Pa s2/m3]
+        virtual scalar inertance() const { return L_; }
+
+        //- Initial flow [m3/s]
+        virtual scalar initialFlow() const { return q0_; }
 };
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 

@@ -39,12 +39,21 @@ Author
 #include "scalarList.H"
 #include "error.H"
 
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 namespace Foam
 {
+
+/*---------------------------------------------------------------------------*\
+                   Namespace circulationForcing Declaration
+\*---------------------------------------------------------------------------*/
+
 namespace circulationForcing
 {
 
+//- Coefficients c0..c3 of the cubic in alpha, in ascending powers
 typedef FixedList<scalar, 4> coeffs;
+
 
 //- Coefficients of the polynomial through n = 1..4 points
 inline coeffs polynomialThrough
@@ -88,14 +97,20 @@ inline coeffs polynomialThrough
     return c;
 }
 
+
 //- Horner evaluation
 inline scalar evaluate(const coeffs& c, const scalar alpha)
 {
     return c[0] + alpha*(c[1] + alpha*(c[2] + alpha*c[3]));
 }
 
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 } // End namespace circulationForcing
 } // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 #endif
 
