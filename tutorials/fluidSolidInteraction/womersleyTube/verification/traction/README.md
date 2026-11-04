@@ -7,7 +7,9 @@ solution. It also decomposes the tutorial's attenuation error.
 - It is separate from the standard verification (`../Allverify`), which it does
   not change.
 - It does not change the solver or the tutorial defaults.
-- Its function object is included only in the study copies it creates.
+- Its function object (`scripts/interfaceTractionDiagnostic`) is not part of
+  the tutorial's `system/`; it is installed and included only in the study
+  copies it creates.
 
 ## Requirements
 
@@ -58,7 +60,7 @@ Outputs:
 
 ## What is measured
 
-`system/interfaceTractionDiagnostic` is a `coded` function object (region
+`scripts/interfaceTractionDiagnostic` is a `coded` function object (region
 `fluid`) that records, every time step over the last two periods:
 
 <!-- markdownlint-disable MD013 -->

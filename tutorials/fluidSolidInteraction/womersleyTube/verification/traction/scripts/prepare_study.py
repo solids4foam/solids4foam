@@ -5,7 +5,8 @@ usage: prepare_study.py SRC_TUTORIAL DEST [--mu MU] [--amplitude A]
                         [--coupling-tol-factor F]
 
 - copies the tutorial (without results) to DEST;
-- includes system/interfaceTractionDiagnostic in the controlDict functions,
+- installs scripts/interfaceTractionDiagnostic as system/interfaceTractionDiagnostic
+  of the copy and includes it in the controlDict functions,
   sampling every time step over the last two periods (timeStart = 4 periods);
 - --mu / --amplitude: change the dynamic viscosity (Pa s) or the pressure
   amplitude (Pa) and REGENERATE, consistently, constant/womersleyProperties
@@ -21,7 +22,7 @@ import shutil
 import sys
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parents[3] / "system"   # tutorial system/
+DIAGNOSTIC = Path(__file__).resolve().parent / "interfaceTractionDiagnostic"
 
 
 def sub_one(path: Path, pattern: str, repl: str, count_expected=1):
@@ -47,7 +48,7 @@ def main():
                                                   "log.*", "processor*"))
     d = a.dest
     # diagnostic function object
-    shutil.copy(HERE / "interfaceTractionDiagnostic", d / "system")
+    shutil.copy(DIAGNOSTIC, d / "system")
     fo = d / "system/interfaceTractionDiagnostic"
     sub_one(fo, r"^(\s*executeInterval\s+)\d+;", r"\g<1>1;")
     sub_one(fo, r"^(\s*writeInterval\s+)\d+;", r"\g<1>1;")
