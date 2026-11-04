@@ -19,7 +19,10 @@ Earlier versions also replaced the `EulerDdtScheme.C` and `backwardDdtScheme.C`
 ddt schemes. These are no longer needed: the foam-extend `pimpleFluid` computes
 its `ddtCorr` flux correction itself. If you replaced these files, the
 foam-extend files should be restored, as the replacement `ddtCorr` does not
-suit the foam-extend solvers, such as `pimpleDyMFoam`.
+suit the foam-extend solvers, such as `pimpleDyMFoam`. The backward fix also
+corrected `meshPhi` for a changing time-step; without it, the solids4foam fluid
+models stop with an error if a moving mesh uses the backward scheme with a
+changing time-step, so use a constant time-step or the Euler scheme there.
 
 ## OpenFOAM.org
 

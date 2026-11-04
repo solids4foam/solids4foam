@@ -551,8 +551,10 @@ release. For complete commit-level details and contributor information, see the
   but backward, with the old-old time level a copy of the old one, for later
   calls in that step, e.g. with several outer correctors; on OpenFOAM.com, a
   restart from a time without `U_0_0` uses backward with such a copy for one
-  time step. The foam-extend backward fix also changed `meshPhi`, which
-  differs from the foam-extend one only when the time-step changes.
+  time step. The foam-extend backward fix also corrected `meshPhi`: the
+  upstream foam-extend `meshPhi` does not conserve the cell volumes when the
+  time-step changes. With foam-extend, the fluid models now stop with an error
+  if the mesh is moving, the ddt scheme is backward and the time-step changes.
 
 ### Fixed
 

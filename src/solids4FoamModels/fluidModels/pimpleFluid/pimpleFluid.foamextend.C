@@ -570,6 +570,9 @@ bool pimpleFluid::evolve()
 #       include "volContinuity.H"
     }
 
+    // Stop if the backward meshPhi would be inconsistent
+    fluidModel::checkBackwardMeshPhi();
+
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());
 
