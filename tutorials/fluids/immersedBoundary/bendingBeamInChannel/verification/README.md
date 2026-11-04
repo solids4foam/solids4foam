@@ -178,9 +178,11 @@ the controller, `fluidModel::CourantNo`, which is face based:
 $\max_f (|\phi|/|S_f| \, \delta) \Delta t$ with $\delta$ the cell distance.
 The Courant number printed in the log by the fluid model is the cell-sum
 definition of OpenFOAM, $0.5 \max (\sum_f |\phi|/V) \Delta t$, which is about
-twice as large (up to 1.07 in the tracked runs, 4.1 for the body-fitted case with
-$\Delta t$ = 0.01 s). They are two definitions, not an overshoot of the
-controller. The driver reports the second one as `max_Co_in_step`.
+twice as large (up to 1.07 in the tracked runs; 4.09 and 4.10 in the logs of
+the archived 24,720-cell body-fitted case and of its control, both at
+$\Delta t$ = 0.01 s, `reference/results/bodyfitted-courant.csv`). They are two
+definitions, not an overshoot of the controller. The driver reports the second
+one as `max_Co_in_step`.
 
 ## Force reconstruction and normalisation
 
@@ -279,19 +281,31 @@ established.
 - **Tracked results** (`reference/results/`): `cases.csv` (one row per
   estimator and coefficient: nRMS, harmonics, noise, fluxes, cost),
   `history-*.csv` (display histories every 0.02 s), `fv-sensitivity.csv`,
-  `cost-observed.csv` and `cost-matched-pairs.csv`, `bodyfitted-R1-*.csv`. They
-  were computed with the functions of this driver from complete saved runs;
-  fields and logs of those runs are not tracked. **Which can be regenerated
-  here:** the rows of `cases.csv` for the runs of `--runs smoke`, `flux`,
-  `L1` to `L4flux` and `studyB` (the cases at the adaptive time step of the
-  tutorial; `Allverify analyse` writes the same columns, plus the solver
-  columns). **Which cannot:** `history-*.csv`, `fv-sensitivity.csv`,
-  `cost-observed.csv`, `cost-matched-pairs.csv` and `bodyfitted-R1-*.csv` have no
-  generator in this repository (the export scripts, the fixed-time-step
-  sensitivity runs, the timing windows and the body-fitted runs are not part of
-  it). They are archived observations: `check` does not use them, and they only
-  feed `results.md` and the figures. The tracked `cases.csv` does not record the
-  solver per row; the baseline is the one stated above.
+  `cost-observed.csv` and `cost-matched-pairs.csv`, `bodyfitted-R1-*.csv`,
+  `bodyfitted-courant.csv`, `diagnostics.csv` (the filtered nRMS of
+  `results.md` Section 2.2), `decomposition-scatter.csv` (serial against
+  parallel force differences) and `provenance-inputs.csv` (SHA-256 and size of
+  every raw input file used). **Generator.**
+  `scripts/regenerate_tracked_results.py` (standard library only) computes all
+  of them with the functions of this driver from the complete saved runs
+  (about 45 GB of fields and logs, not tracked, available on request); with
+  those runs, `python3 -I scripts/regenerate_tracked_results.py --help` lists
+  the inputs. It was run on the saved runs of the author and wrote the 18
+  files that were already tracked byte for byte identical to them. Not
+  reproducible here without those runs: the script cannot be exercised by
+  `Allverify` (it needs runs of up to 8 ranks and the sensitivity runs), and
+  `Allverify analyse` writes only the rows of `cases.csv` for the runs of the
+  driver. Observations that depend on the machine, not only on the
+  runs: `cost-observed.csv` and `cost-matched-pairs.csv` come from the wall
+  time per step in the logs and from a ledger of the start and end times of the
+  jobs of the same campaign, which gives the number of *other ranks of the
+  campaign* running at the same time; the load of other users of the node was
+  not recorded. They are observations of single runs, not a performance model.
+  The body-fitted series in `bodyfitted-R1-*.csv` (A, the archive at
+  $\Delta t$ = 0.01 s with 0.1 s output) is read from the archived case on its
+  own installation; its input dictionaries are not tracked. The tracked
+  `cases.csv` does not record the solver per row; the baseline is the one
+  stated above.
 
 ## Limitations
 
@@ -301,8 +315,13 @@ established.
 - mesh and time step were not varied independently except at Level 2: no
   formal order of convergence is claimed for the forces or for the flux;
 - the cost is observed, from single runs;
+- no force reference of this study is an exact solution: the body-fitted
+  series is a numerical result of limited provenance and the archived
+  body-fitted runs only bound its time-step sensitivity (only the volume rate
+  of the beam is exact);
 - ghostCell is exploratory (its forces are noisier and carry a decomposition
-  scatter of about 1 % of their RMS), and incremental and ghostCell were run
+  scatter of about 1 % of their RMS, `decomposition-scatter.csv`), and
+  incremental and ghostCell were run
   once per level;
 - the surface-traction quadrature options of other pull requests are not
   evaluated here.

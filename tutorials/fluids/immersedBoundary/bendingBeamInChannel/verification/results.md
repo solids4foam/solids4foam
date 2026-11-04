@@ -1,10 +1,10 @@
 # bendingBeamInChannel verification: results
 
-Every number below is read from the tracked files of `reference/results/`
-(`cases.csv` was computed by the functions of
-`scripts/bending_beam_verification.py` from the complete saved runs, which are
-not tracked; see "Provenance and data availability" in `README.md` for which
-files `Allverify` can regenerate), and
+Every number below is read from the tracked files of `reference/results/`.
+They were computed by the functions of `scripts/bending_beam_verification.py`,
+through `scripts/regenerate_tracked_results.py`, from the complete saved runs,
+which are not tracked (see "Provenance and data availability" in `README.md`
+for what can be regenerated here and what only from those runs), and
 `scripts/test_bending_beam_verification.py` checks that the tables of this
 file agree with them.
 Solver: solids4foam `f33b244a2`
@@ -12,7 +12,9 @@ Solver: solids4foam `f33b244a2`
 exchange), penalty, legacy incremental and ghostCell on the mesh levels of the
 tutorial (20,020 / 80,080 / 320,320 / 1,281,280 cells). The comparisons are made
 over $1 < t < 8$ s with the body-fitted series `reference/CdBodyFitted.dat`,
-whose provenance is incomplete (`README.md`). **No formal order of convergence
+which is a numerical result of incomplete provenance, not an exact solution
+(`README.md`; only the volume rate of Section 1 is exact). **No formal order
+of convergence
 is claimed, no ranking of the lift is made, and no method is declared
 superior.** What was observed, what is interpreted and what is not shown are
 kept apart in each section.
@@ -271,7 +273,8 @@ below the threshold of 1.0 point). The number of steps and the mean time step of
 every method on
 a level agree within 3 % (table), so the differences in the nRMS are not due to
 different time-step histories. The last column is a **filtered diagnostic**
-(the force is replaced by its 0.0104 s moving mean before the comparison; the
+(the force is replaced by its 0.0104 s moving mean before the comparison, on
+the native time steps; `reference/results/diagnostics.csv`; the
 unfiltered comparison above is the result): it shows how much of the nRMS is
 high-frequency content.
 
@@ -307,12 +310,16 @@ high-frequency content.
   the solver tolerance on every level (largest $\lvert Q \rvert$ 2.9e-09 and
   7.9e-09 m$^3$/s).
 - **Decomposition scatter of ghostCell.** On Level 1, 1 s, the serial run and
-  the runs on 2 and 4 ranks have the same steps and time steps; the force
-  differs between them by 0.5 to 1.0 % of its RMS (the largest instantaneous
-  difference of $C_d$ is 3.5 to 5.4 % of it, at spikes), and the means differ by
-  0.1 to 0.3 %. The same comparison for penalty (2 against 4 ranks, Level 2) and
-  incremental (serial against 2 ranks, Level 1) gave 0.7 % and 0.02 % at the
-  largest instantaneous difference. The ghostCell forces on Levels 2 and 3 were
+  the runs on 2 and 4 ranks have the same steps and time steps; over
+  $0.5 \le t \le 1$ s the force differs between them by 0.86 to 0.97 % of its
+  RMS in $C_d$ (0.50 to 0.55 % in $C_l$), the largest instantaneous difference
+  of $C_d$ is 3.7 to 5.4 % of it, at spikes, and the means differ by 0.13 and
+  0.28 % of the mean. The same comparison for penalty (2 against 4 ranks,
+  Level 2) and incremental (serial against 2 ranks, Level 1; the times of the
+  two runs are not identical, the parallel force was interpolated) gave 0.68 %
+  and 0.02 % at the largest instantaneous difference
+  (`reference/results/decomposition-scatter.csv`). The ghostCell forces on
+  Levels 2 and 3 were
   run on 4 and 8 ranks and carry this scatter; no replicate was made. The
   cross-processor search for donor cells was exercised (up to 55 ghost cells
   with

@@ -749,7 +749,8 @@ class Documentation(unittest.TestCase):
         text = (bbv.VERIFICATION_DIR / "README.md").read_text()
         by = {(r["method"], int(r["level"]), r["estimator"]): r
               for r in self.rows()
-              if r["study"] == "A" and r["coefficient"] == "Cd"}
+              if r["study"] == "A" and r["coefficient"] == "Cd"
+                   and r["nrms_pct"]}
         line = "| cutLink, surface traction | " + " / ".join(
             f"{float(by[('cutLink', l, 'cutLink ST')]['nrms_pct']):.1f}"
             for l in (1, 2, 3)) + " % |"
@@ -841,6 +842,135 @@ class Documentation(unittest.TestCase):
             rows = list(csv.DictReader(handle))
         self.assertTrue(rows)
         self.assertEqual({r["material"] for r in rows}, {"False"})
+
+
+class Regeneration(unittest.TestCase):
+    """The generator of the tracked files and the numbers of the text that
+    come from the files it writes"""
+
+    GEN = SCRIPT.parent / "regenerate_tracked_results.py"
+
+    @classmethod
+    def setUpClass(cls):
+        spec_g = importlib.util.spec_from_file_location("regen", cls.GEN)
+        cls.regen = importlib.util.module_from_spec(spec_g)
+        spec_g.loader.exec_module(cls.regen)
+
+    def read(self, name):
+        with (bbv.RESULTS_DIR / name).open() as handle:
+            return list(csv.DictReader(handle))
+
+    def test_generator_uses_only_the_standard_library_and_no_local_paths(self):
+        text = self.GEN.read_text()
+        for needle in ("numpy", "scipy", "pandas", "/home/", "/mnt/",
+                       "sairam"):
+            self.assertNotIn(needle, text)
+
+    def test_every_tracked_csv_is_documented_by_the_generator(self):
+        text = self.GEN.read_text()
+        for path in bbv.RESULTS_DIR.glob("*.csv"):
+            stem = path.name
+            if stem.startswith("history-"):
+                stem = "history-*.csv"
+            if stem.startswith("bodyfitted-R1-"):
+                stem = "bodyfitted-R1-*.csv"
+            self.assertIn(stem, text, path.name)
+
+    def test_moving_mean_of_a_constant_and_a_ramp(self):
+        t = [0.001 * i for i in range(200)]
+        self.assertEqual(self.regen.moving_mean(t, [3.0] * 200), [3.0] * 200)
+        ramp = self.regen.moving_mean(t, t)
+        self.assertAlmostEqual(ramp[100], t[100], 12)
+
+    def test_sample_grid_excludes_the_window_ends(self):
+        g = self.regen.grid(0.1)
+        self.assertAlmostEqual(g[0], 1.1)
+        self.assertAlmostEqual(g[-1], 7.9)
+        self.assertEqual(len(g), 69)
+
+    def test_least_squares_harmonics_recover_a_synthetic_series(self):
+        g = self.regen.grid(0.01)
+        y = [2.0 + 3.0 * math.sin(2 * math.pi * x)
+             + 0.5 * math.sin(4 * math.pi * x + 0.4) for x in g]
+        a1, a2, ph2 = self.regen.lsq_harmonics(g, y)
+        self.assertAlmostEqual(a1, 3.0, 6)
+        self.assertAlmostEqual(a2, 0.5, 6)
+        self.assertAlmostEqual(ph2, math.degrees(0.4), 4)
+
+    def test_provenance_inputs_are_hashes_of_named_files(self):
+        rows = self.read("provenance-inputs.csv")
+        self.assertGreater(len(rows), 50)
+        for r in rows:
+            self.assertRegex(r["sha256"], r"^[0-9a-f]{64}$")
+            self.assertGreater(int(r["bytes"]), 0)
+
+    def test_filtered_table_of_results_md_is_the_tracked_diagnostic(self):
+        text = (bbv.VERIFICATION_DIR / "results.md").read_text()
+        rows = self.read("diagnostics.csv")
+        self.assertEqual(len(rows), 15)
+        for r in rows:
+            if r["estimator"] == "cutLink ME":
+                continue  # not in the table of results.md
+            raw = f"{float(r['Cd_nrms_raw']):.2f}"
+            filtered = f"{float(r['Cd_nrms_movmean_0.0104s']):.2f}"
+            self.assertRegex(text, rf"L{r['level']} \| {r['steps']} \|"
+                             rf"[^\n]*\| {raw} \| {filtered} \|")
+        # the raw column of the diagnostic is the tracked nRMS
+        tracked = {(r["method"], r["level"], r["estimator"]):
+                   float(r["nrms_pct"]) for r in self.read("cases.csv")
+                   if r["study"] == "A" and r["coefficient"] == "Cd"
+                   and r["nrms_pct"]}
+        for r in rows:
+            self.assertAlmostEqual(
+                float(r["Cd_nrms_raw"]),
+                tracked[(r["method"], r["level"], r["estimator"])], 3)
+
+    def test_stated_filtered_levels_of_the_third_mesh(self):
+        rows = {(r["method"], r["level"]): float(r["Cd_nrms_movmean_0.0104s"])
+                for r in self.read("diagnostics.csv")
+                if r["estimator"] in ("total",)}
+        text = (bbv.VERIFICATION_DIR / "results.md").read_text()
+        self.assertIn("6.6, 6.5 and 6.6 %", text)
+        self.assertEqual([round(rows[(m, "3")], 1) for m in
+                          ("penalty", "incremental", "ghostCell")],
+                         [6.6, 6.5, 6.6])
+        self.assertIn("(9.8, 7.7, 6.6 %)", text)
+        self.assertEqual([round(rows[("ghostCell", str(l))], 1)
+                          for l in (1, 2, 3)], [9.8, 7.7, 6.6])
+
+    def test_decomposition_numbers_of_the_text_are_the_tracked_ones(self):
+        rows = self.read("decomposition-scatter.csv")
+        cd = {r["comparison"]: r for r in rows if r["coefficient"] == "Cd"}
+        text = (bbv.VERIFICATION_DIR / "results.md").read_text()
+        g2 = cd["ghostCell L1, 1 against 2 ranks"]
+        g4 = cd["ghostCell L1, 1 against 4 ranks"]
+        self.assertIn(f"{float(g4['rms_diff_pct_of_rms']):.2f} to "
+                      f"{float(g2['rms_diff_pct_of_rms']):.2f} % of its",
+                      text.replace("\n  ", " "))
+        self.assertIn(f"{float(g4['max_diff_pct_of_rms']):.1f} to "
+                      f"{float(g2['max_diff_pct_of_rms']):.1f} %", text)
+        pen = cd["penalty L2, 2 against 4 ranks"]
+        inc = cd["incremental L1, 1 against 2 ranks"]
+        self.assertIn(f"{float(pen['max_diff_pct_of_rms']):.2f} %",
+                      text.replace("\n  ", " "))
+        self.assertIn(f"{float(inc['max_diff_pct_of_rms']):.2f} %",
+                      text.replace("\n  ", " "))
+
+    def test_courant_numbers_of_the_body_fitted_logs_are_tracked(self):
+        rows = {r["series"]: float(r["max_Courant_cell_sum"])
+                for r in self.read("bodyfitted-courant.csv")}
+        text = (bbv.VERIFICATION_DIR / "README.md").read_text()
+        self.assertIn(f"{rows['A']:.2f} and {rows['C']:.2f} in the logs",
+                      text.replace("\n", " "))
+        self.assertAlmostEqual(rows["B"], 1.0071, 4)
+
+    def test_text_does_not_claim_an_exact_force_reference(self):
+        text = ((bbv.VERIFICATION_DIR / "README.md").read_text() + " "
+                + (bbv.VERIFICATION_DIR / "results.md").read_text()
+                ).replace("\n", " ")
+        self.assertIn("not an exact solution", text)
+        self.assertIn("no force reference of this study is an exact solution",
+                      text)
 
 
 class Wrapper(unittest.TestCase):
