@@ -11,6 +11,7 @@ foamCleanPolyMesh -region fluid
 foamCleanPolyMesh -region solid
 
 rm -rf constant/polyMesh system/meshDict \
+    constant/triSurface/fluidDomain.fms \
     case.foam postProcessing dynamicCode
 
 # Restore the stored case format
