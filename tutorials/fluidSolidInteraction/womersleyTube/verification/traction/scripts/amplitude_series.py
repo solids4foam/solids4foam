@@ -6,13 +6,12 @@ WORK_DIR holds study copies amp05, base (mu5), amp2, amp4, each with the run
 CASE (default robin_m2_n200) under verification/work. The QoIs are computed
 with each copy's own verification driver. At 4x the tutorial amplitude the
 driver's check that the profile sample points stay within 5% of the cell
-spacing fails (the wall moves further); for this analysis only, that
-tolerance is relaxed to 50% (the axial pressure samples used for the wave
-number are unaffected). Fits E(a) = E0 + c a^m and reports m from successive
-differences.
+spacing fails (the wall moves further); for this analysis only, the
+driver's analyse(..., profile_tolerance=0.5) relaxes it to 50% (the axial
+pressure samples used for the wave number are unaffected). Fits
+E(a) = E0 + c a^m and reports m from successive differences.
 The amplitudes AllverifyTraction runs for CASE (REQUIRED; all four for any
-other CASE) must all be present: a missing run, or a profile-sample check that
-can no longer be found to relax, is an error (exit status 1).
+other CASE) must all be present: a missing run is an error (exit status 1).
 """
 import json
 import math
@@ -26,7 +25,7 @@ case = sys.argv[3] if len(sys.argv) > 3 else "robin_m2_n200"
 QOIS = ("attenuation", "speed", "wallMid_amp", "wallMid_phase", "flow_amp", "flow_phase")
 STUDIES = (("amp05", 0.5), ("mu5", 1.0), ("amp2", 2.0), ("amp4", 4.0))
 REQUIRED = {"robin_m2_n200": (0.5, 1.0, 2.0, 4.0), "robin_m1_n200": (1.0, 4.0)}
-CHECK, RELAXED = "> 0.05 * spacing", "> 0.5 * spacing"
+PROFILE_TOLERANCE = {4.0: 0.5}   # default 0.05 of the sample spacing
 missing = [f"a = {a:g}: {work / study / 'womersleyTube/verification/work' / case}"
            for study, a in STUDIES
            if a in REQUIRED.get(case, (0.5, 1.0, 2.0, 4.0))
@@ -43,17 +42,11 @@ for study, a in STUDIES:
         sys.modules.pop(mod, None)
     sys.path.insert(0, str(st / "verification/scripts"))
     import womersley_tube_verification as V
-    if a > 2.0:
-        src = Path(V.__file__).read_text()
-        if src.count(CHECK) != 1:
-            sys.exit(f"amplitude_series.py: expected exactly one '{CHECK}' (the "
-                     f"profile-sample check) in {V.__file__}, found "
-                     f"{src.count(CHECK)}; cannot relax it")
-        exec(compile(src.replace(CHECK, RELAXED), V.__file__, "exec"), V.__dict__)
     ref = json.loads(V.REFERENCE_FILE.read_text())
     coupling, m, n = case.split("_")
     r = V.analyse({"coupling": coupling, "factor": int(m[1:]), "steps": int(n[1:]),
-                   "name": case, "groups": []}, ref)
+                   "name": case, "groups": []}, ref,
+                  profile_tolerance=PROFILE_TOLERANCE.get(a, 0.05))
     res[a] = {q: r[q] for q in QOIS}
     sys.path.pop(0)
 A = np.array(sorted(res))

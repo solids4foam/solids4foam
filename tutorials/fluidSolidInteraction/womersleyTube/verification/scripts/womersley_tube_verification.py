@@ -371,9 +371,11 @@ def last_period(times, values, period, steps, before=0, count=1):
 
 
 def read_samples(case: Path, exact: Exact, periods: int, window: int,
-                 expected: dict) -> dict:
+                 expected: dict, profile_tolerance: float = 0.05) -> dict:
     """Fourier coefficients of the profile and axial samples over the last
-    `window` periods; `expected` holds the number of points of each set."""
+    `window` periods; `expected` holds the number of points of each set.
+    `profile_tolerance` is the largest allowed movement of a sample point
+    between times, as a fraction of the smallest sample spacing."""
     start = (periods - window) * exact.period
     wanted = period_times(start, window * exact.period,
                           window * SAMPLES_PER_PERIOD)
@@ -410,7 +412,8 @@ def read_samples(case: Path, exact: Exact, periods: int, window: int,
         # cell size)
         spacing = min(b - a for a, b in zip(coord, coord[1:]))
         for s in series[1:]:
-            if any(abs(row[0] - c) > 0.05 * spacing for row, c in zip(s, coord)):
+            if any(abs(row[0] - c) > profile_tolerance * spacing
+                   for row, c in zip(s, coord)):
                 fail(f"The {set_name} sample coordinates change between "
                      f"times in {root}")
         p = [fourier(wanted, [s[i][1] for s in series], exact.omega)
@@ -487,7 +490,8 @@ def execution_time(case: Path) -> float:
     return float(matches[-1]) if matches else math.nan
 
 
-def analyse(spec: dict, reference: dict) -> dict:
+def analyse(spec: dict, reference: dict,
+            profile_tolerance: float = 0.05) -> dict:
     case = WORK_ROOT / spec["name"]
     exact = Exact(reference)
     periods = reference["study"]["periods"]
@@ -521,7 +525,7 @@ def analyse(spec: dict, reference: dict) -> dict:
     mesh = mesh_divisions(spec["factor"], reference)
     samples = read_samples(case, exact, periods, window,
                            {"profile": mesh["fluidRadial"],
-                            "axial": AXIAL_POINTS})
+                            "axial": AXIAL_POINTS}, profile_tolerance)
     # Velocity profile and flow rate at x = L/2
     prof = samples["profile"]
     x_mid = 0.5 * exact.L
