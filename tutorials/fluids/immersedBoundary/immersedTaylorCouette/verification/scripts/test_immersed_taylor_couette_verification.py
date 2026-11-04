@@ -3,6 +3,7 @@
 OpenFOAM nor numpy. Run with ./Allverify unit."""
 
 import contextlib
+import csv
 import io
 import math
 import os
@@ -498,6 +499,242 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(v.check_case(row, near)[-1][0], "SKIPPED")
         far = dict(row, steady="0", T_drift_rel="1e-2")
         self.assertEqual(v.check_case(row, far)[-1][0], "FAIL")
+
+
+class ReviewOfPullRequestTests(unittest.TestCase):
+    """The findings of the review of the pull request"""
+
+    def run_main(self, argv):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = v.main(argv)
+        return code, out.getvalue()
+
+    # 1. the documented form ./Allverify --runs L1 L2
+    def test_run_is_inserted_before_parsing_when_not_a_command(self):
+        self.assertEqual(v.normalise_argv([]), ["run"])
+        self.assertEqual(v.normalise_argv(["--runs", "L1", "L2"]),
+                         ["run", "--runs", "L1", "L2"])
+        self.assertEqual(v.normalise_argv(["--force"]), ["run", "--force"])
+        for command in v.COMMANDS:
+            self.assertEqual(v.normalise_argv([command, "x"]), [command, "x"])
+        self.assertEqual(v.normalise_argv(["-h"]), ["-h"])
+        self.assertEqual(v.normalise_argv(["--help"]), ["--help"])
+
+    def test_main_accepts_runs_without_the_command(self):
+        seen = {}
+
+        def fake_run(args):
+            seen["args"] = args
+            return 0
+        with mock.patch.object(v, "cmd_run", fake_run):
+            self.assertEqual(v.main(["--runs", "L1", "L2"]), 0)
+            self.assertEqual(seen["args"].runs, ["L1", "L2"])
+            self.assertEqual(v.main(["--runs", "dt-extended", "--end-time",
+                                     "20", "--levels", "3"]), 0)
+            self.assertEqual(seen["args"].runs, ["dt-extended"])
+            self.assertEqual(seen["args"].end_time, 20.0)
+            self.assertEqual(seen["args"].levels, [3])
+            self.assertEqual(v.main([]), 0)
+            self.assertEqual(seen["args"].runs, ["smoke"])
+
+    def test_main_with_the_documented_form_runs_the_cases(self):
+        with tempfile.TemporaryDirectory() as d:
+            work = Path(d) / "work"
+            with mock.patch.object(v, "WORK_DIR", work), \
+                    mock.patch.object(v, "CASES_DIR", work / "cases"), \
+                    mock.patch.object(v, "MANIFEST", work / "manifest.json"), \
+                    mock.patch.dict(os.environ, {}, clear=True):
+                code, out = self.run_main(["--runs", "L1", "L2", "--methods",
+                                           "penalty"])
+        self.assertEqual(code, 0)
+        self.assertIn("SKIPPED penalty-L1", out)
+        self.assertIn("SKIPPED penalty-L2", out)
+
+    def test_help_and_unknown_commands(self):
+        with self.assertRaises(SystemExit) as cm, \
+                contextlib.redirect_stdout(io.StringIO()):
+            v.main(["--help"])
+        self.assertEqual(cm.exception.code, 0)
+        with self.assertRaises(SystemExit) as cm, \
+                contextlib.redirect_stderr(io.StringIO()):
+            v.main(["--bogus"])
+        self.assertEqual(cm.exception.code, 2)
+
+    # 3. wording
+    def test_documents_do_not_claim_that_run_analyses_or_checks(self):
+        readme = (v.VERIFICATION_DIR / "README.md").read_text()
+        self.assertNotIn("then check", readme)
+        self.assertNotIn("then analyse", v.__doc__)
+        self.assertNotIn("0.05 (Levels", readme)
+
+    # 4. observed cost in dry-run
+    def test_dry_run_prints_the_observed_cost(self):
+        code, out = self.run_main(["dry-run", "--runs", "matrix"])
+        self.assertNotIn("observed n/a", out)
+        total = float(re.search(r"total of the listed cases: ([0-9.]+)",
+                                out).group(1))
+        rows = {v.row_key(r): float(r["rank_h"]) for r in v.read_results()}
+        expected = sum(rows[(m, e, lv, 0.0)] for lv in (1, 2, 3)
+                       for m, e in v.VARIANTS)
+        self.assertAlmostEqual(total, expected, places=2)
+        self.assertGreater(total, 1.0)
+
+    def test_observed_rank_hours_come_from_the_tracked_files(self):
+        obs = v.load_observed_rank_hours()
+        self.assertAlmostEqual(obs[("penalty", "", 3, 0.0)], 0.0617)
+        self.assertAlmostEqual(obs[("cutLink", "ME", 4, 0.005)], 5.5656)
+        self.assertAlmostEqual(obs[("penalty", "", 3, 0.00125)], 1.5108)
+        for name in ("dt", "dt-extended"):
+            _, rows = v.RUNS[name]
+            self.assertTrue(all(tuple(r[:4]) in obs for r in rows), name)
+
+    def test_dry_run_of_a_twenty_second_run_has_no_observed_cost(self):
+        code, out = self.run_main(["dry-run", "--runs", "steady20"])
+        self.assertEqual(out.count("observed n/a"), 15)
+
+    # 5. reproducibility of the controls
+    def test_dt_extended_covers_exactly_the_rows_of_cases_timestep(self):
+        path = v.RESULTS_DIR / "controls" / "cases-timestep.csv"
+        tracked = {v.row_key(r) for r in v.read_results(path)}
+        class A:
+            runs, methods, levels, ranks = ["dt-extended"], [], [], 0
+        planned = {(m, e, lv, cap) for m, e, lv, _, _, cap, _ in v.plan(A)}
+        self.assertEqual(planned, tracked)
+        self.assertEqual(len(tracked), 14)
+        # no key of the extended run is already in the matrix or in `dt`
+        base = {v.row_key(r) for r in v.read_results()}
+        self.assertFalse(planned & base)
+
+    def test_dt_and_dt_extended_cover_every_tracked_cap_row(self):
+        class A:
+            methods, levels, ranks = [], [], 0
+        A.runs = ["matrix", "L4", "dt", "dt-extended"]
+        planned = {(m, e, lv, cap) for m, e, lv, _, _, cap, _ in v.plan(A)}
+        tracked = {v.row_key(r) for r in v.read_results()}
+        tracked |= {v.row_key(r) for r in v.read_results(
+            v.RESULTS_DIR / "controls" / "cases-timestep.csv")}
+        self.assertEqual(tracked - planned, set())
+
+    def test_steady20_covers_exactly_the_rows_of_steady_extended(self):
+        import taylor_couette_steady as steady
+        path = v.RESULTS_DIR / "controls" / "steady-extended.csv"
+        with path.open() as handle:
+            tracked = {r["case"] for r in csv.DictReader(handle)}
+        class A:
+            runs, methods, levels, ranks = ["steady20"], [], [], 0
+        labels = {steady.legacy_label(m, e, lv, ranks, cap, end)
+                  for m, e, lv, _, ranks, cap, end in v.plan(A)}
+        self.assertEqual(labels, tracked)
+
+    def test_end_time_is_written_and_tags_the_name(self):
+        class A:
+            runs, methods, levels, ranks = ["smoke"], [], [], 0
+            end_time = 20.0
+        (item,) = v.plan(A)
+        self.assertEqual(item[3], "cutLink-ME-L1-t20")
+        self.assertEqual(item[6], 20.0)
+        with tempfile.TemporaryDirectory() as d:
+            plain = v.generate_case("penalty", "", 1, "a", 1, cases_dir=Path(d))
+            long = v.generate_case("penalty", "", 1, "b", 1, cases_dir=Path(d),
+                                   dt_cap=0.01, end_time=20.0)
+            a = (plain / "system/controlDict").read_text()
+            b = (long / "system/controlDict").read_text()
+        self.assertRegex(a, r"endTime\s+10;")
+        self.assertRegex(b, r"endTime\s+20;")
+        self.assertEqual(a.replace("endTime         10;", "endTime         20;"),
+                         b.replace("maxCo           0.5;\nmaxDeltaT      0.01;",
+                                   "maxCo           0.5;"))
+
+    def test_end_time_option_overrides_a_named_run(self):
+        class A:
+            runs, methods, levels, ranks = ["L1"], ["penalty"], [], 0
+            end_time = 20.0
+        self.assertEqual([x[3] for x in v.plan(A)], ["penalty-L1-t20"])
+        self.assertEqual(v.case_name("penalty", "", 1, 0.0025, 20.0),
+                         "penalty-L1-dt0.0025-t20")
+        self.assertEqual(v.case_name("penalty", "", 1), "penalty-L1")
+
+    # 6. robustness of the field analysis
+    def test_guard_passes_on_the_tutorial(self):
+        states = [s for s, _ in v.check_analytic(P)]
+        self.assertEqual(states, ["PASS"] * len(states))
+        self.assertEqual(v.mesh_guard(P)[0], "PASS")
+
+    def test_guard_fails_when_the_rotation_is_not_centred_at_the_origin(self):
+        moved = dict(P, origin=(0.01, 0.0, 0.0), CofR=(0.01, 0.0, 0.0))
+        out = v.check_analytic(moved)
+        self.assertIn("FAIL", [s for s, m in out if "centred at (0, 0)" in m])
+
+    def test_guard_fails_when_the_mesh_changes(self):
+        for change in (dict(mesh_x=(-0.2, 0.2)), dict(mesh_y=(-0.16, 0.17)),
+                       dict(mesh_x=(-0.15, 0.17)),
+                       dict(cells_formula=(16.0, 2.0, 1.0)),
+                       dict(cells_formula=None), dict(square_block=False)):
+            self.assertEqual(v.mesh_guard(dict(P, **change))[0], "FAIL", change)
+
+    def test_guard_reads_a_modified_blockmeshdict(self):
+        with tempfile.TemporaryDirectory() as d:
+            tut = Path(d) / "t"
+            import shutil
+            shutil.copytree(v.TUTORIAL_DIR, tut,
+                            ignore=shutil.ignore_patterns("verification",
+                                                          "regressionTests"))
+            bm = tut / "system/blockMeshDict"
+            text = bm.read_text()
+            self.assertEqual(v.mesh_guard(v.parameters(tut))[0], "PASS")
+            bm.write_text(text.replace("(-0.16 -0.16 0)", "(-0.2 -0.2 0)"))
+            self.assertEqual(v.mesh_guard(v.parameters(tut))[0], "FAIL")
+            bm.write_text(text.replace("32*pow(2,", "40*pow(2,"))
+            self.assertEqual(v.mesh_guard(v.parameters(tut))[0], "FAIL")
+
+    # 7. OpenFOAM flavour
+    def test_openfoam_com_detection(self):
+        com = {"WM_PROJECT": "OpenFOAM", "WM_PROJECT_VERSION": "v2412"}
+        self.assertTrue(v.is_openfoam_com(com))
+        self.assertTrue(v.is_openfoam_com(dict(com, WM_PROJECT_VERSION="v2306")))
+        for env in ({"WM_PROJECT": "OpenFOAM", "WM_PROJECT_VERSION": "11"},
+                    {"WM_PROJECT": "OpenFOAM", "WM_PROJECT_VERSION": "dev"},
+                    {"WM_PROJECT": "OpenFOAM"},
+                    {"WM_PROJECT": "foam", "WM_PROJECT_VERSION": "v4.1"},
+                    {"WM_PROJECT_VERSION": "v2412"}, {}):
+            self.assertFalse(v.is_openfoam_com(env), env)
+
+    def test_check_environment_reasons(self):
+        base = {"WM_PROJECT_DIR": "/opt/OpenFOAM-11", "WM_PROJECT": "OpenFOAM",
+                "WM_PROJECT_VERSION": "11"}
+        with mock.patch.dict(os.environ, base, clear=True):
+            self.assertIn("OpenFOAM.com", v.check_environment(1))
+        # a path that does not contain 'openfoam.org' is still recognised
+        with mock.patch.dict(os.environ, dict(base, WM_PROJECT_DIR="/opt/of"),
+                             clear=True):
+            self.assertIn("OpenFOAM.com", v.check_environment(1))
+        with mock.patch.dict(os.environ, dict(base, WM_PROJECT_VERSION="v2412"),
+                             clear=True), \
+                mock.patch.object(v.shutil, "which", return_value=None):
+            self.assertIn("blockMesh not found", v.check_environment(1))
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertIn("WM_PROJECT_DIR", v.check_environment(1))
+
+    def test_run_with_openfoam_org_is_skipped_never_failed(self):
+        org = {"WM_PROJECT_DIR": "/opt/OpenFOAM-11", "WM_PROJECT": "OpenFOAM",
+               "WM_PROJECT_VERSION": "11"}
+        with tempfile.TemporaryDirectory() as d:
+            work = Path(d) / "work"
+            with mock.patch.object(v, "WORK_DIR", work), \
+                    mock.patch.object(v, "CASES_DIR", work / "cases"), \
+                    mock.patch.object(v, "MANIFEST", work / "manifest.json"), \
+                    mock.patch.dict(os.environ, org, clear=True), \
+                    mock.patch.object(v.subprocess, "call") as call:
+                code, out = self.run_main(["run"])
+                code_check, out_check = self.run_main(["check"])
+        self.assertEqual(code, 0)
+        call.assert_not_called()
+        self.assertIn("SKIPPED cutLink-ME-L1: OpenFOAM.com (ESI) is required",
+                      out)
+        self.assertNotIn("FAIL", out)
+        self.assertEqual(code_check, 0)
+        self.assertRegex(out_check, r"0 FAIL")
 
 
 if __name__ == "__main__":

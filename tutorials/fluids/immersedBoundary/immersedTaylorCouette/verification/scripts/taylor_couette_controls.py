@@ -9,12 +9,18 @@ CFD, no numpy).
                                           with the rate only where it is supported
     taylor_couette_controls.py all        both, written to reference/results/controls
 
+The rows come from the runs of the driver (./Allverify run --runs dt dt-extended
+steady20 st-audit; controls.md lists the generator of every file).
+
 The tutorial step is limited by the Courant number and halves with each mesh
 level (mean 0.095, 0.049, 0.025, 0.013 s on Levels 1-4); a maxDeltaT cap is a
 step that is constant after the start-up ramp (checked on the written times).
 
-Thresholds, fixed before the new data were interpreted (report 12 of the
-campaign):
+Thresholds, the constants SMALL_FRACTION and RATE_SPREAD below, set when the
+step-cap runs were planned and before their rows were interpreted (they are not
+tuned: the statements of controls.md are checked against them by
+test_taylor_couette_controls.py, and a threshold that is changed changes those
+statements):
  - a temporal change is SMALL if the last halving of the step changes the
    torque error by less than 10 % of that error;
  - a rate between meshes is stated only if the temporal change is small on

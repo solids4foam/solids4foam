@@ -49,11 +49,17 @@ plain Python 3 (standard library only). A manifest, work/manifest.json,
 records every case with the SHA-256 of its inputs.
 
 Usage:
-    ./Allverify [run] [--runs ...]   generate and run locally (then analyse,
-                                     check)
+    ./Allverify [run] [--runs ...]   generate and run locally (does not
+                                     analyse or check: follow with the
+                                     'analyse' and 'check' commands); 'run'
+                                     may be omitted: ./Allverify --runs L1 L2
     ./Allverify unit                 exact tests that need no OpenFOAM
     ./Allverify dry-run --runs ...   list the cases and ranks
     ./Allverify generate --runs ...  generate the cases only
+    (run, generate and dry-run take --methods, --levels, --ranks, --force
+    and --end-time T, which writes endTime T into controlDict and tags the
+    case name with -tT; the named runs 'dt-extended' and 'steady20' are the
+    control runs of reference/results/controls/, see controls.md)
     ./Allverify status               state of the cases in the manifest
     ./Allverify analyse              analyse the completed cases
     ./Allverify check                PASS / FAIL / SKIPPED
@@ -125,8 +131,16 @@ CHECK_EXACT_TORQUE = 1e-9         # relative, the closed form against the
 CHECK_FIELD_TORQUE = 0.01         # |difference| of the torque from the field
                                   # and from the force output (Level >= 2)
 
-# Observed allocated rank-hours of the tracked runs (serial except Level 4)
-OBSERVED_RANK_HOURS = {}
+def load_observed_rank_hours() -> dict:
+    """Observed allocated rank-hours of the tracked runs (serial except Level
+    4), {(method, estimator, level, dt_cap): rank_h}, from the rank_h column of
+    reference/results/cases.csv and of controls/cases-timestep.csv"""
+    out = {}
+    for path in (CASES_CSV, RESULTS_DIR / "controls" / "cases-timestep.csv"):
+        for r in read_results(path):
+            if r.get("rank_h") not in ("", None):
+                out[row_key(r)] = float(r["rank_h"])
+    return out
 
 # dt_cap = 0 is the tutorial: the time step is limited by the Courant
 # number 0.5 and, because the cells halve with each level, is itself halved
@@ -136,6 +150,34 @@ DT_VARIANTS = (("cutLink", "ME"), ("cutLink", "ST"), ("penalty", ""),
                ("incremental", ""), ("ghostCell", ""))
 DT_CONTROLS = [(lv, cap) for lv in (1, 2) for cap in (0.01, 0.005, 0.0025)] \
     + [(3, 0.01), (3, 0.005)]
+# The control runs of reference/results/controls/cases-timestep.csv that are
+# not in DT_CONTROLS: Level 4 (4 ranks) at the caps 0.01 and 0.005 (four
+# variants, the momentum exchange among them) and 0.0025 (penalty and
+# incremental), Level 3 at the cap 0.0025 (penalty, incremental, ghostCell) and
+# the penalty method on Level 3 at 0.00125. The keys are exactly those of the
+# CSV (a test compares them)
+DT_EXTENDED = [
+    ("cutLink", "ME", 4, 0.01), ("penalty", "", 4, 0.01),
+    ("incremental", "", 4, 0.01), ("ghostCell", "", 4, 0.01),
+    ("cutLink", "ME", 4, 0.005), ("penalty", "", 4, 0.005),
+    ("incremental", "", 4, 0.005), ("ghostCell", "", 4, 0.005),
+    ("penalty", "", 3, 0.0025), ("penalty", "", 4, 0.0025),
+    ("incremental", "", 3, 0.0025), ("incremental", "", 4, 0.0025),
+    ("ghostCell", "", 3, 0.0025), ("penalty", "", 3, 0.00125)]
+# The 20 s runs of reference/results/controls/steady-extended.csv: (method,
+# estimator, level, dt_cap, end_time); dt_cap 0 is the tutorial step
+STEADY_END = 20.0
+STEADY20 = [
+    ("ghostCell", "", 1, 0.01, STEADY_END), ("ghostCell", "", 1, 0.005, STEADY_END),
+    ("incremental", "", 1, 0.0, STEADY_END),
+    ("incremental", "", 1, 0.01, STEADY_END),
+    ("incremental", "", 1, 0.005, STEADY_END),
+    ("incremental", "", 1, 0.0025, STEADY_END),
+    ("incremental", "", 2, 0.0025, STEADY_END),
+    ("penalty", "", 1, 0.0, STEADY_END), ("penalty", "", 1, 0.01, STEADY_END),
+    ("penalty", "", 1, 0.005, STEADY_END), ("penalty", "", 1, 0.0025, STEADY_END),
+    ("penalty", "", 2, 0.0, STEADY_END), ("penalty", "", 2, 0.01, STEADY_END),
+    ("penalty", "", 2, 0.005, STEADY_END), ("penalty", "", 2, 0.0025, STEADY_END)]
 RUNS = {
     "smoke": ("cutLink (momentum exchange), Level 1",
               [("cutLink", "ME", 1, 0.0)]),
@@ -150,6 +192,15 @@ RUNS = {
            "1-2 and 0.01, 0.005 s on Level 3, five variants",
            [(m, e, lv, cap) for lv, cap in DT_CONTROLS
             for m, e in DT_VARIANTS]),
+    "dt-extended": ("time-step control, Levels 3-4 and the 0.00125 s cap: "
+                    "the 14 rows of controls/cases-timestep.csv (Level 4 on "
+                    "4 ranks; about 30 rank-h in all, the momentum exchange at Level 4 alone 8.5)", list(DT_EXTENDED)),
+    "st-audit": ("cutLink surface traction, Levels 1-4 (Level 4 on 4 ranks): "
+                 "the runs of the surface-traction audit, "
+                 "scripts/taylor_couette_st_audit.py",
+                 [("cutLink", "ST", lv, 0.0) for lv in LEVELS]),
+    "steady20": ("the 15 runs to t = 20 s of controls/steady-extended.csv "
+                 "(about 2 serial hours)", list(STEADY20)),
 }
 DEFAULT_RUNS = ("smoke",)
 LEVEL_RANKS = {1: 1, 2: 1, 3: 1, 4: 4}
@@ -225,12 +276,22 @@ def parameters(tutorial: Path = TUTORIAL_DIR) -> dict:
         fail("the bodies of the tutorial have different centres of rotation")
     cofr = cofrs.pop()
     vertices = re.search(r"vertices\s*\((.*?)\n\);", bm, re.DOTALL).group(1)
-    zs = sorted({float(v.split()[2]) for v in
-                 re.findall(r"\(([-0-9. eE]+)\)", vertices)})
+    pts = [tuple(float(x) for x in v.split())
+           for v in re.findall(r"\(([-0-9. eE]+)\)", vertices)]
+    zs = sorted({q[2] for q in pts})
+    xs, ys = sorted({q[0] for q in pts}), sorted({q[1] for q in pts})
+    cells = re.search(
+        r'^\s*n\s+#eval\s+"round\(\s*([0-9.]+)\s*\*\s*pow\(\s*([0-9.]+)'
+        r'\s*,\s*\$MESH_LEVEL\s*-\s*([0-9.]+)\s*\)\s*\)"', bm, re.MULTILINE)
+    blocks = re.search(r"hex\s*\([^)]*\)\s*\(\s*\$n\s+\$n\s+1\s*\)", bm)
     return {"R1": r1_max, "R2": r2_min, "omega": dict_scalar(motion, "omega"),
             "origin": origin, "axis": axis, "CofR": cofr,
             "nu": dict_scalar(tp, "nu"), "rho": dict_scalar(tp, "rho"),
-            "Lz": zs[-1] - zs[0], "side": SIDE}
+            "Lz": zs[-1] - zs[0], "side": SIDE,
+            "mesh_x": (xs[0], xs[-1]), "mesh_y": (ys[0], ys[-1]),
+            "cells_formula": tuple(float(g) for g in cells.groups())
+            if cells else None,
+            "square_block": blocks is not None}
 
 
 # ------------------------------------------------------------ exact solution
@@ -432,9 +493,12 @@ def dt_tag(dt_cap: float) -> str:
     return f"-dt{fmt(dt_cap)}" if dt_cap else ""
 
 
-def case_name(method: str, est: str, level: int, dt_cap: float = 0.0) -> str:
+def case_name(method: str, est: str, level: int, dt_cap: float = 0.0,
+              end_time: float = 0.0) -> str:
+    """-dt<cap> for a step cap and -t<end> for an end time other than the
+    10 s of the tutorial"""
     return (f"{method}{'-' + est if method == 'cutLink' else ''}-L{level}"
-            f"{dt_tag(dt_cap)}")
+            f"{dt_tag(dt_cap)}{f'-t{fmt(end_time)}' if end_time else ''}")
 
 
 def load_manifest() -> dict:
@@ -449,21 +513,26 @@ def save_manifest(manifest: dict) -> None:
 
 
 def plan(args) -> list:
+    """(method, estimator, level, name, ranks, dt_cap, end_time) of the cases
+    of the named runs; --end-time overrides the end time of every case"""
     out, seen = [], set()
+    override = float(getattr(args, "end_time", 0.0) or 0.0)
     for name in args.runs:
         if name not in RUNS:
             fail(f"unknown run '{name}'; choose from {', '.join(RUNS)}")
-        for method, est, level, cap in RUNS[name][1]:
+        for method, est, level, cap, *rest in RUNS[name][1]:
+            end = override or (rest[0] if rest else 0.0)
             if args.methods and method not in args.methods:
                 continue
             if args.levels and level not in args.levels:
                 continue
-            key = (method, est, level, cap)
+            key = (method, est, level, cap, end)
             if key not in seen:
                 seen.add(key)
                 ranks = args.ranks or LEVEL_RANKS[level]
                 out.append((method, est, level,
-                            case_name(method, est, level, cap), ranks, cap))
+                            case_name(method, est, level, cap, end), ranks,
+                            cap, end))
     return out
 
 
@@ -561,7 +630,7 @@ def input_hashes(case: Path) -> dict:
 
 def generate_case(method: str, est: str, level: int, name: str, ranks: int,
                   force: bool = False, cases_dir: Path = None,
-                  dt_cap: float = 0.0) -> Path:
+                  dt_cap: float = 0.0, end_time: float = 0.0) -> Path:
     cases_dir = CASES_DIR if cases_dir is None else cases_dir
     case = cases_dir / name
     if case.exists():
@@ -585,6 +654,8 @@ def generate_case(method: str, est: str, level: int, name: str, ranks: int,
         if count != 1:
             fail("maxCo entry of the tutorial controlDict not found")
         control.write_text(new)
+    if end_time:
+        replace_entry(case / "system/controlDict", "endTime", fmt(end_time))
     script = case / "Allrun.verify"
     script.write_text(RUN_SCRIPT.format(
         level=level, ranks=ranks,
@@ -595,12 +666,13 @@ def generate_case(method: str, est: str, level: int, name: str, ranks: int,
 
 def cmd_generate(args) -> int:
     manifest = load_manifest()
-    for method, est, level, name, ranks, cap in plan(args):
+    for method, est, level, name, ranks, cap, end in plan(args):
         case = generate_case(method, est, level, name, ranks, args.force,
-                             dt_cap=cap)
+                             dt_cap=cap, end_time=end)
         manifest["cases"][name] = {
             "method": method, "estimator": est, "level": level,
-            "dt_cap": cap, "ranks": ranks, "inputs_sha256": input_hashes(case),
+            "dt_cap": cap, "end_time": end, "ranks": ranks,
+            "inputs_sha256": input_hashes(case),
             "generated": datetime.now().isoformat(timespec="seconds")}
         print(f"{name}: generated in {case}")
     save_manifest(manifest)
@@ -614,9 +686,12 @@ def cmd_dry_run(args) -> int:
           f"L_z = {p['Lz']}")
     print(f"Exact rotor torque: {exact_rotor_torque(p):.6e} N m")
     total = 0.0
-    for method, est, level, name, ranks, cap in plan(args):
+    observed = load_observed_rank_hours()
+    for method, est, level, name, ranks, cap, end in plan(args):
         cells = MESH_CELLS_ACROSS[level] ** 2
-        obs = OBSERVED_RANK_HOURS.get((method, est, level, cap))
+        # the observed cost is that of the 10 s tutorial run of the same key;
+        # a 20 s run costs about twice as much and has no tracked cost
+        obs = None if end else observed.get((method, est, level, cap))
         total += obs or 0.0
         print(f"  {name:20s} {cells:6d} cells, {ranks} rank(s), observed "
               f"{'%.3f' % obs if obs else 'n/a'} allocated rank-h")
@@ -625,12 +700,20 @@ def cmd_dry_run(args) -> int:
     return 0
 
 
+def is_openfoam_com(environ=None) -> bool:
+    """OpenFOAM.com (ESI): WM_PROJECT is OpenFOAM and WM_PROJECT_VERSION
+    starts with 'v' (v2412); OpenFOAM.org has a number or 'dev' (the rule of
+    solids4FoamScripts.sh), foam-extend has WM_PROJECT foam"""
+    environ = os.environ if environ is None else environ
+    return environ.get("WM_PROJECT") == "OpenFOAM" and \
+        environ.get("WM_PROJECT_VERSION", "").startswith("v")
+
+
 def check_environment(ranks: int) -> str:
     """Empty if the cases can be run, else the reason they cannot"""
     if "WM_PROJECT_DIR" not in os.environ:
         return "no OpenFOAM environment (WM_PROJECT_DIR is not set)"
-    if os.environ.get("WM_PROJECT") != "OpenFOAM" or \
-            "openfoam.org" in os.environ.get("WM_PROJECT_DIR", ""):
+    if not is_openfoam_com():
         return "OpenFOAM.com (ESI) is required for libimmersedBoundary"
     for tool in ("blockMesh", "solids4Foam"):
         if not shutil.which(tool):
@@ -664,17 +747,18 @@ def cmd_run(args) -> int:
             print(f"{item[3]}: completed, kept (use --force to rerun)")
         else:
             todo.append(item)
-    for method, est, level, name, ranks, cap in todo:
-        case = generate_case(method, est, level, name, ranks, True, dt_cap=cap)
+    for method, est, level, name, ranks, cap, end in todo:
+        case = generate_case(method, est, level, name, ranks, True, dt_cap=cap,
+                             end_time=end)
         manifest["cases"][name] = {
             "method": method, "estimator": est, "level": level,
-            "dt_cap": cap, "ranks": ranks,
+            "dt_cap": cap, "end_time": end, "ranks": ranks,
             "inputs_sha256": input_hashes(case),
             "generated": datetime.now().isoformat(timespec="seconds")}
         print(f"{name}: generated in {case}")
     save_manifest(manifest)
     status = 0
-    for method, est, level, name, ranks, cap in todo:
+    for method, est, level, name, ranks, cap, end in todo:
         reason = check_environment(ranks)
         entry = manifest["cases"][name]
         if reason:
@@ -830,7 +914,42 @@ def check_analytic(p: dict) -> list:
     out.append(("PASS" if ok else "FAIL",
                 "the torque axis is z, the centre of rotation of the body "
                 "is the origin of the rotation, omega > 0"))
+    # the field analysis measures r and the azimuthal direction from (0, 0)
+    ok = tuple(p["origin"][:2]) == (0.0, 0.0)
+    out.append(("PASS" if ok else "FAIL",
+                "the rotation is centred at (0, 0), as the field analysis "
+                f"assumes (origin {p['origin'][:2]})"))
+    out.append(mesh_guard(p))
     return out
+
+
+def mesh_guard(p: dict) -> tuple:
+    """The field analysis uses SIDE and MESH_CELLS_ACROSS: they must be those
+    of system/blockMeshDict (a square of side SIDE centred on the axis, one
+    block of n x n x 1 cells with n = round(a pow(b, MESH_LEVEL - c)))"""
+    problems = []
+    for key in ("mesh_x", "mesh_y"):
+        lo, hi = p[key]
+        if abs(hi - lo - SIDE) > 1e-12 or abs(hi + lo) > 1e-12:
+            problems.append(f"{key} = ({lo}, {hi}) is not a square of side "
+                            f"{SIDE} centred on the axis")
+    if not p.get("square_block"):
+        problems.append("the block is not n x n x 1 cells")
+    f = p.get("cells_formula")
+    if f is None:
+        problems.append("the cell count formula of blockMeshDict was not "
+                        "recognised")
+    else:
+        a, b, c = f
+        for level, n in MESH_CELLS_ACROSS.items():
+            if round(a * b ** (level - c)) != n:
+                problems.append(f"Level {level} has {round(a * b ** (level - c))}"
+                                f" cells across, not {n}")
+    return ("FAIL" if problems else "PASS",
+            "the mesh of blockMeshDict is the one assumed by the field "
+            f"analysis (side {SIDE}, cells across "
+            f"{', '.join(str(n) for n in MESH_CELLS_ACROSS.values())})"
+            + (": " + "; ".join(problems) if problems else ""))
 
 
 def check_tracked(rows: list, p: dict) -> list:
@@ -1004,7 +1123,22 @@ def cmd_unit(args) -> int:
     return 0 if result.wasSuccessful() else 1
 
 
+COMMANDS = ("run", "generate", "dry-run", "status", "analyse", "check",
+            "tables", "unit")
+
+
+def normalise_argv(argv: list) -> list:
+    """'run' is the default command: it is inserted before parsing when the
+    arguments are empty or do not start with a command or -h/--help, so that
+    ./Allverify --runs L1 L2 is ./Allverify run --runs L1 L2"""
+    argv = list(argv)
+    if not argv or (argv[0] not in COMMANDS and argv[0] not in ("-h", "--help")):
+        return ["run"] + argv
+    return argv
+
+
 def main(argv=None) -> int:
+    argv = normalise_argv(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command")
@@ -1018,12 +1152,13 @@ def main(argv=None) -> int:
                        help="MPI ranks (default: by level)")
         s.add_argument("--force", action="store_true",
                        help="regenerate existing cases")
-    for name in ("status", "analyse", "check", "tables", "unit"):
+        s.add_argument("--end-time", type=float, default=0.0, metavar="T",
+                       help="write endTime T into controlDict (default: the "
+                       "10 s of the tutorial) and tag the case name with -tT")
+    for name in COMMANDS[3:]:
         sub.add_parser(name)
     args = parser.parse_args(argv)
-    command = args.command or "run"
-    if args.command is None:
-        args = parser.parse_args(["run"] + (argv or sys.argv[1:]))
+    command = args.command
     handlers = {"run": cmd_run, "generate": cmd_generate,
                 "dry-run": cmd_dry_run, "status": cmd_status,
                 "analyse": cmd_analyse, "check": cmd_check,
