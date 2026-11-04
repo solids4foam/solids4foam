@@ -1,7 +1,18 @@
 #!/bin/bash
 # Remove everything Allrun and plotter.py made
 cd "$(dirname "$0")" || exit 1
-rm -rf constant/polyMesh processor* postProcessing plots
-find . -maxdepth 1 -type d -regex './[1-9][0-9.e+-]*' -exec rm -rf {} +
-find . -maxdepth 1 -type d -regex './0\.[0-9][0-9.e+-]*' -exec rm -rf {} +
-rm -f log log.*
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source tutorial clean functions
+. "$WM_PROJECT_DIR"/bin/tools/CleanFunctions
+
+cleanCase
+
+# Remove the plots of plotter.py
+rm -rf plots
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

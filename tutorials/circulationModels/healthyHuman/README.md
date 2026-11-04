@@ -94,14 +94,10 @@ Note that this healthy parameter set is itself hypertensive and has a high
 venous pressure, so the parameters should be checked before relying on the
 physiology.
 
-The pressure-volume loops of the four chambers:
+`plotter.py` draws the last cycle in three figures:
 
-![Pressure-volume loops](plots/pv_loops.png)
-
-The pressures on each side of the four valves, with the valve flows:
-
-![Valve pressures](plots/valve_pressures.png)
-
-The left heart: pressures, left ventricular volume and aortic flow:
-
-![Left heart](plots/wiggers.png)
+- `pv_loops.png`: the pressure-volume loops of the four chambers;
+- `valve_pressures.png`: the pressures on each side of the four valves, with
+  the valve flows;
+- `wiggers.png`: the left heart: pressures, left ventricular volume and aortic
+  flow.

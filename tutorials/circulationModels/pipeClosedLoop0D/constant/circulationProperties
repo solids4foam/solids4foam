@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -17,7 +17,7 @@ FoamFile
 }
 
 // The closed-loop pipe circuit with the 3D pipe replaced by its rigid
-// Poiseuille R-L surrogate, solved as one monolithic system. It has no
+// Poiseuille R-L surrogate, solved as one 0D system. It has no
 // partitioned-coupling error, so it is the reference the CFD-coupled
 // ../pipeClosedLoop is judged against (the same role the exact solution plays
 // for the Windkessel). Same circuit file as ../pipeClosedLoop, with the two

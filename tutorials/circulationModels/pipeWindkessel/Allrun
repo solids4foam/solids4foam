@@ -11,8 +11,8 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-blockMesh > log.blockMesh 2>&1 || { echo "blockMesh failed, see log.blockMesh"; exit 1; }
-pimpleFoam > log.pimpleFoam 2>&1 || { echo "pimpleFoam failed, see log.pimpleFoam"; exit 1; }
+solids4Foam::runApplication blockMesh || exit 1
+solids4Foam::runApplication pimpleFoam || exit 1
 echo "done: postProcessing/circulationCoupling/0/coupling.dat"
 
 if command -v python3 > /dev/null; then

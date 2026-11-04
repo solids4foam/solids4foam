@@ -1,7 +1,18 @@
 #!/bin/bash
 # Remove the results of this case
 cd "$(dirname "$0")" || exit 1
-rm -rf postProcessing
-find . -maxdepth 1 -type d -regex './[0-9][0-9.e+-]*' -exec rm -rf {} +
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source tutorial clean functions
+. "$WM_PROJECT_DIR"/bin/tools/CleanFunctions
+
+cleanCase
+
+# Remove the plots of plotter.py
 rm -rf plots
-rm -f log log.*
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

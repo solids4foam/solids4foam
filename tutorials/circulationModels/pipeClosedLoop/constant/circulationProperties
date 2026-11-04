@@ -1,6 +1,6 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
-| Version:     v2.3                                                           |
+| Version:     v2.4                                                           |
 | Web:         https://solids4foam.github.io                                  |
 | Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
 |              producer and distributor of the OpenFOAM software via          |
@@ -25,7 +25,7 @@ FoamFile
 // The CFD gives the flow through each patch; the circuit gives back the
 // pressure of the node the patch is attached to (the outlet node C1, the
 // inlet node C4). The same circuit without the CFD, the pipe replaced by its
-// Poiseuille R-L surrogate, is ../../pipeClosedLoopMonolithic.
+// Poiseuille R-L surrogate, is ../../pipeClosedLoop0D.
 
 units       SI;
 Tcycle      0.8;

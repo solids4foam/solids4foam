@@ -1,4 +1,4 @@
-# Closed-loop circulation with a pipe surrogate: `pipeClosedLoopMonolithic`
+# Closed-loop circulation with a pipe surrogate: `pipeClosedLoop0D`
 
 ---
 

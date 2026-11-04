@@ -17,8 +17,8 @@ the node each patch is attached to. The circuit is one dictionary,
 ## Run it
 
 ```bash
-# blockMesh, circuit check, decomposePar, pimpleFoam on 8 ranks
-# (./Allrun 4 for 4)
+# blockMesh, circuit check, decomposePar, pimpleFoam on the
+# numberOfSubdomains (8) ranks of system/decomposeParDict; 1 runs serially
 ./Allrun
 # figures open on screen and are saved to plots/   (--no-show: only save)
 python3 plotter.py
@@ -61,7 +61,7 @@ run about 2.5 minutes); watch it with `tail -f log.pimpleFoam`.
 
 ## Checks and known limits
 
-There is no closed form for this problem. `../pipeClosedLoopMonolithic` is the
+There is no closed form for this problem. `../pipeClosedLoop0D` is the
 same circuit with the pipe replaced by its rigid Poiseuille R-L surrogate,
 solved as one system by `circulationFoam`. It is a reference for the coupled
 run, which differs from it by the modelling error of the surrogate, and a
@@ -69,13 +69,15 @@ test of the chamber and valve components and the network assembly on a stiff,
 non-smooth, closed-loop circuit.
 
 Explicit order 1 is unstable at `deltaT 1e-3` and stops at `t = 1.997`; use
-a smaller `deltaT`. Implicit coupling of orders 2, 3 and 4 runs through three
-cycles at `deltaT 5e-3` with the `backward` CFD time scheme. That scheme limits
-the coupled solution to second order (the coupler prints a warning for orders 3
-and 4). A third- or fourth-order BDF CFD time scheme is not A-stable, so it can
-add energy to the pipe-compliance oscillation of this loop (about 30 Hz) and
-needs a smaller `deltaT`: BDF4 at `deltaT 5e-3` blew up, and was stable at
-`3e-3`.
+a smaller `deltaT`. Implicit coupling needs many outer correctors on this
+loop: at `deltaT 5e-3` every step reaches the limit of 120, so the run
+completes but the coupling is not converged. Use a smaller `deltaT` (about
+1e-3 or below) for a converged implicit solution, or the explicit scheme.
+With the `backward` CFD time scheme the coupled solution is limited to second
+order for coupling orders 3 and 4 (the coupler prints a warning). A third- or
+fourth-order BDF CFD time scheme is not A-stable, so it can amplify the
+pipe-compliance oscillation of this loop (about 30 Hz): with explicit
+coupling of order 2, BDF3 and BDF4 diverged at `deltaT 5e-3`.
 
 The circuit's ODE solver is `RKDP45` with very tight tolerances (relTol 1e-13),
 and its step cap is raised (`maxSteps 1e8`) because hard-valve switching needs
