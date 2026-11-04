@@ -28,16 +28,6 @@ boundaryField
         value uniform (0 0 0);
     }
 
-    // right
-    // {
-    //     type momentBeamRotationNR;
-    //     momentSeries
-    //     {
-    //         "fileName|file"        "$FOAM_CASE/constant/timeVsMoment";
-    //         outOfBounds     clamp;
-    //     }
-    // }
-
     right
     {
         type fixedBeamRotation;

@@ -23,9 +23,9 @@ beams
 (
     beam_0
     {
-	    crossSectionModel rectangle;
+        crossSectionModel rectangle;
 
-	    rectangleCrossSectionModelDict
+        rectangleCrossSectionModelDict
         {
             b 0.2;
             h 0.2;
@@ -43,13 +43,8 @@ beams
 
 "coupledTotalLagNewtonRaphsonBeamCoeffs"
 {
-    // rho rho [1 -3 0 0 0 0 0] 1000;
-    // E E [1 -1 -2 0 0 0 0] 1;
-    // G G [1 -1 -2 0 0 0 0] 5.882e6;
-
     nCorrectors 200;
     solutionTol 1e-10;
-
-    debug no;
 }
+
 // ************************************************************************* //

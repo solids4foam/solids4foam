@@ -19,10 +19,6 @@ FoamFile
 
 beamModel coupledTotalLagNewtonRaphsonBeam;
 
-// nBeams 1;
-// R R [0 1 0 0 0 0 0] 0.2; //5.70732;
-// L L [0 1 0 0 0 0 0] 10;
-// nSegments 5;
 beams
 (
     beam_0
@@ -36,20 +32,15 @@ beams
         length    10;
         nSegments    50;
     }
- );
+);
 
 "coupledTotalLagNewtonRaphsonBeamCoeffs"
 {
-    E E [1 -1 -2 0 0 0 0] 7.9577472e4;;//20e6;
-    G G [1 -1 -2 0 0 0 0] 3.9788736e4;//10e6; // nu=0
-
-    startPatchName left;
-    endPatchName right;
+    E E [1 -1 -2 0 0 0 0] 7.9577472e4;
+    G G [1 -1 -2 0 0 0 0] 3.9788736e4; // nu = 0
 
     nCorrectors 200;
     convergenceTol 1e-10;
-
-    debug yes;
 }
 
 // ************************************************************************* //

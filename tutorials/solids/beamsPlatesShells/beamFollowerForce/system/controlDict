@@ -16,8 +16,6 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-//libs ("libblockMklParadisoSolver.so");
-
 application     solids4Foam;
 
 libs            ("libS4FBeamSolid.so");
@@ -30,7 +28,7 @@ stopAt          endTime;
 
 endTime         1;
 
-deltaT          0.001; //0.01;
+deltaT          0.001;
 
 writeControl    timeStep;
 

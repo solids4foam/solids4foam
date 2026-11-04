@@ -46,7 +46,8 @@ divSchemes
 
 laplacianSchemes
 {
-    default         none;}
+    default         none;
+}
 
 interpolationSchemes
 {
