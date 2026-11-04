@@ -24,10 +24,16 @@
 #     into solids4foam, unchanged.
 #
 #     The sources are taken with git archive, so only files tracked at that
-#     commit are copied. The build files are solids4foam's own and are kept:
-#     Make/, Allwmake, BEAMFOAM_VERSION and this script. Editor configuration
-#     (.vscode) is not copied. The commit is recorded in
-#     src/beamModels/BEAMFOAM_VERSION.
+#     commit are copied. Before copying, the files that beamFoam tracked at the
+#     previously synchronised commit, recorded in
+#     src/beamModels/BEAMFOAM_VERSION, are removed; any other file in the
+#     synchronised directories is kept. The build files are solids4foam's own
+#     and are never replaced: Make/, Allwmake, BEAMFOAM_VERSION and this
+#     script. Editor configuration (.vscode) is not copied. The new commit is
+#     recorded in src/beamModels/BEAMFOAM_VERSION.
+#
+#     The beamFoam repository must contain both the previous and the new
+#     commit.
 #
 # Usage
 #     src/beamModels/syncBeamFoam.sh <beamFoam git repository> [commit]
@@ -48,6 +54,17 @@ beamFoamRepo="$1"
 commit=$(git -C "$beamFoamRepo" rev-parse --verify "${2:-HEAD}^{commit}")
 s4fRoot=$(cd "${0%/*}/../.." && pwd)
 
+# The commit that the current copy comes from
+previous=$(awk '$1 == "commit" { print $2 }' \
+    "$s4fRoot/src/beamModels/BEAMFOAM_VERSION")
+
+if ! git -C "$beamFoamRepo" cat-file -e "${previous}^{commit}" 2> /dev/null
+then
+    echo "The previously synchronised commit '$previous' (BEAMFOAM_VERSION)"
+    echo "is not in $beamFoamRepo; fetch it first"
+    exit 1
+fi
+
 # beamFoam path -> solids4foam path
 syncPaths=(
     "src/wireBunchingModels:src/beamModels"
@@ -60,6 +77,29 @@ keep=(Make Allwmake BEAMFOAM_VERSION syncBeamFoam.sh)
 
 # beamFoam files that are not copied, at any depth (editor configuration)
 exclude=(.vscode)
+
+# Whether a path relative to a synchronised directory is solids4foam's own or
+# excluded, so that the sync neither removes nor copies it
+skipPath()
+{
+    local path="$1" name component components
+
+    for name in "${keep[@]}"
+    do
+        [[ "${path%%/*}" == "$name" ]] && return 0
+    done
+
+    IFS=/ read -r -a components <<< "$path"
+    for component in "${components[@]}"
+    do
+        for name in "${exclude[@]}"
+        do
+            [[ "$component" == "$name" ]] && return 0
+        done
+    done
+
+    return 1
+}
 
 tmpDir=$(mktemp -d)
 trap 'rm -rf "$tmpDir"' EXIT
@@ -81,10 +121,18 @@ do
         find "$tmpDir/archive" -name "$name" -prune -exec rm -rf {} +
     done
 
-    # Remove the previous copy, keeping the solids4foam files
-    find "$to" -mindepth 1 -maxdepth 1 \
-        $(printf -- '-not -name %s ' "${keep[@]}") \
-        -exec rm -rf {} +
+    # Remove the files of the previous copy, keeping any other file
+    while IFS= read -r -d '' path
+    do
+        path="${path#"$from"/}"
+        if ! skipPath "$path"
+        then
+            rm -f "$to/$path"
+        fi
+    done < <(git -C "$beamFoamRepo" ls-tree -r -z --name-only \
+        "$previous" -- "$from")
+
+    find "$to" -mindepth 1 -type d -empty -delete
 
     # Copy the new sources, skipping the beamFoam build files
     (
