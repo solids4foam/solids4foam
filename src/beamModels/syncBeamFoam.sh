@@ -25,8 +25,9 @@
 #
 #     The sources are taken with git archive, so only files tracked at that
 #     commit are copied. The build files are solids4foam's own and are kept:
-#     Make/, Allwmake, BEAMFOAM_VERSION and this script. The commit is
-#     recorded in src/beamModels/BEAMFOAM_VERSION.
+#     Make/, Allwmake, BEAMFOAM_VERSION and this script. Editor configuration
+#     (.vscode) is not copied. The commit is recorded in
+#     src/beamModels/BEAMFOAM_VERSION.
 #
 # Usage
 #     src/beamModels/syncBeamFoam.sh <beamFoam git repository> [commit]
@@ -57,6 +58,9 @@ syncPaths=(
 # Files owned by solids4foam inside the synchronised directories
 keep=(Make Allwmake BEAMFOAM_VERSION syncBeamFoam.sh)
 
+# beamFoam files that are not copied, at any depth (editor configuration)
+exclude=(.vscode)
+
 tmpDir=$(mktemp -d)
 trap 'rm -rf "$tmpDir"' EXIT
 
@@ -71,6 +75,11 @@ do
     mkdir -p "$tmpDir/archive" "$to"
     git -C "$beamFoamRepo" archive "$commit" "$from" \
         | tar -x -C "$tmpDir/archive"
+
+    for name in "${exclude[@]}"
+    do
+        find "$tmpDir/archive" -name "$name" -prune -exec rm -rf {} +
+    done
 
     # Remove the previous copy, keeping the solids4foam files
     find "$to" -mindepth 1 -maxdepth 1 \
