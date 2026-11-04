@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Opt-in interface-traction diagnostic for womersleyTube (see README.md).
 #
-#   ./AllverifyTraction [--cores N] [--quick] [--analysis-only]
+#   ./AllverifyTraction [--cores N] [--quick] [--analysis-only] [--force]
 #
 # Runs, in copies under verification/traction/work (the tutorial is not
 # modified): the standard verification study with the interfaceTraction
@@ -24,11 +24,13 @@ OUT="$HERE/postProcessing"
 CORES=1
 QUICK=0
 ANALYSIS_ONLY=0
+FORCE=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --cores) CORES="$2"; shift 2 ;;
         --quick) QUICK=1; shift ;;
         --analysis-only) ANALYSIS_ONLY=1; shift ;;
+        --force) FORCE=(--force); shift ;;
         *) echo "Unknown option $1" >&2; exit 2 ;;
     esac
 done
@@ -36,8 +38,11 @@ mkdir -p "$WORK" "$OUT"
 
 prepare() {   # name [prepare_study options]
     local name="$1"; shift
-    [[ -d "$WORK/$name/womersleyTube" ]] || \
-        python3 -I "$SCRIPTS/prepare_study.py" "$TUTORIAL" "$WORK/$name/womersleyTube" "$@"
+    # keeps a complete copy that matches the tutorial, scripts and settings;
+    # otherwise prepares it again, or refuses if the stale copy holds runs
+    # (--force discards it)
+    python3 -I "$SCRIPTS/prepare_study.py" --ensure ${FORCE[@]+"${FORCE[@]}"} \
+        "$TUTORIAL" "$WORK/$name/womersleyTube" "$@"
 }
 
 if [[ $QUICK == 1 ]]; then

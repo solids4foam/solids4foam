@@ -27,7 +27,15 @@ solution. It also decomposes the tutorial's attenuation error.
 ./AllverifyTraction --quick            # one m1/50 run + consistency checks (~1 min)
 ./AllverifyTraction --cores 6          # full study (~2-3 CPU-hours)
 ./AllverifyTraction --analysis-only    # re-analyse existing runs in work/
+./AllverifyTraction --force ...        # discard stale study copies (and their runs)
 ```
+
+Each study copy in `work/` is built in a temporary directory and recorded in
+`diagnostic_settings.json` (written last) with a hash of the tutorial, the
+diagnostic and `prepare_study.py`, and the requested settings. An existing copy
+is kept only if the record is complete and matches. A stale or unfinished copy
+is prepared again if it holds no runs; if it holds runs, the script stops
+(exit status 3) and keeps them unless `--force` is given.
 
 Runs are made in `work/`, and results are written to `postProcessing/`. Both
 are git-ignored.
