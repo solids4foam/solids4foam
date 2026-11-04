@@ -1,7 +1,9 @@
 # Results: oscillating-wall Stokes layer against the exact solution
 
-These results come from `./Allverify run --runs matrix dt` (and the control runs
-of the research workspace listed under Controls), with the baseline
+These results come from `./Allverify run --runs matrix dt` (and the control runs,
+`./Allverify run --runs controls`, listed in [`controls.md`](controls.md); the
+generators of every tracked file are listed in `README.md`, Tracked data), with
+the baseline
 `solids4foam` `f33b244a2` built for OpenFOAM.com v2412, whose
 `src/immersedBoundary` and tutorial files are identical to those of the
 `development` branch used here. The tracked numbers are in `reference/results/`;
@@ -75,9 +77,26 @@ with this file).
 
 ## Exact solutions
 
-Derived in the research report and tested in the unit tests (PDE residual by
-finite differences, boundary values, tau = rho nu du/ds at the wall, the
-amplitude and phase of the shear, the finite-height solution, the modal series).
+Derived below and tested in the unit tests (PDE residual by finite differences,
+boundary values, tau = rho nu du/ds at the wall, the amplitude and phase of the
+shear, the finite-height solution, the modal series).
+
+Derivation. The velocity u(s, t), s = y - y_w, satisfies u_t = nu u_ss with
+u(0, t) = U0 sin(omega t) (the slab) and, in the mesh, a slip lid u_s(H) = 0.
+The periodic solution that decays away from the wall is the imaginary part of
+U0 exp(i omega t - (1 + i) s/delta) with delta = sqrt(2 nu/omega), i.e. the
+formula below. The shear stress of the fluid on the wall is rho nu u_s(0, t);
+differentiating gives -rho nu U0/delta (sin omega t + cos omega t) =
+rho nu U0 sqrt(2)/delta sin(omega t + 5 pi/4). With the lid, the periodic
+solution is Im{U0 e^{i omega t} cosh(lambda (H - s))/cosh(lambda H)}, lambda =
+(1 + i)/delta. The simulation starts from rest, so the exact solution is
+u = u_per + sum a_n exp(-nu k_n^2 t) sin(k_n s): each mode sin(k_n s),
+k_n = (n + 1/2) pi/H, satisfies u = 0 at the wall and u_s = 0 at the lid, and
+the coefficients make u(s, 0) = 0, a_n = -(2/H) integral of u_per(s, 0)
+sin(k_n s) ds over (0, H) (evaluated with 150 modes and Simpson's rule with
+1500 intervals; the wall shear of the modes is rho nu sum a_n k_n exp(-nu k_n^2
+t)). The start-up transient is not negligible after four periods (below), and
+the periodic solution is therefore never the only target.
 
 - Periodic: u = U0 exp(-s/delta) sin(omega t - s/delta), s = y - y_w; shear
   stress of the fluid on the wall tau_w = -rho nu U0/delta (sin omega t + cos
@@ -97,9 +116,11 @@ amplitude and phase of the shear, the finite-height solution, the modal series).
   take about 24 periods (6 times the cost) to bring it to 0.02 %, and the exact
   initial-value solution already gives the exact target for the four-period
   protocol of the tutorial, so the runs are not extended. A control to eight
-  periods (cutLink and penalty, Level 3, research workspace) gives the same
-  errors against the initial-value solution in the fourth and in the eighth
-  period (to 0.01 % of the amplitude), so the numerical solution follows it.
+  periods (cutLink and penalty, Level 3, `./Allverify run --runs T8`, which sets
+  `--end-time 8`) gives the same errors against the initial-value solution in
+  the fourth and in the eighth period (to 0.01 % of the amplitude, which
+  `./Allverify check` tests: `CHECK_LONG_RUN`), so the numerical solution
+  follows it.
 
 ![The difference of the exact initial-value solution from the periodic solution](images/transient.png)
 
@@ -350,8 +371,10 @@ method has no wide coverage.
 Parallel: the `penalty`, `incremental` and `ghostCell` runs of Level 3 on four
 ranks, decomposed in slabs along y (so that the interface and the donors cross
 processor boundaries; 8 ghost-cell donors on other processors), reproduce the
-serial amplitude and velocity errors to all digits of the tables (research
-workspace, `*-np4-mpi`).
+serial amplitude and velocity errors to all digits of the tables (archived
+observation of the original runs; `./Allverify run --runs L3 --methods penalty
+incremental ghostCell --ranks 4` repeats them and `./Allverify check` compares
+them with the tracked rows of the same method and level).
 
 ## Cost
 

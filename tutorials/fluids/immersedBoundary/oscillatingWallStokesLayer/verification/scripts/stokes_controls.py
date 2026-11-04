@@ -13,8 +13,9 @@ numpy), with the exact solutions of the verification driver.
                                    average
     stokes_controls.py all         the three, written to reference/results/controls
 
-Thresholds, fixed before the data were interpreted (report 12 of the
-campaign): a series of time steps is converged to a bound only if three
+Thresholds, fixed before the data were interpreted and not changed since (they
+are the constants RATIO_FIRST, RATIO_SECOND and STEP_FACTOR below): a series of
+time steps is converged to a bound only if three
 successive halvings give monotone differences whose ratio lies in [1.6, 2.5]
 (first order) or [3, 5] (second order); two agreeing values are not
 convergence.

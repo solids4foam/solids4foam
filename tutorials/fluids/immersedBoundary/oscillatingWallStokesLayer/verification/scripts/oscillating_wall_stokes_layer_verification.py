@@ -55,8 +55,9 @@ tutorial itself is never modified. Standard library only. A manifest,
 work/manifest.json, records every case with the SHA-256 of its inputs.
 
 Usage:
-    ./Allverify [run] [--runs ...]   generate and run locally (then analyse,
-                                     check)
+    ./Allverify [run] [--runs ...]   generate and run locally (does not
+                                     analyse or check: follow with the next
+                                     two commands)
     ./Allverify unit                 exact tests that need no OpenFOAM
     ./Allverify dry-run --runs ...   list the cases and ranks
     ./Allverify generate --runs ...  generate the cases only
@@ -67,6 +68,17 @@ Usage:
 
 The default run, 'smoke', is the cutLink case on Level 1 (20 x 2 cells, four
 periods): a few seconds on one core.
+
+Controls, all from this driver (the tracked rows of reference/results/controls
+are what these named runs and options reproduce; see README.md):
+    --runs dt-fine dt-L1 dt-6e-5 dt-3e-5   the time steps down to 3.125e-5 s
+    --runs wall-face     cutLink on Levels 2-4 with the top vertices of the
+                         slab moved onto the mesh face y = 0.125 m (--wall-y)
+    --runs T8            the eight-period control (--end-time 8): cutLink
+                         momentum exchange and penalty, Level 3
+    --end-time T         endTime override of every selected case (tagged -T..)
+    --wall-y Y           move the wall (top vertices of slab.stl) to y = Y
+    --work-dir DIR       keep cases and manifest in DIR (independent jobs)
 """
 
 import argparse
@@ -91,6 +103,8 @@ MANIFEST = WORK_DIR / "manifest.json"
 REFERENCE_DIR = VERIFICATION_DIR / "reference"
 RESULTS_DIR = REFERENCE_DIR / "results"
 CASES_CSV = RESULTS_DIR / "cases.csv"
+CONTROLS_DIR = RESULTS_DIR / "controls"
+CONTROLS_CSV = CONTROLS_DIR / "cases-timestep.csv"
 
 LEVELS = (1, 2, 3, 4)
 # (method, estimator): cutLink ME is the run that gives the ME and ST rows
@@ -129,9 +143,14 @@ N_SIMPSON = 1500                    # Simpson intervals of the mode integrals
 CHECK_SHEAR_AMP = 0.005             # |difference of the amplitude error|
 CHECK_VELOCITY = 2e-4               # |difference of u_L2_all_ivp|
 CHECK_CLOSED_FORM = 1e-9            # exact tau against rho nu du/ds
+CHECK_SERIES = 2e-7                 # |shear history - tracked history| (Pa):
+#                                     twice the rounding of the tracked files
+CHECK_LONG_RUN = 1e-4               # |amplitude error, last period - fourth|
+#                                     (the 0.01 % of the amplitude of
+#                                     results.md, Exact solutions)
 
-# Observed allocated rank-hours of the tracked runs (filled from the data)
-OBSERVED_RANK_HOURS = {}
+# Observed allocated rank-hours of the tracked runs are read from the tracked
+# rows (observed_rank_hours)
 
 # dt = 0 is the tutorial: the fixed time step 0.001 s (adjustTimeStep no). A
 # positive dt sets deltaT in system/controlDict, the control that separates
@@ -143,6 +162,21 @@ DT_VARIANTS = (("cutLink", "ME"), ("penalty", ""), ("incremental", ""),
                ("ghostCell", ""))
 DT_STEPS = (0.0025, 0.0005, 0.00025)
 DT_LEVELS = (2, 3, 4)
+
+# Control runs of reference/results/controls. A run entry is (method, estimator,
+# level, dt) or (method, estimator, level, dt, end_time, wall_y)
+CONTROL_CUTLINK = (("cutLink", "ME"), ("cutLink", "FO"))
+CONTROL_STEP_CASES = {
+    # step: {level: variants}; the L1 steps of dt-L1 and the 1.25e-4 s step
+    # of Levels 2-4 are all variants, the finer steps those tracked in
+    # reference/results/controls/cases-timestep.csv (ST is a column of ME)
+    0.000125: {lv: RUN_VARIANTS for lv in LEVELS},
+    0.0000625: {3: (("penalty", ""), ("incremental", ""), ("ghostCell", "")),
+                4: RUN_VARIANTS},
+    0.00003125: {3: (("incremental", ""),), 4: (("incremental", ""),)},
+}
+WALL_FACE = 0.125                   # a mesh face on Levels 1-4 (0.5 m / 2^k)
+T_LONG = 8.0                        # the eight-period control
 RUNS = {
     "smoke": ("cutLink (momentum exchange and surface traction), Level 1",
               [("cutLink", "ME", 1, 0.0)]),
@@ -156,7 +190,31 @@ RUNS = {
            "2-4, four variants",
            [(m, e, lv, dt) for lv in DT_LEVELS for dt in DT_STEPS
             for m, e in DT_VARIANTS]),
+    "dt-L1": ("control: deltaT 0.0025, 0.0005, 0.00025 s on Level 1, all "
+              "variants",
+              [(m, e, 1, dt) for dt in DT_STEPS for m, e in RUN_VARIANTS]),
+    "dt-fine": ("control: deltaT 1.25e-4 s, Levels 1-4, all variants",
+                [(m, e, lv, 0.000125) for lv, vs in
+                 CONTROL_STEP_CASES[0.000125].items() for m, e in vs]),
+    "dt-6e-5": ("control: deltaT 6.25e-5 s (Level 3: penalty, incremental, "
+                "ghostCell; Level 4: all variants)",
+                [(m, e, lv, 0.0000625) for lv, vs in
+                 CONTROL_STEP_CASES[0.0000625].items() for m, e in vs]),
+    "dt-3e-5": ("control: deltaT 3.125e-5 s, incremental, Levels 3-4",
+                [(m, e, lv, 0.00003125) for lv, vs in
+                 CONTROL_STEP_CASES[0.00003125].items() for m, e in vs]),
+    "wall-face": ("control: the wall on the mesh face y = 0.125 m, cutLink "
+                  "(momentum exchange, forcing), Levels 2-4",
+                  [(m, e, lv, 0.0, 0.0, WALL_FACE) for lv in (2, 3, 4)
+                   for m, e in CONTROL_CUTLINK]),
+    "T8": ("control: eight periods, cutLink momentum exchange and penalty, "
+           "Level 3",
+           [("cutLink", "ME", 3, 0.0, T_LONG, 0.0),
+            ("penalty", "", 3, 0.0, T_LONG, 0.0)]),
 }
+RUNS["controls"] = ("all control runs of reference/results/controls",
+                    [i for n in ("dt-L1", "dt-fine", "dt-6e-5", "dt-3e-5",
+                                 "wall-face", "T8") for i in RUNS[n][1]])
 DEFAULT_RUNS = ("smoke",)
 LEVEL_RANKS = {1: 1, 2: 1, 3: 1, 4: 1}
 
@@ -523,9 +581,14 @@ def dt_tag(dt: float) -> str:
     return f"-dt{fmt(dt)}" if dt else ""
 
 
-def case_name(method: str, est: str, level: int, dt: float = 0.0) -> str:
+def case_name(method: str, est: str, level: int, dt: float = 0.0,
+              end_time: float = 0.0, wall_y: float = 0.0,
+              ranks_tag: str = "") -> str:
+    """Tutorial cases have no tag; a changed step, end time, wall position
+    or rank count is tagged -dt..., -T..., -yw..., -np..."""
     return (f"{method}{'-' + est if method == 'cutLink' else ''}-L{level}"
-            f"{dt_tag(dt)}")
+            f"{dt_tag(dt)}{'-T' + fmt(end_time) if end_time else ''}"
+            f"{'-yw' + fmt(wall_y) if wall_y else ''}{ranks_tag}")
 
 
 def load_manifest() -> dict:
@@ -540,22 +603,53 @@ def save_manifest(manifest: dict) -> None:
 
 
 def plan(args) -> list:
+    """The cases (method, estimator, level, name, ranks, dt, end_time,
+    wall_y) of the named runs; --end-time and --wall-y override the options
+    of every case, a case with a changed step, end time, wall position or
+    rank count carries it in its name"""
     out, seen = [], set()
+    end_arg = getattr(args, "end_time", 0.0) or 0.0
+    wall_arg = getattr(args, "wall_y", 0.0) or 0.0
     for name in args.runs:
         if name not in RUNS:
             fail(f"unknown run '{name}'; choose from {', '.join(RUNS)}")
-        for method, est, level, dt in RUNS[name][1]:
+        for method, est, level, dt, *opt in RUNS[name][1]:
             if args.methods and method not in args.methods:
                 continue
             if args.levels and level not in args.levels:
                 continue
-            key = (method, est, level, dt)
+            end_time = end_arg or (opt[0] if opt else 0.0)
+            wall_y = wall_arg or (opt[1] if len(opt) > 1 else 0.0)
+            ranks = args.ranks or LEVEL_RANKS[level]
+            key = (method, est, level, dt, end_time, wall_y, ranks)
             if key not in seen:
                 seen.add(key)
-                ranks = args.ranks or LEVEL_RANKS[level]
+                tag = f"-np{ranks}" if ranks != LEVEL_RANKS[level] else ""
                 out.append((method, est, level,
-                            case_name(method, est, level, dt), ranks, dt))
+                            case_name(method, est, level, dt, end_time,
+                                      wall_y, tag), ranks, dt, end_time,
+                            wall_y))
     return out
+
+
+def move_wall(path: Path, wall_y: float) -> None:
+    """Move the top vertices of the slab surface (its wall) to y = wall_y,
+    leaving the other vertices (the control of the wall on a mesh face)"""
+    text = path.read_text()
+    top = stl_top(path)
+    if not 0.0 < wall_y < parameters()["height"]:
+        fail(f"--wall-y {wall_y} is outside the mesh")
+    count = [0]
+
+    def move(m):
+        if abs(float(m.group(2)) - top) < 1e-6:
+            count[0] += 1
+            return f"{m.group(1)}{wall_y:.6f}{m.group(3)}"
+        return m.group(0)
+    new = re.sub(r"(vertex\s+\S+\s+)(\S+)(\s+\S+)", move, text)
+    if not count[0]:
+        fail(f"no top vertex found in {path}")
+    path.write_text(new)
 
 
 def replace_entry(path: Path, key: str, value: str) -> None:
@@ -658,7 +752,8 @@ def input_hashes(case: Path) -> dict:
 
 def generate_case(method: str, est: str, level: int, name: str, ranks: int,
                   force: bool = False, cases_dir: Path = None,
-                  dt: float = 0.0) -> Path:
+                  dt: float = 0.0, end_time: float = 0.0,
+                  wall_y: float = 0.0) -> Path:
     cases_dir = CASES_DIR if cases_dir is None else cases_dir
     case = cases_dir / name
     if case.exists():
@@ -678,6 +773,10 @@ def generate_case(method: str, est: str, level: int, name: str, ranks: int,
                          re.MULTILINE):
             fail("the tutorial no longer has a fixed time step")
         replace_entry(control, "deltaT", fmt(dt))
+    if end_time:
+        replace_entry(case / "system/controlDict", "endTime", fmt(end_time))
+    if wall_y:
+        move_wall(case / "constant/triSurface/slab.stl", wall_y)
     write_decompose_par_dict(case / "system/decomposeParDict", ranks)
     script = case / "Allrun.verify"
     script.write_text(RUN_SCRIPT.format(
@@ -687,15 +786,21 @@ def generate_case(method: str, est: str, level: int, name: str, ranks: int,
     return case
 
 
+def manifest_entry(method, est, level, dt, ranks, end_time, wall_y,
+                   case: Path) -> dict:
+    return {"method": method, "estimator": est, "level": level, "dt": dt,
+            "end_time": end_time, "wall_y": wall_y, "ranks": ranks,
+            "inputs_sha256": input_hashes(case),
+            "generated": datetime.now().isoformat(timespec="seconds")}
+
+
 def cmd_generate(args) -> int:
     manifest = load_manifest()
-    for method, est, level, name, ranks, dt in plan(args):
+    for method, est, level, name, ranks, dt, end_time, wall_y in plan(args):
         case = generate_case(method, est, level, name, ranks, args.force,
-                             dt=dt)
-        manifest["cases"][name] = {
-            "method": method, "estimator": est, "level": level, "dt": dt,
-            "ranks": ranks, "inputs_sha256": input_hashes(case),
-            "generated": datetime.now().isoformat(timespec="seconds")}
+                             dt=dt, end_time=end_time, wall_y=wall_y)
+        manifest["cases"][name] = manifest_entry(
+            method, est, level, dt, ranks, end_time, wall_y, case)
         print(f"{name}: generated in {case}")
     save_manifest(manifest)
     return 0
@@ -709,9 +814,11 @@ def cmd_dry_run(args) -> int:
     a, _ = exact_amp_phase(p)
     print(f"Exact wall shear amplitude: {a:.6e} Pa (unit density)")
     total = 0.0
-    for method, est, level, name, ranks, dt in plan(args):
+    observed = observed_rank_hours()
+    for method, est, level, name, ranks, dt, end_time, wall_y in plan(args):
         ny, nx, _, area = mesh_shape(p, level)
-        obs = OBSERVED_RANK_HOURS.get((method, est, level, dt))
+        obs = (None if end_time or wall_y else observed.get(
+            (method, est, level, dt or TUTORIAL_DT)))
         total += obs or 0.0
         print(f"  {name:20s} {nx * ny:6d} cells, {ranks} rank(s), observed "
               f"{'%.4f' % obs if obs else 'n/a'} allocated rank-h")
@@ -721,11 +828,14 @@ def cmd_dry_run(args) -> int:
 
 
 def check_environment(ranks: int) -> str:
-    """Empty if the cases can be run, else the reason they cannot"""
+    """Empty if the cases can be run, else the reason they cannot. The rule
+    of solids4FoamScripts.sh: OpenFOAM.com sets WM_PROJECT=OpenFOAM and a
+    WM_PROJECT_VERSION that starts with 'v' (v2412); OpenFOAM.org sets the
+    same WM_PROJECT with a number (11, 12)"""
     if "WM_PROJECT_DIR" not in os.environ:
         return "no OpenFOAM environment (WM_PROJECT_DIR is not set)"
     if os.environ.get("WM_PROJECT") != "OpenFOAM" or \
-            "openfoam.org" in os.environ.get("WM_PROJECT_DIR", ""):
+            not os.environ.get("WM_PROJECT_VERSION", "").startswith("v"):
         return "OpenFOAM.com (ESI) is required for libimmersedBoundary"
     for tool in ("blockMesh", "solids4Foam"):
         if not shutil.which(tool):
@@ -759,16 +869,15 @@ def cmd_run(args) -> int:
             print(f"{item[3]}: completed, kept (use --force to rerun)")
         else:
             todo.append(item)
-    for method, est, level, name, ranks, dt in todo:
-        case = generate_case(method, est, level, name, ranks, True, dt=dt)
-        manifest["cases"][name] = {
-            "method": method, "estimator": est, "level": level, "dt": dt,
-            "ranks": ranks, "inputs_sha256": input_hashes(case),
-            "generated": datetime.now().isoformat(timespec="seconds")}
+    for method, est, level, name, ranks, dt, end_time, wall_y in todo:
+        case = generate_case(method, est, level, name, ranks, True, dt=dt,
+                             end_time=end_time, wall_y=wall_y)
+        manifest["cases"][name] = manifest_entry(
+            method, est, level, dt, ranks, end_time, wall_y, case)
         print(f"{name}: generated in {case}")
     save_manifest(manifest)
     status = 0
-    for method, est, level, name, ranks, dt in todo:
+    for method, est, level, name, ranks, dt, end_time, wall_y in todo:
         reason = check_environment(ranks)
         entry = manifest["cases"][name]
         if reason:
@@ -779,6 +888,14 @@ def cmd_run(args) -> int:
         print(f"Running {name} ({ranks} rank(s)) ...", flush=True)
         rc = subprocess.call([str(case / "Allrun.verify")])
         problem = solver_problem(case) if rc == 0 else f"Allrun status {rc}"
+        if rc == 0 and problem == "no solver log":
+            # Allrun.verify exits 0 without a solver log only through the
+            # guards of solids4FoamScripts.sh (caseDoesNotRunWith...): the
+            # case was not run, which is SKIPPED, never PASS and never FAIL
+            print(f"SKIPPED {name}: Allrun.verify exited 0 without running "
+                  "the solver (an OpenFOAM or solids4foam guard)")
+            entry["state"] = "skipped"
+            continue
         entry["state"] = "completed" if not problem else "failed"
         if problem:
             print(f"FAILED {name}: {problem}")
@@ -802,42 +919,79 @@ def wall_seconds(case: Path) -> float:
     return float(m[-1]) if m else float("nan")
 
 
+def analysis_windows(end_time: float = 0.0) -> list:
+    """The periods analysed: the fourth, and for an end-time control also
+    the last (end_time - 1 < t <= end_time)"""
+    if end_time and end_time > PERIOD[1] + 1e-9:
+        return [PERIOD, (end_time - 1.0, end_time)]
+    return [PERIOD]
+
+
+def window_label(period: tuple) -> str:
+    return f"{period[0]:g}-{period[1]:g}"
+
+
 def analyse_case(case: Path, method: str, est: str, level: int,
-                 ranks: int = 1) -> tuple:
+                 ranks: int = 1, wall_y: float = 0.0,
+                 end_time: float = 0.0) -> tuple:
     """The result rows of a completed case (two for the cutLink ME run: ME
-    and ST) and the shear series {estimator: (t, tau)}"""
+    and ST) and the shear series {estimator: (t, tau)}. wall_y is the wall
+    of a case with the slab moved (the exact solutions use it); a case that
+    ran beyond four periods has the rows of the fourth and of the last
+    period, tagged 'window'"""
     p = parameters(TUTORIAL_DIR)
+    if wall_y:
+        p["yw"] = wall_y
     ny, nx, _, area = mesh_shape(p, level)
     cols = read_force_file(case / "postProcessing/immersedBoundary/0/slab.dat")
-    profiles = {}
-    for tk in snapshot_times():
-        profiles[tk] = row_profile(
-            p, level, read_vector_field(case / f"{tk:g}" / "U"))
-    vel = velocity_norms(p, level, profiles)
-    lam_file = case / f"{snapshot_times()[-1]:g}" / "immersedBoundary:lambda"
-    covered = (covered_volume_ratio(p, level, read_scalar_field(lam_file))
-               if lam_file.exists() else "")
     dt_text = (case / "system/controlDict").read_text()
     labels = ["ME", "ST"] if (method == "cutLink" and est == "ME") else \
         [est if method == "cutLink" else ""]
+    windows = analysis_windows(end_time)
     rows, series = [], {}
-    for lab in labels:
-        t, tau = shear_series(cols, method, lab, area)
-        row = {"method": method, "estimator": lab, "level": level,
-               "cells": nx * ny, "ranks": ranks,
-               "dt": dict_scalar(dt_text, "deltaT"), "steps": len(t),
-               "wall_s": wall_seconds(case), "covered_volume": covered}
-        row.update(shear_metrics(p, t, tau))
-        if method != "cutLink":
-            ta, taua = aligned_shear_series(cols, area)
-            al = shear_metrics(p, ta, taua)
-            for key in ("shear_amp_err_ivp", "shear_phase_err_deg_ivp",
-                        "shear_rms_err_ivp"):
-                row[key[:-4] + "_al"] = al[key]
-        row.update(vel)
-        rows.append(row)
-        series[lab] = (t, tau)
+    for period in windows:
+        times = snapshot_times(period)
+        profiles = {tk: row_profile(
+            p, level, read_vector_field(case / f"{tk:g}" / "U"))
+            for tk in times}
+        vel = velocity_norms(p, level, profiles)
+        lam_file = case / f"{times[-1]:g}" / "immersedBoundary:lambda"
+        covered = (covered_volume_ratio(p, level, read_scalar_field(lam_file))
+                   if lam_file.exists() else "")
+        for lab in labels:
+            t, tau = shear_series(cols, method, lab, area)
+            row = {"method": method, "estimator": lab, "level": level,
+                   "cells": nx * ny, "ranks": ranks,
+                   "dt": dict_scalar(dt_text, "deltaT"), "steps": len(t),
+                   "wall_s": wall_seconds(case), "covered_volume": covered}
+            row.update(shear_metrics(p, t, tau, period))
+            if method != "cutLink":
+                ta, taua = aligned_shear_series(cols, area)
+                al = shear_metrics(p, ta, taua, period)
+                for key in ("shear_amp_err_ivp", "shear_phase_err_deg_ivp",
+                            "shear_rms_err_ivp"):
+                    row[key[:-4] + "_al"] = al[key]
+            row.update(vel)
+            if wall_y or len(windows) > 1:
+                row["window"] = window_label(period)
+                row["wall_y"] = wall_y or p["yw"]
+            rows.append(row)
+            series[lab] = (t, tau)
     return rows, series
+
+
+def observed_rank_hours() -> dict:
+    """Allocated rank-hours of the tracked runs, {(method, estimator, level,
+    dt): rank_h}, from the tracked rows (reference/results/cases.csv and
+    controls/cases-timestep.csv)"""
+    out = {}
+    for path in (CASES_CSV, CONTROLS_CSV):
+        for r in read_results(path):
+            try:
+                out[row_key(r)] = float(r["rank_h"])
+            except (KeyError, ValueError):
+                pass
+    return out
 
 
 def row_dt(row: dict) -> float:
@@ -871,10 +1025,10 @@ def variant_index(r: dict) -> int:
     return VARIANTS.index((r["method"], r["estimator"]))
 
 
-def write_results(path: Path, rows: list) -> None:
+def write_results(path: Path, rows: list, fields=None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as f:
-        w = csv.DictWriter(f, FIELDS, lineterminator="\n",
+        w = csv.DictWriter(f, fields or FIELDS, lineterminator="\n",
                            extrasaction="ignore", restval="")
         w.writeheader()
         for r in sorted(rows, key=sort_key):
@@ -903,9 +1057,11 @@ def cmd_analyse(args) -> int:
     for name, entry in completed_cases(manifest):
         new, _ = analyse_case(CASES_DIR / name, entry["method"],
                               entry["estimator"], entry["level"],
-                              entry["ranks"])
+                              entry["ranks"], entry.get("wall_y", 0.0),
+                              entry.get("end_time", 0.0))
         for row in new:
-            print(f"{name:18s} {row['estimator'] or '-':2s} amplitude "
+            print(f"{name:18s} {row['estimator'] or '-':2s} "
+                  f"{row.get('window', ''):4s} amplitude "
                   f"{100 * row['shear_amp_err']:+.2f} %, phase "
                   f"{row['shear_phase_err_deg']:+.2f} deg, velocity L2 "
                   f"(initial-value) {row['u_L2_all_ivp']:.3e}")
@@ -914,7 +1070,8 @@ def cmd_analyse(args) -> int:
         print("No completed cases: run ./Allverify first")
         return 1
     out = WORK_DIR / "results.csv"
-    write_results(out, rows)
+    extra = ["window", "wall_y"] if any("window" in r for r in rows) else []
+    write_results(out, rows, FIELDS + extra)
     print(f"Results: {out}")
     return 0
 
@@ -978,6 +1135,81 @@ def check_case(row: dict, tracked: dict) -> list:
     return out
 
 
+def read_series_csv(path: Path) -> dict:
+    with path.open(newline="") as f:
+        r = list(csv.DictReader(f))
+    return {k: [float(x[k]) for x in r] for k in r[0]}
+
+
+def check_series(path: Path, column: str, t: list, tau: list,
+                 name: str) -> tuple:
+    """A re-run shear history against a tracked history (time, column) at the
+    tracked times"""
+    if not path.exists():
+        return ("SKIPPED", f"{name}: no tracked history {path.name}")
+    ref = read_series_csv(path)
+    if column not in ref:
+        return ("SKIPPED", f"{name}: no column {column} in {path.name}")
+    at = {round(x, 9): y for x, y in zip(t, tau)}
+    miss = [x for x in ref["time"] if round(x, 9) not in at]
+    if miss:
+        return ("FAIL", f"{name}: {len(miss)} tracked times are missing")
+    worst = max(abs(at[round(x, 9)] - y)
+                for x, y in zip(ref["time"], ref[column]))
+    return ("PASS" if worst <= CHECK_SERIES else "FAIL",
+            f"{name}: shear history against {path.name}, largest difference "
+            f"{worst:.2e} Pa")
+
+
+def check_long_run(rows: list, name: str) -> list:
+    """The eighth period against the fourth of one end-time control: the
+    error against the initial-value solution is the same"""
+    by = {r["window"]: r for r in rows if "window" in r}
+    wins = sorted(by, key=lambda w: float(w.split("-")[0]))
+    if len(wins) < 2:
+        return []
+    out = []
+    first, last = by[wins[0]], by[wins[-1]]
+    d = abs(float(last["shear_amp_err_ivp"])
+            - float(first["shear_amp_err_ivp"]))
+    out.append(("PASS" if d <= CHECK_LONG_RUN else "FAIL",
+                f"{name}: amplitude error against the initial-value solution "
+                f"{float(first['shear_amp_err_ivp']):+.5f} (period {wins[0]})"
+                f" and {float(last['shear_amp_err_ivp']):+.5f} (period "
+                f"{wins[-1]})"))
+    return out
+
+
+def check_variant(name: str, entry: dict, rows: list, series: dict,
+                  index: dict) -> list:
+    """Checks of a completed case: the tutorial and time-step cases against
+    the tracked rows of the same key; the wall control against the tracked
+    shear histories; an end-time control against its fourth period (tracked
+    row) and against itself in the last period"""
+    out = []
+    wall, end = entry.get("wall_y", 0.0), entry.get("end_time", 0.0)
+    if wall:
+        for lab, (t, tau) in series.items():
+            if lab not in ("ME", "FO"):
+                continue
+            path = CONTROLS_DIR / f"shear-yw{round(wall * 1000):04d}-" \
+                f"L{entry['level']}.csv"
+            out.append(check_series(path, f"cutLink-{lab}", t, tau,
+                                    f"{name} {lab}"))
+        return out
+    for row in rows:
+        if "window" in row and row["window"] != window_label(PERIOD):
+            continue
+        ref = index.get(row_key(row))
+        if ref is None:
+            out.append(("SKIPPED", f"{name}: no tracked row"))
+        else:
+            out += check_case(row, ref)
+    if end:
+        out += check_long_run(rows, name)
+    return out
+
+
 def cmd_check(args) -> int:
     p = parameters()
     results = check_analytic(p)
@@ -994,17 +1226,13 @@ def cmd_check(args) -> int:
     if not done:
         results.append(("SKIPPED", "no completed case in work/ "
                         "(run ./Allverify)"))
-    index = {row_key(r): r for r in tracked}
+    index = {row_key(r): r for r in tracked + read_results(CONTROLS_CSV)}
     for name, entry in done:
-        rows, _ = analyse_case(CASES_DIR / name, entry["method"],
-                               entry["estimator"], entry["level"],
-                               entry["ranks"])
-        for row in rows:
-            ref = index.get(row_key(row))
-            if ref is None:
-                results.append(("SKIPPED", f"{name}: no tracked row"))
-            else:
-                results += check_case(row, ref)
+        rows, series = analyse_case(
+            CASES_DIR / name, entry["method"], entry["estimator"],
+            entry["level"], entry["ranks"], entry.get("wall_y", 0.0),
+            entry.get("end_time", 0.0))
+        results += check_variant(name, entry, rows, series, index)
     for state, message in results:
         print(f"{state}: {message}")
     n = {s: sum(1 for r in results if r[0] == s)
@@ -1131,7 +1359,21 @@ def cmd_unit(args) -> int:
     return 0 if result.wasSuccessful() else 1
 
 
+COMMANDS = ("run", "generate", "dry-run", "status", "analyse", "check",
+            "tables", "unit")
+
+
+def normalise_argv(argv: list) -> list:
+    """No subcommand means 'run': ./Allverify --runs L1 L2 is
+    ./Allverify run --runs L1 L2 (and ./Allverify alone is the smoke run)"""
+    argv = list(argv)
+    if not argv or argv[0] not in COMMANDS + ("-h", "--help"):
+        argv = ["run"] + argv
+    return argv
+
+
 def main(argv=None) -> int:
+    argv = normalise_argv(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command")
@@ -1143,19 +1385,38 @@ def main(argv=None) -> int:
         s.add_argument("--levels", nargs="+", type=int, default=[])
         s.add_argument("--ranks", type=int, default=0,
                        help="MPI ranks (default: by level)")
+        s.add_argument("--end-time", type=float, default=0.0,
+                       help="endTime (s) of every selected case; the cases "
+                       "are tagged -T<time>")
+        s.add_argument("--wall-y", type=float, default=0.0,
+                       help="y (m) of the wall: the top vertices of "
+                       "slab.stl are moved there; the cases are tagged "
+                       "-yw<y>")
         s.add_argument("--force", action="store_true",
                        help="regenerate existing cases")
-    for name in ("status", "analyse", "check", "tables", "unit"):
+        s.add_argument("--work-dir", default="",
+                       help="cases and manifest of these runs (default "
+                       "verification/work)")
+    for name in ("status", "analyse", "check"):
+        s = sub.add_parser(name)
+        s.add_argument("--work-dir", default="",
+                       help="work directory of the runs")
+    for name in ("tables", "unit"):
         sub.add_parser(name)
     args = parser.parse_args(argv)
-    command = args.command or "run"
-    if args.command is None:
-        args = parser.parse_args(["run"] + (argv or sys.argv[1:]))
+    work = getattr(args, "work_dir", "")
+    if work:
+        set_work_dir(Path(work).resolve())
     handlers = {"run": cmd_run, "generate": cmd_generate,
                 "dry-run": cmd_dry_run, "status": cmd_status,
                 "analyse": cmd_analyse, "check": cmd_check,
                 "tables": cmd_tables, "unit": cmd_unit}
-    return handlers[command](args)
+    return handlers[args.command](args)
+
+
+def set_work_dir(path: Path) -> None:
+    global WORK_DIR, CASES_DIR, MANIFEST
+    WORK_DIR, CASES_DIR, MANIFEST = path, path / "cases", path / "manifest.json"
 
 
 if __name__ == "__main__":
