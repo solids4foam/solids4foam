@@ -29,6 +29,9 @@ from pathlib import Path
 
 import numpy as np  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import richardson  # noqa: E402
+
 os.environ.setdefault("MPLCONFIGDIR", os.environ.get("TMPDIR", "/tmp"))
 try:
     import matplotlib
@@ -55,9 +58,14 @@ out = {"configuration": "womersleyTube tutorial, mu = 5 Pa s, Robin-Neumann, BDF
 # --- wave QoIs: budget of the error at (m4, n200) -------------------------
 A = np.array(sorted(amp))
 for q in ("attenuation", "speed", "wallMid_amp", "wallMid_phase"):
-    E = np.array([amp[a][q] for a in A])
-    X = np.vstack([np.ones_like(A), A]).T
-    (e0m2, slope), *_ = np.linalg.lstsq(X, E, rcond=None)
+    # the linear fit is the one amplitude_series.py stored (one definition of
+    # the weights, amplitude set and model)
+    try:
+        stored = _amp["linearFit"][q]
+        slope, misfit = float(stored["slope_per_Pa"]), float(stored["misfit"])
+    except KeyError:
+        sys.exit(f"decomposition_summary.py: amplitude_series.json has no linearFit for '{q}'; "
+                 "run amplitude_series.py again")
     L = lim["limits"][q]
     e4, e4b = L["E_m4_n200"], L["E_m4_n400"]
     t_err_n200 = e4 - (e4b + (e4b - e4) / 3)           # E(n200) - E(dt->0) on m4
@@ -73,7 +81,7 @@ for q in ("attenuation", "speed", "wallMid_amp", "wallMid_phase"):
         "E_m4_n200": e4, "temporal_error_at_n200": t_err_n200,
         "spatial_error_m4_p2": s_err, "spatial_error_m4_pobs": s_err_pobs,
         "finite_amplitude_part": amp_part, "amplitude_slope_per_Pa_m2": slope,
-        "amplitude_fit_misfit": float(np.max(np.abs(X @ [e0m2, slope] - E))),
+        "amplitude_fit_misfit": misfit,
         "residual_linear_continuum": resid,
         "mesh_series_monotone": bool(monotone),
         "residual_uncertainty_space": u_space, "residual_uncertainty_amplitude": u_amp,
@@ -87,15 +95,18 @@ cs = S5["cases"]
 for q in ("Vn_ratio", "VnEst_ratio", "Vn_err/|p|", "P_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|"):
     e1, e2, e4, e4b = (c(cs[n]["errors"][q]) for n in
                        ("robin_m1_n200", "robin_m2_n200", "robin_m4_n200", "robin_m4_n400"))
-    p = math.log(abs((e1 - e2) / (e2 - e4))) / math.log(2)
+    info, lim2_sp, limp_sp = richardson.richardson_limits(e1, e2, e4)
+    p = info["order"]
     dt = (e4b - e4) / 3
-    lim2 = e4b + dt + (e4 - e2) / 3
-    limp = e4b + dt + (e4 - e2) / (2 ** p - 1)
+    lim2 = e4b + dt + (lim2_sp - e4)
+    limp = e4b + dt + (limp_sp - e4)    # = lim2 if the observed order is invalid
     ampl = c(A2["cases"]["robin_m2_n200"]["errors"][q]) - e2
     zero = limp - ampl
     out["traction"][q] = {"m1": [e1.real, e1.imag], "m2": [e2.real, e2.imag],
                           "m4": [e4.real, e4.imag], "m4_n400": [e4b.real, e4b.imag],
-                          "mesh_order": p, "limit_a1_p2": [lim2.real, lim2.imag],
+                          "mesh_order": p, "mesh_order_arg_deg": info["arg_deg"],
+                          "mesh_order_valid": info["valid"], "mesh_order_note": info["reason"],
+                          "limit_a1_p2": [lim2.real, lim2.imag],
                           "limit_a1_pobs": [limp.real, limp.imag],
                           "amplitude_slope": [ampl.real, ampl.imag],
                           "limit_a0": [zero.real, zero.imag]}

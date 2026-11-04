@@ -11,12 +11,16 @@ pass/fail criteria.
   2. traction applied by the solid condition = transferred fluid traction:
      normal <= 1e-4 of |p| (coupling-tolerance level), shear <= 1e-8 of |Vx|;
   3. (full study) wave-projected shear traction error converges on m1/m2/m4
-     at an observed order >= 1.5.
+     at an observed order >= 1.5, with (E1-E2)/(E2-E4) close to a positive real
+     (|arg| <= 30 deg); otherwise the series is non-asymptotic and the check
+     fails (see richardson.py).
 """
 import json
-import math
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import richardson  # noqa: E402
 
 study = Path(sys.argv[1])
 quick = "--quick" in sys.argv
@@ -34,9 +38,12 @@ if not quick:
     names = ["robin_m1_n200", "robin_m2_n200", "robin_m4_n200"]
     if all(n in S["cases"] for n in names):
         v = [complex(*S["cases"][n]["errors"]["Vx_err/|Vx|"]) for n in names]
-        p = math.log(abs((v[0] - v[1]) / (v[1] - v[2]))) / math.log(2)
-        ok = p >= 1.5
-        print(f"{'PASS' if ok else 'FAIL'}: shear traction mesh order {p:.2f} (>= 1.5)")
+        info = richardson.observed_order(*v)
+        p, arg = info["order"], info["arg_deg"]
+        ok = info["valid"] and p >= 1.5
+        why = f" ({info['reason']})" if info["reason"] else ""
+        print(f"{'PASS' if ok else 'FAIL'}: shear traction mesh order {p:.2f} (>= 1.5), "
+              f"arg(ratio) = {arg:.1f} deg (|arg| <= {richardson.MAX_ARG_DEG:g}){why}")
         if not ok:
             fails.append("shear traction order")
     else:

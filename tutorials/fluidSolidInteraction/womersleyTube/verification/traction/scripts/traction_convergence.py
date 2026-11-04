@@ -9,7 +9,9 @@ For each study and each complex error measure E (relative to the exact
 value), it reports per case |E| and, for the mesh series m1/m2/m4 at 200
 steps per period and the time series 100/200/400 on m2:
   - observed order from successive differences of the complex values
-    p = log(|E1 - E2| / |E2 - E4|) / log 2   (reference-free),
+    p = log(|E1 - E2| / |E2 - E4|) / log 2   (reference-free) with
+    arg((E1 - E2)/(E2 - E4)); the order is used only if p > 0.3 and |arg| <=
+    30 deg (richardson.py), otherwise the series is flagged non-asymptotic,
   - Richardson limit E_inf = E4 + (E4 - E2)/(2^p_used - 1) with p_used = 2
     (the formal order) and with the observed p, as the estimate of the
     resolution-independent part of the error; their difference is quoted as
@@ -22,6 +24,9 @@ import math
 import os
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import richardson  # noqa: E402
 
 os.environ.setdefault("MPLCONFIGDIR", os.environ.get("TMPDIR", "/tmp"))
 try:
@@ -41,13 +46,10 @@ def c(v):
 
 
 def series_analysis(vals):
-    """vals: complex values on levels (coarse, mid, fine), ratio 2."""
-    e1, e2, e4 = vals
-    d1, d2 = abs(e1 - e2), abs(e2 - e4)
-    p = math.log(d1 / d2) / math.log(2) if d1 > 0 and d2 > 0 else float("nan")
-    lim2 = e4 + (e4 - e2) / 3.0
-    limp = e4 + (e4 - e2) / (2 ** p - 1) if math.isfinite(p) and p > 0.3 else lim2
-    return p, lim2, limp
+    """vals: complex values on levels (coarse, mid, fine), ratio 2. Returns
+    (order info, limit with p = 2, limit with the observed p); the observed-p
+    limit falls back to p = 2 if the order is invalid (see richardson.py)."""
+    return richardson.richardson_limits(*vals)
 
 
 def main():
@@ -82,23 +84,30 @@ def main():
                 if len(vals) == 2:       # time pair on m4: q = 2 limit only
                     lim2 = vals[1] + (vals[1] - vals[0]) / 3.0
                     rep[kind][m] = {"values": [[v.real, v.imag] for v in vals], "order": float("nan"),
+                                    "order_arg_deg": float("nan"), "asymptotic": None,
+                                    "order_note": "two levels: formal order only",
                                     "limit_p2": [lim2.real, lim2.imag], "limit_pobs": [lim2.real, lim2.imag],
                                     "limit_uncertainty": float("nan")}
                     continue
-                p, lim2, limp = series_analysis(vals)
+                info, lim2, limp = series_analysis(vals)
+                p = info["order"]
                 rep[kind][m] = {"values": [[v.real, v.imag] for v in vals], "order": p,
+                                "order_arg_deg": info["arg_deg"],
+                                "asymptotic": info["valid"], "order_note": info["reason"],
                                 "limit_p2": [lim2.real, lim2.imag],
                                 "limit_pobs": [limp.real, limp.imag],
                                 "limit_uncertainty": abs(lim2 - limp)}
         report[label] = rep
-        md += [f"## {label}", "", "| measure | series | finest value | observed order | Richardson limit (p=2) | |limit p=2 - p_obs| |",
-               "|---|---|---|---|---|---|"]
+        md += [f"## {label}", "", "| measure | series | finest value | observed order | arg(ratio) [deg] | Richardson limit (p=2) | |limit p=2 - p_obs| | note |",
+               "|---|---|---|---|---|---|---|---|"]
         for kind in ("mesh", "time", "time_m4"):
             for m, r in rep[kind].items():
                 fin = complex(*r["values"][-1])
                 lim = complex(*r["limit_p2"])
                 md.append(f"| {m} | {kind} | {fin.real:+.3e}{fin.imag:+.3e}i | {r['order']:.2f} | "
-                          f"{lim.real:+.3e}{lim.imag:+.3e}i | {r['limit_uncertainty']:.1e} |")
+                          f"{r['order_arg_deg']:.0f} | "
+                          f"{lim.real:+.3e}{lim.imag:+.3e}i | {r['limit_uncertainty']:.1e} | "
+                          f"{r['order_note']} |")
         md.append("")
         # plots: |error| vs h for the physical measures
         if rep["mesh"] and plt is not None:

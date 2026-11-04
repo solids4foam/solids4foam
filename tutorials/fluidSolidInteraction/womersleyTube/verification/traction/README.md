@@ -118,9 +118,14 @@ These cover consistency only:
 - transferred viscous traction = momentum wall flux (≤ 1e-10);
 - applied solid traction = transferred fluid traction (normal ≤ 1e-4 of |p|;
   shear ≤ 1e-8; a constant 1.5e-6 normal difference is observed);
-- the shear traction converges with observed order ≥ 1.5.
+- the shear traction converges with observed order ≥ 1.5 and a ratio
+  (E1−E2)/(E2−E4) close to a positive real (|arg| ≤ 30°; otherwise the series
+  is non-asymptotic and the check fails).
 
-Everything else is reported, not asserted.
+Everything else is reported, not asserted. Observed orders of the complex
+errors are used for extrapolation only if p > 0.3 and |arg ratio| ≤ 30°
+(`scripts/richardson.py`); otherwise the p = 2 limit is used and the series is
+flagged.
 
 ## Results (OpenFOAM v2512, development 1576edcc4, Robin–Neumann, μ = 5 Pa s)
 
