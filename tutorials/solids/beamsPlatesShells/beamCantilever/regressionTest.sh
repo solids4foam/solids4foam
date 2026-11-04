@@ -26,7 +26,7 @@ PSI_END=6.283185307179586
 ANALYTICAL_TOL=5e-4
 
 # The reference values are the standalone beamFoam answer for this case
-# (beamFoam 9263c5c, the commit in src/beamModels/BEAMFOAM_VERSION), which
+# (beamFoam built from the same sources as src/beamModels), which
 # solids4Foam reproduced in every written digit on OpenFOAM.com v2412. The
 # history is written to six figures, so the tolerance, 1e-5 relative, is a few
 # units in the last digit
