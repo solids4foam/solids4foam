@@ -4,13 +4,8 @@ sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
 EXE_INC = \
-    -Icoupler \
-    -IboundaryConditions \
-    -I../circulation0D/context \
-    -I../circulation0D/waveform \
-    -I../circulation0D/metrics \
-    -I../circulation0D/components \
-    -I../circulation0D/network \
+    -I$(SOLIDS4FOAM_ROOT)/src/circulationModels/circulation0D/lnInclude \
+    $(VERSION_SPECIFIC_INC) \
     -I$(LIB_SRC)/finiteVolume/lnInclude \
     -I$(LIB_SRC)/meshTools/lnInclude \
     -I$(LIB_SRC)/OpenFOAM/lnInclude \

@@ -32,7 +32,13 @@ Description
 
     epsilon > 0 replaces the hard switch by a smooth one (needed by implicit
     ODE solvers). reverseFraction > 0 gives a closed valve a small leak,
-    Q = -reverseFraction CQ sqrt(-dP).
+    Q = -reverseFraction CQ sqrt(-dP). With epsilon > 0 the leak is smoothed
+    the same way as the forward flow, so the two can be combined:
+
+        Q = g CQ sqrt(dP+) - (1 - g) reverseFraction CQ sqrt(dP-)
+
+    with dP+- = (sqrt(dP^2 + epsilon^2) +- dP)/2 and the sigmoid gate
+    g = 1/(1 + exp(-dP/epsilon)).
 
     The static dPfromQ() is the closed-form inverse used wherever the flow is
     known and the pressure drop is wanted, such as a coupled 3D domain:

@@ -37,8 +37,10 @@ Description
         postProcessing/circulation/<startTime>/circulation.dat
     with the pressure, volume and flow of every element in the units the case
     is written in. At write times the state is stored in
-    <time>/circulationState, and is read from the start time if present, so a
-    long spin-up can be continued.
+    <time>/uniform/circulationState-circulationProperties, and is read from the
+    start time if present, so a long spin-up can be continued. The file is the
+    restart checkpoint of the CFD coupler too, so a spin-up can start a coupled
+    run (see circulationCoupler).
 
 Author
     David Kelly, UCD.
@@ -48,118 +50,39 @@ Author
 #include "argList.H"
 #include "Time.H"
 #include "IOdictionary.H"
+#include "polyMesh.H"
+#include "polyBoundaryMeshEntries.H"
 #include "circulationNetwork.H"
 #include "circulationMetrics.H"
 #include "OSspecific.H"
+#include "OFstream.H"
 
-#include <fstream>
-#include <iomanip>
 #include <limits>
-#include <sstream>
 
 using namespace Foam;
 
-//- Patch names of constant/polyMesh/boundary, read without building the mesh
-//  (a flat scan: a word followed by "{" inside the outer list). Empty if the
-//  case has no mesh.
-static wordList readPatchNames(const fileName& path)
+//- Patch names of constant/polyMesh/boundary, read without building the
+//  mesh. Empty if the case has no mesh.
+static wordList readPatchNames(const Time& runTime)
 {
+    IOobject boundaryIO
+    (
+        "boundary",
+        runTime.constant(),
+        polyMesh::meshSubDir,
+        runTime,
+        IOobject::MUST_READ,
+        IOobject::NO_WRITE
+    );
+
     wordList names;
-    std::ifstream is(path);
-    if (!is)
+    if (boundaryIO.typeHeaderOk<polyBoundaryMeshEntries>(true))
     {
-        return names;
-    }
-
-    std::stringstream buf;
-    buf << is.rdbuf();
-    const std::string text = buf.str();
-
-    // Skip the FoamFile header block
-    std::size_t pos = text.find("FoamFile");
-    if (pos != std::string::npos)
-    {
-        pos = text.find('}', pos);
-        if (pos != std::string::npos)
+        const polyBoundaryMeshEntries entries(boundaryIO);
+        names.setSize(entries.size());
+        forAll(entries, patchi)
         {
-            ++pos;
-        }
-        else
-        {
-            pos = 0;
-        }
-    }
-    else
-    {
-        pos = 0;
-    }
-
-    // Tokens: whitespace separated, with ( ) { } as their own tokens
-    std::vector<std::string> tok;
-    std::string cur;
-    for (std::size_t i = pos; i < text.size(); ++i)
-    {
-        const char c = text[i];
-        if (c == '/' && i + 1 < text.size() && text[i+1] == '/')
-        {
-            while (i < text.size() && text[i] != '\n')
-            {
-                ++i;
-            }
-            continue;
-        }
-        if
-        (
-            std::isspace(static_cast<unsigned char>(c))
-         || c == '(' || c == ')' || c == '{' || c == '}'
-        )
-        {
-            if (!cur.empty())
-            {
-                tok.push_back(cur);
-                cur.clear();
-            }
-            if (!std::isspace(static_cast<unsigned char>(c)))
-            {
-                tok.push_back(std::string(1, c));
-            }
-        }
-        else
-        {
-            cur += c;
-        }
-    }
-    if (!cur.empty())
-    {
-        tok.push_back(cur);
-    }
-
-    int depth = 0;
-    for (std::size_t i = 0; i + 1 < tok.size(); ++i)
-    {
-        if (tok[i] == "(" )
-        {
-            ++depth;
-            continue;
-        }
-        if (tok[i] == ")" )
-        {
-            --depth;
-            continue;
-        }
-        if (tok[i] == "{" )
-        {
-            ++depth;
-            continue;
-        }
-        if (tok[i] == "}" )
-        {
-            --depth;
-            continue;
-        }
-        if (depth == 1 && tok[i+1] == "{")
-        {
-            names.append(word(tok[i], false));
+            names[patchi] = entries[patchi].keyword();
         }
     }
     return names;
@@ -193,8 +116,7 @@ int main(int argc, char *argv[])
 
     if (args.found("check"))
     {
-        const wordList patches =
-            readPatchNames(runTime.path()/"constant"/"polyMesh"/"boundary");
+        const wordList patches = readPatchNames(runTime);
 
         network.check(Info, patches.empty() ? nullptr : &patches);
 
@@ -238,12 +160,16 @@ int main(int argc, char *argv[])
         }
     }
 
+    // The restart state, in the format of the CFD coupler's checkpoint
+    const word stateName("circulationState-circulationProperties");
+
     // Continue from a stored state if there is one at the start time
     {
         IOobject stateIO
         (
-            "circulationState",
+            stateName,
             runTime.timeName(),
+            "uniform",
             runTime,
             IOobject::MUST_READ,
             IOobject::NO_WRITE
@@ -253,6 +179,20 @@ int main(int argc, char *argv[])
         {
             const IOdictionary state(stateIO);
             network.readState(state);
+
+            // A state written at another time is taken at the start time
+            if
+            (
+                mag(network.time() - runTime.value())
+              > 1e-6*runTime.deltaTValue()
+            )
+            {
+                Info<< "The circuit state of t = " << network.time()
+                    << " is taken at the start time t = " << runTime.value()
+                    << endl;
+                network.setState(runTime.value(), network.state());
+            }
+
             Info<< "Restarted from " << stateIO.objectPath() << nl << endl;
         }
     }
@@ -263,8 +203,8 @@ int main(int argc, char *argv[])
     );
     mkDir(outDir);
 
-    std::ofstream log(outDir/"circulation.dat");
-    log << std::setprecision(12);
+    OFstream log(outDir/"circulation.dat");
+    log.precision(12);
 
     {
         const wordList& cols = network.columns();
@@ -279,7 +219,7 @@ int main(int argc, char *argv[])
         log << "\n# s";
         for (const string& u : units)
         {
-            log << ' ' << (u.empty() ? "-" : u);
+            log << ' ' << (u.empty() ? "-" : u.c_str());
         }
         log << '\n';
     }
@@ -346,8 +286,9 @@ int main(int argc, char *argv[])
             (
                 IOobject
                 (
-                    "circulationState",
+                    stateName,
                     runTime.timeName(),
+                    "uniform",
                     runTime,
                     IOobject::NO_READ,
                     IOobject::NO_WRITE
@@ -365,8 +306,6 @@ int main(int argc, char *argv[])
             log.flush();
         }
     }
-
-    log.close();
 
     Info<< "End\n" << endl;
 

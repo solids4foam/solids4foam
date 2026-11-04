@@ -19,7 +19,7 @@ Class
     Foam::circulationPressureFvPatchScalarField
 
 Description
-    Kinematic pressure p/rho on a patch coupled to a lumped circulation
+    Pressure on a patch coupled to a lumped circulation
     network. The one boundary condition for every coupling algorithm: whether
     the exchange is explicit or implicit, and of what order, is chosen in the
     "coupling" block of constant/circulationProperties, not by the BC type.
@@ -29,12 +29,15 @@ Description
             type    circulationPressure;
             value   uniform 0;
             // network circulationProperties;   // optional: which description
+            // phi     phi;                     // optional: the volumetric flux
         }
 
     The patch is bound to its port by the port's "patch" entry in the network
     description. Each time the boundary is evaluated the coupler is asked to
     sample the flux and, on a new exchange, advance the network; the pressure
-    returned is the one the network wants imposed there, divided by rho.
+    returned is the one the network wants imposed there. The network works in
+    Pa: the pressure is divided by the coupling rho for a kinematic p
+    [m2/s2], used directly for p in Pa, and any other dimensions are an error.
 
 Author
     David Kelly, UCD.
@@ -54,6 +57,9 @@ class circulationPressureFvPatchScalarField
     public fixedValueFvPatchScalarField
 {
     word propertiesName_;
+
+    //- Name of the volumetric flux the coupler samples
+    word phiName_;
 
 public:
 

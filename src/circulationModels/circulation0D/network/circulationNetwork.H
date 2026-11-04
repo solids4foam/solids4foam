@@ -195,7 +195,7 @@ class circulationNetwork
         //  group [m3/s]
         scalar forcedFlow(const label k, const scalar t) const;
 
-        //- Its time derivative, by central difference [m3/s2]
+        //- Its time derivative, from those of the sources [m3/s2]
         scalar forcedFlowRate(const label k, const scalar t) const;
 
 

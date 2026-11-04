@@ -33,12 +33,12 @@ Description
         type elastanceChamber;
         V0 5; P0 1; Emin 0.1; Emax 2.5;     // volume, pressure, pressure/volume
         Tes 0.3; Ted 0.45;                  // seconds
-        Eshift 0;                           // seconds, optional
+        Eshift 0;                           // fraction of T, optional
         T 1;                                // optional, default Tcycle
         initialVolume 500;
 
     The atria are the same law with Tes = Tpww/2, Ted = Tpww and
-    Eshift = Tpwb.
+    Eshift = Tpwb/T.
 
 Author
     David Kelly, UCD.

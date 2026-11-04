@@ -128,6 +128,11 @@ Foam::scalar Foam::circulationComponent::fixedFlow(const scalar) const
     CIRC_NOT_IMPLEMENTED("fixedFlow()");
 }
 
+Foam::scalar Foam::circulationComponent::fixedFlowRate(const scalar) const
+{
+    CIRC_NOT_IMPLEMENTED("fixedFlowRate()");
+}
+
 Foam::scalar Foam::circulationComponent::pressure
 (
     const scalar,
@@ -150,6 +155,11 @@ Foam::scalar Foam::circulationComponent::fixedPressure(const scalar) const
 Foam::scalar Foam::circulationComponent::injectedFlow(const scalar) const
 {
     CIRC_NOT_IMPLEMENTED("injectedFlow()");
+}
+
+Foam::scalar Foam::circulationComponent::injectedFlowRate(const scalar) const
+{
+    CIRC_NOT_IMPLEMENTED("injectedFlowRate()");
 }
 
 Foam::scalar Foam::circulationComponent::portFlow(const scalar) const

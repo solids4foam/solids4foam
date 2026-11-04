@@ -193,6 +193,9 @@ public:
             //- Prescribed flow in -> out [m3/s]
             virtual scalar fixedFlow(const scalar t) const;
 
+            //- Its time derivative [m3/s2]
+            virtual scalar fixedFlowRate(const scalar t) const;
+
         // storage
 
             //- Pressure for volume V [Pa]
@@ -208,6 +211,9 @@ public:
 
             //- Flow injected into the node [m3/s]
             virtual scalar injectedFlow(const scalar t) const;
+
+            //- Its time derivative [m3/s2]
+            virtual scalar injectedFlowRate(const scalar t) const;
 
             //- Flow through the port in its natural direction [m3/s]
             virtual scalar portFlow(const scalar t) const;

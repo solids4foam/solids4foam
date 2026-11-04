@@ -4,11 +4,7 @@ sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
 
 EXE_INC = \
-    -Icontext \
-    -Iwaveform \
-    -Imetrics \
-    -Icomponents \
-    -Inetwork \
+    $(VERSION_SPECIFIC_INC) \
     -I$(LIB_SRC)/OpenFOAM/lnInclude \
     -I$(LIB_SRC)/ODE/lnInclude
 

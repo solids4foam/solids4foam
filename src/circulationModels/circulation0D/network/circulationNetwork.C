@@ -716,8 +716,34 @@ Foam::scalar Foam::circulationNetwork::forcedFlowRate
     const scalar t
 ) const
 {
-    const scalar h = 1e-6;
-    return (forcedFlow(k, t + h) - forcedFlow(k, t - h))/(2*h);
+    const forcedInertia& f = forced_[forcedOfComp_[k]];
+
+    // forcedFlow differentiated term by term, analytically
+    scalar inflowRate = 0;
+    forAll(comps_, s)
+    {
+        if (roles_[s] == role::fixedFlow)
+        {
+            const scalar dQ = comps_[s].fixedFlowRate(t);
+            if (groupOfNet_[netOut_[s]] == f.group)
+            {
+                inflowRate += dQ;
+            }
+            if (groupOfNet_[netIn_[s]] == f.group)
+            {
+                inflowRate -= dQ;
+            }
+        }
+        else if (roles_[s] == role::portSource)
+        {
+            if (groupOfNet_[netIn_[s]] == f.group)
+            {
+                inflowRate += comps_[s].injectedFlowRate(t);
+            }
+        }
+    }
+
+    return f.sign*inflowRate;
 }
 
 
@@ -904,74 +930,174 @@ void Foam::circulationNetwork::netPressures
         // flows are not linear in the node pressure. Newton with a line
         // search, so that the switching of a hard valve cannot make it cycle,
         // and an error, never a silent wrong answer, if it does not converge.
-        auto flowResidual = [&](const scalarField& r)
-        {
-            scalar m = 0;
-            forAll(algIndex_, n)
-            {
-                if (algIndex_[n] >= 0 && !pinned_[n])
-                {
-                    m = Foam::max(m, Foam::mag(r[algIndex_[n]]));
-                }
-            }
-            return m;
-        };
-
-        nodalSystem(t, y, P, pAlg_, R, &J, flowScale);
-        scalar norm = flowResidual(R);
-
-        scalarField trial(nAlg_), Rt(nAlg_);
-
-        for
+        //
+        // The rows of nets held by a forced inductor are pressure equations
+        // [Pa], tested against the pressures; the others are flow balances
+        // [m3/s]. Called just after nodalSystem, so P holds the iterate.
+        auto residuals = [&]
         (
-            label iter = 0;
-            iter < 80 && norm > 1e-13*flowScale + 1e-24;
-            ++iter
+            const scalarField& r,
+            scalar& flowRes,
+            scalar& pRes,
+            scalar& pScale
         )
         {
-            scalarField delta(-R);
-            if (!solveDense(J, delta))
+            flowRes = 0;
+            pRes = 0;
+            pScale = 0;
+            forAll(algIndex_, n)
             {
-                singular();
-            }
+                pScale = Foam::max(pScale, Foam::mag(P[n]));
 
-            scalar lambda = 1;
-            bool improved = false;
-            for (label ls = 0; ls < 40; ++ls)
-            {
-                trial = pAlg_ + lambda*delta;
-                scalar fsT = 0;
-                nodalSystem(t, y, P, trial, Rt, nullptr, fsT);
-                const scalar nt = flowResidual(Rt);
-
-                if (nt < (1 - 1e-4*lambda)*norm || nt <= 1e-13*fsT + 1e-24)
+                const label a = algIndex_[n];
+                if (a >= 0)
                 {
-                    improved = true;
+                    scalar& m = pinned_[n] ? pRes : flowRes;
+                    m = Foam::max(m, Foam::mag(r[a]));
+                }
+            }
+        };
+
+        // Both residuals relative to their tolerance: converged at 1 or less
+        auto merit = []
+        (
+            const scalar flowRes,
+            const scalar fs,
+            const scalar pRes,
+            const scalar ps
+        )
+        {
+            return Foam::max
+            (
+                flowRes/(1e-13*fs + 1e-24),
+                pRes/(1e-13*ps + 1e-24)
+            );
+        };
+
+        scalar flowRes = 0, pRes = 0, pScale = 0;
+        scalarField trial(nAlg_), Rt(nAlg_);
+
+        // Newton from pAlg_
+        auto newton = [&]()
+        {
+            nodalSystem(t, y, P, pAlg_, R, &J, flowScale);
+            residuals(R, flowRes, pRes, pScale);
+            scalar norm = merit(flowRes, flowScale, pRes, pScale);
+
+            for (label iter = 0; iter < 80 && norm > 1; ++iter)
+            {
+                scalarField delta(-R);
+                if (!solveDense(J, delta))
+                {
+                    singular();
+                }
+
+                scalar lambda = 1;
+                bool improved = false;
+                for (label ls = 0; ls < 40; ++ls)
+                {
+                    trial = pAlg_ + lambda*delta;
+                    scalar fsT = 0;
+                    nodalSystem(t, y, P, trial, Rt, nullptr, fsT);
+                    scalar frT, prT, psT;
+                    residuals(Rt, frT, prT, psT);
+                    const scalar nt = merit(frT, fsT, prT, psT);
+
+                    if (nt < (1 - 1e-4*lambda)*norm || nt <= 1)
+                    {
+                        improved = true;
+                        break;
+                    }
+                    lambda *= 0.5;
+                }
+
+                if (!improved)
+                {
                     break;
                 }
-                lambda *= 0.5;
-            }
 
-            if (!improved)
-            {
-                break;
+                pAlg_ = trial;
+                nodalSystem(t, y, P, pAlg_, R, &J, flowScale);
+                residuals(R, flowRes, pRes, pScale);
+                norm = merit(flowRes, flowScale, pRes, pScale);
             }
-
-            pAlg_ = trial;
-            nodalSystem(t, y, P, pAlg_, R, &J, flowScale);
-            norm = flowResidual(R);
-        }
+        };
 
         // The absolute floor is roundoff: a square-root valve that is almost
         // shut turns the rounding of the node pressure (1e-12 relative) into a
         // flow error of order 1e-14 m3/s that no iteration can remove
-        if (norm > 1e-8*flowScale + 1e-14)
+        auto solved = [&]()
+        {
+            return
+                flowRes <= 1e-8*flowScale + 1e-14
+             && pRes <= 1e-8*pScale + 1e-14;
+        };
+
+        newton();
+
+        // A hard valve left shut by the starting pressures, those of the last
+        // solve, carries no flow to tell Newton how far to open it. Start again
+        // with each node at the mean pressure of the nodes holding a volume
+        // that its branches reach (the mean of all of those if none), so that
+        // such a valve starts at dP = 0.
+        if (!solved())
+        {
+            scalarField sum(nAlg_, Zero);
+            labelList count(nAlg_, Zero);
+            scalar sumAll = 0;
+            label countAll = 0;
+
+            forAll(algIndex_, n)
+            {
+                if (algIndex_[n] < 0)
+                {
+                    sumAll += P[n];
+                    ++countAll;
+                }
+            }
+
+            forAll(comps_, k)
+            {
+                if (roles_[k] != role::branch && roles_[k] != role::inertia)
+                {
+                    continue;
+                }
+
+                const label ai = algIndex_[netIn_[k]];
+                const label ao = algIndex_[netOut_[k]];
+
+                if (ai >= 0 && ao < 0)
+                {
+                    sum[ai] += P[netOut_[k]];
+                    ++count[ai];
+                }
+                else if (ao >= 0 && ai < 0)
+                {
+                    sum[ao] += P[netIn_[k]];
+                    ++count[ao];
+                }
+            }
+
+            forAll(pAlg_, a)
+            {
+                pAlg_[a] =
+                    count[a] > 0
+                  ? sum[a]/count[a]
+                  : sumAll/Foam::max(countAll, label(1));
+            }
+
+            newton();
+        }
+
+        if (!solved())
         {
             FatalErrorInFunction
                 << "The pressures of the nodes that hold no volume could not"
                 << " be solved at t = " << t << ": the flows into them are out"
-                << " of balance by " << norm << " m3/s (largest flow "
-                << flowScale << " m3/s)." << nl
+                << " of balance by " << flowRes << " m3/s (largest flow "
+                << flowScale << " m3/s), and the pressure across a forced"
+                << " inductor by " << pRes << " Pa (largest pressure "
+                << pScale << " Pa)." << nl
                 << "    A hard valve (epsilon 0) next to a node without a"
                 << " compliance or chamber is the usual cause: give the valve"
                 << " a smoothing  epsilon,  or put a compliance at that node."

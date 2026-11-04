@@ -32,7 +32,9 @@ Description
 
     Cycles are [k T, (k+1) T] for the cardiac period T = Tcycle. A cycle is
     reported when it has been run from its first instant to its last; a run
-    that starts or stops in mid-cycle does not report the partial one.
+    that starts or stops in mid-cycle does not report the partial one. A cycle
+    boundary between two samples is given values interpolated linearly to it,
+    so the output interval need not divide T.
 
     \table
         type      | per-cycle quantities
@@ -62,8 +64,8 @@ SourceFiles
 #include "dictionary.H"
 #include "DynamicList.H"
 #include "fileName.H"
-
-#include <fstream>
+#include "OFstream.H"
+#include "autoPtr.H"
 
 namespace Foam
 {
@@ -82,7 +84,7 @@ class circulationMetrics
     List<item> items_;
     scalar period_;
     fileName dir_;
-    std::ofstream out_;
+    autoPtr<OFstream> out_;
     bool headerWritten_;
 
     //- Samples of the cycle in progress: time, then the monitored columns

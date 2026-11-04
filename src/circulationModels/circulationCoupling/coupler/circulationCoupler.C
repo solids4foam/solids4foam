@@ -32,125 +32,11 @@ Author
 #include "IOdictionary.H"
 #include "surfaceFields.H"
 #include "Pstream.H"
+#include "StringStream.H"
 
 #include <map>
 #include <cmath>
-#include <csignal>
 #include <limits>
-#include <cstdio>
-#include <cstring>
-#include <unistd.h>
-
-// * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * * //
-
-namespace
-{
-
-// The signal a floating point trap raises. OpenFOAM does the same on Apple
-// Silicon, where the trap arrives as SIGILL rather than SIGFPE.
-#if defined(__APPLE__) && defined(__arm64__)
-constexpr int trapSignal = SIGILL;
-#else
-constexpr int trapSignal = SIGFPE;
-#endif
-
-// What the signal handler needs to describe the failure. Plain data, updated
-// after every exchange.
-struct fpeInfo
-{
-    double t = 0, dt = 0, Pmax = 0;
-    int order = 0;
-    bool implicitScheme = false;
-    bool installed = false;
-} fpe;
-
-struct sigaction previousFpe;
-
-void fpeAdvice(int sig, siginfo_t* info, void* context)
-{
-    char buf[1400];
-    const int n = std::snprintf
-    (
-        buf, sizeof(buf),
-        "\n--> circulation coupling: floating point exception in the CFD "
-        "solution\n"
-        "    after t = %g (last accepted step), %s coupling, order %d, "
-        "deltaT %g s.\n"
-        "    The largest port pressure at the last exchange was %g Pa. "
-        "If port pressures\n"
-        "    or flows were growing before this, the coupling is probably "
-        "unstable here:\n"
-        "      - explicit coupling is only conditionally stable: "
-        "use  scheme implicit;\n"
-        "        or a smaller deltaT\n"
-        "      - a high coupling order amplifies noise at a large deltaT: "
-        "try order 2\n"
-        "      - check the circuit with  circulationFoam -check\n"
-        "    (the original CFD error follows)\n\n",
-        fpe.t,
-        fpe.implicitScheme ? "implicit" : "explicit",
-        fpe.order,
-        fpe.dt,
-        fpe.Pmax
-    );
-    if (n > 0)
-    {
-        const ssize_t w = ::write(2, buf, static_cast<size_t>(n));
-        (void)w;
-    }
-
-    // Hand on to the handler that was installed before ours (OpenFOAM's, which
-    // prints the stack trace)
-    if (previousFpe.sa_flags & SA_SIGINFO)
-    {
-        if (previousFpe.sa_sigaction)
-        {
-            previousFpe.sa_sigaction(sig, info, context);
-        }
-    }
-    else if
-    (
-        previousFpe.sa_handler
-     && previousFpe.sa_handler != SIG_IGN
-     && previousFpe.sa_handler != SIG_DFL
-    )
-    {
-        previousFpe.sa_handler(sig);
-    }
-    ::signal(trapSignal, SIG_DFL);
-    ::raise(trapSignal);
-}
-
-//- Make sure our advice handler is the active one. OpenFOAM re-arms its own
-//  handler at times (sigFpe::ignore guards), so this is checked every exchange.
-void installFpeAdvice()
-{
-    struct sigaction cur;
-    if (sigaction(trapSignal, nullptr, &cur) != 0)
-    {
-        return;
-    }
-    if ((cur.sa_flags & SA_SIGINFO) && cur.sa_sigaction == fpeAdvice)
-    {
-        return;
-    }
-
-    struct sigaction act;
-    std::memset(&act, 0, sizeof(act));
-    act.sa_sigaction = fpeAdvice;
-    sigemptyset(&act.sa_mask);
-    act.sa_flags = SA_SIGINFO;
-
-    struct sigaction before;
-    if (sigaction(trapSignal, &act, &before) == 0)
-    {
-        previousFpe = before;
-    }
-    fpe.installed = true;
-}
-
-} // End anonymous namespace
-
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -168,20 +54,44 @@ Foam::circulationCheckpoint::circulationCheckpoint
     const word& name
 )
 :
-    localIOdictionary
+    IOdictionary
     (
         IOobject
         (
             name,
             mesh.time().timeName(mesh.time().startTime().value()),
+            "uniform",
             mesh,
             IOobject::READ_IF_PRESENT,
             IOobject::AUTO_WRITE
-        ),
-        word::null
+        )
     ),
-    resumed_(found("y"))
-{}
+    resumed_(false)
+{
+    // Only the master writes the checkpoint: every rank resumes from its copy.
+    // It is sent as ASCII text at full precision; a binary stream would leave
+    // its lists unreadable.
+    if (Pstream::parRun())
+    {
+        string text;
+        if (Pstream::master())
+        {
+            OStringStream os;
+            os.precision(std::numeric_limits<scalar>::max_digits10);
+            os << static_cast<const dictionary&>(*this);
+            text = os.str();
+        }
+        Pstream::broadcast(text);
+        if (!Pstream::master())
+        {
+            IStringStream is(text);
+            clear();
+            merge(dictionary(is));
+        }
+    }
+
+    resumed_ = found("state");
+}
 
 
 bool Foam::circulationCheckpoint::writeObject
@@ -199,7 +109,11 @@ bool Foam::circulationCheckpoint::writeObject
     (
         std::numeric_limits<scalar>::max_digits10
     );
-    const bool ok = localIOdictionary::writeObject(streamOpt, writeOnProc);
+    const bool ok = IOdictionary::writeObject
+    (
+        streamOpt,
+        writeOnProc && Pstream::master()
+    );
     IOstream::defaultPrecision(oldPrecision);
     return ok;
 }
@@ -208,7 +122,8 @@ bool Foam::circulationCheckpoint::writeObject
 Foam::circulationCoupler::circulationCoupler
 (
     const word& propertiesName,
-    const fvMesh& mesh
+    const fvMesh& mesh,
+    const word& phiName
 )
 :
     regIOobject
@@ -219,10 +134,11 @@ Foam::circulationCoupler::circulationCoupler
             mesh.time().constant(),
             mesh,
             IOobject::NO_READ,
-            IOobject::NO_WRITE
+            IOobject::AUTO_WRITE
         )
     ),
     mesh_(mesh),
+    phiName_(phiName),
     scheme_(scheme::implicitScheme),
     order_(1),
     rho_(1),
@@ -234,7 +150,9 @@ Foam::circulationCoupler::circulationCoupler
     activeTimeIndex_(-1),
     lastConsumedFluxEvent_(-1),
     stepUpdateCount_(0),
-    totalUpdateCount_(0)
+    totalUpdateCount_(0),
+    rowPending_(false),
+    interfaceResidual_(0)
 {
     const IOdictionary props
     (
@@ -281,8 +199,7 @@ Foam::circulationCoupler::circulationCoupler
     {
         const std::map<std::string, label> schemeOrder =
         {
-            {"Euler", 1}, {"localEuler", 1}, {"backward", 2},
-            {"CrankNicolson", 2}
+            {"Euler", 1}, {"localEuler", 1}, {"backward", 2}
         };
 
         for (const entry& e : mesh.schemes().ddtSchemes())
@@ -307,6 +224,18 @@ Foam::circulationCoupler::circulationCoupler
             {
                 cfdOrder = is[i + 1].labelToken();
                 name += " " + std::to_string(cfdOrder);
+            }
+            else if (name == "CrankNicolson")
+            {
+                // Second order only when fully centred (coefficient 1): an
+                // off-centred one, e.g. 0.9, blends in Euler and is first
+                // order. A ramped (Function1) coefficient is not checked.
+                if (is.size() > i + 1 && is[i + 1].isNumber())
+                {
+                    const scalar ocCoeff = is[i + 1].number();
+                    cfdOrder = (mag(ocCoeff - 1) < SMALL) ? 2 : 1;
+                    name += " " + Foam::name(ocCoeff);
+                }
             }
             else
             {
@@ -428,16 +357,28 @@ Foam::circulationCoupler::circulationCoupler
     y_ = network_().state();
     stepStartY_ = y_;
 
-    // On a floating point exception, say what it probably means
-    installFpeAdvice();
-    fpe.order = order_;
-    fpe.implicitScheme = (scheme_ == scheme::implicitScheme);
-    fpe.dt = mesh.time().deltaTValue();
-
     // Pressure before the first exchange: the initial state with no flow
     for (portData& p : ports_)
     {
         p.P = network_().portPressure(p.name);
+    }
+
+    // The accepted flows at the start time are those of the start-time flux,
+    // so that implicit coupling does not ramp the first step up from zero. A
+    // checkpoint, read below, replaces them.
+    if (mesh.foundObject<surfaceScalarField>(phiName_))
+    {
+        const surfaceScalarField& phi =
+            mesh.lookupObject<surfaceScalarField>(phiName_);
+
+        if (phi.dimensions() == dimVolume/dimTime)
+        {
+            for (portData& p : ports_)
+            {
+                p.Q = portFlow(phi, p);
+                p.stepStartQ = p.Q;
+            }
+        }
     }
 
     // Resume from the checkpoint of the start time, if there is one
@@ -448,6 +389,39 @@ Foam::circulationCoupler::circulationCoupler
     if (checkpoint_().resumed())
     {
         restore();
+    }
+    else
+    {
+        // A case with a time earlier than its start time is a restart, which
+        // the circuit cannot follow without its checkpoint. The case
+        // directory is searched too, for a decomposed restart.
+        const Time& runTime = mesh.time();
+        const word startName(runTime.timeName(runTime.startTime().value()));
+
+        instantList times(runTime.times());
+        times.append(Time::findTimes(runTime.globalPath(), runTime.constant()));
+
+        for (const instant& t : times)
+        {
+            if
+            (
+                t.name() != runTime.constant()
+             && t.name() != startName
+             && t.value() < runTime.startTime().value()
+            )
+            {
+                FatalErrorInFunction
+                    << "The case starts from t = " << startName
+                    << ", after its time " << t.name() << ", but there is no "
+                    << "circulation checkpoint "
+                    << checkpoint_().objectRelPath() << nl
+                    << "    The circuit cannot resume without it. Restart "
+                    << "from a time that has one, or remove the earlier time "
+                    << "directories to start the circuit from its initial "
+                    << "conditions at this time."
+                    << exit(FatalError);
+            }
+        }
     }
 
     if (Pstream::master())
@@ -470,6 +444,10 @@ Foam::circulationCoupler::circulationCoupler
         for (const portData& p : ports_)
         {
             log_() << ' ' << p.name << ".Qsampled";
+        }
+        if (scheme_ == scheme::implicitScheme)
+        {
+            log_() << " residual";
         }
         log_() << nl;
 
@@ -501,11 +479,7 @@ Foam::circulationCoupler::circulationCoupler
 
 Foam::circulationCoupler::~circulationCoupler()
 {
-    // The last accepted step is only logged when the next one begins
-    if (activeTimeIndex_ >= 0 && stepUpdateCount_ > 0)
-    {
-        writeRow();
-    }
+    flushRow();
 }
 
 
@@ -514,7 +488,8 @@ Foam::circulationCoupler::~circulationCoupler()
 Foam::circulationCoupler& Foam::circulationCoupler::lookupOrCreate
 (
     const fvMesh& mesh,
-    const word& propertiesName
+    const word& propertiesName,
+    const word& phiName
 )
 {
     objectRegistry& obr = const_cast<objectRegistry&>(mesh.thisDb());
@@ -522,10 +497,23 @@ Foam::circulationCoupler& Foam::circulationCoupler::lookupOrCreate
 
     if (obr.foundObject<circulationCoupler>(key))
     {
-        return obr.lookupObjectRef<circulationCoupler>(key);
+        circulationCoupler& coupler =
+            obr.lookupObjectRef<circulationCoupler>(key);
+
+        if (coupler.phiName_ != phiName)
+        {
+            FatalErrorInFunction
+                << "The patches coupled to " << propertiesName << " name"
+                << " different fluxes, " << coupler.phiName_ << " and "
+                << phiName << ": they share one coupler, which samples one"
+                << " flux" << exit(FatalError);
+        }
+
+        return coupler;
     }
 
-    circulationCoupler* ptr = new circulationCoupler(propertiesName, mesh);
+    circulationCoupler* ptr =
+        new circulationCoupler(propertiesName, mesh, phiName);
     obr.store(ptr);
     return *ptr;
 }
@@ -557,6 +545,10 @@ void Foam::circulationCoupler::writeRow()
     {
         log_() << ' ' << p.Q/fQ;
     }
+    if (scheme_ == scheme::implicitScheme)
+    {
+        log_() << ' ' << interfaceResidual_;
+    }
 
     log_() << nl;
     log_().flush();
@@ -584,10 +576,10 @@ void Foam::circulationCoupler::updateCheckpoint()
         std::numeric_limits<scalar>::max_digits10
     );
 
+    // The network state, by component name, as circulationFoam writes it; the
+    // network holds the accepted state at lastT_ (see advance)
     circulationCheckpoint& cp = checkpoint_();
-    cp.set("time", lastT_);
-    cp.set("y", y_);
-    cp.set("stepEstimate", network_().stepEstimate());
+    cp.merge(network_().stateDict());
     cp.set("historyDepth", min(historyDepth_ + 1, label(3)));
 
     FixedList<scalar, 3> dt;
@@ -617,50 +609,80 @@ void Foam::circulationCoupler::updateCheckpoint()
 void Foam::circulationCoupler::restore()
 {
     const circulationCheckpoint& cp = checkpoint_();
+    const Time& runTime = mesh_.time();
 
-    const scalarField y(cp.get<scalarField>("y"));
-    if (y.size() != network_().nEqns())
+    network_().readState(cp);
+
+    // A state written at another time, e.g. by a circulationFoam spin-up, is
+    // taken at the start time
+    const scalar startT = runTime.startTime().value();
+    if (mag(network_().time() - startT) > 1e-6*runTime.deltaTValue())
     {
-        FatalErrorInFunction
-            << "Checkpoint " << cp.objectRelPath() << " holds " << y.size()
-            << " states but the circuit has " << network_().nEqns()
-            << ": the circuit was changed since it was written"
-            << exit(FatalError);
+        Info<< type() << ": the circuit state of t = " << network_().time()
+            << " in " << cp.objectRelPath() << " is taken at the start time"
+            << " t = " << startT << endl;
+        network_().setState(startT, network_().state());
     }
 
-    lastT_ = cp.get<scalar>("time");
-    y_ = y;
-    network_().setState(lastT_, y_);
-    network_().setStepEstimate
-    (
-        cp.getOrDefault<scalar>("stepEstimate", network_().stepEstimate())
-    );
+    lastT_ = network_().time();
+    y_ = network_().state();
     stepStartY_ = y_;
     stepStartT_ = lastT_;
 
-    historyDepth_ = cp.get<label>("historyDepth");
-    const List<scalar> hdt(cp.get<List<scalar>>("historyDt"));
-    for (label i = 0; i < 3; ++i)
+    // The flow history, if the checkpoint was written by a coupled run;
+    // otherwise it is that of a fresh run
+    if (cp.found("ports"))
     {
-        historyDt_[i] = hdt[i];
-    }
-
-    const dictionary& pd = cp.subDict("ports");
-    for (portData& p : ports_)
-    {
-        const dictionary& d = pd.subDict(p.name);
-        p.Q = d.get<scalar>("Q");
-        p.stepStartQ = p.Q;
-        const List<scalar> h(d.get<List<scalar>>("history"));
+        historyDepth_ = cp.get<label>("historyDepth");
+        const List<scalar> hdt(cp.get<List<scalar>>("historyDt"));
         for (label i = 0; i < 3; ++i)
         {
-            p.history[i] = h[i];
+            historyDt_[i] = hdt[i];
         }
+
+        const dictionary& pd = cp.subDict("ports");
+        for (portData& p : ports_)
+        {
+            const dictionary& d = pd.subDict(p.name);
+            p.Q = d.get<scalar>("Q");
+            p.stepStartQ = p.Q;
+            const List<scalar> h(d.get<List<scalar>>("history"));
+            for (label i = 0; i < 3; ++i)
+            {
+                p.history[i] = h[i];
+            }
+        }
+    }
+
+    for (portData& p : ports_)
+    {
         p.P = network_().portPressure(p.name);
     }
 
     Info<< type() << ": resumed from " << cp.objectRelPath() << " at t = "
         << lastT_ << endl;
+}
+
+
+Foam::scalar Foam::circulationCoupler::portFlow
+(
+    const surfaceScalarField& phi,
+    const portData& p
+) const
+{
+    const scalar leaving = gSum(phi.boundaryField()[p.patchID]);
+    return p.inlet ? -leaving : leaving;
+}
+
+
+void Foam::circulationCoupler::flushRow()
+{
+    if (rowPending_)
+    {
+        network_().setState(lastT_, y_);
+        writeRow();
+        rowPending_ = false;
+    }
 }
 
 
@@ -689,8 +711,7 @@ void Foam::circulationCoupler::beginTimeIndex(const label timeIndex)
         historyDepth_ = min(historyDepth_ + 1, label(3));
 
         // One row per accepted step
-        network_().setState(lastT_, y_);
-        writeRow();
+        flushRow();
     }
 
     activeTimeIndex_ = timeIndex;
@@ -790,19 +811,38 @@ void Foam::circulationCoupler::advance(const Time& runTime)
     }
 
     // ---- Integrate from the start of the step ---------------------------
-    network_().setState(t0, stepStartY_);
-    network_().advance(t1);
-    const scalarField candidate = network_().state();
+    // On the master only, and the result broadcast: the adaptive ODE solver
+    // and the nonlinear node-pressure solve could otherwise take different
+    // paths on different ranks and give them different port pressures
+    scalarList portP(ports_.size());
 
-    // Both schemes accept the integrated state whole
-    y_ = candidate;
+    if (Pstream::master())
+    {
+        network_().setState(t0, stepStartY_);
+        network_().advance(t1);
+
+        // Both schemes accept the integrated state whole
+        y_ = network_().state();
+        network_().setState(t1, y_);
+
+        forAll(ports_, i)
+        {
+            portP[i] = network_().portPressure(ports_[i].name);
+        }
+    }
+
+    Pstream::broadcast(y_);
+    Pstream::broadcast(portP);
 
     lastT_ = t1;
-    network_().setState(t1, y_);
-
-    for (portData& p : ports_)
+    if (!Pstream::master())
     {
-        p.P = network_().portPressure(p.name);
+        network_().setState(t1, y_);
+    }
+
+    forAll(ports_, i)
+    {
+        ports_[i].P = portP[i];
     }
 
     // Divergence guard: stop at a clear threshold with advice, rather than
@@ -835,22 +875,28 @@ void Foam::circulationCoupler::advance(const Time& runTime)
         }
     }
 
-    installFpeAdvice();
     updateCheckpoint();
-
-    fpe.t = t1;
-    fpe.Pmax = 0;
-    for (const portData& p : ports_)
-    {
-        fpe.Pmax = std::max(fpe.Pmax, std::abs(double(p.P)));
-    }
 
     ++stepUpdateCount_;
     ++totalUpdateCount_;
+    rowPending_ = true;
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+bool Foam::circulationCoupler::writeObject
+(
+    IOstreamOption,
+    const bool
+) const
+{
+    // The step is complete at a write time: log it now, so that the results
+    // hold every step up to the time written, as the checkpoint does
+    const_cast<circulationCoupler&>(*this).flushRow();
+    return true;
+}
+
 
 const Foam::word& Foam::circulationCoupler::portOfPatch
 (
@@ -898,7 +944,7 @@ void Foam::circulationCoupler::sampleAndAdvance(const fvMesh& mesh)
         // same number. Every rank must reach the same decision, so the
         // master's is broadcast.
         const label event =
-            mesh.lookupObject<surfaceScalarField>("phi").eventNo();
+            mesh.lookupObject<surfaceScalarField>(phiName_).eventNo();
         bool fresh = (event != lastConsumedFluxEvent_);
         Pstream::broadcast(fresh);
         if (!fresh)
@@ -908,25 +954,48 @@ void Foam::circulationCoupler::sampleAndAdvance(const fvMesh& mesh)
     }
 
     const surfaceScalarField& phi =
-        mesh.lookupObject<surfaceScalarField>("phi");
+        mesh.lookupObject<surfaceScalarField>(phiName_);
 
     if (phi.dimensions() != dimVolume/dimTime)
     {
         FatalErrorInFunction
-            << "A volumetric flux phi is required, found " << phi.dimensions()
-            << exit(FatalError);
+            << "A volumetric flux is required, but " << phiName_ << " has"
+            << " dimensions " << phi.dimensions() << exit(FatalError);
     }
 
-    // All ranks take part in the reductions, including those without faces
+    // All ranks take part in the reductions, including those without faces.
+    // The change from the previous iterate measures the interface convergence
+    // of implicit coupling; the first iterate of a step is compared with the
+    // flow at the start of the step.
+    scalar sumSqrChange = 0;
+    scalar sumSqrQ = 0;
     for (portData& p : ports_)
     {
-        const scalar leaving = gSum(phi.boundaryField()[p.patchID]);
-        p.Q = p.inlet ? -leaving : leaving;
+        const scalar Q = portFlow(phi, p);
+        sumSqrChange += sqr(Q - p.Q);
+        sumSqrQ += sqr(Q);
+        p.Q = Q;
     }
 
     lastConsumedFluxEvent_ = phi.eventNo();
 
     advance(runTime);
+
+    // An explicit step exchanges once, so its state is final already
+    if (scheme_ == scheme::explicitScheme)
+    {
+        flushRow();
+    }
+
+    if (scheme_ == scheme::implicitScheme)
+    {
+        interfaceResidual_ =
+            Foam::sqrt(sumSqrChange)/(Foam::sqrt(sumSqrQ) + SMALL);
+
+        Info<< type() << ": exchange " << stepUpdateCount_
+            << ", flow residual |Q^k - Q^(k-1)|/|Q^k| = " << interfaceResidual_
+            << endl;
+    }
 }
 
 

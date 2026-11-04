@@ -178,10 +178,36 @@ Foam::scalar Foam::externalPort::portFlow(const scalar t) const
 }
 
 
+Foam::scalar Foam::externalPort::portFlowRate(const scalar t) const
+{
+    if (tabulated_)
+    {
+        return table_().derivative(t);
+    }
+
+    const scalar dt = t1_ - t0_;
+    if (dt <= VSMALL)
+    {
+        return 0;
+    }
+
+    const scalar a = Foam::min(Foam::max((t - t0_)/dt, scalar(0)), scalar(1));
+
+    return (c_[1] + a*(2*c_[2] + a*3*c_[3]))/dt;
+}
+
+
 Foam::scalar Foam::externalPort::injectedFlow(const scalar t) const
 {
     const scalar Q = portFlow(t);
     return inlet_ ? -Q : Q;
+}
+
+
+Foam::scalar Foam::externalPort::injectedFlowRate(const scalar t) const
+{
+    const scalar dQ = portFlowRate(t);
+    return inlet_ ? -dQ : dQ;
 }
 
 

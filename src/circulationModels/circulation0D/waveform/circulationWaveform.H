@@ -84,6 +84,10 @@ public:
 
     //- Value at time t [SI]
     scalar value(const scalar t) const;
+
+    //- Time derivative at time t [SI/s]: of a table, the slope of the
+    //  interval holding t (zero where it is extrapolated)
+    scalar derivative(const scalar t) const;
 };
 
 } // End namespace Foam

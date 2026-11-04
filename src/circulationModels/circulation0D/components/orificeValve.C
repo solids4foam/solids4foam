@@ -100,7 +100,19 @@ Foam::scalar Foam::orificeValve::flow(const scalar, const scalar dP) const
         const scalar dPpos = 0.5*(dP + Foam::sqrt(dP*dP + eps_*eps_));
         const scalar a = Foam::min(Foam::max(dP/eps_, scalar(-50)), scalar(50));
         const scalar gate = 1.0/(1.0 + Foam::exp(-a));
-        return CQ_*Foam::sqrt(Foam::max(dPpos, VSMALL))*gate;
+        scalar Q = CQ_*Foam::sqrt(Foam::max(dPpos, VSMALL))*gate;
+
+        // The regurgitant leak, smoothed the same way: the mirror image of
+        // the forward law, scaled by reverseFraction
+        if (reverseFraction_ > 0)
+        {
+            const scalar dPneg = dPpos - dP;
+            Q -=
+                reverseFraction_*CQ_*Foam::sqrt(Foam::max(dPneg, VSMALL))
+               *(1 - gate);
+        }
+
+        return Q;
     }
 
     if (dP >= 0)
@@ -132,7 +144,8 @@ Foam::scalar Foam::orificeValve::dFlowdDP(const scalar t, const scalar dP) const
 
     const scalar floorP = 1e-9;     // Pa
 
-    if (dP > 0)
+    // dP = 0 is on the open branch, as in flow()
+    if (dP >= 0)
     {
         if (Rs_ > 0)
         {
@@ -144,10 +157,15 @@ Foam::scalar Foam::orificeValve::dFlowdDP(const scalar t, const scalar dP) const
         return CQ_/(2*Foam::sqrt(Foam::max(dP, floorP)));
     }
 
-    return
-        reverseFraction_ > 0
-      ? reverseFraction_*CQ_/(2*Foam::sqrt(Foam::max(-dP, floorP)))
-      : scalar(0);
+    if (reverseFraction_ > 0)
+    {
+        return reverseFraction_*CQ_/(2*Foam::sqrt(Foam::max(-dP, floorP)));
+    }
+
+    // Shut, with no leak: the true slope is zero, which leaves a node fed only
+    // through this valve singular. The slope of the open branch at -dP lets
+    // the Newton step open it; the flow itself stays zero.
+    return dFlowdDP(t, -dP);
 }
 
 

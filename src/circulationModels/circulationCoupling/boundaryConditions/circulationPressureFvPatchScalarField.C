@@ -40,7 +40,8 @@ circulationPressureFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(p, iF),
-    propertiesName_("circulationProperties")
+    propertiesName_("circulationProperties"),
+    phiName_("phi")
 {}
 
 
@@ -56,7 +57,8 @@ circulationPressureFvPatchScalarField
     propertiesName_
     (
         dict.getOrDefault<word>("network", "circulationProperties")
-    )
+    ),
+    phiName_(dict.getOrDefault<word>("phi", "phi"))
 {}
 
 
@@ -70,7 +72,8 @@ circulationPressureFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(ptf, p, iF, mapper),
-    propertiesName_(ptf.propertiesName_)
+    propertiesName_(ptf.propertiesName_),
+    phiName_(ptf.phiName_)
 {}
 
 
@@ -81,7 +84,8 @@ circulationPressureFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(ptf),
-    propertiesName_(ptf.propertiesName_)
+    propertiesName_(ptf.propertiesName_),
+    phiName_(ptf.phiName_)
 {}
 
 
@@ -93,7 +97,8 @@ circulationPressureFvPatchScalarField
 )
 :
     fixedValueFvPatchScalarField(ptf, iF),
-    propertiesName_(ptf.propertiesName_)
+    propertiesName_(ptf.propertiesName_),
+    phiName_(ptf.phiName_)
 {}
 
 
@@ -109,17 +114,33 @@ void Foam::circulationPressureFvPatchScalarField::updateCoeffs()
     const fvMesh& mesh = patch().boundaryMesh().mesh();
 
     circulationCoupler& coupler =
-        circulationCoupler::lookupOrCreate(mesh, propertiesName_);
+        circulationCoupler::lookupOrCreate(mesh, propertiesName_, phiName_);
 
     // Sample the fluxes and, on a new exchange, advance the network. Repeated
     // evaluations within one exchange reuse the result.
     coupler.sampleAndAdvance(mesh);
 
-    // The network works in Pa; the incompressible solvers expect p/rho
+    // The network works in Pa: divide by rho only for a kinematic p
+    const dimensionSet& pDims = internalField().dimensions();
+    scalar pScale = 1;
+
+    if (pDims == dimPressure/dimDensity)
+    {
+        pScale = 1/coupler.rho();
+    }
+    else if (pDims != dimPressure)
+    {
+        FatalErrorInFunction
+            << "The field " << internalField().name() << " on patch "
+            << patch().name() << " has dimensions " << pDims
+            << ", but a pressure " << dimPressure
+            << " or a kinematic pressure " << dimPressure/dimDensity
+            << " is required" << exit(FatalError);
+    }
+
     operator==
     (
-        coupler.patchPressure(coupler.portOfPatch(patch().index()))
-       /coupler.rho()
+        pScale*coupler.patchPressure(coupler.portOfPatch(patch().index()))
     );
 
     fixedValueFvPatchScalarField::updateCoeffs();
@@ -128,11 +149,12 @@ void Foam::circulationPressureFvPatchScalarField::updateCoeffs()
 
 void Foam::circulationPressureFvPatchScalarField::write(Ostream& os) const
 {
-    fixedValueFvPatchScalarField::write(os);
+    fvPatchField<scalar>::write(os);
     os.writeEntryIfDifferent<word>
     (
         "network", "circulationProperties", propertiesName_
     );
+    os.writeEntryIfDifferent<word>("phi", "phi", phiName_);
     fvPatchField<scalar>::writeValueEntry(os);
 }
 

@@ -222,4 +222,56 @@ Foam::scalar Foam::circulationWaveform::value(const scalar t) const
     return 0;
 }
 
+
+Foam::scalar Foam::circulationWaveform::derivative(const scalar t) const
+{
+    switch (kind_)
+    {
+        case kind::constant:
+            return 0;
+
+        case kind::sine:
+        {
+            const scalar w = constant::mathematical::twoPi/period_;
+            return amplitude_*w*Foam::cos(w*t + phase_);
+        }
+
+        case kind::halfSine:
+        {
+            const scalar tc = t - period_*std::floor(t/period_);
+            const scalar w = constant::mathematical::pi/systolicDuration_;
+            return tc < systolicDuration_ ? amplitude_*w*Foam::cos(w*tc) : 0;
+        }
+
+        case kind::table:
+        {
+            scalar tq = t;
+            const scalar t0 = tTable_.first();
+            const scalar t1 = tTable_.last();
+
+            if (periodic_)
+            {
+                const scalar span = t1 - t0;
+                tq = t0 + (t - t0) - span*std::floor((t - t0)/span);
+            }
+
+            if (tq < t0 || tq >= t1)
+            {
+                return 0;
+            }
+
+            label lo = 0, hi = tTable_.size() - 1;
+            while (hi - lo > 1)
+            {
+                const label mid = (lo + hi)/2;
+                (tTable_[mid] <= tq ? lo : hi) = mid;
+            }
+
+            return (vTable_[hi] - vTable_[lo])/(tTable_[hi] - tTable_[lo]);
+        }
+    }
+
+    return 0;
+}
+
 // ************************************************************************* //

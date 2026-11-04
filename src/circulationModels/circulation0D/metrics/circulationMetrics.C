@@ -28,7 +28,6 @@ Author
 #include "OSspecific.H"
 
 #include <cmath>
-#include <iomanip>
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -121,8 +120,8 @@ Foam::circulationMetrics::circulationMetrics
     {
         mkDir(dir_);
     }
-    out_.open(dir_/"metrics.dat");
-    out_ << std::setprecision(10);
+    out_.reset(new OFstream(dir_/"metrics.dat"));
+    out_().precision(10);
 }
 
 
@@ -205,11 +204,12 @@ void Foam::circulationMetrics::finishCycle()
             put(n + "Pmin", pressureLabel_, minOf(P));
 
             // Pressure-volume loop of this cycle
-            std::ofstream pv(dir_/(it.name + ".pvLoop.dat"));
-            pv << std::setprecision(10) << "# cycle " << cycle_ << ": t "
-               << t_.first() << " .. " << t_.last()
-               << "\n# V P\n# " << volumeLabel_ << ' ' << pressureLabel_
-               << '\n';
+            OFstream pv(dir_/(it.name + ".pvLoop.dat"));
+            pv.precision(10);
+            pv  << "# cycle " << cycle_ << ": t "
+                << t_.first() << " .. " << t_.last()
+                << "\n# V P\n# " << volumeLabel_.c_str() << ' '
+                << pressureLabel_.c_str() << '\n';
             for (label i = 0; i < t_.size(); ++i)
             {
                 pv << V[i] << ' ' << P[i] << '\n';
@@ -240,28 +240,28 @@ void Foam::circulationMetrics::finishCycle()
 
     if (!headerWritten_)
     {
-        out_ << "# per-cycle metrics, units of the case; "
-                "cycle k is [k T, (k+1) T]\n# cycle tEnd";
+        out_() << "# per-cycle metrics, units of the case; "
+                  "cycle k is [k T, (k+1) T]\n# cycle tEnd";
         for (const auto& n : names)
         {
-            out_ << ' ' << n;
+            out_() << ' ' << n.c_str();
         }
-        out_ << "\n# - s";
+        out_() << "\n# - s";
         for (const auto& u : units)
         {
-            out_ << ' ' << (u.empty() ? "-" : u);
+            out_() << ' ' << (u.empty() ? "-" : u.c_str());
         }
-        out_ << '\n';
+        out_() << '\n';
         headerWritten_ = true;
     }
 
-    out_ << cycle_ << ' ' << t_.last();
+    out_() << cycle_ << ' ' << t_.last();
     for (const scalar v : vals)
     {
-        out_ << ' ' << v;
+        out_() << ' ' << v;
     }
-    out_ << '\n';
-    out_.flush();
+    out_() << '\n';
+    out_().flush();
 }
 
 
@@ -277,22 +277,44 @@ void Foam::circulationMetrics::add(const scalar t, const scalarField& values)
         startCycle(k);
         cycleStartedOnBoundary_ = std::abs(t - k*period_) <= tol;
     }
-    else if (k > cycle_)
+
+    // Each boundary crossed since the last sample closes its cycle with a
+    // sample on the boundary, which also opens the next cycle: the sample
+    // itself if it is on the boundary, otherwise one interpolated linearly
+    // between the last sample and this one
+    while (k > cycle_)
     {
-        // The cycle ends with the sample on its closing boundary, which also
-        // opens the next cycle
-        if (std::abs(t - (cycle_ + 1)*period_) <= tol)
+        const scalar tb = (cycle_ + 1)*period_;
+        const bool onBoundary = std::abs(t - tb) <= tol;
+
+        const scalar t0 = t_.last();
+        const scalar w = onBoundary ? 1 : (tb - t0)/(t - t0);
+        scalarField vb(monitored_.size());
+        forAll(monitored_, i)
         {
-            t_.append(t);
-            forAll(monitored_, i)
-            {
-                v_[i].append(values[monitored_[i]]);
-            }
+            const scalar v0 = v_[i].last();
+            vb[i] = v0 + w*(values[monitored_[i]] - v0);
+        }
+
+        t_.append(onBoundary ? t : tb);
+        forAll(monitored_, i)
+        {
+            v_[i].append(vb[i]);
         }
 
         finishCycle();
-        startCycle(k);
-        cycleStartedOnBoundary_ = std::abs(t - k*period_) <= tol;
+        startCycle(cycle_ + 1);
+        cycleStartedOnBoundary_ = true;
+
+        // A sample on the boundary is added below, as the first of the cycle
+        if (!onBoundary)
+        {
+            t_.append(tb);
+            forAll(monitored_, i)
+            {
+                v_[i].append(vb[i]);
+            }
+        }
     }
 
     t_.append(t);

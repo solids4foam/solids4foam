@@ -59,6 +59,11 @@ public:
 
     virtual role kind() const { return role::fixedFlow; }
     virtual scalar fixedFlow(const scalar t) const { return wave_.value(t); }
+
+    virtual scalar fixedFlowRate(const scalar t) const
+    {
+        return wave_.derivative(t);
+    }
 };
 
 } // End namespace Foam

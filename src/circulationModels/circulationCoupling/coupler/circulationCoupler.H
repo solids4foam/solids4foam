@@ -30,7 +30,7 @@ Description
         {
             scheme      implicit;   // explicit | implicit
             order       2;          // 1..4: degree of the forcing + 1
-            rho         1060;       // kg/m3: the CFD solves p/rho
+            rho         1060;       // kg/m3: converts Pa to a kinematic p
             maxPressure 1e8;        // optional [Pa]: stop if a port pressure
                                     // exceeds this
         }
@@ -69,16 +69,35 @@ Description
     Ports are bound to patches by the "patch" entry of the port in the network
     description (see externalPort). Sign convention: Q is positive in the
     natural direction of the port (outlet: leaving the CFD domain, so the sum
-    of phi over the patch; inlet: entering it, minus that sum).
+    of phi over the patch; inlet: entering it, minus that sum). In parallel the
+    flows are summed over all ranks, the network is integrated on the master,
+    and its state and port pressures are broadcast.
 
     Results: postProcessing/circulationCoupling/<start>/coupling.dat, one row
-    per accepted time step.
+    per accepted time step, written as soon as the step is known to be
+    complete: with explicit coupling straight after its exchange; with implicit
+    coupling, whose state can change at every outer corrector, when the next
+    step starts, at every write time and at the end of the run, so that the
+    file always holds every step up to the last time written. With implicit
+    coupling, the relative change of the port flows |Q^k - Q^(k-1)|/|Q^k| is
+    logged at every exchange, and the last one of each step is the "residual"
+    column.
 
-    Restart: the state of the network and the flow history are written, with
-    the fields, to <time>/circulationState-<properties name> at every output
-    time and read back when the case starts from a time that has one, so the
-    circuit and the CFD resume together and the run continues exactly as it
-    would have. (A "seed" is then ignored.)
+    Restart: the state of the network, by component name, and the flow history
+    are written, with the fields, to
+    <time>/uniform/circulationState-<properties name> at every output time and
+    read back when the case starts from a time that has one, so the circuit
+    and the CFD resume together and the run continues exactly as it would
+    have. (A "seed" is then ignored.) The master writes it, and decomposePar
+    and reconstructPar carry it with the uniform directory. A case that starts
+    after an earlier time without one is an error.
+
+    circulationFoam writes the same file without the flow history, so a 0D
+    spin-up can start a coupled run: copy it to <start time>/uniform/ of the
+    CFD case. Components are matched by name, and the state of a component
+    that the coupled circuit does not have (one that the CFD domain replaces)
+    is ignored. The state is taken at the start time, so spin up whole cycles
+    of a periodic circuit. The flow history starts as in a fresh run.
 
 Author
     David Kelly, UCD.
@@ -97,8 +116,9 @@ SourceFiles
 #include "autoPtr.H"
 #include "OFstream.H"
 #include "circulationMetrics.H"
-#include "localIOdictionary.H"
+#include "IOdictionary.H"
 #include "IOstreamOption.H"
+#include "surfaceFieldsFwd.H"
 
 namespace Foam
 {
@@ -107,10 +127,11 @@ class fvMesh;
 class Time;
 
 //- The restart checkpoint: a dictionary kept up to date at every exchange and
-//  written automatically, at full precision, with every output time
+//  written automatically by the master, at full precision, with every output
+//  time, to <time>/uniform/ so that decomposePar and reconstructPar carry it
 class circulationCheckpoint
 :
-    public localIOdictionary
+    public IOdictionary
 {
 public:
 
@@ -144,6 +165,9 @@ private:
     // Private Data
 
         const fvMesh& mesh_;
+
+        //- Name of the volumetric flux sampled at the coupled patches
+        word phiName_;
 
         scheme scheme_;
         label order_;
@@ -184,7 +208,14 @@ private:
         label stepUpdateCount_;
         label totalUpdateCount_;
 
-        //- Restart checkpoint, <time>/circulationState-<name>
+        //- The state accepted last has not been logged yet
+        bool rowPending_;
+
+        //- Implicit coupling: |Q^k - Q^(k-1)|/|Q^k| over the ports at the
+        //  last exchange, Q^0 being the flow at the start of the step
+        scalar interfaceResidual_;
+
+        //- Restart checkpoint, <time>/uniform/circulationState-<name>
         autoPtr<circulationCheckpoint> checkpoint_;
 
         autoPtr<OFstream> log_;
@@ -193,11 +224,21 @@ private:
 
     // Private Member Functions
 
+        //- Flow of a port from the flux, positive in its natural direction
+        scalar portFlow
+        (
+            const surfaceScalarField& phi,
+            const portData& p
+        ) const;
+
         void beginTimeIndex(const label timeIndex);
 
         void advance(const Time& runTime);
 
         void writeRow();
+
+        //- Log the state accepted last, if it has not been
+        void flushRow();
 
         //- Store what a restart from the end of the step just accepted needs
         void updateCheckpoint();
@@ -214,20 +255,23 @@ public:
     TypeName("circulationCoupler");
 
     //- Construct reading the circulation description "propertiesName"
-    //  from constant/
+    //  from constant/, sampling the flux "phiName"
     circulationCoupler
     (
         const word& propertiesName,
-        const fvMesh& mesh
+        const fvMesh& mesh,
+        const word& phiName = "phi"
     );
 
     virtual ~circulationCoupler();
 
-    //- The coupler registered with the mesh, constructed on first use
+    //- The coupler registered with the mesh, constructed on first use.
+    //  Every patch of one coupler must name the same flux.
     static circulationCoupler& lookupOrCreate
     (
         const fvMesh& mesh,
-        const word& propertiesName = "circulationProperties"
+        const word& propertiesName = "circulationProperties",
+        const word& phiName = "phi"
     );
 
     //- Name of the port coupled to a patch; fatal if there is none
@@ -242,6 +286,14 @@ public:
     scalar rho() const { return rho_; }
 
     const circulationNetwork& network() const { return network_(); }
+
+    //- Called at every write time, when the step is complete: logs its
+    //  row. Writes no file.
+    virtual bool writeObject
+    (
+        IOstreamOption streamOpt,
+        const bool writeOnProc
+    ) const;
 
     virtual bool writeData(Ostream&) const { return true; }
 };

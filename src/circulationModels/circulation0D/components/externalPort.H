@@ -143,7 +143,13 @@ public:
     void setForcing(const scalar t0, const scalar t1, const forcingCoeffs& c);
 
     virtual scalar portFlow(const scalar t) const;
+
+    //- Time derivative of portFlow, from the forcing polynomial [m3/s2]. At
+    //  and beyond the ends of [t0, t1] it is the one-sided derivative there.
+    scalar portFlowRate(const scalar t) const;
+
     virtual scalar injectedFlow(const scalar t) const;
+    virtual scalar injectedFlowRate(const scalar t) const;
     virtual scalar patchPressure(const scalar Pnode, const scalar t) const;
 };
 
