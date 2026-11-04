@@ -193,6 +193,7 @@ REGRESSION_TESTS=(
     "circulationModels/healthyHuman"
     # Not tutorials: test applications' cases, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
+    "../applications/test/immersedSurfaceTraction/case"
     "../applications/test/circulationNetworkChecks/case"
 )
 
