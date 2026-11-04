@@ -689,10 +689,15 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
         if (solvePressure())
         {
-            // Map the p field to the SNES solution vector
+            // Map the p field to the SNES solution vector, as the scaled
+            // unknown pHat = p/pressureUnknownScale_
+            const scalarField pHat
+            (
+                Foam::primitiveField(p())/pressureUnknownScale_
+            );
             foamPetscSnesHelper::InsertFieldComponents<scalar>
             (
-                p(),
+                pHat,
                 foamPetscSnesHelper::solution(),
                 blockSize_ -1 // Location of first component
             );
@@ -728,6 +733,7 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
             pI,
             blockSize_ - 1 // Location of p component
         );
+        pI *= pressureUnknownScale_;
 
         p().correctBoundaryConditions();
 
@@ -1033,6 +1039,31 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
     rImpK_(1.0/impK_),
     rKappaPtr_(),
     dpdtPtr_(),
+    scaleMixedPetScFields_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "scaleMixedPetScFields", false
+        )
+    ),
+    pressureUnknownScaleType_
+    (
+        solidModelDict().lookupOrDefault<word>("pressureUnknownScale", "twoMu")
+    ),
+    pressureUnknownScale_(1.0),
+    pressureScaleFactor_
+    (
+        solidModelDict().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
+    ),
+    pressureScaleByTwoMu_
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "pressureScaleByTwoMu", scaleMixedPetScFields_
+        )
+    ),
+    twoMuRef_(1.0),
+    pressureEqnScale_(1.0),
     predictor_(solidModelDict().lookupOrDefault<Switch>("predictor", false)),
     blockSize_
     (
@@ -1102,6 +1133,71 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
                 fvc::ddt(p())
             )
         );
+
+        // Scaling of the mixed system, after Philip Cardiff's a4a9c07f and
+        // 7b01886d. The pressure unknown is stored in the PETSc solution
+        // vector as pHat = p/pressureUnknownScale_, and the pressure equation
+        // rows are multiplied by pressureEqnScale_, so that both are of the
+        // order of the displacement unknowns and momentum equations. The
+        // physical scale is a volume-averaged 2*mu; impK_ is the deviatoric
+        // implicit stiffness (4/3)*mu here, so 2*mu = 1.5*impK_
+        {
+            const scalarField& impKI = impK_;
+            const scalarField& V = mesh().V();
+            scalar twoMuV = 0;
+            scalar Vtot = 0;
+            forAll(impKI, cellI)
+            {
+                twoMuV += 1.5*impKI[cellI]*V[cellI];
+                Vtot += V[cellI];
+            }
+            reduce(twoMuV, sumOp<scalar>());
+            reduce(Vtot, sumOp<scalar>());
+            twoMuRef_ = twoMuV/max(Vtot, VSMALL);
+        }
+
+        pressureEqnScale_ =
+            pressureScaleFactor_*(pressureScaleByTwoMu_ ? twoMuRef_ : 1.0);
+
+        if (scaleMixedPetScFields_)
+        {
+            if
+            (
+                pressureUnknownScaleType_ == "twoMu"
+             || pressureUnknownScaleType_ == "2mu"
+            )
+            {
+                pressureUnknownScale_ = twoMuRef_;
+            }
+            else if (pressureUnknownScaleType_ == "user")
+            {
+                pressureUnknownScale_ =
+                    readScalar
+                    (
+                        solidModelDict().lookup("pressureUnknownScaleValue")
+                    );
+            }
+            else if (pressureUnknownScaleType_ != "none")
+            {
+                FatalErrorInFunction
+                    << "Unknown pressureUnknownScale "
+                    << pressureUnknownScaleType_ << nl
+                    << "Valid options are twoMu, user and none"
+                    << abort(FatalError);
+            }
+        }
+
+        if (pressureUnknownScale_ <= VSMALL || pressureEqnScale_ <= VSMALL)
+        {
+            FatalErrorInFunction
+                << "The pressure unknown and equation scales must be "
+                << "positive: found " << pressureUnknownScale_ << " and "
+                << pressureEqnScale_ << abort(FatalError);
+        }
+
+        Info<< "Mixed system scaling: pressure unknown scale = "
+            << pressureUnknownScale_ << ", pressure equation scale = "
+            << pressureEqnScale_ << " (2*mu = " << twoMuRef_ << ")" << endl;
     }
 
     if (predictor_)
@@ -1405,6 +1501,9 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale_
+        pI *= pressureUnknownScale_;
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1447,8 +1546,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
           - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
 
-        // Make residual extensive
-        pressureResidual *= mesh.V();
+        // Make residual extensive, and scale the pressure equation rows
+        pressureResidual *= pressureEqnScale_*mesh.V();
 
         // Copy the pressureResidual into the f field as the final equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -1606,6 +1705,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale_
+        pI *= pressureUnknownScale_;
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1634,6 +1736,15 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
               + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
+            // The pressure rows are scaled by pressureEqnScale_ and the
+            // pressure columns by pressureUnknownScale_ (d/dpHat)
+            approxPressureJ *= dimensionedScalar
+            (
+                "pressureScale",
+                dimless,
+                pressureEqnScale_*pressureUnknownScale_
+            );
+
             // Insert the pressure equation
             foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
             (
@@ -1646,9 +1757,11 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 p,
                 D,
                 jac,
-                blockSize_ - 1,            // row offset
-                0,                         // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar components of D
+                blockSize_ - 1,             // row offset
+                0,                          // column offset
+                solidModel::twoD() ? 2 : 3, // number of scalar components of D
+                false,                      // flipSign
+                pressureEqnScale_           // pressure equation row scale
             );
 
             // Insert p-in-D term
@@ -1657,9 +1770,11 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             (
                 p,
                 jac,
-                0,                         // row offset
-                blockSize_ - 1,            // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+                0,                          // row offset
+                blockSize_ - 1,             // column offset
+                solidModel::twoD() ? 2 : 3, // number of scalar equations
+                true,                       // flipSign
+                pressureUnknownScale_       // d/dpHat of the pressure columns
             );
         }
     }

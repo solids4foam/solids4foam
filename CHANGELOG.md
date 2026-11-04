@@ -8,6 +8,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Optional spectral normalisation of the stabilisation models (`normalise`,
+  `referenceNyquistDirections`), and the `stabilisationFourierCheck`
+  utility that verifies it, by Aaron Mullen-Hales.
+- Optional scaling of the mixed displacement-pressure system of
+  `nonLinearGeometryTotalLagrangianTotalDisplacement` (`scaleMixedPetScFields`,
+  `pressureUnknownScale`, `pressureScaleByTwoMu`, `pressureScaleFactor`),
+  ported from Philip Cardiff's earlier work on the mixed solver. Off by
+  default.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the

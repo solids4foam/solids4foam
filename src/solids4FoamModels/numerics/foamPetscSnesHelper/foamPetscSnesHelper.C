@@ -1002,7 +1002,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const bool flipSign,
+    const scalar scale
 ) const
 {
     // Get reference to least square vectors
@@ -1017,7 +1018,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 
     const scalarField& VI = mesh.V();
 
-    const scalar sign = flipSign ? -1.0 : 1.0;
+    const scalar sign = (flipSign ? -1.0 : 1.0)*scale;
 
     // Get the blockSize
     label blockSize;
@@ -1599,7 +1600,8 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const bool flipSign,
+    const scalar scale
 ) const
 {
     // Take references for efficiency and brevity
@@ -1663,6 +1665,15 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
                 // pcoupleLower -= pcl;
                 // pcoupleUpper -= pcu;
             }
+        }
+
+        // Scale the coefficients, e.g. by the scale of a scaled pressure
+        // equation row
+        if (scale != 1.0)
+        {
+            divUCoeffs.diag() *= scale;
+            divUCoeffs.upper() *= scale;
+            divUCoeffs.lower() *= scale;
         }
 
         // Insert component coeffs
