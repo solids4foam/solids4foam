@@ -15,6 +15,8 @@ The tutorials are organised into the following subdirectories:
 - `fluids/` – fluid mechanics cases
 - `fluidSolidInteraction/` – monolithic FSI cases
 - `thermoFluidSolidInteraction/` – thermo-mechanical and coupled problems
+- `circulationModels/` – lumped-parameter (0D) circulation networks, solved
+  on their own or coupled to a CFD domain (OpenFOAM.com only)
 
 Partitioned FSI cases coupled through [preCICE](https://precice.org) are
 maintained in the [preCICE tutorials](https://precice.org/tutorials.html)

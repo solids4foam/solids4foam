@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        // Q(t) = A sin(w t) with A = 1 m^3/s and w = 2 pi, prescribed directly
+        // as a volumetric flow rate.  flowRateInletVelocity divides by the
+        // actual discrete patch area, so the flux is exact regardless of how
+        // the O-grid facets the circular boundary - no calibrated velocity
+        // scale is required.
+        type                flowRateInletVelocity;
+        volumetricFlowRate
+        {
+            type        sine;
+            frequency   1;
+            amplitude   1;
+            scale       1;
+            level       0;
+        }
+        value           uniform (0 0 0);
+    }
+
+    outlet
+    {
+        type            pressureInletOutletVelocity;
+        value           uniform (0 0 0);
+    }
+
+    wall
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+}
+
+// ************************************************************************* //
