@@ -34,6 +34,11 @@ License
 #include "tetQuadrature.H"
 #include "lineQuadrature.H"
 #include "processorFvPatch.H"
+#ifdef FOAMEXTEND
+    #include "Pstream.H"
+#else
+    #include "PstreamBuffers.H"
+#endif
 #include "cellModeller.H"
 #include "debug.H"
 
@@ -286,6 +291,18 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
     CompactListList<point>& faceQuadPoints = autoPtrRef(faceQuadPointsPtr_);
     CompactListList<scalar>& faceQuadWeights = autoPtrRef(faceQuadWeightsPtr_);
 
+    // The lower processor rank supplies the ordering used on both sides. The
+    // data are packed per neighbouring processor and exchanged collectively
+    // with non-blocking communication: a one-sided buffered send is only
+    // progressed by the sender's next MPI call, so a blocking receive on the
+    // neighbour would otherwise wait until the sender has finished whatever
+    // it computes next
+    const label nProcs = Pstream::nProcs();
+
+    labelList nSendFaces(nProcs, 0);
+    labelList nSendValues(nProcs, 0);
+    labelList nRecvFaces(nProcs, 0);
+
     forAll(mesh_.boundary(), patchI)
     {
         const fvPatch& patch = mesh_.boundary()[patchI];
@@ -295,80 +312,194 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
             continue;
         }
 
-        const processorFvPatch& procPatch =
-            refCast<const processorFvPatch>(patch);
+        const label nbrProc =
+            refCast<const processorFvPatch>(patch).neighbProcNo();
+
+        if (Pstream::myProcNo() > nbrProc)
+        {
+            nRecvFaces[nbrProc] += patch.size();
+            continue;
+        }
+
         const label patchStart = patch.patch().start();
 
-        labelField localSizes(patch.size(), 0);
-        label nLocalValues = 0;
+        nSendFaces[nbrProc] += patch.size();
+
+        forAll(patch, patchFaceI)
+        {
+            nSendValues[nbrProc] +=
+                faceQuadPoints[patchStart + patchFaceI].size();
+        }
+    }
+
+    List<labelList> sendSizes(nProcs);
+    List<pointField> sendPoints(nProcs);
+    List<scalarField> sendWeights(nProcs);
+
+    forAll(sendSizes, procI)
+    {
+        sendSizes[procI].setSize(nSendFaces[procI]);
+        sendPoints[procI].setSize(nSendValues[procI]);
+        sendWeights[procI].setSize(nSendValues[procI]);
+    }
+
+    labelList sendFaceI(nProcs, 0);
+    labelList sendValueI(nProcs, 0);
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        const fvPatch& patch = mesh_.boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const label nbrProc =
+            refCast<const processorFvPatch>(patch).neighbProcNo();
+
+        if (Pstream::myProcNo() > nbrProc)
+        {
+            continue;
+        }
+
+        const label patchStart = patch.patch().start();
 
         forAll(patch, patchFaceI)
         {
             const label faceI = patchStart + patchFaceI;
-            localSizes[patchFaceI] = faceQuadPoints[faceI].size();
-            nLocalValues += localSizes[patchFaceI];
+
+            sendSizes[nbrProc][sendFaceI[nbrProc]++] =
+                faceQuadPoints[faceI].size();
+
+            forAll(faceQuadPoints[faceI], qpI)
+            {
+                sendPoints[nbrProc][sendValueI[nbrProc]] =
+                    faceQuadPoints[faceI][qpI];
+                sendWeights[nbrProc][sendValueI[nbrProc]] =
+                    faceQuadWeights[faceI][qpI];
+                ++sendValueI[nbrProc];
+            }
+        }
+    }
+
+    List<labelList> recvSizes(nProcs);
+    List<pointField> recvPoints(nProcs);
+    List<scalarField> recvWeights(nProcs);
+
+#ifdef FOAMEXTEND
+    labelListList sizes;
+    Pstream::exchange<labelList, label>(sendSizes, recvSizes, sizes);
+    Pstream::exchange<pointField, point>(sendPoints, recvPoints, sizes);
+    Pstream::exchange<scalarField, scalar>(sendWeights, recvWeights, sizes);
+#else
+    PstreamBuffers pBufs(Pstream::commsTypes::nonBlocking);
+
+    forAll(sendSizes, procI)
+    {
+        if (nSendFaces[procI] > 0)
+        {
+            UOPstream os(procI, pBufs);
+            os << sendSizes[procI] << sendPoints[procI] << sendWeights[procI];
+        }
+    }
+
+    pBufs.finishedSends();
+
+    forAll(recvSizes, procI)
+    {
+        if (nRecvFaces[procI] == 0)
+        {
+            continue;
         }
 
-        if (Pstream::myProcNo() < procPatch.neighbProcNo())
+#ifdef OPENFOAM_COM
+        if (!pBufs.recvDataCount(procI))
         {
-            pointField masterPoints(nLocalValues);
-            scalarField masterWeights(nLocalValues);
-            label valueI = 0;
-
-            forAll(patch, patchFaceI)
-            {
-                const label faceI = patchStart + patchFaceI;
-
-                forAll(faceQuadPoints[faceI], qpI)
-                {
-                    masterPoints[valueI] = faceQuadPoints[faceI][qpI];
-                    masterWeights[valueI] = faceQuadWeights[faceI][qpI];
-                    ++valueI;
-                }
-            }
-
-            procPatch.send(Pstream::commsTypes::blocking, localSizes);
-            procPatch.send(Pstream::commsTypes::blocking, masterPoints);
-            procPatch.send(Pstream::commsTypes::blocking, masterWeights);
+            FatalErrorInFunction
+                << "Did not receive face quadrature data from processor "
+                << procI << abort(FatalError);
         }
-        else
+#endif
+
+        UIPstream is(procI, pBufs);
+        is >> recvSizes[procI] >> recvPoints[procI] >> recvWeights[procI];
+    }
+#endif
+
+    forAll(recvSizes, procI)
+    {
+        if (recvSizes[procI].size() != nRecvFaces[procI])
         {
-            labelField masterSizes(patch.size(), 0);
-            procPatch.receive(Pstream::commsTypes::blocking, masterSizes);
+            FatalErrorInFunction
+                << "Expected quadrature sizes for " << nRecvFaces[procI]
+                << " faces from processor " << procI << " but received "
+                << recvSizes[procI].size()
+                << abort(FatalError);
+        }
 
-            label nMasterValues = 0;
-            forAll(masterSizes, patchFaceI)
+        const label nRecvValues = sum(recvSizes[procI]);
+
+        if
+        (
+            recvPoints[procI].size() != nRecvValues
+         || recvWeights[procI].size() != nRecvValues
+        )
+        {
+            FatalErrorInFunction
+                << "Expected " << nRecvValues
+                << " quadrature values from processor " << procI
+                << " but received " << recvPoints[procI].size()
+                << " points and " << recvWeights[procI].size() << " weights"
+                << abort(FatalError);
+        }
+    }
+
+    labelList recvFaceI(nProcs, 0);
+    labelList recvValueI(nProcs, 0);
+
+    forAll(mesh_.boundary(), patchI)
+    {
+        const fvPatch& patch = mesh_.boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const label nbrProc =
+            refCast<const processorFvPatch>(patch).neighbProcNo();
+
+        if (Pstream::myProcNo() < nbrProc)
+        {
+            continue;
+        }
+
+        const label patchStart = patch.patch().start();
+
+        forAll(patch, patchFaceI)
+        {
+            const label faceI = patchStart + patchFaceI;
+            const label nMasterPoints =
+                recvSizes[nbrProc][recvFaceI[nbrProc]++];
+
+            if (faceQuadPoints[faceI].size() != nMasterPoints)
             {
-                if (localSizes[patchFaceI] != masterSizes[patchFaceI])
-                {
-                    FatalErrorInFunction
-                        << "Processor patch " << patch.name() << " face "
-                        << patchFaceI << " has " << localSizes[patchFaceI]
-                        << " local quadrature points but "
-                        << masterSizes[patchFaceI]
-                        << " master quadrature points"
-                        << abort(FatalError);
-                }
-
-                nMasterValues += masterSizes[patchFaceI];
+                FatalErrorInFunction
+                    << "Processor patch " << patch.name() << " face "
+                    << patchFaceI << " has " << faceQuadPoints[faceI].size()
+                    << " local quadrature points but " << nMasterPoints
+                    << " master quadrature points"
+                    << abort(FatalError);
             }
 
-            pointField masterPoints(nMasterValues);
-            scalarField masterWeights(nMasterValues);
-            procPatch.receive(Pstream::commsTypes::blocking, masterPoints);
-            procPatch.receive(Pstream::commsTypes::blocking, masterWeights);
-
-            label valueI = 0;
-            forAll(patch, patchFaceI)
+            forAll(faceQuadPoints[faceI], qpI)
             {
-                const label faceI = patchStart + patchFaceI;
-
-                forAll(faceQuadPoints[faceI], qpI)
-                {
-                    faceQuadPoints[faceI][qpI] = masterPoints[valueI];
-                    faceQuadWeights[faceI][qpI] = masterWeights[valueI];
-                    ++valueI;
-                }
+                faceQuadPoints[faceI][qpI] =
+                    recvPoints[nbrProc][recvValueI[nbrProc]];
+                faceQuadWeights[faceI][qpI] =
+                    recvWeights[nbrProc][recvValueI[nbrProc]];
+                ++recvValueI[nbrProc];
             }
         }
     }
