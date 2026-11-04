@@ -13,8 +13,8 @@ fi
 
 # ============================================================
 # beamDynamicCantilever regression test
-# Checks the free-end displacement at the end of the run against beamFoam,
-# and that the solver ran with the Newmark scheme to the end time.
+# Checks the free-end displacement history against ABAQUS, and the free-end
+# displacement at the end of the run against beamFoam.
 # ============================================================
 
 # The reference values are the standalone beamFoam answer for this case
@@ -28,6 +28,13 @@ REF_WY=1.23644
 REF_WZ=-2.06362
 REF_MAG=2.69241
 REF_REL_TOL=1e-5
+
+# The ABAQUS free-end displacement magnitude history in
+# cantilever_abaqus_50percent.txt is an independent answer. The beam stays
+# within 1.0% of its peak magnitude over the run, so the tolerance on the
+# largest difference is 2% of that peak
+ABAQUS_FILE="cantilever_abaqus_50percent.txt"
+ABAQUS_REL_TOL=0.02
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -113,6 +120,33 @@ check_value "w_x(${REF_TIME})" "${wx}" "${REF_WX}" "${REF_MAG}" "${REF_REL_TOL}"
 check_value "w_y(${REF_TIME})" "${wy}" "${REF_WY}" "${REF_MAG}" "${REF_REL_TOL}"
 check_value "w_z(${REF_TIME})" "${wz}" "${REF_WZ}" "${REF_MAG}" "${REF_REL_TOL}"
 check_value "|w|(${REF_TIME})" "${wmag}" "${REF_MAG}" "${REF_MAG}" "${REF_REL_TOL}"
+
+# Largest difference from the ABAQUS history at the times both write, and the
+# ABAQUS peak magnitude: prints "count maxDiff timeOfMaxDiff peak"
+IFS=" " read -r nAbaqus abaqusDiff abaqusTime abaqusPeak <<< "$(
+    awk '
+        FNR == 1 { file++ }
+        /^#/ || NF < 2 { next }
+        file == 1 && FNR > 1 { w[sprintf("%.6f", $1)] = $5; next }
+        file == 2 {
+            if ($2 > peak) peak = $2
+            k = sprintf("%.6f", $1)
+            if (!(k in w)) next
+            d = w[k] - $2; if (d < 0) d = -d
+            if (d > maxDiff) { maxDiff = d; tMax = $1 }
+            n++
+        }
+        END { print n + 0, maxDiff + 0, tMax + 0, peak + 0 }
+    ' "${history_file}" "${CASE_DIR}/${ABAQUS_FILE}"
+)"
+
+if (( nAbaqus < 100 )); then
+    echo "FAIL: only ${nAbaqus} times in common with ${ABAQUS_FILE}"
+    failures=$((failures + 1))
+else
+    check_value "max |w| difference from ABAQUS (t = ${abaqusTime})" \
+        "${abaqusDiff}" 0 "${abaqusPeak}" "${ABAQUS_REL_TOL}"
+fi
 
 if [ "$CHECK_ONLY" = false ]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true

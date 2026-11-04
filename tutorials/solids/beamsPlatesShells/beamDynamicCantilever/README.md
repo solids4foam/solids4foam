@@ -82,8 +82,9 @@ Figure 1: Displacement magnitude of the loaded end
 The histories are written to `postProcessing/0`. Reference displacement
 histories from solids4foam (3-D continuum) and ABAQUS are supplied in
 `solidPointDisplacement_pointDisp.dat` and `cantilever_abaqus_50percent.txt`.
-The results are identical to those of standalone beamFoam, and
-`regressionTest.sh` checks the final free-end displacement.
+The results are identical to those of standalone beamFoam. `regressionTest.sh`
+checks the free-end displacement magnitude history against ABAQUS, to 2% of its
+peak, and the final free-end displacement against beamFoam.
 
 To view the deformed beam in ParaView, apply **Warp By Vector** with `pointW`.
 
