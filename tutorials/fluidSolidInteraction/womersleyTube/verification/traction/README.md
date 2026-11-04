@@ -27,7 +27,7 @@ solution. It also decomposes the tutorial's attenuation error.
 
 ```bash
 ./AllverifyTraction --quick            # one m1/50 run + consistency checks (~1 min)
-./AllverifyTraction --cores 6          # full study (~2-3 CPU-hours)
+./AllverifyTraction --cores 6          # full study (~4 CPU-hours, about 1.8 h on 6 cores)
 ./AllverifyTraction --analysis-only    # re-analyse existing runs in work/
 ./AllverifyTraction --force ...        # discard stale study copies (and their runs)
 ```
@@ -73,11 +73,12 @@ partial analysis is made. `--skip-build-check` omits only the build
 comparison, for analysing stored runs where the solver environment is not
 available.
 
-The full study has not yet been run end-to-end as the single command
-`./AllverifyTraction --cores 6`. The results below were obtained from the same
-components (`prepare_study.py`, the tutorial's `Allverify`, `run_single.py`)
-run as separate commands, and re-analysed with `--analysis-only`; `--quick` was
-run end-to-end. The CPU-time estimate is the sum of those runs on one machine.
+The full study was run end-to-end as the single command
+`./AllverifyTraction --cores 6` (OpenFOAM v2512, PETSc 3.24, solids4foam
+`1576edcc4`): exit status 0, 14,300 CPU-seconds (3.97 CPU-hours), 1 h 47 min
+wall clock on 6 cores. A second `./AllverifyTraction --analysis-only` started
+no solver run. The tutorial files were those of this branch before the commit
+that updated this text.
 
 Outputs:
 
@@ -157,20 +158,14 @@ flagged.
 
 ## Results (OpenFOAM v2512, development 1576edcc4, Robin–Neumann, μ = 5 Pa s)
 
-**Status: pending regeneration.** The numbers in this section and in the
-attenuation budget below were produced by the analysis code of the first
-version of this diagnostic (projection on the deformed fluid face centres of
-the last sample, no check of the phase of the Richardson ratio). The run
-outputs they came from are not stored in the repository, so they have not been
-regenerated with the current scripts, and none has been replaced or invented
-here. Expected effect, not yet measured: the directly measured values change by
-about 1e-6 through the projection; the observed orders and every extrapolated
-value can change, because an order is now accepted only if p > 0.3 and |arg
-ratio| <= 30 deg (so the check on the shear order can turn from PASS to FAIL).
-To regenerate (needs the solver, about 2-3 CPU-hours), run the command below
-and take the numbers from `postProcessing/findings_summary.txt`,
-`traction_convergence.md`, `amplitude_series_m1.json` and
-`traction_checks.txt`:
+**Status.** The tables below were checked against the output of the end-to-end
+run described in Usage, which used the current analysis code (projection on the
+solid's undeformed positions with face-area weights; Richardson order accepted
+only if p > 0.3 and |arg ratio| <= 30 deg). Every number in the tables was
+reproduced to the digits given; the shear-order check passes (order 2.00,
+arg(ratio) -2.3 deg). The numbers are in `postProcessing/findings_summary.txt`,
+`traction_convergence.md`, `amplitude_series_m1.json` and `traction_checks.txt`;
+to reproduce them, run:
 
 ```bash
 ./AllverifyTraction --cores 6           # or --analysis-only if the runs are in work/
@@ -218,8 +213,7 @@ extrapolation.
 
 ## Attenuation error budget (m4, 200 steps/period: −1.961e-3)
 
-Pending regeneration, as for the results above (the fit and the Richardson
-parts depend on the current guards).
+Checked against the end-to-end run, as for the results above.
 
 <!-- markdownlint-disable MD013 -->
 | Part | Value | Basis |
@@ -272,5 +266,5 @@ at fixed 200 steps/period, but not time-step-independent.
   traction, not boundary `sigma`, for interface loads. No defect is implied.
 - Only one geometry, one solid model (linear geometry) and the Robin–Neumann
   coupling were studied in full. IQN-ILS was compared at m2/100 only.
-- The full driver has not been run end-to-end (see Usage); an independent
-  rerun of the full study is still required.
+- The full driver was run once end-to-end (see Usage), on one machine; an
+  independent rerun has not been made.
