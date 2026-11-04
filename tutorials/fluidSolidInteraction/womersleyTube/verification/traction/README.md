@@ -86,7 +86,13 @@ Outputs:
 
 1. takes the first temporal Fourier coefficient of each face value;
 2. projects it on the exact travelling wave over the central half of the tube,
-   `â = Σ a(x) e^{ikx} Δx / Σ Δx`;
+   `â = Σ a(x) e^{ikx} w / Σ w`, with the face areas `magSf` of the solid patch
+   as weights `w` and its undeformed face positions `x` (linear geometry: the
+   solid mesh does not move). Solid faces are matched one-to-one to fluid
+   faces on the full face-centre coordinates. The moving fluid mesh is not
+   used: it oscillates axially by ~7e-4 m, and its window-mean position carries
+   the static offset of the initial solid displacement (the fluid mesh moves by
+   D(t) − D(0)); `--fluid-mean-positions` uses it to quantify the effect;
 3. compares the result with the exact `p`, `2μ ∂u_r/∂r` and `σ_rx` at
    `r = R_i` from `../scripts/womersley_exact.py`.
 
