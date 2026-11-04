@@ -2,12 +2,17 @@
 # Opt-in interface-traction diagnostic for womersleyTube (see README.md).
 #
 #   ./AllverifyTraction [--cores N] [--quick] [--analysis-only] [--force]
+#                       [--skip-build-check]
 #
 # Runs, in copies under verification/traction/work (the tutorial is not
 # modified): the standard verification study with the interfaceTraction
 # function object included (mu5), the 4x mesh at 400 steps per period, three
 # amplitude variants and a 100x tighter coupling tolerance at m2/200, and
 # 4x amplitude on m1; then the analysis. --quick runs one m1/50 case only.
+# Before the analysis every required run is validated (stored settings, tutorial
+# files, solver build, completed log, diagnostic output), also with
+# --analysis-only; --skip-build-check omits the solver-build comparison (to
+# analyse stored runs without the solver environment).
 # Outputs: verification/traction/postProcessing.
 set -euo pipefail
 
@@ -24,6 +29,7 @@ OUT="$HERE/postProcessing"
 CORES=1
 QUICK=0
 ANALYSIS_ONLY=0
+SKIP_BUILD=()
 FORCE=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -31,6 +37,7 @@ while [[ $# -gt 0 ]]; do
         --quick) QUICK=1; shift ;;
         --analysis-only) ANALYSIS_ONLY=1; shift ;;
         --force) FORCE=(--force); shift ;;
+        --skip-build-check) SKIP_BUILD=(--skip-build-check); shift ;;
         *) echo "Unknown option $1" >&2; exit 2 ;;
     esac
 done
@@ -48,6 +55,7 @@ prepare() {   # name [prepare_study options]
 if [[ $QUICK == 1 ]]; then
     prepare quick
     [[ $ANALYSIS_ONLY == 1 ]] || python3 -I -u "$SCRIPTS/run_single.py" "$WORK/quick/womersleyTube" robin:1:50
+    python3 -I "$SCRIPTS/check_runs.py" "$WORK" ${SKIP_BUILD[@]+"${SKIP_BUILD[@]}"} quick:robin_m1_n50
     # the quick run covers 6 periods; analyse the last 2
     python3 -I "$SCRIPTS/womersley_interface_traction.py" "$WORK/quick/womersleyTube"
     mkdir -p "$OUT/quick"
@@ -89,23 +97,18 @@ if [[ $ANALYSIS_ONLY == 0 ]]; then
     fi
 fi
 
-# Every run the analysis needs must have written the diagnostic output
-missing=()
+# Every run the analysis needs must be a valid, completed run of the current
+# settings, tutorial files and solver build (not just a non-empty fluid.dat)
+required=()
 for req in "mu5 robin_m1_n200 robin_m2_n200 robin_m4_n200 robin_m4_n400 robin_m2_n100 robin_m2_n400" \
            "amp05 robin_m2_n200" "amp2 robin_m2_n200" "amp4 robin_m2_n200 robin_m1_n200" \
            "tol robin_m2_n200"; do
     set -- $req
     name="$1"; shift
-    for case in "$@"; do
-        f="$WORK/$name/womersleyTube/verification/work/$case/postProcessing/interfaceTraction/fluid.dat"
-        [[ -s "$f" ]] || missing+=("$name/$case")
-    done
+    for case in "$@"; do required+=("$name:$case"); done
 done
-if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "ERROR: incomplete input, ${#missing[@]} required run(s) missing under $WORK:" >&2
-    printf '  %s\n' "${missing[@]}" >&2
-    exit 1
-fi
+python3 -I "$SCRIPTS/check_runs.py" "$WORK" ${SKIP_BUILD[@]+"${SKIP_BUILD[@]}"} \
+    --keys-out "$OUT/analysis_provenance.json" "${required[@]}"
 
 for name in mu5 amp2 tol; do
     python3 -I "$SCRIPTS/womersley_interface_traction.py" "$WORK/$name/womersleyTube"

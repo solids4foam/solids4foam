@@ -24,6 +24,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve()
@@ -104,30 +105,75 @@ def case_name(spec: dict) -> str:
 
 
 def settings(spec: dict, reference: dict) -> dict:
-    """Everything that defines a run, used to validate a reused case."""
+    """Everything that defines a SOLVER run, used to validate a reused case:
+    the case specification, mesh, physical parameters, time schedule, the
+    content hashes of the tutorial files, a digest of the case inputs after
+    configure() (so that a change of the driver's own substitutions is seen,
+    while a change of its analysis code or of the reference values used only
+    by the analysis is not) and the solver build."""
+    study = reference["study"]
     data = {k: v for k, v in spec.items() if k != "groups"}
     data["mesh"] = mesh_divisions(spec["factor"], reference)
     data["parameters"] = reference["reference"]["parameters"]
+    data["schedule"] = {"periods": study["periods"],
+                        "analysisPeriods": study["analysisPeriods"],
+                        "period": reference["reference"]["derived"]["period"],
+                        "samplesPerPeriod": SAMPLES_PER_PERIOD}
     data["tutorialFiles"] = tutorial_signature()
+    data["configuredInputs"] = configured_inputs_digest(spec, reference)
     data["build"] = build_signature()
     return data
 
 
+def configured_inputs_digest(spec: dict, reference: dict) -> str:
+    """sha1 over the files of the case as configure() writes them (everything
+    the solver reads, except the meshes it generates with blockMesh)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        case = Path(tmp) / "case"
+        configure(case, spec, reference)
+        digest = hashlib.sha1()
+        for path in sorted(p for p in case.rglob("*") if p.is_file() or p.is_symlink()):
+            if path.relative_to(case).parts[0] not in ("0", "constant", "system", "Allrun"):
+                continue        # documentation, images, plotting: not solver input
+            digest.update(str(path.relative_to(case)).encode() + b"\0")
+            digest.update(path.readlink().as_posix().encode() if path.is_symlink()
+                          else path.read_bytes())
+            digest.update(b"\0")
+    return digest.hexdigest()
+
+
+_FILE_HASHES: dict = {}
+
+
+def file_sha1(path: Path) -> str:
+    """Content hash of a (possibly large) file, cached in this process by
+    path, size and mtime so that repeated checks do not re-read it."""
+    status = path.stat()
+    token = (str(path), status.st_size, status.st_mtime_ns)
+    if token not in _FILE_HASHES:
+        digest = hashlib.sha1()
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(1 << 20), b""):
+                digest.update(block)
+        _FILE_HASHES[token] = digest.hexdigest()
+    return _FILE_HASHES[token]
+
+
 def build_signature() -> dict:
-    """OpenFOAM version and the solids4foam executable and library, so that a
-    run is not reused with a different or rebuilt solver."""
+    """OpenFOAM version and the CONTENT hash of the solids4foam executable and
+    libraries (libsolids4Foam*), so that a run is not reused with a different
+    or rebuilt solver, but is when the same binaries are touched, copied or
+    moved. A missing executable is recorded as such."""
     signature = {key: os.environ.get(key, "")
                  for key in ("WM_PROJECT", "WM_PROJECT_VERSION", "WM_OPTIONS")}
-    candidates = [shutil.which("solids4Foam")]
+    executable = shutil.which("solids4Foam")
+    signature["solids4Foam"] = file_sha1(Path(executable)) if executable \
+        else "not found"
     for variable in ("FOAM_USER_LIBBIN", "FOAM_MODULE_LIBBIN", "FOAM_SITE_LIBBIN"):
         libbin = os.environ.get(variable, "")
         if libbin:
-            candidates += sorted(str(p) for p in Path(libbin).glob(
-                "libsolids4FoamModels.*"))
-    for candidate in candidates:
-        if candidate:
-            status = Path(candidate).stat()
-            signature[candidate] = f"{status.st_size}:{status.st_mtime_ns}"
+            for lib in sorted(Path(libbin).glob("libsolids4Foam*")):
+                signature[f"{variable}/{lib.name}"] = file_sha1(lib)
     return signature
 
 

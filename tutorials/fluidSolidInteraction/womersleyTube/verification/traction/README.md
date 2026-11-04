@@ -43,16 +43,25 @@ Runs are made in `work/`, and results are written to `postProcessing/`. Both
 are git-ignored by the repository's root `.gitignore` and removed by
 `../Allclean` (and so `./Allclean all`).
 
-Completed runs in `work/` are reused, not repeated, when their stored settings
-(case, mesh, reference parameters, content hashes of the study copy's tutorial
-files, solver build signature) match and the solver log and diagnostic output
-are complete; a run that does not match is run again. Runs are made by
-`run_single.py` without analysing them, so one failed case does not prevent
-the remaining runs.
+Completed runs in `work/` are reused, not repeated, when their stored
+solver-run key matches: case, mesh, physical parameters, time schedule,
+content hashes of the study copy's tutorial files, a digest of the case inputs
+as the driver configures them, and content hashes (not size or time stamps) of
+the `solids4Foam` executable and `libsolids4Foam*` libraries; and the solver
+log shows a completed run and the diagnostic output is non-empty. A run that
+does not match is run again. Editing a README, the analysis code or the exact
+values of the reference JSON does not change this key. The analysis key (content
+hashes of the verification driver, the reference JSON and these scripts) is
+written with the solver-run keys to `postProcessing/analysis_provenance.json`.
+Runs are made by `run_single.py` without analysing them, so one failed case does
+not prevent the remaining runs.
 
-A failed run, or a required run missing from `work/` (also with
-`--analysis-only`), stops the script with a list of the affected runs and exit
-status 1; no partial analysis is made.
+Before any analysis (also with `--analysis-only`) `scripts/check_runs.py` applies
+the same validation to every required run (stored settings, tutorial files,
+solver build, log, diagnostic output), and stops the script with a list of the
+affected runs and exit status 1 if one is missing or not valid; no partial
+analysis is made. `--skip-build-check` omits only the build comparison, for
+analysing stored runs where the solver environment is not available.
 
 The full study has not yet been run end-to-end as the single command
 `./AllverifyTraction --cores 6`. The results below were obtained from the same
