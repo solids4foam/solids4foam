@@ -32,9 +32,13 @@ def write_dat(path, rows):
     np.savetxt(path, np.array(rows), fmt="%.15g")
 
 
-def make_case(case: Path, xs, amp, n_circ=1, deform=True, solid_shuffle=False):
+def make_case(case: Path, xs, amp, n_circ=1, d0=UX, solid_shuffle=False):
     """Fluid/solid .dat files for P = Re[amp exp(i(w t - k x0))] carried by
-    material faces whose centres oscillate axially by UX cos(w t)."""
+    material faces. The fluid mesh moves by D(t) - D(0) with D(t) = UX cos(w t)
+    and D(0) = d0: d0 = UX is a start from the periodic state (the mesh offset is
+    zero at every whole period); d0 = 0 is a start from the undisplaced state
+    (the mesh then oscillates about +UX, offset UX at a whole period); d0 = None
+    keeps the fluid mesh fixed. The solid mesh never moves."""
     X0, area = faces(xs, n_circ)
     nf = len(X0)
     nvec = np.zeros((nf, 3))
@@ -45,8 +49,8 @@ def make_case(case: Path, xs, amp, n_circ=1, deform=True, solid_shuffle=False):
     perm = np.random.RandomState(0).permutation(nf) if solid_shuffle else np.arange(nf)
     for t in ts:
         x = X0.copy()
-        if deform:
-            x[:, 0] += UX * (math.cos(OMEGA * t) - 1.0)   # mesh moves by D(t) - D(0)
+        if d0 is not None:
+            x[:, 0] += UX * math.cos(OMEGA * t) - d0   # mesh moves by D(t) - D(0)
         for f in range(nf):
             p = (amp * np.exp(1j * (OMEGA * t - K * X0[f, 0]))).real
             row = [t, f, *x[f], area[f], *nvec[f], p] + [0.0] * 12 + [0.0, 1.0]
@@ -63,24 +67,115 @@ EX = {"rho": 1.0, "period": PERIOD, "omega": OMEGA, "k": K, "L": L}
 
 
 class Projection(unittest.TestCase):
-    def test_solid_undeformed_positions_remove_the_phase_error(self):
+    def test_projection_does_not_depend_on_the_fluid_mesh_motion(self):
+        # corrected code: exact for any D(0), including a mesh that oscillates
+        # about an offset position, and for a fixed fluid mesh
+        xs = np.linspace(0.1, L - 0.1, 41)
+        for d0 in (UX, 0.0, None):
+            with self.subTest(d0=d0), tempfile.TemporaryDirectory() as tmp:
+                case = Path(tmp)
+                make_case(case, xs, 0.4 + 0.3j, d0=d0)
+                res = W.analyse_case(case, EX, 2)
+            self.assertLess(abs(res["P"] - (0.4 + 0.3j)), 5e-6)
+
+    def test_fluid_window_mean_positions_carry_the_static_offset(self):
+        # the alternative of projecting on the window-mean fluid centres (kept
+        # as --fluid-mean-positions) is displaced by -D(0): phase k UX ~ 1e-4
         xs = np.linspace(0.1, L - 0.1, 41)
         with tempfile.TemporaryDirectory() as tmp:
             case = Path(tmp)
-            make_case(case, xs, 0.4 + 0.3j, deform=True)
-            res = W.analyse_case(case, EX, 2)
+            make_case(case, xs, 0.4 + 0.3j, d0=UX)
             fluid_mean = W.analyse_case(case, EX, 2, fluid_mean_positions=True)
-        self.assertLess(abs(res["P"] - (0.4 + 0.3j)), 5e-6)
-        # the window-mean fluid position still carries the static offset -D(0):
-        # phase error k UX ~ 1e-4
         self.assertGreater(abs(fluid_mean["P"] - (0.4 + 0.3j)), 2e-5)
-        # the old choice (last-sample deformed face centres) is wrong too
-        last_x = xs + UX * (math.cos(OMEGA * 3.5 * PERIOD) - 1.0)
-        sel = (xs >= 0.25 * L) & (xs <= 0.75 * L)
-        old = W.wave_projection(np.exp(-1j * K * xs) * (0.4 + 0.3j), last_x,
-                                np.where(sel, 1.0, 0.0), K)
-        self.assertGreater(abs(old - (0.4 + 0.3j)), 1e-5)
 
+
+def old_projection_P(case: Path, ex: dict, window: int) -> complex:
+    """Faithful copy of what the analysis did at 7c9f1e2cf (the PR head) for
+    the pressure series: positions xf = the deformed fluid face centre at the
+    LAST sample, solid faces matched by nearest axial position with a 1e-6 L
+    tolerance, weights from midpoints between the sorted axial positions. Only
+    the lines that decide the projection are kept."""
+    tf, F = W.per_time(W.read(case / "postProcessing/interfaceTraction/fluid.dat", 24), 24)
+    ts, S = W.per_time(W.read(case / "postProcessing/interfaceTraction/solid.dat", 15), 15)
+    t_end = tf[-1]
+    t0 = t_end - window * ex["period"]
+    xf = F[-1, :, 2]
+    xs = S[-1, :, 2]
+    match = np.array([np.argmin(np.abs(xs - x)) for x in xf])
+    if np.max(np.abs(xs[match] - xf)) > 1e-6 * ex["L"]:
+        raise RuntimeError("solid and fluid interface faces do not coincide")
+    sel = (xf >= 0.25 * ex["L"]) & (xf <= 0.75 * ex["L"])
+    order = np.argsort(xf)
+    xs_sorted = xf[order]
+    edges = np.concatenate([[xs_sorted[0] - 0.5 * (xs_sorted[1] - xs_sorted[0])],
+                            0.5 * (xs_sorted[1:] + xs_sorted[:-1]),
+                            [xs_sorted[-1] + 0.5 * (xs_sorted[-1] - xs_sorted[-2])]])
+    dx = np.empty_like(xf)
+    dx[order] = np.diff(edges)
+    w = np.where(sel, dx, 0.0)
+    proj = np.exp(1j * ex["k"] * xf)
+    a, _ = W.harmonic(tf, ex["rho"] * F[:, :, 9], ex["omega"], t0, t_end)
+    return complex(np.sum(a * proj * w) / np.sum(w))
+
+
+class HistoricalBehaviour(unittest.TestCase):
+    """What is and is not claimed about the code at 7c9f1e2cf.
+
+    NOT claimed: that the old projection silently produced a ~1e-4 phase error
+    in the PR's runs. The old code took the deformed fluid face centres at the
+    LAST sample, a whole number of periods after the start. If the run starts
+    from the periodic state (D(0) equal to the periodic value at that phase,
+    d0 = UX here) the mesh offset D(t_end) - D(0) is ~0 there, and the old and
+    the corrected code agree (test_old_code_is_fine_when_the_last_sample_is_
+    undisplaced). That D(0) matches the periodic state in the real runs has not
+    been checked (no stored output on this machine).
+
+    Claimed: the old result depended on the fluid mesh position at one
+    sample. The old safety net was a 1e-6 L match tolerance, which allows a
+    phase error of only k x 1.5e-5 m ~ 2e-6; a larger offset (D(0) not equal
+    to the periodic value: here up to UX = 7.3e-4 m, the size Philip quotes)
+    makes the old code RAISE rather than silently be wrong, so it could not
+    carry the 1e-4 error either; the corrected code needs no such coincidence.
+    Also, the old nearest-axial-position matching and sorted-x midpoint weights
+    break down with several faces per axial station.
+    """
+
+    def test_old_code_is_fine_when_the_last_sample_is_undisplaced(self):
+        xs = np.linspace(0.1, L - 0.1, 41)
+        with tempfile.TemporaryDirectory() as tmp:
+            case = Path(tmp)
+            make_case(case, xs, 0.4 + 0.3j, d0=UX)
+            old = old_projection_P(case, EX, 2)
+            new = W.analyse_case(case, EX, 2)["P"]
+        self.assertLess(abs(old - (0.4 + 0.3j)), 5e-6)
+        self.assertLess(abs(new - (0.4 + 0.3j)), 5e-6)
+
+    def test_old_code_stops_when_the_fluid_mesh_is_displaced_at_the_last_sample(self):
+        # D(0) = 0: the mesh oscillates about +UX; last sample displaced by
+        # UX = 7.3e-4 m >> 1e-6 L = 1.5e-5 m. Old: raises. New: correct.
+        xs = np.linspace(0.1, L - 0.1, 41)
+        with tempfile.TemporaryDirectory() as tmp:
+            case = Path(tmp)
+            make_case(case, xs, 0.4 + 0.3j, d0=0.0)
+            with self.assertRaises(RuntimeError):
+                old_projection_P(case, EX, 2)
+            new = W.analyse_case(case, EX, 2)["P"]
+        self.assertLess(abs(new - (0.4 + 0.3j)), 5e-6)
+
+    def test_old_code_phase_error_is_bounded_by_its_tolerance(self):
+        # largest offset the old tolerance accepts: error <~ k * 1.5e-5 ~ 2e-6,
+        # i.e. the old code could not produce a 1e-4 error without raising
+        xs = np.linspace(0.1, L - 0.1, 41)
+        with tempfile.TemporaryDirectory() as tmp:
+            case = Path(tmp)
+            make_case(case, xs, 0.4 + 0.3j, d0=UX - 1.4e-5)
+            old = old_projection_P(case, EX, 2)
+        err = abs(old - (0.4 + 0.3j))
+        self.assertLess(err, 1e-5)
+        self.assertGreater(err, 1e-7)     # the offset is visible, but small
+
+
+class ProjectionGeometry(unittest.TestCase):
     def test_moving_solid_mesh_is_refused(self):
         xs = np.linspace(0.1, L - 0.1, 11)
         with tempfile.TemporaryDirectory() as tmp:
