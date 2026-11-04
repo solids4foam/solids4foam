@@ -118,7 +118,7 @@ FLUID_F1_SIZES = {
     "flapSweep": 0.00101,
     "merging": 0.00202,
 }
-FLUID_LEVELS = ("F1", "F2", "F3", "F4", "F5")
+FLUID_LEVELS = ("F-1", "F1", "F2", "F3", "F4", "F5")
 FLUID_RATIO = math.sqrt(2.0)
 
 # Points of the velocity probes (m): the measured jet peaks on the two MRI
@@ -149,7 +149,8 @@ def fluid_sizes(level: str) -> dict[str, float]:
             for key, value in FLUID_F1_SIZES.items()}
 
 
-def write_mesh_dict(case: Path, level: str, wall: str = "") -> Path:
+def write_mesh_dict(case: Path, level: str, wall: str = "",
+                    edges: bool = True) -> Path:
     """Write system/meshDict.<level> from the tutorial's coarse meshDict.
 
     wall, a fluid level, takes the wall cell size (boundaryCellSize) from
@@ -175,6 +176,16 @@ def write_mesh_dict(case: Path, level: str, wall: str = "") -> Path:
                   f"// Verification fluid level {level}: every cell size of "
                   f"meshDict.coarse scaled by {fluid_scale(level):.6g}",
                   text, count=1, flags=re.MULTILINE)
+    # With feature edges (the default) cartesianMesh captures the edges and
+    # corners of the flap; without them it chamfers the 2 mm thick flap and
+    # shrinks its faces by 1-3 % in area, and the interpolated traction gives
+    # the solid a net load 5-150 % from the fluid force (#665)
+    surface = "fluidDomain.fms" if edges else "fluidDomain.stl.gz"
+    text, found = re.subn(r'^(surfaceFile\s+)"[^"]+";',
+                          rf'\g<1>"constant/triSurface/{surface}";', text,
+                          flags=re.MULTILINE)
+    if found != 1:
+        fail(f"Could not set the surface file in the meshDict for {level}")
     path = case / "system" / f"meshDict.{level}"
     path.write_text(text)
     return path
@@ -942,7 +953,7 @@ DEFAULT_SPEC = {
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
     "solidtol": "default", "coupled": "yes", "fsitest": "default",
     "reuse": -1.0, "wall": "", "motion": "velocity",
-    "write": 0.0,
+    "write": 0.0, "schemes": "tutorial", "edges": "yes",
 }
 
 
@@ -975,6 +986,10 @@ def parse_spec(text: str) -> dict:
         fail("fsitest must be default or strict")
     if spec["wall"] and spec["wall"] not in FLUID_LEVELS:
         fail("wall must be a fluid level, e.g. wall=F3")
+    if spec["schemes"] not in ("tutorial", "lsq"):
+        fail("schemes must be tutorial or lsq")
+    if spec["edges"] not in ("yes", "no"):
+        fail("edges must be yes or no")
     if spec["motion"] not in ("velocity", "displacement", "hyperelastic"):
         fail("motion must be velocity, displacement or hyperelastic")
     return spec
@@ -1013,6 +1028,10 @@ def spec_name(spec: dict) -> str:
         name += f"_wall{spec['wall']}"
     if spec["motion"] != "velocity":
         name += f"_motion{spec['motion']}"
+    if spec["schemes"] != "tutorial":
+        name += f"_{spec['schemes']}"
+    if spec["edges"] != "yes":
+        name += "_noedges"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -1067,7 +1086,8 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
 
     # Fluid mesh
     if spec["fluid"] in FLUID_LEVELS:
-        write_mesh_dict(case, spec["fluid"], spec["wall"])
+        write_mesh_dict(case, spec["fluid"], spec["wall"],
+                        spec["edges"] == "yes")
         info["fluid_sizes_m"] = fluid_sizes(spec["fluid"])
 
     # Solid mesh and centreline monitors on its nodes
@@ -1193,6 +1213,26 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     elif spec["motion"] == "hyperelastic":
         set_hyperelastic_mesh_motion(case)
 
+    if spec["schemes"] == "lsq":
+        # Unlimited fluid operators: least-squares gradients without the
+        # cellLimited limiter on grad(U), and the full non-orthogonal
+        # correction instead of "limited corrected 0.5"
+        schemes = case / "system" / "fluid" / "fvSchemes"
+        text = schemes.read_text()
+        for old, new in (
+                ("    default            Gauss linear;\n"
+                 "    grad(U)            cellLimited Gauss linear 1;\n",
+                 "    default            leastSquares;\n"
+                 "    grad(U)            leastSquares;\n"),
+                ("    default            Gauss linear limited corrected 0.5;\n",
+                 "    default            Gauss linear corrected;\n"),
+                ("    default            limited corrected 0.5;\n",
+                 "    default            corrected;\n")):
+            if text.count(old) != 1:
+                fail(f"Could not set the lsq fluid schemes in {schemes}")
+            text = text.replace(old, new)
+        schemes.write_text(text)
+
     # Decomposition and the solid's parallel linear solver
     vmod.set_subdomains(case, cores, ("", "fluid", "solid"))
     info["solid_preconditioner"] = solid_preconditioner(spec, cores)
@@ -1245,6 +1285,12 @@ def build_meshes(case: Path, spec: dict, cores: int) -> dict:
     if mesh_dict.exists() or mesh_dict.is_symlink():
         mesh_dict.unlink()
     mesh_dict.symlink_to(f"meshDict.{spec['fluid']}")
+    if spec["edges"] == "yes":
+        timings["surfaceFeatureEdges_s"] = run(
+            ["surfaceFeatureEdges", "-angle", "45",
+             "constant/triSurface/fluidDomain.stl.gz",
+             "constant/triSurface/fluidDomain.fms"],
+            case, "log.surfaceFeatureEdges")
     # cartesianMesh is multi-threaded (OpenMP)
     timings["cartesianMesh_s"] = run(["cartesianMesh"], case,
                                      "log.cartesianMesh", threads=cores)
