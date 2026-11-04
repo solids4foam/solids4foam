@@ -15,7 +15,7 @@ Prepared by Seevani Bali
 - Demonstrate a dynamic, geometrically exact beam analysis with the
   `beamSolid` solid model, which runs the beamFoam beam formulation through
   `solids4Foam`.
-- Rotate a beam mesh into its initial position with `setInitialPositionBeam`.
+- Rotate a beam mesh into its initial position with `setInitialPositionBeamS4F`.
 - Write displacement, force, convergence and energy histories with the beam
   function objects.
 
@@ -38,12 +38,12 @@ beam results are compared with detailed 3-D solids4foam and ABAQUS solutions.
 | Time step           | 0.001 s               |
 | Time scheme         | Newmark               |
 
-`createBeamMesh` creates the beam along the $$x$$ axis, and the `Allrun`
+`createBeamMeshS4F` creates the beam along the $$x$$ axis, and the `Allrun`
 script then rotates it by 90° about the $$-y$$ axis so that it stands
 vertically:
 
 ```bash
-setInitialPositionBeam -cellZone beam_0 \
+setInitialPositionBeamS4F -cellZone beam_0 \
     -translate '(0 0 0)' -rotateAngle '((0 -1 0) 90)'
 ```
 

@@ -33,7 +33,7 @@ $$\Delta t = 0.01$$).
 | Shear modulus $$G$$      | 3.9788736e4 Pa        |
 | Beam segments            | 50                    |
 
-The beam is meshed with `createBeamMesh` from `constant/beamProperties`. The
+The beam is meshed with `createBeamMeshS4F` from `constant/beamProperties`. The
 boundary conditions are:
 
 - `left`: `fixedValue` displacement `W` and rotation `Theta` (clamped);

@@ -10,7 +10,8 @@ release. For complete commit-level details and contributor information, see the
 
 - The `beamSolid` solid model runs the geometrically exact beam formulation of
   beamFoam with `solids4Foam`. The beam models (`libS4FBeamModels`) and the
-  `createBeamMesh` and `setInitialPositionBeam` utilities are copied unchanged
+  `createBeamMesh` and `setInitialPositionBeam` utilities (built as
+  `createBeamMeshS4F` and `setInitialPositionBeamS4F`) are copied unchanged
   from beamFoam, and `src/beamModels/syncBeamFoam.sh` updates them from a
   beamFoam commit. A beamFoam case runs with `solidModel beamSolid;` and keeps
   its `constant/beamProperties`. The `beamCantilever`, `beamDynamicCantilever`

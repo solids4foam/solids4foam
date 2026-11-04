@@ -17,7 +17,9 @@ available, that is when `S4F_NO_USE_EIGEN` is not set.
 - `libS4FBeamSolid` (`src/beamSolid`): the `beamSolid` solid model.
 
 The beam mesh utilities `createBeamMesh` and `setInitialPositionBeam` are also
-copied unchanged from beamFoam, in `applications/utilities`.
+copied unchanged from beamFoam, in `applications/utilities`. They are built as
+`createBeamMeshS4F` and `setInitialPositionBeamS4F`, so that they do not
+replace the beamFoam utilities of the same name when both are installed.
 
 ## Case Setup
 
@@ -41,10 +43,10 @@ The solid model base class also needs `constant/g`; use zero for no gravity.
 
 Everything else stays as in beamFoam. The beam model, its solver settings, the
 cross-sections and the material are read from `constant/beamProperties`, the
-mesh is created with `createBeamMesh` (and positioned with
-`setInitialPositionBeam` if needed), and the unknowns are the beam displacement
-`W` and rotation `Theta`. The beam boundary conditions, for example
-`forceBeamDisplacementNR` and `momentBeamRotationNR`, apply the loads.
+mesh is created with `createBeamMeshS4F` (and positioned with
+`setInitialPositionBeamS4F` if needed), and the unknowns are the beam
+displacement `W` and rotation `Theta`. The beam boundary conditions, for
+example `forceBeamDisplacementNR` and `momentBeamRotationNR`, apply the loads.
 Continuum traction boundary conditions are not supported.
 
 See the `beamCantilever`, `beamDynamicCantilever` and `beamFollowerForce`

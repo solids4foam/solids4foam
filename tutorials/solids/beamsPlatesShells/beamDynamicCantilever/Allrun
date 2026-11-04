@@ -12,19 +12,19 @@ solids4Foam::convertCaseFormat .
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 solids4Foam::caseDoesNotRunWithFoamExtend
 
-# The beam models are only built when Eigen is available
-if ! command -v createBeamMesh > /dev/null 2>&1
+# The beam models and their utilities are only built when Eigen is available
+if ! command -v createBeamMeshS4F > /dev/null 2>&1
 then
-    echo; echo "createBeamMesh: command not found, which is required for this case"
+    echo; echo "createBeamMeshS4F: command not found, which is required for this case"
     echo "It is built with the beam models when Eigen is available"; echo
     exit 0
 fi
 
 # Create the beam mesh
-solids4Foam::runApplication createBeamMesh
+solids4Foam::runApplication createBeamMeshS4F
 
 # Rotate the beam from the x-axis into its vertical starting position
-solids4Foam::runApplication setInitialPositionBeam \
+solids4Foam::runApplication setInitialPositionBeamS4F \
     -cellZone beam_0 -translate '(0 0 0)' -rotateAngle '((0 -1 0) 90)'
 
 # Run solver
