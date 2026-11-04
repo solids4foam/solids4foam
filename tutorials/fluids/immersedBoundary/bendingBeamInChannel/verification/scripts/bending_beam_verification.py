@@ -87,17 +87,11 @@ METHOD_SETTINGS = {
                    ("imageInterpolation", "cellPoint")], []),
 }
 
-# Observed allocated rank-hours of the tracked runs (eight seconds, adaptive
-# time step, single runs on a shared node with SLURM or direct MPI): context
-# for the estimate printed by dry-run, not a performance model
-OBSERVED_RANK_HOURS = {("cutLink", 1): 0.057, ("cutLink", 2): 0.505,
-                       ("cutLink", 3): 5.12, ("penalty", 1): 0.042,
-                       ("penalty", 2): 0.282, ("penalty", 3): 2.60,
-                       ("incremental", 1): 0.140, ("incremental", 2): 1.256,
-                       ("ghostCell", 1): 0.046,
-                       # measured for 0.5 s (1.709 allocated rank-hours on 4
-                       # ranks), scaled to the eight-second equivalent
-                       ("cutLink", 4): 27.3}
+# The observed allocated rank-hours of the tracked runs (adaptive time step,
+# single runs on a shared node with SLURM or direct MPI) are read from the
+# allocated_rank_hours column of reference/results/cases.csv by
+# observed_rank_hours(): context for the estimate printed by dry-run, not a
+# performance model
 # Mean number of adaptive steps of an eight-second run (tracked runs)
 STEPS_8S = {1: 1280, 2: 2559, 3: 5216, 4: 10400}
 LEVEL_RANKS = {1: 1, 2: 2, 3: 4, 4: 4}
@@ -123,14 +117,13 @@ RUNS = {
 }
 DEFAULT_RUNS = ("smoke",)
 
-# Tolerances of the check against the tracked results. Both are the thresholds
-# registered in advance for the verification campaign (a change of 1.0 point
-# of the Cd nRMS, or of 0.1 in the second harmonic, is material). They were
-# not adjusted after looking at any result. The tracked values come from runs
-# with the adaptive time step of the tutorial, which is what the generated
-# cases use; the archived fixed-time-step penalty runs of the campaign differ
-# from the tracked second harmonic by 0.06 to 0.18 and are not conforming
-# reruns (see the README)
+# Tolerances of the check against the tracked results: a change of 1.0 point
+# of the Cd nRMS, or of 0.1 in the second harmonic, is taken as material (the
+# thresholds of reference/results/fv-sensitivity.csv). The tracked values come
+# from runs with the adaptive time step of the tutorial, which is what the
+# generated cases use; archived fixed-time-step penalty runs differ from the
+# tracked second harmonic by 0.06 to 0.18 and are not conforming reruns (see
+# the README)
 CHECK_NRMS = 1.0
 CHECK_A2 = 0.1
 CHECK_FLUX_RATIO = 0.01
@@ -175,6 +168,15 @@ def dict_scalar(text: str, key: str) -> float:
     return float(match.group(1))
 
 
+def stl_x_extent(path: Path) -> tuple:
+    """(min, max) x of the vertices of an ASCII STL: the undeformed beam"""
+    xs = [float(m.group(1)) for m in re.finditer(
+        r"^\s*vertex\s+([-+0-9.eE]+)\s", path.read_text(), re.MULTILINE)]
+    if not xs:
+        fail(f"no vertices in {path}")
+    return min(xs), max(xs)
+
+
 def parameters(tutorial: Path = TUTORIAL_DIR) -> dict:
     """Geometry, motion and normalisation read from the tutorial"""
     fv = (tutorial / "constant/fvOptions").read_text()
@@ -191,13 +193,24 @@ def parameters(tutorial: Path = TUTORIAL_DIR) -> dict:
                       inlet)
     u_mean = sum(float(c) * y_top ** int(p) / (int(p) + 1)
                  for c, p in poly)
+    xmin, xmax = stl_x_extent(tutorial / "constant/triSurface/beam.stl")
+    x_center = dict_scalar(fv, "xCenter")
+    if abs(0.5 * (xmin + xmax) - x_center) > 1e-6:
+        fail(f"beam.stl is centred at x = {0.5 * (xmin + xmax):.6g}, not at "
+             f"xCenter = {x_center:.6g}: the volume-rate formula assumes it")
+    if dict_scalar(fv, "yMin") != 0.0:
+        fail("the volume-rate formula assumes yMin = 0 of the bending motion")
+    if abs(dict_scalar(fv, "period") - PERIOD) > 1e-12:
+        fail(f"the motion period is {dict_scalar(fv, 'period')}, not "
+             f"{PERIOD} s: the harmonics, the write interval and the flux "
+             "snapshots of this driver assume it")
     params = {
         "Ax": dict_scalar(fv, "amplitudeX"),
         "Ay": dict_scalar(fv, "amplitudeY"),
         "period": dict_scalar(fv, "period"),
         "H": dict_scalar(fv, "yMax"),
         "xCenter": dict_scalar(fv, "xCenter"),
-        "width": 0.2,
+        "width": xmax - xmin,
         "Lz": max(z) - min(z),
         "U_ref": round(u_mean, 8),
     }
@@ -293,10 +306,30 @@ def plan(args) -> list:
     return cases
 
 
+def observed_rank_hours(path: Path = None) -> dict:
+    """{(method, level): allocated rank-hours of an eight-second Study A run}
+    from the tracked cases.csv; a run that ended earlier (Level 4, 0.5 s) is
+    scaled linearly with its end time. Rows without a recorded cost are left
+    out"""
+    path = RESULTS_DIR / "cases.csv" if path is None else path
+    out = {}
+    for r in read_results(path):
+        if r["study"] != STUDY_A or r["coefficient"] != "Cd" \
+                or r["estimator"] not in ("cutLink ST", "total"):
+            continue
+        try:
+            hours, end = float(r["allocated_rank_hours"]), float(r["end_time"])
+        except ValueError:
+            continue
+        if math.isfinite(hours) and hours > 0 and end > 0:
+            out[(r["method"], int(r["level"]))] = hours * 8.0 / end
+    return out
+
+
 def estimated_rank_hours(method: str, level: int, end: float):
     """Observed allocated rank-hours of the tracked eight-second run, scaled
     with the end time; None where no tracked run of the method exists"""
-    observed = OBSERVED_RANK_HOURS.get((method, level))
+    observed = observed_rank_hours().get((method, level))
     return None if observed is None else observed * end / 8.0
 
 
@@ -423,6 +456,74 @@ def generate_case(method: str, level: int, study: str, end: float,
     return case
 
 
+def git_sha() -> str:
+    """Revision of the tutorial tree: the sources of the cases, not
+    necessarily the build of the solver that runs them"""
+    return subprocess.run(["git", "-C", str(TUTORIAL_DIR), "rev-parse",
+                           "HEAD"], capture_output=True, text=True,
+                          check=False).stdout.strip()
+
+
+# The solver of the tracked results. They record no per-case provenance:
+# this is the build record of the runs that produced them, stated in
+# README.md, and is not written into any case
+BASELINE = {"openfoam": "v2412", "solids4foam": "f33b244a2"}
+PROVENANCE_COLUMNS = ("openfoam_version", "openfoam_variant", "solver_build",
+                      "solver_binary_sha256", "tutorial_revision")
+
+
+def openfoam_variant(version: str, fork: str = "") -> str:
+    """OpenFOAM variant from WM_PROJECT_VERSION (and WM_FORK): v2512 is
+    OpenFOAM.com, a number such as 12 the OpenFOAM Foundation; '' if
+    unknown"""
+    if fork:
+        return fork
+    if re.fullmatch(r"v\d{4}", version):
+        return "OpenFOAM.com"
+    if re.fullmatch(r"\d+(\.\d+)?", version):
+        return "openfoam.org"
+    return ""
+
+
+def solver_build(executable: str = "") -> dict:
+    """What is known of the solids4foam build that runs the cases: the
+    executable, its SHA-256 and, if a BUILD_INFO.txt with a 'SHA=' line is in
+    the root of its build (<root>/platforms/<options>/bin/solids4Foam), that
+    revision. Nothing is guessed: an unknown entry is ''"""
+    executable = executable or shutil.which("solids4Foam") or ""
+    out = {"solver_executable": "", "solver_binary_sha256": "",
+           "solver_build": ""}
+    if not executable or not Path(executable).is_file():
+        return out
+    path = Path(executable).resolve()
+    out["solver_executable"] = str(path)
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    out["solver_binary_sha256"] = digest.hexdigest()
+    info = path.parents[3] / "BUILD_INFO.txt" if len(path.parents) > 3 \
+        else Path()
+    if info.is_file():
+        for line in info.read_text(errors="replace").splitlines():
+            if line.startswith("SHA="):
+                out["solver_build"] = line[4:].strip()
+                break
+    return out
+
+
+def provenance(executable: str = "") -> dict:
+    """OpenFOAM version and variant, solids4foam build and tutorial revision
+    of the environment that generates a case"""
+    version = os.environ.get("WM_PROJECT_VERSION", "")
+    out = {"openfoam_version": version,
+           "openfoam_variant": openfoam_variant(
+               version, os.environ.get("WM_FORK", ""))}
+    out.update(solver_build(executable))
+    out["tutorial_revision"] = git_sha()
+    return out
+
+
 def cmd_generate(args) -> int:
     manifest = load_manifest()
     for method, level, study, end, name, ranks in plan(args):
@@ -432,6 +533,7 @@ def cmd_generate(args) -> int:
             "method": method, "level": level, "study": study,
             "end_time": end, "ranks": ranks,
             "inputs_sha256": input_hashes(case),
+            "provenance": provenance(),
             "generated": datetime.now().isoformat(timespec="seconds")}
         print(f"{name}: generated in {case}")
     save_manifest(manifest)
@@ -463,6 +565,12 @@ def cmd_dry_run(args) -> int:
 
 def check_environment(ranks: int) -> str:
     """Return '' if the environment can run the case, else the reason"""
+    # the rule of solids4FoamScripts.sh: OpenFOAM.com versions start with 'v'.
+    # OpenFOAM.org also sets WM_PROJECT=OpenFOAM, and Allrun.verify would
+    # then exit 0 without running the solver
+    if os.environ.get("WM_PROJECT") != "OpenFOAM" or not os.environ.get(
+            "WM_PROJECT_VERSION", "").startswith("v"):
+        return "OpenFOAM.com (ESI) is required for libimmersedBoundary"
     for executable in ("blockMesh", "solids4Foam", "solids4FoamScripts.sh"):
         if shutil.which(executable) is None:
             return f"'{executable}' is unavailable: source OpenFOAM and " \
@@ -517,6 +625,7 @@ def cmd_run(args) -> int:
             "method": method, "level": level, "study": study,
             "end_time": end, "ranks": ranks, "ran_locally": True,
             "inputs_sha256": input_hashes(case),
+            "provenance": provenance(),
             "load_average_at_start": load,
             "cores": os.cpu_count(),
             "started": datetime.now().isoformat(timespec="seconds")}
@@ -815,7 +924,7 @@ def mesh_cells(case: Path, level: int) -> int:
 
 def analyse_case(case: Path, method: str, level: int, study: str,
                  ranks: int, rank_hours: float = None, refs=None,
-                 params: dict = None) -> list:
+                 params: dict = None, provenance_info: dict = None) -> list:
     """Rows (one per estimator and coefficient) of one completed case"""
     params = params or parameters()
     refs = refs if refs is not None else read_series(REFERENCE_FILE)
@@ -851,6 +960,8 @@ def analyse_case(case: Path, method: str, level: int, study: str,
                 row.update({k: v for k, v in harmonics(t, y).items()})
                 row["noise"] = noise(t, y)
             row.update({f"flux_{k}": v for k, v in flux.items()})
+            row.update({k: (provenance_info or {}).get(k, "")
+                        for k in PROVENANCE_COLUMNS})
             out.append(row)
     return out
 
@@ -862,7 +973,7 @@ RESULT_COLUMNS = ("method", "level", "study", "estimator", "coefficient",
                   "flux_max_abs_Q", "flux_max_abs_residual",
                   "flux_ratio_at_peaks", "flux_peak_residual_pct",
                   "allocated_rank_hours", "rank_us_per_cell_step",
-                  "cpu_over_wall")
+                  "cpu_over_wall") + PROVENANCE_COLUMNS
 
 
 def write_results(path: Path, rows: list) -> None:
@@ -898,7 +1009,8 @@ def cmd_analyse(args) -> int:
     rows = []
     for name, entry, case in completed_cases(manifest):
         rows += analyse_case(case, entry["method"], entry["level"],
-                             entry["study"], entry["ranks"])
+                             entry["study"], entry["ranks"],
+                             provenance_info=entry.get("provenance"))
     if not rows:
         print("no completed cases to analyse")
         return 0
@@ -1036,9 +1148,18 @@ def cmd_check(args) -> int:
                         "no completed cases; run ./Allverify first"))
     for name, entry, case in cases:
         for row in analyse_case(case, entry["method"], entry["level"],
-                                entry["study"], entry["ranks"]):
+                                entry["study"], entry["ranks"],
+                                provenance_info=entry.get("provenance")):
             results += check_case(row, tracked_rows, True)
     counts = {PASS: 0, FAIL: 0, SKIPPED: 0}
+    solvers = sorted({(e.get("provenance") or {}).get("openfoam_version", "")
+                      + " " + (e.get("provenance") or {}).get(
+                          "solver_build", "") for _, e, _ in cases})
+    if cases:
+        print(f"solver of the analysed cases: "
+              f"{'; '.join(s.strip() or 'not recorded' for s in solvers)}; "
+              f"tracked baseline: OpenFOAM {BASELINE['openfoam']}, "
+              f"solids4foam {BASELINE['solids4foam']}")
     for status, label, detail in results:
         counts[status] += 1
         print(f"{status:7s} {label}: {detail}")

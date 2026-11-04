@@ -442,17 +442,205 @@ class CheckSemantics(unittest.TestCase):
             bbv.parameters())}, {bbv.PASS})
 
 
+ESI = {"WM_PROJECT": "OpenFOAM", "WM_PROJECT_VERSION": "v2412"}
+
+
 class MpiSetup(unittest.TestCase):
     def test_missing_openfoam_is_reported(self):
-        with mock.patch.object(shutil, "which", return_value=None):
+        with mock.patch.dict(bbv.os.environ, ESI), \
+                mock.patch.object(shutil, "which", return_value=None):
             self.assertIn("unavailable", bbv.check_environment(1))
 
     def test_more_ranks_than_cores_is_reported(self):
-        with mock.patch.object(shutil, "which", return_value="/bin/true"), \
+        with mock.patch.dict(bbv.os.environ, ESI), \
+                mock.patch.object(shutil, "which", return_value="/bin/true"), \
                 mock.patch.object(bbv.os, "sched_getaffinity",
                                   return_value={0, 1}):
             self.assertIn("share cores", bbv.check_environment(4))
             self.assertEqual(bbv.check_environment(2), "")
+
+    def test_openfoam_org_is_detected_before_any_case_is_run(self):
+        # OpenFOAM.org also sets WM_PROJECT=OpenFOAM; its versions are
+        # numbers, whatever the install path, and Allrun.verify would exit 0
+        # without running the solver
+        for version in ("12", "11", "dev", ""):
+            env = {"WM_PROJECT": "OpenFOAM", "WM_PROJECT_VERSION": version}
+            with mock.patch.dict(bbv.os.environ, env), \
+                    mock.patch.object(shutil, "which",
+                                      return_value="/bin/true"):
+                self.assertIn("OpenFOAM.com", bbv.check_environment(1),
+                              version)
+        for version in ("v2412", "v2512"):
+            env = {"WM_PROJECT": "OpenFOAM", "WM_PROJECT_VERSION": version}
+            with mock.patch.dict(bbv.os.environ, env), \
+                    mock.patch.object(shutil, "which",
+                                      return_value="/bin/true"):
+                self.assertEqual(bbv.check_environment(1), "", version)
+
+    def test_no_openfoam_variables_is_reported(self):
+        with mock.patch.dict(bbv.os.environ, {}, clear=True), \
+                mock.patch.object(shutil, "which", return_value="/bin/true"):
+            self.assertIn("OpenFOAM.com", bbv.check_environment(1))
+
+
+class CommandLine(unittest.TestCase):
+    """The shorthand documented in Allverify and the README"""
+
+    def run_main(self, argv):
+        seen = {}
+
+        def fake(args):
+            seen["args"] = args
+            return 0
+        with mock.patch.dict(bbv.main.__globals__, {"cmd_run": fake}):
+            self.assertEqual(bbv.main(argv), 0)
+        return seen["args"]
+
+    def test_runs_shorthand_means_run(self):
+        args = self.run_main(["--runs", "L1", "L2"])
+        self.assertEqual(args.runs, ["L1", "L2"])
+        self.assertEqual(self.run_main(["--runs", "flux"]).runs, ["flux"])
+
+    def test_no_arguments_is_the_smoke_run(self):
+        self.assertEqual(self.run_main([]).runs, list(bbv.DEFAULT_RUNS))
+
+    def test_explicit_run_and_unknown_option(self):
+        self.assertEqual(self.run_main(["run", "--runs", "L1"]).runs, ["L1"])
+        with self.assertRaises(SystemExit), \
+                redirect_stdout(io.StringIO()), \
+                mock.patch.object(sys, "stderr", io.StringIO()):
+            bbv.main(["--nope"])
+
+    def test_default_run_analyses_and_checks(self):
+        # the docstring says "generate, run locally, analyse, check"
+        calls = []
+        with mock.patch.object(bbv, "plan", return_value=[]), \
+                mock.patch.object(bbv, "cmd_analyse",
+                                  lambda a: calls.append("analyse") or 0), \
+                mock.patch.object(bbv, "cmd_check",
+                                  lambda a: calls.append("check") or 0):
+            bbv.main([])
+        self.assertEqual(calls, ["analyse", "check"])
+
+    def test_no_slurm_is_needed(self):
+        self.assertNotIn("sbatch", SCRIPT.read_text())
+
+
+class ObservedCost(unittest.TestCase):
+    def test_every_tracked_study_a_run_has_an_observed_cost(self):
+        observed = bbv.observed_rank_hours()
+        for key in [("cutLink", 1), ("cutLink", 3), ("penalty", 3),
+                    ("incremental", 3), ("ghostCell", 2), ("ghostCell", 3)]:
+            self.assertIn(key, observed)
+        # Level 4 is a 0.5 s run, scaled to eight seconds
+        self.assertAlmostEqual(observed[("cutLink", 4)], 1.7089 * 16, 2)
+        self.assertAlmostEqual(observed[("incremental", 3)], 13.453, 3)
+
+    def test_dry_run_gives_a_cost_for_every_tracked_case(self):
+        class A:
+            runs = ["L1", "L2", "L3", "studyB", "L4flux"]
+            ranks = 0
+        out = io.StringIO()
+        with redirect_stdout(out):
+            bbv.cmd_dry_run(A)
+        lines = [l for l in out.getvalue().splitlines() if "cells," in l]
+        self.assertTrue(lines)
+        for line in lines:
+            self.assertIn("observed-cost estimate", line)
+        total = float(out.getvalue().split("estimated total ")[1].split()[0])
+        self.assertAlmostEqual(total, 12.1, delta=0.2)   # README: about 12
+
+    def test_untracked_case_has_no_estimate(self):
+        self.assertIsNone(bbv.estimated_rank_hours("ghostCell", 4, 8.0))
+
+
+class Provenance(Sandbox):
+    def make_build(self, sha="a" * 40):
+        root = self.tmp / "build"
+        bindir = root / "platforms/linux64GccDPInt32Opt/bin"
+        bindir.mkdir(parents=True, exist_ok=True)
+        (bindir / "solids4Foam").write_bytes(b"binary")
+        info = root / "BUILD_INFO.txt"
+        if sha:
+            info.write_text(f"X=1\nSHA={sha}\n")
+        elif info.exists():
+            info.unlink()
+        return bindir / "solids4Foam"
+
+    def test_solver_build_is_read_from_build_info_and_never_guessed(self):
+        info = bbv.solver_build(str(self.make_build("b" * 40)))
+        self.assertEqual(info["solver_build"], "b" * 40)
+        self.assertEqual(len(info["solver_binary_sha256"]), 64)
+        self.assertEqual(bbv.solver_build(
+            str(self.make_build(None)))["solver_build"], "")
+        with mock.patch.object(shutil, "which", return_value=None):
+            self.assertEqual(bbv.solver_build()["solver_build"], "")
+
+    def test_variant_follows_the_version(self):
+        self.assertEqual(bbv.openfoam_variant("v2512"), "OpenFOAM.com")
+        self.assertEqual(bbv.openfoam_variant("12"), "openfoam.org")
+        self.assertEqual(bbv.openfoam_variant("dev"), "")
+
+    def test_manifest_and_results_record_the_solver(self):
+        env = dict(ESI, WM_PROJECT_VERSION="v2512")
+        exe = str(self.make_build("c" * 40))
+
+        class A:
+            runs = ["smoke"]
+            ranks = 0
+            force = False
+        with mock.patch.dict(bbv.os.environ, env), \
+                mock.patch.object(shutil, "which", return_value=exe), \
+                redirect_stdout(io.StringIO()):
+            bbv.cmd_generate(A)
+        entry = bbv.load_manifest()["cases"]["cutLink-L1-A-t0p5"]
+        self.assertEqual(entry["provenance"]["openfoam_version"], "v2512")
+        self.assertEqual(entry["provenance"]["solver_build"], "c" * 40)
+        for key in bbv.PROVENANCE_COLUMNS:
+            self.assertIn(key, entry["provenance"])
+            self.assertIn(key, bbv.RESULT_COLUMNS)
+
+    def test_analysed_rows_carry_the_provenance(self):
+        case = self.tmp / "case"
+        (case / "postProcessing/immersedBoundary/0").mkdir(parents=True)
+        (case / "postProcessing/immersedBoundary/0/beam.dat").write_text(
+            "\n".join([HEADER_FORCING, force_line(0.5, (1, 0, 0), (0, 0, 0),
+                                                  (0, 0, 0)),
+                       force_line(1.0, (1, 0, 0), (0, 0, 0), (0, 0, 0))]))
+        info = {k: "x" for k in bbv.PROVENANCE_COLUMNS}
+        rows = bbv.analyse_case(case, "penalty", 1, "A", 1,
+                                provenance_info=info)
+        self.assertEqual(rows[0]["solver_build"], "x")
+        rows = bbv.analyse_case(case, "penalty", 1, "A", 1)
+        self.assertEqual(rows[0]["solver_build"], "")
+
+
+class GeometryGuards(unittest.TestCase):
+    """The volume-rate formula assumes a beam centred on xCenter, yMin = 0
+    and the one-second period"""
+
+    def tutorial(self, **edits):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        shutil.copytree(bbv.TUTORIAL_DIR, tmp / "t", ignore=shutil.
+                        ignore_patterns("verification", "regressionTests"))
+        path = tmp / "t/constant/fvOptions"
+        text = path.read_text()
+        for old, new in edits.items():
+            self.assertIn(old, text)
+            text = text.replace(old, new)
+        path.write_text(text)
+        return tmp / "t"
+
+    def test_width_is_read_from_the_stl(self):
+        self.assertAlmostEqual(bbv.parameters()["width"], 0.2)
+
+    def test_a_moved_beam_period_or_ymin_is_rejected(self):
+        for edit in ({"xCenter     12;": "xCenter     12.5;"},
+                     {"period      1;": "period      2;"},
+                     {"yMin        0;": "yMin        0.1;"}):
+            with self.assertRaises(SystemExit):
+                bbv.parameters(self.tutorial(**edit))
 
 
 class TrackedData(unittest.TestCase):
@@ -601,6 +789,35 @@ class Documentation(unittest.TestCase):
         for method in ("cutLink", "penalty", "incremental", "ghostCell"):
             for l in (1, 2, 3):
                 self.assertIn((method, l), have)
+
+    def test_readme_penalty_second_harmonic_range_covers_every_tracked_run(self):
+        a2 = [float(r["A2"]) for r in self.rows()
+              if r["method"] == "penalty" and r["coefficient"] == "Cd"
+              and r["A2"]]
+        self.assertTrue(a2)
+        self.assertGreaterEqual(min(a2), 1.81 - 0.005)
+        self.assertIn("1.81 to 2.02", (bbv.VERIFICATION_DIR
+                                       / "README.md").read_text())
+        with (bbv.RESULTS_DIR / "fv-sensitivity.csv").open() as handle:
+            tests = [float(r["Cd_A2_test"]) for r in csv.DictReader(handle)
+                     if r["method"] == "penalty"]
+        self.assertLessEqual(max(tests), 2.02 + 0.005)
+
+    def test_documented_courant_maximum_is_the_tracked_one(self):
+        top = max(float(r["max_Co_in_step"]) for r in self.rows()
+                  if r["max_Co_in_step"] not in ("", "nan"))
+        self.assertAlmostEqual(top, 1.07, 2)
+        self.assertIn("up to 1.07 in the tracked runs",
+                      (bbv.VERIFICATION_DIR / "README.md").read_text())
+
+    def test_no_references_to_inaccessible_material(self):
+        for name in ("README.md", "results.md"):
+            text = (bbv.VERIFICATION_DIR / name).read_text().lower()
+            for needle in ("research archive", "research report",
+                           "this campaign", "pre-registered",
+                           "registered in advance"):
+                self.assertNotIn(needle, text, name)
+        self.assertNotIn("campaign", SCRIPT.read_text().lower())
 
     def test_included_figures_exist(self):
         for name in ("README.md", "results.md"):

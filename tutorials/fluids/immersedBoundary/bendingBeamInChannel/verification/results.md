@@ -1,10 +1,13 @@
 # bendingBeamInChannel verification: results
 
 Every number below is read from the tracked files of `reference/results/`
-(computed by the functions of `scripts/bending_beam_verification.py` from the
-complete saved runs), and `scripts/test_bending_beam_verification.py` checks
-that
-the tables of this file agree with them. Solver: solids4foam `f33b244a2`
+(`cases.csv` was computed by the functions of
+`scripts/bending_beam_verification.py` from the complete saved runs, which are
+not tracked; see "Provenance and data availability" in `README.md` for which
+files `Allverify` can regenerate), and
+`scripts/test_bending_beam_verification.py` checks that the tables of this
+file agree with them.
+Solver: solids4foam `f33b244a2`
 (`development`), OpenFOAM v2412, cutLink (surface traction and momentum
 exchange), penalty, legacy incremental and ghostCell on the mesh levels of the
 tutorial (20,020 / 80,080 / 320,320 / 1,281,280 cells). The comparisons are made
@@ -36,8 +39,6 @@ cutLink's surface traction and momentum exchange are two estimators of one run
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
 | Method | Mesh | Flux residual, % of the exact peak | $C_d$ nRMS (%) | $C_l$ nRMS (%) | $C_d$ second harmonic (reference 5.889) |
 | --- | --- | --- | --- | --- | --- |
 | cutLink, surface traction | L1 20,020 | 7.62 | 8.59 | 17.17 | 5.332 |
@@ -58,8 +59,6 @@ cutLink's surface traction and momentum exchange are two estimators of one run
 
 <!-- markdownlint-enable MD013 -->
 
-<!-- markdownlint-enable MD013 -->
-
 ![mesh refinement](images/mesh_refinement.png)
 
 *Mesh refinement of the four methods on Levels 1 to 3 (20,020, 80,080 and
@@ -77,28 +76,12 @@ against $dV/dt = 0.028306 \sin(4 \pi t)$ m$^3$/s. Study A is the tutorial
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | Level | Cells | cutLink $Q$/peak at the extremes | peak residual, % of the peak | Study B: max $\lvert Q \rvert$ ($10^{-3}$ m$^3$/s) | Study B, % of the Study A peak |
 | --- | --- | --- | --- | --- | --- |
 | L1 | 20,020 | 0.9238 | 7.62 | 2.534 | 8.95 |
 | L2 | 80,080 | 0.9504 | 4.96 | 1.327 | 4.69 |
 | L3 | 320,320 | 0.9755 | 2.45 | 0.691 | 2.44 |
 | L4 | 1,281,280 | 0.9878 | 1.22 | - | - |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -149,14 +132,6 @@ and the nRMS and $A_2$ of $C_l$. Adaptive time step, as in the tutorial.
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | Method (estimator) | Level | $C_d$ nRMS (%) | $C_d$ mean | $C_d$ RMS | $C_d$ $A_1$ | $C_d$ $A_2$ | $C_d$ noise | $C_l$ nRMS (%) | $C_l$ $A_2$ |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | cutLink, surface traction | L1 | 8.59 | 18.57 | 55.13 | 73.13 | 5.332 | 2.48 | 17.17 | 7.456 |
@@ -174,14 +149,6 @@ and the nRMS and $A_2$ of $C_l$. Adaptive time step, as in the tutorial.
 | ghostCell (exploratory) | L1 | 12.04 | 16.60 | 52.60 | 69.78 | 2.080 | 10.52 | 35.58 | 10.037 |
 | ghostCell (exploratory) | L2 | 9.82 | 16.70 | 52.43 | 70.03 | 2.155 | 3.97 | 31.27 | 9.875 |
 | ghostCell (exploratory) | L3 | 8.15 | 16.95 | 52.94 | 70.71 | 2.031 | 4.93 | 31.96 | 9.759 |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -227,7 +194,7 @@ Levels 2 and 3 against the tracked body-fitted series (black): (a, c) cutLink,
 surface traction and momentum exchange; (b, d) penalty, legacy incremental and
 exploratory ghostCell. The tracked series are sampled every 0.02 s (the
 spikes of ghostCell and incremental are partly undersampled; the raw
-time-step series are in the research archive). Unfiltered and unshifted. The
+time-step series are not tracked). Unfiltered and unshifted. The
 reference lift is unverified.*
 
 ### 2.1 The body-fitted case at two time steps
@@ -240,14 +207,6 @@ and the decomposition changed (a complete diff of the inputs of B and C shows
 those and nothing else). Same sample times and interval ($1 < t < 8$ s); no
 phase
 alignment.
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
 
 <!-- markdownlint-disable MD013 -->
 
@@ -275,14 +234,6 @@ alignment.
 | nRMS difference A-C (%), 0.1 s grid, normalised by the second | Cl | 1.405 | - | - |
 | nRMS difference A-B (%), 0.1 s grid, normalised by the second | Cl | 5.713 | - | - |
 | nRMS difference B-C (%), 0.01 s grid | Cl | 5.814 | - | - |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -326,12 +277,6 @@ high-frequency content.
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | Method | Level | steps | mean $\Delta t$ (ms) | $C_d$ nRMS (%) | filtered $C_d$ nRMS (%) |
 | --- | --- | --- | --- | --- | --- |
 | cutLink, surface traction | L1 | 1234 | 6.495 | 8.59 | 7.69 |
@@ -346,12 +291,6 @@ high-frequency content.
 | ghostCell (exploratory) | L1 | 1264 | 6.348 | 12.04 | 9.81 |
 | ghostCell (exploratory) | L2 | 2572 | 3.089 | 9.82 | 7.74 |
 | ghostCell (exploratory) | L3 | 5203 | 1.524 | 8.15 | 6.62 |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -392,19 +331,11 @@ high-frequency content.
 Level 2, Study A, fixed time step $\Delta t$ = 0.125/96 (the control), 0 to 8 s,
 two ranks, Euler, `linearUpwind`, `nOuterCorrectors` 1, `nCorrectors` 3,
 pressure
-`relTol` 0.01 (final 0); one setting changed at a time. Pre-registered
-thresholds, set before the runs and not changed: a change of 1.0 point of the
+`relTol` 0.01 (final 0); one setting changed at a time. Thresholds
+(`thr_nrms`, `thr_A2` in `fv-sensitivity.csv`): a change of 1.0 point of the
 $C_d$
 nRMS or 0.1 of $C_d$ $A_2$ is material (0.5 and 0.05 for the solver-convergence
 controls). Changes of the nRMS and $A_2$ are test minus control.
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
 
 <!-- markdownlint-disable MD013 -->
 
@@ -430,14 +361,6 @@ controls). Changes of the nRMS and $A_2$ are test minus control.
 | Q4 | upwind vs linearUpwind (diagnostic, N96) | total | -0.52 | +0.072 | 0.992 | no |
 | Q6 | penaltyCoeff 1e2 vs 1e3 (N96) | total | -0.48 | -0.005 | 0.635 | no |
 | Q6 | penaltyCoeff 1e4 vs 1e3 (N96) | total | +0.31 | +0.005 | 1.164 | no |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -527,14 +450,6 @@ quoted at the rate of their last 40 % of steps:
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | Run | allocated rank-h | at the unaffected rate | share of steps while pinned |
 | --- | --- | --- | --- |
 | T-cutLink-Euler-N48 | 1.8261 | 0.525 | 0.19 |
@@ -544,31 +459,15 @@ quoted at the rate of their last 40 % of steps:
 
 <!-- markdownlint-enable MD013 -->
 
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
 **Matched pairs.** cutLink and penalty runs with identical settings whose
 last-40 % windows were entirely after the correction (two ranks, Level 2, 6144
 or 3072 steps, wall time per step; the last column is the number of other ranks
-of the same campaign running at the time, unknown load of other users
+of the same set of runs running at the time, unknown load of other users
 excluded):
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-| Settings | cutLink s/step | penalty s/step | ratio | other campaign ranks (cutLink / penalty) |
+| Settings | cutLink s/step | penalty s/step | ratio | other ranks of these runs (cutLink / penalty) |
 | --- | --- | --- | --- | --- |
 | Euler N96 | 0.2939 | 0.1408 | 2.09 | 6.0 / 6.0 |
 | Euler N48 | 0.3078 | 0.1661 | 1.85 | 6.0 / 4.0 |
@@ -576,14 +475,6 @@ excluded):
 | backward N48 | 0.2695 | 0.1669 | 1.61 | 6.0 / 2.0 |
 | limitedLinear N96 | 0.2507 | 0.153 | 1.64 | 4.0 / 4.0 |
 | nOuter 2 N96 | 0.3675 | 0.2458 | 1.5 | 4.1 / 4.0 |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -595,7 +486,7 @@ excluded):
 - **Not established.** A single ratio (the earlier "1.8 to 2.0" overstates the
   matched range), an intrinsic efficiency (single runs, node load average about
   130
-  to 195 on a node with 192 cores, 0.7 to 6 other ranks of this campaign
+  to 195 on a node with 192 cores, 0.7 to 6 other ranks of these runs
   running, scatter of nominally identical runs about 15 %), or a cost at fixed
   accuracy: the
   methods differ in accuracy and in what they represent (Section 1), and

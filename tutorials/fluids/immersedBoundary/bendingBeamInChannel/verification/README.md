@@ -15,23 +15,11 @@ not run by `tutorials/Alltest` or `tutorials/Alltest-regression`.
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | | Question | Needs a reference? |
 | --- | --- | --- |
 | A | How does the net flux through the inlet and the outlet compare with the exact rate of change of the volume of the beam? | no: the analytic rate is exact |
 | B | How far are $C_d$ and $C_l$ from the tracked body-fitted series? | yes, of uncertain provenance |
 | F | What does a run cost? | no, it is observed |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -78,12 +66,6 @@ unverified and no lift ranking is made.
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | Method (estimator) | $C_d$ nRMS, Level 1 / 2 / 3 | $C_d$ second harmonic, Level 1 / 2 / 3 (reference 5.89) |
 | --- | --- | --- |
 | cutLink, surface traction | 8.6 / 5.0 / 3.2 % | 5.33 / 5.72 / 5.82 |
@@ -94,28 +76,16 @@ unverified and no lift ranking is made.
 
 <!-- markdownlint-enable MD013 -->
 
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
 The persistent deficit of the second harmonic of penalty, incremental and
 ghostCell is
 not changed by any of the finite-volume settings tested (a property of the
-formulations as implemented, within those settings): it is 1.84 to 2.02 in every
-penalty run, 11 of them with two
+formulations as implemented, within those settings): it is 1.81 to 2.02 in every
+penalty run (the three tracked levels and 11 sensitivity runs, with two
 time steps, two time schemes, three convection schemes, two outer corrector
 counts, a doubled pressure-corrector count, a tighter pressure tolerance and
 three penalty coefficients over two decades.
 That the missing volume flux causes it is not shown. `results.md` has the
 evidence, the figures and the limitations.
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
 
 <!-- markdownlint-disable MD013 -->
 
@@ -131,17 +101,14 @@ evidence, the figures and the limitations.
 
 <!-- markdownlint-enable MD013 -->
 
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
 ## Running
 
 The verification needs OpenFOAM v2412 or later (the immersed boundary library
 is built only with OpenFOAM.com), solids4foam, and `python3`. Nothing else is
-needed to run the exact tests and the dry run.
+needed to run the exact tests and the dry run. An OpenFOAM.org environment
+(`WM_PROJECT_VERSION` not starting with `v`) is detected before any case is
+generated and stops the run with an error, as a missing OpenFOAM does; the
+solids4foam run functions would otherwise skip the solver without a failure.
 
 ```bash
 ./Allverify unit                      # exact tests, no OpenFOAM needed
@@ -162,9 +129,11 @@ needed to run the exact tests and the dry run.
 | `L3` | cutLink, penalty, Level 3, 0 to 8 s | 7.7 |
 | `L4flux` | cutLink, Level 4 (1.28 M cells), 0 to 0.5 s | 1.7 |
 
-The estimates are scaled from the observed allocated rank-hours of single
-runs on a shared node, with the number of ranks given by `--ranks` (default
-by level: 1, 2, 4, 4). They are not a performance model. The whole
+The estimates are scaled with the end time from the observed allocated
+rank-hours of single runs on a shared node (`allocated_rank_hours` of the
+tracked `cases.csv`; the Level 4 run of 0.5 s is scaled to 8 s), whatever
+`--ranks` is (default by level: 1, 2, 4, 4). A case without a tracked run
+prints "no observed cost to scale". They are not a performance model. The whole
 verification, `--runs L1 L2 L3 studyB L4flux`, is about 12 allocated rank-hours
 and is never required.
 
@@ -173,7 +142,13 @@ only the method settings, the mesh level, the end time, the outer correctors,
 the write interval (0.125 s, a quarter of the period of the volume rate,
 where the fluxes are read) and the decomposition changed. The tutorial is
 never modified. `work/manifest.json` records every case with the SHA-256 of
-its inputs and the load of the machine at the start. Parallel cases are run
+its inputs, the load of the machine at the start and the solver: the
+OpenFOAM version and variant (`WM_PROJECT_VERSION`), the solids4foam build
+(the `SHA=` line of the `BUILD_INFO.txt` at the root of the build of the
+`solids4Foam` on `PATH`, empty if there is none; nothing is guessed), the
+SHA-256 of the executable and the revision of the tutorial tree. The same
+columns are written to `work/results.csv`, and `check` prints the solver of the
+analysed cases next to the tracked baseline. Parallel cases are run
 with the solids4foam run functions and no CPU binding is requested
 (`OMPI_MCA_hwloc_base_binding_policy=none`): by default Open MPI binds the
 ranks of every `mpirun` to the first cores, so that two simultaneous runs
@@ -187,24 +162,12 @@ cylinder verifications:
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | Method | Settings | `nOuterCorrectors` |
 | --- | --- | --- |
 | cutLink | `forceEstimator surfaceTraction` (the momentum exchange is written to the same file) | 1 |
 | penalty | `penaltyCoeff 1e3`, `weighting volumeFraction`, `surfaceRateCoeff 3`, `occupancy signedDistance` | 1 |
 | incremental | `couplingCoeff 0.2`, `occupancy vertexFraction` | 5 |
 | ghostCell | `penaltyCoeff 1e3`, `imageDistance 1.5`, `imageInterpolation cellPoint` | 1 |
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
 
 <!-- markdownlint-enable MD013 -->
 
@@ -215,7 +178,7 @@ the controller, `fluidModel::CourantNo`, which is face based:
 $\max_f (|\phi|/|S_f| \, \delta) \Delta t$ with $\delta$ the cell distance.
 The Courant number printed in the log by the fluid model is the cell-sum
 definition of OpenFOAM, $0.5 \max (\sum_f |\phi|/V) \Delta t$, which is about
-twice as large (up to 1.0 in the tracked runs, 4.1 for the body-fitted case with
+twice as large (up to 1.07 in the tracked runs, 4.1 for the body-fitted case with
 $\Delta t$ = 0.01 s). They are two definitions, not an overshoot of the
 controller. The driver reports the second one as `max_Co_in_step`.
 
@@ -252,12 +215,6 @@ alignment.
 
 <!-- markdownlint-disable MD013 -->
 
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
-<!-- markdownlint-disable MD013 -->
-
 | Check | Tolerance |
 | --- | --- |
 | closed-form volume rate against the area of the deformed outline | $10^{-4}$ of the peak |
@@ -269,19 +226,13 @@ alignment.
 
 <!-- markdownlint-enable MD013 -->
 
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-<!-- markdownlint-enable MD013 -->
-
-Both tolerances are the thresholds registered in advance for the sensitivity
-study (a change of 1.0 point of $C_d$ nRMS, or of 0.1 in the second harmonic,
-is material); they were not adjusted after looking at a result. The check is a
+Both tolerances are the thresholds of the sensitivity study
+(`fv-sensitivity.csv`): a change of 1.0 point of $C_d$ nRMS, or of 0.1 in the
+second harmonic, is taken as material. The check is a
 regression check against the tracked values, not a measure of accuracy. The
 tracked values come from runs with the adaptive time step of the tutorial,
-which is what the generated cases use. The archived fixed-time-step runs of the
-campaign are not conforming reruns: for the penalty method they give a second
+which is what the generated cases use. The archived fixed-time-step runs
+are not conforming reruns: for the penalty method they give a second
 harmonic 0.06 to 0.18 above the tracked 1.844 (11 runs, for several time
 steps, schemes and coefficients), so six of them would fail this tolerance.
 The cause of this offset (the time-step control, or run-to-run variation of a
@@ -329,8 +280,18 @@ established.
   estimator and coefficient: nRMS, harmonics, noise, fluxes, cost),
   `history-*.csv` (display histories every 0.02 s), `fv-sensitivity.csv`,
   `cost-observed.csv` and `cost-matched-pairs.csv`, `bodyfitted-R1-*.csv`. They
-  were computed by the functions of this driver from the complete saved runs;
-  fields and logs of those runs are not tracked.
+  were computed with the functions of this driver from complete saved runs;
+  fields and logs of those runs are not tracked. **Which can be regenerated
+  here:** the rows of `cases.csv` for the runs of `--runs smoke`, `flux`,
+  `L1` to `L4flux` and `studyB` (the cases at the adaptive time step of the
+  tutorial; `Allverify analyse` writes the same columns, plus the solver
+  columns). **Which cannot:** `history-*.csv`, `fv-sensitivity.csv`,
+  `cost-observed.csv`, `cost-matched-pairs.csv` and `bodyfitted-R1-*.csv` have no
+  generator in this repository (the export scripts, the fixed-time-step
+  sensitivity runs, the timing windows and the body-fitted runs are not part of
+  it). They are archived observations: `check` does not use them, and they only
+  feed `results.md` and the figures. The tracked `cases.csv` does not record the
+  solver per row; the baseline is the one stated above.
 
 ## Limitations
 
