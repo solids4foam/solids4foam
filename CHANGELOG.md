@@ -870,6 +870,11 @@ release. For complete commit-level details and contributor information, see the
   solid models is every time step (#566). It is now issued when the vectors
   are first computed and repeated only if the number of such cells grows on a
   later mesh change, which points to mesh degradation.
+- Fixed the parallel scaling of the high-order solid solvers: synchronising
+  the processor-face quadrature serialised the face coefficient build across
+  ranks, because the lower rank posted buffered sends and the higher rank
+  blocked in its receive until the lower rank finished its own build. The
+  quadrature data are now exchanged collectively (#662).
 
 ## [v2.4] - 2026-08-24
 

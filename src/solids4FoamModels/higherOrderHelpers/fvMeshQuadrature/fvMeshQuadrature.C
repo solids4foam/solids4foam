@@ -34,6 +34,7 @@ License
 #include "tetQuadrature.H"
 #include "lineQuadrature.H"
 #include "processorFvPatch.H"
+#include "DynamicList.H"
 #ifdef FOAMEXTEND
     #include "Pstream.H"
 #else
@@ -296,12 +297,19 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
     // with non-blocking communication: a one-sided buffered send is only
     // progressed by the sender's next MPI call, so a blocking receive on the
     // neighbour would otherwise wait until the sender has finished whatever
-    // it computes next
+    // it computes next.
+    // When several processor patches share the same neighbour, e.g.
+    // processorCyclic patches, the data of all of them are packed into one
+    // message in local patch order and the receiver unpacks in its own patch
+    // order. Both sides are assumed to list their patches to a given
+    // neighbour in the same order, as syncTools assumes; the per-face size
+    // check below catches most mismatches
     const label nProcs = Pstream::nProcs();
 
-    labelList nSendFaces(nProcs, 0);
-    labelList nSendValues(nProcs, 0);
-    labelList nRecvFaces(nProcs, 0);
+    // Processor patches on which this rank sends (lower rank) or receives
+    // (higher rank)
+    DynamicList<label> sendPatches;
+    DynamicList<label> recvPatches;
 
     forAll(mesh_.boundary(), patchI)
     {
@@ -315,12 +323,25 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
         const label nbrProc =
             refCast<const processorFvPatch>(patch).neighbProcNo();
 
-        if (Pstream::myProcNo() > nbrProc)
+        if (Pstream::myProcNo() < nbrProc)
         {
-            nRecvFaces[nbrProc] += patch.size();
-            continue;
+            sendPatches.append(patchI);
         }
+        else
+        {
+            recvPatches.append(patchI);
+        }
+    }
 
+    labelList nSendFaces(nProcs, 0);
+    labelList nSendValues(nProcs, 0);
+    labelList nRecvFaces(nProcs, 0);
+
+    forAll(sendPatches, i)
+    {
+        const fvPatch& patch = mesh_.boundary()[sendPatches[i]];
+        const label nbrProc =
+            refCast<const processorFvPatch>(patch).neighbProcNo();
         const label patchStart = patch.patch().start();
 
         nSendFaces[nbrProc] += patch.size();
@@ -330,6 +351,15 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
             nSendValues[nbrProc] +=
                 faceQuadPoints[patchStart + patchFaceI].size();
         }
+    }
+
+    forAll(recvPatches, i)
+    {
+        const fvPatch& patch = mesh_.boundary()[recvPatches[i]];
+        const label nbrProc =
+            refCast<const processorFvPatch>(patch).neighbProcNo();
+
+        nRecvFaces[nbrProc] += patch.size();
     }
 
     List<labelList> sendSizes(nProcs);
@@ -346,23 +376,11 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
     labelList sendFaceI(nProcs, 0);
     labelList sendValueI(nProcs, 0);
 
-    forAll(mesh_.boundary(), patchI)
+    forAll(sendPatches, i)
     {
-        const fvPatch& patch = mesh_.boundary()[patchI];
-
-        if (!isA<processorFvPatch>(patch))
-        {
-            continue;
-        }
-
+        const fvPatch& patch = mesh_.boundary()[sendPatches[i]];
         const label nbrProc =
             refCast<const processorFvPatch>(patch).neighbProcNo();
-
-        if (Pstream::myProcNo() > nbrProc)
-        {
-            continue;
-        }
-
         const label patchStart = patch.patch().start();
 
         forAll(patch, patchFaceI)
@@ -480,23 +498,11 @@ void fvMeshQuadrature::synchroniseProcessorFaceQuadrature() const
     labelList recvFaceI(nProcs, 0);
     labelList recvValueI(nProcs, 0);
 
-    forAll(mesh_.boundary(), patchI)
+    forAll(recvPatches, i)
     {
-        const fvPatch& patch = mesh_.boundary()[patchI];
-
-        if (!isA<processorFvPatch>(patch))
-        {
-            continue;
-        }
-
+        const fvPatch& patch = mesh_.boundary()[recvPatches[i]];
         const label nbrProc =
             refCast<const processorFvPatch>(patch).neighbProcNo();
-
-        if (Pstream::myProcNo() < nbrProc)
-        {
-            continue;
-        }
-
         const label patchStart = patch.patch().start();
 
         forAll(patch, patchFaceI)

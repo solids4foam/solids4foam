@@ -148,7 +148,8 @@ private:
         //- Calls the corresponding function for 3D or for 2D meshes
         void calcQuadPointsAndWeights() const;
 
-        //- Use the lower processor rank's point and weight order on both sides
+        //- Use the lower processor rank's point and weight order on both
+        //  sides. Collective: every rank must call it
         void synchroniseProcessorFaceQuadrature() const;
 
         //- Calculate volume-normalised first-order cell moments
@@ -197,10 +198,14 @@ public:
                 return faceOrder_;
             }
 
-            //- Return the face quadrature weights.
+            //- Return the face quadrature weights. In parallel the first
+            //  call synchronises the processor-face quadrature collectively,
+            //  so every rank must make it
             const CompactListList<scalar>& faceQuadWeights() const;
 
-            //- Return the face quadrature points.
+            //- Return the face quadrature points. In parallel the first
+            //  call synchronises the processor-face quadrature collectively,
+            //  so every rank must make it
             const CompactListList<point>& faceQuadPoints() const;
 
             //- Return the cell quadrature weights
