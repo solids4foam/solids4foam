@@ -131,9 +131,33 @@ Description
     relative tolerance of 1e-5, as uniform/time holds deltaT to writePrecision
     digits only.
 
-    Moving meshes are not supported: fvMesh keeps only V0 and V00, fewer old
-    volumes than a third- or higher-order formula needs, so construction on a
-    moving mesh is fatal.
+    Moving meshes. On a moving mesh the formula is applied to the cell
+    integral, as backward applies it with V0 and V00:
+
+    \verbatim
+        ddt(phi)^(n+1) = (1/(dt V^(n+1))) sum_{k=0..q} a_k V^(n+1-k) phi^(n+1-k)
+    \endverbatim
+
+    fvMesh keeps only two old volumes, so the scheme keeps its own: a
+    registered field of cell volumes ("bdfDdt:V") that is set to the current
+    volumes at every call and whose old-time levels are shifted with the
+    fields' (so it holds the volumes the previous steps ended with, however
+    many times the mesh moved within a step). The order on a moving mesh is
+    also limited by the number of volume levels available. The mesh flux of
+    order q, returned by meshPhi, is the combination of the stored mesh
+    fluxes whose divergence is the same formula applied to the volumes
+    themselves,
+
+    \verbatim
+        meshPhi^(n+1) = sum_{j=0..q-1} b_j (dt^(n+1-j)/dt^(n+1)) meshPhi^(n+1-j),
+        b_j = sum_{i=0..j} a_i
+    \endverbatim
+
+    which satisfies the geometric conservation law exactly, as the mesh flux
+    of each step integrates to that step's change of volume, and is
+    backward's 3/2 meshPhi - 1/2 meshPhi^0 at order 2 (its variable-step
+    form too). The test application Test-bdfDdtMovingMesh checks the orders,
+    the conservation law and the implicit form on a prescribed mesh motion.
 
     The flux corrections used by the pressure-velocity coupling (ddtCorr) are
     the same q-th order combination applied to the old fluxes and the old
@@ -153,6 +177,7 @@ SourceFiles
 
 #include "ddtScheme.H"
 #include "scalarList.H"
+#include "volFields.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -200,10 +225,20 @@ class bdfDdtScheme
         template<class GeoField>
         void touch(const GeoField& vf) const;
 
+        //- Number of consecutive old levels of vf holding distinct time
+        //  indices, up to order_
+        template<class GeoField>
+        label levels(const GeoField& vf) const;
+
         //- Order usable on this step for vf: one more than the number of
-        //  consecutive old levels holding distinct time indices
+        //  consecutive old levels holding distinct time indices and, on a
+        //  moving mesh, than the volume levels available
         template<class GeoField>
         label order(const GeoField& vf) const;
+
+        //- The registered field of cell volumes, set to the current volumes,
+        //  with its old levels: V^(n+1-k) is level(cellVolumes(), k)
+        const volScalarField& cellVolumes() const;
 
         //- Order usable on this step for a formula involving two fields:
         //  the lower of their orders
@@ -230,16 +265,25 @@ class bdfDdtScheme
         //  has changed.
         scalarList weights(const label q) const;
 
-        //- The old-time part of the formula, sum_{k=1..q} (-a_k) vf^(n+1-k)
+        //- The old-time part of the formula, sum_{k=1..q} (-a_k) vf^(n+1-k).
+        //  With weighted (a moving mesh, vf a volume field) each level of
+        //  the internal field is multiplied by V^(n+1-k)/V^(n+1); the
+        //  boundary values are never weighted, as for backward.
         template<class GeoField>
-        tmp<GeoField> history(const GeoField& vf, const scalarList& a) const;
+        tmp<GeoField> history
+        (
+            const GeoField& vf,
+            const scalarList& a,
+            const bool weighted = false
+        ) const;
 
         //- As history(vf), for the product rho*vf
         tmp<GeometricField<Type, fvPatchField, volMesh>> history
         (
             const volScalarField& rho,
             const GeometricField<Type, fvPatchField, volMesh>& vf,
-            const scalarList& a
+            const scalarList& a,
+            const bool weighted = false
         ) const;
 
         //- As history(vf), for the product alpha*rho*vf
@@ -248,7 +292,8 @@ class bdfDdtScheme
             const volScalarField& alpha,
             const volScalarField& rho,
             const GeometricField<Type, fvPatchField, volMesh>& vf,
-            const scalarList& a
+            const scalarList& a,
+            const bool weighted = false
         ) const;
 
         //- As history(flux), for the old fluxes phi or Uf of the flux
@@ -262,9 +307,6 @@ class bdfDdtScheme
             const scalarList& a,
             const Reconstruct& reconstruct
         ) const;
-
-        //- Fail on a moving mesh
-        void checkStaticMesh() const;
 
         //- IOobject for a returned ddt field
         IOobject ddtIOobject(const word& name) const;

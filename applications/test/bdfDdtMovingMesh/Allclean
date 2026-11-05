@@ -1,0 +1,5 @@
+#!/bin/bash
+# Remove the mesh and the logs of the test case
+cd "$(dirname "$0")/case" || exit 1
+rm -rf constant/polyMesh
+rm -f log.*
