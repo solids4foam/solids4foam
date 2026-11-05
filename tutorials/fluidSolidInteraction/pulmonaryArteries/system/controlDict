@@ -66,6 +66,14 @@ functions
         );
     }
 
+    // Minimum and maximum inner-wall displacement components, every time
+    // step, in postProcessing/0/solidDisplacementsinnerWall.dat
+    innerWallDisplacement
+    {
+        type            solidDisplacements;
+        historyPatch    innerWall;
+    }
+
     // Number of FSI iterations per time step
     fsiConvData
     {

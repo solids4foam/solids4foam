@@ -112,6 +112,7 @@ pulmonaryArteries/
 ├── Allrun, Allclean, Allmesh     run, clean and mesh the tutorial
 ├── 0/, constant/, system/        the fluid-solid interaction case
 ├── plotInletVsPressure.gp        inlet flow and probe pressure plot
+├── regressionTest.sh             shortened run checked against references
 └── prestress/
     ├── Allrun, Allclean          prestress passes
     ├── petscOptions.hypre        PETSc options for the prestress runs
@@ -229,16 +230,20 @@ starts in equilibrium.
 
 ## Expected Results
 
-[Figures to be added: velocity, pressure, wall shear stress and wall
-displacement.]
+> **Note:** reference images of the velocity, pressure, wall shear stress and
+> wall displacement, and plots of the probe pressure, inner-wall displacement
+> and prestress convergence, will be added here once the full five-cycle run of
+> the case, which is currently running, has finished.
 
 The pressure at a probe in the main pulmonary artery
 ($$(0.04, -0.008, 0.065)\,\mathrm{m}$$) is written every time step to
 `postProcessing/pressureProbe/fluid`. When `gnuplot` is installed, `Allrun`
 plots it against the inlet flow rate with `plotInletVsPressure.gp`, giving
 `inletFlow_vs_probePressure.png`: both against time, and the pressure-flow
-loop. The wall shear stress is written at each write time, and the number of
-FSI iterations per time step is recorded by `fsiConvergenceData`.
+loop. The wall shear stress is written at each write time. The range of the
+inner-wall displacement components is written every time step to
+`postProcessing/0/solidDisplacementsinnerWall.dat`, and the number of FSI
+iterations per time step is recorded by `fsiConvergenceData`.
 
 ## Running the Case
 
@@ -270,6 +275,41 @@ As a guide to run times, on 16 cores the first prestress pass took about one
 minute and each later pass about 15 s of solver time. Three heartbeats (2.58 s)
 of the FSI simulation time took 12 hours on the same 16 cores.
 
+## Regression Test
+
+The case includes a `regressionTest.sh` script:
+
+```bash
+./regressionTest.sh
+```
+
+Because the full case takes about a day, the script copies the case inputs to
+`pulmonaryArteries/regressionTests/main/` and runs a shortened version there;
+the tutorial directory itself is untouched. The copy keeps the tutorial meshes,
+since coarser meshes degrade on this geometry, but runs three prestress passes
+in place of 15, stops the fluid-solid interaction run after five time steps
+($$1.25\times10^{-3}\,\mathrm{s}$$), and runs on four processes in place of
+16. On four cores it takes about nine minutes.
+
+The following are then checked, against stored reference values within loose
+tolerances where a value is compared:
+
+- `maxMag(D)` in `prestress/prestressHistory` falls with each pass, and
+  matches the reference for the first and last passes,
+- every FSI time step converges within `nOuterCorr` correctors,
+- the prestressed wall stays near the imaged geometry: its largest
+  displacement over the five steps is well below that of the unprestressed
+  wall under the same pressure,
+- the largest `innerWall` displacement component from
+  `postProcessing/0/solidDisplacementsinnerWall.dat`,
+- the probe pressure from `postProcessing/pressureProbe/fluid`.
+
+Pass `--check-only` to re-check an existing regression run without re-running
+the case. If PETSc or `cartesianMesh` is unavailable, `Allrun` exits silently
+and the script skips the checks rather than reporting a failure. Like
+`cerebralAneurysm`, the test is run by hand rather than from
+`tutorials/Alltest-regression`.
+
 ## References
 
 1. Yevtushenko, P., Kuehne, T., Bruening, J., & Goubergrits, L. (2025). A
@@ -277,19 +317,19 @@ of the FSI simulation time took 12 hours on the same 16 cores.
    Hemodynamics. Evaluating the Suitability of Large Animal Models for
    Endopulmonary Device Evaluation from a Hemodynamics Point of
    View. Cardiovascular Engineering and Technology, 16(6),
-   688–702. https://doi.org/10.1007/s13239-025-00803-z
+   688–702. <https://doi.org/10.1007/s13239-025-00803-z>
 2. Whitty, J. P. M., Wain, R. a. J., Fsadni, A., Simo, J., & Francis,
    J. (2016). Computational Non-Newtonian Hemodynamics of Small Vessels. Journal
    of Bioinformatics Computational and Systems Biology, 1(1), 103.
 3. Lungu, A., Wild, J. M., Capener, D., Kiely, D. G., Swift, A. J., & Hose,
    D. R. (2014). MRI model-based non-invasive differential diagnosis in
    pulmonary hypertension. Journal of Biomechanics, 47(12),
-   2941–2947. https://doi.org/10.1016/j.jbiomech.2014.07.024
+   2941–2947. <https://doi.org/10.1016/j.jbiomech.2014.07.024>
 4. Yang, W., Dong, M., Rabinovitch, M., Chan, F. P., Marsden, A. L., &
    Feinstein, J. A. (2019). Evolution of hemodynamic forces in the pulmonary
    tree with progressively worsening pulmonary arterial hypertension in
    pediatric patients. Biomechanics and Modeling in Mechanobiology, 18(3),
-   779–796. https://doi.org/10.1007/s10237-018-01114-0
+   779–796. <https://doi.org/10.1007/s10237-018-01114-0>
 5. M. W. Gee, C. Förster, and W. A. Wall, "A computational strategy for
    prestressing patient-specific biomechanical problems under finite
    deformation," *International Journal for Numerical Methods in Biomedical
@@ -302,5 +342,6 @@ of the FSI simulation time took 12 hours on the same 16 cores.
    Newton-Krylov Method for Cell-Centred Finite Volume Solid Mechanics,"
    *International Journal for Numerical Methods in Engineering*, 127(3),
    e70268 (2026). <https://doi.org/10.1002/nme.70268>.
-8. Azadani, A. (2012). Regional Mechanical Properties of Human Pulmonary Root
-   Used for the Ross Operation.
+8. Azadani AN, Chitsaz S, Matthews PB, Jaussaud N, Leung J, Ge L, Tseng
+   EE. Regional mechanical properties of human pulmonary root used for the Ross
+   operation. J Heart Valve Dis. 2012 Jul;21(4):527-34. PMID: 22953683.
