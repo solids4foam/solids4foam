@@ -47,7 +47,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     oldFc_(p.patch().size(), vector::zero),
     oldoldFc_(p.patch().size(), vector::zero),
     acceleration_(p.patch().size(), vector::zero),
-    continuityNormalGradient_(false)
+    continuityNormalGradient_(true)
 {}
 
 
@@ -88,7 +88,7 @@ newMovingWallVelocityFvPatchVectorField::newMovingWallVelocityFvPatchVectorField
     acceleration_(p.patch().size(), vector::zero),
     continuityNormalGradient_
     (
-        dict.lookupOrDefault<Switch>("continuityNormalGradient", false)
+        dict.lookupOrDefault<Switch>("continuityNormalGradient", true)
     )
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
@@ -550,7 +550,7 @@ void newMovingWallVelocityFvPatchVectorField::write(Ostream& os) const
     oldFc_.writeEntry("oldFaceCentres", os);
     oldoldFc_.writeEntry("oldOldFaceCentres", os);
 #endif
-    if (continuityNormalGradient_)
+    if (!continuityNormalGradient_)
     {
 #ifdef OPENFOAM_ORG
         writeEntry(os, "continuityNormalGradient", continuityNormalGradient_);

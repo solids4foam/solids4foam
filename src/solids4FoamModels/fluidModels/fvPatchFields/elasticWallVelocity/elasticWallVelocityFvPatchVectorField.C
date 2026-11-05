@@ -63,7 +63,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
     oldOldFc_(p.patch().size(),vector::zero),
-    continuityNormalGradient_(false)
+    continuityNormalGradient_(true)
 {
     // The face-centre histories are written by write(): initialise them from
     // the current patch geometry so that a zero history is never written
@@ -147,7 +147,7 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     oldOldFc_(p.patch().size(),vector::zero),
     continuityNormalGradient_
     (
-        dict.lookupOrDefault<Switch>("continuityNormalGradient", false)
+        dict.lookupOrDefault<Switch>("continuityNormalGradient", true)
     )
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
@@ -605,7 +605,7 @@ void elasticWallVelocityFvPatchVectorField::write(Ostream& os) const
     oldFc_.writeEntry("oldFaceCentres", os);
     oldOldFc_.writeEntry("oldOldFaceCentres", os);
 #endif
-    if (continuityNormalGradient_)
+    if (!continuityNormalGradient_)
     {
 #ifdef OPENFOAM_ORG
         writeEntry(os, "continuityNormalGradient", continuityNormalGradient_);
