@@ -346,6 +346,51 @@ storage it is written into.
 
 ---
 
+## Prestress
+
+With `prestress yes;` in `mechanicalProperties`, the finite-strain laws are
+evaluated relative to a stress-free configuration other than the mesh. The
+manager reads a prestress deformation gradient `Fpre` (a dimensionless
+`volTensorField`) from the start time, which maps the stress-free
+configuration onto the mesh, and gives the laws the solver's kinematics
+composed with it:
+
+```text
+F    = Fstep & Fpre
+Finv = inv(Fpre) & FinvStep
+J    = Jstep*det(Fpre)
+```
+
+with the old-time values composed with the same `Fpre`. The solver keeps its
+own mesh-relative `F` and `J`; since the laws return the Cauchy stress, which
+belongs to the current configuration, the solver does not need to know about
+`Fpre`.
+
+The work is split between two classes in `mechanicalConstitutiveLawPrestress`:
+
+- `mechanicalConstitutiveLawPrestress` owns `Fpre`: it reads and checks it,
+  holds `inv(Fpre)` and `det(Fpre)`, interpolates all three to the faces on
+  demand, and writes `Fpre` back at full precision.
+- `finiteStrainPrestressedFields` holds the composed kinematics as a
+  `finiteStrainGeometricFields`, the type the laws already take. The manager
+  makes one on the first evaluation and recomposes it with `update()` on every
+  later one.
+
+A law declares that it can be prestressed through `admitsPrestress()` (false
+by default), which holds for laws whose stress is a function of the total
+`F`. The manager refuses to start with prestress on and a law that does not.
+Laws with material directions list them through `stressFreeDirections()`, and
+the manager warns that they are taken in the stress-free configuration.
+
+Prestress is not supported, and is refused, for small-strain evaluations,
+flat-list evaluations on any topology but the cell-centred one, fourth-order
+tangents, `coupledPressureDisplacementSolid`, and topology changes.
+
+`Fpre` itself is produced outside the solver by the `updatePrestress` utility;
+see `applications/utilities/README.md`.
+
+---
+
 ## Higher-order discretisations
 
 Higher-order solid models store stress and kinematics as:
@@ -375,6 +420,16 @@ laws and mesh of its own case: `layeredPipe` (more than one material),
 a tangent query has history to disturb), `viscoTube` (viscoelasticity),
 `blockPunch`, `longWall`, `rotatingCylinder`, `ratCarotid`,
 `idealisedVentricle` and `LandEtAl2015/problem3` (hyperelasticity).
+
+`Test-prestress` checks the `prestress` switch on a case mesh with
+finite-strain laws: that the prestressed volField, surfaceField and flat-list
+stress updates match a manager without prestress given the composed
+kinematics, that the order of composition is visible to that check, that each
+of the six composed fields, old times included, is the product with `Fpre`,
+and that the unsupported evaluations are refused. The scalar tangent of these
+laws is a material constant, so whether the scalar tangent update composes the
+kinematics is not tested. The test moves the case's own `Fpre` aside while it
+runs and puts it back after.
 
 Every solid model takes its stress and tangent from this framework, so every
 tutorial's regression test is runtime coverage of it as well.

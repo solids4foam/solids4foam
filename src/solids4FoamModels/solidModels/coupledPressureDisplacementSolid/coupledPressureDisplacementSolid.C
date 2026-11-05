@@ -842,6 +842,20 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
             );
     }
 
+    // The pressure equation here is an incremental relation on the mesh,
+    // with the pressure starting from zero, while a prestressed law's
+    // volumetric response is that of J*det(Fpre), already non-zero at zero
+    // displacement. The two would describe different materials
+    if (mechanicalManager().prestressed())
+    {
+        FatalErrorInFunction
+            << type() << " does not support prestress: its pressure "
+            << "equation does not see Fpre." << nl
+            << "Use nonLinearGeometryTotalLagrangianTotalDisplacement, with or "
+            << "without solvePressure, for a prestressed case"
+            << exit(FatalError);
+    }
+
     // Prepare for consisten Rhie-Chow correction
     if(consistentRhieChow_)
     {

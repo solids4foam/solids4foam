@@ -393,6 +393,36 @@ public:
             return providesVolumetricSplit();
         }
 
+        //- Can this law be prestressed?
+        //
+        //  With prestress the manager composes a prestress deformation
+        //  gradient Fpre onto the solver's: the law is given F = Fstep & Fpre,
+        //  and the old-time F the same way. That is right only for a law whose
+        //  stress is a function of the total F, measured from the stress-free
+        //  configuration. A law that integrates an increment F & Finv0 onto a
+        //  history variable cancels Fpre out of the increment, and its history
+        //  starts at the stress-free value, so it would be evaluated as if
+        //  there were no prestress, without saying so; a small-strain law has
+        //  no F to compose at all.
+        //
+        //  False by default, which is the safe direction: the manager refuses
+        //  to prestress a law that has not said it can be, naming it
+        virtual bool admitsPrestress() const
+        {
+            return false;
+        }
+
+        //- The prescribed vector state fields this law takes as directions
+        //  in the stress-free configuration, such as fibre directions.
+        //  With prestress they are not mapped back from the imaged
+        //  geometry, so there the law's directions lie along Fpre & d
+        //  rather than along d: the manager warns, and updatePrestress
+        //  reports the angle between the two on each pass. None by default
+        virtual wordList stressFreeDirections() const
+        {
+            return wordList();
+        }
+
         //- Initialise constitutive state variables
         //  Called once after state allocation.
         //  Default implementation does nothing.
