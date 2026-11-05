@@ -105,18 +105,27 @@ release. For complete commit-level details and contributor information, see the
 - Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
   the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
   `fvc::ddt`, including the `ddtCorr` flux corrections used by the
-  pressure-velocity coupling. It requires a static mesh, and it reduces the
-  order during start-up. `BDF 1` and `BDF 2` support a variable time-step
-  (`adjustTimeStep yes`), with `BDF 2` using the same variable-step
-  coefficients as `backward`; orders 3 and above require a constant
-  time-step, so `adjustTimeStep` cannot be used with them. They are also not
-  A-stable, and a warning is printed when one is selected. It is the
+  pressure-velocity coupling. It reduces the order during start-up. `BDF 1`
+  and `BDF 2` support a variable time-step (`adjustTimeStep yes`), with
+  `BDF 2` using the same variable-step coefficients as `backward`; orders 3
+  and above require a constant time-step, so `adjustTimeStep` cannot be used
+  with them. They are also not A-stable, and a warning is printed when one is
+  selected. It is the
   first-derivative counterpart of the `BDF` d2dt2 scheme, for fluids, and is
   currently only available for OpenFOAM.com (#638). `Test-fvcDdt`, run by
   the `decayingTaylorGreenVortex` regression test, checks the start-up order
   ramp, exactness for time polynomials and the observed order of accuracy
   for orders 1 to 6, restart, and a density or flux without stored old-time
   levels.
+- The `BDF` ddt scheme works on moving meshes: the formula is applied to the
+  cell integrals with the volumes of the previous steps, which the scheme
+  keeps itself (fvMesh stores only two), and its mesh flux is the combination
+  of the stored mesh fluxes that satisfies the geometric conservation law
+  exactly, reducing to `backward`'s at order 2. `Test-bdfDdtMovingMesh`
+  (`applications/test/bdfDdtMovingMesh`, with its own `Allrun`) checks the
+  observed orders 1 to 6, the conservation law, the agreement of the implicit
+  and explicit forms and exactness for time polynomials on a prescribed mesh
+  motion, against the exact rate of change of the cell integrals.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A
