@@ -50,13 +50,20 @@ Description
 
     min(U & n, 0) = 0.5*((U & n) - |U & n|) has a kink at U & n = 0, so the
     tangential part of the traction has a derivative jump where a face
-    changes between outflow and backflow; Newton solvers, e.g. the
-    quasi-monolithic coupling, stall on it, as on the switch of inletOutlet
-    and totalPressure. |U & n| is therefore replaced by
+    changes between outflow and backflow. Unlike the switch of inletOutlet
+    and totalPressure, the traction itself is continuous there, and Newton
+    solvers converge with the exact condition in the tests so far; to keep
+    the residual differentiable, |U & n| is nevertheless replaced by
     sqrt((U & n)^2 + eps^2), where the smoothing velocity eps is the
     fraction "smoothing" (default 0.01) of the mean speed of the
     patch-adjacent cells at the previous time step, so that it is fixed
     within a time step; smoothing 0 recovers the exact condition.
+
+    The value fraction is recomputed at every evaluation, not only in
+    updateCoeffs: updateCoeffs is skipped while the patch is flagged as
+    updated, e.g. after an fvMatrix of the velocity has been assembled, and
+    a stale value fraction spoils the finite-difference (matrix-free)
+    Jacobians of Newton solvers.
 
     The kinematic viscosity, nu, is read from the optional "nu" entry or,
     if it is not given, from the "nu" entry of transportProperties.
