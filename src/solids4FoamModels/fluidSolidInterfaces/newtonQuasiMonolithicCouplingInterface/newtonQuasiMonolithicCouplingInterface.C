@@ -2693,6 +2693,11 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     // error of the last displacement predictor
     mapInterfaceSolidToMeshMotion();
 
+    // End the solid time step, as the partitioned couplings do: this closes
+    // the time step of the mechanical laws (history-dependent laws) and rolls
+    // over the face quadrature gradient history of the high-order residual
+    solid().updateTotalFields();
+
     return true;
 }
 
