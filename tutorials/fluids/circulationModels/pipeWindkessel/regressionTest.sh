@@ -6,7 +6,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 RESTART_DIR="${REGRESSION_ROOT}/restart"
-S4F_DIR="${REGRESSION_ROOT}/solids4Foam"
+PF_DIR="${REGRESSION_ROOT}/pimpleFoam"
 
 # Source solids4Foam scripts
 source "${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
@@ -14,11 +14,12 @@ source "${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 # ============================================================
 # pipeWindkessel regression test
 # 1. The outlet pressure against the exact solution of the Windkessel
+#    (solids4Foam, pimpleFluid)
 # 2. A restart: the case run to t = 0.5 on two ranks, reconstructed, and
 #    continued in serial to t = 1, against the continuous run of 1.
-# 3. The pipe solved by solids4Foam and the pimpleFluid fluid model
-#    (./Allrun solids4Foam): the outlet pressure against the exact solution,
-#    and its coupling records against those of the pimpleFoam run.
+# 3. The pipe solved by stock pimpleFoam (./Allrun pimpleFoam): the outlet
+#    pressure against the exact solution, and its coupling records against
+#    those of the solids4Foam run.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -34,10 +35,10 @@ RMSE_TOL=0.005
 # the range of its column: round-off, the restart being exact
 RESTART_TOL=1e-9
 
-# Largest difference of a row of the solids4Foam run from the pimpleFoam one,
+# Largest difference of a row of the pimpleFoam run from the solids4Foam one,
 # relative to the range of its column: round-off, the two solvers taking the
 # same steps on the same mesh
-S4F_TOL=1e-9
+PF_TOL=1e-9
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -49,7 +50,7 @@ RESTART_FILE="postProcessing/circulationCoupling/0.5/coupling.dat"
 echo "============================================================"
 echo "pipeWindkessel regression test"
 echo "|RMSE - ${REF_RMSE}| < ${RMSE_TOL}, restart difference < ${RESTART_TOL},"
-echo "solids4Foam: |RMSE - ${REF_RMSE}| < ${RMSE_TOL}, difference from pimpleFoam < ${S4F_TOL}"
+echo "pimpleFoam: |RMSE - ${REF_RMSE}| < ${RMSE_TOL}, difference from solids4Foam < ${PF_TOL}"
 echo "============================================================"
 echo
 
@@ -116,16 +117,16 @@ if [ "$CHECK_ONLY" = false ]; then
         set_entry system/controlDict writeInterval 10
         solids4Foam::runApplication blockMesh
         solids4Foam::runApplication decomposePar
-        solids4Foam::runParallel pimpleFoam
+        solids4Foam::runParallel solids4Foam
         solids4Foam::runApplication reconstructPar -latestTime
         rm -rf processor*
         set_entry system/controlDict endTime 1
         set_entry system/controlDict startFrom latestTime
-        solids4Foam::runApplication -s restart pimpleFoam
+        solids4Foam::runApplication -s restart solids4Foam
     ) > "${RESTART_DIR}/${ALLRUN_LOGFILE}" 2>&1 || true
 
-    prepare_case "${S4F_DIR}"
-    ( cd "${S4F_DIR}" && ./Allrun solids4Foam > "${ALLRUN_LOGFILE}" 2>&1 )
+    prepare_case "${PF_DIR}"
+    ( cd "${PF_DIR}" && ./Allrun pimpleFoam > "${ALLRUN_LOGFILE}" 2>&1 )
 fi
 
 # ------------------------------------------------------------
@@ -209,11 +210,11 @@ coupling_diff() {
 }
 
 # 1. The outlet pressure against the exact solution
-check_rmse "pimpleFoam" "${CASE_DIR}/${COUPLING_FILE}"
+check_rmse "solids4Foam" "${CASE_DIR}/${COUPLING_FILE}"
 
 # 2. The restart: the rows of (0.5, 1] against the continuous run
 if grep -q "circulationCoupler: resumed from" \
-    "${RESTART_DIR}/log.pimpleFoam.restart" 2> /dev/null
+    "${RESTART_DIR}/log.solids4Foam.restart" 2> /dev/null
 then
     echo "PASS: the restarted run resumed from the circulation checkpoint"
 else
@@ -238,24 +239,24 @@ else
     failures=$((failures + 1))
 fi
 
-# 3. The pipe solved by solids4Foam: against the exact solution, and against
-#    the pimpleFoam run row by row
-check_rmse "solids4Foam" "${S4F_DIR}/${COUPLING_FILE}"
+# 3. The pipe solved by stock pimpleFoam: against the exact solution, and
+#    against the solids4Foam run row by row
+check_rmse "pimpleFoam" "${PF_DIR}/${COUPLING_FILE}"
 
-s4f_diff=$(coupling_diff "${CASE_DIR}/${COUPLING_FILE}" \
-    "${S4F_DIR}/${COUPLING_FILE}" 0)
+pf_diff=$(coupling_diff "${CASE_DIR}/${COUPLING_FILE}" \
+    "${PF_DIR}/${COUPLING_FILE}" 0)
 
-if [[ "${s4f_diff}" == "none" || "${s4f_diff}" == "rows" ]]; then
-    echo "FAIL: the solids4Foam run's rows do not match those of the pimpleFoam run"
+if [[ "${pf_diff}" == "none" || "${pf_diff}" == "rows" ]]; then
+    echo "FAIL: the pimpleFoam run's rows do not match those of the solids4Foam run"
     failures=$((failures + 1))
-elif awk -v d="${s4f_diff}" -v tol="${S4F_TOL}" \
+elif awk -v d="${pf_diff}" -v tol="${PF_TOL}" \
     'BEGIN { exit !(d < tol) }'
 then
-    printf "PASS: solids4Foam rows differ from the pimpleFoam run by %s of range\n" \
-        "${s4f_diff}"
+    printf "PASS: pimpleFoam rows differ from the solids4Foam run by %s of range\n" \
+        "${pf_diff}"
 else
-    printf "FAIL: solids4Foam rows differ from the pimpleFoam run by %s of range\n" \
-        "${s4f_diff}"
+    printf "FAIL: pimpleFoam rows differ from the solids4Foam run by %s of range\n" \
+        "${pf_diff}"
     failures=$((failures + 1))
 fi
 
@@ -263,7 +264,7 @@ fi
 if [[ "$CHECK_ONLY" = false && ${failures} -eq 0 ]]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${RESTART_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
-    ( cd "${S4F_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${PF_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 
 echo

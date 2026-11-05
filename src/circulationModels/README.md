@@ -87,9 +87,10 @@ connections ( (LV SAS SAT SAR SCP SVN RA TV RV PV PAS PAT PAR PCP PVN LA LV) );
 ```
 
 The CFD coupling tutorials in `tutorials/fluids/circulationModels`
-(`pipeWindkessel`, solved by `pimpleFoam` or, with `./Allrun solids4Foam`, by
-`solids4Foam`, and `pipeClosedLoop`) use the simplest case of this, an
-`externalPort` attached to a circuit, bound to a patch by name.
+(`pipeWindkessel` and `pipeClosedLoop`, solved by `solids4Foam` with the
+`pimpleFluid` fluid model or, with `./Allrun pimpleFoam`, by stock `pimpleFoam`)
+use the simplest case of this, an `externalPort` attached to a circuit, bound
+to a patch by name.
 
 ### What crosses the interface
 

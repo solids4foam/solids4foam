@@ -3,20 +3,20 @@
 # serial, about a minute), then, if python3 is available, the comparison with
 # the exact solution.
 #
-#   ./Allrun                  the pipe solved by stock pimpleFoam (default)
-#   ./Allrun solids4Foam      the pipe solved by solids4Foam (pimpleFluid)
+#   ./Allrun                  the pipe solved by solids4Foam (pimpleFluid, default)
+#   ./Allrun pimpleFoam       the pipe solved by stock pimpleFoam
 cd "$(dirname "$0")" || exit 1
 : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 
-solver=pimpleFoam
+solver=solids4Foam
 
 print_usage()
 {
     cat <<'USAGE'
 Usage:
-  ./Allrun                  # default: the pipe solved by pimpleFoam
-  ./Allrun pimpleFoam       # the same
-  ./Allrun solids4Foam      # the pipe solved by solids4Foam (pimpleFluid)
+  ./Allrun                  # default: the pipe solved by solids4Foam (pimpleFluid)
+  ./Allrun solids4Foam      # the same
+  ./Allrun pimpleFoam       # the pipe solved by stock pimpleFoam
 USAGE
 }
 

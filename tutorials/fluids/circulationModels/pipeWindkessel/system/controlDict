@@ -18,7 +18,7 @@ FoamFile
 
 libs ( "libcirculationCoupling.so" );
 
-application     pimpleFoam;     // or solids4Foam: ./Allrun solids4Foam
+application     solids4Foam;    // or pimpleFoam: ./Allrun pimpleFoam
 
 startFrom       startTime;
 startTime       0;

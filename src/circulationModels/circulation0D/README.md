@@ -262,14 +262,16 @@ and `libs ("libcirculationCoupling.so");` in `controlDict`. See
 ## Tutorials
 
 * `healthyHuman`: 4-chamber closed loop, healthy-human parameters.
-* `pipeClosedLoop`: a CFD pipe with **both** ends coupled to a closed
-  circulation loop (atrium, ventricle, two valves, 7 states): same
-  scheme/order choice. `./Allrun 0D` solves the same circuit with the pipe
-  replaced by its R-L surrogate, no CFD (the reference for the coupled run).
-* `pipeWindkessel`: a CFD pipe (`pimpleFoam`) coupled to a Windkessel;
-  `scheme explicit/implicit` and `order 1..4` chosen in the dictionary,
-  compared with the exact solution. `./Allrun solids4Foam` solves the same
-  case by `solids4Foam` with the `pimpleFluid` fluid model.
+* `pipeClosedLoop`: a CFD pipe (`solids4Foam`, `pimpleFluid`) with **both**
+  ends coupled to a closed circulation loop (atrium, ventricle, two valves,
+  7 states): same scheme/order choice. `./Allrun 0D` solves the same circuit
+  with the pipe replaced by its R-L surrogate, no CFD (the reference for the
+  coupled run).
+* `pipeWindkessel`: a CFD pipe (`solids4Foam`, `pimpleFluid`) coupled to a
+  Windkessel; `scheme explicit/implicit` and `order 1..4` chosen in the
+  dictionary, compared with the exact solution.
+
+Both CFD cases also run with stock `pimpleFoam` (`./Allrun pimpleFoam`).
 
 ## Verification
 

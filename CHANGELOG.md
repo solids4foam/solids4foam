@@ -586,8 +586,10 @@ release. For complete commit-level details and contributor information, see the
   exceeds 0.95.
 - The `circulationModels` tutorials moved from `tutorials/circulationModels`
   to `tutorials/fluids/circulationModels`, beside the other fluid cases.
-  `pipeWindkesselSolids4Foam` is now `./Allrun solids4Foam` in
-  `pipeWindkessel`, and `pipeClosedLoop0D` is now `./Allrun 0D` in
+  The two CFD cases, `pipeWindkessel` and `pipeClosedLoop`, are now solved
+  by `solids4Foam` with the `pimpleFluid` fluid model, with `./Allrun
+  pimpleFoam` for stock `pimpleFoam` (`pipeWindkesselSolids4Foam` is folded
+  into `pipeWindkessel`), and `pipeClosedLoop0D` is now `./Allrun 0D` in
   `pipeClosedLoop` (its circuit is in `pipeClosedLoop/reference0D`).
 
 ### Removed

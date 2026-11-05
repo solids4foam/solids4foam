@@ -3,26 +3,34 @@
 # Runs on numberOfSubdomains ranks of system/decomposeParDict (1: serial, slow).
 # Then:  python3 plotter.py
 #
-#   ./Allrun        the coupled CFD case, the pipe solved by pimpleFoam (default)
-#   ./Allrun 0D     the 0D reference in reference0D: the same circuit with the
-#                   pipe replaced by its R-L surrogate, solved by circulationFoam
+#   ./Allrun              the coupled CFD case, the pipe solved by solids4Foam
+#                         (pimpleFluid)
+#   ./Allrun pimpleFoam   the pipe solved by stock pimpleFoam
+#   ./Allrun 0D           the 0D reference in reference0D: the same circuit with
+#                         the pipe replaced by its R-L surrogate (circulationFoam)
 cd "$(dirname "$0")" || exit 1
 : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 
 mode=CFD
+solver=solids4Foam
 
 print_usage()
 {
     cat <<'USAGE'
 Usage:
-  ./Allrun          # default: the CFD pipe coupled to the circuit (pimpleFoam)
-  ./Allrun 0D       # the 0D reference, no mesh (circulationFoam in reference0D)
+  ./Allrun              # default: the CFD pipe coupled to the circuit (solids4Foam)
+  ./Allrun solids4Foam  # the same
+  ./Allrun pimpleFoam   # the pipe solved by stock pimpleFoam
+  ./Allrun 0D           # the 0D reference, no mesh (circulationFoam in reference0D)
 USAGE
 }
 
 for arg in "$@"
 do
     case "$arg" in
+        pimpleFoam|solids4Foam)
+            solver=$arg
+            ;;
         0D)
             mode=0D
             ;;
@@ -62,11 +70,11 @@ solids4Foam::runApplication -s check circulationFoam -check || exit 1
 echo "--- the circuit, as the program understood it ---"
 sed -n '/ODE states/,/^Result/p' log.circulationFoam.check
 
-echo "--- pimpleFoam on $np rank(s) (progress: tail -f log.pimpleFoam) ---"
+echo "--- ${solver} on $np rank(s) (progress: tail -f log.${solver}) ---"
 if [ "$np" -gt 1 ]; then
     solids4Foam::runApplication decomposePar || exit 1
-    solids4Foam::runParallel pimpleFoam || exit 1
+    solids4Foam::runParallel "${solver}" || exit 1
 else
-    solids4Foam::runApplication pimpleFoam || exit 1
+    solids4Foam::runApplication "${solver}" || exit 1
 fi
 echo "done: postProcessing/circulationCoupling/0/coupling.dat  (python3 plotter.py to plot)"

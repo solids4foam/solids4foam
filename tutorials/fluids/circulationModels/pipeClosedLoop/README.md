@@ -17,11 +17,13 @@ the node each patch is attached to. The circuit is one dictionary,
 ## Run it
 
 ```bash
-# blockMesh, circuit check, decomposePar, pimpleFoam on the
+# blockMesh, circuit check, decomposePar, solids4Foam on the
 # numberOfSubdomains (8) ranks of system/decomposeParDict; 1 runs serially
 ./Allrun
 # figures open on screen and are saved to plots/   (--no-show: only save)
 python3 plotter.py
+# the same pipe solved by stock pimpleFoam
+./Allrun pimpleFoam
 # the 0D reference: the same loop with the pipe replaced by its R-L
 # surrogate, solved as one circuit by circulationFoam (no mesh, seconds)
 ./Allrun 0D
@@ -29,16 +31,20 @@ python3 plotter.py
 ./Allclean
 ```
 
-Only `pimpleFoam` is needed: the coupling library (`libs` in
-`system/controlDict`) builds the circuit inside the solver and integrates its
-ODEs at every exchange. `circulationFoam` is for circuit-only cases; here it is
-used only for `circulationFoam -check` (what the program understood, and that
-both patches exist in the mesh). `plotter.py` needs matplotlib
-(`pip3 install matplotlib`).
+The pipe is solved by `solids4Foam` with the `pimpleFluid` fluid model, or by
+stock `pimpleFoam` with `./Allrun pimpleFoam`; the two agree to the PIMPLE
+`residualControl` tolerance of 1e-6, which is also the run-to-run scatter of
+one solver on 8 ranks (the Windkessel case, converged to 1e-10, agrees to all
+digits written). Only the fluid solver is needed: the coupling
+library (`libs` in `system/controlDict`) builds the circuit inside the solver
+and integrates its ODEs at every exchange. `circulationFoam` is for
+circuit-only cases; here it is used only for `circulationFoam -check` (what
+the program understood, and that both patches exist in the mesh). `plotter.py`
+needs matplotlib (`pip3 install matplotlib`).
 
 Settings for this demo: one cardiac cycle (`endTime 0.8`), `deltaT 5e-3`,
 explicit coupling of order 2. About a minute on 8 free cores (the three-cycle
-run about 2.5 minutes); watch it with `tail -f log.pimpleFoam`.
+run about 2.5 minutes); watch it with `tail -f log.solids4Foam`.
 
 ## Things to show
 
