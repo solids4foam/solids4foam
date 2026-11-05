@@ -14,8 +14,9 @@ solution. It also decomposes the tutorial's attenuation error.
 ## Requirements
 
 - OpenFOAM.com with solids4foam built with PETSc, which needs MUMPS and HYPRE
-  (the tutorial's requirement). Tested with OpenFOAM v2512, GCC 13.3, PETSc
-  3.19.6 and solids4foam development `1576edcc4`.
+  (the tutorial's requirement). The end-to-end run below used OpenFOAM v2512, GCC 11.4, PETSc
+  3.24 and solids4foam development `1576edcc4`; earlier development used GCC 13.3 and
+  PETSc 3.19.6.
 - python3 with numpy. matplotlib is optional: without it, the plots are
   skipped.
 - The `coded` function object is compiled at run time (the usual OpenFOAM
@@ -179,7 +180,7 @@ extrapolation.
 |---|---|---|
 | Transferred viscous traction = momentum wall flux | ≤ 5e-14 (all runs) | measured |
 | Applied solid traction = transferred fluid traction | ≤ 5e-12 shear; 1.5e-6 of \|p\| normal, the same in every run (all meshes, time steps, amplitudes, both couplings, and with coupling tolerances × 0.01): not a coupling residual, origin not identified, negligible for every QoI | measured |
-| Transferred normal viscous / exact 2μ∂_r u_r | 0.198, 0.270, 0.302 on m1/m2/m4 (200 steps/period) | measured |
+| Transferred normal viscous / exact 2μ∂_r u_r | 0.198, 0.270, 0.303 on m1/m2/m4 (200 steps/period) | measured |
 | | → 0.332 (observed spatial order 1.06; 0.313 with p = 2) | extrapolated |
 | Fields' own −2μ tr(∇U_b) / exact | 0.59, 0.81, 0.91 | measured |
 | | → 0.996 | extrapolated |
