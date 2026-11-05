@@ -258,11 +258,15 @@ class mechanicalConstitutiveLawPrestress
 {
     // Private Classes
 
-        //- Fpre, written at full round-trip precision whatever
-        //  writePrecision the case asks for, as the constitutive state is: a
-        //  continued run reads Fpre back from the time it continues from, and
-        //  a rounding of it would move the stress the laws see. writeData is
-        //  overridden rather than writeObject, whose signature differs
+        //- Fpre, written at full round-trip precision (17 significant
+        //  digits) whatever writePrecision the case asks for. This follows
+        //  the rule set by the constitutive state, whose
+        //  stateIOFieldProxy::writeData in
+        //  mechanicalConstitutiveLawStateIOTemplates.C does the same:
+        //  anything a restart reads back is written at full precision. A
+        //  continued run reads Fpre back from the time it continues from,
+        //  and a rounding of it would move the stress the laws see. writeData
+        //  is overridden rather than writeObject, whose signature differs
         //  between the three forks
         class fullPrecisionVolTensorField
         :

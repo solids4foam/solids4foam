@@ -49,8 +49,8 @@ Description
     is written and read back as it is held, on every processor; if any of
     that fails, the Fpre that was there is put back and the utility stops.
     Each pass appends a line to prestressHistory in the case directory: the
-    pass written, max mag(F - I) of the run that used the pass before it,
-    and the range of det(Fpre).
+    pass written, max mag(F - I) and the max and RMS of mag(D) of the run
+    that used the pass before it, and the range of det(Fpre).
 
     The manager writes the Fpre it used at every write time, at full
     precision, so Fpre in the latest time is the one the run used, and is
@@ -64,8 +64,13 @@ Description
     run did not apply it. On the first pass, where there is no Fpre in
     either, Fpre the run used is taken to be the identity.
 
-    max mag(F - I) is reported as the convergence measure: it tends to zero
-    as the mesh comes into equilibrium with the load under Fpre.
+    The convergence measures are those of the run that used the pass before:
+    the max and the volume-weighted RMS of mag(D), the displacement of the
+    imaged geometry under the load, and max mag(F - I). All tend to zero as
+    the mesh comes into equilibrium with the load under Fpre. mag(D) says
+    directly how far the loaded geometry is from the imaged one; mag(F - I)
+    also counts rigid rotation, so it can stay large where the wall turns
+    but hardly strains.
 
     A law with directions, such as fibres (see
     mechanicalConstitutiveLaw::stressFreeDirections), takes them in the
@@ -115,9 +120,9 @@ Description
 
     Reference:
     Gee, M. W., Förster, C., & Wall, W. A. (2010). A computational strategy for
-    prestressing patient‐specific biomechanical problems under finite
-    deformation. International journal for numerical methods in biomedical
-    engineering, 26(1), 52-72.
+    prestressing patient-specific biomechanical problems under finite
+    deformation. International Journal for Numerical Methods in Biomedical
+    Engineering, 26(1), 52-72.
 
 
 Usage
@@ -947,6 +952,22 @@ int main(int argc, char *argv[])
         mesh
     );
 
+    // The displacement of the run, from the imaged geometry to the deformed
+    // one, for the convergence measures
+    const volVectorField D
+    (
+        IOobject
+        (
+            "D",
+            latestTime.name(),
+            mesh,
+            IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        mesh
+    );
+
     // Fpre the run used: in the latest time if the run applied it.
     // Unregistered, so that the updated Fpre can be registered under
     // the same name
@@ -1135,7 +1156,16 @@ int main(int argc, char *argv[])
     const scalar maxMagFminusI = max(magFminusI).value();
     const scalar maxJpre = max(JpreNew).value();
 
-    Info<< "    max mag(F - I)    = " << maxMagFminusI << nl;
+    // max and volume-weighted RMS of mag(D) over the cells
+    const scalarField magD(mag(Foam::primitiveField(D)));
+    const scalarField& cellVolumes = mesh.V().field();
+    const scalar maxMagD = gMax(magD);
+    const scalar rmsMagD =
+        Foam::sqrt(gSum(sqr(magD)*cellVolumes)/gSum(cellVolumes));
+
+    Info<< "    max mag(D)        = " << maxMagD << nl
+        << "    RMS mag(D)        = " << rmsMagD << nl
+        << "    max mag(F - I)    = " << maxMagFminusI << nl;
 
     Info<< "    det(Fpre) ranges from " << minJpre << " to " << maxJpre
         << nl << endl;
@@ -1354,8 +1384,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    // One line per pass in the case directory: the pass written, max mag(F -
-    // I) of the run that used the pass before it, and the range of det(Fpre)
+    // One line per pass in the case directory: the pass written, the max and
+    // RMS of mag(D) and max mag(F - I) of the run that used the pass before
+    // it, and the range of det(Fpre)
     if (Pstream::master())
     {
         const fileName historyFile
@@ -1366,7 +1397,11 @@ int main(int argc, char *argv[])
         // The columns, as a header line. A new one is written whenever it
         // differs from the last in the file, so a history that gains or
         // loses a direction column still says what each column is
-        std::string header("# pass  maxMag(F-I)  minDet(Fpre)  maxDet(Fpre)");
+        std::string header
+        (
+            "# pass  maxMag(D)  rmsMag(D)  maxMag(F-I)  minDet(Fpre)"
+            "  maxDet(Fpre)"
+        );
 
         forAll(reported, dirI)
         {
@@ -1396,7 +1431,8 @@ int main(int argc, char *argv[])
         {
             history
                 << header << nl
-                << "# maxMag(F-I) is of the run that used the pass before"
+                << "# maxMag(D), rmsMag(D) and maxMag(F-I) are of the run "
+                << "that used the pass before; rmsMag(D) is volume weighted"
                 << nl;
 
             if (reported.size())
@@ -1411,8 +1447,8 @@ int main(int argc, char *argv[])
 
         history.precision(12);
         history
-            << newPass << "  " << maxMagFminusI << "  " << minJpre << "  "
-            << maxJpre;
+            << newPass << "  " << maxMagD << "  " << rmsMagD << "  "
+            << maxMagFminusI << "  " << minJpre << "  " << maxJpre;
 
         forAll(maxAngles, dirI)
         {
