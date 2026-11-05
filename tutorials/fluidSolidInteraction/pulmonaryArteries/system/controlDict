@@ -1,0 +1,90 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     solids4Foam;
+
+startFrom       startTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+// Five cardiac cycles of the 0.86 s inlet waveform
+endTime         4.3;
+
+deltaT          2.5e-4;
+
+writeControl    runTime;
+
+writeInterval   0.05;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  6;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   6;
+
+runTimeModifiable no;
+
+fileHandler     uncollated;
+
+functions
+{
+    // Pressure in the main pulmonary artery, every time step
+    pressureProbe
+    {
+        type            probes;
+        libs            (sampling);
+        region          fluid;
+        writeControl    timeStep;
+        writeInterval   1;
+        fields          (p);
+        probeLocations
+        (
+            (0.04 -0.008 0.065)
+        );
+    }
+
+    // Number of FSI iterations per time step
+    fsiConvData
+    {
+        type            fsiConvergenceData;
+        region          fluid;
+    }
+
+    // Wall shear stress on the fluid wall, at each write time
+    wallShearStress1
+    {
+        type            wallShearStress;
+        libs            (fieldFunctionObjects);
+        region          fluid;
+        patches         (wall);
+        writeFields     yes;
+        writePrecision  10;
+        writeControl    writeTime;
+        writeInterval   -1;
+    }
+}
+
+// ************************************************************************* //

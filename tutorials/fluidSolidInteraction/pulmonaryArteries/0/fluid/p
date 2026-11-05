@@ -1,0 +1,174 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 1.2575;  // 10 mmHg (1333 Pa / 1060), the prestress pressure
+
+boundaryField
+{
+    processor
+    {
+        type processor;
+    }
+
+    // Outlets: three-element Windkessel (windkesselPressure). The totals
+    //     Rp = 3.3e6 Pa s/m^3, Rd = 2e7 Pa s/m^3, C = 3.5e-8 m^3/Pa
+    // are split across the outlets by flow fraction f_i = r_i^2 / sum r^2:
+    //     Rch_i = Rp/f_i,  R_i = Rd/f_i,  C_i = C*f_i
+    // so a larger outlet has lower resistance and higher compliance, and the
+    // outlets in parallel add back up to the totals.
+    // value: the 10 mmHg prestress pressure, the starting outlet pressure
+
+    outlet1
+    {
+        type        windkesselPressure;
+        // flow fraction 0.292659
+        R           6.83389e+07;
+        Rch         1.12759e+07;
+        C           1.02431e-08;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet2
+    {
+        type        windkesselPressure;
+        // flow fraction 0.095273
+        R           2.09923e+08;
+        Rch         3.46374e+07;
+        C           3.33455e-09;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet3
+    {
+        type        windkesselPressure;
+        // flow fraction 0.209202
+        R           9.56016e+07;
+        Rch         1.57743e+07;
+        C           7.32206e-09;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet4
+    {
+        type        windkesselPressure;
+        // flow fraction 0.088981
+        R           2.24768e+08;
+        Rch         3.70867e+07;
+        C           3.11433e-09;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet5
+    {
+        type        windkesselPressure;
+        // flow fraction 0.084229
+        R           2.37447e+08;
+        Rch         3.91787e+07;
+        C           2.94803e-09;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet6
+    {
+        type        windkesselPressure;
+        // flow fraction 0.047713
+        R           4.19174e+08;
+        Rch         6.91638e+07;
+        C           1.66995e-09;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet7
+    {
+        type        windkesselPressure;
+        // flow fraction 0.056316
+        R           3.55139e+08;
+        Rch         5.85979e+07;
+        C           1.97106e-09;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet8
+    {
+        type        windkesselPressure;
+        // flow fraction 0.014965
+        R           1.33644e+09;
+        Rch         2.20512e+08;
+        C           5.23781e-10;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet9
+    {
+        type        windkesselPressure;
+        // flow fraction 0.024386
+        R           8.20144e+08;
+        Rch         1.35324e+08;
+        C           8.53509e-10;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet10
+    {
+        type        windkesselPressure;
+        // flow fraction 0.077707
+        R           2.57377e+08;
+        Rch         4.24672e+07;
+        C           2.71975e-09;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    outlet11
+    {
+        type        windkesselPressure;
+        // flow fraction 0.008569
+        R           2.33396e+09;
+        Rch         3.85104e+08;
+        C           2.99919e-10;
+        rho         1060;
+        value       uniform 1.2575;
+    }
+
+    inlet
+    {
+        type zeroGradient;
+    }
+
+    wall
+    {
+        // Robin-Neumann coupling: the secant hsModel sets the added-mass
+        // coefficient rho_s*hs, so no case-specific value is needed
+        type        elasticWallPressure;
+        hsModel     secant;
+        value       uniform 1.2575;
+    }
+}
+
+// ************************************************************************* //
