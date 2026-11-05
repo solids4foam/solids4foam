@@ -24,8 +24,8 @@ REG_END_TIME=2.1
 # Regression tolerances
 DISP_TOL=2e-5
 # The force tolerances are relative to the reference, as the total force on
-# the plate and cylinder is dominated by the cylinder drag. OpenFOAM-v2412 and
-# v2512 are within 6e-5 of the references below, and OpenFOAM-9 within 1.5e-4
+# the plate and cylinder is dominated by the cylinder drag. OpenFOAM-9 is
+# within 3e-4 of the references below
 FX_REL_TOL=1e-3
 FY_REL_TOL=5e-3
 
@@ -33,18 +33,20 @@ FY_REL_TOL=5e-3
 # The force references are the total force on the plate and cylinder, in N
 # before the plotting depth correction. All references use the benchmark
 # St. Venant-Kirchhoff law and FSI3 interface tolerance of 1e-5.
-# The displacement and force values are the midpoint of
-# OpenFOAM-v2412 and OpenFOAM-v2512 runs with rhoInf 1000 at t = 2.1.
-REF_TIP_UY=-0.000282008
-REF_FX=6.6783815
-REF_FY=-0.6751037
+# The displacement and force values are from OpenFOAM-v2512 (Linux) with
+# rhoInf 1000 at t = 2.1 and the continuity-based wall-normal velocity
+# gradient (#670), which moves the tip by -19% and Fy by -1.3% at this
+# early, growing stage of the oscillation.
+REF_TIP_UY=-0.000228437
+REF_FX=6.6766
+REF_FY=-0.666029
 
 # foam-extend uses GGI rather than AMI for the interface interpolation and has
 # a distinct, repeatable tip displacement and force at the regression end time.
 if [[ "${WM_PROJECT:-}" == "foam" ]]; then
-    REF_TIP_UY=-0.000242835
-    REF_FX=6.722682
-    REF_FY=-0.6478985
+    REF_TIP_UY=-0.000201693
+    REF_FX=6.7228
+    REF_FY=-0.644138
 fi
 
 ALLRUN_LOGFILE="log.Allrun"
