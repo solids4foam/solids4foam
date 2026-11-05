@@ -85,6 +85,52 @@ class PrepareCopies(unittest.TestCase):
         self.assertEqual(rec["changes"], {"couplingTolFactor": 0.01})
         self.assertFalse(self.dest.with_name("womersleyTube.partial").exists())
 
+    def test_periods_option(self):
+        diag = Path(P.DIAGNOSTIC).read_text()
+        self.assertIn("timeStart", diag)
+        self.ensure("--periods", "10")
+        ref = json.loads((self.dest / "verification/reference/"
+                          "womersleyTube_verification_references.json").read_text())
+        self.assertEqual(ref["study"]["periods"], 10)
+        self.assertEqual(ref["study"]["analysisPeriods"], 2)   # window: periods 9-10
+        import re
+        start = re.search(r"^\s*timeStart\s+([^;]+);",
+                          (self.dest / "system/interfaceTractionDiagnostic").read_text(),
+                          re.MULTILINE).group(1)
+        self.assertEqual(float(start), 8.0)                    # (10 - 2) periods of 1.0
+        rec = json.loads((self.dest / P.MARKER).read_text())
+        self.assertEqual(rec["changes"], {"periods": 10})
+        self.assertEqual(rec["requested"]["periods"], 10)
+        # the source tutorial is untouched and a copy without --periods is another setting
+        self.assertEqual(json.loads((self.src / "verification/reference/"
+                                     "womersleyTube_verification_references.json"
+                                     ).read_text())["study"]["periods"], 6)
+        self.dest.joinpath("verification/work/c1").mkdir(parents=True)
+        (self.dest / "verification/work/c1/x").write_text("run")
+        with self.assertRaises(SystemExit):
+            self.ensure()                                      # holds runs: refused
+
+    def test_periods_with_negative_amplitude_on_the_real_tutorial(self):
+        real = Path(P.__file__).resolve().parents[3]
+        dest = self.root / "real/womersleyTube"
+        quiet(P.main, [str(real), str(dest), "--amplitude=-1", "--periods", "10"])
+        ref = json.loads((dest / "verification/reference/"
+                          "womersleyTube_verification_references.json").read_text())
+        self.assertEqual(ref["study"]["periods"], 10)
+        self.assertEqual(ref["reference"]["parameters"]["pressureAmplitude"], -1.0)
+        rec = json.loads((dest / P.MARKER).read_text())
+        self.assertEqual(rec["changes"], {"pressureAmplitude": -1.0, "periods": 10})
+
+    def test_periods_must_exceed_the_analysis_window(self):
+        for bad in ("2", "1", "0"):
+            with self.assertRaises(SystemExit):
+                self.ensure("--periods", bad)
+            self.assertFalse(self.dest.exists())
+
+    def test_without_periods_the_marker_has_no_periods_key(self):
+        self.ensure()
+        self.assertNotIn("periods", json.loads((self.dest / P.MARKER).read_text())["requested"])
+
     def test_failed_substitution_leaves_no_copy(self):
         (self.src / "constant/fsiProperties.robin").write_text("outerCorrTolerance 1e-6;\n")
         with self.assertRaises(SystemExit):

@@ -2,7 +2,7 @@
 """Prepare a womersleyTube study copy with the interface-traction diagnostic.
 
 usage: prepare_study.py SRC_TUTORIAL DEST [--mu MU] [--amplitude A]
-                        [--coupling-tol-factor F]
+                        [--coupling-tol-factor F] [--periods N]
 
 - copies the tutorial (without results) to DEST;
 - installs scripts/interfaceTractionDiagnostic as system/interfaceTractionDiagnostic
@@ -12,7 +12,12 @@ usage: prepare_study.py SRC_TUTORIAL DEST [--mu MU] [--amplitude A]
   amplitude (Pa) and REGENERATE, consistently, constant/womersleyProperties
   (end data and initial fields) and the reference JSON with the copy's own
   womersley_exact.py; constant/fluid/transportProperties nu is set to mu/rho;
-- --coupling-tol-factor: multiply the Robin and IQN-ILS coupling tolerances.
+- --coupling-tol-factor: multiply the Robin and IQN-ILS coupling tolerances;
+- --periods N: run N periods instead of the study's 6 (set in the copy's
+  reference JSON, which the verification driver reads for the end time); the
+  analysis window stays the last analysisPeriods (2), and the diagnostic
+  samples them (timeStart = (N - 2) periods). A negative --amplitude is valid
+  (use --amplitude=-1).
 Nothing in SRC is modified.
 
 The copy is built in a staging directory DEST.partial (any leftover one is
@@ -217,13 +222,13 @@ def publish(staging: Path, dest: Path, keep_runs: bool):
 
 
 def prepare(src: Path, dest: Path, mu=None, amplitude=None, coupling_tol_factor=None,
-            overwrite_diagnostic=False, keep_runs=False):
+            overwrite_diagnostic=False, keep_runs=False, periods=None):
     src, dest = src.resolve(), dest.resolve()
     staging = dest.with_name(dest.name + ".partial")
     if staging.exists():
         shutil.rmtree(staging)  # an unfinished earlier preparation, holds no runs
     try:
-        build(src, staging, mu, amplitude, coupling_tol_factor, overwrite_diagnostic)
+        build(src, staging, mu, amplitude, coupling_tol_factor, overwrite_diagnostic, periods)
         publish(staging, dest, keep_runs)
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
@@ -232,13 +237,13 @@ def prepare(src: Path, dest: Path, mu=None, amplitude=None, coupling_tol_factor=
     print(f"prepared {dest} with {changes or 'tutorial parameters'}")
 
 
-def build(src: Path, work: Path, mu, amplitude, coupling_tol_factor, overwrite_diagnostic):
+def build(src: Path, work: Path, mu, amplitude, coupling_tol_factor, overwrite_diagnostic,
+          periods=None):
     """Build the study copy in the staging directory `work`; the marker is
     written last, after the copy and the edits have been validated."""
     solver_hash, analysis_hash = source_hashes(src)
     wanted = {"solverHash": solver_hash,
-              "requested": {"mu": mu, "amplitude": amplitude,
-                            "couplingTolFactor": coupling_tol_factor}}
+              "requested": requested_settings(mu, amplitude, coupling_tol_factor, periods)}
     shutil.copytree(src, work, symlinks=True, ignore=shutil.ignore_patterns(*IGNORE))
     d = work
     # diagnostic function object: always the one next to this script. A
@@ -255,12 +260,18 @@ def build(src: Path, work: Path, mu, amplitude, coupling_tol_factor, overwrite_d
     ref_file = d / "verification/reference/womersleyTube_verification_references.json"
     ref = json.loads(ref_file.read_text())
     period = ref["reference"]["derived"]["period"]
-    periods = ref["study"]["periods"]
     window = ref["study"]["analysisPeriods"]
+    changes = {}
+    if periods is not None:
+        if periods <= window:
+            raise SystemExit(f"--periods {periods} must exceed the {window} analysed periods")
+        ref["study"]["periods"] = periods
+        ref_file.write_text(json.dumps(ref, indent=2))
+        changes["periods"] = periods
+    periods = ref["study"]["periods"]
     sub_one(fo, r"^(\s*timeStart\s+)[^;]+;", rf"\g<1>{(periods - window) * period:.12g};")
     sub_one(d / "system/controlDict", r"^functions\s*\n\{",
             'functions\n{\n    #include "interfaceTractionDiagnostic"\n')
-    changes = {}
     if mu is not None or amplitude is not None:
         sys.path.insert(0, str(d / "verification/scripts"))
         try:
@@ -281,6 +292,8 @@ def build(src: Path, work: Path, mu, amplitude, coupling_tol_factor, overwrite_d
             # make the copy's exact script self-consistent with the new parameters
             script = d / "verification/scripts/womersley_exact.py"
             for key, val in changes.items():
+                if key not in ("dynamicViscosity", "pressureAmplitude"):
+                    continue    # e.g. periods: not a parameter of the exact script
                 sub_one(script, rf'^(\s*"{key}":\s*)[^,]+,', rf"\g<1>{val!r},")
             if mu is not None:
                 nu = mu / W.PARAMETERS["fluidDensity"]
@@ -296,9 +309,20 @@ def build(src: Path, work: Path, mu, amplitude, coupling_tol_factor, overwrite_d
                                           str(p.relative_to(d))))
         changes["couplingTolFactor"] = coupling_tol_factor
     validate_copy(src, d, wanted["requested"])
+    if periods is not None and json.loads(ref_file.read_text())["study"]["periods"] != periods:
+        raise SystemExit("the reference JSON of the copy does not hold the requested periods")
     (d / MARKER).write_text(json.dumps(
         dict(wanted, analysisHash=analysis_hash, complete=True, source=str(src),
              changes=changes), indent=2))
+
+
+def requested_settings(mu, amplitude, coupling_tol_factor, periods=None):
+    """The requested settings recorded in the marker. periods is recorded only
+    when requested, so that copies prepared without it keep their marker."""
+    requested = {"mu": mu, "amplitude": amplitude, "couplingTolFactor": coupling_tol_factor}
+    if periods is not None:
+        requested["periods"] = periods
+    return requested
 
 
 def main(argv=None):
@@ -308,6 +332,7 @@ def main(argv=None):
     ap.add_argument("--mu", type=float)
     ap.add_argument("--amplitude", type=float)
     ap.add_argument("--coupling-tol-factor", type=float)
+    ap.add_argument("--periods", type=int)
     ap.add_argument("--ensure", action="store_true",
                     help="keep DEST if complete and matching SRC and the settings")
     ap.add_argument("--force", action="store_true",
@@ -315,7 +340,7 @@ def main(argv=None):
     ap.add_argument("--overwrite-diagnostic", action="store_true")
     a = ap.parse_args(argv)
     kw = dict(mu=a.mu, amplitude=a.amplitude, coupling_tol_factor=a.coupling_tol_factor,
-              overwrite_diagnostic=a.overwrite_diagnostic)
+              overwrite_diagnostic=a.overwrite_diagnostic, periods=a.periods)
     if not a.ensure:
         if a.dest.exists():
             raise SystemExit(f"{a.dest} exists")
@@ -323,8 +348,8 @@ def main(argv=None):
     recover_interrupted(a.dest.resolve())
     solver_hash, analysis_hash = source_hashes(a.src.resolve())
     wanted = {"solverHash": solver_hash,
-              "requested": {"mu": a.mu, "amplitude": a.amplitude,
-                            "couplingTolFactor": a.coupling_tol_factor}}
+              "requested": requested_settings(a.mu, a.amplitude, a.coupling_tol_factor,
+                                              a.periods)}
     state = ensure_state(a.dest, wanted, analysis_hash)
     if state == "current":
         print(f"{a.dest}: up to date")
