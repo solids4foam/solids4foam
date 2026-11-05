@@ -1034,7 +1034,8 @@ def cmd_check(args) -> int:
         row, _ = analyse_case(CASES_DIR / name, entry["method"],
                               entry["estimator"], entry["level"],
                               entry["ranks"], entry.get("dt_cap", 0.0))
-        ref = {row_key(r): r for r in tracked}.get(row_key(row))
+        ref = {row_key(r): r for r in tracked + read_results(
+            RESULTS_DIR / "controls" / "cases-timestep.csv")}.get(row_key(row))
         if ref is None:
             results.append(("SKIPPED", f"{name}: no tracked row"))
         else:

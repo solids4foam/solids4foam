@@ -217,5 +217,15 @@ class StAuditTests(unittest.TestCase):
         self.assertTrue(lines[1].startswith("1,42,-0.972,-0.931,,,"))
 
 
+class CheckFindsControlRows(unittest.TestCase):
+    def test_control_rows_are_tracked_for_check(self):
+        main = {v.row_key(r) for r in v.read_results()}
+        ctl = {v.row_key(r) for r in v.read_results(
+            v.RESULTS_DIR / "controls" / "cases-timestep.csv")}
+        key = ("penalty", "", 3, 0.00125)
+        self.assertNotIn(key, main)
+        self.assertIn(key, ctl)
+
+
 if __name__ == "__main__":
     unittest.main()
