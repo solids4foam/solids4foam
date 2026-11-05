@@ -167,18 +167,11 @@ Four forcing methods are available:
   flux of the velocity of a deforming body (for example a bending beam,
   whose sections stretch on one side and shorten on the other) need not be
   zero, and would otherwise be a source of fluid that leaks into the flow
-  (this has no effect for rigid bodies). The face apertures are sampled at
-  the mesh points, which miss a body thinner than the point spacing for a
-  part of the time (a closed thin plate then lets the fluid through);
-  `thinBodyBlocking openFaces` (default `off`) also blocks (aperture 0, flux
-  of the body velocity) the internal and coupled faces that are fully open
-  by the points but whose centre-to-centre segment crosses the surface, an
-  exact test on the surface triangles for any thickness, and
-  `crossedFaces` also the partly cut internal faces between two cells whose
-  centres are outside the bodies. This is a face-crossing criterion, not a
-  treatment of gaps, holes or free edges thinner than a cell, and an
-  oblique or curved thin shell still transmits less than its swept volume
-  during the start-up. The
+  (this has no effect for rigid bodies). The face
+  apertures are sampled at the mesh points, which miss a body thinner than
+  the point spacing for a part of the time; an experimental switch for such
+  bodies, `thinBodyBlocking` (default `off`), is described in
+  [Experimental: thin bodies](#experimental-thin-bodies). The
   force is the momentum exchange (`forceEstimator momentumExchange`, the
   default), which includes the inertia of the fluid inside the body; the
   alternative surface traction (`forceEstimator surfaceTraction`) is from
@@ -567,6 +560,133 @@ With this version, `clustered` (the default) against `greedy`:
   unchanged (checked with `MESH_LEVEL=1` for `oscillatingCylinderInChannel`,
   `staticCylinderInChannel`, `translatingCylinderInChannel`,
   `bendingBeamInChannel` and `oscillatingWallStokesLayer`).
+
+## Experimental: thin bodies
+
+**Experimental, work in progress, off by default.** This section describes
+`thinBodyBlocking` of `immersedBoundaryForce` (`method cutLink` with
+`apertureCoupling yes`). It is not a validated method for closed valves or
+for thin curved shells in general, and with the default `off` the code path
+and results are unchanged.
+
+### Problem
+
+With `apertureCoupling` the face apertures are computed from the signed
+distance at the mesh points (`cutFaceIso`) and the cells inside the bodies
+from the signed distance at the cell centres. A closed body of thickness `t`
+smaller than the point spacing `h` is therefore seen by the points only for
+the fraction `t/h` of the time, as it moves through the mesh, and the fluid
+leaks through it when it is not seen.
+
+### Crossing test
+
+For every internal face with owner `P` and neighbour `N`, the segment
+`C_P C_N` between the two cell centres is tested against the triangles of the
+surface (`triSurfaceSearch::findLine`): the test is exact for any thickness.
+If the segment crosses the surface, the face is blocked: its aperture is set
+to 0 and the flux through it is that of the body velocity, as for the faces
+that are inside a body, so that the pressure equation of `pimpleFluid` treats
+it as a solid face. Coupled (processor) faces are tested in the same way with
+the segment to the centre of the cell on the other side, so that both sides
+of a processor face block the same faces. Only the faces whose cell centres
+are inside the bounding box of a body, grown by two cell sizes, are tested.
+
+```text
+thinBodyBlocking  off;           // default: unchanged behaviour
+thinBodyBlocking  openFaces;     // also block the faces that the points leave
+                                 // fully open (aperture 1) and a segment crosses
+thinBodyBlocking  crossedFaces;  // openFaces, and also the partly cut internal
+                                 // faces between two cells whose centres are
+                                 // outside the bodies
+```
+
+The blocking is by whole faces (binary), not by a partial aperture.
+
+### Evidence
+
+All results are with OpenFOAM.com v2412. The test is
+`tutorials/fluids/immersedBoundary/thinPlateInDuct`: a closed box plate
+spanning a 2 m x 0.2 m duct (cells of h = 10 mm, one cell in the
+empty direction, 200 x 20 x 1 cells, laminar, nu = 1e-3, impulsive start,
+open ends) translated along the duct at w = 0.1 m/s by `uniformTranslation`.
+An impermeable plate pushes the fluid at its own speed, so the volume flux
+through every cross-section is exactly `w A` (`A = 0.2 x 0.01 m2`). Q is the
+outlet flux, and Q/(wA) is the average of the values of every time step
+between 2 and 8 s (the transient of the impulsive start is excluded;
+instantaneous values vary around it, the ranges are in the case logs of the
+study). `thinBodyBlocking crossedFaces` and `openFaces` gave the same Q/(wA)
+here (openFaces: research-branch runs only).
+
+Time-averaged Q/(wA), 2-8 s, plate moving at w (run with the code of this
+branch):
+
+| t/h | slip walls, off | slip, crossedFaces | no-slip, off | no-slip, crossedFaces |
+| --- | --- | --- | --- | --- |
+| 0.43 | 0.769 | 1.0000 | 0.442 | 0.946 |
+| 0.5 | 0.889 | 1.0000 | 0.568 | 0.954 |
+| 1 | 1.0000 | 1.0000 | 0.964 | 0.981 |
+| 1.7 | 1.0000 | 1.0000 | 0.980 | 0.987 |
+| 3 | 1.0000 | 1.0000 | 0.989 | 0.992 |
+
+With slip walls the exact reference is plug flow and the result with the
+switch is `1.0000` to four digits. The no-slip deficit that remains (about
+1-5 %) is also present for a plate of three cells and is a wall-layer effect
+that has not been investigated.
+
+Results below are from the research branch the code comes from (the same
+blocking code, not re-run for this pull request):
+
+- Static plate with a pressure drop (inlet `p` = 0.01, outlet 0, plate at
+  rest): the leakage fraction at 6 s (outlet flux divided by that of the duct
+  without a plate at the same time, a transient that is still decaying), for
+  a plate of 0.43 cells, is 47 % with the switch off and 5.1 % on with
+  no-slip walls, and 33 % off and 2.3 % on with slip walls. The leakage flux
+  is constant in time (about 1.4e-6 m3/s for slip walls), so the fraction
+  decays only because the free flow grows. The plate is not leak-free.
+- Thin shells of 0.3 cells thickness (a plate tilted by 30 degrees and a
+  parabolic arc of 4.5 cm sag, closed prisms, translated along x at w, slip
+  walls), time-averaged Q/(wA) over 2-8 s: tilted 0.72 (off) to 0.89
+  (`crossedFaces`), arc 0.75 to 0.94. The shortfall is a start-up transient:
+  Q/(wA) of the tilted shell reaches 0.995 at 10 s (0.999 for the arc). With
+  no-slip walls the values are 0.40 to 0.57 and 0.42 to 0.66.
+  These shells are not within 2 % of their swept volume.
+- With the switch on, the ALE test cases of the research branch (3-cell
+  plates, moving mesh) change by amounts of the order of the pressure-solver
+  tolerance, as expected, since faces are blocked.
+
+Regression with the switch off (default), same compiler and OpenFOAM
+as the base `ba563ba6a`, serial, 1 s: `translatingCylinderInChannel`,
+`staticCylinderInChannel`, `oscillatingCylinderInChannel` and
+`bendingBeamInChannel` (`MESH_LEVEL=1`) give fields (`U`, `p`, `phi`, ...) and
+`postProcessing` files that are bit-identical to those of the unmodified base.
+A 4-rank run (simple `(4 1 1)`, the plate crosses the processor faces at
+`x` = 0.5 and 1 m during 2-8 s) gives the same time-averaged Q/(wA) as the
+serial run to the four digits shown (off 0.7688, `crossedFaces` 1.0000); the
+instantaneous outlet flux differs by at most 7e-4 of `w A` (4e-4 with the
+switch off), which is the level of the solver tolerance in parallel.
+
+### Known limitations and open questions
+
+- The pressure equation keeps a diffusivity across blocked faces, so a
+  pressure difference across a static thin body drives a leak (see above); a
+  closed valve is not guaranteed to be sealed.
+- Faces are blocked entirely or not at all, not by a partial aperture; the
+  flux changes in steps of order `h^2 w` as the set of blocked faces changes.
+- Oblique and curved thin shells transmit less than their swept volume during
+  the start-up (0.3 cells thickness, above).
+- The no-slip wall-layer deficit of 1-5 % of the flux is not explained.
+- Free edges, gaps, holes, leaflet tips and tapered leaflets are not treated:
+  a face is blocked only if the segment between two cell centres crosses a
+  triangle, so a slit narrower than a cell between two blocked faces is
+  closed by the staircase, and a gap that no segment crosses is not seen.
+- The force estimators (momentum exchange, surface traction) with the switch
+  on, deforming bodies and contact were not examined.
+- The cost of the crossing search (one `findLine` per candidate face at each
+  update) was not measured on large meshes; meshes with skewed processor
+  faces were not tested.
+- Tested only for prescribed rigid translation at constant velocity, laminar
+  flow and a mesh with `h` = 10 mm.
+- The "faces blocked" count in the log adds the coupled faces on both sides.
 
 ## Provenance
 

@@ -1,0 +1,26 @@
+#!/bin/bash
+# Run one case: ./runCase RATIO WALLS MODE [NPROCS]
+#   RATIO  plate thickness / cell size (cell size h = 10 mm)
+#   WALLS  slip | noSlip
+#   MODE   thinBodyBlocking: off | openFaces | crossedFaces
+#   NPROCS optional, 1 (default, serial) or 4 (simple (4 1 1) decomposition)
+cd "${0%/*}" || exit 1
+ratio=$1; walls=$2; mode=$3; np=${4:-1}
+d=run_${walls}_${ratio}_${mode}; [ "$np" -gt 1 ] && d=${d}_np$np
+rm -rf $d; mkdir $d
+cp -r 0 constant system $d/
+mkdir -p $d/constant/triSurface
+python3 makePlateStl.py $ratio > $d/constant/triSurface/plate.stl
+sed -i "s/thinBodyBlocking .*;/thinBodyBlocking $mode;/" $d/constant/fvOptions
+sed -i "/walls/,/}/ s/type .*slip;/type            $walls;/" $d/0/U
+cd $d || exit 1
+blockMesh > log.blockMesh 2>&1 && topoSet > log.topoSet 2>&1 || exit 1
+if [ "$np" -gt 1 ]
+then
+    sed -i "s/numberOfSubdomains .*;/numberOfSubdomains $np;/" system/decomposeParDict
+    decomposePar -force > log.decomposePar 2>&1 \
+      && mpirun -np $np solids4Foam -parallel > log.solids4Foam 2>&1 \
+      && reconstructPar -latestTime > log.reconstructPar 2>&1
+else
+    solids4Foam > log.solids4Foam 2>&1
+fi

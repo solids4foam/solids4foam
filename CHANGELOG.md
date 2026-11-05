@@ -8,6 +8,11 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Experimental, off by default: `thinBodyBlocking` of `immersedBoundaryForce`
+  (`cutLink`) blocks the faces that a body thinner than the point spacing
+  crosses between two cell centres, with the `thinPlateInDuct` tutorial. See
+  "Experimental: thin bodies" in `src/immersedBoundary/README.md` for the
+  limitations; the default behaviour is unchanged.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the
