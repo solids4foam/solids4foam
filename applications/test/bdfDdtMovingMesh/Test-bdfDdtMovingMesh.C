@@ -51,10 +51,14 @@ Description
 
 \*---------------------------------------------------------------------------*/
 
-#include "fvCFD.H"
-#include "bdfDdtScheme.H"
-#include "fvcDiv.H"
-#include "IStringStream.H"
+#ifdef OPENFOAM_COM
+    #include "fvCFD.H"
+    #include "bdfDdtScheme.H"
+    #include "fvcDiv.H"
+    #include "IStringStream.H"
+#else
+    #include "IOstreams.H"
+#endif
 
 using namespace Foam;
 
@@ -62,6 +66,8 @@ using namespace Foam;
 
 int main(int argc, char *argv[])
 {
+#ifdef OPENFOAM_COM
+
     argList::addOption("deltaT", "scalar", "time step (default: controlDict)");
     argList::addOption("endTime", "scalar", "end time (default: controlDict)");
     argList::addBoolOption
@@ -279,6 +285,13 @@ int main(int argc, char *argv[])
     }
 
     Info<< nl << "End" << nl << endl;
+
+#else
+
+    Info<< "Test-bdfDdtMovingMesh: the BDF ddt scheme requires OpenFOAM.com"
+        << nl << endl;
+
+#endif
 
     return 0;
 }

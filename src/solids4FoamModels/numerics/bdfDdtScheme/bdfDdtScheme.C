@@ -1110,10 +1110,17 @@ tmp<surfaceScalarField> bdfDdtScheme<Type>::meshPhi
 
     tmp<surfaceScalarField> tmeshPhi
     (
-        surfaceScalarField::New
+        new surfaceScalarField
         (
-            phi.name(),
-            IOobject::NO_REGISTER,
+            IOobject
+            (
+                phi.name(),
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
             b*phi
         )
     );
