@@ -273,6 +273,14 @@ Description
         // treatment of holes, gaps or tips thinner than a cell
         thinBodyBlocking off;
 
+        // with thinBodyBlocking: zero (the faces blocked by a crossing, and
+        // the closed faces between cells that are not solid, carry no
+        // pressure-driven flux: their pressure diffusivity is zero, and the
+        // regions that they separate from every fixed pressure get a
+        // reference) or keep (the diffusivity of the aperture blending, the
+        // earlier behaviour, which leaks); optional, default zero
+        thinBodyDiffusivity zero;
+
         // cutLink: force estimate, momentumExchange, surfaceTraction or
         // forcing, optional, default momentumExchange
         forceEstimator  momentumExchange;
@@ -495,6 +503,20 @@ class immersedBoundaryForce
             //  leave fully open) or crossedFaces (also the partly cut faces
             //  between two cells whose centres are outside the bodies)
             word thinBodyBlocking_;
+
+            //- Pressure diffusivity of the faces blocked by a crossing:
+            //  keep (the face keeps the diffusivity of the aperture
+            //  blending, the earlier behaviour, which leaks) or zero, the
+            //  default (a blocked face
+            //  carries no pressure-driven flux: the fluid model sets its
+            //  diffusivity to zero, and handles the regions that the blocked
+            //  faces separate from every fixed pressure)
+            word thinBodyDiffusivity_;
+
+            //- 1 on the faces blocked by a crossing, else 0, registered for
+            //  the fluid model as immersedBoundaryBlockedFaces when
+            //  thinBodyDiffusivity is zero
+            autoPtr<surfaceScalarField> blockedFacesPtr_;
 
             //- Fluid fraction of the area of each face (aperture), and the
             //  flux of the body velocity through each face, registered for

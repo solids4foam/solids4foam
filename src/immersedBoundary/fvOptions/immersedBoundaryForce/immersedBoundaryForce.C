@@ -1091,6 +1091,32 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
     // are only tested when fully open
     if (thinBodyBlocking_ != "off")
     {
+        if (thinBodyDiffusivity_ == "zero")
+        {
+            if (!blockedFacesPtr_)
+            {
+                blockedFacesPtr_.reset
+                (
+                    new surfaceScalarField
+                    (
+                        IOobject
+                        (
+                            "immersedBoundaryBlockedFaces",
+                            mesh_.time().timeName(),
+                            mesh_,
+                            IOobject::NO_READ,
+                            IOobject::NO_WRITE,
+                            true
+                        ),
+                        mesh_,
+                        dimensionedScalar(dimless, Zero)
+                    )
+                );
+            }
+            blockedFacesPtr_->primitiveFieldRef() = 0;
+            blockedFacesPtr_->boundaryFieldRef() = 0;
+        }
+
         const bool allCut = (thinBodyBlocking_ == "crossedFaces");
         const labelUList& own = mesh_.owner();
         const labelUList& nei = mesh_.neighbour();
@@ -1177,6 +1203,10 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
             if (crossed[i])
             {
                 alphaI[openFaces[i]] = 0;
+                if (blockedFacesPtr_)
+                {
+                    blockedFacesPtr_->primitiveFieldRef()[openFaces[i]] = 1;
+                }
                 nBlocked++;
             }
         }
@@ -1243,6 +1273,11 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
                 if (pcrossed[i])
                 {
                     palpha[pFaces[i]] = 0;
+                    if (blockedFacesPtr_)
+                    {
+                        blockedFacesPtr_->boundaryFieldRef()[patchi][pFaces[i]]
+                            = 1;
+                    }
                     nBlocked++;
                 }
             }
@@ -1301,6 +1336,60 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
             }
         }
         solidCellsPtr_->correctBoundaryConditions();
+
+        // thinBodyDiffusivity zero: a face that the points leave entirely
+        // in a body, between two cells that are not entirely solid, is a
+        // closed thin wall too (a body thinner than the point spacing
+        // that contains a point, but no cell centre): no pressure-driven
+        // flux
+        if (blockedFacesPtr_)
+        {
+            const scalarField& solidC = solidCellsPtr_->primitiveField();
+            scalarField& blockedI = blockedFacesPtr_->primitiveFieldRef();
+            label nSolidWalls = 0;
+            forAll(alphaI, facei)
+            {
+                if
+                (
+                    alphaI[facei] <= 0
+                 && solidC[own[facei]] < 0.5
+                 && solidC[nei[facei]] < 0.5
+                )
+                {
+                    blockedI[facei] = 1;
+                    nSolidWalls++;
+                }
+            }
+            forAll(alpha.boundaryField(), patchi)
+            {
+                const fvPatch& patch = mesh_.boundary()[patchi];
+                if (!patch.coupled())
+                {
+                    continue;
+                }
+                const fvsPatchScalarField& palpha =
+                    alpha.boundaryField()[patchi];
+                const fvPatchScalarField& psolid =
+                    solidCellsPtr_->boundaryField()[patchi];
+                const labelUList& fc = patch.faceCells();
+                forAll(palpha, i)
+                {
+                    if
+                    (
+                        palpha[i] <= 0
+                     && solidC[fc[i]] < 0.5
+                     && psolid[i] < 0.5
+                    )
+                    {
+                        blockedFacesPtr_->boundaryFieldRef()[patchi][i] = 1;
+                        nSolidWalls++;
+                    }
+                }
+            }
+            Info<< "    Thin body blocking: closed faces between cells that are"
+                << " not solid: " << returnReduce(nSolidWalls, sumOp<label>())
+                << endl;
+        }
     }
 
     // Faces with a solid part, and their centres
@@ -2109,6 +2198,8 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     pinnedRateCoeff_(100),
     apertureCoupling_(true),
     thinBodyBlocking_("off"),
+    thinBodyDiffusivity_("zero"),
+    blockedFacesPtr_(),
     aperturePtr_(),
     wallFluxPtr_(),
     solidCellsPtr_(),
@@ -2882,6 +2973,16 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
                 << "Unknown thinBodyBlocking " << thinBodyBlocking_
                 << ": valid choices are off, openFaces and crossedFaces"
                 << exit(FatalIOError);
+        }
+        coeffs_.readIfPresent("thinBodyDiffusivity", thinBodyDiffusivity_);
+        if
+        (
+            thinBodyDiffusivity_ != "keep" && thinBodyDiffusivity_ != "zero"
+        )
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown thinBodyDiffusivity " << thinBodyDiffusivity_
+                << ": valid choices are keep and zero" << exit(FatalIOError);
         }
         coeffs_.readIfPresent("pinnedRateCoeff", pinnedRateCoeff_);
         coeffs_.readIfPresent("linkCorrection", linkCorrection_);

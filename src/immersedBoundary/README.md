@@ -567,7 +567,8 @@ With this version, `clustered` (the default) against `greedy`:
 `thinBodyBlocking` of `immersedBoundaryForce` (`method cutLink` with
 `apertureCoupling yes`). It is not a validated method for closed valves or
 for thin curved shells in general, and with the default `off` the code path
-and results are unchanged.
+and results are unchanged (bit-identical on the four immersed-boundary
+tutorials listed below).
 
 ### Problem
 
@@ -594,13 +595,60 @@ are inside the bounding box of a body, grown by two cell sizes, are tested.
 ```text
 thinBodyBlocking  off;           // default: unchanged behaviour
 thinBodyBlocking  openFaces;     // also block the faces that the points leave
-                                 // fully open (aperture 1) and a segment crosses
+                                 // fully open and a segment crosses
 thinBodyBlocking  crossedFaces;  // openFaces, and also the partly cut internal
                                  // faces between two cells whose centres are
                                  // outside the bodies
+thinBodyDiffusivity  zero;       // default with thinBodyBlocking; or keep
 ```
 
 The blocking is by whole faces (binary), not by a partial aperture.
+
+### Pressure equation of a blocked face
+
+In `pimpleFluid` the corrected flux on a face is
+
+```text
+phi_f = phiHbyA_f - rAtU_f |S_f| snGrad(p)_f,
+phiHbyA_f = alpha_f phiHbyA_f^* + wallFlux_f,
+rAtU_f = alpha_f rAtU_f^* + (1 - alpha_f) min(rAtU_P, rAtU_N),
+```
+
+where `phiHbyA_f^*` is the flux of the interpolated `HbyA`, `alpha_f` the
+aperture and `wallFlux_f` the flux of the body velocity through the solid part
+of the face, and `p` solves `sum_f rAtU_f |S_f| snGrad(p)_f = sum_f phiHbyA_f`
+(cells inside a body excepted). For a blocked face, `alpha_f = 0` gives
+`phiHbyA_f = wallFlux_f`, so the flux is the body flux only if the second term
+of `phi_f` vanishes. It does not: `rAtU_f = min(rAtU_P, rAtU_N)` is that of the
+fluid when no cell centre is inside the body (the penalty makes `rAtU` small
+only in the cells whose centre is inside), so a pressure difference across the
+plate drives a flux through a face that was meant to be impermeable. The
+leakage of a static plate under a pressure drop was 2-5 % of the open flow
+(`thinBodyDiffusivity keep`), and a plate that contains a mesh point but no
+cell centre leaked completely.
+
+With `thinBodyDiffusivity zero` (default):
+
+- the faces blocked by a crossing, and the faces that are entirely inside a
+  body between two cells that are not entirely solid, get `rAtU_f = 0`: the
+  pressure matrix stays a graph Laplacian (symmetric, non-positive
+  off-diagonal, zero row sums away from the boundary), and `phi_f` equals
+  `wallFlux_f` exactly on them, so the body flux is conserved;
+- the faces with a zero diffusivity separate the mesh into regions
+  (`regionSplit`, across processors). A region that has no fixed-pressure
+  boundary face is singular: the net volume imbalance of its sources is
+  spread uniformly over its cells (compatibility, logged as the largest net
+  imbalance removed) and one of its cells gets a reference pressure. A region
+  with a fixed pressure is untouched. The cells inside a plate form such a
+  region, with a zero imbalance;
+- the cell-centred pressure gradient, used in the momentum predictor and the
+  velocity correction, uses the cell value on each side of a blocked face
+  instead of the interpolated face value, as `p` is discontinuous across a
+  closed wall; without it a plate thinner than 0.2 cells and no cell centre
+  inside it was unstable (static, slip walls, 0.1 cells).
+
+The default `off` path does not call any of this (the registered field is
+absent), checked by bit-identity.
 
 ### Evidence
 
@@ -608,84 +656,112 @@ All results are with OpenFOAM.com v2412. The test is
 `tutorials/fluids/immersedBoundary/thinPlateInDuct`: a closed box plate
 spanning a 2 m x 0.2 m duct (cells of h = 10 mm, one cell in the
 empty direction, 200 x 20 x 1 cells, laminar, nu = 1e-3, impulsive start,
-open ends) translated along the duct at w = 0.1 m/s by `uniformTranslation`.
-An impermeable plate pushes the fluid at its own speed, so the volume flux
-through every cross-section is exactly `w A` (`A = 0.2 x 0.01 m2`). Q is the
-outlet flux, and Q/(wA) is the average of the values of every time step
-between 2 and 8 s (the transient of the impulsive start is excluded;
-instantaneous values vary around it, the ranges are in the case logs of the
-study). `thinBodyBlocking crossedFaces` and `openFaces` gave the same Q/(wA)
-here (openFaces: research-branch runs only).
+open ends, fixed pressure at both ends) translated along the duct at
+w = 0.1 m/s by `uniformTranslation`. An impermeable plate pushes the fluid at
+its own speed, so the volume flux through every cross-section is exactly `w A`
+(`A = 0.2 x 0.01 m2`). Q is the outlet flux, and Q/(wA) is the average of the
+values of every time step between 2 and 8 s (the start-up transient is
+excluded; the instantaneous values vary around it with the position of the
+plate in the mesh).
 
-Time-averaged Q/(wA), 2-8 s, plate moving at w (run with the code of this
-branch):
+Time-averaged Q/(wA), 2-8 s, plate moving at w (`crossedFaces`; S slip walls,
+N no-slip walls; `keep` is the previous behaviour):
 
-| t/h | slip walls, off | slip, crossedFaces | no-slip, off | no-slip, crossedFaces |
-| --- | --- | --- | --- | --- |
-| 0.43 | 0.769 | 1.0000 | 0.442 | 0.946 |
-| 0.5 | 0.889 | 1.0000 | 0.568 | 0.954 |
-| 1 | 1.0000 | 1.0000 | 0.964 | 0.981 |
-| 1.7 | 1.0000 | 1.0000 | 0.980 | 0.987 |
-| 3 | 1.0000 | 1.0000 | 0.989 | 0.992 |
+| t/h | S off | S keep | S zero | N off | N keep | N zero |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.43 | 0.769 | 1.0000 | 1.0000 | 0.442 | 0.946 | 1.0000 |
+| 0.5 | 0.889 | 1.0000 | 1.0000 | 0.568 | 0.954 | 1.0000 |
+| 1 | 1.0000 | 1.0000 | 1.0000 | 0.964 | 0.981 | 1.0000 |
+| 1.7 | 1.0000 | 1.0000 | 1.0000 | 0.980 | 0.987 | 0.9985 |
+| 3 | 1.0000 | 1.0000 | 1.0000 | 0.989 | 0.992 | 1.0000 |
 
-With slip walls the exact reference is plug flow and the result with the
-switch is `1.0000` to four digits. The no-slip deficit that remains (about
-1-5 %) is also present for a plate of three cells and is a wall-layer effect
-that has not been investigated.
+The no-slip deficit of 1-5 % with `keep` was the leakage through the blocked
+faces, not a wall-layer effect. With `zero` the instantaneous Q/(wA) of the
+no-slip plate of 1.7 cells still varies between 0.992 and 1.000.
 
-Results below are from the research branch the code comes from (the same
-blocking code, not re-run for this pull request):
+Static plate under a pressure drop (inlet `p` = 0.01, outlet 0, plate at rest,
+S slip or N no-slip walls, `crossedFaces`): leakage fraction at 6 s, the outlet
+flux divided by that of the duct without a plate at the same time (the flow
+is still accelerating):
 
-- Static plate with a pressure drop (inlet `p` = 0.01, outlet 0, plate at
-  rest): the leakage fraction at 6 s (outlet flux divided by that of the duct
-  without a plate at the same time, a transient that is still decaying), for
-  a plate of 0.43 cells, is 47 % with the switch off and 5.1 % on with
-  no-slip walls, and 33 % off and 2.3 % on with slip walls. The leakage flux
-  is constant in time (about 1.4e-6 m3/s for slip walls), so the fraction
-  decays only because the free flow grows. The plate is not leak-free.
+| t/h | N off | N keep | N zero | S off | S keep | S zero |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.43 | 47 % | 5.1 % | 1e-8 | 33 % | 2.3 % | 2e-8 |
+| 1 | 7.4 % | 4.5 % | 3e-8 | 3.5 % | 2.0 % | 2e-8 |
+| 3 | 2.4 % | 2.0 % | 1e-9 | 1.1 % | 0.9 % | 1e-9 |
+
+With `zero` the outlet flux is at the level of the solver tolerance (at most
+2e-10 m3/s over the run, against 2.6e-5 m3/s without a plate, no-slip, and
+6e-5 slip). Dependence, 0.43 cells, `zero`, leakage fraction at 6 s: time step
+halved or doubled 2e-8 and 2e-8 (slip), 8e-8 and 1e-10 (no-slip); mesh
+refined to h = 5 mm (same absolute thickness ratio of 0.43 cells) 2e-9 and
+3e-9; thickness 0.1 cells 3e-10 and 8e-11. With `keep` a plate of 0.43 cells
+on the h = 5 mm mesh, which contains a mesh point but no cell centre, leaks
+99.6 %. For a static plate straddling a processor face the outlet flux is at most
+2e-12 m3/s serial and 2e-16 m3/s in 4 ranks.
+
+Moving mesh and deforming body (research-branch ALE test cases A-G, plates of
+three cells, copied for this study; maximum deviation of the lab-frame
+velocity from the exact uniform value, divided by the plate speed; same value
+with the switch off, `keep`, `zero`): fixed mesh and moving plate (B)
+1.5e-5, 3.1e-5, 1.5e-4; plate crossing the duct for 10 s (F) the same;
+mesh moving with the plate (D) 0, 0, 0; mesh moving, plate at rest (C) 0, 0,
+0; mesh and plate moving (G) 1.8e-5, 2.4e-5, 2.4e-5 and at half the cell size
+5.8e-6, 1.1e-5, 1.8e-4; deforming plate (E) 2.0e-4, 2.5e-4, 6.8e-5 and at
+half the cell size 9.2e-5, 9.8e-5, 2.9e-5. The volume flux is 1.000 of the
+exact one in the fixed-mesh cases and the geometric conservation error is
+5e-13 to 3e-8 of the reference flux in all of them. The deviations with `zero`
+remain small but are larger than with `off` in three cases (B, F, G at h/2),
+a few 1e-4 of the plate speed.
+
+Results below are from the research branch the code comes from (the
+crossing code of the first commit, not re-run for this pull request, and with
+the earlier `keep` diffusivity):
+
 - Thin shells of 0.3 cells thickness (a plate tilted by 30 degrees and a
   parabolic arc of 4.5 cm sag, closed prisms, translated along x at w, slip
   walls), time-averaged Q/(wA) over 2-8 s: tilted 0.72 (off) to 0.89
   (`crossedFaces`), arc 0.75 to 0.94. The shortfall is a start-up transient:
   Q/(wA) of the tilted shell reaches 0.995 at 10 s (0.999 for the arc). With
-  no-slip walls the values are 0.40 to 0.57 and 0.42 to 0.66.
-  These shells are not within 2 % of their swept volume.
-- With the switch on, the ALE test cases of the research branch (3-cell
-  plates, moving mesh) change by amounts of the order of the pressure-solver
-  tolerance, as expected, since faces are blocked.
+  no-slip walls the values are 0.40 to 0.57 and 0.42 to 0.66. These shells
+  are not within 2 % of their swept volume.
 
-Regression with the switch off (default), same compiler and OpenFOAM
-as the base `ba563ba6a`, serial, 1 s: `translatingCylinderInChannel`,
+Regression with the switch off (default), same compiler and OpenFOAM as the
+base `ba563ba6a`, serial, 1 s: `translatingCylinderInChannel`,
 `staticCylinderInChannel`, `oscillatingCylinderInChannel` and
 `bendingBeamInChannel` (`MESH_LEVEL=1`) give fields (`U`, `p`, `phi`, ...) and
-`postProcessing` files that are bit-identical to those of the unmodified base.
-A 4-rank run (simple `(4 1 1)`, the plate crosses the processor faces at
+`postProcessing` files that are bit-identical to those of the unmodified base,
+also with the pressure-equation changes.
+A 4-rank run (simple `(4 1 1)`; the plate crosses the processor faces at
 `x` = 0.5 and 1 m during 2-8 s) gives the same time-averaged Q/(wA) as the
-serial run to the four digits shown (off 0.7688, `crossedFaces` 1.0000); the
-instantaneous outlet flux differs by at most 7e-4 of `w A` (4e-4 with the
-switch off), which is the level of the solver tolerance in parallel.
+serial run to the five digits shown (slip 1.00000, no-slip 1.00000); the
+instantaneous outlet flux differs by at most 8e-4 of `w A` (1.7e-3 and 7.8e-3
+of `w A` for the no-slip plates of 0.43 and 1.7 cells), which is the level of
+the solver tolerance in parallel.
 
 ### Known limitations and open questions
 
-- The pressure equation keeps a diffusivity across blocked faces, so a
-  pressure difference across a static thin body drives a leak (see above); a
-  closed valve is not guaranteed to be sealed.
 - Faces are blocked entirely or not at all, not by a partial aperture; the
   flux changes in steps of order `h^2 w` as the set of blocked faces changes.
+  A hole or gap narrower than a cell, or a plate edge that ends inside a
+  face, is not represented properly.
 - Oblique and curved thin shells transmit less than their swept volume during
-  the start-up (0.3 cells thickness, above).
-- The no-slip wall-layer deficit of 1-5 % of the flux is not explained.
+  the start-up (0.3 cells thickness, above, with the earlier diffusivity).
+- Faces entirely inside a body between two cells that are not entirely solid
+  are blocked too (`zero`), which is the intended meaning for a thin body, and
+  not tested for thick bodies (use `off` for those).
 - Free edges, gaps, holes, leaflet tips and tapered leaflets are not treated:
   a face is blocked only if the segment between two cell centres crosses a
-  triangle, so a slit narrower than a cell between two blocked faces is
-  closed by the staircase, and a gap that no segment crosses is not seen.
+  triangle or the face is inside the body, so a slit narrower than a cell
+  between two blocked faces is closed by the staircase.
 - The force estimators (momentum exchange, surface traction) with the switch
   on, deforming bodies and contact were not examined.
 - The cost of the crossing search (one `findLine` per candidate face at each
-  update) was not measured on large meshes; meshes with skewed processor
-  faces were not tested.
-- Tested only for prescribed rigid translation at constant velocity, laminar
-  flow and a mesh with `h` = 10 mm.
+  update, and a `regionSplit` per pressure corrector) was not measured on
+  large meshes; meshes with skewed processor faces were not tested.
+- Tested only for prescribed rigid translation at constant velocity (and the
+  deforming plate of the ALE tests), laminar flow and a mesh with `h` = 10 mm
+  (5 mm for some checks).
 - The "faces blocked" count in the log adds the coupled faces on both sides.
 
 ## Provenance

@@ -26,6 +26,7 @@ License
 #include "constrainPressure.H"
 #include "localMin.H"
 #include "findRefCell.H"
+#include "regionSplit.H"
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "elasticWallPressureFvPatchScalarField.H"
@@ -42,6 +43,75 @@ namespace Foam
 
 namespace fluidModels
 {
+
+// Pressure gradient of the momentum equations. With faces blocked by a thin
+// body (immersedBoundaryBlockedFaces), the cell values are used on each
+// side of a blocked face in place of the interpolated face value, as the
+// pressure is not continuous across a closed wall: the cell next to it does
+// not feel the pressure of the other side (Gauss linear gradient corrected
+// on these faces)
+static tmp<volVectorField> pressureGradient
+(
+    const fvMesh& mesh,
+    const volScalarField& p
+)
+{
+    tmp<volVectorField> tgradp(fvc::grad(p));
+
+    if
+    (
+        !mesh.foundObject<surfaceScalarField>("immersedBoundaryBlockedFaces")
+    )
+    {
+        return tgradp;
+    }
+
+    const surfaceScalarField& blocked =
+        mesh.lookupObject<surfaceScalarField>("immersedBoundaryBlockedFaces");
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const surfaceScalarField& w = mesh.weights();
+    const vectorField& Sf = mesh.Sf();
+    const scalarField& V = mesh.V();
+    const scalarField& pI = p.primitiveField();
+    vectorField& g = tgradp.ref().primitiveFieldRef();
+
+    forAll(own, facei)
+    {
+        if (blocked.primitiveField()[facei] > 0.5)
+        {
+            const scalar pf =
+                w[facei]*pI[own[facei]] + (1 - w[facei])*pI[nei[facei]];
+            g[own[facei]] += (pI[own[facei]] - pf)*Sf[facei]/V[own[facei]];
+            g[nei[facei]] -= (pI[nei[facei]] - pf)*Sf[facei]/V[nei[facei]];
+        }
+    }
+    forAll(blocked.boundaryField(), patchi)
+    {
+        const fvPatch& patch = mesh.boundary()[patchi];
+        if (patch.coupled())
+        {
+            const scalarField pN
+            (
+                p.boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField& pw = w.boundaryField()[patchi];
+            const vectorField& pSf = mesh.Sf().boundaryField()[patchi];
+            const labelUList& fc = patch.faceCells();
+            forAll(fc, i)
+            {
+                if (blocked.boundaryField()[patchi][i] > 0.5)
+                {
+                    const scalar pf = pw[i]*pI[fc[i]] + (1 - pw[i])*pN[i];
+                    g[fc[i]] += (pI[fc[i]] - pf)*pSf[i]/V[fc[i]];
+                }
+            }
+        }
+    }
+    tgradp.ref().correctBoundaryConditions();
+
+    return tgradp;
+}
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -540,7 +610,7 @@ bool pimpleFluid::evolve()
 
         if (pimple.momentumPredictor())
         {
-            solve(UEqn == -fvc::grad(p));
+            solve(UEqn == -pressureGradient(mesh, p)());
 
             options().correct(U);
         }
@@ -592,7 +662,7 @@ bool pimpleFluid::evolve()
                 phiHbyA +=
                     fvc::interpolate(rAtU() - rAU_)*
                     fvc::snGrad(p)*mesh.magSf();
-                HbyA -= (rAU_ - rAtU())*fvc::grad(p);
+                HbyA -= (rAU_ - rAtU())*pressureGradient(mesh, p)();
             }
 
             correctFluxConsistentPatches(phiHbyA, rAtU());
@@ -607,6 +677,11 @@ bool pimpleFluid::evolve()
             tmp<surfaceScalarField> rAtUf;
             tmp<volScalarField> fluidCells;
             tmp<volScalarField> divPhiHbyA;
+
+            // Cells with a pressure reference of their own: one cell of each
+            // region that the blocked faces of a thin body separate from
+            // every fixed pressure
+            labelList extraRefCells;
 
             // Immersed boundaries (immersedBoundaryForce with
             // apertureCoupling): on the faces cut by a body, the flux is the
@@ -638,6 +713,23 @@ bool pimpleFluid::evolve()
                 rAtUf =
                     alpha*fvc::interpolate(rAtU())
                   + (1 - alpha)*localMin<scalar>(mesh).interpolate(rAtU());
+
+                // Faces blocked by a body thinner than the point spacing
+                // (thinBodyDiffusivity zero): no pressure-driven flux
+                const bool zeroBlocked =
+                    mesh.foundObject<surfaceScalarField>
+                    (
+                        "immersedBoundaryBlockedFaces"
+                    );
+                if (zeroBlocked)
+                {
+                    const surfaceScalarField& blocked =
+                        mesh.lookupObject<surfaceScalarField>
+                        (
+                            "immersedBoundaryBlockedFaces"
+                        );
+                    rAtUf = (1 - blocked)*rAtUf();
+                }
 
                 // Continuity is not imposed in the cells entirely inside a
                 // body, where the flux of the velocity of a deforming body
@@ -681,6 +773,133 @@ bool pimpleFluid::evolve()
                                 solidSource/solidVolume
                             );
                     }
+
+                    if (zeroBlocked)
+                    {
+                        // The blocked faces separate the mesh into regions
+                        // whose pressure equations are independent. A
+                        // region without a fixed-pressure boundary face is
+                        // singular: its sources are made compatible (the
+                        // net volume imbalance, which the faces to the rest
+                        // of the domain cannot carry, is spread uniformly
+                        // over its cells) and one of its cells is given a
+                        // reference pressure, as a closed domain
+                        const surfaceScalarField& blocked =
+                            mesh.lookupObject<surfaceScalarField>
+                            (
+                                "immersedBoundaryBlockedFaces"
+                            );
+                        boolList blockedFace(mesh.nFaces(), false);
+                        forAll(mesh.owner(), facei)
+                        {
+                            blockedFace[facei] =
+                                blocked.primitiveField()[facei] > 0.5;
+                        }
+                        forAll(blocked.boundaryField(), patchi)
+                        {
+                            if (blocked.boundaryField()[patchi].coupled())
+                            {
+                                const label start =
+                                    mesh.boundaryMesh()[patchi].start();
+                                forAll(blocked.boundaryField()[patchi], i)
+                                {
+                                    blockedFace[start + i] =
+                                        blocked.boundaryField()[patchi][i]
+                                      > 0.5;
+                                }
+                            }
+                        }
+                        const regionSplit regions(mesh, blockedFace);
+                        const label nRegions = regions.nRegions();
+
+                        boolList hasFixed(nRegions, false);
+                        forAll(p.boundaryField(), patchi)
+                        {
+                            if (p.boundaryField()[patchi].fixesValue())
+                            {
+                                forAll(mesh.boundary()[patchi].faceCells(), i)
+                                {
+                                    hasFixed
+                                    [
+                                        regions
+                                        [
+                                            mesh.boundary()[patchi]
+                                           .faceCells()[i]
+                                        ]
+                                    ] = true;
+                                }
+                            }
+                        }
+                        // The reference cell of a closed domain, if any
+                        if (p.needReference() && pRefCell_ >= 0)
+                        {
+                            hasFixed[regions[pRefCell_]] = true;
+                        }
+                        Pstream::listCombineGather(hasFixed, orEqOp<bool>());
+                        Pstream::listCombineScatter(hasFixed);
+
+                        scalarField netDiv(nRegions, 0.0);
+                        scalarField vol(nRegions, 0.0);
+                        labelList firstCell(nRegions, -1);
+                        const scalarField& V = mesh.V();
+                        const scalarField& dv =
+                            divPhiHbyA().primitiveField();
+                        forAll(regions, celli)
+                        {
+                            netDiv[regions[celli]] += dv[celli]*V[celli];
+                            vol[regions[celli]] += V[celli];
+                            if (firstCell[regions[celli]] < 0)
+                            {
+                                firstCell[regions[celli]] = celli;
+                            }
+                        }
+                        reduce(netDiv, sumOp<scalarField>());
+                        reduce(vol, sumOp<scalarField>());
+
+                        // The lowest processor with cells in a region sets
+                        // its reference
+                        labelList owner(nRegions, Pstream::nProcs());
+                        forAll(firstCell, ri)
+                        {
+                            if (firstCell[ri] >= 0)
+                            {
+                                owner[ri] = Pstream::myProcNo();
+                            }
+                        }
+                        Pstream::listCombineGather(owner, minEqOp<label>());
+                        Pstream::listCombineScatter(owner);
+
+                        DynamicList<label> refCells;
+                        label nUnref = 0;
+                        scalar maxImb = 0;
+                        scalarField& dvRef = divPhiHbyA.ref().primitiveFieldRef();
+                        forAll(hasFixed, ri)
+                        {
+                            if (hasFixed[ri] || vol[ri] < VSMALL)
+                            {
+                                continue;
+                            }
+                            nUnref++;
+                            maxImb = max(maxImb, mag(netDiv[ri]));
+                            if (owner[ri] == Pstream::myProcNo())
+                            {
+                                refCells.append(firstCell[ri]);
+                            }
+                        }
+                        forAll(regions, celli)
+                        {
+                            const label ri = regions[celli];
+                            if (!hasFixed[ri] && vol[ri] > VSMALL)
+                            {
+                                dvRef[celli] -= netDiv[ri]/vol[ri];
+                            }
+                        }
+                        extraRefCells = refCells;
+                        Info<< "    Thin body pressure regions: " << nRegions
+                            << ", without a fixed pressure: " << nUnref
+                            << ", largest net volume imbalance removed: "
+                            << maxImb << " m3/s" << endl;
+                    }
                 }
             }
 
@@ -701,6 +920,23 @@ bool pimpleFluid::evolve()
                 );
 
                 pEqn.setReference(pRefCell_, pRefValue_);
+
+                // Regions of a thin body without a fixed pressure
+                forAll(extraRefCells, i)
+                {
+                    const label celli = extraRefCells[i];
+                    scalar& d = pEqn.diag()[celli];
+                    if (d < VSMALL)
+                    {
+                        d = 1;
+                        pEqn.source()[celli] += pRefValue_;
+                    }
+                    else
+                    {
+                        pEqn.source()[celli] += d*pRefValue_;
+                        d += d;
+                    }
+                }
 
                 pEqn.solve(mesh.solver(p.select(pimple.finalInnerIter())));
 
@@ -736,9 +972,9 @@ bool pimpleFluid::evolve()
             // Explicitly relax pressure for momentum corrector
             p.relax();
 
-            gradp() = fvc::grad(p);
+            gradp() = pressureGradient(mesh, p)();
 
-            U = HbyA - rAtU*fvc::grad(p);
+            U = HbyA - rAtU*pressureGradient(mesh, p)();
             U.correctBoundaryConditions();
             options().correct(U);
 
