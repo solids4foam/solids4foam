@@ -154,7 +154,7 @@ DT_CONTROLS = [(lv, cap) for lv in (1, 2) for cap in (0.01, 0.005, 0.0025)] \
 # not in DT_CONTROLS: Level 4 (4 ranks) at the caps 0.01 and 0.005 (four
 # variants, the momentum exchange among them) and 0.0025 (penalty and
 # incremental), Level 3 at the cap 0.0025 (penalty, incremental, ghostCell) and
-# the penalty method on Level 3 at 0.00125. The keys are exactly those of the
+# the penalty method on Levels 3 and 4 at 0.00125. The keys are exactly those of the
 # CSV (a test compares them)
 DT_EXTENDED = [
     ("cutLink", "ME", 4, 0.01), ("penalty", "", 4, 0.01),
@@ -163,7 +163,8 @@ DT_EXTENDED = [
     ("incremental", "", 4, 0.005), ("ghostCell", "", 4, 0.005),
     ("penalty", "", 3, 0.0025), ("penalty", "", 4, 0.0025),
     ("incremental", "", 3, 0.0025), ("incremental", "", 4, 0.0025),
-    ("ghostCell", "", 3, 0.0025), ("penalty", "", 3, 0.00125)]
+    ("ghostCell", "", 3, 0.0025), ("penalty", "", 3, 0.00125),
+    ("penalty", "", 4, 0.00125)]
 # The 20 s runs of reference/results/controls/steady-extended.csv: (method,
 # estimator, level, dt_cap, end_time); dt_cap 0 is the tutorial step
 STEADY_END = 20.0
@@ -193,8 +194,8 @@ RUNS = {
            [(m, e, lv, cap) for lv, cap in DT_CONTROLS
             for m, e in DT_VARIANTS]),
     "dt-extended": ("time-step control, Levels 3-4 and the 0.00125 s cap: "
-                    "the 14 rows of controls/cases-timestep.csv (Level 4 on "
-                    "4 ranks; about 30 rank-h in all, the momentum exchange at Level 4 alone 8.5)", list(DT_EXTENDED)),
+                    "the 15 rows of controls/cases-timestep.csv (Level 4 on "
+                    "4 ranks; about 35 rank-h in all, the momentum exchange at Level 4 alone 8.5)", list(DT_EXTENDED)),
     "st-audit": ("cutLink surface traction, Levels 1-4 (Level 4 on 4 ranks): "
                  "the runs of the surface-traction audit, "
                  "scripts/taylor_couette_st_audit.py",

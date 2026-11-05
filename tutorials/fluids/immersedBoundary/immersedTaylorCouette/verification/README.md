@@ -60,8 +60,8 @@ time-step control, 40 cases). `--methods`, `--levels` and `--ranks` select
 within them. Levels 1-3 of the matrix are about 1.1 serial hours in all (5 s to
 15 minutes per case); a Level 4 case is 0.6 to 2.5 rank-hours on four ranks; the
 time-step run is about 9 serial hours. The control runs of
-`reference/results/controls/` have named runs too: `dt-extended` (the 14 rows
-of `cases-timestep.csv`: Level 4 and the finer caps, 30 rank-h, 26 of them on
+`reference/results/controls/` have named runs too: `dt-extended` (the 15 rows
+of `cases-timestep.csv`: Level 4 and the finer caps, 35 rank-h, 31 of them on
 four ranks), `steady20` (the 15 runs to 20 s of `steady-extended.csv`, about 2
 serial hours) and `st-audit` (cutLink surface traction on Levels 1-4). The
 option `--end-time T` writes `endTime T` into `controlDict` and tags the case

@@ -601,7 +601,7 @@ class ReviewOfPullRequestTests(unittest.TestCase):
             runs, methods, levels, ranks = ["dt-extended"], [], [], 0
         planned = {(m, e, lv, cap) for m, e, lv, _, _, cap, _ in v.plan(A)}
         self.assertEqual(planned, tracked)
-        self.assertEqual(len(tracked), 14)
+        self.assertEqual(len(tracked), 15)
         # no key of the extended run is already in the matrix or in `dt`
         base = {v.row_key(r) for r in v.read_results()}
         self.assertFalse(planned & base)
