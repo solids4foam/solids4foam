@@ -714,17 +714,46 @@ exact one in the fixed-mesh cases and the geometric conservation error is
 remain small but are larger than with `off` in three cases (B, F, G at h/2),
 a few 1e-4 of the plate speed.
 
-Results below are from the research branch the code comes from (the
-crossing code of the first commit, not re-run for this pull request, and with
-the earlier `keep` diffusivity):
+Thin shells of 0.3 cells thickness (a plate tilted by 30 degrees through
+`(0.35, 0.1)`, and a parabolic arc `x = 0.35 - 2 (y - 0.1)^2` of 4.5 cm sag,
+closed prisms, translated along x at w, slip walls except where stated; one
+geometry each), Q/(wA), mean over 2-8 s:
 
-- Thin shells of 0.3 cells thickness (a plate tilted by 30 degrees and a
-  parabolic arc of 4.5 cm sag, closed prisms, translated along x at w, slip
-  walls), time-averaged Q/(wA) over 2-8 s: tilted 0.72 (off) to 0.89
-  (`crossedFaces`), arc 0.75 to 0.94. The shortfall is a start-up transient:
-  Q/(wA) of the tilted shell reaches 0.995 at 10 s (0.999 for the arc). With
-  no-slip walls the values are 0.40 to 0.57 and 0.42 to 0.66. These shells
-  are not within 2 % of their swept volume.
+| Shell | off | keep | zero | zero, no-slip |
+| --- | --- | --- | --- | --- |
+| tilted 30 degrees | 0.719 | 0.889 | 1.0000 | 0.976 |
+| arc | 0.755 | 0.941 | 1.0000 | 1.0000 |
+
+With `keep` the shortfall was a start-up transient (tilted: 0.37, 0.86, 0.95,
+0.995 at 1, 4, 6, 10 s) that was the same leakage through the blocked faces;
+with `zero` Q/(wA) is 1.000 at every time shown (1 to 10 s). With no-slip
+walls the tilted shell has a steady 2.4 % deficit (0.973 to 0.977 from 1 to
+10 s), which has not been investigated. This is not a verification of
+curved shells.
+
+Holes, slots and plate edges (static plate of 0.43 cells under the pressure
+drop of the leakage test, slip walls, `crossedFaces`, `zero`; Q(6 s) divided
+by that without a plate; the plate covers `y < a` and `y > b`, `y` from 0 to
+0.2 m, cells of 10 mm and 5 mm). The open flux of a slot is not proportional
+to its area (the flow is still accelerating), so only the change with the
+mesh is a measure:
+
+| Opening (width in cells of 10 mm) | h = 10 mm | h = 5 mm |
+| --- | --- | --- |
+| slot 1, centred on a row of cells | 0.021 | 0.031 |
+| slot 0.9, centred on a cell face (no cell centre inside) | 0 | 0.030 |
+| slot 2 | 0.069 | 0.095 |
+| slot 3 | 0.115 | 0.190 |
+| plate ends at a cell face (a = 0.15 m) | 0.509 | 0.523 |
+| plate ends in the middle of a cell (a = 0.1475 m) | 0.518 | 0.566 |
+| plate ends in the middle of a cell (a = 0.1525 m) | 0.493 | 0.474 |
+
+A slot that holds no cell centre is closed completely (0 against 0.030 at the
+finer mesh), the flux through slots is under-predicted by 30 % or more at
+h = 10 mm, and the position of an edge inside a cell changes the flux by up to
+10 %. The binary rule does not represent openings thinner than about two
+cells or edges ending inside a cell; a consistent partial aperture of the
+blocked faces would be a new numerical method, not a correction of this one.
 
 Regression with the switch off (default), same compiler and OpenFOAM as the
 base `ba563ba6a`, serial, 1 s: `translatingCylinderInChannel`,
@@ -745,8 +774,8 @@ the solver tolerance in parallel.
   flux changes in steps of order `h^2 w` as the set of blocked faces changes.
   A hole or gap narrower than a cell, or a plate edge that ends inside a
   face, is not represented properly.
-- Oblique and curved thin shells transmit less than their swept volume during
-  the start-up (0.3 cells thickness, above, with the earlier diffusivity).
+- The tilted shell with no-slip walls has a steady 2.4 % deficit; the shells
+  were tested at one geometry each.
 - Faces entirely inside a body between two cells that are not entirely solid
   are blocked too (`zero`), which is the intended meaning for a thin body, and
   not tested for thick bodies (use `off` for those).
@@ -756,9 +785,18 @@ the solver tolerance in parallel.
   between two blocked faces is closed by the staircase.
 - The force estimators (momentum exchange, surface traction) with the switch
   on, deforming bodies and contact were not examined.
-- The cost of the crossing search (one `findLine` per candidate face at each
-  update, and a `regionSplit` per pressure corrector) was not measured on
-  large meshes; meshes with skewed processor faces were not tested.
+- Cost: with the switch on, a serial 1 s run of the oscillating cylinder at
+  `MESH_LEVEL=3` (81,344 cells, 40 time steps, 0.1 s) takes 587 ms per step
+  against 561 ms with it off (+4.6 %), the peak memory 282 MB against 280 MB
+  (the body is not thin there: this measures the crossing search and the
+  region analysis, not a thin-body case). On the 4,000-cell duct the moving
+  plate costs 29.5 ms per step against 11.5 ms (leaking, off): this includes
+  the longer pressure solution of the closed plate and is not separated.
+  The search is one `findLine` per candidate face on the
+  `triSurfaceSearch` octree that the method already rebuilds when a body
+  moves (no second tree), at each update, and a `regionSplit` per pressure
+  corrector; meshes with skewed
+  processor faces were not tested.
 - Tested only for prescribed rigid translation at constant velocity (and the
   deforming plate of the ALE tests), laminar flow and a mesh with `h` = 10 mm
   (5 mm for some checks).

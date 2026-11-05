@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Closed STL box spanning the duct: back face at x = X0 (default 0.303 m), thickness
-RATIO*h (h = 0.01 m, the cell size); usage: makePlateStl.py RATIO [H [X0]] > plate.stl (H default 0.01 m)"""
+RATIO*h (h = 0.01 m, the cell size); usage: makePlateStl.py RATIO [H [X0 [Y0 Y1]]] > plate.stl (H default 0.01 m)"""
 import sys
 h = float(sys.argv[2]) if len(sys.argv) > 2 else 0.01
 x0 = float(sys.argv[3]) if len(sys.argv) > 3 else 0.303
 x1 = x0 + float(sys.argv[1])*h
-y0, y1, z0, z1 = -0.05, 0.25, -0.05, 0.06
+y0 = float(sys.argv[4]) if len(sys.argv) > 4 else -0.05
+y1 = float(sys.argv[5]) if len(sys.argv) > 5 else 0.25
+z0, z1 = -0.05, 0.06
 v = [(x0,y0,z0),(x1,y0,z0),(x1,y1,z0),(x0,y1,z0),(x0,y0,z1),(x1,y0,z1),(x1,y1,z1),(x0,y1,z1)]
 quads = [(0,3,2,1),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)]
 print("solid plate")

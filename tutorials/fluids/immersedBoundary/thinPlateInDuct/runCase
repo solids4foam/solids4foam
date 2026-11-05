@@ -8,6 +8,9 @@
 #   NOPLATE=1 (no body),
 #   REFINE=n (mesh n times finer in x and y, h = 10 mm/n),
 #   X0=x (position of the back face of the plate, default 0.303 m),
+#   YRANGES="y0:y1,y0:y1" (plates covering only these ranges of y, one body
+#   each: a slot or a free edge),
+#   STLFILE=path (another closed surface in place of the box plate),
 #   STATIC=1 (plate at rest), PIN=value (inlet pressure, fixed; the outlet is
 #   at 0), END=endTime, DT=maxDeltaT, TAG=suffix of the case directory
 cd "${0%/*}" || exit 1
@@ -17,7 +20,21 @@ rm -rf $d; mkdir $d
 cp -r 0 constant system $d/
 mkdir -p $d/constant/triSurface
 python3 makePlateStl.py $ratio $(python3 -c "print(0.01/${REFINE:-1})") ${X0:-0.303} > $d/constant/triSurface/plate.stl
+[ -n "$STLFILE" ] && cp $STLFILE $d/constant/triSurface/plate.stl
 sed -i "s/thinBodyBlocking .*;/thinBodyBlocking $mode;/" $d/constant/fvOptions
+if [ -n "$YRANGES" ]
+then
+    # plates that cover only parts of the width, "y0:y1,y0:y1" (a slot or a
+    # plate edge inside the duct): one body per range
+    bodies=""; k=0
+    for yr in ${YRANGES//,/ }
+    do
+        python3 makePlateStl.py $ratio $(python3 -c "print(0.01/${REFINE:-1})") ${X0:-0.303} ${yr%%:*} ${yr##*:} > $d/constant/triSurface/plate$k.stl
+        bodies="$bodies plate$k { surface \"plate$k.stl\"; motion { type uniformTranslation; velocity (0.1 0 0); } }"
+        k=$((k+1))
+    done
+    sed -i "s|^    bodies .*|    bodies { $bodies }|" $d/constant/fvOptions
+fi
 sed -i "/walls/,/}/ s/type .*slip;/type            $walls;/" $d/0/U
 if [ -n "$DIFFUSIVITY" ]
 then
@@ -25,7 +42,7 @@ then
 fi
 if [ -n "$STATIC" ]
 then
-    sed -i "s/type uniformTranslation; velocity (0.1 0 0);/type static;/" $d/constant/fvOptions
+    sed -i "s/type uniformTranslation; velocity (0.1 0 0);/type static;/g" $d/constant/fvOptions
 fi
 if [ -n "$PIN" ]
 then
