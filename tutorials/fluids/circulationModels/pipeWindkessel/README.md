@@ -1,6 +1,7 @@
 # pipeWindkessel: a CFD pipe coupled to a Windkessel
 
-A 5 m, 0.5 m radius pipe (25,004 cells) solved with stock `pimpleFoam`. The
+A 5 m, 0.5 m radius pipe (25,004 cells) solved with stock `pimpleFoam` or, with
+`./Allrun solids4Foam`, by `solids4Foam` and its `pimpleFluid` fluid model. The
 inlet prescribes the flow `Q(t) = sin(2 pi t)` m3/s. The outlet pressure comes
 from a three-element Windkessel described in `constant/circulationProperties`
 and solved by `circulation0D`. The outlet is a single boundary condition
@@ -53,12 +54,39 @@ changes.
 ```bash
 # blockMesh, pimpleFoam (about a minute), then the comparison with the exact solution
 ./Allrun
+# the same pipe solved by solids4Foam with the pimpleFluid fluid model
+./Allrun solids4Foam
 # back to a clean case
 ./Allclean
 ```
 
 The case as supplied is explicit coupling of order 2 at `deltaT 0.05`.
 `analyse.py` needs only Python 3 and is skipped by `Allrun` if it is not there.
+
+## Solving the pipe with solids4Foam
+
+`./Allrun solids4Foam` solves the same pipe, inflow, Windkessel and coupling
+with `solids4Foam` and the solids4foam `pimpleFluid` fluid model instead of
+stock `pimpleFoam`. It shows that the `circulationPressure` boundary condition
+works with the solids4foam fluid models, and so with fluid-solid interaction
+cases. The files it needs are part of the case and are ignored by `pimpleFoam`:
+
+```c++
+// constant/physicsProperties
+type    fluid;
+
+// constant/fluidProperties
+fluidModel pimpleFluid;
+```
+
+together with `constant/dynamicMeshDict` (`staticFvMesh`), `constant/g` and
+the density in `constant/transportProperties` (the same 1060 kg/m3 as the
+coupling `rho`). The circuit, `0/p` and `0/U` are the same for both solvers.
+
+The RMSE of the outlet pressure against the exact solution is 0.3385 with
+either solver, and `postProcessing/circulationCoupling/0/coupling.dat` of the
+`solids4Foam` run agrees with that of the `pimpleFoam` run to the 12 digits
+written.
 
 ## Other schemes, orders and time steps
 

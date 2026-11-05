@@ -6,15 +6,19 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 RESTART_DIR="${REGRESSION_ROOT}/restart"
+S4F_DIR="${REGRESSION_ROOT}/solids4Foam"
 
 # Source solids4Foam scripts
-source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+source "${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
 # ============================================================
 # pipeWindkessel regression test
 # 1. The outlet pressure against the exact solution of the Windkessel
 # 2. A restart: the case run to t = 0.5 on two ranks, reconstructed, and
 #    continued in serial to t = 1, against the continuous run of 1.
+# 3. The pipe solved by solids4Foam and the pimpleFluid fluid model
+#    (./Allrun solids4Foam): the outlet pressure against the exact solution,
+#    and its coupling records against those of the pimpleFoam run.
 # ============================================================
 
 # ------------------------------------------------------------
@@ -30,6 +34,11 @@ RMSE_TOL=0.005
 # the range of its column: round-off, the restart being exact
 RESTART_TOL=1e-9
 
+# Largest difference of a row of the solids4Foam run from the pimpleFoam one,
+# relative to the range of its column: round-off, the two solvers taking the
+# same steps on the same mesh
+S4F_TOL=1e-9
+
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -39,7 +48,8 @@ RESTART_FILE="postProcessing/circulationCoupling/0.5/coupling.dat"
 
 echo "============================================================"
 echo "pipeWindkessel regression test"
-echo "|RMSE - ${REF_RMSE}| < ${RMSE_TOL}, restart difference < ${RESTART_TOL}"
+echo "|RMSE - ${REF_RMSE}| < ${RMSE_TOL}, restart difference < ${RESTART_TOL},"
+echo "solids4Foam: |RMSE - ${REF_RMSE}| < ${RMSE_TOL}, difference from pimpleFoam < ${S4F_TOL}"
 echo "============================================================"
 echo
 
@@ -113,6 +123,9 @@ if [ "$CHECK_ONLY" = false ]; then
         set_entry system/controlDict startFrom latestTime
         solids4Foam::runApplication -s restart pimpleFoam
     ) > "${RESTART_DIR}/${ALLRUN_LOGFILE}" 2>&1 || true
+
+    prepare_case "${S4F_DIR}"
+    ( cd "${S4F_DIR}" && ./Allrun solids4Foam > "${ALLRUN_LOGFILE}" 2>&1 )
 fi
 
 # ------------------------------------------------------------
@@ -121,11 +134,12 @@ fi
 
 failures=0
 
-# 1. The outlet pressure against the exact solution
+# The RMSE of the outlet pressure of a coupling.dat against the exact solution
 #    Pc(t) = A R/(1+(wRC)^2) [sin wt - wRC cos wt + wRC exp(-t/RC)]
 #    Po(t) = Pc(t) + Rch A sin wt,  A = 1, w = 2 pi, R = 10, Rch = 1, C = 0.01
-if [[ -f "${CASE_DIR}/${COUPLING_FILE}" ]]; then
-    rmse=$(awk '
+outlet_rmse() {
+    [[ -f "$1" ]] || return 0
+    awk '
         /^# time/ { for (i = 3; i <= NF; i++) if ($i == "outlet.Ppatch") c = i - 1 }
         /^#/ || NF == 0 { next }
         $1 > 0 && $1 <= 1 + 1e-9 {
@@ -136,40 +150,38 @@ if [[ -f "${CASE_DIR}/${COUPLING_FILE}" ]]; then
             s += e*e; n++
         }
         END { if (n > 0 && c > 0) printf "%.6g", sqrt(s/n) }
-    ' "${CASE_DIR}/${COUPLING_FILE}")
-else
-    rmse=""
-fi
+    ' "$1"
+}
 
-if [[ -z "${rmse}" ]]; then
-    echo "FAIL: Could not compute the RMSE from ${COUPLING_FILE}"
-    failures=$((failures + 1))
-elif awk -v r="${rmse}" -v ref="${REF_RMSE}" -v tol="${RMSE_TOL}" \
-    'BEGIN { d = r - ref; exit !((d < 0 ? -d : d) < tol) }'
-then
-    printf "PASS: RMSE of the outlet pressure = %s (reference %s)\n" \
-        "${rmse}" "${REF_RMSE}"
-else
-    printf "FAIL: RMSE of the outlet pressure = %s (reference %s)\n" \
-        "${rmse}" "${REF_RMSE}"
-    failures=$((failures + 1))
-fi
+# check_rmse <label> <coupling.dat>
+check_rmse() {
+    local rmse
+    rmse=$(outlet_rmse "$2")
+    if [[ -z "${rmse}" ]]; then
+        echo "FAIL: Could not compute the ${1} RMSE from ${COUPLING_FILE}"
+        failures=$((failures + 1))
+    elif awk -v r="${rmse}" -v ref="${REF_RMSE}" -v tol="${RMSE_TOL}" \
+        'BEGIN { d = r - ref; exit !((d < 0 ? -d : d) < tol) }'
+    then
+        printf "PASS: %s RMSE of the outlet pressure = %s (reference %s)\n" \
+            "$1" "${rmse}" "${REF_RMSE}"
+    else
+        printf "FAIL: %s RMSE of the outlet pressure = %s (reference %s)\n" \
+            "$1" "${rmse}" "${REF_RMSE}"
+        failures=$((failures + 1))
+    fi
+}
 
-# 2. The restart: the rows of (0.5, 1] against the continuous run
-if grep -q "circulationCoupler: resumed from" \
-    "${RESTART_DIR}/log.pimpleFoam.restart" 2> /dev/null
-then
-    echo "PASS: the restarted run resumed from the circulation checkpoint"
-else
-    echo "FAIL: the restarted run did not resume from the circulation checkpoint"
-    failures=$((failures + 1))
-fi
-
-if [[ -f "${RESTART_DIR}/${RESTART_FILE}" ]]; then
-    restart_diff=$(awk '
+# The largest difference between the rows of two coupling.dat files with
+# t > tmin, relative to the range of each column; "rows" if they do not have
+# the same times, "none" if a file is missing
+coupling_diff() {
+    local tmin="$3"
+    [[ -f "$1" && -f "$2" ]] || { echo "none"; return; }
+    awk -v tmin="${tmin}" '
         /^#/ || NF == 0 { next }
         FNR == NR {
-            if ($1 > 0.5 + 1e-9) {
+            if ($1 > tmin + 1e-9) {
                 for (i = 1; i <= NF; i++) {
                     ref[$1, i] = $i
                     if (!(i in lo) || $i < lo[i]) lo[i] = $i
@@ -179,7 +191,7 @@ if [[ -f "${RESTART_DIR}/${RESTART_FILE}" ]]; then
             }
             next
         }
-        {
+        $1 > tmin + 1e-9 {
             if (!(($1, 1) in ref)) { missing++; next }
             for (i = 2; i <= NF; i++) {
                 range = hi[i] - lo[i]
@@ -193,10 +205,24 @@ if [[ -f "${RESTART_DIR}/${RESTART_FILE}" ]]; then
             if (missing > 0 || n == 0 || n != nref) print "rows"
             else printf "%.3g", worst + 0
         }
-    ' "${CASE_DIR}/${COUPLING_FILE}" "${RESTART_DIR}/${RESTART_FILE}")
+    ' "$1" "$2"
+}
+
+# 1. The outlet pressure against the exact solution
+check_rmse "pimpleFoam" "${CASE_DIR}/${COUPLING_FILE}"
+
+# 2. The restart: the rows of (0.5, 1] against the continuous run
+if grep -q "circulationCoupler: resumed from" \
+    "${RESTART_DIR}/log.pimpleFoam.restart" 2> /dev/null
+then
+    echo "PASS: the restarted run resumed from the circulation checkpoint"
 else
-    restart_diff="none"
+    echo "FAIL: the restarted run did not resume from the circulation checkpoint"
+    failures=$((failures + 1))
 fi
+
+restart_diff=$(coupling_diff "${CASE_DIR}/${COUPLING_FILE}" \
+    "${RESTART_DIR}/${RESTART_FILE}" 0.5)
 
 if [[ "${restart_diff}" == "none" || "${restart_diff}" == "rows" ]]; then
     echo "FAIL: the restarted run's rows do not match those of the continuous run"
@@ -212,10 +238,32 @@ else
     failures=$((failures + 1))
 fi
 
+# 3. The pipe solved by solids4Foam: against the exact solution, and against
+#    the pimpleFoam run row by row
+check_rmse "solids4Foam" "${S4F_DIR}/${COUPLING_FILE}"
+
+s4f_diff=$(coupling_diff "${CASE_DIR}/${COUPLING_FILE}" \
+    "${S4F_DIR}/${COUPLING_FILE}" 0)
+
+if [[ "${s4f_diff}" == "none" || "${s4f_diff}" == "rows" ]]; then
+    echo "FAIL: the solids4Foam run's rows do not match those of the pimpleFoam run"
+    failures=$((failures + 1))
+elif awk -v d="${s4f_diff}" -v tol="${S4F_TOL}" \
+    'BEGIN { exit !(d < tol) }'
+then
+    printf "PASS: solids4Foam rows differ from the pimpleFoam run by %s of range\n" \
+        "${s4f_diff}"
+else
+    printf "FAIL: solids4Foam rows differ from the pimpleFoam run by %s of range\n" \
+        "${s4f_diff}"
+    failures=$((failures + 1))
+fi
+
 # Clean cases again, keeping them when a check failed
 if [[ "$CHECK_ONLY" = false && ${failures} -eq 0 ]]; then
     ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${RESTART_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${S4F_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
 fi
 
 echo

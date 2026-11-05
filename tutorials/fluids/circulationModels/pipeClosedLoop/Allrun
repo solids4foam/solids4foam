@@ -2,8 +2,41 @@
 # Demo: a CFD pipe in a closed circulation loop (both ends coupled).
 # Runs on numberOfSubdomains ranks of system/decomposeParDict (1: serial, slow).
 # Then:  python3 plotter.py
+#
+#   ./Allrun        the coupled CFD case, the pipe solved by pimpleFoam (default)
+#   ./Allrun 0D     the 0D reference in reference0D: the same circuit with the
+#                   pipe replaced by its R-L surrogate, solved by circulationFoam
 cd "$(dirname "$0")" || exit 1
 : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+mode=CFD
+
+print_usage()
+{
+    cat <<'USAGE'
+Usage:
+  ./Allrun          # default: the CFD pipe coupled to the circuit (pimpleFoam)
+  ./Allrun 0D       # the 0D reference, no mesh (circulationFoam in reference0D)
+USAGE
+}
+
+for arg in "$@"
+do
+    case "$arg" in
+        0D)
+            mode=0D
+            ;;
+        help|-h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
 
 # Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
 source solids4FoamScripts.sh
@@ -12,10 +45,19 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
+if [ "$mode" = "0D" ]; then
+    # The whole loop as one circuit (no mesh): check the set-up, then solve it
+    cd reference0D || exit 1
+    solids4Foam::runApplication -s check circulationFoam -check || exit 1
+    grep '^Result' log.circulationFoam.check
+    solids4Foam::runApplication circulationFoam || exit 1
+    echo "done: reference0D/postProcessing/circulation/0/circulation.dat"
+    exit 0
+fi
+
 np=$(solids4Foam::getNumberOfProcessors system/decomposeParDict)
 
 solids4Foam::runApplication blockMesh || exit 1
-
 solids4Foam::runApplication -s check circulationFoam -check || exit 1
 echo "--- the circuit, as the program understood it ---"
 sed -n '/ODE states/,/^Result/p' log.circulationFoam.check
@@ -27,5 +69,4 @@ if [ "$np" -gt 1 ]; then
 else
     solids4Foam::runApplication pimpleFoam || exit 1
 fi
-
 echo "done: postProcessing/circulationCoupling/0/coupling.dat  (python3 plotter.py to plot)"

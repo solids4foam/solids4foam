@@ -100,7 +100,7 @@ release. For complete commit-level details and contributor information, see the
   `circulationPressure` boundary condition and coupler
   (`libcirculationCoupling`) that couple a network to a CFD domain with
   explicit or implicit schemes of order 1 to 4. The tutorials are in
-  `tutorials/circulationModels`. It is currently only available for
+  `tutorials/fluids/circulationModels`. It is currently only available for
   OpenFOAM.com.
 - Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
   the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
@@ -584,6 +584,11 @@ release. For complete commit-level details and contributor information, see the
   iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
   The estimate is printed at the start of the run, with a warning when it
   exceeds 0.95.
+- The `circulationModels` tutorials moved from `tutorials/circulationModels`
+  to `tutorials/fluids/circulationModels`, beside the other fluid cases.
+  `pipeWindkesselSolids4Foam` is now `./Allrun solids4Foam` in
+  `pipeWindkessel`, and `pipeClosedLoop0D` is now `./Allrun 0D` in
+  `pipeClosedLoop` (its circuit is in `pipeClosedLoop/reference0D`).
 
 ### Removed
 

@@ -7,32 +7,33 @@ REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 CASE_DIR="${REGRESSION_ROOT}/main"
 
 # Source solids4Foam scripts
-source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
+source "${SCRIPT_DIR}/../../../../applications/scripts/solids4FoamScripts.sh"
 
 # ============================================================
-# pipeWindkesselSolids4Foam regression test
-# The outlet pressure against the exact solution of the Windkessel, with the
-# pipe solved by solids4Foam and the pimpleFluid fluid model
+# healthyHuman regression test
+# The left ventricle over the last cycle, [19 T, 20 T] with T = 1 s: the
+# end-diastolic and end-systolic volumes and the ejection fraction
 # ============================================================
 
 # ------------------------------------------------------------
 # Regression tolerances and reference values
 # ------------------------------------------------------------
 
-# RMSE of the outlet pressure Po over 0 < t <= 1 against the exact solution
-# (see ../pipeWindkessel/analyse.py), as for pipeWindkessel
-REF_RMSE=0.3385
-RMSE_TOL=0.005
+REF_EDV=141.707     # mL
+REF_ESV=55.843      # mL
+REF_EF=0.6059
+VOLUME_TOL=0.05     # mL
+EF_TOL=0.001
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
 # Data files
-COUPLING_FILE="postProcessing/circulationCoupling/0/coupling.dat"
+RESULTS_FILE="postProcessing/circulation/0/circulation.dat"
 
 echo "============================================================"
-echo "pipeWindkesselSolids4Foam regression test"
-echo "|RMSE - ${REF_RMSE}| < ${RMSE_TOL}"
+echo "healthyHuman regression test"
+echo "EDV, ESV within ${VOLUME_TOL} mL, EF within ${EF_TOL}"
 echo "============================================================"
 echo
 
@@ -45,12 +46,11 @@ prepare_case() {
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
         case "${base_item}" in
-            regressionTests|postProcessing|processor*|log.*)
+            regressionTests|postProcessing|plots|log.*)
                 continue
                 ;;
         esac
-        if [[ "${base_item}" != "0" \
-           && "${base_item}" =~ ^[0-9.eE+-]+$ ]]; then
+        if [[ "${base_item}" =~ ^[0-9.eE+-]+$ ]]; then
             continue
         fi
         cp -a "${item}" "${d}/"
@@ -86,44 +86,55 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
 fi
 
 # ------------------------------------------------------------
+# Extract values
+# ------------------------------------------------------------
+
+values=""
+if [[ -f "${CASE_DIR}/${RESULTS_FILE}" ]]; then
+    values=$(awk '
+        /^# t/ { for (i = 2; i <= NF; i++) if ($i == "LV.V") c = i - 1 }
+        /^#/ || NF == 0 { next }
+        c > 0 && $1 >= 19 - 1e-9 && $1 <= 20 + 1e-9 {
+            if (n == 0 || $c > hi) hi = $c
+            if (n == 0 || $c < lo) lo = $c
+            n++
+        }
+        END { if (n > 0) printf "%.6f %.6f %.6f", hi, lo, (hi - lo)/hi }
+    ' "${CASE_DIR}/${RESULTS_FILE}")
+fi
+
+if [[ -z "${values}" ]]; then
+    echo "FAIL: Could not extract the last cycle of LV.V from ${RESULTS_FILE}"
+    echo
+    echo "============================================================"
+    echo "Regression test FAILED"
+    echo "============================================================"
+    exit 1
+fi
+
+IFS=' ' read -r edv esv ef <<< "${values}"
+
+# ------------------------------------------------------------
 # Checks
 # ------------------------------------------------------------
 
 failures=0
 
-# The outlet pressure against the exact solution
-#    Pc(t) = A R/(1+(wRC)^2) [sin wt - wRC cos wt + wRC exp(-t/RC)]
-#    Po(t) = Pc(t) + Rch A sin wt,  A = 1, w = 2 pi, R = 10, Rch = 1, C = 0.01
-if [[ -f "${CASE_DIR}/${COUPLING_FILE}" ]]; then
-    rmse=$(awk '
-        /^# time/ { for (i = 3; i <= NF; i++) if ($i == "outlet.Ppatch") c = i - 1 }
-        /^#/ || NF == 0 { next }
-        $1 > 0 && $1 <= 1 + 1e-9 {
-            A = 1; w = 8*atan2(1, 1); R = 10; Rch = 1; C = 0.01; k = w*R*C
-            t = $1
-            pc = A*R/(1 + k*k)*(sin(w*t) - k*cos(w*t) + k*exp(-t/(R*C)))
-            e = $c - (pc + Rch*A*sin(w*t))
-            s += e*e; n++
-        }
-        END { if (n > 0 && c > 0) printf "%.6g", sqrt(s/n) }
-    ' "${CASE_DIR}/${COUPLING_FILE}")
-else
-    rmse=""
-fi
+check() {
+    local name="$1" value="$2" ref="$3" tol="$4"
+    if awk -v v="${value}" -v r="${ref}" -v t="${tol}" \
+        'BEGIN { d = v - r; exit !((d < 0 ? -d : d) < t) }'
+    then
+        printf "PASS: %s = %s (reference %s)\n" "${name}" "${value}" "${ref}"
+    else
+        printf "FAIL: %s = %s (reference %s)\n" "${name}" "${value}" "${ref}"
+        failures=$((failures + 1))
+    fi
+}
 
-if [[ -z "${rmse}" ]]; then
-    echo "FAIL: Could not compute the RMSE from ${COUPLING_FILE}"
-    failures=$((failures + 1))
-elif awk -v r="${rmse}" -v ref="${REF_RMSE}" -v tol="${RMSE_TOL}" \
-    'BEGIN { d = r - ref; exit !((d < 0 ? -d : d) < tol) }'
-then
-    printf "PASS: RMSE of the outlet pressure = %s (reference %s)\n" \
-        "${rmse}" "${REF_RMSE}"
-else
-    printf "FAIL: RMSE of the outlet pressure = %s (reference %s)\n" \
-        "${rmse}" "${REF_RMSE}"
-    failures=$((failures + 1))
-fi
+check "EDV [mL]" "${edv}" "${REF_EDV}" "${VOLUME_TOL}"
+check "ESV [mL]" "${esv}" "${REF_ESV}" "${VOLUME_TOL}"
+check "EF" "${ef}" "${REF_EF}" "${EF_TOL}"
 
 # Clean case again, keeping it when a check failed
 if [[ "$CHECK_ONLY" = false && ${failures} -eq 0 ]]; then

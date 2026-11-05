@@ -46,7 +46,7 @@ literature, `units mmHg_mL`, with the time in seconds and a cardiac period
   `PVN` are `CR` segments, and `SAR`, `SCP`, `PAR` and `PCP` are resistors.
 
 The equations assembled from these components are described in the
-[`circulation0D`](../../../src/circulationModels/circulation0D/README.md)
+[`circulation0D`](../../../../src/circulationModels/circulation0D/README.md)
 README. The circuit is in `constant/circulationProperties`, and is solved
 with the adaptive `RKDP45` ODE solver.
 

@@ -22,6 +22,9 @@ the node each patch is attached to. The circuit is one dictionary,
 ./Allrun
 # figures open on screen and are saved to plots/   (--no-show: only save)
 python3 plotter.py
+# the 0D reference: the same loop with the pipe replaced by its R-L
+# surrogate, solved as one circuit by circulationFoam (no mesh, seconds)
+./Allrun 0D
 # back to a clean case
 ./Allclean
 ```
@@ -59,14 +62,42 @@ run about 2.5 minutes); watch it with `tail -f log.pimpleFoam`.
   `backward` CFD time scheme)
 * **a stiffer ventricle**: `ventricle { ... active { E1 3.0e9; ... } }`
 
-## Checks and known limits
+## The 0D reference: `./Allrun 0D`
 
-There is no closed form for this problem. `../pipeClosedLoop0D` is the
-same circuit with the pipe replaced by its rigid Poiseuille R-L surrogate,
-solved as one system by `circulationFoam`. It is a reference for the coupled
-run, which differs from it by the modelling error of the surrogate, and a
-test of the chamber and valve components and the network assembly on a stiff,
-non-smooth, closed-loop circuit.
+There is no closed form for this problem. `reference0D/` is the same circuit
+with the 3D pipe replaced by its rigid, laminar Poiseuille surrogate, a
+resistor `Rpipe` in series with an inductor `Lpipe`, so that the whole loop is
+one `circulationNetwork` solved by `circulationFoam` with no CFD and no mesh:
+
+```text
+C1 -R1-L1- C2 -R2- C3 -R3- atrium -mitral- ventricle -aortic(+R4)- C4 -pipe- C1
+```
+
+* `Rpipe = 8 mu L / (pi r^4)`, with a viscosity `mu` of 0.004 Pa s, a pipe
+  length `L` of 0.3 m and a radius `r` of 0.02 m;
+* `Lpipe = rho L / A`, with a density `rho` of 1060 kg/m3 and the pipe
+  cross-sectional area `A`.
+
+The circuit is `reference0D/constant/circulationProperties`: the circuit of
+the coupled case with the two coupling ports replaced by `Rpipe` and `Lpipe`.
+`reference0D/system/controlDict` runs three cardiac cycles (`endTime 2.4`)
+with `deltaT 1e-4`, which is only the **output interval**: the ODE solver
+(`RKDP45`, tight tolerances) takes whatever internal steps it needs, many of
+them small because of the hard switching of the valves.
+
+`./Allrun 0D` runs `circulationFoam -check`, which describes the circuit and
+checks the set-up, and then solves it. The results are in
+`reference0D/postProcessing/circulation/0/circulation.dat`: a row every
+`deltaT`, with the pressure, volume and flow of every element.
+
+The solution has no partitioned coupling error, so it is the reference for
+the coupled run, which differs from it by the modelling error of the
+surrogate: the resolved pipe is not exactly its rigid laminar surrogate. At
+the coarse time steps used in the tutorial, the coupling error dominates this
+difference. It is also a test of the chamber and valve components and the
+network assembly on a stiff, non-smooth, closed-loop circuit.
+
+## Checks and known limits
 
 Explicit order 1 is unstable at `deltaT 1e-3` and stops at `t = 1.997`; use
 a smaller `deltaT`. Implicit coupling needs many outer correctors on this
