@@ -552,11 +552,8 @@ void newMovingWallVelocityFvPatchVectorField::write(Ostream& os) const
 #endif
     if (!continuityNormalGradient_)
     {
-#ifdef OPENFOAM_ORG
-        writeEntry(os, "continuityNormalGradient", continuityNormalGradient_);
-#else
-        os.writeEntry("continuityNormalGradient", continuityNormalGradient_);
-#endif
+        os.writeKeyword("continuityNormalGradient")
+            << continuityNormalGradient_ << token::END_STATEMENT << nl;
     }
 }
 
