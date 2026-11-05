@@ -76,8 +76,8 @@ $$(1.5, 0)\,\mathrm{m}$$, is written to
 interface to `postProcessing/fluid/forces/0/force.dat`. The half cylinder leans
 downstream as the inflow ramps up and settles once the ramp ends
 (Figure 2). The steady top-point displacement is
-$$(0.1173, -0.0137)\,\mathrm{m}$$ and the steady interface force
-$$(15.8, -25.0)\,\mathrm{N}$$ per metre of span; the vertical force is
+$$(0.1165, -0.0136)\,\mathrm{m}$$ and the steady interface force
+$$(15.7, -24.9)\,\mathrm{N}$$ per metre of span; the vertical force is
 dominated by the pressure, which is about $$25\,\mathrm{Pa}$$ at the half
 cylinder because of the viscous pressure drop along the channel.
 
@@ -94,7 +94,7 @@ extracts them to compare with. Figure 3 shows the comparison from that study.
 At $$t = 1\,\mathrm{s}$$ the tutorial mesh reproduces the published interface
 to within about 2% of the interface displacement. In the steady state the
 published half cylinder leans further downstream: the steady top-point
-displacement of [2] is $$(0.1297, -0.0117)\,\mathrm{m}$$, about 10% more than
+displacement of [2] is $$(0.1297, -0.0117)\,\mathrm{m}$$, about 11% more than
 on the tutorial mesh. The difference shrinks with mesh refinement, and the
 remaining offset is discussed in the verification README.
 
