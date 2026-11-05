@@ -131,8 +131,20 @@ issue #583).
 |---|---|---|
 | `mu5` | standard study (m1/m2/m4 at 200 steps/period; m2 at 50/100/200/400; IQN-ILS and Robin) plus m4/400 | spatial and temporal error; non-intrusiveness |
 | `amp05`, `amp2`, `amp4` | m2/200 (`amp4` also m1/200) | amplitude-dependent part; mesh dependence of its slope |
+| `ampm1` (optional) | m2/200, a = −1 | odd and even part of the amplitude dependence |
+| `p10`, `p10a4` (optional) | m2/200, 10 periods, a = 1 and 4 | does the amplitude slope decay with time |
 | `tol` | m2/200, coupling tolerances × 0.01 | coupling-iteration error |
 <!-- markdownlint-enable MD013 -->
+
+The optional copies are not run by `AllverifyTraction`; `ampm1`, `p10` and
+`p10a4` are prepared into `work/` with `scripts/prepare_study.py --ensure
+TUTORIAL work/ampm1/womersleyTube --amplitude=-1`, `... work/p10/womersleyTube
+--periods 10` and `... work/p10a4/womersleyTube --periods 10 --amplitude 4`,
+run with `scripts/run_single.py work/<copy>/womersleyTube robin:2:200` (about
+13, 21 and 21 CPU-min), and analysed with `scripts/amplitude_series.py work
+OUT.json` (adds the odd/even parts when `ampm1` is present) and
+`scripts/periods_slope.py work OUT.json`. `--periods N` keeps the analysis window at the
+last two periods.
 
 The amplitude variants regenerate `constant/womersleyProperties` and the
 reference JSON with the copy's own exact script. At 4× amplitude the standard
@@ -226,7 +238,9 @@ Checked against the end-to-end run, as for the results above.
 <!-- markdownlint-enable MD013 -->
 
 The amplitude-dependent part is an **amplitude-dependent contribution, linear
-in the tested amplitude range, origin unidentified**. Assumptions:
+in the tested amplitude range, odd in the sign of the amplitude and not
+decaying over 10 periods; origin unidentified** (see the two tests below).
+Assumptions:
 
 - the slope measured at m2/200 holds at m4 and in the Δt → 0 limit (checked
   for m1 vs m2; not checked in Δt);
@@ -241,11 +255,35 @@ Why its origin is open:
 - The observed, approximately linear dependence on positive amplitude is not
   explained by this simple smooth periodic-response argument. The mean wall
   displacement is O(a²) and only 2.7e-4 of the first harmonic.
-- The observations are not sufficient to establish a physical or numerical
-  mechanism. One possible explanation is contamination from the initial
-  condition (the linear exact solution) carried into the analysis window by a
-  slowly decaying free mode (see `../womersley_temporal_investigation.md`).
-  **This explanation has not been tested.**
+- The two tests below exclude a decaying start-up mode as the cause of the
+  amplitude-linear part, and show that it is odd in the sign of the amplitude.
+  They do not identify the mechanism.
+
+**Sign of the amplitude (a = -1, m2/200, 6 periods).** For a smooth periodic
+steady state the response to −a is the response to a shifted by half a period,
+so E(−1) = E(1) would follow. Observed (attenuation error, fit of a = 0.5–4:
+E0 = −1.087e-3, slope s = −1.0905e-3 per Pa): the odd part (E(1) − E(−1))/2 =
+−1.0854e-3 = 1.00 s and the even part (E(1) + E(−1))/2 = −1.0911e-3 =
+E0 + 0.00 s. All six QoIs behave the same (odd part = 0.99–1.03 s; even part
+equal to E0 within 0.03 s). The error is therefore linear **and odd** in a: the
+half-period symmetry of a periodic steady state is broken, so the error is not
+a property of the periodic steady state of the symmetric problem.
+
+**Duration (10 periods, analysis periods 9–10, m2/200, a = 1 and 4).** If the
+slope came from a free mode excited at start-up and decaying, it would fall with
+the number of periods. The two-point slope (E(4) − E(1))/3 of the attenuation
+error is −1.0912e-3 per Pa over periods 5–6 and −1.0951e-3 per Pa over periods
+9–10 (ratio 1.004; the other five QoIs 0.993–1.003), and E(1) is −2.1765e-3 and
+−2.1819e-3. The amplitude-linear part does not decay over four more periods
+(a decay on a time scale much longer than 10 periods is not excluded).
+
+**What remains.** An error that is odd in a and persistent is compatible with
+an effect of the initial state that does not decay, such as the static offset of
+the initial solid displacement carried by the moving fluid mesh (the fluid mesh
+moves by D(t) − D(0), closed issue #650, linear in the amplitude), but these
+runs do not show that this is the cause, nor its size. A run with the offset
+removed, or a smaller-amplitude series, would test it. The free-mode
+explanation proposed earlier is not supported (slope ratio 1.004).
 
 On m2 (the standard study's time series) the attenuation error is −4.24, −2.18,
 −1.69e-3 at 100/200/400 steps/period (time order 2.07). It is mesh-independent
