@@ -167,7 +167,18 @@ Four forcing methods are available:
   flux of the velocity of a deforming body (for example a bending beam,
   whose sections stretch on one side and shorten on the other) need not be
   zero, and would otherwise be a source of fluid that leaks into the flow
-  (this has no effect for rigid bodies). The
+  (this has no effect for rigid bodies). The face apertures are sampled at
+  the mesh points, which miss a body thinner than the point spacing for a
+  part of the time (a closed thin plate then lets the fluid through);
+  `thinBodyBlocking openFaces` (default `off`) also blocks (aperture 0, flux
+  of the body velocity) the internal and coupled faces that are fully open
+  by the points but whose centre-to-centre segment crosses the surface, an
+  exact test on the surface triangles for any thickness, and
+  `crossedFaces` also the partly cut internal faces between two cells whose
+  centres are outside the bodies. This is a face-crossing criterion, not a
+  treatment of gaps, holes or free edges thinner than a cell, and an
+  oblique or curved thin shell still transmits less than its swept volume
+  during the start-up. The
   force is the momentum exchange (`forceEstimator momentumExchange`, the
   default), which includes the inertia of the fluid inside the body; the
   alternative surface traction (`forceEstimator surfaceTraction`) is from

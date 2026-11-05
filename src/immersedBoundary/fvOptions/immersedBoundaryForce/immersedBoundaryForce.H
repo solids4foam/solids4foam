@@ -264,6 +264,15 @@ Description
         // pressure equation of pimpleFluid, optional, default yes
         apertureCoupling yes;
 
+        // cutLink with apertureCoupling: block the faces that a body
+        // thinner than the point spacing crosses between the centres of
+        // their cells (exact test on the surface triangles): off,
+        // openFaces (only faces whose points are all in the fluid) or
+        // crossedFaces (also partly cut faces between cells whose centres
+        // are outside the bodies); optional, default off. Not a
+        // treatment of holes, gaps or tips thinner than a cell
+        thinBodyBlocking off;
+
         // cutLink: force estimate, momentumExchange, surfaceTraction or
         // forcing, optional, default momentumExchange
         forceEstimator  momentumExchange;
@@ -478,6 +487,14 @@ class immersedBoundaryForce
             //  diffusivity of the pressure equation with those of the
             //  bodies on the faces they cut
             bool apertureCoupling_;
+
+            //- Block the internal faces that a body crosses between the
+            //  centres of their two cells although the points do not see it
+            //  (a body thinner than the point spacing), tested on the
+            //  surface triangles: off, openFaces (the faces that the points
+            //  leave fully open) or crossedFaces (also the partly cut faces
+            //  between two cells whose centres are outside the bodies)
+            word thinBodyBlocking_;
 
             //- Fluid fraction of the area of each face (aperture), and the
             //  flux of the body velocity through each face, registered for

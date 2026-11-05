@@ -1081,6 +1081,177 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
         }
     }
 
+    // Thin bodies: a face whose points are all in the fluid, so that it is
+    // fully open, but whose centre-to-centre segment crosses the surface of
+    // a body, lies behind or ahead of a body thinner than the point spacing,
+    // which no point sample sees: block it. The test is exact on the surface
+    // triangles for any thickness. The faces already cut by the points keep
+    // their aperture (openFaces), or, between two cells whose centres are
+    // outside the bodies, are blocked too (crossedFaces); the coupled faces
+    // are only tested when fully open
+    if (thinBodyBlocking_ != "off")
+    {
+        const bool allCut = (thinBodyBlocking_ == "crossedFaces");
+        const labelUList& own = mesh_.owner();
+        const labelUList& nei = mesh_.neighbour();
+        const vectorField& C = mesh_.C();
+
+        // Candidate faces: open internal faces whose cell centres are within
+        // the bounding box of a body, grown by the cell sizes
+        DynamicList<label> openFaces;
+        DynamicList<point> segStart;
+        DynamicList<point> segEnd;
+        List<treeBoundBox> boxes(bodies_.size());
+        forAll(bodies_, bodyi)
+        {
+            boxes[bodyi] = treeBoundBox(bodies_[bodyi].surface().points());
+            const scalar grow =
+                2*Foam::cbrt(gMax(mesh_.V().field())) + SMALL;
+            boxes[bodyi].grow(grow);
+        }
+        // Cells whose centre is inside a body
+        boolList centreInside(mesh_.nCells(), false);
+        for (const immersedBody& body : bodies_)
+        {
+            for (const label celli : body.insideCells())
+            {
+                centreInside[celli] = true;
+            }
+        }
+
+        forAll(alphaI, facei)
+        {
+            if
+            (
+                alphaI[facei] <= 0
+             || (
+                    alphaI[facei] < 1
+                 && !(
+                        allCut
+                     && !centreInside[own[facei]]
+                     && !centreInside[nei[facei]]
+                    )
+                )
+            )
+            {
+                continue;
+            }
+            const point& a = C[own[facei]];
+            const point& b = C[nei[facei]];
+            bool near = false;
+            forAll(boxes, bodyi)
+            {
+                if (boxes[bodyi].contains(a) || boxes[bodyi].contains(b))
+                {
+                    near = true;
+                    break;
+                }
+            }
+            if (near)
+            {
+                openFaces.append(facei);
+                segStart.append(a);
+                segEnd.append(b);
+            }
+        }
+
+        const pointField start(segStart);
+        const pointField end(segEnd);
+        boolList crossed(start.size(), false);
+        forAll(bodies_, bodyi)
+        {
+            List<pointIndexHit> hits;
+            bodies_[bodyi].findLine(start, end, hits);
+            forAll(hits, i)
+            {
+                if (hits[i].hit())
+                {
+                    crossed[i] = true;
+                }
+            }
+        }
+
+        label nBlocked = 0;
+        forAll(crossed, i)
+        {
+            if (crossed[i])
+            {
+                alphaI[openFaces[i]] = 0;
+                nBlocked++;
+            }
+        }
+
+        // Coupled (processor) faces: the segment from the cell centre to the
+        // centre of the cell on the other side. Only the open faces, whose
+        // state is known on both sides; both sides test the same segment
+        forAll(alpha.boundaryField(), patchi)
+        {
+            const fvPatch& patch = mesh_.boundary()[patchi];
+            if (!patch.coupled())
+            {
+                continue;
+            }
+            fvsPatchScalarField& palpha = alpha.boundaryFieldRef()[patchi];
+            const labelUList& faceCells = patch.faceCells();
+            const vectorField delta(patch.delta());
+
+            DynamicList<label> pFaces;
+            DynamicList<point> pStart;
+            DynamicList<point> pEnd;
+            forAll(palpha, i)
+            {
+                if (palpha[i] < 1)
+                {
+                    continue;
+                }
+                const point a = C[faceCells[i]];
+                const point b = a + delta[i];
+                bool near = false;
+                forAll(boxes, bodyi)
+                {
+                    if (boxes[bodyi].contains(a) || boxes[bodyi].contains(b))
+                    {
+                        near = true;
+                        break;
+                    }
+                }
+                if (near)
+                {
+                    pFaces.append(i);
+                    pStart.append(a);
+                    pEnd.append(b);
+                }
+            }
+
+            const pointField pstart(pStart);
+            const pointField pend(pEnd);
+            boolList pcrossed(pstart.size(), false);
+            forAll(bodies_, bodyi)
+            {
+                List<pointIndexHit> hits;
+                bodies_[bodyi].findLine(pstart, pend, hits);
+                forAll(hits, i)
+                {
+                    if (hits[i].hit())
+                    {
+                        pcrossed[i] = true;
+                    }
+                }
+            }
+            forAll(pcrossed, i)
+            {
+                if (pcrossed[i])
+                {
+                    palpha[pFaces[i]] = 0;
+                    nBlocked++;
+                }
+            }
+        }
+
+        Info<< "    Thin body blocking: faces blocked by a crossing: "
+            << returnReduce(nBlocked, sumOp<label>()) << endl;
+    }
+
     // Cells whose internal and coupled faces are all solid
     {
         scalarField& solid = solidCellsPtr_->primitiveFieldRef();
@@ -1937,6 +2108,7 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     tractions_(),
     pinnedRateCoeff_(100),
     apertureCoupling_(true),
+    thinBodyBlocking_("off"),
     aperturePtr_(),
     wallFluxPtr_(),
     solidCellsPtr_(),
@@ -2698,6 +2870,19 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
             imageInterpolation_
         );
         coeffs_.readIfPresent("apertureCoupling", apertureCoupling_);
+        coeffs_.readIfPresent("thinBodyBlocking", thinBodyBlocking_);
+        if
+        (
+            thinBodyBlocking_ != "off"
+         && thinBodyBlocking_ != "openFaces"
+         && thinBodyBlocking_ != "crossedFaces"
+        )
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown thinBodyBlocking " << thinBodyBlocking_
+                << ": valid choices are off, openFaces and crossedFaces"
+                << exit(FatalIOError);
+        }
         coeffs_.readIfPresent("pinnedRateCoeff", pinnedRateCoeff_);
         coeffs_.readIfPresent("linkCorrection", linkCorrection_);
         coeffs_.readIfPresent("forceEstimator", forceEstimator_);
