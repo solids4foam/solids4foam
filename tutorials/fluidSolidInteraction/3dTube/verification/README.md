@@ -423,21 +423,21 @@ digits), and level 2 is independent of the number of ranks.
 | Eken (2016) | 0.1242 | 6.69 | -0.0794 | -0.0763 |
 | Backward, level 3 | 0.15851 | 7.252 | -0.08571 | -0.09603 |
 
-With the published discretisation the peak is within +2.5%/-1.4% (level 1)
-and +1.3%/-2.6% (level 2) of the two published peaks, against 33% and 28%
-with the backward level-3 solution; the axial trough moves from 8-16% to
-1-6% (level 1; 1-8% on level 2) of the published values and the late radial
-trough from 26-27% to 0-3%. The damping by Euler at `Δt = 1e-4 s`
-(0.036-0.038 mm) amounts to 92-115% of the gap between the published peaks and the backward solution
-(86-126% within the reading accuracy of the figures). The Euler results
-converge slowly in time (successive `u_r,max(A)` changes of 11.5%, 7.3% and
-4.2%, still 4.4% below the backward value at `Δt = 1.25e-5 s`), so neither
-published finite element peak is converged in time. The time discretisation
-therefore reproduces most, and within the reading accuracy all, of the
-published difference in `u_r,max(A)`, and much of the difference in the
-troughs; it does not explain the 0.3 ms earlier peak of Eken (2016), and the
-published results also differ in their wall model (St Venant-Kirchhoff),
-pressure switch-off (instantaneous) and meshes.
+With the published discretisation the peak is within +2.5%/-1.4% (level 1) and
++1.3%/-2.6% (level 2) of the two published peaks, against 33% and 28% with the
+backward level-3 solution; the axial trough moves from 8-16% to 1-6% (level 1;
+1-8% on level 2) of the published values and the late radial trough from 26-27%
+to 0-3%. The damping by Euler at `Δt = 1e-4 s` (0.036-0.038 mm) amounts to
+92-115% of the gap between the published peaks and the backward solution
+(86-126% within the reading accuracy of the figures). The Euler results converge
+slowly in time (successive `u_r,max(A)` changes of 11.5%, 7.3% and 4.2%, still
+4.4% below the backward value at `Δt = 1.25e-5 s`), so neither published finite
+element peak is converged in time. The time discretisation therefore reproduces
+most, and within the reading accuracy all, of the published difference in
+`u_r,max(A)`, and much of the difference in the troughs; it does not explain the
+0.3 ms earlier peak of Eken (2016), and the published results also differ in
+their wall model (St Venant-Kirchhoff), pressure switch-off (instantaneous) and
+meshes.
 
 ### Coupling study
 
