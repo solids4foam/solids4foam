@@ -24,8 +24,8 @@ where:
 - **Asf**: fluid pressure at the FSI interface affecting the solid traction
 
 The system is stored as a PETSc `MatNest` and solved with SNES Newton line
-search. In parallel, the MatNest is converted to a monolithic `MPIAIJ` matrix
-for preconditioning.
+search. For preconditioning, the MatNest is converted to a monolithic `AIJ`
+matrix (`MPIAIJ` in parallel), in serial and in parallel runs.
 
 The solid sets its displacement from its velocity with the backward (BDF2)
 scheme, and evaluates the stress and the interface traction at the new time.

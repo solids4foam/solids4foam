@@ -182,10 +182,10 @@ underside value reproduces the recorded `solidPointDisplacement` value, and
 `postProcess -region solid` probes of `D` with `cellPoint` interpolation agree
 with the nodal `pointD` to <= 0.3 % (mesh 1) and <= 2e-5 m (meshes 3, 4).
 
-Quasi-monolithic `uy` (m) (**pre-#597** values; see the rerun section below), `y` in tutorial coordinates (top `y = 0`, mid
-`y = -0.2`, underside `y = -0.4`); the mid-thickness point corresponds to
-(4, -1.2) in ANSYS coordinates if its plate top is at `y = -1` (assumption,
-not confirmed by the ANSYS author):
+Quasi-monolithic `uy` (m) (**pre-#597** values; see the rerun section below),
+`y` in tutorial coordinates (top `y = 0`, mid `y = -0.2`, underside `y = -0.4`);
+the mid-thickness point corresponds to (4, -1.2) in ANSYS coordinates if its
+plate top is at `y = -1` (assumption, not confirmed by the ANSYS author):
 
 | ΔX (m) | top | mid | underside (recorded) | ANSYS mid (Tandis) | Tukovic A |
 |---:|---:|---:|---:|---:|---:|
@@ -209,9 +209,9 @@ point is not reproduced).
 ### Partitioned versus quasi-monolithic, four levels
 
 `uy` is the underside (recorded) value; `Fy` is the total interface force
-(N per metre of span).
+(N per metre of span). Monolithic: pre-#597 quasi-monolithic runs.
 
-| ΔX (m) | uy partitioned | uy monolithic (pre-#597) | Fy partitioned | Fy monolithic (pre-#597) |
+| ΔX (m) | uy partitioned | uy monolithic | Fy partitioned | Fy monolithic |
 |---:|---:|---:|---:|---:|
 | 0.1 | -0.202495 | -0.201557 | -5.15266 | -5.12249 |
 | 0.05 | -0.228799 | -0.228817 | -5.23784 | -5.23811 |
@@ -226,7 +226,7 @@ extrapolations (using the observed last order: -5.2608 and -5.2611) are only
 indicative. Partitioned and monolithic agree to 0.01 to 0.02 % in `uy` and
 `Fy` on the three finest meshes.
 
-### Rerun with the newtonIcoFluid continuity fix (solids4foam PR #597, recorded 20 Oct 2026)
+### Rerun with the newtonIcoFluid continuity fix (#597, 20 Oct 2026)
 
 `newtonIcoFluid` built its continuity residual from `fvc::div(U)` rather than
 from the flux that convects momentum; #597 fixes that. Everything else is as
@@ -236,38 +236,40 @@ Only the code version changed. Data: `monolithic_597` rows of the CSV/JSON;
 the earlier monolithic rows are now labelled `monolithic_pre597`.
 
 Build: solids4foam branch `feature-petsc-snes-quasi-monolithic` at 257b2e564
-(contains 597cc6317), OpenFOAM v2512 (OpenCFD) on xenosim (Ubuntu 22.04),
-gcc 11.4.0, wmake `-O3` (default `Opt`), PETSc 3.24.1 with MUMPS and HYPRE;
-private lib/app directories; the `solids4Foam` solver was linked and run.
-Levels 1 to 3 ran serially; level 4 ran on 4 MPI ranks (`Allrun monolithic
-parallel`, scotch) because serial took about 55 to 80 s per step, with the
-fluid mesh-motion PETSc preconditioner changed from `bjacobi`+LU to
-`redundant`+LU (exact LU as in serial: a 4-rank `bjacobi` run failed its
-mesh-motion linear solve at t = 15.5 s). The first three levels at the same
-settings were not rerun in parallel, so a serial/parallel difference on level 4
-is not separately quantified. End time 300 s (not 200 s): at 200 s the level 2
-`uy` still oscillated with peak-to-peak 2.3e-5 m (decaying), above the 1e-5 m
-target; at 300 s the change in `uy` over the last 10 % is at most 5e-6 m on every
-level and `Fy` changes by at most 2e-7 N. Levels 1 and 2 at 200 s gave
--0.201552 and -0.228473, within 6e-6 m of the 300 s values.
+(contains 597cc6317), OpenFOAM v2512 (OpenCFD) on xenosim (Ubuntu 22.04), gcc
+11.4.0, wmake `-O3` (default `Opt`), PETSc 3.24.1 with MUMPS and HYPRE; private
+lib/app directories; the `solids4Foam` solver was linked and run. Levels 1 to 3
+ran serially; level 4 ran on 4 MPI ranks (`Allrun monolithic parallel`, scotch)
+because serial took about 55 to 80 s per step, with the fluid mesh-motion PETSc
+preconditioner changed from `bjacobi`+LU to `redundant`+LU (exact LU as in
+serial: a 4-rank `bjacobi` run failed its mesh-motion linear solve at t = 15.5
+s). The first three levels at the same settings were not rerun in parallel, so a
+serial/parallel difference on level 4 is not separately quantified. End time 300
+s (not 200 s): at 200 s the level 2 `uy` still oscillated with peak-to-peak
+2.3e-5 m (decaying), above the 1e-5 m target; at 300 s the change in `uy` over
+the last 10 % is at most 5e-6 m on every level and `Fy` changes by at most 2e-7
+N. Levels 1 and 2 at 200 s gave -0.201552 and -0.228473, within 6e-6 m of the
+300 s values.
 
 `uy` underside (recorded point (4, -0.4)); top and mid are sampled from the
-final `pointD` at the nodes (4, 0) and (4, -0.2):
+final `pointD` at the nodes (4, 0) and (4, -0.2). Columns: pre = monolithic
+before #597, mono = monolithic with #597, part. = partitioned; Richardson
+uses p = 2 and levels 3 and 4:
 
-| ΔX (m) | uy pre-#597 | uy mono (#597) | uy partitioned | Fy pre-#597 | Fy mono (#597) | Fy partitioned |
+| ΔX (m) | uy pre | uy mono | uy part. | Fy pre | Fy mono | Fy part. |
 |---:|---:|---:|---:|---:|---:|---:|
 | 0.1 | -0.201557 | -0.201546 | -0.202495 | -5.12249 | -5.12258 | -5.15266 |
 | 0.05 | -0.228817 | -0.228468 | -0.228799 | -5.23811 | -5.22750 | -5.23784 |
 | 0.025 | -0.235676 | -0.235448 | -0.235628 | -5.25764 | -5.25072 | -5.25637 |
 | 0.0125 | -0.237336 | -0.237187 | -0.237307 | -5.26056 | -5.25611 | -5.25993 |
-| order | 1.99, 2.05 | 1.95, 2.01 | 1.95, 2.02 | 2.57, 2.74 | 2.18, 2.11 | 2.20, 2.38 |
-| Richardson (p = 2, levels 3-4) | -0.23789 | -0.23777 | -0.23787 | -5.2615 | -5.2579 | -5.2611 |
+| order | 1.99,2.05 | 1.95,2.01 | 1.95,2.02 | 2.57,2.74 | 2.18,2.11 | 2.20,2.38 |
+| Richardson | -0.23789 | -0.23777 | -0.23787 | -5.2615 | -5.2579 | -5.2611 |
 
 Top (y = 0) `uy`: -0.203597, -0.231074, -0.238211, -0.239990; mid (y = -0.2):
 -0.205030, -0.232320, -0.239415, -0.241184 (pre-#597 top -0.203607,
 -0.231431, -0.238445, -0.240142). `ux` at all three points is below 1.1e-4 m.
-The monitor point in the tutorial is now (4 0 0.5), the top surface (PR
-#584); all three points are recorded regardless.
+The monitor point in the tutorial is now (4 0 0.5), the top surface
+(PR #584); all three points are recorded regardless.
 
 Change relative to pre-#597 (`uy` / `Fy`): +0.005 % / -0.002 % (level 1),
 +0.15 % / +0.20 % (level 2), +0.10 % / +0.13 % (level 3), +0.06 % / +0.08 %
@@ -298,24 +300,24 @@ branch `feature-ring-monolithic-verification` at 0698d55cd (HEAD when the
 coupling, `relaxationFactor 0.1`, `outerCorrTolerance 1e-5`, coupling from
 t = 10 s, end time 200 s. Level 4 ran on 4 MPI ranks (scotch).
 
-* At the tutorial pseudo-time step (0.5 s) level 4 diverged earlier; the
+- At the tutorial pseudo-time step (0.5 s) level 4 diverged earlier; the
   fluid-only start-up (the coupling starts at 10 s) also diverges at
   ΔT = 0.125 s (mean Courant number 8, blow-up at t = 9) and with a 20 s
   ramped inlet at ΔT = 0.125 and 0.25 s. ΔT = 0.0625 s (mean Courant number 4)
   is stable.
-* With the default FSI test (`min(r1, r2)`) at ΔT = 0.0625 s the run reaches
+- With the default FSI test (`min(r1, r2)`) at ΔT = 0.0625 s the run reaches
   t = 200 s and `uy` = -0.237312, but steps are accepted after one iteration
   with `r1` of order 1 (median 0.76; issue #552) and `Fy` fluctuates by 0.1 N
   from step to step (-5.20 N at the end): the coupling is not converged and
   that run is not used.
-* `requireAllResidualMeasures yes` with the default `nOuterCorr 20` fails at
+- `requireAllResidualMeasures yes` with the default `nOuterCorr 20` fails at
   t = 56.75 s (residual floor about 1.6e-4 from the 1e-6 fluid linear solver
   tolerance); with `nOuterCorr 40` it fails at t = 142.6 s (2.1e-5). The
   accepted run uses `requireAllResidualMeasures yes`, `nOuterCorr 40` and
   the fluid linear solver tolerance 1e-8: `r1` at acceptance in the last 10 %
   of the run has a maximum of 6.0e-6 (below the 1e-5 tolerance, 3.8 outer
   iterations on average), r2 below 5e-13.
-* Steadiness: the change in `uy` over the last 10 % of the run is 1.3e-5 m
+- Steadiness: the change in `uy` over the last 10 % of the run is 1.3e-5 m
   (target 1e-5; the monolithic runs are at 2.3e-5 m, oscillating with a
   decaying amplitude, extrapolated remaining about 5e-6 m).
 

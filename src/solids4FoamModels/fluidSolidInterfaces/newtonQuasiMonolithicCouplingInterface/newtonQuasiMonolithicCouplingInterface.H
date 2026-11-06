@@ -146,8 +146,8 @@ class newtonQuasiMonolithicCouplingInterface
 
     // Private Member Functions
 
-        //- Make the isFluid, isFluidVelocity, isFluidPressure, isMotion and
-        //  isSolid index sets
+        //- Make the isFluid, isFluidVelocity, isFluidPressure and isSolid
+        //  index sets (the name is historical: there is no mesh-motion set)
         void makeIsFluidIsMotionIsSolid() const;
 
         //- Return isFluid pointer
@@ -289,8 +289,8 @@ class newtonQuasiMonolithicCouplingInterface
             const bool twoD
         ) const;
 
-        //- Insert Afm matrix coefficients
-        //  This represents how the mesh motion affects the fluid equations
+        //- Insert the Afs matrix coefficients
+        //  This represents the solid coupling in the fluid equations
         //  This does NOT zero the entries first
         label formAfs
         (

@@ -493,6 +493,10 @@ scalar nonLinGeomTotalLagVelocitySolid::backwardDeltaT0() const
     // time-step
 #ifdef OPENFOAM_COM
     if (runTime().timeIndex() < 2)
+#elif defined(OPENFOAM_ORG)
+    // As backwardDdtScheme::deltaT0_(vf); calling oldTime().oldTime() here
+    // would create the old-old time field
+    if (U().nOldTimes() < 2)
 #else
     if (U().oldTime().timeIndex() == U().oldTime().oldTime().timeIndex())
 #endif
@@ -870,6 +874,12 @@ nonLinGeomTotalLagVelocitySolid::nonLinGeomTotalLagVelocitySolid
 
     if (predictor_)
     {
+        // predict() is not called by evolveSnes() or by the quasi-monolithic
+        // coupling
+        WarningIn(type() + "::" + type())
+            << "The predictor option has no effect for the " << type()
+            << " solid model: the solution is not predicted" << endl;
+
         // Check ddt scheme for D is not steadyState
         const word ddtDScheme
         (

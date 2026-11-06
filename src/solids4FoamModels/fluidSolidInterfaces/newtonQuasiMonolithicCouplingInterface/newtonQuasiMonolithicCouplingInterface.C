@@ -36,6 +36,7 @@ License
 #include "meshMotionSolidModelFvMotionSolver.H"
 #include "meshMotionTotalDispSolid.H"
 #include "globalIndex.H"
+#include "labelPairHashes.H"
 #include "compatibilityFunctions.H"
 #include "fvcMeshPhi.H"
 
@@ -84,6 +85,14 @@ public:
         // value so the retry does not treat the failed step as the last
         // accepted one when operator++() updates deltaT0.
         state.deltaTSave_ = runTime.deltaT0Value();
+        // A failed step that reached a write time raised writeTimeIndex_
+        // (by one: a step does not span a write interval); lower it again,
+        // or the retried step does not write and adjustableRunTime aims at
+        // the following write time
+        if (state.writeTime_)
+        {
+            --state.writeTimeIndex_;
+        }
         state.writeTime_ = false;
 
         return state;
@@ -724,6 +733,10 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
     const labelListList& fluidFaceSolidFacesRef = fluidFaceSolidFaces();
     const labelList& fluidFaceToZone = fluidGlobalPatch.faceToGlobalAddr();
 
+    // Fluid cell - solid cell pairs already counted: two interface faces
+    // can couple the same pair of cells
+    labelPairHashSet coupledCells;
+
     // Loop over LOCAL fluid interface faces
     forAll(fluidPatchRef, fluidFaceI)
     {
@@ -738,6 +751,11 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAfs
         {
             const label globalSolidCellID =
                 label(zoneSolidGlobalCellIDs[solidZoneFaces[i]]);
+
+            if (!coupledCells.insert(labelPair(fluidCellID, globalSolidCellID)))
+            {
+                continue;
+            }
 
             // Check if the coupled solid cell is on this processor
             const bool solidCellLocal =
@@ -856,6 +874,10 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
     const labelListList& solidFaceFluidFacesRef = solidFaceFluidFaces();
     const labelList& solidFaceToZone = solidGlobalPatch.faceToGlobalAddr();
 
+    // Solid cell - fluid cell pairs already counted: two interface faces
+    // can couple the same pair of cells
+    labelPairHashSet coupledCells;
+
     // Loop over LOCAL solid interface faces
     forAll(solidPatchRef, solidFaceI)
     {
@@ -870,6 +892,11 @@ label newtonQuasiMonolithicCouplingInterface::initialiseAsf
         {
             const label globalFluidCellID =
                 label(zoneFluidGlobalCellIDs[fluidZoneFaces[i]]);
+
+            if (!coupledCells.insert(labelPair(solidCellID, globalFluidCellID)))
+            {
+                continue;
+            }
 
             // Check if the coupled fluid cell is on this processor
             const bool fluidCellLocal =
@@ -2349,7 +2376,7 @@ void newtonQuasiMonolithicCouplingInterface::setDeltaT(Time& runTime)
 
         runTime.setDeltaT(newDeltaT);
 
-        if (enableTimeStepLog)
+        if (enableTimeStepLog && Pstream::master())
         {
             if (tsLogPtr_.empty())
             {
@@ -2482,13 +2509,17 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         DMotion.correctBoundaryConditions();
 
         //    (a) Explicitly predict the solid displacement field D[n], which
-        //        moves the fluid mesh:
-        //          D[n] = D[n-1] + (3*dt/2)*USolid[n-1] - (dt/2)*USolid[n-2]
-        //        After the solve, the solid sets D[n] from the converged
-        //        velocity with the backward scheme
+        //        moves the fluid mesh, with the variable-step second-order
+        //        Adams-Bashforth formula (r = dt/dt0):
+        //          D[n] = D[n-1] + dt*((1 + r/2)*USolid[n-1]
+        //                 - (r/2)*USolid[n-2])
+        //        which is (3*dt/2)*USolid[n-1] - (dt/2)*USolid[n-2] for a
+        //        constant time-step. After the solve, the solid sets D[n] from
+        //        the converged velocity with the backward scheme
+        const scalar r = deltaT.value()/time.deltaT0Value();
         D = D.oldTime()
-          + (3.0*deltaT/2.0)*USolid.oldTime()
-          - (deltaT/2.0)*USolid.oldTime().oldTime();
+          + (deltaT*(1.0 + 0.5*r))*USolid.oldTime()
+          - (deltaT*(0.5*r))*USolid.oldTime().oldTime();
 
         // Update displacement gradient
         updateSolidGradD(D);
@@ -3187,7 +3218,7 @@ label newtonQuasiMonolithicCouplingInterface::formResidual
             << endl;
     }
 
-    PetscFunctionReturn(PETSC_SUCCESS);
+    return 0;
 }
 
 

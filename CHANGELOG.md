@@ -429,6 +429,29 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `newtonIcoFluid`, also in standalone runs: a plain `fixedGradient`
+  pressure on a wall with a `fixedValue` velocity takes its gradient from
+  the wall-normal momentum equation (each such patch is listed at start-up;
+  use `uniformFixedGradient` for a prescribed gradient). The Jacobian
+  contains the segregated upwind `fvm::div(phi,U)` by default; the Newton
+  tensor terms of `div(phi,U)` are added with the new `addNewtonDivPhiU`.
+  The momentum residual includes the transpose part of the viscous stress,
+  the continuity residual uses the convecting face flux, and the
+  pressure-reference residual is `pRefValue - p[pRefCell]`. With
+  `-snes_mf_operator` the Jacobian changes alter iteration counts, not the
+  converged solution. Without `adjustTimeStep`, `stopOnPetscError false`
+  still accepts a non-converged step.
+- `foamPetscSnesHelper::solve(true)` returns the negative SNES converged
+  reason for `SNES_DIVERGED_FUNCTION_DOMAIN` too (it returned 0), and the
+  PETSc options are loaded on the first solve rather than at construction.
+- In parallel, the copies of a constrained `pointD` value on processor
+  boundaries are synchronised (`solidModel`), so results of parallel solid
+  and FSI runs can change at round-off level. The fluid model's `U` and `p`
+  take back their names in the registry from a mesh-motion solid model that
+  read the same files first on a restart (`fluidModel`).
+- `meshMotionTotalDisplacement` accepts only the `implicitSegregated` and
+  `PETScSNES` solution algorithms (the keyword was ignored before) and
+  stores the old-time `pointD`.
 - `foamPetscSnesHelper` is split into `petscSnesSystem` (the residual,
   Jacobian and solver hooks of a nonlinear system), `foamPetscSnesSolver`
   (the SNES object, vectors and options) and `foamPetscMeshAssembly` (the

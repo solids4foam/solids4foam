@@ -1039,6 +1039,11 @@ label foamPetscMeshAssembly::InsertFvcDivGradInterpolateIntoPETScMatrix
         }
         else if (fp.coupled())
         {
+            // Only the owner-side part, w*gamma*Sf & grad_own: the (1 - w)
+            // neighbour part, inserted on interior faces, would need the
+            // gradient stencil of the cell on the other processor. The
+            // Jacobian (a preconditioner) therefore differs slightly between
+            // serial and parallel runs; the residual does not
             const fvsPatchScalarField& pw =
                 mesh.weights().boundaryField()[patchI];
 

@@ -235,10 +235,17 @@ The following entries are read from `newtonIcoFluidCoeffs`:
 
 - `predictor`: if enabled, extrapolates the velocity from old time levels before
   the PETSc solve.
-- `forceImplicitFlux`: if enabled, updates the flux from the current velocity
-  inside the residual and Jacobian paths.
+- `forceImplicitFlux`: if enabled, the residual and Jacobian use the flux of
+  the current velocity even when the caller (the quasi-monolithic coupling)
+  asks for the extrapolated flux. Standalone runs always use the current
+  flux, so the option has no effect there.
 - `fluidFluxExtrapolationAlgorithm1`: selects one of the explicit old-time flux
-  extrapolation formulae when `forceImplicitFlux` is disabled.
+  extrapolation formulae used for an extrapolated flux.
+- `addNewtonDivPhiU`: if enabled, the Jacobian also contains the Newton
+  linearisation of `div(phi,U)` with respect to the flux (the tensor terms);
+  by default only the segregated upwind `fvm::div(phi,U)` is inserted.
+  With `-snes_mf_operator` the Jacobian is only the preconditioner, so the
+  option changes the iteration counts, not the converged solution.
 - `addDivPhiUDamping`: adds a semi-implicit damping term based on
   `div(phiAbs)`. The matrix uses `fvm::SuSp` so only the part that preserves
   the negative-diagonal momentum-block sign is added implicitly.
@@ -270,10 +277,10 @@ velocity `fvMatrix` before PETSc insertion:
 `(1/alpha - 1)*fvm::Sp(UEqn.A(), U)`. This scales the segregated
 velocity-equation diagonal from `D` to `D/alpha` without calling
 `fvMatrix::relax()`, whose diagonal-dominance logic assumes a positive
-diagonal and is not valid for this negative-diagonal Jacobian. For
-implicit-flux Jacobians, the extra tensor terms from the Newton
-linearisation of `div(phi,U)` are still inserted directly into PETSc
-and are not modified by the scalar diagonal relaxation. The pressure
+diagonal and is not valid for this negative-diagonal Jacobian. With
+`addNewtonDivPhiU`, the extra tensor terms from the Newton linearisation
+of `div(phi,U)` are inserted directly into PETSc and are not modified by
+the scalar diagonal relaxation. The pressure
 stabilisation `rAUf` is still constructed from the upwind
 laplacian-ddt-div approximation before optional `addDivPhiUDamping`
 terms are added, since the damping term does not guarantee the same
@@ -366,8 +373,9 @@ given PETSc solution vector:
 - applies the pressure reference cell and `pressureScaleFactor`;
 - inserts the cell residuals into the PETSc residual vector.
 
-The pressure stabilisation uses `rAUf = interpolate(1/A(U))` from an auxiliary
-momentum equation. This couples the pressure stabilisation strength to the
+The pressure stabilisation uses `rAUf = -interpolate(1/A(U))` from an
+auxiliary momentum equation (the diagonal `A` of the Jacobian's momentum
+block is negative). This couples the pressure stabilisation strength to the
 current momentum diagonal.
 
 ### Jacobian and Preconditioning Matrix
@@ -405,45 +413,43 @@ solutions by an amount that does not vanish with mesh or time-step refinement
 On boundaries with a prescribed velocity (no-slip walls, the FSI interface
 whatever its patch type, e.g. `patch` in TurekHron2006, and inlets), the
 boundary value of the transpose stress is set from the wall velocity: it is
-`n*q` with `q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))`, where `G_s` is
-the surface gradient of the wall velocity vector. This is `n & grad(U)^T` at
-fixed `n` with the normal derivative of the normal velocity taken from
-continuity (zero velocity divergence); the stored tensor `n*q` only serves
-this normal flux, its own trace is not zero. `G_s` is a least-squares fit
-to the neighbouring faces of the wall patch, with tangential distance
-vectors and inverse-square-distance weights: it is zero for a rigid
-translation (also on a curved wall) and exact for a linear wall velocity on
-any face spacing. On a one-cell wedge the images of each face across the
-wedge planes are added as neighbours, which supplies the circumferential
-derivatives (the `U_r/R` part of the surface divergence): the image of the
-face centre is its reflection across the wedge plane, so no assumption on
-the position of the axis is made, and the image of the velocity its rotation
-by the wedge transformation. Neighbours across a sharp edge of the patch
-(normals more than 45 degrees apart) are not used, so a curved wall needs
-adjacent face normals within 45 degrees (at least eight faces per turn). A tangential direction
-that the neighbours do not resolve (the empty direction of a 2-D case, or
-nearly collinear neighbours: eigenvalue of the distance tensor below 1e-6 of
-the largest) gets a zero derivative rather than an extrapolated one. The
-neighbours are the edge neighbours in the whole patch: on a patch with faces
-on more than one processor the fit addresses them in a global copy of the
-patch (`globalPolyPatch`, as the FSI coupler uses for the interface), whose
-face centres and normals are gathered when the mesh moves and whose wall
-velocity is gathered once per evaluation (one global sum of the patch
-velocity per split patch), so that serial and parallel runs give the same
+`n*q` with `q = nuEff*((I - n n) & (G_s & n) - n*tr(G_s))`, where `G_s` is the
+surface gradient of the wall velocity vector. This is `n & grad(U)^T` at fixed
+`n` with the normal derivative of the normal velocity taken from continuity
+(zero velocity divergence); the stored tensor `n*q` only serves this normal
+flux, its own trace is not zero. `G_s` is a least-squares fit to the
+neighbouring faces of the wall patch, with tangential distance vectors and
+inverse-square-distance weights: it is zero for a rigid translation (also on a
+curved wall) and exact for a linear wall velocity on any face spacing. On a
+one-cell wedge the images of each face across the wedge planes are added as
+neighbours, which supplies the circumferential derivatives (the `U_r/R` part of
+the surface divergence): the image of the face centre is its reflection across
+the wedge plane, so no assumption on the position of the axis is made, and the
+image of the velocity its rotation by the wedge transformation. Neighbours
+across a sharp edge of the patch (normals more than 45 degrees apart) are not
+used, so a curved wall needs adjacent face normals within 45 degrees (at least
+eight faces per turn). A tangential direction that the neighbours do not resolve
+(the empty direction of a 2-D case, or nearly collinear neighbours: eigenvalue
+of the distance tensor below 1e-6 of the largest) gets a zero derivative rather
+than an extrapolated one. The neighbours are the edge neighbours in the whole
+patch: on a patch with faces on more than one processor the fit addresses them
+in a global copy of the patch (`globalPolyPatch`, as the FSI coupler uses for
+the interface), whose face centres and normals are gathered when the mesh moves
+and whose wall velocity is gathered once per evaluation (one global sum of the
+patch velocity per split patch), so that serial and parallel runs give the same
 wall values to round-off. The fit is still one-sided at cyclic and symmetry
-patches. The same
-value enters the momentum residual's wall flux and the traction, so the
-traction stays the fluid's own discrete wall flux. Evaluated instead from the boundary value of `grad(U)`,
-whose tangential derivatives come from the adjacent cell values, the term
-carries the near-wall discretisation error of the cell velocity: on the
-stationary `blobInTreacle` wall it gave a spurious transpose force of 0.6%,
-0.39% and 0.22% of the interface load on the x1, x2 and x4 meshes, decaying at
-order 0.6–0.8. With the wall evaluation it is zero there; on `womersleyTube`
-m2 n200 the monolithic wall phase and attenuation are within 2e-5 of the
-Robin–Neumann ones. `pimpleFluid` evaluates `n & -devReff` from `grad(U)`,
-so the two tractions are the same expression only away from these walls (and
-only with gradient schemes that impose `n & grad(U) = snGrad(U)` on the
-boundary, such as `leastSquares`; `leastSquaresS4f` does not).
+patches. The same value enters the momentum residual's wall flux and the
+traction, so the traction stays the fluid's own discrete wall flux. Evaluated
+instead from the boundary value of `grad(U)`, whose tangential derivatives come
+from the adjacent cell values, the term carries the near-wall discretisation
+error of the cell velocity: on the stationary `blobInTreacle` wall it gave a
+spurious transpose force of 0.6%, 0.39% and 0.22% of the interface load on the
+x1, x2 and x4 meshes, decaying at order 0.6–0.8. With the wall evaluation it is
+zero there; on `womersleyTube` m2 n200 the monolithic wall phase and attenuation
+are within 2e-5 of the Robin–Neumann ones. `pimpleFluid` evaluates `n &
+-devReff` from `grad(U)`, so the two tractions are the same expression only away
+from these walls (and only with gradient schemes that impose `n & grad(U) =
+snGrad(U)` on the boundary, such as `leastSquares`; `leastSquaresS4f` does not).
 
 The gradient, the transpose stress, its divergence, the viscous Laplacian and
 `ddt(U)` are evaluated once per velocity state and cached: the cache compares
@@ -465,16 +471,20 @@ fixed-velocity patch and reused until the mesh points change.
 
 ### Wall Pressure Gradient
 
-A plain `fixedGradient` pressure on a wall with fixed velocity, such as the
-FSI interface of the monolithic tutorials, has its gradient set from the
-normal momentum equation in the adjacent cells,
-`n & (laplacian(nuEff, U) + div(nuEff*dev2(T(grad(U)))) - ddt(U)_wall)`
-(`updatePressureGradientBoundary`), with the same viscous terms as the
-momentum residual, taken from the cached fields described above (no
-whole-mesh evaluation per patch). Leaving the transpose term out of this gradient, while it
-is in the residual and the traction, makes the wall pressure inconsistent
-with the momentum equation wherever the discrete velocity gradient is not
-trace-free.
+This applies to every wall patch where `p` is exactly `fixedGradient` and `U`
+is `fixedValue`, in standalone runs too, and each such patch is listed in the
+log at start-up. A prescribed wall pressure gradient needs a condition of
+another type, e.g. `uniformFixedGradient`, which keeps its gradient.
+
+A plain `fixedGradient` pressure on a wall with fixed velocity, such as the FSI
+interface of the monolithic tutorials, has its gradient set from the normal
+momentum equation in the adjacent cells, `n & (laplacian(nuEff, U) +
+div(nuEff*dev2(T(grad(U)))) - ddt(U)_wall)` (`updatePressureGradientBoundary`),
+with the same viscous terms as the momentum residual, taken from the cached
+fields described above (no whole-mesh evaluation per patch). Leaving the
+transpose term out of this gradient, while it is in the residual and the
+traction, makes the wall pressure inconsistent with the momentum equation
+wherever the discrete velocity gradient is not trace-free.
 
 On `blobInTreacle` (steady displacement, monolithic minus partitioned, x1/x2/x4
 meshes) the former `viscousStressTranspose yes` gave -2.34%, -1.04% and

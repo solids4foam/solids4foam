@@ -114,6 +114,14 @@ public:
         // accepted one when operator++() updates deltaT0.
         state.deltaTSave_ = runTime.deltaT0Value();
 #ifdef OPENFOAM_NOT_EXTEND
+        // A failed step that reached a write time raised writeTimeIndex_
+        // (by one: a step does not span a write interval); lower it again,
+        // or the retried step does not write and adjustableRunTime aims at
+        // the following write time
+        if (state.writeTime_)
+        {
+            --state.writeTimeIndex_;
+        }
         state.writeTime_ = false;
 #endif
 
@@ -921,6 +929,32 @@ newtonIcoFluid::newtonIcoFluid
 
     U().oldTime().oldTime();
 
+    // Store the old-time pressure from the start, so that a retry of the
+    // first time-step restores it (restoreOldTimeState); created lazily, it
+    // would be a copy of the failed iterate
+    p().oldTime();
+
+    // A plain fixedGradient pressure on a wall with a fixedValue velocity is
+    // not a prescribed gradient: it is set from the wall-normal momentum
+    // equation (updatePressureGradientBoundary)
+    forAll(mesh().boundary(), patchI)
+    {
+        if
+        (
+            isA<wallFvPatch>(mesh().boundary()[patchI])
+         && p().boundaryField()[patchI].type()
+         == fixedGradientFvPatchScalarField::typeName
+         && isA<fixedValueFvPatchVectorField>(U().boundaryField()[patchI])
+        )
+        {
+            Info<< "Patch " << mesh().boundary()[patchI].name()
+                << ": the fixedGradient pressure gradient is set from the "
+                << "wall-normal momentum equation, dp/dn = n.(nu*lap(U) - "
+                << "ddt(U)); use uniformFixedGradient for a prescribed "
+                << "gradient" << endl;
+        }
+    }
+
     // if (mesh().dynamic())
     // {
     //     Info<< "Constructing face velocity Uf\n" << endl;
@@ -1197,7 +1231,7 @@ void newtonIcoFluid::setDeltaT(Time& runTime)
 
         runTime.setDeltaT(newDeltaT);
 
-        if (enableTimeStepLog)
+        if (enableTimeStepLog && Pstream::master())
         {
             if (tsLogPtr_.empty())
             {
@@ -1255,10 +1289,6 @@ bool newtonIcoFluid::evolve()
     //const bool correctPhi = correctPhi_;
     //const bool checkMeshCourantNo = checkMeshCourantNo_;
     //const bool moveMeshOuterCorrectors = moveMeshOuterCorrectors_;
-
-    // Store U and p fields to allow under-relaxation
-    U.storePrevIter();
-    p().storePrevIter();
 
     // Solution predictor
     const Switch predictor
@@ -1363,8 +1393,11 @@ bool newtonIcoFluid::evolve()
         Info<< "Solving the fluid for U and p" << endl;
         const int solveStatus = foamPetscSnesHelper::solve(true);
 
+        // Without time-step adaptation, `stopOnPetscError false` keeps its
+        // meaning: the iterate is accepted and time advances
         const bool acceptable =
             (solveStatus >= 0)
+         || (!adjustTimeStep && !foamPetscSnesHelper::stopOnPetscError())
          || (
                 tolerateSnesNonConvergence
              && (
@@ -1455,18 +1488,6 @@ bool newtonIcoFluid::evolve()
         fvc::makeRelative(phi, U);
     }
 
-    // Optionally relax p and U
-    U.relax();
-    p().relax();
-
-    // Keep the face flux consistent with the velocity used by transport and
-    // turbulence corrections after optional field relaxation.
-    phi = mesh.Sf() & fvc::interpolate(U);
-
-    if (mesh.changing())
-    {
-        fvc::makeRelative(phi, U);
-    }
 
     // Correct transport and turbulence models once per call to evolve
     Info<< nl << "Correcting the transport model" << endl;

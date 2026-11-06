@@ -312,9 +312,12 @@ public:
 
             //- Call the PETSc SNES solve function and check its convergence
             //  Give a warning or fatal error if convergence was not reached
-            //  If returnOnSnesError = true, a PETSc error code is returned;
-            //  otherwise, a fatal error is thrown within this function when
-            //  the SNES solver fails
+            //  If returnOnSnesError = true, the negative SNESConvergedReason
+            //  of a failed solve is returned (also for
+            //  SNES_DIVERGED_FUNCTION_DOMAIN, for which 0 was returned
+            //  before); otherwise, a fatal error is thrown within this
+            //  function when the SNES solver fails, unless stopOnPetscError
+            //  is false. The PETSc options are loaded on the first call
             int solve(const bool returnOnSnesError = false);
 };
 

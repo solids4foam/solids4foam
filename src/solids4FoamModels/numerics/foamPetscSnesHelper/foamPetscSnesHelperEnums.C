@@ -57,6 +57,9 @@ namespace Foam
         "points",
         "none"
     };
+
+    const NamedEnum<SOLUTION_LOCATION_CLASS::solutionLocation, 3>
+    SOLUTION_LOCATION_CLASS::solutionLocationNames_;
 #endif
 
 #if defined(USE_PETSC) && defined(OPENFOAM_COM)

@@ -284,6 +284,11 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::toSerialEntities
         return labelList(localEntities);
     }
 
+    // Read on every rank: with a collated or masterUncollated file handler
+    // the reads are collective
+    const labelList cellAddr(cellProcAddressing(mesh));
+    const labelList faceAddr(faceProcAddressing(mesh));
+
     // A processor can hold no cells of this region, e.g. with a coupled
     // decomposition of a fluid-solid case; its addressing is then empty and
     // it has no entries to relate
@@ -291,9 +296,6 @@ Foam::labelList Foam::mechanicalConstitutiveLawStateIO::toSerialEntities
     {
         return labelList();
     }
-
-    const labelList cellAddr(cellProcAddressing(mesh));
-    const labelList faceAddr(faceProcAddressing(mesh));
 
     // An empty list is only a missing file when this rank has a mesh. A rank
     // that holds no cells of this region - the region was decomposed onto
