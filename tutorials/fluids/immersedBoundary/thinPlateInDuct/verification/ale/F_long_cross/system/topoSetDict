@@ -1,0 +1,10 @@
+FoamFile { version 2.0; format ascii; class dictionary; object topoSetDict; }
+actions
+(
+ { name fz_up; type faceSet; action new; source boxToFace; box (0.149 -1 -1) (0.151 1 1); }
+ { name fz_up; type faceZoneSet; action new; source setToFaceZone; faceSet fz_up; }
+ { name fz_a; type faceSet; action new; source boxToFace; box (1.499 -1 -1) (1.501 1 1); }
+ { name fz_a; type faceZoneSet; action new; source setToFaceZone; faceSet fz_a; }
+ { name fz_b; type faceSet; action new; source boxToFace; box (1.699 -1 -1) (1.701 1 1); }
+ { name fz_b; type faceZoneSet; action new; source setToFaceZone; faceSet fz_b; }
+);

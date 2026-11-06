@@ -732,30 +732,50 @@ warning is issued if `forceEstimator surfaceTraction` is used with
 `thinBodyBlocking`; the default `momentumExchange` estimator was not examined
 with a pocket).
 
-Topology change (the plate A passes the plate B, so that the pocket disappears
-and another forms): the net flux of the pocket changes sign (-4e-4 to +4e-4
-m3/s) at 3.49 s, as the table shows. Pressure with `source` (largest |p| in the
-window, `p_max`; `dpAB` is the maximum of the difference of the area-averaged
-pressure at x = 1.5 m and x = 1.7 m, a pressure difference within the
-downstream connected region, so independent of the pocket gauge): impulsive
-start of A at 0.2 m/s, before the event 0.14 and `dpAB` 4e-4, at the event 30.2
-and `dpAB` 6.1, after 0.10; with `flag` the pressure is far larger (before 38,
-at the event 1.1e3, `dpAB` 53), as the imbalance stays at one reference cell,
-and the time step is 10 times smaller (Courant limit). The impulsive start
-itself gives `p_max` 8 (`source`) in the first steps. To separate the physical
-impulsive response from the pocket: the same test with a plate that starts from
+Topology change (the plate A passes through the plate B, so that the pocket
+disappears and another forms): the net flux of the pocket changes sign (-4e-4
+to +4e-4 m3/s) at 3.49 s, as the table shows. The event pressure is `p_max`,
+the largest |p| of the field in a window, and `dpAB`, the largest difference of
+the area-averaged pressure at x = 1.5 m and x = 1.7 m (within the downstream
+connected region, so independent of the pocket gauge). With `source`, impulsive
+start of A at 0.2 m/s: before the event `p_max` 0.14 and `dpAB` 4e-4, at the
+event 30.2 and 6.1, after 0.10; with `flag` far larger (before 38, at the event
+1.1e3, `dpAB` 53) because the imbalance stays at one reference cell and the
+time step is 10 times smaller (Courant limit). With a plate that starts from
 rest and moves with a smooth velocity (`sinusoidalTranslation`, phase -pi/2,
-period 16 s, amplitude 0.9 m, so that A reaches B at 3.42 s), `source`: `p_max`
-before 0.29 and after 0.30, at the event 92 with `dpAB` 18.7; with the time
-step halved 136 and 27.5; with the mesh refined (h/2) 397 and 38; with `flag`
-2.98e3 and 161. The event pressure grows with the refinement of the time step
-and of the mesh, whereas a physical response to a continuous velocity would
-converge: **the pressure spike at the topology change is an artefact of the
-incompatible pocket (the imbalance and the sign change of its net flux), not a
-physical impulsive response**, and the pressure in the neighbourhood of an
-incompatible pocket, including the pressure difference within the downstream
-region at the event, must not be used. The fluxes `Q_out/(wA)` are 0 before and
-1 after the event with both policies
+period 16 s, amplitude 0.9 m, A reaches B at 3.42 s), `source`, h = 10 mm:
+before the event `p_max` 0.29, after 0.30, at the event 92 with `dpAB` 18.7;
+with the time step halved 136 and 27.5; at h/2 397 and 38; with `flag` 2.98e3
+and 161. **Interpretation (corrected after an independent re-audit):** the
+plate velocity is continuous, but the flux prescribed into the downstream
+region is not: when A passes through B the plate that seals the downstream
+region changes (two rigid bodies interpenetrate), and the outlet flux steps
+from 0 to `w A` in one time step. For an incompressible column of length L = 1
+m (B to the outlet) the response is `p = L dU/dt` with dU the one-step jump and
+dt the step at the event; this estimate gives 95.4 (measured 92.3), 138.8
+(135.6) and, for the uniform start, 32.1 (30.2), and for `dpAB` 19.1 (18.7),
+27.7 (27.5), 6.4 (6.1), i.e. agreement within 3-6 %, and it scales as 1/dt. The
+spike is therefore the response of the incompressible model to a prescribed
+step in flux, caused by the test configuration, and is present with every
+pocket policy (the policy changes the amplitude only through the time step); it
+is neither shown to be an artefact of the pocket treatment nor a physical
+impulsive response. The value at h/2 (397) is three times the estimate and is
+**not explained**. The pressure near an incompatible pocket remains not usable
+for the separate reason of the incompatibility above. The fluxes `Q_out/(wA)`
+are 0 before and 1 after the event with both policies.
+
+Transient at h/2 before any event (found by the re-audit; **not explained**):
+with the same smooth test at h/2, between 0.1 and 0.8 s (A moving slowly, B
+static and sealing) |p| reaches 149 at the cells next to B (x = 1.0075), `dpAB`
+35 and the outlet velocity 2e-3 m/s, against 0.06, 2e-4 and 1.5e-6 m/s at h;
+after 0.8 s the run is quiet. It is the same with `exact`, 636 (|p|) with B
+shifted so that no mesh point is inside it (the cell centre is), 55 and a
+different pattern with `flag`, and absent without the plate B (|p| 3.4, the
+pocket does not form); the net flux of the pocket in this window is 1e-5 to
+8e-5 m3/s and the regions flicker between 3 and 4. The pre-event pressure of
+0.29 quoted above is for h only. The cause was not identified (a static plate B
+at h/2 with the pocket and the source policy; not examined: the effect of the
+reference cell and of the solid-cell columns).
 
 ### Partial aperture (`thinBodyAperture exact`)
 
@@ -905,19 +925,37 @@ these deficits have not been investigated (the no-slip result of the same
 plates with the same resolution aligned with the mesh is 1.0000). This is not
 a verification of curved shells.
 
-Sliding gate: a plate of 0.43 cells covering `y` below `y_e(t)`, with the
-edge `y_e` moving down at 0.02 m/s from 0.197 m (the opening grows from 3 mm
-to 0.16 m in 8 s), inlet velocity 0.05 m/s (so `Q = 1e-4 m3/s` through every
-section), outlet `p` = 0. The pressure difference across the gate,
-`dp(t)`, is smoothed with a polynomial fit in `log |dp|`; the ripple is the
-largest deviation from the fit divided by the largest `|dp|`. h = 10 mm,
-binary / exact (k = 4): ripple 0.37 / 0.20; the error of the flux through the
-outlet, `max |Q_out/Q_in - 1|`, 2e-2 / 1e-8; `dp` at the end of the run -0.42
-(non-physical sign) / 0.0012. h = 5 mm: ripple 0.35 / 0.034 and flux error
-1e-9 / 1e-9. Exact in k = 2, 4, 8 (h = 10 mm): ripple 0.23, 0.20, 0.18, flux error
-5e-9, 1e-8, 3e-9. There is no analytical reference for `dp(t)` (the flux is
-prescribed, so the volume balance is satisfied by the continuity equation; the
-ripple measures the smoothness as the edge crosses the faces).
+Sliding gate: a plate of 0.43 cells covering `y` below `y_e(t)`, with the edge
+`y_e` moving down at 0.02 m/s from 0.197 m (the opening grows from 3 mm to 0.16
+m in 8 s), inlet velocity 0.05 m/s (so `Q = 1e-4 m3/s` through every section),
+outlet `p` = 0. Metrics (`verification/gate.py`): the flux error is `max
+|Q_out/Q_in - 1|` for t >= 0.5 s (the flux is prescribed, so it is the volume
+conservation of the run); `dp(t)` is the area-averaged pressure at x = 0.15 m
+minus that at x = 1.5 m; the ripple is computed on 400 uniform times in [1, 8]
+s, fitting `log |dp|` with a polynomial of degree 6, as `max |dp - sign(dp)
+exp(fit)| / max |dp|` (large when `dp` changes sign or is not smooth in time).
+There is no analytical reference for `dp(t)`.
+
+| Gate | flux error | ripple | max abs dp | dp at 8 s |
+| --- | --- | --- | --- | --- |
+| off, h | 3e-8 | 0.036 | 0.037 | 0.0010 |
+| binary, h | 2e-2 | 0.63 | 0.42 | -0.42 |
+| exact, h | 1e-8 | 0.11 | 0.23 | 0.0012 |
+| off, h/2 | 7e-8 | 0.97 | 0.0005 | -5e-6 |
+| binary, h/2 | 1e-9 | 0.27 | 0.22 | 0.0010 |
+| exact, h/2 | 1e-9 | 0.035 | 0.25 | 0.0012 |
+
+(exact with k = 2, 4, 8 at h: ripple 0.15, 0.11, 0.10, flux error 5e-9, 1e-8,
+3e-9.) **Reading:** `exact` does not beat the unblocked baseline on this test:
+the flux error is at the level of the solver for `off` and `exact`, and the
+`off` pressure difference is smooth at h (ripple 0.036 against 0.11). The `off`
+gate does not seal (its `dp` is 6 to 500 times smaller than with the blocking,
+as the 0.43-cell plate is seen only part of the time), so a small smooth `dp`
+is not a better answer; the test shows that `binary` at h has a 2 % flux error
+and a `dp` that changes sign, that `exact` removes both, and that the ripple at
+h/2 is smaller for `exact` (0.035) than for `binary` (0.27). Earlier numbers of
+this README (ripple 0.37 and 0.20) used a fit window from 0.5 s and are
+replaced by these.
 
 Moving mesh and deforming body (the ALE test cases A-G of the research branch
 of the author, plates of three cells, copied for this study; maximum deviation
@@ -1001,7 +1039,9 @@ separately.
   on, deforming bodies (other than the ALE test E), contact, turbulence, and
   meshes with skewed or cyclic processor faces were not examined.
 - Not run: other OpenFOAM versions, foam-extend and OpenFOAM.org, GitHub CI,
-  more than 4 ranks, the pocket cases in parallel.
+  more than 4 ranks, the pocket cases in parallel, the cost on the valve
+  geometry (no valve geometry is in this repository), the independent evaluation
+  of the gradient correction, a Poiseuille reference for the slots.
 - The "faces blocked" counts in the log add the coupled faces on both sides.
 
 ## Provenance
@@ -1050,7 +1090,8 @@ the `quadraticBend` and `customProfileBend` deformations, and the
 the versions of Sairam Pamulaparthi Venkata in solids4foam/cardiacFoam#20,
 except the closed-to-open valve morph, which is from his later working copy
 of xenosim-erc/immersedBoundaryRigidMotion
-(`src/HFDIBDEM/geomModels/stlBased/stlBased.C`, June 2026, not committed). The openHFDIB-DEM
+(`src/HFDIBDEM/geomModels/stlBased/stlBased.C`, June 2026, not committed). The
+openHFDIB-DEM
 interpolation of the velocity at the immersed boundary (`lineInt`,
 `leastSquares`), which the benchmark cases do not use, is not included.
 
