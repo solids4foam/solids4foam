@@ -1,0 +1,53 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version   2.0;
+    format    ascii;
+    class     dictionary;
+    location  "system";
+    object    meshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+surfaceFile     "constant/triSurface/h08_capped.fms";
+
+// Maximum cell size [mm]
+maxCellSize     1.4;
+
+// One boundary layer on the wall
+boundaryLayers
+{
+    nLayers                 1;
+    maxFirstLayerThickness  0.7;
+    minFirstLayerThickness  0.5;
+}
+
+// Finer cells around the two smallest outlets
+objectRefinements
+{
+    smallOutlet7
+    {
+        type        sphere;
+        cellSize    0.7;
+        centre      (92.9372 41.396 27.7214);
+        radius      7.73303;
+    }
+
+    smallOutlet11
+    {
+        type        sphere;
+        cellSize    0.7;
+        centre      (109.036 68.6858 35.6716);
+        radius      5.85163;
+    }
+}
+
+// ************************************************************************* //
