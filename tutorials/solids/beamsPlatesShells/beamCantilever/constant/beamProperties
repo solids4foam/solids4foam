@@ -1,0 +1,46 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      beamProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+beamModel coupledTotalLagNewtonRaphsonBeam;
+
+beams
+(
+    beam_0
+    {
+        crossSectionModel    circle;
+
+        circleCrossSectionModelDict
+        {
+            radius    0.2;
+        }
+        length    10;
+        nSegments    50;
+    }
+);
+
+"coupledTotalLagNewtonRaphsonBeamCoeffs"
+{
+    E E [1 -1 -2 0 0 0 0] 7.9577472e4;
+    G G [1 -1 -2 0 0 0 0] 3.9788736e4; // nu = 0
+
+    nCorrectors 200;
+    convergenceTol 1e-10;
+}
+
+// ************************************************************************* //
