@@ -12,7 +12,8 @@ diffusionHyperElastic
 ```
 
 The law is used by the `solids4foamSolidModel` fluid mesh motion solver, which
-solves the `meshMotionTotalDisplacement` solid model on the fluid mesh,
+moves the fluid mesh with a solid model, e.g. the
+`meshMotionTotalDisplacement` solid model on the fluid mesh,
 with `finiteStrain yes`; see the
 [fluid-solid interface page](../../../fluidSolidInterfaces/README.md). The
 dictionary layout common to all laws is described in the
@@ -34,11 +35,14 @@ sigma = d*(mu*dev(bEbar) + 0.5*K*(J^2 - 1)*I)/J
 
 `d` is read from the `stiffnessScaleFactor` field, at the law's integration
 points (face values are interpolated from the cells). The
-`solids4foamSolidModel` mesh motion solver calculates it on the current fluid
-mesh before each solution, from the `diffusivity` in
-`constant/fluid/dynamicMeshDict`, as the face diffusivity limited to between
-`minFactor` (default `0.1`) and `maxFactor` (default `100`) times its average,
-divided by its average, and averaged to the cells. With
+`solids4foamSolidModel` mesh motion solver calculates it from the
+`diffusivity` in `constant/fluid/dynamicMeshDict`, as the face diffusivity
+limited to between `minFactor` (default `0.1`) and `maxFactor` (default `100`)
+times its average, divided by its average, and averaged to the cells: on the
+current fluid mesh before each solution with the `meshMotionTotalDisplacement`
+solid model, and once, from the mesh at construction, with the other solid
+models, e.g. in the quasi-monolithic tutorials (`updateStiffnessScaleFactor`
+in the `dynamicMeshDict` overrides this). With
 `quadratic inverseDistance (interface)`, the mesh is stiffer, and deforms
 less, near the interface. Set
 `writeStiffScaleFactor yes` in the `dynamicMeshDict` to write the field. The
@@ -95,3 +99,5 @@ mechanical
 ## Tutorials
 
 - `fluidSolidInteraction/beamInCrossFlow` (`./Allrun diffusionHyperElastic`)
+- `fluidSolidInteraction/TurekHron2006` and `collapsibleChannel`
+  (`./Allrun monolithic`, in `constant/fluid/mechanicalProperties.monolithic`)

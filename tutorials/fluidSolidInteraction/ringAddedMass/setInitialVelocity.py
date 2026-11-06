@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Generate the ring's old-time displacement fields for its initial velocity."""
+"""Generate the ring's old-time displacement fields for its initial velocity.
+
+With the optional "velocity" argument, the initial velocity is written to the
+U field instead, for the velocity-based solid models of the monolithic setup.
+"""
 
 from __future__ import annotations
 
@@ -113,12 +117,20 @@ def write_internal_field(path: Path, values: list[tuple[float, float, float]]) -
 
 
 def main() -> None:
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5) or (
+        len(sys.argv) == 5 and sys.argv[4] != "velocity"
+    ):
         raise SystemExit(
             "Usage: setInitialVelocity.py BLOCK_MESH_DICT CONTROL_DICT FIELD_DIR"
+            " [velocity]"
         )
-    block_mesh_dict, control_dict, field_dir = map(Path, sys.argv[1:])
+    block_mesh_dict, control_dict, field_dir = map(Path, sys.argv[1:4])
     centres = cell_centres(read_mesh_counts(block_mesh_dict))
+    if len(sys.argv) == 5:
+        # displacements() scales the velocity by -old_time_level*delta_t, so
+        # a time-step of -1 at the first old time-level gives the velocity
+        write_internal_field(field_dir / "U", displacements(centres, -1.0, 1))
+        return
     delta_t = read_delta_t(control_dict)
     write_internal_field(field_dir / "D_0", displacements(centres, delta_t, 1))
     write_internal_field(field_dir / "D_0_0", displacements(centres, delta_t, 2))

@@ -35,6 +35,7 @@ cd tutorials/fluidSolidInteraction/3dTube/verification
 ./Allverify --study coupling       # Robin-Neumann vs IQN-ILS on the tutorial mesh
 ./Allverify --study coupling --couplings robin,iqnils,aitken
 ./Allverify --coupling iqnils      # any sweep with another coupling
+./Allverify --coupling monolithic  # the quasi-monolithic Newton coupling
 ./Allverify --quick                # smoke run of level 1 to t = 10 ms, no checks
 ./Allverify --reuse                # re-evaluate completed runs
 ./Allverify --cores 6              # MPI ranks per run (default: auto)
@@ -81,7 +82,10 @@ The verification copies differ from the tutorial as follows:
 - the solid uses an algebraic multigrid (`hypre`) preconditioner instead of the
   block-Jacobi LU of the tutorial, whose factorisation does not scale to the
   finer meshes (`--solid-preconditioner lu` restores it); the converged
-  solution does not depend on it;
+  solution does not depend on it. With `--coupling monolithic`, the solid
+  block of the quasi-monolithic preconditioner (`redundant` LU) is replaced
+  likewise, and the time scheme is also set in the `*.monolithic` variant
+  files;
 - for IQN-ILS, the fluid-solid interface `predictor` is switched on, which
   avoids a first-iterate added-mass spike (issue #489); Aitken predicts the
   solid itself (`predictSolid`, on by default), and the Robin-Neumann setup is
@@ -328,6 +332,29 @@ The IQN-ILS arm uses the interface `predictor`. An earlier run without it
 gave the same solution (to 0.001% in every monitored quantity) with 15.46
 mean and 20 maximum iterations per step, so the predictor does not change the
 comparison here.
+
+### Quasi-monolithic coupling
+
+`--coupling monolithic`, mesh study, backward, 8 MPI ranks, on a shared
+192-core Linux node (OpenFOAM v2512, GCC), with the 3-D assembly and PETSc
+settings of PR #599; the Robin-Neumann rows are from the same node (`Iter.`
+is the mean number of Newton or FSI iterations per step; `t_max` is
+t(u_r,max); `Clock` in seconds):
+
+| Level | Coupling | u_r,max | t_max | u_z,min | t_arr | c_p | Iter. | Clock |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | Robin | 0.15978 | 7.201 | -0.08819 | 5.873 | 4.663 | 4.78 | 282 |
+| 1 | monolithic | 0.15949 | 7.225 | -0.08896 | 5.876 | 4.666 | 2.00 | 221 |
+| 2 | Robin | 0.15946 | 7.215 | -0.08659 | 5.843 | 4.651 | 3.87 | 3 214 |
+| 2 | monolithic | 0.15978 | 7.226 | -0.08669 | 5.847 | 4.652 | 2.00 | 3 398 |
+
+Every check passes. On level 2 the quasi-monolithic coupling agrees with
+Robin-Neumann to 0.2% in `u_r,max(A)`, 0.12% in `u_z,min(A)`, 0.07% in
+`t_arr(A)` and 0.02% in `c_p`, and its peak is 1.8% above the Tuković et al.
+(2018) value. Every step converged in 2 Newton iterations. With the
+`redundant` LU solid block of the tutorial (`--solid-preconditioner lu`) the
+results are identical, but level 2 takes 26 218 s, eight times as long: the
+LU of the 3-D solid block dominates even with the Jacobian lagged.
 
 ## References
 

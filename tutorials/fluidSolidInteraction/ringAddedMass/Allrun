@@ -11,6 +11,7 @@ source solids4FoamScripts.sh
 # ./Allrun robin      # Robin-Neumann coupling
 # ./Allrun standard   # standard (second-order) solid residual
 # ./Allrun robin standard parallel
+# ./Allrun monolithic # quasi-monolithic Newton coupling (OpenFOAM.com)
 
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
@@ -25,6 +26,7 @@ coupling=iqnils
 interfaceCondition=dirichletNeumann
 runMode=serial
 solidModel=highOrder
+monolithic=no
 
 for arg in "$@"
 do
@@ -37,6 +39,9 @@ do
             coupling=robin
             interfaceCondition=robin
             ;;
+        monolithic|Monolithic)
+            monolithic=yes
+            ;;
         standard)
             solidModel=standard
             ;;
@@ -48,13 +53,23 @@ do
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [iqnils|robin] [highOrder|standard] [parallel]"
+            echo "Usage: ./Allrun [iqnils|robin|monolithic] [highOrder|standard] [parallel]"
             exit 1
             ;;
     esac
 done
 
-echo "Using ${coupling} coupling setup"
+if [[ "${monolithic}" == "yes" ]]; then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com; its files are stored as *.monolithic variants. Its
+    # velocity solid model has the standard second-order residual only, so
+    # the coupling and solid set-up options do not apply
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    echo "Using monolithic coupling setup"
+else
+    echo "Using ${coupling} coupling setup"
+fi
 
 solverArgs=()
 if [[ "$WM_PROJECT" == "foam" ]]; then
@@ -62,14 +77,30 @@ if [[ "$WM_PROJECT" == "foam" ]]; then
     solverArgs=(-Tolerances closedDomainTol=1e-5)
 fi
 
+# Undo a previous variant selection before setting the links below, and
+# remove the solid U generated for it
+solids4Foam::restoreCaseVariant .
+rm -f 0/solid/U
+
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "solidProperties.${solidModel}" constant/solid/solidProperties
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
 ln -vnsf "p.${interfaceCondition}" 0/fluid/p
 
-# Set D_0 and D_0_0 from the current mesh description and time-step
-python3 setInitialVelocity.py \
-    system/solid/blockMeshDict system/controlDict 0/solid || exit 1
+if [[ "${monolithic}" == "yes" ]]; then
+    solids4Foam::selectCaseVariant . monolithic
+
+    # Set the solid U from the current mesh description, in a copy of the
+    # stored U.monolithic, which Allclean removes
+    rm -f 0/solid/U
+    cp 0/solid/U.monolithic 0/solid/U
+    python3 setInitialVelocity.py \
+        system/solid/blockMeshDict system/controlDict 0/solid velocity || exit 1
+else
+    # Set D_0 and D_0_0 from the current mesh description and time-step
+    python3 setInitialVelocity.py \
+        system/solid/blockMeshDict system/controlDict 0/solid || exit 1
+fi
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

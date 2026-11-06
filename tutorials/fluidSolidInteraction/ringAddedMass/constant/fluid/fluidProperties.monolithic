@@ -1,0 +1,52 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fluidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidModel    newtonIcoFluid;
+
+newtonIcoFluidCoeffs
+{
+    // Force an implicit flux
+    forceImplicitFlux yes;
+
+    // If the flux is explicit, specific the extrapolation approach
+    // This is not used if forceImplicitFlux is enabled
+    fluidFluxExtrapolationAlgorithm1 yes;
+
+    // Additional divU term which is meant to improve convergence
+    addDivPhiUDamping no;
+
+    // Scaling of pressure equation relative to the momentum
+    pressureScaleFactor 1.0;
+
+    // The fluid is enclosed, so fix the pressure level at a point on the
+    // diagonal, where the n = 2 pressure vanishes
+    pRefPoint           (0.908 0.916 0.05);
+    pRefValue           0;
+
+    // Pressure stabilisation approach
+    stabilisation
+    {
+        type RhieChow;
+        scaleFactor 1.0;
+
+        // type laplacian;
+        // omega omega [0 -2 1 0 0 0 0] 1.0;
+    }
+}
+
+// ************************************************************************* //

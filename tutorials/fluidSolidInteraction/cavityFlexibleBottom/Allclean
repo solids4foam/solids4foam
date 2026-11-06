@@ -17,8 +17,9 @@ fi
 
 rm -rf case.foam residuals force.pdf deflection.pdf postProcessing 0/fluid/velocityInletProfile
 
-# Restore the stored case format
+# Restore the stored case format and the default (partitioned) variant
 solids4Foam::restoreCaseFormat .
+solids4Foam::restoreCaseVariant .
 
 # Remove the regression test cases, and the verification study cases and
 # results, too with ./Allclean all

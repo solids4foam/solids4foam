@@ -812,6 +812,15 @@ public:
                 return true;
             }
 
+            //- Does the coupling itself set the fluid velocity on the
+            //  interface to the solid velocity, e.g. as part of a monolithic
+            //  system? If so, the fluid interface velocity condition is
+            //  expected to be fixedValue and is not checked
+            virtual bool imposesFluidInterfaceVelocity() const
+            {
+                return false;
+            }
+
             //- Sync the fluidZonePointsDispl field across processors
             virtual void syncFluidZonePointsDispl
             (

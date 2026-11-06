@@ -14,6 +14,39 @@ solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 # PETSc is required for the solid solver
 solids4Foam::requirePetscOrExitSilently
 
+# Example usage
+# ./Allrun                      # partitioned, serial
+# ./Allrun parallel             # partitioned, parallel
+# ./Allrun monolithic           # quasi-monolithic Newton, serial
+# ./Allrun monolithic parallel  # quasi-monolithic Newton, parallel
+
+coupling=partitioned
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        monolithic|Monolithic)
+            coupling=monolithic
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [monolithic] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+# The quasi-monolithic files are stored as *.monolithic variants
+if [[ "${coupling}" == "monolithic" ]]; then
+    solids4Foam::selectCaseVariant . monolithic
+else
+    solids4Foam::restoreCaseVariant .
+fi
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
@@ -26,7 +59,7 @@ solids4Foam::runApplication -s fluid setSet -batch setSet.batch -region fluid
 solids4Foam::runApplication -s fluid refineMesh -region fluid -overwrite
 
 # Run solver
-if [[ "$1" == "parallel" ]]; then
+if [[ "${runMode}" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid

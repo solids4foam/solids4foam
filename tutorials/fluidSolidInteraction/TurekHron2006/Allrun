@@ -11,6 +11,7 @@ source solids4FoamScripts.sh
 # ./Allrun fsi1            # steady FSI1 benchmark
 # ./Allrun fsi2            # periodic FSI2 benchmark
 # ./Allrun robin           # Robin-Neumann coupling
+# ./Allrun monolithic      # quasi-monolithic Newton coupling
 # ./Allrun parallel
 # ./Allrun fsi2 robin parallel
 
@@ -33,12 +34,16 @@ do
             coupling=robin
             interfaceCondition=robin
             ;;
+        monolithic|Monolithic)
+            coupling=monolithic
+            interfaceCondition=dirichletNeumann
+            ;;
         parallel)
             runMode=parallel
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [fsi1|fsi2|fsi3] [iqnils|robin] [parallel]"
+            echo "Usage: ./Allrun [fsi1|fsi2|fsi3] [iqnils|robin|monolithic] [parallel]"
             exit 1
             ;;
     esac
@@ -46,9 +51,17 @@ done
 
 echo "Using ${coupling} coupling setup"
 
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com with PETSc
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    solids4Foam::requirePetscOrExitSilently
+fi
+
 # Set the inflow, plate material and run control of the requested benchmark.
 # The stored case is FSI3; the edited dictionaries are restored on exit.
-benchmarkFiles="0/fluid/U.dirichletNeumann 0/fluid/U.robin \
+benchmarkFiles="0/fluid/U.dirichletNeumann 0/fluid/U.robin 0/fluid/U.monolithic \
 constant/solid/mechanicalProperties system/controlDict \
 constant/fsiProperties.iqnils constant/fsiProperties.robin system/fluid/fvSolution"
 
@@ -110,7 +123,7 @@ then
     done
     trap restore_benchmark EXIT
 
-    for file in 0/fluid/U.dirichletNeumann 0/fluid/U.robin
+    for file in 0/fluid/U.dirichletNeumann 0/fluid/U.robin 0/fluid/U.monolithic
     do
         "${SOLIDS4FOAM_SED}" -i \
             -e "s/^\(\s*maxValue\s\+\)[^;]*;/\1${maxValue};/" \
@@ -134,9 +147,19 @@ then
         system/fluid/fvSolution
 fi
 
+# Start from the stored case
+solids4Foam::restoreCaseVariant .
+
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
 ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic coupling needs conformal interface meshes; its
+    # files, including the meshes, are stored as *.monolithic variants,
+    # which replace the links made above
+    solids4Foam::selectCaseVariant . monolithic
+fi
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

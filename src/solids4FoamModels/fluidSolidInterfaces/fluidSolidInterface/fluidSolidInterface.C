@@ -21,7 +21,7 @@ License
 #include "volFields.H"
 #include "fixedValueFvPatchFields.H"
 #include "polyPatchID.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #include "ZoneIDs.H"
 #include "elasticWallPressureFvPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
@@ -1004,7 +1004,11 @@ Foam::autoPtr<Foam::fluidSolidInterface> Foam::fluidSolidInterface::New
 
     // Check once here, rather than in each coupling, that the fluid sees the
     // interface motion
-    if (fsiPtr->movesFluidInterface())
+    if
+    (
+        fsiPtr->movesFluidInterface()
+     && !fsiPtr->imposesFluidInterfaceVelocity()
+    )
     {
         fsiPtr->checkFluidInterfaceVelocity();
 
@@ -1723,7 +1727,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                   - fluidPatchesPointsDisplsPrev[interfaceI][pointI];
             }
 
-            twoDPointCorrector twoDCorrector(fluidMesh());
+            twoDPointCorrectorS4f twoDCorrector(fluidMesh());
             twoDCorrector.correctPoints(newPoints);
 
             fluidMesh().movePoints(newPoints);
@@ -1796,7 +1800,7 @@ void Foam::fluidSolidInterface::moveFluidMesh()
     //               - fluidZonePointsDisplPrev()[pointI];
     //         }
     //     }
-    //     twoDPointCorrector twoDCorrector(fluidMesh());
+    //     twoDPointCorrectorS4f twoDCorrector(fluidMesh());
     //     twoDCorrector.correctPoints(newPoints);
     //     fluidMesh().movePoints(newPoints);
     // }
