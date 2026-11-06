@@ -26,6 +26,7 @@ License
 #include "constrainPressure.H"
 #include "localMin.H"
 #include "findRefCell.H"
+#include "thinBodyPockets.H"
 #include "elasticSlipWallVelocityFvPatchVectorField.H"
 #include "elasticWallVelocityFvPatchVectorField.H"
 #include "elasticWallPressureFvPatchScalarField.H"
@@ -42,6 +43,101 @@ namespace Foam
 
 namespace fluidModels
 {
+
+// Pressure gradient of the momentum equations. With faces blocked by a thin
+// body (immersedBoundaryBlockedFaces), the cell values are used on each
+// side of a blocked face in place of the interpolated face value, as the
+// pressure is not continuous across a closed wall: the cell next to it does
+// not feel the pressure of the other side (Gauss linear gradient corrected
+// on these faces)
+static tmp<volVectorField> pressureGradient
+(
+    const fvMesh& mesh,
+    const volScalarField& p
+)
+{
+    tmp<volVectorField> tgradp(fvc::grad(p));
+
+    if
+    (
+        !mesh.foundObject<surfaceScalarField>("immersedBoundaryBlockedFaces")
+    )
+    {
+        return tgradp;
+    }
+
+    // The correction below is that of a Gauss linear gradient
+    {
+        const ITstream& is = mesh.gradScheme("grad(" + p.name() + ")");
+        const bool gaussLinear =
+            is.size() >= 2
+         && is[0].isWord() && is[0].wordToken() == "Gauss"
+         && is[1].isWord() && is[1].wordToken() == "linear";
+        if (!gaussLinear)
+        {
+            FatalErrorInFunction
+                << "The faces blocked by a thin body (thinBodyDiffusivity "
+                << "zero) need the gradient scheme Gauss linear for grad("
+                << p.name() << "), as the correction of the cell gradient "
+                << "on these faces is that of this scheme; the scheme "
+                << "selected in fvSchemes is " << is << exit(FatalError);
+        }
+    }
+
+    const surfaceScalarField& blocked =
+        mesh.lookupObject<surfaceScalarField>("immersedBoundaryBlockedFaces");
+    const surfaceScalarField& aperture =
+        mesh.lookupObject<surfaceScalarField>("immersedBoundaryAperture");
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const surfaceScalarField& w = mesh.weights();
+    const vectorField& Sf = mesh.Sf();
+    const scalarField& V = mesh.V();
+    const scalarField& pI = p.primitiveField();
+    vectorField& g = tgradp.ref().primitiveFieldRef();
+
+    forAll(own, facei)
+    {
+        // The closed part of the face (1 - aperture), where the cell value
+        // is used on each side
+        const scalar c = blocked.primitiveField()[facei]
+           *(1 - aperture.primitiveField()[facei]);
+        if (c > 0)
+        {
+            const scalar pf =
+                w[facei]*pI[own[facei]] + (1 - w[facei])*pI[nei[facei]];
+            g[own[facei]] += c*(pI[own[facei]] - pf)*Sf[facei]/V[own[facei]];
+            g[nei[facei]] -= c*(pI[nei[facei]] - pf)*Sf[facei]/V[nei[facei]];
+        }
+    }
+    forAll(blocked.boundaryField(), patchi)
+    {
+        const fvPatch& patch = mesh.boundary()[patchi];
+        if (patch.coupled())
+        {
+            const scalarField pN
+            (
+                p.boundaryField()[patchi].patchNeighbourField()
+            );
+            const scalarField& pw = w.boundaryField()[patchi];
+            const vectorField& pSf = mesh.Sf().boundaryField()[patchi];
+            const labelUList& fc = patch.faceCells();
+            forAll(fc, i)
+            {
+                const scalar c = blocked.boundaryField()[patchi][i]
+                   *(1 - aperture.boundaryField()[patchi][i]);
+                if (c > 0)
+                {
+                    const scalar pf = pw[i]*pI[fc[i]] + (1 - pw[i])*pN[i];
+                    g[fc[i]] += c*(pI[fc[i]] - pf)*pSf[i]/V[fc[i]];
+                }
+            }
+        }
+    }
+    tgradp.ref().correctBoundaryConditions();
+
+    return tgradp;
+}
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -285,6 +381,7 @@ pimpleFluid::pimpleFluid
     ),
     fluxConsistentPatches_(),
     cumulativeContErr_(0),
+    pockets_(),
     solveEnergyEq_
     (
         fluidProperties().lookupOrAddDefault<Switch>
@@ -540,7 +637,7 @@ bool pimpleFluid::evolve()
 
         if (pimple.momentumPredictor())
         {
-            solve(UEqn == -fvc::grad(p));
+            solve(UEqn == -pressureGradient(mesh, p)());
 
             options().correct(U);
         }
@@ -592,7 +689,7 @@ bool pimpleFluid::evolve()
                 phiHbyA +=
                     fvc::interpolate(rAtU() - rAU_)*
                     fvc::snGrad(p)*mesh.magSf();
-                HbyA -= (rAU_ - rAtU())*fvc::grad(p);
+                HbyA -= (rAU_ - rAtU())*pressureGradient(mesh, p)();
             }
 
             correctFluxConsistentPatches(phiHbyA, rAtU());
@@ -607,6 +704,10 @@ bool pimpleFluid::evolve()
             tmp<surfaceScalarField> rAtUf;
             tmp<volScalarField> fluidCells;
             tmp<volScalarField> divPhiHbyA;
+
+            // Pressure pockets that the closed faces of a thin body separate
+            // from every fixed pressure (see thinBodyPockets)
+            bool usePockets = false;
 
             // Immersed boundaries (immersedBoundaryForce with
             // apertureCoupling): on the faces cut by a body, the flux is the
@@ -638,6 +739,56 @@ bool pimpleFluid::evolve()
                 rAtUf =
                     alpha*fvc::interpolate(rAtU())
                   + (1 - alpha)*localMin<scalar>(mesh).interpolate(rAtU());
+
+                // Faces blocked by a body thinner than the point spacing
+                // (thinBodyDiffusivity zero): no pressure-driven flux
+                const bool zeroBlocked =
+                    mesh.foundObject<surfaceScalarField>
+                    (
+                        "immersedBoundaryBlockedFaces"
+                    );
+                if (zeroBlocked)
+                {
+                    const surfaceScalarField& blocked =
+                        mesh.lookupObject<surfaceScalarField>
+                        (
+                            "immersedBoundaryBlockedFaces"
+                        );
+                    // The faces of a thin body: the diffusivity is that of
+                    // the open part of the face only
+                    rAtUf =
+                        (1 - blocked)*rAtUf()
+                      + blocked*alpha*fvc::interpolate(rAtU());
+
+                    // The faces with zero aperture are closed: the pressure
+                    // equation separates into regions across them
+                    boolList closed(mesh.nFaces(), false);
+                    forAll(mesh.owner(), facei)
+                    {
+                        closed[facei] =
+                            blocked.primitiveField()[facei] > 0.5
+                         && alpha.primitiveField()[facei] <= 0;
+                    }
+                    forAll(blocked.boundaryField(), patchi)
+                    {
+                        if (blocked.boundaryField()[patchi].coupled())
+                        {
+                            const label start =
+                                mesh.boundaryMesh()[patchi].start();
+                            forAll(blocked.boundaryField()[patchi], i)
+                            {
+                                closed[start + i] =
+                                    blocked.boundaryField()[patchi][i] > 0.5
+                                 && alpha.boundaryField()[patchi][i] <= 0;
+                            }
+                        }
+                    }
+                    pockets_.analyse
+                    (
+                        mesh, p, closed, p.needReference(), pRefCell_
+                    );
+                    usePockets = true;
+                }
 
                 // Continuity is not imposed in the cells entirely inside a
                 // body, where the flux of the velocity of a deforming body
@@ -681,6 +832,20 @@ bool pimpleFluid::evolve()
                                 solidSource/solidVolume
                             );
                     }
+
+                }
+
+                if (usePockets)
+                {
+                    if (!divPhiHbyA.valid())
+                    {
+                        divPhiHbyA = fvc::div(phiHbyA);
+                    }
+                    pockets_.treatSources
+                    (
+                        mesh,
+                        divPhiHbyA.ref().primitiveFieldRef()
+                    );
                 }
             }
 
@@ -701,6 +866,11 @@ bool pimpleFluid::evolve()
                 );
 
                 pEqn.setReference(pRefCell_, pRefValue_);
+
+                if (usePockets)
+                {
+                    pockets_.addReferences(pEqn, pRefValue_);
+                }
 
                 pEqn.solve(mesh.solver(p.select(pimple.finalInnerIter())));
 
@@ -733,12 +903,18 @@ bool pimpleFluid::evolve()
                 #include "continuityErrs.H"
             }
 
+            if (usePockets)
+            {
+                pockets_.report(mesh, phi);
+                pockets_.keepMeanPressure(mesh, p);
+            }
+
             // Explicitly relax pressure for momentum corrector
             p.relax();
 
-            gradp() = fvc::grad(p);
+            gradp() = pressureGradient(mesh, p)();
 
-            U = HbyA - rAtU*fvc::grad(p);
+            U = HbyA - rAtU*pressureGradient(mesh, p)();
             U.correctBoundaryConditions();
             options().correct(U);
 

@@ -1,0 +1,82 @@
+#!/bin/bash
+# Run one case: ./runCase RATIO WALLS MODE [NPROCS]
+#   RATIO  plate thickness / cell size (cell size h = 10 mm)
+#   WALLS  slip | noSlip
+#   MODE   thinBodyBlocking: off | openFaces | crossedFaces
+#   NPROCS optional, 1 (default, serial) or 4 (simple (4 1 1) decomposition)
+# Environment (all optional): DIFFUSIVITY=keep|zero (thinBodyDiffusivity),
+#   NOPLATE=1 (no body),
+#   REFINE=n (mesh n times finer in x and y, h = 10 mm/n),
+#   X0=x (position of the back face of the plate, default 0.303 m),
+#   YRANGES="y0:y1,y0:y1" (plates covering only these ranges of y, one body
+#   each: a slot or a free edge),
+#   STLFILE=path (another closed surface in place of the box plate),
+#   APERTURE=binary|exact (thinBodyAperture) and SAMPLES=k (samples per
+#   triangle of a face, k*k),
+#   SHEAR=s (non-orthogonal mesh: upper wall shifted by s in x),
+#   GRADSCHEME="..." (grad scheme in fvSchemes),
+#   STATIC=1 (plate at rest), PIN=value (inlet pressure, fixed; the outlet is
+#   at 0), END=endTime, DT=maxDeltaT, TAG=suffix of the case directory
+cd "${0%/*}" || exit 1
+ratio=$1; walls=$2; mode=$3; np=${4:-1}
+d=run_${walls}_${ratio}_${mode}${TAG}; [ "$np" -gt 1 ] && d=${d}_np$np
+rm -rf $d; mkdir $d
+cp -r 0 constant system $d/
+mkdir -p $d/constant/triSurface
+python3 makePlateStl.py $ratio $(python3 -c "print(0.01/${REFINE:-1})") ${X0:-0.303} > $d/constant/triSurface/plate.stl
+[ -n "$STLFILE" ] && cp $STLFILE $d/constant/triSurface/plate.stl
+sed -i "s/thinBodyBlocking .*;/thinBodyBlocking $mode;/" $d/constant/fvOptions
+if [ -n "$YRANGES" ]
+then
+    # plates that cover only parts of the width, "y0:y1,y0:y1" (a slot or a
+    # plate edge inside the duct): one body per range
+    bodies=""; k=0
+    for yr in ${YRANGES//,/ }
+    do
+        python3 makePlateStl.py $ratio $(python3 -c "print(0.01/${REFINE:-1})") ${X0:-0.303} ${yr%%:*} ${yr##*:} > $d/constant/triSurface/plate$k.stl
+        bodies="$bodies plate$k { surface \"plate$k.stl\"; motion { type uniformTranslation; velocity (0.1 0 0); } }"
+        k=$((k+1))
+    done
+    sed -i "s|^    bodies .*|    bodies { $bodies }|" $d/constant/fvOptions
+fi
+sed -i "/walls/,/}/ s/type .*slip;/type            $walls;/" $d/0/U
+if [ -n "$DIFFUSIVITY" ]
+then
+    sed -i "s/thinBodyBlocking .*;/&\n    thinBodyDiffusivity $DIFFUSIVITY;/" $d/constant/fvOptions
+fi
+if [ -n "$APERTURE" ]
+then
+    sed -i "s/thinBodyBlocking .*;/&\n    thinBodyAperture $APERTURE;\n    thinBodyApertureSamples ${SAMPLES:-4};/" $d/constant/fvOptions
+fi
+if [ -n "$STATIC" ]
+then
+    sed -i "s/type uniformTranslation; velocity (0.1 0 0);/type static;/g" $d/constant/fvOptions
+fi
+if [ -n "$PIN" ]
+then
+    sed -i "/inlet/,/}/ s/value .*;/value           uniform $PIN;/" $d/0/p
+fi
+[ -n "$END" ] && sed -i "s/endTime [0-9.]*;/endTime $END;/" $d/system/controlDict
+[ -n "$DT" ] && sed -i "s/maxDeltaT .*;/maxDeltaT $DT;/; s/^deltaT .*;/deltaT $DT;/" $d/system/controlDict
+[ -n "$REFINE" ] && sed -i "s/(200 20 1)/($((200*REFINE)) $((20*REFINE)) 1)/" $d/system/blockMeshDict
+if [ -n "$SHEAR" ]
+then
+    # non-orthogonal mesh: the upper wall shifted by SHEAR in x
+    sed -i "s/(2 0.2 0)/($(python3 -c "print(2+$SHEAR)") 0.2 0)/; s/(0 0.2 0)/($SHEAR 0.2 0)/; s/(2 0.2 0.01)/($(python3 -c "print(2+$SHEAR)") 0.2 0.01)/; s/(0 0.2 0.01)/($SHEAR 0.2 0.01)/" $d/system/blockMeshDict
+fi
+if [ -n "$GRADSCHEME" ]
+then
+    sed -i "s/default *Gauss linear;/default $GRADSCHEME;/" $d/system/fvSchemes
+fi
+[ -n "$NOPLATE" ] && rm -f $d/constant/fvOptions
+cd $d || exit 1
+blockMesh > log.blockMesh 2>&1 && topoSet > log.topoSet 2>&1 || exit 1
+if [ "$np" -gt 1 ]
+then
+    sed -i "s/numberOfSubdomains .*;/numberOfSubdomains $np;/" system/decomposeParDict
+    decomposePar -force > log.decomposePar 2>&1 \
+      && mpirun -np $np solids4Foam -parallel > log.solids4Foam 2>&1 \
+      && reconstructPar -latestTime > log.reconstructPar 2>&1
+else
+    solids4Foam > log.solids4Foam 2>&1
+fi

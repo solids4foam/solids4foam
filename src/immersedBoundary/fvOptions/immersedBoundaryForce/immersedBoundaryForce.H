@@ -264,6 +264,34 @@ Description
         // pressure equation of pimpleFluid, optional, default yes
         apertureCoupling yes;
 
+        // cutLink with apertureCoupling: block the faces that a body
+        // thinner than the point spacing crosses between the centres of
+        // their cells (exact test on the surface triangles): off,
+        // openFaces (only faces whose points are all in the fluid) or
+        // crossedFaces (also partly cut faces between cells whose centres
+        // are outside the bodies); optional, default off. Not a
+        // treatment of holes, gaps or tips thinner than a cell
+        thinBodyBlocking off;
+
+        // with thinBodyBlocking: zero (the faces blocked by a crossing, and
+        // the closed faces between cells that are not solid, carry no
+        // pressure-driven flux: their pressure diffusivity is zero, and the
+        // regions that they separate from every fixed pressure get a
+        // reference) or keep (the diffusivity of the aperture blending, the
+        // earlier behaviour, which leaks); optional, default zero
+        thinBodyDiffusivity zero;
+
+        // with thinBodyBlocking: binary or exact (partial aperture of the
+        // faces between cells outside the bodies, from the surface
+        // triangles); optional, default binary
+        thinBodyAperture binary;
+        thinBodyApertureSamples 4;
+
+        // pressure pockets enclosed by closed faces: flag, reject or source,
+        // and the relative net volume flux that is reported
+        thinBodyPocketPolicy flag;
+        thinBodyPocketTolerance 1e-6;
+
         // cutLink: force estimate, momentumExchange, surfaceTraction or
         // forcing, optional, default momentumExchange
         forceEstimator  momentumExchange;
@@ -339,6 +367,7 @@ SourceFiles
 #ifndef immersedBoundaryForce_H
 #define immersedBoundaryForce_H
 
+#include "IOdictionary.H"
 #include "fvOption.H"
 #include "Enum.H"
 #include "volFields.H"
@@ -478,6 +507,52 @@ class immersedBoundaryForce
             //  diffusivity of the pressure equation with those of the
             //  bodies on the faces they cut
             bool apertureCoupling_;
+
+            //- Block the internal faces that a body crosses between the
+            //  centres of their two cells although the points do not see it
+            //  (a body thinner than the point spacing), tested on the
+            //  surface triangles: off, openFaces (the faces that the points
+            //  leave fully open) or crossedFaces (also the partly cut faces
+            //  between two cells whose centres are outside the bodies)
+            word thinBodyBlocking_;
+
+            //- Pressure diffusivity of the faces blocked by a crossing:
+            //  keep (the face keeps the diffusivity of the aperture
+            //  blending, the earlier behaviour, which leaks) or zero, the
+            //  default (a blocked face
+            //  carries no pressure-driven flux: the fluid model sets its
+            //  diffusivity to zero, and handles the regions that the blocked
+            //  faces separate from every fixed pressure)
+            word thinBodyDiffusivity_;
+
+            //- Aperture of the faces behind or ahead of a thin body:
+            //  binary (a face crossed by the surface between the two cell
+            //  centres is closed, the earlier behaviour) or exact (the open
+            //  fraction of the face from the surface triangles, sampled on
+            //  the face; needs thinBodyDiffusivity zero)
+            word thinBodyAperture_;
+
+            //- Samples of the exact aperture: k*k per triangle of the face
+            label apertureSamples_;
+
+            //- Treatment of a pressure pocket (a region that the closed faces
+            //  separate from every fixed pressure) with a net volume flux
+            //  (a sealed pocket whose enclosing walls change its volume has no
+            //  incompressible solution): flag (leave it, absorbed at the
+            //  reference cell, and report it), reject (fatal error) or source
+            //  (remove it uniformly: an artificial volume source, explicit)
+            word thinBodyPocket_;
+
+            //- Relative net volume flux above which a pocket is reported
+            scalar thinBodyPocketTolerance_;
+
+            //- Registered for the fluid model as immersedBoundaryThinBody
+            autoPtr<IOdictionary> thinBodyDictPtr_;
+
+            //- 1 on the faces blocked by a crossing, else 0, registered for
+            //  the fluid model as immersedBoundaryBlockedFaces when
+            //  thinBodyDiffusivity is zero
+            autoPtr<surfaceScalarField> blockedFacesPtr_;
 
             //- Fluid fraction of the area of each face (aperture), and the
             //  flux of the body velocity through each face, registered for

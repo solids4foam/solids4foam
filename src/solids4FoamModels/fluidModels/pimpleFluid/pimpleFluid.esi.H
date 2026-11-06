@@ -33,6 +33,7 @@ SourceFiles
 #ifndef pimpleFluid_H
 #define pimpleFluid_H
 
+#include "thinBodyPockets.H"
 #include "fluidModel.H"
 #include "singlePhaseTransportModel.H"
 #include "turbulentTransportModel.H"
@@ -113,6 +114,9 @@ class pimpleFluid
 
         //- Cumulative continuity errors
         scalar cumulativeContErr_;
+
+        //- Pressure pockets of thin bodies (immersedBoundaryForce)
+        thinBodyPockets pockets_;
 
         //- Solve energy equation
         Switch solveEnergyEq_;
