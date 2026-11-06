@@ -11,6 +11,10 @@
 #   YRANGES="y0:y1,y0:y1" (plates covering only these ranges of y, one body
 #   each: a slot or a free edge),
 #   STLFILE=path (another closed surface in place of the box plate),
+#   APERTURE=binary|exact (thinBodyAperture) and SAMPLES=k (samples per
+#   triangle of a face, k*k),
+#   SHEAR=s (non-orthogonal mesh: upper wall shifted by s in x),
+#   GRADSCHEME="..." (grad scheme in fvSchemes),
 #   STATIC=1 (plate at rest), PIN=value (inlet pressure, fixed; the outlet is
 #   at 0), END=endTime, DT=maxDeltaT, TAG=suffix of the case directory
 cd "${0%/*}" || exit 1
@@ -40,6 +44,10 @@ if [ -n "$DIFFUSIVITY" ]
 then
     sed -i "s/thinBodyBlocking .*;/&\n    thinBodyDiffusivity $DIFFUSIVITY;/" $d/constant/fvOptions
 fi
+if [ -n "$APERTURE" ]
+then
+    sed -i "s/thinBodyBlocking .*;/&\n    thinBodyAperture $APERTURE;\n    thinBodyApertureSamples ${SAMPLES:-4};/" $d/constant/fvOptions
+fi
 if [ -n "$STATIC" ]
 then
     sed -i "s/type uniformTranslation; velocity (0.1 0 0);/type static;/g" $d/constant/fvOptions
@@ -51,6 +59,15 @@ fi
 [ -n "$END" ] && sed -i "s/endTime [0-9.]*;/endTime $END;/" $d/system/controlDict
 [ -n "$DT" ] && sed -i "s/maxDeltaT .*;/maxDeltaT $DT;/; s/^deltaT .*;/deltaT $DT;/" $d/system/controlDict
 [ -n "$REFINE" ] && sed -i "s/(200 20 1)/($((200*REFINE)) $((20*REFINE)) 1)/" $d/system/blockMeshDict
+if [ -n "$SHEAR" ]
+then
+    # non-orthogonal mesh: the upper wall shifted by SHEAR in x
+    sed -i "s/(2 0.2 0)/($(python3 -c "print(2+$SHEAR)") 0.2 0)/; s/(0 0.2 0)/($SHEAR 0.2 0)/; s/(2 0.2 0.01)/($(python3 -c "print(2+$SHEAR)") 0.2 0.01)/; s/(0 0.2 0.01)/($SHEAR 0.2 0.01)/" $d/system/blockMeshDict
+fi
+if [ -n "$GRADSCHEME" ]
+then
+    sed -i "s/default *Gauss linear;/default $GRADSCHEME;/" $d/system/fvSchemes
+fi
 [ -n "$NOPLATE" ] && rm -f $d/constant/fvOptions
 cd $d || exit 1
 blockMesh > log.blockMesh 2>&1 && topoSet > log.topoSet 2>&1 || exit 1

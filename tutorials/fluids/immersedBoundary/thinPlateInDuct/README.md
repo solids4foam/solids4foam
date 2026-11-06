@@ -24,6 +24,9 @@ no-slip walls (`checkFlux.py CASE` prints the average).
 `STATIC=1 PIN=0.01 END=6 ./runCase 0.43 slip crossedFaces` runs the plate at
 rest under a pressure drop (outlet flux at the solver tolerance level with
 the default `thinBodyDiffusivity zero`, see the README of the library).
+The header of `runCase` lists the other options: `APERTURE=exact`,
+`DIFFUSIVITY=keep`, `REFINE`, `YRANGES` (slots and plate edges), `STLFILE`,
+`SHEAR` (non-orthogonal mesh), `X0`, `NPROCS`.
 
 The test does not cover holes, gaps or free edges thinner than a cell,
 oblique or curved thin shells, or a closed valve.

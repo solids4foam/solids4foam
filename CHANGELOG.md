@@ -10,7 +10,11 @@ release. For complete commit-level details and contributor information, see the
 
 - Experimental, off by default: `thinBodyBlocking` of `immersedBoundaryForce`
   (`cutLink`) blocks the faces that a body thinner than the point spacing
-  crosses between two cell centres, with the `thinPlateInDuct` tutorial. See
+  crosses between two cell centres, with zero pressure diffusivity on the
+  blocked faces (`thinBodyDiffusivity`), an optional partial aperture from the
+  surface triangles (`thinBodyAperture exact`, a new formulation, for bodies
+  about one cell thick or less), an explicit policy for sealed pressure
+  pockets (`thinBodyPocketPolicy`), and the `thinPlateInDuct` tutorial. See
   "Experimental: thin bodies" in `src/immersedBoundary/README.md` for the
   limitations; the default behaviour is unchanged.
 - Cook's membrane verification studies now store the per-mesh tip
