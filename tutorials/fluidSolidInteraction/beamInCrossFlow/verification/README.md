@@ -421,7 +421,7 @@ confirmation.
 
 ## Astra (GPT-6-Astra, xhigh) review, 2026-10-12
 
-Prompt and full reply: `reference/campaign/astra/`. Main points and actions:
+Main points and actions (the prompt and reply are not kept in the repository):
 
 - Relative-reduction tests become unattainable at steady state; recommends a
   calibrated absolute floor, `R <= max(1e-5 R_step, R_abs)`. Not available
@@ -444,7 +444,7 @@ Prompt and full reply: `reference/campaign/astra/`. Main points and actions:
 
 ## Astra final review (2026-10-13)
 
-Prompt and reply: `reference/campaign/astra/astra_2_final_*`. Adopted: the
+Adopted: the
 "suggested, not demonstrated" asymptotic wording; conditional Richardson
 values without a headline GCI; fixed-dt wording ("the discretisation trend
 includes mesh-dependent effects of the time-step-dependent Rhie-Chow

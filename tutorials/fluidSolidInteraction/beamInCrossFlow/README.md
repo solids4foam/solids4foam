@@ -160,15 +160,23 @@ For a higher-level overview of the available FSI coupling schemes and the main
 `fluidSolidInterface` options, see the
 [fluid-solid interfaces documentation](https://www.solids4foam.com/documentation/fluid-solid-interfaces/).
 
-For the current settings, a fair comparison over the strongly-coupled transient
-window up to `t = 1.0 s`, using the same time step, PETSc-based solid solve,
-solid predictor, fluid residual control and shared FSI settings, gives:
+Over the transient window up to `t = 1.0 s` (20 time steps of `0.05 s`), with
+the supplied settings, the same PETSc-based solid solve and solid predictor, a
+serial run of each coupling gives (solids4foam development, OpenFOAM v2512,
+Apple M1 Ultra):
 
-- Aitken: `279` outer FSI iterations and about `21.8 s` wall-clock.
-- IQNILS: `215` outer FSI iterations and about `16.3 s` wall-clock.
+| Coupling | Convergence test | Outer FSI iterations | Wall-clock |
+| --- | --- | ---: | ---: |
+| Aitken (supplied) | smaller of the two residual measures | 129 | 14 s |
+| Aitken | `requireAllResidualMeasures yes` | 173 | 17 s |
+| IQNILS (supplied) | `requireAllResidualMeasures yes` | 187 | 18 s |
+| IQNILS, `couplingReuse 2` | `requireAllResidualMeasures yes` | 161 | 16 s |
 
-So for this like-for-like setup, IQNILS is both faster and requires fewer FSI
-iterations than Aitken.
+All four give the same point-A displacement at `t = 1.0 s` to within
+`1e-10 m`. For this short, mildly coupled start-up window the two methods
+cost about the same once they use the same (strict) convergence test; the
+supplied Aitken setup is cheaper mainly because its default test accepts a
+step when either residual measure is below `outerCorrTolerance`.
 
 The IQNILS setup sets `relMinSignificant 1e-2` in `constant/fsiProperties.iqnils`,
 which drops a secant mode when the part of it that is orthogonal to the newer
@@ -396,8 +404,8 @@ directory, which places the lower half of the beam ($$y < 0.1$$ m) in the
 `stiff` set and the upper half in the `flexible` set:
 
 ```plaintext
-cellSet stiff new boxToCell (0.45 0 -0.2) (0.55 0.1 0)
-cellSet flexible new boxToCell (0.45 0.1 -0.2) (0.55 0.2 0)
+cellSet stiff new boxToCell (0.4 0 -0.2) (0.5 0.1 0)
+cellSet flexible new boxToCell (0.4 0.1 -0.2) (0.5 0.2 0)
 ```
 
 **3. Create the cell zones.** In the `Allrun` script, convert the sets to cell
