@@ -154,12 +154,31 @@ void Foam::clampedMomentFaPatchScalarField::updateCoeffs()
     // Lookup flexural stiffness from the solver
     const scalar D = plateSolid.bendingStiffness().value();
 
-    // Set the boundary moment sum to force a clamped edge
+    // Lookup the transverse displacement of the boundary cells relative to
+    // the edge
+    const faPatchField<scalar>& w =
+        patch().lookupPatchField<areaScalarField, scalar>("w");
+    const scalarField wPif(w.patchInternalField() - w);
+
+    // Second derivative of the displacement normal to the edge, given that
+    // the displacement and its slope vanish at the edge. The Taylor
+    // expansions of the displacement and of the slope at the cell centre are
+    // combined so that the third derivative cancels and the estimate is
+    // second order:
+    //     d2w/dn2 = 6*w_P/d^2 - 2*(n & theta_P)/d
+    // where n is the outward normal and theta = -grad(w)
+    const scalarField& deltaCoeffs = patch().deltaCoeffs();
+    const scalarField d2wdn2
+    (
+        6.0*wPif*sqr(deltaCoeffs) - 2.0*nDotThetaPif*deltaCoeffs
+    );
+
+    // Set the boundary moment sum to force a clamped edge: the tangential
+    // curvature vanishes along a clamped edge, so M = -D*d2w/dn2
     const scalarField prevMomentSum(*this);
     faPatchField<scalar>::operator==
     (
-        relaxFac_*(-D*nDotThetaPif*patch().deltaCoeffs())
-      + (1.0 - relaxFac_)*prevMomentSum
+        relaxFac_*(-D*d2wdn2) + (1.0 - relaxFac_)*prevMomentSum
     );
 
     fixedValueFaPatchField<scalar>::updateCoeffs();
