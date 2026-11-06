@@ -1,0 +1,58 @@
+#!/bin/bash
+# A CFD pipe coupled to a Windkessel (explicit coupling, order 2, deltaT 0.05,
+# serial, about a minute), then, if python3 is available, the comparison with
+# the exact solution.
+#
+#   ./Allrun                  the pipe solved by solids4Foam (pimpleFluid, default)
+#   ./Allrun pimpleFoam       the pipe solved by stock pimpleFoam
+cd "$(dirname "$0")" || exit 1
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+solver=solids4Foam
+
+print_usage()
+{
+    cat <<'USAGE'
+Usage:
+  ./Allrun                  # default: the pipe solved by solids4Foam (pimpleFluid)
+  ./Allrun solids4Foam      # the same
+  ./Allrun pimpleFoam       # the pipe solved by stock pimpleFoam
+USAGE
+}
+
+for arg in "$@"
+do
+    case "$arg" in
+        pimpleFoam|solids4Foam)
+            solver=$arg
+            ;;
+        help|-h|--help)
+            print_usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+# Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
+source solids4FoamScripts.sh
+
+# The circulation models are currently only built for OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+echo "Solving the pipe with ${solver}"
+
+solids4Foam::runApplication blockMesh || exit 1
+solids4Foam::runApplication "${solver}" || exit 1
+echo "done: postProcessing/circulationCoupling/0/coupling.dat"
+
+if command -v python3 > /dev/null; then
+    python3 analyse.py
+else
+    echo "python3 not found: skipping the comparison with the exact solution (analyse.py)"
+fi

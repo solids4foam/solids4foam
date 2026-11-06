@@ -188,9 +188,8 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
     "fluidSolidInteraction/womersleyTube"
-    "circulationModels/pipeWindkessel"
-    "circulationModels/pipeWindkesselSolids4Foam"
-    "circulationModels/healthyHuman"
+    "fluids/circulationModels/pipeWindkessel"
+    "fluids/circulationModels/healthyHuman"
     # Not tutorials: test applications' cases, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
     "../applications/test/immersedSurfaceTraction/case"
