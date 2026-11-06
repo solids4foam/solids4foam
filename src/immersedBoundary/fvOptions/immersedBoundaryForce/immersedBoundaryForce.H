@@ -281,6 +281,17 @@ Description
         // earlier behaviour, which leaks); optional, default zero
         thinBodyDiffusivity zero;
 
+        // with thinBodyBlocking: binary or exact (partial aperture of the
+        // faces between cells outside the bodies, from the surface
+        // triangles); optional, default binary
+        thinBodyAperture binary;
+        thinBodyApertureSamples 4;
+
+        // pressure pockets enclosed by closed faces: flag, reject or source,
+        // and the relative net volume flux that is reported
+        thinBodyPocketPolicy flag;
+        thinBodyPocketTolerance 1e-6;
+
         // cutLink: force estimate, momentumExchange, surfaceTraction or
         // forcing, optional, default momentumExchange
         forceEstimator  momentumExchange;
@@ -356,6 +367,7 @@ SourceFiles
 #ifndef immersedBoundaryForce_H
 #define immersedBoundaryForce_H
 
+#include "IOdictionary.H"
 #include "fvOption.H"
 #include "Enum.H"
 #include "volFields.H"
@@ -512,6 +524,30 @@ class immersedBoundaryForce
             //  diffusivity to zero, and handles the regions that the blocked
             //  faces separate from every fixed pressure)
             word thinBodyDiffusivity_;
+
+            //- Aperture of the faces behind or ahead of a thin body:
+            //  binary (a face crossed by the surface between the two cell
+            //  centres is closed, the earlier behaviour) or exact (the open
+            //  fraction of the face from the surface triangles, sampled on
+            //  the face; needs thinBodyDiffusivity zero)
+            word thinBodyAperture_;
+
+            //- Samples of the exact aperture: k*k per triangle of the face
+            label apertureSamples_;
+
+            //- Treatment of a pressure pocket (a region that the closed faces
+            //  separate from every fixed pressure) with a net volume flux
+            //  (a sealed pocket whose enclosing walls change its volume has no
+            //  incompressible solution): flag (leave it, absorbed at the
+            //  reference cell, and report it), reject (fatal error) or source
+            //  (remove it uniformly: an artificial volume source, explicit)
+            word thinBodyPocket_;
+
+            //- Relative net volume flux above which a pocket is reported
+            scalar thinBodyPocketTolerance_;
+
+            //- Registered for the fluid model as immersedBoundaryThinBody
+            autoPtr<IOdictionary> thinBodyDictPtr_;
 
             //- 1 on the faces blocked by a crossing, else 0, registered for
             //  the fluid model as immersedBoundaryBlockedFaces when

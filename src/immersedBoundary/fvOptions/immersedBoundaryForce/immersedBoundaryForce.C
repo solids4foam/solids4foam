@@ -37,6 +37,10 @@ License
 #include "symmetryFvPatch.H"
 #include "symmetryPlaneFvPatch.H"
 #include "wedgeFvPatch.H"
+#include "processorFvPatch.H"
+#include "PstreamBuffers.H"
+#include "vector2D.H"
+#include "IOdictionary.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -1091,6 +1095,8 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
     // are only tested when fully open
     if (thinBodyBlocking_ != "off")
     {
+        const scalar thinBodyT0 = mesh_.time().elapsedCpuTime();
+
         if (thinBodyDiffusivity_ == "zero")
         {
             if (!blockedFacesPtr_)
@@ -1110,6 +1116,28 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
                         ),
                         mesh_,
                         dimensionedScalar(dimless, Zero)
+                    )
+                );
+            }
+            if (!thinBodyDictPtr_)
+            {
+                dictionary d;
+                d.add("pocketPolicy", thinBodyPocket_);
+                d.add("pocketTolerance", thinBodyPocketTolerance_);
+                thinBodyDictPtr_.reset
+                (
+                    new IOdictionary
+                    (
+                        IOobject
+                        (
+                            "immersedBoundaryThinBody",
+                            mesh_.time().timeName(),
+                            mesh_,
+                            IOobject::NO_READ,
+                            IOobject::NO_WRITE,
+                            true
+                        ),
+                        d
                     )
                 );
             }
@@ -1145,97 +1173,27 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
             }
         }
 
-        forAll(alphaI, facei)
+        if (thinBodyAperture_ == "binary")
         {
-            if
-            (
-                alphaI[facei] <= 0
-             || (
-                    alphaI[facei] < 1
-                 && !(
-                        allCut
-                     && !centreInside[own[facei]]
-                     && !centreInside[nei[facei]]
+            forAll(alphaI, facei)
+            {
+                if
+                (
+                    alphaI[facei] <= 0
+                 || (
+                        alphaI[facei] < 1
+                     && !(
+                            allCut
+                         && !centreInside[own[facei]]
+                         && !centreInside[nei[facei]]
+                        )
                     )
                 )
-            )
-            {
-                continue;
-            }
-            const point& a = C[own[facei]];
-            const point& b = C[nei[facei]];
-            bool near = false;
-            forAll(boxes, bodyi)
-            {
-                if (boxes[bodyi].contains(a) || boxes[bodyi].contains(b))
-                {
-                    near = true;
-                    break;
-                }
-            }
-            if (near)
-            {
-                openFaces.append(facei);
-                segStart.append(a);
-                segEnd.append(b);
-            }
-        }
-
-        const pointField start(segStart);
-        const pointField end(segEnd);
-        boolList crossed(start.size(), false);
-        forAll(bodies_, bodyi)
-        {
-            List<pointIndexHit> hits;
-            bodies_[bodyi].findLine(start, end, hits);
-            forAll(hits, i)
-            {
-                if (hits[i].hit())
-                {
-                    crossed[i] = true;
-                }
-            }
-        }
-
-        label nBlocked = 0;
-        forAll(crossed, i)
-        {
-            if (crossed[i])
-            {
-                alphaI[openFaces[i]] = 0;
-                if (blockedFacesPtr_)
-                {
-                    blockedFacesPtr_->primitiveFieldRef()[openFaces[i]] = 1;
-                }
-                nBlocked++;
-            }
-        }
-
-        // Coupled (processor) faces: the segment from the cell centre to the
-        // centre of the cell on the other side. Only the open faces, whose
-        // state is known on both sides; both sides test the same segment
-        forAll(alpha.boundaryField(), patchi)
-        {
-            const fvPatch& patch = mesh_.boundary()[patchi];
-            if (!patch.coupled())
-            {
-                continue;
-            }
-            fvsPatchScalarField& palpha = alpha.boundaryFieldRef()[patchi];
-            const labelUList& faceCells = patch.faceCells();
-            const vectorField delta(patch.delta());
-
-            DynamicList<label> pFaces;
-            DynamicList<point> pStart;
-            DynamicList<point> pEnd;
-            forAll(palpha, i)
-            {
-                if (palpha[i] < 1)
                 {
                     continue;
                 }
-                const point a = C[faceCells[i]];
-                const point b = a + delta[i];
+                const point& a = C[own[facei]];
+                const point& b = C[nei[facei]];
                 bool near = false;
                 forAll(boxes, bodyi)
                 {
@@ -1247,44 +1205,412 @@ void Foam::fv::immersedBoundaryForce::updateApertures()
                 }
                 if (near)
                 {
-                    pFaces.append(i);
-                    pStart.append(a);
-                    pEnd.append(b);
+                    openFaces.append(facei);
+                    segStart.append(a);
+                    segEnd.append(b);
                 }
             }
 
-            const pointField pstart(pStart);
-            const pointField pend(pEnd);
-            boolList pcrossed(pstart.size(), false);
+            const pointField start(segStart);
+            const pointField end(segEnd);
+            boolList crossed(start.size(), false);
             forAll(bodies_, bodyi)
             {
                 List<pointIndexHit> hits;
-                bodies_[bodyi].findLine(pstart, pend, hits);
+                bodies_[bodyi].findLine(start, end, hits);
                 forAll(hits, i)
                 {
                     if (hits[i].hit())
                     {
-                        pcrossed[i] = true;
+                        crossed[i] = true;
                     }
                 }
             }
-            forAll(pcrossed, i)
+
+            label nBlocked = 0;
+            forAll(crossed, i)
             {
-                if (pcrossed[i])
+                if (crossed[i])
                 {
-                    palpha[pFaces[i]] = 0;
+                    alphaI[openFaces[i]] = 0;
                     if (blockedFacesPtr_)
                     {
-                        blockedFacesPtr_->boundaryFieldRef()[patchi][pFaces[i]]
-                            = 1;
+                        blockedFacesPtr_->primitiveFieldRef()[openFaces[i]] = 1;
                     }
                     nBlocked++;
                 }
             }
+
+            // Coupled (processor) faces: the segment from the cell centre to the
+            // centre of the cell on the other side. Only the open faces, whose
+            // state is known on both sides; both sides test the same segment
+            forAll(alpha.boundaryField(), patchi)
+            {
+                const fvPatch& patch = mesh_.boundary()[patchi];
+                if (!patch.coupled())
+                {
+                    continue;
+                }
+                fvsPatchScalarField& palpha = alpha.boundaryFieldRef()[patchi];
+                const labelUList& faceCells = patch.faceCells();
+                const vectorField delta(patch.delta());
+
+                DynamicList<label> pFaces;
+                DynamicList<point> pStart;
+                DynamicList<point> pEnd;
+                forAll(palpha, i)
+                {
+                    if (palpha[i] < 1)
+                    {
+                        continue;
+                    }
+                    const point a = C[faceCells[i]];
+                    const point b = a + delta[i];
+                    bool near = false;
+                    forAll(boxes, bodyi)
+                    {
+                        if (boxes[bodyi].contains(a) || boxes[bodyi].contains(b))
+                        {
+                            near = true;
+                            break;
+                        }
+                    }
+                    if (near)
+                    {
+                        pFaces.append(i);
+                        pStart.append(a);
+                        pEnd.append(b);
+                    }
+                }
+
+                const pointField pstart(pStart);
+                const pointField pend(pEnd);
+                boolList pcrossed(pstart.size(), false);
+                forAll(bodies_, bodyi)
+                {
+                    List<pointIndexHit> hits;
+                    bodies_[bodyi].findLine(pstart, pend, hits);
+                    forAll(hits, i)
+                    {
+                        if (hits[i].hit())
+                        {
+                            pcrossed[i] = true;
+                        }
+                    }
+                }
+                forAll(pcrossed, i)
+                {
+                    if (pcrossed[i])
+                    {
+                        palpha[pFaces[i]] = 0;
+                        if (blockedFacesPtr_)
+                        {
+                            blockedFacesPtr_->boundaryFieldRef()[patchi][pFaces[i]]
+                                = 1;
+                        }
+                        nBlocked++;
+                    }
+                }
+            }
+
+            Info<< "    Thin body blocking: faces blocked by a crossing: "
+                << returnReduce(nBlocked, sumOp<label>()) << endl;
         }
 
-        Info<< "    Thin body blocking: faces blocked by a crossing: "
-            << returnReduce(nBlocked, sumOp<label>()) << endl;
+        else
+        {
+            // Open fraction of the faces near a body: the fraction of the face area whose
+            // centre-to-centre line, translated across the face to the sample
+            // point, does not meet the surface (exact crossing test on the surface
+            // triangles, on the octree of the body, at sample points that are
+            // the centroids of k*k sub-triangles of each triangle (face
+            // centre, two vertices) of the face polygon)
+            if (thinBodyDiffusivity_ != "zero")
+            {
+                FatalErrorInFunction
+                    << "thinBodyAperture exact needs thinBodyDiffusivity zero"
+                    << exit(FatalError);
+            }
+
+            // Barycentric (u, v) of the sample points in a triangle
+            const label k = apertureSamples_;
+            DynamicList<vector2D> uv;
+            for (label i = 0; i < k; i++)
+            {
+                for (label j = 0; j < k - i; j++)
+                {
+                    uv.append(vector2D((i + 1.0/3.0)/k, (j + 1.0/3.0)/k));
+                    if (j < k - i - 1)
+                    {
+                        uv.append(vector2D((i + 2.0/3.0)/k, (j + 2.0/3.0)/k));
+                    }
+                }
+            }
+
+            const pointField& pts = mesh_.points();
+            const faceList& faces = mesh_.faces();
+            const vectorField& Cfm = mesh_.faceCentres();
+
+            // Candidate faces (internal, then coupled), with the centres of
+            // the two cells
+            DynamicList<label> cFaces;      // mesh face index
+            DynamicList<label> cPatch;      // -1 for internal
+            DynamicList<point> cP;
+            DynamicList<point> cN;
+
+            auto near = [&](const label facei, const point& a, const point& b)
+            {
+                // The face is within reach of a body when the surface is
+                // within the cell spacing of its centre
+                scalar rad = 0;
+                for (const label pi : faces[facei])
+                {
+                    rad = max(rad, mag(pts[pi] - Cfm[facei]));
+                }
+                const scalar R = mag(b - a) + rad;
+                for (label bodyi = 0; bodyi < bodies_.size(); bodyi++)
+                {
+                    if (!boxes[bodyi].contains(a) && !boxes[bodyi].contains(b))
+                    {
+                        continue;
+                    }
+                    List<pointIndexHit> hits;
+                    vectorField normals;
+                    bodies_[bodyi].nearest
+                    (
+                        pointField(1, Cfm[facei]),
+                        scalarField(1, sqr(R)),
+                        hits,
+                        normals
+                    );
+                    if (hits[0].hit())
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            forAll(alphaI, facei)
+            {
+                const point& a = C[own[facei]];
+                const point& b = C[nei[facei]];
+                if (near(facei, a, b))
+                {
+                    cFaces.append(facei);
+                    cPatch.append(-1);
+                    cP.append(a);
+                    cN.append(b);
+                }
+            }
+            const label nInt = cFaces.size();
+            forAll(alpha.boundaryField(), patchi)
+            {
+                const fvPatch& patch = mesh_.boundary()[patchi];
+                if (!patch.coupled())
+                {
+                    continue;
+                }
+                const labelUList& faceCells = patch.faceCells();
+                const vectorField delta(patch.delta());
+                forAll(faceCells, i)
+                {
+                    const label facei = patch.start() + i;
+                    const point a = C[faceCells[i]];
+                    const point b = a + delta[i];
+                    if (near(facei, a, b))
+                    {
+                        cFaces.append(facei);
+                        cPatch.append(patchi);
+                        cP.append(a);
+                        cN.append(b);
+                    }
+                }
+            }
+
+            // Sample rays
+            const label nPerTri = uv.size();
+            DynamicList<point> rStart;
+            DynamicList<point> rEnd;
+            DynamicList<scalar> rWeight;
+            labelList rFirst(cFaces.size() + 1, 0);
+            forAll(cFaces, ci)
+            {
+                const label facei = cFaces[ci];
+                const face& f = faces[facei];
+                const point& cf = Cfm[facei];
+                rFirst[ci] = rStart.size();
+                forAll(f, pi)
+                {
+                    const point& p1 = pts[f[pi]];
+                    const point& p2 = pts[f[f.fcIndex(pi)]];
+                    const scalar a = 0.5*mag((p1 - cf) ^ (p2 - cf));
+                    for (const vector2D& w : uv)
+                    {
+                        const point s =
+                            cf + w.x()*(p1 - cf) + w.y()*(p2 - cf);
+                        // The shift of the line through the sample point is
+                        // transverse to the centre-to-centre direction
+                        vector dh = cN[ci] - cP[ci];
+                        dh /= max(mag(dh), VSMALL);
+                        const vector shift = (s - cf) - ((s - cf) & dh)*dh;
+                        rStart.append(cP[ci] + shift);
+                        rEnd.append(cN[ci] + shift);
+                        rWeight.append(a/nPerTri);
+                    }
+                }
+            }
+            rFirst[cFaces.size()] = rStart.size();
+
+            boolList rHit(rStart.size(), false);
+            {
+                const pointField sP(rStart);
+                const pointField eP(rEnd);
+                forAll(bodies_, bodyi)
+                {
+                    List<pointIndexHit> hits;
+                    bodies_[bodyi].findLine(sP, eP, hits);
+                    forAll(hits, ri)
+                    {
+                        if (hits[ri].hit())
+                        {
+                            rHit[ri] = true;
+                        }
+                    }
+                }
+            }
+
+            // Open fraction of each candidate face
+            DynamicList<scalar> openFrac(cFaces.size());
+            forAll(cFaces, ci)
+            {
+                openFrac.append(1.0);
+            }
+            forAll(cFaces, ci)
+            {
+                scalar wOpen = 0, wAll = 0;
+                for (label ri = rFirst[ci]; ri < rFirst[ci + 1]; ri++)
+                {
+                    wAll += rWeight[ri];
+                    if (!rHit[ri])
+                    {
+                        wOpen += rWeight[ri];
+                    }
+                }
+                openFrac[ci] = (wAll > 0 ? wOpen/wAll : 1.0);
+            }
+
+            // Coupled faces: both sides must use the same open fraction (the
+            // smaller of the two), exchanged between the sides
+            {
+                PstreamBuffers pBufs(Pstream::commsTypes::nonBlocking);
+                forAll(alpha.boundaryField(), patchi)
+                {
+                    const fvPatch& patch = mesh_.boundary()[patchi];
+                    if (!isA<processorFvPatch>(patch))
+                    {
+                        continue;
+                    }
+                    scalarField own(patch.size(), 1.0);
+                    for (label ci = nInt; ci < cFaces.size(); ci++)
+                    {
+                        if (cPatch[ci] == patchi)
+                        {
+                            own[cFaces[ci] - patch.start()] = openFrac[ci];
+                        }
+                    }
+                    UOPstream toNbr
+                    (
+                        refCast<const processorFvPatch>(patch).neighbProcNo(),
+                        pBufs
+                    );
+                    toNbr << own;
+                }
+                pBufs.finishedSends();
+                forAll(alpha.boundaryField(), patchi)
+                {
+                    const fvPatch& patch = mesh_.boundary()[patchi];
+                    if (!isA<processorFvPatch>(patch))
+                    {
+                        continue;
+                    }
+                    UIPstream fromNbr
+                    (
+                        refCast<const processorFvPatch>(patch).neighbProcNo(),
+                        pBufs
+                    );
+                    scalarField nbr(fromNbr);
+                    for (label ci = nInt; ci < cFaces.size(); ci++)
+                    {
+                        if (cPatch[ci] == patchi)
+                        {
+                            const label i = cFaces[ci] - patch.start();
+                            openFrac[ci] = min(openFrac[ci], nbr[i]);
+                        }
+                    }
+                    // The neighbour's candidate set may include faces that
+                    // this side did not select (they are all open here)
+                    for (label i = 0; i < patch.size(); i++)
+                    {
+                        if (nbr[i] < 1.0)
+                        {
+                            bool have = false;
+                            for (label ci = nInt; ci < cFaces.size(); ci++)
+                            {
+                                if
+                                (
+                                    cPatch[ci] == patchi
+                                 && cFaces[ci] - patch.start() == i
+                                )
+                                {
+                                    have = true;
+                                    break;
+                                }
+                            }
+                            if (!have)
+                            {
+                                cFaces.append(patch.start() + i);
+                                cPatch.append(patchi);
+                                openFrac.append(nbr[i]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Set the apertures and mark the faces
+            label nPartial = 0, nClosed = 0;
+            forAll(cFaces, ci)
+            {
+                const label facei = cFaces[ci];
+                if (cPatch[ci] < 0)
+                {
+                    alphaI[facei] = openFrac[ci];
+                    blockedFacesPtr_->primitiveFieldRef()[facei] = 1;
+                }
+                else
+                {
+                    const label i = facei - mesh_.boundary()[cPatch[ci]].start();
+                    alpha.boundaryFieldRef()[cPatch[ci]][i] = openFrac[ci];
+                    blockedFacesPtr_->boundaryFieldRef()[cPatch[ci]][i] = 1;
+                }
+                if (openFrac[ci] <= 0)
+                {
+                    nClosed++;
+                }
+                else if (openFrac[ci] < 1)
+                {
+                    nPartial++;
+                }
+            }
+            Info<< "    Thin body aperture: faces closed " << returnReduce(nClosed, sumOp<label>())
+                << ", partly open " << returnReduce(nPartial, sumOp<label>())
+                << ", rays " << returnReduce(rStart.size(), sumOp<label>())
+                << endl;
+        }
+
+        Info<< "    Thin body blocking: search time "
+            << (mesh_.time().elapsedCpuTime() - thinBodyT0) << " s" << endl;
     }
 
     // Cells whose internal and coupled faces are all solid
@@ -2199,6 +2525,11 @@ Foam::fv::immersedBoundaryForce::immersedBoundaryForce
     apertureCoupling_(true),
     thinBodyBlocking_("off"),
     thinBodyDiffusivity_("zero"),
+    thinBodyAperture_("binary"),
+    thinBodyPocket_("flag"),
+    thinBodyPocketTolerance_(1e-6),
+    thinBodyDictPtr_(),
+    apertureSamples_(4),
     blockedFacesPtr_(),
     aperturePtr_(),
     wallFluxPtr_(),
@@ -2984,9 +3315,52 @@ bool Foam::fv::immersedBoundaryForce::read(const dictionary& dict)
                 << "Unknown thinBodyDiffusivity " << thinBodyDiffusivity_
                 << ": valid choices are keep and zero" << exit(FatalIOError);
         }
+        coeffs_.readIfPresent("thinBodyPocketPolicy", thinBodyPocket_);
+        coeffs_.readIfPresent
+        (
+            "thinBodyPocketTolerance", thinBodyPocketTolerance_
+        );
+        if
+        (
+            thinBodyPocket_ != "flag" && thinBodyPocket_ != "reject"
+         && thinBodyPocket_ != "source"
+        )
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown thinBodyPocketPolicy " << thinBodyPocket_
+                << ": valid choices are flag, reject and source"
+                << exit(FatalIOError);
+        }
+        coeffs_.readIfPresent("thinBodyAperture", thinBodyAperture_);
+        coeffs_.readIfPresent("thinBodyApertureSamples", apertureSamples_);
+        if (thinBodyAperture_ != "binary" && thinBodyAperture_ != "exact")
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "Unknown thinBodyAperture " << thinBodyAperture_
+                << ": valid choices are binary and exact"
+                << exit(FatalIOError);
+        }
+        if (apertureSamples_ < 1)
+        {
+            FatalIOErrorInFunction(coeffs_)
+                << "thinBodyApertureSamples must be at least 1"
+                << exit(FatalIOError);
+        }
         coeffs_.readIfPresent("pinnedRateCoeff", pinnedRateCoeff_);
         coeffs_.readIfPresent("linkCorrection", linkCorrection_);
         coeffs_.readIfPresent("forceEstimator", forceEstimator_);
+        if (thinBodyBlocking_ != "off" && forceEstimator_ == "surfaceTraction")
+        {
+            WarningInFunction
+                << "thinBodyBlocking with forceEstimator surfaceTraction: "
+                << "the pressure in a pocket that the closed faces of a thin "
+                << "body isolate from every fixed pressure is a gauge (a "
+                << "reference value), so the pressure force on a surface "
+                << "facing such a pocket is not meaningful (fluxes, "
+                << "velocities and pressure differences within a connected "
+                << "region are not affected). Not examined in this version"
+                << endl;
+        }
         coeffs_.readIfPresent("writeSurfaceTraction", writeSurfaceTraction_);
 
         // An unknown quadrature is a fatal error
