@@ -416,6 +416,16 @@ fixedDisplacementFvPatchVectorField::evaluateQuadrature
     return tQuadPointsValue;
 }
 
+
+autoPtr<CompactListList<vector>>
+fixedDisplacementFvPatchVectorField::quadratureValues
+(
+    const fvMeshQuadrature&
+) const
+{
+    return evaluateQuadrature();
+}
+
 void fixedDisplacementFvPatchVectorField::write(Ostream& os) const
 {
     os.writeKeyword("nonOrthogonalCorrections")
