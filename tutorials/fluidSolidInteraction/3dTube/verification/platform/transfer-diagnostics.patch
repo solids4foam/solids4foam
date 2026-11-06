@@ -4,7 +4,7 @@ index 3b1c68377..9a0ef0a35 100644
 +++ b/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/fluidSolidInterface.C
 @@ -18,6 +18,8 @@ License
  \*---------------------------------------------------------------------------*/
- 
+
  #include "fluidSolidInterface.H"
 +
 +#define S4F_DBG_CHK(label, fld)     if (getenv("S4F_DEBUG_TRACTION"))     {         Sout.precision(17);         Sout<< "DBGM " << label << " n " << (fld).size()             << " sum|.| " << sum(mag(fld)) << " max|.| " << max(mag(fld))             << " sum " << sum(fld) << nl;         Sout.precision(6);     }
@@ -14,16 +14,16 @@ index 3b1c68377..9a0ef0a35 100644
 @@ -1647,6 +1649,8 @@ void Foam::fluidSolidInterface::moveFluidMesh()
                  )*fluidPatchPointDeltaCoeffs
              );
- 
+
 +        S4F_DBG_CHK("fluidPatchDispl", fluidPatchesPointsDispls[interfaceI])
 +        S4F_DBG_CHK("fluidPatchDisplPrev", fluidPatchesPointsDisplsPrev[interfaceI])
          Info<< "Maximal accumulated displacement of interface " << interfaceI
              << ": " << delta << endl;
- 
+
 @@ -2267,6 +2271,13 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
              );
          }
- 
+
 +        S4F_DBG_CHK("solidZoneDisplIncrAtSolid", solidZonePointsDisplsAtSolid)
 +        S4F_DBG_CHK("solidZoneTotDisplAtSolid", solidZonePointsTotDisplsAtSolid)
 +        S4F_DBG_CHK("solidZoneDisplAtFluid", solidZonesPointsDispls()[interfaceI])
@@ -33,14 +33,14 @@ index 3b1c68377..9a0ef0a35 100644
 +
          // Update interface residuals
          residualsPrev()[interfaceI] = residuals()[interfaceI];
- 
+
 diff --git a/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping/amiInterfaceToInterfaceMapping/amiInterfaceToInterfaceMapping.C b/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping/amiInterfaceToInterfaceMapping/amiInterfaceToInterfaceMapping.C
 index 525bd8dba..b166c7b50 100644
 --- a/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping/amiInterfaceToInterfaceMapping/amiInterfaceToInterfaceMapping.C
 +++ b/src/solids4FoamModels/fluidSolidInterfaces/fluidSolidInterface/interfaceToInterfaceMapping/amiInterfaceToInterfaceMapping/amiInterfaceToInterfaceMapping.C
 @@ -20,6 +20,7 @@ License
  #ifdef OPENFOAM_NOT_EXTEND
- 
+
  #include "amiInterfaceToInterfaceMapping.H"
 +#include "OFstream.H"
  #include "addToRunTimeSelectionTable.H"
@@ -68,8 +68,8 @@ index 525bd8dba..b166c7b50 100644
 +        }
 +    }
  }
- 
- 
+
+
 @@ -536,6 +554,23 @@ void amiInterfaceToInterfaceMapping::calcZoneBPointWeights() const
              zoneBPointWeights.set(pointI, new scalarField(0));
          }
@@ -92,5 +92,5 @@ index 525bd8dba..b166c7b50 100644
 +        }
 +    }
  }
- 
+
  const List<labelPair>&

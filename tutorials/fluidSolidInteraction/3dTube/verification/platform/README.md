@@ -4,11 +4,13 @@ Between two platforms the 3dTube verification gave the same radial
 displacement, arrival time and pulse speed (to 0.1-0.2%) but an axial trough
 `u_z,min(A)` that differed by 1.5% on level 1, growing to 3.0% on level 3:
 
+<!-- markdownlint-disable MD013 -->
 | Platform | OpenFOAM build | solids4foam compile flags | u_z,min(A), level 1 (mm) |
 |---|---|---|---:|
 | xenosim (AMD EPYC 9684X) | v2412 and v2512 Ubuntu packages, GCC 11.4 | `-O3` (wmake default) | -0.08954 |
 | MeluXina (AMD EPYC 7H12) | v2412 EasyBuild foss-2024a, GCC 13.3 | `-O2 -fno-tree-vectorize -march=znver2` (EasyBuild rules) | -0.08819 |
 | Apple M1 Ultra (earlier README) | v2412, Clang | | -0.08823 |
+<!-- markdownlint-enable MD013 -->
 
 Each platform was deterministic and independent of MPI ranks, preconditioner,
 tolerances, coupling (Robin-Neumann or IQN-ILS), mesh source and

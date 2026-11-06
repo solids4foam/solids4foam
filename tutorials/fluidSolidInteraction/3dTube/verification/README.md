@@ -168,7 +168,8 @@ step:
 Levels 1 and 2 form the default sweep; level 3 is opt-in and costs about
 6 h on 32 ranks (720 core-hours). Because the time step is halved with the
 mesh, the default sweep is a combined space-time refinement; `--delta-t`
-holds the time step fixed so that the mesh alone is refined. The acceptance criteria are:
+holds the time step fixed so that the mesh alone is refined. The acceptance
+criteria are:
 
 - the change between the two finest levels is at most 5% for `u_r,max(A)` and
   `u_z,min(A)`, 2% for `t_arr(A)` and 3% for `c_p`, and, with three or more
@@ -302,12 +303,15 @@ two-level study (which used the faulty point transfer on level 2).
 Time step halved with the mesh (`Iter.` is the mean number of FSI iterations
 per step):
 
+<!-- markdownlint-disable MD013 -->
 | Level | Fluid / solid cells | Δt (s) | Ranks | u_r,max | t(u_r,max) | u_z,min | t_arr | c_p | Iter. | Clock (s) |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 1 | 16 000 / 6 400 | 2.5e-5 | 4 | 0.15978 | 7.201 | -0.08819 | 5.873 | 4.654 | 4.78 | 531 |
 | 2 | 128 000 / 51 200 | 1.25e-5 | 8 | 0.15946 | 7.215 | -0.08659 | 5.843 | 4.635 | 3.87 | 3 744 |
 | 3 | 1 024 000 / 409 600 | 6.25e-6 | 128 | 0.15851 | 7.252 | -0.08571 | 5.825 | 4.594 | 3.18 | 15 317 |
+<!-- markdownlint-enable MD013 -->
 
+<!-- markdownlint-disable MD013 -->
 | Quantity | Change 1→2 | Change 2→3 | Observed order | Verdict |
 |---|---:|---:|---:|---|
 | u_r,max(A) | -0.20% | -0.60% | undefined | monotone, but the change grows: not asymptotic |
@@ -315,6 +319,7 @@ per step):
 | t_arr(A) | -0.51% | -0.31% | 0.72 | monotone, sub-nominal |
 | c_p | -0.41% | -0.88% | undefined | the change grows; of the size of the probe sampling noise |
 | u_r,min(A), t > 14 ms | 6.3% | 2.0% | undefined | non-monotone |
+<!-- markdownlint-enable MD013 -->
 
 With the time step fixed at `2.5e-5 s` on all three meshes (pure mesh
 refinement; level 3 on MeluXina): `u_r,max(A)` 0.15978, 0.15921, 0.15835
@@ -422,8 +427,8 @@ With the published discretisation the peak is within +2.5%/-1.4% (level 1)
 and +1.3%/-2.6% (level 2) of the two published peaks, against 33% and 28%
 with the backward level-3 solution; the axial trough moves from 8-16% to
 1-6% (level 1; 1-8% on level 2) of the published values and the late radial
-trough from 26-27% to 0-3%. The damping by Euler at `Δt = 1e-4 s` (0.036-0.038 mm) amounts to
-92-115% of the gap between the published peaks and the backward solution
+trough from 26-27% to 0-3%. The damping by Euler at `Δt = 1e-4 s`
+(0.036-0.038 mm) amounts to 92-115% of the gap between the published peaks and the backward solution
 (86-126% within the reading accuracy of the figures). The Euler results
 converge slowly in time (successive `u_r,max(A)` changes of 11.5%, 7.3% and
 4.2%, still 4.4% below the backward value at `Δt = 1.25e-5 s`), so neither
