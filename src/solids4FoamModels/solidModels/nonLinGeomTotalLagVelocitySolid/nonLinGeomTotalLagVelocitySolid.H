@@ -124,6 +124,15 @@ class nonLinGeomTotalLagVelocitySolid
         //  for the U field
         boolIOList useBoundaryFaceValuesU_;
 
+        //- Finite-strain kinematics at the face quadrature points, used by
+        //  the high-order residual
+        mutable autoPtr<CompactListList<tensor>> FQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FQuad0Ptr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuad0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
+
 
     // Private Member Functions
 
@@ -134,6 +143,21 @@ class nonLinGeomTotalLagVelocitySolid
         //- Update the cell-centred stress from the current kinematics
         //  using the mechanicalConstitutiveLaw framework
         void correctStress();
+
+        //- Update the stress at the face quadrature points from gradDQuad(),
+        //  for the high-order residual
+        void correctStressQuad();
+
+        //- Return DImplicit_ with the boundary conditions of D, whose
+        //  fixed-displacement patches the high-order (k-exact)
+        //  reconstruction evaluates at the face quadrature points
+        tmp<volVectorField> DImplicitWithDBoundaries() const;
+
+        //- Return the deformed face area vectors at the new time: from the
+        //  interpolated cell kinematics, or, with the high-order residual,
+        //  on the boundary from Nanson's relation integrated over the face
+        //  quadrature points, as in nonLinGeomTotalLagTotalDispSolid
+        tmp<surfaceVectorField> currentSf() const;
 
         //- Construct impK from the mechanicalConstitutiveLaw framework
         tmp<volScalarField> makeImpK() const;

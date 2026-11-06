@@ -29,6 +29,7 @@ License
 #include "slipFvPatchFields.H"
 #include "compatibilityFunctions.H"
 #include "mechanicalConstitutiveLawManager.H"
+#include "hofvc.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -117,6 +118,126 @@ void nonLinGeomTotalLagVelocitySolid::correctStress()
             sigma()
         );
     }
+}
+
+
+void nonLinGeomTotalLagVelocitySolid::correctStressQuad()
+{
+    // As in nonLinGeomTotalLagTotalDispSolid: the quadrature points carry
+    // their own constitutive state, and the old-time gradient comes from
+    // solidModel, which copies gradDQuad() at the end of each time step
+    quadDeformationGradient(gradDQuad(), FQuadPtr_);
+    quadInverseAndJacobian(FQuadPtr_(), FinvQuadPtr_, JQuadPtr_);
+
+    quadDeformationGradient(gradDQuad0(), FQuad0Ptr_);
+    quadInverseAndJacobian(FQuad0Ptr_(), FinvQuad0Ptr_, JQuad0Ptr_);
+
+    mechanicalManager().updateStressFiniteStrain
+    (
+        FQuadPtr_(),
+        FQuad0Ptr_(),
+        FinvQuadPtr_(),
+        FinvQuad0Ptr_(),
+        JQuadPtr_(),
+        JQuad0Ptr_(),
+        mesh().time().deltaTValue(),
+        sigmaQuad()
+    );
+}
+
+
+tmp<volVectorField>
+nonLinGeomTotalLagVelocitySolid::DImplicitWithDBoundaries() const
+{
+    // A copy of D keeps its patch types, e.g. fixedDisplacement with its
+    // prescribed displacement at the new time; only the cell values, which
+    // are those of DImplicit_, are used elsewhere
+    tmp<volVectorField> tDI
+    (
+        new volVectorField
+        (
+            IOobject
+            (
+                "DImplicitHighOrder",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            D()
+        )
+    );
+
+#ifdef OPENFOAM_NOT_EXTEND
+    tDI.ref().primitiveFieldRef() = DImplicit_.primitiveField();
+#else
+    tDI().internalField() = DImplicit_.internalField();
+#endif
+
+    return tDI;
+}
+
+
+tmp<surfaceVectorField> nonLinGeomTotalLagVelocitySolid::currentSf() const
+{
+    tmp<surfaceVectorField> tSfCurrent
+    (
+        new surfaceVectorField
+        (
+            "SfCurrent",
+            fvc::interpolate(J_*Finv_.T()) & mesh().Sf()
+        )
+    );
+
+    if (!highOrderResidual())
+    {
+        return tSfCurrent;
+    }
+
+    surfaceVectorField& SfCurrent = tmpRef(tSfCurrent);
+
+    const surfaceVectorField& Sf = mesh().Sf();
+    const vectorField normal(mesh().faceAreas()/mag(mesh().faceAreas()));
+    auto& quadW = compactListListCRef
+    (
+        displacementLeastSquares().quadrature().faceQuadWeights()
+    );
+    auto& quadGradD = compactListListCRef(gradDQuad());
+
+    // Only the boundary values are used, for the traction conditions
+    forAll(SfCurrent.boundaryField(), patchI)
+    {
+        vectorField& SfCurrentPatch = boundaryFieldRef(SfCurrent)[patchI];
+
+        forAll(SfCurrentPatch, faceI)
+        {
+            const label globalFaceID =
+                mesh().boundaryMesh()[patchI].start() + faceI;
+
+            if (!quadW[globalFaceID].size())
+            {
+                SfCurrentPatch[faceI] = Sf.boundaryField()[patchI][faceI];
+                continue;
+            }
+
+            SfCurrentPatch[faceI] = vector::zero;
+
+            forAll(quadW[globalFaceID], qpI)
+            {
+                const tensor F(I + quadGradD[globalFaceID][qpI].T());
+
+                // The quadrature weights include the reference area, so
+                // Nanson's relation is applied to the reference unit normal
+                SfCurrentPatch[faceI] +=
+                    quadW[globalFaceID][qpI]
+                   *det(F)
+                   *(inv(F).T() & normal[globalFaceID]);
+            }
+        }
+    }
+
+    return tSfCurrent;
 }
 
 
@@ -259,7 +380,74 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
             const vectorField& nPatch = nCurrent.boundaryField()[patchI];
             const vectorField totalTraction(trac - nPatch*pressure);
 
-            if (tracPatch.useUndeformedArea())
+            if (highOrderResidual())
+            {
+                // Integrate the traction over the face quadrature points, as
+                // nonLinGeomTotalLagTotalDispSolid does. The quadrature values
+                // hold the traction minus the pressure along the reference
+                // normal, so the pressure is added back and applied, constant
+                // over the face, along the deformed normal
+                const bool useUndeformedArea = tracPatch.useUndeformedArea();
+
+                // Face quadrature weights include the reference face area
+                auto& faceQuadWeights = compactListListCRef
+                (
+                    displacementLeastSquares().quadrature().faceQuadWeights()
+                );
+
+                auto& faceGradD = compactListListCRef(gradDQuad());
+
+                const vectorField nRef
+                (
+                    D.mesh().boundary()[patchI].Sf()
+                   /D.mesh().boundary()[patchI].magSf()
+                );
+
+                const autoPtr<CompactListList<vector>> quadratureValues =
+                    tracPatch.evaluateQuadrature();
+                auto& tractionPressureQuad = compactListListCRef
+                (
+                    quadratureValues()
+                );
+                const scalarField& magSfRef =
+                    D.mesh().boundary()[patchI].magSf();
+                const scalarField& magSfCurrentPatch =
+                    magSfCurrent.boundaryField()[patchI];
+                const label start = D.mesh().boundaryMesh()[patchI].start();
+
+                forAll(forceP, faceI)
+                {
+                    forceP[faceI] = -pressure[faceI]*nPatch[faceI]*
+                    (
+                        useUndeformedArea
+                      ? magSfRef[faceI]
+                      : magSfCurrentPatch[faceI]
+                    );
+
+                    const label faceID = faceI + start;
+
+                    forAll(faceQuadWeights[faceID], pointI)
+                    {
+                        const scalar weight = faceQuadWeights[faceID][pointI];
+                        const vector traction =
+                            tractionPressureQuad[faceI][pointI]
+                          + nRef[faceI]*pressure[faceI];
+
+                        if (useUndeformedArea)
+                        {
+                            forceP[faceI] += weight*traction;
+                        }
+                        else
+                        {
+                            const tensor F(I + faceGradD[faceID][pointI].T());
+                            const vector areaMap(cof(F) & nRef[faceI]);
+
+                            forceP[faceI] += weight*mag(areaMap)*traction;
+                        }
+                    }
+                }
+            }
+            else if (tracPatch.useUndeformedArea())
             {
                 forceP = totalTraction*D.mesh().boundary()[patchI].magSf();
             }
@@ -810,7 +998,18 @@ void nonLinGeomTotalLagVelocitySolid::updateDisplacement()
     D().correctBoundaryConditions();
 
     // Update the gradient of displacement and the stress
-    gradD() = fvc::grad(D());
+    if (highOrderResidual())
+    {
+        // High-order cell gradient, and the face quadrature gradient of the
+        // converged displacement, which solidModel copies to gradDQuad0() at
+        // the end of the time step
+        gradD() = displacementLeastSquares().grad(D());
+        gradQuad(D(), gradDQuad());
+    }
+    else
+    {
+        gradD() = fvc::grad(D());
+    }
 
     if (!linearGeometryFormulation_)
     {
@@ -881,10 +1080,40 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // the backward scheme applied to the velocity, consistent with ddt(U)
     updateDImplicit(U);
 
-    // Calculate the gradient of displacement at the new time
-    gradD() = fvc::grad(DImplicit_);
+    if (highOrderResidual())
+    {
+        if (linearGeometryFormulation_)
+        {
+            FatalErrorInFunction
+                << "The high-order residual is not implemented for "
+                << "linearGeometryFormulation" << abort(FatalError);
+        }
 
-    if (linearGeometryFormulation_)
+        // High-order (k-exact least squares) cell gradient, used for the
+        // deformed normals and the stabilisation, and the gradient at the
+        // face quadrature points, used for the stress
+        const tmp<volVectorField> tDI(DImplicitWithDBoundaries());
+        gradD() = displacementLeastSquares().grad(tDI());
+        gradQuad(tDI(), gradDQuad());
+
+        // Stress at the face quadrature points at the new time
+        correctStressQuad();
+
+        F_ = I + gradD().T();
+        Finv_ = inv(F_);
+        J_ = det(F_);
+    }
+    else
+    {
+        // Calculate the gradient of displacement at the new time
+        gradD() = fvc::grad(DImplicit_);
+    }
+
+    if (highOrderResidual())
+    {
+        // The stress was calculated at the face quadrature points above
+    }
+    else if (linearGeometryFormulation_)
     {
         // Small strain stress at the new time
         correctStress();
@@ -946,15 +1175,22 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     else
     {
         // Calculate the deformed normals at the new time
-        const surfaceVectorField SfNew
-        (
-            fvc::interpolate(J_*Finv_.T()) & mesh.Sf()
-        );
+        const tmp<surfaceVectorField> tSfNew(currentSf());
+        const surfaceVectorField& SfNew = tSfNew();
         const surfaceScalarField magSfNew(mag(SfNew));
         const surfaceVectorField nNew(SfNew/magSfNew);
 
         // Traction vectors at the faces
         surfaceVectorField tractionNew(nNew & fvc::interpolate(sigma()));
+
+        if (highOrderResidual())
+        {
+            // Nominal traction (force per unit undeformed area), from the
+            // first Piola-Kirchhoff stress integrated over the face
+            // quadrature points, as in nonLinGeomTotalLagTotalDispSolid
+            tractionNew =
+                hofvc::surfaceIntegrate(sigmaQuad(), gradDQuad(), mesh);
+        }
 
         // Add stabilisation to the traction
         // We add this before enforcing the traction condition as the stabilisation
@@ -977,7 +1213,17 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
             tractionNew += impKf_*momentumStabilisation().faceVector();
         }
 
-        forcePtr.reset(new surfaceVectorField("force", magSfNew*tractionNew));
+        // The high-order traction is per unit undeformed area
+        forcePtr.reset
+        (
+            new surfaceVectorField
+            (
+                "force",
+                highOrderResidual()
+              ? mesh.magSf()*tractionNew
+              : magSfNew*tractionNew
+            )
+        );
 
         // Enforce traction boundary conditions
         enforceTractionBoundaries(forcePtr(), D(), nNew, magSfNew);
