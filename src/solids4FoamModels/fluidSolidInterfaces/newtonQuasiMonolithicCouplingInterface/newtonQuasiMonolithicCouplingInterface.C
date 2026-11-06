@@ -1765,6 +1765,22 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 }
 
 
+void newtonQuasiMonolithicCouplingInterface::updateSolidGradD
+(
+    const volVectorField& D
+)
+{
+    if (solid().highOrderResidual())
+    {
+        solid().gradD() = solid().displacementLeastSquares().grad(D);
+    }
+    else
+    {
+        solid().gradD() = fvc::grad(D);
+    }
+}
+
+
 void newtonQuasiMonolithicCouplingInterface::setInterfaceDisplacementOffsets()
 {
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
@@ -1787,7 +1803,7 @@ void newtonQuasiMonolithicCouplingInterface::setInterfaceDisplacementOffsets()
     // The mapped solid interface state at the start
     interfaceDOffsetPtr_.clear();
     interfacePointDOffsetPtr_.clear();
-    solid().gradD() = fvc::grad(solid().D());
+    updateSolidGradD(solid().D());
     solid().interpolatePointDisplacement
     (
         solid().D(), solid().gradD(), solid().pointD()
@@ -1847,7 +1863,7 @@ void newtonQuasiMonolithicCouplingInterface::restoreOldTimeState
     D = D.oldTime();
     D.correctBoundaryConditions();
 
-    solid().gradD() = fvc::grad(D);
+    updateSolidGradD(D);
     solid().interpolatePointDisplacement(D, solid().gradD(), solid().pointD());
     solid().pointD().correctBoundaryConditions();
 
@@ -2201,6 +2217,27 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
                 << " to set 'useUndeformedArea yes'" << exit(FatalError);
         }
     }
+    else
+    {
+        // The fluid traction is transferred per unit deformed area, so a
+        // nonlinear-geometry solid must apply it on the deformed areas
+        const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
+        if
+        (
+            solid().nonLinGeom() != nonLinearGeometry::LINEAR_GEOMETRY
+         && refCast<const solidTractionFvPatchVectorField>
+            (
+                solid().D().boundaryField()[solidPatchID]
+            ).useUndeformedArea()
+        )
+        {
+            FatalErrorInFunction
+                << "The solid interface patch "
+                << solidMesh().boundary()[solidPatchID].name()
+                << " sets 'useUndeformedArea yes', which requires "
+                << "'conservativeTractionTransfer yes'" << exit(FatalError);
+        }
+    }
 
     Info<< "fluidSystemScaleFactor = " << fluidSystemScaleFactor_ << nl
         << "solidSystemScaleFactor = " << solidSystemScaleFactor_ << nl
@@ -2454,7 +2491,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
           - (deltaT/2.0)*USolid.oldTime().oldTime();
 
         // Update displacement gradient
-        solid().gradD() = fvc::grad(D);
+        updateSolidGradD(D);
 
         // Interpolate cell displacements to vertices
         solid().interpolatePointDisplacement

@@ -336,6 +336,11 @@ class newtonQuasiMonolithicCouplingInterface
         //  interface. Three fields are mapped: D, U and pointD
         void mapInterfaceSolidToMeshMotion();
 
+        //- Update the solid displacement gradient from D with the scheme the
+        //  solid uses for its residual, so that the point displacements match
+        //  those of the accepted time steps
+        void updateSolidGradD(const volVectorField& D);
+
         //- Set the interface displacement offsets from the difference between
         //  the mapped solid interface displacement and the mesh motion
         //  interface displacement at the start of the coupling, which is

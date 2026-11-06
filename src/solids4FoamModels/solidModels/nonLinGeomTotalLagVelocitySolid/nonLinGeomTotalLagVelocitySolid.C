@@ -380,58 +380,74 @@ void nonLinGeomTotalLagVelocitySolid::enforceTractionBoundaries
             const vectorField& nPatch = nCurrent.boundaryField()[patchI];
             const vectorField totalTraction(trac - nPatch*pressure);
 
-            // With the high-order residual, a traction per unit deformed area
-            // would have to be integrated over the face quadrature points
-            // with the deformed area map, as nonLinGeomTotalLagTotalDispSolid
-            // does; this is not implemented here, while a pressure, constant
-            // over the face, uses the deformed face area as there
-            bool nonZeroTraction = false;
-            if (highOrderResidual() && !tracPatch.useUndeformedArea())
+            if (highOrderResidual())
             {
-                // The face-average traction can vanish while the traction at
-                // the quadrature points does not. The quadrature values hold
-                // the traction minus the pressure along the reference normal,
-                // as used by nonLinGeomTotalLagTotalDispSolid, so the pressure
-                // is added back
-                const autoPtr<CompactListList<vector>> quadTraction =
-                    tracPatch.evaluateQuadrature();
-                auto& quadTrac = compactListListCRef(quadTraction());
+                // Integrate the traction over the face quadrature points, as
+                // nonLinGeomTotalLagTotalDispSolid does. The quadrature values
+                // hold the traction minus the pressure along the reference
+                // normal, so the pressure is added back and applied, constant
+                // over the face, along the deformed normal
+                const bool useUndeformedArea = tracPatch.useUndeformedArea();
+
+                // Face quadrature weights include the reference face area
+                auto& faceQuadWeights = compactListListCRef
+                (
+                    displacementLeastSquares().quadrature().faceQuadWeights()
+                );
+
+                auto& faceGradD = compactListListCRef(gradDQuad());
+
                 const vectorField nRef
                 (
                     D.mesh().boundary()[patchI].Sf()
                    /D.mesh().boundary()[patchI].magSf()
                 );
-                scalar maxMag = 0;
-                forAll(nRef, faceI)
+
+                const autoPtr<CompactListList<vector>> quadratureValues =
+                    tracPatch.evaluateQuadrature();
+                auto& tractionPressureQuad = compactListListCRef
+                (
+                    quadratureValues()
+                );
+                const scalarField& magSfRef =
+                    D.mesh().boundary()[patchI].magSf();
+                const scalarField& magSfCurrentPatch =
+                    magSfCurrent.boundaryField()[patchI];
+                const label start = D.mesh().boundaryMesh()[patchI].start();
+
+                forAll(forceP, faceI)
                 {
-                    forAll(quadTrac[faceI], qpI)
+                    forceP[faceI] = -pressure[faceI]*nPatch[faceI]*
+                    (
+                        useUndeformedArea
+                      ? magSfRef[faceI]
+                      : magSfCurrentPatch[faceI]
+                    );
+
+                    const label faceID = faceI + start;
+
+                    forAll(faceQuadWeights[faceID], pointI)
                     {
-                        maxMag = max
-                        (
-                            maxMag,
-                            mag
-                            (
-                                quadTrac[faceI][qpI]
-                              + nRef[faceI]*pressure[faceI]
-                            )
-                        );
+                        const scalar weight = faceQuadWeights[faceID][pointI];
+                        const vector traction =
+                            tractionPressureQuad[faceI][pointI]
+                          + nRef[faceI]*pressure[faceI];
+
+                        if (useUndeformedArea)
+                        {
+                            forceP[faceI] += weight*traction;
+                        }
+                        else
+                        {
+                            const tensor F(I + faceGradD[faceID][pointI].T());
+                            const vector areaMap(cof(F) & nRef[faceI]);
+
+                            forceP[faceI] += weight*mag(areaMap)*traction;
+                        }
                     }
                 }
-                nonZeroTraction =
-                    returnReduce(maxMag, maxOp<scalar>()) > SMALL
-                 || gMax(mag(trac)) > SMALL;
             }
-
-            if (nonZeroTraction)
-            {
-                FatalErrorInFunction
-                    << "The high-order residual requires "
-                    << "'useUndeformedArea yes' on solidTraction patch "
-                    << D.mesh().boundary()[patchI].name()
-                    << ", which has a non-zero traction" << abort(FatalError);
-            }
-
-            if (tracPatch.useUndeformedArea())
+            else if (tracPatch.useUndeformedArea())
             {
                 forceP = totalTraction*D.mesh().boundary()[patchI].magSf();
             }
