@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+usage() {
+cat <<'EOF'
+Usage:
+  ./Allrun [configuration]
+
+Where [configuration] is one of:
+  clampedInner            clamped inner edge, free outer edge, uniform load
+                          (default)
+  clampedInnerCosineLoad  clamped inner edge, free outer edge,
+                          load p = p0 cos(phi)
+  clampedOuter            clamped outer edge, free inner edge, uniform load
+EOF
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]
+then
+    usage
+    exit 0
+fi
+
+CONFIGURATION="${1:-clampedInner}"
+
+case "$CONFIGURATION" in
+    clampedInner|clampedInnerCosineLoad)
+        BOUNDARY="clampedInner"
+        ;;
+    clampedOuter)
+        BOUNDARY="clampedOuter"
+        ;;
+    *)
+        echo "Error: Unknown configuration '$CONFIGURATION'"
+        usage
+        exit 1
+        ;;
+esac
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+if [[ "${WM_PROJECT_VERSION#v}" -lt 2412 ]]
+then
+    echo
+    echo "OpenFOAM-v2412 or a newer version is required for this case"
+    echo
+    exit 0
+fi
+
+# Select the boundary conditions
+echo "Using the ${CONFIGURATION} configuration"
+for field in M w
+do
+    ln -vnsf "${field}.${BOUNDARY}" "0/finite-area/${field}"
+done
+ln -vnsf p.uniform 0/finite-area/p
+
+# Create volume mesh
+solids4Foam::runApplication blockMesh
+
+# Create finite area mesh
+solids4Foam::runApplication makeFaMesh
+
+# Write the cosine load, which varies over the finite area faces
+if [[ "$CONFIGURATION" == "clampedInnerCosineLoad" ]]
+then
+    if ! command -v python3 > /dev/null 2>&1
+    then
+        echo "python3 is required for the ${CONFIGURATION} configuration"
+        exit 1
+    fi
+    echo "Running writeCosineLoad.py"
+    python3 -I writeCosineLoad.py > log.writeCosineLoad 2>&1 || exit 1
+fi
+
+# Run solver
+solids4Foam::runApplication solids4Foam

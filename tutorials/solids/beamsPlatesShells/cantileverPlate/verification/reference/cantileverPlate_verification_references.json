@@ -1,0 +1,50 @@
+{
+  "default_levels": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "default_variants": [
+    "main"
+  ],
+  "tutorial_level": 2,
+  "variants": {
+    "main": {
+      "approach": ""
+    }
+  },
+  "plate_length_m": 10.0,
+  "clamped_patches": [
+    "left"
+  ],
+  "clamped_moment_relaxation": {
+    "comment": "clampedMoment relaxationFactor per level; its loop gain grows with refinement",
+    "1": 0.01,
+    "2": 0.01,
+    "3": 0.002,
+    "4": 0.001
+  },
+  "metrics": {
+    "tip_midpoint": {
+      "description": "deflection at the midpoint of the free tip edge",
+      "patch": "right",
+      "location": "midpoint",
+      "reference_m": 0.0704747
+    },
+    "tip_mean": {
+      "description": "mean deflection along the free tip edge",
+      "patch": "right",
+      "location": "mean",
+      "reference_m": 0.0701213
+    }
+  },
+  "primary_metric": "tip_midpoint",
+  "reference": {
+    "comment": "Kirchhoff plate finite element solution with the 12-DOF ACM rectangular element, Richardson-extrapolated from 64 x 64 and 128 x 128 elements (p = 1000 Pa, E = 200 GPa, nu = 0.3, h = 0.1 m, L = 10 m)"
+  },
+  "acceptance": {
+    "relative_tolerance": 0.02,
+    "minimum_net_order": 0.8
+  }
+}
