@@ -312,6 +312,43 @@ study.
   quantity. Robin-Neumann takes 9.3 coupling iterations per time-step against
   14.6 for IQN-ILS, and half the run time.
 
+### Accuracy limit of the profile near the wall
+
+The linearised exact solution does not say whether it refers to the
+undeformed or to the current position of a point, and the two differ at
+O(η ∂u/∂r). `profile` evaluates the exact solution at the undeformed cell
+centres. The fluid mesh follows the wall displacement relative to its initial
+value, $$D(t) - D(0)$$, so the near-wall cells are offset from the exact
+wall position by the static part $$-\eta(0)$$, which is $$2.26 \times 10^{-4} R$$
+at $$x = L/2$$. Through the steep velocity gradient at the wall this shifts
+the first harmonic of the exact profile at the near-wall cells by
+$$\eta(0)\, \partial \hat{u} / \partial r \approx 8 \times 10^{-4}$$ of the
+largest velocity, independent of the wall stiffness. Products of two first
+harmonics feed only the mean and the second harmonic, so the oscillating part
+of the wall motion does not contribute.
+
+Wall-layer profile errors below about $$8 \times 10^{-4}$$ are therefore not
+resolved at the tutorial amplitude, and which evaluation point the discrete
+solution follows depends on the mesh motion: with the Laplacian motion of the
+partitioned runs it follows the undeformed centres, with the pseudo-solid
+motion of the quasi-monolithic runs the current ones. This is why the
+quasi-monolithic profile error appears to stall at $$7.7 \times 10^{-4}$$ on m8
+(solids4foam issue #650); a fluid-only run with the exact wall motion
+prescribed reproduces it without any coupling. The other quantities are
+integral or wall quantities and are not affected.
+
+The ambiguity scales with the amplitude and the discretisation error does
+not. With every amplitude (pressure, velocity and wall displacement) scaled
+by 0.1 and errors taken relative to the scaled exact solution, the
+quasi-monolithic profile error is $$1.80 \times 10^{-2}$$, $$5.01 \times 10^{-3}$$,
+$$1.25 \times 10^{-3}$$ and $$3.67 \times 10^{-4}$$ on m1 to m8 at 200 steps per
+period (orders 1.84, 2.01, 1.77) and $$2.55 \times 10^{-4}$$ on m8 at 400,
+against $$2.69 \times 10^{-4}$$ with Robin-Neumann; the two couplings agree to
+1-5% on every common level. The tutorial keeps its amplitude, for which the
+tables above were computed; for wall-layer errors below $$10^{-3}$$, scale the
+amplitude down (by 0.1 or more) or evaluate the exact solution at the current
+cell centres.
+
 ### Quasi-monolithic coupling
 
 > **Note:** the results in this section use the former Laplacian-form
