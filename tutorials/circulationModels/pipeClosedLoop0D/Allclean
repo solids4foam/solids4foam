@@ -1,0 +1,15 @@
+#!/bin/bash
+# Remove the results of this case
+cd "$(dirname "$0")" || exit 1
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source tutorial clean functions
+. "$WM_PROJECT_DIR"/bin/tools/CleanFunctions
+
+cleanCase
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

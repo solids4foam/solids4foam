@@ -88,10 +88,11 @@ release. For complete commit-level details and contributor information, see the
   an optional mesh motion `diffusivity`, on the current mesh before each
   solution. With the other solid models, as in the quasi-monolithic coupling,
   the factor is calculated once, from the mesh at construction; the optional
-  `updateStiffnessScaleFactor` entry overrides the default. A solid model on a mesh owned by another model
-  (`solidModel::sharedMesh()`) does not clear the mesh's moving flag or the
-  owner's solver performance records, and its `U`, `p`, `rho`, `g`, `rAUf`
-  and `useBoundaryFaceValues_p` fields are private to it.
+  `updateStiffnessScaleFactor` entry overrides the default. A solid model on
+  a mesh owned by another model (`solidModel::sharedMesh()`) does not clear
+  the mesh's moving flag or the owner's solver performance records, and its
+  `U`, `p`, `rho`, `g`, `rAUf` and `useBoundaryFaceValues_p` fields are
+  private to it.
 - `meshMotionTotalDisplacement` can be solved with PETSc SNES
   (`solutionAlgorithm PETScSNES`; the segregated corrector loop stays the
   default), with the same residual on the current mesh and the implicit
@@ -153,6 +154,30 @@ release. For complete commit-level details and contributor information, see the
   recommended for undamped structures, and a warning is printed when an
   order of 3 or above is selected. The `cantileverVibration` tutorial has a
   non-default `bdf3` option that shows the effect.
+- Added the `circulationModels` module (`src/circulationModels`): a mesh-free
+  lumped-parameter (0D) network of chambers, valves, resistances and
+  compliances for the circulatory system, solved with the OpenFOAM ODE solvers
+  (`libcirculation0D`), with the `circulationFoam` solver and a
+  `circulationPressure` boundary condition and coupler
+  (`libcirculationCoupling`) that couple a network to a CFD domain with
+  explicit or implicit schemes of order 1 to 4. The tutorials are in
+  `tutorials/circulationModels`. It is currently only available for
+  OpenFOAM.com.
+- Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
+  the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
+  `fvc::ddt`, including the `ddtCorr` flux corrections used by the
+  pressure-velocity coupling. It requires a static mesh, and it reduces the
+  order during start-up. `BDF 1` and `BDF 2` support a variable time-step
+  (`adjustTimeStep yes`), with `BDF 2` using the same variable-step
+  coefficients as `backward`; orders 3 and above require a constant
+  time-step, so `adjustTimeStep` cannot be used with them. They are also not
+  A-stable, and a warning is printed when one is selected. It is the
+  first-derivative counterpart of the `BDF` d2dt2 scheme, for fluids, and is
+  currently only available for OpenFOAM.com (#638). `Test-fvcDdt`, run by
+  the `decayingTaylorGreenVortex` regression test, checks the start-up order
+  ramp, exactness for time polynomials and the observed order of accuracy
+  for orders 1 to 6, restart, and a density or flux without stored old-time
+  levels.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A
@@ -414,6 +439,25 @@ release. For complete commit-level details and contributor information, see the
   print their per-call messages in debug mode only, as the `directMap` point
   transfer already did, which shortens the logs of the fluid-solid
   couplings.
+- The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
+  `leastSquaresS4f`, which is implemented in solids4foam and so is the same
+  scheme in all OpenFOAM variants. The case conversion script no longer
+  replaces `pointCellsLeastSquares` with `leastSquares` on foam-extend, which
+  made foam-extend solve a different discretisation from OpenFOAM.com and
+  OpenFOAM.org in those tutorials (#549). The regression references of these
+  tutorials were re-recorded, and `blockPunch` now compares the cell
+  displacement field rather than the point-A displacement, which depends on
+  the fork's volume-to-point interpolation. The thermal and poroelastic
+  tutorials use `leastSquaresS4f` for `grad(D)` only, with `leastSquares` for
+  the scalar fields, for which the solid models register no boundary-face
+  list; `hotSphere` and `suctionCaission` keep `leastSquares` for `D` too, as
+  `leastSquaresS4f` moves their peak stress outside the regression bands
+  until the least-squares treatment of the symmetry and zero-shear patches is
+  settled.
+  The tutorials that run only on foam-extend keep `leastSquares`, which they
+  used before. On foam-extend, the case conversion now replaces
+  `pointCellsLeastSquares` with `leastSquaresS4f` in a user case, one way, so
+  that an old case runs with the same scheme as on OpenFOAM.
 - `IQNILS` with `couplingReuse` greater than zero is now robust: the reused
   secant modes are no longer applied to the residual of the solid-only
   predictor (`predictSolid`), which comes from a solid solve with the previous
@@ -438,7 +482,6 @@ release. For complete commit-level details and contributor information, see the
   4.2, and the regression tests pass unchanged. The results in the
   `verification/` READMEs of these tutorials were computed without reuse
   (#587).
-
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes
@@ -714,6 +757,25 @@ release. For complete commit-level details and contributor information, see the
   any test. solids4foam's preCICE cases are now maintained upstream in the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
+- The `FixedList.C` (OpenFOAM.org and foam-extend) and `meshObjectBase.H`
+  (foam-extend) optional fixes are removed. `FixedList.C` is needed to build
+  OpenFOAM itself with Clang 17 or newer, so it is not a solids4foam fix, and
+  `meshObjectBase.H` only avoids a segmentation fault at the end of a
+  foam-extend run, after the results are written. `Allcheck` no longer
+  reports them, and `Allreplace` no longer copies them.
+- The `EulerDdtScheme.C` and `backwardDdtScheme.C` optional fixes are removed
+  for OpenFOAM.org, OpenFOAM.com and foam-extend, so no optional fixes remain
+  for OpenFOAM.com. The foam-extend ones are replaced by the `ddtCorr` flux
+  correction in `pimpleFluid` (see Fixed). The OpenFOAM.org and OpenFOAM.com
+  backward scheme fixes only changed the start-up of the scheme: on
+  OpenFOAM.org, Euler is used for the first `ddt(U)` of the first time step
+  but backward, with the old-old time level a copy of the old one, for later
+  calls in that step, e.g. with several outer correctors; on OpenFOAM.com, a
+  restart from a time without `U_0_0` uses backward with such a copy for one
+  time step. The foam-extend backward fix also corrected `meshPhi`: the
+  upstream foam-extend `meshPhi` does not conserve the cell volumes when the
+  time-step changes. With foam-extend, the fluid models now stop with an error
+  if the mesh is moving, the ddt scheme is backward and the time-step changes.
 
 ### Fixed
 
@@ -885,6 +947,19 @@ release. For complete commit-level details and contributor information, see the
   `Allcheck` and `Allreplace` no longer select a directory by version (#519).
   Installations patched with the earlier file are reported by `Allcheck`
   (with `S4F_NO_FILE_FIXES=0`), and `Allreplace` updates them.
+- With foam-extend, `pimpleFluid` with `ddtCorr yes` added the whole old-time
+  face flux, from `fvc::ddtConsistentPhiCorr`, on installations without the
+  `EulerDdtScheme.C` and `backwardDdtScheme.C` optional fixes. That flux suits
+  the foam-extend solvers, which keep `ddt(U)` out of the momentum matrix used
+  for `H`, but `pimpleFluid` keeps it in, so the old-time flux was counted
+  twice. `pimpleFluid` now computes the correction itself: the difference
+  between the old face velocity flux and the flux of the interpolated old
+  cell velocity, for the Euler and backward ddt schemes, as the optional fixes
+  did. Other ddt schemes stop with an error when `ddtCorr` is on.
+- The files in `optionalFixes` had their OpenFOAM and foam-extend copyright
+  and licence headers replaced by the solids4foam header. They now keep the
+  upstream headers, with a note on what solids4foam changed, and the file
+  header check skips `optionalFixes`.
 - The high-order least-squares reconstruction now rejects axisymmetric
   (wedge) meshes when the solid model is constructed, with an error that
   names the limitation, instead of stopping later with the misleading
@@ -956,6 +1031,11 @@ release. For complete commit-level details and contributor information, see the
   solid models is every time step (#566). It is now issued when the vectors
   are first computed and repeated only if the number of such cells grows on a
   later mesh change, which points to mesh degradation.
+- Fixed the parallel scaling of the high-order solid solvers: synchronising
+  the processor-face quadrature serialised the face coefficient build across
+  ranks, because the lower rank posted buffered sends and the higher rank
+  blocked in its receive until the lower rank finished its own build. The
+  quadrature data are now exchanged collectively (#662).
 
 ## [v2.4] - 2026-08-24
 
