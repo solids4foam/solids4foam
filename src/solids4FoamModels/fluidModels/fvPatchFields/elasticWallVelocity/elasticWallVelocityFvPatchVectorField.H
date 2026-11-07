@@ -59,11 +59,27 @@ class elasticWallVelocityFvPatchVectorField
     vectorField oldFc_;
     vectorField oldOldFc_;
 
+    //- Normal derivative of the normal velocity at the wall from continuity,
+    //  -div_s(U_wall), instead of zero. Zero is exact only for a wall whose
+    //  velocity has no surface divergence (a rigid or sliding wall); on a
+    //  deforming wall it removes most of the viscous normal stress.
+    //  Default yes; 'continuityNormalGradient no' restores the zero normal
+    //  gradient used before (#670)
+    Switch continuityNormalGradient_;
+
 
     // Private Member Functions
 
         //- Set Fc_ to the current patch face centres
         void setCurrentFaceCentres();
+
+        //- Normal derivative of the normal velocity at the wall from
+        //  continuity: minus the tangential divergence of the velocity, from
+        //  the gradient in the wall cells
+        tmp<scalarField> continuityNormalGradient
+        (
+            const fvPatchField<tensor>& gradU
+        ) const;
 
 
 public:

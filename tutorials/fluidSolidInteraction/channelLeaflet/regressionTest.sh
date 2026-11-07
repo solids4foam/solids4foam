@@ -22,10 +22,11 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 END_TIME=1
 DELTA_T=0.01
 
-# Tip displacement at t = 0.5 s and t = 1 s
-REF_DX_HALF=0.20743
-REF_DX_END=0.38140
-REF_DY_END=-0.21541
+# Tip displacement at t = 0.5 s and t = 1 s (OpenFOAM-v2512, Linux, with the
+# continuity-based wall-normal velocity gradient, #670)
+REF_DX_HALF=0.20762
+REF_DX_END=0.382578
+REF_DY_END=-0.217718
 DISP_TOL=0.002
 
 # Log files
