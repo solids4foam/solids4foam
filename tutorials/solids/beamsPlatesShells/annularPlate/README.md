@@ -91,12 +91,12 @@ verification script evaluates both solutions.
 The deflection of the free edge is $$7.503 \times 10^{-6}$$ m for
 `clampedInner`, $$7.214 \times 10^{-6}$$ m (amplitude of the $$\cos\varphi$$
 mode) for `clampedInnerCosineLoad` and $$4.603 \times 10^{-6}$$ m for
-`clampedOuter`. The tutorial mesh overpredicts them by 8.0%, 8.5% and 8.6%,
-and the overprediction halves with every mesh refinement (see the verification
-study below). The moment sum $$M$$ is predicted to within 1% in the whole plate
-for the inner-clamped configurations, and for the cosine load the normal
-gradient of $$M$$ on the free edge, which the curvature term determines, is
-within 4.4% of the exact value on the tutorial mesh.
+`clampedOuter`. The tutorial mesh overpredicts them by 0.7%, 1.2% and 1.0%,
+and the overprediction falls by a factor of two to five with every mesh
+refinement (see the verification study below). The moment sum $$M$$ is
+predicted to within 1% in the whole plate on the tutorial mesh, and for the
+cosine load the normal gradient of $$M$$ on the free edge, which the curvature
+term determines, is within 0.5% of the exact value.
 
 ---
 
@@ -112,6 +112,12 @@ area mesh using `makeFaMesh` (`> makeFaMesh`), writes the cosine load when
 requested, and runs the case with the `solids4foam` solver (`> solids4Foam`).
 The case runs with OpenFOAM.com v2412 or newer and takes a few seconds on the
 tutorial mesh.
+
+Setting `coupled yes;` in `constant/solidProperties` solves the `M` and `w`
+equations with their edge conditions as one linear system with PETSc instead
+of the segregated corrector loop; see the `cantileverPlate` tutorial. It gives
+the same solution in two outer iterations and requires solids4foam to be
+compiled with PETSc.
 
 ---
 
@@ -130,22 +136,24 @@ cd verification
 ./Allverify
 ```
 
-The free-edge deflection converges at first order in all three configurations
-(relative error against the exact solution):
+The free-edge deflection converges to the exact solution in all three
+configurations, at second order for `clampedInner` and between first and
+second order for the other two (relative error against the exact solution):
 
 | Mesh | Inner clamped | Inner clamped, cosine | Outer clamped |
 |:---:|---:|---:|---:|
-| 8 x 76 | 13.7% | 14.4% | 15.5% |
-| 16 x 152 | 8.0% | 8.5% | 8.6% |
-| 32 x 304 | 4.3% | 4.6% | 4.5% |
-| 64 x 608 | 2.2% | 2.4% | 2.3% |
-| Net order | 0.88 | 0.87 | 0.92 |
+| 8 x 76 | 3.0% | 4.1% | 2.3% |
+| 16 x 152 | 0.69% | 1.2% | 1.0% |
+| 32 x 304 | 0.14% | 0.38% | 0.49% |
+| 64 x 608 | 0.02% | 0.14% | 0.24% |
+| Net order | 2.44 | 1.63 | 1.10 |
 
-The relative $$L_2$$ error of $$w$$ follows the same first-order trend (16.4% to
-2.6% for `clampedInner`), and the error of the free-edge normal gradient of
-$$M$$ for the cosine load falls from 7.2% to 1.2% (net order 0.84). The whole
-sweep takes about 25 minutes in serial on an Apple M1 Ultra, almost all of it
-on the finest meshes.
+The relative $$L_2$$ error of $$w$$ follows the same trend (4.0% to 0.04% for
+`clampedInner`), and the error of the free-edge normal gradient of $$M$$ for
+the cosine load falls from 1.6% to 0.06% (net order 1.63). The whole
+sweep takes about 35 minutes in serial on an Apple M1 Ultra with the segregated
+solver, almost all of it on the finest meshes, and under a minute with
+`./Allverify --coupled`.
 
 The study is separate from `regressionTest.sh` and is not run by the normal
 tutorial tests. See the verification README for the mesh levels, options and

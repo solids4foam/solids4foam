@@ -56,10 +56,12 @@ the two unknowns:
   at a corner with a clamped edge both slopes vanish there.
 
 The clamped edge uses `fixedValue` for `w` and `clampedMoment` for `M`, which
-sets the edge moment from the second-order estimate $$\partial^2 w /
-\partial n^2 = 6 w_P / d^2 - 2 (n \cdot \theta_P) / d$$ of the normal
-curvature, where $$w_P$$ and $$\theta_P = -\nabla w$$ are taken at the adjacent
-cell centre at distance $$d$$ from the edge.
+sets the edge moment from the normal curvature estimated as the slope of the
+adjacent cell centre over its distance $$d$$ to the edge, where the slope
+vanishes: $$\partial^2 w / \partial n^2 = -(n \cdot \theta_P) / d$$ with
+$$\theta_P = -\nabla w$$ at the cell centre. The one-sided combination
+$$6 w_P / d^2 - 2 (n \cdot \theta_P) / d$$, formally of higher order, was found
+to converge only at first order, while this estimate converges at second order.
 
 The conditions are coupled explicitly, so the `relaxationFactor` of each
 condition and the field under-relaxation of `w` and `M` in
@@ -83,8 +85,9 @@ deflects more than a beam strip because the free side edges relax the
 anticlastic curvature that a strip would suppress.
 
 The tutorial mesh of 50 x 50 cells predicts a tip midpoint deflection of
-$$0.07257$$ m, 3.0% above the reference; the overprediction halves with every
-mesh refinement (see the verification study below). The bending moment along
+$$0.07057$$ m, 0.13% above the reference; the overprediction falls by a factor
+of two to three with every mesh refinement (see the verification study
+below). The bending moment along
 the free side edges and its normal gradient also agree with the finite element
 solution. Figure 1 shows the deflection field.
 
@@ -105,6 +108,15 @@ the mesh using `blockMesh` (`> blockMesh`), creates the finite area mesh using
 (`> solids4Foam`). The case runs with OpenFOAM.com v2412 or newer and takes
 about 20 s on the 50 x 50 mesh.
 
+The segregated algorithm couples the clamped and free edge conditions
+explicitly and needs thousands of under-relaxed correctors. Setting
+`coupled yes;` in `constant/solidProperties` instead assembles the `M` and `w`
+equations with their edge conditions into one linear system and solves it with
+PETSc (a direct solve with MUMPS by default; a `petscOptions` file in the case
+directory can select another solver). This gives the same solution in two
+outer iterations and a fraction of a second, and requires solids4foam to be
+compiled with PETSc.
+
 ---
 
 ## Verification and Convergence Study
@@ -120,21 +132,25 @@ cd verification
 ./Allverify
 ```
 
-The tip deflection converges at first order (relative error against the finite
-element reference):
+The tip deflection converges towards the finite element reference at an
+observed order between one and two (relative error against the reference):
 
 | Cells | Tip midpoint | Error | Tip mean | Error |
 |:---:|---:|---:|---:|---:|
-| 25 x 25 | 0.074551 m | +5.8% | 0.074199 m | +5.8% |
-| 50 x 50 | 0.072568 m | +3.0% | 0.072215 m | +3.0% |
-| 100 x 100 | 0.071537 m | +1.5% | 0.071184 m | +1.5% |
-| 200 x 200 | 0.071011 m | +0.8% | 0.070657 m | +0.8% |
+| 25 x 25 | 0.070734 m | +0.37% | 0.070387 m | +0.38% |
+| 50 x 50 | 0.070567 m | +0.13% | 0.070217 m | +0.14% |
+| 100 x 100 | 0.070511 m | +0.05% | 0.070160 m | +0.06% |
+| 200 x 200 | 0.070490 m | +0.02% | 0.070138 m | +0.02% |
 
-The net order of the tip midpoint deflection is 0.98, and Richardson
-extrapolation of the three finest meshes gives an order of 0.97 and a limit of
-$$0.070462$$ m, 0.02% below the finite element reference, so the first-order
-scheme converges to the right answer. The whole sweep takes about 30 minutes
-in serial on an Apple M1 Ultra, most of it on the finest mesh.
+The net order of the tip midpoint deflection is 1.35 (successive orders 1.50,
+1.34 and 1.22: the clamped edge treatment is second order while the one-sided
+free edge estimates are first order, so the observed order falls towards one
+as the free-edge error takes over), and Richardson extrapolation of the three
+finest meshes gives an order of 1.43 and a limit of $$0.070478$$ m, 0.005%
+above the finite element reference, so the scheme converges to the right
+answer. The whole sweep takes about an hour in
+serial on an Apple M1 Ultra with the segregated solver, most of it on the
+finest mesh, and under a minute with `./Allverify --coupled`.
 
 The study is separate from `regressionTest.sh` and is not run by the normal
 tutorial tests. See the verification README for the mesh levels, options and

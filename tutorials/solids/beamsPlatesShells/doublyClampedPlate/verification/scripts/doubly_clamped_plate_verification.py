@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="continue after an individual case fails",
     )
+    parser.add_argument(
+        "--coupled",
+        action="store_true",
+        help="use the block-coupled solver; results go under work/coupled",
+    )
     return parser.parse_args()
 
 
@@ -160,6 +165,21 @@ def set_clamped_relaxation(run_dir: Path, patches: list[str], value: float) -> N
     field.write_text(text)
 
 
+def set_coupled(run_dir: Path) -> None:
+    """Select the block-coupled solver in constant/solidProperties."""
+    path = run_dir / "constant" / "solidProperties"
+    new_text, count = re.subn(
+        r"^([ \t]*coupled\s+)\w+;",
+        r"\1yes;",
+        path.read_text(),
+        count=1,
+        flags=re.MULTILINE,
+    )
+    if count != 1:
+        raise RuntimeError(f"could not find the coupled entry in {path}")
+    path.write_text(new_text)
+
+
 def check_solver_log(solver_log: Path, label: str) -> tuple[int, float]:
     """Reject a run that crashed or did not converge; return correctors and time."""
     text = solver_log.read_text(errors="replace")
@@ -171,11 +191,14 @@ def check_solver_log(solver_log: Path, label: str) -> tuple[int, float]:
         raise RuntimeError(
             f"{label} did not reach the end of the run; see {solver_log}"
         )
-    if "The residuals have converged" not in text:
+    coupled = re.findall(r"^\s*Coupled iteration (\d+),", text, re.MULTILINE)
+    if not coupled and "The residuals have converged" not in text:
         raise RuntimeError(
             f"{label} ran out of correctors before converging; see {solver_log}"
         )
     correctors = re.findall(r"^\s*(\d+), [-+0-9.eE]+, ", text, re.MULTILINE)
+    if coupled:
+        correctors = coupled
     clock = re.findall(r"ClockTime\s*=\s*([0-9.eE+-]+)", text)
     return (
         int(correctors[-1]) if correctors else -1,
@@ -353,6 +376,7 @@ def run_level(
     level: int,
     reference: dict,
     reuse: bool,
+    coupled: bool,
 ) -> dict:
     run_dir = WORK_DIR / variant_name / f"mesh{level}"
     solver_log = run_dir / "log.solids4Foam"
@@ -374,6 +398,8 @@ def run_level(
         if relaxation is None:
             raise RuntimeError(f"no clampedMoment relaxation factor given for level {level}")
         set_clamped_relaxation(run_dir, reference["clamped_patches"], float(relaxation))
+        if coupled:
+            set_coupled(run_dir)
         command = ["./Allrun"]
         if variant["approach"]:
             command.append(variant["approach"])
@@ -595,7 +621,11 @@ def create_plot(variant_names: list[str], reference: dict) -> None:
 
 
 def main() -> int:
+    global WORK_DIR, POST_DIR
     args = parse_args()
+    if args.coupled:
+        WORK_DIR = WORK_DIR / "coupled"
+        POST_DIR = POST_DIR / "coupled"
     reference = json.loads(REFERENCE_FILE.read_text())
     all_variants = reference["variants"]
     if args.variants:
@@ -634,7 +664,9 @@ def main() -> int:
         for level in levels:
             try:
                 results.append(
-                    run_level(name, all_variants[name], level, reference, args.reuse)
+                    run_level(
+                        name, all_variants[name], level, reference, args.reuse, args.coupled
+                    )
                 )
             except RuntimeError as error:
                 print(f"ERROR: {error}", file=sys.stderr)

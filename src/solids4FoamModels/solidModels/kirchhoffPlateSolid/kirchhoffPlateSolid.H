@@ -23,6 +23,22 @@ Description
 
     Based on "rotation-free formulation" of Torlak (2006).
 
+    The moment sum and transverse displacement equations are solved either
+    in a segregated manner, with under-relaxation and outer corrector
+    iterations, or, with "coupled yes;" in the solver dictionary, as one
+    block-coupled sparse linear system: both Laplace equations are
+    assembled, together with their edge conditions, into one matrix that is
+    solved with PETSc (OpenFOAM.com builds with PETSc only, serial runs).
+
+    The unknowns are M and D*w in every area face (cell) followed by M and
+    D*w on every boundary edge, where D is the bending stiffness; scaling w
+    by D gives both blocks coefficients of the same magnitude. The edge
+    conditions are written as rows of the system, so that the clamped and
+    free edge conditions, which the segregated algorithm couples explicitly
+    with under-relaxation, become implicit. The discrete relations are the
+    same as those of the segregated algorithm, so both approaches converge
+    to the same solution.
+
 Author
     Philip Cardiff, UCD.
 
@@ -121,6 +137,10 @@ class kirchhoffPlateSolid
         //  areaPatch to the areaShadowPatch
         mutable label areaShadowPatchID_;
 
+        //- Solve the M and w equations as one block-coupled linear system
+        //  instead of the segregated corrector loop
+        const Switch coupled_;
+
 
     // Private Member Functions
 
@@ -138,6 +158,10 @@ class kirchhoffPlateSolid
             const areaScalarField& M,
             const areaScalarField& w
         );
+
+        //- Solve the M and w equations, with their edge conditions, as one
+        //  block-coupled linear system using PETSc
+        void solveCoupled();
 
         //- Return a reference to the areaPatch
         const fvPatch& areaPatch() const;

@@ -53,9 +53,9 @@ curvature at the free edges nor carries the full plate stiffness at the
 centre.
 
 The tutorial mesh of 50 x 50 cells predicts a free-edge midpoint deflection of
-$$0.001688$$ m, 6.2% above the reference, and a centre deflection of
-$$0.001474$$ m, 5.4% above; both overpredictions halve with every mesh
-refinement (see the verification study below).
+$$0.001605$$ m, 1.1% above the reference, and a centre deflection of
+$$0.001402$$ m, 0.3% above; both overpredictions fall by a factor of two to
+three with every mesh refinement (see the verification study below).
 
 ---
 
@@ -68,6 +68,12 @@ creates the mesh using `blockMesh` (`> blockMesh`), creates the finite area
 mesh using `makeFaMesh` (`> makeFaMesh`), and runs the case with the
 `solids4foam` solver (`> solids4Foam`). The case runs with OpenFOAM.com v2412
 or newer and takes a few seconds on the 50 x 50 mesh.
+
+Setting `coupled yes;` in `constant/solidProperties` solves the `M` and `w`
+equations with their edge conditions as one linear system with PETSc instead
+of the segregated corrector loop; see the `cantileverPlate` tutorial. It gives
+the same solution in two outer iterations and requires solids4foam to be
+compiled with PETSc.
 
 ---
 
@@ -85,22 +91,24 @@ cd verification
 ./Allverify
 ```
 
-The deflections converge at first order (relative error against the finite
-element reference):
+The deflections converge towards the finite element reference at an observed
+order between one and two (relative error against the reference):
 
 | Cells | Free-edge midpoint | Error | Centre | Error |
 |:---:|---:|---:|---:|---:|
-| 25 x 25 | 0.0017823 m | +12.2% | 0.0015430 m | +10.4% |
-| 50 x 50 | 0.0016876 m | +6.3% | 0.0014742 m | +5.5% |
-| 100 x 100 | 0.0016392 m | +3.2% | 0.0014375 m | +2.9% |
-| 200 x 200 | 0.0016140 m | +1.6% | 0.0014180 m | +1.5% |
+| 25 x 25 | 0.0016397 m | +3.2% | 0.0014197 m | +1.6% |
+| 50 x 50 | 0.0016051 m | +1.1% | 0.0014017 m | +0.3% |
+| 100 x 100 | 0.0015951 m | +0.43% | 0.0013985 m | +0.06% |
+| 200 x 200 | 0.0015912 m | +0.19% | 0.0013978 m | +0.01% |
 
-The net order of the free-edge midpoint deflection is 0.97, and Richardson
-extrapolation of the three finest meshes gives an order of 0.95 and a limit
-of $$0.0015869$$ m, 0.09% below the finite element reference, so the
-first-order scheme converges to the right answer. The whole sweep takes about
-20 minutes in serial on an Apple M1 Ultra, almost all of it on the finest
-mesh.
+The net order of the free-edge midpoint deflection is 1.36 (successive orders
+1.61, 1.30 and 1.18, falling towards the first order of the one-sided free
+edge estimates), and Richardson extrapolation of the three finest meshes
+gives an order of 1.39 and a limit of $$0.0015889$$ m, 0.04% above the finite
+element reference, so the scheme converges to the right answer. The whole
+sweep takes about an hour in serial on an Apple M1 Ultra with the segregated
+solver, almost all of it on the finest mesh, and a few seconds with
+`./Allverify --coupled`.
 
 The study is separate from `regressionTest.sh` and is not run by the normal
 tutorial tests. See the verification README for the mesh levels, options and

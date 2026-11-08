@@ -20,6 +20,14 @@ License
 #ifndef OPENFOAM_ORG
 
 #include "kirchhoffPlateSolid.H"
+
+// PETSc must be included before faCFD.H, which brings the Foam namespace
+// into scope
+#if defined(USE_PETSC) && defined(OPENFOAM_COM)
+#include <petscksp.h>
+#include <vector>
+#endif
+
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
@@ -27,6 +35,10 @@ License
 #include "faCFD.H"
 #include "linearElasticMechanicalConstitutiveLaw.H"
 #include "mechanicalConstitutiveLawManager.H"
+#include "sigFpe.H"
+#include "leastSquaresFaVectors.H"
+#include "fixedGradientFaPatchFields.H"
+#include "freeEdgeStencil.H"
 
 //#include "BlockLduSystem.H"
 
@@ -308,6 +320,685 @@ void kirchhoffPlateSolid::calcAreaPatches() const
 }
 
 
+void kirchhoffPlateSolid::solveCoupled()
+{
+#if defined(USE_PETSC) && defined(OPENFOAM_COM)
+
+    if (Pstream::parRun())
+    {
+        FatalErrorInFunction
+            << "The coupled Kirchhoff plate solver does not run in parallel"
+            << abort(FatalError);
+    }
+
+    const faMesh& mesh = aMesh_;
+    const label nCells = w_.size();
+    const labelUList& own = mesh.owner();
+    const labelUList& nei = mesh.neighbour();
+    const scalarField& S = mesh.S();
+    const faBoundaryMesh& bm = mesh.boundary();
+    const scalar D = bendingStiffness_.value();
+    const scalar nu = nu_.value();
+
+    // Unknown numbering: M and W = D*w of cell i at 2i and 2i + 1, followed
+    // by M and W of each boundary edge
+    labelList bStart(bm.size(), -1);
+    label nBoundaryEdges = 0;
+    forAll(bm, patchI)
+    {
+        if (w_.boundaryField()[patchI].size())
+        {
+            bStart[patchI] = 2*nCells + 2*nBoundaryEdges;
+            nBoundaryEdges += bm[patchI].size();
+        }
+    }
+    const label nUnknowns = 2*nCells + 2*nBoundaryEdges;
+
+    auto mCell = [](const label i) { return 2*i; };
+    auto wCell = [](const label i) { return 2*i + 1; };
+    auto mEdge = [&bStart](const label patchI, const label e)
+    {
+        return bStart[patchI] + 2*e;
+    };
+    auto wEdge = [&bStart](const label patchI, const label e)
+    {
+        return bStart[patchI] + 2*e + 1;
+    };
+
+    // Sparse matrix in triplet form
+    DynamicList<label> rows(20*nUnknowns);
+    DynamicList<label> cols(20*nUnknowns);
+    DynamicList<scalar> vals(20*nUnknowns);
+    auto add = [&](const label r, const label c, const scalar v)
+    {
+        rows.append(r);
+        cols.append(c);
+        vals.append(v);
+    };
+
+    // Right-hand side of the boundary rows, which does not change between
+    // outer iterations
+    scalarField rhsBoundary(nUnknowns, 0.0);
+
+    // Least-squares gradient stencil of w in each cell, as the segregated
+    // algorithm uses the leastSquares gradient for theta = -grad(w)
+    const leastSquaresFaVectors& lsv = leastSquaresFaVectors::New(mesh);
+    const edgeVectorField& pV = lsv.pVectors();
+    const edgeVectorField& nV = lsv.nVectors();
+
+    List<DynamicList<label>> gradIdx(nCells);
+    List<DynamicList<vector>> gradVec(nCells);
+
+    forAll(own, e)
+    {
+        const label o = own[e];
+        const label n = nei[e];
+
+        gradIdx[o].append(wCell(n));
+        gradVec[o].append(pV[e]);
+        gradIdx[o].append(wCell(o));
+        gradVec[o].append(-pV[e]);
+
+        gradIdx[n].append(wCell(n));
+        gradVec[n].append(-nV[e]);
+        gradIdx[n].append(wCell(o));
+        gradVec[n].append(nV[e]);
+    }
+
+    forAll(bm, patchI)
+    {
+        if (bStart[patchI] < 0)
+        {
+            continue;
+        }
+
+        const labelUList& ef = bm[patchI].edgeFaces();
+        const vectorField& pVb = pV.boundaryField()[patchI];
+
+        forAll(ef, e)
+        {
+            gradIdx[ef[e]].append(wEdge(patchI, e));
+            gradVec[ef[e]].append(pVb[e]);
+            gradIdx[ef[e]].append(wCell(ef[e]));
+            gradVec[ef[e]].append(-pVb[e]);
+        }
+    }
+
+    // Add coeff*(n & grad(w))_cellI to the given row
+    auto addNormalGrad = [&]
+    (
+        const label row, const label cellI, const vector& n, const scalar coeff
+    )
+    {
+        forAll(gradIdx[cellI], k)
+        {
+            add(row, gradIdx[cellI][k], coeff*(n & gradVec[cellI][k]));
+        }
+    };
+
+    // Interior Laplacian coefficients, taken from the finite-area
+    // discretisation so that the schemes of faSchemes are used
+    const faScalarMatrix lapM(fam::laplacian(M_));
+    const faScalarMatrix lapW(fam::laplacian(bendingStiffness_, w_));
+    const scalarField& upperM = lapM.upper();
+    const scalarField& upperW = lapW.upper();
+
+    // M equation: -laplacian(M) + rho*h*d2dt2(w) = p
+    // w equation: laplacian(D, w) + M = 0, written for W = D*w
+    forAll(own, e)
+    {
+        const label o = own[e];
+        const label n = nei[e];
+
+        add(mCell(o), mCell(o), upperM[e]);
+        add(mCell(o), mCell(n), -upperM[e]);
+        add(mCell(n), mCell(n), upperM[e]);
+        add(mCell(n), mCell(o), -upperM[e]);
+
+        add(wCell(o), wCell(o), -upperW[e]/D);
+        add(wCell(o), wCell(n), upperW[e]/D);
+        add(wCell(n), wCell(n), -upperW[e]/D);
+        add(wCell(n), wCell(o), upperW[e]/D);
+    }
+
+    // Inertia with the Euler scheme, consistent with the segregated
+    // algorithm: rho*h*(w - 2*w0 + w00)/deltaT^2
+    const scalar inertiaCoeff =
+        rho_.value()*h_.value()/sqr(runTime().deltaTValue());
+
+    forAll(S, i)
+    {
+        add(wCell(i), mCell(i), S[i]);
+
+        if (rho_.value() > SMALL)
+        {
+            add(mCell(i), wCell(i), S[i]*inertiaCoeff/D);
+        }
+    }
+
+    // Boundary edge fluxes and boundary rows
+    forAll(bm, patchI)
+    {
+        if (bStart[patchI] < 0)
+        {
+            continue;
+        }
+
+        const faPatch& fap = bm[patchI];
+        const labelUList& ef = fap.edgeFaces();
+        const scalarField& dc = fap.deltaCoeffs();
+        const scalarField& Lb = mesh.magLe().boundaryField()[patchI];
+        const vectorField n(fap.edgeNormals());
+        const vectorField& Ce = fap.edgeCentres();
+        const pointField& points = mesh.points();
+
+        const faPatchField<scalar>& Mp = M_.boundaryField()[patchI];
+        const faPatchField<scalar>& wp = w_.boundaryField()[patchI];
+
+        // Fluxes through the boundary edges in the cell rows
+        forAll(ef, e)
+        {
+            const label c = ef[e];
+
+            add(mCell(c), mCell(c), Lb[e]*dc[e]);
+            add(mCell(c), mEdge(patchI, e), -Lb[e]*dc[e]);
+
+            add(wCell(c), wCell(c), -Lb[e]*dc[e]);
+            add(wCell(c), wEdge(patchI, e), Lb[e]*dc[e]);
+        }
+
+        // Edge connectivity for the free edge conditions
+        const labelListList nbrs(freeEdgeStencil::edgeNeighbours(fap));
+        const labelListList ends(freeEdgeStencil::edgeEndPoints(fap));
+        const vectorField t(freeEdgeStencil::edgeTangents(fap, nbrs));
+
+        // Add coeff*g_j to the row, where g_j = (W_b - W_P)*deltaCoeffs is
+        // D times the normal slope on edge j
+        auto addSlope = [&](const label row, const label j, const scalar coeff)
+        {
+            add(row, wEdge(patchI, j), coeff*dc[j]);
+            add(row, wCell(ef[j]), -coeff*dc[j]);
+        };
+
+        // Add coeff*q_j to the row, where q_j = D*kappa*dw/ds on edge j from
+        // the rotation of the neighbouring edge normals and the neighbouring
+        // edge values of W
+        auto addCurvatureSlope = [&]
+        (
+            const label row, const label j, const scalar coeff
+        )
+        {
+            const labelList& nbr = nbrs[j];
+
+            if (nbr.size() == 0)
+            {
+                return;
+            }
+
+            label m = j;
+            label p = j;
+
+            forAll(nbr, i)
+            {
+                if (((Ce[nbr[i]] - Ce[j]) & t[j]) > 0)
+                {
+                    p = nbr[i];
+                }
+                else
+                {
+                    m = nbr[i];
+                }
+            }
+
+            const scalar h = mag(Ce[p] - Ce[m]);
+            const scalar f = coeff*(t[j] & (n[p] - n[m]))/sqr(h);
+
+            add(row, wEdge(patchI, p), f);
+            add(row, wEdge(patchI, m), -f);
+        };
+
+        // M rows
+        forAll(ef, e)
+        {
+            const label c = ef[e];
+            const label row = mEdge(patchI, e);
+
+            if (Mp.type() == "clampedMoment")
+            {
+                // M_b = -D*d2w/dn2 = -(0 - n & grad(W)_P)*dc, as the slope
+                // vanishes at the edge
+                add(row, row, 1.0);
+                addNormalGrad(row, c, n[e], -dc[e]);
+            }
+            else if (Mp.type() == "freeEdgeMoment")
+            {
+                // (M_b - M_P)*dc = (1 - nu)*(d2g/ds2 - dq/ds)
+                add(row, row, dc[e]);
+                add(row, mCell(c), -dc[e]);
+
+                const labelList& nbr = nbrs[e];
+
+                // Distances behind (m) and ahead (p) of the edge centre and
+                // the edges, or virtual corner node, that hold the values
+                scalar hm = 0.0;
+                scalar hp = 0.0;
+                label jm = -1;
+                label jp = -1;
+
+                if (nbr.size() == 2)
+                {
+                    jm = nbr[0];
+                    jp = nbr[1];
+
+                    if (((Ce[jp] - Ce[jm]) & t[e]) < 0)
+                    {
+                        Swap(jm, jp);
+                    }
+
+                    hm = mag(Ce[jm] - Ce[e]);
+                    hp = mag(Ce[jp] - Ce[e]);
+                }
+                else if (nbr.size() == 1 && ends[e].size() == 1)
+                {
+                    const label nbrI = nbr[0];
+                    const label pointI = ends[e][0];
+                    const scalar h0 = mag(points[pointI] - Ce[e]);
+
+                    // Virtual node at the corner: zero at a clamped or
+                    // supported corner (jc = -1), mirror of this edge at a
+                    // free corner (jc = e)
+                    scalar hc = h0;
+                    label jc = -1;
+
+                    if (!freeEdgeStencil::fixesValueAtPoint(w_, fap, pointI))
+                    {
+                        hc = 2.0*h0;
+                        jc = e;
+                    }
+
+                    if (((Ce[nbrI] - Ce[e]) & t[e]) > 0)
+                    {
+                        hm = hc;
+                        jm = jc;
+                        hp = mag(Ce[nbrI] - Ce[e]);
+                        jp = nbrI;
+                    }
+                    else
+                    {
+                        hm = mag(Ce[nbrI] - Ce[e]);
+                        jm = nbrI;
+                        hp = hc;
+                        jp = jc;
+                    }
+                }
+                else
+                {
+                    continue;
+                }
+
+                const scalar denom = hm*hp*(hm + hp);
+                const scalar K = 1.0 - nu;
+
+                // d2g/ds2 = 2*(hm*g_p - (hm + hp)*g_e + hp*g_m)/denom
+                addSlope(row, e, 2.0*K*(hm + hp)/denom);
+                if (jp != -1)
+                {
+                    addSlope(row, jp, -2.0*K*hm/denom);
+                }
+                if (jm != -1)
+                {
+                    addSlope(row, jm, -2.0*K*hp/denom);
+                }
+
+                // dq/ds = (hm^2*q_p - hp^2*q_m + (hp^2 - hm^2)*q_e)/denom
+                addCurvatureSlope(row, e, K*(sqr(hp) - sqr(hm))/denom);
+                if (jp != -1)
+                {
+                    addCurvatureSlope(row, jp, K*sqr(hm)/denom);
+                }
+                if (jm != -1)
+                {
+                    addCurvatureSlope(row, jm, -K*sqr(hp)/denom);
+                }
+            }
+            else if (Mp.fixesValue())
+            {
+                add(row, row, 1.0);
+                rhsBoundary[row] = Mp[e];
+            }
+            else if (isA<fixedGradientFaPatchField<scalar>>(Mp))
+            {
+                add(row, row, dc[e]);
+                add(row, mCell(c), -dc[e]);
+                rhsBoundary[row] =
+                    refCast<const fixedGradientFaPatchField<scalar>>(Mp)
+                   .gradient()[e];
+            }
+            else if (Mp.type() == "zeroGradient")
+            {
+                add(row, row, 1.0);
+                add(row, mCell(c), -1.0);
+            }
+            else
+            {
+                FatalErrorInFunction
+                    << "The coupled solver does not support the " << Mp.type()
+                    << " condition for M on patch " << fap.name()
+                    << abort(FatalError);
+            }
+        }
+
+        // w rows
+        forAll(ef, e)
+        {
+            const label c = ef[e];
+            const label row = wEdge(patchI, e);
+
+            if (wp.type() == "freeEdgeDisplacement")
+            {
+                // (W_b - W_P)*dc = n & grad(W)_P + nu/(1 - nu)*M_P/dc
+                // where at a free-free corner the right-hand side is that of
+                // the neighbouring edge
+                add(row, row, dc[e]);
+                add(row, wCell(c), -dc[e]);
+
+                label j = e;
+
+                if
+                (
+                    nbrs[e].size() == 1
+                 && ends[e].size() == 1
+                 && !freeEdgeStencil::fixesValueAtPoint(w_, fap, ends[e][0])
+                )
+                {
+                    j = nbrs[e][0];
+                }
+
+                addNormalGrad(row, ef[j], n[j], -1.0);
+                add(row, mCell(ef[j]), -nu/((1.0 - nu)*dc[j]));
+            }
+            else if (wp.fixesValue())
+            {
+                add(row, row, 1.0);
+                rhsBoundary[row] = D*wp[e];
+            }
+            else if (isA<fixedGradientFaPatchField<scalar>>(wp))
+            {
+                add(row, row, dc[e]);
+                add(row, wCell(c), -dc[e]);
+                rhsBoundary[row] =
+                    D*refCast<const fixedGradientFaPatchField<scalar>>(wp)
+                   .gradient()[e];
+            }
+            else if (wp.type() == "zeroGradient")
+            {
+                add(row, row, 1.0);
+                add(row, wCell(c), -1.0);
+            }
+            else
+            {
+                FatalErrorInFunction
+                    << "The coupled solver does not support the " << wp.type()
+                    << " condition for w on patch " << fap.name()
+                    << abort(FatalError);
+            }
+        }
+    }
+
+    // PETSc matrix
+    PetscBool petscInitialised;
+    PetscInitialized(&petscInitialised);
+    if (!petscInitialised)
+    {
+        PetscInitialize(NULL, NULL, NULL, NULL);
+    }
+
+    // Optional options file in the case directory
+    {
+        fileName optionsFile
+        (
+            solidModelDict().lookupOrDefault<fileName>
+            (
+                "optionsFile", "petscOptions"
+            )
+        );
+        optionsFile.expand();
+
+        if (isFile(optionsFile))
+        {
+            Info<< "    Reading PETSc options from " << optionsFile << endl;
+            PetscOptionsInsertFile
+            (
+                PETSC_COMM_SELF, NULL, optionsFile.c_str(), PETSC_TRUE
+            );
+        }
+    }
+
+    std::vector<PetscInt> nnz(nUnknowns, 0);
+    forAll(rows, k)
+    {
+        ++nnz[rows[k]];
+    }
+
+    Mat A;
+    MatCreate(PETSC_COMM_SELF, &A);
+    MatSetSizes(A, nUnknowns, nUnknowns, nUnknowns, nUnknowns);
+    MatSetType(A, MATSEQAIJ);
+    MatSeqAIJSetPreallocation(A, 0, nnz.data());
+
+    forAll(rows, k)
+    {
+        MatSetValue(A, rows[k], cols[k], vals[k], ADD_VALUES);
+    }
+
+    MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY);
+    MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY);
+
+    Vec b;
+    Vec x;
+    VecCreateSeq(PETSC_COMM_SELF, nUnknowns, &b);
+    VecDuplicate(b, &x);
+
+    // Direct solver by default, with MUMPS when PETSc has it: the PETSc LU
+    // factorisation does not pivot and can be inaccurate for this system.
+    // The options file can select another solver or package
+    KSP ksp;
+    KSPCreate(PETSC_COMM_SELF, &ksp);
+    KSPSetOperators(ksp, A, A);
+    KSPSetType(ksp, KSPPREONLY);
+    {
+        PC pc;
+        KSPGetPC(ksp, &pc);
+        PCSetType(pc, PCLU);
+
+        PetscBool hasMumps;
+        PetscHasExternalPackage("mumps", &hasMumps);
+        if (hasMumps)
+        {
+            PCFactorSetMatSolverType(pc, MATSOLVERMUMPS);
+        }
+        else
+        {
+            WarningInFunction
+                << "PETSc was built without MUMPS: the PETSc LU "
+                << "factorisation does not pivot and may be inaccurate; "
+                << "check the reported true residual" << endl;
+        }
+    }
+    KSPSetFromOptions(ksp);
+
+    Vec r;
+    VecDuplicate(b, &r);
+
+    Info<< "    Coupled system: " << nUnknowns << " unknowns, "
+        << rows.size() << " coefficients" << endl;
+
+    // Outer iterations for the explicit non-orthogonal correction of the
+    // Laplacians; one iteration is exact on an orthogonal mesh
+    const areaScalarField& w0 = w_.oldTime();
+    const areaScalarField& w00 = w0.oldTime();
+
+    for (int iter = 0; iter < nCorr(); ++iter)
+    {
+        const faScalarMatrix lapMIter(fam::laplacian(M_));
+        const faScalarMatrix lapWIter(fam::laplacian(bendingStiffness_, w_));
+
+        scalarField rhs(rhsBoundary);
+        forAll(S, i)
+        {
+            rhs[mCell(i)] = S[i]*p_[i] - lapMIter.source()[i];
+            rhs[wCell(i)] = lapWIter.source()[i]/D;
+
+            if (rho_.value() > SMALL)
+            {
+                rhs[mCell(i)] += S[i]*inertiaCoeff*(2.0*w0[i] - w00[i]);
+            }
+        }
+
+        {
+            PetscScalar* bArray;
+            VecGetArray(b, &bArray);
+            forAll(rhs, k)
+            {
+                bArray[k] = rhs[k];
+            }
+            VecRestoreArray(b, &bArray);
+        }
+
+        // The factorisation packages can raise harmless floating point
+        // exceptions, so the OpenFOAM trap is suspended during the solve
+        {
+            sigFpe::ignore ignoreFpe;
+            KSPSolve(ksp, b, x);
+        }
+
+        KSPConvergedReason reason;
+        KSPGetConvergedReason(ksp, &reason);
+        PetscInt nIters;
+        KSPGetIterationNumber(ksp, &nIters);
+
+        if (reason < 0)
+        {
+            FatalErrorInFunction
+                << "PETSc KSP diverged, reason " << label(reason)
+                << abort(FatalError);
+        }
+
+        // True residual of the linear solve
+        PetscReal normR;
+        PetscReal normB;
+        MatMult(A, x, r);
+        VecAXPY(r, -1.0, b);
+        VecNorm(r, NORM_2, &normR);
+        VecNorm(b, NORM_2, &normB);
+        const scalar relResidual = normR/(normB + VSMALL);
+
+        if (relResidual > 1e-4)
+        {
+            FatalErrorInFunction
+                << "The linear solve is inaccurate: true relative residual "
+                << relResidual << ". Select another factorisation package or "
+                << "solver in the PETSc options file" << abort(FatalError);
+        }
+
+        // Retrieve the solution and measure the change
+        const PetscScalar* xArray;
+        VecGetArrayRead(x, &xArray);
+
+        scalar maxDeltaM = 0.0;
+        scalar maxDeltaW = 0.0;
+        scalar maxM = SMALL;
+        scalar maxW = SMALL;
+
+        forAll(S, i)
+        {
+            const scalar Mi = xArray[mCell(i)];
+            const scalar wi = xArray[wCell(i)]/D;
+            maxDeltaM = max(maxDeltaM, mag(Mi - M_[i]));
+            maxDeltaW = max(maxDeltaW, mag(wi - w_[i]));
+            maxM = max(maxM, mag(Mi));
+            maxW = max(maxW, mag(wi));
+            M_[i] = Mi;
+            w_[i] = wi;
+        }
+
+        forAll(bm, patchI)
+        {
+            if (bStart[patchI] < 0)
+            {
+                continue;
+            }
+
+            const faPatch& fap = bm[patchI];
+            const labelUList& ef = fap.edgeFaces();
+            const scalarField& dc = fap.deltaCoeffs();
+
+            scalarField Mb(fap.size());
+            scalarField wb(fap.size());
+            forAll(ef, e)
+            {
+                Mb[e] = xArray[mEdge(patchI, e)];
+                wb[e] = xArray[wEdge(patchI, e)]/D;
+            }
+
+            faPatchField<scalar>& Mp = M_.boundaryFieldRef()[patchI];
+            faPatchField<scalar>& wp = w_.boundaryFieldRef()[patchI];
+
+            Mp == Mb;
+            wp == wb;
+
+            // Store the slopes so that fixedGradient patches evaluate to
+            // the coupled solution
+            if (isA<fixedGradientFaPatchField<scalar>>(Mp))
+            {
+                refCast<fixedGradientFaPatchField<scalar>>(Mp).gradient() =
+                    (Mb - Mp.patchInternalField())*dc;
+            }
+            if (isA<fixedGradientFaPatchField<scalar>>(wp))
+            {
+                refCast<fixedGradientFaPatchField<scalar>>(wp).gradient() =
+                    (wb - wp.patchInternalField())*dc;
+            }
+        }
+
+        VecRestoreArrayRead(x, &xArray);
+
+        // Update the angle of rotation and its gradient
+        theta_ = -fac::grad(w_);
+        gradTheta_ = fac::grad(theta_);
+
+        const scalar relDeltaM = maxDeltaM/maxM;
+        const scalar relDeltaW = maxDeltaW/maxW;
+
+        Info<< "    Coupled iteration " << iter + 1
+            << ", KSP iterations: " << label(nIters)
+            << ", true residual: " << relResidual
+            << ", max relative change M: " << relDeltaM
+            << ", w: " << relDeltaW << endl;
+
+        if (relDeltaM < solutionTol() && relDeltaW < solutionTol())
+        {
+            break;
+        }
+    }
+
+    KSPDestroy(&ksp);
+    VecDestroy(&r);
+    VecDestroy(&x);
+    VecDestroy(&b);
+    MatDestroy(&A);
+
+#else
+
+    FatalErrorInFunction
+        << "The coupled Kirchhoff plate solver requires OpenFOAM.com and "
+        << "solids4foam compiled with PETSc (PETSC_DIR set)"
+        << abort(FatalError);
+
+#endif
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 kirchhoffPlateSolid::kirchhoffPlateSolid
@@ -442,7 +1133,8 @@ kirchhoffPlateSolid::kirchhoffPlateSolid
     h_(solidModelDict().lookup("plateThickness")),
     bendingStiffness_("zero", dimPressure*dimVolume, 0.0),
     areaPatchID_(-1),
-    areaShadowPatchID_(-1)
+    areaShadowPatchID_(-1),
+    coupled_(solidModelDict().lookupOrDefault<Switch>("coupled", false))
 {
     // A Kirchhoff plate has one thickness and one bending stiffness, so one
     // isotropic linear elastic material is what its formulation is written
@@ -492,114 +1184,123 @@ bool kirchhoffPlateSolid::evolve()
 
         Info<< "Solving the Kirchhoff plate equation for w and M" << endl;
 
-        // w and M equation loop
-        do
+        if (coupled_)
         {
-            // Algorithm
-            // Solve M equation
-            // Solve w equation
-            // where
-            // M is the moment sum
-            // w is the transvere (out of plane) displacement
-            // The M equation is:
-            //     rho*h*fac::d2dt2(w) = fam::laplacian(M) + p
-            // and the w equation is:
-            //     fam::laplacian(D, w) + M
-            // where
-            // rho is the density
-            // h is the plate thickness
-            // p is the net transverse pressure
-            // D is the bending stiffness
-            // THESE ARE BOTH SCALARS: IDEA: USE BLOCK COUPLED!
-
-            // Store fields for under-relaxation and residual calculation
-            M_.storePrevIter();
-
-            // Solve M equation
-            // d2dt2 not implemented so calculate it manually using ddt
-            // Also, "==" complains so we will move all terms to left
-            faScalarMatrix MEqn
-            (
-                rho_*h_
-               *(
-                   fac::ddt(w_) - fac::ddt(w_.oldTime())
-                )/runTime().deltaT()
-              - fam::laplacian(M_) - p_
-            );
-
-            // Relax the linear system
-            MEqn.relax();
-
-            // Solve the linear system
-            solverPerfM = MEqn.solve();
-
-            // Relax the field
-            M_.relax();
-
-            // Store fields for under-relaxation and residual calculation
-            w_.storePrevIter();
-
-            // Solve w equation
-            faScalarMatrix wEqn
-            (
-                fam::laplacian(bendingStiffness_, w_) + M_
-            );
-
-            // Relax the linear system
-            wEqn.relax();
-
-            // Solve the linear system
-            solverPerfw = wEqn.solve();
-
-            // Relax the field
-            w_.relax();
-
-            // Update the angle of rotation
-            theta_ = -fac::grad(w_);
-
-            // Update the gradient of rotation field, used for non-orthogonal
-            // correction in clamped boundary conditions
-            gradTheta_ = fac::grad(theta_);
-
-            // Work in progress
-            // Use block-coupled framework to implicitly couple the equations
-            //if (coupled_)
-            // {
-            //     // Prepare block system
-            //     BlockLduSystem<vector2, vector2> blockM(aMesh_);
-
-            //     // Grab block diagonal and set it to zero
-            //     Field<tensor2>& d = blockM.diag().asSquare();
-            //     d = tensor2::zero;
-
-            //     // Grab linear off-diagonal and set it to zero
-            //     Field<vector2>& l = blockM.lower().asLinear();
-            //     Field<vector2>& u = blockM.upper().asLinear();
-            //     u = vector2::zero;
-            //     l = vector2::zero;
-
-            //     // Insert MEqn and wEqn (without coupling terms)
-            //     to-do
-
-            //     // Insert coupling terms implicitly
-            //     to-do
-
-            //     // Solve the linear system
-            //     to-do
-
-            //     // Retrieve solution
-            //     to-do
-
-            //     // Correct the boundary conditions for M and w
-            //     M.correctBoundaryConditions();
-            //     w.correctBoundaryConditions();
-            // }
+            // Solve the M and w equations as one linear system
+            solveCoupled();
         }
-        while
-        (
-            !converged(iCorr, solverPerfM, solverPerfw, M_, w_)
-         && ++iCorr < nCorr()
-        );
+        else
+        {
+            // Segregated w and M equation loop
+            do
+            {
+                // Algorithm
+                // Solve M equation
+                // Solve w equation
+                // where
+                // M is the moment sum
+                // w is the transvere (out of plane) displacement
+                // The M equation is:
+                //     rho*h*fac::d2dt2(w) = fam::laplacian(M) + p
+                // and the w equation is:
+                //     fam::laplacian(D, w) + M
+                // where
+                // rho is the density
+                // h is the plate thickness
+                // p is the net transverse pressure
+                // D is the bending stiffness
+                // THESE ARE BOTH SCALARS: IDEA: USE BLOCK COUPLED!
+
+                // Store fields for under-relaxation and residual calculation
+                M_.storePrevIter();
+
+                // Solve M equation
+                // d2dt2 not implemented so calculate it manually using ddt
+                // Also, "==" complains so we will move all terms to left
+                faScalarMatrix MEqn
+                (
+                    rho_*h_
+                   *(
+                       fac::ddt(w_) - fac::ddt(w_.oldTime())
+                    )/runTime().deltaT()
+                  - fam::laplacian(M_) - p_
+                );
+
+                // Relax the linear system
+                MEqn.relax();
+
+                // Solve the linear system
+                solverPerfM = MEqn.solve();
+
+                // Relax the field
+                M_.relax();
+
+                // Store fields for under-relaxation and residual calculation
+                w_.storePrevIter();
+
+                // Solve w equation
+                faScalarMatrix wEqn
+                (
+                    fam::laplacian(bendingStiffness_, w_) + M_
+                );
+
+                // Relax the linear system
+                wEqn.relax();
+
+                // Solve the linear system
+                solverPerfw = wEqn.solve();
+
+                // Relax the field
+                w_.relax();
+
+                // Update the angle of rotation
+                theta_ = -fac::grad(w_);
+
+                // Update the gradient of rotation field, used for the
+                // non-orthogonal correction in clamped boundary conditions
+                gradTheta_ = fac::grad(theta_);
+
+                // Work in progress
+                // Use block-coupled framework to implicitly couple the
+                // equations
+                //if (coupled_)
+                // {
+                //     // Prepare block system
+                //     BlockLduSystem<vector2, vector2> blockM(aMesh_);
+
+                //     // Grab block diagonal and set it to zero
+                //     Field<tensor2>& d = blockM.diag().asSquare();
+                //     d = tensor2::zero;
+
+                //     // Grab linear off-diagonal and set it to zero
+                //     Field<vector2>& l = blockM.lower().asLinear();
+                //     Field<vector2>& u = blockM.upper().asLinear();
+                //     u = vector2::zero;
+                //     l = vector2::zero;
+
+                //     // Insert MEqn and wEqn (without coupling terms)
+                //     to-do
+
+                //     // Insert coupling terms implicitly
+                //     to-do
+
+                //     // Solve the linear system
+                //     to-do
+
+                //     // Retrieve solution
+                //     to-do
+
+                //     // Correct the boundary conditions for M and w
+                //     M.correctBoundaryConditions();
+                //     w.correctBoundaryConditions();
+                // }
+            }
+            while
+            (
+                !converged(iCorr, solverPerfM, solverPerfw, M_, w_)
+             && ++iCorr < nCorr()
+            );
+        }
 
         // Map area fields to vol fields
         mapAreaFieldToSingleLayerVolumeField(M_, MVf_);

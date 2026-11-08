@@ -18,15 +18,15 @@ fi
 # ============================================================
 
 # The 50 x 50 mesh overpredicts the converged free-edge deflection of
-# 0.001588 m by about 6%; the band allows a 1% drift either side of the
+# 0.001588 m by about 1%; the band allows a 1% drift either side of the
 # recorded value
-WF_MIN=1.67e-3
-WF_MAX=1.71e-3
+WF_MIN=1.59e-3
+WF_MAX=1.62e-3
 
 # The value recorded on OpenFOAM.com v2606, written to eight figures. The
 # segregated solver converges to a relative tolerance of 1e-8, so a round-off
 # difference on another machine moves the last figures only
-REF_MAX_W=0.00168758
+REF_MAX_W=0.0016050875
 REF_REL_TOL=1e-4
 
 PATCH="top"
@@ -45,7 +45,7 @@ prepare_case() {
 
     for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
-        if [[ "${base_item}" == "regressionTests" ]]; then
+        if [[ "${base_item}" == "regressionTests" || "${base_item}" == "verification" ]]; then
             continue
         fi
         cp -a "${item}" "${d}/"
@@ -77,8 +77,8 @@ if solids4Foam::regressionCaseSkipped "${CASE_DIR}/${ALLRUN_LOGFILE}"; then
     exit 0
 fi
 
-field_file=$(find "${CASE_DIR}" -path '*/1/finite-area/w' -print | tail -n 1)
-if [[ -z "${field_file}" ]]; then
+field_file="${CASE_DIR}/1/finite-area/w"
+if [[ ! -f "${field_file}" ]]; then
     echo "FAIL: Could not find the finite area field w"
     exit 1
 fi

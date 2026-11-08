@@ -32,6 +32,7 @@ Useful options:
 ./Allverify --variants clampedInnerCosineLoad  # one configuration
 ./Allverify --levels 1,2,3                     # skip the finest level
 ./Allverify --reuse                            # resume without re-running
+./Allverify --coupled                          # block-coupled solver
 ```
 
 Each level of each configuration is a complete copy of the tutorial under the
@@ -56,8 +57,9 @@ alone. The tutorial ships level 2. The loop gain of the explicitly coupled
 | 3 | 32 x 304 | 0.005 |
 | 4 | 64 x 608 | 0.002 |
 
-The whole default sweep takes about 25 minutes in serial on an Apple M1 Ultra:
-the three level-4 cases take 8 to 9 minutes each and the rest under a minute.
+The whole default sweep takes about 35 minutes in serial on an Apple M1 Ultra:
+the three level-4 cases take 8 to 13 minutes each and the rest about a minute.
+With `--coupled` the whole sweep takes under a minute.
 
 ## Metrics
 
@@ -85,9 +87,9 @@ For every configuration:
 
 - The relative error of the free-edge deflection must decrease monotonically
   with refinement.
-- Its net order must be at least 0.7 (the scheme is first order because the
-  clamped and free edge conditions are imposed from one-sided estimates, and
-  the coarsest annulus mesh is still in the pre-asymptotic range).
+- Its net order must be at least 0.7 (the free edge conditions are imposed
+  from one-sided estimates, so the observed order falls towards one on fine
+  meshes, and the coarsest annulus mesh is still in the pre-asymptotic range).
 - The finest mesh must be within 5%.
 
 A `--quick` run only exercises the two coarsest meshes, which are not expected
@@ -111,10 +113,10 @@ Exact free-edge deflection 7.50303e-06 m.
 
 | Level | Cells | Corr. | w_f (m) | Error | L2 w | L2 M |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1 | 608 | 3153 | 8.53410e-06 | +13.74% | 16.44% | 0.58% |
-| 2 | 2432 | 3892 | 8.10394e-06 | +8.01% | 9.39% | 0.66% |
-| 3 | 9728 | 6578 | 7.82577e-06 | +4.30% | 5.01% | 0.44% |
-| 4 | 38912 | 12432 | 7.67009e-06 | +2.23% | 2.59% | 0.24% |
+| 1 | 608 | 3479 | 7.72935e-06 | +3.02% | 4.01% | 0.99% |
+| 2 | 2432 | 3750 | 7.55445e-06 | +0.69% | 0.94% | 0.31% |
+| 3 | 9728 | 6248 | 7.51348e-06 | +0.14% | 0.21% | 0.11% |
+| 4 | 38912 | 11997 | 7.50444e-06 | +0.02% | 0.04% | 0.05% |
 
 ### clampedInnerCosineLoad
 
@@ -123,10 +125,10 @@ error of the free-edge normal gradient of $$M$$.
 
 | Level | Cells | Corr. | w_f (m) | Error | L2 w | L2 M | dM/dn |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 608 | 3137 | 8.25431e-06 | +14.42% | 16.88% | 0.60% | +7.18% |
-| 2 | 2432 | 3700 | 7.82408e-06 | +8.45% | 9.73% | 0.46% | +4.37% |
-| 3 | 9728 | 6771 | 7.54286e-06 | +4.56% | 5.21% | 0.31% | +2.39% |
-| 4 | 38912 | 12822 | 7.38465e-06 | +2.36% | 2.70% | 0.18% | +1.25% |
+| 1 | 608 | 3214 | 7.50745e-06 | +4.06% | 4.94% | 0.65% | +1.64% |
+| 2 | 2432 | 3542 | 7.29945e-06 | +1.18% | 1.37% | 0.15% | +0.47% |
+| 3 | 9728 | 6336 | 7.24171e-06 | +0.38% | 0.42% | 0.12% | +0.15% |
+| 4 | 38912 | 12348 | 7.22422e-06 | +0.14% | 0.14% | 0.07% | +0.06% |
 
 ### clampedOuter
 
@@ -134,21 +136,22 @@ Exact free-edge deflection 4.60288e-06 m.
 
 | Level | Cells | Corr. | w_f (m) | Error | L2 w | L2 M |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1 | 608 | 1923 | 5.31784e-06 | +15.53% | 16.85% | 5.23% |
-| 2 | 2432 | 2514 | 4.99829e-06 | +8.59% | 9.50% | 2.75% |
-| 3 | 9728 | 4703 | 4.80987e-06 | +4.50% | 5.02% | 1.41% |
-| 4 | 38912 | 8854 | 4.70866e-06 | +2.30% | 2.57% | 0.72% |
+| 1 | 608 | 2513 | 4.71002e-06 | +2.33% | 1.83% | 0.61% |
+| 2 | 2432 | 2638 | 4.65105e-06 | +1.05% | 0.85% | 0.60% |
+| 3 | 9728 | 4454 | 4.62557e-06 | +0.49% | 0.41% | 0.38% |
+| 4 | 38912 | 8554 | 4.61386e-06 | +0.24% | 0.20% | 0.21% |
 
-The free-edge deflection error halves with every refinement in all three
-configurations: the successive orders are 0.78, 0.90, 0.95 (`clampedInner`),
-0.77, 0.89, 0.95 (`clampedInnerCosineLoad`) and 0.85, 0.93, 0.97
-(`clampedOuter`), approaching first order, with net orders of 0.88, 0.87 and
-0.92. The $$L_2$$ error of $$w$$ converges at the same rate (net orders 0.89,
-0.88, 0.90). The $$L_2$$ error of $$M$$ is below 1% on every mesh for the
-inner-clamped configurations, since $$M$$ is nearly uniform there, and
-converges at first order (net 0.96) for `clampedOuter`. For the cosine load the
+The free-edge deflection error falls with every refinement in all three
+configurations: the successive orders are 2.14, 2.30, 2.89 (`clampedInner`),
+1.78, 1.63, 1.46 (`clampedInnerCosineLoad`) and 1.15, 1.09, 1.05
+(`clampedOuter`), with net orders of 2.44, 1.63 and 1.10. The axisymmetric
+inner-clamped case converges at second order; the cosine load and the
+outer-clamped case, where the free-edge treatment contributes more of the
+error, fall towards the first order of its one-sided estimates. The $$L_2$$
+error of $$w$$ converges at the same rates (net orders 2.23, 1.71, 1.07). The
+$$L_2$$ error of $$M$$ is below 1% on every mesh. For the cosine load the
 free-edge normal gradient of $$M$$, which the curvature term of
-`freeEdgeMoment` sets, converges with a net order of 0.84. The number of
+`freeEdgeMoment` sets, converges with a net order of 1.63. The number of
 correctors grows with refinement because the `clampedMoment` relaxation factor
 has to be reduced.
 

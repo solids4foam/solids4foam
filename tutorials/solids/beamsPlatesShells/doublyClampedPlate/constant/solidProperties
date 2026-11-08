@@ -29,6 +29,11 @@ kirchhoffPlateCoeffs
     // correctors
     nCorrectors       100000;
 
+    // Solve the M and w equations with their edge conditions as one
+    // block-coupled linear system with PETSc instead of the segregated
+    // corrector loop (requires solids4foam compiled with PETSc)
+    coupled           no;
+
     // Solution tolerance for displacement
     solutionTolerance 1e-8;
 
