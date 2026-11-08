@@ -39,8 +39,9 @@ relaxationFactors
 
     fields
     {
-        // The explicitly coupled free and clamped edge conditions need
-        // field under-relaxation to converge
+        // The explicitly coupled free and clamped edge conditions of the
+        // segregated solver need field under-relaxation to converge; the
+        // coupled solver does not use these factors
         M        0.1;
         w        0.1;
     }

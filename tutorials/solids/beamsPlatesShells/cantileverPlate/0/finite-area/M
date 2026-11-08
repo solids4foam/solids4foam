@@ -26,6 +26,7 @@ boundaryField
     left
     {
         type            clampedMoment;
+        // Used only by segregated solver; coupled needs no under-relaxation
         relaxationFactor 0.01;
         value           uniform 0;
     }
@@ -33,6 +34,7 @@ boundaryField
     right
     {
         type            freeEdgeMoment;
+        // Used only by segregated solver; coupled needs no under-relaxation
         relaxationFactor 0.5;
         value           uniform 0;
     }
@@ -40,6 +42,7 @@ boundaryField
     top
     {
         type            freeEdgeMoment;
+        // Used only by segregated solver; coupled needs no under-relaxation
         relaxationFactor 0.5;
         value           uniform 0;
     }
@@ -47,6 +50,7 @@ boundaryField
     bottom
     {
         type            freeEdgeMoment;
+        // Used only by segregated solver; coupled needs no under-relaxation
         relaxationFactor 0.5;
         value           uniform 0;
     }

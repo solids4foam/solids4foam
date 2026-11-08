@@ -32,6 +32,7 @@ boundaryField
     right
     {
         type            freeEdgeDisplacement;
+        // Used only by segregated solver; coupled needs no under-relaxation
         relaxationFactor 0.5;
         value           uniform 0;
     }
@@ -39,6 +40,7 @@ boundaryField
     top
     {
         type            freeEdgeDisplacement;
+        // Used only by segregated solver; coupled needs no under-relaxation
         relaxationFactor 0.5;
         value           uniform 0;
     }
@@ -46,6 +48,7 @@ boundaryField
     bottom
     {
         type            freeEdgeDisplacement;
+        // Used only by segregated solver; coupled needs no under-relaxation
         relaxationFactor 0.5;
         value           uniform 0;
     }
