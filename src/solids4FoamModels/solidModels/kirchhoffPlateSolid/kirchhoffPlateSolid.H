@@ -41,6 +41,8 @@ Description
 
 Author
     Philip Cardiff, UCD.
+    Seevani Bali, UCD.
+    Ivan Batistic, FSB.
 
 SourceFiles
     kirchhoffPlateSolid.C
