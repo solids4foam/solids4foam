@@ -1,5 +1,5 @@
 # Inlet volumetric flow rate vs pressure-probe pressure
-# Usage: gnuplot plotInletVsPressure.gp
+# Usage: gnuplot plotInletVsPressure.gplt
 #
 # Flow:     constant/fluid/inletFlow/humanFlow (m^3/s, period 0.86 s, repeated)
 # Pressure: postProcessing/pressureProbe/fluid/*/p (kinematic, m^2/s^2),

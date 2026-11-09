@@ -97,7 +97,7 @@ prepare_case() {
     # Copy only the case inputs: results, logs and generated meshes from any
     # previous run of the tutorial are deliberately left behind
     for item in Allrun Allclean Allmesh 0 constant system prestress \
-        plotInletVsPressure.gp
+        plotInletVsPressure.gplt
     do
         cp -a "${SCRIPT_DIR}/${item}" "${CASE_DIR}/"
     done

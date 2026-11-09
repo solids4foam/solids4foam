@@ -22,11 +22,6 @@ internalField   uniform 1.2575;  // 10 mmHg (1333 Pa / 1060), the prestress pres
 
 boundaryField
 {
-    processor
-    {
-        type processor;
-    }
-
     // Outlets: three-element Windkessel (windkesselPressure). The totals
     //     Rp = 3.3e6 Pa s/m^3, Rd = 2e7 Pa s/m^3, C = 3.5e-8 m^3/Pa
     // are split across the outlets by flow fraction f_i = r_i^2 / sum r^2:

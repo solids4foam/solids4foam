@@ -111,7 +111,7 @@ solid-only prestress case in `prestress/`:
 pulmonaryArteries/
 ├── Allrun, Allclean, Allmesh     run, clean and mesh the tutorial
 ├── 0/, constant/, system/        the fluid-solid interaction case
-├── plotInletVsPressure.gp        inlet flow and probe pressure plot
+├── plotInletVsPressure.gplt      inlet flow and probe pressure plot
 ├── regressionTest.sh             shortened run checked against references
 └── prestress/
     ├── Allrun, Allclean          prestress passes
@@ -230,20 +230,78 @@ starts in equilibrium.
 
 ## Expected Results
 
-> **Note:** reference images of the velocity, pressure, wall shear stress and
-> wall displacement, and plots of the probe pressure, inner-wall displacement
-> and prestress convergence, will be added here once the full five-cycle run of
-> the case, which is currently running, has finished.
+The results below are from the full run of the tutorial: 15 prestress passes
+and five cardiac cycles on 16 cores. The field images are shown in the fifth
+cycle, at the write time nearest the peak inflow ($$t = 3.55\,\mathrm{s}$$,
+$$0.11\,\mathrm{s}$$ into the cycle), unless stated otherwise.
+
+### Prestress
+
+The displacement of the wall under the imaging pressure falls with each
+prestress pass (`prestress/prestressHistory`). The first pass, without
+prestress, moves the wall by up to $$7.4\,\mathrm{mm}$$; after 15 passes the
+largest displacement is $$0.36\,\mathrm{mm}$$ and the RMS displacement
+$$0.09\,\mathrm{mm}$$.
+
+![Prestress convergence](images/prestressConvergence.png)
+
+### Flow and pressure
+
+The blood accelerates from the main pulmonary artery into the left and right
+pulmonary arteries, reaching about $$0.39\,\mathrm{m\,s^{-1}}$$ at peak
+inflow.
+
+![Velocity streamlines at peak inflow](images/velocity.webp)
+
+The wall pressure falls from about $$12.7\,\mathrm{mmHg}$$ at the inlet to
+about $$10\,\mathrm{mmHg}$$ at the outlets at peak inflow.
+
+![Wall pressure at peak inflow](images/pressure.webp)
 
 The pressure at a probe in the main pulmonary artery
 ($$(0.04, -0.008, 0.065)\,\mathrm{m}$$) is written every time step to
 `postProcessing/pressureProbe/fluid`. When `gnuplot` is installed, `Allrun`
-plots it against the inlet flow rate with `plotInletVsPressure.gp`, giving
+plots it against the inlet flow rate with `plotInletVsPressure.gplt`, giving
 `inletFlow_vs_probePressure.png`: both against time, and the pressure-flow
-loop. The wall shear stress is written at each write time. The range of the
-inner-wall displacement components is written every time step to
-`postProcessing/0/solidDisplacementsinnerWall.dat`, and the number of FSI
-iterations per time step is recorded by `fsiConvergenceData`.
+loop. The first cycle starts from the uniform initial pressure of
+$$10\,\mathrm{mmHg}$$, and the loops settle over the following cycles as the
+Windkessel outlets approach their periodic state; the fourth and fifth cycles
+are close to each other.
+
+![Inlet flow rate and probe pressure](images/inletFlow_vs_probePressure.png)
+
+### Wall shear stress
+
+The wall shear stress is written at each write time ($$0.05\,\mathrm{s}$$).
+The time-averaged wall shear stress over the fifth cycle, averaged from these
+17 write times, is mostly below $$0.5\,\mathrm{Pa}$$, with higher values in
+the smallest outlet branches and near the bifurcation.
+
+![Time-averaged wall shear stress over the fifth cycle](images/wallShearStress.webp)
+
+### Wall displacement
+
+The `innerWall` displacement is largest in the larger of the two pulmonary
+branches (right of the image) and at the bifurcation, shown here at $$t = 3.70\,\mathrm{s}$$, near the largest lumen
+volume of the cycle; the fixed inlet and outlet rings do not move. The range
+of the `innerWall` displacement components is written every time step to
+`postProcessing/0/solidDisplacementsinnerWall.dat`. The largest component is
+$$3.4\,\mathrm{mm}$$ in the first cycle, and settles to about
+$$2.8\,\mathrm{mm}$$ in the fifth.
+
+![Wall displacement magnitude](images/wallDisplacement.webp)
+
+![Range of the innerWall displacement components](images/innerWallDisplacement.png)
+
+### Coupling iterations
+
+The number of FSI correctors per time step is recorded by
+`fsiConvergenceData` in `postProcessing/0/fsiConvergenceData.dat`. The
+first time steps need up to 11 correctors; after that the coupling converges
+in about two correctors per time step on average, well within the permitted
+30.
+
+![FSI correctors per time step](images/fsiIterations.png)
 
 ## Running the Case
 
@@ -271,9 +329,23 @@ The case requires PETSc and `cartesianMesh`; if either is unavailable,
 `Allrun` exits without running. The mesh-generation workflow is not supported
 on foam-extend.
 
-As a guide to run times, on 16 cores the first prestress pass took about one
-minute and each later pass about 15 s of solver time. Three heartbeats (2.58 s)
-of the FSI simulation time took 12 hours on the same 16 cores.
+### Run times
+
+As a guide, the full tutorial (`./Allrun parallel`) took about 10 h 20 min of
+wall-clock time on 16 cores of an AMD EPYC 9684X:
+
+| Stage | Time |
+| ----- | ---- |
+| `Allmesh` (`cartesianMesh`, `extrudeMesh`, `createPatch`, `transformPoints`, `checkMesh`) | under 1 min |
+| `prestress/Allrun` (15 passes) | 2.5 min: 40 s of solver time for the first pass, 4-8 s for each later pass |
+| `solids4Foam` fluid-solid interaction, five cycles (4.3 s, 17,200 time steps) | 10.3 h (37,000 s) |
+| `decomposePar` and `reconstructPar` of the fluid-solid interaction case | under 1 min |
+
+The fluid-solid interaction run takes about 2.2 s per time step, or about
+2 h per cardiac cycle, with about two FSI correctors per time step. It writes
+86 time directories of about 60 MB each, so the finished case takes about
+5 GB of disk space; increase `writeInterval` in `system/controlDict` to reduce
+this.
 
 ## Regression Test
 
@@ -283,7 +355,7 @@ The case includes a `regressionTest.sh` script:
 ./regressionTest.sh
 ```
 
-Because the full case takes about a day, the script copies the case inputs to
+Because the full case takes about ten hours, the script copies the case inputs to
 `pulmonaryArteries/regressionTests/main/` and runs a shortened version there;
 the tutorial directory itself is untouched. The copy keeps the tutorial meshes,
 since coarser meshes degrade on this geometry, but runs three prestress passes

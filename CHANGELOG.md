@@ -63,6 +63,17 @@ release. For complete commit-level details and contributor information, see the
   what does not yet work: thinning the leaflet does not converge to the beam
   model, refined fluid meshes stall in the coupling, and IQN-ILS and
   Robin-Neumann coupling do not complete the case.
+- Added the `pulmonaryArteries` prestressed fluid-solid interaction
+  tutorial: pulsatile, shear-thinning blood flow in a patient-specific main
+  pulmonary artery and its proximal branches, with one inlet, eleven
+  three-element Windkessel outlets and a finite-strain `isotropicFungElastic`
+  wall, coupled by the Robin pressure condition (`elasticWallPressure`). The
+  prestress of the imaged wall is computed first, in a solid-only case, by
+  repeated `solids4Foam` and `updatePrestress` passes (MULF), and applied
+  through `Fpre`. The fluid and wall meshes are generated with
+  `cartesianMesh` and `extrudeMesh`. The case needs PETSc and
+  `cartesianMesh`, and includes a shortened regression test,
+  `regressionTest.sh`, run by hand.
 - Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
   a fluid-solid coupling step is also converged if the maximum interface point
   residual (the displacement-increment mismatch by default) is below this

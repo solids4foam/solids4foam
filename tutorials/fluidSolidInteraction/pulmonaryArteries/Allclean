@@ -30,7 +30,7 @@ rm -f constant/*/*.withDefaultValues
 # The prestress written by prestress/Allrun
 rm -f 0/solid/Fpre
 
-# The plot written by Allrun (plotInletVsPressure.gp)
+# The plot written by Allrun (plotInletVsPressure.gplt)
 rm -f inletFlow_probeP.dat inletFlow_vs_probePressure.png
 
 # Logs, e.g. ./Allrun > log.Allrun or a batch job

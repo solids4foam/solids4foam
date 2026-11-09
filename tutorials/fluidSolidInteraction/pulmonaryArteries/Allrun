@@ -87,7 +87,7 @@ then
     if [ -d postProcessing/pressureProbe/fluid ]
     then
         echo "Generating inletFlow_vs_probePressure.png using gnuplot"
-        gnuplot plotInletVsPressure.gp &> log.gnuplot \
+        gnuplot plotInletVsPressure.gplt &> log.gnuplot \
             || echo "gnuplot failed: see log.gnuplot" >&2
     else
         echo "No pressure probe output found: skipping the plot" >&2
