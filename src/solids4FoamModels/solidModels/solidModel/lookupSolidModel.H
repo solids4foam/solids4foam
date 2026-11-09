@@ -28,6 +28,9 @@ Description
 
     This facilitates multiple solidModels to co-exist.
 
+    foundSolidModel returns true if lookupSolidModel would find a solidModel,
+    for code that also runs without one, e.g. in a fluid model.
+
 Author
     Philip Cardiff, UCD.
 
@@ -52,6 +55,8 @@ const solidModel& lookupSolidModel
     const objectRegistry& obReg,
     const word& obName
 );
+
+bool foundSolidModel(const objectRegistry& obReg);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
