@@ -230,6 +230,31 @@ run_high_order_grad_test() {
     return 1
 }
 
+run_patch_quadrature_values_test() {
+    local least_squares_type="$1"
+    local suffix="${least_squares_type}.serial"
+    local log_file="${CASE_DIR}/log.Test-patchQuadratureValues.${suffix}"
+
+    if ! command -v Test-patchQuadratureValues >/dev/null 2>&1; then
+        echo "SKIP: Test-patchQuadratureValues is not available"
+        return 0
+    fi
+
+    (
+        cd "${CASE_DIR}"
+        solids4Foam::runApplication \
+            -o -s "${suffix}" Test-patchQuadratureValues >/dev/null 2>&1
+    )
+
+    if grep -q "Overall result: PASSED" "${log_file}"; then
+        echo "PASS: Test-patchQuadratureValues (${least_squares_type}, serial)"
+        return 0
+    fi
+
+    echo "FAIL: Test-patchQuadratureValues (${least_squares_type}, serial)"
+    return 1
+}
+
 check_top_right_disp() {
     local approach="$1"
     local top_right_disp
@@ -273,6 +298,10 @@ if [ "$CHECK_ONLY" = false ]; then
             least_squares_type="${approach#highOrder-}"
 
             if ! run_high_order_grad_test "${least_squares_type}"; then
+                failures=$((failures + 1))
+            fi
+
+            if ! run_patch_quadrature_values_test "${least_squares_type}"; then
                 failures=$((failures + 1))
             fi
         fi

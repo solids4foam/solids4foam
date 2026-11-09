@@ -89,6 +89,9 @@ namespace hofvc
     //  The Cauchy stress and the displacement gradient at the quadrature points
     //  are given, and the integration results with the nominal traction, i.e.
     //  the force per unit undeformed area
+    //  Unlike the Cauchy version, this has no dims argument, because the
+    //  first Piola-Kirchhoff stress is used only by solids, so the traction is
+    //  always in dimPressure
     tmp<surfaceVectorField> surfaceIntegrate
     (
         const leastSquaresScheme& ls,

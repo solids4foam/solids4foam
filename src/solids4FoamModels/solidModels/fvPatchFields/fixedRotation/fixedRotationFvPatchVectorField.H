@@ -185,7 +185,9 @@ public:
             //- Return the values at the face quadrature points of the
             //  high-order least-squares scheme
             //  This returns evaluateQuadrature(), which derived patch fields
-            //  may override, so it uses the quadrature of the solid model
+            //  may override, so it uses the quadrature of the displacement
+            //  least-squares scheme of the solid model, and quad must have the
+            //  same face quadrature points
             virtual autoPtr<CompactListList<vector>> quadratureValues
             (
                 const fvMeshQuadrature&
