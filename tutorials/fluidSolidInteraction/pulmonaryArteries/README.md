@@ -235,7 +235,7 @@ and five cardiac cycles on 16 cores. The field images are shown in the fifth
 cycle, at the write time nearest the peak inflow ($$t = 3.55\,\mathrm{s}$$,
 $$0.11\,\mathrm{s}$$ into the cycle), unless stated otherwise.
 
-### Prestress
+### Prestress convergence
 
 The displacement of the wall under the imaging pressure falls with each
 prestress pass (`prestress/prestressHistory`). The first pass, without
@@ -282,9 +282,10 @@ the smallest outlet branches and near the bifurcation.
 ### Wall displacement
 
 The `innerWall` displacement is largest in the larger of the two pulmonary
-branches (right of the image) and at the bifurcation, shown here at $$t = 3.70\,\mathrm{s}$$, near the largest lumen
-volume of the cycle; the fixed inlet and outlet rings do not move. The range
-of the `innerWall` displacement components is written every time step to
+branches (right of the image) and at the bifurcation, shown here at
+$$t = 3.70\,\mathrm{s}$$, near the largest lumen volume of the cycle; the
+fixed inlet and outlet rings do not move. The range of the `innerWall`
+displacement components is written every time step to
 `postProcessing/0/solidDisplacementsinnerWall.dat`. The largest component is
 $$3.4\,\mathrm{mm}$$ in the first cycle, and settles to about
 $$2.8\,\mathrm{mm}$$ in the fifth.
@@ -334,12 +335,14 @@ on foam-extend.
 As a guide, the full tutorial (`./Allrun parallel`) took about 10 h 20 min of
 wall-clock time on 16 cores of an AMD EPYC 9684X:
 
-| Stage | Time |
-| ----- | ---- |
-| `Allmesh` (`cartesianMesh`, `extrudeMesh`, `createPatch`, `transformPoints`, `checkMesh`) | under 1 min |
-| `prestress/Allrun` (15 passes) | 2.5 min: 40 s of solver time for the first pass, 4-8 s for each later pass |
-| `solids4Foam` fluid-solid interaction, five cycles (4.3 s, 17,200 time steps) | 10.3 h (37,000 s) |
-| `decomposePar` and `reconstructPar` of the fluid-solid interaction case | under 1 min |
+- `Allmesh` (`cartesianMesh`, `extrudeMesh`, `createPatch`,
+  `transformPoints`, `checkMesh`): under 1 min.
+- `prestress/Allrun` (15 passes): 2.5 min, with 40 s of solver time for the
+  first pass and 4-8 s for each later pass.
+- `solids4Foam` fluid-solid interaction, five cycles (4.3 s, 17,200 time
+  steps): 10.3 h (37,000 s).
+- `decomposePar` and `reconstructPar` of the fluid-solid interaction case:
+  under 1 min.
 
 The fluid-solid interaction run takes about 2.2 s per time step, or about
 2 h per cardiac cycle, with about two FSI correctors per time step. It writes
