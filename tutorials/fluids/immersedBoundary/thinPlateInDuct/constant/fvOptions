@@ -1,0 +1,11 @@
+FoamFile { version 2.0; format ascii; class dictionary; location "constant"; object fvOptions; }
+
+// Closed plate thinner than a cell moving at 0.1 m/s along the duct: it must
+// transmit the volume flux w*A. thinBodyBlocking off (the default) leaks
+immersedBoundary
+{
+    type immersedBoundaryForce;
+    method cutLink;
+    thinBodyBlocking crossedFaces;
+    bodies { plate { surface "plate.stl"; motion { type uniformTranslation; velocity (0.1 0 0); } } }
+}
