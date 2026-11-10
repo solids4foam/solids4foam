@@ -1,0 +1,62 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fsiProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Dirichlet-Neumann coupling with Aitken under-relaxation. IQN-ILS and
+// Robin-Neumann coupling were tried and do not complete this case; see the
+// README
+fluidSolidInterface    Aitken;
+
+AitkenCoeffs
+{
+    // Interface patches: the upstream, top and downstream faces of the
+    // leaflet
+    solidPatch interface;
+    fluidPatch interface;
+
+    // Extrapolate the interface at the start of each time step
+    predictor            yes;
+
+    // Do not solve the solid with the old fluid load before the first fluid
+    // solve: the light leaflet would jump towards the new load, and passing
+    // that jump to the fluid unrelaxed gives a large added-mass pressure
+    predictSolid         no;
+
+    // Under-relaxation factor for the first iteration of each time step,
+    // after which Aitken's method adapts it. It is roughly the leaflet mass
+    // over the added mass of the fluid; it must be reduced if the leaflet is
+    // made lighter
+    relaxationFactor     0.05;
+
+    // Tolerance for the FSI loop within each time-step: the interface
+    // residual relative to the largest interface displacement
+    outerCorrTolerance   1e-4;
+
+    // Maximum number of outer FSI loop correctors within each time-step
+    nOuterCorr           200;
+
+    // Enable coupling from the start
+    coupled              yes;
+
+    // The fluid and solid interface faces match
+    interfaceTransferMethod directMap;
+
+    // Write fsi residuals to file
+    writeResidualsToFile yes;
+}
+
+// ************************************************************************* //

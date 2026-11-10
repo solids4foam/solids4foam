@@ -60,3 +60,7 @@ The kExact displacement errors compare cell averages; MLS errors compare
 point values at cell centres. Stress errors use cell-centre values in both.
 The study is not run by
 `tutorials/Alltest` or `tutorials/Alltest-regression`.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

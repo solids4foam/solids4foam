@@ -18,6 +18,10 @@ tutorial regression test (`../regressionTest.sh`) is separate.
 | `scripts/beam_in_cross_flow_verification.py`, `scripts/rigid_fluid_diagnostic.py` | Earlier drivers, kept for the graded-family definitions they export. |
 | `reference/campaign/` | Compact evidence (CSV/JSON) of the campaign. |
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 All definitive runs use one platform and one build: MeluXina, OpenFOAM v2412
 (foss-2024a, GCC 13.3), PETSc 3.22.0, and a frozen copy of the
 `s4f-verif-v2412` build of solids4foam `aee0c8e350267` (-O2), stored in

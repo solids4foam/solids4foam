@@ -1,0 +1,13 @@
+# Abaqus, CPE4H (plane-strain hybrid quadrilateral) elements, structured
+# meshes of the same family as the solids4foam sweep.
+# Columns: cells per side n, average cell spacing sqrt(1440 mm^2 / n^2) in
+# mm, and the vertical displacement of the top-right corner in m.
+# Migrated from solid-benchmarks/elastoPlasticity/cooksMembrane/plotScripts.
+cells_per_side,spacing_mm,displacement_m
+3,12.65,0.000689323
+6,6.325,0.00174998
+12,3.162,0.00342076
+24,1.581,0.00514638
+48,0.7906,0.00624494
+96,0.3953,0.00672531
+192,0.1976,0.00689862

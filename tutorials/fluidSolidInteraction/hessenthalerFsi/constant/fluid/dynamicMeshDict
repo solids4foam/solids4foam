@@ -1,0 +1,31 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+
+"solver|motionSolver" velocityLaplacian;
+
+// The flap swings through up to 30 mm; a diffusivity that decays with the
+// distance from the flap moves the cells next to it almost rigidly, which
+// keeps the thin cells at its sharp edges valid. A uniform diffusivity
+// inverted cells at the flap tip corners within the first millimetres of
+// motion (see README.md)
+diffusivity     quadratic inverseDistance (interface);
+
+// ************************************************************************* //

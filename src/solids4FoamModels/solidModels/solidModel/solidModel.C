@@ -25,6 +25,9 @@ License
 #include "twoDPointCorrector.H"
 #include "solidTractionFvPatchVectorField.H"
 #include "fixedDisplacementZeroShearFvPatchVectorField.H"
+#include "normalDisplacementZeroShearFvPatchVectorField.H"
+#include "solidSpringDashpotFvPatchVectorField.H"
+#include "basicSymmetryFvPatchFields.H"
 #ifdef OPENFOAM_NOT_EXTEND
     #include "primitivePatchInterpolation.H"
 #else
@@ -125,11 +128,10 @@ void Foam::solidModel::makeRAUf() const
     (
         new surfaceScalarField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "rAUf",
                 runTime().timeName(),
-                mesh(),
                 IOobject::NO_READ,
                 IOobject::NO_WRITE
             ),
@@ -409,11 +411,10 @@ void Foam::solidModel::makeU() const
     (
         new volVectorField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "U",
                 runTime().timeName(),
-                mesh(),
                 IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
             ),
@@ -436,11 +437,10 @@ void Foam::solidModel::makeP() const
     (
         new volScalarField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "p",
                 mesh().time().timeName(),
-                mesh(),
                 IOobject::READ_IF_PRESENT,
                 IOobject::AUTO_WRITE
             ),
@@ -474,6 +474,49 @@ namespace
         }
 
         return includePatchInStencils;
+    }
+
+    // Make the registry hold the old-time levels of a field that are in use.
+    // On a restart, OpenFOAM reads each level below the first twice: once
+    // when the level above it is read-constructed, and again when that
+    // level's readOldTimeIfPresent() replaces it. The replacement is created
+    // while the first copy is still registered, so it fails to register.
+    // OpenFOAM.com v2412 and later then delete the first copy, leaving the
+    // level in use unregistered and never written again, so a later restart
+    // from this run finds no D_0_0 and backward d2dt2 falls back to first
+    // order. Earlier OpenFOAM.com versions, OpenFOAM.org and foam-extend leak
+    // the first copy instead, which stays registered and is written with the
+    // values it was read with
+    template<class GeoField>
+    void registerOldTimeLevels(const GeoField& field)
+    {
+        const Foam::label nOldTimes = field.nOldTimes();
+
+        const GeoField* levelPtr = &field;
+
+        for (Foam::label levelI = 0; levelI < nOldTimes; ++levelI)
+        {
+            levelPtr = &levelPtr->oldTime();
+            GeoField& level = const_cast<GeoField&>(*levelPtr);
+
+            const Foam::objectRegistry& db = level.db();
+
+            if (db.foundObject<GeoField>(level.name()))
+            {
+                const GeoField& registered =
+                    db.lookupObject<GeoField>(level.name());
+
+                if (&registered == &level)
+                {
+                    continue;
+                }
+
+                // A stale copy holds the name: release it
+                const_cast<GeoField&>(registered).checkOut();
+            }
+
+            level.checkIn();
+        }
     }
 }
 
@@ -689,7 +732,7 @@ void Foam::solidModel::correctPointDisplacement
         }
     }
 
-    twoDCorrector_.correctPoints(pointDI);
+    twoDCorrectPoints(pointDI);
 }
 
 
@@ -750,6 +793,31 @@ const Foam::setCellDisplacements& Foam::solidModel::setCellDisps() const
 
 
 // * * * * * * * * * * Protected Member Function * * * * * * * * * * * * * * //
+
+Foam::IOobject Foam::solidModel::sharedMeshIOobject
+(
+    const word& name,
+    const fileName& instance,
+    const IOobject::readOption r,
+    const IOobject::writeOption w
+) const
+{
+    if (sharedMesh_)
+    {
+        return IOobject
+        (
+            name,
+            instance,
+            mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false  // Do not register
+        );
+    }
+
+    return IOobject(name, instance, mesh(), r, w);
+}
+
 
 const Foam::meshDual& Foam::solidModel::dualMesh() const
 {
@@ -837,12 +905,20 @@ void Foam::solidModel::setCellDisps(fvVectorMatrix& DEqn)
 
 void Foam::solidModel::relaxField(volVectorField& D, int iCorr)
 {
-    // Hack to avoid expensive copy of residuals
+    // Hack to avoid expensive copy of residuals. On a shared mesh, only the
+    // residuals of D are removed, as the others belong to the mesh's owner
 #ifdef OPENFOAM_COM
-    const_cast<dictionary&>
-    (
-        D.mesh().data().solverPerformanceDict()
-    ).clear();
+    dictionary& solverPerf =
+        const_cast<dictionary&>(D.mesh().data().solverPerformanceDict());
+
+    if (sharedMesh_)
+    {
+        solverPerf.remove(D.name());
+    }
+    else
+    {
+        solverPerf.clear();
+    }
 #endif
 
     if (relaxationMethod_ == "fixed")
@@ -1006,9 +1082,10 @@ Foam::solidModel::solidModel
             IOobject::NO_WRITE
         )
     ),
+    sharedMesh_(runTime.foundObject<dynamicFvMesh>(region)),
     meshOwnerPtr_
     (
-        runTime.foundObject<dynamicFvMesh>(region)
+        sharedMesh_
       ? Foam::autoPtr<Foam::dynamicFvMesh>()
       : dynamicFvMesh::New
         (
@@ -1090,11 +1167,10 @@ Foam::solidModel::solidModel
     ),
     useBoundaryFaceValuesp_
     (
-        IOobject
+        sharedMeshIOobject
         (
             "useBoundaryFaceValues_p",
             runTime.constant(),
-            mesh(),
             IOobject::NO_READ,
             IOobject::NO_WRITE
         ),
@@ -1202,13 +1278,16 @@ Foam::solidModel::solidModel
     rhoPtr_(),
     g_
     (
+        // On a shared mesh, the owner's g, e.g. that of a buoyant fluid, is
+        // neither required nor registered over
         IOobject
         (
             "g",
             runTime.constant(),
             mesh(),
-            IOobject::MUST_READ,
-            IOobject::NO_WRITE
+            sharedMesh_ ? IOobject::READ_IF_PRESENT : IOobject::MUST_READ,
+            IOobject::NO_WRITE,
+            !sharedMesh_
         )
     ),
     dampingCoeff_
@@ -1317,8 +1396,12 @@ Foam::solidModel::solidModel
     // On a restart, however, the fvMesh constructor marks the mesh as moving if
     // it finds a 'meshPhi' or 'V0' field in the start time directory, and then,
     // for example, backwardD2dt2Scheme stops with a "not implemented for a
-    // moving mesh" error (issue #184). So the flag is cleared here
-    mesh().moving(false);
+    // moving mesh" error (issue #184). So the flag is cleared here, unless the
+    // mesh belongs to another model, e.g. the moving fluid mesh
+    if (!sharedMesh_)
+    {
+        mesh().moving(false);
+    }
 
     checkRemovedMechanicalModelEntries();
 
@@ -1332,6 +1415,10 @@ Foam::solidModel::solidModel
                 D_.boundaryField()[patchI]
             )
          || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D_.boundaryField()[patchI]
+            )
+         || isA<solidSpringDashpotFvPatchVectorField>
             (
                 D_.boundaryField()[patchI]
             )
@@ -1353,6 +1440,10 @@ Foam::solidModel::solidModel
                 DD_.boundaryField()[patchI]
             )
          || isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                DD_.boundaryField()[patchI]
+            )
+         || isA<solidSpringDashpotFvPatchVectorField>
             (
                 DD_.boundaryField()[patchI]
             )
@@ -1384,6 +1475,12 @@ Foam::solidModel::solidModel
     gradD_.oldTime();
     gradDD_.oldTime();
     sigma_.oldTime();
+
+    // Re-register the old-time levels read on a restart, so that they are
+    // written again (see registerOldTimeLevels)
+    registerOldTimeLevels(D_);
+    registerOldTimeLevels(DD_);
+    registerOldTimeLevels(pointD_);
 
     // Whether a continued run has the old-time gradient a constitutive
     // history is measured against. Looked for rather than assumed from
@@ -1422,6 +1519,14 @@ Foam::solidModel::solidModel
         gradD_.writeOpt() = IOobject::AUTO_WRITE;
         gradD_.oldTime().writeOpt() = IOobject::AUTO_WRITE;
         gradDD_.writeOpt() = IOobject::AUTO_WRITE;
+
+        // The velocity is created on first use, which is otherwise after the
+        // first time increment, where there is no U to read: a restart would
+        // then predict its first step from zero velocity
+        if (runTime.startTimeIndex() > 0)
+        {
+            U();
+        }
     }
     else
     {
@@ -1525,6 +1630,8 @@ Foam::solidModel::solidModel
                    [solidModel::solutionAlgorithm::PETSC_SNES]
                 << abort(FatalError);
         }
+
+        leastSquaresScheme::checkMeshSupported(mesh());
     }
 
     // Print out the relaxation factor
@@ -1637,6 +1744,177 @@ Foam::solidModel::~solidModel()
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::solidModel::enforceTractionBoundaries
+(
+    surfaceVectorField& traction,
+    const volVectorField& D,
+    const surfaceVectorField& n
+) const
+{
+    // Enforce traction conditions
+    forAll(D.boundaryField(), patchI)
+    {
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidTractionFvPatchVectorField& tracPatch =
+                refCast<const solidTractionFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+            if (highOrderResidual())
+            {
+                // Face quadrature points weights
+                auto& faceQuadWeights = compactListListCRef
+                (
+                    displacementLeastSquares().quadrature().faceQuadWeights()
+                );
+
+                const surfaceScalarField& magSf = mesh().magSf();
+
+                // Get value at patch faces quadrature points
+                autoPtr<CompactListList<vector>> patchQuadraturePointsValue =
+                    tracPatch.evaluateQuadrature();
+
+                auto& quadratureValues = compactListListCRef
+                (
+                    patchQuadraturePointsValue()
+                );
+
+                forAll(mesh().boundaryMesh()[patchI], faceI)
+                {
+                    const label start = mesh().boundaryMesh()[patchI].start();
+
+                    // Get global face index
+                    const label faceID = faceI + start;
+
+                    // Get the number of quadrature points for this face
+                    const label nPoints = faceQuadWeights[faceID].size();
+
+                    // Loop over quadrature points and add their contribution
+                    boundaryFieldRef(traction)[patchI][faceI] = vector::zero;
+                    for (label pointI = 0; pointI < nPoints; ++pointI)
+                    {
+                        boundaryFieldRef(traction)[patchI][faceI] +=
+                            quadratureValues[faceI][pointI]
+                           *faceQuadWeights[faceID][pointI];
+                    }
+
+                    // Divide with area because we use physical weights
+                    boundaryFieldRef(traction)[patchI][faceI] /=
+                        magSf.boundaryField()[patchI][faceI];
+                }
+            }
+            else
+            {
+#ifdef OPENFOAM_NOT_EXTEND
+                traction.boundaryFieldRef()[patchI] =
+#else
+                traction.boundaryField()[patchI] =
+#endif
+                    tracPatch.boundaryTraction(nPatch);
+            }
+        }
+        else if
+        (
+            isA<solidSpringDashpotFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            const solidSpringDashpotFvPatchVectorField& springPatch =
+                refCast<const solidSpringDashpotFvPatchVectorField>
+                (
+                    D.boundaryField()[patchI]
+                );
+
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+#ifdef OPENFOAM_NOT_EXTEND
+            traction.boundaryFieldRef()[patchI] =
+#else
+            traction.boundaryField()[patchI] =
+#endif
+                springPatch.springDashpotTraction
+                (
+                    nPatch, scalarField(nPatch.size(), 1.0)
+                );
+        }
+        else if
+        (
+            isA<fixedDisplacementZeroShearFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<normalDisplacementZeroShearFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+         || isA<basicSymmetryFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            // basicSymmetry covers symmetry, symmetryPlane, solidSymmetry and
+            // slip patches
+
+            // Unit normals
+            const vectorField& nPatch = n.boundaryField()[patchI];
+
+            // Set shear traction to zero
+#ifdef OPENFOAM_NOT_EXTEND
+            traction.boundaryFieldRef()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+#else
+            traction.boundaryField()[patchI] =
+                sqr(nPatch) & traction.boundaryField()[patchI];
+#endif
+        }
+    }
+}
+
+
+void Foam::solidModel::enableTractionBoundaryExtrapolation
+(
+    volVectorField& D
+) const
+{
+    forAll(D.boundaryField(), patchI)
+    {
+        if
+        (
+            isA<solidTractionFvPatchVectorField>
+            (
+                D.boundaryField()[patchI]
+            )
+        )
+        {
+            solidTractionFvPatchVectorField& tracPatch =
+                refCast<solidTractionFvPatchVectorField>
+                (
+                    boundaryFieldRef(D)[patchI]
+                );
+
+            Info<< "    Setting `extrapolateValue` to `true` on the "
+                << mesh().boundary()[patchI].name() << " patch of the "
+                << D.name() << " field" << endl;
+
+            tracPatch.enableExtrapolation();
+        }
+    }
+}
+
 
 const Foam::volScalarField& Foam::solidModel::rho() const
 {
@@ -2427,11 +2705,10 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::initialRho() const
     (
         new volScalarField
         (
-            IOobject
+            sharedMeshIOobject
             (
                 "rho",
                 mesh().time().timeName(),
-                mesh(),
                 IOobject::READ_IF_PRESENT,
                 IOobject::NO_WRITE
             ),
@@ -3006,6 +3283,19 @@ void Foam::solidModel::writeFields(const Time& runTime)
 }
 
 
+void Foam::solidModel::twoDCorrectPoints(vectorField& points) const
+{
+    // Not on a processor holding no points of this region: in a 2-D case the
+    // corrector finds the plane normal from the local empty or wedge faces,
+    // and fails if there are none. It has nothing to correct there anyway,
+    // and it holds no collective operations, so the ranks need not agree
+    if (points.size())
+    {
+        twoDCorrector_.correctPoints(points);
+    }
+}
+
+
 void Foam::solidModel::moveMesh
 (
     const pointField& oldPoints,
@@ -3018,7 +3308,7 @@ void Foam::solidModel::moveMesh
 
     // Calculate the new points and apply 2-D corrections
     vectorField newPoints(oldPoints + pointDDI);
-    twoDCorrector_.correctPoints(newPoints);
+    twoDCorrectPoints(newPoints);
 
     // Move the mesh
     mesh().movePoints(newPoints);

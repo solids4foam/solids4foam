@@ -1,0 +1,30 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      fvOptions;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Manufactured body force per unit reference volume (OpenFOAM.com). On
+// OpenFOAM.org and foam-extend, Allrun selects the tutorial-local
+// neoHookeanManufacturedSolutionSolid model, which adds the same source. The parameters are
+// read from constant/neoHookeanManufacturedSolutionProperties.
+momentumSource
+{
+    type            neoHookeanManufacturedSolutionSource;
+    fields          (D);
+}
+
+// ************************************************************************* //

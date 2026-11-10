@@ -670,7 +670,9 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
               "Unsigned errors (profile): from the errors of the two finest "
               "runs. Signed errors: from the differences between the three "
               "runs, which cancel the error shared by the series, such as "
-              "the time error of the mesh study.", "",
+              "the time error of the mesh study. Time-step series of more "
+              "than three runs give one order per three successive steps.",
+              "",
               "| Series | Quantity | Errors | Order |", "|---|---|---|---:|"]
 
     def check(condition: bool, message: str) -> None:
@@ -723,14 +725,19 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
     if time:
         for key in SIGNED:
             values = [r[key] for r in time]
-            order = difference_order(values)
+            # One order per three successive step sizes; the check is on the
+            # finest three, where an O(dt) term would show first
+            triplet_orders = [difference_order(values[i:i + 3])
+                              for i in range(len(values) - 2)]
+            order = triplet_orders[-1]
             orders.append(f"| time step | {key} | "
                           f"{', '.join(fmt(e) for e in values)} | "
-                          f"{fmt(order, '.2f')} |")
+                          f"{', '.join(fmt(o, '.2f') for o in triplet_orders)} |")
             if key in tol["timeOrderQuantities"]:
                 check(math.isfinite(order) and order >= tol["minTimeOrder"],
                       f"time step: observed order {fmt(order, '.2f')} of the "
-                      f"{key} at least {tol['minTimeOrder']}")
+                      f"{key} (finest three steps) at least "
+                      f"{tol['minTimeOrder']}")
         # The time error of the mesh-study step size, estimated from the
         # difference with the next smaller step
         finest = time[-1]

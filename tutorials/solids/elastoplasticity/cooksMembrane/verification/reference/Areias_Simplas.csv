@@ -1,0 +1,13 @@
+# P. Areias, Simplas benchmarks,
+# http://www.simplassoftware.com/benchmarks.html; the delta and alpha
+# element formulations (legacy values in mm, converted to m).
+# Columns: cells per side n, average cell spacing sqrt(1440 mm^2 / n^2) in
+# mm, and the vertical displacement of the top-right corner in m.
+# Migrated from solid-benchmarks/elastoPlasticity/cooksMembrane/plotScripts.
+cells_per_side,spacing_mm,displacement_delta_m,displacement_alpha_m
+2,18.97,0.00510303,0.00314405
+4,9.487,0.00643539,0.00596802
+8,4.743,0.00662404,0.00649477
+16,2.372,0.00681241,0.00678257
+32,1.186,0.00702014,0.00692069
+64,0.5929,0.00709242,0.00698801

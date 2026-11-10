@@ -270,9 +270,6 @@ void AitkenCouplingInterface::updateDisplacement()
         }
     }
 
-    // Update movingWallPressure boundary conditions, if found
-    fluidSolidInterface::updateMovingWallPressureAcceleration();
-
     // Update elasticWallPressure boundary conditions, if found
     fluidSolidInterface::updateElasticWallPressureAcceleration();
 

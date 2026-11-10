@@ -1657,6 +1657,9 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
         << regionOfInterestBottomCorner_ << token::END_STATEMENT << nl;
     os.writeKeyword("writeZoneVTK")
         << writeZoneVTK_ << token::END_STATEMENT << nl;
+    os.writeKeyword("quickReject")
+        << newGgiInterpolation::quickRejectNames_[quickReject_]
+        << token::END_STATEMENT << nl;
 #endif
 
     os.writeKeyword("writePointDistanceFields")
@@ -1689,34 +1692,6 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
                 << frictionModels()[0].type()
                 << token::END_STATEMENT << nl;
             frictionModels()[0].writeDict(os);
-
-            os.writeKeyword("useNewPointDistanceMethod")
-                << dict_.lookupOrDefault<Switch>
-                (
-                    "useNewPointDistanceMethod", false
-                )
-                << token::END_STATEMENT << nl;
-
-            os.writeKeyword("projectPointsToPatchBoundary")
-                << dict_.lookupOrDefault<Switch>
-                (
-                    "projectPointsToPatchBoundary", false
-                )
-                << token::END_STATEMENT << nl;
-
-            os.writeKeyword("checkPointDistanceOrientations")
-                << dict_.lookupOrDefault<Switch>
-                (
-                    "checkPointDistanceOrientations", false
-                )
-                << token::END_STATEMENT << nl;
-
-            os.writeKeyword("usePrevCandidateMasterNeighbors")
-                << dict_.lookupOrDefault<Switch>
-                (
-                    "usePrevCandidateMasterNeighbors", false
-                )
-                << token::END_STATEMENT << nl;
         }
         else
         {
@@ -1739,6 +1714,42 @@ void Foam::solidContactFvPatchVectorField::write(Ostream& os) const
                 os  << '}' << endl;
             }
         }
+
+        // These are read from the top level of the patch dictionary whatever
+        // the number of shadow patches, so they are written there too
+        os.writeKeyword("useNewPointDistanceMethod")
+            << dict_.lookupOrDefault<Switch>
+            (
+                "useNewPointDistanceMethod", false
+            )
+            << token::END_STATEMENT << nl;
+
+        os.writeKeyword("projectPointsToPatchBoundary")
+            << dict_.lookupOrDefault<Switch>
+            (
+                "projectPointsToPatchBoundary", false
+            )
+            << token::END_STATEMENT << nl;
+
+        os.writeKeyword("checkPointDistanceOrientations")
+            << dict_.lookupOrDefault<Switch>
+            (
+                "checkPointDistanceOrientations", false
+            )
+            << token::END_STATEMENT << nl;
+
+        os.writeKeyword("usePrevCandidateMasterNeighbors")
+            << dict_.lookupOrDefault<Switch>
+            (
+                "usePrevCandidateMasterNeighbors", false
+            )
+            << token::END_STATEMENT << nl;
+
+#ifdef FOAMEXTEND
+        os.writeKeyword("integralNormalGap")
+            << dict_.lookupOrDefault<Switch>("integralNormalGap", true)
+            << token::END_STATEMENT << nl;
+#endif
     }
 
 #ifdef FOAMEXTEND

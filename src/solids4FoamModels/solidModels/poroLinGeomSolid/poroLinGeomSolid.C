@@ -278,6 +278,9 @@ bool poroLinGeomSolid::evolve()
 {
     Info << "Evolving poro solid solver" << endl;
 
+    // Refresh time-varying loads before assembling the explicit face traction
+    D().correctBoundaryConditions();
+
     int iCorr = 0;
 #ifdef OPENFOAM_NOT_EXTEND
     SolverPerformance<vector> solverPerfD;
@@ -329,6 +332,19 @@ bool poroLinGeomSolid::evolve()
 
         momentumStabilisation().updateVector(D(), &gradD());
 
+        const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+        // linearInterpolate is deliberate: it reproduces the Gauss linear
+        // div(sigma) scheme these models used, without requiring a new
+        // interpolate(sigma) entry in fvSchemes
+        surfaceVectorField traction(n & linearInterpolate(sigma()));
+
+        // Add stabilisation before enforcing the traction condition so that
+        // its boundary contribution is also replaced by the prescribed load
+        traction += impKf_*momentumStabilisation().faceVector();
+        // TODO: solidTraction patches with setEffectiveTraction set the total
+        // traction here, while their gradient enforces the effective traction
+        enforceTractionBoundaries(traction, D(), n);
+
         // Linear momentum equation total displacement form
         // Assemble the RHS in stages.
         tmp<fvVectorMatrix> tRhsEqn
@@ -336,9 +352,8 @@ bool poroLinGeomSolid::evolve()
             fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
         );
         tmpRef(tRhsEqn) -= fvc::laplacian(impKf_, D(), "laplacian(DD,D)");
-        tmpRef(tRhsEqn) += fvc::div(sigma(), "div(sigma)");
+        tmpRef(tRhsEqn) += fvc::div(mesh().magSf()*traction);
         tmpRef(tRhsEqn) += rho()*g();
-        tmpRef(tRhsEqn) += impK_*momentumStabilisation().cellVector(nullptr, true);
 
         fvVectorMatrix DEqn
         (

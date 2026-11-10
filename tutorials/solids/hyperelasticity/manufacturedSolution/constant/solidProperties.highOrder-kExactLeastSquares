@@ -1,0 +1,71 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    // Solve the momentum equation monolithically using a Jacobian-free
+    // Newton-Krylov method via PETSc SNES; the PETSc options are specified in
+    // system/fvSolution
+    solutionAlgorithm   PETScSNES;
+
+    // High-order residual: cubic kExactLeastSquares reconstruction of the
+    // displacement with face quadrature, and volume integration of the
+    // manufactured body force
+    highOrderCoeffs
+    {
+        highOrderJacobian false;
+        highOrderResidual true;
+
+        displacement
+        {
+            type kExactLeastSquares;
+
+            // Polynomial order of displacement field
+            polynomialOrder 3;
+
+            // Extra cells in minimum size stencil
+            faceStencilExtraCells 65;
+
+            // Weight function for least square systems
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+
+            calcConditionNumber false;
+        }
+    }
+
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+    }
+
+    // Predict D at the start of each time step
+    predictor           yes;
+}
+
+// ************************************************************************* //

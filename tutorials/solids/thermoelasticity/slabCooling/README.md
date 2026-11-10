@@ -1,5 +1,5 @@
 ---
-sort: 3
+sort: 4
 ---
 
 # The cooling of a solid slab: `slabCooling`

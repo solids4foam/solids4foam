@@ -179,6 +179,14 @@ gradientBoundaryCoeffs() const
 void fixedTemperatureFvPatchScalarField::write(Ostream& os) const
 {
     fixedValueFvPatchScalarField::write(os);
+
+    if (temperatureSeries_.size())
+    {
+        os.writeKeyword("temperatureSeries") << nl;
+        os << token::BEGIN_BLOCK << nl;
+        temperatureSeries_.write(os);
+        os << token::END_BLOCK << nl;
+    }
 }
 
 

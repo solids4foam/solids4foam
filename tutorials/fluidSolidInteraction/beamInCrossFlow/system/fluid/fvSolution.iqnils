@@ -37,7 +37,7 @@ solvers
         mergeLevels     1;
     }
 
-    cellMotionU
+    "cellMotionU|cellDisplacement"
     {
         solver          GAMG;
         tolerance       1e-06;
@@ -64,6 +64,15 @@ solvers
         relTol          0;
         minIter         1;
     }
+
+    // solids4foamSolidModel mesh motion
+    "D|DD"
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-09;
+        relTol          0.1;
+    }
 }
 
 PIMPLE
@@ -86,6 +95,15 @@ PIMPLE
             relTol    1e-5;
             tolerance 1e-5;
         }
+    }
+}
+
+// solids4foamSolidModel mesh motion
+relaxationFactors
+{
+    fields
+    {
+        "D|DD"          0.7;
     }
 }
 

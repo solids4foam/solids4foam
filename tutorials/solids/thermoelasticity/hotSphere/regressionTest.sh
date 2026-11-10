@@ -23,12 +23,16 @@ solids4Foam::requireGnuSed
 # Regression tolerances
 # ------------------------------------------------------------
 
+# With the leastSquares gradient on every fork: OpenFOAM.com v2412 and
+# OpenFOAM.org 9 give a max epsilonEq of 2.39e-4 and a max sigmaEq of 5.23e7,
+# where pointCellsLeastSquares gave 4.4e7; foam-extend 4.1 gives 2.03e-4 and
+# 4.44e7
 T_MIN=339.5
 T_MAX=340.5
 EPS_MIN=1.5e-4
-EPS_MAX=2.5e-4
+EPS_MAX=2.6e-4
 SIGMA_MIN=3.8e7
-SIGMA_MAX=4.6e7
+SIGMA_MAX=5.6e7
 
 # Log files
 SOLVER_LOGFILE="log.solids4Foam"
@@ -107,8 +111,8 @@ extract_max_sigma() {
         | awk '{print $NF}'
 }
 
-# Run the case to its full end time, and hold it to the answer of the removed
-# legacy mechanicalModel.
+# Run the case to its full end time, and hold it to a recorded answer, which
+# began as that of the removed legacy mechanicalModel.
 #
 # This case runs several time steps, so unlike slabCooling it exercises the
 # framework rolling its constitutive state over between them.
@@ -126,11 +130,18 @@ FRAMEWORK_D_REL_TOL=1e-6
 COMPARISON_END_TIME=5
 
 # The final D, as the max and mean component magnitude of the field written
-# to fourteen figures, from the removed legacy mechanicalModel on the last
-# commit that had it (mcl-stage8-coverage, c3a92b3d). OpenFOAM.com v2512's;
-# OpenFOAM.org 9 agrees to 2e-9. foam-extend is not compared, as below
-REF_D_MAX=0.00015702498751748
-REF_D_MEAN=7.86486280639836e-05
+# to fourteen figures. These were first the removed legacy mechanicalModel's,
+# from the last commit that had it (mcl-stage8-coverage, c3a92b3d), and were
+# re-recorded when thermalLinearGeometry started to impose the boundary
+# traction on the complete face traction, stabilisation included (#578): the
+# stabilisation flux is now replaced by the prescribed load on the traction
+# patches and loses its shear part on the symmetry patches, which moved the
+# max of D by 1.7e-5 relative, and again when the gradient scheme changed from
+# pointCellsLeastSquares to leastSquares (#572), which moved it by 1.4e-2
+# (0.00015702235246175 before). OpenFOAM.com v2412's; OpenFOAM.org 9 agrees
+# to 2e-8. foam-extend is not compared, as below
+REF_D_MAX=0.00015474908009917
+REF_D_MEAN=7.75003220351214e-05
 
 run_reference_comparison() {
     # Not on foam-extend, where the framework and the legacy model differed by

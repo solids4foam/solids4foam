@@ -45,6 +45,10 @@ are never modified. Results are written to the ignored
 `blobInTreacle_interfaces.png`. The exit code is zero only if every check
 passes.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference data
 
 Liu et al. (2014) report only the self-convergence of their errors in time,
@@ -139,6 +143,12 @@ only that every run completes and reaches a steady state.
 Recorded with OpenFOAM v2512 on Linux, with `--cores 4`: levels x0.5 and x1
 and the time-step study in serial, levels x2 and x4 on four MPI ranks. The
 whole study took about 33 minutes.
+
+These results predate the continuity-based wall-normal velocity gradient that
+`newMovingWallVelocity` now applies by default (#670). With it, the tutorial's
+steady top-point displacement is 0.7% smaller (0.116481 against 0.117301 on
+level x1); the tables below have not yet been re-recorded. Setting
+`continuityNormalGradient no` on the interface patch reproduces them.
 
 Time-step study, tutorial mesh, `t = 1 s`:
 

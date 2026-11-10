@@ -11,3 +11,14 @@ rm -rf processor* force.pdf case.foam constant/polyMesh
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
+
+# Reset the fluid model selected by ./Allrun <fluidModel>
+solids4Foam::requireGnuSed
+"${SOLIDS4FOAM_SED}" -i "s/^fluidModel .*/fluidModel pimpleFluid;/" \
+    constant/fluidProperties
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

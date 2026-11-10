@@ -155,6 +155,13 @@ public:
             return incompressible_;
         }
 
+        //- The stress is a function of the total deformation gradient,
+        //  with no history, so a prestress Fpre composed onto it is seen
+        virtual bool admitsPrestress() const override
+        {
+            return true;
+        }
+
     // Edit
 
         //- Finite-strain constitutive evaluation

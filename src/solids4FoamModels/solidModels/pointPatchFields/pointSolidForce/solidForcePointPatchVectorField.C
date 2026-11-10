@@ -277,6 +277,8 @@ void solidForcePointPatchVectorField::write(Ostream& os) const
     {
         os.writeKeyword("forceField")
             << forceFieldPtr_().name() << token::END_STATEMENT << nl;
+        os.writeKeyword("region")
+            << forceFieldPtr_().mesh().name() << token::END_STATEMENT << nl;
     }
     else
     {

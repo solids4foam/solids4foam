@@ -238,6 +238,13 @@ protected:
         //- Calculate the Courant number
         void CourantNo() const;
 
+        //- On foam-extend, stop with a fatal error if the mesh is moving, the
+        //  ddt scheme is backward and the time-step has changed, because the
+        //  foam-extend backward meshPhi then does not conserve volume.
+        //  ddtName is the ddt scheme entry used for meshPhi, by default
+        //  "ddt(U)". Does nothing on OpenFOAM.com and OpenFOAM.org
+        void checkBackwardMeshPhi(const word& ddtName = word::null) const;
+
 #if FOAMEXTEND
         //- Calculate the Courant number
         void oversetCourantNo

@@ -20,3 +20,9 @@ rm -rf case.foam displacement.pdf 0/fluid/alpha1 0/fluid/alpha.water postProcess
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

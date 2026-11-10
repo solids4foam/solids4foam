@@ -29,6 +29,9 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "fluxCorrectedVelocityFvPatchVectorField.H"
 #include "compatibilityFunctions.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "extrapolatedCalculatedFvPatchFields.H"
+#endif
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -442,6 +445,65 @@ void Foam::fluidModel::CourantNo() const
     CourantNo(CoNum, meanCoNum, velMag);
 }
 
+
+void Foam::fluidModel::checkBackwardMeshPhi(const word& ddtName) const
+{
+#if FOAMEXTEND
+    // foam-extend's backwardDdtScheme::meshPhi weights the old-time mesh flux
+    // by deltaT^2/(deltaT0*(deltaT + deltaT0)). The weight consistent with
+    // the backward ddt of the cell volumes, as used by OpenFOAM.com, is
+    // deltaT/(deltaT + deltaT0). The two agree only when deltaT == deltaT0:
+    // when the time-step changes, the mesh flux no longer matches the swept
+    // volumes. This affects fvc::makeRelative and the moving-wall velocity
+    // conditions. The optional fix that corrected this was removed, so the
+    // case is stopped instead.
+    if (!mesh().moving())
+    {
+        return;
+    }
+
+    const word ddtKey =
+        ddtName.empty() ? word("ddt(" + U().name() + ')') : ddtName;
+
+    const word ddtScheme(mesh().schemesDict().ddtScheme(ddtKey));
+
+    if (ddtScheme != fv::backwardDdtScheme<vector>::typeName)
+    {
+        return;
+    }
+
+    // As in backwardDdtScheme::deltaT0_(vf), the scheme uses Euler weights
+    // until U has a distinct old-old time level
+    if
+    (
+        U().nOldTimes() < 2
+     || U().oldTime().timeIndex() == U().oldTime().oldTime().timeIndex()
+    )
+    {
+        return;
+    }
+
+    const scalar deltaT = runTime().deltaT().value();
+    const scalar deltaT0 = runTime().deltaT0().value();
+
+    // The relative tolerance allows for the time-step written to and read
+    // from the time directory with limited precision on a restart
+    if (mag(deltaT - deltaT0) > 1e-5*deltaT)
+    {
+        FatalErrorIn("void Foam::fluidModel::checkBackwardMeshPhi() const")
+            << "The time-step changed from " << deltaT0 << " to " << deltaT
+            << " on a moving fluid mesh, with the backward ddt scheme ("
+            << ddtKey << ")." << nl
+            << "On foam-extend, the backward meshPhi does not conserve the"
+            << " cell volumes when the time-step changes." << nl
+            << "Use a constant time-step (adjustTimeStep no, and the same"
+            << " deltaT when restarting), the Euler ddt scheme, or"
+            << " OpenFOAM.com or OpenFOAM.org."
+            << abort(FatalError);
+    }
+#endif
+}
+
 #if FOAMEXTEND
 void Foam::fluidModel::oversetCourantNo
 (
@@ -802,6 +864,11 @@ Foam::fluidModel::fluidModel
             ),
             mesh(),
             dimensionedTensor("zero", dimVelocity/dimLength, tensor::zero)
+            // The patch type of the fields created by the gradient schemes,
+            // as the gradient cache updates this field when grad(U) is cached
+#ifdef OPENFOAM_NOT_EXTEND
+          , extrapolatedCalculatedFvPatchTensorField::typeName
+#endif
         )
     ),
     gradpPtr_
@@ -818,6 +885,9 @@ Foam::fluidModel::fluidModel
             ),
             mesh(),
             dimensionedVector("zero", p().dimensions()/dimLength, vector::zero)
+#ifdef OPENFOAM_NOT_EXTEND
+          , extrapolatedCalculatedFvPatchVectorField::typeName
+#endif
         )
     ),
     phiPtr_
@@ -927,6 +997,36 @@ Foam::fluidModel::fluidModel
         // when U and its old-time levels are read on restart; performed before
         // the gradients are calculated so that they see the corrected values
         correctFluxCorrectedVelocityBoundaries();
+
+        // The gradient fields are registered with the names that the gradient
+        // cache uses, so a cached gradient is this class's field
+#if defined(OPENFOAM_COM) && (OPENFOAM >= 2512)
+        // The cache updates a cached gradient in place, unless it is newer
+        // than its field. The gradient fields were created after U and p, so
+        // mark their initial zero values as out of date
+        gradUPtr_().eventNo() = UPtr_().eventNo();
+        gradpPtr_().eventNo() = pPtr_().eventNo();
+#else
+        // The cache deletes a stale cached gradient, which this class owns
+        if
+        (
+#ifdef OPENFOAM_NOT_EXTEND
+            mesh().cache(gradUPtr_().name())
+         || mesh().cache(gradpPtr_().name())
+#else
+            mesh().solutionDict().cache(gradUPtr_().name())
+         || mesh().solutionDict().cache(gradpPtr_().name())
+#endif
+        )
+        {
+            FatalErrorIn("Foam::fluidModel::fluidModel(...)")
+                << "Caching " << gradUPtr_().name() << " or "
+                << gradpPtr_().name() << " is only supported by the fluid "
+                << "models with OpenFOAM.com v2512 and later. Please remove "
+                << "them from the cache sub-dictionary of fvSolution"
+                << abort(FatalError);
+        }
+#endif
 
         gradUPtr_() = fvc::grad(UPtr_());
         gradpPtr_() = fvc::grad(pPtr_());

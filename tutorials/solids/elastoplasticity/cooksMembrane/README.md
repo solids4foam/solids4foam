@@ -68,7 +68,9 @@ displacement in the top right corner tends to a value of 7.4 mm, which is close
 to the values reported in
 [[1](https://onlinelibrary.wiley.com/doi/10.1002/nme.1620330705),
 [2](http://www.simplassoftware.com/benchmarks.html),
-[3](https://repositorio-aberto.up.pt/handle/10216/438)].
+[3](https://repositorio-aberto.up.pt/handle/10216/438)]. The tutorial case
+uses a coarse 12 x 12 cell mesh, which gives a vertical displacement of about
+6 mm.
 
 In the `solids4foam` case, the vertical displacement at the top right corner is
 extracted using the `solidPointDisplacement` function object placed in the
@@ -110,11 +112,17 @@ run using the included `Allrun` script, i.e. `> ./Allrun`. In this case, the
 Allrun consists of creating the mesh using `blockMesh` (`> blockMesh`) followed
 by running the `solids4foam` solver (`> solids4Foam`).
 
+The case can also be run on an unstructured triangular-prism mesh with
+`> ./Allrun triangular`, which creates the mesh with Gmsh from
+`cooksMembrane.geo` and converts it with `gmshToFoam`; Gmsh must be installed.
+The mesh spacing is set by `dx` in `cooksMembrane.geo`.
+
 ## Verification and convergence study
 
 The opt-in [`verification/`](verification/) directory contains the migrated
-mesh-convergence study and published displacement references. It is separate
-from normal regression testing and is not run by `tutorials/Alltest` or
+mesh-convergence study, for the quadrilateral and the triangular meshes, and the
+published per-mesh displacement references. It is separate from normal
+regression testing and is not run by `tutorials/Alltest` or
 `tutorials/Alltest-regression`. See its README for the command, acceptance
 criteria, and expected outputs.
 

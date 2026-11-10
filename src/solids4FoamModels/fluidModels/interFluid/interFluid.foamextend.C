@@ -167,9 +167,14 @@ tmp<vectorField> interFluid::patchViscousForce(const label patchID) const
         new vectorField(mesh().boundary()[patchID].size(), vector::zero)
     );
 
+    // Named normal: a tmp normal field would be reused as the storage of
+    // the inner product, which aliases an input of the loop and gives
+    // wrong results with some -O3 builds (see the 3dTube verification)
+    const vectorField nf(mesh().boundary()[patchID].nf());
+
     tvF() =
         (
-            mesh().boundary()[patchID].nf()
+            nf
           & (-turbulence_->devReff()().boundaryField()[patchID])
         );
 
@@ -242,6 +247,9 @@ bool interFluid::evolve()
     {
         #include "correctPhi.foamextend.interFluid.H"
     }
+
+    // Stop if the backward meshPhi would be inconsistent
+    fluidModel::checkBackwardMeshPhi();
 
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi, U);

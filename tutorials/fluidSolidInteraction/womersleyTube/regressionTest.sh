@@ -19,19 +19,24 @@ EXACT_AMPLITUDE=4.512494768325512e-4
 EXACT_PHASE=-1.0453187730902433
 OMEGA=0.12566370614359174
 
-# Regression tolerances. The difference from the exact solution, 2.7e-6 m
-# (IQN-ILS) and 3.4e-6 m (Robin) of an amplitude of 4.5e-4 m, is mostly the
+# Regression tolerances. The difference from the exact solution, 2.2e-6 m
+# (IQN-ILS) and 2.1e-6 m (Robin) of an amplitude of 4.5e-4 m, is mostly the
 # start-up transient, which decays over the first periods. The final
-# displacement differs between OpenFOAM-v2412 and v2512 by 1e-7 m (IQN-ILS)
-# and 1.2e-6 m (Robin), independent of the FSI tolerances
+# displacement differs between OpenFOAM-v2412 and v2512 by 1.1e-7 m (IQN-ILS)
+# and 1.2e-8 m (Robin). The Robin difference was 1.2e-6 m before the old-time
+# solid displacements were given exact boundary values (it came from the
+# start-up), which is why DISP_TOL was 2e-6
 EXACT_TOL=1e-5          # final displacement difference from the exact (m)
-DISP_TOL=2e-6           # final displacement difference from the reference (m)
+DISP_TOL=5e-7           # final displacement difference from the reference (m)
 
-# Reference values at REG_END_TIME (OpenFOAM-v2512)
+# Reference values at REG_END_TIME (OpenFOAM-v2512), with
+# fluxConsistentPatches on the tube ends and exact boundary values of the
+# old-time solid displacements; they changed by -5.1e-7 m (IQN-ILS) and
+# -1.3e-6 m (Robin) from the values before these two changes
 ref_final_ur() {
     case "$1" in
-        iqnils) echo -0.0002236660656 ;;
-        robin) echo -0.0002229508061 ;;
+        iqnils) echo -0.0002241790827 ;;
+        robin) echo -0.0002242599027 ;;
     esac
 }
 

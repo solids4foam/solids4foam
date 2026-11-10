@@ -111,12 +111,12 @@ void Foam::thermoMechanicalLawMechanicalConstitutiveLaw::evaluate
 
     const scalarField& T = inputs.getScalar(TName_);
 
-    // The thermal term uses the sub-law's bulk modulus. Note that it is taken
-    // as a single value: a sub-law
-    // whose bulk modulus varies from point to point cannot be expressed
-    // through this interface
+    // The thermal term uses the sub-law's thermal bulk modulus, which differs
+    // from its kappa() in plane stress. Note that it is taken as a single
+    // value: a sub-law whose bulk modulus varies from point to point cannot be
+    // expressed through this interface
     const scalar threeKAlpha =
-        3.0*subLawPtr_->kappa().value()*alpha_.value();
+        3.0*subLawPtr_->thermalKappa().value()*alpha_.value();
 
     const scalar T0 = T0_.value();
 

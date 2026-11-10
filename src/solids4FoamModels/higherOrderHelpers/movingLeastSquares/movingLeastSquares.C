@@ -610,6 +610,9 @@ void movingLeastSquares::calcCellCoeffs() const
         factorials[n] = factorials[n - 1]*n;
     }
 
+    // Integer powers of the normalised offset, up to the polynomial order
+    FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
+
     // Reference to remote centres
     const Map<vector>& remoteCI = stencil().remoteCentresMap();
 
@@ -667,6 +670,7 @@ void movingLeastSquares::calcCellCoeffs() const
 
             // Normalise dx to improve conditioning
             dx /= h;
+            componentPowers(dx, dxPow);
 
             // Compute monomial values for each exponent
             for (label p = 0; p < Np; ++p)
@@ -683,14 +687,13 @@ void movingLeastSquares::calcCellCoeffs() const
                 // Compute monomial values for each exponent
                 if (twoD)
                 {
-                    Q(p, cI) =
-                        pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
+                    Q(p, cI) = dxPow[0][i]*dxPow[1][j]/factorialDenominator;
                 }
                 else
                 {
                     Q(p, cI) =
-                        pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
-                        /factorialDenominator;
+                        dxPow[0][i]*dxPow[1][j]*dxPow[2][k]
+                       /factorialDenominator;
                 }
             }
         }
@@ -880,6 +883,9 @@ void movingLeastSquares::calcFaceCoeffs() const
         factorials[n] = factorials[n - 1]*n;
     }
 
+    // Integer powers of the normalised offset, up to the polynomial order
+    FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
+
     // Reference to face stencils, quadrature points and remote centres
     auto& stencils = compactListListCRef(faceGradStencil());
     auto& faceQuadPts =
@@ -1037,6 +1043,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 
                 // Normalise dx to improve conditioning
                 dx /= h;
+                componentPowers(dx, dxPow);
 
                 // Compute monomial values for each exponent
                 for (label p = 0; p < Np; ++p)
@@ -1052,15 +1059,13 @@ void movingLeastSquares::calcFaceCoeffs() const
                     if (twoD)
                     {
                         Q(p, cI) =
-                            pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
+                            dxPow[0][i]*dxPow[1][j]/factorialDenominator;
                     }
                     else
                     {
                         Q(p, cI) =
-                            pow(dx.x(), i)
-                          * pow(dx.y(), j)
-                          * pow(dx.z(), k)
-                          / factorialDenominator;
+                            dxPow[0][i]*dxPow[1][j]*dxPow[2][k]
+                           /factorialDenominator;
                     }
                 }
             }
@@ -1220,19 +1225,6 @@ movingLeastSquares::movingLeastSquares
             << "faceNn/minNn = " << faceNnRatio << nl
             << "Check 'faceStencilExtraCells' entry in the dictionary."
             << endl;
-    }
-
-    if (mesh_.nGeometricD() == 2)
-    {
-        const Vector<label>& solD = mesh_.solutionD();
-
-        if (solD[vector::Z] != -1)
-        {
-            FatalErrorInFunction
-                << "Empty direction should be vector::Z. "
-                << "Please change mesh orientation!"
-                << abort(FatalError);
-        }
     }
 }
 

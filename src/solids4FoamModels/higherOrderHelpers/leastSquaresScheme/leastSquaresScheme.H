@@ -174,6 +174,25 @@ public:
         );
 
 
+    // Static Member Functions
+
+        //- Check that the mesh is supported by the high-order
+        //  reconstruction: planar 2-D meshes with an empty z direction,
+        //  and 3-D meshes. Axisymmetric (wedge) meshes are not supported.
+        static void checkMeshSupported(const fvMesh& mesh);
+
+        //- Fill xPow[n] with x to the power n, for n from 0 to
+        //  xPow.size() - 1, by repeated multiplication
+        static void integerPowers(const scalar x, UList<scalar>& xPow);
+
+        //- Fill dPow[cmpt] with the integer powers of component cmpt of d
+        static void componentPowers
+        (
+            const vector& d,
+            FixedList<scalarList, 3>& dPow
+        );
+
+
     // Constructors
 
         //- Construct from mesh

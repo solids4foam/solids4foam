@@ -23,3 +23,11 @@ done
 # Link the OpenFOAM mesh dictionary back to the default location
 \rm -f constant/polyMesh/blockMeshDict system/blockMeshDict
 ln -vnsf blockMeshDict.openfoam system/blockMeshDict
+
+# Remove the regression test cases, and the verification study cases and
+# results, too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+    (cd verification && ./Allclean)
+fi

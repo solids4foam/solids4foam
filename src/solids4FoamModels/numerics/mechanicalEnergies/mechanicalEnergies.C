@@ -208,18 +208,20 @@ void mechanicalEnergies::checkEnergies
     {
         if (!mesh_.boundary()[patchI].coupled())
         {
+            // Named operands: a tmp vector times a tmp symmTensor would reuse
+            // the vector storage as the result of the inner product, which
+            // aliases an input of the loop and gives wrong results with some
+            // -O3 builds (see pimpleFluid::patchViscousForce)
+            const vectorField halfSf(0.5*mesh_.Sf().boundaryField()[patchI]);
+            const symmTensorField sigmaSum
+            (
+                sigma.boundaryField()[patchI]
+              + sigma.oldTime().boundaryField()[patchI]
+            );
+            const vectorField tractionSum(halfSf & sigmaSum);
+
             externalWork_ +=
-                gSum
-                (
-                    (
-                        0.5*mesh_.Sf().boundaryField()[patchI]
-                      & (
-                          sigma.boundaryField()[patchI]
-                        + sigma.oldTime().boundaryField()[patchI]
-                        )
-                    )
-                  & DD.boundaryField()[patchI]
-                );
+                gSum(tractionSum & DD.boundaryField()[patchI]);
         }
     }
 

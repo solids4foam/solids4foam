@@ -1,0 +1,27 @@
+context/circulationContext.C
+context/circulationPresets.C
+waveform/circulationWaveform.C
+metrics/circulationMetrics.C
+
+components/circulationComponent.C
+components/resistor.C
+components/inductor.C
+components/compliance.C
+components/circulationModule.C
+components/elastanceChamber.C
+components/mixedChamber.C
+components/orificeValve.C
+components/flowSource.C
+components/pressureSource.C
+components/ground.C
+components/externalPort.C
+
+components/CR.C
+components/CRL.C
+components/valvedChamber.C
+components/coupledDomain.C
+
+network/circulationBuilder.C
+network/circulationNetwork.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libcirculation0D

@@ -211,7 +211,15 @@ public:
                 return pressure_;
             }
 
-            // Non-const access to the extrapolateValue flag
+            //- Return the complete prescribed traction for the given normals
+            tmp<vectorField> boundaryTraction(const vectorField& n) const;
+
+            //- Enable extrapolation of the patch value from the adjacent cell
+            void enableExtrapolation();
+
+            //- Non-const access to the extrapolateValue flag
+            //  Prefer enableExtrapolation() when enabling this option so that
+            //  incompatible settings are diagnosed.
             Switch& extrapolateValue()
             {
                 return extrapolateValue_;

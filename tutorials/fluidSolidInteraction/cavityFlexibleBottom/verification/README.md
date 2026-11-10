@@ -2,8 +2,15 @@
 
 This opt-in study is a mesh study. It uniformly refines the tutorial fluid and
 solid meshes, runs each level to a steady FSI response, and compares the steady
-vertical displacement at `(4 -1 0.5)` and the steady vertical interface force
+vertical displacement at point A, `(4 0 0.5)` on the top (wetted) surface of the
+plate, and the steady vertical interface force
 with the mesh study of Tuković et al. (2018).
+
+Note: until October 2026 the monitor point was given as `(4 -1 0.5)`, which
+lies outside the solid (the plate occupies `-0.4 <= y <= 0`), so
+`solidPointDisplacement` used the nearest node on the plate underside,
+`(4 -0.4)`. Values recorded before then are underside values, about 1.2 %
+smaller in magnitude than the top-surface values on the finest meshes.
 
 It is deliberately separate from `regressionTest.sh`: the regression test
 checks that the tutorial remains numerically stable, whereas this study checks
@@ -94,6 +101,10 @@ twenty times the published values.
 A `--quick` run only exercises the two coarsest meshes, which are not expected
 to meet the accuracy tolerances, so it checks only that both levels reach a
 steady response.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
 
 ## Reference results
 

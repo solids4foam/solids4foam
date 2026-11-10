@@ -1,0 +1,205 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      flapCentreline;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Solid points on the flap centreline, every 2.5 mm (included in the
+// functions of system/controlDict)
+
+flapCentrelineZ025
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0025);
+}
+
+flapCentrelineZ050
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.005);
+}
+
+flapCentrelineZ075
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0075);
+}
+
+flapCentrelineZ100
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.01);
+}
+
+flapCentrelineZ125
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0125);
+}
+
+flapCentrelineZ150
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.015);
+}
+
+flapCentrelineZ175
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0175);
+}
+
+flapCentrelineZ200
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.02);
+}
+
+flapCentrelineZ225
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0225);
+}
+
+flapCentrelineZ250
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.025);
+}
+
+flapCentrelineZ275
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0275);
+}
+
+flapCentrelineZ300
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.03);
+}
+
+flapCentrelineZ325
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0325);
+}
+
+flapCentrelineZ350
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.035);
+}
+
+flapCentrelineZ375
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0375);
+}
+
+flapCentrelineZ400
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.04);
+}
+
+flapCentrelineZ425
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0425);
+}
+
+flapCentrelineZ450
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.045);
+}
+
+flapCentrelineZ475
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0475);
+}
+
+flapCentrelineZ500
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.05);
+}
+
+flapCentrelineZ525
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0525);
+}
+
+flapCentrelineZ550
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.055);
+}
+
+flapCentrelineZ575
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0575);
+}
+
+flapCentrelineZ600
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.06);
+}
+
+flapCentrelineZ625
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.0625);
+}
+
+flapCentrelineZ650
+{
+    type            solidPointDisplacement;
+    region          solid;
+    point           (0 0 0.065);
+}
+
+// ************************************************************************* //

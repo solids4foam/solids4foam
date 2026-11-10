@@ -68,6 +68,13 @@ solvers
 
 PIMPLE
 {
+    // The tube ends fix the exact pressure and the exact normal velocity
+    // gradient (codedMixed). Without this entry the pressure equation gives
+    // an end flux that differs from the boundary velocity flux by
+    // rAU*dp/dn, a term proportional to the time-step; with it, the end
+    // flux is consistent to O(deltaT*h)
+    fluxConsistentPatches (inlet outlet);
+
     momentumPredictor   on;
     nOuterCorrectors    2;
     nCorrectors         3;

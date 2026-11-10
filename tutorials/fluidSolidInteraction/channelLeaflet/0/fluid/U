@@ -1,0 +1,75 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+// The fluid starts from rest
+internalField   uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        // Pulsatile Poiseuille inflow, u = 6 y (1 - y) q(t), with the flux
+        // q(t) = 1.5 - 0.5 cos(pi t) varying between 1 and 2 with period 2 s,
+        // ramped up from zero as (1 - cos(pi t))/2 over the first second
+        type            codedFixedValue;
+        value           uniform (0 0 0);
+        name            channelLeafletInletVelocity;
+
+        code
+        #{
+            const scalar pi = constant::mathematical::pi;
+            const scalar t = this->db().time().value();
+            const scalar period = 2.0;
+            const scalar tRamp = 1.0;
+            scalar q = 1.5 - 0.5*Foam::cos(2.0*pi*t/period);
+            if (t < tRamp)
+            {
+                q *= 0.5*(1.0 - Foam::cos(pi*t/tRamp));
+            }
+            const scalarField y(patch().Cf().component(vector::Y));
+            operator==(6.0*q*y*(1.0 - y)*vector(1, 0, 0));
+        #};
+    }
+    outlet
+    {
+        // Parallel flow: zero transverse velocity, zero-gradient axial velocity
+        type            directionMixed;
+        refValue        uniform (0 0 0);
+        refGradient     uniform (0 0 0);
+        valueFraction   uniform (0 0 0 1 0 1);
+        value           uniform (0 0 0);
+    }
+    walls
+    {
+        type            fixedValue;
+        value           uniform (0 0 0);
+    }
+    interface
+    {
+        type            newMovingWallVelocity;
+        value           uniform (0 0 0);
+    }
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

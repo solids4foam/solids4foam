@@ -29,3 +29,7 @@ tolerances are defined in
 
 This is a formulation verification rather than a mesh-convergence study: it
 keeps the tutorial's non-matching 5-by-5 and 8-by-8 interface meshes fixed.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.

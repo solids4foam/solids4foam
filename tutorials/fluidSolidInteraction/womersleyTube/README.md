@@ -81,10 +81,21 @@ tolerances of the solvers.
   conditions is in `system/womersleyCode` and reads the exact solution's
   coefficients from `constant/womersleyProperties`, which is written by
   `verification/scripts/womersley_exact.py --write-case .`.
+- **End flux.** A fixed pressure and a velocity condition that fixes the
+  boundary value (here the mixed condition that imposes the gradient) on
+  the same patch would make the pressure equation's end flux differ from the
+  boundary velocity flux by a term proportional to the time-step. The
+  `pimpleFluid` entry `fluxConsistentPatches (inlet outlet);` in
+  `system/fluid/fvSolution` makes the end flux consistent with the boundary
+  velocity to O(Δt h); without it the time-step study converges at well
+  below second order (see `verification/README.md`).
 - **Initial fields.** The fluid velocity and pressure and the wall
   displacement, including the old-time displacements `D_0`, `D_0_0` and
   `D_0_0_0` read by the second-order time scheme, are set to the exact
-  solution with `#codeStream`, so there is no start-up ramp. Both the
+  solution with `#codeStream`, in the cells and on the boundaries, so there
+  is no start-up ramp. The boundary values of the old-time displacements
+  matter: they enter the wall acceleration that the Robin condition imposes
+  on the fluid in the first time-steps. Both the
   boundary conditions
   and the initial fields compile a small library on the first run.
 - **Wall.** `linearGeometryTotalDisplacement` with the PETSc SNES solver. The
@@ -126,11 +137,11 @@ a solver whose log exists.
 Figure 2 compares the velocity profile at $$x = L/2$$ over the second period,
 at four phases, and the radial wall displacement at $$x = L/4$$, $$L/2$$ and
 $$3L/4$$, with the exact solution. Over the second period, the velocity
-profile is within 0.5% of the largest exact velocity at every phase, the
-flow rate at $$x = L/2$$ within 0.02% in amplitude and 0.001 rad in phase, the
-wall displacement amplitude within 0.25% at the three stations, and the wave
-speed fitted to the pressure along the tube within 0.15%. The attenuation,
-$$\mathrm{Im}(k)$$, is within 0.9%. If `gnuplot` is installed,
+profile is within 0.5% of the largest exact velocity, the flow rate at
+$$x = L/2$$ within 0.05% in amplitude and 0.0011 rad in phase, the wall
+displacement amplitude within 0.08% at the three stations, and the wave speed
+fitted to the pressure along the tube within 0.02%. The attenuation,
+$$\mathrm{Im}(k)$$, is within 0.41%. If `gnuplot` is installed,
 `Allrun` also plots the wall displacement against the exact solution in
 `wallDisplacement.pdf`.
 

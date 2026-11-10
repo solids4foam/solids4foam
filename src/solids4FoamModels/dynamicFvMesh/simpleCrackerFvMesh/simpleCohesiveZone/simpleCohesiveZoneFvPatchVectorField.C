@@ -231,8 +231,14 @@ simpleCohesiveZoneFvPatchVectorField
 
     if (dict.found("oldSeparationDistance"))
     {
-        separationDistance_ =
+        oldSeparationDistance_ =
             scalarField("oldSeparationDistance", dict, p.size());
+    }
+
+    if (dict.found("initiationTraction"))
+    {
+        initiationTraction_ =
+            vectorField("initiationTraction", dict, p.size());
     }
 }
 
@@ -336,7 +342,13 @@ label simpleCohesiveZoneFvPatchVectorField::updateCrack()
     const scalarField curNormalTraction = (n & (n & curSigma));
 
     // Current tangential traction
-    const vectorField curTangentialTraction = ((I - sqr(n)) & (n & curSigma));
+    // Named operands: a tmp operand with the type of the result would be reused
+    // as the storage of the inner product, which aliases an input of the loop
+    // and gives wrong results with some -O3 builds (see
+    // pimpleFluid::patchViscousForce)
+    const vectorField nSigma(n & curSigma);
+    const symmTensorField nPerp(I - sqr(n));
+    const vectorField curTangentialTraction(nPerp & nSigma);
 
     // New traction to be set on the patch
     vectorField newTraction(patch().size(), vector::zero);
@@ -665,6 +677,10 @@ void simpleCohesiveZoneFvPatchVectorField::write(Ostream& os) const
     damageIndicator_.writeEntry("damageIndicator", os);
 
     crackIndicator_.writeEntry("crackIndicator", os);
+
+    separationDistance_.writeEntry("separationDistance", os);
+
+    oldSeparationDistance_.writeEntry("oldSeparationDistance", os);
 
     os.writeKeyword("relaxationFactor") << relaxationFactor_
         << token::END_STATEMENT << nl;

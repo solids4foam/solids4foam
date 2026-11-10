@@ -8,8 +8,24 @@
     "relative_tolerance": 0.08
   },
   "published_range_m": [0.00697, 0.00709],
+  "published_mesh_series": [
+    {"label": "Simo and Armero (1992), Q1/P0", "file": "SimoArmero1992.csv", "column": "displacement_Q1P0_m"},
+    {"label": "Simo and Armero (1992), Q1/E4", "file": "SimoArmero1992.csv", "column": "displacement_Q1E4_m"},
+    {"label": "Cesar de Sa et al. (2001), Q4", "file": "CesarDeSa2001.csv", "column": "displacement_Q4_m"},
+    {"label": "Cesar de Sa et al. (2001), Q1E4", "file": "CesarDeSa2001.csv", "column": "displacement_Q1E4_m"},
+    {"label": "Cesar de Sa et al. (2001), Qi6", "file": "CesarDeSa2001.csv", "column": "displacement_Qi6_m"},
+    {"label": "Areias (Simplas), delta", "file": "Areias_Simplas.csv", "column": "displacement_delta_m"},
+    {"label": "Areias (Simplas), alpha", "file": "Areias_Simplas.csv", "column": "displacement_alpha_m"},
+    {"label": "Abaqus, CPE4H", "file": "Abaqus_CPE4H.csv", "column": "displacement_m"}
+  ],
+  "triangular": {
+    "allrun_arguments": ["triangular"],
+    "spacings_m": [0.025, 0.0125, 0.00625, 0.003125, 0.0015625, 0.00078125, 0.000390625, 0.0001953125],
+    "default_levels": [2, 3, 4, 5, 6]
+  },
   "legacy_study": {
     "repository": "solid-benchmarks/elastoPlasticity/cooksMembrane",
-    "mesh_cells_per_side": [3, 6, 12, 24, 48, 96, 192, 384]
+    "mesh_cells_per_side": [3, 6, 12, 24, 48, 96, 192, 384],
+    "triangular_spacings_m": [0.025, 0.0125, 0.00625, 0.003125, 0.0015625, 0.00078125, 0.000390625, 0.0001953125]
   }
 }

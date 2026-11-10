@@ -62,7 +62,8 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
 #endif
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
-    oldOldFc_(p.patch().size(),vector::zero)
+    oldOldFc_(p.patch().size(),vector::zero),
+    continuityNormalGradient_(true)
 {
     // The face-centre histories are written by write(): initialise them from
     // the current patch geometry so that a zero history is never written
@@ -84,7 +85,8 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     timeIndex_(ptf.timeIndex_),
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
-    oldOldFc_(p.patch().size(),vector::zero)
+    oldOldFc_(p.patch().size(),vector::zero),
+    continuityNormalGradient_(ptf.continuityNormalGradient_)
 {
     // Initialise the histories from the current patch geometry: this is the
     // fallback used when the source histories cannot be mapped
@@ -142,7 +144,11 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     //timeIndex_(dimensionedInternalField().mesh().time().timeIndex()),
     Fc_(p.patch().size(),vector::zero),
     oldFc_(p.patch().size(),vector::zero),
-    oldOldFc_(p.patch().size(),vector::zero)
+    oldOldFc_(p.patch().size(),vector::zero),
+    continuityNormalGradient_
+    (
+        dict.lookupOrDefault<Switch>("continuityNormalGradient", true)
+    )
 {
     fvPatchVectorField::operator=(vectorField("value", dict, p.size()));
 
@@ -198,7 +204,8 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     timeIndex_(pivpvf.timeIndex_),
     Fc_(pivpvf.Fc_),
     oldFc_(pivpvf.oldFc_),
-    oldOldFc_(pivpvf.oldOldFc_)
+    oldOldFc_(pivpvf.oldOldFc_),
+    continuityNormalGradient_(pivpvf.continuityNormalGradient_)
 {}
 #endif
 
@@ -213,7 +220,8 @@ elasticWallVelocityFvPatchVectorField::elasticWallVelocityFvPatchVectorField
     timeIndex_(pivpvf.timeIndex_),
     Fc_(pivpvf.oldFc_),
     oldFc_(pivpvf.oldFc_),
-    oldOldFc_(pivpvf.oldOldFc_)
+    oldOldFc_(pivpvf.oldOldFc_),
+    continuityNormalGradient_(pivpvf.continuityNormalGradient_)
 {}
 
 
@@ -418,6 +426,10 @@ snGrad() const
           - nGradUP;
 
         tnGradU.ref() -= (sqr(n) & tnGradU());
+    if (continuityNormalGradient_)
+    {
+        tnGradU.ref() += n*continuityNormalGradient(gradU);
+    }
 #else
         tnGradU() =
             2
@@ -428,6 +440,10 @@ snGrad() const
           - nGradUP;
 
         tnGradU() -= (sqr(n) & tnGradU());
+    if (continuityNormalGradient_)
+    {
+        tnGradU() += n*continuityNormalGradient(gradU);
+    }
 #endif
 
         return tnGradU;
@@ -458,6 +474,10 @@ snGrad() const
         )*patch().deltaCoeffs();
 
     tnGradU.ref() -= (sqr(n) & tnGradU());
+    if (continuityNormalGradient_)
+    {
+        tnGradU.ref() += n*continuityNormalGradient(gradU);
+    }
 #else
     tnGradU() =
         (
@@ -466,6 +486,10 @@ snGrad() const
         )*patch().deltaCoeffs();
 
     tnGradU() -= (sqr(n) & tnGradU());
+    if (continuityNormalGradient_)
+    {
+        tnGradU() += n*continuityNormalGradient(gradU);
+    }
 #endif
 
     return tnGradU;
@@ -475,6 +499,19 @@ snGrad() const
     //    *this
     //  - (patchInternalField() + (k&gradU.patchInternalField()))
     //)*this->patch().deltaCoeffs();
+}
+
+
+tmp<scalarField> elasticWallVelocityFvPatchVectorField::
+continuityNormalGradient(const fvPatchField<tensor>& gradU) const
+{
+    // Continuity, tr(grad U) = 0, at the wall gives
+    // n.(grad U).n = -tr((I - nn) & grad U), the tangential divergence of the
+    // velocity, which the wall velocity determines
+    const vectorField n(patch().nf());
+    const tensorField gradUP(gradU.patchInternalField());
+
+    return -tr((I - sqr(n)) & gradUP);
 }
 
 
@@ -539,7 +576,12 @@ gradientBoundaryCoeffs() const
         )*this->patch().deltaCoeffs()
     );
 
-    const vectorField nGradUn(sqr(n) & nGradU);
+    vectorField nGradUn(sqr(n) & nGradU);
+
+    if (continuityNormalGradient_)
+    {
+        nGradUn -= n*continuityNormalGradient(gradU);
+    }
 
     return
         this->patch().deltaCoeffs()
@@ -563,6 +605,11 @@ void elasticWallVelocityFvPatchVectorField::write(Ostream& os) const
     oldFc_.writeEntry("oldFaceCentres", os);
     oldOldFc_.writeEntry("oldOldFaceCentres", os);
 #endif
+    if (!continuityNormalGradient_)
+    {
+        os.writeKeyword("continuityNormalGradient")
+            << continuityNormalGradient_ << token::END_STATEMENT << nl;
+    }
 }
 
 

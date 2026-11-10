@@ -101,6 +101,10 @@ $$10^{-8}$$ the monotone and order checks are skipped, because that
 discretisation reproduces the analytical solution exactly and its remaining
 error is arithmetic roundoff, which neither decreases nor has an order.
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference results
 
 Recorded with OpenFOAM v2512 on an Apple M1 Ultra.

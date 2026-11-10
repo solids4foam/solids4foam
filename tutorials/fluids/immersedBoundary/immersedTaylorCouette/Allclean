@@ -9,3 +9,9 @@ source solids4FoamScripts.sh
 
 cleanCase
 rm -rf constant/polyMesh
+
+# Remove the regression test cases too with ./Allclean all
+if [ "${1:-}" = "all" ]
+then
+    rm -rf regressionTests
+fi

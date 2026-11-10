@@ -99,16 +99,11 @@ class nonLinGeomTotalLagTotalDispSolid
         //  This is used by the optional linear predictor
         mutable autoPtr<volScalarField> dpdtPtr_;
 
-        //- Set once the law's volumetric response has been checked against
-        //  the closure the pressure equation assumes
-        mutable bool volumetricClosureChecked_ = false;
-
         //- The law's own volumetric response, dU/dJ
         //  Only built when solvePressure is enabled on the constitutive-law
         //  framework. Asking for it is what leaves the stress without its
         //  volumetric part, which is the part the solved pressure supplies;
-        //  the value itself is what checkVolumetricClosure compares against
-        //  the volumetric energy the pressure equation was written for
+        //  the pressure equation's residual is written on the value itself
         mutable autoPtr<volScalarField> volumetricResponsePtr_;
 
         //- Predict new time-step fields using the velocity field
@@ -116,6 +111,9 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
+
+        //- Field to provide fvOptions with the correct dimensions
+        volScalarField ds_;
 
 
     // Private Member Functions
@@ -160,10 +158,6 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Return const access to the reciprocal of the bulk modulus
         const volScalarField& rKappa() const;
 
-        //- Refuse a law whose volumetric response is not the one the
-        //  pressure equation was written for
-        void checkVolumetricClosure() const;
-
         //- Replace the volumetric part of the stress with the solved
         //  pressure. Both the residual and the linear predictor do this and
         //  they have to agree, so it lives here rather than at each of them
@@ -202,6 +196,12 @@ class nonLinGeomTotalLagTotalDispSolid
 protected:
 
     // Protected member functions
+
+#ifndef OPENFOAM_COM
+        //- Return optional source per unit reference volume; empty (no
+        //  source) by default
+        virtual tmp<volVectorField> fvOptionsSource() const;
+#endif
 
         //- Return nonlinear geometry enumerator
         virtual nonLinearGeometry::nonLinearType nonLinGeom() const

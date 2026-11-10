@@ -255,7 +255,7 @@ void nonLinGeomUpdatedLagSolid::enforceTractionBoundaries
             }
             else
             {
-                tracP = tracPatch.traction() - nPatch*tracPatch.pressure();
+                tracP = tracPatch.boundaryTraction(nPatch);
             }
 
             if (tracPatch.useUndeformedArea())
@@ -940,6 +940,10 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
         F_.storeOldTime();
         J_.storeOldTime();
 
+        // The predictor uses the acceleration of the last step: write it, so
+        // that a restart predicts the same first step as the original run
+        A_.writeOpt() = IOobject::AUTO_WRITE;
+
         // The framework restores its own constitutive state through the
         // registered state fields, so there is nothing to tell it here
     }
@@ -968,30 +972,7 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
                 << " solution algorithm" << abort(FatalError);
         }
 
-        // Set extrapolateValue to true for solidTraction boundaries
-        forAll(DD().boundaryField(), patchI)
-        {
-            if
-            (
-                isA<solidTractionFvPatchVectorField>
-                (
-                    DD().boundaryField()[patchI]
-                )
-            )
-            {
-                Info<< "    Setting `extrapolateValue` to `true` on the "
-                    << mesh().boundary()[patchI].name() << " patch of the DD "
-                    << "field" << endl;
-
-                solidTractionFvPatchVectorField& tracPatch =
-                    refCast<solidTractionFvPatchVectorField>
-                    (
-                        boundaryFieldRef(DD())[patchI]
-                    );
-
-                tracPatch.extrapolateValue() = true;
-            }
-        }
+        enableTractionBoundaryExtrapolation(DD());
     }
 }
 
@@ -1334,9 +1315,10 @@ label nonLinGeomUpdatedLagSolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh().V();
 
-    // Add optional fvOptions, e.g. MMS body force
-    // Note that "source()" is already multiplied by the volumes
-    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(D))().source();
+    // fvOptions are not currently applied by this solid model in either the
+    // segregated or SNES path. If added, follow linGeomTotalDispSolid, where
+    // "residual += V*(M & D)" for the fvOptions matrix M: note that
+    // "residual -= M.source()" would give the explicit part only
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>

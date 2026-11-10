@@ -1,0 +1,7 @@
+neoHookeanManufacturedSolution.C
+neoHookeanManufacturedSolutionSource.C
+neoHookeanManufacturedSolutionSolid.C
+neoHookeanManufacturedSolutionFunctionObject.C
+neoHookeanManufacturedSolutionFvPatchVectorField.C
+
+LIB = $(FOAM_MODULE_LIBBIN)/libneoHookeanManufacturedSolution

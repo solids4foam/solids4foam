@@ -44,7 +44,8 @@ fixedRelaxationCoeffs
     // steps it needs 2.48 FSI correctors per time step against 2.87 with the
     // defaults, and over the full cardiac cycle it averages 1.3 (77% of the
     // steps converge in a single corrector), while the interface
-    // displacement and force stay within the regression tolerances
+    // displacement and force stay within the regression tolerances (these
+    // counts were measured before the outerWall spring support was added)
     robinPressureTolerance 1e-3;
     robinFluxTolerance     1e-3;
 

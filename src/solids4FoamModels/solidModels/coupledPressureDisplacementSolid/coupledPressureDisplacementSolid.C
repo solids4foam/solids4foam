@@ -842,6 +842,20 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
             );
     }
 
+    // The pressure equation here is an incremental relation on the mesh,
+    // with the pressure starting from zero, while a prestressed law's
+    // volumetric response is that of J*det(Fpre), already non-zero at zero
+    // displacement. The two would describe different materials
+    if (mechanicalManager().prestressed())
+    {
+        FatalErrorInFunction
+            << type() << " does not support prestress: its pressure "
+            << "equation does not see Fpre." << nl
+            << "Use nonLinearGeometryTotalLagrangianTotalDisplacement, with or "
+            << "without solvePressure, for a prestressed case"
+            << exit(FatalError);
+    }
+
     // Prepare for consisten Rhie-Chow correction
     if(consistentRhieChow_)
     {
@@ -1116,8 +1130,17 @@ bool coupledPressureDisplacementSolid::evolve()
             }
 
             surfaceVectorField nf = mesh().Sf()/mesh().magSf();
-            tGradDDn_ = ( (I-sqr(nf)) & (gradDDf_ & nf) );
-            nGradDDn_ = ((nf*nf) & fvc::snGrad(DD()));
+
+            // Named operands: a tmp operand with the type of the result would
+            // be reused as the storage of the inner product, which aliases an
+            // input of the loop and gives wrong results with some -O3 builds
+            // (see pimpleFluid::patchViscousForce)
+            const surfaceSymmTensorField nfPerp(I - sqr(nf));
+            const surfaceVectorField gradDDfn(gradDDf_ & nf);
+            const surfaceTensorField nfnf(nf*nf);
+            const surfaceVectorField snGradDD(fvc::snGrad(DD()));
+            tGradDDn_ = (nfPerp & gradDDfn);
+            nGradDDn_ = (nfnf & snGradDD);
 
             #include "calcTraction.H"
 

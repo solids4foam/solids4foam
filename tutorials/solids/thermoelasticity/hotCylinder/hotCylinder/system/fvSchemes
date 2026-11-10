@@ -28,7 +28,12 @@ ddtSchemes
 
 gradSchemes
 {
-    default            pointCellsLeastSquares;
+    // leastSquaresS4f needs a list of the patches whose face values enter
+    // the least-squares stencils, which the solid models register for D but
+    // not for the scalar fields
+    default            leastSquares;
+    grad(D)            leastSquaresS4f;
+    snGradCorr(D)      leastSquaresS4f;
 }
 
 divSchemes

@@ -172,6 +172,10 @@ therefore possible (`--coupling robin`) but is not expected to be run
 routinely. The cost and the uncoupled-phase behaviour are the subject of
 [issue #493](https://github.com/solids4foam/solids4foam/issues/493).
 
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
+
 ## Reference results
 
 Recorded with OpenFOAM v2412 on an Apple M1 Ultra shared with other jobs.

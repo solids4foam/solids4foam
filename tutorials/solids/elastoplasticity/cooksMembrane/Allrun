@@ -6,11 +6,62 @@
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+usage() {
+cat <<'USAGE'
+Usage:
+  ./Allrun [mesh]
+
+Where [mesh] is one of:
+  quadrilateral     (default) structured quadrilateral mesh from blockMesh
+  triangular        unstructured triangular-prism mesh from Gmsh
+
+Examples:
+  ./Allrun
+  ./Allrun triangular
+USAGE
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]
+then
+    usage
+    exit 0
+fi
+
+MESH="${1:-quadrilateral}"
+
+case "$MESH" in
+    quadrilateral|triangular) ;;
+    *)
+        echo "Error: Unknown mesh '$MESH'"
+        usage
+        exit 1
+        ;;
+esac
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
 # Create mesh
-solids4Foam::runApplication blockMesh
+if [[ "$MESH" == "quadrilateral" ]]
+then
+    solids4Foam::runApplication blockMesh
+elif command -v gmsh &> /dev/null
+then
+    # Temporarily rename 0 to avoid issues
+    mv 0 0.tmp
+
+    # Create mesh with gmsh
+    solids4Foam::runApplication gmsh -3 -format msh2 cooksMembrane.geo
+    solids4Foam::runApplication gmshToFoam cooksMembrane.msh
+    solids4Foam::runApplication changeDictionary
+
+    # Move 0 back
+    mv 0.tmp 0
+else
+    # Fail silently
+    echo; echo "Gmsh is required to run this case: please install it"
+    exit 0
+fi
 
 # Run solver
 solids4Foam::runApplication solids4Foam
