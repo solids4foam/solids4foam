@@ -97,6 +97,29 @@ class newtonQuasiMonolithicCouplingInterface
         //  displacement on the local fluid patch points
         autoPtr<vectorField> interfacePointDOffsetPtr_;
 
+        //- Is the fluid mesh moved by a solid model (motionSolver
+        //  solids4foamSolidModel)? Otherwise, it is moved by an OpenFOAM
+        //  motion solver through the fluid mesh motion coupler
+        bool solidModelMeshMotion_;
+
+        //- For an OpenFOAM motion solver: the fluid interface point
+        //  displacement from the reference points (points0), which the mesh
+        //  is moved to. It is the counterpart of the pointD of a solid model
+        //  mesh motion, and is written for restarts
+        autoPtr<pointVectorField> interfacePointDPtr_;
+
+        //- For an OpenFOAM motion solver: the reference (points0) positions
+        //  of the local fluid interface patch points
+        autoPtr<vectorField> interfacePoints0Ptr_;
+
+        //- For an OpenFOAM motion solver: the solid interface velocity
+        //  mapped to the local fluid interface patch faces
+        vectorField interfaceU_;
+
+        //- For an OpenFOAM motion solver: the internal fields of the motion
+        //  solver at the start of the time step, restored on a retry
+        HashTable<vectorField> meshMotionStateBackup_;
+
         //- Solid zone faces giving the value on each fluid zone face
         mutable autoPtr<labelListList> fluidFaceSolidFacesPtr_;
 
@@ -209,6 +232,27 @@ class newtonQuasiMonolithicCouplingInterface
         //- Return a reference to the mesh motion solver cast as a solid
         //  model
         solidModel& motionSolid();
+
+        //- Return the fluid mesh motion interface point displacement: the
+        //  pointD of a solid model mesh motion, or interfacePointDPtr_
+        pointVectorField& motionPointD();
+
+        //- For an OpenFOAM motion solver: create the interface point
+        //  displacement and the reference interface points
+        void makeInterfacePointD();
+
+        //- Move the fluid mesh to the mesh motion interface point
+        //  displacement
+        void updateFluidMesh();
+
+        //- For an OpenFOAM motion solver: store the internal fields of the
+        //  motion solver (cellMotionU, pointMotionU, cellDisplacement,
+        //  pointDisplacement), to restore them on a retry
+        void storeMeshMotionState();
+
+        //- For an OpenFOAM motion solver: restore the stored motion solver
+        //  fields
+        void restoreMeshMotionState();
 
         //- Calculate the interface face transfer addressing and weights in
         //  both directions from the interface-to-interface mapping. For a
@@ -333,7 +377,9 @@ class newtonQuasiMonolithicCouplingInterface
         void reportInterfaceFluxDiagnostics();
 
         //- Map the displacement and velocity from the solid to the mesh motion
-        //  interface. Three fields are mapped: D, U and pointD
+        //  interface. Three fields are mapped: D, U and pointD. For an
+        //  OpenFOAM motion solver, the velocity is mapped to interfaceU_ and
+        //  pointD to interfacePointDPtr_
         void mapInterfaceSolidToMeshMotion();
 
         //- Update the solid displacement gradient from D with the scheme the
