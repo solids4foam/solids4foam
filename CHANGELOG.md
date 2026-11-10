@@ -46,7 +46,10 @@ release. For complete commit-level details and contributor information, see the
   work on axisymmetric (wedge) meshes, and the coupling accepts a solid that
   starts deformed, which the fluid mesh then follows relative to its initial
   displacement; `womersleyTube/verification/Allverify --monolithic` verifies
-  both against the exact pulsatile flow in an elastic tube.
+  both against the exact pulsatile flow in an elastic tube. The fluid mesh
+  is moved by a solid model (`solids4foamSolidModel`) or, as in the
+  partitioned couplings, by a velocity- or displacement-based OpenFOAM motion
+  solver such as `velocityLaplacian` or `displacementLaplacian`.
   `./Allrun monolithic` runs it in the `beamInCrossFlow`, `blobInTreacle`,
   `cavityFlexibleBottom`, `collapsibleChannel`, `membraneRoof`,
   `perpendicularFlap`, `ringAddedMass`, `3dTube`, `mokLidDrivenCavity`,

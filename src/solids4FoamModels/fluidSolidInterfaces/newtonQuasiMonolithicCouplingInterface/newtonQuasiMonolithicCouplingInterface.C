@@ -35,6 +35,12 @@ License
 #include "motionSolver.H"
 #include "meshMotionSolidModelFvMotionSolver.H"
 #include "meshMotionTotalDispSolid.H"
+#include "fluidMeshMotionCoupler.H"
+#include "velocityFluidMeshMotionCoupler.H"
+#include "displacementFluidMeshMotionCoupler.H"
+#include "points0MotionSolver.H"
+#include "fixedValuePointPatchFields.H"
+#include "calculatedPointPatchFields.H"
 #include "globalIndex.H"
 #include "labelPairHashes.H"
 #include "compatibilityFunctions.H"
@@ -238,14 +244,15 @@ newtonQuasiMonolithicCouplingInterface::solidAssembly() const
 
 foamPetscSnesHelper& newtonQuasiMonolithicCouplingInterface::motion()
 {
-    // meshMotionSolidModelFvMotionSolver is the only currently supported
-    // mesh motion solver
+    // Only available for the meshMotionSolidModelFvMotionSolver mesh motion
+    // solver
 
     if (!isA<dynamicMotionSolverFvMesh>(fluidMesh()))
     {
         FatalErrorInFunction
-            << "meshMotionSolidModelFvMotionSolver is the only currently "
-            << "supported mesh motion solver" << exit(FatalError);
+            << "The mesh motion solver is not "
+            << meshMotionSolidModelFvMotionSolver::typeName
+            << exit(FatalError);
     }
 
     if
@@ -257,8 +264,9 @@ foamPetscSnesHelper& newtonQuasiMonolithicCouplingInterface::motion()
     )
     {
         FatalErrorInFunction
-            << "meshMotionSolidModelFvMotionSolver is the only currently "
-            << "supported mesh motion solver" << exit(FatalError);
+            << "The mesh motion solver is not "
+            << meshMotionSolidModelFvMotionSolver::typeName
+            << exit(FatalError);
     }
 
     // Cast the fluid mesh to a dynamicMotionSolverFvMesh then access its motion
@@ -282,6 +290,199 @@ foamPetscSnesHelper& newtonQuasiMonolithicCouplingInterface::motion()
 solidModel& newtonQuasiMonolithicCouplingInterface::motionSolid()
 {
     return refCast<solidModel>(motion());
+}
+
+
+pointVectorField& newtonQuasiMonolithicCouplingInterface::motionPointD()
+{
+    if (solidModelMeshMotion_)
+    {
+        return motionSolid().pointD();
+    }
+
+    if (interfacePointDPtr_.empty())
+    {
+        makeInterfacePointD();
+    }
+
+    return interfacePointDPtr_();
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::makeInterfacePointD()
+{
+    if (interfacePointDPtr_.valid() || interfacePoints0Ptr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set" << abort(FatalError);
+    }
+
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+    const polyPatch& fluidPatch = fluidMesh().boundaryMesh()[fluidPatchID];
+
+    // The reference points of the fluid mesh, as used by the displacement
+    // motion solvers: constant/polyMesh/points0, or else the points of the
+    // initial mesh
+    const pointIOField points0(points0MotionSolver::points0IO(fluidMesh()));
+
+    interfacePoints0Ptr_.reset
+    (
+        new vectorField(points0, fluidPatch.meshPoints())
+    );
+
+    // The interface point displacement is read on a restart, so that the
+    // interface displacement offset is recovered (see
+    // setInterfaceDisplacementOffsets); otherwise it is the current
+    // displacement of the fluid interface points
+    IOobject io
+    (
+        "interfacePointD",
+        fluidMesh().time().timeName(),
+        fluidMesh(),
+        IOobject::MUST_READ,
+        IOobject::AUTO_WRITE
+    );
+
+    if (io.typeHeaderOk<pointVectorField>(true))
+    {
+        Info<< "Reading " << io.name() << endl;
+
+        interfacePointDPtr_.reset
+        (
+            new pointVectorField(io, pointMesh::New(fluidMesh()))
+        );
+    }
+    else
+    {
+        wordList patchTypes
+        (
+            fluidMesh().boundaryMesh().size(),
+            calculatedPointPatchVectorField::typeName
+        );
+        patchTypes[fluidPatchID] = fixedValuePointPatchVectorField::typeName;
+
+        interfacePointDPtr_.reset
+        (
+            new pointVectorField
+            (
+                IOobject
+                (
+                    io.name(),
+                    io.instance(),
+                    io.db(),
+                    IOobject::NO_READ,
+                    IOobject::AUTO_WRITE
+                ),
+                pointMesh::New(fluidMesh()),
+                dimensionedVector(dimLength, Zero),
+                patchTypes
+            )
+        );
+
+        boundaryFieldRef(interfacePointDPtr_())[fluidPatchID] ==
+            vectorField(fluidMesh().points(), fluidPatch.meshPoints())
+          - interfacePoints0Ptr_();
+    }
+
+    if
+    (
+        !isA<fixedValuePointPatchVectorField>
+        (
+            interfacePointDPtr_().boundaryField()[fluidPatchID]
+        )
+    )
+    {
+        FatalErrorInFunction
+            << "The " << io.name() << " interface patch must be of type "
+            << "'fixedValue'" << abort(FatalError);
+    }
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::updateFluidMesh()
+{
+    if (solidModelMeshMotion_)
+    {
+        // The mesh motion solid model takes the interface displacement from
+        // its pointD
+        fluidMesh().update();
+
+        return;
+    }
+
+    // Set the change of the fluid interface points from their current
+    // positions to the interface point displacement in the motion solver,
+    // as the partitioned couplings do, and move the fluid mesh
+    const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+    const polyPatch& fluidPatch = fluidMesh().boundaryMesh()[fluidPatchID];
+    const vectorField& interfacePointD =
+        refCast<const fixedValuePointPatchVectorField>
+        (
+            motionPointD().boundaryField()[fluidPatchID]
+        );
+
+    fluidMeshMotion().setPatchMotion
+    (
+        fluidPatchID,
+        interfacePoints0Ptr_()
+      + interfacePointD
+      - vectorField(fluidMesh().points(), fluidPatch.meshPoints())
+    );
+
+    fluidMeshMotion().commit();
+
+    fluidMesh().update();
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::storeMeshMotionState()
+{
+    meshMotionStateBackup_.clear();
+
+    for (const word& name : {"cellMotionU", "cellDisplacement"})
+    {
+        const volVectorField* fieldPtr =
+            fluidMesh().findObject<volVectorField>(name);
+
+        if (fieldPtr)
+        {
+            meshMotionStateBackup_.set(name, fieldPtr->primitiveField());
+        }
+    }
+
+    for (const word& name : {"pointMotionU", "pointDisplacement"})
+    {
+        const pointVectorField* fieldPtr =
+            fluidMesh().findObject<pointVectorField>(name);
+
+        if (fieldPtr)
+        {
+            meshMotionStateBackup_.set(name, fieldPtr->primitiveField());
+        }
+    }
+}
+
+
+void newtonQuasiMonolithicCouplingInterface::restoreMeshMotionState()
+{
+    forAllConstIters(meshMotionStateBackup_, iter)
+    {
+        volVectorField* volFieldPtr =
+            fluidMesh().getObjectPtr<volVectorField>(iter.key());
+
+        if (volFieldPtr)
+        {
+            volFieldPtr->primitiveFieldRef() = iter.val();
+            volFieldPtr->correctBoundaryConditions();
+            continue;
+        }
+
+        pointVectorField& pointField =
+            fluidMesh().lookupObjectRef<pointVectorField>(iter.key());
+
+        pointField.primitiveFieldRef() = iter.val();
+        pointField.correctBoundaryConditions();
+    }
 }
 
 
@@ -1498,8 +1699,13 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceMotionUToFluidU()
     const label motionPatchID = fluidPatchID;
 
     // Map the motion interface velocity to the fluid interface
-    const fvPatchVectorField& motionPatchU =
-        motionSolid().U().boundaryField()[motionPatchID];
+    const vectorField& motionPatchU =
+        solidModelMeshMotion_
+      ? static_cast<const vectorField&>
+        (
+            motionSolid().U().boundaryField()[motionPatchID]
+        )
+      : interfaceU_;
 
     forAll(fluidPatchU, fluidFaceI)
     {
@@ -1639,19 +1845,29 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     // Lookup the fluid mesh interface patch
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
 
-    // Lookup the mesh motion displacement field
-    fvPatchVectorField& motionPatchD =
-        boundaryFieldRef(motionSolid().D())[fluidPatchID];
-    if (!isA<fixedValueFvPatchVectorField>(motionPatchD))
+    // Lookup the mesh motion displacement and velocity fields of a solid
+    // model mesh motion. An OpenFOAM motion solver only takes the interface
+    // point displacement, and the interface velocity is stored in
+    // interfaceU_
+    fvPatchVectorField* motionPatchDPtr = nullptr;
+    vectorField* motionPatchUPtr = &interfaceU_;
+    if (solidModelMeshMotion_)
     {
-        FatalErrorInFunction
-            << "The meshMotionFluid interface patch must be of type "
-            << "'fixedValue'" << abort(FatalError);
-    }
+        motionPatchDPtr = &boundaryFieldRef(motionSolid().D())[fluidPatchID];
+        if (!isA<fixedValueFvPatchVectorField>(*motionPatchDPtr))
+        {
+            FatalErrorInFunction
+                << "The meshMotionFluid interface patch must be of type "
+                << "'fixedValue'" << abort(FatalError);
+        }
 
-    // Lookup the mesh motion velocity field
-    fvPatchVectorField& motionPatchU =
-        boundaryFieldRef(motionSolid().U())[fluidPatchID];
+        motionPatchUPtr = &boundaryFieldRef(motionSolid().U())[fluidPatchID];
+    }
+    else
+    {
+        interfaceU_.setSize(fluidMesh().boundary()[fluidPatchID].size());
+    }
+    vectorField& motionPatchU = *motionPatchUPtr;
 
     // Lookup the solid interface patch
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
@@ -1696,17 +1912,26 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     const vectorField fluidZoneU(solidZoneToFluidZone(zoneSolidU));
 
     // Extract the local fluid values
-    forAll(motionPatchD, fluidFaceI)
+    forAll(motionPatchU, fluidFaceI)
     {
         const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
 
-        motionPatchD[fluidFaceI] = fluidZoneD[fluidZoneFaceI];
         motionPatchU[fluidFaceI] = fluidZoneU[fluidZoneFaceI];
     }
 
-    if (interfaceDOffsetPtr_.valid())
+    if (motionPatchDPtr)
     {
-        motionPatchD -= interfaceDOffsetPtr_();
+        fvPatchVectorField& motionPatchD = *motionPatchDPtr;
+
+        forAll(motionPatchD, fluidFaceI)
+        {
+            motionPatchD[fluidFaceI] = fluidZoneD[fluidFaceToZone[fluidFaceI]];
+        }
+
+        if (interfaceDOffsetPtr_.valid())
+        {
+            motionPatchD -= interfaceDOffsetPtr_();
+        }
     }
 
     if (interfaceToInterfaceList().size() != 1)
@@ -1717,10 +1942,14 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
 
     // fixedDisplacement patches overwrite the value with an internally stored
     // totalDisp field, so we must set that
-    if (isA<fixedDisplacementFvPatchVectorField>(motionPatchD))
+    if
+    (
+        motionPatchDPtr
+     && isA<fixedDisplacementFvPatchVectorField>(*motionPatchDPtr)
+    )
     {
-        refCast<fixedDisplacementFvPatchVectorField>(motionPatchD).totalDisp() =
-            motionPatchD;
+        refCast<fixedDisplacementFvPatchVectorField>(*motionPatchDPtr)
+            .totalDisp() = *motionPatchDPtr;
     }
 
     // Take references to zones
@@ -1760,11 +1989,12 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     );
 
     // Check the motion pointD interface patch type is fixed value
+    pointVectorField& motionPointD = this->motionPointD();
     if
     (
         !isA<fixedValuePointPatchVectorField>
         (
-            boundaryFieldRef(motionSolid().pointD())[fluidPatchID]
+            boundaryFieldRef(motionPointD)[fluidPatchID]
         )
     )
     {
@@ -1777,18 +2007,18 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     // Use "==" to reassign fixedValue
     if (interfacePointDOffsetPtr_.valid())
     {
-        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
+        boundaryFieldRef(motionPointD)[fluidPatchID] ==
             meshPatchPointD - interfacePointDOffsetPtr_();
     }
     else
     {
-        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
+        boundaryFieldRef(motionPointD)[fluidPatchID] ==
             meshPatchPointD;
     }
 
     // Correct boundary conditions to enforce the new patch values on the
     // internal field
-    motionSolid().pointD().correctBoundaryConditions();
+    motionPointD.correctBoundaryConditions();
 }
 
 
@@ -1811,6 +2041,46 @@ void newtonQuasiMonolithicCouplingInterface::updateSolidGradD
 void newtonQuasiMonolithicCouplingInterface::setInterfaceDisplacementOffsets()
 {
     const label fluidPatchID = fluidSolidInterface::fluidPatchIndices()[0];
+
+    if (!solidModelMeshMotion_)
+    {
+        // An OpenFOAM motion solver only takes the interface point
+        // displacement
+        pointPatchVectorField& motionPatchPointD =
+            boundaryFieldRef(motionPointD())[fluidPatchID];
+
+        const vectorField motionPointD
+        (
+            refCast<fixedValuePointPatchVectorField>(motionPatchPointD)
+        );
+
+        interfacePointDOffsetPtr_.clear();
+        updateSolidGradD(solid().D());
+        solid().interpolatePointDisplacement
+        (
+            solid().D(), solid().gradD(), solid().pointD()
+        );
+        solid().pointD().correctBoundaryConditions();
+        mapInterfaceSolidToMeshMotion();
+
+        interfacePointDOffsetPtr_.reset
+        (
+            new vectorField
+            (
+                refCast<fixedValuePointPatchVectorField>(motionPatchPointD)
+              - motionPointD
+            )
+        );
+
+        Info<< "Interface displacement offset between the solid and the "
+            << "fluid mesh at the start: max "
+            << gMax(mag(interfacePointDOffsetPtr_())) << endl;
+
+        motionPatchPointD == motionPointD;
+        this->motionPointD().correctBoundaryConditions();
+
+        return;
+    }
 
     fvPatchVectorField& motionPatchD =
         boundaryFieldRef(motionSolid().D())[fluidPatchID];
@@ -1876,7 +2146,6 @@ void newtonQuasiMonolithicCouplingInterface::restoreOldTimeState
     surfaceScalarField& phi = fluid().phi();
     volVectorField& USolid = solid().U();
     volVectorField& D = solid().D();
-    volVectorField& DMotion = motionSolid().D();
 
     UFluid = UFluid.oldTime();
     UFluid.correctBoundaryConditions();
@@ -1897,16 +2166,27 @@ void newtonQuasiMonolithicCouplingInterface::restoreOldTimeState
     solid().sigma() = solid().sigma().oldTime();
     solid().sigma().correctBoundaryConditions();
 
-    DMotion = DMotion.oldTime();
-    DMotion.correctBoundaryConditions();
+    if (solidModelMeshMotion_)
+    {
+        volVectorField& DMotion = motionSolid().D();
+        DMotion = DMotion.oldTime();
+        DMotion.correctBoundaryConditions();
 
-    motionSolid().pointD() = motionSolid().pointD().oldTime();
-    motionSolid().pointD().correctBoundaryConditions();
+        motionSolid().pointD() = motionSolid().pointD().oldTime();
+        motionSolid().pointD().correctBoundaryConditions();
 
-    motionSolid().sigma() = motionSolid().sigma().oldTime();
-    motionSolid().sigma().correctBoundaryConditions();
+        motionSolid().sigma() = motionSolid().sigma().oldTime();
+        motionSolid().sigma().correctBoundaryConditions();
+    }
 
     fMesh.movePoints(oldFluidPoints);
+
+    if (!solidModelMeshMotion_)
+    {
+        // The interface point displacement is set again from the solid
+        // before the mesh is moved
+        restoreMeshMotionState();
+    }
 
     phi = fvc::interpolate(UFluid) & fMesh.Sf();
 
@@ -2100,6 +2380,11 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     ),
     interfaceDOffsetPtr_(),
     interfacePointDOffsetPtr_(),
+    solidModelMeshMotion_(false),
+    interfacePointDPtr_(),
+    interfacePoints0Ptr_(),
+    interfaceU_(),
+    meshMotionStateBackup_(),
     fluidFaceSolidFacesPtr_(),
     fluidFaceSolidWeightsPtr_(),
     solidFaceFluidFacesPtr_(),
@@ -2140,22 +2425,50 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
             << exit(FatalError);
     }
 
-    if
-    (
-        !isA<meshMotionSolidModelFvMotionSolver>
+    solidModelMeshMotion_ =
+        isA<meshMotionSolidModelFvMotionSolver>
         (
             refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
-        )
-    )
-    {
-        FatalErrorInFunction
-            << "The fluid mesh motion solver must be "
-            << meshMotionSolidModelFvMotionSolver::typeName
-            << exit(FatalError);
-    }
+        );
 
-    // The mesh motion solid model must be solved with PETSc SNES
+    if (!solidModelMeshMotion_)
     {
+        // The fluid mesh is moved by an OpenFOAM motion solver, through the
+        // fluid mesh motion coupler of the partitioned couplings, which
+        // checks the interface condition of the motion solver
+        const fluidMeshMotionCoupler& coupler = fluidMeshMotion();
+
+        if
+        (
+            !isA<velocityFluidMeshMotionCoupler>(coupler)
+         && !isA<displacementFluidMeshMotionCoupler>(coupler)
+        )
+        {
+            FatalErrorInFunction
+                << "The fluid mesh motion solver "
+                << refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion()
+                   .type()
+                << " (fluidMeshMotion coupler " << coupler.type()
+                << ") is not supported by " << typeName << "." << nl
+                << "Use " << meshMotionSolidModelFvMotionSolver::typeName
+                << ", a velocity-based motion solver with a pointMotionU "
+                << "field (e.g. velocityLaplacian) or a displacement-based "
+                << "motion solver with a pointDisplacement field (e.g. "
+                << "displacementLaplacian)" << exit(FatalError);
+        }
+
+        Info<< "The fluid mesh is moved by the "
+            << refCast<dynamicMotionSolverFvMesh>(fluidMesh()).motion().type()
+            << " motion solver after the interface displacement is "
+            << "predicted" << endl;
+
+        // Create the interface point displacement, which is read on a
+        // restart
+        motionPointD();
+    }
+    else
+    {
+        // The mesh motion solid model must be solved with PETSc SNES
         const solidModel& motionModel =
             refCast<const meshMotionSolidModelFvMotionSolver>
             (
@@ -2282,7 +2595,10 @@ newtonQuasiMonolithicCouplingInterface::newtonQuasiMonolithicCouplingInterface
     solid().U().oldTime().oldTime();
     // The solid needs D and its old-time and old-old-time values
     solid().D().oldTime().oldTime();
-    motionSolid().D().oldTime();
+    if (solidModelMeshMotion_)
+    {
+        motionSolid().D().oldTime();
+    }
     solid().sigma().oldTime();
 
     // Create the solver of the monolithic system. The PETSc options are read
@@ -2454,9 +2770,12 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
 
     if (!coupled())
     {
-        motionSolid().D().correctBoundaryConditions();
-        motionSolid().pointD().correctBoundaryConditions();
-        motionSolid().U().correctBoundaryConditions();
+        if (solidModelMeshMotion_)
+        {
+            motionSolid().D().correctBoundaryConditions();
+            motionSolid().pointD().correctBoundaryConditions();
+            motionSolid().U().correctBoundaryConditions();
+        }
 
         return fluid().evolve();
     }
@@ -2468,7 +2787,6 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     volScalarField& p = fluid().p();
     volVectorField& USolid = solid().U();
     volVectorField& D = solid().D();
-    volVectorField& DMotion = motionSolid().D();
     const bool twoD = fluid().twoD();
     const label fluidBlockSize = twoD ? 3 : 4;
     const label solidBlockSize = twoD ? 2 : 3;
@@ -2485,7 +2803,7 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
 
     label timeStepRetry = 0;
 
-    if (!interfaceDOffsetPtr_.valid())
+    if (!interfacePointDOffsetPtr_.valid())
     {
         setInterfaceDisplacementOffsets();
     }
@@ -2506,7 +2824,15 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         p.correctBoundaryConditions();
         USolid.correctBoundaryConditions();
         D.correctBoundaryConditions();
-        DMotion.correctBoundaryConditions();
+        if (solidModelMeshMotion_)
+        {
+            motionSolid().D().correctBoundaryConditions();
+        }
+        else
+        {
+            // Keep the motion solver state for a retry of the time step
+            storeMeshMotionState();
+        }
 
         //    (a) Explicitly predict the solid displacement field D[n], which
         //        moves the fluid mesh, with the variable-step second-order
@@ -2548,8 +2874,9 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
         //        i.e. fluidMesh.update()
         // This updates DMotion based on the interface D which was set in
         // step (b). In addition, this function moves the fluid mesh using this
-        // D field
-        fluidMesh().update();
+        // D field. An OpenFOAM motion solver instead moves the fluid mesh
+        // from the interface point displacement
+        updateFluidMesh();
 
         // Print the mesh Courant number
         {
