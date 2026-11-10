@@ -398,7 +398,7 @@ def main() -> int:
     parser.add_argument("--factor", type=int, required=True)
     parser.add_argument("--thickness-multiplier", type=int, default=1)
     parser.add_argument("--high-order-solid", action="store_true")
-    parser.add_argument("--inlet-peak", type=float, default=0.3)
+    parser.add_argument("--inlet-peak", type=float, default=0.2)
     parser.add_argument("--ramp", type=float, default=1.0)
     parser.add_argument("--dt", type=float, default=0.00625)
     parser.add_argument("--end-time", type=float, default=8.0)

@@ -46,7 +46,7 @@ obtained by extrapolation from the finest three meshes.
 | Solid | `(0.4,0.5)x(0,0.2)x(-0.2,0.2)`, StVK, `mu = 5e5`, `nu = 0.4` | StVK, `E = 1.4 MPa`, `nu = 0.4` | identical Lame constants |
 | Clamp | `u = 0` on the base (y = 0), `n.u = 0` on the symmetry base | same | |
 | Fluid | `rho = 1000`, `nu = 1e-3` | same | |
-| Inlet | `v = 0.3 y(0.4-y)(0.4^2-z^2)/(0.2^2 0.4^2)`, "peak velocity vmax = 0.3" | `paraboloidInletVelocity`, `maxVelocity 0.3`: the same polynomial | see below |
+| Inlet | `v = 0.3 y(0.4-y)(0.4^2-z^2)/(0.2^2 0.4^2)`, "peak velocity vmax = 0.3" | `paraboloidInletVelocity`, the same polynomial; `maxVelocity 0.2` in the tutorial (0.3 for the printed profile) | see below |
 | Outlet | do-nothing, `J sigma F^-T n = 0` | `p = 0`, `grad U . n = 0` | differs only by the normal viscous stress at an outlet 1 m downstream |
 | Point A | `(0.45, 0.15, 0.15)` "close to the outer corner" | `(0.45, 0.15, -0.15)` | mirror point; a mesh vertex at every level; `u_z` changes sign |
 | Drag | `J_drag = int_Gamma_i n.(J sigma_f F^-T) e1 ds` on the computed half | pressure + viscous traction on the deformed half interface (`forces`) | same functional; Richter evaluates it as a residual on the base |
@@ -60,10 +60,13 @@ printed bi-parabolic profile is `(2/3)^2 0.3 = 0.133 m/s`. Neither stated
 mean matches it: the published 0.15 (with `Re ~ 25`) and the preprint's 0.2
 (with `Re = 40`) are both inconsistent with a 0.3 peak. The published
 definition is therefore internally inconsistent: the stated peak and the
-stated average cannot both hold (a 0.15 mean would need a 0.3375 peak). We
-use the printed profile (peak 0.3) as the primary definition. A labelled
-0.2 m/s diagnostic (below) tests which inflow the reference values belong
-to; clarification is being sought from the author. Nothing here is tuned to
+stated average cannot both hold (a 0.15 mean would need a 0.3375 peak). The
+campaign below first used the printed profile (peak 0.3) as the primary
+definition, with a labelled 0.2 m/s diagnostic testing which inflow the
+reference values belong to. The reference values are reproduced only with
+the 0.2 m/s peak (below), so since 2026-11-10 the tutorial, its regression
+references and the verification references use a 0.2 m/s peak, as the paper
+does; this is pending confirmation from the author. Nothing here is tuned to
 the reference values; the comparison is made only after our own sequence is
 resolved.
 

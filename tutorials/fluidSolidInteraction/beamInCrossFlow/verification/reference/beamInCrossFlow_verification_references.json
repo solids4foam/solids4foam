@@ -1,34 +1,40 @@
 {
   "richter": {
     "description": "Richter (2012) stationary three-dimensional FSI benchmark",
+    "inletPeakVelocity": 0.2,
+    "inletPeakNote": "The published profile has a 0.3 m/s peak, inconsistent with the stated mean (0.15 m/s) and with the preprint's 0.2 m/s and Re = 40; the reference values are reproduced only with a 0.2 m/s peak, so 0.3 m/s is taken to be an error (not yet confirmed by the author).",
     "pointA": [0.45, 0.15, -0.15],
     "pointAEquivalentPublishedCoordinate": [0.45, 0.15, 0.15],
     "referenceProvenance": {
       "citation": "Thomas Richter (2012), Goal-oriented error estimation for fluid-structure interaction problems, Computer Methods in Applied Mechanics and Engineering 223-224, 28-42, doi:10.1016/j.cma.2012.02.014",
-      "detail": "Table 5 contains five uniformly refined Q1 finite-element results. Table 6 extrapolates the finest three to Fx=1.327 N with +/-0.01 N accuracy and ux(A)=5.924e-5 m with +/-1e-7 m accuracy; Richter states that the values are accurate to at most about 1% relative error."
+      "detail": "Published Table 3 gives Fx = 1.33 N and ux(A) = 5.95e-5 m, each with a stated accuracy of 1%, extrapolated from the finest three of five uniformly refined Q1 levels. The 2011 preprint gives the same extrapolations more precisely (Table 6): Fx = 1.327 +/- 0.01 N and ux(A) = 5.924e-5 +/- 1e-7 m; its Table 5 lists the five levels."
     },
     "references": {
       "ux": {
-        "value": 5.924e-5,
-        "absoluteUncertainty": 1e-7,
+        "value": 5.95e-5,
+        "absoluteUncertainty": 6e-7,
         "tolerance": 0.05,
         "primary": true,
-        "source": "Richter (2012), Table 6"
+        "source": "Richter (2012), Table 3"
       },
       "fx": {
-        "value": 1.327,
-        "absoluteUncertainty": 0.01,
+        "value": 1.33,
+        "absoluteUncertainty": 0.013,
         "tolerance": 0.05,
         "primary": true,
-        "source": "Richter (2012), Table 6"
+        "source": "Richter (2012), Table 3"
       }
     },
     "publishedReferences": {
-      "richter2012Table5Finest": {
+      "richter2012Table3": {
+        "ux": 5.95e-5,
+        "fx": 1.33
+      },
+      "richter2011PreprintTable5Finest": {
         "ux": 5.9202e-5,
         "fx": 1.3380
       },
-      "richter2012Table6": {
+      "richter2011PreprintTable6": {
         "ux": 5.924e-5,
         "fx": 1.327
       }

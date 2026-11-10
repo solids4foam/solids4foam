@@ -30,15 +30,20 @@ The production case reproduces the stationary three-dimensional benchmark of
 [Richter](https://doi.org/10.1016/j.cma.2012.02.014). The channel is
 `[0, 1.5] x [0, 0.4] x [-0.4, 0.4] m`, and symmetry permits the computation to
 use its `z <= 0` half. The undeformed solid is
-`[0.4, 0.5] x [0, 0.2] x [-0.2, 0.2] m`. Following the explicit boundary
-condition in section 7.2 of Richter (2012), the inlet profile is bi-parabolic
-with peak speed `0.3 m/s`. The stated average speed (`0.15 m/s` in the
-published article, `0.2 m/s` and `Re=40` in the 2011 preprint) is
-inconsistent with it: the area average of the printed profile is `4/9` of its
-peak, `0.133 m/s`. This source inconsistency is retained explicitly rather
-than choosing the coefficient that best reproduces the reference table. The
-outlet uses the do-nothing/zero-traction condition, and the remaining outer
-walls are no-slip.
+`[0.4, 0.5] x [0, 0.2] x [-0.2, 0.2] m`. Following the boundary condition in
+section 6.2 of Richter (2012) (section 7.2 of the preprint), the inlet profile
+is bi-parabolic, but the tutorial uses a peak speed of `0.2 m/s` instead of the printed
+`0.3 m/s`. The three statements of the inflow in the sources are inconsistent:
+the area average of the printed profile is `4/9` of its peak, `0.133 m/s`,
+whereas the published article states an average of `0.15 m/s` and the 2011
+preprint a velocity of `0.2 m/s` with `Re = 40`. `Re = 40` with the plate
+height (`0.2 m`) and the viscosity corresponds to `0.2 m/s`, and the reference
+values are reproduced to their stated accuracy only with a `0.2 m/s` peak; the
+printed profile gives about 1.8 times them. The printed `0.3 m/s` is therefore
+taken to be an error. This is an inference from the published values, not yet
+confirmed by the author; set `maxVelocity 0.3` in `0/fluid/U.*` to solve the
+printed profile. The outlet uses the do-nothing/zero-traction condition, and
+the remaining outer walls are no-slip.
 
 The elastic plate has density `1000 kg/m3`, Young's modulus `1.4 MPa`, shear
 modulus `0.5 MPa`, Poisson ratio `0.4`, and the compressible St
@@ -129,9 +134,11 @@ end
 
 The incoming flow imparts pressure and viscous forces on the plate, causing it
 to bend. Following some initial transient effects, the flow and beam reach a
-steady state. Richter's finite-element extrapolations are
-`u_x(A) = 5.924e-5 m` with stated accuracy `+/-1e-7 m` and
-`F_x = 1.327 N` with stated accuracy `+/-0.01 N`. These are independent-code
+steady state. Richter's published finite-element extrapolations (Table 3)
+are `u_x(A) = 5.95e-5 m` and `F_x = 1.33 N`, each with a stated accuracy of
+1 %; the 2011 preprint gives them as `5.924e-5 +/- 1e-7 m` and
+`1.327 +/- 0.01 N`. They apply to the `0.2 m/s` peak used here (see above).
+These are independent-code
 verification targets, not regression values to which the discretisation is
 tuned. Figure 2 shows the displacement field in the beam, the fluid velocity
 streamlines, and the fluid pressure on the channel ground, wall and outlet.
