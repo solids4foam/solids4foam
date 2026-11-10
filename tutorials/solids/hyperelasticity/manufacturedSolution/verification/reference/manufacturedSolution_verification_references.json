@@ -20,8 +20,11 @@
       "structTet-highOrder-movingLeastSquares",
       "unstructTet-highOrder-movingLeastSquares",
       "hex-highOrder-kExactLeastSquares",
+      "hex-highOrder-leastSquares",
       "structTet-highOrder-kExactLeastSquares",
-      "unstructTet-highOrder-kExactLeastSquares"
+      "structTet-highOrder-leastSquares",
+      "unstructTet-highOrder-kExactLeastSquares",
+      "unstructTet-highOrder-leastSquares"
     ],
     "variants": {
       "hex-segregated": {
@@ -120,6 +123,14 @@
           "stress": 2.5
         }
       },
+      "hex-highOrder-leastSquares": {
+        "mesh": "hex",
+        "approach": "highOrder-leastSquares",
+        "minimum_net_order": {
+          "displacement": 3.5,
+          "stress": 2.5
+        }
+      },
       "structTet-highOrder-kExactLeastSquares": {
         "mesh": "structTet",
         "approach": "highOrder-kExactLeastSquares",
@@ -128,9 +139,25 @@
           "stress": 2.5
         }
       },
+      "structTet-highOrder-leastSquares": {
+        "mesh": "structTet",
+        "approach": "highOrder-leastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      },
       "unstructTet-highOrder-kExactLeastSquares": {
         "mesh": "unstructTet",
         "approach": "highOrder-kExactLeastSquares",
+        "minimum_net_order": {
+          "displacement": 3.0,
+          "stress": 2.5
+        }
+      },
+      "unstructTet-highOrder-leastSquares": {
+        "mesh": "unstructTet",
+        "approach": "highOrder-leastSquares",
         "minimum_net_order": {
           "displacement": 3.0,
           "stress": 2.5
