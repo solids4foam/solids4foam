@@ -1,30 +1,32 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const {prepare, publish, validate} = require('./claudeReview.cjs');
+const {prepare, publish, validate, classifyRisk, formatAssessment} = require('./claudeReview.cjs');
 
 function fixture(filename = 'README.md', patch = '@@ -1 +1 @@\n-old\n+new') {
   const pr = {number: 42, head: {sha: 'a'.repeat(40)}, base: {sha: 'b'.repeat(40)},
     title: 'Change', body: 'Evidence', state: 'open', draft: false};
-  const comments = [], outputs = {}, failures = [];
+  const comments = [], existingComments = [], outputs = {}, failures = [];
   const current = structuredClone(pr);
   const files = [{filename, patch, status: 'modified'}];
   const github = {
     rest: {pulls: {get: async () => ({data: current}), listFiles: {}},
-      issues: {createComment: async args => comments.push(args)}},
-    paginate: async () => files
+      issues: {listComments: {}, createComment: async args => comments.push(args),
+        updateComment: async args => comments.push(args)}},
+    paginate: async endpoint => endpoint === github.rest.issues.listComments ? existingComments : files
   };
   const context = {repo: {owner: 'example', repo: 'test'},
     payload: {pull_request: pr}, serverUrl: 'https://github.com', runId: 123};
   const core = {setOutput: (key, value) => {outputs[key] = String(value);},
     setFailed: value => failures.push(value), notice: () => {}};
-  return {github, context, core, comments, outputs, failures, current, files};
+  return {github, context, core, comments, outputs, failures, current, files, existingComments};
 }
 const response = (risk = 'LOW') => JSON.stringify({risk, summary: 'Clear summary',
   reason: 'Risk explanation', findings: [], verification: 'Reported evidence only.',
   human_review: ['Check the method.']});
 const env = (extra = {}) => ({REVIEW_RESULT: 'success', CLAUDE_CONCLUSION: 'success',
-  REVIEW_JSON: response(), SECURITY_CHANGE: 'false', ...extra});
+  REVIEW_JSON: response(), SECURITY_CHANGE: 'false',
+  CLAUDE_REVIEW_MODEL: 'claude-opus-5-5', CLAUDE_REVIEW_EFFORT: 'high', ...extra});
 
 test('documentation patches are data; LOW report is published with SHA and run', async () => {
   const f = fixture();
@@ -114,7 +116,7 @@ for (const result of ['failure', 'cancelled', 'timed_out']) {
     const f = fixture();
     await publish(f, env({REVIEW_RESULT: result}));
     assert.match(f.comments[0].body, /INCOMPLETE/);
-    assert.match(f.comments[0].body, /Risk is unassessed/);
+    assert.match(f.comments[0].body, /Risk: HIGH \(conservative fallback/);
     assert.equal(f.failures.length, 1);
   });
 }
@@ -168,6 +170,9 @@ test('workflow retains security boundaries and commit pins', () => {
   assert.match(yaml, /--disallowedTools "\*"/);
   assert.match(yaml, /--strict-mcp-config/);
   assert.match(yaml, /--bare/);
+  assert.match(yaml, /CLAUDE_REVIEW_MODEL: claude-opus-5-5/);
+  assert.match(yaml, /CLAUDE_REVIEW_EFFORT: high/);
+  assert.match(yaml, /--effort \$\{\{ env.CLAUDE_REVIEW_EFFORT \}\}/);
   assert.match(yaml, /--setting-sources user/);
   assert.ok(!yaml.includes('contents: write'));
   assert.ok(!yaml.includes('issues: write'));
@@ -178,4 +183,57 @@ test('workflow retains security boundaries and commit pins', () => {
   for (const line of yaml.split('\n').filter(line => line.includes('uses:'))) {
     assert.match(line, /@[a-f0-9]{40} /);
   }
+});
+
+
+test('classification is conservative and separate from presentation', () => {
+  for (const risk of ['LOW', 'MEDIUM', 'HIGH']) {
+    assert.equal(classifyRisk(risk, 'false'), risk);
+    assert.equal(classifyRisk(risk, 'true'), 'HIGH');
+  }
+  for (const invalid of [undefined, null, '', 'SAFE', 'low', {}]) {
+    assert.equal(classifyRisk(invalid, 'false'), 'HIGH');
+  }
+  for (const missing of [undefined, '', 'invalid']) {
+    assert.equal(classifyRisk('LOW', missing), 'HIGH');
+  }
+  const data = JSON.parse(response('HIGH'));
+  data.findings = ['Significant unique concern', 'Unresolved numerical concern'];
+  const text = formatAssessment(data, 'HIGH', 'false');
+  assert.ok(data.findings.every(finding => text.includes(finding)));
+});
+
+test('same-SHA reruns update only the workflow bot report', async () => {
+  const f = fixture();
+  const marker = `<!-- solids4foam-ai-review:${f.current.head.sha} -->`;
+  f.existingComments.push({id: 1, user: {login: 'outsider'}, body: marker},
+    {id: 2, user: {login: 'github-actions[bot]'}, body: marker});
+  await publish(f, env());
+  assert.equal(f.comments.length, 1);
+  assert.equal(f.comments[0].comment_id, 2);
+  assert.match(f.comments[0].body, /Requested API model: claude/);
+  assert.match(f.comments[0].body, /effort: high/);
+  assert.match(f.comments[0].body, /two-reviewer MEDIUM\/HIGH policy is not implemented/);
+});
+
+test('spoofed markers cannot replace human comments or old-SHA reports', async () => {
+  const f = fixture();
+  f.existingComments.push({id: 1, user: {login: 'outsider'},
+    body: `<!-- solids4foam-ai-review:${f.current.head.sha} -->`},
+  {id: 2, user: {login: 'github-actions[bot]'},
+    body: `<!-- solids4foam-ai-review:${'c'.repeat(40)} -->`});
+  await publish(f, env());
+  assert.equal(f.comments[0].issue_number, 42);
+  assert.equal(f.comments[0].comment_id, undefined);
+});
+
+test('failed rerun replaces the current-SHA report with explicit incomplete status', async () => {
+  const f = fixture();
+  f.existingComments.push({id: 2, user: {login: 'github-actions[bot]'},
+    body: `<!-- solids4foam-ai-review:${f.current.head.sha} -->`});
+  await publish(f, env({REVIEW_JSON: response('INVALID')}));
+  assert.equal(f.comments[0].comment_id, 2);
+  assert.match(f.comments[0].body, /INCOMPLETE/);
+  assert.match(f.comments[0].body, /Risk: HIGH \(conservative fallback/);
+  assert.equal(f.failures.length, 1);
 });

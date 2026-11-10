@@ -7,6 +7,11 @@ on:
 # No repository-wide write token. The model job cannot write to GitHub.
 permissions: {}
 
+# Explicit API model and effort. Never take these from PR content.
+env:
+  CLAUDE_REVIEW_MODEL: claude-opus-5-5
+  CLAUDE_REVIEW_EFFORT: high
+
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -52,7 +57,8 @@ jobs:
           display_report: 'false'
           show_full_output: 'false'
           claude_args: >-
-            --model sonnet
+            --model ${{ env.CLAUDE_REVIEW_MODEL }}
+            --effort ${{ env.CLAUDE_REVIEW_EFFORT }}
             --max-turns 3
             --max-budget-usd 2
             --disallowedTools "*"

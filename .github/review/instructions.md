@@ -52,3 +52,10 @@ assessments from contributing reviewers. Final approval and merging remain with
 core maintainers. Review only the supplied patches; surrounding implementation,
 CI results, and linked evidence have not been independently inspected. State
 these limits in the verification assessment.
+
+This is the standard automated AI assessment. Invite independent human judgement
+and verification rather than another full pasted AI review. Report only findings
+supported by the supplied evidence. The fixed publisher displays all findings;
+it does not use a synthesis model to dismiss unresolved concerns. The pilot has
+one reviewer, irrespective of risk; do not claim the future two-reviewer policy
+has been satisfied.

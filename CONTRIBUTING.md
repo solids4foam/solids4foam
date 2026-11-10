@@ -104,6 +104,17 @@ remains uncertain. Your technical assessment helps core maintainers decide.
 Core maintainers retain architectural decisions, final approval, and merging.
 Contributing reviews do not independently authorise a merge at this stage.
 
+Use the automated workflow as the standard AI assessment. Add independent
+technical judgement, verification, and interpretation in human reviews. Private
+AI assistance is welcome, but avoid routinely posting additional full AI reviews.
+For another assessment, agree a workflow re-run or a focused unresolved question
+with a maintainer.
+
+Contributors can develop into contributing reviewers through sustained work and
+paired reviews. Progression to core maintainer depends on review quality,
+architectural understanding, and sound technical judgement. Core maintainers
+discuss that responsibility with the contributor; review counts do not grant it.
+
 The optional Claude report is an initial, advisory assessment. Check its commit
 SHA and verify its findings. It does not replace human judgement or numerical
 verification. See the [review guide](.github/review/README.md) for risk levels,

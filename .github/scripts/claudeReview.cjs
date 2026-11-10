@@ -43,6 +43,30 @@ function plain(value) {
     .replace(/[\r\n]+/g, ' ');
 }
 
+// Classification is advisory and cannot reduce review effort in this pilot.
+// A future router must use this conservative result, never the raw model value.
+function classifyRisk(proposed, securityChange) {
+  if (securityChange !== 'false') return 'HIGH';
+  return schema.properties.risk.enum.includes(proposed) ? proposed : 'HIGH';
+}
+
+// Single-reviewer presentation only. No model synthesises or filters findings.
+function formatAssessment(data, risk, securityChange) {
+  return `**Status: analysis completed. Advisory only; no approval.**\n\n` +
+      `**Risk: ${risk}**\n\n${plain(data.reason)}\n\n` +
+      (securityChange === 'false' ? '' : securityChange === 'true'
+        ? 'CI or security configuration changed; risk is at least HIGH.\n\n'
+        : 'CI/security classification is unavailable; risk defaults to HIGH.\n\n') +
+      `### Summary\n\n${plain(data.summary)}\n\n### Findings\n\n` +
+      (data.findings.map(item => `- ${plain(item)}`).join('\n') ||
+        'No actionable issue identified in the supplied patches.') +
+      `\n\n### Verification evidence and limits\n\n${plain(data.verification)}\n\n` +
+      `### Human review checklist\n\n` +
+      data.human_review.map(item => `- [ ] ${plain(item)}`).join('\n') +
+      '\n\nContributing reviewers: please add independent numerical judgement and verification. ' +
+      'Use this standard AI report; core maintainers decide approval and merging.';
+}
+
 async function prepare({github, context, core}) {
   const pr = context.payload.pull_request;
   const args = {...context.repo, pull_number: pr.number};
@@ -85,7 +109,10 @@ async function publish({github, context, core}, env = process.env) {
   const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
     `/actions/runs/${context.runId}`;
   const heading = `## Claude advisory review\n\nReviewed commit: \`${pr.head.sha}\`\n` +
-    `\n[Workflow run](${run}) · Attempt ${env.GITHUB_RUN_ATTEMPT || '1'}\n\n`;
+    `\n[Workflow run](${run}) · Attempt ${env.GITHUB_RUN_ATTEMPT || '1'}\n\n` +
+    `Requested API model: ${plain(env.CLAUDE_REVIEW_MODEL || 'unspecified')}; ` +
+    `effort: ${plain(env.CLAUDE_REVIEW_EFFORT || 'unspecified')}.\n\n` +
+    'Pilot: one AI reviewer. The planned two-reviewer MEDIUM/HIGH policy is not implemented.\n\n';
   let body;
   let failed = false;
   try {
@@ -93,27 +120,29 @@ async function publish({github, context, core}, env = process.env) {
       throw new Error('Review did not complete');
     }
     const data = validate(env.REVIEW_JSON);
-    const risk = env.SECURITY_CHANGE === 'true' ? 'HIGH' : data.risk;
-    body = heading + `**Status: analysis completed. Advisory only; no approval.**\n\n` +
-      `**Risk: ${risk}**\n\n${plain(data.reason)}\n\n` +
-      (env.SECURITY_CHANGE === 'true' ? 'CI or security configuration changed; risk is at least HIGH.\n\n' : '') +
-      `### Summary\n\n${plain(data.summary)}\n\n### Findings\n\n` +
-      (data.findings.map(item => `- ${plain(item)}`).join('\n') ||
-        'No actionable issue identified in the supplied patches.') +
-      `\n\n### Verification evidence and limits\n\n${plain(data.verification)}\n\n` +
-      `### Human review checklist\n\n` +
-      data.human_review.map(item => `- [ ] ${plain(item)}`).join('\n') +
-      '\n\nContributing reviewers are welcome. Core maintainers decide approval and merging.';
+    const risk = classifyRisk(data.risk, env.SECURITY_CHANGE);
+    body = heading + formatAssessment(data, risk, env.SECURITY_CHANGE);
   } catch {
     failed = true;
     body = heading + '**Status: INCOMPLETE — no successful AI review.**\n\n' +
-      'Risk is unassessed. Human review is required. Check the workflow run for ' +
+      '**Risk: HIGH (conservative fallback; classification unassessed).** ' +
+      'Human review is required. Check the workflow run for ' +
       'missing credentials, API errors, timeout, incomplete diff, or invalid output. ' +
       'A previous report applies only to its stated commit.';
   }
   // A conversation comment, never a GitHub approval or request-changes review.
-  await github.rest.issues.createComment({...context.repo, issue_number: pr.number, body});
+  const marker = `<!-- solids4foam-ai-review:${pr.head.sha} -->`;
+  body = `${marker}\n${body}`;
+  const comments = await github.paginate(github.rest.issues.listComments,
+    {...context.repo, issue_number: pr.number, per_page: 100});
+  const previous = comments.find(comment => comment.user?.login === 'github-actions[bot]' &&
+    comment.body?.startsWith(marker));
+  if (previous) {
+    await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
+  } else {
+    await github.rest.issues.createComment({...context.repo, issue_number: pr.number, body});
+  }
   if (failed) core.setFailed('AI review incomplete; failure report published.');
 }
 
-module.exports = {schema, validate, plain, prepare, publish};
+module.exports = {schema, validate, classifyRisk, formatAssessment, plain, prepare, publish};

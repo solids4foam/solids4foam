@@ -6,24 +6,47 @@ build and regression evidence.
 
 ## Human roles
 
-Core maintainers own architecture, final approval, and merging. Contributing
-reviewers are encouraged to assess methods, reproduce results, and explain
-technical concerns. Their assessments inform core-maintainer decisions. They
-do not independently authorise merging at this stage. AI provides an independent
-initial assessment. It can miss defects or report incorrect findings.
+- **Core maintainers:** currently Philip Cardiff and Ivan Battistić. They own
+  architectural decisions, final integration, approval, and merging.
+- **Contributing reviewers:** experienced contributors, such as Amirhossein,
+  Seevani, and others. Their substantive reviews are valued and should be
+  recognised in review discussions. They assess methods, reproduce results,
+  and explain concerns. Their reviews inform but do not replace core approval.
+- **Automated AI reviewers:** provide preliminary technical assessments and
+  identify decisions that need human judgement. They can be wrong or miss bugs.
 
-Keep role descriptions here rather than individual names in workflow code.
-For a future reviewer directory, use an opt-in GitHub organisation team or a
-small section in CONTRIBUTING.md with verified profile links and areas of
-expertise. Core maintainers should confirm membership before adding anyone.
-Do not infer usernames from names. Do not request every reviewer on every PR.
-Authors and maintainers can invite a reviewer with relevant experience.
+Names here describe current roles; they are not permission configuration. Do
+not infer GitHub usernames. If a reviewer directory is useful later, add opt-in,
+verified profile links and areas of expertise to CONTRIBUTING.md, or use an
+organisation team. No permissions or automatic reviewer requests are changed.
+Invite relevant expertise rather than requesting every reviewer on every PR.
 
-A lightweight path to core maintainership is to pair a contributing reviewer
-with a core maintainer for selected PRs. Compare assessments and discuss missed
-issues. After sustained, sound reviews and useful numerical verification,
-core maintainers can discuss expanding responsibility with that contributor.
-No points system or new permission automation is needed.
+Progression is lightweight and based on demonstrated work:
+
+1. **Contributor:** build experience through sustained fixes, features, examples,
+   and reproducible numerical verification.
+2. **Contributing reviewer:** volunteer for reviews in familiar areas. Pair with
+   a core maintainer; compare assessments and discuss missed issues. Recognise
+   review quality, clear reasoning, and constructive follow-through.
+3. **Core maintainer:** after sustained contributions and strong reviews, the
+   core maintainers discuss progression with the contributor. Consider broad
+   architectural understanding, sound numerical and technical judgement, and
+   responsible integration decisions. Promotion is a human decision, not an
+   automatic result of review counts. No new administrative system is needed.
+
+## One standard AI review
+
+Use this workflow as the standard AI review mechanism. Human reviews should
+add independent technical judgement, numerical assessment, verification, and
+interpretation of AI findings. Private AI assistance is welcome, but do not
+routinely paste another full AI review into the PR. Own and check any findings
+you bring into a human review.
+
+For another AI assessment, ask a maintainer to re-run the structured workflow,
+or agree a specific unresolved concern to investigate. State its scope and
+report only new evidence or unresolved findings. No new comment-command system
+is introduced. Broader multi-model reviews belong in the coordinated extension
+below, with one consolidated report rather than competing bot comments.
 
 ## Risk and future approval policy
 
@@ -38,6 +61,10 @@ Classify by consequences, not diff size. Use the highest relevant risk.
 The intended one/both policy refers to the two current core maintainers. Role
 membership must be verified before any future enforcement is introduced.
 This version changes no branch protection, approval rules, or permissions.
+
+The current pilot uses one strong reviewer at every risk level. See the
+[model policy](model-policy.md) for the planned risk-dependent reviewers,
+verified API options, independence rules, and consolidation safeguards.
 
 ## Setup
 
@@ -106,16 +133,19 @@ Action installs its Claude runtime; the action pin does not freeze every
 transitive runtime dependency. Repeat live validation after updates.
 
 Each run has a ten-minute model timeout, a small turn limit, and a USD 2 model
-budget. Organisation spending limits are still needed: a public contributor
+budget. Opus 5.5 and explicit high effort are selected in the workflow.
+Organisation spending limits are still needed: a public contributor
 can trigger repeated runs. Concurrency cancels older runs for the same PR.
-Reports are appended with the exact head SHA, attempt, and run link. Reports
+Reports include the requested model/effort, exact head SHA, attempt, and run
+link. Re-runs update the workflow bot's same-SHA comment. Reports
 for older SHAs are historical evidence only. A final API check suppresses stale
 publication, though a commit can still arrive between that check and posting;
 the explicit SHA remains authoritative.
 
 Missing patches (including binary files), 3000 or more files, payloads over
 120 KB, collection errors, API failures, timeouts, and invalid model output
-produce an INCOMPLETE comment and a failing job. Risk is then unassessed.
+produce an INCOMPLETE comment and a failing job. Risk is unassessed and the
+conservative policy fallback is HIGH; no completed classification is claimed.
 A cancelled run may leave no comment. A publication failure also fails the job.
 **No report for the current SHA means no completed AI review.** A green job or
 an older report is not an approval. Skipped jobs do not mean a review occurred.
@@ -158,6 +188,17 @@ Use disposable PRs in a test repository with the same settings for live checks:
 
 Also test draft/ready transitions, a missing secret, truncated or binary diffs,
 malformed output, and denied comment permission. Confirm the comment author,
-SHA, run link, escaping, and repeat-run behaviour on GitHub. Confirm no review
-approval, source commit, or merge occurs. Review Actions logs for accidental
-sensitive output. Model risk and checklist quality require human assessment.
+SHA, model/effort, run link, escaping, and same-SHA comment updates on GitHub.
+Confirm no review approval, source commit, or merge occurs. Review Actions logs
+for accidental sensitive output. Model risk and checklist quality require human assessment.
+
+## Independent review before wider team discussion
+
+Ask an independent reviewer to inspect the trusted-ref checkout, token scopes,
+tool denial, injection handling, and whether the pinned Action correctly passes
+model/effort and structured-output options. Verify failure reports, HIGH fallback,
+comment update ownership checks, and fork/cancellation behaviour in a test repo.
+Evaluate sample numerical PRs for risk and finding quality. Confirm Opus API
+access, costs, and data handling with the organisation account owner. Review the
+human progression language and the planned two-reviewer coverage with the core
+maintainers before enabling the pilot or asking the wider team to rely on it.
