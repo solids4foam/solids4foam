@@ -80,14 +80,16 @@ verified API options, independence rules, and consolidation safeguards.
    Set a spending limit and monitor usage. Store it as the organisation Actions
    secret `ANTHROPIC_API_KEY`, restricted to this repository. A repository secret
    can be used for a pilot. Do not use a personal Claude subscription token.
-3. Allow the pinned checkout, github-script, and official Anthropic Action in
-   organisation Actions policy. The workflow supplies `GITHUB_TOKEN` explicitly;
+3. Allow the pinned checkout, github-script, upload-artifact, and Anthropic
+   Action in organisation Actions policy. The workflow supplies `GITHUB_TOKEN` explicitly;
    no GitHub App installation, personal access token, or custom App is required.
    The model job needs Contents read and Pull requests read. Only the separate
    publisher job needs Pull requests write to create a conversation comment.
-   It never calls the approval or merge APIs. No Issues write or OIDC is needed.
+   It never calls the approval or merge APIs. The publisher also needs Actions
+   read to detect explicit timeouts. No Issues write or OIDC is needed.
 4. After reviewing security and costs, set repository Actions variable
-   `CLAUDE_REVIEW_ENABLED` to `true`. Until then all AI jobs are skipped.
+   `CLAUDE_REVIEW_ENABLED` to `true`. Until then AI execution is skipped;
+   finalisation still uploads a skipped status record.
    Set it to `false` to stop new reviews. Cancel active runs separately if needed.
 5. Run the live-validation scenarios below before relying on report delivery.
    Do not make this advisory workflow a required branch-protection check.
@@ -155,12 +157,19 @@ confirm linked evidence or run numerical cases. Missing patches fail rather
 than silently claiming coverage. GitHub can also limit patch content. Humans
 must inspect the complete diff and surrounding code.
 
+## Attempt status
+
+Each run attempt uploads a small machine-readable status artifact, including
+skipped and failed reviews. Completion requires successful report publication.
+See [status records](status-records.md) for fields, conservative error reasons,
+optional numeric usage, retention, and retrieval limits. No fallback is enabled.
+
 ## Verification
 
 Run the offline tests from the repository root:
 
 ```sh
-node --test .github/scripts/claudeReview.test.cjs
+node --test .github/scripts/claudeReview*.test.cjs
 markdownlint .github/review/*.md .github/pull_request_template.md CONTRIBUTING.md
 ```
 
@@ -190,7 +199,8 @@ Also test draft/ready transitions, a missing secret, truncated or binary diffs,
 malformed output, and denied comment permission. Confirm the comment author,
 SHA, model/effort, run link, escaping, and same-SHA comment updates on GitHub.
 Confirm no review approval, source commit, or merge occurs. Review Actions logs
-for accidental sensitive output. Model risk and checklist quality require human assessment.
+for accidental sensitive output. Model risk and checklist quality require
+human assessment.
 
 ## Independent review before wider team discussion
 

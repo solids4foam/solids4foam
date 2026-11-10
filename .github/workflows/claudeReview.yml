@@ -28,6 +28,7 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
+      telemetry: ${{ steps.telemetry.outputs.telemetry }}
       report: ${{ steps.claude.outputs.structured_output }}
       conclusion: ${{ steps.claude.outputs.conclusion }}
       security_change: ${{ steps.prepare.outputs.security_change }}
@@ -68,13 +69,23 @@ jobs:
             --bare
             --disable-slash-commands
             --json-schema '${{ steps.prepare.outputs.schema }}'
+      - name: Capture safe API telemetry
+        id: telemetry
+        if: ${{ always() }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        with:
+          script: |
+            require('./.github/scripts/claudeReviewStatus.cjs').capture(core, process.env.EXECUTION_FILE);
 
   publish:
     needs: review
-    if: ${{ always() && !cancelled() && needs.review.result != 'skipped' }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     permissions:
+      actions: read
       contents: read
       pull-requests: write
     steps:
@@ -83,6 +94,9 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Publish report or explicit failure
+        id: publication
+        if: ${{ !cancelled() && needs.review.result != 'skipped' }}
+        timeout-minutes: 1
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           REVIEW_RESULT: ${{ needs.review.result }}
@@ -91,4 +105,27 @@ jobs:
           SECURITY_CHANGE: ${{ needs.review.outputs.security_change }}
         with:
           script: |
-            await require('./.github/scripts/claudeReview.cjs').publish({github, context, core});
+            const result = await require('./.github/scripts/claudeReview.cjs').publish({github, context, core});
+            core.setOutput('publication_status', JSON.stringify(result));
+      - name: Write machine-readable attempt status
+        if: ${{ always() }}
+        timeout-minutes: 1
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          REVIEW_RESULT: ${{ needs.review.result }}
+          CLAUDE_CONCLUSION: ${{ needs.review.outputs.conclusion }}
+          REVIEW_TELEMETRY: ${{ needs.review.outputs.telemetry }}
+          PUBLICATION_OUTCOME: ${{ steps.publication.outcome }}
+          PUBLICATION_STATUS: ${{ steps.publication.outputs.publication_status }}
+        with:
+          script: |
+            await require('./.github/scripts/claudeReviewStatus.cjs').finalise({github, context, core});
+      - name: Upload attempt status
+        if: ${{ always() }}
+        timeout-minutes: 1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: review-status-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-status.json
+          if-no-files-found: error
+          retention-days: 30

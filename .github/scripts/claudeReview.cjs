@@ -104,7 +104,7 @@ async function publish({github, context, core}, env = process.env) {
   const {data: current} = await github.rest.pulls.get(args);
   if (current.head.sha !== pr.head.sha || current.state !== 'open' || current.draft) {
     core.notice('No report published: the PR changed or is no longer eligible.');
-    return;
+    return {status: 'skipped'};
   }
   const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
     `/actions/runs/${context.runId}`;
@@ -143,6 +143,7 @@ async function publish({github, context, core}, env = process.env) {
     await github.rest.issues.createComment({...context.repo, issue_number: pr.number, body});
   }
   if (failed) core.setFailed('AI review incomplete; failure report published.');
+  return {status: failed ? 'failed' : 'completed'};
 }
 
 module.exports = {schema, validate, classifyRisk, formatAssessment, plain, prepare, publish};
