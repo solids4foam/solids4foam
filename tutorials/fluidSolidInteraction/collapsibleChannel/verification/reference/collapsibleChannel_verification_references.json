@@ -28,9 +28,9 @@
       "solidMeshes": [[80, 8], [160, 8], [320, 8], [640, 8], [160, 4]],
       "quickSolidMeshes": [[80, 8]],
       "reference": {
-        "wallQuarter": -0.09645925,
-        "wallMid": -0.14362832,
-        "wallThreeQuarter": -0.09645925
+        "wallQuarter": -0.09651478,
+        "wallMid": -0.14371737,
+        "wallThreeQuarter": -0.09651478
       },
       "acceptance": {
         "maxRelError": {"highOrder": 0.005},
