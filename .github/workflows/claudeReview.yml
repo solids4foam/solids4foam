@@ -1,0 +1,88 @@
+name: Claude advisory PR review
+
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+# No repository-wide write token. The model job cannot write to GitHub.
+permissions: {}
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      vars.CLAUDE_REVIEW_ENABLED == 'true' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      report: ${{ steps.claude.outputs.structured_output }}
+      conclusion: ${{ steps.claude.outputs.conclusion }}
+      security_change: ${{ steps.prepare.outputs.security_change }}
+    steps:
+      # Never check out the head, a merge ref, or scripts from the PR.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Collect patches as data
+        id: prepare
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            await require('./.github/scripts/claudeReview.cjs').prepare({github, context, core});
+      - name: Analyse without tools or write credentials
+        id: claude
+        timeout-minutes: 10
+        uses: anthropics/claude-code-action@4fa93a88de49bbef68b10eb15aabedf28ca0e1ed # v1, pinned
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+          # External human contributors are eligible, with a read-only token.
+          allowed_non_write_users: '*'
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          include_fix_links: 'false'
+          display_report: 'false'
+          show_full_output: 'false'
+          claude_args: >-
+            --model sonnet
+            --max-turns 3
+            --max-budget-usd 2
+            --disallowedTools "*"
+            --strict-mcp-config
+            --mcp-config '{"mcpServers":{}}'
+            --setting-sources user
+            --bare
+            --disable-slash-commands
+            --json-schema '${{ steps.prepare.outputs.schema }}'
+
+  publish:
+    needs: review
+    if: ${{ always() && !cancelled() && needs.review.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Publish report or explicit failure
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          REVIEW_RESULT: ${{ needs.review.result }}
+          CLAUDE_CONCLUSION: ${{ needs.review.outputs.conclusion }}
+          REVIEW_JSON: ${{ needs.review.outputs.report }}
+          SECURITY_CHANGE: ${{ needs.review.outputs.security_change }}
+        with:
+          script: |
+            await require('./.github/scripts/claudeReview.cjs').publish({github, context, core});

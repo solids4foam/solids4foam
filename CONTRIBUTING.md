@@ -96,6 +96,19 @@ Go to the original solids4foam repository on GitHub and open a pull request
 - Any **related issue numbers** (e.g., `Closes #123`).
 - **Instructions or example cases** to test your contribution, if applicable.
 
+## Reviewing Pull Requests
+
+Contributing reviewers are welcome. You can check a numerical method, reproduce
+results, or explain a compatibility concern. State what you inspected and what
+remains uncertain. Your technical assessment helps core maintainers decide.
+Core maintainers retain architectural decisions, final approval, and merging.
+Contributing reviews do not independently authorise a merge at this stage.
+
+The optional Claude report is an initial, advisory assessment. Check its commit
+SHA and verify its findings. It does not replace human judgement or numerical
+verification. See the [review guide](.github/review/README.md) for risk levels,
+reviewer development, and workflow setup.
+
 ## Questions?
 
 If you have any questions or need assistance, we encourage you to use the
