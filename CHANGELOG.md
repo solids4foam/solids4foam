@@ -8,6 +8,18 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Added the `leastSquares` high-order reconstruction scheme: the stored cell
+  values are point values at the cell centres, one polynomial per cell is
+  fitted to them and evaluated at the face quadrature points. It is selected
+  with `type leastSquares;` next to `movingLeastSquares` and
+  `kExactLeastSquares`, and is the k-exact formulation with all positive-order
+  cell moments set to zero. The per-cell-polynomial machinery shared with
+  `kExactLeastSquares` moved to the new abstract base `cellLeastSquares`, and
+  `leastSquaresScheme::cellAverageUnknowns()` reports whether a scheme stores
+  cell averages; the tutorial analytical-solution function objects and
+  `Test-highOrderGrad` use it instead of checking the scheme type. The
+  high-order regression suites and the manufactured-solution tutorials run
+  the new scheme as `highOrder-leastSquares`.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the

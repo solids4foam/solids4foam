@@ -20,14 +20,14 @@ Application
 
 Description
     Tests cell-centred and face-quadrature gradients reconstructed by
-    leastSquareScheme (kExactLeastSquares,  movingLeastSquares, ...)
-    for linear, quadratic and cubic scalar and vector polynomials on a
-    two- or three-dimensional mesh. The reconstruction settings are read from
-    constant/solidProperties.
+    a leastSquaresScheme (kExactLeastSquares, leastSquares,
+    movingLeastSquares) for linear, quadratic and cubic scalar and vector
+    polynomials on a two- or three-dimensional mesh. The reconstruction
+    settings are read from constant/solidProperties.
 
-    For kExactLeastSquares, the unknowns are initialized with exact cell
-    averages. For movingLeastSquares, they are initialized with polynomial
-    values at the cell centres.
+    When the scheme stores cell averages (cellAverageUnknowns() is true), the
+    unknowns are initialized with exact cell averages; otherwise they are
+    initialized with polynomial values at the cell centres.
 
     In 2-D, the manufactured polynomials contain every monomial in x and y up to
     the tested order. In 3-D, the same polynomials are extended with every
@@ -1022,8 +1022,7 @@ int main(int argc, char *argv[])
         displacementCoeffs
     );
 
-    const bool cellAverageUnknown =
-        reconstruction.type() == "kExactLeastSquares";
+    const bool cellAverageUnknown = reconstruction.cellAverageUnknowns();
 
     const boolList physicalNeumannPatches =
         physicalNeumannPatchMask(mesh, displacement);
@@ -1033,18 +1032,6 @@ int main(int argc, char *argv[])
         mesh,
         reconstruction
     );
-
-    if
-    (
-        !cellAverageUnknown
-     && reconstruction.type() != "movingLeastSquares"
-    )
-    {
-        FatalErrorInFunction
-            << "Test-highOrderGrad supports kExactLeastSquares and "
-            << "movingLeastSquares, but selected " << reconstruction.type()
-            << abort(FatalError);
-    }
 
     // Use third-order quadrature to calculate exact cell averages for all
     // three polynomial degrees, independently of the reconstruction order

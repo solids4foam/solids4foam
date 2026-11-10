@@ -39,8 +39,10 @@ APPROACHES=(
     petscSnes
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
+    highOrder-leastSquares
     highOrder-movingLeastSquares-parallel
     highOrder-kExactLeastSquares-parallel
+    highOrder-leastSquares-parallel
 )
 
 echo "============================================================"
@@ -123,21 +125,21 @@ select_run_approach() {
     local requested="$1"
 
     case "${requested}" in
-        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares|highOrder-leastSquares)
             local least_squares_type="${requested#highOrder-}"
             sed -E -i.bak \
-                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares|leastSquares);/\\1type ${least_squares_type};/" \
                 -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
                 "${CASE_DIR}/constant/solidProperties.highOrder"
             rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
             RUN_APPROACH=highOrder
             RUN_MODE=serial
             ;;
-        highOrder-movingLeastSquares-parallel|highOrder-kExactLeastSquares-parallel)
+        highOrder-movingLeastSquares-parallel|highOrder-kExactLeastSquares-parallel|highOrder-leastSquares-parallel)
             local least_squares_type="${requested#highOrder-}"
             least_squares_type="${least_squares_type%-parallel}"
             sed -E -i.bak \
-                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares|leastSquares);/\\1type ${least_squares_type};/" \
                 -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
                 "${CASE_DIR}/constant/solidProperties.highOrder"
             rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
@@ -201,7 +203,7 @@ run_parallel_high_order_grad_test() {
     fi
 
     sed -E -i.bak \
-        "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\1type ${least_squares_type};/" \
+        "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares|leastSquares);/\1type ${least_squares_type};/" \
         "${CASE_DIR}/constant/solidProperties.highOrder"
     rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
 

@@ -17,6 +17,7 @@ APPROACHES=(
     petscSnes
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
+    highOrder-leastSquares
 )
 
 MESHES=(hex tet)

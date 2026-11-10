@@ -26,6 +26,7 @@ APPROACHES=(
     petscSnes
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
+    highOrder-leastSquares
 )
 MODES=(steady dynamic)
 

@@ -19,8 +19,8 @@ Prepared by Ivan Batistić,  Pablo Castrillo and Philip Cardiff
   and `NewmarkBeta` second time derivative schemes on a fixed mesh
   (`dynamic` mode).
 - Compare the segregated, Jacobian-free Newton-Krylov (PETSc SNES), and
-  high-order (cubic `movingLeastSquares` and `kExactLeastSquares`
-  reconstruction) solution approaches.
+  high-order (cubic `movingLeastSquares`, `leastSquares` and
+  `kExactLeastSquares` reconstruction) solution approaches.
 
 ---
 
@@ -113,6 +113,7 @@ for the dynamic mode, the time scheme:
 ./Allrun steady segregated unstructTet
 ./Allrun steady highOrder-movingLeastSquares
 ./Allrun steady highOrder-kExactLeastSquares
+./Allrun steady highOrder-leastSquares
 ./Allrun dynamic
 ./Allrun dynamic segregated hex Euler
 ./Allrun dynamic petscSnes hex NewmarkBeta
