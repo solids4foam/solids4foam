@@ -51,10 +51,6 @@ Description
         Mesh Finite-Volume Scheme for the Advection-Diffusion Equation.
         Journal of Computational Physics, 181:729-752, 2002.
 
-SourceFiles
-    kExactLeastSquares.C
-    kExactLeastSquaresTemplates.C
-
     The per-cell polynomial machinery is implemented in cellLeastSquares and
     shared with leastSquares, the point-value scheme; this class selects the
     cell-average representation through cellAverageUnknowns().

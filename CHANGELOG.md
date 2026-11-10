@@ -380,6 +380,10 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The cell condition-number field written by the high-order schemes with
+  `calcConditionNumber true` is now named after the scheme,
+  `kExactLeastSquaresCellConditionNumber` or
+  `leastSquaresCellConditionNumber`, in place of `kExactCellConditionNumber`.
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same
   scheme in all OpenFOAM variants. The case conversion script no longer

@@ -629,7 +629,8 @@ tmp<GeometricField<
         const UList<label>& stencil = stencils[cellI];
         const UList<vector>& coeffs = gradCoeffs[cellI];
 
-        // Neighbour cell-average difference contribution
+        // Neighbour cell-value (average or point value) difference
+        // contribution
         forAll(stencil, cI)
         {
             grad[cellI] +=

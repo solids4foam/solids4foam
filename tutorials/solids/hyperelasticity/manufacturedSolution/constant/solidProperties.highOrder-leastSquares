@@ -26,7 +26,7 @@ nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
     // system/fvSolution
     solutionAlgorithm   PETScSNES;
 
-    // High-order residual: cubic movingLeastSquares reconstruction of the
+    // High-order residual: cubic leastSquares reconstruction of the
     // displacement with face quadrature, and volume integration of the
     // manufactured body force
     highOrderCoeffs

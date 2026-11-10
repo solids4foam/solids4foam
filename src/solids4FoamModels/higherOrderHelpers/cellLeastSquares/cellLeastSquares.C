@@ -446,7 +446,7 @@ void cellLeastSquares::makeCellConditionNumber() const
         (
            IOobject
            (
-               "cellLeastSquaresConditionNumber",
+               type() + "CellConditionNumber",
                mesh_.time().timeName(),
                mesh_,
                IOobject::NO_READ,
@@ -1143,7 +1143,8 @@ void cellLeastSquares::calcFaceGradCoeffs() const
                 numberOfObservations
             );
 
-            // The owner-cell averages do not depend on the stencil cell
+            // The owner-cell values (average or point value) do not depend
+            // on the stencil cell
             fillOwnerAverages(ownerGlobalCellID);
 
             forAll(cellStencil, stencilI)
@@ -1358,7 +1359,8 @@ void cellLeastSquares::calcFaceGradCoeffs() const
             Eigen::MatrixXd Q(Np, Nn + Nc);
             Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn + Nc);
 
-            // The owner-cell averages do not depend on the stencil cell
+            // The owner-cell values (average or point value) do not depend
+            // on the stencil cell
             fillOwnerAverages(ownerGlobalCellID);
 
             forAll(cellStencil, stencilI)
@@ -1431,8 +1433,9 @@ void cellLeastSquares::calcFaceGradCoeffs() const
                 }
             }
 
-            // Solve the cell-average and prescribed boundary-point equations
-            // together in one weighted least-squares system.
+            // Solve the cell-value (average or point value) and prescribed
+            // boundary-point equations together in one weighted least-squares
+            // system.
             const QRSolution qrs = QRSolve(Q, W);
             const Eigen::MatrixXd& A = qrs.A;
 
@@ -1813,8 +1816,8 @@ void cellLeastSquares::calcCellCoeffs() const
     DynamicList<FixedList<label, 3>> exponents;
     generateExponents(polynomialOrder_, exponents);
 
-    // The constant coefficient is fixed by the owner-cell average and is not
-    // included in exponents
+    // The constant coefficient is fixed by the owner-cell value (average or
+    // point value) and is not included in exponents
     const label Np = exponents.size();
 
     // Compute and store derivatives rows position in matrix A
@@ -2053,10 +2056,12 @@ void cellLeastSquares::calcCellCoeffs() const
                 << abort(FatalError);
         }
 
-        // The owner-cell averages do not depend on the stencil cell
+        // The owner-cell values (average or point value) do not depend on
+        // the stencil cell
         fillOwnerAverages(ownerGlobalCellID);
 
-        // Loop over stencil cells and compute their cell-average equations
+        // Loop over stencil cells and compute their cell-value (average or
+        // point value) equations
         for (label cI = 0; cI < stencil.size(); ++cI)
         {
             const label neiGlobalCellID = stencil[cI];
@@ -2509,7 +2514,8 @@ tmp<volSymmTensorField> cellLeastSquares::secondGrad
         const UList<label>& stencil = stencils[cellI];
         const UList<symmTensor>& coeffs = secondGradCoeffs[cellI];
 
-        // Neighbour cell-average difference contribution
+        // Neighbour cell-value (average or point value) difference
+        // contribution
         forAll(stencil, cI)
         {
             secondGrad[cellI] +=
@@ -2563,7 +2569,8 @@ autoPtr<List<symmTensor3rdOrder>> cellLeastSquares::thirdGrad
         const UList<label>& stencil = stencils[cellI];
         const UList<symmTensor3rdOrder>& coeffs = thirdGradCoeffs[cellI];
 
-        // Neighbour cell-average difference contribution
+        // Neighbour cell-value (average or point value) difference
+        // contribution
         forAll(stencil, cI)
         {
             thirdGrad[cellI] +=
