@@ -216,11 +216,10 @@ checks for the Aitken, IQNILS, and Robin coupling options:
 For efficiency, the script runs the `aitken`, `iqnils`, and `robin` variants in
 local regression copies under `beamInCrossFlow/regressionTests/`, with the end
 time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
-then. It also runs the `iqnils highOrder` variant and checks that it reaches the
-shortened end time. On supported OpenFOAM versions, the high-order result is
-checked against the same displacement and force references as the lower-order
-variants; the displacement tolerance is widened to allow the expected
-discretisation difference.
+then. It also runs the `iqnils highOrder` variant, which is checked against
+its own references because the high-order solid is less stiff on this coarse
+mesh. All supported OpenFOAM versions share one set of references; foam-extend
+is not supported for this case.
 The `iqnils` case is also run with the `displacementLaplacian` fluid mesh
 motion, and checked against the same references, because the mesh motion
 changes the beam response by much less than the tolerances, and with the
