@@ -30,8 +30,7 @@ matrix (`MPIAIJ` in parallel), in serial and in parallel runs.
 The solid sets its displacement from its velocity with the backward (BDF2)
 scheme, and evaluates the stress and the interface traction at the new time.
 Before each solve, the fluid mesh is moved to a predicted interface
-displacement; the fluid mesh motion is a solid model
-(`motionSolver solids4foamSolidModel` in `constant/fluid/dynamicMeshDict`).
+displacement (see Fluid Mesh Motion).
 
 The coupling is available on OpenFOAM.com with PETSc only.
 
@@ -96,6 +95,45 @@ On the fluid interface patch:
 
 On the solid interface patch, use a `solidTraction` condition, as for the
 partitioned couplings.
+
+## Fluid Mesh Motion
+
+The fluid mesh motion is not part of the monolithic system. Before each solve,
+the solid interface displacement is predicted with the second-order
+Adams-Bashforth formula, and the fluid mesh is moved once to it. The fluid
+mesh (`dynamicFvMesh dynamicMotionSolverFvMesh` in
+`constant/fluid/dynamicMeshDict`) can be moved by:
+
+- a solid model (`motionSolver solids4foamSolidModel`), solved with PETSc
+  SNES, as in the monolithic tutorial variants;
+- a velocity-based OpenFOAM motion solver with a `pointMotionU` field, e.g.
+  `velocityLaplacian`;
+- a displacement-based OpenFOAM motion solver with a `pointDisplacement`
+  field, e.g. `displacementLaplacian`.
+
+The OpenFOAM motion solvers are set through the fluid mesh motion coupler of
+the partitioned couplings; other motion solvers stop with an error. For
+example, `velocityLaplacian` needs, in `constant/fluid/dynamicMeshDict`,
+
+```c++
+dynamicFvMesh   dynamicMotionSolverFvMesh;
+
+motionSolver    velocityLaplacian;
+
+diffusivity     quadratic inverseDistance (interface);
+```
+
+a `0/fluid/pointMotionU` with a `fixedValue` condition on the interface patch,
+and a `cellMotionU` solver in `system/fluid/fvSolution`, as in the partitioned
+tutorials. `displacementLaplacian` instead needs `0/fluid/pointDisplacement`,
+with a `fixedValue` interface, and a `cellDisplacement` solver.
+
+With an OpenFOAM motion solver, the coupling writes the fluid interface point
+displacement from the reference points (`interfacePointD` in the fluid time
+directories), which a restart reads, so that the fluid interface follows the
+solid as in an uninterrupted run. A retried time step restores the fluid mesh
+points and the `cellMotionU`, `pointMotionU`, `cellDisplacement` and
+`pointDisplacement` fields.
 
 ## Non-conformal Interfaces
 

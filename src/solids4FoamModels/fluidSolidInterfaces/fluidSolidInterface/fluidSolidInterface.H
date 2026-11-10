@@ -350,9 +350,6 @@ class fluidSolidInterface
         //- Return accumulated interfaces displacements
         PtrList<vectorIOField>& accumulatedFluidInterfacesDisplacements();
 
-        //- Return the fluid mesh motion coupler, creating it on first use
-        fluidMeshMotionCoupler& fluidMeshMotion();
-
         //- Disallow default bitwise copy construct
         fluidSolidInterface(const fluidSolidInterface&);
 
@@ -361,6 +358,9 @@ class fluidSolidInterface
 
 protected:
     // Protected Member Functions
+
+        //- Return the fluid mesh motion coupler, creating it on first use
+        fluidMeshMotionCoupler& fluidMeshMotion();
 
         //- Update the coupled switch based on the couplingStartTime
         bool updateCoupled();
