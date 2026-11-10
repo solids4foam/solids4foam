@@ -198,8 +198,8 @@ $$t = 1.5\,\mathrm{s}$$, against a peak displacement of $$0.216\,\mathrm{m}$$:
 
 | Check | Largest difference (m) | Relative to peak |
 | --- | ---: | ---: |
-| Spatial correction, `--refine 3` to the extrapolation, $$\Delta t = 0.003125$$ | 3.6e-4 | 0.17% |
-| Extrapolation from `--refine` 2 and 3 vs 3 and 4, $$\Delta t = 0.00625$$ | 8.4e-6 | 0.004% |
+| Spatial correction to `--refine 3`, $$\Delta t = 0.003125$$ | 3.6e-4 | 0.17% |
+| Extrapolation, refine 2, 3 vs 3, 4, $$\Delta t = 0.00625$$ | 8.4e-6 | 0.004% |
 | Crouzeix-Raviart vs Taylor-Hood elements (`--refine 1`) | 1.4e-7 | < 0.001% |
 | Richardson correction of the converged reference | 8.4e-5 | 0.04% |
 | $$\Delta t = 0.0031$$ vs $$0.0016$$ | 2.5e-4 | 0.12% |
@@ -236,11 +236,11 @@ displacement of the reference, $$0.216\,\mathrm{m}$$.
   the same time step. The error must decrease and the finest must be within
   1%.
 - `time`: the tutorial fluid mesh with the 160 x 8 cubic solid and Robin
-  coupling at $$\Delta t = 0.025$$ to $$0.003125\,\mathrm{s}$$. The error against
-  the converged reference carries the spatial error of the mesh (about 4.6%),
-  so the temporal convergence is measured between successive time steps:
-  every step must complete, the observed order must be at least 1.5, and the
-  difference between the two finest steps at most 0.5%.
+  coupling at $$\Delta t = 0.025$$ to $$0.003125\,\mathrm{s}$$. The error
+  against the converged reference carries the spatial error of the mesh
+  (about 4.6%), so the temporal convergence is measured between successive
+  time steps: every step must complete, the observed order must be at least
+  1.5, and the difference between the two finest steps at most 0.5%.
 
 ## Recorded results
 
