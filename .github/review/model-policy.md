@@ -10,16 +10,17 @@ The MEDIUM/HIGH two-reviewer target below is **not implemented**.
 
 Classification, execution, presentation, and merge decisions are separate:
 
-1. The collector obtains one bounded PR snapshot and a deterministic CI/security
-   risk floor. No PR code is executed.
+1. The collector obtains one bounded PR snapshot and deterministic numerical
+   and security path floors. No PR code is executed.
 2. The official Claude Action performs one assessment and proposes a risk.
    There is no separate classifier API call and no risk-based execution branch.
 3. `classifyRisk` applies the conservative floor. Missing or invalid risk/floor
    data means HIGH. An invalid report or failed execution remains INCOMPLETE;
    HIGH fallback is a routing precaution, not a successful classification.
-4. `formatAssessment` presents every finding from the valid report without an
-   AI synthesis step. The publisher validates and escapes data and posts one
-   report per commit. Re-runs update that bot report, including on failure.
+4. Findings have kind, severity, category, location, claim, evidence, and a
+   suggested check. `formatAssessment` presents every finding without AI
+   synthesis. The publisher validates and escapes data and updates one sticky
+   report per PR, including on failure. Each update identifies its SHA.
 5. Human reviewers assess the evidence. Core maintainers decide integration
    and merging. AI risk or completion never supplies merge authority.
 

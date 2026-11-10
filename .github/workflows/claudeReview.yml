@@ -2,7 +2,8 @@ name: Claude advisory PR review
 
 on:
   pull_request_target:
-    types: [opened, reopened, ready_for_review, synchronize]
+    branches: [development, master]
+    types: [opened, reopened, ready_for_review, synchronize, labeled]
 
 # No repository-wide write token. The model job cannot write to GitHub.
 permissions: {}
@@ -13,7 +14,11 @@ env:
   CLAUDE_REVIEW_EFFORT: high
 
 concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
+  # Unrelated labels must not cancel an in-flight review.
+  group: >-
+    claude-review-${{ github.event.pull_request.number }}-${{
+      github.event.action == 'labeled' && github.event.label.name != 'ai-review-approved'
+      && github.run_id || 'review' }}
   cancel-in-progress: true
 
 jobs:
@@ -21,7 +26,11 @@ jobs:
     if: >-
       vars.CLAUDE_REVIEW_ENABLED == 'true' &&
       github.event.pull_request.draft == false &&
-      github.event.pull_request.user.type != 'Bot'
+      github.event.pull_request.user.type != 'Bot' &&
+      (github.event.action != 'labeled' || github.event.label.name == 'ai-review-approved') &&
+      (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR","CONTRIBUTOR"]'),
+        github.event.pull_request.author_association) ||
+       contains(github.event.pull_request.labels.*.name, 'ai-review-approved'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -31,7 +40,10 @@ jobs:
       telemetry: ${{ steps.telemetry.outputs.telemetry }}
       report: ${{ steps.claude.outputs.structured_output }}
       conclusion: ${{ steps.claude.outputs.conclusion }}
-      security_change: ${{ steps.prepare.outputs.security_change }}
+      risk_floor: ${{ steps.prepare.outputs.risk_floor }}
+      coverage: ${{ steps.prepare.outputs.coverage }}
+      collection_reason: ${{ steps.prepare.outputs.collection_reason }}
+      base_sha: ${{ steps.prepare.outputs.base_sha }}
     steps:
       # Never check out the head, a merge ref, or scripts from the PR.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -44,7 +56,7 @@ jobs:
         with:
           script: |
             await require('./.github/scripts/claudeReview.cjs').prepare({github, context, core});
-      - name: Analyse without tools or write credentials
+      - name: Analyse with structured-output tool only
         id: claude
         timeout-minutes: 10
         uses: anthropics/claude-code-action@4fa93a88de49bbef68b10eb15aabedf28ca0e1ed # v1, pinned
@@ -62,7 +74,8 @@ jobs:
             --effort ${{ env.CLAUDE_REVIEW_EFFORT }}
             --max-turns 3
             --max-budget-usd 2
-            --disallowedTools "*"
+            --tools StructuredOutput
+            --disallowedTools "mcp__*"
             --strict-mcp-config
             --mcp-config '{"mcpServers":{}}'
             --setting-sources user
@@ -95,14 +108,17 @@ jobs:
           persist-credentials: false
       - name: Publish report or explicit failure
         id: publication
-        if: ${{ !cancelled() && needs.review.result != 'skipped' }}
+        if: ${{ always() && needs.review.result != 'skipped' }}
         timeout-minutes: 1
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           REVIEW_RESULT: ${{ needs.review.result }}
           CLAUDE_CONCLUSION: ${{ needs.review.outputs.conclusion }}
           REVIEW_JSON: ${{ needs.review.outputs.report }}
-          SECURITY_CHANGE: ${{ needs.review.outputs.security_change }}
+          RISK_FLOOR: ${{ needs.review.outputs.risk_floor }}
+          REVIEW_COVERAGE: ${{ needs.review.outputs.coverage }}
+          REVIEW_BASE_SHA: ${{ needs.review.outputs.base_sha }}
+          COLLECTION_REASON: ${{ needs.review.outputs.collection_reason }}
         with:
           script: |
             const result = await require('./.github/scripts/claudeReview.cjs').publish({github, context, core});

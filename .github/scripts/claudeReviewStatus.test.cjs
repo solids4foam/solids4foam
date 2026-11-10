@@ -10,7 +10,7 @@ const context = {repo: {owner: 'example', repo: 'test'}, runId: 123,
   payload: {pull_request: {number: 42, head: {sha: 'a'.repeat(40)}}}};
 const env = extra => ({GITHUB_RUN_ATTEMPT: '2', REVIEW_RESULT: 'success',
   CLAUDE_CONCLUSION: 'success', PUBLICATION_OUTCOME: 'success',
-  PUBLICATION_STATUS: '{"status":"completed"}', ...extra});
+  PUBLICATION_STATUS: '{"status":"completed","coverage":"complete"}', ...extra});
 
 function check(record) {
   assert.equal(record.schema_version, 1);
@@ -28,6 +28,9 @@ test('completed requires both model success and confirmed publication', () => {
   check(completed);
   assert.equal(completed.status, 'completed');
   assert.equal(completed.failure_reason, null);
+  assert.equal(completed.coverage, 'complete');
+  assert.equal(statusRecord(context, env({PUBLICATION_STATUS:
+    '{"status":"completed","coverage":"partial"}'})).coverage, 'partial');
   for (const extra of [{PUBLICATION_OUTCOME: 'failure'}, {PUBLICATION_STATUS: ''},
     {PUBLICATION_STATUS: '{"status":"failed"}'}, {CLAUDE_CONCLUSION: 'failure'},
     {REVIEW_RESULT: 'failure'}, {PUBLICATION_STATUS: 'null'}]) {
@@ -124,12 +127,13 @@ test('publisher confirms completed only after successful API write', async () =>
     state: 'open', draft: false}})}, issues: {listComments: {},
     createComment: async () => {throw new Error('Denied');}}}, paginate: async () => []};
   const core = {setFailed: () => {}, notice: () => {}};
-  const params = {...env(), REVIEW_JSON: JSON.stringify(data), SECURITY_CHANGE: 'false'};
+  const params = {...env(), REVIEW_JSON: JSON.stringify(data), RISK_FLOOR: 'LOW',
+    REVIEW_COVERAGE: JSON.stringify({status: 'complete', omitted: []})};
   await assert.rejects(publish({github, context, core}, params), /Denied/);
   github.rest.issues.createComment = async () => {};
-  assert.deepEqual(await publish({github, context, core}, params), {status: 'completed'});
+  assert.deepEqual(await publish({github, context, core}, params), {status: 'completed', coverage: 'complete'});
   params.REVIEW_JSON = 'invalid';
-  assert.deepEqual(await publish({github, context, core}, params), {status: 'failed'});
+  assert.deepEqual(await publish({github, context, core}, params), {status: 'failed', coverage: 'incomplete'});
 });
 
 test('workflow finalises skipped/failed attempts and uploads only the status file', () => {

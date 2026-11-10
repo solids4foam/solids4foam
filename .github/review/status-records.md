@@ -15,6 +15,7 @@ accounts is implemented.
 | `status` | `completed`, `failed`, or `skipped` |
 | `failure_reason` | Null only for completed; otherwise a machine-readable code |
 | `run_id`, `run_attempt` | GitHub run ID string and numeric attempt number |
+| `coverage` | Patch coverage: `complete`, `partial`, `incomplete`, or null |
 | `usage` | Available numeric SDK token/cost totals, or null if unavailable |
 
 `completed` requires successful model execution, a valid report, and a successful
@@ -22,7 +23,8 @@ GitHub comment create/update. A successful model invocation or INCOMPLETE commen
 alone cannot produce it. `failed` includes model, validation, and publication
 failures. `skipped` means disabled/ineligible (`not_eligible_or_disabled`) or a PR
 that changed or became ineligible before publication (`pr_changed_or_ineligible`).
-A completed record is historical evidence for its stated SHA, never an approval.
+A completed record may have partial patch coverage. It is historical evidence
+for its stated SHA, never an approval.
 
 Failure reasons use evidence, not guesses:
 

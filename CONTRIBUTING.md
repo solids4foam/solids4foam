@@ -115,10 +115,11 @@ paired reviews. Progression to core maintainer depends on review quality,
 architectural understanding, and sound technical judgement. Core maintainers
 discuss that responsibility with the contributor; review counts do not grant it.
 
-The optional Claude report is an initial, advisory assessment. Check its commit
-SHA and verify its findings. It does not replace human judgement or numerical
-verification. See the [review guide](.github/review/README.md) for risk levels,
-reviewer development, and workflow setup.
+When enabled, the standard Claude report is an initial, advisory assessment.
+Check its commit SHA and verify its findings. It does not replace human
+judgement or numerical verification. See the
+[review guide](.github/review/README.md) for risk levels, reviewer development,
+and workflow setup.
 
 ## Questions?
 

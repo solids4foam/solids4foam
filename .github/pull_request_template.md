@@ -24,4 +24,6 @@ Link related issues. Keep this summary useful without the technical details. -->
   existing cases, or solver behaviour.
 - **Review focus:** Identify uncertainties and decisions that need human review.
 
-See the [contribution guide](../CONTRIBUTING.md) for review roles and expectations.
+See the [contribution guide][contributing] for review roles and expectations.
+
+[contributing]: https://github.com/solids4foam/solids4foam/blob/development/CONTRIBUTING.md

@@ -43,7 +43,8 @@ function statusRecord(context, env, timedOut = false) {
     status = 'skipped';
     reason = 'pr_changed_or_ineligible';
   } else if (env.REVIEW_RESULT === 'success' && env.CLAUDE_CONCLUSION === 'success' &&
-      env.PUBLICATION_OUTCOME === 'success' && publication?.status === 'completed') {
+      env.PUBLICATION_OUTCOME === 'success' && publication?.status === 'completed' &&
+      ['complete', 'partial'].includes(publication.coverage)) {
     status = 'completed';
     reason = null;
   } else if (timedOut) {
@@ -62,6 +63,8 @@ function statusRecord(context, env, timedOut = false) {
     head_sha: context.payload.pull_request.head.sha,
     review_type: 'primary', reviewer: 'claude-api', status, failure_reason: reason,
     run_id: String(context.runId), run_attempt: Number(env.GITHUB_RUN_ATTEMPT),
+    coverage: status === 'completed' && ['complete', 'partial'].includes(publication?.coverage)
+      ? publication.coverage : status === 'skipped' ? null : 'incomplete',
     // Re-sanitise across the job boundary, rather than copying arbitrary JSON.
     usage: telemetry([{type: 'result', usage: summary?.usage,
       total_cost_usd: summary?.usage?.cost_usd}]).usage

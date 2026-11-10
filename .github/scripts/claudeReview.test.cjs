@@ -1,7 +1,7 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const {prepare, publish, validate, classifyRisk, formatAssessment} = require('./claudeReview.cjs');
+const {prepare, publish, validate, classifyRisk, formatAssessment, pathRisk, riskFloor, buildPrompt, schema} = require('./claudeReview.cjs');
 
 function fixture(filename = 'README.md', patch = '@@ -1 +1 @@\n-old\n+new') {
   const pr = {number: 42, head: {sha: 'a'.repeat(40)}, base: {sha: 'b'.repeat(40)},
@@ -21,18 +21,24 @@ function fixture(filename = 'README.md', patch = '@@ -1 +1 @@\n-old\n+new') {
     setFailed: value => failures.push(value), notice: () => {}};
   return {github, context, core, comments, outputs, failures, current, files, existingComments};
 }
+
+const finding = claim => ({kind: 'risk', severity: 'important', category: 'numerics',
+  file: 'src/example.C', line: 12, claim, evidence: 'Changed residual',
+  suggested_check: 'Compare the Jacobian with a finite difference.'});
+
 const response = (risk = 'LOW') => JSON.stringify({risk, summary: 'Clear summary',
   reason: 'Risk explanation', findings: [], verification: 'Reported evidence only.',
   human_review: ['Check the method.']});
 const env = (extra = {}) => ({REVIEW_RESULT: 'success', CLAUDE_CONCLUSION: 'success',
-  REVIEW_JSON: response(), SECURITY_CHANGE: 'false',
+  REVIEW_JSON: response(), RISK_FLOOR: 'LOW',
+  REVIEW_COVERAGE: JSON.stringify({status: 'complete', omitted: []}),
   CLAUDE_REVIEW_MODEL: 'claude-opus-5-5', CLAUDE_REVIEW_EFFORT: 'high', ...extra});
 
 test('documentation patches are data; LOW report is published with SHA and run', async () => {
   const f = fixture();
   await prepare(f);
   assert.match(f.outputs.prompt, /UNTRUSTED PR DATA/);
-  assert.equal(f.outputs.security_change, 'false');
+  assert.equal(f.outputs.risk_floor, 'LOW');
   await publish(f, env());
   assert.equal(f.comments.length, 1);
   const c = f.comments[0];
@@ -70,7 +76,7 @@ test('new commits suppress old reports and collect the new SHA', async () => {
   f.current.head.sha = 'c'.repeat(40);
   await publish(f, env());
   assert.equal(f.comments.length, 0);
-  await assert.rejects(prepare(f), /changed/);
+  await assert.rejects(prepare(f), /collection failed/);
   f.context.payload.pull_request.head.sha = f.current.head.sha;
   await prepare(f);
   await publish(f, env());
@@ -86,7 +92,7 @@ test('head or base changing while paginating fails collection', async () => {
     };
     // Model real API snapshots, not shared object references.
     f.github.rest.pulls.get = async () => ({data: structuredClone(f.current)});
-    await assert.rejects(prepare(f), /changed during collection/);
+    await assert.rejects(prepare(f), /collection failed/);
   }
 });
 
@@ -135,8 +141,8 @@ test('missing output, invalid risk, false conclusion and extra fields fail close
 test('workflow permission changes force HIGH despite model downgrade', async () => {
   const f = fixture('.github/workflows/build.yml', '+permissions: write-all');
   await prepare(f);
-  assert.equal(f.outputs.security_change, 'true');
-  await publish(f, env({SECURITY_CHANGE: f.outputs.security_change}));
+  assert.equal(f.outputs.risk_floor, 'HIGH');
+  await publish(f, env({RISK_FLOOR: f.outputs.risk_floor}));
   assert.match(f.comments[0].body, /Risk: HIGH/);
 });
 
@@ -145,7 +151,7 @@ test('incomplete and oversized patches are not silently reviewed', async () => {
     [{filename: 'large.C', patch: '+'.repeat(120001)}]]) {
     const f = fixture();
     f.github.paginate = async () => files;
-    await assert.rejects(prepare(f), /Incomplete diff|exceeds review limit/);
+    await assert.rejects(prepare(f), /collection failed/);
     assert.equal(f.outputs.prompt, undefined);
   }
 });
@@ -165,9 +171,11 @@ test('publication API failure propagates; closed/draft PRs are suppressed', asyn
 test('workflow retains security boundaries and commit pins', () => {
   const yaml = fs.readFileSync('.github/workflows/claudeReview.yml', 'utf8');
   assert.match(yaml, /pull_request_target:/);
-  assert.match(yaml, /types: \[opened, reopened, ready_for_review, synchronize\]/);
+  assert.match(yaml, /types: \[opened, reopened, ready_for_review, synchronize, labeled\]/);
   assert.match(yaml, /cancel-in-progress: true/);
-  assert.match(yaml, /--disallowedTools "\*"/);
+  assert.match(yaml, /--tools StructuredOutput/);
+  assert.match(yaml, /--disallowedTools "mcp__\*"/);
+  assert.ok(!yaml.includes('--disallowedTools "*"'));
   assert.match(yaml, /--strict-mcp-config/);
   assert.match(yaml, /--bare/);
   assert.match(yaml, /CLAUDE_REVIEW_MODEL: claude-opus-5-5/);
@@ -188,24 +196,24 @@ test('workflow retains security boundaries and commit pins', () => {
 
 test('classification is conservative and separate from presentation', () => {
   for (const risk of ['LOW', 'MEDIUM', 'HIGH']) {
-    assert.equal(classifyRisk(risk, 'false'), risk);
-    assert.equal(classifyRisk(risk, 'true'), 'HIGH');
+    assert.equal(classifyRisk(risk, 'LOW'), risk);
+    assert.equal(classifyRisk(risk, 'HIGH'), 'HIGH');
   }
   for (const invalid of [undefined, null, '', 'SAFE', 'low', {}]) {
-    assert.equal(classifyRisk(invalid, 'false'), 'HIGH');
+    assert.equal(classifyRisk(invalid, 'LOW'), 'HIGH');
   }
   for (const missing of [undefined, '', 'invalid']) {
     assert.equal(classifyRisk('LOW', missing), 'HIGH');
   }
   const data = JSON.parse(response('HIGH'));
-  data.findings = ['Significant unique concern', 'Unresolved numerical concern'];
-  const text = formatAssessment(data, 'HIGH', 'false');
-  assert.ok(data.findings.every(finding => text.includes(finding)));
+  data.findings = [finding('Significant unique concern'), finding('Unresolved numerical concern')];
+  const text = formatAssessment(data, 'HIGH', 'HIGH');
+  assert.ok(data.findings.every(finding => text.includes(finding.claim)));
 });
 
-test('same-SHA reruns update only the workflow bot report', async () => {
+test('reruns update only the workflow bot report', async () => {
   const f = fixture();
-  const marker = `<!-- solids4foam-ai-review:${f.current.head.sha} -->`;
+  const marker = '<!-- solids4foam-ai-review -->';
   f.existingComments.push({id: 1, user: {login: 'outsider'}, body: marker},
     {id: 2, user: {login: 'github-actions[bot]'}, body: marker});
   await publish(f, env());
@@ -216,12 +224,12 @@ test('same-SHA reruns update only the workflow bot report', async () => {
   assert.match(f.comments[0].body, /two-reviewer MEDIUM\/HIGH policy is not implemented/);
 });
 
-test('spoofed markers cannot replace human comments or old-SHA reports', async () => {
+test('spoofed markers cannot replace human comments or unrelated reports', async () => {
   const f = fixture();
   f.existingComments.push({id: 1, user: {login: 'outsider'},
-    body: `<!-- solids4foam-ai-review:${f.current.head.sha} -->`},
+    body: '<!-- solids4foam-ai-review -->'},
   {id: 2, user: {login: 'github-actions[bot]'},
-    body: `<!-- solids4foam-ai-review:${'c'.repeat(40)} -->`});
+    body: '<!-- unrelated-marker -->'});
   await publish(f, env());
   assert.equal(f.comments[0].issue_number, 42);
   assert.equal(f.comments[0].comment_id, undefined);
@@ -230,10 +238,106 @@ test('spoofed markers cannot replace human comments or old-SHA reports', async (
 test('failed rerun replaces the current-SHA report with explicit incomplete status', async () => {
   const f = fixture();
   f.existingComments.push({id: 2, user: {login: 'github-actions[bot]'},
-    body: `<!-- solids4foam-ai-review:${f.current.head.sha} -->`});
+    body: '<!-- solids4foam-ai-review -->'});
   await publish(f, env({REVIEW_JSON: response('INVALID')}));
   assert.equal(f.comments[0].comment_id, 2);
   assert.match(f.comments[0].body, /INCOMPLETE/);
   assert.match(f.comments[0].body, /Risk: HIGH \(conservative fallback/);
   assert.equal(f.failures.length, 1);
+});
+
+
+test('mixed binary/text and oversized data produce explicit partial coverage', async () => {
+  const f = fixture('src/newBoundaryCondition.C');
+  f.files.push({filename: 'tutorials/check/result.png'},
+    {filename: 'tutorials/check/constant/polyMesh/points', patch: '+'.repeat(200000)});
+  await prepare(f);
+  const coverage = JSON.parse(f.outputs.coverage);
+  assert.equal(coverage.status, 'partial');
+  assert.equal(coverage.omitted.length, 2);
+  assert.ok(f.outputs.prompt.includes('result.png'));
+  await publish(f, env({REVIEW_COVERAGE: f.outputs.coverage, RISK_FLOOR: f.outputs.risk_floor}));
+  assert.match(f.comments[0].body, /Patch coverage: PARTIAL/);
+  assert.ok(f.comments[0].body.includes('result\\.png'));
+  assert.equal(f.failures.length, 0);
+});
+
+test('escaped prompt stays bounded with quote-heavy patches and prioritises source', () => {
+  const f = fixture();
+  const result = buildPrompt(f.current, [
+    {filename: 'tutorials/mesh/constant/polyMesh/points', patch: 'x'.repeat(60000)},
+    {filename: 'src/newBC.C', patch: '\"\\'.repeat(8000)}]);
+  assert.ok(Buffer.byteLength(JSON.stringify(result.prompt)) <= 90000);
+  const actionInputs = JSON.stringify({prompt: result.prompt,
+    claude_args: `--json-schema '${JSON.stringify(schema)}'`});
+  assert.ok(Buffer.byteLength(actionInputs) < 110000);
+  assert.ok(result.prompt.includes('src/newBC.C'));
+  assert.equal(result.coverage.status, 'partial');
+  assert.equal(result.coverage.omitted[0].path, 'tutorials/mesh/constant/polyMesh/points');
+});
+
+test('path floors cover core numerics, agents, build scripts, renamed and omitted files', () => {
+  for (const path of ['src/solids4FoamModels/mechanicalConstitutiveLaw/law.C',
+    'src/solids4FoamModels/fluidSolidInterfaces/interface.C',
+    'src/solids4FoamModels/solidModels/nonlinear/solver.C',
+    'src/solids4FoamModels/numerics/operator.C', 'src/blockCoupledSolids4FoamTools/solver.H',
+    '.claude/settings.json', '.agents/skills/test.md', '.gitmodules', '.mcp.json',
+    'src/solids4FoamModels/Make/options',
+    '.docker/build', 'Allwmake', 'applications/scripts/check.sh', 'tests/check.sh']) {
+    assert.equal(pathRisk(path), 'HIGH', path);
+  }
+  assert.equal(pathRisk('src/solids4FoamModels/solidModels/fvPatchFields/newBC.C'), 'MEDIUM');
+  assert.equal(pathRisk('README.md'), 'LOW');
+  assert.equal(pathRisk('tutorials/case/0/D'), 'MEDIUM');
+  assert.equal(riskFloor([{filename: 'README.md', previous_filename: 'CLAUDE.md'}]), 'HIGH');
+  assert.equal(riskFloor([{filename: '.github/workflows/ci.yml'}]), 'HIGH');
+});
+
+test('structured findings validate and render evidence separately', () => {
+  const data = JSON.parse(response('MEDIUM'));
+  data.findings = [finding('Check the sign')];
+  assert.deepEqual(validate(JSON.stringify(data)), data);
+  const rendered = formatAssessment(data, 'MEDIUM', 'MEDIUM');
+  assert.match(rendered, /Claim: Check the sign/);
+  assert.match(rendered, /Evidence: Changed residual/);
+  for (const changes of [{kind: 'approval'}, {line: -1}, {file: {}}, {severity: 'safe'},
+    {claim: ''}, {extra: 'unvalidated'}]) {
+    data.findings = [{...finding('Claim'), ...changes}];
+    assert.throws(() => validate(JSON.stringify(data)));
+  }
+});
+
+test('new head updates the same sticky report and failures replace old completion', async () => {
+  const f = fixture();
+  f.existingComments.push({id: 5, user: {login: 'github-actions[bot]'},
+    body: '<!-- solids4foam-ai-review -->\nold successful report'});
+  f.current.head.sha = f.context.payload.pull_request.head.sha = 'c'.repeat(40);
+  await publish(f, env({REVIEW_RESULT: 'failure', COLLECTION_REASON: 'nothing_reviewable'}));
+  assert.equal(f.comments[0].comment_id, 5);
+  assert.ok(f.comments[0].body.includes('c'.repeat(40)));
+  assert.match(f.comments[0].body, /INCOMPLETE/);
+  assert.match(f.comments[0].body, /nothing_reviewable/);
+});
+
+test('publication checks the collected base as well as the head', async () => {
+  const f = fixture();
+  await publish(f, env({REVIEW_BASE_SHA: 'c'.repeat(40)}));
+  assert.equal(f.comments.length, 0);
+});
+
+
+test('collection failures carry a safe diagnostic without API response text', async () => {
+  const f = fixture();
+  f.github.rest.pulls.get = async () => {throw new Error('secret authentication response');};
+  await assert.rejects(prepare(f), /evidence collection failed/);
+  assert.equal(f.outputs.collection_reason, 'collection_failed');
+  assert.ok(!JSON.stringify(f.outputs).includes('secret'));
+});
+
+test('trigger rules restrict branches and cost eligibility without exposing write tools', () => {
+  const yaml = fs.readFileSync('.github/workflows/claudeReview.yml', 'utf8');
+  assert.match(yaml, /branches: \[development, master\]/);
+  assert.match(yaml, /github.event.pull_request.author_association/);
+  assert.match(yaml, /contains\(github.event.pull_request.labels.\*.name, 'ai-review-approved'\)/);
+  assert.match(yaml, /github.event.label.name != 'ai-review-approved'\n      && github.run_id/);
 });
