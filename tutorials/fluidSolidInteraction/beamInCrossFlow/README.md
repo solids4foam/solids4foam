@@ -174,8 +174,7 @@ settings in `constant/fluid/solidProperties.*` and `mechanicalProperties.*`,
 `0/fluid/D` and `pointD`, and the `D` entries of `system/fluid/fvSchemes` and
 `fvSolution`; the law's stiffness is scaled by the
 `quadratic inverseDistance (interface)` diffusivity.
-The displacement-based options are not available on foam-extend, and the
-solid model options only on OpenFOAM.com. See the
+The solid model options are only available on OpenFOAM.com. See the
 [fluid-solid interfaces README](../../../src/solids4FoamModels/fluidSolidInterfaces/README.md)
 for the fluid mesh motion options.
 
@@ -221,7 +220,7 @@ then. It also runs the `iqnils highOrder` variant and checks that it reaches the
 shortened end time. On supported OpenFOAM versions, the high-order result is
 checked against the same displacement and force references as the lower-order
 variants; the displacement tolerance is widened to allow the expected
-discretisation difference. The high-order variant is skipped on foam-extend.
+discretisation difference.
 The `iqnils` case is also run with the `displacementLaplacian` fluid mesh
 motion, and checked against the same references, because the mesh motion
 changes the beam response by much less than the tolerances, and with the
@@ -296,6 +295,9 @@ The `Allrun` script is shown below:
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 # Example usage
 # ./Allrun            # default behaviour is the tuned IQNILS setup
 # ./Allrun aitken
@@ -304,10 +306,24 @@ The `Allrun` script is shown below:
 # ./Allrun aitken parallel
 # ./Allrun iqnils highOrder
 # ./Allrun iqnils highOrder parallel
+# ./Allrun displacementLaplacian   # fluid mesh motion (default velocityLaplacian)
+# ./Allrun diffusionElastic        # solid model mesh motion, small strain
+# ./Allrun diffusionHyperElastic   # solid model mesh motion, finite strain
+
+# foam-extend is not supported for this case: its results differ from the
+# OpenFOAM.com and OpenFOAM.org versions by about 2 %, beyond the regression
+# tolerances, and solids4foam is moving away from foam-extend
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
 
 coupling=iqnils
 interfaceCondition=dirichletNeumann
 runMode=serial
+fvSolutionSuffix=""
+solidPropertiesSuffix=""
+meshMotion=velocityLaplacian
 
 for arg in "$@"
 do
@@ -325,15 +341,32 @@ do
         parallel)
             runMode=parallel
             ;;
+        highOrder)
+            solidPropertiesSuffix=".highOrder"
+            ;;
+        velocityLaplacian|displacementLaplacian|diffusionElastic|diffusionHyperElastic)
+            meshMotion="$arg"
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|robin] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]" \
+                 "[velocityLaplacian|displacementLaplacian|diffusionElastic|diffusionHyperElastic]"
             exit 1
             ;;
     esac
 done
 
+if [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    fvSolutionSuffix=".openfoamorg"
+fi
+
+# The solid model mesh motion solver is only available in OpenFOAM.com
+if [[ "${meshMotion}" == diffusion* ]]; then
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+fi
+
 echo "Using ${coupling} coupling setup"
+echo "Using ${meshMotion} fluid mesh motion"
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 if [[ "${coupling}" == "robin" ]]; then
@@ -341,14 +374,19 @@ if [[ "${coupling}" == "robin" ]]; then
 else
     solutionSetup=${coupling}
 fi
-ln -vnsf "solidProperties.${solutionSetup}" constant/solid/solidProperties
+ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
 ln -vnsf "controlDict.${solutionSetup}" system/controlDict
-ln -vnsf "fvSolution.${solutionSetup}" system/fluid/fvSolution
+ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
 ln -vnsf "p.${interfaceCondition}" 0/fluid/p
-
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
+if [[ "${meshMotion}" == diffusion* ]]; then
+    ln -vnsf dynamicMeshDict.solidModel constant/fluid/dynamicMeshDict
+    ln -vnsf "solidProperties.${meshMotion}" constant/fluid/solidProperties
+    ln -vnsf "mechanicalProperties.${meshMotion}" \
+        constant/fluid/mechanicalProperties
+else
+    ln -vnsf "dynamicMeshDict.${meshMotion}" constant/fluid/dynamicMeshDict
+fi
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
@@ -362,7 +400,9 @@ if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
+
     solids4Foam::runParallel solids4Foam
+
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
@@ -375,8 +415,11 @@ if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
     gnuplot deflection.gnuplot &> /dev/null
-    echo "Generating force.pdf using gnuplot"
-    gnuplot force.gnuplot &> /dev/null
+    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi

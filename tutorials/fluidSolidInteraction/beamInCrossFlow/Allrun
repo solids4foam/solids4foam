@@ -18,6 +18,11 @@ source solids4FoamScripts.sh
 # ./Allrun diffusionElastic        # solid model mesh motion, small strain
 # ./Allrun diffusionHyperElastic   # solid model mesh motion, finite strain
 
+# foam-extend is not supported for this case: its results differ from the
+# OpenFOAM.com and OpenFOAM.org versions by about 2 %, beyond the regression
+# tolerances, and solids4foam is moving away from foam-extend
+solids4Foam::caseDoesNotRunWithFoamExtend
+
 # PETSc is required for this case
 solids4Foam::requirePetscOrExitSilently
 
@@ -59,18 +64,11 @@ do
     esac
 done
 
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    fvSolutionSuffix=".foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+if [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
     fvSolutionSuffix=".openfoamorg"
 fi
 
-# The displacement-based and solid model fluid mesh motion couplers are not
-# available in foam-extend, and the solid model mesh motion solver only in
-# OpenFOAM.com
-if [[ "${meshMotion}" != "velocityLaplacian" ]]; then
-    solids4Foam::caseDoesNotRunWithFoamExtend
-fi
+# The solid model mesh motion solver is only available in OpenFOAM.com
 if [[ "${meshMotion}" == diffusion* ]]; then
     solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 fi
@@ -111,17 +109,7 @@ if [[ "$runMode" == "parallel" ]]; then
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
 
-    if [[ "$WM_PROJECT" == "foam" ]]; then
-        # foam-extend's processorPolyPatch face-matching check
-        # (patchFaceMatchTol, default 1e-3) can trip partway through this
-        # case: the parallel mesh-motion point interpolation is not exactly
-        # reproducible across processor boundaries, and the mismatch grows
-        # with the beam's oscillation amplitude until it exceeds the default
-        # tolerance. Loosen it for foam-extend only.
-        solids4Foam::runParallel solids4Foam -Tolerances patchFaceMatchTol=0.05
-    else
-        solids4Foam::runParallel solids4Foam
-    fi
+    solids4Foam::runParallel solids4Foam
 
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid

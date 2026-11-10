@@ -40,10 +40,9 @@ SOLID_MESH_MOTION_END_TIME=0.5
 SOLID_MESH_MOTION_DISP_TOL=1e-3
 SOLID_MESH_MOTION_FORCE_TOL=0.1
 
+# foam-extend is not supported for this case: the Allrun declares a skip
 variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" == "9" ]]; then
+if [[ "${WM_PROJECT_VERSION:-}" != v* ]]; then
     variant="openfoamorg"
 fi
 
@@ -205,9 +204,7 @@ prepare_case() {
         ln -vnsf "U.${interface_condition}" 0/fluid/U
         ln -vnsf "p.${interface_condition}" 0/fluid/p
 
-if [[ "${variant}" == "foamextend" ]]; then
-            ln -vnsf "fvSolution.${solution_setup}.foamextend" system/fluid/fvSolution
-        elif [[ "${variant}" == "openfoamorg" ]]; then
+        if [[ "${variant}" == "openfoamorg" ]]; then
             ln -vnsf "fvSolution.${solution_setup}.openfoamorg" system/fluid/fvSolution
         fi
 
@@ -409,10 +406,8 @@ run_case "${iqnils_case}" iqnils
 robin_case=$(prepare_case robin)
 run_case "${robin_case}" robin
 
-if [[ "${variant}" != "foamextend" ]]; then
-    high_order_case=$(prepare_case iqnils highOrder)
-    run_high_order_case "${high_order_case}"
-fi
+high_order_case=$(prepare_case iqnils highOrder)
+run_high_order_case "${high_order_case}"
 
 # The fluid mesh motion variants: displacementLaplacian changes the beam
 # response by much less than the tolerances, so it shares the references;
@@ -443,13 +438,9 @@ check_case robin "${robin_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
     || failures=$((failures + $?))
 
-if [[ "${variant}" != "foamextend" ]]; then
-    check_case highOrder "${high_order_case}" \
-        "${REF_HO_MAX_DISP}" "${REF_HO_FINAL_DISP}" "${REF_HO_FINAL_FORCE}" \
-        || failures=$((failures + $?))
-else
-    echo "Skipping high-order regression case: unavailable on foam-extend"
-fi
+check_case highOrder "${high_order_case}" \
+    "${REF_HO_MAX_DISP}" "${REF_HO_FINAL_DISP}" "${REF_HO_FINAL_FORCE}" \
+    || failures=$((failures + $?))
 
 check_case displacementLaplacian "${displacement_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
