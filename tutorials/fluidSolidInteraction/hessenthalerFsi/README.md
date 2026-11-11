@@ -99,10 +99,15 @@ motion solver and a quadratic inverse-distance diffusivity.
 
 `Allrun` builds the meshes:
 
-1. `cartesianMesh` builds the fluid mesh from `system/meshDict.coarse` or
-   `system/meshDict.medium` and the surface
-   `constant/triSurface/fluidDomain.stl.gz`.
-2. `blockMesh` builds the solid mesh (`system/solid/blockMeshDict`).
+1. `surfaceFeatureEdges -angle 45` writes `constant/triSurface/fluidDomain.fms`,
+   the surface `constant/triSurface/fluidDomain.stl.gz` with its feature edges.
+2. `cartesianMesh` builds the fluid mesh from `system/meshDict.coarse` or
+   `system/meshDict.medium` and that surface. Without the feature edges it
+   chamfers the edges of the 2 mm thick flap and shrinks its faces by 1–3 %
+   in area, and the interpolated fluid traction then gives the solid a net
+   load that differs from the fluid force by 5–150 % (#665); with them the
+   flap surface is reproduced to 0.01 % in area.
+3. `blockMesh` builds the solid mesh (`system/solid/blockMeshDict`).
 
 The fluid surface is the published surface split into the patches
 `upperInlet`, `lowerInlet`, `outlet`, `wall` and `interface` (the five faces
