@@ -94,8 +94,8 @@ The relevant inherited `solidModel` entries are:
 The stabilisation sub-models accept a `scaleFactorJacobian` alongside
 `scaleFactor`, so the stabilisation used when forming the block matrix can
 differ from the one used in the residual. Setting both to zero, as the
-`heartTissueBeam` tutorial does, disables stabilisation entirely; the comment
-there notes that momentum stabilisation contributes to `sigmaHyd`
+`LandEtAl2015/problem1` tutorial does, disables stabilisation entirely; the
+comment there notes that momentum stabilisation contributes to `sigmaHyd`
 oscillations.
 
 ### The mechanicalConstitutiveLaw framework
@@ -291,9 +291,9 @@ less exercised than the defaults; treat them as experimental.
 
 Cases that select `coupledPressureDisplacementSolid`, all foam-extend only:
 
-- `solids/hyperelasticity/heartTissueBeam`
+- `solids/hyperelasticity/LandEtAl2015/problem1`
 - `solids/hyperelasticity/ratCarotid`
-- `solids/hyperelasticity/idealisedVentricle`
+- `solids/hyperelasticity/LandEtAl2015/problem2`
 - `solids/hyperelasticity/cylindricalPressureVessel`, in its
   `caseOptions/pressureDisplacement` variants
 - `solids/linearElasticity/plateHole`, in its
