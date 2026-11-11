@@ -47,6 +47,9 @@ Author
 namespace Foam
 {
 
+// Forward declaration
+class leastSquaresScheme;
+
 /*---------------------------------------------------------------------------*\
                       Class stabilisationModel Declaration
 \*---------------------------------------------------------------------------*/
@@ -324,6 +327,42 @@ public:
                 std::abort();
             }
 
+            //- Re-calculate the scalar stabilisation with the given
+            //  high-order least-squares reconstruction of the field
+            //  Only models that support the high-order residual implement
+            //  this. The caller owns the scheme, so no solid model is needed
+            virtual void updateScalarHighOrder
+            (
+                const volScalarField& field,
+                const leastSquaresScheme& reconstruction
+            ) const
+            {
+                FatalErrorInFunction
+                    << "high-order scalar stabilisation not supported by "
+                    << type() << exit(FatalError);
+
+                // Keep the compiler happy
+                std::abort();
+            }
+
+            //- Re-calculate the vector stabilisation with the given
+            //  high-order least-squares reconstruction of the field
+            //  Only models that support the high-order residual implement
+            //  this. The caller owns the scheme, so no solid model is needed
+            virtual void updateVectorHighOrder
+            (
+                const volVectorField& field,
+                const leastSquaresScheme& reconstruction
+            ) const
+            {
+                FatalErrorInFunction
+                    << "high-order vector stabilisation not supported by "
+                    << type() << exit(FatalError);
+
+                // Keep the compiler happy
+                std::abort();
+            }
+
             //- Provide an implicit approximation of the stabilisation
             //  This is an approximate Jacobian of the stabilisation term
             //  Provide the primary variable field and optionally a surface
@@ -364,7 +403,9 @@ public:
 
             //- Return true if this model is compatible with high-order
             //  residual calculation. Defaults to false; overridden by
-            //  models that are known to be compatible (e.g. alphaStab).
+            //  models that are known to be compatible (e.g. alphaStab),
+            //  which also implement updateScalarHighOrder and
+            //  updateVectorHighOrder.
             virtual bool supportsHighOrderResidual() const
             {
                 return false;

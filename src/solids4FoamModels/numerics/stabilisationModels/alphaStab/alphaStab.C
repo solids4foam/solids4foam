@@ -21,6 +21,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
 #include "fvmLaplacian.H"
+#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -57,24 +58,8 @@ Foam::alphaStab::~alphaStab()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-void Foam::alphaStab::updateScalar
-(
-    const volScalarField& p,
-    const volVectorField* gradPtr
-) const
+void Foam::alphaStab::initFaceScalar(const volScalarField& field) const
 {
-    clearCellScalarCache();
-
-    if (gradPtr == nullptr)
-    {
-        FatalErrorInFunction
-            << "grad(" << p.name() << ") must be provided with this "
-            << "stabilisation method" << exit(FatalError);
-    }
-
-    const volVectorField& gradP = *gradPtr;
-
-    // If required, initialise the face stabilisation field
     if (faceScalarPtr().empty())
     {
         faceScalarPtr().set
@@ -83,7 +68,7 @@ void Foam::alphaStab::updateScalar
             (
                 IOobject
                 (
-                    "faceStabilisation(" + p.name() + ")",
+                    "faceStabilisation(" + field.name() + ")",
                     mesh().time().timeName(),
                     mesh(),
                     IOobject::READ_IF_PRESENT,
@@ -99,45 +84,11 @@ void Foam::alphaStab::updateScalar
         autoPtrRef(faceScalarPtr()).setOriented(true);
 #endif
     }
-
-    const solidModel& solMod = lookupSolidModel(p.mesh());
-
-    if (solMod.highOrderResidual())
-    {
-        computeDiffStencilHighOrder
-        (
-            p,
-            autoPtrRef(faceScalarPtr()),
-            scaleFactor_,
-            solMod.pressureLeastSquares()
-        );
-    }
-    else
-    {
-        // Update the stabilisation
-        computeDiffStencil(p, gradP, autoPtrRef(faceScalarPtr()), scaleFactor_);
-    }
 }
 
 
-void Foam::alphaStab::updateVector
-(
-    const volVectorField& p,
-    const volTensorField* gradPtr
-) const
+void Foam::alphaStab::initFaceVector(const volVectorField& field) const
 {
-    clearCellVectorCache();
-
-    if (gradPtr == nullptr)
-    {
-        FatalErrorInFunction
-            << "grad(" << p.name() << ") must be provided with this "
-            << "stabilisation method" << exit(FatalError);
-    }
-
-    const volTensorField& gradP = *gradPtr;
-
-    // If required, initialise the face stabilisation field
     if (faceVectorPtr().empty())
     {
         faceVectorPtr().set
@@ -146,7 +97,7 @@ void Foam::alphaStab::updateVector
             (
                 IOobject
                 (
-                    "faceStabilisation(" + p.name() + ")",
+                    "faceStabilisation(" + field.name() + ")",
                     mesh().time().timeName(),
                     mesh(),
                     IOobject::READ_IF_PRESENT,
@@ -162,31 +113,166 @@ void Foam::alphaStab::updateVector
         autoPtrRef(faceVectorPtr()).setOriented(true);
 #endif
     }
+}
 
-    const solidModel& solMod = lookupSolidModel(p.mesh());
 
-    if (solMod.highOrderResidual())
+void Foam::alphaStab::updateScalar
+(
+    const volScalarField& p,
+    const volVectorField* gradPtr
+) const
+{
+    if (gradPtr == nullptr)
     {
-        // Update the high-order stabilisation
-        computeDiffStencilHighOrder
-        (
-            p,
-            autoPtrRef(faceVectorPtr()),
-            scaleFactor_,
-            solMod.displacementLeastSquares()
-        );
+        FatalErrorInFunction
+            << "grad(" << p.name() << ") must be provided with this "
+            << "stabilisation method" << exit(FatalError);
     }
-    else
+
+    // A high-order solid model on this mesh supplies its pressure scheme
+    if (foundSolidModel(p.mesh()))
     {
-        // Update the second-order stabilisation
-        computeDiffStencil
-        (
-            p,
-            gradP,
-            autoPtrRef(faceVectorPtr()),
-            scaleFactor_
-        );
+        const solidModel& solMod = lookupSolidModel(p.mesh());
+
+        if (solMod.highOrderResidual())
+        {
+            updateScalarHighOrder(p, solMod.pressureLeastSquares());
+            return;
+        }
     }
+
+    clearCellScalarCache();
+
+    // If required, initialise the face stabilisation field
+    initFaceScalar(p);
+
+    // Update the second-order stabilisation
+    computeDiffStencil(p, *gradPtr, autoPtrRef(faceScalarPtr()), scaleFactor_);
+}
+
+
+void Foam::alphaStab::updateVector
+(
+    const volVectorField& p,
+    const volTensorField* gradPtr
+) const
+{
+    if (gradPtr == nullptr)
+    {
+        FatalErrorInFunction
+            << "grad(" << p.name() << ") must be provided with this "
+            << "stabilisation method" << exit(FatalError);
+    }
+
+    // A high-order solid model on this mesh supplies its displacement scheme
+    if (foundSolidModel(p.mesh()))
+    {
+        const solidModel& solMod = lookupSolidModel(p.mesh());
+
+        if (solMod.highOrderResidual())
+        {
+            updateVectorHighOrder(p, solMod.displacementLeastSquares());
+            return;
+        }
+    }
+
+    clearCellVectorCache();
+
+    // If required, initialise the face stabilisation field
+    initFaceVector(p);
+
+    // Update the second-order stabilisation
+    computeDiffStencil(p, *gradPtr, autoPtrRef(faceVectorPtr()), scaleFactor_);
+}
+
+
+void Foam::alphaStab::updateScalarHighOrder
+(
+    const volScalarField& field,
+    const leastSquaresScheme& reconstruction
+) const
+{
+    clearCellScalarCache();
+
+    // If required, initialise the face stabilisation field
+    initFaceScalar(field);
+
+    // Update the high-order stabilisation
+    computeDiffStencilHighOrder
+    (
+        field,
+        autoPtrRef(faceScalarPtr()),
+        scaleFactor_,
+        reconstruction
+    );
+}
+
+
+void Foam::alphaStab::updateVectorHighOrder
+(
+    const volVectorField& field,
+    const leastSquaresScheme& reconstruction
+) const
+{
+    clearCellVectorCache();
+
+    // If required, initialise the face stabilisation field
+    initFaceVector(field);
+
+    // Update the high-order stabilisation
+    computeDiffStencilHighOrder
+    (
+        field,
+        autoPtrRef(faceVectorPtr()),
+        scaleFactor_,
+        reconstruction
+    );
+}
+
+
+const Foam::fvScalarMatrix& Foam::alphaStab::scalarJacobian
+(
+    const volScalarField& field,
+    const surfaceScalarField* gammaPtr,
+    const bool rebuild
+) const
+{
+    checkGamma(gammaPtr);
+
+    // Scalar Jacobian taken from diffStencilLaplacianStab, as for the vector
+    // Jacobian below
+    if (scalarJacobianPtr().empty() || rebuild)
+    {
+        if (gammaPtr == nullptr)
+        {
+            scalarJacobianPtr().reset
+            (
+                new fvScalarMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(field, "laplacian(" + field.name() + ")")
+                )
+            );
+        }
+        else
+        {
+            const word schemeName
+            (
+                "laplacian(" + gammaPtr->name() + "," + field.name() + ")"
+            );
+
+            scalarJacobianPtr().reset
+            (
+                new fvScalarMatrix
+                (
+                    scaleFactorJacobian()
+                   *fvm::laplacian(*gammaPtr, field, schemeName)
+                )
+            );
+        }
+    }
+
+    return scalarJacobianPtr()();
 }
 
 
