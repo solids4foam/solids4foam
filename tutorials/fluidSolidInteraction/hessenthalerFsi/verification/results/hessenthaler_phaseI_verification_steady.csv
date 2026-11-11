@@ -1,0 +1,9 @@
+case,run,t_end_s,tip_y_mm,tip_dz_mm,drift_mm_per_s
+F1S1,F1_S1_mu64.2_dt0.002_T40_fsistrict_reuse0,40,16.2006,-2.3107,3.0e-05
+F1S2,F1_S2_mu64.2_dt0.002_T45_fsistrict_reuse0_rep1,45,16.6550,-2.4153,2.2e-05
+F1S3,F1_S3_mu64.2_dt0.002_T45_fsistrict_reuse0,45,16.7530,-2.4370,1.2e-04
+F2S2,F2_S2_mu64.2_dt0.002_T45_fsistrict_reuse0,45,16.6920,-2.4280,8.6e-05
+F3S2,F3_S2_mu64.2_dt0.002_T40_fsistrict_reuse0,40,16.7219,-2.4375,2.6e-05
+F3S3,F3_S3_mu64.2_dt0.002_T40_tol0.001_fsistrict_reuse0,40,16.8133,-2.4567,-3.0e-05
+F1S2_tol1e-3,F1_S2_mu64.2_dt0.002_T45_tol0.001_fsistrict_reuse0,45,16.6554,-2.4154,-1.6e-05
+F1S2_tol1e-3_wallF3,F1_S2_mu64.2_dt0.002_T40_tol0.001_fsistrict_reuse0_wallF3,40,16.6688,-2.4212,1.0e-04
