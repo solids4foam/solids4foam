@@ -2,7 +2,7 @@
   "richter": {
     "description": "Richter (2012) stationary three-dimensional FSI benchmark",
     "inletPeakVelocity": 0.2,
-    "inletPeakNote": "The published profile has a 0.3 m/s peak, inconsistent with the stated mean (0.15 m/s) and with the preprint's 0.2 m/s and Re = 40; the reference values are reproduced only with a 0.2 m/s peak, so 0.3 m/s is taken to be an error (not yet confirmed by the author).",
+    "inletPeakNote": "The published profile has a 0.3 m/s peak, inconsistent with the stated mean (0.15 m/s) and with the preprint's 0.2 m/s and Re = 40; the reference values are reproduced only with a 0.2 m/s peak, so 0.3 m/s is an error; the author confirmed the 0.2 m/s peak from his original code (T. Richter, private communication, November 2026).",
     "pointA": [0.45, 0.15, -0.15],
     "pointAEquivalentPublishedCoordinate": [0.45, 0.15, 0.15],
     "referenceProvenance": {
