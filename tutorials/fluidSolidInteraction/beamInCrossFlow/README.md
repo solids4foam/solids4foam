@@ -5,7 +5,7 @@ sort: 4
 # My third tutorial: `beamInCrossFlow`
 
 You can find the files for this tutorial under
-[`tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils`](https://github.com/solids4foam/solids4foam/tree/master/tutorials/fluidSolidInteraction/beamInCrossFlow.iqnils).
+[`tutorials/fluidSolidInteraction/beamInCrossFlow`](https://github.com/solids4foam/solids4foam/tree/development/tutorials/fluidSolidInteraction/beamInCrossFlow).
 
 ---
 
@@ -26,32 +26,36 @@ is considered. An incompressible viscous fluid with a density of 1000 kg/m3 and
 kinematic viscosity of 0.001 m2/s enters the channel from the left-hand side
 with a parabolic velocity profile.
 
-This case can be analysed in two forms:
+The production case reproduces the stationary three-dimensional benchmark of
+[Richter](https://doi.org/10.1016/j.cma.2012.02.014). The channel is
+`[0, 1.5] x [0, 0.4] x [-0.4, 0.4] m`, and symmetry permits the computation to
+use its `z <= 0` half. The undeformed solid is
+`[0.4, 0.5] x [0, 0.2] x [-0.2, 0.2] m`. Following the boundary condition in
+section 6.2 of Richter (2012) (section 7.2 of the preprint), the inlet profile
+is bi-parabolic, but the tutorial uses a peak speed of `0.2 m/s` instead of the printed
+`0.3 m/s`. The three statements of the inflow in the sources are inconsistent:
+the area average of the printed profile is `4/9` of its peak, `0.133 m/s`,
+whereas the published article states an average of `0.15 m/s` and the 2011
+preprint a velocity of `0.2 m/s` with `Re = 40`. `Re = 40` with the plate
+height (`0.2 m`) and the viscosity corresponds to `0.2 m/s`, and the reference
+values are reproduced to their stated accuracy only with a `0.2 m/s` peak; the
+printed profile gives about 1.8 times them. The author has confirmed from his
+original code that the reference computations used this bi-parabolic profile
+with a `0.2 m/s` peak, on the same coordinates as here (T. Richter, private
+communication, November 2026), so the printed `0.3 m/s` is an error. Set
+`maxVelocity 0.3` in `0/fluid/U.*` to solve the printed profile. The outlet
+uses the do-nothing/zero-traction condition, and the remaining outer walls are
+no-slip.
 
-- The original form, proposed by
-  [Richter](https://onlinelibrary.wiley.com/doi/10.1002/nme.4943): The peak
-  inlet velocity is 0.2 m/s, corresponding to Re = 40 with respect to the plate
-  height (h = 0.2 m). The peak inlet velocity gradually increases from zero at t
-  = 0 s to its maximum value at t = 4 s using the following transition function
-  $$0.2 [1 − \cos(\pi t/4)]/2$$. A constant pressure is imposed at the channel
-  outlet, and a no-slip boundary condition is applied on the channel walls. The
-  elastic plate has a density of 1000 kg/m3, Young’s modulus of 1.4 MPa (shear
-  modulus of 0.5 MPa), and a Poisson’s ratio of 0.4.
-- A modified form, analysed by
-  [Gillebaart et al.](https://doi.org/10.1016/j.cma.2015.09.025) and
-  [Tuković et al.](https://hrcak.srce.hr/206941): The peak inlet velocity is
-  increased to 0.3 m/s, and the Young’s modulus of the solid beam is reduced to
-  10 kPa. In addition, the velocity reaches its maximum value at 1 s, and the
-  simulation continues until the beam reaches steady-state. The purpose of these
-  changes is to demonstrate large solid displacements and fluid mesh motion.
-
-```note
-The `beamInCrossFlow` case in solids4foam is set up in the modified form;
- however, it is straight-forward to return the case to its original form by
- setting `maxVelocity` to `0.2` and `timeAtMaxVelocity` to `4.0` in `0/fluid/U`,
- setting `E` to `1.4e6` in `constant/solid/mechanicalProperties`, and running
- past `t = 4 s` until the solution is steady.
-```
+The elastic plate has density `1000 kg/m3`, Young's modulus `1.4 MPa`, shear
+modulus `0.5 MPa`, Poisson ratio `0.4`, and the compressible St
+Venant--Kirchhoff law used by Richter. Point A is the material point
+`(0.45, 0.15, 0.15) m`; the supplied negative-`z` symmetry half samples its
+equivalent point `(0.45, 0.15, -0.15) m`. The inlet is ramped over the first
+second only as a continuation device for the transient-to-steady partitioned
+solution. Verification values are accepted only after the solution satisfies
+the documented steady-state criterion, so the ramp is not part of the
+stationary benchmark definition.
 
 The fluid is described by incompressible Newtonian isothermal laminar flow,
 where the Navier-Stokes governing equations take the form:
@@ -68,8 +72,8 @@ $$
 + \boldsymbol{f_b}
 $$
 
-For the solid, we assume finite strains (though a small strain assumption would
-be OK in the the original form of the case) with the material behaviour
+For the solid, we assume finite strains (although the benchmark deformation is
+small enough for a small-strain approximation) with the material behaviour
 described by the St Venant-Kirchhoff hyperelastic law:
 
 $$
@@ -132,15 +136,14 @@ end
 
 The incoming flow imparts pressure and viscous forces on the plate, causing it
 to bend. Following some initial transient effects, the flow and beam reach a
-steady-state. In the modified form of the case, with an increased peak inlet
-velocity of 0.3 m/s and reduced Young’s modulus of 10 kPa, displacement of point
-A is expected to be (0.01463, 0.005, −0.000447) m at steady state. Further
-details of the case can be found in
-[Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković (2018) OpenFOAM Finite
-Volume Solver for Fluid-Solid Interaction](https://hrcak.srce.hr/206941);
-in particular, see Fig. 28 therein. Figure 2 shows the displacement field in the
-beam, the fluid velocity streamlines, and the fluid pressure on the channel
-ground, wall and outlet.
+steady state. Richter's published finite-element extrapolations (Table 3)
+are `u_x(A) = 5.95e-5 m` and `F_x = 1.33 N`, each with a stated accuracy of
+1 %; the 2011 preprint gives them as `5.924e-5 +/- 1e-7 m` and
+`1.327 +/- 0.01 N`. They apply to the `0.2 m/s` peak used here (see above).
+These are independent-code
+verification targets, not regression values to which the discretisation is
+tuned. Figure 2 shows the displacement field in the beam, the fluid velocity
+streamlines, and the fluid pressure on the channel ground, wall and outlet.
 
 ![Diagram of the expected results](images/fs_over_2.PNG)
 
@@ -173,8 +176,7 @@ settings in `constant/fluid/solidProperties.*` and `mechanicalProperties.*`,
 `0/fluid/D` and `pointD`, and the `D` entries of `system/fluid/fvSchemes` and
 `fvSolution`; the law's stiffness is scaled by the
 `quadratic inverseDistance (interface)` diffusivity.
-The displacement-based options are not available on foam-extend, and the
-solid model options only on OpenFOAM.com. See the
+The solid model options are only available on OpenFOAM.com. See the
 [fluid-solid interfaces README](../../../src/solids4FoamModels/fluidSolidInterfaces/README.md)
 for the fluid mesh motion options.
 
@@ -182,15 +184,23 @@ For a higher-level overview of the available FSI coupling schemes and the main
 `fluidSolidInterface` options, see the
 [fluid-solid interfaces documentation](https://www.solids4foam.com/documentation/fluid-solid-interfaces/).
 
-For the current settings, a fair comparison over the strongly-coupled transient
-window up to `t = 1.0 s`, using the same time step, PETSc-based solid solve,
-solid predictor, fluid residual control and shared FSI settings, gives:
+Over the transient window up to `t = 1.0 s` (20 time steps of `0.05 s`), with
+the supplied settings, the same PETSc-based solid solve and solid predictor, a
+serial run of each coupling gives (solids4foam development, OpenFOAM v2512,
+Apple M1 Ultra):
 
-- Aitken: `279` outer FSI iterations and about `21.8 s` wall-clock.
-- IQNILS: `215` outer FSI iterations and about `16.3 s` wall-clock.
+| Coupling | Convergence test | Outer FSI iterations | Wall-clock |
+| --- | --- | ---: | ---: |
+| Aitken (supplied) | smaller of the two residual measures | 129 | 14 s |
+| Aitken | `requireAllResidualMeasures yes` | 173 | 17 s |
+| IQNILS (supplied) | `requireAllResidualMeasures yes` | 187 | 18 s |
+| IQNILS, `couplingReuse 2` | `requireAllResidualMeasures yes` | 161 | 16 s |
 
-So for this like-for-like setup, IQNILS is both faster and requires fewer FSI
-iterations than Aitken.
+All four give the same point-A displacement at `t = 1.0 s` to within
+`1e-10 m`. For this short, mildly coupled start-up window the two methods
+cost about the same once they use the same (strict) convergence test; the
+supplied Aitken setup is cheaper mainly because its default test accepts a
+step when either residual measure is below `outerCorrTolerance`.
 
 The IQNILS setup sets `relMinSignificant 1e-2` in `constant/fsiProperties.iqnils`,
 which drops a secant mode when the part of it that is orthogonal to the newer
@@ -208,11 +218,10 @@ checks for the Aitken, IQNILS, and Robin coupling options:
 For efficiency, the script runs the `aitken`, `iqnils`, and `robin` variants in
 local regression copies under `beamInCrossFlow/regressionTests/`, with the end
 time reduced to `t = 1.0 s`, since the strongest FSI coupling occurs before
-then. It also runs the `iqnils highOrder` variant and checks that it reaches the
-shortened end time. On supported OpenFOAM versions, the high-order result is
-checked against the same displacement and force references as the lower-order
-variants; the displacement tolerance is widened to allow the expected
-discretisation difference. The high-order variant is skipped on foam-extend.
+then. It also runs the `iqnils highOrder` variant, which is checked against
+its own references because the high-order solid is less stiff on this coarse
+mesh. All supported OpenFOAM versions share one set of references; foam-extend
+is not supported for this case.
 The `iqnils` case is also run with the `displacementLaplacian` fluid mesh
 motion, and checked against the same references, because the mesh motion
 changes the beam response by much less than the tolerances, and with the
@@ -287,6 +296,9 @@ The `Allrun` script is shown below:
 # Source tutorial run functions
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
 # Example usage
 # ./Allrun            # default behaviour is the tuned IQNILS setup
 # ./Allrun aitken
@@ -295,10 +307,24 @@ The `Allrun` script is shown below:
 # ./Allrun aitken parallel
 # ./Allrun iqnils highOrder
 # ./Allrun iqnils highOrder parallel
+# ./Allrun displacementLaplacian   # fluid mesh motion (default velocityLaplacian)
+# ./Allrun diffusionElastic        # solid model mesh motion, small strain
+# ./Allrun diffusionHyperElastic   # solid model mesh motion, finite strain
+
+# foam-extend is not supported for this case: its results differ from the
+# OpenFOAM.com and OpenFOAM.org versions by about 2 %, beyond the regression
+# tolerances, and solids4foam is moving away from foam-extend
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+# PETSc is required for this case
+solids4Foam::requirePetscOrExitSilently
 
 coupling=iqnils
 interfaceCondition=dirichletNeumann
 runMode=serial
+fvSolutionSuffix=""
+solidPropertiesSuffix=""
+meshMotion=velocityLaplacian
 
 for arg in "$@"
 do
@@ -316,15 +342,32 @@ do
         parallel)
             runMode=parallel
             ;;
+        highOrder)
+            solidPropertiesSuffix=".highOrder"
+            ;;
+        velocityLaplacian|displacementLaplacian|diffusionElastic|diffusionHyperElastic)
+            meshMotion="$arg"
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [aitken|iqnils|robin] [parallel]"
+            echo "Usage: ./Allrun [aitken|iqnils|robin] [highOrder] [parallel]" \
+                 "[velocityLaplacian|displacementLaplacian|diffusionElastic|diffusionHyperElastic]"
             exit 1
             ;;
     esac
 done
 
+if [[ "${WM_PROJECT_VERSION:-}" != *"v"* ]]; then
+    fvSolutionSuffix=".openfoamorg"
+fi
+
+# The solid model mesh motion solver is only available in OpenFOAM.com
+if [[ "${meshMotion}" == diffusion* ]]; then
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+fi
+
 echo "Using ${coupling} coupling setup"
+echo "Using ${meshMotion} fluid mesh motion"
 
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 if [[ "${coupling}" == "robin" ]]; then
@@ -332,14 +375,19 @@ if [[ "${coupling}" == "robin" ]]; then
 else
     solutionSetup=${coupling}
 fi
-ln -vnsf "solidProperties.${solutionSetup}" constant/solid/solidProperties
+ln -vnsf "solidProperties.${solutionSetup}${solidPropertiesSuffix}" constant/solid/solidProperties
 ln -vnsf "controlDict.${solutionSetup}" system/controlDict
-ln -vnsf "fvSolution.${solutionSetup}" system/fluid/fvSolution
+ln -vnsf "fvSolution.${solutionSetup}${fvSolutionSuffix}" system/fluid/fvSolution
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
 ln -vnsf "p.${interfaceCondition}" 0/fluid/p
-
-# Source solids4Foam scripts
-source solids4FoamScripts.sh
+if [[ "${meshMotion}" == diffusion* ]]; then
+    ln -vnsf dynamicMeshDict.solidModel constant/fluid/dynamicMeshDict
+    ln -vnsf "solidProperties.${meshMotion}" constant/fluid/solidProperties
+    ln -vnsf "mechanicalProperties.${meshMotion}" \
+        constant/fluid/mechanicalProperties
+else
+    ln -vnsf "dynamicMeshDict.${meshMotion}" constant/fluid/dynamicMeshDict
+fi
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .
@@ -353,7 +401,9 @@ if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
     solids4Foam::runApplication -s fluid decomposePar -region fluid
     solids4Foam::runApplication -s solid decomposePar -region solid
+
     solids4Foam::runParallel solids4Foam
+
     solids4Foam::runApplication -s fluid reconstructPar -region fluid
     solids4Foam::runApplication -s solid reconstructPar -region solid
 else
@@ -366,8 +416,11 @@ if command -v gnuplot &> /dev/null
 then
     echo "Generating deflection.pdf using gnuplot"
     gnuplot deflection.gnuplot &> /dev/null
-    echo "Generating force.pdf using gnuplot"
-    gnuplot force.gnuplot &> /dev/null
+    if [ $(find . -name forces.dat | wc -l) -eq 1 ]
+    then
+        echo "Generating force.pdf using gnuplot"
+        gnuplot force.gnuplot &> /dev/null
+    fi
 else
     echo "Please install gnuplot if you would like to generate the plots"
 fi
@@ -423,8 +476,8 @@ directory, which places the lower half of the beam ($$y < 0.1$$ m) in the
 `stiff` set and the upper half in the `flexible` set:
 
 ```plaintext
-cellSet stiff new boxToCell (0.45 0 -0.2) (0.55 0.1 0)
-cellSet flexible new boxToCell (0.45 0.1 -0.2) (0.55 0.2 0)
+cellSet stiff new boxToCell (0.4 0 -0.2) (0.5 0.1 0)
+cellSet flexible new boxToCell (0.4 0.1 -0.2) (0.5 0.2 0)
 ```
 
 **3. Create the cell zones.** In the `Allrun` script, convert the sets to cell

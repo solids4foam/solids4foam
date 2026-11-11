@@ -45,9 +45,14 @@ fluidSolidInterface    IQNILS;
     outerCorrTolerance 1e-6;
 
     // Maximum number of outer FSI loop correctors within each time-step
-    // The refined meshes of the verification study need up to 45 at their
-    // hardest time step, so this leaves a margin
-    nOuterCorr 100;
+    // The refined meshes and the all-residual convergence check can require
+    // more than 100 correctors during the initial transient
+    nOuterCorr 200;
+
+    // Require both normalized interface residual measures to converge.  The
+    // legacy minimum test can accept a small update relative to the total
+    // displacement while the current-step residual is still unresolved.
+    requireAllResidualMeasures yes;
 
     // Enable/disable coupling from the start
     coupled yes;

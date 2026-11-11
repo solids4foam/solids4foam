@@ -13,7 +13,7 @@ functions
         "rhoName|rho"       rhoInf;
         log                 true;
         rhoInf              1000;
-        CofR                (0.5 0.1 0);
+        CofR                (0.45 0.1 0);
     }
     displacement
     {

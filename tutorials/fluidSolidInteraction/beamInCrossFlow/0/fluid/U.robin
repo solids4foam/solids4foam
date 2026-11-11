@@ -34,7 +34,9 @@ boundaryField
     inlet
     {
         type            paraboloidInletVelocity;
-        maxVelocity     0.3;
+        // Peak 0.2 m/s, as confirmed by Richter: the printed 0.3 m/s of
+        // Richter (2012) is an error (see README.md); set 0.3 for the printed profile
+        maxVelocity     0.2;
         yWidth          0.2;
         zWidth          0.4;
         timeVaryingEndTime 1.0;
