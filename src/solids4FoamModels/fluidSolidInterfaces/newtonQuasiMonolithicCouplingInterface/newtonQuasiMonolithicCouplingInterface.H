@@ -88,9 +88,10 @@ class newtonQuasiMonolithicCouplingInterface
         //- Report interface normal flux defect diagnostics
         const Switch interfaceFluxDiagnostics_;
 
-        //- Offset subtracted from the mapped solid interface displacement on
-        //  the local fluid patch faces, so that the fluid mesh follows the
-        //  solid displacement relative to the start of the coupling
+        //- Difference between the mapped and the stored mesh-motion
+        //  interface face displacement at the start of the coupling; the
+        //  face displacement itself now follows the offset point
+        //  displacement (#697), so this records that the offsets are set
         autoPtr<vectorField> interfaceDOffsetPtr_;
 
         //- Offset subtracted from the mapped solid interface point

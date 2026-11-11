@@ -1656,14 +1656,11 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     // Lookup the solid interface patch
     const label solidPatchID = fluidSolidInterface::solidPatchIndices()[0];
 
-    // Map the solid interface displacement to the motion interface
+    // Map the solid interface velocity to the motion interface
     // In parallel, we broadcast solid data to zone level, transfer solid to
     // fluid zone faces, then extract local fluid values
-    // The boundary value of the solid displacement is extrapolated from the
-    // adjacent cell centres by the solidTraction condition
-    const fvPatchVectorField& solidPatchD =
-        solid().D().boundaryField()[solidPatchID];
-
+    // The interface displacement is set from the transferred point
+    // displacements at the end of this function (#697)
     // The solid velocity on the interface is extrapolated from the
     // adjacent cell centres with the cell gradient, as the solidTraction
     // condition does for D; the boundary value of the velocity is the
@@ -1682,45 +1679,24 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
     );
 
     // Broadcast to zone level
-    const vectorField zoneSolidD
-    (
-        solidGlobalPatch.patchFaceToGlobal(solidPatchD)
-    );
     const vectorField zoneSolidU
     (
         solidGlobalPatch.patchFaceToGlobal(solidPatchU)
     );
 
     // Transfer from the solid zone to the fluid zone
-    const vectorField fluidZoneD(solidZoneToFluidZone(zoneSolidD));
     const vectorField fluidZoneU(solidZoneToFluidZone(zoneSolidU));
 
     // Extract the local fluid values
-    forAll(motionPatchD, fluidFaceI)
+    forAll(motionPatchU, fluidFaceI)
     {
-        const label fluidZoneFaceI = fluidFaceToZone[fluidFaceI];
-
-        motionPatchD[fluidFaceI] = fluidZoneD[fluidZoneFaceI];
-        motionPatchU[fluidFaceI] = fluidZoneU[fluidZoneFaceI];
-    }
-
-    if (interfaceDOffsetPtr_.valid())
-    {
-        motionPatchD -= interfaceDOffsetPtr_();
+        motionPatchU[fluidFaceI] = fluidZoneU[fluidFaceToZone[fluidFaceI]];
     }
 
     if (interfaceToInterfaceList().size() != 1)
     {
         FatalErrorInFunction
             << "Only one interface allowed" << abort(FatalError);
-    }
-
-    // fixedDisplacement patches overwrite the value with an internally stored
-    // totalDisp field, so we must set that
-    if (isA<fixedDisplacementFvPatchVectorField>(motionPatchD))
-    {
-        refCast<fixedDisplacementFvPatchVectorField>(motionPatchD).totalDisp() =
-            motionPatchD;
     }
 
     // Take references to zones
@@ -1773,17 +1749,45 @@ void newtonQuasiMonolithicCouplingInterface::mapInterfaceSolidToMeshMotion()
             << "'fixedValue'" << abort(FatalError);
     }
 
+    // The mesh interface point displacement, relative to the start offset
+    const vectorField motionPatchPointD
+    (
+        interfacePointDOffsetPtr_.valid()
+      ? vectorField(meshPatchPointD - interfacePointDOffsetPtr_())
+      : meshPatchPointD
+    );
+
     // Set the mesh interface pointD
     // Use "==" to reassign fixedValue
-    if (interfacePointDOffsetPtr_.valid())
+    boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
+        motionPatchPointD;
+
+    // Set the mesh interface face displacement to the average of the face's
+    // point displacements, so the faces follow the interface points (#697).
+    // A face-to-face transfer of the solid face values is piecewise constant
+    // over each solid face: where the solid is coarser than the fluid it
+    // departs from the interface points by up to half the solid face size
+    // times the rotation, which crushes fluid cells at solid corners
+    const faceList& fluidPatchFaces =
+        fluidMesh().boundaryMesh()[fluidPatchID].localFaces();
+    vectorField faceD(fluidPatchFaces.size(), vector::zero);
+    forAll(fluidPatchFaces, fluidFaceI)
     {
-        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
-            meshPatchPointD - interfacePointDOffsetPtr_();
+        const face& f = fluidPatchFaces[fluidFaceI];
+        forAll(f, fpI)
+        {
+            faceD[fluidFaceI] += motionPatchPointD[f[fpI]];
+        }
+        faceD[fluidFaceI] /= f.size();
     }
-    else
+    motionPatchD == faceD;
+
+    // fixedDisplacement patches overwrite the value with an internally stored
+    // totalDisp field, so we must set that
+    if (isA<fixedDisplacementFvPatchVectorField>(motionPatchD))
     {
-        boundaryFieldRef(motionSolid().pointD())[fluidPatchID] ==
-            meshPatchPointD;
+        refCast<fixedDisplacementFvPatchVectorField>(motionPatchD).totalDisp() =
+            faceD;
     }
 
     // Correct boundary conditions to enforce the new patch values on the
