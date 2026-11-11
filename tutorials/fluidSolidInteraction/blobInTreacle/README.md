@@ -9,11 +9,12 @@ sort: 10
 - Demonstrates a partitioned fluid-solid interaction simulation with a strong
   added-mass effect: the solid and fluid densities are equal.
 - Demonstrates IQN-ILS coupling with the interface predictor.
-- Reproduces the temporal-accuracy case of Liu, Jaiman and Gurugubelli [1].
+- Is based on the temporal-accuracy case of Liu, Jaiman and Gurugubelli [1],
+  with a finite-strain solid.
 
 ## Case Overview
 
-A linear elastic half cylinder of radius $$0.5\,\mathrm{m}$$, centred at
+An elastic half cylinder of radius $$0.5\,\mathrm{m}$$, centred at
 $$(1.5, -0.5)\,\mathrm{m}$$, is attached to the floor of the channel
 $$[0, 6.5] \times [-0.5, 1]\,\mathrm{m}$$ [1]. The inlet velocity is
 
@@ -43,13 +44,24 @@ the half cylinder; the mesh drawn is finer than the tutorial mesh**
 
 The Reynolds number is of order one, so the flow is dominated by viscosity,
 hence the name. Liu et al. [1] describe the solid as linearly elastic, and the
-preprint of the same work [2] lists it as "linear"; the tutorial therefore uses
-the `linearGeometryTotalDisplacement` solid model with a `linearElastic` law.
+preprint of the same work [2] lists it as "linear". The half cylinder deforms
+by about a quarter of its radius, however, and a small-strain solid integrates
+the fluid traction over its undeformed surface: it then receives about 12%
+less force than the fluid exerts, and an exact force balance gives a
+different solution. The tutorial therefore uses a finite-strain solid
+(`nonLinearGeometryTotalLagrangianTotalDisplacement`) with a neo-Hookean law
+(`neoHookeanElastic`) and the Lamé constants of [1], which reduces to their
+model for small strains; the interface forces then balance to about 1e-6.
+St Venant-Kirchhoff is not used: it softens in compression, and the half
+cylinder collapses under the flow at $$t \approx 1.8\,\mathrm{s}$$.
 
 The fluid is solved with `pimpleFluid` and the solid with a segregated solver.
 The coupling is IQN-ILS with the interface predictor (`predictor yes` in
 `constant/fsiProperties`): with equal densities, the first coupling iterate of
-each time step otherwise sees a large added-mass error. Both regions use the
+each time step otherwise sees a large added-mass error. The secant modes of
+earlier time steps are not reused (`couplingReuse 0`): at the larger time steps
+of the verification study they give coupling iterates that invert solid cells,
+which the neo-Hookean law rejects. Both regions use the
 second-order `backward` time scheme with $$\Delta t = 0.01\,\mathrm{s}$$, and
 the case runs to $$t = 10\,\mathrm{s}$$, by which time the flow has been steady
 for several seconds.
@@ -76,8 +88,8 @@ $$(1.5, 0)\,\mathrm{m}$$, is written to
 interface to `postProcessing/fluid/forces/0/force.dat`. The half cylinder leans
 downstream as the inflow ramps up and settles once the ramp ends
 (Figure 2). The steady top-point displacement is
-$$(0.1165, -0.0136)\,\mathrm{m}$$ and the steady interface force
-$$(15.7, -24.9)\,\mathrm{N}$$ per metre of span; the vertical force is
+$$(0.1356, -0.0134)\,\mathrm{m}$$ and the steady interface force
+$$(15.7, -25.1)\,\mathrm{N}$$ per metre of span; the vertical force is
 dominated by the pressure, which is about $$25\,\mathrm{Pa}$$ at the half
 cylinder because of the viscous pressure drop along the channel.
 
@@ -90,17 +102,11 @@ Liu et al. [1] report only the self-convergence of their errors in time, not
 the solution itself. The preprint [2] shows the deformed interface at
 $$t = 1\,\mathrm{s}$$ and the deformed solid mesh in the steady state
 ($$t = 10\,\mathrm{s}$$), both drawn as vector graphics; the verification study
-extracts them to compare with. Figure 3 shows the comparison from that study.
-At $$t = 1\,\mathrm{s}$$ the tutorial mesh reproduces the published interface
-to within about 2% of the interface displacement. In the steady state the
-published half cylinder leans further downstream: the steady top-point
-displacement of [2] is $$(0.1297, -0.0117)\,\mathrm{m}$$, about 11% more than
-on the tutorial mesh. The difference shrinks with mesh refinement, and the
-remaining offset is discussed in the verification README.
-
-The published data for this case are limited to self-convergence norms and
-the coarse-mesh figures of the preprint, so an independent reference solution,
-e.g. from COMSOL, LS-DYNA or ANSYS, would be valuable; one is being arranged.
+extracts them to compare with (Figure 3). They are solutions of the
+small-strain model on a coarse mesh, so the comparison is indicative only. The
+steady top-point displacement of [2] is $$(0.1297, -0.0117)\,\mathrm{m}$$,
+4.3% below the tutorial mesh value and 7.9% below the finest level of the
+verification study.
 
 ![Figure 3: Deformed interface compared with Liu (arXiv:1401.0082).](images/blobInTreacle-interfaces.png)
 
