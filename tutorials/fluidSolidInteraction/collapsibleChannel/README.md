@@ -83,8 +83,8 @@ partitioned coupling works at every time step and mesh:
    $$0.025\,\mathrm{s}$$ and on fine fluid meshes. The wall is given the density
    of the fluid, $$\rho_s/\rho_f = 1$$, like a penalty bulk modulus for an
    incompressible solid: it moves the converged oomph-lib solution by 0.28% of
-   the peak deflection, below the precision of the reference, and the
-   reference is computed with the same density. The density sweep in
+   the peak deflection, and the reference is computed with the same
+   density. The density sweep in
    `verification/README.md` gives the rationale.
 
 The non-dimensional parameters, on the oomph-lib scales (lengths on $$a$$,
@@ -258,13 +258,14 @@ The `verification/` directory holds an opt-in study against oomph-lib
 solutions of the same problem; see
 [`verification/README.md`](verification/README.md). In summary:
 
-- the static wall deflection of the cubic solid is within 0.25% of the beam
-  on every solid mesh, and converges to 0.05%;
+- the static wall deflection of the cubic solid is within 0.32% of the beam
+  on every solid mesh, and converges to within 0.01%;
 - in the coupled problem the solid discretisation error of the cubic solid
   is 0.44% on the tutorial mesh, against 17% for the linear solid;
 - with Robin coupling at $$\Delta t = 0.00625\,\mathrm{s}$$, refining the
-  fluid mesh up to four times brings the wall-midpoint history to within 0.5%
-  of oomph-lib (4.65% on the tutorial mesh), the reference precision;
+  fluid mesh up to four times brings the wall-midpoint history to within
+  0.34% of oomph-lib (4.81% on the tutorial mesh), with an observed order of
+  1.6 to 2.5;
 - the time-step study converges with an observed order of 1.8 to 2.0, as
   oomph-lib does, with a difference of 0.34% between the two finest steps.
 
