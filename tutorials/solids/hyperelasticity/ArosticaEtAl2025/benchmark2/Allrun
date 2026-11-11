@@ -1,0 +1,134 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Arostica et al. (2025) benchmark 2: elastodynamics of an idealised
+# biventricular geometry, with the rule-based fibres, LV and RV follower
+# pressures and spring-dashpot (pericardium/base) boundary conditions.
+#
+# Usage:
+#     ./Allrun [coarse|fine] [pressure|displacement] [parallel]
+#
+# coarse (default): 45 304 tetrahedra, fine: 121 133 tetrahedra (Table 6).
+# The meshes and fibres are those distributed with the benchmark, converted
+# to OpenFOAM format once and downloaded from the solids4foam website
+# (ArosticaEtAl2025.zip, with the converter). Without internet access, put
+# ArosticaEtAl2025.zip in data/ first. The time series are tabulated by the
+# makeArosticaTimeSeries utility in the parent directory, which Allrun
+# compiles.
+#
+# Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
+#------------------------------------------------------------------------------
+cd "${0%/*}" || exit 1    # Run from this directory
+
+# Source tutorial run functions
+. "$WM_PROJECT_DIR/bin/tools/RunFunctions"
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# The case is solved with PETSc SNES
+solids4Foam::requirePetscOrExitSilently
+
+# The case has only been run with OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# The time-series utility, makeArosticaTimeSeries, is shared by both
+# benchmarks, in the parent directory, or where ARO_DIR points (the regression
+# test runs a copy of this case elsewhere)
+ARO_DIR="${ARO_DIR:-..}"
+if [[ ! -d "$ARO_DIR/makeArosticaTimeSeries" ]]
+then
+    echo "makeArosticaTimeSeries was not found in $ARO_DIR"
+    exit 1
+fi
+
+# The meshes are downloaded once from the solids4foam website, into data/
+ARCHIVE_URL="https://www.solids4foam.com/tutorials/archive/ArosticaEtAl2025.zip"
+ARCHIVE_SHA256="08a13aad266f0b30a2c311508769cfa37779a33238ff00399d98019c3befc5a3"
+ARCHIVE="data/ArosticaEtAl2025.zip"
+
+MESH="coarse"
+FORMULATION="pressure"
+PARALLEL="no"
+for arg in "$@"
+do
+    case "$arg" in
+        coarse|fine) MESH="$arg" ;;
+        pressure|displacement) FORMULATION="$arg" ;;
+        parallel) PARALLEL="yes" ;;
+        *) echo "Unknown argument: $arg"; exit 1 ;;
+    esac
+done
+echo "Biventricular mesh: $MESH"
+
+# Active stress tau(t) (Table 8) and the LV and RV pressures (Table 9): ODEs
+# in time only, tabulated once here
+wmake "$ARO_DIR/makeArosticaTimeSeries" > log.wmake 2>&1 \
+    || { echo "Building makeArosticaTimeSeries failed: see log.wmake"; exit 1; }
+{
+    makeArosticaTimeSeries -active -sigma0 1.5e5 -tSys 0.163 -tDias 0.5 \
+        -out constant/activeStress \
+ && makeArosticaTimeSeries -pressure bivLV -out constant/pressureLV \
+ && makeArosticaTimeSeries -pressure bivRV -out constant/pressureRV
+} > log.makeArosticaTimeSeries 2>&1 \
+    || { echo "makeArosticaTimeSeries failed: see log.makeArosticaTimeSeries"; exit 1; }
+
+# Solid formulation: "pressure" (default), the mixed displacement-pressure
+# formulation, or "displacement", with the bulk modulus as a penalty in the
+# momentum equation. The selected fvSolution and solidProperties variants are
+# linked into place, as in LandEtAl2015/problem3
+echo "Formulation: $FORMULATION"
+
+# The mixed formulation's Jacobian has no processor-boundary (coupled patch)
+# coupling of the pressure to the displacement
+# (foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix: "patch.coupled(): D-in-p
+# not implemented"), so it only runs in serial
+if [[ "$FORMULATION" == "pressure" && "$PARALLEL" == "yes" ]]
+then
+    echo "The pressure formulation cannot currently run in parallel:"
+    echo "run it in serial, or use the displacement formulation in parallel."
+    exit 1
+fi
+for file in system/fvSolution.$FORMULATION constant/solidProperties.$FORMULATION
+do
+    ln -vnsf "${file##*/}" "${file%.*}"
+done
+
+# Restore 0 directory from 0.orig
+restore0Dir
+
+# Mesh (constant/polyMesh) and fibres (0/f0, 0/s0, 0/n0), from the archive
+solids4Foam::downloadFile "$ARCHIVE_URL" "$ARCHIVE" "$ARCHIVE_SHA256" \
+    || { echo "Could not download $ARCHIVE_URL"; exit 1; }
+command -v unzip > /dev/null 2>&1 || {
+    echo "unzip: command not found, which is required for this case"
+    exit 0
+}
+rm -rf constant/polyMesh data/ArosticaEtAl2025/benchmark2
+unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark2/$MESH/*" -d data
+cp -r "data/ArosticaEtAl2025/benchmark2/$MESH/constant/polyMesh" constant/
+cp "data/ArosticaEtAl2025/benchmark2/$MESH/0/"* 0/
+solids4Foam::runApplication checkMesh
+
+# Run the solver
+if [[ "$PARALLEL" == "yes" ]]
+then
+    solids4Foam::runApplication decomposePar
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication reconstructPar
+else
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Plot the displacements of p0, p1 and p2 against the benchmark participants
+if command -v gnuplot > /dev/null 2>&1
+then
+    echo "Writing verification/$MESH.pdf with gnuplot"
+    gnuplot -e "refDir='verification/reference/$MESH'; points='p0 p1 p2'; \
+output='verification/$MESH.pdf'" "$ARO_DIR/plotVsReference.gnuplot" \
+        > log.gnuplot 2>&1
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi
+
+#------------------------------------------------------------------------------
