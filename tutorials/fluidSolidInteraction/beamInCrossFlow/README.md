@@ -43,8 +43,9 @@ printed profile gives about 1.8 times them. The author has confirmed from his
 original code that the reference computations used this bi-parabolic profile
 with a `0.2 m/s` peak, on the same coordinates as here (T. Richter, private
 communication, November 2026), so the printed `0.3 m/s` is an error. Set
-`maxVelocity 0.3` in `0/fluid/U.*` to solve the printed profile. The outlet uses the do-nothing/zero-traction condition, and
-the remaining outer walls are no-slip.
+`maxVelocity 0.3` in `0/fluid/U.*` to solve the printed profile. The outlet
+uses the do-nothing/zero-traction condition, and the remaining outer walls are
+no-slip.
 
 The elastic plate has density `1000 kg/m3`, Young's modulus `1.4 MPa`, shear
 modulus `0.5 MPa`, Poisson ratio `0.4`, and the compressible St
