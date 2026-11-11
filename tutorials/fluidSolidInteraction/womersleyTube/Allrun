@@ -55,23 +55,25 @@ ln -vnsf "p.${interfaceCondition}" 0/fluid/p
 solids4Foam::convertCaseFormat .
 
 # Create meshes
-solids4Foam::runApplication -s solid blockMesh -region solid
-solids4Foam::runApplication -s fluid blockMesh -region fluid
+# A failing step stops the script with that step's exit status (the plotting
+# below is optional and does not affect the status)
+solids4Foam::runApplication -s solid blockMesh -region solid || exit $?
+solids4Foam::runApplication -s fluid blockMesh -region fluid || exit $?
 
 # Face zone at x = L/2 for the flow rate
-solids4Foam::runApplication -s fluid topoSet -region fluid
+solids4Foam::runApplication -s fluid topoSet -region fluid || exit $?
 
 # Run solver
 if [[ "$runMode" == "parallel" ]]; then
     # Run parallel
-    solids4Foam::runApplication -s fluid decomposePar -region fluid
-    solids4Foam::runApplication -s solid decomposePar -region solid
-    solids4Foam::runParallel solids4Foam
-    solids4Foam::runApplication -s fluid reconstructPar -region fluid
-    solids4Foam::runApplication -s solid reconstructPar -region solid
+    solids4Foam::runApplication -s fluid decomposePar -region fluid || exit $?
+    solids4Foam::runApplication -s solid decomposePar -region solid || exit $?
+    solids4Foam::runParallel solids4Foam || exit $?
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid || exit $?
+    solids4Foam::runApplication -s solid reconstructPar -region solid || exit $?
 else
     # Run serial
-    solids4Foam::runApplication solids4Foam
+    solids4Foam::runApplication solids4Foam || exit $?
 fi
 
 # Create plots
