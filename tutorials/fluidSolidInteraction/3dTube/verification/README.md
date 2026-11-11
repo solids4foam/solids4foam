@@ -13,13 +13,16 @@ convergence and agreement with published results. Nothing here is run by
 case. The published point-A histories used here are read from figures: the
 Tuković et al. (2018) curve exactly from the vector graphics of the PDF, and
 the Lozovskiy et al. (2019) and Eken (2016) curves from raster figures, to
-about ±3e-6 m and ±0.05 ms. The published finite element results use
-first-order implicit Euler with `Δt = 1e-4 s`, which damps the pulse peak by
-about a quarter, so they are compared only with a run that uses the same time
-discretisation; the converged (backward, small `Δt`) results are compared with
-Tuković et al. (2018). The analytical pulse-wave speed is a thin- or
-thick-wall long-wave estimate and is only an approximate check. See
-[Reference quality](#reference-quality).
+about ±3e-6 m and ±0.05 ms. The two independent monolithic references (finite
+elements in Lozovskiy et al.; a side-centred finite volume fluid with a finite
+element wall in Eken) use first-order implicit Euler with `Δt = 1e-4 s`, which
+damps the pulse peak by about a quarter, so they are compared only with a run
+that uses the same time discretisation; the backward, small-`Δt` results are
+compared with Tuković et al. (2018), an earlier version of the same code. The
+analytical pulse-wave speed is a thin- or thick-wall long-wave estimate and is
+only an approximate check. See [Reference quality](#reference-quality) and,
+for the three-level results and their limitations,
+[Reference results](#reference-results).
 
 ## Running
 
@@ -38,6 +41,9 @@ cd tutorials/fluidSolidInteraction/3dTube/verification
 ./Allverify --quick                # smoke run of level 1 to t = 10 ms, no checks
 ./Allverify --reuse                # re-evaluate completed runs
 ./Allverify --cores 6              # MPI ranks per run (default: auto)
+./Allverify --levels 1,2,3 --delta-t 2.5e-5   # refine the mesh at a fixed time step
+./Allverify --probe-z-shift 7.8125e-5         # axis probes off the cell faces (c_p)
+./Allverify --tight-tolerances     # diagnostic: bound the iterative error
 ```
 
 The driver requires Python 3.8 or newer, `blockMesh` and `solids4Foam`;
@@ -127,7 +133,14 @@ preCICE `elastic-tube-3d` tutorial.
   cell and step slightly as the fluid mesh moves); for `c_wall`, the time at
   which the wall radial displacement reaches half of its first peak. `c_p` is
   the checked quantity: the wall signal also carries the faster axial stress
-  wave of the wall.
+  wave of the wall. The stations `z = 5, 10, ..., 45 mm` lie on cell faces of
+  every mesh level, so the cell that contains a default probe is a tie that
+  different builds break differently (`c_p` = 4.767 m/s with OpenFOAM v2412
+  and 4.660 m/s with v2512 on the same level-1 case). Use
+  `--probe-z-shift 7.8125e-5` (half a level-3 cell) for `c_p`; even then the
+  probes return the value of the containing cell, and the axial wall motion
+  moves them between cells, so `c_p` carries a sampling noise of about one
+  axial cell per station (`Δz/c`, 0.03 ms on level 3, about 0.5-1% in `c_p`).
 
 ## Studies and acceptance criteria
 
@@ -150,10 +163,13 @@ step:
 |---:|---:|---:|---:|---:|---:|
 | 1 | 1x | 16 000 | 6 400 | 2.5e-5 | 4 |
 | 2 | 2x | 128 000 | 51 200 | 1.25e-5 | 6 |
-| 3 | 4x | 1 024 000 | 409 600 | 6.25e-6 | 6 |
+| 3 | 4x | 1 024 000 | 409 600 | 6.25e-6 | 32 |
 
-Levels 1 and 2 form the default sweep; level 3 is about sixteen times as
-expensive as level 2 and is opt-in. The acceptance criteria are:
+Levels 1 and 2 form the default sweep; level 3 is opt-in and costs about
+6 h on 32 ranks (720 core-hours). Because the time step is halved with the
+mesh, the default sweep is a combined space-time refinement; `--delta-t`
+holds the time step fixed so that the mesh alone is refined. The acceptance
+criteria are:
 
 - the change between the two finest levels is at most 5% for `u_r,max(A)` and
   `u_z,min(A)`, 2% for `t_arr(A)` and 3% for `c_p`, and, with three or more
@@ -167,7 +183,10 @@ expensive as level 2 and is opt-in. The acceptance criteria are:
 
 ### Time-step study (`--study timestep`)
 
-The tutorial mesh with `Δt = 1e-4, 5e-5, 2.5e-5` and `1.25e-5 s`. The change
+The tutorial mesh with `Δt = 1e-4, 5e-5, 2.5e-5` and `1.25e-5 s` (the
+default members); a fifth member, `6.25e-6 s` (`--levels 5`), uses the
+level-3 time step but is unstable on this mesh (see
+[Small-time-step instability](#small-time-step-instability)). The change
 between the two smallest time steps is at most 2% for `u_r,max(A)` and
 `u_z,min(A)` and 1% for `t_arr(A)` and `c_p`; each successive change is
 smaller than the previous one or below the 0.2% floor, and the observed order
@@ -192,24 +211,34 @@ normalised by the IQN-ILS peak, and the relative differences in
 `u_r,max(A)`, `u_z,min(A)`, `t_arr(A)` and `c_p`, must each be within 1%. The
 number of FSI iterations of each coupling is reported.
 
-`verification/Allclean` removes the generated `work/` and `postProcessing/`
-directories, as does `./Allclean all` in the case directory; the plain case
-`./Allclean` keeps them.
-
 ## Reference quality
 
 - Tuković et al. (2018), Section 4.4, Fig. 25: finite volume, backward,
-  `Δt = 2.5e-5` to `1e-4 s`; the `u_r(A)` history to 10 ms and its peak for
-  three time steps. Read exactly from the vector graphics of the PDF.
+  `Δt = 2.5e-5` to `1e-4 s`, IQN-ILS, St Venant-Kirchhoff wall, full tube
+  with 449 600 fluid and 288 000 solid cells, run to 10 ms; one mesh, with
+  the peak given for three time steps (0.15203, 0.15631 and 0.15694 mm). Read
+  exactly from the vector graphics of the PDF. An earlier version of this
+  code (same lineage), so not an independent reference.
 - Tuković et al. (2018), Eqs. (35)-(36): the analytical thick-wall wave speed,
   4.81 m/s. Printed.
 - Tuković et al. (2018), Section 4.4: the simulated wave speed, 4.54 m/s.
   Printed, but obtained with another method; information only.
-- Lozovskiy et al. (2019), Section 5.1, Fig. 3: monolithic finite elements,
-  implicit Euler, `Δt = 1e-4 s`; the `u_r(A)` and `u_z(A)` histories to 20 ms.
-  Read from a raster figure, about ±3e-6 m.
-- Eken (2016), Section 5.2, Fig. 5.6: monolithic finite elements, implicit
-  Euler, `Δt = 1e-4 s`; the `u_r(A)` and `u_z(A)` histories to 20 ms. Read
+- Lozovskiy et al. (2019), Section 5.1, Fig. 3: monolithic finite elements
+  (P2-P1 Taylor-Hood fluid, P2 displacement, Ani3D), St Venant-Kirchhoff wall,
+  implicit Euler `Δt = 1e-4 s` with the geometry and advection linearly
+  extrapolated from the previous steps (one linear solve per step), the
+  pressure switched off instantaneously at 3 ms; three tetrahedral meshes
+  (13 200/6 336, 29 202/11 904 and 89 232/38 016 fluid/solid cells), with a
+  stated largest fine-to-finer history difference of 0.7% (axial) and 2.3%
+  (radial); no time-step study. The `u_r(A)` and `u_z(A)` histories of the
+  finer mesh to 20 ms, read from a raster figure, about ±3e-6 m. They state
+  that their results are consistent with Eken and Sahin (2016).
+- Eken (2016), Section 5.2, Fig. 5.6, and Eken and Sahin (2016), Section 3.2:
+  monolithic ALE, side-centred (staggered) unstructured finite volume fluid
+  with a Galerkin finite element St Venant-Kirchhoff wall, first-order implicit
+  Euler in the fluid with `Δt = 1e-4 s` (chosen "to be consistent with Gee et
+  al."), hexahedral meshes M1 (324 122 DOF) and M2 (2 557 571 DOF); no
+  time-step study. The `u_r(A)` and `u_z(A)` histories of M2 to 20 ms, read
   from a raster figure, about ±3e-6 m.
 - Moens-Korteweg and thick-wall formulas: long-wave analytical wave speeds of
   4.81-5.74 m/s. Approximate.
@@ -226,12 +255,15 @@ and a shell wall; Degroote et al. use a shell wall. The preCICE
 `elastic-tube-3d` tutorial uses the same parameters, but its reference plot
 shows per-step displacement increments and is not a usable reference.
 
-The finite element and finite volume references differ by about 25% in the
-peak radial displacement (0.119-0.124 mm against 0.157 mm). This is the time
-discretisation, not the benchmark: the `literature` study reproduces the
-finite element values with the published `Euler`, `Δt = 1e-4 s` setup, and the
-mesh and time-step studies converge towards the Tuković et al. (2018) value
-with the backward scheme.
+The implicit-Euler references and the backward finite volume reference differ
+by about 21-24% in the peak radial displacement (0.119-0.124 mm against
+0.157 mm). The split is between time discretisations rather than between
+finite elements and finite volumes (the Eken fluid is itself a finite volume
+discretisation). Much of it, and within the reading accuracy all of it for
+`u_r,max(A)`, is reproduced by running this code with the published
+`Euler`, `Δt = 1e-4 s` setup; see
+[Implicit Euler and the published results](#implicit-euler-and-the-published-results).
+The arrival of the Eken peak about 0.3 ms earlier is not explained by it.
 
 ### Wave speed
 
@@ -247,87 +279,177 @@ tolerance.
 
 ## Reference results
 
-Recorded with OpenFOAM v2412 on an Apple M1 Ultra shared with other jobs, so
-the clock times are indicative only. Every study passed. Radial and axial
-displacements are at point A, in mm; times in ms; speeds in m/s.
+Recorded in October 2026 with solids4foam branch `verification/3dtube-level3`
+at commit `0ff7f462b`, which contains two fixes found by this study (see
+[Platform dependence](#platform-dependence-and-the-two-fixes); both are in
+`development` through PR #546, which rebased the branch commits cited here),
+Robin-Neumann
+coupling and the backward scheme unless stated. Levels 1 and 2 and the
+level-1 studies: OpenFOAM v2512 (Ubuntu package) on a shared 192-core AMD
+node; level 3: MeluXina, OpenFOAM v2412 (EasyBuild foss-2024a), 128 ranks.
+The two platforms agree on levels 1 and 2 to 0.005% in every point-A
+quantity. Displacements at point A are in mm, times in ms, speeds in m/s; `c_p`
+from the probe-shifted runs (`--probe-z-shift 7.8125e-5`). The compact
+evidence is in `results/` (`3dTube_evidence.json`, `3dTube_mesh_study.csv`,
+`3dTube_runs.csv`, `3dTube_meluxina_runs.csv`), written by
+`scripts/analyse_3dTube_evidence.py`.
 
-### Mesh study
+**All values recorded before these fixes are superseded**, including the
+earlier versions of this section and the Apple M1 values of the original
+two-level study (which used the faulty point transfer on level 2).
 
-Robin-Neumann, backward, 4 MPI ranks for both levels (`Iter.` is the mean
-number of FSI iterations per time step):
+### Mesh study: three levels
 
-| Level | u_r,max | t(u_r,max) | u_z,min | t_arr | c_p | Iter. | Clock (s) |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 0.15984 | 7.204 | -0.08823 | 5.874 | 4.771 | 4.74 | 425 |
-| 2 | 0.15976 | 7.206 | -0.08660 | 5.854 | 4.695 | 4.16 | 7 197 |
+Time step halved with the mesh (`Iter.` is the mean number of FSI iterations
+per step):
 
-Between the levels, `u_r,max(A)` changes by 0.05%, `u_z,min(A)` by 1.85%,
-`t_arr(A)` by 0.34% and `c_p` by 1.58%. On level 2, `u_r,max(A)` is 1.8% above
-the Tuković et al. (2018) value of 0.15694 mm and its time 0.3% before
-7.23 ms; the largest difference from their radial history over 0-10 ms is 3.9%
-of the peak. `c_p` is 2.4% below the thick-wall estimate of 4.81 m/s and 3.4%
-above the 4.54 m/s they report from a different evaluation of their
-simulation. The Moens-Korteweg values of 5.2-5.7 m/s are 11-22% above `c_p`,
-as expected for a wall with `h/R = 0.2`.
+<!-- markdownlint-disable MD013 -->
+| Level | Fluid / solid cells | Δt (s) | Ranks | u_r,max | t(u_r,max) | u_z,min | t_arr | c_p | Iter. | Clock (s) |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 16 000 / 6 400 | 2.5e-5 | 4 | 0.15978 | 7.201 | -0.08819 | 5.873 | 4.654 | 4.78 | 531 |
+| 2 | 128 000 / 51 200 | 1.25e-5 | 8 | 0.15946 | 7.215 | -0.08659 | 5.843 | 4.635 | 3.87 | 3 744 |
+| 3 | 1 024 000 / 409 600 | 6.25e-6 | 128 | 0.15851 | 7.252 | -0.08571 | 5.825 | 4.594 | 3.18 | 15 317 |
+<!-- markdownlint-enable MD013 -->
 
-### Time-step study
+<!-- markdownlint-disable MD013 -->
+| Quantity | Change 1→2 | Change 2→3 | Observed order | Verdict |
+|---|---:|---:|---:|---|
+| u_r,max(A) | -0.20% | -0.60% | undefined | monotone, but the change grows: not asymptotic |
+| u_z,min(A) | 1.87% | 1.02% | 0.87 | monotone, about first order (nominal 2) |
+| t_arr(A) | -0.51% | -0.31% | 0.72 | monotone, sub-nominal |
+| c_p | -0.41% | -0.88% | undefined | the change grows; of the size of the probe sampling noise |
+| u_r,min(A), t > 14 ms | 6.3% | 2.0% | undefined | non-monotone |
+<!-- markdownlint-enable MD013 -->
 
-Robin-Neumann, backward, tutorial mesh, 2 MPI ranks (`Iter.` as above):
+With the time step fixed at `2.5e-5 s` on all three meshes (pure mesh
+refinement; level 3 on MeluXina): `u_r,max(A)` 0.15978, 0.15921, 0.15835
+(changes 0.36%, 0.54%; undefined); `u_z,min(A)` -0.08819, -0.08643, -0.08554
+(2.0%, 1.03%; order 0.98); `t_arr(A)` 5.873, 5.837, 5.815 (0.61%, 0.38%; order
+0.65).
 
-| Δt (s) | u_r,max | t(u_r,max) | u_z,min | t_arr | c_p | Iter. | Clock (s) |
-|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1e-4 | 0.15581 | 7.224 | -0.08558 | 5.721 | 4.752 | 4.55 | 246 |
-| 5e-5 | 0.15853 | 7.207 | -0.08789 | 5.848 | 4.768 | 4.26 | 466 |
-| 2.5e-5 | 0.15984 | 7.204 | -0.08823 | 5.874 | 4.771 | 4.74 | 942 |
-| 1.25e-5 | 0.15987 | 7.242 | -0.08821 | 5.866 | 4.764 | 7.36 | 1894 |
+Every step of every level met all three Robin criteria (worst final residuals
+6.5e-7, 1.0e-5 and 9.1e-6 against tolerances 1e-6, 1e-5 and 1e-5; no stalled
+steps); the iterations per step fall with refinement (4.78, 3.87, 3.18; at
+most 9). Tightening every tolerance (`--tight-tolerances`) changed no point-A
+quantity by more than 3e-6 (relative) on any level in the runs before the
+fixes; the fixes do not change the solvers or the tolerances.
 
-The successive changes in `u_r,max(A)` are 1.74%, 0.83% and 0.016%, and in
-`t_arr(A)` 2.23%, 0.44% and 0.14%: the tutorial time step of `2.5e-5 s` is
-converged in time to about 0.1%. The mesh therefore dominates the remaining
-level-1 error. The time-step dependence of the peak agrees with Tuković et al.
-(2018), whose peak rises from 0.15203 to 0.15694 mm over the same range of
-time steps. The mean number of Robin-Neumann iterations rises from 4.7 to 7.4
-at the smallest time step (not investigated further here); every step still
-met all its criteria.
+What this establishes:
 
-### Published-discretisation study
+- `u_r,max(A)` decreases monotonically but is not in an asymptotic range: the
+  last change (0.6%, 0.5% at fixed time step) is larger than the first. No
+  order can be given; the level-3 value carries an estimated discretisation
+  uncertainty of about 0.6% (the last change; Roache's band with `Fs = 3`,
+  `p = 2`) and plausibly more, since the changes are not yet decreasing.
+- `u_z,min(A)` and `t_arr(A)` converge monotonically at about first order
+  (0.87-0.98 and 0.65-0.72), well below the nominal second order. With
+  `p = 1` the remaining error of `u_z,min(A)` on level 3 is about 1%
+  (-0.0848 mm extrapolated), and of `t_arr(A)` about 0.3%.
+- `c_p` stays within 4.59-4.66 m/s on every level and run, 3-5% below the
+  thick-wall estimate of 4.81 m/s; its changes are of the size of the probe
+  sampling noise and are not ranked.
+- On level 3, `u_r,max(A)` is 1.0% above and its time 0.3% after the
+  Tuković et al. (2018) value (0.15694 mm, 7.23 ms, `Δt = 2.5e-5 s`, an
+  earlier version of this code on a full-tube mesh).
 
-Robin-Neumann, `Euler`, `Δt = 1e-4 s`, tutorial mesh, 2 MPI ranks, 232 s:
+### Space-time separation
 
-| Quantity | solids4foam | Lozovskiy et al. (2019) | Eken (2016) |
-|---|---:|---:|---:|
-| u_r,max (mm) | 0.1224 | 0.1194 (+2.5%) | 0.1242 (-1.4%) |
-| t(u_r,max) (ms) | 7.005 | 7.00 (+0.1%) | 6.69 (+4.7%) |
-| u_z,min (mm) | -0.0748 | -0.0740 (+1.1%) | -0.0794 (-5.8%) |
-| u_r,min after 14 ms (mm) | -0.0777 | -0.0755 (+2.9%) | -0.0763 (+1.8%) |
+| Mesh | Δt change (s) | Δu_r,max | Δu_z,min | Δt_arr |
+|---|---|---:|---:|---:|
+| level 1 | 2.5e-5 → 1.25e-5 | +0.07% | -0.01% | -0.13% |
+| level 2 | 2.5e-5 → 1.25e-5 | +0.16% | +0.18% | +0.10% |
+| level 3 | 2.5e-5 → 6.25e-6 | +0.10% | +0.20% | +0.17% |
 
-The largest difference from the published radial histories over 0-20 ms is
-4.7% (Lozovskiy et al.) and 11.5% (Eken) of the published peak; the latter is
-mostly the 0.3 ms earlier peak of the Eken curve. With this discretisation
-the solids4foam peak is 23% below its converged backward value, which is the
-source of the difference between the two families of published results.
+The time-step error at the level-2 and level-3 time steps is 0.1-0.2%,
+against level-2-to-3 mesh changes at fixed time step of 0.4-1.0%: the scaled
+sequence is dominated by the mesh, and the fixed-step sequence leads to the
+same conclusions. On level 1 the backward time-step study gives successive
+`u_r,max(A)` changes of 1.43%, 0.78% and 0.07% for `Δt = 1e-4` to
+`1.25e-5 s`.
+
+### Small-time-step instability
+
+With the backward scheme, the time step must not be reduced far on a coarse
+mesh. On level 1, `Δt = 6.25e-6 s` (the level-3 step) develops a growing
+spurious mode from about 9 ms (the maximum Courant number, physically about
+0.003, grows to 0.008 at 11 ms and 0.07 at 12 ms) and diverges at 13.9 ms,
+although every coupling iteration converged; it is unchanged by the two fixes
+below. At `Δt = 1.25e-5 s` the same mode is visible after 17 ms but stays
+bounded to 20 ms, and with implicit Euler it does not appear. It depends on
+`Δt` relative to the mesh, not on `Δt` alone: levels 2 and 3 at their scaled
+time steps show no trace of it to 20 ms. The scaled sweep is not affected;
+the cause (the Robin wall conditions with the backward scheme are a
+candidate) has not been investigated.
+
+### Platform dependence and the two fixes
+
+The original three-level study gave a `u_z,min(A)` that differed between two
+platforms by 1.5% on level 1 and 3% on level 3. Two defects were found and
+fixed (details, evidence and reproducers in
+[`platform/README.md`](platform/README.md)):
+
+1. **Aliasing miscompilation of the fluid wall viscous force** (all levels,
+   `-O3` builds only). `nf() & (-devReff().boundaryField())` writes the inner
+   product into the storage of the tmp normal, which OpenFOAM's field loops
+   access through `__restrict__` pointers; at `-O3` the axial component was
+   formed from the overwritten normal. The axial wall shear was wrong by up
+   to a factor of 2.5 on the first step. Builds with `-O2` (the EasyBuild
+   OpenFOAM rules) were not affected. Fixed in every fluid model (commit
+   `635ff464f`, merged in PR #546).
+2. **Degenerate barycentric weights in the FSI point transfer** (levels 2 and
+   3, all platforms). `triangle::pointToBarycentric` compares `4 A^2` (m^4)
+   with `SMALL = 1e-15`, so the fan triangles of every interface face finer
+   than about 0.3 mm got the weights (1/3, 1/3, 1/3): the solid displacement
+   was transferred to the fluid as a smeared average on levels 2 and 3 but
+   correctly on level 1, which broke the quarter-tube symmetry and made the
+   result depend on decomposition and build. A scale-invariant weight
+   (`triangleWeights.H`) is used instead (commit `0ff7f462b`, merged in
+   PR #546).
+
+With both fixes, the platforms agree on levels 1 and 2 to 0.005% in
+`u_r,max(A)`, `u_z,min(A)` and `t_arr(A)` (the resolution of the reported
+digits), and level 2 is independent of the number of ranks.
+
+### Implicit Euler and the published results
+
+| Run | u_r,max | t(u_r,max) | u_z,min | u_r,min, t > 14 ms |
+|---|---:|---:|---:|---:|
+| Euler, Δt 1e-4, level 1 | 0.12241 | 7.005 | -0.07480 | -0.07767 |
+| Euler, Δt 1e-4, level 2 | 0.12100 | 7.035 | -0.07326 | -0.07628 |
+| Euler, Δt 5e-5, level 1 | 0.13649 | 7.077 | -0.07969 | -0.08584 |
+| Euler, Δt 2.5e-5, level 1 | 0.14651 | 7.121 | -0.08299 | -0.09048 |
+| Euler, Δt 1.25e-5, level 1 | 0.15272 | 7.155 | -0.08517 | -0.09380 |
+| Lozovskiy et al. (2019) | 0.1194 | 7.00 | -0.0740 | -0.0755 |
+| Eken (2016) | 0.1242 | 6.69 | -0.0794 | -0.0763 |
+| Backward, level 3 | 0.15851 | 7.252 | -0.08571 | -0.09603 |
+
+With the published discretisation the peak is within +2.5%/-1.4% (level 1) and
++1.3%/-2.6% (level 2) of the two published peaks, against 33% and 28% with the
+backward level-3 solution; the axial trough moves from 8-16% to 1-6% (level 1;
+1-8% on level 2) of the published values and the late radial trough from 26-27%
+to 0-3%. The damping by Euler at `Δt = 1e-4 s` (0.036-0.038 mm) amounts to
+92-115% of the gap between the published peaks and the backward solution
+(86-126% within the reading accuracy of the figures). The Euler results converge
+slowly in time (successive `u_r,max(A)` changes of 11.5%, 7.3% and 4.2%, still
+4.4% below the backward value at `Δt = 1.25e-5 s`), so neither published finite
+element peak is converged in time. The time discretisation therefore reproduces
+most, and within the reading accuracy all, of the published difference in
+`u_r,max(A)`, and much of the difference in the troughs; it does not explain the
+0.3 ms earlier peak of Eken (2016), and the published results also differ in
+their wall model (St Venant-Kirchhoff), pressure switch-off (instantaneous) and
+meshes.
 
 ### Coupling study
 
-Tutorial mesh, backward, `Δt = 2.5e-5 s`, 2 MPI ranks (`Iter.` is the total
-number of FSI iterations over the 800 time steps):
+Tutorial mesh, backward, `Δt = 2.5e-5 s`, 4 ranks:
 
-| Coupling | u_r,max | u_z,min | t_arr | c_p | Iter. | Mean | Max | Clock (s) |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Robin | 0.15984 | -0.08823 | 5.874 | 4.771 | 3 791 | 4.74 | 9 | 758 |
-| IQN-ILS | 0.15971 | -0.08818 | 5.869 | 4.771 | 12 420 | 15.53 | 20 | 3 075 |
+| Coupling | u_r,max | u_z,min | t_arr | Iter. (mean / max) | Clock (s) |
+|---|---:|---:|---:|---:|---:|
+| Robin | 0.15978 | -0.08819 | 5.873 | 4.78 / 9 | 483 |
+| IQN-ILS | 0.15969 | -0.08815 | 5.869 | 15.52 / 20 | 1 994 |
 
-The two radial histories at A differ by at most 0.27% of the peak, and the
-monitored quantities by at most 0.08%. Every Robin-Neumann step met its
-displacement, pressure and leakage-flux criteria without stalling (worst
-final residuals 6.1e-7, 9.9e-6 and 9.2e-6). The Robin-Neumann coupling needs
-3.3 times fewer FSI iterations than IQN-ILS and runs 4.1 times faster on this
-case, for which it was designed.
-
-The IQN-ILS arm uses the interface `predictor`. An earlier run without it
-gave the same solution (to 0.001% in every monitored quantity) with 15.46
-mean and 20 maximum iterations per step, so the predictor does not change the
-comparison here.
+The radial histories at A differ by at most 0.26% of the peak and the
+monitored quantities by at most 0.07%, below the level-2-to-3 changes.
 
 ## References
 
