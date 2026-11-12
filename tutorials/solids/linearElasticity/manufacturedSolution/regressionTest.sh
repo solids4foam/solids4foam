@@ -250,6 +250,77 @@ if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
     fi
 fi
 
+# Parallel test: the mixed approach on two processors must reproduce the serial
+# errors, which needs the D-in-p coupling across processor patches. A simple
+# decomposition is used, so the test does not depend on a partitioner library
+SERIAL_LOG="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex/log.solids4Foam"
+if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" && -f "$SERIAL_LOG" ]] \
+&& command -v mpirun >/dev/null 2>&1; then
+    CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex-parallel"
+    if [[ "$CHECK_ONLY" == false ]]; then
+        rm -rf "$CASE_DIR"
+        mkdir -p "$CASE_DIR"
+        for item in "$SCRIPT_DIR"/*; do
+            name=$(basename "$item")
+            case "$name" in
+                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
+            esac
+            cp -a "$item" "$CASE_DIR/"
+        done
+        rm -rf "$CASE_DIR/constant/polyMesh"
+        (
+            cd "$CASE_DIR"
+            ln -nsf solidProperties.petscSnesPressure constant/solidProperties
+            ln -nsf fvSolution.petscSnesPressure system/fvSolution
+            rm -f system/decomposeParDict
+            cat > system/decomposeParDict <<'DICT'
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+
+numberOfSubdomains 2;
+
+method          simple;
+
+simpleCoeffs
+{
+    n           (2 1 1);
+    delta       0.001;
+}
+DICT
+            solids4Foam::runApplication blockMesh
+            solids4Foam::runApplication decomposePar
+            solids4Foam::runParallel solids4Foam
+        ) > "$CASE_DIR/log.Allrun" 2>&1 || true
+    fi
+    SOLVER_LOG="$CASE_DIR/log.solids4Foam"
+    echo
+    echo "Checking petscSnesPressure (hex, 2 processors) against the serial run"
+    if [[ ! -f "$SOLVER_LOG" ]] || ! grep -q '^End' "$SOLVER_LOG" \
+    || ! grep -q 'Nonlinear solve converged' "$SOLVER_LOG"; then
+        echo "FAIL: the parallel petscSnesPressure run did not complete"
+        failures=$((failures + 1))
+    else
+        for marker in "Writing DDifference field" "Writing sigmaDifference field" \
+                      "Writing pDifference field"; do
+            serial=$(SOLVER_LOG="$SERIAL_LOG" extract_norm "$marker" 3)
+            parallel=$(extract_norm "$marker" 3)
+            if [[ -n "$serial" && -n "$parallel" ]] \
+            && awk "BEGIN {d = ($parallel) - ($serial); if (d < 0) d = -d;
+                           exit !(d <= 1e-4*($serial))}"; then
+                echo "PASS: ${marker#Writing } cell RMS: parallel $parallel, serial $serial"
+            else
+                echo "FAIL: ${marker#Writing } cell RMS: parallel '$parallel', serial '$serial'"
+                failures=$((failures + 1))
+            fi
+        done
+    fi
+fi
+
 if ((failures)); then
     echo "Regression test FAILED ($failures checks)"
     exit 1

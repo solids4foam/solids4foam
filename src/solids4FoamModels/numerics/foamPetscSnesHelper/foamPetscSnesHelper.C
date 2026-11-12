@@ -1130,9 +1130,6 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             const labelList& neiGlobalFaceCells =
                 neiProcGlobalIDs(mesh)[patchI];
-            const scalarField& patchNeiVols = neiProcVolumes(mesh)[patchI];
-            const vectorField& patchNeiLs = neiLs.boundaryField()[patchI];
-            // const vectorField patchNeiLs(... patchNeighbourField());
 
             forAll(fp, patchFaceI)
             {
@@ -1163,13 +1160,18 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 // Neighbour global cell ID
                 const label globalBlockColI = neiGlobalFaceCells[patchFaceI];
 
-                // Off-proc off-diagonal coefficient
-                // mat(ownCellID, neiCellID) += VI[ownCellID]*neiLs[faceI];
+                // Off-proc off-diagonal coefficient of this processor's row:
+                // lsGrad[own] += ownLs*(p_nei - p_own), so
+                // mat(ownCellID, neiCellID) += VI[ownCellID]*ownLs[faceI],
+                // with the owner-side volume and least-squares vector, as for
+                // an internal face. The neighbour's volume and vector belong
+                // to the neighbour's row, which the other processor inserts.
+                // From Philip Cardiff's 5dd6ce420 on the fix-pressure-solid
+                // branch
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
                     values[cmptI*blockSize + colOffset] =
-                        sign*patchNeiVols[patchFaceI]
-                       *patchNeiLs[patchFaceI][cmptI];
+                        sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                 }
                 AssertPETSc
                 (
