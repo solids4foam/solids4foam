@@ -27,6 +27,200 @@ License
 
 // * * * * * * * * * * *  Public Member Functions  * * * * * * * * * * * * * //
 
+template<class Type>
+Foam::List<Foam::Field<Type>>
+Foam::leastSquaresStencil::remoteCandidatesValues
+(
+    const List<labelList>& remoteCandidates,
+    const labelList& procToQuery,
+    const UList<Type>& C
+) const
+{
+    List<Field<Type>> remoteCellCentres(Pstream::nProcs());
+
+    forAll(remoteCellCentres, procI)
+    {
+        remoteCellCentres[procI].clear();
+    }
+
+    if (!Pstream::parRun())
+    {
+        return remoteCellCentres;
+    }
+
+#ifdef FOAMEXTEND
+    List<labelList> sendRequests(Pstream::nProcs());
+
+    forAll(procToQuery, i)
+    {
+        const label procI = procToQuery[i];
+        sendRequests[procI] = remoteCandidates[procI];
+    }
+
+    List<labelList> receivedRequests;
+    labelListList requestSizes;
+    Pstream::exchange<labelList, label>
+    (
+        sendRequests,
+        receivedRequests,
+        requestSizes
+    );
+
+    List<Field<Type>> sendCentres(Pstream::nProcs());
+
+    forAll(receivedRequests, requestingProc)
+    {
+        const labelList& requestedGlobalIDs =
+            receivedRequests[requestingProc];
+        Field<Type>& centres = sendCentres[requestingProc];
+        centres.setSize(requestedGlobalIDs.size());
+
+        forAll(requestedGlobalIDs, i)
+        {
+            const label globalCellID = requestedGlobalIDs[i];
+            const label localCell = globalCells_.toLocal(globalCellID);
+
+            if (localCell < 0 || localCell >= mesh_.nCells())
+            {
+                FatalErrorInFunction
+                    << "Invalid global->local mapping: globalCellID="
+                    << globalCellID << " localCell=" << localCell
+                    << " on proc " << Pstream::myProcNo()
+                    << abort(FatalError);
+            }
+
+            centres[i] = C[localCell];
+        }
+    }
+
+    labelListList centreSizes;
+    Pstream::exchange<Field<Type>, Type>
+    (
+        sendCentres,
+        remoteCellCentres,
+        centreSizes
+    );
+
+    forAll(remoteCandidates, procI)
+    {
+        if (remoteCellCentres[procI].size() != remoteCandidates[procI].size())
+        {
+            FatalErrorInFunction
+                << "Centres reply size mismatch from proc " << procI
+                << ": got " << remoteCellCentres[procI].size()
+                << " expected " << remoteCandidates[procI].size()
+                << abort(FatalError);
+        }
+    }
+#else
+    PstreamBuffers reqBufs(Pstream::commsTypes::nonBlocking);
+
+    // Phase 1: send cell global IDs to each processor in contact
+    forAll(procToQuery, i)
+    {
+        const label procI = procToQuery[i];
+
+        if (!remoteCandidates[procI].empty())
+        {
+            UOPstream os(procI, reqBufs);
+            os << remoteCandidates[procI];
+        }
+    }
+
+    reqBufs.finishedSends();
+
+    // Phase 2: respond with cell centre coordinates
+    PstreamBuffers repBufs(Pstream::commsTypes::nonBlocking);
+
+    forAll (procToQuery, i)
+    {
+        const label fromProc = procToQuery[i];
+
+        if (fromProc == Pstream::myProcNo())
+        {
+            continue;
+        }
+
+#ifdef OPENFOAM_COM
+        if (!reqBufs.recvDataCount(fromProc))
+        {
+            continue;
+        }
+#endif
+
+        UIPstream is(fromProc, reqBufs);
+
+        labelList processorsCellID;
+        is >> processorsCellID;
+
+        Field<Type> centres(processorsCellID.size());
+
+        forAll(processorsCellID, i)
+        {
+            const label globalCellID = processorsCellID[i];
+
+            const label localCell = globalCells_.toLocal(globalCellID);
+
+            if (localCell < 0 || localCell >= mesh_.nCells())
+            {
+                FatalErrorInFunction
+                    << "Invalid global->local mapping: globaCellID="
+                    << globalCellID << " localCell=" << localCell
+                    << " on proc " << Pstream::myProcNo() << nl
+                    << exit(FatalError);
+            }
+
+            centres[i] = C[localCell];
+        }
+
+        UOPstream os(fromProc, repBufs);
+        os << centres;
+    }
+
+    repBufs.finishedSends();
+
+    // Phase 3: send back populated cell centres lists
+
+    forAll(procToQuery, i)
+    {
+        const label p = procToQuery[i];
+
+        if (remoteCandidates[p].empty())
+        {
+            continue;
+        }
+
+#ifdef OPENFOAM_COM
+        if (!repBufs.recvDataCount(p))
+        {
+            FatalErrorInFunction
+                << "Did not receive centres from proc " << p << nl
+                << exit(FatalError);
+        }
+#endif
+
+        UIPstream is(p, repBufs);
+
+        Field<Type> centres;
+        is >> centres;
+
+        if (centres.size() != remoteCandidates[p].size())
+        {
+            FatalErrorInFunction
+                << "Centres reply size mismatch from proc " << p
+                << ": got " << centres.size()
+                << " expected " << remoteCandidates[p].size() << nl
+                << exit(FatalError);
+        }
+
+        remoteCellCentres[p].transfer(centres);
+    }
+#endif
+
+    return remoteCellCentres;
+}
+
+
 
 template<class Type>
 Foam::Map<Type>

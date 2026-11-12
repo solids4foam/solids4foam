@@ -52,6 +52,7 @@ SourceFiles
 #include "mechanicalConstitutiveLawState.H"
 #include "mechanicalConstitutiveLawStateSpec.H"
 #include "integrationPointTopology.H"
+#include "cellZoneInterface.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -88,6 +89,12 @@ class mechanicalConstitutiveLawStateSetup
         //- Whether a continued run has the kinematic history a constitutive
         //  history is measured against, as the solid model says
         const bool& restartKinematicsAvailable_;
+
+        //- For each face of a coupled patch, whether the cell on the other
+        //  side is of another material. Built here, on every rank, because
+        //  building it communicates; a prescribed state is then gathered on
+        //  such a face from its own cell (gatherToIntegrationPoints)
+        const List<boolList> coupledInterface_;
 
 
     // Private Member Functions

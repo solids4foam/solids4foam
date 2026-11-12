@@ -574,6 +574,20 @@ void Foam::solidModels::linGeomTotalDispSolid::correctStressQuad()
         mesh().time().deltaTValue(),
         sigmaQuad()
     );
+
+    // The neighbour side of the material interfaces, each point evaluated
+    // by the face neighbour's law
+    if (materialInterfaceQuad())
+    {
+        mechanicalManager().updateStressSmallStrain
+        (
+            interfaceNeighbourTopology(),
+            gradDQuadNei().m(),
+            gradDQuadNei0().m(),
+            mesh().time().deltaTValue(),
+            sigmaQuadNei().m()
+        );
+    }
 }
 
 
@@ -798,6 +812,13 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
     // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(D().name());
 
+    // The two sides of a material interface are held together by the
+    // stabilisation, with the series stiffness of the two materials
+    if (materialInterfaceQuad())
+    {
+        interfaceSeriesStiffness(impKf_, impK_);
+    }
+
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
 
@@ -998,6 +1019,8 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     if (highOrderJacobian())
     {
+        checkHighOrderMaterials();
+
         return hofvm::initialiseJacobian
         (
             jac,
@@ -1078,11 +1101,27 @@ label linGeomTotalDispSolid::formResidual
         // Update gradient of displacement at face quadrature points
         gradQuad(D, gradDQuad());
 
+        if (materialInterfaceQuad())
+        {
+            gradQuadInterfaceNeighbour(D, gradDQuadNei());
+        }
+
         // Calculate sigma at quadrature points
         correctStressQuad();
 
         // Integration over face quadrature points to get face traction
         traction = hofvc::surfaceIntegrate(sigmaQuad(), mesh);
+
+        // On a material interface, the weighted mean of the two sides
+        if (materialInterfaceQuad())
+        {
+            combineInterfaceTraction
+            (
+                traction,
+                hofvc::surfaceIntegrate(sigmaQuadNei(), mesh)(),
+                impK_
+            );
+        }
     }
     else
     {
@@ -1177,6 +1216,13 @@ label linGeomTotalDispSolid::formResidual
     // stabilisation is set to zero on traction boundaries
     momentumStabilisation().updateVector(D, &gradD());
     traction += impKf_*momentumStabilisation().faceVector();
+
+    // On a material interface, the stronger stabilisation that holds the two
+    // sides together
+    if (materialInterfaceQuad())
+    {
+        addInterfaceStabilisation(traction, impKf_);
+    }
 
     // Enforce traction boundary conditions
     enforceTractionBoundaries(traction, D, n);

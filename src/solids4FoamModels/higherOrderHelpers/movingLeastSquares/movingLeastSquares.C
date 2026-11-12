@@ -856,6 +856,54 @@ void movingLeastSquares::calcFaceCoeffs() const
             << "Pointer already set!" << abort(FatalError);
     }
 
+    faceGradCoeffsPtr_.set
+    (
+        new List<CompactListList<vector>>(mesh_.nFaces())
+    );
+
+    calcFaceGradCoeffs
+    (
+        faceGradStencil(),
+        autoPtrRef(faceGradCoeffsPtr_),
+        calcConditionNumber_
+    );
+
+    if (debug)
+    {
+        InfoInFunction << "end" << endl;
+    }
+}
+
+
+void movingLeastSquares::calcInterfaceNeighbourFaceCoeffs() const
+{
+    if (interfaceNeighbourFaceGradCoeffsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    interfaceNeighbourFaceGradCoeffsPtr_.set
+    (
+        new List<CompactListList<vector>>(mesh_.nFaces())
+    );
+
+    calcFaceGradCoeffs
+    (
+        stencil().interfaceNeighbourFacesStencil(),
+        autoPtrRef(interfaceNeighbourFaceGradCoeffsPtr_),
+        false
+    );
+}
+
+
+void movingLeastSquares::calcFaceGradCoeffs
+(
+    const CompactListList<label>& faceStencils,
+    List<CompactListList<vector>>& faceGradCoeffs,
+    const bool conditionNumber
+) const
+{
     // References for brevity
     const fvMesh& mesh = mesh_;
     const bool twoD = mesh.nGeometricD() == 2;
@@ -863,13 +911,6 @@ void movingLeastSquares::calcFaceCoeffs() const
     const vectorField& Cf = mesh.faceCentres();
     const surfaceVectorField& Sf = mesh.Sf();
     const globalIndex& globalCells = stencil().globalCells();
-
-    faceGradCoeffsPtr_.set
-    (
-        new List<CompactListList<vector>>(mesh.nFaces())
-    );
-    List<CompactListList<vector>>& faceGradCoeffs =
-        autoPtrRef(faceGradCoeffsPtr_);
 
     // Calculate Taylor series exponents, exponents differs for 2D and 3D case
     DynamicList<FixedList<label, 3>> exponents;
@@ -887,7 +928,7 @@ void movingLeastSquares::calcFaceCoeffs() const
     FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
 
     // Reference to face stencils, quadrature points and remote centres
-    auto& stencils = compactListListCRef(faceGradStencil());
+    auto& stencils = compactListListCRef(faceStencils);
     auto& faceQuadPts =
         compactListListCRef(quadrature().faceQuadPoints());
 
@@ -905,10 +946,17 @@ void movingLeastSquares::calcFaceCoeffs() const
         return remoteCI[globalCellID];
     };
 
-    // Loop over all faces
+    // Loop over all faces. A face without a stencil - one of an empty
+    // patch, or not on a material interface for the neighbour-side
+    // stencils - has no coefficients
     forAll(stencils, faceI)
     {
         const UList<label>& stencil = stencils[faceI];
+
+        if (stencil.empty())
+        {
+            continue;
+        }
 
         // Centre of current face
         const vector& faceCentre = Cf[faceI];
@@ -1099,7 +1147,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 
             const Eigen::MatrixXd& A = qrs.A;
 
-            if (calcConditionNumber_)
+            if (conditionNumber)
             {
                 avgCond += qrs.cond*(1/scalar(nbOfQuadPts));
             }
@@ -1118,7 +1166,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 
         }
 
-        if (calcConditionNumber_)
+        if (conditionNumber)
         {
             // Store face average condition number
             if (faceI < mesh_.nInternalFaces())
@@ -1137,16 +1185,11 @@ void movingLeastSquares::calcFaceCoeffs() const
         }
     }
 
-    if (calcConditionNumber_)
+    if (conditionNumber)
     {
         Info<< "Writing " << faceConditionNumber().name() << " to time = "
             << mesh.time().value() << endl;
         faceConditionNumber().write();
-    }
-
-    if (debug)
-    {
-        InfoInFunction << "end" << endl;
     }
 }
 
@@ -1187,6 +1230,7 @@ movingLeastSquares::movingLeastSquares
     cellSecondGradCoeffsPtr_(),
     cellThirdGradCoeffsPtr_(),
     faceGradCoeffsPtr_(),
+    interfaceNeighbourFaceGradCoeffsPtr_(),
     cellConditionNumberPtr_(),
     faceConditionNumberPtr_()
 {
@@ -1250,6 +1294,7 @@ void Foam::movingLeastSquares::clear() const
     cellSecondGradCoeffsPtr_.clear();
     cellThirdGradCoeffsPtr_.clear();
     faceGradCoeffsPtr_.clear();
+    interfaceNeighbourFaceGradCoeffsPtr_.clear();
     cellConditionNumberPtr_.clear();
     faceConditionNumberPtr_.clear();
 }
@@ -1272,6 +1317,16 @@ void movingLeastSquares::fGrad
 ) const
 {
     this->fGrad<vector>(vf, result);
+}
+
+
+void movingLeastSquares::fGradInterfaceNeighbour
+(
+    const volVectorField& vf,
+    CompactListList<tensor>& result
+) const
+{
+    this->fGradInterfaceNeighbour<vector>(vf, result);
 }
 
 

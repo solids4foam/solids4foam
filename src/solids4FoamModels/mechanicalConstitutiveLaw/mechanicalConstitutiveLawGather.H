@@ -77,7 +77,16 @@ inline bool mechanicalConstitutiveLawHeaderIsA(IOobject& io)
 //  to rounding, and exactly so for two cells.
 //
 //  Every type is treated alike. A direction, such as a fibre, is
-//  therefore interpolated too, and a law reading one normalises it
+//  therefore interpolated too, and a law reading one normalises it.
+//
+//  With coupledInterfacePtr, for data that belongs to a material, such as a
+//  prescribed fibre direction, a point on a face between a cell of this law
+//  and a cell of another takes this law's cell value rather than a blend of
+//  the two materials'. It holds, for each coupled patch face, whether the
+//  cell on the other side is of another material (cellZoneInterfaceCoupled),
+//  built by the caller because building it communicates. Without it, for a
+//  field continuous across materials, such as a temperature, a point takes
+//  the interpolated face value
 template<class Type>
 inline void gatherToIntegrationPoints
 (
@@ -86,7 +95,8 @@ inline void gatherToIntegrationPoints
     const GeometricField<Type, fvPatchField, volMesh>& src,
     const integrationPointTopology& topo,
     const labelList& ipIDs,
-    Field<Type>& fld
+    Field<Type>& fld,
+    const List<boolList>* coupledInterfacePtr = nullptr
 )
 {
     // The face each point lies on, or -1 for a point that lies in a cell
@@ -159,6 +169,19 @@ inline void gatherToIntegrationPoints
         linearInterpolate(src)
     );
 
+    // Whether each cell is one of this law's, for the material-sided gather
+    const bool materialSided = (coupledInterfacePtr != nullptr);
+    boolList lawCell;
+
+    if (materialSided)
+    {
+        lawCell.setSize(mesh.nCells(), false);
+        forAll(lawCells, i)
+        {
+            lawCell[lawCells[i]] = true;
+        }
+    }
+
     forAll(ipIDs, localI)
     {
         const label faceI = ipFace[localI];
@@ -170,21 +193,45 @@ inline void gatherToIntegrationPoints
 
         if (faceI < nInternal)
         {
-            fld[localI] = srcf[faceI];
+            const label ownCellI = mesh.faceOwner()[faceI];
+            const label neiCellI = mesh.faceNeighbour()[faceI];
+
+            if (materialSided && lawCell[ownCellI] != lawCell[neiCellI])
+            {
+                // A face between this law's material and another
+                fld[localI] = src[lawCell[ownCellI] ? ownCellI : neiCellI];
+            }
+            else
+            {
+                fld[localI] = srcf[faceI];
+            }
+
             continue;
         }
 
         const label patchI = mesh.boundaryMesh().whichPatch(faceI);
         const fvsPatchField<Type>& pf = srcf.boundaryField()[patchI];
+        const label patchFaceI = faceI - mesh.boundaryMesh()[patchI].start();
 
-        if (pf.empty())
+        if
+        (
+            materialSided
+         && (*coupledInterfacePtr)[patchI].size()
+         && (*coupledInterfacePtr)[patchI][patchFaceI]
+        )
+        {
+            // A processor face between this law's material and another:
+            // the face's only cell on this rank is this law's
+            fld[localI] = src[mesh.faceOwner()[faceI]];
+        }
+        else if (pf.empty())
         {
             // A face of an empty patch holds no value, and has one cell
             fld[localI] = src[mesh.faceOwner()[faceI]];
         }
         else
         {
-            fld[localI] = pf[faceI - mesh.boundaryMesh()[patchI].start()];
+            fld[localI] = pf[patchFaceI];
         }
     }
 }

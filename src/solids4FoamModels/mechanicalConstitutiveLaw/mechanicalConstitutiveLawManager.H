@@ -783,6 +783,20 @@ public:
             const word& topologyTypeName
         ) const;
 
+        //- Return (and lazily construct) the compact face topology of the
+        //  neighbour side of the material interfaces, from a layout with one
+        //  row per face whose only non-empty rows are the faces between two
+        //  materials.
+        //  Each of its points belongs to the face neighbour's law, so with
+        //  the owner-side topology compactCellTopologyFor() builds for more
+        //  than one law, an interface face is evaluated once by each of its
+        //  two materials, each with its own kinematics and history. Pass it
+        //  to the flat-list updates. Requires more than one law
+        const integrationPointTopology& interfaceNeighbourTopologyFor
+        (
+            const CompactListList<tensor>& layout
+        ) const;
+
         //- Const-access to the unregistered material-density fallback field
         const volScalarField& rho() const;
 

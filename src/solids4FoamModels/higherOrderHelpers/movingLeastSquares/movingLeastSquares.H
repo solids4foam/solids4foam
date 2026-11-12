@@ -138,6 +138,12 @@ private:
         //- QR Gradient face Gauss points coefficients
         mutable autoPtr<List<CompactListList<vector>>> faceGradCoeffsPtr_;
 
+        //- Gradient coefficients at the face quadrature points of the
+        //  neighbour side of the material interfaces, over
+        //  stencil().interfaceNeighbourFacesStencil(); empty for other faces
+        mutable autoPtr<List<CompactListList<vector>>>
+            interfaceNeighbourFaceGradCoeffsPtr_;
+
         //- Cell condition number field of the least squares system
         mutable autoPtr<volScalarField> cellConditionNumberPtr_;
 
@@ -233,6 +239,20 @@ private:
 
         //- Calculate interpolation coefficients for the faces quadrature points
         void calcFaceCoeffs() const;
+
+        //- Calculate the gradient coefficients at the face quadrature points
+        //  of the neighbour side of the material interfaces
+        void calcInterfaceNeighbourFaceCoeffs() const;
+
+        //- Calculate the gradient coefficients at the quadrature points of
+        //  every face with a non-empty stencil in faceStencils, optionally
+        //  writing the face condition number
+        void calcFaceGradCoeffs
+        (
+            const CompactListList<label>& faceStencils,
+            List<CompactListList<vector>>& faceGradCoeffs,
+            const bool conditionNumber
+        ) const;
 
         //- Calculate value coefficients for one cell at a specified point
         //  Stencil-cell coefficients are followed by the owner coefficient
@@ -419,6 +439,25 @@ private:
 
         //- Gradient of vector field at face quadrature points
         virtual void fGrad
+        (
+            const volVectorField& vf,
+            CompactListList<tensor>& result
+        ) const;
+
+        //- Gradient of field at the face quadrature points of the neighbour
+        //  side of the material interfaces. result has a row per face, sized
+        //  as the face's quadrature points for a face between two materials
+        //  and empty otherwise
+        template<class Type>
+        void fGradInterfaceNeighbour
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf,
+            CompactListList<typename outerProduct<vector, Type>::type>& result
+        ) const;
+
+        //- Gradient of vector field at the face quadrature points of the
+        //  neighbour side of the material interfaces
+        virtual void fGradInterfaceNeighbour
         (
             const volVectorField& vf,
             CompactListList<tensor>& result

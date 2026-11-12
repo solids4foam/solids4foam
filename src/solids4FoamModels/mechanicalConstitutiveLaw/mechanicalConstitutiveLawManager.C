@@ -552,9 +552,20 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     }
     else
     {
+        // With more than one law a face's points go to its owner cell only,
+        // so that each point belongs to exactly one law. A face between two
+        // materials is then evaluated by the owner's law here, and by the
+        // neighbour's on the topology interfaceNeighbourTopologyFor() builds
+        typedef compactFaceIntegrationPointTopology::cellAssociation assoc;
+
         topoPtr.set
         (
-            new compactFaceIntegrationPointTopology(mesh_, std::move(cellToIP))
+            new compactFaceIntegrationPointTopology
+            (
+                mesh_,
+                std::move(cellToIP),
+                laws_.size() > 1 ? assoc::owner : assoc::both
+            )
         );
     }
 
@@ -563,6 +574,81 @@ Foam::mechanicalConstitutiveLawManager::compactCellTopologyFor
     compactFingerprints_.set(key, fingerprint);
 
     return topology(key).topology_;
+}
+
+
+const Foam::integrationPointTopology&
+Foam::mechanicalConstitutiveLawManager::interfaceNeighbourTopologyFor
+(
+    const CompactListList<tensor>& layout
+) const
+{
+    // A literal key, the same on every rank (see compactCellTopologyFor)
+    const word key("compactFaceInterfaceNeighbour");
+
+    if (topologyCache_.found(key))
+    {
+        return topology(key).topology_;
+    }
+
+    if (laws_.size() < 2)
+    {
+        FatalErrorInFunction
+            << "The neighbour side of the material interfaces was requested, "
+            << "but there is only one mechanical constitutive law"
+            << exit(FatalError);
+    }
+
+    // As in compactCellTopologyFor: OpenFOAM.org counts the rows from the
+    // offset table
+#ifdef OPENFOAM_ORG
+    const labelUList& offsets = layout.offsets();
+    const label nRows = max(offsets.size() - 1, label(0));
+
+    labelList rowSizes(nRows);
+    forAll(rowSizes, rowI)
+    {
+        rowSizes[rowI] = offsets[rowI + 1] - offsets[rowI];
+    }
+#else
+    const label nRows = layout.size();
+    const labelList rowSizes(layout.sizes());
+#endif
+
+    if (nRows != mesh_.nFaces())
+    {
+        FatalErrorInFunction
+            << "The neighbour-side interface layout must have one row per "
+            << "face, but it has " << nRows << " rows, while the mesh has "
+            << mesh_.nFaces() << " faces" << exit(FatalError);
+    }
+
+    CompactListList<label> faceToIP(rowSizes);
+
+    for (label faceI = 0; faceI < nRows; ++faceI)
+    {
+        const label n = rowSizes[faceI];
+        for (label j = 0; j < n; ++j)
+        {
+#ifdef OPENFOAM_ORG
+            faceToIP(faceI, j) = offsets[faceI] + j;
+#else
+            faceToIP(faceI, j) = layout.index(faceI, j);
+#endif
+        }
+    }
+
+    autoPtr<integrationPointTopology> topoPtr
+    (
+        new compactFaceIntegrationPointTopology
+        (
+            mesh_,
+            std::move(faceToIP),
+            compactFaceIntegrationPointTopology::cellAssociation::neighbour
+        )
+    );
+
+    return registerTopology(key, topoPtr);
 }
 
 
