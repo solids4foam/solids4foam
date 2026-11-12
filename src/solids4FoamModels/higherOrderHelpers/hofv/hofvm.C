@@ -31,6 +31,10 @@ License
 #include "petscErrorHandling.H"
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
+#include "processorFvPatch.H"
+#ifndef FOAMEXTEND
+    #include "PstreamBuffers.H"
+#endif
 #include "symmetryPolyPatch.H"
 #include "fixedGradientFvPatchFields.H"
 
@@ -40,6 +44,58 @@ License
 
 namespace Foam
 {
+
+namespace
+{
+
+// Send one labelList per face of every processor patch to the neighbouring
+// processor and return the lists received for the same faces (processor
+// patch faces are ordered identically on both sides). Used to assemble the
+// high-order stabilisation across processor faces.
+List<List<labelList>> swapProcessorFaceLists
+(
+    const fvMesh& mesh,
+    const List<List<labelList>>& sendLists
+)
+{
+    const polyBoundaryMesh& bm = mesh.boundaryMesh();
+    List<List<labelList>> recvLists(bm.size());
+
+    if (!Pstream::parRun())
+    {
+        return recvLists;
+    }
+
+    PstreamBuffers pBufs(Pstream::commsTypes::nonBlocking);
+
+    forAll(bm, patchI)
+    {
+        if (isA<processorPolyPatch>(bm[patchI]))
+        {
+            const processorPolyPatch& procPatch =
+                refCast<const processorPolyPatch>(bm[patchI]);
+            UOPstream os(procPatch.neighbProcNo(), pBufs);
+            os << sendLists[patchI];
+        }
+    }
+
+    pBufs.finishedSends();
+
+    forAll(bm, patchI)
+    {
+        if (isA<processorPolyPatch>(bm[patchI]))
+        {
+            const processorPolyPatch& procPatch =
+                refCast<const processorPolyPatch>(bm[patchI]);
+            UIPstream is(procPatch.neighbProcNo(), pBufs);
+            is >> recvLists[patchI];
+        }
+    }
+
+    return recvLists;
+}
+
+} // End anonymous namespace
 
 namespace
 {
@@ -771,6 +827,74 @@ label Foam::hofvm::initialiseJacobian
         }
     }
 
+    // Processor faces: the high-order alpha stabilisation couples the owner
+    // cell to the cell-centred stencil of the cell on the other side, and
+    // each processor inserts its own side into both rows (see
+    // insertAlphaStabIntoPETScMatrix). Reserve the columns of the
+    // neighbour's stencil in the local row. Only processor faces are
+    // affected, so serial runs allocate exactly as before.
+    if (Pstream::parRun())
+    {
+        const polyBoundaryMesh& bm = mesh.boundaryMesh();
+        List<List<labelList>> sendLists(bm.size());
+
+        forAll(bm, patchI)
+        {
+            if (!isA<processorPolyPatch>(bm[patchI]))
+            {
+                continue;
+            }
+
+            const polyPatch& pp = bm[patchI];
+            List<labelList>& faceLists = sendLists[patchI];
+            faceLists.setSize(pp.size());
+
+            forAll(pp, faceI)
+            {
+                const label ownCellID = mesh.faceOwner()[pp.start() + faceI];
+                const labelUList cellStencil = cellStencils[ownCellID];
+                labelList& cols = faceLists[faceI];
+                cols.setSize(cellStencil.size() + 1);
+                forAll(cellStencil, cI)
+                {
+                    cols[cI] = cellStencil[cI];
+                }
+                cols[cellStencil.size()] =
+                    reconstructionGlobalCells.toGlobal(ownCellID);
+
+                // Own side, inserted into the local row
+                forAll(cols, cI)
+                {
+                    rowCols[ownCellID].insert(cols[cI]);
+                }
+            }
+        }
+
+        const List<List<labelList>> recvLists =
+            swapProcessorFaceLists(mesh, sendLists);
+
+        forAll(bm, patchI)
+        {
+            if (!isA<processorPolyPatch>(bm[patchI]))
+            {
+                continue;
+            }
+
+            const polyPatch& pp = bm[patchI];
+
+            forAll(pp, faceI)
+            {
+                const label ownCellID = mesh.faceOwner()[pp.start() + faceI];
+                const labelList& cols = recvLists[patchI][faceI];
+
+                forAll(cols, cI)
+                {
+                    rowCols[ownCellID].insert(cols[cI]);
+                }
+            }
+        }
+    }
+
 #ifndef OPENFOAM_COM
     const label myProcNo = Pstream::myProcNo();
     const label gStart = petscSnesHelper.globalCells().offset(myProcNo);
@@ -963,12 +1087,6 @@ void Foam::hofvm::insertAlphaStabIntoPETScMatrix
     const label colOffset
 )
 {
-    // Support for processor-face coefficient assembly will be added
-    if (Pstream::parRun())
-    {
-        return;
-    }
-
      // Skip in the case of very small stabilisation factor
     if ( mag(scaleFactor) < SMALL)
     {
@@ -1136,6 +1254,94 @@ void Foam::hofvm::insertAlphaStabIntoPETScMatrix
                 globalOwnRow,
                 nullptr
             );
+        }
+    }
+
+    // Processor faces. The residual uses the owner-side face value from
+    // this processor and the neighbour-side value from the other one. Each
+    // processor inserts the derivative of its own side's reconstruction into
+    // its own row and, with the opposite sign, into the row of the cell on
+    // the other side (an off-processor row, communicated by PETSc during
+    // assembly), so the face is assembled exactly as an internal face.
+    if (Pstream::parRun())
+    {
+        const polyBoundaryMesh& bm = mesh.boundaryMesh();
+        List<List<labelList>> sendRows(bm.size());
+
+        forAll(bm, patchI)
+        {
+            if (!isA<processorPolyPatch>(bm[patchI]))
+            {
+                continue;
+            }
+
+            const labelUList& faceCells = mesh.boundary()[patchI].faceCells();
+            List<labelList>& rows = sendRows[patchI];
+            rows.setSize(faceCells.size());
+
+            forAll(faceCells, faceI)
+            {
+                rows[faceI] = labelList
+                (
+                    1, petscSnesHelper.globalCells().toGlobal(faceCells[faceI])
+                );
+            }
+        }
+
+        const List<List<labelList>> neighbourRows =
+            swapProcessorFaceLists(mesh, sendRows);
+
+        forAll(mesh.boundary(), patchI)
+        {
+            const fvPatch& patch = mesh.boundary()[patchI];
+
+            if (!isA<processorFvPatch>(patch))
+            {
+                continue;
+            }
+
+            const processorFvPatch& procPatch =
+                refCast<const processorFvPatch>(patch);
+#ifdef FOAMEXTEND
+            const vectorField& neighbourCellCentres =
+                refCast<const processorPolyPatch>(patch.patch())
+               .neighbFaceCellCentres();
+#else
+            const vectorField& neighbourCellCentres =
+                procPatch.procPolyPatch().neighbFaceCellCentres();
+#endif
+            const labelUList& faceCells = patch.faceCells();
+            const vectorField patchN(patch.nf());
+            const scalarField& patchMagSf =
+                mesh.magSf().boundaryField()[patchI];
+            const scalarField& patchDiffusivity =
+                diffusivity.boundaryField()[patchI];
+
+            forAll(patch, patchFaceI)
+            {
+                const label faceI = patch.patch().start() + patchFaceI;
+                const label ownCellID = faceCells[patchFaceI];
+                const PetscInt globalOwnRow =
+                    petscSnesHelper.globalCells().toGlobal(ownCellID);
+                const PetscInt globalNeiRow =
+                    neighbourRows[patchI][patchFaceI][0];
+                const vector d =
+                    neighbourCellCentres[patchFaceI] - C[ownCellID];
+
+                const scalar faceScale =
+                    scaleFactor*patchDiffusivity[patchFaceI]
+                   *patchMagSf[patchFaceI]
+                   /max(mag(patchN[patchFaceI] & d), VSMALL);
+
+                insertReconstruction
+                (
+                    ownCellID,
+                    ownerCoeffs[faceI],
+                    -faceScale,
+                    globalOwnRow,
+                    &globalNeiRow
+                );
+            }
         }
     }
 }
