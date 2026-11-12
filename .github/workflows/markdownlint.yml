@@ -22,5 +22,5 @@ jobs:
       - name: Run MarkdownLint
         uses: DavidAnson/markdownlint-cli2-action@eb5ca3ab411449c66620fe7f1b3c9e10547144b0 # v18.0.0
         with:
-          globs: "ThirdParty/**/*.md,tests/**/*.md,optionalFixes/**/*.md,tutorials/**/*.md,applications/**/*.md,CHANGELOG.md,CONTRIBUTING.md,CONTRIBUTORS.md,README.md,etc/**/*.md,src/**/*.md,.github/review/*.md,.github/pull_request_template.md"
+          globs: "ThirdParty/**/*.md,tests/**/*.md,optionalFixes/**/*.md,tutorials/**/*.md,applications/**/*.md,CHANGELOG.md,CONTRIBUTING.md,CONTRIBUTORS.md,README.md,etc/**/*.md,src/**/*.md,.github/review/*.md,.github/pull_request_template.md,.agents/skills/**/*.md"
           separator: ','
