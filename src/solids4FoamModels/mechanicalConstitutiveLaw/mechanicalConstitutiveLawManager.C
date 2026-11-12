@@ -1664,6 +1664,24 @@ Foam::mechanicalConstitutiveLawManager::singleLaw() const
 }
 
 
+bool Foam::mechanicalConstitutiveLawManager::providesScalarShearTangent
+(
+    wordList& undeclared
+) const
+{
+    // Every processor holds every law, so the answer is the same everywhere
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].providesScalarShearTangent())
+        {
+            undeclared.append(laws_[lawI].type());
+        }
+    }
+
+    return undeclared.empty();
+}
+
+
 const Foam::volScalarField&
 Foam::mechanicalConstitutiveLawManager::kappa() const
 {
@@ -2542,7 +2560,7 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentVol
             << VolFields::scalarTangentContext() << " was asked for a "
             << tangentRequestName(tangentReq) << " tangent." << nl
             << "This interface returns a scalar tangent at cell centres, so "
-            << "the request must be scalar or scalarDeviatoric."
+            << "the request must be scalar, scalarDeviatoric or scalarShear."
             << exit(FatalError);
     }
 

@@ -618,10 +618,15 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
 
         if (solvePressure())
         {
-            // Map the p field to the SNES solution vector
+            // Map the p field to the SNES solution vector, as the scaled
+            // unknown pHat = p/pressureUnknownScale
+            const scalarField pHat
+            (
+                Foam::primitiveField(p())/pressureUnknownScale()
+            );
             foamPetscSnesHelper::InsertFieldComponents<scalar>
             (
-                p(),
+                pHat,
                 foamPetscSnesHelper::solution(),
                 blockSize_ -1 // Location of first component
             );
@@ -657,6 +662,9 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
             pI,
             blockSize_ - 1 // Location of p component
         );
+
+        // The PETSc vector holds the scaled unknown pHat = p/pressureUnknownScale
+        pI *= pressureUnknownScale();
 
         p().correctBoundaryConditions();
 
@@ -821,13 +829,12 @@ Foam::tmp<Foam::volScalarField>
 Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
 {
     // With the mixed displacement-pressure formulation the implicit stiffness
-    // is the scalar Laplacian surrogate for div(dev(sigma)), which is
-    // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu, as in
-    // linGeomTotalDispSolid for the same formulation
-    const tangentRequest req =
-        solvePressure()
-      ? tangentRequest::scalarDeviatoric
-      : tangentRequest::scalar;
+    // is by default the scalar Laplacian surrogate for div(dev(sigma)), which
+    // for an isotropic law is mu*lap(D) + (1/3)*mu*grad(div(D)), i.e.
+    // (4/3)*mu, as in linGeomTotalDispSolid for the same formulation; with
+    // mixedImplicitStiffness twoMu it is the law's declared 2*mu
+    // (mixedImplicitStiffnessRequest)
+    const tangentRequest req = mixedImplicitStiffnessRequest();
 
     // Announce which tangent the implicit stiffness is taken from
     Info<< "Implicit stiffness from the mechanicalConstitutiveLaw framework"
@@ -836,13 +843,24 @@ Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::makeImpK() const
     // The name, dimensions and boundary types are not free: the field is
     // registered under "impK" and looked up by that name by the contact and
     // cohesive zone models
+    return scalarTangentQuery(req, "impK");
+}
+
+
+Foam::tmp<Foam::volScalarField>
+Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::scalarTangentQuery
+(
+    const tangentRequest req,
+    const word& fieldName
+) const
+{
     tmp<volScalarField> tImpK
     (
         new volScalarField
         (
             IOobject
             (
-                "impK",
+                fieldName,
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,
@@ -1012,6 +1030,9 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 
         // Ensure p is created and the oldTime is stored
         p().oldTime();
+
+        // Algebraic scaling of the mixed PETSc system (off by default)
+        setMixedSystemScaling();
 
         // A p that is zero everywhere, as it is at the start of a run, starts
         // from the law's volumetric response at the initial kinematics, which
@@ -1352,6 +1373,9 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale
+        pI *= pressureUnknownScale();
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1395,8 +1419,8 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
           + pressureStabilisation().cellScalar(&rAUf(), true)*one
         );
 
-        // Make residual extensive
-        pressureResidual *= mesh.V();
+        // Make residual extensive, and scale the pressure equation rows
+        pressureResidual *= pressureEqnScale()*mesh.V();
 
         // Copy the pressureResidual into the f field as the final equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -1554,6 +1578,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale
+        pI *= pressureUnknownScale();
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1582,6 +1609,15 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
               + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
+            // The pressure rows are scaled by pressureEqnScale and the
+            // pressure columns by pressureUnknownScale (d/dpHat)
+            approxPressureJ *= dimensionedScalar
+            (
+                "pressureScale",
+                dimless,
+                pressureEqnScale()*pressureUnknownScale()
+            );
+
             // Insert the pressure equation
             foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
             (
@@ -1596,7 +1632,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 jac,
                 blockSize_ - 1,            // row offset
                 0,                         // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar components of D
+                solidModel::twoD() ? 2 : 3, // number of scalar components of D
+                false,                      // flipSign
+                pressureEqnScale()          // pressure equation row scale
             );
 
             // Insert p-in-D term
@@ -1607,7 +1645,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 jac,
                 0,                         // row offset
                 blockSize_ - 1,            // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+                solidModel::twoD() ? 2 : 3, // number of scalar equations to insert
+                true,                       // flipSign
+                pressureUnknownScale()      // d/dpHat of the pressure columns
             );
         }
     }

@@ -80,6 +80,15 @@ void Foam::mechanicalConstitutiveLaw::fillScalarTangent
         return;
     }
 
+    if (response.tangentReq() == tangentRequest::scalarShear)
+    {
+        // Reached only by a law that claims providesScalarShearTangent but
+        // fills the tangent without declaring 2*mu
+        FatalErrorInFunction
+            << "A scalarShear tangent was requested from a law that does not "
+            << "supply 2*mu to fillScalarTangent" << exit(FatalError);
+    }
+
     const scalar Keff =
         response.tangentReq() == tangentRequest::scalarDeviatoric
       ? Kdev
@@ -90,6 +99,34 @@ void Foam::mechanicalConstitutiveLaw::fillScalarTangent
     forAll(K, i)
     {
         K[i] = Keff;
+    }
+}
+
+
+void Foam::mechanicalConstitutiveLaw::fillScalarTangent
+(
+    mechanicalConstitutiveLawResponse& response,
+    const scalar Kfull,
+    const scalar Kdev,
+    const scalar twoMu
+)
+{
+    if (!response.wantsScalarTangent())
+    {
+        return;
+    }
+
+    if (response.tangentReq() != tangentRequest::scalarShear)
+    {
+        fillScalarTangent(response, Kfull, Kdev);
+        return;
+    }
+
+    UIndirectList<scalar>& K = response.scalarTangent();
+
+    forAll(K, i)
+    {
+        K[i] = twoMu;
     }
 }
 

@@ -71,6 +71,11 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | `momentum` always used |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+| `mixedImplicitStiffness` | `deviatoric` | `deviatoric` or `twoMu`, only with `solvePressure` |
+| `scaleMixedPETScFields` | `false` | Store the pressure unknown as `p/s` in PETSc, only with `solvePressure` |
+| `pressureUnknownScale` | `twoMu` | `s`: `twoMu`, `user` (with `pressureUnknownScaleValue`) or `none` |
+| `pressureScaleByTwoMu` | as `scaleMixedPETScFields` | Multiply the pressure rows by 2μ |
+| `pressureScaleFactor` | `1` | Further factor on the pressure rows |
 
 For `stabilisation`, the code will create a default dictionary if none is
 provided. The `momentum` sub-dictionary is always used. The `pressure`
@@ -93,11 +98,98 @@ This is a special case and is only supported when `solutionAlgorithm` is
 - the model uses the pressure stabilisation sub-model;
 - the code enforces the `PETScSNES` path at construction time.
 
+The mechanical law is asked for its stress without its volumetric response
+(`K tr(epsilon)` for `linearElastic`), which the solved pressure replaces:
+`sigma = sigma_law - p I`.
+
+Parallel runs are supported across `processor` patches. The assembled mixed
+Jacobian blocks recognise only that patch type: a mesh with any other coupled
+patch (`cyclic`, `cyclicAMI`, `cyclicACMI`, or the `processorCyclic` patches
+that decomposing a cyclic mesh creates) stops in the first Jacobian assembly,
+in serial or parallel.
+
 If `solvePressure` is `false`, the `stabilisation/pressure` sub-dictionary is
 ignored.
 
 In other words, `solvePressure true` is not a general option for the
 segregated or explicit paths.
+
+### Mixed implicit stiffness
+
+With `solvePressure true`, the implicit stiffness `impK` of the mixed
+formulation is selected by
+
+```text
+mixedImplicitStiffness deviatoric;   // default
+mixedImplicitStiffness twoMu;
+```
+
+- `deviatoric` (default, unchanged behaviour): the law's deviatoric scalar
+  tangent, the Laplacian surrogate for div(dev(sigma)). For `linearElastic`,
+  `neoHookeanElastic` and `GuccioneElastic` it is (4/3) mu; other laws define
+  their own.
+- `twoMu`: 2 mu, as declared by the mechanical constitutive law
+  (`tangentRequest::scalarShear`). Supported by `linearElastic`,
+  `neoHookeanElastic`, `GuccioneElastic` and an `electroMechanicalLaw` whose
+  passive law is one of these; any other law is refused with an error. For
+  `GuccioneElastic`, mu = k (cf + ct + cfs)/6 is a declared scalar stiffness
+  measure, not the shear modulus of an isotropic material.
+
+`impK` weights the momentum stabilisation and sets the pressure-stabilisation
+diffusivity (`rAUf`, the reciprocal of the momentum diagonal), as well as the
+preconditioner. Changing it therefore changes both stabilisation strengths
+at fixed `scaleFactor`s: for a steady case with uniform properties, `twoMu`
+is equivalent to `deviatoric` with the momentum scale factor multiplied by
+3/2 and the pressure scale factors by 2/3. The keyword is refused without
+`solvePressure`.
+
+### Mixed system scaling
+
+The displacement and pressure unknowns, and the momentum and pressure
+equations, can differ by many orders of magnitude, which degrades the
+matrix-free (MFFD) differencing step and the linear solves. The mixed PETSc
+system can be scaled (opt-in; off by default, so existing cases are
+unchanged):
+
+```text
+scaleMixedPETScFields yes;     // pressure unknown pHat = p/s_u
+pressureUnknownScale  twoMu;   // s_u: twoMu (default), user or none
+// pressureUnknownScaleValue 1e6;   // s_u with pressureUnknownScale user
+// pressureScaleByTwoMu yes;        // default: as scaleMixedPETScFields
+// pressureScaleFactor  1;          // s_r = pressureScaleFactor*(2 mu or 1)
+```
+
+With the PETSc unknowns (D, pHat), p = s_u pHat, and the pressure rows of the
+residual multiplied by s_r, the system has the same roots, so the converged D
+and p are unchanged; only the conditioning, and the norm used by the
+nonlinear stopping test, change. The assembled matrix, which is an
+approximate preconditioning matrix (the Newton operator is matrix-free with
+`snes_mf_operator`), is transformed consistently: its A_Dp block is multiplied
+by s_u, A_pD by s_r and A_pp by s_r s_u, in every cell, boundary and
+processor coefficient. The transformation is exact; it does not make the
+assembled blocks an exact Jacobian. The OpenFOAM `p` field is always the
+physical pressure.
+
+The scaling balances magnitudes; it is not a nondimensionalisation. The
+extensive pressure rows have units of m³, so multiplied by 2μ they are in
+N·m, a length factor (of the order of the cell size) away from the momentum
+rows in N. Because the residual norm changes, SNES tolerances change meaning
+when the scaling is switched on: the pressure rows are multiplied by 2μ, so
+`snes_atol`, and `snes_rtol` when the initial pressure residual dominates,
+may need retuning.
+
+`twoMu` is the volume average of 2μ as the laws declare it (the `scalarShear`
+tangent, as for `mixedImplicitStiffness twoMu`), independently of
+`mixedImplicitStiffness`. A law that declares no 2μ is refused with a pointer
+to an explicit scale: `pressureUnknownScale user` with
+`pressureUnknownScaleValue`, and `pressureScaleByTwoMu no` with
+`pressureScaleFactor`. The keywords and defaults are those of the original
+implementation by Philip Cardiff on the `fix-pressure-solid` branch and its
+port to the total-Lagrangian solver in #627 (Chanikya Valeti), with two
+changes: the switch is spelled `scaleMixedPETScFields` (the earlier
+`scaleMixedPetScFields` is still read, with a warning), and the undocumented
+`pressureUnknownScale 2mu` alias is no longer accepted. There, `twoMu` was
+1.5 `impK`, which equals 2μ only where `impK` is (4/3)μ.
 
 ### Explicit-solve time-step control
 

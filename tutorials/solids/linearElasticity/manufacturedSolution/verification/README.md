@@ -47,6 +47,25 @@ orders to meet or exceed these values. The net order uses the coarsest and
 finest errors and effective mesh spacings; intermediate errors need not decrease
 monotonically. The summary reports each measured order, threshold, and result.
 
+The `hex-petscSnesPressure` variant runs the mixed displacement-pressure
+approach and also records the pressure cell RMS and L-infinity errors
+(`pressure_l2_pa`, `pressure_linf_pa`), the number of failed linear solves
+(`failed_linear_solves`) and how many of those stopped at the iteration
+limit, PETSc reason `DIVERGED_ITS` (`failed_linear_solves_iteration_limit`).
+The RMS and L-infinity
+pressure errors have separate thresholds, `pressure_l2` and `pressure_linf`
+(other fields use one threshold for both norms). With levels 5, 10, 20 and 40
+the measured net orders were 1.50 (RMS) and 0.90 (L-infinity) for the
+pressure, and 1.50 and 0.91 for the stress, with no failed linear solve. In
+an earlier run with the default `deviatoric` implicit stiffness (net
+orders 1.49 and 0.90 for the pressure), splitting the cells into those that
+own a boundary face and the rest gave, between successive levels, pressure
+RMS orders of 1.11-1.15 and 1.24-1.44, and maximum-error orders of 0.83-0.95 and
+0.56-0.89, respectively, so neither group shows second-order convergence on
+these meshes. The thresholds, 1.25 (RMS) and 0.75 (L-infinity), are
+0.25 and 0.15 below the measured net orders; the successive orders were still
+increasing at the finest level.
+
 Initial thresholds are 1.5 for displacement and 0.5 for stress for standard
 methods. High-order thresholds allow a 0.5 margin below the nominal orders:
 1.5, 1.5, and 3.5 for displacement and 0.5, 1.5, and 2.5 for stress for p=1,

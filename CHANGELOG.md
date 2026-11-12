@@ -8,6 +8,25 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Mixed displacement-pressure solids (`solvePressure` with
+  `linearGeometryTotalDisplacement` and
+  `nonLinearGeometryTotalLagrangianTotalDisplacement`):
+  - opt-in `mixedImplicitStiffness twoMu`, taking the implicit stiffness from
+    the 2μ the law declares (`tangentRequest::scalarShear`; `linearElastic`,
+    `neoHookeanElastic`, `GuccioneElastic` and `electroMechanicalLaw`). The
+    default, `deviatoric`, is unchanged;
+  - optional algebraic scaling of the mixed PETSc system in both solvers
+    (`scaleMixedPETScFields`, `pressureUnknownScale`,
+    `pressureUnknownScaleValue`, `pressureScaleByTwoMu`,
+    `pressureScaleFactor`), after Philip Cardiff's work on the mixed solver
+    and Chanikya Valeti's port to the total-Lagrangian solver (#627). Off by
+    default. The automatic 2μ scale is the volume average of the declared 2μ;
+    a law that declares none is refused with a pointer to an explicit scale;
+  - parallel runs: the D-in-p coupling across processor patches, by Chanikya
+    Valeti (#652).
+- `manufacturedSolution` tutorial: a mixed displacement-pressure approach
+  (`petscSnesPressure`) with pressure-error norms, a regression arm and a
+  verification variant with measured convergence orders.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the
@@ -708,6 +727,18 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `linearGeometryTotalDisplacement` now refuses `solvePressure` with the
+  high-order Jacobian, as the total-Lagrangian solver does: that Jacobian
+  reconstructs the shear modulus from the implicit stiffness assuming
+  impK = (4/3)μ + K, which is negative for the mixed formulation.
+- `foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix`: on processor patches
+  the off-processor coefficient of a cell's row now uses that cell's volume
+  and least-squares vector, as for an internal face, so the assembled
+  gradient block is the same in parallel as in serial (after Philip Cardiff's
+  fix on the `fix-pressure-solid` branch). This affects the preconditioner of
+  parallel mixed-solid runs, not the residual. `newtonIcoFluid` calls the same
+  function, but its parallel Jacobian assembly still stops earlier, at the
+  convection term, which has no processor-patch implementation.
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual

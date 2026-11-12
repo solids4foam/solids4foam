@@ -251,6 +251,11 @@ private:
         //  analogous to rAUf in pressure-velocity coupling
         mutable autoPtr<surfaceScalarField> rAUfPtr_;
 
+        //- Algebraic scaling of the mixed system (setMixedSystemScaling):
+        //  scale of the PETSc pressure unknown, and of the pressure rows
+        scalar pressureUnknownScale_;
+        scalar pressureEqnScale_;
+
         //- Solution standard tolerance
         const scalar solutionTol_;
 
@@ -595,11 +600,61 @@ protected:
         //  Shared by the solid models, because the field is registered under
         //  "impK" and looked up by that name by the contact and cohesive zone
         //  models, so its name, dimensions and boundary types are not free
+        //  The field is named fieldName, "impK" unless another name is given
+        //  for a query that must not take the registered name
         tmp<volScalarField> lawImpK
         (
             mechanicalConstitutiveLawManager& manager,
-            const tangentRequest req
+            const tangentRequest req,
+            const word& fieldName = "impK"
         ) const;
+
+        //- The tangent request for the implicit stiffness impK.
+        //  Without solvePressure: scalar, unchanged. With solvePressure, the
+        //  solid-model keyword mixedImplicitStiffness selects
+        //      deviatoric (default): scalarDeviatoric, the Laplacian
+        //          surrogate for div(dev(sigma)) ((4/3)*mu for linearElastic,
+        //          neoHookeanElastic and GuccioneElastic; law-specific
+        //          otherwise)
+        //      twoMu: scalarShear, 2*mu as declared by the law
+        //  The keyword is refused without solvePressure
+        tangentRequest mixedImplicitStiffnessRequest() const;
+
+        //- Set the algebraic scaling of the mixed displacement-pressure
+        //  PETSc system (solvePressure) from the solid-model keywords
+        //  scaleMixedPETScFields, pressureUnknownScale,
+        //  pressureUnknownScaleValue, pressureScaleByTwoMu and
+        //  pressureScaleFactor (names, defaults and meaning from #627; its
+        //  scaleMixedPetScFields is accepted as a deprecated alias). The
+        //  PETSc pressure unknown is pHat = p/pressureUnknownScale() and the
+        //  pressure equation rows are multiplied by pressureEqnScale(). A
+        //  2*mu scale is the volume average of the 2*mu the laws declare
+        //  (scalarShear), whatever mixedImplicitStiffness is; a law that
+        //  declares none is refused, with a pointer to an explicit scale
+        void setMixedSystemScaling();
+
+        //- A scalar tangent field of the laws for the request, evaluated as
+        //  the implicit stiffness is: at zero strain for a small-strain
+        //  model (lawImpK). A finite-strain model overrides it with the
+        //  evaluation at its deformation gradient. Used for the 2*mu scale
+        //  of setMixedSystemScaling
+        virtual tmp<volScalarField> scalarTangentQuery
+        (
+            const tangentRequest req,
+            const word& fieldName
+        ) const;
+
+        //- Scale of the PETSc pressure unknown: p = pressureUnknownScale()*pHat
+        scalar pressureUnknownScale() const
+        {
+            return pressureUnknownScale_;
+        }
+
+        //- Scale of the pressure equation rows, residual and Jacobian
+        scalar pressureEqnScale() const
+        {
+            return pressureEqnScale_;
+        }
 
         //- Deformation gradient at the quadrature points, F = I + gradD.T(),
         //  from a total displacement gradient there. Sized and offset to

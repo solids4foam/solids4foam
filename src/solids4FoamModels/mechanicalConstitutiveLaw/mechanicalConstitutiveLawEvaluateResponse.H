@@ -167,6 +167,26 @@ void evaluateResponse
         }
     }
 
+    // A scalarShear request asks for the law's declared 2*mu. A law that does
+    // not declare one is refused here, rather than answering with another
+    // tangent. Checked on the law evaluated, so a wrapper answers for itself
+    // and its child law, and a derived law does not inherit the declaration
+    // of its parent (see providesScalarShearTangent)
+    if
+    (
+        tangentReq == tangentRequest::scalarShear
+     && !law.providesScalarShearTangent()
+    )
+    {
+        FatalErrorInFunction
+            << "The mechanical constitutive law " << law.type()
+            << " does not declare a shear stiffness 2*mu, which the "
+            << "scalarShear tangent request needs" << nl
+            << "    (mixedImplicitStiffness twoMu of a mixed displacement-"
+            << "pressure solid model). Use mixedImplicitStiffness deviatoric, "
+            << "or a law that declares 2*mu." << exit(FatalError);
+    }
+
     // One place, because every law is reached through here.
     //
     // A law that needs the stress already standing at its points is handed it

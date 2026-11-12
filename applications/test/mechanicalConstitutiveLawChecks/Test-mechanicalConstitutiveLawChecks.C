@@ -33,6 +33,8 @@ Description
             isotropic       yes;    // optional, default no
             linear          yes;    // optional, default no; small strain
             referenceChecks no;     // optional, default yes: checks 1-3
+            scalarShear     refused;  // optional, default refused: check 7
+            declaredMu      4666.67;  // with scalarShear declared
             yieldBounds     (243e6 600e6);  // optional: check 6
             fields          { T T [0 0 0 1 0 0 0] 0; }  // optional
             law             { type ...; ... }
@@ -65,6 +67,13 @@ Description
          a finite-strain one, as a Kirchhoff stress - lies between the initial
          yield stress and the last of its hardening table. This is what runs
          the return mapping.
+      7. The shear scalar tangent (tangentRequest::scalarShear), the 2 mu of
+         mixedImplicitStiffness twoMu. With scalarShear shearModulus it is
+         2 C_xyxy of the reference tangent; with scalarShear declared it is
+         2 declaredMu, a declared scalar stiffness measure, and the deviatoric
+         scalar tangent is unchanged at (4/3) declaredMu; with scalarShear
+         refused, the default, the request is refused, so that a law cannot
+         gain or inherit the declaration without an entry saying so.
 
     Every law is checked for a stiffness that is positive and finite and a
     stress that is not zero under load, so that a law that is never reached
@@ -303,6 +312,21 @@ int main(int argc, char *argv[])
         const bool isotropic =
             spec.lookupOrDefault<Switch>("isotropic", false);
         const bool linear = spec.lookupOrDefault<Switch>("linear", false);
+        const word shearExpect
+        (
+            spec.lookupOrDefault<word>("scalarShear", "refused")
+        );
+        if
+        (
+            shearExpect != "shearModulus"
+         && shearExpect != "declared"
+         && shearExpect != "refused"
+        )
+        {
+            FatalErrorInFunction
+                << name << ": scalarShear must be shearModulus, declared or "
+                << "refused, not " << shearExpect << exit(FatalError);
+        }
         const bool referenceChecks =
             spec.lookupOrDefault<Switch>("referenceChecks", true);
 
@@ -537,6 +561,86 @@ int main(int argc, char *argv[])
                 "past yield, the equivalent stress lies within yieldBounds",
                 sigmaEq, bounds[1]
             );
+        }
+
+        // 7. The shear scalar tangent of the mixed formulation. Last, because
+        //    a refused request leaves the manager mid-evaluation. Evaluated
+        //    with exceptions on, so that an unexpected refusal is reported as
+        //    a failed check rather than ending the run
+        {
+            scalar K2 = -GREAT;
+            bool refused = false;
+
+            FatalError.throwExceptions();
+            try
+            {
+                probe.stress(tensor::zero, &K2, tangentRequest::scalarShear);
+            }
+            catch (const Foam::error& err)
+            {
+                refused =
+                    string(err.message()).find
+                    (
+                        "does not declare a shear stiffness"
+                    ) != string::npos;
+
+                if (!refused)
+                {
+                    FatalError.dontThrowExceptions();
+                    throw;
+                }
+            }
+            FatalError.dontThrowExceptions();
+
+            if (shearExpect == "refused")
+            {
+                check
+                (
+                    refused,
+                    name, "scalarShear request is refused", refused ? 0 : 1, 0
+                );
+            }
+            else if (refused)
+            {
+                check
+                (
+                    false,
+                    name, "scalarShear request is answered, not refused", 1, 0
+                );
+            }
+            else
+            {
+                scalar twoMuRef = 2*C(symmTensor::XY, symmTensor::XY);
+                string what("shear scalar tangent is 2 C_xyxy");
+
+                if (shearExpect == "declared")
+                {
+                    const scalar declaredMu =
+                        readScalar(spec.lookup("declaredMu"));
+                    twoMuRef = 2*declaredMu;
+                    what = "shear scalar tangent is 2 declaredMu";
+
+                    scalar Kdev = -GREAT;
+                    probe.stress
+                    (
+                        tensor::zero, &Kdev, tangentRequest::scalarDeviatoric
+                    );
+                    const scalar errDev =
+                        mag(Kdev - 4*declaredMu/3)/max(4*declaredMu/3, VSMALL);
+
+                    check
+                    (
+                        errDev <= 1e-12,
+                        name, "deviatoric scalar tangent is (4/3) declaredMu",
+                        errDev, 1e-12
+                    );
+                }
+
+                const scalar err =
+                    mag(K2 - twoMuRef)/max(mag(twoMuRef), VSMALL);
+
+                check(err <= 1e-4, name, what, err, 1e-4);
+            }
         }
     }
 

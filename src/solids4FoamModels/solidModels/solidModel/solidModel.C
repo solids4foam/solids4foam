@@ -1301,6 +1301,8 @@ Foam::solidModel::solidModel
     momentumStabilisationPtr_(),
     pressureStabilisationPtr_(),
     rAUfPtr_(),
+    pressureUnknownScale_(1.0),
+    pressureEqnScale_(1.0),
     solutionTol_
     (
         solidModelDict().lookupOrAddDefault<scalar>("solutionTolerance", 1e-06)
@@ -2768,10 +2770,235 @@ void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 }
 
 
+Foam::tangentRequest Foam::solidModel::mixedImplicitStiffnessRequest() const
+{
+    const bool specified = solidModelDict().found("mixedImplicitStiffness");
+
+    if (!solvePressure())
+    {
+        if (specified)
+        {
+            FatalIOErrorInFunction(solidModelDict())
+                << "mixedImplicitStiffness is only used with solvePressure "
+                << "(the mixed displacement-pressure formulation)"
+                << exit(FatalIOError);
+        }
+
+        return tangentRequest::scalar;
+    }
+
+    const word stiffness
+    (
+        solidModelDict().lookupOrDefault<word>
+        (
+            "mixedImplicitStiffness", "deviatoric"
+        )
+    );
+
+    if (stiffness == "deviatoric")
+    {
+        return tangentRequest::scalarDeviatoric;
+    }
+    else if (stiffness == "twoMu")
+    {
+        Info<< "Mixed implicit stiffness: twoMu (2*mu declared by the "
+            << "mechanical constitutive law)" << endl;
+
+        return tangentRequest::scalarShear;
+    }
+
+    FatalIOErrorInFunction(solidModelDict())
+        << "Unknown mixedImplicitStiffness '" << stiffness << "'" << nl
+        << "Valid options are: deviatoric (default), twoMu"
+        << exit(FatalIOError);
+
+    return tangentRequest::scalarDeviatoric;
+}
+
+
+Foam::tmp<Foam::volScalarField> Foam::solidModel::scalarTangentQuery
+(
+    const tangentRequest req,
+    const word& fieldName
+) const
+{
+    return lawImpK(mechanicalManager(), req, fieldName);
+}
+
+
+void Foam::solidModel::setMixedSystemScaling()
+{
+    // Algebraic scaling of the mixed displacement-pressure system, after
+    // Philip Cardiff's 7b01886d and a4a9c07f on the fix-pressure-solid branch
+    // and Chanikya Valeti's port of them to nonLinGeomTotalLagTotalDispSolid
+    // in #627 (d20b551be), whose keywords, defaults and meaning are kept.
+    //
+    // With the PETSc pressure unknown pHat = p/su and the pressure rows of
+    // the residual multiplied by sr, the system F(D, p) = (F_D, F_p) = 0
+    // becomes Fhat(D, pHat) = (F_D(D, su*pHat), sr*F_p(D, su*pHat)) = 0. It
+    // has the same roots, so the physical D and p are unchanged; only the
+    // conditioning and the norm used by the nonlinear stopping test change.
+    // The assembled blocks follow: A_DD unchanged, A_Dp*su, A_pD*sr and
+    // A_pp*sr*su.
+    //
+    // Different from #627: a 2*mu scale is the volume average of the 2*mu
+    // the laws declare (scalarShear), queried here, independently of
+    // mixedImplicitStiffness. #627 took 1.5*impK, which is 2*mu only where
+    // impK is (4/3)*mu; for a law that declares no 2*mu there is no material
+    // value to take, so the request is refused rather than given one
+
+    pressureUnknownScale_ = 1.0;
+    pressureEqnScale_ = 1.0;
+
+    // scaleMixedPETScFields; scaleMixedPetScFields, the spelling of #627 and
+    // of the fix-pressure-solid branch, is accepted with a warning
+    const bool newName = solidModelDict().found("scaleMixedPETScFields");
+    const bool oldName = solidModelDict().found("scaleMixedPetScFields");
+    if (newName && oldName)
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "Both scaleMixedPETScFields and its deprecated spelling "
+            << "scaleMixedPetScFields are set: keep scaleMixedPETScFields"
+            << exit(FatalIOError);
+    }
+    if (oldName)
+    {
+        WarningInFunction
+            << "scaleMixedPetScFields is deprecated: use scaleMixedPETScFields"
+            << endl;
+    }
+    const Switch scaleFields
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            oldName ? "scaleMixedPetScFields" : "scaleMixedPETScFields",
+            false
+        )
+    );
+    const word unknownScaleType
+    (
+        solidModelDict().lookupOrDefault<word>("pressureUnknownScale", "twoMu")
+    );
+    const scalar scaleFactor
+    (
+        solidModelDict().lookupOrDefault<scalar>("pressureScaleFactor", 1.0)
+    );
+    const Switch scaleByTwoMu
+    (
+        solidModelDict().lookupOrDefault<Switch>
+        (
+            "pressureScaleByTwoMu", scaleFields
+        )
+    );
+
+    const bool unknownByTwoMu = scaleFields && unknownScaleType == "twoMu";
+
+    if
+    (
+        scaleFields
+     && !unknownByTwoMu
+     && unknownScaleType != "user"
+     && unknownScaleType != "none"
+    )
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "Unknown pressureUnknownScale '" << unknownScaleType << "'" << nl
+            << "Valid options are: twoMu, user (with "
+            << "pressureUnknownScaleValue) and none" << exit(FatalIOError);
+    }
+
+    scalar twoMuRef = 0;
+
+    if (unknownByTwoMu || scaleByTwoMu)
+    {
+        wordList undeclared;
+
+        if (!mechanicalManager().providesScalarShearTangent(undeclared))
+        {
+            FatalIOErrorInFunction(solidModelDict())
+                << "A 2*mu scale of the mixed system was requested ("
+                << (
+                       unknownByTwoMu
+                     ? "pressureUnknownScale twoMu"
+                     : "pressureScaleByTwoMu yes"
+                   )
+                << "), but the mechanical constitutive law(s) " << undeclared
+                << " do not declare a shear stiffness 2*mu (scalarShear)."
+                << nl << "Set an explicit numerical scale instead: "
+                << "pressureUnknownScale user with pressureUnknownScaleValue "
+                << "<value> (or pressureUnknownScale none), and "
+                << "pressureScaleByTwoMu no with pressureScaleFactor <value>"
+                << exit(FatalIOError);
+        }
+
+        const tmp<volScalarField> tTwoMu
+        (
+            scalarTangentQuery(tangentRequest::scalarShear, "mixedSystemTwoMu")
+        );
+        const scalarField& twoMuI = tTwoMu();
+        const scalarField& V = mesh().V();
+
+        scalar twoMuV = 0;
+        scalar Vtot = 0;
+        forAll(twoMuI, cellI)
+        {
+            twoMuV += twoMuI[cellI]*V[cellI];
+            Vtot += V[cellI];
+        }
+        reduce(twoMuV, sumOp<scalar>());
+        reduce(Vtot, sumOp<scalar>());
+        twoMuRef = twoMuV/max(Vtot, VSMALL);
+    }
+
+    pressureEqnScale_ = scaleFactor*(scaleByTwoMu ? twoMuRef : 1.0);
+
+    if (scaleFields)
+    {
+        if (unknownByTwoMu)
+        {
+            pressureUnknownScale_ = twoMuRef;
+        }
+        else if (unknownScaleType == "user")
+        {
+            pressureUnknownScale_ =
+                readScalar
+                (
+                    solidModelDict().lookup("pressureUnknownScaleValue")
+                );
+        }
+    }
+
+    if (pressureUnknownScale_ <= VSMALL || pressureEqnScale_ <= VSMALL)
+    {
+        FatalIOErrorInFunction(solidModelDict())
+            << "The pressure unknown and equation scales must be positive: "
+            << "found " << pressureUnknownScale_ << " and " << pressureEqnScale_
+            << exit(FatalIOError);
+    }
+
+    if (pressureUnknownScale_ == 1.0 && pressureEqnScale_ == 1.0)
+    {
+        Info<< "Mixed system scaling: none" << endl;
+    }
+    else
+    {
+        Info<< "Mixed system scaling: pressure unknown scale = "
+            << pressureUnknownScale_ << ", pressure equation scale = "
+            << pressureEqnScale_;
+        if (unknownByTwoMu || scaleByTwoMu)
+        {
+            Info<< " (declared 2*mu = " << twoMuRef << ")";
+        }
+        Info<< endl;
+    }
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
 (
     mechanicalConstitutiveLawManager& manager,
-    const tangentRequest req
+    const tangentRequest req,
+    const word& fieldName
 ) const
 {
     tmp<volScalarField> tImpK
@@ -2780,7 +3007,7 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
         (
             IOobject
             (
-                "impK",
+                fieldName,
                 mesh().time().timeName(),
                 mesh(),
                 IOobject::NO_READ,

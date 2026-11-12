@@ -421,6 +421,9 @@ bool linGeomTotalDispSolid::evolveSnes()
             blockSize_ - 1 // Location of p component
         );
 
+        // The PETSc vector holds the scaled unknown pHat = p/pressureUnknownScale
+        pI *= pressureUnknownScale();
+
         p().correctBoundaryConditions();
     }
 
@@ -649,12 +652,11 @@ Foam::tmp<Foam::volScalarField>
 Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
 {
     // For the mixed displacement-pressure formulation the implicit stiffness
-    // is the scalar Laplacian surrogate for div(dev(sigma)), which is
-    // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu
-    const tangentRequest req =
-        solvePressure()
-      ? tangentRequest::scalarDeviatoric
-      : tangentRequest::scalar;
+    // is by default the scalar Laplacian surrogate for div(dev(sigma)), which
+    // for an isotropic law is mu*lap(D) + (1/3)*mu*grad(div(D)), i.e.
+    // (4/3)*mu; with mixedImplicitStiffness twoMu it is the law's declared
+    // 2*mu (mixedImplicitStiffnessRequest)
+    const tangentRequest req = mixedImplicitStiffnessRequest();
 
     return lawImpK(mechanicalManager(), req);
 }
@@ -823,6 +825,9 @@ linGeomTotalDispSolid::linGeomTotalDispSolid
 
         // Ensure p is created
         p();
+
+        // Algebraic scaling of the mixed PETSc system (off by default)
+        setMixedSystemScaling();
     }
 
     if (predictor_)
@@ -1052,6 +1057,25 @@ label linGeomTotalDispSolid::formResidual
                 << abort(FatalError);
     }
 
+    // As in nonLinGeomTotalLagTotalDispSolid: the high-order Jacobian
+    // recovers the shear modulus from the implicit stiffness by
+    // mu = (3/4)*(impK - K), which inverts impK = (4/3)*mu + K, the value a
+    // displacement formulation asks for. A mixed formulation asks for
+    // (4/3)*mu (or 2*mu with mixedImplicitStiffness twoMu), so the same
+    // expression returns a negative shear modulus for any compressible law
+    // with K > (4/3)*mu, and assembles a preconditioner of negative stiffness
+    if (solvePressure() && highOrderJacobian())
+    {
+        FatalErrorInFunction
+            << "solvePressure must be disabled when using the high order "
+            << "Jacobian." << nl
+            << "The high order Jacobian recovers the shear modulus from the "
+            << "implicit stiffness, assuming impK = (4/3)*mu + K. With a "
+            << "pressure solved separately impK is (4/3)*mu (or 2*mu), and "
+            << "that assumption returns a negative shear modulus."
+            << abort(FatalError);
+    }
+
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
@@ -1106,6 +1130,9 @@ label linGeomTotalDispSolid::formResidual
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale
+        pI *= pressureUnknownScale();
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1145,8 +1172,8 @@ label linGeomTotalDispSolid::formResidual
           - tr(gradD())
         );
 
-        // Make residual extensive
-        pressureResidual *= mesh.V();
+        // Make residual extensive, and scale the pressure equation rows
+        pressureResidual *= pressureEqnScale()*mesh.V();
 
         // Copy the pressureResidual into the f field as the 4th equation
         foamPetscSnesHelper::InsertFieldComponents<scalar>
@@ -1275,6 +1302,9 @@ label linGeomTotalDispSolid::formJacobian
             x, pI, blockSize_ - 1
         );
 
+        // x holds the scaled unknown pHat = p/pressureUnknownScale
+        pI *= pressureUnknownScale();
+
         // Enforce the boundary conditions
         p.correctBoundaryConditions();
 
@@ -1303,6 +1333,15 @@ label linGeomTotalDispSolid::formJacobian
               + one*pressureStabilisation().scalarJacobian(p, &rAUf())
             );
 
+            // The pressure rows are scaled by pressureEqnScale and the
+            // pressure columns by pressureUnknownScale (d/dpHat)
+            approxPressureJ *= dimensionedScalar
+            (
+                "pressureScale",
+                dimless,
+                pressureEqnScale()*pressureUnknownScale()
+            );
+
             // Insert the pressure equation
             foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix<scalar>
             (
@@ -1318,7 +1357,9 @@ label linGeomTotalDispSolid::formJacobian
             jac,
             blockSize_ - 1,            // row offset
             0,                         // column offset
-            solidModel::twoD() ? 2 : 3 // number of scalar components of D
+            solidModel::twoD() ? 2 : 3, // number of scalar components of D
+            false,                      // flipSign
+            pressureEqnScale()          // pressure equation row scale
         );
 
         // Insert p-in-D term
@@ -1329,7 +1370,9 @@ label linGeomTotalDispSolid::formJacobian
             jac,
             0,                         // row offset
             blockSize_ - 1,            // column offset
-            solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+            solidModel::twoD() ? 2 : 3, // number of scalar equations to insert
+            true,                       // flipSign
+            pressureUnknownScale()      // d/dpHat of the pressure columns
         );
     }
 

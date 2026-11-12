@@ -12,9 +12,22 @@ TET_STRESS_TOL=9e5
 HIGH_ORDER_DISP_TOL=7e-9
 HIGH_ORDER_STRESS_TOL=7e4
 
+# Mixed displacement-pressure approach (petscSnesPressure), coarse hex mesh.
+# Measured on the 5^3 hex mesh with mixedImplicitStiffness twoMu (OpenFOAM.com
+# v2312, PETSc 3.22, macOS): displacement 7.04e-8 m, stress 5.02e5 Pa,
+# pressure 2.31e5 Pa (cell RMS). The tolerances are 42%, 31% and 26% above
+# these values, within the 27-43% margins of the displacement-only tolerances
+# above, for platform and OpenFOAM-variant differences; a tighter solve
+# changes these errors by less than 1e-6 relative. One mesh refinement reduces
+# each error by a factor of 2.7-4, so a regression of that size is detected
+MIXED_HEX_DISP_TOL=1.0e-7
+MIXED_HEX_STRESS_TOL=6.6e5
+MIXED_HEX_PRESSURE_TOL=2.9e5
+
 APPROACHES=(
     segregated
     petscSnes
+    petscSnesPressure
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
 )
@@ -27,18 +40,38 @@ export DYLD_LIBRARY_PATH="${DYLD_LIBRARY_PATH:-}"
 : "${FOAM_LD_LIBRARY_PATH:=}"
 source solids4FoamScripts.sh
 
+# Usage: ./regressionTest.sh [--check-only] [--mesh hex|tet] [approach ...]
+# With approach names, only those approaches are run and checked
 CHECK_ONLY=false
-for arg in "$@"; do
-    case "$arg" in
+SELECTED=()
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+    case "${args[i]}" in
         --check-only|--no-run) CHECK_ONLY=true ;;
+        --mesh) i=$((i + 1)); MESHES=("${args[i]}") ;;
+        -*) echo "Unknown option ${args[i]}"; exit 1 ;;
+        *) SELECTED+=("${args[i]}") ;;
     esac
 done
+if ((${#SELECTED[@]})); then
+    for approach in "${SELECTED[@]}"; do
+        known=false
+        for candidate in "${APPROACHES[@]}"; do
+            [[ "$candidate" == "$approach" ]] && known=true
+        done
+        if [[ "$known" == false ]]; then
+            echo "Unknown approach $approach"
+            exit 1
+        fi
+    done
+    APPROACHES=("${SELECTED[@]}")
+fi
 
 extract_norm()
 {
     local marker="$1"
     local column="$2"
-    grep -A2 "$marker" "$SOLVER_LOG" | tail -n 1 | awk -v col="$column" '{print $col}'
+    { grep -A2 "$marker" "$SOLVER_LOG" || true; } | tail -n 1 | awk -v col="$column" '{print $col}'
 }
 
 check_log_message()
@@ -84,6 +117,10 @@ for mesh in "${MESHES[@]}"; do
             echo "SKIP: $approach requires PETSc"
             continue
         fi
+        if [[ "$approach" == "petscSnesPressure" && "$mesh" != "hex" ]]; then
+            echo "SKIP: $approach tolerances are calibrated for the hex mesh only"
+            continue
+        fi
 
         CASE_DIR="$SCRIPT_DIR/regressionTests/$approach-$mesh"
 
@@ -107,7 +144,27 @@ for mesh in "${MESHES[@]}"; do
             failures=$((failures + 1))
             continue
         fi
-        if grep -q 'DIVERGED_' "$SOLVER_LOG"; then
+        if [[ "$approach" == "petscSnesPressure" ]]; then
+            # A failed linear solve ends the Newton solve unless
+            # snes_max_linear_solve_fail allows it; the nonlinear outcome
+            # decides
+            if grep -q 'Nonlinear solve did not converge' "$SOLVER_LOG" \
+            || ! grep -q 'Nonlinear solve converged' "$SOLVER_LOG"; then
+                echo "FAIL: $approach did not converge"
+                failures=$((failures + 1))
+                continue
+            fi
+            # Report failed linear solves by their KSP convergence reason;
+            # DIVERGED_ITS is the iteration limit (ksp_max_it)
+            n_linear_fail=$(grep -c 'Linear solve did not converge' "$SOLVER_LOG" || true)
+            linear_fail_reasons=$(
+                grep -o 'Linear solve did not converge due to [A-Z_]*' "$SOLVER_LOG" \
+              | awk '{print $NF}' | sort | uniq -c \
+              | awk '{printf "%s%s %d", s, $2, $1; s = ", "}' \
+              || true
+            )
+            echo "NOTE: $approach: $n_linear_fail failed linear solve(s)${linear_fail_reasons:+ ($linear_fail_reasons)}"
+        elif grep -q 'DIVERGED_' "$SOLVER_LOG"; then
             echo "FAIL: $approach did not converge"
             failures=$((failures + 1))
             continue
@@ -118,7 +175,14 @@ for mesh in "${MESHES[@]}"; do
 
         echo
         echo "Checking $approach ($mesh)"
-        if [[ "$approach" == highOrder-* ]]; then
+        if [[ "$approach" == "petscSnesPressure" ]]; then
+            # The nonlinear solve must report convergence, and the pressure
+            # error must be present: a missing value fails check_tolerance
+            pressure_rms=$(extract_norm "Writing pDifference field" 3)
+            check_tolerance "displacement L2" "$displacement_l2" "$MIXED_HEX_DISP_TOL" || failures=$((failures + 1))
+            check_tolerance "stress L2" "$stress_l2" "$MIXED_HEX_STRESS_TOL" || failures=$((failures + 1))
+            check_tolerance "pressure cell RMS" "$pressure_rms" "$MIXED_HEX_PRESSURE_TOL" || failures=$((failures + 1))
+        elif [[ "$approach" == highOrder-* ]]; then
             check_log_message 'Using volume-averaged manufactured body force' || failures=$((failures + 1))
             if [[ "$approach" == "highOrder-kExactLeastSquares" ]]; then
                 check_log_message 'Using cell-average analytical displacement' || failures=$((failures + 1))
@@ -136,6 +200,126 @@ for mesh in "${MESHES[@]}"; do
         fi
     done
 done
+
+# Negative test: the mixed formulation must refuse the high-order Jacobian,
+# which would reconstruct a negative shear modulus from the implicit stiffness
+run_guard=false
+for approach in "${APPROACHES[@]}"; do
+    [[ "$approach" == "petscSnesPressure" ]] && run_guard=true
+done
+for mesh in "${MESHES[@]}"; do
+    [[ "$mesh" == "hex" ]] || run_guard=false
+done
+if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
+    CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-highOrderJacobian"
+    SOLVER_LOG="$CASE_DIR/log.solids4Foam"
+    if [[ "$CHECK_ONLY" == false ]]; then
+        rm -rf "$CASE_DIR"
+        mkdir -p "$CASE_DIR"
+        for item in "$SCRIPT_DIR"/*; do
+            name=$(basename "$item")
+            case "$name" in
+                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
+            esac
+            cp -a "$item" "$CASE_DIR/"
+        done
+        rm -rf "$CASE_DIR/constant/polyMesh"
+        (
+            cd "$CASE_DIR"
+            ln -nsf solidProperties.petscSnesPressureHighOrderJacobian \
+                constant/solidProperties
+            ln -nsf fvSolution.petscSnesPressure system/fvSolution
+            blockMesh > log.blockMesh 2>&1
+            # Expected to fail: record, rather than stop on, the exit status
+            if solids4Foam > log.solids4Foam 2>&1; then
+                echo "accepted" > log.guardOutcome
+            else
+                echo "refused" > log.guardOutcome
+            fi
+        )
+    fi
+    echo
+    echo "Checking that petscSnesPressure refuses the high-order Jacobian"
+    if [[ "$(cat "$CASE_DIR/log.guardOutcome" 2>/dev/null)" == "refused" ]] \
+    && grep -q 'solvePressure must be disabled when using the high order' \
+        "$SOLVER_LOG"; then
+        echo "PASS: the high-order Jacobian is refused with solvePressure"
+    else
+        echo "FAIL: the high-order Jacobian was not refused with solvePressure"
+        failures=$((failures + 1))
+    fi
+fi
+
+# Parallel test: the mixed approach on two processors must reproduce the serial
+# errors, which needs the D-in-p coupling across processor patches. A simple
+# decomposition is used, so the test does not depend on a partitioner library
+SERIAL_LOG="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex/log.solids4Foam"
+if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" && -f "$SERIAL_LOG" ]] \
+&& command -v mpirun >/dev/null 2>&1; then
+    CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex-parallel"
+    if [[ "$CHECK_ONLY" == false ]]; then
+        rm -rf "$CASE_DIR"
+        mkdir -p "$CASE_DIR"
+        for item in "$SCRIPT_DIR"/*; do
+            name=$(basename "$item")
+            case "$name" in
+                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
+            esac
+            cp -a "$item" "$CASE_DIR/"
+        done
+        rm -rf "$CASE_DIR/constant/polyMesh"
+        (
+            cd "$CASE_DIR"
+            ln -nsf solidProperties.petscSnesPressure constant/solidProperties
+            ln -nsf fvSolution.petscSnesPressure system/fvSolution
+            rm -f system/decomposeParDict
+            cat > system/decomposeParDict <<'DICT'
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      decomposeParDict;
+}
+
+numberOfSubdomains 2;
+
+method          simple;
+
+simpleCoeffs
+{
+    n           (2 1 1);
+    delta       0.001;
+}
+DICT
+            solids4Foam::runApplication blockMesh
+            solids4Foam::runApplication decomposePar
+            solids4Foam::runParallel solids4Foam
+        ) > "$CASE_DIR/log.Allrun" 2>&1 || true
+    fi
+    SOLVER_LOG="$CASE_DIR/log.solids4Foam"
+    echo
+    echo "Checking petscSnesPressure (hex, 2 processors) against the serial run"
+    if [[ ! -f "$SOLVER_LOG" ]] || ! grep -q '^End' "$SOLVER_LOG" \
+    || ! grep -q 'Nonlinear solve converged' "$SOLVER_LOG"; then
+        echo "FAIL: the parallel petscSnesPressure run did not complete"
+        failures=$((failures + 1))
+    else
+        for marker in "Writing DDifference field" "Writing sigmaDifference field" \
+                      "Writing pDifference field"; do
+            serial=$(SOLVER_LOG="$SERIAL_LOG" extract_norm "$marker" 3)
+            parallel=$(extract_norm "$marker" 3)
+            if [[ -n "$serial" && -n "$parallel" ]] \
+            && awk "BEGIN {d = ($parallel) - ($serial); if (d < 0) d = -d;
+                           exit !(d <= 1e-4*($serial))}"; then
+                echo "PASS: ${marker#Writing } cell RMS: parallel $parallel, serial $serial"
+            else
+                echo "FAIL: ${marker#Writing } cell RMS: parallel '$parallel', serial '$serial'"
+                failures=$((failures + 1))
+            fi
+        done
+    fi
+fi
 
 if ((failures)); then
     echo "Regression test FAILED ($failures checks)"

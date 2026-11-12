@@ -241,12 +241,14 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
     }
 
     // Scalar tangent, if asked for. The deviatoric one is the Laplacian
-    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D))
+    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D));
+    // the shear one is 2*mu, the shear modulus mu = E/(2(1 + nu))
     fillScalarTangent
     (
         response,
         2.0*mu_.value() + lambda_.value(),
-        (4.0/3.0)*mu_.value()
+        (4.0/3.0)*mu_.value(),
+        2.0*mu_.value()
     );
 
     // Fourth-order tangent, analytically or by finite differences

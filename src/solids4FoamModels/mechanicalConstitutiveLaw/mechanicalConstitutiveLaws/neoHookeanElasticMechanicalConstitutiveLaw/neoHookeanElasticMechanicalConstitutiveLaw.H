@@ -149,6 +149,13 @@ public:
             return true;
         }
 
+        //- Declares 2*mu for a scalarShear request. True for this type only:
+        //  a law derived from it does not inherit the declaration
+        virtual bool providesScalarShearTangent() const override
+        {
+            return type() == typeName;
+        }
+
         //- True if nu = 0.5
         virtual bool incompressible() const override
         {

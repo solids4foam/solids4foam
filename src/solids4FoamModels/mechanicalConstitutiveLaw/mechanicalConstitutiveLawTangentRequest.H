@@ -63,6 +63,13 @@ enum class tangentRequest
                                 // (e.g. for mixed displacement–pressure
                                 // formulations)
 
+    scalarShear,                // Twice the law's declared shear stiffness
+                                // measure, 2*mu, as the implicit stiffness
+                                // of a mixed displacement-pressure
+                                // formulation. Unlike the other requests it is
+                                // not advisory: a law that does not declare
+                                // 2*mu (providesScalarShearTangent) is refused
+
     fourthOrder,                // Full fourth-order material tangent,
                                 // represented as a 6x6 matrix in Voigt form
 
@@ -76,7 +83,8 @@ inline bool needsScalarTangent(const tangentRequest req)
 {
     return
         req == tangentRequest::scalar
-     || req == tangentRequest::scalarDeviatoric;
+     || req == tangentRequest::scalarDeviatoric
+     || req == tangentRequest::scalarShear;
 }
 
 //- Does the request ask for a fourth-order tangent
@@ -98,6 +106,7 @@ inline const word tangentRequestName
         case tangentRequest::none:              return "none";
         case tangentRequest::scalar:            return "scalar";
         case tangentRequest::scalarDeviatoric:  return "scalarDeviatoric";
+        case tangentRequest::scalarShear:       return "scalarShear";
         case tangentRequest::fourthOrder:       return "fourthOrder";
         case tangentRequest::fourthOrderFiniteDifference:
             return "fourthOrderFiniteDifference";
@@ -124,6 +133,10 @@ inline tangentRequest tangentRequestNamed(const word& name)
     {
         return tangentRequest::scalarDeviatoric;
     }
+    else if (name == "scalarShear")
+    {
+        return tangentRequest::scalarShear;
+    }
     else if (name == "fourthOrder")
     {
         return tangentRequest::fourthOrder;
@@ -135,7 +148,8 @@ inline tangentRequest tangentRequestNamed(const word& name)
 
     FatalErrorInFunction
         << "Unknown tangent request '" << name << "'." << nl
-        << "Valid options are: none, scalar, scalarDeviatoric, fourthOrder, "
+        << "Valid options are: none, scalar, scalarDeviatoric, scalarShear, "
+        << "fourthOrder, "
         << "fourthOrderFiniteDifference"
         << exit(FatalError);
 

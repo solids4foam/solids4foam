@@ -1002,7 +1002,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const bool flipSign,
+    const scalar scale
 ) const
 {
     // Get reference to least square vectors
@@ -1017,7 +1018,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
 
     const scalarField& VI = mesh.V();
 
-    const scalar sign = flipSign ? -1.0 : 1.0;
+    const scalar sign = (flipSign ? -1.0 : 1.0)*scale;
 
     // Get the blockSize
     label blockSize;
@@ -1129,9 +1130,6 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
         {
             const labelList& neiGlobalFaceCells =
                 neiProcGlobalIDs(mesh)[patchI];
-            const scalarField& patchNeiVols = neiProcVolumes(mesh)[patchI];
-            const vectorField& patchNeiLs = neiLs.boundaryField()[patchI];
-            // const vectorField patchNeiLs(... patchNeighbourField());
 
             forAll(fp, patchFaceI)
             {
@@ -1162,13 +1160,18 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 // Neighbour global cell ID
                 const label globalBlockColI = neiGlobalFaceCells[patchFaceI];
 
-                // Off-proc off-diagonal coefficient
-                // mat(ownCellID, neiCellID) += VI[ownCellID]*neiLs[faceI];
+                // Off-proc off-diagonal coefficient of this processor's row:
+                // lsGrad[own] += ownLs*(p_nei - p_own), so
+                // mat(ownCellID, neiCellID) += VI[ownCellID]*ownLs[faceI],
+                // with the owner-side volume and least-squares vector, as for
+                // an internal face. The neighbour's volume and vector belong
+                // to the neighbour's row, which the other processor inserts.
+                // From Philip Cardiff's 5dd6ce420 on the fix-pressure-solid
+                // branch
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
                     values[cmptI*blockSize + colOffset] =
-                        sign*patchNeiVols[patchFaceI]
-                       *patchNeiLs[patchFaceI][cmptI];
+                        sign*VI[ownCellID]*patchOwnLs[patchFaceI][cmptI];
                 }
                 AssertPETSc
                 (
@@ -1599,7 +1602,8 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
     const label rowOffset,
     const label colOffset,
     const label nScalarEqns,
-    const bool flipSign
+    const bool flipSign,
+    const scalar scale
 ) const
 {
     // Take references for efficiency and brevity
@@ -1646,22 +1650,41 @@ label foamPetscSnesHelper::InsertFvmDivUIntoPETScMatrix
                     sign*internalCoeffs[faceI][cmptI]*Sf[faceI][cmptI];
             }
 
-            if (patch.coupled())
+            if (patch.type() == "processor")
             {
-                // Todo: add off-core coeffs
-                notImplemented("patch.coupled(): D-in-p");
+                // The face value is w*U_own + (1 - w)*U_nei: the w*U_own part
+                // is the diagonal contribution above, while the
+                // (1 - w)*U_nei part couples to the neighbour cell on the
+                // other processor, i.e. the off-processor analogue of the
+                // upper coefficient (lower - Sf = -(1 - w)*Sf). As in the
+                // D-in-D block, it is passed through boundaryCoeffs, which
+                // InsertFvMatrixIntoPETScMatrix inserts with a flipped sign
+                // in the column of the neighbour cell; the internalCoeffs
+                // stay zero, as the diagonal is already complete
+                divUCoeffs.boundaryCoeffs()[patchI] =
+                    sign*(1.0 - pw)*Sf.component(cmptI);
+            }
+            else if (patch.coupled())
+            {
+                notImplemented
+                (
+                    "patch.coupled(): D-in-p for coupled patches other than "
+                    "processor patches"
+                );
+            }
+        }
 
-                // CoeffField<vector>::linearTypeField& pcoupleUpper =
-                //     bs.coupleUpper()[patchI].asLinear();
-                // CoeffField<vector>::linearTypeField& pcoupleLower =
-                //     bs.coupleLower()[patchI].asLinear();
-
-                // const vectorField pcl = -pw*Sf;
-                // const vectorField pcu = pcl + Sf;
-
-                // // Coupling  contributions
-                // pcoupleLower -= pcl;
-                // pcoupleUpper -= pcu;
+        // Scale the coefficients, e.g. by the scale of a scaled pressure
+        // equation row (the processor coupling coefficients included, so the
+        // rows stay consistent in parallel)
+        if (scale != 1.0)
+        {
+            divUCoeffs.diag() *= scale;
+            divUCoeffs.upper() *= scale;
+            divUCoeffs.lower() *= scale;
+            forAll(divUCoeffs.boundaryCoeffs(), patchI)
+            {
+                divUCoeffs.boundaryCoeffs()[patchI] *= scale;
             }
         }
 

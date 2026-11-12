@@ -211,11 +211,16 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
     // div(dev(sigma)) alone. The bulk modulus here is a near-incompressibility
     // penalty, two orders above the shear modulus, so including it makes the
     // surrogate stiff enough that the linear solve does not converge at all
+    // The shear one is 2*mu with the same mu = k*(cf + ct + cfs)/6. For this
+    // anisotropic law mu is a declared scalar stiffness measure, the one the
+    // research mixed formulation used (shearModulus() of the legacy law),
+    // not the shear modulus of an isotropic material
     fillScalarTangent
     (
         response,
         (4.0/3.0)*mu_.value() + bulkModulus_.value(),
-        (4.0/3.0)*mu_.value()
+        (4.0/3.0)*mu_.value(),
+        2.0*mu_.value()
     );
 
     // No analytical fourth-order tangent has been derived for this law
