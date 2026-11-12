@@ -63,7 +63,8 @@ Foam::diffStencilLaplacianStab::diffStencilLaplacianStab
 {
     writeSpectralNormalisationInfo
     (
-        "directionally split m = 1 spectral shape, raw reference response 4*rStar",
+        "directionally split m = 1 spectral shape, raw reference response "
+        "4*rStar",
         diffStencilNormalisation()
     );
 }

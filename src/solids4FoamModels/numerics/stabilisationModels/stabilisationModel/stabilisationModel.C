@@ -24,11 +24,13 @@ InClass
 #include "fvc.H"
 #include "compatibilityFunctions.H"
 
+// * * * * * * * * * * * * * * * Local Functions * * * * * * * * * * * * * * //
+
 namespace Foam
 {
-namespace
-{
-label readReferenceNyquistDirections
+
+//- Read and validate referenceNyquistDirections; zero without normalisation
+static label readReferenceNyquistDirections
 (
     const fvMesh& mesh,
     const dictionary& dict,
@@ -60,9 +62,8 @@ label readReferenceNyquistDirections
             << referenceNyquistDirections << exit(FatalIOError);
     }
 
-    // The directions in which a Nyquist mode exists: the geometric ones, so
-    // that the one-cell empty or wedge direction is excluded, as in
-    // stabilisationFourierCheck
+    // A Nyquist mode exists only in the geometric directions: a one-cell
+    // empty or wedge direction is excluded
     const label maxReferenceNyquistDirections =
         min(label(3), mesh.nGeometricD());
 
@@ -77,8 +78,9 @@ label readReferenceNyquistDirections
 
     return referenceNyquistDirections;
 }
-}
-}
+
+} // End namespace Foam
+
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -160,7 +162,6 @@ bool Foam::stabilisationModel::readSpectralNormalisation
 
     return dict.lookupOrDefault<Switch>("spectralNormalisation", false);
 }
-
 
 
 Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New

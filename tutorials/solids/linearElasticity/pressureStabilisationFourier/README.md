@@ -50,7 +50,7 @@ normalisation of models that do not support it (`alpha`, `gradDiv`,
 The two `system/accept*` dictionaries must be accepted: `spectralNormalisation`
 without a warning, and `normalise` with a deprecation warning.
 
-## Running the case
+## Running the Case
 
 ```bash
 ./Allrun           # 16 cells per axis
@@ -62,11 +62,10 @@ nonzero) or if an invalid dictionary is accepted. The results are written to
 `postProcessing/stabilisationFourierCheck`:
 
 - `results_NxNx1.csv`: measured and analytical eigenvalues per model and mode,
-  for the raw (`spectralNormalisation` 0) and normalised (1) campaigns; the
-  first column, formerly `normalise`, is named after the dictionary keyword.
-  The `paperOrder` column is the number of repeated Laplacian factors, m + 1,
-  and the `spectralRelation` labels keep their earlier names, so that existing
-  post-processing of these columns still works;
+  for the raw (`spectralNormalisation` 0) and normalised (1) campaigns. The
+  `paperOrder` column is the number of repeated Laplacian factors, m + 1, and
+  the `spectralRelation` labels (`legacyM1`, `coupledRepeatedLaplacian`,
+  `splitM2Shape`) also count the order from one;
 - `crossChecks_NxNx1.csv` and `gammaChecks_NxNx1.csv`: pair and constant-gamma
   checks;
 - `symbols_NxNx1.csv` and `symbolMaps_NxNx1.csv`: analytical cuts and maps
@@ -85,5 +84,5 @@ accepted as described above. `regressionTest.sh` checks all three.
 
 ## Notes
 
-The case runs on OpenFOAM.com and OpenFOAM.org; foam-extend is skipped. The
-utility needs a uniform, axis-aligned mesh with cyclic and empty patches only.
+The case is skipped on foam-extend. The utility needs a uniform, axis-aligned
+mesh with cyclic and empty patches only.

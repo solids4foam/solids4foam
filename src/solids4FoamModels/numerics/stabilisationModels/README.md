@@ -82,8 +82,10 @@ wedge directions, which have one cell, do not count.
 The order is m = `laplacianPower`, counted from zero: m = 0 is the Laplacian,
 m = 1 the bi-Laplacian and m = 2 the sixth-order operator, with m + 1
 repeated Laplacian factors. The normalisation divides the operator by its
-raw response to the reference mode, so that the normalised operator's symbol
-at that mode equals `scaleFactor`:
+raw response to the reference mode. On a uniform mesh of spacing h, the
+eigenvalue of the normalised operator at the reference mode is then
+`-scaleFactor/h^2`, whatever m: its dimensionless magnitude, `-h^2*lambda`,
+equals `scaleFactor`.
 
 <!-- markdownlint-disable MD013 -->
 
@@ -139,8 +141,8 @@ models (`linearGeometryTotalDisplacement` and
 R_P += s_r * sum_f rAUf_f * |Sf| * scaleFactor/(4*rStar) * deltaCoeffs_f*(p_N - p_P)
 ```
 
-where `s_r` is the pressure-equation scale of `scaleMixedPETScFields` (1 when
-scaling is off), and
+where `s_r` is any scale the solid model applies to the pressure rows (1 for
+an unscaled system), and
 `rAUf = -1/interpolate(A(laplacian(impKf, D) - rho*d2dt2(D)))` is the
 reciprocal of the diagonal of the approximate momentum operator. On a uniform
 orthogonal Cartesian mesh of spacing h in nD dimensions, with constant
@@ -161,8 +163,8 @@ So:
   `-s_r*scaleFactor*p/(2*nD*impK)` per unit volume, independent of h: the
   damping of grid-scale modes does not vanish under refinement, which is the
   purpose of the normalisation. Its size relative to the other terms of the
-  pressure equation is set by `scaleFactor`, `impK` (2μ with
-  `mixedImplicitStiffness twoMu`) and `s_r`, not by `scaleFactor` alone.
+  pressure equation is set by `scaleFactor`, the implicit stiffness `impK`
+  and `s_r`, not by `scaleFactor` alone.
 
 The legacy form carries a further `|d|^2`: `O(h^4)` for smooth fields and
 `O(h^2)` for grid-scale modes, so its damping of grid-scale modes vanishes
