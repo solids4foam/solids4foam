@@ -20,6 +20,16 @@ fi
 
 (cd solids4FoamModels && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
 
+# The beam models are copied from beamFoam and require OpenFOAM.com and Eigen
+if [[ $WM_PROJECT_VERSION == v* && -z "${S4F_NO_USE_EIGEN:-}" ]]
+then
+    (cd beamModels && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+    (cd beamSolid && ./Allwmake $targetType $* 2>&1 | tee log.Allwmake)
+else
+    echo; echo "Skipping beamModels and beamSolid: they require OpenFOAM.com"
+    echo "and Eigen"; echo
+fi
+
 # The immersed boundary method is currently only implemented for OpenFOAM.com
 if [[ "$WM_PROJECT" == "OpenFOAM" && $WM_PROJECT_VERSION == v* ]]
 then
