@@ -25,6 +25,9 @@ License
     #include "PstreamBuffers.H"
 #endif
 #include "processorPolyPatch.H"
+#ifndef FOAMEXTEND
+    #include "processorCyclicPolyPatch.H"
+#endif
 #include "volFields.H"
 #include "Tuple2.H"
 #include "cellZoneInterface.H"
@@ -320,48 +323,77 @@ void leastSquaresStencil::calcCellRegion() const
     {
         // Single material: nothing is filtered, stencils are unchanged
         cellRegionPtr_.reset(new labelList());
+        materialInterfaceFacePtr_.reset(new boolList());
         return;
     }
 
-    // A material interface on a processor boundary would need each side's
-    // reconstruction on the other processor; refuse it
+    // The faces between two materials: internal faces, and coupled faces
+    // whose cells on the two sides are in two materials
     const List<boolList> coupledInterface(cellZoneInterfaceCoupled(mesh_));
 
-    label nCoupledInterfaces = 0;
-    forAll(coupledInterface, patchI)
-    {
-        forAll(coupledInterface[patchI], i)
-        {
-            if (coupledInterface[patchI][i])
-            {
-                ++nCoupledInterfaces;
-            }
-        }
-    }
-    reduce(nCoupledInterfaces, sumOp<label>());
+    materialInterfaceFacePtr_.reset(new boolList(mesh_.nFaces(), false));
+    boolList& interfaceFace = autoPtrRef(materialInterfaceFacePtr_);
 
-    if (nCoupledInterfaces > 0)
-    {
-        FatalErrorInFunction
-            << nCoupledInterfaces << " faces between two materials lie on a "
-            << "processor boundary." << nl
-            << "    High-order reconstruction with more than one material "
-            << "needs every material interface inside one processor:"
-            << " constrain the decomposition (singleProcessorFaceSets) so that"
-            << " the cells on both sides of each interface share a processor."
-            << exit(FatalError);
-    }
-
-    // The connected regions of each material: cells are connected through
-    // every face but those between two materials, which are all internal
-    boolList blockedFace(mesh_.nFaces(), false);
     const labelUList& own = mesh_.faceOwner();
     const labelUList& nei = mesh_.faceNeighbour();
 
     for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
     {
-        blockedFace[faceI] = (material[own[faceI]] != material[nei[faceI]]);
+        interfaceFace[faceI] = (material[own[faceI]] != material[nei[faceI]]);
     }
+
+    // On a processor face each processor evaluates its own side and the two
+    // sides' tractions are exchanged. Other coupled patches (cyclic,
+    // processorCyclic, and on foam-extend a processor patch decomposed from
+    // a cyclic, which carries its transform) would need the exchanged
+    // values transformed and are not supported
+    label nUnsupported = 0;
+    forAll(coupledInterface, patchI)
+    {
+        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+#ifdef FOAMEXTEND
+        const bool plainProcessor =
+            isA<processorPolyPatch>(pp)
+         && refCast<const coupledPolyPatch>(pp).parallel()
+         && !refCast<const coupledPolyPatch>(pp).separated();
+#else
+        const bool plainProcessor =
+            isA<processorPolyPatch>(pp)
+         && !isA<processorCyclicPolyPatch>(pp);
+#endif
+
+        forAll(coupledInterface[patchI], i)
+        {
+            if (coupledInterface[patchI][i])
+            {
+                if (plainProcessor)
+                {
+                    interfaceFace[pp.start() + i] = true;
+                }
+                else
+                {
+                    ++nUnsupported;
+                }
+            }
+        }
+    }
+    reduce(nUnsupported, sumOp<label>());
+
+    if (nUnsupported > 0)
+    {
+        FatalErrorInFunction
+            << nUnsupported << " faces between two materials lie on a cyclic "
+            << "or processorCyclic patch." << nl
+            << "    High-order reconstruction with more than one material "
+            << "supports material interfaces on internal and processor faces "
+            << "only"
+            << exit(FatalError);
+    }
+
+    // The connected regions of each material: cells are connected through
+    // every face but those between two materials. A blocked processor face
+    // is blocked on both sides, as the material test is symmetric
+    const boolList& blockedFace = interfaceFace;
 
     const regionSplit regions(mesh_, blockedFace);
 
@@ -1104,6 +1136,9 @@ void leastSquaresStencil::calcCellsStencil(const scalar relTol) const
     // Prerequisites
     auto& faceStencils =
         compactListListCRef(this->facesStencil());
+    auto& interfaceNeighbourStencils =
+        compactListListCRef(this->interfaceNeighbourFacesStencil());
+    const labelUList& faceNeighbour = mesh_.faceNeighbour();
 
     const List<labelList>& remoteCellsPerProc = this->remoteCellsPerProc();
 
@@ -1152,7 +1187,21 @@ void leastSquaresStencil::calcCellsStencil(const scalar relTol) const
         forAll(faces, fI)
         {
             const label faceID = faces[fI];
-            const labelUList faceStencil = faceStencils[faceID];
+
+            // On a material interface the neighbour cell takes the
+            // neighbour side's face stencil, as the owner's is of the other
+            // material. Then each side gathers the same candidates whether
+            // the face is internal or, once decomposed, a processor face
+            // whose local cell is that side's owner
+            const bool neighbourSide =
+                faceID < mesh_.nInternalFaces()
+             && faceNeighbour[faceID] == cellI
+             && interfaceNeighbourStencils[faceID].size() > 0;
+
+            const labelUList faceStencil =
+                neighbourSide
+              ? interfaceNeighbourStencils[faceID]
+              : faceStencils[faceID];
 
             forAll(faceStencil, j)
             {
@@ -1299,6 +1348,7 @@ leastSquaresStencil::leastSquaresStencil
     remoteCellLocationPtr_(),
     cellRegionPtr_(),
     multiMaterial_(false),
+    materialInterfaceFacePtr_(),
     remoteRegionPtr_(),
     faceRegionPtr_(),
     interfaceNeighbourFacesStencilPtr_()
@@ -1371,6 +1421,17 @@ leastSquaresStencil::interfaceNeighbourFacesStencil() const
     }
 
     return autoPtrRef(interfaceNeighbourFacesStencilPtr_);
+}
+
+
+const boolList& leastSquaresStencil::materialInterfaceFace() const
+{
+    if (!cellRegionPtr_.valid())
+    {
+        calcCellRegion();
+    }
+
+    return materialInterfaceFacePtr_();
 }
 
 
@@ -1524,6 +1585,7 @@ void leastSquaresStencil::clear() const
     remoteCentresMapPtr_.clear();
     remoteCellLocationPtr_.clear();
     cellRegionPtr_.clear();
+    materialInterfaceFacePtr_.clear();
     remoteRegionPtr_.clear();
     faceRegionPtr_.clear();
     interfaceNeighbourFacesStencilPtr_.clear();

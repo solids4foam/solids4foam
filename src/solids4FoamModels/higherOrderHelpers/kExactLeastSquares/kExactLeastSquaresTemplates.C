@@ -364,6 +364,8 @@ void kExactLeastSquares::fGrad
 
     // Average owner-side reconstructions across processor patches. The face
     // quadrature object guarantees the same point order on both sides.
+    const boolList& interfaceFaces = stencil().materialInterfaceFace();
+
     forAll(mesh.boundary(), patchI)
     {
         const fvPatch& patch = mesh.boundary()[patchI];
@@ -434,13 +436,18 @@ void kExactLeastSquares::fGrad
         {
             const label faceI = patchStart + patchFaceI;
 
+            // A face between two materials takes this side's reconstruction
+            // alone: the other processor evaluates the other side, and the
+            // two sides' tractions are combined in the solid model
+            const bool interfaceFace =
+                interfaceFaces.size() && interfaceFaces[faceI];
+
             forAll(faceQuadPoints[faceI], qpI)
             {
-                result[faceI][qpI] = 0.5
-                   *(
-                        sendGrad[start + qpI]
-                      + receiveGrad[start + qpI]
-                    );
+                result[faceI][qpI] =
+                    interfaceFace
+                  ? sendGrad[start + qpI]
+                  : 0.5*(sendGrad[start + qpI] + receiveGrad[start + qpI]);
             }
 
             start += faceQuadPoints[faceI].size();

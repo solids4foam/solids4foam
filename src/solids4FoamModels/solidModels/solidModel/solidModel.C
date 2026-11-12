@@ -41,6 +41,7 @@ License
 #include "NewmarkBetaD2dt2Scheme.H"
 #include "hofvc.H"
 #include "cellZoneInterface.H"
+#include "processorFvPatch.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
@@ -2862,6 +2863,155 @@ Foam::solidModel::interfaceNeighbourTopology() const
 }
 
 
+namespace
+{
+    // The owner side's weight on a face between two materials, from the two
+    // sides' stiffness scales. Every weighting is symmetric in the two
+    // sides, so that the result does not depend on which is the owner, nor
+    // on the order of the materials
+    Foam::scalar interfaceOwnWeight
+    (
+        const Foam::word& weighting,
+        const Foam::scalar aOwn,
+        const Foam::scalar aNei
+    )
+    {
+        if (weighting == "harmonic")
+        {
+            // The more compliant side counts more
+            return aNei/(aOwn + aNei);
+        }
+        else if (weighting == "stiffnessWeighted")
+        {
+            // The stiffer side counts more
+            return aOwn/(aOwn + aNei);
+        }
+        else if (weighting == "stiffer" && aOwn != aNei)
+        {
+            return (aOwn > aNei) ? 1.0 : 0.0;
+        }
+        else if (weighting == "softer" && aOwn != aNei)
+        {
+            return (aOwn < aNei) ? 1.0 : 0.0;
+        }
+
+        return 0.5;
+    }
+
+
+    // Replace each processor face's value in boundaryValues (indexed by
+    // boundary face, from nInternalFaces) by the value of the same face on
+    // the other processor. Every rank sends on every processor patch, then
+    // receives on every one, so this cannot deadlock however the patches are
+    // ordered, and is collective-safe whether or not a rank has any
+    // material interface
+    template<class Type>
+    void swapProcessorFaceValues
+    (
+        const Foam::fvMesh& mesh,
+        Foam::Field<Type>& boundaryValues
+    )
+    {
+        using namespace Foam;
+
+        const label nInternalFaces = mesh.nInternalFaces();
+
+        forAll(mesh.boundary(), patchI)
+        {
+            const fvPatch& patch = mesh.boundary()[patchI];
+
+            if (isA<processorFvPatch>(patch))
+            {
+                const label start = patch.patch().start() - nInternalFaces;
+
+                Field<Type> sendValues(patch.size());
+                forAll(sendValues, i)
+                {
+                    sendValues[i] = boundaryValues[start + i];
+                }
+
+                refCast<const processorFvPatch>(patch).send
+                (
+                    Pstream::commsTypes::blocking, sendValues
+                );
+            }
+        }
+
+        forAll(mesh.boundary(), patchI)
+        {
+            const fvPatch& patch = mesh.boundary()[patchI];
+
+            if (isA<processorFvPatch>(patch))
+            {
+                const label start = patch.patch().start() - nInternalFaces;
+
+                Field<Type> receiveValues(patch.size());
+                refCast<const processorFvPatch>(patch).receive
+                (
+                    Pstream::commsTypes::blocking, receiveValues
+                );
+
+                forAll(receiveValues, i)
+                {
+                    boundaryValues[start + i] = receiveValues[i];
+                }
+            }
+        }
+    }
+
+
+    // The cell stiffness and the normal distance from the cell centre to the
+    // face of every boundary face's own side, and the same of the other side
+    // for processor faces, exchanged, so that both processors of a face
+    // hold the same pair
+    void processorFaceSides
+    (
+        const Foam::fvMesh& mesh,
+        const Foam::scalarField& K,
+        Foam::scalarField& ownK,
+        Foam::scalarField& ownDelta,
+        Foam::scalarField& otherK,
+        Foam::scalarField& otherDelta
+    )
+    {
+        using namespace Foam;
+
+        const label nBoundaryFaces = mesh.nFaces() - mesh.nInternalFaces();
+
+        ownK.setSize(nBoundaryFaces, 0.0);
+        ownDelta.setSize(nBoundaryFaces, 0.0);
+
+        forAll(mesh.boundary(), patchI)
+        {
+            const fvPatch& patch = mesh.boundary()[patchI];
+
+            if (!isA<processorFvPatch>(patch))
+            {
+                continue;
+            }
+
+            const label start = patch.patch().start() - mesh.nInternalFaces();
+            const labelUList& faceCells = patch.faceCells();
+            const vectorField& Cf = patch.Cf();
+            const vectorField nf(patch.nf());
+            const vectorField& C = mesh.C();
+
+            forAll(patch, i)
+            {
+                ownK[start + i] = K[faceCells[i]];
+                ownDelta[start + i] =
+                    max(mag(nf[i] & (Cf[i] - C[faceCells[i]])), VSMALL);
+            }
+        }
+
+        otherK = ownK;
+        otherDelta = ownDelta;
+        swapProcessorFaceValues(mesh, otherK);
+        swapProcessorFaceValues(mesh, otherDelta);
+    }
+}
+
+
 void Foam::solidModel::combineInterfaceTraction
 (
     surfaceVectorField& traction,
@@ -2893,7 +3043,7 @@ void Foam::solidModel::combineInterfaceTraction
             << exit(FatalIOError);
     }
 
-    // The interface faces are those with neighbour-side points
+    // The internal interface faces are those with neighbour-side points
     const labelList rowSizes(gradDQuadNei().sizes());
     const labelUList& own = mesh().owner();
     const labelUList& nei = mesh().neighbour();
@@ -2922,33 +3072,94 @@ void Foam::solidModel::combineInterfaceTraction
         const scalar aNei =
             K[neiCellI]/max(mag(n & (C[neiCellI] - Cf[faceI])), VSMALL);
 
-        // The owner's weight. Every weighting is symmetric in the two sides,
-        // so that the result does not depend on which is the owner, nor on
-        // the order of the materials
-        scalar ownWeight = 0.5;
-
-        if (weighting == "harmonic")
-        {
-            // The more compliant side counts more
-            ownWeight = aNei/(aOwn + aNei);
-        }
-        else if (weighting == "stiffnessWeighted")
-        {
-            // The stiffer side counts more
-            ownWeight = aOwn/(aOwn + aNei);
-        }
-        else if (weighting == "stiffer" && aOwn != aNei)
-        {
-            ownWeight = (aOwn > aNei) ? 1.0 : 0.0;
-        }
-        else if (weighting == "softer" && aOwn != aNei)
-        {
-            ownWeight = (aOwn < aNei) ? 1.0 : 0.0;
-        }
+        const scalar ownWeight = interfaceOwnWeight(weighting, aOwn, aNei);
 
         tractionI[faceI] =
             ownWeight*tractionI[faceI]
           + (1.0 - ownWeight)*neiTractionI[faceI];
+    }
+
+    // Processor faces between two materials: each processor holds its own
+    // side's traction; the other side's is exchanged, negated as the other
+    // processor's face normal is opposite. Both processors take the weights
+    // from the same pair of exchanged values, and the processor with the
+    // lower number computes them, so that the two tractions are exactly
+    // opposite
+    const boolList& interfaceFace =
+        displacementLeastSquares().stencil().materialInterfaceFace();
+
+    if (interfaceFace.empty())
+    {
+        return;
+    }
+
+    const label nInternalFaces = mesh().nInternalFaces();
+    vectorField otherTraction
+    (
+        mesh().nFaces() - nInternalFaces, vector::zero
+    );
+
+    forAll(mesh().boundary(), patchI)
+    {
+        const label start = mesh().boundary()[patchI].patch().start();
+
+        forAll(traction.boundaryField()[patchI], i)
+        {
+            otherTraction[start - nInternalFaces + i] =
+                traction.boundaryField()[patchI][i];
+        }
+    }
+
+    swapProcessorFaceValues(mesh(), otherTraction);
+
+    scalarField ownK, ownDelta, otherK, otherDelta;
+    processorFaceSides(mesh(), K, ownK, ownDelta, otherK, otherDelta);
+
+    forAll(mesh().boundary(), patchI)
+    {
+        const fvPatch& patch = mesh().boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const bool lowerProc =
+            Pstream::myProcNo()
+          < refCast<const processorFvPatch>(patch).neighbProcNo();
+        const label start = patch.patch().start();
+        vectorField& patchTraction = boundaryFieldRef(traction)[patchI];
+
+        forAll(patch, i)
+        {
+            if (!interfaceFace[start + i])
+            {
+                continue;
+            }
+
+            const label bI = start - nInternalFaces + i;
+            const scalar aOwn = ownK[bI]/ownDelta[bI];
+            const scalar aOther = otherK[bI]/otherDelta[bI];
+
+            // The lower processor's side weight, the same on both
+            const scalar lowerWeight =
+                lowerProc
+              ? interfaceOwnWeight(weighting, aOwn, aOther)
+              : interfaceOwnWeight(weighting, aOther, aOwn);
+
+            if (lowerProc)
+            {
+                patchTraction[i] =
+                    lowerWeight*patchTraction[i]
+                  - (1.0 - lowerWeight)*otherTraction[bI];
+            }
+            else
+            {
+                patchTraction[i] =
+                    (1.0 - lowerWeight)*patchTraction[i]
+                  - lowerWeight*otherTraction[bI];
+            }
+        }
     }
 }
 
@@ -2986,6 +3197,45 @@ void Foam::solidModel::interfaceSeriesStiffness
         impKfI[faceI] =
             (deltaOwn + deltaNei)
            /max(deltaOwn/K[ownCellI] + deltaNei/K[neiCellI], VSMALL);
+    }
+
+    // Processor faces between two materials, from the exchanged pair of
+    // stiffnesses and distances: the sums are symmetric in the two sides, so
+    // both processors compute the same value
+    const List<boolList> coupledInterface(cellZoneInterfaceCoupled(mesh()));
+
+    scalarField ownK, ownDelta, otherK, otherDelta;
+    processorFaceSides(mesh(), K, ownK, ownDelta, otherK, otherDelta);
+
+    forAll(mesh().boundary(), patchI)
+    {
+        const fvPatch& patch = mesh().boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const label start = patch.patch().start() - mesh().nInternalFaces();
+        scalarField& patchImpKf = boundaryFieldRef(impKf)[patchI];
+
+        forAll(patch, i)
+        {
+            if (!coupledInterface[patchI][i])
+            {
+                continue;
+            }
+
+            const label bI = start + i;
+
+            patchImpKf[i] =
+                (ownDelta[bI] + otherDelta[bI])
+               /max
+                (
+                    ownDelta[bI]/ownK[bI] + otherDelta[bI]/otherK[bI],
+                    VSMALL
+                );
+        }
     }
 }
 
@@ -3034,6 +3284,41 @@ void Foam::solidModel::addInterfaceStabilisation
         if (rowSizes[faceI] > 0)
         {
             tractionI[faceI] += extra*impKfI[faceI]*stabI[faceI];
+        }
+    }
+
+    // Processor faces between two materials. impKf is the same on both
+    // processors and the jump is opposite, so the two stay opposite
+    const boolList& interfaceFace =
+        displacementLeastSquares().stencil().materialInterfaceFace();
+
+    if (interfaceFace.empty())
+    {
+        return;
+    }
+
+    const surfaceVectorField& stab = momentumStabilisation().faceVector();
+
+    forAll(mesh().boundary(), patchI)
+    {
+        const fvPatch& patch = mesh().boundary()[patchI];
+
+        if (!isA<processorFvPatch>(patch))
+        {
+            continue;
+        }
+
+        const label start = patch.patch().start();
+        const scalarField& patchImpKf = impKf.boundaryField()[patchI];
+        const vectorField& patchStab = stab.boundaryField()[patchI];
+        vectorField& patchTraction = boundaryFieldRef(traction)[patchI];
+
+        forAll(patch, i)
+        {
+            if (interfaceFace[start + i])
+            {
+                patchTraction[i] += extra*patchImpKf[i]*patchStab[i];
+            }
         }
     }
 }

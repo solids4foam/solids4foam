@@ -59,6 +59,9 @@ HIGH_ORDER_ORDER_REL_MAX=1e-10
 # Krylov iterations of the whole high-order solve: about 20 with the default
 # interface stabilisation, thousands (or a stall) when it is too weak
 HIGH_ORDER_KSP_MAX=200
+# Parallel against serial, with the material interface on the processor
+# boundary: equal to the solver tolerance (about 1e-9 here)
+HIGH_ORDER_PARALLEL_REL_MAX=1e-7
 
 R1=0.05
 R2=0.07
@@ -673,13 +676,20 @@ run_high_order_arm() {
     fi
 }
 
-# A material interface on a processor boundary is refused with the high-order
-# face quadrature: the interface decomposition puts all of it there
+# With the high-order face quadrature, a material interface on a processor
+# boundary is evaluated by each processor from its own side, and the two
+# sides' tractions are exchanged. The interface decomposition puts all of the
+# interface there; the answer must match the serial run of the same scheme
 run_high_order_processor_interface_arm() {
-    local arm="highOrder-parallel-interface"
+    local scheme="$1"
+    local arm="highOrder-${scheme}-parallel-interface"
     local dir="${REGRESSION_ROOT}/${arm}"
+    local serial="${REGRESSION_ROOT}/highOrder-${scheme}"
 
     copy_case_to "${dir}"
+    sed -i.bak "s/type movingLeastSquares;/type ${scheme};/" \
+        "${dir}/constant/solidProperties"
+    rm -f "${dir}/constant/solidProperties.bak"
 
     ( cd "${dir}" && ./Allclean > /dev/null 2>&1 ) || true
     ( cd "${dir}" && ./Allrun parallel interface \
@@ -688,13 +698,34 @@ run_high_order_processor_interface_arm() {
     if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
     then
         echo "SKIP: ${arm} does not run in this environment"
-    elif grep -q "faces between two materials lie on a processor boundary" \
-        "${dir}/${SOLVER_LOGFILE}" 2>/dev/null
+        return
+    fi
+
+    if ! grep -q "^End" "${dir}/${SOLVER_LOGFILE}" 2>/dev/null
     then
-        echo "PASS: ${arm}: refused, as the interface is a processor boundary"
+        echo "FAIL: ${arm}: did not run to completion"
+        failures=$((failures + 1))
+        return
+    fi
+
+    local t cmp rel max1 max2
+    t="$(solids4Foam::latestTime "${serial}")"
+
+    if ! cmp=$(compare_internal_vector_fields \
+        "${serial}/${t}/D" "${dir}/${t}/D")
+    then
+        echo "FAIL: ${arm}: could not compare with the serial run"
+        failures=$((failures + 1))
+        return
+    fi
+
+    read -r rel max1 max2 <<< "${cmp}"
+
+    if awk "BEGIN {exit !(${rel} < ${HIGH_ORDER_PARALLEL_REL_MAX})}"
+    then
+        printf "PASS: %s: differs from serial by %.4g\n" "${arm}" "${rel}"
     else
-        echo "FAIL: ${arm}: was not refused for its processor-boundary" \
-            "interface"
+        printf "FAIL: %s: differs from serial by %.4g\n" "${arm}" "${rel}"
         failures=$((failures + 1))
     fi
 }
@@ -713,7 +744,8 @@ if [ "$CHECK_ONLY" = false ]; then
     else
         run_high_order_arm movingLeastSquares
         run_high_order_arm kExactLeastSquares
-        run_high_order_processor_interface_arm
+        run_high_order_processor_interface_arm movingLeastSquares
+        run_high_order_processor_interface_arm kExactLeastSquares
     fi
 fi
 

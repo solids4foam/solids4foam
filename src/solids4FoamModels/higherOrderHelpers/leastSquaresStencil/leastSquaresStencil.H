@@ -134,6 +134,10 @@ class leastSquaresStencil
         //  enough to tell, as a rank may hold no cells
         mutable bool multiMaterial_;
 
+        //- Whether each face (internal and boundary) lies between two
+        //  materials, empty with a single material. Set with cellRegionPtr_
+        mutable autoPtr<boolList> materialInterfaceFacePtr_;
+
         //- The material region of each remote stencil candidate, by global
         //  cell index, exchanged with the candidates' cell centres
         mutable autoPtr<Map<label>> remoteRegionPtr_;
@@ -300,6 +304,12 @@ public:
         //  two materials, and built from the neighbour's material, where
         //  facesStencil() is built from the owner's
         const CompactListList<label>& interfaceNeighbourFacesStencil() const;
+
+        //- Whether each face, internal or boundary, lies between two
+        //  materials: an internal face whose cells are in two materials, or
+        //  a processor face whose cells on the two processors are. Empty
+        //  with a single material, the same on every rank
+        const boolList& materialInterfaceFace() const;
 
         //- Returns cell stencils (global indexing)
         const CompactListList<label>& cellsStencil() const;

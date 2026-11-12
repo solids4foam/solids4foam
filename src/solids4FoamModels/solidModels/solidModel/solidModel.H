@@ -537,7 +537,11 @@ protected:
         //  stiffness on these faces is the series stiffness of the two
         //  materials (interfaceSeriesStiffness), and whose scale factor on
         //  these faces is interfaceStabilisationScaleFactor
-        //  (addInterfaceStabilisation)
+        //  (addInterfaceStabilisation). On a processor face each processor
+        //  evaluates its own side, as that face's owner, and the other
+        //  side's traction, stiffness and distance are exchanged across the
+        //  processor patch, so that both processors form the same, opposite,
+        //  traction
 
             //- Is the high-order face quadrature used with more than one
             //  material?

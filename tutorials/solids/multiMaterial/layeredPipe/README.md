@@ -165,9 +165,11 @@ law, and the face traction is a weighted mean of the two sides' tractions
 the momentum stabilisation, which on these faces uses
 `interfaceStabilisationScaleFactor` (default 1) in place of its own
 `scaleFactor`: with a weaker penalty the Krylov solver can stall. The result
-does not depend on the order in which the materials are listed. With the high-order discretisation,
-a material interface must not lie on a processor boundary, so the
-`interface` decomposition is refused.
+does not depend on the order in which the materials are listed. A material
+interface may lie on a processor boundary, as with the `interface`
+decomposition: each processor then evaluates its own side, and the two sides'
+tractions are exchanged, giving the serial answer. A material interface on a
+cyclic patch is not supported.
 
 ```note
 For multi-material cases, solids4foam expects to find a cellZone for each
