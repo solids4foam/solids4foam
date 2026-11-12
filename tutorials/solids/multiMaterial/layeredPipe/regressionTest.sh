@@ -517,6 +517,11 @@ copy_case_to() {
         "${dir}/constant/solidProperties"
     cp "${dir}/system/fvSchemes.highOrder" "${dir}/system/fvSchemes"
     cp "${dir}/system/fvSolution.highOrder" "${dir}/system/fvSolution"
+
+    # Enough digits for the material-order comparison
+    sed -i.bak "s/^writePrecision .*/writePrecision  15;/" \
+        "${dir}/system/controlDict"
+    rm -f "${dir}/system/controlDict.bak"
 }
 
 # The largest cell-centre displacement error of a case against the analytical
@@ -612,7 +617,7 @@ run_high_order_arm() {
     done
 
     local err
-    err="$(compute_displacement_err "${dir}")"
+    err="$(compute_displacement_err "${dir}")" || err=""
 
     if [[ -z "${err}" ]]
     then
@@ -679,9 +684,12 @@ if [ "$CHECK_ONLY" = false ]; then
     run_parallel_arm simple
     run_one_cell_thick_arm
 
-    # The high-order face quadrature does not exist on foam-extend
+    # The high-order face quadrature does not exist on foam-extend, and is
+    # solved with PETSc
     if [[ "$(solids4Foam::foamFlavour)" == foamextend ]]; then
         echo "SKIP: the high-order arms: no high order on foam-extend"
+    elif [[ -z "${PETSC_DIR:-}" ]]; then
+        echo "SKIP: the high-order arms: PETSc is not installed"
     else
         run_high_order_arm movingLeastSquares
         run_high_order_arm kExactLeastSquares

@@ -2735,32 +2735,40 @@ void Foam::solidModel::gradQuad
     CompactListList<tensor>& gradDQuad
 ) const
 {
-    if (materialInterfaceQuad())
-    {
-        if (!supportsMaterialInterfaceQuad())
-        {
-            FatalErrorInFunction
-                << "The " << type() << " solid model does not support more "
-                << "than one material with the high-order face quadrature"
-                << exit(FatalError);
-        }
-
-        if (highOrderJacobian())
-        {
-            FatalErrorInFunction
-                << "highOrderJacobian is not supported with more than one "
-                << "material: the high-order Jacobian does not include the "
-                << "neighbour side of the material interfaces." << nl
-                << "    Set highOrderJacobian false: the residual is still "
-                << "high order, and is solved matrix-free"
-                << exit(FatalError);
-        }
-    }
+    checkHighOrderMaterials();
 
     // With more than one material the least-squares stencils keep to one
     // material, and a face between two materials is reconstructed from its
     // owner's (its neighbour's side: gradQuadInterfaceNeighbour)
     hofvc::fGrad(D, gradDQuad);
+}
+
+
+void Foam::solidModel::checkHighOrderMaterials() const
+{
+    if (mechanicalManager().nLaws() < 2)
+    {
+        return;
+    }
+
+    if (highOrderJacobian())
+    {
+        FatalErrorInFunction
+            << "highOrderJacobian is not supported with more than one "
+            << "material: the high-order Jacobian does not include the "
+            << "neighbour side of the material interfaces." << nl
+            << "    Set highOrderJacobian false: with highOrderResidual true "
+            << "the residual is still high order, and is solved matrix-free"
+            << exit(FatalError);
+    }
+
+    if (highOrderResidual() && !supportsMaterialInterfaceQuad())
+    {
+        FatalErrorInFunction
+            << "The " << type() << " solid model does not support more "
+            << "than one material with the high-order face quadrature"
+            << exit(FatalError);
+    }
 }
 
 

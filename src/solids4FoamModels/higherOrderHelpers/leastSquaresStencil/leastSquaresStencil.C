@@ -28,7 +28,7 @@ License
 #include "volFields.H"
 #include "Tuple2.H"
 #include "cellZoneInterface.H"
-#include "syncTools.H"
+#include "regionSplit.H"
 #include <cmath>
 
 
@@ -290,202 +290,23 @@ List<vectorField> leastSquaresStencil::remoteCandidatesCellCentres
     const labelList& procToQuery
 ) const
 {
-    const vectorField& C = primitiveField(mesh_.C());
-
-    List<vectorField> remoteCellCentres(Pstream::nProcs());
-
-    forAll(remoteCellCentres, procI)
-    {
-        remoteCellCentres[procI].clear();
-    }
-
-    if (!Pstream::parRun())
-    {
-        return remoteCellCentres;
-    }
-
-#ifdef FOAMEXTEND
-    List<labelList> sendRequests(Pstream::nProcs());
-
-    forAll(procToQuery, i)
-    {
-        const label procI = procToQuery[i];
-        sendRequests[procI] = remoteCandidates[procI];
-    }
-
-    List<labelList> receivedRequests;
-    labelListList requestSizes;
-    Pstream::exchange<labelList, label>
+    return remoteCandidatesValues
     (
-        sendRequests,
-        receivedRequests,
-        requestSizes
+        remoteCandidates,
+        procToQuery,
+        primitiveField(mesh_.C())
     );
-
-    List<vectorField> sendCentres(Pstream::nProcs());
-
-    forAll(receivedRequests, requestingProc)
-    {
-        const labelList& requestedGlobalIDs =
-            receivedRequests[requestingProc];
-        vectorField& centres = sendCentres[requestingProc];
-        centres.setSize(requestedGlobalIDs.size());
-
-        forAll(requestedGlobalIDs, i)
-        {
-            const label globalCellID = requestedGlobalIDs[i];
-            const label localCell = globalCells_.toLocal(globalCellID);
-
-            if (localCell < 0 || localCell >= mesh_.nCells())
-            {
-                FatalErrorInFunction
-                    << "Invalid global->local mapping: globalCellID="
-                    << globalCellID << " localCell=" << localCell
-                    << " on proc " << Pstream::myProcNo()
-                    << abort(FatalError);
-            }
-
-            centres[i] = C[localCell];
-        }
-    }
-
-    labelListList centreSizes;
-    Pstream::exchange<vectorField, vector>
-    (
-        sendCentres,
-        remoteCellCentres,
-        centreSizes
-    );
-
-    forAll(remoteCandidates, procI)
-    {
-        if (remoteCellCentres[procI].size() != remoteCandidates[procI].size())
-        {
-            FatalErrorInFunction
-                << "Centres reply size mismatch from proc " << procI
-                << ": got " << remoteCellCentres[procI].size()
-                << " expected " << remoteCandidates[procI].size()
-                << abort(FatalError);
-        }
-    }
-#else
-    PstreamBuffers reqBufs(Pstream::commsTypes::nonBlocking);
-
-    // Phase 1: send cell global IDs to each processor in contact
-    forAll(procToQuery, i)
-    {
-        const label procI = procToQuery[i];
-
-        if (!remoteCandidates[procI].empty())
-        {
-            UOPstream os(procI, reqBufs);
-            os << remoteCandidates[procI];
-        }
-    }
-
-    reqBufs.finishedSends();
-
-    // Phase 2: respond with cell centre coordinates
-    PstreamBuffers repBufs(Pstream::commsTypes::nonBlocking);
-
-    forAll (procToQuery, i)
-    {
-        const label fromProc = procToQuery[i];
-
-        if (fromProc == Pstream::myProcNo())
-        {
-            continue;
-        }
-
-#ifdef OPENFOAM_COM
-        if (!reqBufs.recvDataCount(fromProc))
-        {
-            continue;
-        }
-#endif
-
-        UIPstream is(fromProc, reqBufs);
-
-        labelList processorsCellID;
-        is >> processorsCellID;
-
-        vectorField centres(processorsCellID.size());
-
-        forAll(processorsCellID, i)
-        {
-            const label globalCellID = processorsCellID[i];
-
-            const label localCell = globalCells_.toLocal(globalCellID);
-
-            if (localCell < 0 || localCell >= mesh_.nCells())
-            {
-                FatalErrorInFunction
-                    << "Invalid global->local mapping: globaCellID="
-                    << globalCellID << " localCell=" << localCell
-                    << " on proc " << Pstream::myProcNo() << nl
-                    << exit(FatalError);
-            }
-
-            centres[i] = C[localCell];
-         }
-
-         UOPstream os(fromProc, repBufs);
-         os << centres;
-    }
-
-    repBufs.finishedSends();
-
-    // Phase 3: send back populated cell centres lists
-
-    forAll(procToQuery, i)
-    {
-        const label p = procToQuery[i];
-
-        if (remoteCandidates[p].empty())
-        {
-            continue;
-        }
-
-#ifdef OPENFOAM_COM
-        if (!repBufs.recvDataCount(p))
-        {
-            FatalErrorInFunction
-                << "Did not receive centres from proc " << p << nl
-                << exit(FatalError);
-        }
-#endif
-
-        UIPstream is(p, repBufs);
-
-        vectorField centres;
-        is >> centres;
-
-        if (centres.size() != remoteCandidates[p].size())
-        {
-            FatalErrorInFunction
-                << "Centres reply size mismatch from proc " << p
-                << ": got " << centres.size()
-                << " expected " << remoteCandidates[p].size() << nl
-                << exit(FatalError);
-        }
-
-        remoteCellCentres[p].transfer(centres);
-    }
-#endif
-
-    return remoteCellCentres;
 }
 
 
-void leastSquaresStencil::calcGlobalMaterial() const
+void leastSquaresStencil::calcCellRegion() const
 {
-    // Local material of every cell: all -1 with a single material
-    const labelList localMaterial(cellMaterialID(mesh_));
+    const labelList material(cellMaterialID(mesh_));
 
     bool multiMaterial = false;
-    forAll(localMaterial, cellI)
+    forAll(material, cellI)
     {
-        if (localMaterial[cellI] != -1)
+        if (material[cellI] != -1)
         {
             multiMaterial = true;
             break;
@@ -496,104 +317,20 @@ void leastSquaresStencil::calcGlobalMaterial() const
     if (!multiMaterial)
     {
         // Single material: nothing is filtered, stencils are unchanged
-        globalMaterialPtr_.reset(new labelList());
+        cellRegionPtr_.reset(new labelList());
         return;
     }
 
-    // Every rank holds the material of every cell, in global numbering, so
-    // that remote stencil candidates can be filtered without extra exchanges
-    labelList globalMaterial(globalCells_.size(), -1);
-    forAll(localMaterial, cellI)
-    {
-        globalMaterial[globalCells_.toGlobal(cellI)] = localMaterial[cellI];
-    }
-
-#ifdef OPENFOAM_COM
-    Pstream::listCombineReduce(globalMaterial, maxEqOp<label>());
-#else
-    Pstream::listCombineGather(globalMaterial, maxEqOp<label>());
-    Pstream::listCombineScatter(globalMaterial);
-#endif
-
-    globalMaterialPtr_.reset(new labelList(std::move(globalMaterial)));
-}
-
-
-label leastSquaresStencil::materialOfGlobalCell(const label globalCellID) const
-{
-    if (!globalMaterialPtr_.valid())
-    {
-        calcGlobalMaterial();
-    }
-
-    const labelList& globalMaterial = globalMaterialPtr_();
-
-    return globalMaterial.empty() ? -1 : globalMaterial[globalCellID];
-}
-
-
-void leastSquaresStencil::calcFaceMaterial() const
-{
-    faceMaterialPtr_.reset(new labelList(mesh_.nFaces(), -1));
-    labelList& faceMaterial = autoPtrRef(faceMaterialPtr_);
-
-    const labelList localMaterial(cellMaterialID(mesh_));
-
-    bool multiMaterial = false;
-    forAll(localMaterial, cellI)
-    {
-        if (localMaterial[cellI] != -1)
-        {
-            multiMaterial = true;
-            break;
-        }
-    }
-    reduce(multiMaterial, orOp<bool>());
-
-    if (!multiMaterial)
-    {
-        return;
-    }
-
-    const labelUList& own = mesh_.faceOwner();
-
-    // Internal faces: the owner's material. Inside one material that is
-    // the face's material; a face between two materials is reconstructed
-    // from each side separately - from the owner's material here, and from
-    // the neighbour's in interfaceNeighbourFacesStencil - so that no
-    // reconstruction mixes two materials and neither material is preferred
-    for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
-    {
-        faceMaterial[faceI] = localMaterial[own[faceI]];
-    }
-
-    // Boundary faces: the owner's material
-    for (label faceI = mesh_.nInternalFaces(); faceI < mesh_.nFaces(); ++faceI)
-    {
-        faceMaterial[faceI] = localMaterial[own[faceI]];
-    }
-
-    // A material interface on a processor boundary would be reconstructed
-    // from a different material on each side; refuse it
-    labelList neiMaterial;
-    syncTools::swapBoundaryCellList(mesh_, localMaterial, neiMaterial);
+    // A material interface on a processor boundary would need each side's
+    // reconstruction on the other processor; refuse it
+    const List<boolList> coupledInterface(cellZoneInterfaceCoupled(mesh_));
 
     label nCoupledInterfaces = 0;
-    forAll(mesh_.boundaryMesh(), patchI)
+    forAll(coupledInterface, patchI)
     {
-        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
-
-        if (!pp.coupled())
+        forAll(coupledInterface[patchI], i)
         {
-            continue;
-        }
-
-        forAll(pp, i)
-        {
-            const label faceI = pp.start() + i;
-            const label bFaceI = faceI - mesh_.nInternalFaces();
-
-            if (neiMaterial[bFaceI] != localMaterial[own[faceI]])
+            if (coupledInterface[patchI][i])
             {
                 ++nCoupledInterfaces;
             }
@@ -612,7 +349,123 @@ void leastSquaresStencil::calcFaceMaterial() const
             << " the cells on both sides of each interface share a processor."
             << exit(FatalError);
     }
+
+    // The connected regions of each material: cells are connected through
+    // every face but those between two materials, which are all internal
+    boolList blockedFace(mesh_.nFaces(), false);
+    const labelUList& own = mesh_.faceOwner();
+    const labelUList& nei = mesh_.faceNeighbour();
+
+    for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
+    {
+        blockedFace[faceI] = (material[own[faceI]] != material[nei[faceI]]);
+    }
+
+    const regionSplit regions(mesh_, blockedFace);
+
+    cellRegionPtr_.reset(new labelList(regions));
 }
+
+
+const labelList& leastSquaresStencil::cellRegion() const
+{
+    if (!cellRegionPtr_.valid())
+    {
+        calcCellRegion();
+    }
+
+    return cellRegionPtr_();
+}
+
+
+void leastSquaresStencil::calcRemoteRegions
+(
+    const List<labelList>& remoteCells,
+    const labelList& procToQuery
+) const
+{
+    remoteRegionPtr_.reset(new Map<label>());
+
+    // Collective: every rank takes this branch, or none does
+    if (cellRegion().empty())
+    {
+        return;
+    }
+
+    const List<Field<label>> regions =
+        remoteCandidatesValues(remoteCells, procToQuery, cellRegion());
+
+    Map<label>& remoteRegion = autoPtrRef(remoteRegionPtr_);
+
+    forAll(remoteCells, procI)
+    {
+        forAll(remoteCells[procI], i)
+        {
+            remoteRegion.set(remoteCells[procI][i], regions[procI][i]);
+        }
+    }
+}
+
+
+label leastSquaresStencil::regionOfGlobalCell(const label globalCellID) const
+{
+    const labelList& region = cellRegion();
+
+    if (region.empty())
+    {
+        return -1;
+    }
+
+    if (globalCells_.isLocal(globalCellID))
+    {
+        return region[globalCells_.toLocal(globalCellID)];
+    }
+
+    if (remoteRegionPtr_.valid())
+    {
+        const Map<label>& remoteRegion = remoteRegionPtr_();
+        const Map<label>::const_iterator iter =
+            remoteRegion.find(globalCellID);
+
+        if (iter != remoteRegion.end())
+        {
+            return iter();
+        }
+    }
+
+    FatalErrorInFunction
+        << "No material region for remote cell " << globalCellID
+        << abort(FatalError);
+
+    return -1;
+}
+
+
+void leastSquaresStencil::calcFaceRegion() const
+{
+    faceRegionPtr_.reset(new labelList(mesh_.nFaces(), -1));
+    labelList& faceRegion = autoPtrRef(faceRegionPtr_);
+
+    const labelList& region = cellRegion();
+
+    if (region.empty())
+    {
+        return;
+    }
+
+    // Every face: its owner's region. Inside one material that is the face's
+    // region; a face between two materials is reconstructed from each side
+    // separately - from the owner's region here, and from the neighbour's in
+    // interfaceNeighbourFacesStencil - so that no reconstruction mixes two
+    // materials and neither material is preferred
+    const labelUList& own = mesh_.faceOwner();
+
+    forAll(faceRegion, faceI)
+    {
+        faceRegion[faceI] = region[own[faceI]];
+    }
+}
+
 
 void  leastSquaresStencil::calcProcessorCells() const
 {
@@ -643,7 +496,7 @@ labelList leastSquaresStencil::buildFacesStencil
     const scalar relTol,
     const scalar overSampleFactor,
     const scalar searchExpansionFactor,
-    const label stencilMaterialIn
+    const label stencilRegionIn
 ) const
 {
     // When this number of cell is reached, layer approach stops
@@ -663,22 +516,21 @@ labelList leastSquaresStencil::buildFacesStencil
     labelHashSet currentLayer;
     labelHashSet nextLayer;
 
-    // With more than one material only cells of the face's material enter
-    // the stencil (-1: single material, no filtering)
-    if (!faceMaterialPtr_.valid())
+    // With more than one material only cells of the face's material region
+    // enter the stencil (-1: single material, no filtering)
+    if (!faceRegionPtr_.valid())
     {
-        calcFaceMaterial();
+        calcFaceRegion();
     }
-    const label stencilMaterial =
-        stencilMaterialIn >= 0
-      ? stencilMaterialIn
-      : faceMaterialPtr_()[faceI];
+    const label stencilRegion =
+        stencilRegionIn >= 0
+      ? stencilRegionIn
+      : faceRegionPtr_()[faceI];
     const auto sameMaterial = [&](const label localCellID)
     {
         return
-            stencilMaterial == -1
-         || materialOfGlobalCell(globalCells_.toGlobal(localCellID))
-         == stencilMaterial;
+            stencilRegion == -1
+         || cellRegion()[localCellID] == stencilRegion;
     };
 
     const label ownerCell = mesh_.faceOwner()[faceI];
@@ -866,8 +718,8 @@ labelList leastSquaresStencil::buildFacesStencil
         {
             if
             (
-                stencilMaterial != -1
-             && materialOfGlobalCell(procCells[i]) != stencilMaterial
+                stencilRegion != -1
+             && regionOfGlobalCell(procCells[i]) != stencilRegion
             )
             {
                 continue;
@@ -921,8 +773,8 @@ labelList leastSquaresStencil::buildFacesStencil
             {
                 if
                 (
-                    stencilMaterial != -1
-                 && materialOfGlobalCell(procCells[i]) != stencilMaterial
+                    stencilRegion != -1
+                 && regionOfGlobalCell(procCells[i]) != stencilRegion
                 )
                 {
                     continue;
@@ -1145,6 +997,9 @@ void leastSquaresStencil::calcFacesStencil() const
     List<vectorField> remoteCellsCentres =
         remoteCandidatesCellCentres(remoteCells, procToQuery);
 
+    // With more than one material, the candidates' material regions
+    calcRemoteRegions(remoteCells, procToQuery);
+
     // Build face stencils using local and remote cells
     List<labelList> facesStencil(mesh_.nFaces());
     forAll(facesStencil, faceI)
@@ -1192,16 +1047,18 @@ void leastSquaresStencil::calcFacesStencil() const
     // The neighbour side of the faces between two materials, built here so
     // that their remote cells are kept by filterUnusedCandidates below
     List<labelList> interfaceNeighbourStencil(mesh_.nFaces());
+
+    if (cellRegion().size())
     {
-        const labelList localMaterial(cellMaterialID(mesh_));
+        const labelList& region = cellRegion();
         const labelUList& own = mesh_.faceOwner();
         const labelUList& nei = mesh_.faceNeighbour();
 
         for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
         {
-            const label neiMat = localMaterial[nei[faceI]];
+            const label neiRegion = region[nei[faceI]];
 
-            if (neiMat != localMaterial[own[faceI]])
+            if (neiRegion != region[own[faceI]])
             {
                 interfaceNeighbourStencil[faceI] =
                     buildFacesStencil
@@ -1212,7 +1069,7 @@ void leastSquaresStencil::calcFacesStencil() const
                         1e-8,
                         1.5,
                         1.3,
-                        neiMat
+                        neiRegion
                     );
             }
         }
@@ -1290,8 +1147,8 @@ void leastSquaresStencil::calcCellsStencil(const scalar relTol) const
                 // interface belongs to one side only; keep this cell's own
                 if
                 (
-                    materialOfGlobalCell(faceStencil[j])
-                 == materialOfGlobalCell(globalCells_.toGlobal(cellI))
+                    regionOfGlobalCell(faceStencil[j])
+                 == regionOfGlobalCell(globalCells_.toGlobal(cellI))
                 )
                 {
                     candidates.insert(faceStencil[j]);
@@ -1480,7 +1337,7 @@ const CompactListList<label>& leastSquaresStencil::facesStencil() const
 {
     if (facesStencilPtr_.empty())
     {
-         calcFacesStencil();
+        calcFacesStencil();
     }
 
     return autoPtrRef(facesStencilPtr_);
@@ -1492,7 +1349,7 @@ leastSquaresStencil::interfaceNeighbourFacesStencil() const
 {
     if (interfaceNeighbourFacesStencilPtr_.empty())
     {
-         calcFacesStencil();
+        calcFacesStencil();
     }
 
     return autoPtrRef(interfaceNeighbourFacesStencilPtr_);
@@ -1504,7 +1361,7 @@ const CompactListList<label>& leastSquaresStencil::cellsStencil() const
     // Cells stencils are constructed from faces stencils
     if (facesStencilPtr_.empty())
     {
-         calcFacesStencil();
+        calcFacesStencil();
     }
 
     if (cellsStencilPtr_.empty())
@@ -1520,7 +1377,7 @@ const List<labelList>& leastSquaresStencil::remoteCellsPerProc() const
 {
     if (remoteCellsPerProcPtr_.empty())
     {
-         calcFacesStencil();
+        calcFacesStencil();
     }
 
     return autoPtrRef(remoteCellsPerProcPtr_);
@@ -1648,8 +1505,9 @@ void leastSquaresStencil::clear() const
     procCellsPtr_.clear();
     remoteCentresMapPtr_.clear();
     remoteCellLocationPtr_.clear();
-    globalMaterialPtr_.clear();
-    faceMaterialPtr_.clear();
+    cellRegionPtr_.clear();
+    remoteRegionPtr_.clear();
+    faceRegionPtr_.clear();
     interfaceNeighbourFacesStencilPtr_.clear();
 }
 

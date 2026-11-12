@@ -1019,6 +1019,8 @@ label linGeomTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     if (highOrderJacobian())
     {
+        checkHighOrderMaterials();
+
         return hofvm::initialiseJacobian
         (
             jac,

@@ -541,6 +541,11 @@ protected:
             //  material?
             bool materialInterfaceQuad() const;
 
+            //- Refuse what is not supported with more than one material: the
+            //  high-order Jacobian, and the high-order face quadrature in a
+            //  model that does not evaluate both sides of the interfaces
+            void checkHighOrderMaterials() const;
+
             //- Does this solid model evaluate the neighbour side of the
             //  material interfaces? A model that does not is refused more
             //  than one material with the high-order face quadrature

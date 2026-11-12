@@ -151,6 +151,15 @@ class nonLinGeomTotalLagTotalDispSolid
         mutable autoPtr<CompactListList<scalar>> JQuadPtr_;
         mutable autoPtr<CompactListList<scalar>> JQuad0Ptr_;
 
+        //- The same kinematics on the neighbour side of the material
+        //  interfaces, with more than one material (see solidModel)
+        mutable autoPtr<CompactListList<tensor>> FQuadNeiPtr_;
+        mutable autoPtr<CompactListList<tensor>> FQuadNei0Ptr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadNeiPtr_;
+        mutable autoPtr<CompactListList<tensor>> FinvQuadNei0Ptr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadNeiPtr_;
+        mutable autoPtr<CompactListList<scalar>> JQuadNei0Ptr_;
+
         //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
 

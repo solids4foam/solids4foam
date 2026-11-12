@@ -1063,6 +1063,8 @@ label nonLinGeomUpdatedLagSolid::initialiseJacobian(Mat& jac)
         // where the stencils are unchanged by construction; a case with
         // sufficient mesh deformation to re-order a stencil would require the
         // Jacobian to be re-created after mesh motion
+        checkHighOrderMaterials();
+
         return hofvm::initialiseJacobian
         (
             jac,

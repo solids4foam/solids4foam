@@ -809,28 +809,24 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
     // by the face neighbour's law with its own kinematics
     if (materialInterfaceQuad())
     {
-        autoPtr<CompactListList<tensor>> FPtr;
-        autoPtr<CompactListList<tensor>> FinvPtr;
-        autoPtr<CompactListList<scalar>> JPtr;
-        autoPtr<CompactListList<tensor>> F0Ptr;
-        autoPtr<CompactListList<tensor>> Finv0Ptr;
-        autoPtr<CompactListList<scalar>> J0Ptr;
+        quadDeformationGradient(gradDQuadNei(), FQuadNeiPtr_);
+        quadInverseAndJacobian(FQuadNeiPtr_(), FinvQuadNeiPtr_, JQuadNeiPtr_);
 
-        quadDeformationGradient(gradDQuadNei(), FPtr);
-        quadInverseAndJacobian(FPtr(), FinvPtr, JPtr);
-
-        quadDeformationGradient(gradDQuadNei0(), F0Ptr);
-        quadInverseAndJacobian(F0Ptr(), Finv0Ptr, J0Ptr);
+        quadDeformationGradient(gradDQuadNei0(), FQuadNei0Ptr_);
+        quadInverseAndJacobian
+        (
+            FQuadNei0Ptr_(), FinvQuadNei0Ptr_, JQuadNei0Ptr_
+        );
 
         mechanicalManager().updateStressFiniteStrain
         (
             interfaceNeighbourTopology(),
-            FPtr().m(),
-            F0Ptr().m(),
-            FinvPtr().m(),
-            Finv0Ptr().m(),
-            JPtr().m(),
-            J0Ptr().m(),
+            FQuadNeiPtr_().m(),
+            FQuadNei0Ptr_().m(),
+            FinvQuadNeiPtr_().m(),
+            FinvQuadNei0Ptr_().m(),
+            JQuadNeiPtr_().m(),
+            JQuadNei0Ptr_().m(),
             mesh().time().deltaTValue(),
             sigmaQuadNei().m()
         );
@@ -1264,6 +1260,8 @@ label nonLinGeomTotalLagTotalDispSolid::initialiseJacobian(Mat& jac)
 {
     if (highOrderJacobian())
     {
+        checkHighOrderMaterials();
+
         return hofvm::initialiseJacobian
         (
             jac,

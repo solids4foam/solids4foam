@@ -77,7 +77,13 @@ inline bool mechanicalConstitutiveLawHeaderIsA(IOobject& io)
 //  to rounding, and exactly so for two cells.
 //
 //  Every type is treated alike. A direction, such as a fibre, is
-//  therefore interpolated too, and a law reading one normalises it
+//  therefore interpolated too, and a law reading one normalises it.
+//
+//  With materialSided, for data that belongs to a material, such as a
+//  prescribed fibre direction, a point on a face between a cell of this law
+//  and a cell of another takes this law's cell value rather than a blend of
+//  the two materials'. Without it, for a field continuous across materials,
+//  such as a temperature, it takes the interpolated face value
 template<class Type>
 inline void gatherToIntegrationPoints
 (
@@ -86,7 +92,8 @@ inline void gatherToIntegrationPoints
     const GeometricField<Type, fvPatchField, volMesh>& src,
     const integrationPointTopology& topo,
     const labelList& ipIDs,
-    Field<Type>& fld
+    Field<Type>& fld,
+    const bool materialSided = false
 )
 {
     // The face each point lies on, or -1 for a point that lies in a cell
@@ -159,6 +166,18 @@ inline void gatherToIntegrationPoints
         linearInterpolate(src)
     );
 
+    // Whether each cell is one of this law's, for materialSided
+    boolList lawCell;
+
+    if (materialSided)
+    {
+        lawCell.setSize(mesh.nCells(), false);
+        forAll(lawCells, i)
+        {
+            lawCell[lawCells[i]] = true;
+        }
+    }
+
     forAll(ipIDs, localI)
     {
         const label faceI = ipFace[localI];
@@ -170,7 +189,19 @@ inline void gatherToIntegrationPoints
 
         if (faceI < nInternal)
         {
-            fld[localI] = srcf[faceI];
+            const label ownCellI = mesh.faceOwner()[faceI];
+            const label neiCellI = mesh.faceNeighbour()[faceI];
+
+            if (materialSided && lawCell[ownCellI] != lawCell[neiCellI])
+            {
+                // A face between this law's material and another
+                fld[localI] = src[lawCell[ownCellI] ? ownCellI : neiCellI];
+            }
+            else
+            {
+                fld[localI] = srcf[faceI];
+            }
+
             continue;
         }
 
