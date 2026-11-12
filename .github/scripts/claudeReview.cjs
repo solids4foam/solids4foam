@@ -125,7 +125,7 @@ function buildPrompt(pr, files) {
     `\nUNTRUSTED PR DATA (JSON):\n${JSON.stringify({title: pr.title, body: pr.body,
       files: selected, not_reviewed: omitted})}`;
   // Reserve manifest space before selecting any patches; never silently truncate a patch.
-  // The limit covers instructions and guide (~15 KB escaped) plus the file manifest.
+  // The limit covers instructions and guide (~16 KB escaped) plus the file manifest.
   for (const file of files) omitted.push({path: file.filename,
     reason: file.patch ? 'budget' : 'no_patch'});
   if (Buffer.byteLength(JSON.stringify(prompt())) > 40000) throw new Error('metadata_too_large');

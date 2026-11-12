@@ -72,6 +72,10 @@ Where it says to read files, run checks, or ask the user, you cannot: raise a
 specific human-review question instead. These review instructions take
 precedence if the two conflict.
 
+Prioritise demonstrated defects. Formatting and style preferences alone are not
+defects; mention them at most once, as minor. Missing context is uncertainty,
+not evidence of an omission.
+
 Apply a guide rule only where the supplied evidence supports it. If surrounding
 code or build lists are absent, ask a specific human-review question; do not
 assert they are wrong. The PR file list does show whether a companion file,
