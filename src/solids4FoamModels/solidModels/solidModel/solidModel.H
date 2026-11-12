@@ -535,7 +535,9 @@ protected:
         //  and the result does not depend on the order of the materials. The
         //  two sides are held together by the momentum stabilisation, whose
         //  stiffness on these faces is the series stiffness of the two
-        //  materials (interfaceSeriesStiffness)
+        //  materials (interfaceSeriesStiffness), and whose scale factor on
+        //  these faces is interfaceStabilisationScaleFactor
+        //  (addInterfaceStabilisation)
 
             //- Is the high-order face quadrature used with more than one
             //  material?
@@ -604,6 +606,23 @@ protected:
             (
                 surfaceScalarField& impKf,
                 const volScalarField& impK
+            ) const;
+
+            //- Set the momentum stabilisation on each face between two
+            //  materials to interfaceStabilisationScaleFactor (in
+            //  highOrderCoeffs, default 1) times impKf times the jump between
+            //  the two sides' reconstructions over the cell-centre distance,
+            //  in place of the stabilisation's own scaleFactor. Each side's
+            //  traction depends only on its own material's cells, so this
+            //  penalty is all that couples the two sides. With the small
+            //  scaleFactor used inside a material (e.g. 0.1) the jump is
+            //  barely constrained and the Krylov solver stalls (k-exact);
+            //  with 1, the penalty matches the two-point coupling of the
+            //  approximate Jacobian, impKf/delta, on these faces
+            void addInterfaceStabilisation
+            (
+                surfaceVectorField& traction,
+                const surfaceScalarField& impKf
             ) const;
 
         //- Refuse a multi-material run whose gradient scheme is not

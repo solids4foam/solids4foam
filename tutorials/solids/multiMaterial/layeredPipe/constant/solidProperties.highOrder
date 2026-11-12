@@ -44,6 +44,13 @@ linearGeometryTotalDisplacementCoeffs
         // (that side alone)
         interfaceTractionWeighting average;
 
+        // The two sides of a material interface are held together only by the
+        // momentum stabilisation, which on these faces is scaled by this
+        // factor instead of its own scaleFactor (default 1). A weak penalty,
+        // such as the 0.1 used inside each material, leaves the jump between
+        // the two sides barely constrained, and the Krylov solver stalls
+        interfaceStabilisationScaleFactor 1;
+
         displacement
         {
             // movingLeastSquares or kExactLeastSquares
@@ -59,7 +66,8 @@ linearGeometryTotalDisplacementCoeffs
         }
     }
 
-    // Holds the two sides of each material interface together
+    // Also holds the two sides of each material interface together, with
+    // interfaceStabilisationScaleFactor in place of scaleFactor there
     stabilisation
     {
         momentum

@@ -161,8 +161,11 @@ between the two materials is then evaluated from each side, each side
 reconstructed only from cells of its own material and evaluated by its own
 law, and the face traction is a weighted mean of the two sides' tractions
 (`interfaceTractionWeighting`: `average`, the default, `harmonic`,
-`stiffnessWeighted`, `stiffer` or `softer`). The result does not depend on the
-order in which the materials are listed. With the high-order discretisation,
+`stiffnessWeighted`, `stiffer` or `softer`). The two sides are held together by
+the momentum stabilisation, which on these faces uses
+`interfaceStabilisationScaleFactor` (default 1) in place of its own
+`scaleFactor`: with a weaker penalty the Krylov solver can stall. The result
+does not depend on the order in which the materials are listed. With the high-order discretisation,
 a material interface must not lie on a processor boundary, so the
 `interface` decomposition is refused.
 

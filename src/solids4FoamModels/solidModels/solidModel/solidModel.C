@@ -2990,6 +2990,55 @@ void Foam::solidModel::interfaceSeriesStiffness
 }
 
 
+void Foam::solidModel::addInterfaceStabilisation
+(
+    surfaceVectorField& traction,
+    const surfaceScalarField& impKf
+) const
+{
+    const scalar interfaceScale
+    (
+        highOrderCoeffsDict().lookupOrDefault<scalar>
+        (
+            "interfaceStabilisationScaleFactor", 1.0
+        )
+    );
+    const scalar scale = momentumStabilisation().scaleFactor();
+
+    if (interfaceScale <= 0 || scale <= 0)
+    {
+        FatalIOErrorInFunction(highOrderCoeffsDict())
+            << "With more than one material, the momentum stabilisation is "
+            << "all that holds the two sides of a material interface "
+            << "together, so its scaleFactor (" << scale << ") and "
+            << "interfaceStabilisationScaleFactor (" << interfaceScale
+            << ") must be positive" << exit(FatalIOError);
+    }
+
+    if (mag(interfaceScale - scale) < SMALL*scale)
+    {
+        return;
+    }
+
+    // faceVector holds scale times the jump term: add the difference
+    const scalar extra = interfaceScale/scale - 1.0;
+
+    // The interface faces are those with neighbour-side points
+    const labelList rowSizes(gradDQuadNei().sizes());
+    const vectorField& stabI = momentumStabilisation().faceVector();
+    const scalarField& impKfI = impKf;
+    vectorField& tractionI = primitiveFieldRef(traction);
+
+    for (label faceI = 0; faceI < mesh().nInternalFaces(); ++faceI)
+    {
+        if (rowSizes[faceI] > 0)
+        {
+            tractionI[faceI] += extra*impKfI[faceI]*stabI[faceI];
+        }
+    }
+}
+
+
 void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 {
     if (mechanicalManager().nLaws() < 2)

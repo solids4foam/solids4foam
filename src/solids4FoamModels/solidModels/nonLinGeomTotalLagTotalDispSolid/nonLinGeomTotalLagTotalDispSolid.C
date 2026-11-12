@@ -1504,6 +1504,13 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
     momentumStabilisation().updateVector(D, &gradD());
     traction += impKf_*momentumStabilisation().faceVector();
 
+    // On a material interface, the stronger stabilisation that holds the two
+    // sides together
+    if (materialInterfaceQuad())
+    {
+        addInterfaceStabilisation(traction, impKf_);
+    }
+
     // Calculate the force at the faces
     surfaceVectorField force
     (

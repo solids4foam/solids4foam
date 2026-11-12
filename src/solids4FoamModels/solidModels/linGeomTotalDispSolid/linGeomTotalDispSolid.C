@@ -1217,6 +1217,13 @@ label linGeomTotalDispSolid::formResidual
     momentumStabilisation().updateVector(D, &gradD());
     traction += impKf_*momentumStabilisation().faceVector();
 
+    // On a material interface, the stronger stabilisation that holds the two
+    // sides together
+    if (materialInterfaceQuad())
+    {
+        addInterfaceStabilisation(traction, impKf_);
+    }
+
     // Enforce traction boundary conditions
     enforceTractionBoundaries(traction, D, n);
 

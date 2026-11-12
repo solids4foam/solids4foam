@@ -56,6 +56,9 @@ PARALLEL_REL_MAX=5e-4
 # Listing the materials in the other order must give the same field
 HIGH_ORDER_D_ERR_MAX=1e-4
 HIGH_ORDER_ORDER_REL_MAX=1e-10
+# Krylov iterations of the whole high-order solve: about 20 with the default
+# interface stabilisation, thousands (or a stall) when it is too weak
+HIGH_ORDER_KSP_MAX=200
 
 R1=0.05
 R2=0.07
@@ -615,6 +618,23 @@ run_high_order_arm() {
         ( cd "${d}" && postProcess -func writeCellCentres -latestTime \
             > log.writeCellCentres 2>&1 ) || true
     done
+
+    local nKsp
+    nKsp=$(awk '/Linear solve converged/ {n += $NF} END {print n + 0}' \
+        "${dir}/${SOLVER_LOGFILE}")
+
+    if grep -q "Linear solve did not converge" "${dir}/${SOLVER_LOGFILE}"
+    then
+        echo "FAIL: ${arm}: a linear solve did not converge"
+        failures=$((failures + 1))
+    elif [[ "${nKsp}" -gt 0 && "${nKsp}" -le "${HIGH_ORDER_KSP_MAX}" ]]
+    then
+        echo "PASS: ${arm}: ${nKsp} Krylov iterations in all"
+    else
+        echo "FAIL: ${arm}: ${nKsp} Krylov iterations in all" \
+            "(at most ${HIGH_ORDER_KSP_MAX})"
+        failures=$((failures + 1))
+    fi
 
     local err
     err="$(compute_displacement_err "${dir}")" || err=""
