@@ -1,5 +1,15 @@
 # `kExactLeastSquares`
 
+> **Class layout.** The functions documented below (`calcCellCoeffs`,
+> `calcFaceGradCoeffs`, `cellValueCoeffsAtPoint`, `cellGradCoeffsAtPoint`,
+> `valueAtPoint`, `fGrad`, ...) are implemented in the abstract base
+> `cellLeastSquares`, which builds one polynomial per cell and is shared with
+> the point-value scheme `leastSquares`. `kExactLeastSquares` selects the
+> cell-average representation through `cellAverageUnknowns()`, which switches
+> on the cell moments. The derivation here is written for cell averages; with
+> every positive-order moment set to zero it reduces to `leastSquares`, see
+> [`../leastSquares/README.md`](../leastSquares/README.md).
+
 ## Class principal functions
 
 This document provides explanation of the principal functions documented below

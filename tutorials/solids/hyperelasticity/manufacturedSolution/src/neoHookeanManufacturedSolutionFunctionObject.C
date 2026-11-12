@@ -22,7 +22,6 @@ License
 #include "volFields.H"
 #include "pointFields.H"
 #include "lookupSolidModel.H"
-#include "kExactLeastSquares.H"
 #include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -169,13 +168,13 @@ bool Foam::neoHookeanManufacturedSolutionFunctionObject::writeData()
             aSI[cellI] = mms.cauchyStress(CI[cellI], t);
         }
 
-        // kExactLeastSquares stores cell averages, so its displacement is
-        // compared with the cell average of the exact solution
+        // A scheme that stores cell averages has its displacement compared
+        // with the cell average of the exact solution
         const solidModel& solMod = lookupSolidModel(mesh);
         if
         (
             solMod.highOrderResidual()
-         && isA<kExactLeastSquares>(solMod.displacementLeastSquares())
+         && solMod.displacementLeastSquares().cellAverageUnknowns()
         )
         {
             const fvMeshQuadrature& quadrature =

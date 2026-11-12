@@ -23,7 +23,6 @@ License
 #include "pointFields.H"
 #include "coordinateSystem.H"
 #include "lookupSolidModel.H"
-#include "kExactLeastSquares.H"
 #include "compatibilityFunctions.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
@@ -56,7 +55,7 @@ calculateAnalyticalCellDisplacement
     if (solMod.highOrderResidual())
     {
         useCellAverage =
-            isA<kExactLeastSquares>(solMod.displacementLeastSquares());
+            solMod.displacementLeastSquares().cellAverageUnknowns();
     }
 
     if (useCellAverage)

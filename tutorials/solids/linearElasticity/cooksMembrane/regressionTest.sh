@@ -31,6 +31,7 @@ APPROACHES=(
     petscSnes
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
+    highOrder-leastSquares
 )
 
 # Settings for Test-leastSquaresS4fGrad test
@@ -85,10 +86,10 @@ select_run_approach() {
     local requested="$1"
 
     case "${requested}" in
-        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares|highOrder-leastSquares)
             local least_squares_type="${requested#highOrder-}"
             sed -E -i.bak \
-                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares|leastSquares);/\\1type ${least_squares_type};/" \
                 "${CASE_DIR}/constant/solidProperties.highOrder"
             rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
             RUN_APPROACH=highOrder
@@ -201,7 +202,7 @@ run_high_order_grad_test() {
     fi
 
     sed -E -i.bak \
-        "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\1type ${least_squares_type};/" \
+        "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares|leastSquares);/\1type ${least_squares_type};/" \
         "${CASE_DIR}/constant/solidProperties.highOrder"
     rm -f "${CASE_DIR}/constant/solidProperties.highOrder.bak"
 

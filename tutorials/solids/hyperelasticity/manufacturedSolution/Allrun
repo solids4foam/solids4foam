@@ -13,7 +13,8 @@ mode:       steady (default),
 approach:   segregated (default),
             petscSnes,
             highOrder-movingLeastSquares,
-            highOrder-kExactLeastSquares
+            highOrder-kExactLeastSquares,
+            highOrder-leastSquares
 
 mesh:       hex (default),
             distHex,
@@ -47,7 +48,7 @@ esac
 
 case "$APPROACH" in
     segregated|petscSnes) ;;
-    highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
+    highOrder-movingLeastSquares|highOrder-kExactLeastSquares|highOrder-leastSquares) ;;
     *)
         echo "Error: unknown approach '$APPROACH'"
         usage

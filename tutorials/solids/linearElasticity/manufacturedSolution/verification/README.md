@@ -3,15 +3,16 @@
 This opt-in study is a convergence study. The default sweep
 combines the segregated and PETSc SNES solution procedures with regular
 hexahedral, dual-polyhedral, and distorted-hexahedral meshes. Their tetrahedral
-variants remain available explicitly. Both high-order approaches,
-`highOrder-movingLeastSquares` and `highOrder-kExactLeastSquares`, are included
-on regular hexahedral and tetrahedral meshes with polynomial degrees p=1, p=2,
-and p=3. The JSON `p` entry sets `polynomialOrder` in each copied case. The per-variant
-JSON `stencil_extra_cells` input sets `faceStencilExtraCells`, which both
+variants remain available explicitly. The three high-order approaches,
+`highOrder-movingLeastSquares`, `highOrder-leastSquares` and
+`highOrder-kExactLeastSquares`, are included on regular hexahedral and
+tetrahedral meshes with polynomial degrees p=1, p=2, and p=3. The JSON `p`
+entry sets `polynomialOrder` in each copied case. The per-variant JSON
+`stencil_extra_cells` input sets `faceStencilExtraCells`, which all three
 methods also use for the cell stencil when `cellStencilExtraCells` is absent.
 It defaults to 45 for p=1, 55 for p=2, and 65 for p=3 in the supplied JSON, for
-both reconstruction methods. These correspond to nominal displacement orders 2,
-2 (instead of 3), and 4, respectively; stress involves a derivative,
+all three reconstruction methods. These correspond to nominal displacement
+orders 2, 2 (instead of 3), and 4, respectively; stress involves a derivative,
 with nominal orders 1, 2, and 3. High-order variants require a PETSc-enabled build.
 Variant names include the polynomial degree, for example
 `hex-highOrder-movingLeastSquares-p3`. The `tet-structured` mesh label identifies

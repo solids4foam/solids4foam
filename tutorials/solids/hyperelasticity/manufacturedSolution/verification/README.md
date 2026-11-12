@@ -46,8 +46,9 @@ The default variants, named `<mesh>-<approach>`, combine the `segregated` and
 `petscSnes` approaches with all four mesh types, the regular (`hex`) and
 distorted (`distHex`) hexahedral meshes and the structured (`structTet`) and
 unstructured (`unstructTet`) tetrahedral meshes, and the
-`highOrder-movingLeastSquares` and `highOrder-kExactLeastSquares` approaches
-with the `hex`, `structTet`, and `unstructTet` meshes. The tetrahedral meshes
+`highOrder-movingLeastSquares`, `highOrder-leastSquares` and
+`highOrder-kExactLeastSquares` approaches with the `hex`, `structTet`, and
+`unstructTet` meshes. The tetrahedral meshes
 require Gmsh, and the PETSc SNES and high-order approaches require a
 PETSc-enabled solids4foam build. The structured tetrahedral meshes have six
 cells per hexahedron. The high-order approaches are not combined with the

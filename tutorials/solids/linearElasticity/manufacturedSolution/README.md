@@ -46,6 +46,7 @@ The run script also accepts a solution approach and mesh type:
 ./Allrun petscSnes poly
 ./Allrun highOrder-movingLeastSquares hex
 ./Allrun highOrder-kExactLeastSquares hex
+./Allrun highOrder-leastSquares hex
 ```
 
 The `petscSnes` and high-order approaches require a PETSc-enabled solids4foam
@@ -70,10 +71,11 @@ The source coefficients remain in `constant/fvOptions` on all versions. The
 boundary condition evaluates the analytical displacement at face quadrature
 points.
 
-`movingLeastSquares` stores point values, so displacement errors use the
-analytical solution at cell centres. `kExactLeastSquares` stores cell averages,
-so its displacement errors use the volume-averaged analytical solution.
-Analytical stress is evaluated at cell centres for both approaches.
+`movingLeastSquares` and `leastSquares` store point values, so their
+displacement errors use the analytical solution at cell centres.
+`kExactLeastSquares` stores cell averages, so its displacement errors use the
+volume-averaged analytical solution. Analytical stress is evaluated at cell
+centres for all approaches.
 
 ## Verification and regression
 

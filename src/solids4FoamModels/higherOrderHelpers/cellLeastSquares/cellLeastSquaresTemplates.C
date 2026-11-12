@@ -17,7 +17,7 @@ License
 
 \*---------------------------------------------------------------------------*/
 
-#include "kExactLeastSquares.H"
+#include "cellLeastSquares.H"
 
 namespace Foam
 {
@@ -25,7 +25,7 @@ namespace Foam
 // * * * * * * * * * * *  Private Member Functions * * * * * * * * * * * * * //
 
 template<class Type, class GlobalCells>
-inline Type kExactLeastSquares::fieldValue
+inline Type cellLeastSquares::fieldValue
 (
     const label globalCellID,
     const GlobalCells& globalCells,
@@ -57,7 +57,7 @@ inline Type kExactLeastSquares::fieldValue
 
 
 template<class Type>
-Type kExactLeastSquares::evaluateAtPoint
+Type cellLeastSquares::evaluateAtPoint
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf,
     const label cellID,
@@ -78,16 +78,24 @@ Type kExactLeastSquares::evaluateAtPoint
 
     // Construct all coefficient and moment tables collectively before
     // checking for the negative cell marker used by parallel point evaluation.
+    // Cell moments are only used when the stored values are cell averages.
+    const bool cellAverages = cellAverageUnknowns();
     (void)cellGradCoeffs();
     if (polynomialOrder() >= 2)
     {
         (void)cellSecondGradCoeffs();
-        (void)secondOrderCellMoments();
+        if (cellAverages)
+        {
+            (void)quadrature().secondOrderCellMoments();
+        }
     }
     if (polynomialOrder() >= 3)
     {
         (void)cellThirdGradCoeffs();
-        (void)thirdOrderCellMoments();
+        if (cellAverages)
+        {
+            (void)quadrature().thirdOrderCellMoments();
+        }
     }
 
     const UList<Type>& vfI = vf.internalField();
@@ -125,7 +133,7 @@ Type kExactLeastSquares::evaluateAtPoint
 
 
 template<class Type>
-void kExactLeastSquares::exchangeProcessorPatchField
+void cellLeastSquares::exchangeProcessorPatchField
 (
     const processorFvPatch& procPatch,
     const Field<Type>& sendField,
@@ -146,7 +154,7 @@ void kExactLeastSquares::exchangeProcessorPatchField
 
 
 template<class Type>
-void kExactLeastSquares::fGrad
+void cellLeastSquares::fGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf,
     CompactListList<typename outerProduct<vector, Type>::type>& result
@@ -572,7 +580,7 @@ tmp<GeometricField<
     typename outerProduct<vector, Type>::type,
     fvPatchField,
     volMesh
->> kExactLeastSquares::grad
+>> cellLeastSquares::grad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf
 ) const
@@ -621,7 +629,8 @@ tmp<GeometricField<
         const UList<label>& stencil = stencils[cellI];
         const UList<vector>& coeffs = gradCoeffs[cellI];
 
-        // Neighbour cell-average difference contribution
+        // Neighbour cell-value (average or point value) difference
+        // contribution
         forAll(stencil, cI)
         {
             grad[cellI] +=

@@ -51,8 +51,10 @@ APPROACHES=(
     petscSnesPressure
     highOrder-movingLeastSquares
     highOrder-kExactLeastSquares
+    highOrder-leastSquares
     highOrder-movingLeastSquares-parallel
     highOrder-kExactLeastSquares-parallel
+    highOrder-leastSquares-parallel
     highOrderFourthOrder
 )
 
@@ -156,19 +158,19 @@ run_case() {
     prepare_case "${case_dir}"
 
     case "${requested}" in
-        highOrder-movingLeastSquares|highOrder-kExactLeastSquares)
+        highOrder-movingLeastSquares|highOrder-kExactLeastSquares|highOrder-leastSquares)
             local least_squares_type="${requested#highOrder-}"
             sed -E -i.bak \
-                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares|leastSquares);/\\1type ${least_squares_type};/" \
                 "${case_dir}/constant/solidProperties.highOrder"
             rm -f "${case_dir}/constant/solidProperties.highOrder.bak"
             set -- highOrder "${@:2}"
             ;;
-        highOrder-movingLeastSquares-parallel|highOrder-kExactLeastSquares-parallel)
+        highOrder-movingLeastSquares-parallel|highOrder-kExactLeastSquares-parallel|highOrder-leastSquares-parallel)
             local least_squares_type="${requested#highOrder-}"
             least_squares_type="${least_squares_type%-parallel}"
             sed -E -i.bak \
-                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares);/\\1type ${least_squares_type};/" \
+                -e "s/^([[:space:]]*)type[[:space:]]+(movingLeastSquares|kExactLeastSquares|leastSquares);/\\1type ${least_squares_type};/" \
                 -e "s/^([[:space:]]*)highOrderJacobian[[:space:]]+(true|false);/\\1highOrderJacobian false;/" \
                 "${case_dir}/constant/solidProperties.highOrder"
             rm -f "${case_dir}/constant/solidProperties.highOrder.bak"

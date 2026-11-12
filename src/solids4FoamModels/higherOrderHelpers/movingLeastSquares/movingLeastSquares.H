@@ -316,6 +316,12 @@ private:
             return polynomialOrder_;
         };
 
+        //- The stored cell values are point values at the cell centres
+        virtual bool cellAverageUnknowns() const
+        {
+            return false;
+        }
+
         //- Const access to the weight function
         const weightFunction& weightFunc() const
         {

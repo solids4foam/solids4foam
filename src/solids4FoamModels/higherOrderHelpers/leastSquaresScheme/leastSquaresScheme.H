@@ -214,6 +214,10 @@ public:
         //- Return polynomial order of the reconstruction
         virtual label polynomialOrder() const = 0;
 
+        //- True when the stored cell values are cell averages, false when
+        //  they are point values at the cell centres
+        virtual bool cellAverageUnknowns() const = 0;
+
         //- Return quadrature data
         virtual const fvMeshQuadrature& quadrature() const = 0;
 

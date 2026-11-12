@@ -103,17 +103,8 @@ calculateAnalyticalCellDisplacement
 
     if (solMod.highOrderResidual())
     {
-        const dictionary& displacementDict =
-            solMod.solidModelDict()
-           .subDict("highOrderCoeffs")
-           .subDict("displacement");
-
         useCellAverage =
-            displacementDict.lookupOrDefault<word>
-            (
-                "type",
-                "movingLeastSquares"
-            ) == "kExactLeastSquares";
+            solMod.displacementLeastSquares().cellAverageUnknowns();
     }
 
     const vectorField& cellCentres = mesh.C().internalField();
