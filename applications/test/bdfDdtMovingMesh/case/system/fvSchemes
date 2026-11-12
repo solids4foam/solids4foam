@@ -1,0 +1,19 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// The test app constructs the BDF schemes itself; these are for fvc::div
+ddtSchemes      { default Euler; }
+gradSchemes     { default Gauss linear; }
+divSchemes      { default Gauss linear; }
+laplacianSchemes { default Gauss linear corrected; }
+interpolationSchemes { default linear; }
+snGradSchemes   { default corrected; }
+
+// ************************************************************************* //
