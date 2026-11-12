@@ -221,7 +221,21 @@ test('reruns update only the workflow bot report', async () => {
   assert.equal(f.comments[0].comment_id, 2);
   assert.match(f.comments[0].body, /Requested API model: claude/);
   assert.match(f.comments[0].body, /effort: high/);
-  assert.match(f.comments[0].body, /two-reviewer MEDIUM\/HIGH policy is not implemented/);
+  // LOW: one AI review is the policy, so no second-review request.
+  assert.ok(!f.comments[0].body.includes('Second independent AI review'));
+});
+
+test('MEDIUM/HIGH and failed reports ask a maintainer for the second review', async () => {
+  for (const [extra, risk] of [[{REVIEW_JSON: response('MEDIUM')}, 'MEDIUM'],
+    [{RISK_FLOOR: 'HIGH'}, 'HIGH'], [{REVIEW_RESULT: 'failure'}, 'HIGH']]) {
+    const f = fixture();
+    await publish(f, env(extra));
+    const body = f.comments[0].body;
+    assert.match(body, new RegExp(`Required for ${risk} risk, but not yet automated`));
+    assert.match(body, /`node \.github\/scripts\/secondReview\.cjs 42 --post`/);
+    assert.match(body, /- \[ \] Second independent AI review posted \(core maintainer\)/);
+    assert.match(body, /does not meet the two-reviewer policy/);
+  }
 });
 
 test('spoofed markers cannot replace human comments or unrelated reports', async () => {

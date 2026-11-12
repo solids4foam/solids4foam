@@ -45,8 +45,8 @@ you bring into a human review.
 For another AI assessment, ask a maintainer to re-run the structured workflow,
 or agree a specific unresolved concern to investigate. State its scope and
 report only new evidence or unresolved findings. No new comment-command system
-is introduced. Broader multi-model reviews belong in the coordinated extension
-below, with one consolidated report rather than competing bot comments.
+is introduced. The only planned additional AI review is the second
+independent review for MEDIUM/HIGH risk, described below.
 
 ## Risk and future approval policy
 
@@ -62,9 +62,35 @@ The intended one/both policy refers to the two current core maintainers. Role
 membership must be verified before any future enforcement is introduced. This
 version changes no branch protection, approval rules, or permissions.
 
-The current pilot uses one strong reviewer at every risk level. See the [model
+The workflow runs one strong reviewer at every risk level. See the [model
 policy](model-policy.md) for the planned risk-dependent reviewers, verified API
 options, independence rules, and consolidation safeguards.
+
+## Second independent AI review (interim, manual)
+
+MEDIUM and HIGH PRs need a second AI review from a different model family.
+Until that is automated, the Claude report for such a PR (and any failed run)
+asks for it and adds a checklist item. A core maintainer then runs, from an
+up-to-date `development` checkout:
+
+```bash
+node .github/scripts/secondReview.cjs <PR number> --post
+```
+
+The script builds exactly the prompt CI would build: the instructions, skill
+and `CHANGELOG.md` are fetched from the PR's base branch on GitHub, not from
+the local tree, and the PR is untrusted data. Codex (`gpt-6-astra`, `xhigh`
+effort) reviews it without seeing the Claude report or any PR comment, so
+agreement between the two is independent. The result is validated and escaped
+like the CI report and posted as one separate comment per maintainer; a rerun
+updates it. Without `--post`, it only writes the report locally.
+
+Because the PR text is untrusted, Codex runs without tools: shell, code
+execution, apps, plugins, browser, image, agent and web tools are disabled,
+inside a read-only sandbox in an empty temporary directory, with no user
+config, MCP servers or rules. Recheck the disabled feature list in the script
+when Codex is upgraded. It needs `gh` (authenticated) and a Codex login with
+access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
 
 ## Setup
 

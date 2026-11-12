@@ -116,8 +116,9 @@ architectural understanding, and sound technical judgement. Core maintainers
 discuss that responsibility with the contributor; review counts do not grant it.
 
 When enabled, the standard Claude report is an initial, advisory assessment.
-Check its commit SHA and verify its findings. It does not replace human
-judgement or numerical verification. See the
+Check its commit SHA and verify its findings. For MEDIUM and HIGH risk, a core
+maintainer also posts a second, independent AI review from a different model.
+Neither replaces human judgement or numerical verification. See the
 [review guide](.github/review/README.md) for risk levels, reviewer development,
 and workflow setup.
 

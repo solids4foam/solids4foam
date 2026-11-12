@@ -6,7 +6,15 @@ One Anthropic reviewer runs for every eligible PR, irrespective of risk. The
 workflow selects `claude-opus-5-5` with explicit `high` effort. Reports show the
 requested API model and effort. This meets the intended single-reviewer model
 selection; numerical review quality still needs evaluation on real PRs.
-The MEDIUM/HIGH two-reviewer target below is **not implemented**.
+
+The MEDIUM/HIGH two-reviewer target below is **not automated**. As an interim
+step, MEDIUM/HIGH and failed reports ask a core maintainer to run
+`.github/scripts/secondReview.cjs`. It sends the same prompt to Codex
+(`gpt-6-astra`, `xhigh`) without the first report and posts a separate,
+validated comment. Two separate comments are not yet one consolidated report;
+the [README](README.md#second-independent-ai-review-interim-manual) gives
+details. These manual pairs will show how often the reviewers agree and differ,
+which informs the automated extension below.
 
 Classification, execution, presentation, and merge decisions are separate:
 
@@ -59,7 +67,12 @@ The next extension should:
    surviving review as satisfying the two-reviewer target. Test preservation of
    significant findings and disagreements before enabling synthesis.
 
-This PR defers the second API integration, ahead-of-review classification,
+A natural first automated step is a deterministic publisher that lists both
+reviewers' findings in one comment, grouped by file and line and tagged by
+source, with no synthesis model. Duplicates then sit side by side and nothing
+can be dropped.
+
+This PR defers the automated second API integration, ahead-of-review classification,
 original-result artifacts, and multi-model consolidation. They require another
 credential/billing setup, schema and retention decisions, and failure tests.
 These are planned extensions, not hidden optional paths in the pilot.

@@ -101,21 +101,45 @@ function formatAssessment(data, risk, floor) {
     'Use this standard AI report; core maintainers decide approval and merging.';
 }
 
+// MEDIUM/HIGH need a second, independent AI review (model-policy.md). Until it
+// is automated, the report asks a core maintainer to run it locally.
+function secondReviewNotice(risk, number) {
+  if (risk === 'LOW') return '';
+  return '\n\n### Second independent AI review\n\n' +
+    `Required for ${risk === 'MEDIUM' ? 'MEDIUM' : 'HIGH'} risk, but not yet automated. ` +
+    'A core maintainer runs it locally from an up-to-date `development` checkout with ' +
+    `\`node .github/scripts/secondReview.cjs ${number} --post\`. It gives Codex ` +
+    '(gpt-6-astra) the same instructions, repository guide and patches, without this ' +
+    'report or any PR comment, and posts its result as a separate comment. This report ' +
+    'alone does not meet the two-reviewer policy.\n\n' +
+    '- [ ] Second independent AI review posted (core maintainer)';
+}
+function formatCoverage(coverage) {
+  return `**Patch coverage: ${coverage.status.toUpperCase()}** ` +
+    '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n' +
+    (coverage.omitted.length ? 'Not reviewed:\n' + coverage.omitted.map(item =>
+      `- ${plain(item.path)} (${item.reason === 'no_patch' ? 'no patch available' : 'prompt budget'})`)
+      .join('\n') + '\n\n' : '');
+}
+
 // The agent skill shared by all solids4foam agents, read from the trusted base
-// checkout on every run (never copied), so the reviewer knows the same rules.
+// branch on every run (never copied), so the reviewer knows the same rules.
+// `read` defaults to the trusted checkout; the local second review passes a
+// reader that fetches the same files from the PR's base branch on GitHub.
 const skillPath = '.agents/skills/solids4foam/SKILL.md';
-function repositoryGuide() {
-  const skill = fs.readFileSync(skillPath, 'utf8').replace(/^---\n[\s\S]*?\n---\n+/, '');
-  const release = fs.readFileSync('CHANGELOG.md', 'utf8').match(/^## \[(v[^\]]+)\]/m);
+const readCheckout = path => fs.readFileSync(path, 'utf8');
+function repositoryGuide(read = readCheckout) {
+  const skill = read(skillPath).replace(/^---\n[\s\S]*?\n---\n+/, '');
+  const release = read('CHANGELOG.md').match(/^## \[(v[^\]]+)\]/m);
   return `## Repository guide (trusted, from \`${skillPath}\` on the base branch)\n\n` +
     (release ? `Latest released version in CHANGELOG.md: ${release[1]}\n\n` : '') +
     skill.trim();
 }
 
 // Budget the JSON-escaped *whole prompt*, leaving room for ALL_INPUTS and schema.
-function buildPrompt(pr, files) {
-  const instructions = fs.readFileSync('.github/review/instructions.md', 'utf8');
-  const guide = repositoryGuide();
+function buildPrompt(pr, files, read = readCheckout) {
+  const instructions = read('.github/review/instructions.md');
+  const guide = repositoryGuide(read);
   const selected = [], omitted = [];
   const priority = file => file.filename.startsWith('src/') ? 0 :
     file.filename.startsWith('applications/') ? 1 :
@@ -185,8 +209,7 @@ async function publish({github, context, core}, env = process.env) {
     '**Applies only if this SHA matches the current PR head.**\n\n' +
     `[Workflow run](${run}) · Attempt ${env.GITHUB_RUN_ATTEMPT || '1'}\n\n` +
     `Requested API model: ${plain(env.CLAUDE_REVIEW_MODEL || 'unspecified')}; ` +
-    `effort: ${plain(env.CLAUDE_REVIEW_EFFORT || 'unspecified')}.\n\n` +
-    'Pilot: one AI reviewer. The planned two-reviewer MEDIUM/HIGH policy is not implemented.\n\n';
+    `effort: ${plain(env.CLAUDE_REVIEW_EFFORT || 'unspecified')}.\n\n`;
   let body, coverage;
   let failed = false;
   try {
@@ -195,11 +218,9 @@ async function publish({github, context, core}, env = process.env) {
     coverage = JSON.parse(env.REVIEW_COVERAGE);
     if (!['complete', 'partial'].includes(coverage.status) || !Array.isArray(coverage.omitted) ||
         Buffer.byteLength(env.REVIEW_COVERAGE) > 30000) throw new Error('Invalid coverage');
-    body = heading + `**Patch coverage: ${coverage.status.toUpperCase()}** ` +
-      '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n' +
-      (coverage.omitted.length ? 'Not reviewed:\n' + coverage.omitted.map(item =>
-        `- ${plain(item.path)} (${item.reason === 'no_patch' ? 'no patch available' : 'prompt budget'})`).join('\n') + '\n\n' : '') +
-      formatAssessment(data, classifyRisk(data.risk, env.RISK_FLOOR), env.RISK_FLOOR);
+    const risk = classifyRisk(data.risk, env.RISK_FLOOR);
+    body = heading + formatCoverage(coverage) + formatAssessment(data, risk, env.RISK_FLOOR) +
+      secondReviewNotice(risk, pr.number);
     if (body.length > 60000) throw new Error('Report too large');
   } catch {
     failed = true;
@@ -208,7 +229,8 @@ async function publish({github, context, core}, env = process.env) {
     const reason = known.includes(env.COLLECTION_REASON) ? env.COLLECTION_REASON : 'execution_or_report_failed';
     body = heading + '**Status: INCOMPLETE — no successful AI review.**\n\n' +
       '**Risk: HIGH (conservative fallback; classification unassessed).**\n\n' +
-      `Reason: ${reason}. Human review is required. See the workflow run for details.`;
+      `Reason: ${reason}. Human review is required. See the workflow run for details.` +
+      secondReviewNotice('HIGH', pr.number);
   }
   // One sticky conversation comment, never an approval or merge API call.
   const marker = '<!-- solids4foam-ai-review -->';
@@ -223,4 +245,4 @@ async function publish({github, context, core}, env = process.env) {
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
 module.exports = {schema, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
-  formatAssessment, plain, prepare, publish};
+  formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};
