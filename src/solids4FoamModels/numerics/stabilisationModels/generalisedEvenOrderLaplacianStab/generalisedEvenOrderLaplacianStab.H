@@ -56,8 +56,8 @@ class generalisedEvenOrderLaplacianStab
         //- Scale factor used for globally scaling the amount of stabilisation
         const scalar scaleFactor_;
 
-        //- Laplacian power: 0 == laplacianStab, 1 == JSTStab, ...
-        //  The paper order is laplacianPower + 1
+        //- Laplacian power m (zero-based): 0 == laplacianStab, 1 == JSTStab,
+        //  ...; the operator has m + 1 repeated Laplacian factors
         const label laplacianPower_;
 
 

@@ -43,7 +43,8 @@ label readReferenceNyquistDirections
     if (!dict.found("referenceNyquistDirections"))
     {
         FatalIOErrorInFunction(dict)
-            << "referenceNyquistDirections is required when normalise is true"
+            << "referenceNyquistDirections is required when "
+            << "spectralNormalisation is true"
             << exit(FatalIOError);
     }
 
@@ -59,15 +60,18 @@ label readReferenceNyquistDirections
             << referenceNyquistDirections << exit(FatalIOError);
     }
 
+    // The directions in which a Nyquist mode exists: the geometric ones, so
+    // that the one-cell empty or wedge direction is excluded, as in
+    // stabilisationFourierCheck
     const label maxReferenceNyquistDirections =
-        min(label(3), mesh.nSolutionD());
+        min(label(3), mesh.nGeometricD());
 
     if (referenceNyquistDirections > maxReferenceNyquistDirections)
     {
         FatalIOErrorInFunction(dict)
             << "referenceNyquistDirections must be in the valid range 1 .. "
             << maxReferenceNyquistDirections
-            << " = min(3, mesh.nSolutionD()), found "
+            << " = min(3, mesh.nGeometricD()), found "
             << referenceNyquistDirections << exit(FatalIOError);
     }
 
@@ -101,7 +105,7 @@ Foam::stabilisationModel::stabilisationModel
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
     ),
-    normalise_(dict.lookupOrDefault<Switch>("normalise", false)),
+    normalise_(readSpectralNormalisation(dict)),
     referenceNyquistDirections_
     (
         readReferenceNyquistDirections(mesh, dict, normalise_)
@@ -117,13 +121,46 @@ Foam::stabilisationModel::stabilisationModel
     if (!normalise_ && dict.found("referenceNyquistDirections"))
     {
         WarningInFunction
-            << "Ignoring referenceNyquistDirections because normalise is false"
+            << "Ignoring referenceNyquistDirections because "
+            << "spectralNormalisation is false"
             << endl;
     }
 }
 
 
 // * * * * * * * * * * * * * * * Member functions * * * * * * * * * * * * * * //
+
+bool Foam::stabilisationModel::readSpectralNormalisation
+(
+    const dictionary& dict
+)
+{
+    // spectralNormalisation is the keyword; normalise, its earlier spelling,
+    // is still read. Both together are refused, whatever their values, so
+    // that a dictionary never carries two settings of which one is ignored
+    const bool canonical = dict.found("spectralNormalisation");
+    const bool alias = dict.found("normalise");
+
+    if (canonical && alias)
+    {
+        FatalIOErrorInFunction(dict)
+            << "Both spectralNormalisation and its deprecated alias "
+            << "normalise are given. Use spectralNormalisation only"
+            << exit(FatalIOError);
+    }
+
+    if (alias)
+    {
+        WarningInFunction
+            << "The keyword normalise is deprecated: use "
+            << "spectralNormalisation" << endl;
+
+        return Switch(dict.lookup("normalise"));
+    }
+
+    return dict.lookupOrDefault<Switch>("spectralNormalisation", false);
+}
+
 
 
 Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
@@ -182,7 +219,7 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
 
 Foam::scalar Foam::stabilisationModel::nyquistNormalisation
 (
-    const label paperOrder
+    const label nLaplacianFactors
 ) const
 {
     if (!normalise_)
@@ -193,7 +230,7 @@ Foam::scalar Foam::stabilisationModel::nyquistNormalisation
     scalar referenceResponse = 1.0;
     const scalar directionalResponse = 4.0*referenceNyquistDirections_;
 
-    for (label i = 0; i < paperOrder; ++i)
+    for (label i = 0; i < nLaplacianFactors; ++i)
     {
         referenceResponse *= directionalResponse;
     }
@@ -221,22 +258,27 @@ void Foam::stabilisationModel::writeSpectralNormalisationInfo
 
 void Foam::stabilisationModel::writeSpectralNormalisationInfo
 (
-    const label paperOrder,
+    const label nLaplacianFactors,
     const bool usesIdealLaplacianStencil
 ) const
 {
-    string responseDescription("paper order ");
-    responseDescription += Foam::name(paperOrder);
+    // m = laplacianPower, zero-based: m + 1 repeated Laplacian factors
+    string responseDescription("m = ");
+    responseDescription += Foam::name(nLaplacianFactors - 1);
+    responseDescription += " (";
+    responseDescription += Foam::name(nLaplacianFactors);
+    responseDescription +=
+        nLaplacianFactors == 1 ? " Laplacian factor)" : " Laplacian factors)";
 
     if (usesIdealLaplacianStencil)
     {
-        responseDescription += ", using ideal m=1 snGrad stencil";
+        responseDescription += ", using the ideal snGrad stencil";
     }
 
     writeSpectralNormalisationInfo
     (
         responseDescription,
-        nyquistNormalisation(paperOrder)
+        nyquistNormalisation(nLaplacianFactors)
     );
 }
 

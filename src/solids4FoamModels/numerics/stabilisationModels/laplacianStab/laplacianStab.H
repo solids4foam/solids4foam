@@ -26,8 +26,9 @@ Description
     provides the common cached face-field and approximate Jacobian interface.
 
     For backwards compatibility, the unnormalised form retains its legacy
-    face-based |d|^2 scaling. Spectral normalisation uses the ideal paper-order
-    m=1 form, scaleFactor*snGrad(field), without the legacy |d|^2 scaling.
+    face-based |d|^2 scaling. Spectral normalisation uses the ideal m = 0
+    (Laplacian) form, scaleFactor/(4*rStar)*snGrad(field), without the legacy
+    |d|^2 scaling.
 
 SourceFiles
     laplacianStab.C

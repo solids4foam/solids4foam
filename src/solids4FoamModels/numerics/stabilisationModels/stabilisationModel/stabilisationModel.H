@@ -124,11 +124,12 @@ class stabilisationModel
             const scalar factor
         ) const;
 
-        //- Print the coupled repeated-Laplacian family settings and optionally
-        //  report use of the ideal Laplacian stencil
+        //- Print the coupled repeated-Laplacian family settings, for
+        //  nLaplacianFactors = m + 1 with m = laplacianPower (zero-based),
+        //  and optionally report use of the ideal Laplacian stencil
         void writeSpectralNormalisationInfo
         (
-            const label paperOrder,
+            const label nLaplacianFactors,
             const bool usesIdealLaplacianStencil = false
         ) const;
 
@@ -225,7 +226,12 @@ public:
                 return scaleFactorJacobian_;
             }
 
+            //- Read spectralNormalisation, or its deprecated alias normalise,
+            //  from a model dictionary; both together are refused
+            static bool readSpectralNormalisation(const dictionary& dict);
+
             //- Return whether spectral normalisation is enabled
+            //  (spectralNormalisation)
             bool normalise() const
             {
                 return normalise_;
@@ -237,9 +243,10 @@ public:
                 return referenceNyquistDirections_;
             }
 
-            //- Return (4*rStar)^(-paperOrder), the reference-mode
-            //  normalisation of the coupled repeated-Laplacian family
-            scalar nyquistNormalisation(const label paperOrder) const;
+            //- Return (4*rStar)^(-nLaplacianFactors), the reference-mode
+            //  normalisation of the coupled repeated-Laplacian family with
+            //  nLaplacianFactors = m + 1 (m = laplacianPower, zero-based)
+            scalar nyquistNormalisation(const label nLaplacianFactors) const;
 
             //- Provide access to the scalar face stabilisation pointer
             autoPtr<surfaceScalarField>& faceScalarPtr() const

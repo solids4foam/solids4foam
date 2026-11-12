@@ -28,7 +28,8 @@ Description
 
     On uniform Cartesian meshes with a centred cell gradient and linear
     interpolation, its spectral shape is proportional to sum_q a_q^2 and
-    coincides with the directionally split m=2 spectral shape. The generalised
+    coincides with the directionally split m=1 (bi-Laplacian) spectral
+    shape, m = laplacianPower being zero-based. The generalised
     directionally split family is not implemented here.
 
 SourceFiles

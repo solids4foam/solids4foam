@@ -66,47 +66,159 @@ The currently available model types in this directory are:
 The Laplacian-family models support optional reference-mode normalisation:
 
 ```text
-normalise                    true;
+spectralNormalisation        true;
 referenceNyquistDirections   2;
 ```
 
-`normalise` defaults to `false`, preserving the legacy formulas and dictionary
-behaviour. `referenceNyquistDirections` is required when normalisation is
-enabled and must be in the range `1 .. min(3, mesh.nSolutionD())`. It specifies
-`rStar`, the number of Nyquist directions in the isotropic orthogonal reference
-mode.
+`spectralNormalisation` defaults to `false`, preserving the legacy formulas
+and dictionary behaviour. Its earlier spelling, `normalise`, is still read,
+with a deprecation warning; a model dictionary that gives both is refused,
+whatever their values. `referenceNyquistDirections`, written `rStar` below,
+is required when normalisation is enabled and must be in the range
+`1 .. min(3, mesh.nGeometricD())`: the number of mesh directions in which the
+isotropic orthogonal reference mode is at the Nyquist frequency. Empty and
+wedge directions, which have one cell, do not count.
 
-The user-provided `scaleFactor` remains the stabilisation strength. The
-effective residual scale and reference symbol are:
+The order is m = `laplacianPower`, counted from zero: m = 0 is the Laplacian,
+m = 1 the bi-Laplacian and m = 2 the sixth-order operator, with m + 1
+repeated Laplacian factors. The normalisation divides the operator by its
+raw response to the reference mode, so that the normalised operator's symbol
+at that mode equals `scaleFactor`:
 
 <!-- markdownlint-disable MD013 -->
 
-| Model | Paper order | Spectral relation | Raw reference response | Normalisation |
+| Model | m | Spectral relation | Raw reference response | Normalisation |
 | --- | ---: | --- | ---: | ---: |
-| `laplacian` | 1 | Coupled repeated-Laplacian | `4*rStar` | `1/(4*rStar)` |
-| `generalisedEvenOrderLaplacian` | `laplacianPower + 1` | Coupled repeated-Laplacian | `(4*rStar)^m` | `(4*rStar)^(-m)` |
-| `JamesonSchmidtTurkel` | 2 | Coupled repeated-Laplacian | `(4*rStar)^2` | `(4*rStar)^(-2)` |
-| `diffStencilLaplacian`, `RhieChow` | — | Split-m=2 shape, `sum_q a_q^2` | `4*rStar` | `1/(4*rStar)` |
+| `laplacian` | 0 | Coupled repeated-Laplacian | `4*rStar` | `1/(4*rStar)` |
+| `generalisedEvenOrderLaplacian` | `laplacianPower` | Coupled repeated-Laplacian | `(4*rStar)^(m+1)` | `(4*rStar)^(-(m+1))` |
+| `JamesonSchmidtTurkel` | 1 | Coupled repeated-Laplacian | `(4*rStar)^2` | `(4*rStar)^(-2)` |
+| `diffStencilLaplacian`, `RhieChow` | — | Directionally split m = 1 shape, `sum_q a_q^2` | `4*rStar` | `1/(4*rStar)` |
 
 <!-- markdownlint-enable MD013 -->
 
-For `laplacian` and `generalisedEvenOrderLaplacian` with
-`laplacianPower 0`, the legacy operator contains an additional face-local
-`|d|^2` numerical scaling. A scalar coefficient cannot remove this
-mesh-dependent factor. Therefore, normalisation switches this paper-`m=1`
-branch to the ideal form
-`scaleFactor/(4*rStar) * orthogonalSnGrad(field)`. With normalisation disabled,
-the legacy expression is unchanged. Consequently, a `scaleFactor` tuned with
-`normalise false` does not carry over to `normalise true` because the
-operator's mesh-size scaling changes (on a uniform mesh,
+The symbol is that of the operator applied to a pressure field (the face
+flux, or the cell field built from it), on a uniform, orthogonal, periodic
+Cartesian mesh, where the coupled formulas are exact. It is not the magnitude
+of the complete stabilisation term in a solver residual, which is further
+weighted by `rAUf`, the face areas, the residual scale and the cell volume
+(see m = 0 below). `scaleFactor` is therefore the strength of the normalised
+operator, not the absolute damping of the residual. On such a mesh, with a
+centred cell gradient and linear interpolation, the
+`diffStencilLaplacian`/`RhieChow` operator has a normalised spectral shape
+equal to that of the directionally split m = 1 (bi-Laplacian) family; its raw
+prefactor differs, and no higher-order directionally split family is
+implemented. `stabilisationFourierCheck` and the
+`tutorials/solids/linearElasticity/pressureStabilisationFourier` case verify
+these symbols against the implemented operators.
+
+### m = 0
+
+For `laplacian`, and `generalisedEvenOrderLaplacian` with
+`laplacianPower 0`, the face flux is computed with the orthogonal normal
+gradient, `orthogonalSnGrad(p) = deltaCoeffs*(p_N - p_P)`. On an internal
+face `1/deltaCoeffs = |d|`, the distance between the centroids of the two
+cells sharing the face; on a boundary face of a non-coupled patch it is the
+patch-normal distance from the owner-cell centroid to the face,
+`n & (Cf - C_P)`, and the boundary value of `p` is that of its boundary
+condition. The legacy flux is `scaleFactor*|d|^2*orthogonalSnGrad(p)`, with
+the same `|d|`. A scalar coefficient cannot remove this mesh-dependent
+factor, so with normalisation the m = 0 branch uses
+`scaleFactor/(4*rStar)*orthogonalSnGrad(p)`. With normalisation disabled the
+legacy expression is unchanged. A `scaleFactor` tuned with
+`spectralNormalisation false` therefore does not carry over to
+`spectralNormalisation true` (on a uniform mesh,
 `s_normalised ≈ 4*rStar*h^2*s_legacy`).
 
-The coupled formulas are exact for the audited isotropic, orthogonal reference
-mesh. On a uniform orthogonal Cartesian mesh, with a centred cell gradient and
-linear interpolation, the implemented `diffStencilLaplacian`/`RhieChow`
-operator has a normalised spectral shape matching the directionally split
-`m=2` family. Its raw prefactor differs, and no higher-order directionally
-split generalisation is implemented here.
+Dropping `|d|^2` does not remove the mesh scaling of the stabilisation,
+because the face flux is weighted by `rAUf`. The complete contribution to the
+residual of the pressure equation of cell P, as assembled by the mixed solid
+models (`linearGeometryTotalDisplacement` and
+`nonLinearGeometryTotalLagrangianTotalDisplacement`), is
+
+```text
+R_P += s_r * sum_f rAUf_f * |Sf| * scaleFactor/(4*rStar) * deltaCoeffs_f*(p_N - p_P)
+```
+
+where `s_r` is the pressure-equation scale of `scaleMixedPETScFields` (1 when
+scaling is off), and
+`rAUf = -1/interpolate(A(laplacian(impKf, D) - rho*d2dt2(D)))` is the
+reciprocal of the diagonal of the approximate momentum operator. On a uniform
+orthogonal Cartesian mesh of spacing h in nD dimensions, with constant
+implicit stiffness `impK` and no inertia or relaxation,
+`|rAUf| = h^2/(2*nD*impK)`, and per unit volume the term is
+
+```text
+R_P/V = s_r * scaleFactor/(4*rStar) /(2*nD*impK) * sum_f (p_N - p_P)
+```
+
+So:
+
+- for a smooth pressure, `sum_f (p_N - p_P) = h^2*laplacian(p) + O(h^4)`, and
+  the term is `O(h^2*scaleFactor*p/impK)`, of the order of the discretisation
+  error, so the formal order of accuracy is retained;
+- for the reference grid-scale mode (Nyquist in `rStar` directions),
+  `sum_f (p_N - p_P) = -4*rStar*p`, and the term is
+  `-s_r*scaleFactor*p/(2*nD*impK)` per unit volume, independent of h: the
+  damping of grid-scale modes does not vanish under refinement, which is the
+  purpose of the normalisation. Its size relative to the other terms of the
+  pressure equation is set by `scaleFactor`, `impK` (2μ with
+  `mixedImplicitStiffness twoMu`) and `s_r`, not by `scaleFactor` alone.
+
+The legacy form carries a further `|d|^2`: `O(h^4)` for smooth fields and
+`O(h^2)` for grid-scale modes, so its damping of grid-scale modes vanishes
+under refinement.
+
+These estimates assume a uniform orthogonal mesh, a constant `impK`, and that
+the momentum diagonal is dominated by the stiffness. Inertia adds
+`rho/deltaT^2` to the diagonal and so reduces `|rAUf|` (and the
+stabilisation) when `deltaT` is small compared with `h*sqrt(rho/impK)`;
+under-relaxation of the approximate momentum equation and mesh
+non-uniformity modify `rAUf` locally.
+
+Supporting tests: the reference response `4*rStar` and its normalisation are
+checked by `stabilisationFourierCheck` (the `pressureStabilisationFourier`
+tutorial), and the manufactured-solution case with normalised m = 0
+(`scaleFactor 1`, `referenceNyquistDirections 3`) converged on 5^3 to 40^3
+meshes with net orders 1.50 (RMS) and 0.91 (maximum) for the pressure and
+2.17 for the displacement, as with its unnormalised m = 1 configuration.
+
+### Approximate Jacobian
+
+Normalisation applies to the residual only. `scalarJacobian` is
+`scaleFactorJacobian*laplacian(gamma, p)`, with the `laplacian` scheme
+selected in `fvSchemes`, whether or not `spectralNormalisation` is on, so
+`scaleFactorJacobian` remains an independent preconditioner control.
+
+For m = 0 with normalisation, the assembled contribution equals the
+derivative of the residual term only where the two use the same stencil and
+coefficients:
+
+- `scaleFactorJacobian = scaleFactor/(4*rStar)`;
+- the Jacobian's face coefficient, `|Sf|` times the `laplacian` scheme's
+  (orthogonal) delta coefficient, equals `|Sf|*deltaCoeffs` of
+  `orthogonalSnGrad`: true on orthogonal meshes, where both distances are the
+  cell-centroid separation, but not on non-orthogonal meshes, where a
+  `corrected` scheme uses `1/(n & d)` and adds an explicit correction that the
+  residual's `orthogonalSnGrad` does not have;
+- the boundary treatment of `p` in the residual flux and in the Jacobian's
+  boundary coefficients agree (as for a zero-gradient pressure);
+- `gamma` (`rAUf`) does not depend on the unknowns, or its dependence is
+  negligible: the Jacobian holds `rAUf` fixed. `rAUf` is built from the
+  diagonal of the approximate momentum operator, which depends on the
+  implicit stiffness, the mesh and the time step; it varies with the
+  solution only where the implicit stiffness does.
+
+Agreement to round-off (4e-16 relative, against a finite-difference Jacobian)
+was established for one configuration: `linearGeometryTotalDisplacement`,
+`linearElastic`, a 2-D orthogonal 6 x 5 graded Cartesian mesh,
+`laplacian` with `scaleFactor 10`, `referenceNyquistDirections 2` and
+`scaleFactorJacobian 1.25`, `Gauss linear corrected`, with the mixed system
+scaling on. It is not claimed for non-orthogonal meshes or for
+solution-dependent implicit stiffness. In every case the assembled matrix of
+the mixed solid models remains an approximate preconditioning matrix, used
+with a matrix-free Newton operator (`snes_mf_operator`). For m >= 1 the
+Laplacian is a surrogate, and `scaleFactor/(4*rStar)` is a starting point
+rather than an exact value.
 
 ## Usage Pattern
 
@@ -180,12 +292,6 @@ vectorJacobian(field, gammaPtr, rebuild)
 The optional `scaleFactorJacobian` entry defaults to `1.0`, not to the
 explicit stabilisation `scaleFactor`. This lets the approximate Jacobian act
 as an independently tuned implicit contribution when needed.
-
-Spectral normalisation applies only to the residual. It does not modify
-`scaleFactorJacobian`, which remains an independent preconditioner control.
-To match the reference-mode scale approximately, a useful starting point is
-`scaleFactorJacobian = scaleFactor/(4*rStar)`; this is a guideline rather than
-an automatic setting.
 
 The default is `false`, which preserves the existing behaviour and reuses the
 cached matrix. If a solver needs the approximate Jacobian to be reconstructed
