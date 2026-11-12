@@ -1165,9 +1165,7 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                 // mat(ownCellID, neiCellID) += VI[ownCellID]*ownLs[faceI],
                 // with the owner-side volume and least-squares vector, as for
                 // an internal face. The neighbour's volume and vector belong
-                // to the neighbour's row, which the other processor inserts.
-                // From Philip Cardiff's 5dd6ce420 on the fix-pressure-solid
-                // branch
+                // to the neighbour's row, which the other processor inserts
                 for (label cmptI = 0; cmptI < nScalarEqns; ++cmptI)
                 {
                     values[cmptI*blockSize + colOffset] =

@@ -663,7 +663,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveSnes()
             blockSize_ - 1 // Location of p component
         );
 
-        // The PETSc vector holds the scaled unknown pHat = p/pressureUnknownScale
+        // The PETSc vector holds the scaled unknown
+        // pHat = p/pressureUnknownScale
         pI *= pressureUnknownScale();
 
         p().correctBoundaryConditions();
@@ -1645,7 +1646,7 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 jac,
                 0,                         // row offset
                 blockSize_ - 1,            // column offset
-                solidModel::twoD() ? 2 : 3, // number of scalar equations to insert
+                solidModel::twoD() ? 2 : 3, // scalar equations to insert
                 true,                       // flipSign
                 pressureUnknownScale()      // d/dpHat of the pressure columns
             );

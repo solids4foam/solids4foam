@@ -421,7 +421,8 @@ bool linGeomTotalDispSolid::evolveSnes()
             blockSize_ - 1 // Location of p component
         );
 
-        // The PETSc vector holds the scaled unknown pHat = p/pressureUnknownScale
+        // The PETSc vector holds the scaled unknown
+        // pHat = p/pressureUnknownScale
         pI *= pressureUnknownScale();
 
         p().correctBoundaryConditions();

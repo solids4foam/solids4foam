@@ -2828,10 +2828,7 @@ Foam::tmp<Foam::volScalarField> Foam::solidModel::scalarTangentQuery
 
 void Foam::solidModel::setMixedSystemScaling()
 {
-    // Algebraic scaling of the mixed displacement-pressure system, after
-    // Philip Cardiff's 7b01886d and a4a9c07f on the fix-pressure-solid branch
-    // and Chanikya Valeti's port of them to nonLinGeomTotalLagTotalDispSolid
-    // in #627 (d20b551be), whose keywords, defaults and meaning are kept.
+    // Algebraic scaling of the mixed displacement-pressure system.
     //
     // With the PETSc pressure unknown pHat = p/su and the pressure rows of
     // the residual multiplied by sr, the system F(D, p) = (F_D, F_p) = 0
@@ -2841,17 +2838,15 @@ void Foam::solidModel::setMixedSystemScaling()
     // The assembled blocks follow: A_DD unchanged, A_Dp*su, A_pD*sr and
     // A_pp*sr*su.
     //
-    // Different from #627: a 2*mu scale is the volume average of the 2*mu
-    // the laws declare (scalarShear), queried here, independently of
-    // mixedImplicitStiffness. #627 took 1.5*impK, which is 2*mu only where
-    // impK is (4/3)*mu; for a law that declares no 2*mu there is no material
-    // value to take, so the request is refused rather than given one
+    // A 2*mu scale is the volume average of the 2*mu the laws declare
+    // (scalarShear), independently of mixedImplicitStiffness. For a law that
+    // declares no 2*mu there is no material value to take, so the request is
+    // refused rather than given one
 
     pressureUnknownScale_ = 1.0;
     pressureEqnScale_ = 1.0;
 
-    // scaleMixedPETScFields; scaleMixedPetScFields, the spelling of #627 and
-    // of the fix-pressure-solid branch, is accepted with a warning
+    // scaleMixedPetScFields is a deprecated spelling, accepted with a warning
     const bool newName = solidModelDict().found("scaleMixedPETScFields");
     const bool oldName = solidModelDict().found("scaleMixedPetScFields");
     if (newName && oldName)

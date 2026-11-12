@@ -232,7 +232,7 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
     }
 
     // Scalar tangent, if asked for. The deviatoric one is the Laplacian
-    // surrogate for div(dev(sigma)), which is mu*lap(D) + (1/3)*mu*grad(div(D));
+    // surrogate for div(dev(sigma)) = mu*lap(D) + (1/3)*mu*grad(div(D));
     // the shear one is 2*mu, with mu the shear modulus of the law
     fillScalarTangent
     (

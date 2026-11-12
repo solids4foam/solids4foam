@@ -624,8 +624,8 @@ protected:
         //  PETSc system (solvePressure) from the solid-model keywords
         //  scaleMixedPETScFields, pressureUnknownScale,
         //  pressureUnknownScaleValue, pressureScaleByTwoMu and
-        //  pressureScaleFactor (names, defaults and meaning from #627; its
-        //  scaleMixedPetScFields is accepted as a deprecated alias). The
+        //  pressureScaleFactor (scaleMixedPetScFields is accepted as a
+        //  deprecated alias). The
         //  PETSc pressure unknown is pHat = p/pressureUnknownScale() and the
         //  pressure equation rows are multiplied by pressureEqnScale(). A
         //  2*mu scale is the volume average of the 2*mu the laws declare

@@ -119,8 +119,8 @@ As for the displacement and stress (whose second column is labelled
 "mean L2"), the cell RMS is the root mean square over cells, unweighted. The
 volume-weighted RMS, $\sqrt{\sum_P V_P e_P^2 / \sum_P V_P}$, is the
 continuous $L^2$ norm of the cell-wise constant error divided by the square
-root of the domain volume; on this uniform mesh the two coincide. The values above are those of the default
-$5^3$ mesh. Displacement-only approaches are unaffected.
+root of the domain volume; on this uniform mesh the two coincide. The values
+above are those of the default $5^3$ mesh. Displacement-only approaches are unaffected.
 
 The case scales the mixed PETSc system (`scaleMixedPETScFields yes`): the
 pressure unknown is stored as $p/2\mu$ and the pressure rows are multiplied

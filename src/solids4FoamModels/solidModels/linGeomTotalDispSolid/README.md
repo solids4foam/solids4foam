@@ -183,13 +183,8 @@ tangent, as for `mixedImplicitStiffness twoMu`), independently of
 `mixedImplicitStiffness`. A law that declares no 2μ is refused with a pointer
 to an explicit scale: `pressureUnknownScale user` with
 `pressureUnknownScaleValue`, and `pressureScaleByTwoMu no` with
-`pressureScaleFactor`. The keywords and defaults are those of the original
-implementation by Philip Cardiff on the `fix-pressure-solid` branch and its
-port to the total-Lagrangian solver in #627 (Chanikya Valeti), with two
-changes: the switch is spelled `scaleMixedPETScFields` (the earlier
-`scaleMixedPetScFields` is still read, with a warning), and the undocumented
-`pressureUnknownScale 2mu` alias is no longer accepted. There, `twoMu` was
-1.5 `impK`, which equals 2μ only where `impK` is (4/3)μ.
+`pressureScaleFactor`. The spelling `scaleMixedPetScFields` is read as a
+deprecated alias of `scaleMixedPETScFields`, with a warning.
 
 ### Explicit-solve time-step control
 

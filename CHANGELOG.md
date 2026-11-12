@@ -18,10 +18,10 @@ release. For complete commit-level details and contributor information, see the
   - optional algebraic scaling of the mixed PETSc system in both solvers
     (`scaleMixedPETScFields`, `pressureUnknownScale`,
     `pressureUnknownScaleValue`, `pressureScaleByTwoMu`,
-    `pressureScaleFactor`), after Philip Cardiff's work on the mixed solver
-    and Chanikya Valeti's port to the total-Lagrangian solver (#627). Off by
-    default. The automatic 2μ scale is the volume average of the declared 2μ;
-    a law that declares none is refused with a pointer to an explicit scale;
+    `pressureScaleFactor`), by Philip Cardiff and Chanikya Valeti (#627).
+    Off by default. The automatic 2μ scale is the volume average of the
+    declared 2μ; a law that declares none is refused with a pointer to an
+    explicit scale;
   - parallel runs: the D-in-p coupling across processor patches, by Chanikya
     Valeti (#652).
 - `manufacturedSolution` tutorial: a mixed displacement-pressure approach
@@ -734,11 +734,11 @@ release. For complete commit-level details and contributor information, see the
 - `foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix`: on processor patches
   the off-processor coefficient of a cell's row now uses that cell's volume
   and least-squares vector, as for an internal face, so the assembled
-  gradient block is the same in parallel as in serial (after Philip Cardiff's
-  fix on the `fix-pressure-solid` branch). This affects the preconditioner of
-  parallel mixed-solid runs, not the residual. `newtonIcoFluid` calls the same
-  function, but its parallel Jacobian assembly still stops earlier, at the
-  convection term, which has no processor-patch implementation.
+  gradient block is the same in parallel as in serial (Philip Cardiff). This
+  affects the preconditioner of parallel mixed-solid runs, not the residual.
+  `newtonIcoFluid` calls the same function, but its parallel Jacobian
+  assembly still stops earlier, at the convection term, which has no
+  processor-patch implementation.
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual

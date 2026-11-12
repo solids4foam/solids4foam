@@ -212,9 +212,8 @@ void Foam::GuccioneElasticMechanicalConstitutiveLaw::evaluate
     // penalty, two orders above the shear modulus, so including it makes the
     // surrogate stiff enough that the linear solve does not converge at all
     // The shear one is 2*mu with the same mu = k*(cf + ct + cfs)/6. For this
-    // anisotropic law mu is a declared scalar stiffness measure, the one the
-    // research mixed formulation used (shearModulus() of the legacy law),
-    // not the shear modulus of an isotropic material
+    // anisotropic law mu is a declared scalar stiffness measure, not the
+    // shear modulus of an isotropic material
     fillScalarTangent
     (
         response,
