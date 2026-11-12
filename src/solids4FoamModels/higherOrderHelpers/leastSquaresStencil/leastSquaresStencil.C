@@ -27,6 +27,8 @@ License
 #include "processorPolyPatch.H"
 #include "volFields.H"
 #include "Tuple2.H"
+#include "cellZoneInterface.H"
+#include "syncTools.H"
 #include <cmath>
 
 
@@ -474,6 +476,144 @@ List<vectorField> leastSquaresStencil::remoteCandidatesCellCentres
     return remoteCellCentres;
 }
 
+
+void leastSquaresStencil::calcGlobalMaterial() const
+{
+    // Local material of every cell: all -1 with a single material
+    const labelList localMaterial(cellMaterialID(mesh_));
+
+    bool multiMaterial = false;
+    forAll(localMaterial, cellI)
+    {
+        if (localMaterial[cellI] != -1)
+        {
+            multiMaterial = true;
+            break;
+        }
+    }
+    reduce(multiMaterial, orOp<bool>());
+
+    if (!multiMaterial)
+    {
+        // Single material: nothing is filtered, stencils are unchanged
+        globalMaterialPtr_.reset(new labelList());
+        return;
+    }
+
+    // Every rank holds the material of every cell, in global numbering, so
+    // that remote stencil candidates can be filtered without extra exchanges
+    labelList globalMaterial(globalCells_.size(), -1);
+    forAll(localMaterial, cellI)
+    {
+        globalMaterial[globalCells_.toGlobal(cellI)] = localMaterial[cellI];
+    }
+
+#ifdef OPENFOAM_COM
+    Pstream::listCombineReduce(globalMaterial, maxEqOp<label>());
+#else
+    Pstream::listCombineGather(globalMaterial, maxEqOp<label>());
+    Pstream::listCombineScatter(globalMaterial);
+#endif
+
+    globalMaterialPtr_.reset(new labelList(std::move(globalMaterial)));
+}
+
+
+label leastSquaresStencil::materialOfGlobalCell(const label globalCellID) const
+{
+    if (!globalMaterialPtr_.valid())
+    {
+        calcGlobalMaterial();
+    }
+
+    const labelList& globalMaterial = globalMaterialPtr_();
+
+    return globalMaterial.empty() ? -1 : globalMaterial[globalCellID];
+}
+
+
+void leastSquaresStencil::calcFaceMaterial() const
+{
+    faceMaterialPtr_.reset(new labelList(mesh_.nFaces(), -1));
+    labelList& faceMaterial = autoPtrRef(faceMaterialPtr_);
+
+    const labelList localMaterial(cellMaterialID(mesh_));
+
+    bool multiMaterial = false;
+    forAll(localMaterial, cellI)
+    {
+        if (localMaterial[cellI] != -1)
+        {
+            multiMaterial = true;
+            break;
+        }
+    }
+    reduce(multiMaterial, orOp<bool>());
+
+    if (!multiMaterial)
+    {
+        return;
+    }
+
+    const labelUList& own = mesh_.faceOwner();
+    const labelUList& nei = mesh_.faceNeighbour();
+
+    // Internal faces inside one material: that material only. A face
+    // between two materials is reconstructed from the lower material index
+    for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
+    {
+        const label ownMat = localMaterial[own[faceI]];
+        const label neiMat = localMaterial[nei[faceI]];
+        faceMaterial[faceI] = min(ownMat, neiMat);
+    }
+
+    // Boundary faces: the owner's material
+    for (label faceI = mesh_.nInternalFaces(); faceI < mesh_.nFaces(); ++faceI)
+    {
+        faceMaterial[faceI] = localMaterial[own[faceI]];
+    }
+
+    // A material interface on a processor boundary would be reconstructed
+    // from a different material on each side; refuse it
+    labelList neiMaterial;
+    syncTools::swapBoundaryCellList(mesh_, localMaterial, neiMaterial);
+
+    label nCoupledInterfaces = 0;
+    forAll(mesh_.boundaryMesh(), patchI)
+    {
+        const polyPatch& pp = mesh_.boundaryMesh()[patchI];
+
+        if (!pp.coupled())
+        {
+            continue;
+        }
+
+        forAll(pp, i)
+        {
+            const label faceI = pp.start() + i;
+            const label bFaceI = faceI - mesh_.nInternalFaces();
+
+            if (neiMaterial[bFaceI] != localMaterial[own[faceI]])
+            {
+                ++nCoupledInterfaces;
+            }
+        }
+    }
+    reduce(nCoupledInterfaces, sumOp<label>());
+
+    if (nCoupledInterfaces > 0)
+    {
+        FatalErrorInFunction
+            << nCoupledInterfaces << " faces between two materials lie on a "
+            << "processor boundary." << nl
+            << "    High-order reconstruction with more than one material "
+            << "needs every material interface inside one processor:"
+            << " constrain the decomposition (singleProcessorFaceSets) so that"
+            << " the cells on both sides of each interface share a processor."
+            << exit(FatalError);
+    }
+}
+
 void  leastSquaresStencil::calcProcessorCells() const
 {
     procCellsPtr_.reset(new boolList(mesh_.nCells(), false));
@@ -522,15 +662,36 @@ labelList leastSquaresStencil::buildFacesStencil
     labelHashSet currentLayer;
     labelHashSet nextLayer;
 
+    // With more than one material only cells of the face's material enter
+    // the stencil (-1: single material, no filtering)
+    if (!faceMaterialPtr_.valid())
+    {
+        calcFaceMaterial();
+    }
+    const label stencilMaterial = faceMaterialPtr_()[faceI];
+    const auto sameMaterial = [&](const label localCellID)
+    {
+        return
+            stencilMaterial == -1
+         || materialOfGlobalCell(globalCells_.toGlobal(localCellID))
+         == stencilMaterial;
+    };
+
     const label ownerCell = mesh_.faceOwner()[faceI];
-    currentLayer.insert(ownerCell);
-    localCandidates.insert(ownerCell);
+    if (sameMaterial(ownerCell))
+    {
+        currentLayer.insert(ownerCell);
+        localCandidates.insert(ownerCell);
+    }
 
     if (faceI < mesh_.nInternalFaces())
     {
         const label nei = mesh_.faceNeighbour()[faceI];
-        currentLayer.insert(nei);
-        localCandidates.insert(nei);
+        if (sameMaterial(nei))
+        {
+            currentLayer.insert(nei);
+            localCandidates.insert(nei);
+        }
     }
 
     const labelListList& cellCells = mesh_.cellCells();
@@ -551,6 +712,10 @@ labelList leastSquaresStencil::buildFacesStencil
             forAll(neighbours, i)
             {
                 const label cellID = neighbours[i];
+                if (!sameMaterial(cellID))
+                {
+                    continue;
+                }
                 if (localCandidates.insert(cellID))
                 {
                     nextLayer.insert(cellID);
@@ -695,6 +860,14 @@ labelList leastSquaresStencil::buildFacesStencil
 
         forAll(procCells, i)
         {
+            if
+            (
+                stencilMaterial != -1
+             && materialOfGlobalCell(procCells[i]) != stencilMaterial
+            )
+            {
+                continue;
+            }
             const scalar d2 = magSqr(procCellCentres[i] - faceCentre);
             if (d2 <= R2)
             {
@@ -742,6 +915,14 @@ labelList leastSquaresStencil::buildFacesStencil
 
             forAll(procCells, i)
             {
+                if
+                (
+                    stencilMaterial != -1
+                 && materialOfGlobalCell(procCells[i]) != stencilMaterial
+                )
+                {
+                    continue;
+                }
                 allDist.append
                 (
                     Tuple2<label, scalar>
@@ -1042,7 +1223,16 @@ void leastSquaresStencil::calcCellsStencil(const scalar relTol) const
 
             forAll(faceStencil, j)
             {
-                candidates.insert(faceStencil[j]);
+                // With more than one material a face stencil on a material
+                // interface belongs to one side only; keep this cell's own
+                if
+                (
+                    materialOfGlobalCell(faceStencil[j])
+                 == materialOfGlobalCell(globalCells_.toGlobal(cellI))
+                )
+                {
+                    candidates.insert(faceStencil[j]);
+                }
             }
         }
 
@@ -1383,6 +1573,8 @@ void leastSquaresStencil::clear() const
     procCellsPtr_.clear();
     remoteCentresMapPtr_.clear();
     remoteCellLocationPtr_.clear();
+    globalMaterialPtr_.clear();
+    faceMaterialPtr_.clear();
 }
 
 } // End namespace Foam

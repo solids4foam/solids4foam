@@ -703,6 +703,11 @@ Foam::mechanicalConstitutiveLawManager::topology
     // Build integration-point addressing per law
     // ---------------------------------------------------------------------
 
+    // With more than one law on face quadrature points, each point belongs
+    // to the law of its face only, so that no point is evaluated twice
+    const bool byFaceLaw = assignsFacePointsToOneLaw(topo);
+    const labelList faceLaw(byFaceLaw ? faceLaws() : labelList());
+
     forAll(laws_, lawI)
     {
         DynamicList<label> ipIDs;
@@ -718,6 +723,15 @@ Foam::mechanicalConstitutiveLawManager::topology
             forAll(cellIPs, j)
             {
                 const label ip = cellIPs[j];
+
+                if
+                (
+                    byFaceLaw
+                 && faceLaw[topo.integrationPointFace(ip)] != lawI
+                )
+                {
+                    continue;
+                }
 
                 if (topo.requiresUniqueIntegrationPointsPerMaterial())
                 {
@@ -814,6 +828,49 @@ void Foam::mechanicalConstitutiveLawManager::allocateBoundaryStates
 }
 
 
+bool Foam::mechanicalConstitutiveLawManager::assignsFacePointsToOneLaw
+(
+    const integrationPointTopology& topo
+) const
+{
+    return
+        laws_.size() > 1
+     && topo.requiresUniqueIntegrationPointsPerMaterial()
+     && topo.type() == compactFaceIntegrationPointTopology::typeName;
+}
+
+
+Foam::labelList Foam::mechanicalConstitutiveLawManager::faceLaws() const
+{
+    labelList cellLaw(mesh_.nCells(), -1);
+    forAll(lawCells_, lawI)
+    {
+        const labelList& cells = lawCells_[lawI];
+        forAll(cells, i)
+        {
+            cellLaw[cells[i]] = lawI;
+        }
+    }
+
+    const labelUList& own = mesh_.faceOwner();
+    const labelUList& nei = mesh_.faceNeighbour();
+
+    labelList faceLaw(mesh_.nFaces(), -1);
+
+    for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
+    {
+        faceLaw[faceI] = min(cellLaw[own[faceI]], cellLaw[nei[faceI]]);
+    }
+
+    for (label faceI = mesh_.nInternalFaces(); faceI < mesh_.nFaces(); ++faceI)
+    {
+        faceLaw[faceI] = cellLaw[own[faceI]];
+    }
+
+    return faceLaw;
+}
+
+
 void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
 (
     const integrationPointTopology& topo,
@@ -837,7 +894,12 @@ void Foam::mechanicalConstitutiveLawManager::checkTangentRequest
             << exit(FatalError);
     }
 
-    if (topo.requiresUniqueIntegrationPointsPerMaterial() && laws_.size() > 1)
+    if
+    (
+        topo.requiresUniqueIntegrationPointsPerMaterial()
+     && laws_.size() > 1
+     && !assignsFacePointsToOneLaw(topo)
+    )
     {
         FatalErrorInFunction
             << "A " << tangentRequestName(req) << " tangent was requested on "
@@ -2086,7 +2148,12 @@ void Foam::mechanicalConstitutiveLawManager::evaluateFlat
         );
     }
 
-    if (topo.requiresUniqueIntegrationPointsPerMaterial() && laws_.size() > 1)
+    if
+    (
+        topo.requiresUniqueIntegrationPointsPerMaterial()
+     && laws_.size() > 1
+     && !assignsFacePointsToOneLaw(topo)
+    )
     {
         FatalErrorInFunction
             << "The flat-list update does not perform stress collapse, but "

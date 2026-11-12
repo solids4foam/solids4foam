@@ -2724,15 +2724,10 @@ void Foam::solidModel::gradQuad
     CompactListList<tensor>& gradDQuad
 ) const
 {
-    // The framework has no quadrature-point gradient for more than one
-    // material
-    if (mechanicalManager().nLaws() > 1)
-    {
-        FatalErrorInFunction
-            << "The face quadrature gradient is not implemented for more than "
-            << "one material." << exit(FatalError);
-    }
-
+    // With more than one material the least-squares stencils are restricted
+    // to one material (leastSquaresStencil): a face takes the lower material
+    // index of its two cells, and its quadrature points are evaluated by that
+    // material's law (mechanicalConstitutiveLawManager::faceLaws)
     hofvc::fGrad(D, gradDQuad);
 }
 

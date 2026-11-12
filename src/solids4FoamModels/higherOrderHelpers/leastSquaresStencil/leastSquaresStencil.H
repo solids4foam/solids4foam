@@ -118,6 +118,17 @@ class leastSquaresStencil
         //  First value in list is proc ID and second value represents index
         mutable autoPtr<Map<FixedList<label, 2>>> remoteCellLocationPtr_;
 
+        //- Material (mechanical law) index of every cell in global cell
+        //  numbering, or empty when the case has a single material.
+        //  With more than one material the stencils are restricted to one
+        //  material, so that no reconstruction mixes two materials
+        mutable autoPtr<labelList> globalMaterialPtr_;
+
+        //- Material whose cells build each face stencil, or -1 everywhere
+        //  with a single material. Internal faces between two materials take
+        //  the lower material index; boundary faces take their owner's
+        mutable autoPtr<labelList> faceMaterialPtr_;
+
     // Private Member Functions
 
         //- Disallow default bitwise copy construct
@@ -137,6 +148,15 @@ class leastSquaresStencil
 
         //- Mark cells at processor boundary
         void calcProcessorCells() const;
+
+        //- Calculate the global cell material list (empty if one material)
+        void calcGlobalMaterial() const;
+
+        //- Calculate the face material list
+        void calcFaceMaterial() const;
+
+        //- Material of a cell given in global numbering (-1 if one material)
+        label materialOfGlobalCell(const label globalCellID) const;
 
         //- Check processor overlap between bounding box for remote processors
         /// cells and bounding box for local processor faces

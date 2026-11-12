@@ -502,7 +502,8 @@ protected:
 
         //- Displacement gradient at the face quadrature points.
         //
-        //  hofvc::fGrad() for one material; not implemented for more than one
+        //  hofvc::fGrad(); with more than one material the stencils keep to
+        //  one material and each face takes the lower material of its cells
         void gradQuad
         (
             const volVectorField& D,
