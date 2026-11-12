@@ -125,9 +125,16 @@ class leastSquaresStencil
         mutable autoPtr<labelList> globalMaterialPtr_;
 
         //- Material whose cells build each face stencil, or -1 everywhere
-        //  with a single material. Internal faces between two materials take
-        //  the lower material index; boundary faces take their owner's
+        //  with a single material. A face between two materials takes its
+        //  owner's material (its neighbour's is used for the neighbour-side
+        //  stencils); boundary faces take their owner's
         mutable autoPtr<labelList> faceMaterialPtr_;
+
+        //- Face stencils of the neighbour side of the material interfaces:
+        //  for a face between two materials, the stencil built from its
+        //  neighbour's material; empty for every other face
+        mutable autoPtr<CompactListList<label>>
+            interfaceNeighbourFacesStencilPtr_;
 
     // Private Member Functions
 
@@ -181,6 +188,9 @@ class leastSquaresStencil
         ) const;
 
         //- Build face stencil
+        //- Build the stencil of a face. Its cells are of the face's material
+        //  (faceMaterial), or of material stencilMaterial when that is given
+        //  (>= 0)
         labelList buildFacesStencil
         (
              const label faceI,
@@ -188,7 +198,8 @@ class leastSquaresStencil
              const List<vectorField>& remoteCellsCentres,
              const scalar relTol = 1e-8,
              const scalar overSampleFactor = 1.5,
-             const scalar searchExpansionFactor = 1.3
+             const scalar searchExpansionFactor = 1.3,
+             const label stencilMaterial = -1
         ) const;
 
         //- Filter unused cells and store cells IDs and their cell centres
@@ -242,6 +253,12 @@ public:
 
         //- Returns face stencils (global indexing)
         const CompactListList<label>& facesStencil() const;
+
+        //- Returns the face stencils of the neighbour side of the material
+        //  interfaces (global indexing): non-empty only for the faces between
+        //  two materials, and built from the neighbour's material, where
+        //  facesStencil() is built from the owner's
+        const CompactListList<label>& interfaceNeighbourFacesStencil() const;
 
         //- Returns cell stencils (global indexing)
         const CompactListList<label>& cellsStencil() const;

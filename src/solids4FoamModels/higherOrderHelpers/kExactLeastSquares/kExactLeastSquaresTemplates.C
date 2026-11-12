@@ -146,6 +146,76 @@ void kExactLeastSquares::exchangeProcessorPatchField
 
 
 template<class Type>
+void kExactLeastSquares::fGradInterfaceNeighbour
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    CompactListList<typename outerProduct<vector, Type>::type>& result
+) const
+{
+    typedef typename outerProduct<vector, Type>::type GradType;
+
+    if (interfaceNeighbourFaceGradCoeffsPtr_.empty())
+    {
+        calcInterfaceNeighbourFaceGradCoeffs();
+    }
+
+    const fvMesh& mesh = mesh_;
+    const globalIndex& globalCells = stencil().globalCells();
+    const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
+    auto& cellStencils = compactListListCRef(stencil().cellsStencil());
+    const labelUList& neighbour = mesh.neighbour();
+#ifdef FOAMEXTEND
+    List<CompactListList<vector>>& coeffs =
+        const_cast<List<CompactListList<vector>>&>
+        (
+            interfaceNeighbourFaceGradCoeffsPtr_()
+        );
+#else
+    const List<CompactListList<vector>>& coeffs =
+        interfaceNeighbourFaceGradCoeffsPtr_();
+#endif
+
+    const UList<Type>& vfI = vf.internalField();
+    const List<Field<Type>> remoteField = stencil().remoteFieldPerProc(vfI);
+
+    for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
+    {
+        if (result[faceI].size() == 0)
+        {
+            continue;
+        }
+
+        const label neiCellI = neighbour[faceI];
+        const labelUList& neiStencil = cellStencils[neiCellI];
+        auto& faceCoeffs = coeffs[faceI];
+
+        forAll(result[faceI], qpI)
+        {
+            const UList<vector>& qpCoeffs = faceCoeffs[qpI];
+
+            GradType sum = qpCoeffs[neiStencil.size()]*vfI[neiCellI];
+
+            forAll(neiStencil, stencilI)
+            {
+                sum +=
+                    qpCoeffs[stencilI]
+                  * fieldValue
+                    (
+                        neiStencil[stencilI],
+                        globalCells,
+                        remoteLoc,
+                        vfI,
+                        remoteField
+                    );
+            }
+
+            result[faceI][qpI] = sum;
+        }
+    }
+}
+
+
+template<class Type>
 void kExactLeastSquares::fGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf,

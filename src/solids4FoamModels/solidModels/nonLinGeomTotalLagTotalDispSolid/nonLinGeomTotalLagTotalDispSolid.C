@@ -804,6 +804,37 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStressQuad()
         mesh().time().deltaTValue(),
         sigmaQuad()
     );
+
+    // The neighbour side of the material interfaces, each point evaluated
+    // by the face neighbour's law with its own kinematics
+    if (materialInterfaceQuad())
+    {
+        autoPtr<CompactListList<tensor>> FPtr;
+        autoPtr<CompactListList<tensor>> FinvPtr;
+        autoPtr<CompactListList<scalar>> JPtr;
+        autoPtr<CompactListList<tensor>> F0Ptr;
+        autoPtr<CompactListList<tensor>> Finv0Ptr;
+        autoPtr<CompactListList<scalar>> J0Ptr;
+
+        quadDeformationGradient(gradDQuadNei(), FPtr);
+        quadInverseAndJacobian(FPtr(), FinvPtr, JPtr);
+
+        quadDeformationGradient(gradDQuadNei0(), F0Ptr);
+        quadInverseAndJacobian(F0Ptr(), Finv0Ptr, J0Ptr);
+
+        mechanicalManager().updateStressFiniteStrain
+        (
+            interfaceNeighbourTopology(),
+            FPtr().m(),
+            F0Ptr().m(),
+            FinvPtr().m(),
+            Finv0Ptr().m(),
+            JPtr().m(),
+            J0Ptr().m(),
+            mesh().time().deltaTValue(),
+            sigmaQuadNei().m()
+        );
+    }
 }
 
 
@@ -985,6 +1016,13 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 
     // A multi-material run needs a material-aware gradient
     checkFrameworkGradScheme(D().name());
+
+    // The two sides of a material interface are held together by the
+    // stabilisation, with the series stiffness of the two materials
+    if (materialInterfaceQuad())
+    {
+        interfaceSeriesStiffness(impKf_, impK_);
+    }
 
     // Force all required old-time fields to be created
     fvm::d2dt2(D());
@@ -1306,6 +1344,11 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
 
         // Update gradient of displacement at face quadrature points
         gradQuad(D, gradDQuad());
+
+        if (materialInterfaceQuad())
+        {
+            gradQuadInterfaceNeighbour(D, gradDQuadNei());
+        }
     }
     else
     {
@@ -1435,6 +1478,21 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
         // integrating the first Piola-Kirchhoff stress over the face
         // quadrature points
         traction = hofvc::surfaceIntegrate(sigmaQuad(), gradDQuad(), mesh);
+
+        // On a material interface, the weighted mean of the two sides'
+        // nominal tractions
+        if (materialInterfaceQuad())
+        {
+            combineInterfaceTraction
+            (
+                traction,
+                hofvc::surfaceIntegrate
+                (
+                    sigmaQuadNei(), gradDQuadNei(), mesh
+                )(),
+                impK_
+            );
+        }
     }
 
     //fvc::div(J_*Finv_ & sigma(), "div(sigma)");

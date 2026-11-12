@@ -556,15 +556,15 @@ void leastSquaresStencil::calcFaceMaterial() const
     }
 
     const labelUList& own = mesh_.faceOwner();
-    const labelUList& nei = mesh_.faceNeighbour();
 
-    // Internal faces inside one material: that material only. A face
-    // between two materials is reconstructed from the lower material index
+    // Internal faces: the owner's material. Inside one material that is
+    // the face's material; a face between two materials is reconstructed
+    // from each side separately - from the owner's material here, and from
+    // the neighbour's in interfaceNeighbourFacesStencil - so that no
+    // reconstruction mixes two materials and neither material is preferred
     for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
     {
-        const label ownMat = localMaterial[own[faceI]];
-        const label neiMat = localMaterial[nei[faceI]];
-        faceMaterial[faceI] = min(ownMat, neiMat);
+        faceMaterial[faceI] = localMaterial[own[faceI]];
     }
 
     // Boundary faces: the owner's material
@@ -642,7 +642,8 @@ labelList leastSquaresStencil::buildFacesStencil
     const List<vectorField>& remoteCellsCentres,
     const scalar relTol,
     const scalar overSampleFactor,
-    const scalar searchExpansionFactor
+    const scalar searchExpansionFactor,
+    const label stencilMaterialIn
 ) const
 {
     // When this number of cell is reached, layer approach stops
@@ -668,7 +669,10 @@ labelList leastSquaresStencil::buildFacesStencil
     {
         calcFaceMaterial();
     }
-    const label stencilMaterial = faceMaterialPtr_()[faceI];
+    const label stencilMaterial =
+        stencilMaterialIn >= 0
+      ? stencilMaterialIn
+      : faceMaterialPtr_()[faceI];
     const auto sameMaterial = [&](const label localCellID)
     {
         return
@@ -998,19 +1002,29 @@ void leastSquaresStencil::filterUnusedCandidates
     usedRemoteCells.reserve(totalRemote);
 #endif
 
-    auto& facesStencil =
-        compactListListCRef(this->facesStencil());
-
-    forAll(facesStencil, faceI)
+    // Remote cells used by any face stencil, the neighbour-side interface
+    // stencils included
+    for (label sideI = 0; sideI < 2; ++sideI)
     {
-        const labelUList faceStencil = facesStencil[faceI];
+        auto& facesStencil =
+            compactListListCRef
+            (
+                sideI == 0
+              ? this->facesStencil()
+              : this->interfaceNeighbourFacesStencil()
+            );
 
-        forAll(faceStencil, cellI)
+        forAll(facesStencil, faceI)
         {
-            const label gCellID = faceStencil[cellI];
-            if (!globalCells_.isLocal(gCellID))
+            const labelUList faceStencil = facesStencil[faceI];
+
+            forAll(faceStencil, cellI)
             {
-                usedRemoteCells.insert(gCellID);
+                const label gCellID = faceStencil[cellI];
+                if (!globalCells_.isLocal(gCellID))
+                {
+                    usedRemoteCells.insert(gCellID);
+                }
             }
         }
     }
@@ -1052,6 +1066,41 @@ void leastSquaresStencil::filterUnusedCandidates
         storedRemoteCentres[procI].transfer(filteredCellCentres.shrink());
     }
 }
+
+
+namespace
+{
+
+// Pack a list of lists into compact storage
+autoPtr<CompactListList<label>> toCompactListList(const List<labelList>& lists)
+{
+    labelList sizes(lists.size());
+    forAll(lists, i)
+    {
+        sizes[i] = lists[i].size();
+    }
+
+    autoPtr<CompactListList<label>> resultPtr
+    (
+        new CompactListList<label>(sizes)
+    );
+    CompactListList<label>& result = autoPtrRef(resultPtr);
+
+    forAll(lists, i)
+    {
+        const labelList& src = lists[i];
+        labelUList dst = result[i];
+
+        forAll(src, j)
+        {
+            dst[j] = src[j];
+        }
+    }
+
+    return resultPtr;
+}
+
+} // End anonymous namespace
 
 
 void leastSquaresStencil::calcFacesStencil() const
@@ -1140,26 +1189,40 @@ void leastSquaresStencil::calcFacesStencil() const
         }
     }
 
-    // Allocate compact storage  and store into it
-    labelList sizes(facesStencil.size());
-    forAll(facesStencil, faceI)
+    // The neighbour side of the faces between two materials, built here so
+    // that their remote cells are kept by filterUnusedCandidates below
+    List<labelList> interfaceNeighbourStencil(mesh_.nFaces());
     {
-        sizes[faceI] = facesStencil[faceI].size();
-    }
+        const labelList localMaterial(cellMaterialID(mesh_));
+        const labelUList& own = mesh_.faceOwner();
+        const labelUList& nei = mesh_.faceNeighbour();
 
-    facesStencilPtr_.reset(new CompactListList<label>(sizes));
-    CompactListList<label>& facesStencilRef = autoPtrRef(facesStencilPtr_);
-
-    forAll(facesStencil, faceI)
-    {
-        const labelList& src = facesStencil[faceI];
-        labelUList dst = facesStencilRef[faceI];
-
-        forAll(src, j)
+        for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
         {
-            dst[j] = src[j];
+            const label neiMat = localMaterial[nei[faceI]];
+
+            if (neiMat != localMaterial[own[faceI]])
+            {
+                interfaceNeighbourStencil[faceI] =
+                    buildFacesStencil
+                    (
+                        faceI,
+                        remoteCells,
+                        remoteCellsCentres,
+                        1e-8,
+                        1.5,
+                        1.3,
+                        neiMat
+                    );
+            }
         }
     }
+
+    facesStencilPtr_.reset(toCompactListList(facesStencil).ptr());
+    interfaceNeighbourFacesStencilPtr_.reset
+    (
+        toCompactListList(interfaceNeighbourStencil).ptr()
+    );
 
     // Filter and store remote cells and cell centres
     filterUnusedCandidates(remoteCells, remoteCellsCentres);
@@ -1424,6 +1487,18 @@ const CompactListList<label>& leastSquaresStencil::facesStencil() const
 }
 
 
+const CompactListList<label>&
+leastSquaresStencil::interfaceNeighbourFacesStencil() const
+{
+    if (interfaceNeighbourFacesStencilPtr_.empty())
+    {
+         calcFacesStencil();
+    }
+
+    return autoPtrRef(interfaceNeighbourFacesStencilPtr_);
+}
+
+
 const CompactListList<label>& leastSquaresStencil::cellsStencil() const
 {
     // Cells stencils are constructed from faces stencils
@@ -1575,6 +1650,7 @@ void leastSquaresStencil::clear() const
     remoteCellLocationPtr_.clear();
     globalMaterialPtr_.clear();
     faceMaterialPtr_.clear();
+    interfaceNeighbourFacesStencilPtr_.clear();
 }
 
 } // End namespace Foam

@@ -33,6 +33,13 @@ Description
     true here and false there, and it is what restricts a flat-list update
     over this topology to a single material.
 
+    With more than one material the points of a face are instead given to
+    one of its cells only (cellAssociation): the owner, or the neighbour.
+    Each point then belongs to exactly one material, and a face between two
+    materials is evaluated once from each side, by two topologies: the
+    owner-side one, holding every face, and a neighbour-side one, holding
+    the material-interface faces only.
+
 SourceFiles
     None: header only
 
@@ -57,6 +64,22 @@ class compactFaceIntegrationPointTopology
 :
     public integrationPointTopology
 {
+public:
+
+    //- Which cells a face's points are associated with
+    enum class cellAssociation
+    {
+        both,       // the owner and the neighbour: points are shared
+        owner,      // the owner only
+        neighbour   // the neighbour only (internal faces)
+    };
+
+
+private:
+
+    //- Which cells a face's points are associated with
+    cellAssociation association_;
+
     //- Flattened integration-point indices of every face, in face order
     labelList integrationPointIDs_;
 
@@ -80,14 +103,18 @@ public:
     //- Runtime type information
     TypeName("compactFaceIntegrationPointTopology");
 
-    //- Construct from mesh and face-to-integration-point addressing
+    //- Construct from mesh and face-to-integration-point addressing.
+    //  With cellAssociation::neighbour every boundary face must have no
+    //  points, as it has no neighbour
     compactFaceIntegrationPointTopology
     (
         const fvMesh& mesh,
-        CompactListList<label>&& faceToIntegrationPointIDs
+        CompactListList<label>&& faceToIntegrationPointIDs,
+        const cellAssociation association = cellAssociation::both
     )
     :
         integrationPointTopology(mesh),
+        association_(association),
         integrationPointIDs_(),
         faceStartOffsets_(),
         cellIntegrationPointIDs_(),
@@ -137,8 +164,42 @@ public:
         // Gather each cell's points from its faces. A cell's faces are its
         // own, so this is the natural association; an internal face
         // contributes to both of its cells, which is what makes the points
-        // shared
+        // shared. With an owner or neighbour association it contributes to
+        // that cell only
         const cellList& cells = mesh_.cells();
+        const labelUList& own = mesh_.faceOwner();
+        const labelUList& nei = mesh_.faceNeighbour();
+        const label nInternalFaces = mesh_.nInternalFaces();
+
+        if (association_ == cellAssociation::neighbour)
+        {
+            for (label faceI = nInternalFaces; faceI < mesh_.nFaces(); ++faceI)
+            {
+                if (rowSizes[faceI] > 0)
+                {
+                    FatalErrorInFunction
+                        << "Boundary face " << faceI << " has integration "
+                        << "points, but the points are associated with the "
+                        << "face neighbour, which a boundary face does not "
+                        << "have" << exit(FatalError);
+                }
+            }
+        }
+
+        // Whether cellI takes the points of its face faceI
+        const auto takesFace = [&](const label cellI, const label faceI)
+        {
+            if (association_ == cellAssociation::owner)
+            {
+                return own[faceI] == cellI;
+            }
+            else if (association_ == cellAssociation::neighbour)
+            {
+                return faceI < nInternalFaces && nei[faceI] == cellI;
+            }
+
+            return true;
+        };
 
         labelList cellSizes(mesh_.nCells(), 0);
         forAll(cells, cellI)
@@ -146,7 +207,10 @@ public:
             const labelList& cFaces = cells[cellI];
             forAll(cFaces, i)
             {
-                cellSizes[cellI] += rowSizes[cFaces[i]];
+                if (takesFace(cellI, cFaces[i]))
+                {
+                    cellSizes[cellI] += rowSizes[cFaces[i]];
+                }
             }
         }
 
@@ -167,6 +231,12 @@ public:
             forAll(cFaces, i)
             {
                 const label faceI = cFaces[i];
+
+                if (!takesFace(cellI, faceI))
+                {
+                    continue;
+                }
+
                 for
                 (
                     label k = faceStartOffsets_[faceI];
@@ -215,11 +285,18 @@ public:
         return false;
     }
 
-    //- A face is shared by two cells, so the same quadrature point is reached
-    //  from both and must not be aggregated twice
+    //- Which cells a face's points are associated with
+    cellAssociation association() const
+    {
+        return association_;
+    }
+
+    //- With both cells associated, a face is shared by two cells, so the
+    //  same quadrature point is reached from both and must not be aggregated
+    //  twice. With one cell, every point belongs to that cell alone
     virtual bool requiresUniqueIntegrationPointsPerMaterial() const override
     {
-        return true;
+        return association_ == cellAssociation::both;
     }
 };
 

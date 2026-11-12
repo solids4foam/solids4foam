@@ -83,8 +83,10 @@ class nonLinGeomTotalLagTotalDispSolid
         //  In the case of Hookean elasticity, (2*mu + lambda) is the optimum
         const volScalarField impK_;
 
-        //- Implicit stiffness surface field
-        const surfaceScalarField impKf_;
+        //- Implicit stiffness surface field. Not const: on the faces between
+        //  two materials it is the series stiffness of the two, with the
+        //  high-order face quadrature
+        surfaceScalarField impKf_;
 
         //- Reciprocal of impK
         //  We divide by impK every time tractionBoundarySnGrad is called so we
@@ -120,6 +122,13 @@ class nonLinGeomTotalLagTotalDispSolid
 
         //- Update the cell-centred stress
         void correctStress();
+
+        //- This model evaluates both sides of the material interfaces with
+        //  the high-order face quadrature
+        virtual bool supportsMaterialInterfaceQuad() const
+        {
+            return true;
+        }
 
         //- This model smooths the hydrostatic stress on request, in
         //  correctStress(), in its implicit segregated algorithm

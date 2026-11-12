@@ -238,6 +238,74 @@ movingLeastSquares::fGrad
 
 
 template<class Type>
+void movingLeastSquares::fGradInterfaceNeighbour
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf,
+    CompactListList<typename outerProduct<vector, Type>::type>& result
+) const
+{
+    typedef typename outerProduct<vector, Type>::type GradType;
+
+    if (interfaceNeighbourFaceGradCoeffsPtr_.empty())
+    {
+        calcInterfaceNeighbourFaceCoeffs();
+    }
+
+    const globalIndex& globalCells = stencil().globalCells();
+    const Map<FixedList<label, 2>>& remoteLoc = stencil().remoteCellLocation();
+    auto& stencils =
+        compactListListCRef(stencil().interfaceNeighbourFacesStencil());
+#ifdef FOAMEXTEND
+    List<CompactListList<vector>>& fGradCoeffs =
+        const_cast<List<CompactListList<vector>>&>
+        (
+            interfaceNeighbourFaceGradCoeffsPtr_()
+        );
+#else
+    const List<CompactListList<vector>>& fGradCoeffs =
+        interfaceNeighbourFaceGradCoeffsPtr_();
+#endif
+
+    const Field<Type>& vfI = vf.internalField();
+    const List<Field<Type>> remoteField = stencil().remoteFieldPerProc(vfI);
+
+    // Only internal faces lie on a material interface
+    for (label faceI = 0; faceI < mesh_.nInternalFaces(); ++faceI)
+    {
+        const UList<label>& stencil = stencils[faceI];
+
+        if (stencil.empty())
+        {
+            continue;
+        }
+
+        auto& coeffs = fGradCoeffs[faceI];
+
+        forAll(result[faceI], qpI)
+        {
+            GradType sum = pTraits<GradType>::zero;
+
+            forAll(stencil, cI)
+            {
+                sum +=
+                    coeffs[qpI][cI]
+                  * fieldValue
+                    (
+                        stencil[cI],
+                        globalCells,
+                        remoteLoc,
+                        vfI,
+                        remoteField
+                    );
+            }
+
+            result[faceI][qpI] = sum;
+        }
+    }
+}
+
+
+template<class Type>
 void movingLeastSquares::fGrad
 (
     const GeometricField<Type, fvPatchField, volMesh>& vf,

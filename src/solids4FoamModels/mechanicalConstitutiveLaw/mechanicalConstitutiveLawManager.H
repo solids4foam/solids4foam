@@ -726,20 +726,6 @@ class mechanicalConstitutiveLawManager
             const tangentRequest req
         );
 
-        //- True with more than one law on the compact face topology (the
-        //  face quadrature points of high-order solid models). Each of its
-        //  integration points is then given to exactly one law, the law of
-        //  the face it lies on (see faceLaws), so no point is shared
-        bool assignsFacePointsToOneLaw
-        (
-            const integrationPointTopology& topo
-        ) const;
-
-        //- The law of every face: the lower law index of the two cells of an
-        //  internal face, the owner's law on a boundary face. Consistent with
-        //  the face material used by the high-order least-squares stencils
-        labelList faceLaws() const;
-
         //- Create (if required) and return scratch containers for surface
         //  fields
         surfaceSymmTensorField& surfaceStressSum() const;
@@ -795,6 +781,20 @@ public:
         const integrationPointTopology& topologyFor
         (
             const word& topologyTypeName
+        ) const;
+
+        //- Return (and lazily construct) the compact face topology of the
+        //  neighbour side of the material interfaces, from a layout with one
+        //  row per face whose only non-empty rows are the faces between two
+        //  materials.
+        //  Each of its points belongs to the face neighbour's law, so with
+        //  the owner-side topology compactCellTopologyFor() builds for more
+        //  than one law, an interface face is evaluated once by each of its
+        //  two materials, each with its own kinematics and history. Pass it
+        //  to the flat-list updates. Requires more than one law
+        const integrationPointTopology& interfaceNeighbourTopologyFor
+        (
+            const CompactListList<tensor>& layout
         ) const;
 
         //- Const-access to the unregistered material-density fallback field

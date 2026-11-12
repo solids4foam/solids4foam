@@ -624,11 +624,22 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
     List<CompactListList<vector>>& faceBoundaryDataCoeffs =
         autoPtrRef(faceBoundaryDataCoeffsPtr_);
 
+    // A face between two materials has a neighbour-side stencil. Its
+    // gradient here is the owner cell's polynomial alone: averaging it with
+    // the neighbour's would mix the strains of two materials, which differ
+    // across the interface. The neighbour's polynomial is the neighbour side
+    // (calcInterfaceNeighbourFaceGradCoeffs)
+    auto& interfaceNeighbourStencils =
+        compactListListCRef(stencil().interfaceNeighbourFacesStencil());
+
     // Loop over internal faces
     for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
     {
         const label ownCellI = owner[faceI];
         const label neiCellI = neighbour[faceI];
+        const bool materialInterface =
+            interfaceNeighbourStencils[faceI].size() > 0;
+        const scalar ownWeight = materialInterface ? 1.0 : 0.5;
 
         const labelUList& ownStencil = cellStencils[ownCellI];
         const labelUList& neiStencil = cellStencils[neiCellI];
@@ -677,10 +688,15 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                 const label faceStencilI =
                     faceCellToIndex[ownStencil[cellI]];
 
-                coeffs[faceStencilI] += 0.5*coeff;
+                coeffs[faceStencilI] += ownWeight*coeff;
                 ownSum += coeff;
             }
-            coeffs[ownIndex] -= 0.5*ownSum;
+            coeffs[ownIndex] -= ownWeight*ownSum;
+
+            if (materialInterface)
+            {
+                continue;
+            }
 
             // Get neighbour side coefficients
             cellGradCoeffsAtPoint(neiCellI, quadPoint, neiCoeffs);
@@ -2247,6 +2263,7 @@ kExactLeastSquares::kExactLeastSquares
     cellThirdGradCoeffsPtr_(),
     faceGradStencilPtr_(),
     faceGradCoeffsPtr_(),
+    interfaceNeighbourFaceGradCoeffsPtr_(),
     faceBoundaryDataStencilPtr_(),
     faceBoundaryDataCoeffsPtr_(),
     cellConditionNumberPtr_()
@@ -2345,6 +2362,7 @@ void kExactLeastSquares::clear() const
     cellThirdGradCoeffsPtr_.clear();
     faceGradStencilPtr_.clear();
     faceGradCoeffsPtr_.clear();
+    interfaceNeighbourFaceGradCoeffsPtr_.clear();
     faceBoundaryDataStencilPtr_.clear();
     faceBoundaryDataCoeffsPtr_.clear();
     cellConditionNumberPtr_.clear();
@@ -2368,6 +2386,77 @@ void kExactLeastSquares::fGrad
 ) const
 {
     this->fGrad<vector>(vf, result);
+}
+
+
+void kExactLeastSquares::fGradInterfaceNeighbour
+(
+    const volVectorField& vf,
+    CompactListList<tensor>& result
+) const
+{
+    this->fGradInterfaceNeighbour<vector>(vf, result);
+}
+
+
+void kExactLeastSquares::calcInterfaceNeighbourFaceGradCoeffs() const
+{
+    if (interfaceNeighbourFaceGradCoeffsPtr_.valid())
+    {
+        FatalErrorInFunction
+            << "Pointer already set!" << abort(FatalError);
+    }
+
+    const fvMesh& mesh = mesh_;
+    const labelUList& neighbour = mesh.neighbour();
+    auto& cellStencils = compactListListCRef(stencil().cellsStencil());
+    auto& interfaceNeighbourStencils =
+        compactListListCRef(stencil().interfaceNeighbourFacesStencil());
+    auto& faceQuadPoints =
+        compactListListCRef(quadrature().faceQuadPoints());
+
+    interfaceNeighbourFaceGradCoeffsPtr_.set
+    (
+        new List<CompactListList<vector>>(mesh.nFaces())
+    );
+    List<CompactListList<vector>>& faceCoeffs =
+        autoPtrRef(interfaceNeighbourFaceGradCoeffsPtr_);
+
+    for (label faceI = 0; faceI < mesh.nInternalFaces(); ++faceI)
+    {
+        if (interfaceNeighbourStencils[faceI].size() == 0)
+        {
+            continue;
+        }
+
+        // The neighbour cell's polynomial: its cell stencil, followed by the
+        // cell itself
+        const label neiCellI = neighbour[faceI];
+        const labelUList& neiStencil = cellStencils[neiCellI];
+        const UList<point>& quadPoints = faceQuadPoints[faceI];
+        const label nCoeffs = neiStencil.size() + 1;
+
+        faceCoeffs[faceI] =
+            CompactListList<vector>(labelList(quadPoints.size(), nCoeffs));
+
+        vectorField neiCoeffs(neiStencil.size());
+
+        forAll(quadPoints, qpI)
+        {
+            UList<vector> coeffs = faceCoeffs[faceI][qpI];
+
+            cellGradCoeffsAtPoint(neiCellI, quadPoints[qpI], neiCoeffs);
+
+            vector neiSum = vector::zero;
+            forAll(neiStencil, cellI)
+            {
+                coeffs[cellI] = neiCoeffs[cellI];
+                neiSum += neiCoeffs[cellI];
+            }
+
+            coeffs[nCoeffs - 1] = -neiSum;
+        }
+    }
 }
 
 

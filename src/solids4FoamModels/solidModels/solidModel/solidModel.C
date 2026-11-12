@@ -40,6 +40,7 @@ License
 #include "compatibilityFunctions.H"
 #include "NewmarkBetaD2dt2Scheme.H"
 #include "hofvc.H"
+#include "cellZoneInterface.H"
 #include "fvm.H"
 #include "fvc.H"
 #include "fvMatrices.H"
@@ -2577,6 +2578,16 @@ void Foam::solidModel::rollOverQuadratureHistory()
 
         copyQuadGradient(gradDQuad(), gradDQuad0Ptr_());
     }
+
+    if (gradDQuadNeiPtr_.valid())
+    {
+        if (gradDQuadNei0Ptr_.empty())
+        {
+            gradDQuadNei0Ptr_.set(new CompactListList<tensor>());
+        }
+
+        copyQuadGradient(gradDQuadNei(), gradDQuadNei0Ptr_());
+    }
 #endif
 }
 
@@ -2724,11 +2735,250 @@ void Foam::solidModel::gradQuad
     CompactListList<tensor>& gradDQuad
 ) const
 {
-    // With more than one material the least-squares stencils are restricted
-    // to one material (leastSquaresStencil): a face takes the lower material
-    // index of its two cells, and its quadrature points are evaluated by that
-    // material's law (mechanicalConstitutiveLawManager::faceLaws)
+    if (materialInterfaceQuad())
+    {
+        if (!supportsMaterialInterfaceQuad())
+        {
+            FatalErrorInFunction
+                << "The " << type() << " solid model does not support more "
+                << "than one material with the high-order face quadrature"
+                << exit(FatalError);
+        }
+
+        if (highOrderJacobian())
+        {
+            FatalErrorInFunction
+                << "highOrderJacobian is not supported with more than one "
+                << "material: the high-order Jacobian does not include the "
+                << "neighbour side of the material interfaces." << nl
+                << "    Set highOrderJacobian false: the residual is still "
+                << "high order, and is solved matrix-free"
+                << exit(FatalError);
+        }
+    }
+
+    // With more than one material the least-squares stencils keep to one
+    // material, and a face between two materials is reconstructed from its
+    // owner's (its neighbour's side: gradQuadInterfaceNeighbour)
     hofvc::fGrad(D, gradDQuad);
+}
+
+
+bool Foam::solidModel::materialInterfaceQuad() const
+{
+    return highOrderResidual() && mechanicalManager().nLaws() > 1;
+}
+
+
+Foam::CompactListList<Foam::tensor>& Foam::solidModel::gradDQuadNei() const
+{
+    if (gradDQuadNeiPtr_.empty())
+    {
+        // One row per face, sized as the face's quadrature points on a face
+        // between two materials and empty on every other face
+        auto& faceQuadPts = compactListListCRef
+        (
+            displacementLeastSquares().quadrature().faceQuadPoints()
+        );
+        auto& interfaceStencils = compactListListCRef
+        (
+            displacementLeastSquares().stencil()
+           .interfaceNeighbourFacesStencil()
+        );
+
+        labelList rowSizes(faceQuadPts.size(), 0);
+        for (label faceI = 0; faceI < mesh().nInternalFaces(); ++faceI)
+        {
+            if (interfaceStencils[faceI].size() > 0)
+            {
+                rowSizes[faceI] = faceQuadPts[faceI].size();
+            }
+        }
+
+        gradDQuadNeiPtr_.set(new CompactListList<tensor>(rowSizes));
+        gradDQuadNeiPtr_().m() = tensor::zero;
+    }
+
+    return autoPtrRef(gradDQuadNeiPtr_);
+}
+
+
+const Foam::CompactListList<Foam::tensor>&
+Foam::solidModel::gradDQuadNei0() const
+{
+    if (gradDQuadNei0Ptr_.empty())
+    {
+        // From the previous-time displacement, as gradDQuad0() is, so that a
+        // restart starts from the right history
+        gradDQuadNei0Ptr_.set
+        (
+            new CompactListList<tensor>(gradDQuadNei().sizes())
+        );
+        gradQuadInterfaceNeighbour(D_.oldTime(), gradDQuadNei0Ptr_());
+    }
+
+    return autoPtrRef(gradDQuadNei0Ptr_);
+}
+
+
+Foam::CompactListList<Foam::symmTensor>&
+Foam::solidModel::sigmaQuadNei() const
+{
+    if (sigmaQuadNeiPtr_.empty())
+    {
+        sigmaQuadNeiPtr_.set
+        (
+            new CompactListList<symmTensor>(gradDQuadNei().sizes())
+        );
+        sigmaQuadNeiPtr_().m() = symmTensor::zero;
+    }
+
+    return autoPtrRef(sigmaQuadNeiPtr_);
+}
+
+
+void Foam::solidModel::gradQuadInterfaceNeighbour
+(
+    const volVectorField& D,
+    CompactListList<tensor>& gradDQuadNei
+) const
+{
+    displacementLeastSquares().fGradInterfaceNeighbour(D, gradDQuadNei);
+}
+
+
+const Foam::integrationPointTopology&
+Foam::solidModel::interfaceNeighbourTopology() const
+{
+    return mechanicalManager().interfaceNeighbourTopologyFor(gradDQuadNei());
+}
+
+
+void Foam::solidModel::combineInterfaceTraction
+(
+    surfaceVectorField& traction,
+    const surfaceVectorField& neighbourTraction,
+    const volScalarField& impK
+) const
+{
+    const word weighting
+    (
+        highOrderCoeffsDict().lookupOrDefault<word>
+        (
+            "interfaceTractionWeighting", "average"
+        )
+    );
+
+    if
+    (
+        weighting != "average"
+     && weighting != "harmonic"
+     && weighting != "stiffnessWeighted"
+     && weighting != "stiffer"
+     && weighting != "softer"
+    )
+    {
+        FatalIOErrorInFunction(highOrderCoeffsDict())
+            << "Unknown interfaceTractionWeighting '" << weighting << "'."
+            << nl << "    Valid weightings are average, harmonic, "
+            << "stiffnessWeighted, stiffer and softer"
+            << exit(FatalIOError);
+    }
+
+    // The interface faces are those with neighbour-side points
+    const labelList rowSizes(gradDQuadNei().sizes());
+    const labelUList& own = mesh().owner();
+    const labelUList& nei = mesh().neighbour();
+    const vectorField& Cf = mesh().faceCentres();
+    const vectorField& C = mesh().C();
+    const vectorField& Sf = mesh().faceAreas();
+    const scalarField& K = impK;
+
+    vectorField& tractionI = primitiveFieldRef(traction);
+    const vectorField& neiTractionI = neighbourTraction;
+
+    for (label faceI = 0; faceI < mesh().nInternalFaces(); ++faceI)
+    {
+        if (rowSizes[faceI] == 0)
+        {
+            continue;
+        }
+
+        // Each side's stiffness scale: K over the normal distance from its
+        // cell centre to the face
+        const vector n(Sf[faceI]/mag(Sf[faceI]));
+        const label ownCellI = own[faceI];
+        const label neiCellI = nei[faceI];
+        const scalar aOwn =
+            K[ownCellI]/max(mag(n & (Cf[faceI] - C[ownCellI])), VSMALL);
+        const scalar aNei =
+            K[neiCellI]/max(mag(n & (C[neiCellI] - Cf[faceI])), VSMALL);
+
+        // The owner's weight. Every weighting is symmetric in the two sides,
+        // so that the result does not depend on which is the owner, nor on
+        // the order of the materials
+        scalar ownWeight = 0.5;
+
+        if (weighting == "harmonic")
+        {
+            // The more compliant side counts more
+            ownWeight = aNei/(aOwn + aNei);
+        }
+        else if (weighting == "stiffnessWeighted")
+        {
+            // The stiffer side counts more
+            ownWeight = aOwn/(aOwn + aNei);
+        }
+        else if (weighting == "stiffer" && aOwn != aNei)
+        {
+            ownWeight = (aOwn > aNei) ? 1.0 : 0.0;
+        }
+        else if (weighting == "softer" && aOwn != aNei)
+        {
+            ownWeight = (aOwn < aNei) ? 1.0 : 0.0;
+        }
+
+        tractionI[faceI] =
+            ownWeight*tractionI[faceI]
+          + (1.0 - ownWeight)*neiTractionI[faceI];
+    }
+}
+
+
+void Foam::solidModel::interfaceSeriesStiffness
+(
+    surfaceScalarField& impKf,
+    const volScalarField& impK
+) const
+{
+    const labelList material(cellMaterialID(mesh()));
+    const labelUList& own = mesh().owner();
+    const labelUList& nei = mesh().neighbour();
+    const vectorField& Cf = mesh().faceCentres();
+    const vectorField& C = mesh().C();
+    const vectorField& Sf = mesh().faceAreas();
+    const scalarField& K = impK;
+
+    scalarField& impKfI = primitiveFieldRef(impKf);
+
+    for (label faceI = 0; faceI < mesh().nInternalFaces(); ++faceI)
+    {
+        const label ownCellI = own[faceI];
+        const label neiCellI = nei[faceI];
+
+        if (material[ownCellI] == material[neiCellI])
+        {
+            continue;
+        }
+
+        const vector n(Sf[faceI]/mag(Sf[faceI]));
+        const scalar deltaOwn = mag(n & (Cf[faceI] - C[ownCellI]));
+        const scalar deltaNei = mag(n & (C[neiCellI] - Cf[faceI]));
+
+        impKfI[faceI] =
+            (deltaOwn + deltaNei)
+           /max(deltaOwn/K[ownCellI] + deltaNei/K[neiCellI], VSMALL);
+    }
 }
 
 

@@ -50,6 +50,13 @@ POINT_D_REF_REL_MAX=3e-3
 # tracked in #470; this bound holds it where it is
 PARALLEL_REL_MAX=5e-4
 
+# High-order arms: the largest cell-centre displacement error against the
+# analytical solution, relative to the largest displacement. The second-order
+# discretisation gives 1.6e-3 on this mesh, the high-order one about 4e-5.
+# Listing the materials in the other order must give the same field
+HIGH_ORDER_D_ERR_MAX=1e-4
+HIGH_ORDER_ORDER_REL_MAX=1e-10
+
 R1=0.05
 R2=0.07
 R3=0.1
@@ -488,10 +495,198 @@ SETEOF
     fi
 }
 
+# ------------------------------------------------------------
+# High order with two materials
+# ------------------------------------------------------------
+# The high-order face quadrature evaluates a face between the two materials
+# from each side, each reconstructed from, and evaluated by, its own material,
+# and takes the face traction as the weighted mean of the two sides'. The
+# displacement is held to a bound well below the second-order error, and the
+# answer must not depend on the order in which the materials are listed
+copy_case_to() {
+    local dir="$1"
+    local item
+
+    rm -rf "${dir}"; mkdir -p "${dir}"
+    for item in "${SCRIPT_DIR}"/*; do
+        [[ "$(basename "${item}")" == "regressionTests" ]] && continue
+        cp -a "${item}" "${dir}/"
+    done
+
+    cp "${dir}/constant/solidProperties.highOrder" \
+        "${dir}/constant/solidProperties"
+    cp "${dir}/system/fvSchemes.highOrder" "${dir}/system/fvSchemes"
+    cp "${dir}/system/fvSolution.highOrder" "${dir}/system/fvSolution"
+}
+
+# The largest cell-centre displacement error of a case against the analytical
+# (plane-stress Lame) solution, relative to the largest displacement
+compute_displacement_err() {
+    local dir="$1"
+    local t d c
+
+    t="$(solids4Foam::latestTime "${dir}")"
+    d=$(solids4Foam::internalFieldValues "${dir}/${t}/D") || return 1
+    c=$(solids4Foam::internalFieldValues "${dir}/${t}/C") || return 1
+
+    paste <(echo "${d}") <(echo "${c}") | awk \
+        -v r1="${R1}" -v r2="${R2}" -v r3="${R3}" \
+        -v e1="${E1}" -v e2="${E2}" -v nu1="${NU1}" -v nu2="${NU2}" \
+        -v p="${PLOAD}" '
+    function abs(x) { return x < 0 ? -x : x }
+    BEGIN {
+        pint = (2*r1*r1*p/(e1*(r2*r2-r1*r1))) / (((1.0/e2)*(((r3*r3+r2*r2)/(r3*r3-r2*r2))+nu2)) + ((1.0/e1)*(((r2*r2+r1*r1)/(r2*r2-r1*r1))-nu1)))
+        a1 = (r1*r1*p - r2*r2*pint)/(r2*r2 - r1*r1)
+        b1 = -(pint - p)*r1*r1*r2*r2/(r2*r2 - r1*r1)
+        a2 = r2*r2*pint/(r3*r3 - r2*r2)
+        b2 = pint*r2*r2*r3*r3/(r3*r3 - r2*r2)
+    }
+    {
+        # One component per line: x, y and z of each cell in turn
+        k = (NR - 1) % 3
+        dv[k] = $1
+        cv[k] = $2
+        if (k < 2) next
+
+        r = sqrt(cv[0]*cv[0] + cv[1]*cv[1])
+        if (r < r2) {
+            u = r/e1*((1 - nu1)*a1 + (1 + nu1)*b1/(r*r))
+        } else {
+            u = r/e2*((1 - nu2)*a2 + (1 + nu2)*b2/(r*r))
+        }
+
+        ex = dv[0] - u*cv[0]/r
+        ey = dv[1] - u*cv[1]/r
+        e = sqrt(ex*ex + ey*ey)
+        if (e > maxErr) maxErr = e
+        if (abs(u) > maxU) maxU = abs(u)
+    }
+    END { printf "%.6g\n", maxErr/maxU }'
+}
+
+run_high_order_arm() {
+    local scheme="$1"
+    local arm="highOrder-${scheme}"
+    local dir="${REGRESSION_ROOT}/${arm}"
+    local swapped="${REGRESSION_ROOT}/${arm}-swapped"
+    local d
+
+    copy_case_to "${dir}"
+    copy_case_to "${swapped}"
+
+    for d in "${dir}" "${swapped}"; do
+        sed -i.bak \
+            "s/type movingLeastSquares;/type ${scheme};/" \
+            "${d}/constant/solidProperties"
+        rm -f "${d}/constant/solidProperties.bak"
+    done
+
+    # The same materials, listed in the other order
+    sed -i.bak \
+        -e '/^    outer$/,/^    }$/{H;d;}' \
+        -e '/^);$/{x;s/^\n//;p;x;}' \
+        "${swapped}/constant/mechanicalProperties"
+    rm -f "${swapped}/constant/mechanicalProperties.bak"
+
+    for d in "${dir}" "${swapped}"; do
+        ( cd "${d}" && ./Allclean > /dev/null 2>&1 ) || true
+        ( cd "${d}" && ./Allrun > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+    done
+
+    if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${arm} does not run in this environment"
+        return
+    fi
+
+    for d in "${dir}" "${swapped}"; do
+        if ! grep -q "^End" "${d}/${SOLVER_LOGFILE}" 2>/dev/null
+        then
+            echo "FAIL: ${arm}: $(basename "${d}") did not run to completion"
+            failures=$((failures + 1))
+            return
+        fi
+
+        ( cd "${d}" && postProcess -func writeCellCentres -latestTime \
+            > log.writeCellCentres 2>&1 ) || true
+    done
+
+    local err
+    err="$(compute_displacement_err "${dir}")"
+
+    if [[ -z "${err}" ]]
+    then
+        echo "FAIL: ${arm}: could not compute the displacement error"
+        failures=$((failures + 1))
+    elif awk "BEGIN {exit !(${err} < ${HIGH_ORDER_D_ERR_MAX})}"
+    then
+        printf "PASS: %s: max displacement error = %.4g\n" "${arm}" "${err}"
+    else
+        printf "FAIL: %s: max displacement error = %.4g\n" "${arm}" "${err}"
+        failures=$((failures + 1))
+    fi
+
+    local t cmp rel max1 max2
+    t="$(solids4Foam::latestTime "${dir}")"
+
+    if ! cmp=$(compare_internal_vector_fields \
+        "${dir}/${t}/D" "${swapped}/${t}/D")
+    then
+        echo "FAIL: ${arm}: could not compare the two material orders"
+        failures=$((failures + 1))
+        return
+    fi
+
+    read -r rel max1 max2 <<< "${cmp}"
+
+    if awk "BEGIN {exit !(${rel} < ${HIGH_ORDER_ORDER_REL_MAX})}"
+    then
+        printf "PASS: %s: material order changes D by %.4g\n" "${arm}" "${rel}"
+    else
+        printf "FAIL: %s: material order changes D by %.4g\n" "${arm}" "${rel}"
+        failures=$((failures + 1))
+    fi
+}
+
+# A material interface on a processor boundary is refused with the high-order
+# face quadrature: the interface decomposition puts all of it there
+run_high_order_processor_interface_arm() {
+    local arm="highOrder-parallel-interface"
+    local dir="${REGRESSION_ROOT}/${arm}"
+
+    copy_case_to "${dir}"
+
+    ( cd "${dir}" && ./Allclean > /dev/null 2>&1 ) || true
+    ( cd "${dir}" && ./Allrun parallel interface \
+        > "${ALLRUN_LOGFILE}" 2>&1 ) || true
+
+    if solids4Foam::regressionCaseSkipped "${dir}/${ALLRUN_LOGFILE}"
+    then
+        echo "SKIP: ${arm} does not run in this environment"
+    elif grep -q "faces between two materials lie on a processor boundary" \
+        "${dir}/${SOLVER_LOGFILE}" 2>/dev/null
+    then
+        echo "PASS: ${arm}: refused, as the interface is a processor boundary"
+    else
+        echo "FAIL: ${arm}: was not refused for its processor-boundary" \
+            "interface"
+        failures=$((failures + 1))
+    fi
+}
+
 if [ "$CHECK_ONLY" = false ]; then
     run_parallel_arm interface
     run_parallel_arm simple
     run_one_cell_thick_arm
+
+    # The high-order face quadrature does not exist on foam-extend
+    if [[ "$(solids4Foam::foamFlavour)" == foamextend ]]; then
+        echo "SKIP: the high-order arms: no high order on foam-extend"
+    else
+        run_high_order_arm movingLeastSquares
+        run_high_order_arm kExactLeastSquares
+        run_high_order_processor_interface_arm
+    fi
 fi
 
 if [ "$CHECK_ONLY" = false ]; then

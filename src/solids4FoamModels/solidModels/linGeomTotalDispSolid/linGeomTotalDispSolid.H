@@ -141,6 +141,13 @@ class linGeomTotalDispSolid
         //- Update the cell-centred stress
         void correctStress();
 
+        //- This model evaluates both sides of the material interfaces with
+        //  the high-order face quadrature
+        virtual bool supportsMaterialInterfaceQuad() const
+        {
+            return true;
+        }
+
         //- This model smooths the hydrostatic stress on request, in
         //  correctStress(), in its implicit segregated algorithm
         virtual bool supportsHydrostaticSmoothing() const

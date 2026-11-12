@@ -1,0 +1,73 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// High-order variant: copy this file to solidProperties, and
+// system/fvSchemes.highOrder and system/fvSolution.highOrder to fvSchemes and
+// fvSolution
+
+// linearGeometry: assumes small strains and rotations
+solidModel     linearGeometryTotalDisplacement;
+
+linearGeometryTotalDisplacementCoeffs
+{
+    // The residual is high order and is solved matrix-free with PETSc SNES
+    solutionAlgorithm    PETScSNES;
+
+    highOrderCoeffs
+    {
+        // The high-order Jacobian is not supported with more than one
+        // material
+        highOrderJacobian false;
+        highOrderResidual true;
+
+        // A face between the two materials is evaluated from each side,
+        // each side reconstructed from, and evaluated by, its own material.
+        // The face traction is the weighted mean of the two sides':
+        // average (default), harmonic (the more compliant side counts more),
+        // stiffnessWeighted (the stiffer side counts more), stiffer or softer
+        // (that side alone)
+        interfaceTractionWeighting average;
+
+        displacement
+        {
+            // movingLeastSquares or kExactLeastSquares
+            type movingLeastSquares;
+            polynomialOrder 3;
+            faceStencilExtraCells 25;
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k 6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
+    // Holds the two sides of each material interface together
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+    }
+}
+
+// ************************************************************************* //
