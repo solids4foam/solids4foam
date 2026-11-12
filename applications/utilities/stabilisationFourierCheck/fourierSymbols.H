@@ -51,9 +51,13 @@ inline scalar expectedEigenvalue
         q[d] = sqr(std::sin(theta[d]/2));
     }
 
+    // spectralNormalisation, or its deprecated alias normalise (the model
+    // constructor refuses both together and warns about the alias)
     const Switch normalise
     (
-        modelDict.lookupOrDefault<Switch>("normalise", false)
+        modelDict.found("spectralNormalisation")
+      ? Switch(modelDict.lookup("spectralNormalisation"))
+      : modelDict.lookupOrDefault<Switch>("normalise", false)
     );
     if (normalise)
     {
@@ -97,15 +101,16 @@ inline scalar expectedEigenvalue
 
         if (type == "diffStencilLaplacian" || type == "RhieChow")
         {
-            // Operator-specific split-m=2 spectral shape. This is not the
-            // coupled paper-m=1 formula, despite sharing the factor 1/(4r*).
+            // Operator-specific directionally split m = 1 spectral shape
+            // (m = laplacianPower, zero-based). This is not the coupled m = 0
+            // formula, despite sharing the factor 1/(4r*).
             return -s*split/(rStar*sqr(hRef));
         }
 
-        label paperOrder = 1;
+        label nLaplacianFactors = 1;
         if (type == "JamesonSchmidtTurkel")
         {
-            paperOrder = 2;
+            nLaplacianFactors = 2;
         }
         else if (type == "generalisedEvenOrderLaplacian")
         {
@@ -118,7 +123,7 @@ inline scalar expectedEigenvalue
                 FatalErrorInFunction << "Negative laplacianPower"
                     << exit(FatalError);
             }
-            paperOrder = laplacianPower + 1;
+            nLaplacianFactors = laplacianPower + 1;
         }
         else if (type != "laplacian")
         {
@@ -128,7 +133,7 @@ inline scalar expectedEigenvalue
 
         // The normalised m=1 path is the ideal Laplacian stencil, not the
         // legacy raw h^2-scaled branch.
-        return -s*std::pow(A/rStar, paperOrder)/sqr(hRef);
+        return -s*std::pow(A/rStar, nLaplacianFactors)/sqr(hRef);
     }
 
     // The raw formulas below are the trusted legacy verification path.

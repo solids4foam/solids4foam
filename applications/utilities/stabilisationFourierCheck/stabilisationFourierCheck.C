@@ -65,7 +65,7 @@ static bool splitSpectralShape(const word& type)
     return type == "diffStencilLaplacian" || type == "RhieChow";
 }
 
-static label paperOrder(const word& type, const dictionary& modelDict)
+static label nLaplacianFactors(const word& type, const dictionary& modelDict)
 {
     if (splitSpectralShape(type))
     {
@@ -457,13 +457,16 @@ int main(int argc, char *argv[])
     metadata(results, runTime, tol, pairTol, gammaTol);
     metadata(cross, runTime, tol, pairTol, gammaTol);
     metadata(gamma, runTime, tol, pairTol, gammaTol);
-    results << "normalise,referenceNyquistDirections,model,type,spectralRelation,paperOrder,"
+    // The paperOrder column is the number of repeated Laplacian factors,
+    // m + 1 with m = laplacianPower (zero-based); the name is kept for the
+    // existing post-processing of these files
+    results << "spectralNormalisation,referenceNyquistDirections,model,type,spectralRelation,paperOrder,"
         << "scaleFactor,laplacianPower,params,Nx,Ny,Nz,hx,hy,hz,modeIndex,kx,ky,kz,"
         << "thetaX_over_pi,thetaY_over_pi,thetaZ_over_pi,lambda_exact,lambda_num,lambda_ref,"
         << "relativeEigenvalueError,rayleighErr,eigenmodeErr,eigenmodeErrRef,referenceMode,pass\n";
-    cross << "normalise,referenceNyquistDirections,modelA,modelB,modeIndex,"
+    cross << "spectralNormalisation,referenceNyquistDirections,modelA,modelB,modeIndex,"
         << "thetaX_over_pi,thetaY_over_pi,maxAbsDiffOverRef,bitwiseEqual,pass\n";
-    gamma << "normalise,referenceNyquistDirections,model,modeIndex,gamma,"
+    gamma << "spectralNormalisation,referenceNyquistDirections,model,modeIndex,gamma,"
         << "maxAbsDiffOverRef,nullGammaBitwiseEqual,pass\n";
 
     wordList patchTypes(mesh.boundary().size());
@@ -572,7 +575,8 @@ int main(int argc, char *argv[])
             dictionary modelDict(models.subDict(names[modeli]));
             if (normalise)
             {
-                modelDict.set("normalise", Switch(true));
+                modelDict.remove("normalise");
+                modelDict.set("spectralNormalisation", Switch(true));
                 modelDict.set("referenceNyquistDirections", rStar);
             }
             const word type(modelDict.lookup("type"));
@@ -615,7 +619,7 @@ int main(int argc, char *argv[])
             if (normalise) results << rStar;
             results << ',' << names[modeli] << ',' << type << ','
                 << spectralRelation(type, modelDict, normalise) << ',';
-            const label order = paperOrder(type, modelDict);
+            const label order = nLaplacianFactors(type, modelDict);
             if (order > 0) results << order;
             results << ',' << scale << ',';
             if (power >= 0) results << power;

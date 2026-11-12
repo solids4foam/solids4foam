@@ -3,7 +3,7 @@ FoamFile
     version 2.0;
     format ascii;
     class dictionary;
-    object stabilisationFourierCheckDict;
+    object stabilisationFourierDict;
 }
 
 // rAUf is exactly 1 with dimensions area/pressure.

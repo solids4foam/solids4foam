@@ -293,24 +293,34 @@ The mesh is overwritten!
 
 ## `stabilisationFourierCheck`
 
-Verifies production runtime-selected pressure stabilisation models on a
-uniform periodic Cartesian mesh against independent raw and spectrally
-normalised Fourier symbols.
-Supported models are Laplacian, JamesonSchmidtTurkel, generalised even-order
-Laplacian powers 0/1/2, diffStencilLaplacian and its RhieChow subclass.
-It reports volume-weighted eigenvalues and residuals, writes CSV results,
-checks equivalent model pairs, constant gamma and invalid configurations,
-and exits nonzero on failure. Optional `-symbolSweep` exports raw analytical
-curves/maps, `-writeFields` writes uniquely named pressure/stabilisation
-fields, and `-constructOnly` supports focused constructor rejection tests.
-When a dictionary contains `fieldOutput`, `-writeFields` performs only a
-generic field export: its named Fourier modes and runtime-selected models are
-written using configurable pressure and stabilisation prefixes, without
-running the CSV campaign. Model dictionaries control normalisation normally.
+- **Utility purpose** Verifies the runtime-selected pressure-stabilisation
+  models against independent analytical Fourier symbols, with and without
+  spectral normalisation (`spectralNormalisation`, `referenceNyquistDirections`).
 
-The particular Paper-1 ParaView demonstration, including its selected modes,
-models and synthetic filtering, lives in the solid-benchmarks repository under
-`papers/JFNK_mixed/fourierVerification/pressureStabilisationFourier/`.
+- **Utility description** On a uniform, axis-aligned periodic Cartesian mesh
+  (cyclic and empty patches only), each model in
+  `system/stabilisationFourierDict` is applied, through the calls a solid
+  model makes, to discrete Fourier modes of the pressure. The measured
+  eigenvalues are compared with the analytical symbols of `fourierSymbols.H`;
+  equivalent model pairs, constant-gamma linearity and the rejection of
+  invalid configurations are also checked. Supported models: `laplacian`,
+  `JamesonSchmidtTurkel`, `generalisedEvenOrderLaplacian` with
+  m = `laplacianPower` = 0, 1 and 2 (counted from zero),
+  `diffStencilLaplacian` and `RhieChow`. Results are written as CSV files to
+  `postProcessing/stabilisationFourierCheck`, and the utility exits nonzero if
+  a check fails.
+
+- **Options** `-dict <name>` (default `stabilisationFourierDict`),
+  `-symbolSweep` (write analytical cuts and 2-D maps), `-writeFields` (write
+  the pressure and stabilisation fields of the modes; with a `fieldOutput`
+  entry, a generic export only), `-constructOnly` (construct the models and
+  exit, for rejection tests) and `-gammaLinearityCheck <scalar>`.
+
+- **Tutorial** `tutorials/solids/linearElasticity/pressureStabilisationFourier`
+  runs the checks and the parameter validation, and is part of
+  `Alltest-regression`.
+
+---
 
 ## `updatePrestress`
 
