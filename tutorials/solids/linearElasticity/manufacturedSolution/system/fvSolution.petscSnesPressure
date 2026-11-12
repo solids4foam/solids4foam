@@ -1,0 +1,91 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    D
+    {
+        solver          petsc;
+
+        // Jacobian-free Newton-Krylov with a block (displacement | pressure)
+        // Schur-complement preconditioner; the block size is 4 in 3-D
+        // (Dx, Dy, Dz, p)
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type basic;
+            snes_rtol "1e-6";
+            // Continue after a failed linear solve: on the 20^3
+            // and finer meshes the first Krylov solve does not reach ksp_rtol
+            // within the iteration limit, although the Newton iteration then
+            // converges. The tests require nonlinear convergence
+            snes_max_linear_solve_fail "100";
+            snes_monitor;
+            snes_converged_reason;
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "200";
+            ksp_rtol "1e-4";
+            ksp_max_it "100";
+            ksp_converged_reason;
+
+            pc_type fieldsplit;
+            pc_fieldsplit_type schur;
+            pc_fieldsplit_schur_fact_type lower;
+            pc_fieldsplit_schur_precondition a11;
+            pc_fieldsplit_block_size "4";
+            pc_fieldsplit_0_fields "0,1,2";
+            pc_fieldsplit_1_fields "3";
+
+            fieldsplit_0_ksp_type preonly;
+            fieldsplit_0_pc_type hypre;
+            fieldsplit_0_pc_hypre_type boomeramg;
+            fieldsplit_0_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_0_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_0_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_0_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_0_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_0_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_0_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_0_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_0_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_0_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_0_pc_hypre_boomeramg_truncfactor "0.3";
+
+            fieldsplit_1_ksp_type preonly;
+            fieldsplit_1_pc_type hypre;
+            fieldsplit_1_pc_hypre_type boomeramg;
+            fieldsplit_1_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_1_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_1_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_1_pc_hypre_boomeramg_truncfactor "0.3";
+        }
+    }
+}
+
+// ************************************************************************* //

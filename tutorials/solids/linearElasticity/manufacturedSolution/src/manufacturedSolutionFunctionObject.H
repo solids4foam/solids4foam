@@ -79,6 +79,13 @@ class manufacturedSolutionFunctionObject
         //- Calculate point stress fields
         const Switch pointStress_;
 
+        //- True if cellPressure was given explicitly in the dictionary
+        const bool cellPressureSpecified_;
+
+        //- Explicit cellPressure setting; when not given, the pressure error
+        //  is reported if and only if the solid model solves for the pressure
+        const Switch cellPressure_;
+
 
     // Private Member Functions
 
@@ -88,6 +95,10 @@ class manufacturedSolutionFunctionObject
             const fvMesh& mesh,
             vectorField& analyticalD
         );
+
+        //- Compare the cell pressure of the mixed displacement-pressure
+        //  formulation with the analytical, compression-positive pressure
+        void writePressureError(const fvMesh& mesh);
 
         //- Write data
         bool writeData();

@@ -130,7 +130,11 @@ def validate_variant(name: str, variant: dict) -> None:
         extra_cells = variant.get("stencil_extra_cells")
         if type(extra_cells) is not int or extra_cells < 0:
             raise RuntimeError(f"{name}: stencil_extra_cells must be a non-negative integer")
-    for field in ("displacement", "stress"):
+    fields = ["displacement", "stress"]
+    if reports_pressure(variant):
+        # Separate thresholds for the cell RMS and the maximum error
+        fields += ["pressure_l2", "pressure_linf"]
+    for field in fields:
         value = variant.get("minimum_net_order", {}).get(field)
         if (
             isinstance(value, bool)
@@ -225,7 +229,16 @@ def run_level(
     log_text = solver_log.read_text()
     if not re.search(r"^End\s*$", log_text, re.MULTILINE):
         raise RuntimeError(f"incomplete solver log: {solver_log}")
-    if "DIVERGED_" in log_text:
+    if reports_pressure(variant):
+        # The mixed approach allows failed linear solves inside a converged
+        # Newton solve (snes_max_linear_solve_fail); the nonlinear outcome
+        # decides
+        if (
+            "Nonlinear solve did not converge" in log_text
+            or "Nonlinear solve converged" not in log_text
+        ):
+            raise RuntimeError(f"PETSc failed to converge: {solver_log}")
+    elif "DIVERGED_" in log_text:
         raise RuntimeError(f"PETSc failed to converge: {solver_log}")
     if variant["approach"].startswith("highOrder-"):
         markers = ["Using volume-averaged manufactured body force"]
@@ -242,6 +255,11 @@ def run_level(
     stress_l2, stress_linf = extract_norms(
         log_text, "Writing sigmaDifference field"
     )
+    if reports_pressure(variant):
+        # Cell RMS and maximum of the pressure error
+        pressure_l2, pressure_linf = extract_norms(
+            log_text, "Writing pDifference field"
+        )
     cell_count = count_cells(run_dir)
     clock_matches = re.findall(r"ClockTime\s*=\s*([0-9.eE+-]+)", log_text)
     result: dict[str, float | int | str] = {
@@ -258,6 +276,18 @@ def run_level(
         "stress_linf_pa": stress_linf,
         "clock_time_s": float(clock_matches[-1]) if clock_matches else math.nan,
     }
+    if reports_pressure(variant):
+        result["pressure_l2_pa"] = pressure_l2
+        result["pressure_linf_pa"] = pressure_linf
+        # Failed linear solves, and those that stopped at the iteration
+        # limit (KSP reason DIVERGED_ITS, i.e. ksp_max_it)
+        reasons = re.findall(
+            r"Linear solve did not converge(?: due to (\w+))?", log_text
+        )
+        result["failed_linear_solves"] = len(reasons)
+        result["failed_linear_solves_iteration_limit"] = reasons.count(
+            "DIVERGED_ITS"
+        )
     numeric_values = (
         value
         for key, value in result.items()
@@ -266,6 +296,28 @@ def run_level(
     if not all(math.isfinite(float(value)) for value in numeric_values):
         raise RuntimeError(f"non-finite result extracted from {solver_log}")
     return result
+
+
+def reports_pressure(variant: dict) -> bool:
+    return any(
+        key.startswith("pressure")
+        for key in variant.get("minimum_net_order", {})
+    )
+
+
+def minimum_order(variant: dict, metric: str) -> float:
+    """Threshold for a metric such as pressure_l2_pa: a norm-specific entry
+    (pressure_l2) if there is one, otherwise the field entry (pressure)"""
+    orders = variant["minimum_net_order"]
+    norm_key = metric.rsplit("_", 1)[0]
+    return orders[norm_key] if norm_key in orders else orders[metric.split("_")[0]]
+
+
+def variant_metrics(reference: dict, variant: dict) -> list[str]:
+    metrics = list(reference["acceptance"]["required_metrics"])
+    if reports_pressure(variant):
+        metrics += ["pressure_l2_pa", "pressure_linf_pa"]
+    return metrics
 
 
 def net_order(
@@ -288,36 +340,44 @@ def write_results(
     quick: bool,
 ) -> bool:
     POST_DIR.mkdir(parents=True, exist_ok=True)
-    metrics = reference["acceptance"]["required_metrics"]
+    metrics_of = {
+        name: variant_metrics(reference, reference["variants"][name])
+        for name in variant_names
+    }
     grouped = {
         name: [row for row in results if row["variant"] == name]
         for name in variant_names
     }
     orders = {
-        name: {metric: net_order(grouped[name], metric) for metric in metrics}
+        name: {
+            metric: net_order(grouped[name], metric)
+            for metric in metrics_of[name]
+        }
         for name in variant_names
     }
 
     with (POST_DIR / "mesh_convergence.csv").open("w", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=results[0].keys())
+        fieldnames: list[str] = []
+        for row in results:
+            fieldnames += [key for key in row if key not in fieldnames]
+        writer = csv.DictWriter(stream, fieldnames=fieldnames, restval="")
         writer.writeheader()
         writer.writerows(results)
 
     finite_positive = all(
         math.isfinite(float(row[metric])) and float(row[metric]) > 0
         for row in results
-        for metric in metrics
+        for metric in metrics_of[str(row["variant"])]
     )
     passed = finite_positive
     if not quick:
         passed = passed and all(
             float(grouped[name][-1][metric]) < float(grouped[name][0][metric])
             and math.isfinite(orders[name][metric])
-            and orders[name][metric] >= reference["variants"][name][
-                "minimum_net_order"
-            ][metric.split("_")[0]]
+            and orders[name][metric]
+            >= minimum_order(reference["variants"][name], metric)
             for name in variant_names
-            for metric in metrics
+            for metric in metrics_of[name]
         )
 
     lines = [
@@ -339,11 +399,20 @@ def write_results(
             ]
         )
         variant = reference["variants"][name]
+        if reports_pressure(variant):
+            lines.append(
+                "- Failed linear solves (at the iteration limit), per level: "
+                + ", ".join(
+                    f"{row['failed_linear_solves']}"
+                    f" ({row['failed_linear_solves_iteration_limit']})"
+                    for row in variant_results
+                )
+            )
         if "p" in variant:
             lines.append(f"- Polynomial degree: p={variant['p']}")
             lines.append(f"- Extra stencil cells: {variant['stencil_extra_cells']}")
-        for metric in metrics:
-            minimum = variant["minimum_net_order"][metric.split("_")[0]]
+        for metric in metrics_of[name]:
+            minimum = minimum_order(variant, metric)
             metric_passed = all(
                 math.isfinite(float(row[metric])) and float(row[metric]) > 0
                 for row in variant_results

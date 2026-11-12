@@ -1,0 +1,52 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel     linearGeometryTotalDisplacement;
+
+linearGeometryTotalDisplacementCoeffs
+{
+    solutionAlgorithm PETScSNES;
+
+    // Mixed displacement-pressure formulation: the pressure p is a separate
+    // unknown, compression positive (sigma = dev(sigma) - p*I)
+    solvePressure     yes;
+
+    // One representative stabilisation configuration. The pressure term is
+    // the generalised even-order Laplacian with m = laplacianPower = 1 (the
+    // bi-Laplacian), unnormalised. These coefficients verify the current
+    // development implementation; they do not reproduce published results
+    stabilisation
+    {
+        momentum
+        {
+            type        diffStencilLaplacian;
+            scaleFactor 0.1;
+        }
+
+        pressure
+        {
+            type                generalisedEvenOrderLaplacian;
+            laplacianPower      1;
+            scaleFactor         0.125;
+            scaleFactorJacobian 1.0;
+        }
+    }
+}
+
+// ************************************************************************* //

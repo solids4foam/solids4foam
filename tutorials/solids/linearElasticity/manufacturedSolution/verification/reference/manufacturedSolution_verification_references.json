@@ -9,6 +9,7 @@
   "default_variants": [
     "hex-segregated",
     "hex-petscSnes",
+    "hex-petscSnesPressure",
     "poly-segregated",
     "poly-petscSnes",
     "distHex-segregated",
@@ -41,6 +42,16 @@
       "minimum_net_order": {
         "displacement": 1.5,
         "stress": 0.5
+      }
+    },
+    "hex-petscSnesPressure": {
+      "mesh": "hex",
+      "approach": "petscSnesPressure",
+      "minimum_net_order": {
+        "displacement": 1.5,
+        "stress": 0.5,
+        "pressure_l2": 1.25,
+        "pressure_linf": 0.75
       }
     },
     "tet-structured-segregated": {

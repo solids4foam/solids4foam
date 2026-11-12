@@ -75,14 +75,70 @@ analytical solution at cell centres. `kExactLeastSquares` stores cell averages,
 so its displacement errors use the volume-averaged analytical solution.
 Analytical stress is evaluated at cell centres for both approaches.
 
+## Mixed displacement-pressure approach
+
+`petscSnesPressure` solves the same problem with the mixed
+displacement-pressure formulation (`solvePressure yes`) and the PETSc SNES
+solution procedure:
+
+```bash
+./Allrun petscSnesPressure
+```
+
+The pressure is compression positive, $\boldsymbol\sigma =
+\tilde{\boldsymbol\sigma} - p\mathbf{I}$, and the pressure equation is
+$-p/K - \nabla\cdot\boldsymbol{u} = 0$ plus stabilisation. For this linear
+elastic solution the analytical pressure is
+
+$$
+p = -\tfrac{1}{3}\operatorname{tr}\boldsymbol\sigma
+  = -\left(\lambda + \tfrac{2}{3}\mu\right)\nabla\cdot\boldsymbol{u}
+  = -K\,\nabla\cdot\boldsymbol{u},
+$$
+
+evaluated at the cell centres. The case uses one stabilisation configuration:
+momentum `diffStencilLaplacian` with scale factor 0.1, and pressure
+`generalisedEvenOrderLaplacian` with `laplacianPower` 1 (the bi-Laplacian),
+scale factor 0.125 and Jacobian scale factor 1.0, unnormalised. The PETSc
+options use a Schur-complement field split with BoomerAMG on both blocks.
+These settings verify the current implementation; they are not intended to
+reproduce published results.
+
+The error function object reports the pressure error whenever the solid model
+solves for the pressure (`cellPressure` may be set to `yes` or `no` in
+`system/controlDict` to override this; `yes` without `solvePressure` is an
+error). It writes `analyticalP` and `pDifference` and logs
+
+```text
+Writing pDifference field
+    Pressure error norms: mean L1, cell RMS, LInf, volume-weighted RMS:
+    Magnitude: 184019 234249 937903 234249
+```
+
+As for the displacement and stress (whose second column is labelled
+"mean L2"), the cell RMS is the root mean square over cells, unweighted. The
+volume-weighted RMS, $\sqrt{\sum_P V_P e_P^2 / \sum_P V_P}$, is the
+continuous $L^2$ norm of the cell-wise constant error divided by the square
+root of the domain volume; on this uniform mesh the two coincide. The values above are those of the default
+$5^3$ mesh. Displacement-only approaches are unaffected.
+
+On the $20^3$ and finer meshes the first Krylov solve can reach
+`ksp_max_it`; `snes_max_linear_solve_fail` lets the Newton iteration continue.
+The tests require nonlinear convergence and report the number of failed linear
+solves with their PETSc reasons (`DIVERGED_ITS` is the iteration limit).
+
 ## Verification and regression
 
 The regression test checks `segregated`, `petscSnes`, and both high-order
-approaches on coarse hex and tet meshes. Both high-order reconstructions share
-the same displacement and stress L2 tolerances:
+approaches on coarse hex and tet meshes, and `petscSnesPressure` on the coarse
+hex mesh. Both high-order reconstructions share the same displacement and
+stress L2 tolerances. The mixed check also requires nonlinear convergence and a
+pressure error below its tolerance; a missing pressure error fails the test.
+Approach names and `--mesh` select a subset:
 
 ```bash
 ./regressionTest.sh
+./regressionTest.sh --mesh hex petscSnesPressure
 ```
 
 The opt-in [`verification/`](verification/) directory holds mesh and solver
