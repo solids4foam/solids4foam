@@ -23,15 +23,16 @@ License
 #include "dictionary.H"
 #include "Switch.H"
 #include "vector.H"
-#include <cmath>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 namespace Foam
 {
 
-//- Independent mathematical symbols of the Cartesian operators.
-//  No production discretisation or field evaluation belongs in this function.
+//- Analytical eigenvalue (Fourier symbol) of a stabilisation model for the
+//  mode theta on a uniform Cartesian mesh of spacings h and cell counts N.
+//  It is written from the mathematical operators, independently of the
+//  model implementations, so that it can verify them.
 inline scalar expectedEigenvalue
 (
     const dictionary& modelDict,
@@ -48,11 +49,11 @@ inline scalar expectedEigenvalue
     vector q;
     for (direction d = 0; d < 3; ++d)
     {
-        q[d] = sqr(std::sin(theta[d]/2));
+        q[d] = sqr(Foam::sin(theta[d]/2));
     }
 
-    // spectralNormalisation, or its deprecated alias normalise (the model
-    // constructor refuses both together and warns about the alias)
+    // spectralNormalisation, or its deprecated alias normalise; the model
+    // constructor refuses both together
     const Switch normalise
     (
         modelDict.found("spectralNormalisation")
@@ -95,15 +96,15 @@ inline scalar expectedEigenvalue
         }
         if (hRef <= 0)
         {
-            FatalErrorInFunction << "No active mesh direction"
+            FatalErrorInFunction
+                << "No active mesh direction"
                 << exit(FatalError);
         }
 
         if (type == "diffStencilLaplacian" || type == "RhieChow")
         {
-            // Operator-specific directionally split m = 1 spectral shape
-            // (m = laplacianPower, zero-based). This is not the coupled m = 0
-            // formula, despite sharing the factor 1/(4r*).
+            // Directionally split m = 1 (bi-Laplacian) shape, normalised
+            // by its raw reference response 4*rStar
             return -s*split/(rStar*sqr(hRef));
         }
 
@@ -120,23 +121,27 @@ inline scalar expectedEigenvalue
             );
             if (laplacianPower < 0)
             {
-                FatalErrorInFunction << "Negative laplacianPower"
+                FatalErrorInFunction
+                    << "Negative laplacianPower"
                     << exit(FatalError);
             }
             nLaplacianFactors = laplacianPower + 1;
         }
         else if (type != "laplacian")
         {
-            FatalErrorInFunction << "Unsupported normalised symbol: " << type
+            FatalErrorInFunction
+                << "Unsupported normalised symbol: " << type
                 << exit(FatalError);
         }
 
-        // The normalised m=1 path is the ideal Laplacian stencil, not the
-        // legacy raw h^2-scaled branch.
-        return -s*std::pow(A/rStar, nLaplacianFactors)/sqr(hRef);
+        // Coupled repeated Laplacian with m + 1 factors; for m = 0 the
+        // normalised model uses the plain snGrad stencil, without the |d|^2
+        // of the raw branch. At the reference mode, A = rStar, and the
+        // eigenvalue is -s/hRef^2
+        return -s*Foam::pow(A/rStar, scalar(nLaplacianFactors))/sqr(hRef);
     }
 
-    // The raw formulas below are the trusted legacy verification path.
+    // Raw (unnormalised) symbols
     if (type == "diffStencilLaplacian" || type == "RhieChow")
     {
         scalar split = 0;
@@ -157,32 +162,35 @@ inline scalar expectedEigenvalue
         m = readLabel(modelDict.lookup("laplacianPower"));
         if (m < 0)
         {
-            FatalErrorInFunction << "Negative laplacianPower"
+            FatalErrorInFunction
+                << "Negative laplacianPower"
                 << exit(FatalError);
         }
     }
     else if (type != "laplacian")
     {
-        FatalErrorInFunction << "Unsupported raw symbol: " << type
+        FatalErrorInFunction
+            << "Unsupported raw symbol: " << type
             << exit(FatalError);
     }
 
-    // m=0 is a special production branch, with an extra numerical h^2.
+    // m = 0 carries the legacy face |d|^2 = h^2 factor, which cancels the
+    // 1/h^2 of the Laplacian symbol
     if (m == 0)
     {
         return -4*s*(q.x() + q.y() + q.z());
     }
 
-    // A is |lambda_Delta|; B is the direction-dependent outer face scaling.
-    // This includes the anisotropic form without copying a stencil.
+    // A is the symbol magnitude of the Laplacian; B that of the outer
+    // Laplacian with its face scaling h_d^(2m)
     scalar A = 0;
     scalar B = 0;
     for (direction d = 0; d < 3; ++d)
     {
         A += 4*q[d]/sqr(h[d]);
-        B += 4*q[d]*std::pow(h[d], 2*m - 2);
+        B += 4*q[d]*Foam::pow(h[d], scalar(2*m - 2));
     }
-    return -s*std::pow(A, m)*B;
+    return -s*Foam::pow(A, scalar(m))*B;
 }
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //

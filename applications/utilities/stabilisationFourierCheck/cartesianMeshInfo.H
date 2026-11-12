@@ -23,6 +23,9 @@ License
 #include "fvMesh.H"
 #include "compatibilityFunctions.H"
 #include "boundBox.H"
+
+// std::lround: OpenFOAM has no scalar rounding function in all supported
+// flavours
 #include <cmath>
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -53,26 +56,42 @@ struct cartesianMeshInfo
         const Vector<label> active(mesh.geometricD());
         bool periodic[3] = {false, false, false};
 
+        // Return the axis a face is normal to, checking that the face is
+        // axis-aligned and the spacing uniform along that axis
         const auto checkFace = [&](const vector& area, const scalar delta)
         {
             const vector normal(area/mag(area));
             direction axis = 0;
             for (direction d = 1; d < 3; ++d)
             {
-                if (mag(normal[d]) > mag(normal[axis])) axis = d;
+                if (mag(normal[d]) > mag(normal[axis]))
+                {
+                    axis = d;
+                }
             }
+
             if (mag(normal[axis]) < 1 - 1e-10 || delta <= 0)
             {
-                FatalErrorInFunction << "Non-Cartesian face or invalid delta"
+                FatalErrorInFunction
+                    << "Non-Cartesian face or invalid delta"
                     << exit(FatalError);
             }
+
+            // The first face normal to an axis sets its spacing; every
+            // other must match it
             const scalar spacing = 1/delta;
-            if (h[axis] == 0) h[axis] = spacing;
+            if (h[axis] == 0)
+            {
+                h[axis] = spacing;
+            }
+
             if (mag(h[axis] - spacing) > 1e-12*h[axis])
             {
-                FatalErrorInFunction << "Non-uniform spacing in axis " << axis
+                FatalErrorInFunction
+                    << "Non-uniform spacing in axis " << axis
                     << exit(FatalError);
             }
+
             return axis;
         };
 
@@ -80,15 +99,23 @@ struct cartesianMeshInfo
         {
             checkFace(mesh.Sf()[facei], mesh.deltaCoeffs()[facei]);
         }
+
         forAll(mesh.boundary(), patchi)
         {
             const fvPatch& patch = mesh.boundary()[patchi];
+
             if (patch.type() != "cyclic" && patch.type() != "empty")
             {
-                FatalErrorInFunction << "Only cyclic and empty patches supported"
+                FatalErrorInFunction
+                    << "Only cyclic and empty patches supported"
                     << exit(FatalError);
             }
-            if (patch.type() == "empty") continue;
+
+            if (patch.type() == "empty")
+            {
+                continue;
+            }
+
             forAll(mesh.Sf().boundaryField()[patchi], facei)
             {
                 const direction axis = checkFace
@@ -113,14 +140,16 @@ struct cartesianMeshInfo
             {
                 if (!periodic[d] || h[d] <= 0)
                 {
-                    FatalErrorInFunction << "Axis " << d << " is not periodic"
+                    FatalErrorInFunction
+                        << "Axis " << d << " is not periodic"
                         << exit(FatalError);
                 }
                 N[d] = std::lround(span[d]/h[d]);
             }
             if (N[d] < 1 || mag(span[d] - N[d]*h[d]) > 1e-12*span[d])
             {
-                FatalErrorInFunction << "Invalid Cartesian extent in axis " << d
+                FatalErrorInFunction
+                    << "Invalid Cartesian extent in axis " << d
                     << exit(FatalError);
             }
             count *= N[d];
@@ -129,11 +158,13 @@ struct cartesianMeshInfo
         }
         if (count != mesh.nCells())
         {
-            FatalErrorInFunction << "Cell count does not match Cartesian lattice"
+            FatalErrorInFunction
+                << "Cell count does not match Cartesian lattice"
                 << exit(FatalError);
         }
 
         boolList seen(count, false);
+        // Each cell centre must lie on the lattice, at a distinct index
         forAll(primitiveField(mesh.C()), celli)
         {
             if
@@ -142,16 +173,19 @@ struct cartesianMeshInfo
              || mag(mesh.V()[celli] - volume) > 1e-12*volume
             )
             {
-                FatalErrorInFunction << "Expected uniform hexahedral volumes"
+                FatalErrorInFunction
+                    << "Expected uniform hexahedral volumes"
                     << exit(FatalError);
             }
             for (direction d = 0; d < 3; ++d)
             {
-                const scalar x = (mesh.C()[celli][d] - bounds.min()[d])/h[d] - 0.5;
+                const scalar x =
+                    (mesh.C()[celli][d] - bounds.min()[d])/h[d] - 0.5;
                 const label i = std::lround(x);
                 if (i < 0 || i >= N[d] || mag(x - i) > 1e-10)
                 {
-                    FatalErrorInFunction << "Cell centre is off the lattice"
+                    FatalErrorInFunction
+                        << "Cell centre is off the lattice"
                         << exit(FatalError);
                 }
                 index[d][celli] = i;
@@ -160,7 +194,8 @@ struct cartesianMeshInfo
                 + N[0]*(index[1][celli] + N[1]*index[2][celli]);
             if (seen[flat])
             {
-                FatalErrorInFunction << "Duplicate Cartesian cell index"
+                FatalErrorInFunction
+                    << "Duplicate Cartesian cell index"
                     << exit(FatalError);
             }
             seen[flat] = true;

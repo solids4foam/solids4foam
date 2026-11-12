@@ -1,32 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
 FoamFile
 {
-    version 2.0;
-    format ascii;
-    class dictionary;
-    object stabilisationFourierDict;
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      stabilisationFourierDict;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-// rAUf is exactly 1 with dimensions area/pressure.
-tolerance 1e-9;
-pairTolerance 1e-12;
-gammaTolerance 1e-14;
-gammaLinearityCheck 0.37;  // 0 disables this secondary check
+// Example dictionary for stabilisationFourierCheck: copy it to system/ of a
+// uniform periodic Cartesian case. The pressureStabilisationFourier tutorial
+// uses the same settings.
+
+// rAUf is exactly 1 with dimensions area/pressure
+tolerance       1e-9;
+pairTolerance   1e-12;
+gammaTolerance  1e-14;
+
+// Constant face weight of the linearity check; 0 disables the check
+gammaLinearityCheck 0.37;
+
+// Repeat the checks with spectral normalisation, with this reference mode
 normalisedVerification true;
 referenceNyquistDirections 2;
 
 models
 {
-    laplacian { type laplacian; scaleFactor 0.37; }
-    JST { type JamesonSchmidtTurkel; scaleFactor 0.37; }
-    gen0 { type generalisedEvenOrderLaplacian; scaleFactor 0.37; laplacianPower 0; }
-    gen1 { type generalisedEvenOrderLaplacian; scaleFactor 0.37; laplacianPower 1; }
-    gen2 { type generalisedEvenOrderLaplacian; scaleFactor 0.37; laplacianPower 2; }
-    diffStencil { type diffStencilLaplacian; scaleFactor 0.37; }
-    RhieChow { type RhieChow; scaleFactor 0.37; }
+    laplacian
+    {
+        type            laplacian;
+        scaleFactor     0.37;
+    }
+
+    JST
+    {
+        type            JamesonSchmidtTurkel;
+        scaleFactor     0.37;
+    }
+
+    gen0
+    {
+        type            generalisedEvenOrderLaplacian;
+        scaleFactor     0.37;
+        laplacianPower  0;
+    }
+
+    gen1
+    {
+        type            generalisedEvenOrderLaplacian;
+        scaleFactor     0.37;
+        laplacianPower  1;
+    }
+
+    gen2
+    {
+        type            generalisedEvenOrderLaplacian;
+        scaleFactor     0.37;
+        laplacianPower  2;
+    }
+
+    diffStencil
+    {
+        type            diffStencilLaplacian;
+        scaleFactor     0.37;
+    }
+
+    RhieChow
+    {
+        type            RhieChow;
+        scaleFactor     0.37;
+    }
 }
 
-// theta/pi: k_d = N_d * (theta_d/pi) / 2 must be an integer.
-// Index-based cosine has nonzero amplitude even at the Nyquist mode.
+// Modes as theta/pi: k_d = N_d*(theta_d/pi)/2 must be an integer. The modes
+// are cosines of the cell index, so the Nyquist mode is nonzero
 modes
 (
     (0 0 0)
@@ -39,4 +95,12 @@ modes
     (0.125 0 0)
 );
 
-crossChecks ((laplacian gen0) (JST gen1) (diffStencil RhieChow));
+// Model pairs that implement the same operator
+crossChecks
+(
+    (laplacian gen0)
+    (JST gen1)
+    (diffStencil RhieChow)
+);
+
+// ************************************************************************* //
