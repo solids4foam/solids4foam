@@ -1,0 +1,10 @@
+#!/bin/bash
+cd "${0%/*}" || exit 1
+
+. "$WM_PROJECT_DIR/bin/tools/CleanFunctions"
+source solids4FoamScripts.sh
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+cleanCase
+rm -rf constant/polyMesh postProcessing regressionTests log.*
+rm -f system/blockMeshDict.N*

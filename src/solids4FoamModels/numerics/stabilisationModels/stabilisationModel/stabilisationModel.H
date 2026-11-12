@@ -38,6 +38,7 @@ Author
 #include "typeInfo.H"
 #include "runTimeSelectionTables.H"
 #include "dictionary.H"
+#include "Switch.H"
 #include "volFields.H"
 #include "surfaceFields.H"
 #include "fvMatrices.H"
@@ -70,6 +71,12 @@ class stabilisationModel
         //- Scale factor used for globally scaling the approximate Jacobian
         //  This defaults to 1.0
         const scalar scaleFactorJacobian_;
+
+        //- Enable reference-mode spectral normalisation
+        const Switch normalise_;
+
+        //- Number of Nyquist directions in the reference mode
+        const label referenceNyquistDirections_;
 
         //- Pointer to the scalar face stabilisation
         mutable autoPtr<surfaceScalarField> faceScalarPtr_;
@@ -108,6 +115,23 @@ class stabilisationModel
 
         //- Check that an optional face diffusivity field is non-negative
         void checkGamma(const surfaceScalarField* gammaPtr) const;
+
+        //- Print spectral-normalisation settings using an explicit
+        //  operator-specific response description and factor
+        void writeSpectralNormalisationInfo
+        (
+            const string& responseDescription,
+            const scalar factor
+        ) const;
+
+        //- Print the coupled repeated-Laplacian family settings, for
+        //  nLaplacianFactors = m + 1 with m = laplacianPower (zero-based),
+        //  and optionally report use of the ideal Laplacian stencil
+        void writeSpectralNormalisationInfo
+        (
+            const label nLaplacianFactors,
+            const bool usesIdealLaplacianStencil = false
+        ) const;
 
 
     // Private Member Functions
@@ -201,6 +225,28 @@ public:
             {
                 return scaleFactorJacobian_;
             }
+
+            //- Read spectralNormalisation, or its deprecated alias normalise,
+            //  from a model dictionary; both together are refused
+            static bool readSpectralNormalisation(const dictionary& dict);
+
+            //- Return whether spectral normalisation is enabled
+            //  (spectralNormalisation)
+            bool normalise() const
+            {
+                return normalise_;
+            }
+
+            //- Return the number of Nyquist directions in the reference mode
+            label referenceNyquistDirections() const
+            {
+                return referenceNyquistDirections_;
+            }
+
+            //- Return (4*rStar)^(-nLaplacianFactors), the reference-mode
+            //  normalisation of the coupled repeated-Laplacian family with
+            //  nLaplacianFactors = m + 1 (m = laplacianPower, zero-based)
+            scalar nyquistNormalisation(const label nLaplacianFactors) const;
 
             //- Provide access to the scalar face stabilisation pointer
             autoPtr<surfaceScalarField>& faceScalarPtr() const
@@ -366,6 +412,12 @@ public:
             //  residual calculation. Defaults to false; overridden by
             //  models that are known to be compatible (e.g. alphaStab).
             virtual bool supportsHighOrderResidual() const
+            {
+                return false;
+            }
+
+            //- Return true if this model supports spectral normalisation
+            virtual bool supportsSpectralNormalisation() const
             {
                 return false;
             }

@@ -291,6 +291,37 @@ The mesh is overwritten!
 
 ---
 
+## `stabilisationFourierCheck`
+
+- **Utility purpose** Verifies the runtime-selected pressure-stabilisation
+  models against independent analytical Fourier symbols, with and without
+  spectral normalisation (`spectralNormalisation`, `referenceNyquistDirections`).
+
+- **Utility description** On a uniform, axis-aligned periodic Cartesian mesh
+  (cyclic and empty patches only), each model in
+  `system/stabilisationFourierDict` is applied, through the calls a solid
+  model makes, to discrete Fourier modes of the pressure. The measured
+  eigenvalues are compared with the analytical symbols of `fourierSymbols.H`;
+  equivalent model pairs, constant-gamma linearity and the rejection of
+  invalid configurations are also checked. Supported models: `laplacian`,
+  `JamesonSchmidtTurkel`, `generalisedEvenOrderLaplacian` with
+  m = `laplacianPower` = 0, 1 and 2 (counted from zero),
+  `diffStencilLaplacian` and `RhieChow`. Results are written as CSV files to
+  `postProcessing/stabilisationFourierCheck`, and the utility exits nonzero if
+  a check fails.
+
+- **Options** `-dict <name>` (default `stabilisationFourierDict`),
+  `-symbolSweep` (write analytical cuts and 2-D maps), `-writeFields` (write
+  the pressure and stabilisation fields of the modes; with a `fieldOutput`
+  entry, a generic export only), `-constructOnly` (construct the models and
+  exit, for rejection tests) and `-gammaLinearityCheck <scalar>`.
+
+- **Tutorial** `tutorials/solids/linearElasticity/pressureStabilisationFourier`
+  runs the checks and the parameter validation, and is part of
+  `Alltest-regression`.
+
+---
+
 ## `updatePrestress`
 
 - **Utility purpose** Performs one pass of the modified updated Lagrangian

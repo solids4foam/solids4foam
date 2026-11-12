@@ -8,6 +8,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Optional spectral normalisation of the Laplacian-family pressure
+  stabilisation models (`spectralNormalisation`, `referenceNyquistDirections`),
+  by Aaron Mullen-Hales (ported in #627). Off by default. The keyword was
+  `normalise` in #627; that spelling is still read, with a deprecation
+  warning, and a dictionary giving both is refused. The order is
+  m = `laplacianPower`, counted from zero; with normalisation the m = 0
+  branch uses the ideal `scaleFactor/(4*rStar)*snGrad(p)` form.
+  `referenceNyquistDirections` is limited by the geometric mesh directions,
+  so a one-cell empty or wedge direction is excluded.
+- `stabilisationFourierCheck`, which verifies the stabilisation operators
+  against their analytical Fourier symbols, by Aaron Mullen-Hales (ported in
+  #627), and the `pressureStabilisationFourier` tutorial and regression test
+  that run it with the parameter-validation checks. Its default dictionary
+  name, `stabilisationFourierDict`, is now that of the shipped example.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the
