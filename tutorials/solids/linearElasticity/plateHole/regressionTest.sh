@@ -407,21 +407,29 @@ do
         continue
     fi
 
-    app_status=0
-    solids4Foam::requireTestApp Test-alphaStabJacobian || app_status=$?
+    jacobian_log="${case_dir}/log.Test-alphaStabJacobian"
 
-    if (( app_status == 2 )); then
-        failures=$((failures + 1))
-        continue
-    elif (( app_status != 0 )); then
+    if [ "$CHECK_ONLY" = false ]; then
+        app_status=0
+        solids4Foam::requireTestApp Test-alphaStabJacobian || app_status=$?
+
+        if (( app_status == 2 )); then
+            failures=$((failures + 1))
+            continue
+        elif (( app_status != 0 )); then
+            continue
+        fi
+    elif [[ ! -f "${jacobian_log}" ]]; then
+        echo "SKIP: ${approach}: alpha-stabilisation Jacobian (no log)"
         continue
     fi
 
-    jacobian_log="${case_dir}/log.Test-alphaStabJacobian"
-
-    ( cd "${case_dir}" \
-        && solids4Foam::runParallel -o Test-alphaStabJacobian > /dev/null ) \
-        || true
+    # With --check-only the log of an earlier run is inspected as it is
+    if [ "$CHECK_ONLY" = false ]; then
+        ( cd "${case_dir}" \
+            && solids4Foam::runParallel -o Test-alphaStabJacobian \
+            > /dev/null ) || true
+    fi
 
     if grep -q "Overall result: PASSED" "${jacobian_log}" 2>/dev/null; then
         echo "PASS: ${approach}: alpha-stabilisation Jacobian matches the" \

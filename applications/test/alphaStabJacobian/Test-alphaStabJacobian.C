@@ -446,12 +446,21 @@ int main(int argc, char *argv[])
     Foam::boundaryFieldRef(internalDiffusivity) = 0.0;
 
     // Processor faces are internal faces split between two processors
+    label nProcessorFaces = 0;
     forAll(mesh.boundary(), patchI)
     {
         if (isA<processorFvPatch>(mesh.boundary()[patchI]))
         {
             Foam::boundaryFieldRef(internalDiffusivity)[patchI] = 1.0;
+            nProcessorFaces += mesh.boundary()[patchI].size();
         }
+    }
+    reduce(nProcessorFaces, sumOp<label>());
+
+    if (Pstream::parRun())
+    {
+        Info<< "Processor faces in the internal-face check: "
+            << nProcessorFaces << nl << endl;
     }
 
     surfaceScalarField boundaryDiffusivity
@@ -524,7 +533,9 @@ int main(int argc, char *argv[])
     printResult("Internal-face contribution", internalError);
     passed = passed && internalError.passed;
 
-    if (nFixedValueFaces)
+    // Global: the check below is collective, so a rank without fixed-value
+    // faces must still take part when another rank has some
+    if (returnReduce(nFixedValueFaces, sumOp<label>()))
     {
         MatHandle boundaryJacobian;
         hofvm::initialiseJacobian

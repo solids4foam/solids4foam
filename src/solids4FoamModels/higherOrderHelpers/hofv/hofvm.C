@@ -32,10 +32,7 @@ License
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
 #include "processorFvPatch.H"
-#ifdef FOAMEXTEND
-    #include "IPstream.H"
-    #include "OPstream.H"
-#else
+#ifndef FOAMEXTEND
     #include "PstreamBuffers.H"
 #endif
 #include "symmetryPolyPatch.H"
@@ -70,27 +67,66 @@ List<List<labelList>> swapProcessorFaceLists
     }
 
 #ifdef FOAMEXTEND
-    // foam-extend has no PstreamBuffers: its blocking OPstream is buffered,
-    // so every send completes before the matching receive is posted
-    forAll(bm, patchI)
+    // foam-extend has no PstreamBuffers. Its blocking OPstream is buffered
+    // (MPI_Bsend), and the buffer would not hold a large mesh's stencils, so
+    // the lists are flattened per neighbouring processor - for each face, its
+    // size then its entries, the patches in order - and swapped with
+    // Pstream::exchange, as leastSquaresStencil does
+    List<labelList> sendBufs(Pstream::nProcs());
     {
-        if (isA<processorPolyPatch>(bm[patchI]))
+        List<DynamicList<label>> bufs(Pstream::nProcs());
+
+        forAll(bm, patchI)
         {
-            const processorPolyPatch& procPatch =
-                refCast<const processorPolyPatch>(bm[patchI]);
-            OPstream os(Pstream::blocking, procPatch.neighbProcNo());
-            os << sendLists[patchI];
+            if (isA<processorPolyPatch>(bm[patchI]))
+            {
+                const label nbrProcNo =
+                    refCast<const processorPolyPatch>(bm[patchI])
+                   .neighbProcNo();
+                const List<labelList>& faceLists = sendLists[patchI];
+
+                forAll(faceLists, faceI)
+                {
+                    bufs[nbrProcNo].append(faceLists[faceI].size());
+                    bufs[nbrProcNo].append(faceLists[faceI]);
+                }
+            }
+        }
+
+        forAll(bufs, procI)
+        {
+            sendBufs[procI].transfer(bufs[procI]);
         }
     }
+
+    List<labelList> recvBufs;
+    labelListList sizes;
+    Pstream::exchange<labelList, label>(sendBufs, recvBufs, sizes);
+
+    // Read position in each processor's buffer
+    labelList pos(Pstream::nProcs(), 0);
 
     forAll(bm, patchI)
     {
         if (isA<processorPolyPatch>(bm[patchI]))
         {
-            const processorPolyPatch& procPatch =
-                refCast<const processorPolyPatch>(bm[patchI]);
-            IPstream is(Pstream::blocking, procPatch.neighbProcNo());
-            is >> recvLists[patchI];
+            const label nbrProcNo =
+                refCast<const processorPolyPatch>(bm[patchI]).neighbProcNo();
+            const labelList& buf = recvBufs[nbrProcNo];
+            label& i = pos[nbrProcNo];
+            List<labelList>& faceLists = recvLists[patchI];
+            faceLists.setSize(bm[patchI].size());
+
+            forAll(faceLists, faceI)
+            {
+                labelList& lst = faceLists[faceI];
+                lst.setSize(buf[i++]);
+
+                forAll(lst, j)
+                {
+                    lst[j] = buf[i++];
+                }
+            }
         }
     }
 #else
@@ -123,6 +159,7 @@ List<List<labelList>> swapProcessorFaceLists
 
     return recvLists;
 }
+
 
 inline label nDisplacementEqns(const fvMesh& mesh)
 {
@@ -1324,15 +1361,14 @@ void Foam::hofvm::insertAlphaStabIntoPETScMatrix
                 continue;
             }
 
-            const processorFvPatch& procPatch =
-                refCast<const processorFvPatch>(patch);
 #ifdef FOAMEXTEND
             const vectorField& neighbourCellCentres =
                 refCast<const processorPolyPatch>(patch.patch())
                .neighbFaceCellCentres();
 #else
             const vectorField& neighbourCellCentres =
-                procPatch.procPolyPatch().neighbFaceCellCentres();
+                refCast<const processorFvPatch>(patch)
+               .procPolyPatch().neighbFaceCellCentres();
 #endif
             const labelUList& faceCells = patch.faceCells();
             const vectorField patchN(patch.nf());
