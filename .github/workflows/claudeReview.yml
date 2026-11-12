@@ -44,12 +44,20 @@ jobs:
       coverage: ${{ steps.prepare.outputs.coverage }}
       collection_reason: ${{ steps.prepare.outputs.collection_reason }}
       base_sha: ${{ steps.prepare.outputs.base_sha }}
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
     steps:
-      # Never check out the head, a merge ref, or scripts from the PR.
+      # GitHub always runs this YAML from the default branch (master), but
+      # contributions target development. Scripts, instructions and the skill
+      # therefore come from the tip of the PR's base branch, which the branch
+      # filter limits to development or master. Never check out the PR head,
+      # a merge ref, or anything else from the PR.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.sha }}
+          ref: refs/heads/${{ github.event.pull_request.base.ref }}
           persist-credentials: false
+      - name: Record trusted commit
+        id: trusted
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Collect patches as data
         id: prepare
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
@@ -102,9 +110,12 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      # Same trusted commit as the review job (base branch tip if it was skipped).
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.sha }}
+          ref: >-
+            ${{ needs.review.outputs.trusted_sha ||
+              format('refs/heads/{0}', github.event.pull_request.base.ref) }}
           persist-credentials: false
       - name: Publish report or explicit failure
         id: publication

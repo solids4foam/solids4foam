@@ -363,6 +363,10 @@ test('collection failures carry a safe diagnostic without API response text', as
 test('trigger rules restrict branches and cost eligibility without exposing write tools', () => {
   const yaml = fs.readFileSync('.github/workflows/claudeReview.yml', 'utf8');
   assert.match(yaml, /branches: \[development, master\]/);
+  // Trusted code comes from the base branch tip; never the PR head or merge ref.
+  assert.match(yaml, /ref: refs\/heads\/\$\{\{ github.event.pull_request.base.ref \}\}/);
+  assert.match(yaml, /needs.review.outputs.trusted_sha \|\|/);
+  assert.ok(!/pull_request\.head|refs\/pull|github\.head_ref|github\.sha/.test(yaml));
   assert.match(yaml, /github.event.pull_request.author_association/);
   assert.match(yaml, /contains\(github.event.pull_request.labels.\*.name, 'ai-review-approved'\)/);
   assert.match(yaml, /github.event.label.name != 'ai-review-approved'\n      && github.run_id/);

@@ -68,15 +68,18 @@ options, independence rules, and consolidation safeguards.
 
 ## Setup
 
-1. Review this PR against `development`, the normal contribution target. Deploy
-   the workflow and its helper/instruction files to the default branch
-   (`master`) before enabling it. GitHub's current event documentation specifies
-   that `pull_request_target` runs in the default-branch context. The explicit
-   `github.sha` checkout uses that trusted workflow snapshot. See [GitHub's
-   event
+1. Merge this PR into `development` as usual. GitHub always runs
+   `pull_request_target` workflows from the default branch (`master`), even for
+   PRs into `development`; see [GitHub's event
    reference](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target).
-   Confirm the ref and SHA in the first live run. This draft PR cannot test its
-   own privileged workflow before deployment.
+   So also copy **only** `.github/workflows/claudeReview.yml` to `master`, for
+   example in a small maintainer PR. The workflow then checks out the tip of
+   the PR's base branch for the scripts, instructions and skill, so PRs into
+   `development` are reviewed with `development`'s current rules and master
+   does not need updating until the next release. Later changes to the YAML
+   itself (triggers, permissions, model flags) only take effect once copied to
+   `master`. Confirm the checked-out commit in the first live run. This draft
+   PR cannot test its own privileged workflow before deployment.
 2. Create an organisation-owned Anthropic API key for a dedicated workspace. Set
    a spending limit and monitor usage. Store it as the organisation Actions
    secret `ANTHROPIC_API_KEY`, restricted to this repository. A repository
@@ -127,8 +130,10 @@ comment commands or reviewer requests are installed. Editing only the PR body
 does not trigger review; re-run the workflow if evidence was added there.
 
 `pull_request_target` gives access to base-repository secrets for fork PRs. Both
-jobs check out only the event's trusted base commit (`github.sha`), with no
-persisted checkout credentials. Neither job fetches or checks out PR code. The
+jobs check out only the tip of the PR's base branch, which the branch filter
+limits to `development` or `master`; both are maintainer-controlled, so code
+merged there is trusted to the same degree. Checkout credentials are not
+persisted. Neither job fetches or checks out PR code. The
 collector reads patches through the GitHub API. It never executes them, loads
 their configuration, installs their dependencies, or runs their tests. Only
 trusted base scripts run. Never change checkout to the PR head or merge ref,
