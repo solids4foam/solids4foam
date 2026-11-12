@@ -29,10 +29,10 @@ Description
     constant/solidProperties, and therefore applies to movingLeastSquares and
     kExactLeastSquares.
 
-    This initial utility tests serial assembly. Parallel execution is skipped
-    until processor-face assembly is implemented in
-    hofvm::insertAlphaStabIntoPETScMatrix(). A fixed-value-boundary check is
-    reported as skipped when the case has no fixed-value displacement patch.
+    In parallel, processor faces are included in the internal-face check,
+    since they are internal faces split between two processors. A
+    fixed-value-boundary check is reported as skipped when the case has no
+    fixed-value displacement patch.
 
 Author
     Ivan Batistic, UCD.
@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
 #include "leastSquaresScheme.H"
 #include "petscErrorHandling.H"
 #include "solidModel.H"
+#include "processorFvPatch.H"
 
 using namespace Foam;
 
@@ -321,15 +322,6 @@ int main(int argc, char *argv[])
     #include "setRootCase.H"
     #include "createTime.H"
 
-    if (Pstream::parRun())
-    {
-        Info<< "Test-alphaStabJacobian: SKIPPED in parallel until "
-            << "processor-face matrix assembly is implemented"
-            << nl << endl;
-
-        return 0;
-    }
-
     autoPtr<solidModel> solidPtr = solidModel::New
     (
         runTime,
@@ -452,6 +444,15 @@ int main(int argc, char *argv[])
     );
     Foam::primitiveFieldRef(internalDiffusivity) = 1.0;
     Foam::boundaryFieldRef(internalDiffusivity) = 0.0;
+
+    // Processor faces are internal faces split between two processors
+    forAll(mesh.boundary(), patchI)
+    {
+        if (isA<processorFvPatch>(mesh.boundary()[patchI]))
+        {
+            Foam::boundaryFieldRef(internalDiffusivity)[patchI] = 1.0;
+        }
+    }
 
     surfaceScalarField boundaryDiffusivity
     (

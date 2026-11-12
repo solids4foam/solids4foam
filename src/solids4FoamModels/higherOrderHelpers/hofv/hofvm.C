@@ -32,7 +32,10 @@ License
 #include "emptyPolyPatch.H"
 #include "processorPolyPatch.H"
 #include "processorFvPatch.H"
-#ifndef FOAMEXTEND
+#ifdef FOAMEXTEND
+    #include "IPstream.H"
+    #include "OPstream.H"
+#else
     #include "PstreamBuffers.H"
 #endif
 #include "symmetryPolyPatch.H"
@@ -51,7 +54,7 @@ namespace
 // Send one labelList per face of every processor patch to the neighbouring
 // processor and return the lists received for the same faces (processor
 // patch faces are ordered identically on both sides). Used to assemble the
-// high-order stabilisation across processor faces.
+// high-order stabilisation across processor faces
 List<List<labelList>> swapProcessorFaceLists
 (
     const fvMesh& mesh,
@@ -66,6 +69,31 @@ List<List<labelList>> swapProcessorFaceLists
         return recvLists;
     }
 
+#ifdef FOAMEXTEND
+    // foam-extend has no PstreamBuffers: its blocking OPstream is buffered,
+    // so every send completes before the matching receive is posted
+    forAll(bm, patchI)
+    {
+        if (isA<processorPolyPatch>(bm[patchI]))
+        {
+            const processorPolyPatch& procPatch =
+                refCast<const processorPolyPatch>(bm[patchI]);
+            OPstream os(Pstream::blocking, procPatch.neighbProcNo());
+            os << sendLists[patchI];
+        }
+    }
+
+    forAll(bm, patchI)
+    {
+        if (isA<processorPolyPatch>(bm[patchI]))
+        {
+            const processorPolyPatch& procPatch =
+                refCast<const processorPolyPatch>(bm[patchI]);
+            IPstream is(Pstream::blocking, procPatch.neighbProcNo());
+            is >> recvLists[patchI];
+        }
+    }
+#else
     PstreamBuffers pBufs(Pstream::commsTypes::nonBlocking);
 
     forAll(bm, patchI)
@@ -91,14 +119,10 @@ List<List<labelList>> swapProcessorFaceLists
             is >> recvLists[patchI];
         }
     }
+#endif
 
     return recvLists;
 }
-
-} // End anonymous namespace
-
-namespace
-{
 
 inline label nDisplacementEqns(const fvMesh& mesh)
 {
