@@ -1,0 +1,164 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Compute the prestress Fpre for the pulmonary artery wall
+#
+# The solid mesh is copied here by ../Allmesh. Pass 1 runs
+# with prestress off; updatePrestress then writes Fpre to 0 and removes the
+# later time directories. The remaining passes run with prestress on, each
+# refining Fpre. The final Fpre is copied to ../0/solid, the FSI case.
+#
+# Usage:
+#   ./Allrun           # run in serial
+#   ./Allrun parallel  # run in parallel (numberOfSubdomains in
+#                      # system/decomposeParDict)
+#------------------------------------------------------------------------------
+
+set -Eeo pipefail
+IFS=$'\n\t'
+
+cd "$(cd "$(dirname "$0")" && pwd)"
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment is not sourced}"
+
+source solids4FoamScripts.sh
+
+# Number of prestress passes. Each pass appends its convergence measures to
+# prestressHistory: maxMag(D) and rmsMag(D), how far the loaded wall still
+# moves from the imaged geometry, and maxMag(F-I), which also counts rigid
+# rotation. 15 passes is a fixed choice for this tutorial; for another case,
+# check these measures and set the number of passes, or a tolerance on
+# maxMag(D), to suit it
+nPasses=15
+
+runParallel=no
+
+for arg in "$@"
+do
+    case "$arg" in
+        parallel)
+            runParallel=yes
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            echo "Usage: ./Allrun [parallel]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+solids4Foam::requirePetscOrExitSilently
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+if [ ! -d constant/polyMesh ]
+then
+    echo "No solid mesh in constant/polyMesh." >&2
+    echo "Run ../Allmesh first." >&2
+    exit 1
+fi
+
+# Set "prestress yes|no;" in constant/mechanicalProperties. Only a line that
+# starts with the keyword is changed, so comments are left alone
+setPrestress()
+{
+    local file=constant/mechanicalProperties
+    sed -E "s/^([[:space:]]*prestress[[:space:]]+)[a-z]+;/\1$1;/" \
+        "$file" > "$file.tmp"
+    mv "$file.tmp" "$file"
+}
+
+# Run an application in serial or parallel, logging to log.<app>.p<pass>
+run()
+{
+    local pass="$1"
+    shift
+    if [ "$runParallel" = yes ]
+    then
+        solids4Foam::runParallel -o -s "p$pass" "$@"
+    else
+        solids4Foam::runApplication -o -s "p$pass" "$@"
+    fi
+}
+
+# The wall material is defined once, in the FSI case, so that Fpre is computed
+# with the same material the FSI run uses
+materialFile=../constant/solid/mechanicalProperties
+
+if [ ! -f "$materialFile" ]
+then
+    echo "Material file not found: $materialFile" >&2
+    exit 1
+fi
+
+cp "$materialFile" constant/mechanicalProperties
+
+# Start from no prestress. updatePrestress refuses an Fpre in 0 that the run
+# did not use, so any left from an earlier run is removed
+rm -f 0/Fpre 0/Fpre.gz 0/FprePass* prestressHistory
+setPrestress no
+
+if [ "$runParallel" = yes ]
+then
+    solids4Foam::runApplication -o decomposePar -force
+fi
+
+# Inner-wall pressure, read by 0/D from constant/timeVsPressure. Pass 1 ramps
+# the pressure up from zero on the unstressed wall. Later passes start from a
+# wall that already carries the Fpre stresses, which balance the full pressure,
+# so they apply it in full from the start: ramping it again would first
+# deflate the prestressed wall, and the solver fails there
+setPressure()
+{
+    cp "constant/timeVsPressure.$1" constant/timeVsPressure
+}
+
+# Time step in system/controlDict (endTime 1). Pass 1 ramps the pressure over
+# four load steps; later passes hold the full pressure, so a single step to
+# endTime is enough. Only a line that starts with the keyword is changed
+rampDeltaT=0.25
+fullDeltaT=1
+
+setDeltaT()
+{
+    local file=system/controlDict
+    sed -E "s/^([[:space:]]*deltaT[[:space:]]+)[^;]+;/\1$1;/" \
+        "$file" > "$file.tmp"
+    mv "$file.tmp" "$file"
+}
+
+# Restore the ramp time step when the script exits, also on failure, so that
+# system/controlDict is left as it is in the repository
+trap 'setDeltaT "$rampDeltaT"' EXIT
+
+for pass in $(seq 1 "$nPasses")
+do
+    echo "Prestress pass $pass of $nPasses"
+    if [ "$pass" -eq 1 ]
+    then
+        setPressure ramp
+        setDeltaT "$rampDeltaT"
+    else
+        setPressure full
+        setDeltaT "$fullDeltaT"
+    fi
+    run "$pass" solids4Foam
+    run "$pass" updatePrestress
+
+    # Passes after the first apply the Fpre just written
+    if [ "$pass" -eq 1 ]
+    then
+        setPrestress yes
+    fi
+done
+
+if [ "$runParallel" = yes ]
+then
+    solids4Foam::runApplication -o reconstructPar -withZero -fields '(Fpre)'
+    rm -rf processor[0-9]*
+fi
+
+cp 0/Fpre ../0/solid/Fpre
+
+echo "Prestress history (maxMag(D), rmsMag(D) and maxMag(F-I) should fall with each pass):"
+cat prestressHistory
+
+#------------------------------------------------------------------------------
