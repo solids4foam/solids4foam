@@ -172,8 +172,20 @@ namespace Foam
         const labelList materialID(cellMaterialID(mesh));
 
         // Nothing to do for a single material: every cell is -1, so no face
-        // can lie between two different materials
-        if (min(materialID) == -1 && max(materialID) == -1)
+        // can lie between two different materials. Decided over every rank,
+        // as what follows communicates and a rank may hold no cells
+        bool multiMaterial = false;
+        forAll(materialID, cellI)
+        {
+            if (materialID[cellI] != -1)
+            {
+                multiMaterial = true;
+                break;
+            }
+        }
+        reduce(multiMaterial, orOp<bool>());
+
+        if (!multiMaterial)
         {
             return interface;
         }

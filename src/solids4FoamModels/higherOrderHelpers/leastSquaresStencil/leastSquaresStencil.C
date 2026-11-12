@@ -314,6 +314,8 @@ void leastSquaresStencil::calcCellRegion() const
     }
     reduce(multiMaterial, orOp<bool>());
 
+    multiMaterial_ = multiMaterial;
+
     if (!multiMaterial)
     {
         // Single material: nothing is filtered, stencils are unchanged
@@ -378,6 +380,17 @@ const labelList& leastSquaresStencil::cellRegion() const
 }
 
 
+bool leastSquaresStencil::multiMaterial() const
+{
+    if (!cellRegionPtr_.valid())
+    {
+        calcCellRegion();
+    }
+
+    return multiMaterial_;
+}
+
+
 void leastSquaresStencil::calcRemoteRegions
 (
     const List<labelList>& remoteCells,
@@ -387,7 +400,7 @@ void leastSquaresStencil::calcRemoteRegions
     remoteRegionPtr_.reset(new Map<label>());
 
     // Collective: every rank takes this branch, or none does
-    if (cellRegion().empty())
+    if (!multiMaterial())
     {
         return;
     }
@@ -409,12 +422,12 @@ void leastSquaresStencil::calcRemoteRegions
 
 label leastSquaresStencil::regionOfGlobalCell(const label globalCellID) const
 {
-    const labelList& region = cellRegion();
-
-    if (region.empty())
+    if (!multiMaterial())
     {
         return -1;
     }
+
+    const labelList& region = cellRegion();
 
     if (globalCells_.isLocal(globalCellID))
     {
@@ -446,12 +459,12 @@ void leastSquaresStencil::calcFaceRegion() const
     faceRegionPtr_.reset(new labelList(mesh_.nFaces(), -1));
     labelList& faceRegion = autoPtrRef(faceRegionPtr_);
 
-    const labelList& region = cellRegion();
-
-    if (region.empty())
+    if (!multiMaterial())
     {
         return;
     }
+
+    const labelList& region = cellRegion();
 
     // Every face: its owner's region. Inside one material that is the face's
     // region; a face between two materials is reconstructed from each side
@@ -1048,7 +1061,7 @@ void leastSquaresStencil::calcFacesStencil() const
     // that their remote cells are kept by filterUnusedCandidates below
     List<labelList> interfaceNeighbourStencil(mesh_.nFaces());
 
-    if (cellRegion().size())
+    if (multiMaterial())
     {
         const labelList& region = cellRegion();
         const labelUList& own = mesh_.faceOwner();
@@ -1283,7 +1296,12 @@ leastSquaresStencil::leastSquaresStencil
     remoteCellsPerProcPtr_(),
     remoteCentresPerProcPtr_(),
     remoteCentresMapPtr_(),
-    remoteCellLocationPtr_()
+    remoteCellLocationPtr_(),
+    cellRegionPtr_(),
+    multiMaterial_(false),
+    remoteRegionPtr_(),
+    faceRegionPtr_(),
+    interfaceNeighbourFacesStencilPtr_()
 {
     if (!(haloDepthScale_ > 0) || !std::isfinite(haloDepthScale_))
     {

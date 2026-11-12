@@ -276,7 +276,7 @@ void Foam::mechanicalConstitutiveLawStateSetup::readPrescribed
     // A prescribed state belongs to its law's material
     gatherToIntegrationPoints
     (
-        mesh_, lawCells_[lawI], src, topo, ipIDs, fld, true
+        mesh_, lawCells_[lawI], src, topo, ipIDs, fld, &coupledInterface_
     );
 }
 
@@ -334,7 +334,8 @@ Foam::mechanicalConstitutiveLawStateSetup::mechanicalConstitutiveLawStateSetup
     lawCells_(lawCells),
     lawBoundaryFaces_(lawBoundaryFaces),
     stateWriteProxies_(stateWriteProxies),
-    restartKinematicsAvailable_(restartKinematicsAvailable)
+    restartKinematicsAvailable_(restartKinematicsAvailable),
+    coupledInterface_(cellZoneInterfaceCoupled(mesh))
 {}
 
 

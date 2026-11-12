@@ -129,6 +129,11 @@ class leastSquaresStencil
         //  neighbour layers within a processor are filtered alike
         mutable autoPtr<labelList> cellRegionPtr_;
 
+        //- Whether the case has more than one material, the same on every
+        //  rank. Set with cellRegionPtr_: an empty region list is not
+        //  enough to tell, as a rank may hold no cells
+        mutable bool multiMaterial_;
+
         //- The material region of each remote stencil candidate, by global
         //  cell index, exchanged with the candidates' cell centres
         mutable autoPtr<Map<label>> remoteRegionPtr_;
@@ -183,6 +188,9 @@ class leastSquaresStencil
         //- The material region of the local cells, empty with a single
         //  material
         const labelList& cellRegion() const;
+
+        //- Whether the case has more than one material, on every rank
+        bool multiMaterial() const;
 
         //- Material region of a cell given in global numbering: a local
         //  cell or a remote stencil candidate (-1 with a single material)
