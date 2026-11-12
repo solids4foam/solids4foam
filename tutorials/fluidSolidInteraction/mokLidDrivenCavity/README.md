@@ -194,9 +194,9 @@ by 0.8% of the peak between the two finest meshes, and the standard and the
 high-order solids agree to 0.04%. For this tension-dominated membrane the
 high-order solid gives no accuracy benefit: the standard solid reaches the same
 answer with two cells through the thickness, whereas the high-order solid needs
-eight and costs 1.5 times as much. A 128 x 128 mesh level could not be
-completed: the partitioned coupling diverges at that resolution, with either
-solid, and the cause has not been found. The study is separate from
+eight and costs 1.5 times as much. A 128 x 128 mesh level needs relaxed PIMPLE
+outer correctors: with the tutorial settings the fluid's outer loop diverges at
+that resolution (see the verification README). The study is separate from
 `regressionTest.sh` and is not run by the normal tutorial test suites. See the
 verification README for the benchmark definition, the reference quality, the
 acceptance criteria and the recorded results.

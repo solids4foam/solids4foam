@@ -137,8 +137,7 @@ is $$t = 20$$-$$70$$ s, after the start-up transient. For each member the driver
 records the mean peak and trough per lid period, the time-mean, their distance
 outside the group B envelope, and the largest distance of the history from the
 band between the Valdés and fixed-opening Kratos curves. In the tables below,
-"FSI its" is the mean/maximum number of coupling iterations per time step, and
-"Time" the wall-clock time in seconds.
+"FSI its" is the mean/maximum number of coupling iterations per time step.
 
 - `mesh`: the fluid and solid meshes are refined together (16, 32, 64 and 96
   cells across the cavity and along the membrane, eight cells through the
@@ -152,17 +151,16 @@ band between the Valdés and fixed-opening Kratos curves. In the tables below,
 
 ### Mesh study (high-order solid, eight cells through the membrane, 8 ranks)
 
-| Mesh | $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its | Time |
-|---|---|---|---|---|---|---|
-| 16 x 16 | 0.2 | 0.2934 | 0.1943 | 0.2425 | 5.3/26 | 123 |
-| 32 x 32 | 0.1 | 0.2889 | 0.1986 | 0.2426 | 2.7/14 | 227 |
-| 64 x 64 | 0.05 | 0.2870 | 0.2022 | 0.2437 | 2.3/6 | 26096 |
-| 96 x 96 | 0.025 | 0.2861 | 0.2044 | 0.2445 | 2.0/6 | 39963 |
+| Mesh | $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its |
+|---|---|---|---|---|---|
+| 16 x 16 | 0.2 | 0.2934 | 0.1943 | 0.2425 | 5.3/26 |
+| 32 x 32 | 0.1 | 0.2889 | 0.1986 | 0.2426 | 2.7/14 |
+| 64 x 64 | 0.05 | 0.2870 | 0.2022 | 0.2437 | 2.3/6 |
+| 96 x 96 | 0.025 | 0.2861 | 0.2044 | 0.2445 | 2.0/6 |
 
 The 16 x 16 and 32 x 32 levels were run serially: on eight ranks these small
 meshes leave each rank so few cells that the high-order solid gives wrong
-results (solids4foam issue #696). The clock times are explained under
-"Recorded results".
+results (solids4foam issue #696).
 
 The response changes by 1.58%, 1.25% and 0.77% of the peak between successive
 levels. The mean is mesh-independent to 0.8%, and the peak converges at an
@@ -172,33 +170,42 @@ is still rising by 0.8% of the peak at the finest level; it is uncertain by
 about 1-2% of the peak. The time step matters much less than the mesh (see
 below), so halving it with each mesh level only removes a small contribution.
 
-A 128 x 128 level was attempted and could not be completed. With both the
+A 128 x 128 level does not run with the tutorial settings. With both the
 standard and the high-order solid, with $$\Delta t = 0.1$$ and 0.025 s, with an
 initial relaxation factor of 0.02 and with eight PIMPLE outer correctors, the
 coupled iteration diverges within a single time step and the solid PETSc SNES
 solve then fails: at $$t = 4.3$$ s with $$\Delta t = 0.1$$ s, and at
-$$t = 13.925$$ s in all three runs with $$\Delta t = 0.025$$ s. The 96 x 96
-level therefore stands in for it. The cause was not isolated, and the
-divergence is recorded as a known limitation.
+$$t = 13.925$$ s in all three runs with $$\Delta t = 0.025$$ s. The cause is the
+fluid's unrelaxed PIMPLE outer loop: during the fast rise to the third peak the
+pressure residual grows across the outer correctors within one coupling
+iteration ($$\nu \Delta t / h^2$$ is about 4 at 128 x 128 against 2.3 at
+96 x 96). Relaxing the non-final outer correctors (p 0.3, U 0.7, the final
+corrector unrelaxed) with residual control (p 1e-4, U 1e-6, at most 30 outer
+correctors) removes it. With these settings, the high-order solid and
+$$\Delta t = 0.025$$ s, the 128 x 128 mesh runs to $$t = 70$$ s and gives a peak,
+trough and mean of 0.2848, 0.2058 and 0.2446 m, within 0.5% of the
+fixed-opening Kratos solution on the same mesh. The settings are not the
+tutorial default because they have not been tested on the coarser levels, so
+this run is not part of the study tables.
 
 ### Time-step study (64 mesh, high-order solid, 4 ranks)
 
-| $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its | Time |
-|---|---|---|---|---|---|
-| 0.1 | 0.2870 | 0.2026 | 0.2440 | 3.1/25 | 16558 |
-| 0.05 | 0.2870 | 0.2022 | 0.2437 | 2.3/7 | 18020 |
-| 0.025 | 0.2870 | 0.2020 | 0.2436 | 1.9/6 | 21885 |
+| $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its |
+|---|---|---|---|---|
+| 0.1 | 0.2870 | 0.2026 | 0.2440 | 3.1/25 |
+| 0.05 | 0.2870 | 0.2022 | 0.2437 | 2.3/7 |
+| 0.025 | 0.2870 | 0.2020 | 0.2436 | 1.9/6 |
 
 The response changes by 0.16% and then 0.06% of the peak: the benchmark time
 step of 0.1 s is already converged to well within the reference spread.
 
 ### Solid discretisation study (64 mesh, $$\Delta t = 0.1$$ s, 2 ranks)
 
-| Solid | Cells in $$h$$ | Peak (m) | Trough (m) | Mean (m) | FSI its | Time |
-|---|---|---|---|---|---|---|
-| standard | 2 | 0.2869 | 0.2027 | 0.2440 | 3.2/26 | 2791 |
-| standard | 8 | 0.2870 | 0.2027 | 0.2441 | 3.5/32 | 3323 |
-| high-order | 8 | 0.2870 | 0.2026 | 0.2440 | 3.4/34 | 5316 |
+| Solid | Cells in $$h$$ | Peak (m) | Trough (m) | Mean (m) | FSI its |
+|---|---|---|---|---|---|
+| standard | 2 | 0.2869 | 0.2027 | 0.2440 | 3.2/26 |
+| standard | 8 | 0.2870 | 0.2027 | 0.2441 | 3.5/32 |
+| high-order | 8 | 0.2870 | 0.2026 | 0.2440 | 3.4/34 |
 
 The standard and the high-order solids give the same response to 0.03% of the
 peak, and the standard solid needs only two cells through the thickness. The
@@ -294,15 +301,16 @@ $$t = 10$$ s, before the periodic state, and checks only that they complete.
 
 ## Recorded results
 
-Recorded with OpenFOAM v2512 on Linux, on the UCD Sonic cluster (Intel Xeon
-Gold 6542Y nodes), with solids4foam `development` at `206437983` plus the
-outlet condition of PR #676 and this branch's verification scripts. The
-studies ran concurrently in two Slurm jobs: `mesh` on eight ranks, with the
-16 x 16 and 32 x 32 members rerun serially (`--cores 1`) because of
-solids4foam issue #696; `timestep` on four ranks; and `solid` on two. The
-combined summary was then written by `./Allverify --reuse`, which passes every
-check. The eight-rank `mesh` pass on its own reports FAIL only because its two coarsest
-members cannot complete there; the serial pass completes them.
+Recorded with OpenFOAM v2512 on Linux, on the UCD Sonic cluster (Intel Xeon Gold
+6542Y nodes), with solids4foam `development` at `206437983` (a clean checkout;
+the source tree also held the outlet condition of PR #676, which is not built
+into the solver library and not used by this case) and this branch's
+verification scripts. The studies ran concurrently in two Slurm jobs: `mesh` on
+eight ranks, with the 16 x 16 and 32 x 32 members rerun serially (`--cores 1`)
+because of solids4foam issue #696; `timestep` on four ranks; and `solid` on two.
+The combined summary was then written by `./Allverify --reuse`, which passes
+every check. The eight-rank `mesh` pass on its own reports FAIL only because its
+two coarsest members cannot complete there; the serial pass completes them.
 
 The margins of the finest members to the acceptance limits are:
 
@@ -322,20 +330,19 @@ The margins of the finest members to the acceptance limits are:
 | highOrder_ny8 | history band | 1.37% of peak | - | 8.63% |
 
 Every result lies inside, or within 1.3% of, the group B envelope; the peak
-is the binding check. The clock times in the study tables are not
-representative of the cost: the parallel members shared their nodes and were
-slowed by MPI overhead on Sonic. The serial 16 x 16 and 32 x 32 members took
-123 s and 227 s; in an earlier run on an Apple Silicon Mac Studio with two
-ranks (OpenFOAM v2412), the 64 x 64 and 96 x 96 members took 827 s and
-3729 s.
+is the binding check. Clock times are not given: the parallel
+members shared nodes on Sonic and were slowed by MPI overhead, so they do not
+represent the cost. As an indication only, in an earlier run on an Apple
+Silicon Mac Studio with two ranks (OpenFOAM v2412), the 64 x 64 and 96 x 96
+members took 827 s and 3729 s.
 
 With `--quick` the driver runs the two coarsest members of each study to
 $$t = 10$$ s, which took about 7 minutes on two ranks.
 
 ## Known limitations
 
-- A 128 x 128 mesh level could not be completed (see the mesh study), so the
-  finest mesh level is 96 x 96.
+- A 128 x 128 mesh level needs relaxed PIMPLE outer correctors (see the mesh
+  study), so the finest level of the study is 96 x 96.
 - The study was run on OpenFOAM.com only. The tutorial also runs on
   OpenFOAM.org and foam-extend, but their results differ (see the tutorial
   README): on foam-extend the midpoint displacement at t = 5 s is 3% smaller
