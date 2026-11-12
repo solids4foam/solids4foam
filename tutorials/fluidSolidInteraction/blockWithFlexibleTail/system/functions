@@ -1,0 +1,8 @@
+functions
+{
+   pointDisp
+   {
+       type    solidPointDisplacement;
+       point   (0.095 0.06 0.0005);
+   }
+}
