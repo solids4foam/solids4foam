@@ -101,20 +101,34 @@ function formatAssessment(data, risk, floor) {
     'Use this standard AI report; core maintainers decide approval and merging.';
 }
 
+// The agent skill shared by all solids4foam agents, read from the trusted base
+// checkout on every run (never copied), so the reviewer knows the same rules.
+const skillPath = '.agents/skills/solids4foam/SKILL.md';
+function repositoryGuide() {
+  const skill = fs.readFileSync(skillPath, 'utf8').replace(/^---\n[\s\S]*?\n---\n+/, '');
+  const release = fs.readFileSync('CHANGELOG.md', 'utf8').match(/^## \[(v[^\]]+)\]/m);
+  return `## Repository guide (trusted, from \`${skillPath}\` on the base branch)\n\n` +
+    (release ? `Latest released version in CHANGELOG.md: ${release[1]}\n\n` : '') +
+    skill.trim();
+}
+
 // Budget the JSON-escaped *whole prompt*, leaving room for ALL_INPUTS and schema.
 function buildPrompt(pr, files) {
   const instructions = fs.readFileSync('.github/review/instructions.md', 'utf8');
+  const guide = repositoryGuide();
   const selected = [], omitted = [];
   const priority = file => file.filename.startsWith('src/') ? 0 :
     file.filename.startsWith('applications/') ? 1 :
     /(^|\/)(polyMesh|0)\/|\.csv$/.test(file.filename) ? 3 : 2;
-  const prompt = () => `${instructions}\n\nReviewed head: ${pr.head.sha}\nBase: ${pr.base.sha}\n` +
+  const prompt = () => `${instructions}\n\n${guide}\n\n` +
+    `Reviewed head: ${pr.head.sha}\nBase: ${pr.base.sha}\n` +
     `\nUNTRUSTED PR DATA (JSON):\n${JSON.stringify({title: pr.title, body: pr.body,
       files: selected, not_reviewed: omitted})}`;
   // Reserve manifest space before selecting any patches; never silently truncate a patch.
+  // The limit covers instructions and guide (~15 KB escaped) plus the file manifest.
   for (const file of files) omitted.push({path: file.filename,
     reason: file.patch ? 'budget' : 'no_patch'});
-  if (Buffer.byteLength(JSON.stringify(prompt())) > 30000) throw new Error('metadata_too_large');
+  if (Buffer.byteLength(JSON.stringify(prompt())) > 40000) throw new Error('metadata_too_large');
   for (const file of files.slice().sort((a, b) => priority(a) - priority(b))) {
     if (!file.patch) continue;
     const item = {filename: file.filename, previous_filename: file.previous_filename,

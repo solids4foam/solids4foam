@@ -63,22 +63,19 @@ it does not use a synthesis model to dismiss unresolved concerns. The pilot has
 one reviewer, irrespective of risk; do not claim the future two-reviewer policy
 has been satisfied.
 
-## solids4foam context
+## Repository guide and coverage
 
-`physicsModel` selects the analysis. `solidModel`, `fluidModel`, and
-`fluidSolidInterface` provide runtime-selected model families. A
-`mechanicalConstitutiveLaw` provides constitutive behaviour (also called a
-mechanical law). For a new class, look for consistent `TypeName`,
-`defineTypeNameAndDebug`, `addToRunTimeSelectionTable`, and dictionary type
-names. Build lists and options vary between OpenFOAM.com, OpenFOAM.org, and
-foam-extend. Guards such as `OPENFOAM_COM` and `OPENFOAM_NOT_EXTEND` select
-variant interfaces. Tutorials use `Allrun` and `regressionTest.sh` for execution
-and verification.
+The repository guide below these instructions is the solids4foam agent skill,
+shared by all agents and taken from the trusted base branch. Use its rules
+(sections 1-5) as review criteria; its section 6 is for agents making changes.
+Where it says to read files, run checks, or ask the user, you cannot: raise a
+specific human-review question instead. These review instructions take
+precedence if the two conflict.
 
-Where the supplied evidence supports it, check residual/Jacobian consistency,
-`gSum`/`gMax` versus local reductions, coupled and processor patches, changed
-dictionary defaults, and restart/IO for new fields. If surrounding code or build
-lists are absent, ask a specific human-review question; do not assert they are
-wrong. The not_reviewed manifest lists absent or budget-excluded files. Do not
+Apply a guide rule only where the supplied evidence supports it. If surrounding
+code or build lists are absent, ask a specific human-review question; do not
+assert they are wrong. The PR file list does show whether a companion file,
+such as `Make/files.foamextend` or `CHANGELOG.md`, was changed at all. The
+not_reviewed manifest lists absent or budget-excluded files. Do not
 claim they were inspected. Partial patch coverage is useful but cannot establish
 correctness of the whole PR. In particular, verification plots are not examined.

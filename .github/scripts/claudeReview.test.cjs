@@ -276,6 +276,29 @@ test('escaped prompt stays bounded with quote-heavy patches and prioritises sour
   assert.equal(result.coverage.omitted[0].path, 'tutorials/mesh/constant/polyMesh/points');
 });
 
+test('trusted repository guide (skill) precedes untrusted PR data, without frontmatter', () => {
+  const f = fixture();
+  const {prompt} = buildPrompt(f.current, f.files);
+  const skill = fs.readFileSync('.agents/skills/solids4foam/SKILL.md', 'utf8');
+  const body = skill.replace(/^---\n[\s\S]*?\n---\n+/, '').trim();
+  assert.ok(body.length > 1000 && !body.startsWith('---'));
+  const guideAt = prompt.indexOf(body), dataAt = prompt.indexOf('UNTRUSTED PR DATA');
+  assert.ok(guideAt > prompt.indexOf('## Repository guide and coverage'));
+  assert.ok(guideAt > 0 && guideAt < dataAt);
+  assert.ok(!prompt.includes('\nname: solids4foam\n'));
+  const release = fs.readFileSync('CHANGELOG.md', 'utf8').match(/^## \[(v[^\]]+)\]/m)[1];
+  assert.ok(prompt.includes(`Latest released version in CHANGELOG.md: ${release}`));
+});
+
+test('manifest space survives the guide: a 120-file PR is still reviewable', () => {
+  const f = fixture();
+  const files = Array.from({length: 120}, (_, i) =>
+    ({filename: `src/solids4FoamModels/solidModels/fvPatchFields/bc${i}/bc${i}.C`,
+      patch: '@@ -1 +1 @@\n-a\n+b', status: 'modified'}));
+  const result = buildPrompt(f.current, files);
+  assert.equal(result.coverage.status, 'complete');
+});
+
 test('path floors cover core numerics, agents, build scripts, renamed and omitted files', () => {
   for (const path of ['src/solids4FoamModels/mechanicalConstitutiveLaw/law.C',
     'src/solids4FoamModels/fluidSolidInterfaces/interface.C',

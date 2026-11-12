@@ -134,8 +134,13 @@ their configuration, installs their dependencies, or runs their tests. Only
 trusted base scripts run. Never change checkout to the PR head or merge ref,
 even to inspect a proposed instruction file.
 
-Claude receives a bounded JSON payload with the PR description and patches. The
-versioned instructions explicitly treat that payload as untrusted. Only the
+Claude receives the review instructions, the repository guide, and a bounded
+JSON payload with the PR description and patches. The guide is the solids4foam
+agent skill (`.agents/skills/solids4foam/SKILL.md`, the same file every coding
+agent uses) plus the latest released version from `CHANGELOG.md`. Both are read
+from the trusted base checkout on every run, never copied, so a PR that edits
+the skill cannot change its own review. The versioned instructions explicitly
+treat the PR payload as untrusted. Only the
 schema-return tool `StructuredOutput` is enabled. Shell, filesystem, network,
 and GitHub tools are unavailable. MCP is empty, strict, and denied. Bare mode,
 user-only settings, and disabled commands prevent project skills and hooks from
@@ -168,7 +173,8 @@ suppresses stale publication, though a commit can still arrive between that
 check and posting; the explicit SHA remains authoritative.
 
 The collector includes whole patches within a 90 KB JSON-escaped prompt budget,
-including instructions and metadata. This leaves margin for the Action's
+including instructions, the repository guide (about 14 KB with the
+instructions) and metadata. This leaves margin for the Action's
 serialized environment inputs. Source files precede application code, other
 text, and tutorial mesh/field/CSV data. Missing patches (binary, empty files,
 renames) and budget-excluded files are listed as not reviewed in the prompt and
