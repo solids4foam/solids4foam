@@ -53,9 +53,12 @@ directories, as does `./Allclean all` in the case directory; the plain case
 
 Liu et al. (2014) report only the self-convergence of their errors in time,
 not the solution itself. The preprint solves the same case, with the same
-geometry, inflow ramp and material, and describes the solid as linear. Two of
-its figures are vector graphics, from which the reference data were extracted
-exactly rather than digitised:
+geometry, inflow ramp and material, and describes the solid as linear. The
+tutorial uses a finite-strain neo-Hookean solid with the same Lamé constants
+instead (see the tutorial README), so the published data are solutions of a
+slightly different, small-strain model, and the comparison with them is
+indicative only. Two of the preprint's figures are vector graphics, from which
+the reference data were extracted exactly rather than digitised:
 
 - `reference/LiuInterface_t1.csv`: the deformed interface at `t = 1 s` from
   Fig. 5.3, computed on a P5/P4/P5 mesh with a first-order scheme and
@@ -123,12 +126,12 @@ Acceptance criteria and their basis:
 - The change in the steady `u_x` between successive levels must decrease, with
   an observed order of at least `1.5` from the three finest levels, and the
   finest `u_x` must be within 1% of the Richardson extrapolation. The
-  discretisation is second order; the observed order is 2.4.
+  discretisation is second order; the observed order is 2.0.
 - The finest steady `u_x` must be within 10% and `u_y` within 25% of the
   published top-point displacement. The published steady state comes from a
   coarse mesh, and its `u_y` is small, so these are comparisons
-  rather than tight agreements. The converged solids4foam value is 7% below
-  the published `u_x`.
+  rather than tight agreements, and they are of a small-strain model. The
+  converged solids4foam value is 8% above the published `u_x`.
 - The largest distance of the finest interface from the published one,
   divided by the largest interface displacement, must be below 5% at
   `t = 1 s`, where the reference itself carries about 4% of time error, and
@@ -140,24 +143,22 @@ only that every run completes and reaches a steady state.
 
 ## Reference results
 
-Recorded with OpenFOAM v2512 on Linux, with `--cores 4`: levels x0.5 and x1
-and the time-step study in serial, levels x2 and x4 on four MPI ranks. The
-whole study took about 33 minutes.
-
-These results predate the continuity-based wall-normal velocity gradient that
-`newMovingWallVelocity` now applies by default (#670). With it, the tutorial's
-steady top-point displacement is 0.7% smaller (0.116481 against 0.117301 on
-level x1); the tables below have not yet been re-recorded. Setting
-`continuityNormalGradient no` on the interface patch reproduces them.
+Recorded with OpenFOAM v2512 on Linux (solids4foam `development` at
+`206437983` with the finite-strain solid of this branch), with `--cores 4`:
+levels x0.5 and x1 and the time-step study in serial, levels x2 and x4 on four
+MPI ranks. The whole study took about 40 minutes.
 
 Time-step study, tutorial mesh, `t = 1 s`:
 
 | `deltaT` (s) | `u_x` (m) | Change (m) | Order | Interface order | FSI its |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0.25 | 0.0558737 | – | – | – | 11.5/14 |
-| 0.125 | 0.0564184 | 5.45e-4 | – | – | 13.0/14 |
-| 0.0625 | 0.0565219 | 1.04e-4 | 2.39 | 2.39 | 13.0/15 |
-| 0.03125 | 0.0565398 | 1.78e-5 | 2.54 | 2.41 | 13.1/14 |
+| 0.25 | 0.0590302 | – | – | – | 11.0/13 |
+| 0.125 | 0.0595007 | 4.71e-4 | – | – | 13.9/22 |
+| 0.0625 | 0.0596084 | 1.08e-4 | 2.13 | 2.12 | 13.9/16 |
+| 0.03125 | 0.0596316 | 2.32e-5 | 2.21 | 2.00 | 14.5/15 |
+
+The observed orders are close to the formal second order. With the earlier
+small-strain solid they were 2.4-2.5.
 
 Mesh study, top-point displacement in the steady state, and the largest
 distance of the interface from the published one divided by the largest
@@ -165,38 +166,34 @@ interface displacement:
 
 | Level | `u_x` (m) | `u_y` (m) | Change (m) | Shape, 1 s | Shape, steady |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| x0.5 | 0.108206 | -0.012650 | – | 5.5% | 12.6% |
-| x1 | 0.117301 | -0.013745 | 9.10e-3 | 1.6% | 7.8% |
-| x2 | 0.119698 | -0.014003 | 2.40e-3 | 1.6% | 6.5% |
-| x4 | 0.120152 | -0.013996 | 4.54e-4 | 1.6% | 6.3% |
+| x0.5 | 0.124852 | -0.012477 | – | 3.9% | 6.1% |
+| x1 | 0.135581 | -0.013376 | 1.07e-2 | 4.6% | 4.6% |
+| x2 | 0.139075 | -0.013717 | 3.49e-3 | 3.6% | 4.5% |
+| x4 | 0.139948 | -0.013872 | 8.72e-4 | 3.6% | 4.9% |
 
 | Level | Cores | Clock time (s) | FSI iterations per step (mean/max) |
 | ---: | ---: | ---: | ---: |
-| x0.5 | 1 | 41 | 7.7/11 |
-| x1 | 1 | 91 | 9.0/14 |
-| x2 | 4 | 376 | 10.6/16 |
-| x4 | 4 | 1430 | 11.7/18 |
+| x0.5 | 1 | 47 | 7.8/11 |
+| x1 | 1 | 111 | 9.1/14 |
+| x2 | 4 | 403 | 10.3/16 |
+| x4 | 4 | 1806 | 12.2/18 |
 
-The steady `u_x` converges at an observed order of 2.40 to an extrapolated
-`0.12026 m`; the finest level is 0.1% from it and 7.4% below the published
-`0.1297 m`, and its `u_y` is 20% larger in magnitude than the published
-`-0.0117 m`. The interface at `t = 1 s` agrees with the published one to 1.6%
-of the interface displacement on every level from x1, which is within the 4%
-time error of the reference curve itself. In the steady state the published
-half cylinder leans further downstream, by up to 6% of the displacement once
-the mesh is converged.
+The steady `u_x` converges at an observed order of 2.00 to an extrapolated
+`0.14024 m`; the finest level is 0.2% from it and 7.9% above the published
+`0.1297 m`, and its `u_y` is 19% larger in magnitude than the published
+`-0.0117 m`. The interfaces lie within 3.6-4.9% of the interface displacement
+of the published ones on the finer levels. These differences are of the order
+expected between the finite-strain model and the small-strain model of the
+published solution, which was also computed on a coarse mesh.
 
-The steady offset does not come from the time step or the mesh of the
-solids4foam solution, both of which are converged well below it. The
-published steady state was computed on the coarse mesh of the preprint,
-whereas the `t = 1 s` curve, which solids4foam reproduces, was computed with
-P5/P4/P5 elements on a refinement of it; the offset is therefore attributed
-mainly to the reference, although this cannot be confirmed from the published
-data.
+The interface forces balance to about 1e-6: the force the solid receives
+equals the force the fluid exerts. With the earlier small-strain solid, which
+integrated the fluid traction over its undeformed surface, the solid received
+about 12% less x-force.
 
 Because the published data are limited to self-convergence norms and the
-coarse-mesh figures of the preprint, an independent reference solution, e.g.
-from COMSOL, LS-DYNA or ANSYS, would be valuable; one is being arranged.
+coarse-mesh figures of the preprint, an independent reference solution of the
+finite-strain case would be valuable.
 
 ## References
 
