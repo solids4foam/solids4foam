@@ -649,12 +649,11 @@ Foam::tmp<Foam::volScalarField>
 Foam::solidModels::linGeomTotalDispSolid::makeImpK() const
 {
     // For the mixed displacement-pressure formulation the implicit stiffness
-    // is the scalar Laplacian surrogate for div(dev(sigma)), which is
-    // mu*lap(D) + (1/3)*mu*grad(div(D)), i.e. (4/3)*mu
-    const tangentRequest req =
-        solvePressure()
-      ? tangentRequest::scalarDeviatoric
-      : tangentRequest::scalar;
+    // is by default the scalar Laplacian surrogate for div(dev(sigma)), which
+    // for an isotropic law is mu*lap(D) + (1/3)*mu*grad(div(D)), i.e.
+    // (4/3)*mu; with mixedImplicitStiffness twoMu it is the law's declared
+    // 2*mu (mixedImplicitStiffnessRequest)
+    const tangentRequest req = mixedImplicitStiffnessRequest();
 
     return lawImpK(mechanicalManager(), req);
 }

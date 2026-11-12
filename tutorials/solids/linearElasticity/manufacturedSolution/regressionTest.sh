@@ -13,13 +13,13 @@ HIGH_ORDER_DISP_TOL=7e-9
 HIGH_ORDER_STRESS_TOL=7e4
 
 # Mixed displacement-pressure approach (petscSnesPressure), coarse hex mesh.
-# Measured on the 5^3 hex mesh (OpenFOAM.com v2312, PETSc 3.22, macOS):
-# displacement 7.94e-8 m, stress 5.26e5 Pa, pressure 2.34e5 Pa (cell RMS).
-# The tolerances are about 25% above these values, comparable with the margins
-# of the displacement-only tolerances above, for platform and OpenFOAM-variant
-# differences; a tighter solve changes these errors by less than 1e-6
-# relative. One mesh refinement reduces each error by a factor of 2.7-3.5, so
-# a regression of that size is detected
+# Measured on the 5^3 hex mesh with mixedImplicitStiffness twoMu (OpenFOAM.com
+# v2312, PETSc 3.22, macOS): displacement 7.04e-8 m, stress 5.02e5 Pa,
+# pressure 2.31e5 Pa (cell RMS). The tolerances are 42%, 31% and 26% above
+# these values, within the 27-43% margins of the displacement-only tolerances
+# above, for platform and OpenFOAM-variant differences; a tighter solve
+# changes these errors by less than 1e-6 relative. One mesh refinement reduces
+# each error by a factor of 2.7-4, so a regression of that size is detected
 MIXED_HEX_DISP_TOL=1.0e-7
 MIXED_HEX_STRESS_TOL=6.6e5
 MIXED_HEX_PRESSURE_TOL=2.9e5

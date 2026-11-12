@@ -71,6 +71,7 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | `momentum` always used |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+| `mixedImplicitStiffness` | `deviatoric` | `deviatoric` or `twoMu`, only with `solvePressure` |
 
 For `stabilisation`, the code will create a default dictionary if none is
 provided. The `momentum` sub-dictionary is always used. The `pressure`
@@ -98,6 +99,35 @@ ignored.
 
 In other words, `solvePressure true` is not a general option for the
 segregated or explicit paths.
+
+### Mixed implicit stiffness
+
+With `solvePressure true`, the implicit stiffness `impK` of the mixed
+formulation is selected by
+
+```text
+mixedImplicitStiffness deviatoric;   // default
+mixedImplicitStiffness twoMu;
+```
+
+- `deviatoric` (default, unchanged behaviour): the law's deviatoric scalar
+  tangent, the Laplacian surrogate for div(dev(sigma)). For `linearElastic`,
+  `neoHookeanElastic` and `GuccioneElastic` it is (4/3) mu; other laws define
+  their own.
+- `twoMu`: 2 mu, as declared by the mechanical constitutive law
+  (`tangentRequest::scalarShear`). Supported by `linearElastic`,
+  `neoHookeanElastic`, `GuccioneElastic` and an `electroMechanicalLaw` whose
+  passive law is one of these; any other law is refused with an error. For
+  `GuccioneElastic`, mu = k (cf + ct + cfs)/6 is a declared scalar stiffness
+  measure, not the shear modulus of an isotropic material.
+
+`impK` weights the momentum stabilisation and sets the pressure-stabilisation
+diffusivity (`rAUf`, the reciprocal of the momentum diagonal), as well as the
+preconditioner. Changing it therefore changes both stabilisation strengths
+at fixed `scaleFactor`s: for a steady case with uniform properties, `twoMu`
+is equivalent to `deviatoric` with the momentum scale factor multiplied by
+3/2 and the pressure scale factors by 2/3. The keyword is refused without
+`solvePressure`.
 
 ### Explicit-solve time-step control
 

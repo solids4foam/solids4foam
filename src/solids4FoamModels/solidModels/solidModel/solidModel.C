@@ -2768,6 +2768,52 @@ void Foam::solidModel::checkFrameworkGradScheme(const word& fieldName) const
 }
 
 
+Foam::tangentRequest Foam::solidModel::mixedImplicitStiffnessRequest() const
+{
+    const bool specified = solidModelDict().found("mixedImplicitStiffness");
+
+    if (!solvePressure())
+    {
+        if (specified)
+        {
+            FatalIOErrorInFunction(solidModelDict())
+                << "mixedImplicitStiffness is only used with solvePressure "
+                << "(the mixed displacement-pressure formulation)"
+                << exit(FatalIOError);
+        }
+
+        return tangentRequest::scalar;
+    }
+
+    const word stiffness
+    (
+        solidModelDict().lookupOrDefault<word>
+        (
+            "mixedImplicitStiffness", "deviatoric"
+        )
+    );
+
+    if (stiffness == "deviatoric")
+    {
+        return tangentRequest::scalarDeviatoric;
+    }
+    else if (stiffness == "twoMu")
+    {
+        Info<< "Mixed implicit stiffness: twoMu (2*mu declared by the "
+            << "mechanical constitutive law)" << endl;
+
+        return tangentRequest::scalarShear;
+    }
+
+    FatalIOErrorInFunction(solidModelDict())
+        << "Unknown mixedImplicitStiffness '" << stiffness << "'" << nl
+        << "Valid options are: deviatoric (default), twoMu"
+        << exit(FatalIOError);
+
+    return tangentRequest::scalarDeviatoric;
+}
+
+
 Foam::tmp<Foam::volScalarField> Foam::solidModel::lawImpK
 (
     mechanicalConstitutiveLawManager& manager,

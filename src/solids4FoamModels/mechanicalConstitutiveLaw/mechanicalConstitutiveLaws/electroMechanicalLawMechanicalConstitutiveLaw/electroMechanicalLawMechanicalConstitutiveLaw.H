@@ -211,6 +211,18 @@ public:
             return subLawPtr_->providesVolumetricSplit();
         }
 
+        //- The active stress contributes nothing to this scalar implicit-
+        //  stiffness approximation (the complete active stress does depend on
+        //  the displacement), so 2*mu is the passive law's, declared if the
+        //  passive law declares it. For this type only, as for the laws that
+        //  declare it themselves
+        virtual bool providesScalarShearTangent() const override
+        {
+            return
+                type() == typeName
+             && subLawPtr_->providesScalarShearTangent();
+        }
+
         //- The active tension is a function of the total deformation
         //  gradient, so this law can be prestressed if the passive law can
         virtual bool admitsPrestress() const override

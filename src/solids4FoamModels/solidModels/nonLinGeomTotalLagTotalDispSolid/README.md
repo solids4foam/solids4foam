@@ -80,6 +80,7 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+| `mixedImplicitStiffness` | `deviatoric` | `deviatoric` or `twoMu`, only with `solvePressure` |
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with
@@ -99,6 +100,35 @@ This is a special case and is only supported when `solutionAlgorithm` is
 - the PETSc solution vector includes `p` as an extra unknown;
 - the pressure stabilisation sub-model is used;
 - the code enforces the `PETScSNES` path at construction time.
+
+### Mixed implicit stiffness
+
+With `solvePressure true`, the implicit stiffness `impK` of the mixed
+formulation is selected by
+
+```text
+mixedImplicitStiffness deviatoric;   // default
+mixedImplicitStiffness twoMu;
+```
+
+- `deviatoric` (default, unchanged behaviour): the law's deviatoric scalar
+  tangent, the Laplacian surrogate for div(dev(sigma)). For `linearElastic`,
+  `neoHookeanElastic` and `GuccioneElastic` it is (4/3) mu; other laws define
+  their own.
+- `twoMu`: 2 mu, as declared by the mechanical constitutive law
+  (`tangentRequest::scalarShear`). Supported by `linearElastic`,
+  `neoHookeanElastic`, `GuccioneElastic` and an `electroMechanicalLaw` whose
+  passive law is one of these; any other law is refused with an error. For
+  `GuccioneElastic`, mu = k (cf + ct + cfs)/6 is a declared scalar stiffness
+  measure, not the shear modulus of an isotropic material.
+
+`impK` weights the momentum stabilisation and sets the pressure-stabilisation
+diffusivity (`rAUf`, the reciprocal of the momentum diagonal), as well as the
+preconditioner. Changing it therefore changes both stabilisation strengths
+at fixed `scaleFactor`s: for a steady case with uniform properties, `twoMu`
+is equivalent to `deviatoric` with the momentum scale factor multiplied by
+3/2 and the pressure scale factors by 2/3. The keyword is refused without
+`solvePressure`.
 
 ### Recommended dictionary setup
 

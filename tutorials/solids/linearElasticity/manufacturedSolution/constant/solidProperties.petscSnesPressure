@@ -27,6 +27,11 @@ linearGeometryTotalDisplacementCoeffs
     // unknown, compression positive (sigma = dev(sigma) - p*I)
     solvePressure     yes;
 
+    // Implicit stiffness of the mixed formulation: 2*mu, as declared by the
+    // mechanical constitutive law (the default, deviatoric, is (4/3)*mu for
+    // this linear elastic law)
+    mixedImplicitStiffness twoMu;
+
     // One representative stabilisation configuration. The pressure term is
     // the generalised even-order Laplacian with m = laplacianPower = 1 (the
     // bi-Laplacian), unnormalised. These coefficients verify the current

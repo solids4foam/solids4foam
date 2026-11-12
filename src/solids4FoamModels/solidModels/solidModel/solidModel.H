@@ -601,6 +601,17 @@ protected:
             const tangentRequest req
         ) const;
 
+        //- The tangent request for the implicit stiffness impK.
+        //  Without solvePressure: scalar, unchanged. With solvePressure, the
+        //  solid-model keyword mixedImplicitStiffness selects
+        //      deviatoric (default): scalarDeviatoric, the Laplacian
+        //          surrogate for div(dev(sigma)) ((4/3)*mu for linearElastic,
+        //          neoHookeanElastic and GuccioneElastic; law-specific
+        //          otherwise)
+        //      twoMu: scalarShear, 2*mu as declared by the law
+        //  The keyword is refused without solvePressure
+        tangentRequest mixedImplicitStiffnessRequest() const;
+
         //- Deformation gradient at the quadrature points, F = I + gradD.T(),
         //  from a total displacement gradient there. Sized and offset to
         //  match the gradient, so every list handed to the constitutive

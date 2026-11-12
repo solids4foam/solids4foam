@@ -112,7 +112,7 @@ error). It writes `analyticalP` and `pDifference` and logs
 ```text
 Writing pDifference field
     Pressure error norms: mean L1, cell RMS, LInf, volume-weighted RMS:
-    Magnitude: 184019 234249 937903 234249
+    Magnitude: 183305 230706 908771 230706
 ```
 
 As for the displacement and stress (whose second column is labelled

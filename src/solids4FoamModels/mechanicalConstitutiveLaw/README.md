@@ -150,6 +150,7 @@ Supported tangent modes:
 - `none`
 - `scalar`
 - `scalarDeviatoric`
+- `scalarShear`
 - `fourthOrder`
 - `fourthOrderFiniteDifference`
 
@@ -338,6 +339,14 @@ The available requests are the `tangentRequest` enumeration:
 - `none`: stress only,
 - `scalar` and `scalarDeviatoric`: scalar tangents suitable for segregated or
   mixed formulations,
+- `scalarShear`: the law's declared 2 mu, the implicit stiffness of a mixed
+  formulation with `mixedImplicitStiffness twoMu`. It is not advisory: a law
+  that does not declare 2 mu (`providesScalarShearTangent()`) is refused.
+  `linearElastic`, `neoHookeanElastic` and `GuccioneElastic` declare it (for
+  `GuccioneElastic`, mu = k (cf + ct + cfs)/6 is a declared scalar stiffness
+  measure), and `electroMechanicalLaw` declares its passive law's. The
+  declaration applies to the type itself, so a law derived from one of these
+  does not inherit it,
 - `fourthOrder` and `fourthOrderFiniteDifference`: full 6x6 Voigt tangents,
   where the selected update interface and topology support them.
 

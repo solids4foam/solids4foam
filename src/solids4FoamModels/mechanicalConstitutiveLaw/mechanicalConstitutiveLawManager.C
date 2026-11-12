@@ -2542,7 +2542,7 @@ void Foam::mechanicalConstitutiveLawManager::updateScalarTangentVol
             << VolFields::scalarTangentContext() << " was asked for a "
             << tangentRequestName(tangentReq) << " tangent." << nl
             << "This interface returns a scalar tangent at cell centres, so "
-            << "the request must be scalar or scalarDeviatoric."
+            << "the request must be scalar, scalarDeviatoric or scalarShear."
             << exit(FatalError);
     }
 
