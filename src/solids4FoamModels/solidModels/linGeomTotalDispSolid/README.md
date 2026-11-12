@@ -98,6 +98,16 @@ This is a special case and is only supported when `solutionAlgorithm` is
 - the model uses the pressure stabilisation sub-model;
 - the code enforces the `PETScSNES` path at construction time.
 
+The mechanical law is asked for its stress without its volumetric response
+(`K tr(epsilon)` for `linearElastic`), which the solved pressure replaces:
+`sigma = sigma_law - p I`.
+
+Parallel runs are supported across `processor` patches. The assembled mixed
+Jacobian blocks recognise only that patch type: a mesh with any other coupled
+patch (`cyclic`, `cyclicAMI`, `cyclicACMI`, or the `processorCyclic` patches
+that decomposing a cyclic mesh creates) stops in the first Jacobian assembly,
+in serial or parallel.
+
 If `solvePressure` is `false`, the `stabilisation/pressure` sub-dictionary is
 ignored.
 

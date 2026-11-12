@@ -105,6 +105,28 @@ This is a special case and is only supported when `solutionAlgorithm` is
 - the pressure stabilisation sub-model is used;
 - the code enforces the `PETScSNES` path at construction time.
 
+The mechanical law is asked for its stress without its volumetric response,
+which the solved pressure replaces (`sigma = sigma_law - p I`, with no
+deviatoric projection of the total stress). The stress is therefore whatever
+the law defines apart from that response. For the cardiac laws:
+
+- `GuccioneElastic` evaluates its energy on the isochoric deformation
+  `Fbar = J^(-1/3) F`, so its stress is the isochoric (deviatoric) Cauchy stress
+  `dev(Fbar S Fbar^T)/J`, and its volumetric response `0.5 K (J^2 - 1)/J` is
+  the one the pressure equation uses;
+- `electroMechanicalLaw` adds the active stress `F (Ta f0 f0) F^T / J` in
+  full, with the physical `F`, including its spherical part, which is not part
+  of any energy and so is not replaced by the pressure.
+
+The pressure variable `p` is therefore not the mean stress where an active
+stress acts: the mean Cauchy stress is `-p + tr(sigma_active)/3`.
+
+Parallel runs are supported across `processor` patches. The assembled mixed
+Jacobian blocks recognise only that patch type: a mesh with any other coupled
+patch (`cyclic`, `cyclicAMI`, `cyclicACMI`, or the `processorCyclic` patches
+that decomposing a cyclic mesh creates) stops in the first Jacobian assembly,
+in serial or parallel.
+
 ### Mixed implicit stiffness
 
 With `solvePressure true`, the implicit stiffness `impK` of the mixed
