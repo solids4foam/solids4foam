@@ -5,7 +5,7 @@ const findingProperties = {
   kind: {type: 'string', enum: ['defect', 'risk', 'question']},
   severity: {type: 'string', enum: ['blocking', 'important', 'minor']},
   category: {type: 'string', enum: ['numerics', 'architecture', 'compatibility',
-    'verification', 'security', 'build']},
+    'verification', 'security', 'build', 'style']},
   file: {type: ['string', 'null'], maxLength: 1000},
   line: {type: ['integer', 'null'], minimum: 1},
   ...Object.fromEntries(['claim', 'evidence', 'suggested_check'].map(key =>
@@ -125,10 +125,10 @@ function buildPrompt(pr, files) {
     `\nUNTRUSTED PR DATA (JSON):\n${JSON.stringify({title: pr.title, body: pr.body,
       files: selected, not_reviewed: omitted})}`;
   // Reserve manifest space before selecting any patches; never silently truncate a patch.
-  // The limit covers instructions and guide (~16 KB escaped) plus the file manifest.
+  // The limit covers instructions and guide (~18 KB escaped) plus the file manifest.
   for (const file of files) omitted.push({path: file.filename,
     reason: file.patch ? 'budget' : 'no_patch'});
-  if (Buffer.byteLength(JSON.stringify(prompt())) > 40000) throw new Error('metadata_too_large');
+  if (Buffer.byteLength(JSON.stringify(prompt())) > 45000) throw new Error('metadata_too_large');
   for (const file of files.slice().sort((a, b) => priority(a) - priority(b))) {
     if (!file.patch) continue;
     const item = {filename: file.filename, previous_filename: file.previous_filename,

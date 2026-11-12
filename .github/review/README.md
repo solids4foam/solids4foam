@@ -173,7 +173,7 @@ suppresses stale publication, though a commit can still arrive between that
 check and posting; the explicit SHA remains authoritative.
 
 The collector includes whole patches within a 90 KB JSON-escaped prompt budget,
-including instructions, the repository guide (about 16 KB with the
+including instructions, the repository guide (about 18 KB with the
 instructions) and metadata. This leaves margin for the Action's
 serialized environment inputs. Source files precede application code, other
 text, and tutorial mesh/field/CSV data. Missing patches (binary, empty files,

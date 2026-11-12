@@ -97,8 +97,33 @@ criteria; section 6 applies only when making changes.
 
 ## 3) C++ style
 
-- Follow the surrounding OpenFOAM/solids4foam code: indentation, braces,
-  naming, include order and comment style.
+- Added and changed C++ lines must follow the OpenFOAM Coding Style Guide
+  (<https://openfoam.org/dev/coding-style-guide>). This is enforced: a style
+  violation in changed code is a blocking review finding. Much existing code
+  does not fully conform; do not reformat lines the change does not touch.
+  Key rules:
+  - at most 80 characters per line; indent 4 spaces, never tabs; no trailing
+    whitespace;
+  - braces on their own lines, and always around control-statement bodies
+    (except a lone `break` or `continue`); `if (`, `for (` and `while (` take
+    a space, `forAll(` does not;
+  - spaces around `+`, `-`, `&`, `^`, `=`, `==`, `!=`, `<`, `>`, `<=`, `>=`,
+    `||` and `&&`; none around `*` and `/` (`a*b`, `a/b`);
+  - split long lines after the return type (function name left-aligned on
+    the next line) or after `=` (continuation indented 4 spaces), with
+    operators at the start of continuation lines; put a long argument list
+    one argument per line inside parentheses on their own lines;
+  - stream output as `Info<< "..."`, with continuation `<<` aligned four
+    characters after the start of the stream name;
+  - pass `bool`, `label`, `scalar` and other primitives by value and larger
+    types by reference; use `const` wherever it applies; initialise const
+    references with `=`; prefer `++iter`;
+  - British spelling in comments and text (`neighbour`), `-ize` in
+    identifiers (`initialize`).
+- solids4foam conventions on top of the guide: `.C` files usually open
+  `namespace Foam` and the model-family namespace rather than fully scoping
+  every name; follow the neighbouring file. Otherwise follow the surrounding
+  code for naming and include order.
 - Keep the standard structural comments: section separators such as
   `// * * * Constructors * * * //`, class declaration banners, namespace and
   end-of-file banners, and `//-` documentation comments on declarations. For a

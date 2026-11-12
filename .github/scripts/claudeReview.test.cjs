@@ -320,6 +320,9 @@ test('structured findings validate and render evidence separately', () => {
   const data = JSON.parse(response('MEDIUM'));
   data.findings = [finding('Check the sign')];
   assert.deepEqual(validate(JSON.stringify(data)), data);
+  const styled = {...data, findings: [{...finding('Line exceeds 80 characters'), kind: 'defect',
+    severity: 'blocking', category: 'style'}]};
+  assert.deepEqual(validate(JSON.stringify(styled)), styled);
   const rendered = formatAssessment(data, 'MEDIUM', 'MEDIUM');
   assert.match(rendered, /Claim: Check the sign/);
   assert.match(rendered, /Evidence: Changed residual/);

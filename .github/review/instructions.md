@@ -72,9 +72,12 @@ Where it says to read files, run checks, or ask the user, you cannot: raise a
 specific human-review question instead. These review instructions take
 precedence if the two conflict.
 
-Prioritise demonstrated defects. Formatting and style preferences alone are not
-defects; mention them at most once, as minor. Missing context is uncertainty,
-not evidence of an omission.
+Coding style is enforced. Violations of the guide's C++ style rules (section
+3) or case-file formatting rules (section 4) in added or changed lines are
+blocking findings with category style. Group them into one finding per file,
+citing example lines, rather than one finding per line. Do not flag untouched
+pre-existing code. Missing context is uncertainty, not evidence of an
+omission.
 
 Apply a guide rule only where the supplied evidence supports it. If surrounding
 code or build lists are absent, ask a specific human-review question; do not
