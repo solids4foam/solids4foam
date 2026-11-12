@@ -51,6 +51,26 @@ script first executes `blockMesh` for both `solid` and `fluid` domains
 displacement history of point A, and a file `force.pdf` will be created with the
 history of the force on the interface.
 
+### Quasi-monolithic variant
+
+`./Allrun monolithic` (optionally with `parallel`) runs the case with the
+quasi-monolithic Newton coupling (`fluidSolidInterface NewtonQuasiMonolithic`),
+which needs OpenFOAM.com and PETSc. The fluid velocity and pressure
+(`newtonIcoFluid`) and the solid velocity are solved together with PETSc SNES
+in every time step, so there are no FSI sub-iterations; the fluid mesh motion
+is a separate solid model in the fluid region. The files of this variant are
+stored beside the partitioned ones as `*.monolithic` files, which `Allrun`
+links in and `Allclean` removes again.
+
+The solid model is `nonLinearGeometryTotalLagrangianVelocity`. Its time
+integration is nearly energy-conserving, and the coupling is active from the
+start rather than from `t = 10 s`, so the flexible bottom oscillates for longer
+before it settles; a small velocity-proportional damping (`dampingCoeff 0.1`),
+which vanishes at the steady state, is added in
+`constant/solid/solidProperties.monolithic`. The final vertical displacement
+of point A is `-0.2017 m`, against `-0.2025 m` for the partitioned approach,
+and the regression test checks both against the same references.
+
 ---
 
 ## Analysing Results

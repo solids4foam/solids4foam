@@ -1,4 +1,8 @@
+# Use SOLIDS4FOAM_ROOT from the environment if set (e.g. for a copy of the
+# case outside the source tree); otherwise search upwards from the case
+ifeq ($(SOLIDS4FOAM_ROOT),)
 SOLIDS4FOAM_ROOT := $(shell d="$(CURDIR)"; while [ "$$d" != "/" ]; do if [ -f "$$d/etc/wmake-options" ] && [ -d "$$d/src/solids4FoamModels" ]; then echo "$$d"; exit 0; fi; d="$$(dirname "$$d")"; done)
+endif
 
 sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
 sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options

@@ -224,7 +224,16 @@ complete, Robin and IQN-ILS agree to 0.1-0.25% of the peak deflection.
 ./Allrun linear        # IQN-ILS, second-order (linear) solid, about 4 minutes
 ./Allrun robin         # Robin-Neumann, cubic solid, about 8 minutes
 ./Allrun robin linear  # Robin-Neumann, linear solid, about 5 minutes
+./Allrun monolithic    # quasi-monolithic Newton, second-order solid, about 5 minutes
 ```
+
+The quasi-monolithic variant (OpenFOAM.com only, files `*.monolithic`) solves
+the fluid and the wall velocity in one Newton system. Its velocity solid has
+the second-order (linear) discretisation only, so on the tutorial mesh it
+collapses about as little as `./Allrun linear` (first trough within 1.4%).
+Unlike the partitioned couplings, it does not need the regularising wall
+density: it also runs the massless wall of the published problem, and at the
+smallest time steps (see `verification/README.md`).
 
 The case runs in serial: the assembled high-order Jacobian
 (`highOrderJacobian`) that preconditions the solid is serial-only for now, as

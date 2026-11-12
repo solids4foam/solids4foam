@@ -44,6 +44,9 @@ COUPLINGS = {
     "aitken": {"allrun": ["dirichletNeumann"],
                "fsiProperties": "constant/fsiProperties.pimpleFluid",
                "interface": "Aitken", "predictor": False},
+    "monolithic": {"allrun": ["monolithic"],
+                   "fsiProperties": "constant/fsiProperties.monolithic",
+                   "interface": None},
 }
 
 
@@ -145,6 +148,24 @@ def configure_time_scheme(case: Path, scheme: str) -> None:
             if count != 1:
                 fail(f"Expected one {section}/default entry in {path}")
         path.write_text(text)
+    # The quasi-monolithic variant: newtonIcoFluid names its ddt schemes, and
+    # the solid has its own fvSchemes
+    fluid = case / "system/fluid/fvSchemes.monolithic"
+    if fluid.is_file():
+        text, count = re.subn(r"^(\s*ddt\((?:U|dU|p)\)\s+)\w+;",
+                              rf"\g<1>{scheme};", fluid.read_text(),
+                              flags=re.MULTILINE)
+        if count != 3:
+            fail(f"Expected the ddt(U), ddt(dU) and ddt(p) schemes in {fluid}")
+        fluid.write_text(text)
+        solid = case / "system/solid/fvSchemes.monolithic"
+        text = solid.read_text()
+        for section in ("d2dt2Schemes", "ddtSchemes"):
+            text, count = re.subn(rf"({section}\s*\{{\s*default\s+)[^;]+;",
+                                  rf"\g<1>{scheme};", text, count=1)
+            if count != 1:
+                fail(f"Expected one {section}/default entry in {solid}")
+        solid.write_text(text)
 
 
 def configure_solid_preconditioner(case: Path, preconditioner: str) -> None:
@@ -168,6 +189,23 @@ def configure_solid_preconditioner(case: Path, preconditioner: str) -> None:
     if count != 1:
         fail(f"Expected one block-Jacobi LU preconditioner in {path}")
     path.write_text(text)
+    # The solid block of the quasi-monolithic preconditioner, factorised with
+    # LU on every rank by default, which dominates the cost on finer meshes
+    path = case / "system/fvSolution.monolithic"
+    if path.is_file():
+        text, count = re.subn(
+            r"fieldsplit_solid_pc_type\s+redundant\s*;\s*"
+            r"fieldsplit_solid_redundant_pc_type\s+lu\s*;",
+            "fieldsplit_solid_pc_type hypre;\n"
+            "            fieldsplit_solid_pc_hypre_type boomeramg;\n"
+            '            fieldsplit_solid_pc_hypre_boomeramg_max_iter "1";\n'
+            '            fieldsplit_solid_pc_hypre_boomeramg_strong_threshold '
+            '"0.7";',
+            path.read_text(),
+        )
+        if count != 1:
+            fail(f"Expected one redundant LU solid preconditioner in {path}")
+        path.write_text(text)
 
 
 def station_name(z: float) -> str:
@@ -707,8 +745,32 @@ def dirichlet_neumann_summary(case: Path, coupling: str, end_time: float
     }
 
 
+def monolithic_summary(case: Path) -> dict[str, float]:
+    """Newton iterations of the coupled solve in each time step.
+
+    A step whose Newton solve fails stops the run (adjustTimeStep is off), so
+    a completed run has converged every step.
+    """
+    counts = [int(n) for n in re.findall(
+        r"^Solving the monolithic momentum-continuity system.*?"
+        r"Nonlinear solve \w+ due to \w+ iterations (\d+)",
+        (case / "log.solids4Foam").read_text(errors="replace"),
+        re.MULTILINE | re.DOTALL)]
+    if not counts:
+        fail(f"No monolithic time steps found in {case / 'log.solids4Foam'}")
+    return {
+        "time_steps": len(counts),
+        "total_fsi_iterations": sum(counts),
+        "mean_fsi_iterations": sum(counts) / len(counts),
+        "maximum_fsi_iterations": max(counts),
+        "unconverged_steps": 0,
+    }
+
+
 def coupling_summary(case: Path, coupling: str, end_time: float
                      ) -> dict[str, float]:
+    if coupling == "monolithic":
+        return monolithic_summary(case)
     summary = iteration_summary(case, end_time)
     # The residual evaluated for each step must be that of its last
     # FSI iteration, as recorded independently in fsiConvergenceData.dat.

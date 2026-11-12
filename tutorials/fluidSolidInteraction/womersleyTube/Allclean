@@ -17,7 +17,8 @@ fi
 
 rm -rf case.foam residuals wallDisplacement.pdf postProcessing dynamicCode
 
-# Restore the default IQNILS set-up
+# Undo the monolithic variant links, then restore the default IQNILS set-up
+solids4Foam::restoreCaseVariant .
 ln -nsf fsiProperties.iqnils constant/fsiProperties
 ln -nsf U.dirichletNeumann 0/fluid/U
 ln -nsf p.dirichletNeumann 0/fluid/p

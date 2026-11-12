@@ -54,7 +54,7 @@ SourceFiles
 #include "mechanicalConstitutiveLawManager.H"
 #include "integrationPointTopologies.H"
 #include "globalPointIndices.H"
-#include "twoDPointCorrector.H"
+#include "twoDPointCorrectorS4f.H"
 #ifdef OPENFOAM_COM
     #include "pointVolInterpolation.H"
 #endif
@@ -305,11 +305,11 @@ public:
             //- Initialise the Jacobian matrix
             //  This procedure should set the size and non-zero structure of
             //  the matrix
-            virtual label initialiseJacobian(Mat& jac);
+            virtual label initialiseJacobian(Mat& jac) override;
 
             //- Initialise the solution vector
             //  This procedure should set the size of the solution vector
-            virtual label initialiseSolution(Vec& x);
+            virtual label initialiseSolution(Vec& x) override;
 
             //- Calculate the residual (PETSc array) given the solution (PETSc
             //  array) vector
@@ -317,14 +317,14 @@ public:
             (
                 Vec f,         // Residual
                 const Vec x    // Solution
-            );
+            ) override;
 
             //- Form the Jacobian of the governing equation
             virtual label formJacobian
             (
                 Mat jac,       // Jacobian
                 const Vec x    // Solution
-            );
+            ) override;
 #endif // USE_PETSC
 
             //- Traction boundary surface normal gradient

@@ -126,11 +126,54 @@ def cell_count(case: Path) -> int:
     return total
 
 
+def solid_cell_count(mesh: Path) -> int:
+    """Cells of a solid blockMeshDict."""
+    return sum(math.prod(int(value) for value in match.group(1).split())
+               for match in re.finditer(r"hex\s+\([^)]*\)\s+\(([^()]+)\)",
+                                        mesh.read_text()))
+
+
+def tutorial_level(case: Path) -> str:
+    """The refinement factor of the tutorial mesh whose plate resolution the
+    case's solid mesh matches, as a key of the reference tolerances.
+
+    The tolerances are set for the tutorial meshes. The conformal interface
+    meshes of the quasi-monolithic variant have a quarter of the solid cells
+    of the tutorial mesh at the same factor, so they run one level behind it.
+    After Allrun, system/solid/blockMeshDict is the mesh that was used.
+    """
+    ratio = (solid_cell_count(case / "system/solid/blockMeshDict")
+             / solid_cell_count(TUTORIAL / "system/solid/blockMeshDict"))
+    level = 2.0**round(math.log2(math.sqrt(ratio)))
+    return str(int(level)) if level >= 1 else f"{level:g}"
+
+
+def configure_interface_mesh(case: Path, coupling: str) -> None:
+    """Run the quasi-monolithic variant on the tutorial meshes.
+
+    The monolithicAMI coupling removes the conformal interface meshes of the
+    variant, so that the tutorial meshes, those of the partitioned couplings,
+    are used, and transfers the interface data with AMI, as their interface
+    faces do not match.
+    """
+    if coupling != "monolithicAMI":
+        return
+    for region in ("fluid", "solid"):
+        (case / f"system/{region}/blockMeshDict.monolithic").unlink()
+    replace_entry(case / "constant/fsiProperties.monolithic",
+                  "interfaceTransferMethod", "AMI")
+
+
 def configure_case(case: Path, spec: dict, factor: int, delta_t: float,
                    end_time: float, write_interval: int | None,
                    cores: int) -> None:
     refine_mesh(case / "system/fluid/blockMeshDict", factor)
     refine_mesh(case / "system/solid/blockMeshDict", factor)
+    # The conformal interface meshes of the quasi-monolithic variant
+    for region in ("fluid", "solid"):
+        variant = case / f"system/{region}/blockMeshDict.monolithic"
+        if variant.is_file():
+            refine_mesh(variant, factor)
 
     control = case / "system/controlDict"
     replace_entry(control, "deltaT", f"{delta_t:.8g}")
@@ -190,7 +233,9 @@ def run_case(case: Path, label: str, cores: int, coupling: str,
     allrun = case / "Allrun"
     if not allrun.is_file():
         fail(f"Missing {allrun}")
-    command = [str(allrun), coupling]
+    # monolithicAMI is the quasi-monolithic variant on the tutorial meshes
+    command = [str(allrun), "monolithic" if coupling == "monolithicAMI"
+               else coupling]
     if cores > 1:
         command.append("parallel")
     log = case / "log.Allverify"
@@ -571,12 +616,14 @@ def run_level(args: argparse.Namespace, spec: dict, factor: int, coupling: str,
         case = copy_case(name)
         configure_case(case, spec, factor, delta_t, end_time,
                        args.write_interval, cores)
+        configure_interface_mesh(case, coupling)
         if spec.get("benchmark") == "fsi2":
             configure_fsi2(case, spec["fsi2"])
     run_case(case, name, cores, coupling, args.reuse)
     row: dict = {"case": name, "coupling": coupling, "mesh_level": index + 1,
                  "refinement": factor, "delta_t": delta_t, "cores": cores,
-                 "end_time": end_time, "window": window}
+                 "end_time": end_time, "window": window,
+                 "tolerance_level": tutorial_level(case)}
     if spec.get("benchmark") == "fsi2":
         # A reused run keeps the rank count it was run with
         row["cores"] = len(list(case.glob("processor*"))) or 1
@@ -618,7 +665,18 @@ def mesh_study(args: argparse.Namespace, spec: dict) -> bool:
                                           tuple(spec["periodicity"].get("reportOnly", ("drag",))))]
         level_failures = check_references(row, spec["references"])
         if factor == factors[-1]:
-            failures += [f"{name}: {message}" for message in level_failures]
+            # The reference tolerances are set for the default finest level
+            # of the tutorial mesh, and belong to its plate resolution
+            tolerance_level = spec["mesh"]["defaultLevels"][-1]
+            if float(row["tolerance_level"]) < tolerance_level:
+                failures.append(
+                    f"{name}: the finest level has the plate resolution of the "
+                    f"tutorial {row['tolerance_level']}x mesh; the reference "
+                    f"tolerances are set for the tutorial {tolerance_level}x mesh, "
+                    "so refine the sweep"
+                )
+            else:
+                failures += [f"{name}: {message}" for message in level_failures]
     csv_name = f"{prefix}{args.coupling}_mesh_sweep.csv"
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     if args.quick:
@@ -729,9 +787,31 @@ def robin_residual_summary(case: Path, end_time: float) -> dict[str, float]:
     }
 
 
+def monolithic_iteration_summary(case: Path) -> dict[str, float]:
+    """Newton iterations of the coupled solve in each coupled time step."""
+    counts = [int(n) for n in re.findall(
+        r"^Solving the monolithic momentum-continuity system.*?"
+        r"Nonlinear solve \w+ due to \w+ iterations (\d+)",
+        (case / "log.solids4Foam").read_text(errors="replace"),
+        re.MULTILINE | re.DOTALL)]
+    if not counts:
+        fail(f"No coupled time steps recorded in {case / 'log.solids4Foam'}")
+    return {
+        "coupled_time_steps": len(counts),
+        "total_outer_iterations": sum(counts),
+        "maximum_outer_iterations": max(counts),
+    }
+
+
 def iqnils_iteration_summary(case: Path) -> dict[str, float]:
     path = case / "postProcessing/fsiResiduals.dat"
     if not path.is_file():
+        if (case / "constant/fsiProperties.monolithic").is_file() and re.search(
+            r"^Solving the monolithic momentum-continuity system",
+            (case / "log.solids4Foam").read_text(errors="replace"),
+            re.MULTILINE,
+        ):
+            return monolithic_iteration_summary(case)
         return {}
     final_by_time: dict[float, float] = {}
     for fields in numeric_rows(path):
@@ -976,7 +1056,7 @@ def configure_fsi1(case: Path, fsi1: dict) -> None:
     steady state. The full solid state is written at the end time so that the
     steady coupling comparison can restart from it.
     """
-    for condition in ("dirichletNeumann", "robin"):
+    for condition in ("dirichletNeumann", "robin", "monolithic"):
         path = case / f"0/fluid/U.{condition}"
         replace_entry(path, "maxValue", f"{fsi1['inletMaxValue']:.8g}")
         replace_entry(path, "transitionPeriod", f"{fsi1['transitionPeriod']:.8g}")
@@ -985,7 +1065,7 @@ def configure_fsi1(case: Path, fsi1: dict) -> None:
         "E",
         f"E [1 -1 -2 0 0 0 0] {fsi1['youngsModulus']:.8g}",
     )
-    for coupling in ("iqnils", "robin"):
+    for coupling in ("iqnils", "robin", "monolithic"):
         replace_entry(
             case / f"constant/fsiProperties.{coupling}",
             "couplingStartTime",
@@ -1056,12 +1136,14 @@ def fsi1_run(args: argparse.Namespace, spec: dict, factor: int,
         configure_case(case, spec, factor, delta_t, end_time,
                        args.write_interval, cores)
         configure_fsi1(case, fsi1)
+        configure_interface_mesh(case, coupling)
     run_case(case, name, cores, coupling, args.reuse)
     # A reused run keeps the rank count it was run with
     cores = len(list(case.glob("processor*"))) or 1
     row: dict = {"case": name, "coupling": coupling, "mesh_level": index + 1,
                  "refinement": factor, "delta_t": delta_t, "cores": cores,
                  "end_time": end_time, "cell_count": cell_count(case),
+                 "tolerance_level": tutorial_level(case),
                  "execution_time": execution_time(case)}
     if coupling == "robin":
         row.update(robin_residual_summary(case, end_time))
@@ -1116,8 +1198,9 @@ def fsi1_mesh_study(args: argparse.Namespace, spec: dict) -> bool:
         for quantity, reference in fsi1["references"].items():
             error = relative_error(row[quantity], reference["value"])
             row[f"{quantity}_error"] = error
-            # Tolerances are given for the finest level of the sweep
-            limit = reference["tolerance"].get(str(row["refinement"]))
+            # Tolerances are given for the finest level of the sweep, keyed
+            # by the tutorial mesh level of the same plate resolution
+            limit = reference["tolerance"].get(row["tolerance_level"])
             if (row is rows[-1] and reference["primary"] and limit is not None
                     and error > limit):
                 failures.append(
@@ -1125,9 +1208,10 @@ def fsi1_mesh_study(args: argparse.Namespace, spec: dict) -> bool:
                     f"Featflow value {reference['value']:.6g} by {100 * error:.3f}% "
                     f"(tolerance {100 * limit:g}%)"
                 )
-        if row is rows[-1] and str(row["refinement"]) not in fsi1["references"]["uy"]["tolerance"]:
-            failures.append(f"{row['case']}: no reference tolerances for the finest level; "
-                            "include level 2 or 4 in the sweep")
+        if row is rows[-1] and row["tolerance_level"] not in fsi1["references"]["uy"]["tolerance"]:
+            failures.append(f"{row['case']}: no reference tolerances for the finest level "
+                            f"(the resolution of tutorial level {row['tolerance_level']}x); "
+                            "refine the sweep")
     if len(rows) > 1:
         for quantity, reference in fsi1["references"].items():
             growth = rows[-1][f"{quantity}_error"] - rows[0][f"{quantity}_error"]
@@ -1337,14 +1421,14 @@ def configure_fsi2(case: Path, fsi2: dict) -> None:
     (1 m/s) and a heavier, softer plate. The inflow is ramped smoothly over
     the benchmark's 2 s ramp and the coupling starts at the end of the ramp.
     """
-    for condition in ("dirichletNeumann", "robin"):
+    for condition in ("dirichletNeumann", "robin", "monolithic"):
         path = case / f"0/fluid/U.{condition}"
         replace_entry(path, "maxValue", f"{fsi2['inletMaxValue']:.8g}")
         replace_entry(path, "transitionPeriod", f"{fsi2['transitionPeriod']:.8g}")
     properties = case / "constant/solid/mechanicalProperties"
     replace_entry(properties, "rho", f"rho [1 -3 0 0 0 0 0] {fsi2['solidDensity']:.8g}")
     replace_entry(properties, "E", f"E [1 -1 -2 0 0 0 0] {fsi2['youngsModulus']:.8g}")
-    for coupling in ("iqnils", "robin"):
+    for coupling in ("iqnils", "robin", "monolithic"):
         replace_entry(
             case / f"constant/fsiProperties.{coupling}",
             "couplingStartTime",
@@ -1357,7 +1441,9 @@ def main() -> int:
     parser.add_argument("--benchmark", choices=("fsi3", "fsi1", "fsi2"), default="fsi3",
                         help="periodic FSI3 (default), steady FSI1 or periodic FSI2 benchmark")
     parser.add_argument("--study", choices=("mesh", "coupling"), default="mesh")
-    parser.add_argument("--coupling", choices=("iqnils", "robin"), default="iqnils",
+    parser.add_argument("--coupling",
+                        choices=("iqnils", "robin", "monolithic", "monolithicAMI"),
+                        default="iqnils",
                         help="coupling variant for the mesh study (default: iqnils)")
     parser.add_argument("--levels", help="comma-separated refinement factors, e.g. 1,2,4 "
                         "(mesh study) or a single factor (coupling study)")

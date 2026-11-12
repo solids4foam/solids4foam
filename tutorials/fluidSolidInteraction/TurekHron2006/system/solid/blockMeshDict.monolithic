@@ -1,0 +1,88 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+scale 0.001;
+
+// Conformal-interface design (level 1, 150 solid cells):
+//   - block A (near-cyl, x in [248.99, 299.57]): 5 cells along length, 5 thick
+//   - block B (post-cyl, x in [299.57, 600]):    25 cells along length, 5 thick
+//   - plate face counts (each side): top = 30, right = 5, bottom = 30
+//
+// Levels 2 and 3 multiply every (nx ny 1) tuple uniformly by 2 and 4.
+vertices
+(
+    (248.9898 190 0)        //0
+    (299.5733 190 0)        //1
+    (600      190 0)        //2
+    (600      210 0)        //3
+    (299.5733 210 0)        //4
+    (248.9898 210 0)        //5
+
+    (248.9898 190 15)       //6
+    (299.5733 190 15)       //7
+    (600      190 15)       //8
+    (600      210 15)       //9
+    (299.5733 210 15)       //10
+    (248.9898 210 15)       //11
+);
+
+blocks
+(
+    hex (0 1 4 5 6 7 10 11) (5 5 1) simpleGrading (1 1 1)
+    hex (1 2 3 4 7 8 9 10) (25 5 1) simpleGrading (1 1 1)
+);
+
+edges
+(
+);
+
+patches
+(
+    patch plateFix
+    (
+        (5 11 6 0)
+    )
+
+    patch plate
+    (
+        // top of plate (y = 190)
+        (0 6 7 1)
+        (1 7 8 2)
+
+        // right end of plate (x = 600)
+        (2 8 9 3)
+
+        // bottom of plate (y = 210)
+        (3 9 10 4)
+        (4 10 11 5)
+    )
+
+    empty frontAndBackPlanes
+    (
+        (0 1 4 5)
+        (1 2 3 4)
+        (6 11 10 7)
+        (7 10 9 8)
+    )
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //

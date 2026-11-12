@@ -17,7 +17,10 @@ fi
 
 rm -rf case.foam residuals displacement.pdf postProcessing dynamicCode
 
-# Restore the default IQNILS and high-order solid set-up
+# Undo a monolithic variant selection, and restore the default IQNILS and
+# high-order solid set-up
+solids4Foam::restoreCaseVariant .
+rm -f 0/solid/U
 ln -nsf fsiProperties.iqnils constant/fsiProperties
 ln -nsf solidProperties.highOrder constant/solid/solidProperties
 ln -nsf U.dirichletNeumann 0/fluid/U
