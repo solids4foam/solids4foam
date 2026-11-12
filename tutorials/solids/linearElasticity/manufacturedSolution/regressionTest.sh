@@ -201,6 +201,55 @@ for mesh in "${MESHES[@]}"; do
     done
 done
 
+# Negative test: the mixed formulation must refuse the high-order Jacobian,
+# which would reconstruct a negative shear modulus from the implicit stiffness
+run_guard=false
+for approach in "${APPROACHES[@]}"; do
+    [[ "$approach" == "petscSnesPressure" ]] && run_guard=true
+done
+for mesh in "${MESHES[@]}"; do
+    [[ "$mesh" == "hex" ]] || run_guard=false
+done
+if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
+    CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-highOrderJacobian"
+    SOLVER_LOG="$CASE_DIR/log.solids4Foam"
+    if [[ "$CHECK_ONLY" == false ]]; then
+        rm -rf "$CASE_DIR"
+        mkdir -p "$CASE_DIR"
+        for item in "$SCRIPT_DIR"/*; do
+            name=$(basename "$item")
+            case "$name" in
+                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
+            esac
+            cp -a "$item" "$CASE_DIR/"
+        done
+        rm -rf "$CASE_DIR/constant/polyMesh"
+        (
+            cd "$CASE_DIR"
+            ln -nsf solidProperties.petscSnesPressureHighOrderJacobian \
+                constant/solidProperties
+            ln -nsf fvSolution.petscSnesPressure system/fvSolution
+            blockMesh > log.blockMesh 2>&1
+            # Expected to fail: record, rather than stop on, the exit status
+            if solids4Foam > log.solids4Foam 2>&1; then
+                echo "accepted" > log.guardOutcome
+            else
+                echo "refused" > log.guardOutcome
+            fi
+        )
+    fi
+    echo
+    echo "Checking that petscSnesPressure refuses the high-order Jacobian"
+    if [[ "$(cat "$CASE_DIR/log.guardOutcome" 2>/dev/null)" == "refused" ]] \
+    && grep -q 'solvePressure must be disabled when using the high order' \
+        "$SOLVER_LOG"; then
+        echo "PASS: the high-order Jacobian is refused with solvePressure"
+    else
+        echo "FAIL: the high-order Jacobian was not refused with solvePressure"
+        failures=$((failures + 1))
+    fi
+fi
+
 if ((failures)); then
     echo "Regression test FAILED ($failures checks)"
     exit 1

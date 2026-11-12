@@ -1057,6 +1057,25 @@ label linGeomTotalDispSolid::formResidual
                 << abort(FatalError);
     }
 
+    // As in nonLinGeomTotalLagTotalDispSolid: the high-order Jacobian
+    // recovers the shear modulus from the implicit stiffness by
+    // mu = (3/4)*(impK - K), which inverts impK = (4/3)*mu + K, the value a
+    // displacement formulation asks for. A mixed formulation asks for
+    // (4/3)*mu (or 2*mu with mixedImplicitStiffness twoMu), so the same
+    // expression returns a negative shear modulus for any compressible law
+    // with K > (4/3)*mu, and assembles a preconditioner of negative stiffness
+    if (solvePressure() && highOrderJacobian())
+    {
+        FatalErrorInFunction
+            << "solvePressure must be disabled when using the high order "
+            << "Jacobian." << nl
+            << "The high order Jacobian recovers the shear modulus from the "
+            << "implicit stiffness, assuming impK = (4/3)*mu + K. With a "
+            << "pressure solved separately impK is (4/3)*mu (or 2*mu), and "
+            << "that assumption returns a negative shear modulus."
+            << abort(FatalError);
+    }
+
     // Unit normal vectors at the faces
     const surfaceVectorField n(mesh.Sf()/mesh.magSf());
 
