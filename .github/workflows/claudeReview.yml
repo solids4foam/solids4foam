@@ -1,0 +1,158 @@
+name: Claude advisory PR review
+
+on:
+  pull_request_target:
+    branches: [development, master]
+    types: [opened, reopened, ready_for_review, synchronize, labeled]
+
+# No repository-wide write token. The model job cannot write to GitHub.
+permissions: {}
+
+# Explicit API model and effort. Never take these from PR content.
+env:
+  CLAUDE_REVIEW_MODEL: claude-opus-5-5
+  CLAUDE_REVIEW_EFFORT: high
+
+concurrency:
+  # Unrelated labels must not cancel an in-flight review.
+  group: >-
+    claude-review-${{ github.event.pull_request.number }}-${{
+      github.event.action == 'labeled' && github.event.label.name != 'ai-review-approved'
+      && github.run_id || 'review' }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      vars.CLAUDE_REVIEW_ENABLED == 'true' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.type != 'Bot' &&
+      (github.event.action != 'labeled' || github.event.label.name == 'ai-review-approved') &&
+      (contains(fromJSON('["OWNER","MEMBER","COLLABORATOR","CONTRIBUTOR"]'),
+        github.event.pull_request.author_association) ||
+       contains(github.event.pull_request.labels.*.name, 'ai-review-approved'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      telemetry: ${{ steps.telemetry.outputs.telemetry }}
+      report: ${{ steps.claude.outputs.structured_output }}
+      conclusion: ${{ steps.claude.outputs.conclusion }}
+      risk_floor: ${{ steps.prepare.outputs.risk_floor }}
+      coverage: ${{ steps.prepare.outputs.coverage }}
+      collection_reason: ${{ steps.prepare.outputs.collection_reason }}
+      base_sha: ${{ steps.prepare.outputs.base_sha }}
+      trusted_sha: ${{ steps.trusted.outputs.sha }}
+    steps:
+      # GitHub always runs this YAML from the default branch (master), but
+      # contributions target development. Scripts, instructions and the skill
+      # therefore come from the tip of the PR's base branch, which the branch
+      # filter limits to development or master. Never check out the PR head,
+      # a merge ref, or anything else from the PR.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/heads/${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
+      - name: Record trusted commit
+        id: trusted
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Collect patches as data
+        id: prepare
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            await require('./.github/scripts/claudeReview.cjs').prepare({github, context, core});
+      - name: Analyse with structured-output tool only
+        id: claude
+        timeout-minutes: 10
+        uses: anthropics/claude-code-action@4fa93a88de49bbef68b10eb15aabedf28ca0e1ed # v1, pinned
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+          # External human contributors are eligible, with a read-only token.
+          allowed_non_write_users: '*'
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          include_fix_links: 'false'
+          display_report: 'false'
+          show_full_output: 'false'
+          claude_args: >-
+            --model ${{ env.CLAUDE_REVIEW_MODEL }}
+            --effort ${{ env.CLAUDE_REVIEW_EFFORT }}
+            --max-turns 3
+            --max-budget-usd 2
+            --tools StructuredOutput
+            --disallowedTools "mcp__*"
+            --strict-mcp-config
+            --mcp-config '{"mcpServers":{}}'
+            --setting-sources user
+            --bare
+            --disable-slash-commands
+            --json-schema '${{ steps.prepare.outputs.schema }}'
+      - name: Capture safe API telemetry
+        id: telemetry
+        if: ${{ always() }}
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
+        with:
+          script: |
+            require('./.github/scripts/claudeReviewStatus.cjs').capture(core, process.env.EXECUTION_FILE);
+
+  publish:
+    needs: review
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: write
+    steps:
+      # Same trusted commit as the review job (base branch tip if it was skipped).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: >-
+            ${{ needs.review.outputs.trusted_sha ||
+              format('refs/heads/{0}', github.event.pull_request.base.ref) }}
+          persist-credentials: false
+      - name: Publish report or explicit failure
+        id: publication
+        if: ${{ always() && needs.review.result != 'skipped' }}
+        timeout-minutes: 1
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          REVIEW_RESULT: ${{ needs.review.result }}
+          CLAUDE_CONCLUSION: ${{ needs.review.outputs.conclusion }}
+          REVIEW_JSON: ${{ needs.review.outputs.report }}
+          RISK_FLOOR: ${{ needs.review.outputs.risk_floor }}
+          REVIEW_COVERAGE: ${{ needs.review.outputs.coverage }}
+          REVIEW_BASE_SHA: ${{ needs.review.outputs.base_sha }}
+          COLLECTION_REASON: ${{ needs.review.outputs.collection_reason }}
+        with:
+          script: |
+            const result = await require('./.github/scripts/claudeReview.cjs').publish({github, context, core});
+            core.setOutput('publication_status', JSON.stringify(result));
+      - name: Write machine-readable attempt status
+        if: ${{ always() }}
+        timeout-minutes: 1
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          REVIEW_RESULT: ${{ needs.review.result }}
+          CLAUDE_CONCLUSION: ${{ needs.review.outputs.conclusion }}
+          REVIEW_TELEMETRY: ${{ needs.review.outputs.telemetry }}
+          PUBLICATION_OUTCOME: ${{ steps.publication.outcome }}
+          PUBLICATION_STATUS: ${{ steps.publication.outputs.publication_status }}
+        with:
+          script: |
+            await require('./.github/scripts/claudeReviewStatus.cjs').finalise({github, context, core});
+      - name: Upload attempt status
+        if: ${{ always() }}
+        timeout-minutes: 1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: review-status-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/review-status.json
+          if-no-files-found: error
+          retention-days: 30

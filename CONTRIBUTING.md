@@ -96,6 +96,32 @@ Go to the original solids4foam repository on GitHub and open a pull request
 - Any **related issue numbers** (e.g., `Closes #123`).
 - **Instructions or example cases** to test your contribution, if applicable.
 
+## Reviewing Pull Requests
+
+Contributing reviewers are welcome. You can check a numerical method, reproduce
+results, or explain a compatibility concern. State what you inspected and what
+remains uncertain. Your technical assessment helps core maintainers decide.
+Core maintainers retain architectural decisions, final approval, and merging.
+Contributing reviews do not independently authorise a merge at this stage.
+
+Use the automated workflow as the standard AI assessment. Add independent
+technical judgement, verification, and interpretation in human reviews. Private
+AI assistance is welcome, but avoid routinely posting additional full AI reviews.
+For another assessment, agree a workflow re-run or a focused unresolved question
+with a maintainer.
+
+Contributors can develop into contributing reviewers through sustained work and
+paired reviews. Progression to core maintainer depends on review quality,
+architectural understanding, and sound technical judgement. Core maintainers
+discuss that responsibility with the contributor; review counts do not grant it.
+
+When enabled, the standard Claude report is an initial, advisory assessment.
+Check its commit SHA and verify its findings. For MEDIUM and HIGH risk, a core
+maintainer also posts a second, independent AI review from a different model.
+Neither replaces human judgement or numerical verification. See the
+[review guide](.github/review/README.md) for risk levels, reviewer development,
+and workflow setup.
+
 ## Questions?
 
 If you have any questions or need assistance, we encourage you to use the

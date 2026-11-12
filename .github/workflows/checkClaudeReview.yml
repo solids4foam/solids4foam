@@ -1,0 +1,33 @@
+name: Check advisory review helpers
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/claudeReview*'
+      - '.github/scripts/secondReview*'
+      - '.github/review/**'
+      - '.github/workflows/*ClaudeReview.yml'
+      - '.github/workflows/claudeReview.yml'
+      - '.agents/skills/**'
+  push:
+    branches: [development, master]
+    paths:
+      - '.github/scripts/claudeReview*'
+      - '.github/scripts/secondReview*'
+      - '.github/review/**'
+      - '.github/workflows/*ClaudeReview.yml'
+      - '.github/workflows/claudeReview.yml'
+      - '.agents/skills/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - run: node --test .github/scripts/*.test.cjs
