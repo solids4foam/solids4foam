@@ -145,8 +145,9 @@ for mesh in "${MESHES[@]}"; do
             continue
         fi
         if [[ "$approach" == "petscSnesPressure" ]]; then
-            # Failed linear solves are allowed inside a converged Newton solve
-            # (snes_max_linear_solve_fail); the nonlinear outcome decides
+            # A failed linear solve ends the Newton solve unless
+            # snes_max_linear_solve_fail allows it; the nonlinear outcome
+            # decides
             if grep -q 'Nonlinear solve did not converge' "$SOLVER_LOG" \
             || ! grep -q 'Nonlinear solve converged' "$SOLVER_LOG"; then
                 echo "FAIL: $approach did not converge"

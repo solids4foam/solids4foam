@@ -230,9 +230,8 @@ def run_level(
     if not re.search(r"^End\s*$", log_text, re.MULTILINE):
         raise RuntimeError(f"incomplete solver log: {solver_log}")
     if reports_pressure(variant):
-        # The mixed approach allows failed linear solves inside a converged
-        # Newton solve (snes_max_linear_solve_fail); the nonlinear outcome
-        # decides
+        # A failed linear solve ends the Newton solve unless
+        # snes_max_linear_solve_fail allows it; the nonlinear outcome decides
         if (
             "Nonlinear solve did not converge" in log_text
             or "Nonlinear solve converged" not in log_text

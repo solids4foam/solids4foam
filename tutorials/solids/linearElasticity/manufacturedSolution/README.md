@@ -122,10 +122,16 @@ continuous $L^2$ norm of the cell-wise constant error divided by the square
 root of the domain volume; on this uniform mesh the two coincide. The values above are those of the default
 $5^3$ mesh. Displacement-only approaches are unaffected.
 
-On the $20^3$ and finer meshes the first Krylov solve can reach
-`ksp_max_it`; `snes_max_linear_solve_fail` lets the Newton iteration continue.
-The tests require nonlinear convergence and report the number of failed linear
-solves with their PETSc reasons (`DIVERGED_ITS` is the iteration limit).
+The case scales the mixed PETSc system (`scaleMixedPETScFields yes`): the
+pressure unknown is stored as $p/2\mu$ and the pressure rows are multiplied
+by $2\mu$, the volume average of the shear stiffness the law declares. The
+converged solution is unchanged. Without it, the first Krylov solve on the
+$20^3$ and finer meshes stopped at `ksp_max_it`, because the matrix-free
+differencing step, scaled by the unknowns, is too small for pressures of
+order $10^6$ Pa. With the scaling no linear solve fails, so the case keeps
+PETSc's default limit of one failed linear solve per Newton solve. The tests
+require nonlinear convergence and report any failed linear solves with their
+PETSc reasons (`DIVERGED_ITS` is the iteration limit).
 
 ## Verification and regression
 

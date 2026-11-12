@@ -31,11 +31,6 @@ solvers
             snes_type newtonls;
             snes_linesearch_type basic;
             snes_rtol "1e-6";
-            // Continue after a failed linear solve: on the 20^3
-            // and finer meshes the first Krylov solve does not reach ksp_rtol
-            // within the iteration limit, although the Newton iteration then
-            // converges. The tests require nonlinear convergence
-            snes_max_linear_solve_fail "100";
             snes_monitor;
             snes_converged_reason;
             snes_mf;

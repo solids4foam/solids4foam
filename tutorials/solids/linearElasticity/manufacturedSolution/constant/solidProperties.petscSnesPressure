@@ -32,6 +32,12 @@ linearGeometryTotalDisplacementCoeffs
     // this linear elastic law)
     mixedImplicitStiffness twoMu;
 
+    // Algebraic scaling of the mixed PETSc system: the pressure unknown is
+    // stored as p/(2*mu) and the pressure rows are multiplied by 2*mu, with
+    // 2*mu the volume average declared by the law. The converged solution is
+    // unchanged; the linear solves are better conditioned
+    scaleMixedPETScFields yes;
+
     // One representative stabilisation configuration. The pressure term is
     // the generalised even-order Laplacian with m = laplacianPower = 1 (the
     // bi-Laplacian), unnormalised. These coefficients verify the current

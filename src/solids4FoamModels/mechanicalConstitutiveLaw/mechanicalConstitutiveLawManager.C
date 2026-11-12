@@ -1664,6 +1664,24 @@ Foam::mechanicalConstitutiveLawManager::singleLaw() const
 }
 
 
+bool Foam::mechanicalConstitutiveLawManager::providesScalarShearTangent
+(
+    wordList& undeclared
+) const
+{
+    // Every processor holds every law, so the answer is the same everywhere
+    forAll(laws_, lawI)
+    {
+        if (!laws_[lawI].providesScalarShearTangent())
+        {
+            undeclared.append(laws_[lawI].type());
+        }
+    }
+
+    return undeclared.empty();
+}
+
+
 const Foam::volScalarField&
 Foam::mechanicalConstitutiveLawManager::kappa() const
 {
