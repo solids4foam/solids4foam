@@ -424,7 +424,7 @@ void kirchhoffPlateSolid::solveCoupled()
         }
     }
 
-    // Add coeff*(n & grad(w))_cellI to the given row
+    // Add coeff*(n & grad(W))_cellI to the given row
     auto addNormalGrad = [&]
     (
         const label row, const label cellI, const vector& n, const scalar coeff
@@ -436,12 +436,35 @@ void kirchhoffPlateSolid::solveCoupled()
         }
     };
 
+    // Add coeff*(n & grad(M))_cellI to the given row: the M unknowns use the
+    // same stencil as W, with the index of M one before that of W
+    auto addNormalGradM = [&]
+    (
+        const label row, const label cellI, const vector& n, const scalar coeff
+    )
+    {
+        forAll(gradIdx[cellI], k)
+        {
+            add(row, gradIdx[cellI][k] - 1, coeff*(n & gradVec[cellI][k]));
+        }
+    };
+
     // Interior Laplacian coefficients, taken from the finite-area
     // discretisation so that the schemes of faSchemes are used
     const faScalarMatrix lapM(fam::laplacian(M_));
     const faScalarMatrix lapW(fam::laplacian(bendingStiffness_, w_));
     const scalarField& upperM = lapM.upper();
     const scalarField& upperW = lapW.upper();
+
+    // Non-orthogonal correction of the Laplacians: the corrected scheme adds
+    // magLe*(k & grad(phi))_e to the edge flux, with the gradient linearly
+    // interpolated from the least-squares cell gradients. It is assembled
+    // implicitly through the gradient stencils, so that one solve gives the
+    // corrected discretisation on any mesh. The correction vectors vanish
+    // on an orthogonal mesh and on the boundary edges
+    const edgeVectorField& corrVecs = mesh.correctionVectors();
+    const edgeScalarField& weights = mesh.weights();
+    const scalarField& magLe = mesh.magLe().primitiveField();
 
     // M equation: -laplacian(M) + rho*h*d2dt2(w) = p
     // w equation: laplacian(D, w) + M = 0, written for W = D*w
@@ -459,6 +482,23 @@ void kirchhoffPlateSolid::solveCoupled()
         add(wCell(o), wCell(n), upperW[e]/D);
         add(wCell(n), wCell(n), -upperW[e]/D);
         add(wCell(n), wCell(o), upperW[e]/D);
+
+        if (magSqr(corrVecs[e]) > SMALL)
+        {
+            const vector k = corrVecs[e];
+            const scalar lo = magLe[e]*weights[e];
+            const scalar ln = magLe[e]*(1.0 - weights[e]);
+
+            addNormalGrad(wCell(o), o, k, lo);
+            addNormalGrad(wCell(o), n, k, ln);
+            addNormalGrad(wCell(n), o, k, -lo);
+            addNormalGrad(wCell(n), n, k, -ln);
+
+            addNormalGradM(mCell(o), o, k, -lo);
+            addNormalGradM(mCell(o), n, k, -ln);
+            addNormalGradM(mCell(n), o, k, lo);
+            addNormalGradM(mCell(n), n, k, ln);
+        }
     }
 
     // Inertia with the Euler scheme, consistent with the segregated
@@ -833,21 +873,18 @@ void kirchhoffPlateSolid::solveCoupled()
     Info<< "    Coupled system: " << nUnknowns << " unknowns, "
         << rows.size() << " coefficients" << endl;
 
-    // Outer iterations for the explicit non-orthogonal correction of the
-    // Laplacians; one iteration is exact on an orthogonal mesh
+    // The system is linear and fully implicit, so the second iteration only
+    // confirms the solution of the first
     const areaScalarField& w0 = w_.oldTime();
     const areaScalarField& w00 = w0.oldTime();
 
     for (int iter = 0; iter < nCorr(); ++iter)
     {
-        const faScalarMatrix lapMIter(fam::laplacian(M_));
-        const faScalarMatrix lapWIter(fam::laplacian(bendingStiffness_, w_));
-
         scalarField rhs(rhsBoundary);
         forAll(S, i)
         {
-            rhs[mCell(i)] = S[i]*p_[i] - lapMIter.source()[i];
-            rhs[wCell(i)] = lapWIter.source()[i]/D;
+            rhs[mCell(i)] = S[i]*p_[i];
+            rhs[wCell(i)] = 0.0;
 
             if (rho_.value() > SMALL)
             {
