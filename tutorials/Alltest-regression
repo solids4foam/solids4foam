@@ -138,6 +138,7 @@ REGRESSION_TESTS=(
     "solids/beamsPlatesShells/cantileverPlate"
     "solids/beamsPlatesShells/doublyClampedPlate"
     "solids/beamsPlatesShells/annularPlate"
+    "solids/beamsPlatesShells/manufacturedSolutionPlate"
     "solids/linearElasticity/cantilever2d"
     "solids/linearElasticity/curvedCantilever"
     "solids/linearElasticity/cooksMembrane"

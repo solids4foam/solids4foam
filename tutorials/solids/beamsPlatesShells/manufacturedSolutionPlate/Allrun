@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+usage() {
+cat <<'USAGE'
+Usage:
+  ./Allrun [mesh]
+
+Where [mesh] is one of:
+  hex      uniform quadrilateral finite area mesh from blockMesh (default)
+  distHex  the blockMesh mesh with randomly perturbed interior points
+  tri      unstructured triangular mesh from Gmsh (requires gmsh)
+USAGE
+}
+
+if [[ "${1:-}" =~ ^(-h|--help)$ ]]
+then
+    usage
+    exit 0
+fi
+
+MESH="${1:-hex}"
+
+case "$MESH" in
+    hex|distHex|tri)
+        ;;
+    *)
+        echo "Error: Unknown mesh '$MESH'"
+        usage
+        exit 1
+        ;;
+esac
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+if [[ "${WM_PROJECT_VERSION#v}" -lt 2412 ]]
+then
+    echo
+    echo "OpenFOAM-v2412 or a newer version is required for this case"
+    echo
+    exit 0
+fi
+
+if ! command -v python3 > /dev/null 2>&1
+then
+    echo "python3 is required to write the manufactured load"
+    exit 1
+fi
+
+# Create volume mesh
+echo "Using the ${MESH} mesh"
+case "$MESH" in
+    hex|distHex)
+        solids4Foam::runApplication blockMesh
+        if [[ "$MESH" == "distHex" ]]
+        then
+            echo "Running perturbPlateMesh.py"
+            python3 -I perturbPlateMesh.py > log.perturbPlateMesh 2>&1 || exit 1
+        fi
+        ;;
+    tri)
+        if ! command -v gmsh > /dev/null 2>&1
+        then
+            echo "gmsh is required for the ${MESH} mesh"
+            exit 1
+        fi
+        solids4Foam::runApplication gmsh -3 -format msh2 \
+            -o gmsh/tri-unstructured.msh gmsh/tri-unstructured.geo
+        solids4Foam::runApplication gmshToFoam gmsh/tri-unstructured.msh
+        ;;
+esac
+
+# Create finite area mesh
+solids4Foam::runApplication makeFaMesh
+
+# Write the manufactured load and the exact fields on the finite area faces
+echo "Running writeManufacturedSolution.py"
+python3 -I writeManufacturedSolution.py > log.writeManufacturedSolution 2>&1 \
+    || exit 1
+
+# Run solver
+solids4Foam::runApplication solids4Foam
