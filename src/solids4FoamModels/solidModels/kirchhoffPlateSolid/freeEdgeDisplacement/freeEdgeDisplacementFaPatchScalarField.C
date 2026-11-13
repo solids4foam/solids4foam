@@ -21,6 +21,7 @@ License
 
 #include "freeEdgeDisplacementFaPatchScalarField.H"
 #include "addToRunTimeSelectionTable.H"
+#include "freeEdgeStencil.H"
 #include "kirchhoffPlateSolid.H"
 #include "lookupSolidModel.H"
 
@@ -111,49 +112,33 @@ void Foam::freeEdgeDisplacementFaPatchScalarField::updateCoeffs()
         return;
     }
 
-    // Info<< nl << "------------------------------------------" << nl << endl;
-
     // Lookup angle of rotation field
-    // const faPatchField<vector>& theta =
-    //     patch().lookupPatchField<areaVectorField, vector>("theta");
+    const faPatchField<vector>& theta =
+        patch().lookupPatchField<areaVectorField, vector>("theta");
 
     // Lookup the gradient of rotation field
-    // const faPatchField<tensor>& gradTheta =
-    //     patch().lookupPatchField<areaTensorField, tensor>("grad(theta)");
+    const faPatchField<tensor>& gradTheta =
+        patch().lookupPatchField<areaTensorField, tensor>("grad(theta)");
 
     // Calculate correction vectors
-    // const vectorField n = patch().edgeNormals();
-    // const vectorField delta(patch().delta());
-    // const vectorField k = (I - sqr(n)) & delta;
+    const vectorField n(patch().edgeNormals());
+    const vectorField delta(patch().delta());
+    const vectorField k((I - sqr(n)) & delta);
 
-    // Calculate the patch internal field and correction for non-orthogonality
-    // const scalarField nDotThetaPif =
-    //  n & (theta.patchInternalField() + (k & gradTheta.patchInternalField()));
-
-    // Info<< "theta: "
-    //     << vectorField(theta) << nl << endl;
-    // Info<< "theta pif: "
-    //     << (theta.patchInternalField()) << nl << endl;
-
-    // gradTheta patch internal field in normal direction
-    // const vectorField nDotGradThetaPif = n & gradTheta.patchInternalField();
+    // Normal slope at the foot of the normal from the cell centre, including
+    // the non-orthogonal correction, which matters on curved edges
+    const scalarField nDotThetaPif
+    (
+        n & (theta.patchInternalField() + (k & gradTheta.patchInternalField()))
+    );
 
     // Lookup moment sum field
     const faPatchField<scalar>& M =
         patch().lookupPatchField<areaScalarField, scalar>("M");
 
     // Lookup fvMesh
-    // Fix for FSI: this is only correct for
-    const fvMesh* vmeshPtr = NULL;
-    if (db().parent().foundObject<fvMesh>("solid"))
-    {
-        vmeshPtr = &db().parent().lookupObject<fvMesh>("solid");
-    }
-    else
-    {
-        vmeshPtr = &db().parent().lookupObject<fvMesh>("region0");
-    }
-    const fvMesh& vmesh = *vmeshPtr;
+    const fvMesh& vmesh =
+        refCast<const fvMesh>(patch().boundaryMesh().mesh().mesh());
 
     // Lookup the solidModel object
     const solidModel& solMod = lookupSolidModel(vmesh);
@@ -166,34 +151,40 @@ void Foam::freeEdgeDisplacementFaPatchScalarField::updateCoeffs()
     const scalar D = plateSolid.bendingStiffness().value();
     const scalar nu = plateSolid.nu().value();
 
-    // Update the gradient
-    gradient() +=
-        relaxFac_*(1.0 + nu)*M/(D*(1.0 - pow(nu, 2))*patch().deltaCoeffs());
+    // Normal slope at the edge extrapolated from the cell centre: the normal
+    // curvature on a free edge is w_nn = nu/(1 - nu) M/D, where M is taken
+    // from the adjacent cell
+    const scalarField extrapolated
+    (
+       -nDotThetaPif
+      + (nu/(1.0 - nu))*(M.patchInternalField()/D)/patch().deltaCoeffs()
+    );
+    scalarField newGradient(extrapolated);
 
-    // Info<< "prev gradient(): " << gradient() << nl << endl;
+    // At a corner shared with another free edge the twisting moment vanishes,
+    // so the normal slope does not vary along the edge there: take the slope
+    // of the neighbouring edge, since the extrapolation above leaves the
+    // corner cell undetermined
+    const labelListList nbrs(freeEdgeStencil::edgeNeighbours(patch()));
+    const labelListList ends(freeEdgeStencil::edgeEndPoints(patch()));
+    const areaScalarField& w = db().lookupObject<areaScalarField>("w");
 
-    // gradient() =
-    //     relaxFac_
-    //    *(
-    //        nDotThetaPif
-    //      + (delta & nDotGradThetaPif)
-    //      + M/(D*(1.0 - pow(nu, 2))*patch().deltaCoeffs())
-    //     )
-    //   + (1.0 - relaxFac_)*gradient();
+    forAll(newGradient, edgeI)
+    {
+        if
+        (
+            nbrs[edgeI].size() == 1
+         && ends[edgeI].size() == 1
+         && !freeEdgeStencil::fixesValueAtPoint(w, patch(), ends[edgeI][0])
+        )
+        {
+            newGradient[edgeI] = extrapolated[nbrs[edgeI][0]];
+        }
+    }
 
-    // Info<< "new gradient(): " << gradient() << nl << endl;
-
-    // Info<< "this (w): " << scalarField(*this) << nl << endl;
-
-    // Info<< "nDotThetaPif: " << nDotThetaPif << endl;
-    // Info<< "(delta & nDotGradThetaPif) "
-    //     << (delta & nDotGradThetaPif) << endl;
-    // Info<< "3: "
-    //     << M/(D*(1.0 - pow(nu, 2))*patch().deltaCoeffs()) << endl;
+    gradient() = relaxFac_*newGradient + (1.0 - relaxFac_)*gradient();
 
     fixedGradientFaPatchField<scalar>::updateCoeffs();
-
-    //Info<< nl << "-------------------------------------------" << nl << endl;
 }
 
 

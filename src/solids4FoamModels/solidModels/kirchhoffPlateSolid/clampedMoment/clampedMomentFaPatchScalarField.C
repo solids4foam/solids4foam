@@ -154,7 +154,13 @@ void Foam::clampedMomentFaPatchScalarField::updateCoeffs()
     // Lookup flexural stiffness from the solver
     const scalar D = plateSolid.bendingStiffness().value();
 
-    // Set the boundary moment sum to force a clamped edge
+    // Set the boundary moment sum to force a clamped edge: the tangential
+    // curvature vanishes along a clamped edge, so M = -D*d2w/dn2, with the
+    // normal curvature taken as the slope of the boundary cell over its
+    // distance to the edge, where the slope vanishes. The one-sided
+    // combination 6*w_P/d^2 - 2*(n & theta_P)/d, formally of higher order,
+    // was found to converge only at first order on the clamped square plate
+    // and the cantilever, while this form converges at second order
     const scalarField prevMomentSum(*this);
     faPatchField<scalar>::operator==
     (
