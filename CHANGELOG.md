@@ -368,6 +368,21 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The high-order least-squares schemes (`kExactLeastSquares` and
+  `movingLeastSquares`) take the boundary values at the face quadrature
+  points from any patch field that derives from the new
+  `quadratureValuePatchField` interface, not only from `fixedDisplacement`
+  and `fixedRotation`. A scalar or vector `fixedValue` patch field is also
+  accepted when its value is uniform, and stops with an error otherwise;
+  other patch fields that fix the value, e.g. `mixed` and `directionMixed`,
+  still stop with an error. A plain `fixedDisplacement` patch with a
+  non-uniform value now gives a warning, as copying its face-centre values to
+  the quadrature points limits the boundary data to second-order accuracy.
+  The `hofvc` functions take the least-squares scheme as an argument (the
+  solid-model versions are kept), so that models other than solids can use
+  them. Solid results are unchanged. The new `Test-patchQuadratureValues`
+  utility checks the behaviour of every registered patch field type.
+
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same
   scheme in all OpenFOAM variants. The case conversion script no longer

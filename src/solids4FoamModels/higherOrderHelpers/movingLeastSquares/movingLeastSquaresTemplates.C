@@ -123,23 +123,6 @@ Type movingLeastSquares::evaluateAtPoint
 
 
 template<class Type>
-autoPtr<CompactListList<Type>> movingLeastSquares::patchFaceQuadValues
-(
-    const GeometricField<Type, fvPatchField, volMesh>&,
-    const label patchI
-) const
-{
-    FatalErrorInFunction
-        << "patchFaceQuadValues is not implemented for field type "
-        << pTraits<Type>::typeName
-        << " on patch " << patchI
-        << abort(FatalError);
-
-    return autoPtr<CompactListList<Type>>(nullptr);
-}
-
-
-template<class Type>
 tmp<GeometricField<
     typename outerProduct<vector, Type>::type,
     fvPatchField,

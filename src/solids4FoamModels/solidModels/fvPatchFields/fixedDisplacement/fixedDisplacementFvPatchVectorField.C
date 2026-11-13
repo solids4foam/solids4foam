@@ -28,6 +28,8 @@ License
 #include "patchCorrectionVectors.H"
 #include "lookupSolidModel.H"
 #include "compatibilityFunctions.H"
+#include "patchQuadratureValues.H"
+#include "HashSet.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -371,50 +373,58 @@ autoPtr<CompactListList<vector>>
 fixedDisplacementFvPatchVectorField::evaluateQuadrature
 () const
 {
-    const fvMesh& mesh = patch().boundaryMesh().mesh();
-    const solidModel& solMod = lookupSolidModel(mesh);
-
-    // faceQuadPoints is list for the  whole mesh
-    auto& faceQuadPoints = compactListListCRef
-    (
-        solMod.displacementLeastSquares().quadrature().faceQuadPoints()
-    );
-
-    // faceQuadPoints is list for whole mesh.
-    labelList nQpPerFace(this->size(), 0);
-    const label start = this->patch().patch().start();
-    forAll(nQpPerFace, faceI)
+    // Copying the face-centre values to the quadrature points is exact only
+    // when the displacement is uniform on the patch. A non-uniform patch is
+    // reported once, as it limits the boundary data to second-order accuracy.
+    if (!uniformPatchValue(*this))
     {
-        const label globalFaceID = faceI + start;
-        nQpPerFace[faceI]=faceQuadPoints[globalFaceID].size();
-    }
+        static wordHashSet reportedPatches;
 
-    autoPtr<CompactListList<vector>> tQuadPointsValue
-    (
-        new CompactListList<vector>(nQpPerFace)
-    );
+        const word patchKey =
+            patch().boundaryMesh().mesh().name() + "/" + patch().name();
 
-    // Get a reference to the actual data for easier access
-    CompactListList<vector>& quadPointsValue = autoPtrRef(tQuadPointsValue);
-
-    forAll(*this, faceI)
-    {
-        // Get the current face value
-        const vector& faceValue = (*this)[faceI];
-        const label globalFaceID = faceI + start;
-
-        // Get the number of quadrature points for this face
-        const label nPoints = faceQuadPoints[globalFaceID].size();
-
-        // Assign the same value to all quadrature points on this face
-        for (label pointI = 0; pointI < nPoints; ++pointI)
+        if (reportedPatches.insert(patchKey))
         {
-            quadPointsValue[faceI][pointI] = faceValue;
+            WarningInFunction
+                << "The displacement on patch " << patch().name()
+                << " is not uniform, so copying the face-centre values to the "
+                << "face quadrature points limits the boundary data to "
+                << "second-order accuracy." << nl
+                << "    Derive a patch field that overrides "
+                << "evaluateQuadrature() to give the exact values at the "
+                << "quadrature points" << endl;
         }
     }
 
-    return tQuadPointsValue;
+    const solidModel& solMod =
+        lookupSolidModel(patch().boundaryMesh().mesh());
+
+    return uniformQuadratureValues
+    (
+        *this, solMod.displacementLeastSquares().quadrature()
+    );
 }
+
+
+autoPtr<CompactListList<vector>>
+fixedDisplacementFvPatchVectorField::quadratureValues
+(
+    const fvMeshQuadrature& quad
+) const
+{
+    // evaluateQuadrature() and its overrides in derived patch fields use the
+    // quadrature of the displacement least-squares scheme of the solid model
+    const solidModel& solMod =
+        lookupSolidModel(patch().boundaryMesh().mesh());
+
+    checkSameQuadraturePoints
+    (
+        *this, quad, solMod.displacementLeastSquares().quadrature()
+    );
+
+    return evaluateQuadrature();
+}
+
 
 void fixedDisplacementFvPatchVectorField::write(Ostream& os) const
 {

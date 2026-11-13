@@ -19,6 +19,7 @@ License
 
 #include "hofvc.H"
 #include "lookupSolidModel.H"
+#include "leastSquaresScheme.H"
 #include "compatibilityFunctions.H"
 #ifdef OPENFOAM_ORG
     #include "fvSchemes.H"
@@ -31,20 +32,33 @@ using namespace Foam;
 
 void hofvc::fGrad
 (
+    const leastSquaresScheme& ls,
+    const volVectorField& vf,
+    CompactListList<tensor>& gradQuad
+)
+{
+    ls.fGrad(vf, gradQuad);
+}
+
+
+void hofvc::fGrad
+(
     const volVectorField& D,
     CompactListList<tensor>& gradDQuad
  )
 {
     const solidModel& solMod = lookupSolidModel(D.mesh());
 
-    solMod.displacementLeastSquares().fGrad(D, gradDQuad);
+    fGrad(solMod.displacementLeastSquares(), D, gradDQuad);
 }
 
 
 tmp<surfaceVectorField> hofvc::surfaceIntegrate
 (
+    const leastSquaresScheme& ls,
     const CompactListList<symmTensor>& quadSigma,
-    const fvMesh& mesh
+    const fvMesh& mesh,
+    const dimensionSet& dims
 )
 {
     tmp<surfaceVectorField> tsf
@@ -60,7 +74,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
                  IOobject::NO_WRITE
             ),
             mesh,
-            dimensionedVector("0", dimPressure, vector::zero)
+            dimensionedVector("0", dims, vector::zero)
         )
     );
 
@@ -69,11 +83,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     const vectorField normal(mesh.faceAreas()/mag(mesh.faceAreas()));
     const surfaceScalarField& magSf = mesh.magSf();
     // Reference to integration weights
-    const solidModel& solMod = lookupSolidModel(mesh);
-    auto& quadW = compactListListCRef
-    (
-        solMod.displacementLeastSquares().quadrature().faceQuadWeights()
-    );
+    auto& quadW = compactListListCRef(ls.quadrature().faceQuadWeights());
     auto& quadSigmaRef = compactListListCRef(quadSigma);
 
     forAll(tf, faceI)
@@ -125,6 +135,19 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 tmp<surfaceVectorField> hofvc::surfaceIntegrate
 (
     const CompactListList<symmTensor>& quadSigma,
+    const fvMesh& mesh
+)
+{
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    return surfaceIntegrate(solMod.displacementLeastSquares(), quadSigma, mesh);
+}
+
+
+tmp<surfaceVectorField> hofvc::surfaceIntegrate
+(
+    const leastSquaresScheme& ls,
+    const CompactListList<symmTensor>& quadSigma,
     const CompactListList<tensor>& quadGradD,
     const fvMesh& mesh
 )
@@ -151,11 +174,7 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
     const vectorField normal(mesh.faceAreas()/mag(mesh.faceAreas()));
     const surfaceScalarField& magSf = mesh.magSf();
     // Reference to integration weights
-    const solidModel& solMod = lookupSolidModel(mesh);
-    auto& quadW = compactListListCRef
-    (
-        solMod.displacementLeastSquares().quadrature().faceQuadWeights()
-    );
+    auto& quadW = compactListListCRef(ls.quadrature().faceQuadWeights());
     auto& quadSigmaRef = compactListListCRef(quadSigma);
     auto& quadGradDRef = compactListListCRef(quadGradD);
 
@@ -215,6 +234,22 @@ tmp<surfaceVectorField> hofvc::surfaceIntegrate
 
     return tsf;
 };
+
+
+tmp<surfaceVectorField> hofvc::surfaceIntegrate
+(
+    const CompactListList<symmTensor>& quadSigma,
+    const CompactListList<tensor>& quadGradD,
+    const fvMesh& mesh
+)
+{
+    const solidModel& solMod = lookupSolidModel(mesh);
+
+    return surfaceIntegrate
+    (
+        solMod.displacementLeastSquares(), quadSigma, quadGradD, mesh
+    );
+}
 
 
 tmp<volVectorField> hofvc::d2dt2
