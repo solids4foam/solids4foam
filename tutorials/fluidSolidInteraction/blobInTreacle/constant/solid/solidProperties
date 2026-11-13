@@ -16,9 +16,14 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel      linearGeometryTotalDisplacement;
+// The case uses a finite-strain solid: Liu et al. (2014) use a small-strain
+// linear elastic solid, but the deformation is large, and a small-strain solid
+// integrates the fluid traction over its undeformed surface, so it receives
+// about 12% less force than the fluid exerts. The neo-Hookean law with the same
+// Lame constants reduces to their model for small strains
+solidModel      nonLinearGeometryTotalLagrangianTotalDisplacement;
 
-linearGeometryTotalDisplacementCoeffs
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
 {
     // Maximum number of momentum correctors
     nCorrectors     1000;
