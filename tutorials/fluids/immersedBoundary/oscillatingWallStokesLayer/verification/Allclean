@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Remove the generated verification cases and their results (work/); the
+# tracked reference/ and images/ are not touched
+cd "${0%/*}" || exit 1
+rm -rf work postProcessing scripts/__pycache__
