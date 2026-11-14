@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Opt-in verification driver for the bendingBeamInChannel tutorial: the
+# exact volume balance, the force coefficients against the body-fitted
+# series and the observed cost of the cutLink, penalty, legacy incremental and
+# ghostCell methods on the tutorial mesh levels. See README.md.
+#
+#     ./Allverify unit                   # exact tests, no OpenFOAM needed
+#     ./Allverify dry-run --runs L2      # cases, ranks and estimated cost
+#     ./Allverify                        # smoke: Level 1, first 0.5 s
+#     ./Allverify --runs flux            # Levels 1-2, volume-balance check
+#     ./Allverify --runs L1 L2           # force coefficients (hours)
+#     ./Allverify check                  # PASS / FAIL / SKIPPED
+#     ./Allverify --help
+set -euo pipefail
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "ERROR: python3 is required for bendingBeamInChannel verification." >&2
+    exit 2
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 -u "${SCRIPT_DIR}/scripts/bending_beam_verification.py" "$@"

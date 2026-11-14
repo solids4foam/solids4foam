@@ -1,0 +1,4 @@
+series,run,steps,max_Courant_cell_sum
+A,archive,800,4.08891
+B,R1-bodyfitted-A24720-dt0.0025,3200,1.0071
+C,R1C-bodyfitted-A24720-dt0.01,800,4.10099

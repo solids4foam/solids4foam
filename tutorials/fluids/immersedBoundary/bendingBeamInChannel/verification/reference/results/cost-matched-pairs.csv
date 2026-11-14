@@ -1,0 +1,7 @@
+settings,cutLink_run,penalty_run,cutLink_s_per_step,penalty_s_per_step,ratio,cutLink_other_ranks,penalty_other_ranks,both_windows_after_affinity_fix
+Euler N96,T-cutLink-Euler-N96,T-penalty-Euler-N96,0.2939,0.1408,2.09,6.0,6.0,True
+Euler N48,T-cutLink-Euler-N48,T-penalty-Euler-N48,0.3078,0.1661,1.85,6.0,4.0,True
+backward N96,T-cutLink-backward-N96,T-penalty-backward-N96,0.2584,0.1453,1.78,4.0,6.0,True
+backward N48,T-cutLink-backward-N48,T-penalty-backward-N48,0.2695,0.1669,1.61,6.0,2.0,True
+limitedLinear N96,S-cutLink-limitedLinear-N96,S-penalty-limitedLinear-N96,0.2507,0.153,1.64,4.0,4.0,True
+nOuter 2 N96,P-cutLink-nOuter2-r2,P-penalty-nOuter2,0.3675,0.2458,1.5,4.1,4.0,True
