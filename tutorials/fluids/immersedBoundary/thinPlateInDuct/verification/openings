@@ -1,0 +1,16 @@
+#!/bin/bash
+# Static plate of 0.43 cells with slots and edges under a pressure drop (inlet
+# p = 0.01, outlet 0, slip walls). usage: ./openings APERTURE [REFINE] [NPAR]
+#   APERTURE binary | exact; REFINE 1 (h = 10 mm, default), 2 or 4; the cases
+#   run NPAR at a time (default 4) in ./openings_APERTURE_hREFINE; openings.py
+#   prints Q(6 s) / Q without a plate
+cd "${0%/*}" || exit 1
+ap=$1; ref=${2:-1}; npar=${3:-4}
+declare -A yr=( [slot1al]="-0.05:0.09,0.10:0.25" [slot09ctr]="-0.05:0.0955,0.1045:0.25"
+  [slot05]="-0.05:0.0925,0.0975:0.25" [slot2al]="-0.05:0.09,0.11:0.25"
+  [slot3al]="-0.05:0.085,0.115:0.25" [slot1sh]="-0.05:0.0975,0.1075:0.25"
+  [edgeA]="-0.05:0.15" [edgeM1]="-0.05:0.1475" [edgeM2]="-0.05:0.1525" )
+for n in "${!yr[@]}"; do
+    echo "PIN=0.01 STATIC=1 END=6 REFINE=$ref YRANGES=${yr[$n]} DIFFUSIVITY=zero APERTURE=$ap TAG=_${n}_${ap}_h$ref ../runCase 0.43 slip crossedFaces 1"
+done | xargs -P $npar -I{} bash -c "mkdir -p openings_${ap}_h$ref && cd openings_${ap}_h$ref && cp -r ../../0 ../../constant ../../system ../../makePlateStl.py . 2>/dev/null; cd ..; env {}"
+echo "cases are in ../run_slip_0.43_crossedFaces_*_${ap}_h$ref; run: python3 openings.py $ap $ref"

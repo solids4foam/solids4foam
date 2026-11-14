@@ -1,0 +1,11 @@
+#!/bin/bash
+# Thin shells of 0.3 cells (a plate tilted by 30 degrees and a parabolic arc)
+# translated along the duct, slip and no-slip walls, binary and exact.
+# usage: ./shells [NPAR]; cases in ../run_*_0.3_crossedFaces_*; shells.py prints
+# Q/(wA)
+cd "${0%/*}" || exit 1
+npar=${1:-4}
+for s in tilt30 arc; do python3 shellStl.py $s $PWD/${s}_0p3.stl 0.3; done
+for s in tilt30 arc; do for w in slip noSlip; do for a in binary exact; do
+    echo "STLFILE=$PWD/${s}_0p3.stl END=10 DIFFUSIVITY=zero APERTURE=$a TAG=_${s}_$a ../runCase 0.3 $w crossedFaces 1"
+done; done; done | xargs -P $npar -I{} env {}

@@ -1,0 +1,48 @@
+#!/bin/bash
+# Pressure pocket / topology test: plate A moves towards the static plate B at
+# x = 1.003 m in the duct and passes through it (the region between them is a
+# sealed pocket whose volume changes: no incompressible solution). usage:
+#   ./pocketCase NAME MOTION POLICY APERTURE [END]
+#   MOTION uni (0.2 m/s from the start) | sins (sinusoidal, from rest, period 16 s)
+#   POLICY flag | reject | source (thinBodyPocketPolicy)  APERTURE binary | exact
+# environment: DT (maxDeltaT), REFINE (cells n times smaller), BX (x of B), NOB=1
+# (no plate B). The case is run in ./pocket_NAME. postProcessing/thinBodyPockets/
+# pockets.dat holds the pocket quantities; pockets.py analyses the pressure.
+T=$(cd "${0%/*}/.." && pwd)
+d=$(cd "${0%/*}" && pwd)/pocket_$1; rm -rf $d; mkdir -p $d
+cp -r $T/0 $T/constant $T/system $T/makePlateStl.py $d/; cd $d; mkdir constant/triSurface
+h=$(python3 -c "print(0.01/${REFINE:-1})")
+python3 makePlateStl.py 0.43 $h 0.303 > constant/triSurface/plateA.stl
+python3 makePlateStl.py 0.43 $h ${BX:-1.003} > constant/triSurface/plateB.stl
+if [ $2 = uni ]; then mot="type uniformTranslation; velocity (0.2 0 0);"
+else mot="type sinusoidalTranslation; amplitude 0.9; period 16; phase -1.5707963; offset (0.9 0 0); direction (1 0 0);"; fi
+cat > constant/fvOptions <<EOT
+FoamFile { version 2.0; format ascii; class dictionary; location "constant"; object fvOptions; }
+immersedBoundary
+{
+    type immersedBoundaryForce;
+    method cutLink;
+    thinBodyBlocking crossedFaces;
+    thinBodyDiffusivity zero;
+    thinBodyAperture $4;
+    thinBodyPocketPolicy $3;
+    bodies
+    {
+        plateA { surface "plateA.stl"; motion { $mot } }
+        plateB { surface "plateB.stl"; motion { type static; } }
+    }
+}
+EOT
+[ -n "$NOB" ] && sed -i "/plateB {/d" constant/fvOptions
+sed -i "s/endTime [0-9.]*;/endTime ${5:-6};/" system/controlDict
+[ -n "$DT" ] && sed -i "s/maxDeltaT .*;/maxDeltaT $DT;/; s/^deltaT .*;/deltaT $DT;/" system/controlDict
+[ -n "$REFINE" ] && sed -i "s/(200 20 1)/($((200*REFINE)) $((20*REFINE)) 1)/" system/blockMeshDict
+for z in fz_a fz_b; do
+cat >> system/probes <<EOT
+p_$z { type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType faceZone; name $z; operation areaAverage; fields (p); }
+EOT
+done
+cat >> system/probes <<EOT
+pMM { type fieldMinMax; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; fields (p); mode magnitude; }
+EOT
+blockMesh > log.blockMesh 2>&1 && topoSet > log.topoSet 2>&1 && solids4Foam > log.solids4Foam 2>&1

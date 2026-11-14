@@ -1,0 +1,4 @@
+fluxUp { type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType faceZone; name fz_up; operation sum; fields (phi); }
+fluxA  { type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType faceZone; name fz_a; operation sum; fields (phi); }
+fluxB  { type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType faceZone; name fz_b; operation sum; fields (phi); }
+fluxOut{ type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType patch; name outlet; operation sum; fields (phi); }

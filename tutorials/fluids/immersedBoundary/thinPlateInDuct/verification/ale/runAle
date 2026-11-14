@@ -1,0 +1,26 @@
+#!/bin/bash
+# ALE flux tests of the thin-body option (moving mesh, deforming body):
+#   ./runAle LABEL [NPAR]   runs every case with thinBodyBlocking off (the
+#   default), crossedFaces with the binary rule (zero diffusivity) and
+#   crossedFaces with the exact aperture, NPAR at a time (default 4), into
+#   runs/LABEL, then prints the table of analyze.py
+# Plates of three cells in the duct of thinPlateInDuct: A fixed at rest; B plate
+# moving (fixed mesh); C mesh moving, body fixed; D mesh and body co-moving;
+# E deforming mesh and moving body; F long crossing; G mesh and body moving
+# (the _h2 cases have half the cell size)
+cd "${0%/*}" || exit 1
+label=${1:?usage: runAle LABEL [NPAR]}; npar=${2:-4}
+rm -rf runs/$label; mkdir -p runs/$label
+for c in */; do
+    c=${c%/}; [ -d $c/system ] || continue
+    for v in off zero exact; do
+        d=runs/$label/${c}__$v; cp -r $c $d
+        case $v in
+            zero) sed -i "s/method cutLink;/method cutLink; thinBodyBlocking crossedFaces; thinBodyDiffusivity zero;/" $d/constant/fvOptions;;
+            exact) sed -i "s/method cutLink;/method cutLink; thinBodyBlocking crossedFaces; thinBodyDiffusivity zero; thinBodyAperture exact;/" $d/constant/fvOptions;;
+        esac
+        echo $d
+    done
+done > runs/$label/list.txt
+cat runs/$label/list.txt | xargs -P $npar -I{} bash -c 'cd {} && blockMesh > log.blockMesh 2>&1 && { [ -f system/topoSetDict ] && topoSet > log.topoSet 2>&1; solids4Foam > log.solids4Foam 2>&1; }'
+python3 analyze.py $label

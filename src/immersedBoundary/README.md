@@ -167,7 +167,11 @@ Four forcing methods are available:
   flux of the velocity of a deforming body (for example a bending beam,
   whose sections stretch on one side and shorten on the other) need not be
   zero, and would otherwise be a source of fluid that leaks into the flow
-  (this has no effect for rigid bodies). The
+  (this has no effect for rigid bodies). The face
+  apertures are sampled at the mesh points, which miss a body thinner than
+  the point spacing for a part of the time; an experimental switch for such
+  bodies, `thinBodyBlocking` (default `off`), is described in
+  [Experimental: thin bodies](#experimental-thin-bodies). The
   force is the momentum exchange (`forceEstimator momentumExchange`, the
   default), which includes the inertia of the fluid inside the body; the
   alternative surface traction (`forceEstimator surfaceTraction`) is from
@@ -557,6 +561,489 @@ With this version, `clustered` (the default) against `greedy`:
   `staticCylinderInChannel`, `translatingCylinderInChannel`,
   `bendingBeamInChannel` and `oscillatingWallStokesLayer`).
 
+## Experimental: thin bodies
+
+**Experimental, work in progress, off by default.** This section describes
+`thinBodyBlocking` of `immersedBoundaryForce` (`method cutLink` with
+`apertureCoupling yes`). It is not a validated method for closed valves or
+for thin curved shells in general, and with the default `off` the code path
+and results are unchanged (bit-identical on the four immersed-boundary
+tutorials listed below). The partial aperture (`thinBodyAperture exact`) is a
+**new numerical formulation, not a bug fix**.
+
+### Problem
+
+With `apertureCoupling` the face apertures are computed from the signed
+distance at the mesh points (`cutFaceIso`) and the cells inside the bodies
+from the signed distance at the cell centres. A closed body of thickness `t`
+smaller than the point spacing `h` is therefore seen by the points only for
+the fraction `t/h` of the time, as it moves through the mesh, and the fluid
+leaks through it when it is not seen.
+
+### Crossing test (`thinBodyAperture binary`, the default)
+
+For every internal face with owner `P` and neighbour `N`, the segment
+`C_P C_N` between the two cell centres is tested against the triangles of the
+surface (`triSurfaceSearch::findLine`): the test is exact for any thickness.
+If the segment crosses the surface, the face is blocked: its aperture is set
+to 0 and the flux through it is that of the body velocity, as for the faces
+that are inside a body, so that the pressure equation of `pimpleFluid` treats
+it as a solid face. Coupled (processor) faces are tested in the same way with
+the segment to the centre of the cell on the other side. Only the faces whose
+cell centres are inside the bounding box of a body, grown by two cell sizes,
+are tested.
+
+```text
+thinBodyBlocking  off;           // default: unchanged behaviour
+thinBodyBlocking  openFaces;     // also block the faces that the points leave
+                                 // fully open and a segment crosses
+thinBodyBlocking  crossedFaces;  // openFaces, and also the partly cut internal
+                                 // faces between two cells whose centres are
+                                 // outside the bodies
+thinBodyDiffusivity  zero;       // default with thinBodyBlocking; or keep
+thinBodyAperture     binary;     // default; or exact
+thinBodyApertureSamples 4;       // exact: k*k samples per face triangle
+thinBodyPocketPolicy flag;       // default; or reject, source
+thinBodyPocketTolerance 1e-6;
+```
+
+### Pressure equation of a blocked face
+
+In `pimpleFluid` the corrected flux on a face is
+
+```text
+phi_f = phiHbyA_f - rAtU_f |S_f| snGrad(p)_f,
+phiHbyA_f = alpha_f phiHbyA_f^* + wallFlux_f,
+rAtU_f = alpha_f rAtU_f^* + (1 - alpha_f) min(rAtU_P, rAtU_N),
+```
+
+where `phiHbyA_f^*` is the flux of the interpolated `HbyA`, `alpha_f` the
+aperture and `wallFlux_f = (1 - alpha_f) U_b.S_f` the flux of the body
+velocity through the solid part of the face, and `p` solves
+`sum_f rAtU_f |S_f| snGrad(p)_f = sum_f phiHbyA_f` (cells inside a body
+excepted). For a blocked face, `alpha_f = 0` gives `phiHbyA_f = wallFlux_f`,
+so the flux is the body flux only if the second term of `phi_f` vanishes. It
+does not: `rAtU_f = min(rAtU_P, rAtU_N)` is that of the fluid when no cell
+centre is inside the body (the penalty makes `rAtU` small only in the cells
+whose centre is inside), so a pressure difference across the plate drives a
+flux through a face that was meant to be impermeable. The leakage of a
+static plate under a pressure drop was 2-5 % of the open flow
+(`thinBodyDiffusivity keep`), and a plate that contains a mesh point but no
+cell centre leaked completely.
+
+With `thinBodyDiffusivity zero` (default):
+
+- the faces blocked by a crossing, and the faces that are entirely inside a
+  body between two cells that are not entirely solid, get `rAtU_f = 0`: the
+  pressure matrix stays a graph Laplacian (symmetric, non-positive
+  off-diagonal, zero row sums away from fixed pressures), and `phi_f` equals
+  `wallFlux_f` exactly on them;
+- the cell-centred pressure gradient, used in the momentum predictor and the
+  velocity correction, uses the cell value on each side of a closed face
+  instead of the interpolated face value, as `p` is discontinuous across a
+  closed wall (weighted by the closed fraction `1 - alpha_f` for a partly
+  open face). This corrects a **Gauss linear** gradient only: any other
+  `grad(p)` scheme in `fvSchemes` is a fatal error;
+- the faces with zero aperture separate the mesh into regions (see the next
+  section).
+
+The default `off` path does not call any of this (the registered fields are
+absent), checked by bit-identity.
+
+### Sealed pressure pockets: compatibility condition
+
+A region of fluid whose enclosing boundaries are all impermeable (closed
+faces of thin bodies, walls) is a pressure pocket: no fixed pressure
+acts on it, its pressure matrix is singular (a constant is a solution), and
+its pressure level is a **gauge**. Whether the equation has a solution is a
+different question. Integrating the continuity equation of an incompressible
+fluid over the pocket gives
+
+```text
+sum over the pocket cells of div(phiHbyA) V = net outward flux of the
+prescribed wall fluxes = dV_pocket/dt (geometric conservation law),
+```
+
+so a solution exists only if `dV_pocket/dt = 0`, that is only if the
+enclosing walls do not change the volume of the pocket. This is the
+compatibility condition (the constant of the gauge does not enter it). A
+pocket whose volume changes (a plate moving towards a second plate in a
+closed duct section) is **mathematically incompatible** for a strictly
+incompressible fluid: it has no solution, and the physical fluid would have to
+compress or leak. Pocket test (slip duct as `thinPlateInDuct`, plate A of
+0.43 cells moving at 0.2 m/s from x = 0.303 m towards the static plate B at
+x = 1.003 m; the pocket is the region between them, 3 regions of which 1
+pocket before A passes B at 3.49 s, then the region between B and A grows):
+the six quantities per time (V exact: geometric volume of the pocket in
+m3; V mesh: volume of the pocket cells; dV/dt exact in m3/s; prescribed flux:
+net outward flux of the wall fluxes; removed: the source removed from
+continuity with the policy `source`; net phi: magnitude of the net flux of the
+corrected `phi` on the pocket cells after the solution, with `source`):
+
+| t (s) | V exact | V mesh | dV/dt exact | prescribed flux | removed | net phi |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1.0 | 9.912e-04 | 9.800e-04 | -4.0e-04 | -4.00e-04 | 4.00e-04 | 4.00e-04 |
+| 2.0 | 5.913e-04 | 5.800e-04 | -4.0e-04 | -4.00e-04 | 4.00e-04 | 4.00e-04 |
+| 3.0 | 1.915e-04 | 1.800e-04 | -4.0e-04 | -4.00e-04 | 4.00e-04 | 4.00e-04 |
+| 4.5 | 4.000e-04 | 3.800e-04 | +4.0e-04 | +4.00e-04 | 4.00e-04 | 4.00e-04 |
+| 5.5 | 8.001e-04 | 7.800e-04 | +4.0e-04 | +4.00e-04 | 4.00e-04 | 4.00e-04 |
+
+The prescribed wall flux is equal to `dV/dt` of the geometry, within the
+accuracy of the volume of the mesh cells; the pocket is therefore **not
+compatible**: the case is classified as an incompatible boundary motion (a
+sealed incompressible region whose enclosing wall changes the enclosed
+volume), not a geometric accounting error, an interface flux defect, a false
+disconnection (the closed faces are really closed), a discrete continuity error
+or missing physics inside the cutLink core. With the policy `source` the
+solver removes this net flux from the continuity equation of the pocket cells
+(an artificial volume source: fluid volume is created or destroyed; it is not
+a gauge and not conservation) and with `flag` it leaves the imbalance in the
+equation, where it is absorbed at the reference cell of the pocket. In both
+the corrected flux on the pocket boundary is the prescribed one, so the net
+flux of `phi` on the pocket cells stays 4e-4 m3/s (100 % of `w A`): no
+policy can make this configuration conservative.
+
+`thinBodyPocketPolicy` selects the action for a pocket whose net flux is above
+`thinBodyPocketTolerance` (relative to the sum of the absolute divergences of
+its cells, default 1e-6):
+
+- `flag` (default): a warning once per time step, the pocket is solved with a
+  reference cell and the imbalance stays at it (pressures near it are large,
+  see the topology test);
+- `reject`: fatal error;
+- `source`: the net flux is removed uniformly from the pocket cells, logged
+  and warned as an artificial volume source (explicit, never the default).
+
+A pocket whose net flux is zero to the tolerance (for example the cells inside
+a plate, or a pocket between two static plates) needs only the gauge: one
+reference cell, set silently. Per time step the file
+`postProcessing/thinBodyPockets/pockets.dat` holds the time, the numbers of
+regions and pockets, the prescribed net flux and volume of the pocket with the
+largest one, the removed source, the net flux of `phi` on the pocket cells and
+the largest relative imbalance.
+
+The pressure level of a pocket is a gauge; to keep it continuous when a
+pocket forms or merges, the volume mean of the pressure of its cells before
+the solution is preserved. Gauge-invariant: the fluxes `phi`, the velocity,
+the pressure differences within a connected region (a region with a fixed
+pressure is not affected). Not gauge-invariant: the absolute pressure in a
+pocket and any pressure integral over a surface that faces a pocket (a
+warning is issued if `forceEstimator surfaceTraction` is used with
+`thinBodyBlocking`; the default `momentumExchange` estimator was not examined
+with a pocket).
+
+Topology change (the plate A passes through the plate B, so that the pocket
+disappears and another forms): the net flux of the pocket changes sign (-4e-4
+to +4e-4 m3/s) at 3.49 s, as the table shows. The event pressure is `p_max`,
+the largest |p| of the field in a window, and `dpAB`, the largest difference of
+the area-averaged pressure at x = 1.5 m and x = 1.7 m (within the downstream
+connected region, so independent of the pocket gauge). With `source`, impulsive
+start of A at 0.2 m/s: before the event `p_max` 0.14 and `dpAB` 4e-4, at the
+event 30.2 and 6.1, after 0.10; with `flag` far larger (before 38, at the event
+1.1e3, `dpAB` 53) because the imbalance stays at one reference cell and the
+time step is 10 times smaller (Courant limit). With a plate that starts from
+rest and moves with a smooth velocity (`sinusoidalTranslation`, phase -pi/2,
+period 16 s, amplitude 0.9 m, A reaches B at 3.42 s), `source`, h = 10 mm:
+before the event `p_max` 0.29, after 0.30, at the event 92 with `dpAB` 18.7;
+with the time step halved 136 and 27.5; at h/2 397 and 38; with `flag` 2.98e3
+and 161. **Interpretation (corrected after an independent re-audit):** the
+plate velocity is continuous, but the flux prescribed into the downstream
+region is not: when A passes through B the plate that seals the downstream
+region changes (two rigid bodies interpenetrate), and the outlet flux steps
+from 0 to `w A` in one time step. For an incompressible column of length L = 1
+m (B to the outlet) the response is `p = L dU/dt` with dU the one-step jump and
+dt the step at the event; this estimate gives 95.4 (measured 92.3), 138.8
+(135.6) and, for the uniform start, 32.1 (30.2), and for `dpAB` 19.1 (18.7),
+27.7 (27.5), 6.4 (6.1), i.e. agreement within 3-6 %, and it scales as 1/dt. The
+spike is therefore the response of the incompressible model to a prescribed
+step in flux, caused by the test configuration, and is present with every
+pocket policy (the policy changes the amplitude only through the time step); it
+is neither shown to be an artefact of the pocket treatment nor a physical
+impulsive response. The value at h/2 (397) is three times the estimate and is
+**not explained**. The pressure near an incompatible pocket remains not usable
+for the separate reason of the incompatibility above. The fluxes `Q_out/(wA)`
+are 0 before and 1 after the event with both policies.
+
+Transient at h/2 before any event (found by the re-audit; **not explained**):
+with the same smooth test at h/2, between 0.1 and 0.8 s (A moving slowly, B
+static and sealing) |p| reaches 149 at the cells next to B (x = 1.0075), `dpAB`
+35 and the outlet velocity 2e-3 m/s, against 0.06, 2e-4 and 1.5e-6 m/s at h;
+after 0.8 s the run is quiet. It is the same with `exact`, 636 (|p|) with B
+shifted so that no mesh point is inside it (the cell centre is), 55 and a
+different pattern with `flag`, and absent without the plate B (|p| 3.4, the
+pocket does not form); the net flux of the pocket in this window is 1e-5 to
+8e-5 m3/s and the regions flicker between 3 and 4. The pre-event pressure of
+0.29 quoted above is for h only. The cause was not identified (a static plate B
+at h/2 with the pocket and the source policy; not examined: the effect of the
+reference cell and of the solid-cell columns).
+
+### Partial aperture (`thinBodyAperture exact`)
+
+**New formulation.** For a face `f` with polygon `F`, owner and neighbour
+centres `C_P`, `C_N` and `d = C_N - C_P`, the open fraction is
+
+the area fraction of the face for which the line parallel to `d` through the
+point, between the planes of the two cell centres, does not meet the surface
+(for a face between two fluid cells with a sheet crossing between them, the
+part of the face that the sheet does not cover). The body then hides the part
+of the face on its footprint along `d`, but a closed thin body crossing between
+the centres hides the whole face only if its footprint covers the whole face; a
+face whose two centres are fluid and a sheet crosses between them is open
+exactly on the part of the face that the sheet does not cover. The fraction is
+a quadrature: the centroids of `k * k` sub-triangles of each triangle (face
+centre, two vertices) of the polygon (`thinBodyApertureSamples`, `k` = 4 by
+default: 64 samples on a quadrilateral), each tested with the exact `findLine`
+on the surface triangles and the octree that `immersedBody` already builds.
+`alpha_f` is a multiple of the sample weight, so it is exactly zero when all
+samples are blocked: **no threshold or epsilon** (the sensitivity to `k` is
+shown below). The work is bounded to the faces whose centre is within the cell
+spacing of a surface (octree `findNearest`), `k * k * 4` rays per such face and
+body.
+
+Equations on a face with `0 < alpha_f < 1`:
+
+```text
+phi_f = alpha_f (phiHbyA_f^* - rAtU_f^* |S_f| snGrad(p)_f)
+        + (1 - alpha_f) U_b.S_f
+```
+
+(pressure coefficient `alpha_f rAtU_f^*`, no blending with the penalised
+cells, and the cell gradient uses the cell values on the closed fraction). The
+flux through the face is the share `alpha_f` of the free flux, plus the flux of
+the body velocity on the rest. Conservation is that of the discretisation: the
+pressure equation imposes `sum_f phi_f = 0` in each fluid cell with these
+`phi_f`, so the discrete volume balance with the moving-wall flux holds to the
+solver tolerance. The graph of the faces with `alpha_f > 0` defines the
+connected regions. **What is not claimed:** the flux through an opening
+narrower than a cell is not linear in the open fraction (it depends on the
+slot width through the viscous or contraction losses), so a half-open face
+passes half of the free flux, not the exact flux of the slot; the method gives
+the right limits (closed, open) and a consistent area weighting.
+
+### Evidence
+
+All results are with OpenFOAM.com v2412. The test is
+`tutorials/fluids/immersedBoundary/thinPlateInDuct`: a closed box plate
+spanning a 2 m x 0.2 m duct (cells of h = 10 mm, one cell in the
+empty direction, 200 x 20 x 1 cells, laminar, nu = 1e-3, impulsive start,
+open ends, fixed pressure at both ends) translated along the duct at
+w = 0.1 m/s by `uniformTranslation`. An impermeable plate pushes the fluid at
+its own speed, so the volume flux through every cross-section is exactly `w A`
+(`A = 0.2 x 0.01 m2`). Q is the outlet flux, and Q/(wA) is the average of the
+values of every time step between 2 and 8 s.
+
+Time-averaged Q/(wA), 2-8 s, plate moving at w (`crossedFaces`; S slip walls,
+N no-slip walls; keep = diffusivity of the aperture blending, zero = zero
+diffusivity on the blocked faces with the binary rule, exact = partial
+aperture):
+
+| t/h | S off | S keep | S zero | S exact | N off | N keep | N zero | N exact |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.43 | 0.769 | 1.0000 | 1.0000 | 1.0000 | 0.442 | 0.946 | 1.0000 | 1.0000 |
+| 0.5 | 0.889 | 1.0000 | 1.0000 | 1.0000 | 0.568 | 0.954 | 1.0000 | 1.0000 |
+| 1 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.964 | 0.981 | 1.0000 | 1.0000 |
+| 1.7 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.980 | 0.987 | 0.9985 | 1.0000 |
+| 3 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 0.989 | 0.992 | 1.0000 | 1.0000 |
+
+The no-slip deficit of 1-5 % with `keep` was the leakage through the blocked
+faces, not a wall-layer effect.
+
+Static plate under a pressure drop (inlet `p` = 0.01, outlet 0, plate at rest,
+S slip or N no-slip walls, `crossedFaces`): leakage fraction at 6 s, the outlet
+flux divided by that of the duct without a plate at the same time (the flow
+is still accelerating):
+
+| t/h | N off | N keep | N zero | S off | S keep | S zero | S exact | N exact |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.43 | 47 % | 5.1 % | 1e-8 | 33 % | 2.3 % | 2e-8 | 3e-7 | 6e-7 |
+| 1 | 7.4 % | 4.5 % | 3e-8 | 3.5 % | 2.0 % | 2e-8 | 2e-6 | 3e-6 |
+| 3 | 2.4 % | 2.0 % | 1e-9 | 1.1 % | 0.9 % | 1e-9 | | |
+
+With `zero` or `exact` the outlet flux is at the level of the solver tolerance
+(at most 3.4e-10 m3/s over the run, against 2.6e-5 to 6e-5 m3/s without a
+plate). Dependence, 0.43 cells, `zero`, leakage fraction at 6 s: time step
+halved or doubled 2e-8 (slip), 8e-8 and 1e-10 (no-slip); mesh refined to
+h = 5 mm 2e-9 and 3e-9 (`exact`: 2e-9 and 1e-7); thickness 0.1 cells 3e-10
+and 8e-11. With `keep` a plate of 0.43 cells on the h = 5 mm mesh, which
+contains a mesh point but no cell centre, leaks 99.6 %. For a static plate
+straddling a processor face the outlet flux is at most 2e-12 m3/s serial and
+5e-16 m3/s in 4 ranks (`exact`).
+
+Non-orthogonal mesh (upper wall shifted by 0.1 m in x, cells at about 27
+degrees; independent reference: exact flux `w A` or zero leakage): moving
+plate of 0.43 cells, Q/(wA) 2-8 s, slip: off 0.908, zero 1.0001, exact 1.0000;
+no-slip: off 0.198, zero 0.9965, exact 0.9979. Static plate, slip: leakage
+7e-6 (`zero`) and 8e-6 (`exact`, independent of the number of samples k = 2, 4
+and 8), no-slip 1e-4 (`exact`). The gradient correction was not compared with
+an independent evaluation of the pressure force on the cells; its consequences
+(leakage, velocity of the moving plate) are as above.
+
+Slots and plate edges (static plate of 0.43 cells under the same pressure
+drop, slip walls; the plate covers `y < a` and `y > b`, `y` from 0 to 0.2 m,
+Q(6 s) divided by that without a plate; `binary` = zero diffusivity):
+
+| Opening (width in cells of 10 mm) | binary h, h/2, h/4 | exact h, h/2, h/4 |
+| --- | --- | --- |
+| slot 1, centred on a row of cells | 0.021, 0.031 | 0.021, 0.028 |
+| slot 0.9, centred on a cell face | 0, 0.030, 0.199 | 0.007, 0.026, 0.013 |
+| slot 0.5, centred on a row of cells | | 0.005, 0.011 |
+| slot 1, off a cell face | 0.019, 0.058, 0.189 | 0.016, 0.037, 0.017 |
+| slot 2 | 0.069, 0.095, 0.265 | 0.069, 0.090, 0.066 |
+| slot 3 | 0.115, 0.191 | 0.111, 0.183 |
+| plate ends at a cell face (a = 0.15 m) | 0.509, 0.523 | 0.509, 0.520 |
+| plate ends mid-cell (a = 0.1475 m) | 0.518, 0.566 | 0.525, 0.551, 0.535 |
+| plate ends mid-cell (a = 0.1525 m) | 0.493, 0.474 | 0.475, 0.498 |
+
+**There is no reliable reference for these openings, and neither rule
+converges.** The `binary` flux of the 0.9 cell slot is 0 at h = 10 mm and
+0.199 at h/4, but the binary flux at h/4 is not smooth in time (Q at 1, 3
+and 6 s of the 2-cell slot: 1.5e-5, 1.1e-5, 1.6e-5 m3/s) whereas the `exact`
+flux is smooth and 4e-6 m3/s; a steady orifice estimate `0.6 g d sqrt(2 dp)`
+of the 2-cell slot, 1.7e-5 m3/s, is closer to the `binary` value at h/4, but
+the estimate is not a reference. The `exact` rule opens the 0.9 cell slot at
+the coarse mesh (0.007 against 0) and the edge position inside a cell changes
+the flux by 5-10 % with both. The `exact` flux does not increase with the
+refinement of a slot of 1-2 cells, while the plate seals. A Poiseuille
+reference (a long channel of a slot width between two plates) was not run.
+
+Thin shells of 0.3 cells thickness (a plate tilted by 30 degrees through
+`(0.35, 0.1)`, and a parabolic arc `x = 0.35 - 2 (y - 0.1)^2` of 4.5 cm sag,
+closed prisms, translated along x at w; one geometry each), Q/(wA), mean over
+2-8 s:
+
+| Shell | off S | keep S | zero S | exact S | zero N | exact N |
+| --- | --- | --- | --- | --- | --- | --- |
+| tilted 30 degrees | 0.719 | 0.889 | 1.0000 | 1.0000 | 0.976 | 0.972 |
+| arc | 0.755 | 0.941 | 1.0000 | 1.0000 | 1.0000 | 0.992 |
+
+With `keep` the shortfall was a start-up transient (tilted: 0.37, 0.86, 0.95,
+0.995 at 1, 4, 6, 10 s) that was the same leakage through the blocked faces;
+with `zero` Q/(wA) is 1.000 at every time shown (1 to 10 s). With no-slip
+walls the tilted shell has a steady deficit of 2.4 % (0.973 to 0.977 from 1
+to 10 s) with `zero` and 2.8 % with `exact`, and the arc 0.8 % with `exact`;
+these deficits have not been investigated (the no-slip result of the same
+plates with the same resolution aligned with the mesh is 1.0000). This is not
+a verification of curved shells.
+
+Sliding gate: a plate of 0.43 cells covering `y` below `y_e(t)`, with the edge
+`y_e` moving down at 0.02 m/s from 0.197 m (the opening grows from 3 mm to 0.16
+m in 8 s), inlet velocity 0.05 m/s (so `Q = 1e-4 m3/s` through every section),
+outlet `p` = 0. Metrics (`verification/gate.py`): the flux error is `max
+|Q_out/Q_in - 1|` for t >= 0.5 s (the flux is prescribed, so it is the volume
+conservation of the run); `dp(t)` is the area-averaged pressure at x = 0.15 m
+minus that at x = 1.5 m; the ripple is computed on 400 uniform times in [1, 8]
+s, fitting `log |dp|` with a polynomial of degree 6, as `max |dp - sign(dp)
+exp(fit)| / max |dp|` (large when `dp` changes sign or is not smooth in time).
+There is no analytical reference for `dp(t)`.
+
+| Gate | flux error | ripple | max abs dp | dp at 8 s |
+| --- | --- | --- | --- | --- |
+| off, h | 3e-8 | 0.036 | 0.037 | 0.0010 |
+| binary, h | 2e-2 | 0.63 | 0.42 | -0.42 |
+| exact, h | 1e-8 | 0.11 | 0.23 | 0.0012 |
+| off, h/2 | 7e-8 | 0.97 | 0.0005 | -5e-6 |
+| binary, h/2 | 1e-9 | 0.27 | 0.22 | 0.0010 |
+| exact, h/2 | 1e-9 | 0.035 | 0.25 | 0.0012 |
+
+(exact with k = 2, 4, 8 at h: ripple 0.15, 0.11, 0.10, flux error 5e-9, 1e-8,
+3e-9.) **Reading:** `exact` does not beat the unblocked baseline on this test:
+the flux error is at the level of the solver for `off` and `exact`, and the
+`off` pressure difference is smooth at h (ripple 0.036 against 0.11). The `off`
+gate does not seal (its `dp` is 6 to 500 times smaller than with the blocking,
+as the 0.43-cell plate is seen only part of the time), so a small smooth `dp`
+is not a better answer; the test shows that `binary` at h has a 2 % flux error
+and a `dp` that changes sign, that `exact` removes both, and that the ripple at
+h/2 is smaller for `exact` (0.035) than for `binary` (0.27). Earlier numbers of
+this README (ripple 0.37 and 0.20) used a fit window from 0.5 s and are
+replaced by these.
+
+Moving mesh and deforming body (the ALE test cases A-G of the research branch
+of the author, plates of three cells, copied for this study; maximum deviation
+of the lab-frame velocity from the exact uniform value, divided by the plate
+speed), off / zero / exact: fixed mesh and moving plate (B, F) 1.5e-5 / 1.5e-4
+/ **0.30**; mesh moving with the plate (D) 0 / 0 / 0; mesh moving, plate at
+rest (C) 0 / 0 / 0; mesh and plate moving (G) 1.8e-5 / 2.4e-5 / 1.6e-3 (at
+half the cell size 5.8e-6 / 1.8e-4 / 1.1e-2); deforming plate (E) 2.0e-4 /
+6.8e-5 / 7.2e-2 (half the cell size 9.2e-5 / 2.9e-5 / 9.7e-4). The volume
+flux is 1.000 of the exact one in B and F with all of them, and the geometric
+conservation error is at most 3e-8 of the reference flux for off and zero.
+**The `exact` aperture fails the thick-plate test B (30 % velocity error and
+a continuity error of -0.034)**: it is for bodies about one cell thick or
+less (the faces between a fluid cell and a cell whose centre is inside a thick
+body are closed by the rays, which turns more cells into solid cells than the
+binary rule), and `binary` with `zero` is the better choice for thick bodies;
+the cause was not investigated further.
+
+Regression with the switch off (default), same compiler and OpenFOAM as the
+base `ba563ba6a`, serial, 1 s: `translatingCylinderInChannel`,
+`staticCylinderInChannel`, `oscillatingCylinderInChannel` and
+`bendingBeamInChannel` (`MESH_LEVEL=1`) give fields (`U`, `p`, `phi`, ...) and
+`postProcessing` files that are bit-identical to those of the unmodified base,
+after each of the changes to `pimpleFluid`.
+
+Parallel (4 ranks, simple `(4 1 1)`; the plate crosses the processor faces at
+`x` = 0.5 and 1 m during 2-8 s; both sides of a processor face use the smaller
+of the two open fractions): Q/(wA) of the 2-8 s mean is the same as serial to
+five digits (`exact`: slip 1.00000 and 1.00000, no-slip 1.00000 and 1.00000,
+1.7 cells no-slip 0.99999 and 1.00000); the instantaneous outlet flux differs
+by at most 2e-3 of `w A` (the number of time steps can differ by two). A static
+plate straddling a processor face: outlet flux at most 2e-12 m3/s serial and
+5e-16 in 4 ranks (`exact`), and the same flux (6.417e-6 m3/s at 6 s) through a
+2-cell slot at the processor face in serial and in 4 ranks. Not run in
+parallel: the pressure pocket cases, cyclic or skewed processor faces, more
+than 4 ranks.
+
+Cost (serial; oscillating cylinder at `MESH_LEVEL=3`, 81,344 cells, 40 time
+steps; thin-body options on a thick body, so this measures the search and the
+changed pressure equation, not a thin-body case): off 508 ms per step, 280 MB;
+`binary` with `zero` 540 ms (+6 %), 282 MB; `exact` 801 ms (+58 %), 343 MB;
+the search (`findNearest` and `findLine` of `updateApertures`, profiled in the
+log as `search time`) takes 0.04 s in total for `binary` and 4.3 s of the
+32 s for `exact` (in this case the bodies move, so the search is done at each
+step). Plate in the duct (4,000 cells, 3 s): 11.7 ms per step off, 29.1
+binary, 29.9 exact (search 1 ms per step for `exact`); the closed plate needs
+longer pressure solutions, which is not separated. The region analysis
+(`regionSplit`) is done at every pressure corrector and is not profiled
+separately.
+
+### Known limitations and open questions
+
+- The `exact` aperture is for bodies about one cell thick or less (thick
+  plate test B: 30 % velocity error); it does not converge for slots of 1-2
+  cells and no reference for the flux through an opening was reached; the
+  flux through a partly open face is the share of the free flux, not the
+  exact flux of an opening narrower than a cell. A Poiseuille reference was
+  not run.
+- A pressure pocket whose enclosing walls change its volume has no
+  incompressible solution (see above): the policies `flag`, `reject` and
+  `source` handle it explicitly but none makes the case conservative; the
+  pressure around it is not usable. A pocket that is closed only through
+  partly open faces (alpha in (0, 1)) is connected in the graph and is not
+  detected as a pocket: its matrix is not singular but the same
+  incompatibility appears as a very large pressure.
+- The pressure of a pocket is a gauge; the pressure force on a surface facing
+  a pocket is not meaningful (warning for `surfaceTraction`; the default
+  estimator and forces with the switch on were not examined).
+- The correction of the cell pressure gradient needs the `Gauss linear`
+  scheme (fatal error otherwise) and was not compared with an independent
+  evaluation.
+- Faces are blocked entirely or partly, but cells are penalised by the
+  position of the cell centre: an opening narrower than a cell between two
+  cells whose centres are inside bodies (ghost cells) is represented only
+  through the face apertures.
+- Free edges, gaps, holes, leaflet tips and tapered leaflets are not treated
+  accurately (slot and edge results above).
+- The no-slip tilted shell has a steady deficit of 2.4-2.8 %, not
+  investigated; the shells were tested at one geometry each.
+- The force estimators (momentum exchange, surface traction) with the switch
+  on, deforming bodies (other than the ALE test E), contact, turbulence, and
+  meshes with skewed or cyclic processor faces were not examined.
+- Not run: other OpenFOAM versions, foam-extend and OpenFOAM.org, GitHub CI,
+  more than 4 ranks, the pocket cases in parallel, the cost on the valve
+  geometry (no valve geometry is in this repository), the independent evaluation
+  of the gradient correction, a Poiseuille reference for the slots.
+- The "faces blocked" counts in the log add the coupled faces on both sides.
+
 ## Provenance
 
 This library is a rewrite, for prescribed motion and as a finite volume
@@ -603,7 +1090,8 @@ the `quadraticBend` and `customProfileBend` deformations, and the
 the versions of Sairam Pamulaparthi Venkata in solids4foam/cardiacFoam#20,
 except the closed-to-open valve morph, which is from his later working copy
 of xenosim-erc/immersedBoundaryRigidMotion
-(`src/HFDIBDEM/geomModels/stlBased/stlBased.C`, June 2026, not committed). The openHFDIB-DEM
+(`src/HFDIBDEM/geomModels/stlBased/stlBased.C`, June 2026, not committed). The
+openHFDIB-DEM
 interpolation of the velocity at the immersed boundary (`lineInt`,
 `leastSquares`), which the benchmark cases do not use, is not included.
 

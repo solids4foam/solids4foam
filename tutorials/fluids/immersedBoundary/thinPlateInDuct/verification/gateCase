@@ -1,0 +1,26 @@
+#!/bin/bash
+# Sliding gate (prescribed opening): a plate of 0.43 cells covers y < ye(t),
+# ye(0) = 0.197 m, moving down at 0.02 m/s (the opening grows from 3 mm to
+# 0.16 m in 8 s), inlet velocity 0.05 m/s (Q = 1e-4 m3/s through every
+# section), outlet p = 0. usage: ./gateCase NAME MODE [REFINE]
+#   MODE off | binary | exact (SAMPLES=k for exact). Run in ./gate_NAME.
+T=$(cd "${0%/*}/.." && pwd)
+d=$(cd "${0%/*}" && pwd)/gate_$1; rm -rf $d; mkdir -p $d; cp -r $T/0 $T/constant $T/system $T/makePlateStl.py $d/
+cd $d; mkdir -p constant/triSurface; ref=${3:-1}
+python3 makePlateStl.py 0.43 $(python3 -c "print(0.01/$ref)") 0.303 -0.05 0.197 > constant/triSurface/plate.stl
+if [ $2 = off ]; then m="thinBodyBlocking off;"; else m="thinBodyBlocking crossedFaces; thinBodyDiffusivity zero; thinBodyAperture $2; thinBodyApertureSamples ${SAMPLES:-4};"; fi
+cat > constant/fvOptions <<EOT
+FoamFile { version 2.0; format ascii; class dictionary; location "constant"; object fvOptions; }
+immersedBoundary { type immersedBoundaryForce; method cutLink; $m
+ bodies { plate { surface "plate.stl"; motion { type uniformTranslation; velocity (0 -0.02 0); } } } }
+EOT
+sed -i "/inlet/,/}/ s/type .*;/type            fixedValue; value uniform (0.05 0 0);/" 0/U
+sed -i "/inlet/,/}/ { s/type .*;/type            zeroGradient;/; /value/d }" 0/p
+sed -i "s/endTime [0-9.]*;/endTime 8;/; s/writeInterval 5/writeInterval 8/" system/controlDict
+[ $ref != 1 ] && sed -i "s/(200 20 1)/($((200*ref)) $((20*ref)) 1)/" system/blockMeshDict
+cat > system/probes <<EOT
+pUp { type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType faceZone; name fz_up; operation areaAverage; fields (p); }
+pDn { type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType faceZone; name fz_a; operation areaAverage; fields (p); }
+fluxOut{ type surfaceFieldValue; libs (fieldFunctionObjects); log no; writeControl timeStep; writeInterval 1; writeFields no; regionType patch; name outlet; operation sum; fields (phi); }
+EOT
+blockMesh > log.blockMesh 2>&1 && topoSet > log.topoSet 2>&1 && solids4Foam > log.solids4Foam 2>&1
