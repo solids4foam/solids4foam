@@ -74,6 +74,11 @@ release. For complete commit-level details and contributor information, see the
   `cartesianMesh` and `extrudeMesh`. The case needs PETSc and
   `cartesianMesh`, and includes a shortened regression test,
   `regressionTest.sh`, run by hand.
+- `tutorials/Alltest` runs a case's own `Alltest` script, when it has one, in
+  place of its `Allrun`, after the usual one-time-step modifications. This is
+  for cases where one run needs the converged results of an earlier run:
+  `pulmonaryArteries/Alltest` runs one prestress pass to its end time, and
+  then one time step of the fluid-solid interaction case.
 - Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
   a fluid-solid coupling step is also converged if the maximum interface point
   residual (the displacement-increment mismatch by default) is below this

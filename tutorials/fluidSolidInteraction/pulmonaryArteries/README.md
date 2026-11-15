@@ -113,6 +113,7 @@ pulmonaryArteries/
 ├── 0/, constant/, system/        the fluid-solid interaction case
 ├── plotInletVsPressure.gplt      inlet flow and probe pressure plot
 ├── regressionTest.sh             shortened run checked against references
+├── Alltest                       smoke test, run by tutorials/Alltest
 └── prestress/
     ├── Allrun, Allclean          prestress passes
     ├── petscOptions.hypre        PETSc options for the prestress runs
