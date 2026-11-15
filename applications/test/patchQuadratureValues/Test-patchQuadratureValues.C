@@ -40,9 +40,11 @@ Description
     Types that cannot be constructed on this patch without a dictionary are
     skipped and counted, as are quadratureValuePatchField types that cannot be
     evaluated without the entries of their dictionary (e.g. fixedRotation
-    without its rotation axis). Each type is tested in a child process (POSIX fork),
-    because some constructors stop with abort(FatalError), which cannot be
-    caught. The case must be a high-order solid case, as for
+    without its rotation axis), i.e. that stop with an error or an abort at
+    their own quadrature points. Each type is tested in a child process (POSIX
+    fork), because some constructors stop with abort(FatalError), which cannot
+    be caught in OpenFOAM.com (OpenFOAM.org and foam-extend throw it while
+    exceptions are on). The case must be a high-order solid case, as for
     Test-highOrderGrad, and the utility runs in serial. It exits with zero when
     every type behaves as expected and with one otherwise.
 
@@ -218,8 +220,18 @@ void testTypeInChild
     {
         pf == uniformField;
 
+        // A patch field that gives an error at its own quadrature points
+        // cannot be evaluated without the entries of its dictionary (e.g.
+        // fixedRotation without its rotation axis). Leave without a result,
+        // as when it stops with an abort in OpenFOAM.com; OpenFOAM.org and
+        // foam-extend throw the abort instead of ending the process
         bool unused = false;
         const bool ownGivesValues = givesValues(pf, quad, unused);
+        if (!ownGivesValues)
+        {
+            return;
+        }
+
         const bool otherGivesValues = givesValues(pf, otherQuad, unused);
 
         report =
@@ -390,11 +402,13 @@ label testPatchFieldTypes
         }
         else if (kind == 'I')
         {
-            // The patch field stopped (abort) when evaluated: it needs the
-            // entries of its dictionary (e.g. the axis of fixedRotation)
+            // The patch field stopped (error or abort) when evaluated at its
+            // own quadrature points: it needs the entries of its dictionary
+            // (e.g. the axis of fixedRotation)
             ++nNotEvaluated;
             Info<< "    SKIPPED " << types[typeI] << ": cannot be evaluated "
-                << "without a dictionary (stopped with an abort)" << nl;
+                << "without a dictionary (stopped at its own quadrature "
+                << "points)" << nl;
             continue;
         }
         else if (kind == 'O')

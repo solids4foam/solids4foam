@@ -252,6 +252,13 @@ run_patch_quadrature_values_test() {
     fi
 
     echo "FAIL: Test-patchQuadratureValues (${least_squares_type}, serial)"
+    if [[ ! -f "${log_file}" ]]; then
+        echo "    ${log_file} was not written"
+    elif grep -q "Overall result" "${log_file}"; then
+        grep -E "FAILED|Overall result" "${log_file}" | sed 's/^/    /'
+    else
+        tail -n 20 "${log_file}" | sed 's/^/    /'
+    fi
     return 1
 }
 
