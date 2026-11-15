@@ -118,20 +118,16 @@ public:
 
         // Access
 
-            //- Re-calculate the scalar stabilisation
-            //  Provide the primary variable field and its gradient. If a
-            //  solid model with a high-order residual exists on this mesh,
-            //  its pressure scheme is used instead of the gradient
+            //- Re-calculate the second-order scalar stabilisation
+            //  Provide the primary variable field and its gradient
             virtual void updateScalar
             (
                 const volScalarField& field,
                 const volVectorField* gradPtr = nullptr
             ) const;
 
-            //- Re-calculate the vector stabilisation
-            //  Provide the primary variable field and its gradient. If a
-            //  solid model with a high-order residual exists on this mesh,
-            //  its displacement scheme is used instead of the gradient
+            //- Re-calculate the second-order vector stabilisation
+            //  Provide the primary variable field and its gradient
             virtual void updateVector
             (
                 const volVectorField& field,

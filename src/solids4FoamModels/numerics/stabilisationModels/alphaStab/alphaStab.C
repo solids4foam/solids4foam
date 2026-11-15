@@ -21,7 +21,6 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "compatibilityFunctions.H"
 #include "fvmLaplacian.H"
-#include "lookupSolidModel.H"
 
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
@@ -129,18 +128,6 @@ void Foam::alphaStab::updateScalar
             << "stabilisation method" << exit(FatalError);
     }
 
-    // A high-order solid model on this mesh supplies its pressure scheme
-    if (foundSolidModel(p.mesh()))
-    {
-        const solidModel& solMod = lookupSolidModel(p.mesh());
-
-        if (solMod.highOrderResidual())
-        {
-            updateScalarHighOrder(p, solMod.pressureLeastSquares());
-            return;
-        }
-    }
-
     clearCellScalarCache();
 
     // If required, initialise the face stabilisation field
@@ -162,18 +149,6 @@ void Foam::alphaStab::updateVector
         FatalErrorInFunction
             << "grad(" << p.name() << ") must be provided with this "
             << "stabilisation method" << exit(FatalError);
-    }
-
-    // A high-order solid model on this mesh supplies its displacement scheme
-    if (foundSolidModel(p.mesh()))
-    {
-        const solidModel& solMod = lookupSolidModel(p.mesh());
-
-        if (solMod.highOrderResidual())
-        {
-            updateVectorHighOrder(p, solMod.displacementLeastSquares());
-            return;
-        }
     }
 
     clearCellVectorCache();

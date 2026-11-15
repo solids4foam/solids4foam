@@ -368,14 +368,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
-- The `alpha` stabilisation no longer needs a solid model. Its second-order
-  form can now be used in any model, e.g. as the `newtonIcoFluid` pressure
-  stabilisation, where it used to stop with "Could not find
-  solidModel_region0", and it has a scalar Jacobian, which the
-  `newtonIcoFluid` pressure needs. The new `updateScalarHighOrder`
-  and `updateVectorHighOrder` functions of the stabilisation models take the
-  least-squares scheme from the caller, so a model without a solid model can
-  also use the high-order `alpha` stabilisation. Solid results are unchanged.
+- The stabilisation models no longer look up the solid model. The
+  second-order `alpha` stabilisation can now be used in any model, e.g. as
+  the `newtonIcoFluid` pressure stabilisation, where it used to stop with
+  "Could not find solidModel_region0", and it has a scalar Jacobian, which
+  the `newtonIcoFluid` pressure needs. The high-order form is a separate
+  call, `updateScalarHighOrder` or `updateVectorHighOrder`, which takes the
+  least-squares scheme from the caller; the solid models make this call when
+  `highOrderResidual` is on. Solid results are unchanged.
 
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same

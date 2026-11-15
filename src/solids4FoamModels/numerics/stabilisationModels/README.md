@@ -131,11 +131,14 @@ where `reconstruction` is the `leastSquaresScheme` of the field. The caller
 owns the scheme, so these work in any model, e.g. a fluid model, without a
 solid model.
 
-For compatibility, `alpha`'s `updateScalar(...)` and `updateVector(...)` check
-whether a solid model with `highOrderResidual` exists on the mesh. If it does,
-they use its pressure or displacement scheme and call the high-order version;
-otherwise they compute the second-order stabilisation from `gradPtr`. No solid
-model is needed for the second-order stabilisation.
+`updateScalar(...)` and `updateVector(...)` always compute the second-order
+stabilisation from `gradPtr`; the stabilisation models do not look up the solid
+model. The solid models choose between the two through
+`solidModel::updateMomentumStabilisation(D, gradD)` and
+`solidModel::updatePressureStabilisation(p, gradp)`, which call the high-order
+version with the displacement or pressure least-squares scheme when
+`highOrderResidual` is on and the model supports it, and the second-order
+version otherwise.
 
 ## Jacobian Caching
 

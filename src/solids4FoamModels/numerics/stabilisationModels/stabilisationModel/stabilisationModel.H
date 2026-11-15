@@ -340,9 +340,6 @@ public:
                 FatalErrorInFunction
                     << "high-order scalar stabilisation not supported by "
                     << type() << exit(FatalError);
-
-                // Keep the compiler happy
-                std::abort();
             }
 
             //- Re-calculate the vector stabilisation with the given
@@ -358,9 +355,6 @@ public:
                 FatalErrorInFunction
                     << "high-order vector stabilisation not supported by "
                     << type() << exit(FatalError);
-
-                // Keep the compiler happy
-                std::abort();
             }
 
             //- Provide an implicit approximation of the stabilisation

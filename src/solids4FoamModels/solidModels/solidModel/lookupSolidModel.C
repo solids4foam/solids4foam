@@ -66,18 +66,6 @@ const solidModel& lookupSolidModel
     return obReg.lookupObject<solidModel>("none");
 }
 
-
-bool foundSolidModel(const objectRegistry& obReg)
-{
-    const word solidModelName("solidModel_" + obReg.name());
-
-    return
-    (
-        obReg.foundObject<solidModel>(solidModelName)
-     || obReg.parent().foundObject<solidModel>(solidModelName)
-    );
-}
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 } // End namespace Foam
