@@ -244,7 +244,7 @@ prestress, moves the wall by up to $$7.4\,\mathrm{mm}$$; after 15 passes the
 largest displacement is $$0.36\,\mathrm{mm}$$ and the RMS displacement
 $$0.09\,\mathrm{mm}$$.
 
-![Prestress convergence](images/prestressConvergence.png)
+![Prestress convergence](images/pulmonaryArteries-prestressConvergence.png)
 
 ### Flow and pressure
 
@@ -252,12 +252,12 @@ The blood accelerates from the main pulmonary artery into the left and right
 pulmonary arteries, reaching about $$0.39\,\mathrm{m\,s^{-1}}$$ at peak
 inflow.
 
-![Velocity streamlines at peak inflow](images/velocity.webp)
+![Velocity streamlines at peak inflow](images/pulmonaryArteries-velocity.webp)
 
 The wall pressure falls from about $$12.7\,\mathrm{mmHg}$$ at the inlet to
 about $$10\,\mathrm{mmHg}$$ at the outlets at peak inflow.
 
-![Wall pressure at peak inflow](images/pressure.webp)
+![Wall pressure at peak inflow](images/pulmonaryArteries-pressure.webp)
 
 The pressure at a probe in the main pulmonary artery
 ($$(0.04, -0.008, 0.065)\,\mathrm{m}$$) is written every time step to
@@ -269,7 +269,7 @@ $$10\,\mathrm{mmHg}$$, and the loops settle over the following cycles as the
 Windkessel outlets approach their periodic state; the fourth and fifth cycles
 are close to each other.
 
-![Inlet flow rate and probe pressure](images/inletFlow_vs_probePressure.png)
+![Inlet flow rate and probe pressure](images/pulmonaryArteries-inletFlow_vs_probePressure.png)
 
 ### Wall shear stress
 
@@ -278,7 +278,7 @@ The time-averaged wall shear stress over the fifth cycle, averaged from these
 17 write times, is mostly below $$0.5\,\mathrm{Pa}$$, with higher values in
 the smallest outlet branches and near the bifurcation.
 
-![Time-averaged wall shear stress over the fifth cycle](images/wallShearStress.webp)
+![Time-averaged wall shear stress over the fifth cycle](images/pulmonaryArteries-wallShearStress.webp)
 
 ### Wall displacement
 
@@ -291,9 +291,9 @@ displacement components is written every time step to
 $$3.4\,\mathrm{mm}$$ in the first cycle, and settles to about
 $$2.8\,\mathrm{mm}$$ in the fifth.
 
-![Wall displacement magnitude](images/wallDisplacement.webp)
+![Wall displacement magnitude](images/pulmonaryArteries-wallDisplacement.webp)
 
-![Range of the innerWall displacement components](images/innerWallDisplacement.png)
+![Range of the innerWall displacement components](images/pulmonaryArteries-innerWallDisplacement.png)
 
 ### Coupling iterations
 
@@ -303,7 +303,7 @@ first time steps need up to 11 correctors; after that the coupling converges
 in about two correctors per time step on average, well within the permitted
 30.
 
-![FSI correctors per time step](images/fsiIterations.png)
+![FSI correctors per time step](images/pulmonaryArteries-fsiIterations.png)
 
 ### Animation
 
