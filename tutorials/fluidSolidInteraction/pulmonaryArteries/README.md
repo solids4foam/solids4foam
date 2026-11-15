@@ -305,6 +305,14 @@ in about two correctors per time step on average, well within the permitted
 
 ![FSI correctors per time step](images/fsiIterations.png)
 
+### Animation
+
+{% include youtube.html id="4asYlINixZ8" %}
+
+**Video 1: Animation of the tutorial: the geometry, the fluid and wall
+meshes, the prestress passes, and the blood flow and wall motion over a
+cardiac cycle.**
+
 ## Running the Case
 
 From the tutorial directory, run
