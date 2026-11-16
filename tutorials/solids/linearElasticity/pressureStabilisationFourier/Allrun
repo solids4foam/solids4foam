@@ -37,13 +37,15 @@ for N in $levels; do
     tail -n 2 "log.stabilisationFourierCheck.N$N"
 done
 
-# Parameter validation: each dictionary must be refused, with its message
+# Parameter validation: each dictionary must be refused, with its message.
+# The output of these expected failures is written to expectedError.<dict>,
+# not log.*, so that tutorials/Alltest does not report its FOAM FATAL ERROR
 failures=0
 checkRejected()
 {
     local dictName="$1"
     local expected="$2"
-    local log="log.stabilisationFourierCheck.$dictName"
+    local log="expectedError.$dictName"
     if stabilisationFourierCheck -dict "$dictName" -constructOnly > "$log" 2>&1
     then
         echo "FAIL rejection: $dictName was accepted"

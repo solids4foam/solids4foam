@@ -47,6 +47,7 @@ missing, or larger than the number of geometric mesh directions (2 here);
 normalisation of models that do not support it (`alpha`, `gradDiv`,
 `volStrainRate`, `multiple`); a negative `laplacianPower`; and both
 `spectralNormalisation` and its deprecated alias `normalise` in one model.
+The output of each refused run is kept in `expectedError.<dictionary>`.
 The two `system/accept*` dictionaries must be accepted: `spectralNormalisation`
 without a warning, and `normalise` with a deprecation warning.
 

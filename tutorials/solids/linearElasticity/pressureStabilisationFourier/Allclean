@@ -6,5 +6,5 @@ source solids4FoamScripts.sh
 solids4Foam::caseDoesNotRunWithFoamExtend
 
 cleanCase
-rm -rf constant/polyMesh postProcessing regressionTests log.*
+rm -rf constant/polyMesh postProcessing regressionTests log.* expectedError.*
 rm -f system/blockMeshDict.N*
