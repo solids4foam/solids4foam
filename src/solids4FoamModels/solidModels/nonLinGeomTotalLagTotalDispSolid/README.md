@@ -80,11 +80,15 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
-| `mixedImplicitStiffness` | `deviatoric` | `deviatoric` or `twoMu`, only with `solvePressure` |
-| `scaleMixedPETScFields` | `false` | Store the pressure unknown as `p/s` in PETSc, only with `solvePressure` |
-| `pressureUnknownScale` | `twoMu` | `s`: `twoMu`, `user` (with `pressureUnknownScaleValue`) or `none` |
-| `pressureScaleByTwoMu` | as `scaleMixedPETScFields` | Multiply the pressure rows by 2μ |
+| `mixedImplicitStiffness` | `deviatoric` | `deviatoric` or `twoMu` |
+| `scaleMixedPETScFields` | `false` | Store the pressure unknown as `p/s` |
+| `pressureUnknownScale` | `twoMu` | `s`: `twoMu`, `user` or `none` |
+| `pressureScaleByTwoMu` | as `scaleMixedPETScFields` | Pressure rows × 2μ |
 | `pressureScaleFactor` | `1` | Further factor on the pressure rows |
+
+The keywords from `mixedImplicitStiffness` on apply only with
+`solvePressure`. With `pressureUnknownScale user`, the scale `s` is read from
+`pressureUnknownScaleValue`.
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with

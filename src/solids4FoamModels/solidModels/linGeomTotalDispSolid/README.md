@@ -71,11 +71,15 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | `momentum` always used |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
-| `mixedImplicitStiffness` | `deviatoric` | `deviatoric` or `twoMu`, only with `solvePressure` |
-| `scaleMixedPETScFields` | `false` | Store the pressure unknown as `p/s` in PETSc, only with `solvePressure` |
-| `pressureUnknownScale` | `twoMu` | `s`: `twoMu`, `user` (with `pressureUnknownScaleValue`) or `none` |
-| `pressureScaleByTwoMu` | as `scaleMixedPETScFields` | Multiply the pressure rows by 2μ |
+| `mixedImplicitStiffness` | `deviatoric` | `deviatoric` or `twoMu` |
+| `scaleMixedPETScFields` | `false` | Store the pressure unknown as `p/s` |
+| `pressureUnknownScale` | `twoMu` | `s`: `twoMu`, `user` or `none` |
+| `pressureScaleByTwoMu` | as `scaleMixedPETScFields` | Pressure rows × 2μ |
 | `pressureScaleFactor` | `1` | Further factor on the pressure rows |
+
+The keywords from `mixedImplicitStiffness` on apply only with
+`solvePressure`. With `pressureUnknownScale user`, the scale `s` is read from
+`pressureUnknownScaleValue`.
 
 For `stabilisation`, the code will create a default dictionary if none is
 provided. The `momentum` sub-dictionary is always used. The `pressure`
