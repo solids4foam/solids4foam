@@ -211,14 +211,46 @@ done
 for mesh in "${MESHES[@]}"; do
     [[ "$mesh" == "hex" ]] && hex_selected=true
 done
+# They start from the serial hex case, which Allrun has meshed and converted
+# for this OpenFOAM flavour, and change only the solid properties
+MIXED_HEX_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex"
 run_guard=false
 if [[ "$mixed_selected" == true && "$hex_selected" == true ]]; then
-    if [[ -n "${PETSC_DIR:-}" ]]; then
-        run_guard=true
-    else
+    if [[ -z "${PETSC_DIR:-}" ]]; then
         echo "SKIP: petscSnesPressure negative and parallel arms require PETSc"
+    elif [[ "$CHECK_ONLY" == false && ! -d "$MIXED_HEX_DIR/constant/polyMesh" ]]; then
+        echo "SKIP: petscSnesPressure negative and parallel arms: no serial hex mesh"
+    else
+        run_guard=true
     fi
 fi
+
+copy_mixed_hex_case()
+{
+    local dest="$1" item name
+    rm -rf "$dest"
+    mkdir -p "$dest"
+    for item in "$MIXED_HEX_DIR"/*; do
+        name=$(basename "$item")
+        case "$name" in
+            postProcessing|processor*|log.*|[1-9]*) continue ;;
+        esac
+        cp -a "$item" "$dest/"
+    done
+}
+
+# As Allrun, OpenFOAM.org and foam-extend use the tutorial source model
+use_solid_properties()
+{
+    local variant="$1"
+    rm -f constant/solidProperties
+    if [[ "$(solids4Foam::foamFlavour)" == "com" ]]; then
+        ln -s "$variant" constant/solidProperties
+    else
+        sed 's/^solidModel .*/solidModel manufacturedSolutionSolid;/' \
+            "constant/$variant" > constant/solidProperties
+    fi
+}
 
 # Negative test: the mixed formulation must refuse the high-order Jacobian,
 # which would reconstruct a negative shear modulus from the implicit stiffness
@@ -226,22 +258,10 @@ if [[ "$run_guard" == true ]]; then
     CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-highOrderJacobian"
     SOLVER_LOG="$CASE_DIR/log.solids4Foam"
     if [[ "$CHECK_ONLY" == false ]]; then
-        rm -rf "$CASE_DIR"
-        mkdir -p "$CASE_DIR"
-        for item in "$SCRIPT_DIR"/*; do
-            name=$(basename "$item")
-            case "$name" in
-                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
-            esac
-            cp -a "$item" "$CASE_DIR/"
-        done
-        rm -rf "$CASE_DIR/constant/polyMesh"
+        copy_mixed_hex_case "$CASE_DIR"
         (
             cd "$CASE_DIR"
-            ln -nsf solidProperties.petscSnesPressureHighOrderJacobian \
-                constant/solidProperties
-            ln -nsf fvSolution.petscSnesPressure system/fvSolution
-            blockMesh > log.blockMesh 2>&1
+            use_solid_properties solidProperties.petscSnesPressureHighOrderJacobian
             # Expected to fail: record, rather than stop on, the exit status
             if solids4Foam > log.solids4Foam 2>&1; then
                 echo "accepted" > log.guardOutcome
@@ -274,26 +294,14 @@ if [[ "$run_guard" == true ]]; then
     CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-nonFiniteScale"
     SOLVER_LOG="$CASE_DIR/log.solids4Foam"
     if [[ "$CHECK_ONLY" == false ]]; then
-        rm -rf "$CASE_DIR"
-        mkdir -p "$CASE_DIR"
-        for item in "$SCRIPT_DIR"/*; do
-            name=$(basename "$item")
-            case "$name" in
-                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
-            esac
-            cp -a "$item" "$CASE_DIR/"
-        done
-        rm -rf "$CASE_DIR/constant/polyMesh"
+        copy_mixed_hex_case "$CASE_DIR"
         (
             cd "$CASE_DIR"
             awk '{print} /scaleMixedPETScFields yes;/ {
                 print "    pressureScaleFactor 1e300;"}' \
                 constant/solidProperties.petscSnesPressure \
                 > constant/solidProperties.petscSnesPressureNonFiniteScale
-            ln -nsf solidProperties.petscSnesPressureNonFiniteScale \
-                constant/solidProperties
-            ln -nsf fvSolution.petscSnesPressure system/fvSolution
-            blockMesh > log.blockMesh 2>&1
+            use_solid_properties solidProperties.petscSnesPressureNonFiniteScale
             # Expected to fail: record, rather than stop on, the exit status.
             # Shell builtins, not env(1): on macOS env strips DYLD_* variables
             if [[ "$(solids4Foam::foamFlavour)" == "com" ]]; then
@@ -327,7 +335,7 @@ fi
 # Parallel test: the mixed approach on two processors must reproduce the serial
 # errors, which needs the D-in-p coupling across processor patches. A simple
 # decomposition is used, so the test does not depend on a partitioner library
-SERIAL_LOG="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex/log.solids4Foam"
+SERIAL_LOG="$MIXED_HEX_DIR/log.solids4Foam"
 run_parallel=false
 if [[ "$run_guard" == true ]]; then
     if ! command -v mpirun >/dev/null 2>&1; then
@@ -341,20 +349,9 @@ fi
 if [[ "$run_parallel" == true ]]; then
     CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex-parallel"
     if [[ "$CHECK_ONLY" == false ]]; then
-        rm -rf "$CASE_DIR"
-        mkdir -p "$CASE_DIR"
-        for item in "$SCRIPT_DIR"/*; do
-            name=$(basename "$item")
-            case "$name" in
-                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
-            esac
-            cp -a "$item" "$CASE_DIR/"
-        done
-        rm -rf "$CASE_DIR/constant/polyMesh"
+        copy_mixed_hex_case "$CASE_DIR"
         (
             cd "$CASE_DIR"
-            ln -nsf solidProperties.petscSnesPressure constant/solidProperties
-            ln -nsf fvSolution.petscSnesPressure system/fvSolution
             rm -f system/decomposeParDict
             cat > system/decomposeParDict <<'DICT'
 FoamFile
@@ -375,7 +372,6 @@ simpleCoeffs
     delta       0.001;
 }
 DICT
-            solids4Foam::runApplication blockMesh
             solids4Foam::runApplication decomposePar
             solids4Foam::runParallel solids4Foam
         ) > "$CASE_DIR/log.Allrun" 2>&1 || true
