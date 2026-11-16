@@ -250,6 +250,54 @@ if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
     fi
 fi
 
+# Negative test: a non-finite pressure scale must be refused. The dictionary
+# parser already rejects nan, inf and out-of-range numbers, so the input is a
+# finite pressureScaleFactor whose product with the declared 2*mu overflows.
+# Floating-point trapping is disabled for this run, otherwise the overflow
+# itself would abort the solver before the scale check
+if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
+    CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-nonFiniteScale"
+    SOLVER_LOG="$CASE_DIR/log.solids4Foam"
+    if [[ "$CHECK_ONLY" == false ]]; then
+        rm -rf "$CASE_DIR"
+        mkdir -p "$CASE_DIR"
+        for item in "$SCRIPT_DIR"/*; do
+            name=$(basename "$item")
+            case "$name" in
+                regressionTests|verification|postProcessing|processor*|log.*|[1-9]*) continue ;;
+            esac
+            cp -a "$item" "$CASE_DIR/"
+        done
+        rm -rf "$CASE_DIR/constant/polyMesh"
+        (
+            cd "$CASE_DIR"
+            awk '{print} /scaleMixedPETScFields yes;/ {
+                print "    pressureScaleFactor 1e300;"}' \
+                constant/solidProperties.petscSnesPressure \
+                > constant/solidProperties.petscSnesPressureNonFiniteScale
+            ln -nsf solidProperties.petscSnesPressureNonFiniteScale \
+                constant/solidProperties
+            ln -nsf fvSolution.petscSnesPressure system/fvSolution
+            blockMesh > log.blockMesh 2>&1
+            # Expected to fail: record, rather than stop on, the exit status
+            if FOAM_SIGFPE=false solids4Foam > log.solids4Foam 2>&1; then
+                echo "accepted" > log.guardOutcome
+            else
+                echo "refused" > log.guardOutcome
+            fi
+        )
+    fi
+    echo
+    echo "Checking that petscSnesPressure refuses a non-finite pressure scale"
+    if [[ "$(cat "$CASE_DIR/log.guardOutcome" 2>/dev/null)" == "refused" ]] \
+    && grep -q 'scales must be finite and positive' "$SOLVER_LOG"; then
+        echo "PASS: a non-finite pressure equation scale is refused"
+    else
+        echo "FAIL: a non-finite pressure equation scale was not refused"
+        failures=$((failures + 1))
+    fi
+fi
+
 # Parallel test: the mixed approach on two processors must reproduce the serial
 # errors, which needs the D-in-p coupling across processor patches. A simple
 # decomposition is used, so the test does not depend on a partitioner library

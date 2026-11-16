@@ -44,6 +44,7 @@ License
 #include "fvc.H"
 #include "fvMatrices.H"
 #include "zeroGradientFvPatchFields.H"
+#include <cmath>
 #ifdef OPENFOAM_NOT_EXTEND
     #include "enhancedVolPointInterpolation.H"
 #endif
@@ -2963,10 +2964,20 @@ void Foam::solidModel::setMixedSystemScaling()
         }
     }
 
-    if (pressureUnknownScale_ <= VSMALL || pressureEqnScale_ <= VSMALL)
+    // A non-finite scale (for example the product of a large
+    // pressureScaleFactor and 2*mu) fails neither comparison with VSMALL, so
+    // it is rejected explicitly
+    if
+    (
+        !std::isfinite(pressureUnknownScale_)
+     || !std::isfinite(pressureEqnScale_)
+     || pressureUnknownScale_ <= VSMALL
+     || pressureEqnScale_ <= VSMALL
+    )
     {
         FatalIOErrorInFunction(solidModelDict())
-            << "The pressure unknown and equation scales must be positive: "
+            << "The pressure unknown and equation scales must be finite and "
+            << "positive: "
             << "found " << pressureUnknownScale_ << " and " << pressureEqnScale_
             << exit(FatalIOError);
     }
