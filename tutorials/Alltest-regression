@@ -101,10 +101,13 @@ mkdir -p "${REG_ROOT}"
 
 # List of regression test directories (relative to tutorials/)
 #
-# Every tutorial with a regressionTest.sh is listed, except two whose scripts
+# Every tutorial with a regressionTest.sh is listed, except three whose scripts
 # are run by hand:
 #   fluidSolidInteraction/cerebralAneurysm, which meshes with cfMesh's
 #     cartesianMesh and fails, rather than skipping, where that cannot run
+#   fluidSolidInteraction/pulmonaryArteries, which also meshes with
+#     cartesianMesh, and runs three prestress passes and five FSI time steps
+#     on four processes, taking about nine minutes
 #   solids/poroelasticity/suctionCaission, which takes about eleven minutes,
 #     and whose stress band holds on OpenFOAM.com and OpenFOAM.org but not on
 #     foam-extend, where the case reads 7.2e5 against [1.5e6, 2.2e6], as the
