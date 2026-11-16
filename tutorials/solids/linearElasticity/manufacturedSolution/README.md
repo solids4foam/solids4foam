@@ -140,7 +140,10 @@ approaches on coarse hex and tet meshes, and `petscSnesPressure` on the coarse
 hex mesh. Both high-order reconstructions share the same displacement and
 stress L2 tolerances. The mixed check also requires nonlinear convergence and a
 pressure error below its tolerance; a missing pressure error fails the test.
-Approach names and `--mesh` select a subset:
+Whenever `petscSnesPressure` and the hex mesh are selected, as by default, the
+test also checks that the mixed formulation refuses the high-order Jacobian
+and a non-finite pressure scale, and that a 2-processor run reproduces the
+serial errors. Approach names and `--mesh` select a subset:
 
 ```bash
 ./regressionTest.sh

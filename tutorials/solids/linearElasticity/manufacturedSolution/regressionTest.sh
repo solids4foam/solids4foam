@@ -201,16 +201,28 @@ for mesh in "${MESHES[@]}"; do
     done
 done
 
-# Negative test: the mixed formulation must refuse the high-order Jacobian,
-# which would reconstruct a negative shear modulus from the implicit stiffness
-run_guard=false
+# The negative and parallel arms below run whenever petscSnesPressure and the
+# hex mesh are both selected, including the default invocation
+mixed_selected=false
+hex_selected=false
 for approach in "${APPROACHES[@]}"; do
-    [[ "$approach" == "petscSnesPressure" ]] && run_guard=true
+    [[ "$approach" == "petscSnesPressure" ]] && mixed_selected=true
 done
 for mesh in "${MESHES[@]}"; do
-    [[ "$mesh" == "hex" ]] || run_guard=false
+    [[ "$mesh" == "hex" ]] && hex_selected=true
 done
-if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
+run_guard=false
+if [[ "$mixed_selected" == true && "$hex_selected" == true ]]; then
+    if [[ -n "${PETSC_DIR:-}" ]]; then
+        run_guard=true
+    else
+        echo "SKIP: petscSnesPressure negative and parallel arms require PETSc"
+    fi
+fi
+
+# Negative test: the mixed formulation must refuse the high-order Jacobian,
+# which would reconstruct a negative shear modulus from the implicit stiffness
+if [[ "$run_guard" == true ]]; then
     CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-highOrderJacobian"
     SOLVER_LOG="$CASE_DIR/log.solids4Foam"
     if [[ "$CHECK_ONLY" == false ]]; then
@@ -254,8 +266,11 @@ fi
 # parser already rejects nan, inf and out-of-range numbers, so the input is a
 # finite pressureScaleFactor whose product with the declared 2*mu overflows.
 # Floating-point trapping is disabled for this run, otherwise the overflow
-# itself would abort the solver before the scale check
-if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
+# itself would abort the solver before the scale check. OpenFOAM.com reads the
+# value of FOAM_SIGFPE (false disables trapping; unset falls back to trapFpe in
+# etc/controlDict, which is on), whereas OpenFOAM.org and foam-extend trap
+# whenever FOAM_SIGFPE is set, whatever its value, so there it is unset
+if [[ "$run_guard" == true ]]; then
     CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-nonFiniteScale"
     SOLVER_LOG="$CASE_DIR/log.solids4Foam"
     if [[ "$CHECK_ONLY" == false ]]; then
@@ -279,8 +294,14 @@ if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
                 constant/solidProperties
             ln -nsf fvSolution.petscSnesPressure system/fvSolution
             blockMesh > log.blockMesh 2>&1
-            # Expected to fail: record, rather than stop on, the exit status
-            if FOAM_SIGFPE=false solids4Foam > log.solids4Foam 2>&1; then
+            # Expected to fail: record, rather than stop on, the exit status.
+            # Shell builtins, not env(1): on macOS env strips DYLD_* variables
+            if [[ "$(solids4Foam::foamFlavour)" == "com" ]]; then
+                export FOAM_SIGFPE=false
+            else
+                unset FOAM_SIGFPE
+            fi
+            if solids4Foam > log.solids4Foam 2>&1; then
                 echo "accepted" > log.guardOutcome
             else
                 echo "refused" > log.guardOutcome
@@ -289,7 +310,12 @@ if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" ]]; then
     fi
     echo
     echo "Checking that petscSnesPressure refuses a non-finite pressure scale"
-    if [[ "$(cat "$CASE_DIR/log.guardOutcome" 2>/dev/null)" == "refused" ]] \
+    # Every flavour announces enabled trapping in the log header
+    if grep -Eq 'Enabling floating point exception trapping|trapping enabled' \
+        "$SOLVER_LOG" 2>/dev/null; then
+        echo "FAIL: floating-point trapping was not disabled for this run"
+        failures=$((failures + 1))
+    elif [[ "$(cat "$CASE_DIR/log.guardOutcome" 2>/dev/null)" == "refused" ]] \
     && grep -q 'scales must be finite and positive' "$SOLVER_LOG"; then
         echo "PASS: a non-finite pressure equation scale is refused"
     else
@@ -302,8 +328,17 @@ fi
 # errors, which needs the D-in-p coupling across processor patches. A simple
 # decomposition is used, so the test does not depend on a partitioner library
 SERIAL_LOG="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex/log.solids4Foam"
-if [[ "$run_guard" == true && -n "${PETSC_DIR:-}" && -f "$SERIAL_LOG" ]] \
-&& command -v mpirun >/dev/null 2>&1; then
+run_parallel=false
+if [[ "$run_guard" == true ]]; then
+    if ! command -v mpirun >/dev/null 2>&1; then
+        echo "SKIP: petscSnesPressure 2-processor arm requires mpirun"
+    elif [[ ! -f "$SERIAL_LOG" ]]; then
+        echo "SKIP: petscSnesPressure 2-processor arm: no serial hex run to compare"
+    else
+        run_parallel=true
+    fi
+fi
+if [[ "$run_parallel" == true ]]; then
     CASE_DIR="$SCRIPT_DIR/regressionTests/petscSnesPressure-hex-parallel"
     if [[ "$CHECK_ONLY" == false ]]; then
         rm -rf "$CASE_DIR"
