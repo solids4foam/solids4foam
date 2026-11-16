@@ -739,6 +739,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- A high-order (face-quadrature) parallel run no longer stops at the end of the
+  first time step when a processor holds no cells. The constitutive law manager
+  decided from the row count whether a compact integration-point layout was
+  cell-based or face-based, and a rank with no cells has no faces either, so
+  that rank registered a `compactCell` topology while the others registered
+  `compactFace`. The caller of the `CompactListList` stress updates now states
+  which kind of layout it passes (#707).
+
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual
