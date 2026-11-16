@@ -20,8 +20,15 @@ tolerances, coupling (Robin-Neumann or IQN-ILS), mesh source and
 
 Two independent defects, found in this order. Both were fixed on the branch
 `verification/3dtube-level3` and are in `development` through PR #546, which
-rebased the commits cited below. The diagnostic patches in this directory
-apply to that branch (`c45b30b7e`), not necessarily to `development`.
+rebased the commits cited below. The two diagnostic patches in this directory
+apply to different commits (checked with `git apply --check`):
+
+- `traction-diagnostics.patch` applies to every commit of the branch from
+  `15a652f09` (the commit before fix 1) to `c45b30b7e`, and to `development`.
+- `transfer-diagnostics.patch` applies only to `15a652f09` and `635ff464f`
+  (fix 1). Fix 2 (`0ff7f462b`) changes the context of its
+  `amiInterfaceToInterfaceMapping.C` hunks, so it does not apply to
+  `0ff7f462b`, `c45b30b7e` or `development`.
 
 ### 1. Aliasing miscompilation of the fluid wall viscous force (level 1 onwards)
 
@@ -178,3 +185,8 @@ tensorField` were not audited.
 - `traction-diagnostics.patch`: the temporary instrumentation (wall-force
   decomposition, `snGrad` lookup, per-face `devReff` and traction), applied to
   the commit before the fix and enabled with `S4F_DEBUG_TRACTION=1`.
+- `transfer-diagnostics.patch`: the temporary instrumentation of the FSI
+  point transfer (sums of the interface displacement fields in
+  `fluidSolidInterface`, and the per-point addressing and barycentric weights
+  of `amiInterfaceToInterfaceMapping`, written to `zoneAPointWeights.dbg` and
+  `zoneBPointWeights.dbg`), also enabled with `S4F_DEBUG_TRACTION=1`.

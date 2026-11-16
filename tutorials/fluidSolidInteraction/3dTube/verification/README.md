@@ -162,7 +162,7 @@ step:
 | Level | Refinement | Fluid cells | Solid cells | Δt (s) | Default cores |
 |---:|---:|---:|---:|---:|---:|
 | 1 | 1x | 16 000 | 6 400 | 2.5e-5 | 4 |
-| 2 | 2x | 128 000 | 51 200 | 1.25e-5 | 6 |
+| 2 | 2x | 128 000 | 51 200 | 1.25e-5 | 8 |
 | 3 | 4x | 1 024 000 | 409 600 | 6.25e-6 | 32 |
 
 Levels 1 and 2 form the default sweep; level 3 is opt-in and costs about
@@ -210,6 +210,10 @@ step, so the largest difference between the two radial histories at A,
 normalised by the IQN-ILS peak, and the relative differences in
 `u_r,max(A)`, `u_z,min(A)`, `t_arr(A)` and `c_p`, must each be within 1%. The
 number of FSI iterations of each coupling is reported.
+
+`verification/Allclean` removes the generated `work/` and `postProcessing/`
+directories, as does `./Allclean all` in the case directory; the plain case
+`./Allclean` keeps them.
 
 ## Reference quality
 
@@ -326,6 +330,13 @@ refinement; level 3 on MeluXina): `u_r,max(A)` 0.15978, 0.15921, 0.15835
 (changes 0.36%, 0.54%; undefined); `u_z,min(A)` -0.08819, -0.08643, -0.08554
 (2.0%, 1.03%; order 0.98); `t_arr(A)` 5.873, 5.837, 5.815 (0.61%, 0.38%; order
 0.65).
+
+The three-level sweep (`./Allverify --levels 1,2,3`) therefore exits with
+status 1 and reports FAIL: the changes in `u_r,max(A)` and `c_p` grow from
+2→3, so the criterion that each successive change be smaller than the
+previous one (or below 0.2%) is not met. This is the expected outcome (it is
+the same on xenosim and MeluXina), not a failed run: the runs themselves
+completed and converged.
 
 Every step of every level met all three Robin criteria (worst final residuals
 6.5e-7, 1.0e-5 and 9.1e-6 against tolerances 1e-6, 1e-5 and 1e-5; no stalled
