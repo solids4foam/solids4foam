@@ -43,7 +43,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
 #elif defined(OPENFOAM_COM)
     const IOdictionary& msData
 #else
-    Istream & msData
+    Istream& msData
 #endif
 )
     :
@@ -178,7 +178,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
 
     // Initialize RBF interpolator
 
-    const dictionary & dict = coeffDict.subDict("interpolation");
+    const dictionary& dict = coeffDict.subDict("interpolation");
 
     word function = word(dict.lookup("function"));
 
@@ -366,9 +366,9 @@ tmp<pointField> RBFMeshMotionSolver::curPoints() const
    );
 
 #ifdef OPENFOAM_NOT_EXTEND
-    pointField & newPoints = tnewPoints.ref();
+    pointField& newPoints = tnewPoints.ref();
 #else
-    pointField & newPoints = tnewPoints();
+    pointField& newPoints = tnewPoints();
 #endif
 
     newPoints = this->newPoints;
@@ -380,7 +380,7 @@ tmp<pointField> RBFMeshMotionSolver::curPoints() const
 }
 
 // As a first step, the motion is defined in the
-void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
+void RBFMeshMotionSolver::setMotion(const Field<vectorField>& motion)
 {
     // Input checking
 
@@ -388,7 +388,7 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
 
     forAll(motion, ipatch)
     {
-        const vectorField & mpatch = motion[ipatch];
+        const vectorField& mpatch = motion[ipatch];
 
         // Check whether the size of patch motion is equal to number of face
         // centers in patch
@@ -538,7 +538,7 @@ void RBFMeshMotionSolver::solve()
 
         forAll(staticPatchIDs, i)
         {
-            const labelList & meshPoints =
+            const labelList& meshPoints =
                 mesh().boundaryMesh()[staticPatchIDs[i]].meshPoints();
 
             forAll(meshPoints, j)
@@ -566,7 +566,7 @@ void RBFMeshMotionSolver::solve()
 
         forAll(fixedPatchIDs, i)
         {
-            const labelList & meshPoints =
+            const labelList& meshPoints =
                 mesh().boundaryMesh()[fixedPatchIDs[i]].meshPoints();
 
             forAll(meshPoints, j)
@@ -604,7 +604,7 @@ void RBFMeshMotionSolver::solve()
         {
             forAll(movingPatchIDs, patchI)
             {
-                const labelList & meshPoints =
+                const labelList& meshPoints =
                     mesh().boundaryMesh()[movingPatchIDs[patchI]].meshPoints();
                 globalMovingPointsLabelList[movingPatchIDs[patchI]] =
                     labelList(meshPoints.size(), 0);
@@ -802,7 +802,7 @@ void RBFMeshMotionSolver::solve()
             {
                 forAll(movingPatchIDs, patchI)
                 {
-                    const labelList & meshPoints =
+                    const labelList& meshPoints =
                         mesh().boundaryMesh()[movingPatchIDs[patchI]]
                        .meshPoints();
                     globalMovingPointsLabelList[movingPatchIDs[patchI]] =
@@ -949,7 +949,7 @@ void RBFMeshMotionSolver::solve()
         rbf::matrix positions(nbFaceCenters, mesh().nGeometricD());
         positions.setZero();
 
-        const Foam::pointField & points = mesh().points();
+        const Foam::pointField& points = mesh().points();
 
         vectorField positionsField(positions.rows(), vector::zero);
 
@@ -1188,7 +1188,7 @@ void RBFMeshMotionSolver::solve()
 
     forAll(mesh().boundaryMesh(), i)
     {
-        const labelList & meshPoints = mesh().boundaryMesh()[i].meshPoints();
+        const labelList& meshPoints = mesh().boundaryMesh()[i].meshPoints();
 
         bool isFixedPatch = false;
         forAll(fixedPatchIDs, j)

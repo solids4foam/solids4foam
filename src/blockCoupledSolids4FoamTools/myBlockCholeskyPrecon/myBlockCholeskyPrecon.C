@@ -342,7 +342,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiply
             );
     }
 
-    forAllReverse (upper, coeffI)
+    forAllReverse(upper, coeffI)
     {
         x[lowerAddr[coeffI]] -=
             mult
@@ -385,7 +385,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiplyCoeffT
             );
     }
 
-    forAllReverse (upper, coeffI)
+    forAllReverse(upper, coeffI)
     {
         x[lowerAddr[coeffI]] -=
             mult
@@ -434,7 +434,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiply
             );
     }
 
-    forAllReverse (upper, coeffI)
+    forAllReverse(upper, coeffI)
     {
         x[lowerAddr[coeffI]] -=
             mult
@@ -483,7 +483,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiplyTranspose
             );
     }
 
-    forAllReverse (upper, coeffI)
+    forAllReverse(upper, coeffI)
     {
         losortCoeff = losortAddr[coeffI];
 

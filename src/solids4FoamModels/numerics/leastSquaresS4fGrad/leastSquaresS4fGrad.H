@@ -95,8 +95,7 @@ public:
             //         )   << "Unknown extra option: " << word(schemeData)
             //             << nl << nl
             //             << "Example usage:" << nl
-            //             << "    grad(D)    leastSquaresS4f; "
-            //                "// defaults to false" << nl
+            //             << "    grad(D)    leastSquaresS4f; // default" << nl
             //             << "    grad(D)    leastSquaresS4f true;" << nl
             //             << "    grad(D)    leastSquaresS4f false;" << nl
             //             << abort(FatalError);

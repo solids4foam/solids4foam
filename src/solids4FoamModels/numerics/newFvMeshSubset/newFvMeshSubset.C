@@ -1492,7 +1492,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
 {
     labelList region(baseMesh().nCells(), 0);
 
-    forAllConstIter (labelHashSet, globalCellMap, iter)
+    forAllConstIter(labelHashSet, globalCellMap, iter)
     {
         region[iter.key()] = 1;
     }

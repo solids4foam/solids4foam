@@ -56,38 +56,44 @@ namespace rbf
                 std::shared_ptr<RBFFunctionInterface> rbfFunction
             );
 
-            RBFInterpolation(
+            RBFInterpolation
+            (
                 std::shared_ptr<RBFFunctionInterface> rbfFunction,
                 bool polynomialTerm,
                 bool cpu
-                );
+            );
 
-            void compute(
-                const matrix & positions,
-                const matrix & positionsInterpolation
-                );
+            void compute
+            (
+                const matrix& positions,
+                const matrix& positionsInterpolation
+            );
 
-            void interpolate(
-                const matrix & values,
-                matrix & valuesInterpolation
-                );
+            void interpolate
+            (
+                const matrix& values,
+                matrix& valuesInterpolation
+            );
 
-            void interpolate(
-                const matrix & positions,
-                const matrix & positionsInterpolation,
-                const matrix & values,
-                matrix & valuesInterpolation
-                );
+            void interpolate
+            (
+                const matrix& positions,
+                const matrix& positionsInterpolation,
+                const matrix& values,
+                matrix& valuesInterpolation
+            );
 
-            void interpolate2(
-                const matrix & values,
-                matrix & valuesInterpolation
-                );
+            void interpolate2
+            (
+                const matrix& values,
+                matrix& valuesInterpolation
+            );
 
-            void buildPhi(
-                const matrix & positions,
-                const matrix & positionsInterpolation
-                );
+            void buildPhi
+            (
+                const matrix& positions,
+                const matrix& positionsInterpolation
+            );
 
             std::shared_ptr<RBFFunctionInterface> rbfFunction;
             bool polynomialTerm;
@@ -103,16 +109,18 @@ namespace rbf
             matrix positionsInterpolation;
 
         private:
-            void evaluateH(
-                const matrix & positions,
-                matrix & H
-                );
+            void evaluateH
+            (
+                const matrix& positions,
+                matrix& H
+            );
 
-            void evaluatePhi(
-                const matrix & positions,
-                const matrix & positionsInterpolation,
-                matrix & Phi
-                );
+            void evaluatePhi
+            (
+                const matrix& positions,
+                const matrix& positionsInterpolation,
+                matrix& Phi
+            );
     };
 }
 

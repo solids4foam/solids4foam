@@ -96,7 +96,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::precondition
                 upper[coeffI]*x[lowerAddr[coeffI]];
         }
 
-        forAllReverse (upper, coeffI)
+        forAllReverse(upper, coeffI)
         {
             x[lowerAddr[coeffI]] -=
                 preconDiag_[lowerAddr[coeffI]]*
@@ -124,7 +124,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::precondition
                 lower[losortCoeff]*x[lowerAddr[losortCoeff]];
         }
 
-        forAllReverse (upper, coeffI)
+        forAllReverse(upper, coeffI)
         {
             x[lowerAddr[coeffI]] -=
                 preconDiag_[lowerAddr[coeffI]]*
@@ -170,7 +170,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::preconditionT
                 upper[coeffI]*xT[lowerAddr[coeffI]];
         }
 
-        forAllReverse (upper, coeffI)
+        forAllReverse(upper, coeffI)
         {
             losortCoeff = losortAddr[coeffI];
 
