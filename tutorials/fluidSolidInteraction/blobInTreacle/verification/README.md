@@ -144,6 +144,12 @@ Recorded with OpenFOAM v2512 on Linux, with `--cores 4`: levels x0.5 and x1
 and the time-step study in serial, levels x2 and x4 on four MPI ranks. The
 whole study took about 33 minutes.
 
+These results predate the continuity-based wall-normal velocity gradient that
+`newMovingWallVelocity` now applies by default (#670). With it, the tutorial's
+steady top-point displacement is 0.7% smaller (0.116481 against 0.117301 on
+level x1); the tables below have not yet been re-recorded. Setting
+`continuityNormalGradient no` on the interface patch reproduces them.
+
 Time-step study, tutorial mesh, `t = 1 s`:
 
 | `deltaT` (s) | `u_x` (m) | Change (m) | Order | Interface order | FSI its |
