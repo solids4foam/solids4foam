@@ -63,6 +63,22 @@ release. For complete commit-level details and contributor information, see the
   what does not yet work: thinning the leaflet does not converge to the beam
   model, refined fluid meshes stall in the coupling, and IQN-ILS and
   Robin-Neumann coupling do not complete the case.
+- Added the `pulmonaryArteries` prestressed fluid-solid interaction
+  tutorial: pulsatile, shear-thinning blood flow in a patient-specific main
+  pulmonary artery and its proximal branches, with one inlet, eleven
+  three-element Windkessel outlets and a finite-strain `isotropicFungElastic`
+  wall, coupled by the Robin pressure condition (`elasticWallPressure`). The
+  prestress of the imaged wall is computed first, in a solid-only case, by
+  repeated `solids4Foam` and `updatePrestress` passes (MULF), and applied
+  through `Fpre`. The fluid and wall meshes are generated with
+  `cartesianMesh` and `extrudeMesh`. The case needs PETSc and
+  `cartesianMesh`, and includes a shortened regression test,
+  `regressionTest.sh`, run by hand.
+- `tutorials/Alltest` runs a case's own `Alltest` script, when it has one, in
+  place of its `Allrun`, after the usual one-time-step modifications. This is
+  for cases where one run needs the converged results of an earlier run:
+  `pulmonaryArteries/Alltest` runs one prestress pass to its end time, and
+  then one time step of the fluid-solid interaction case.
 - Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
   a fluid-solid coupling step is also converged if the maximum interface point
   residual (the displacement-increment mismatch by default) is below this
@@ -380,6 +396,21 @@ release. For complete commit-level details and contributor information, see the
   opt-in verification campaign (`verification/`, not run by CI) reproduces
   Richter's published values (`u_x(A)` = 5.95e-5 m, `F_x` = 1.33 N) to within
   0.2 % on the finest of four meshes.
+- The high-order least-squares schemes (`kExactLeastSquares` and
+  `movingLeastSquares`) take the boundary values at the face quadrature
+  points from any patch field that derives from the new
+  `quadratureValuePatchField` interface, not only from `fixedDisplacement`
+  and `fixedRotation`. A scalar or vector `fixedValue` patch field is also
+  accepted when its value is uniform, and stops with an error otherwise;
+  other patch fields that fix the value, e.g. `mixed` and `directionMixed`,
+  still stop with an error. A plain `fixedDisplacement` patch with a
+  non-uniform value now gives a warning, as copying its face-centre values to
+  the quadrature points limits the boundary data to second-order accuracy.
+  The `hofvc` functions take the least-squares scheme as an argument (the
+  solid-model versions are kept), so that models other than solids can use
+  them. Solid results are unchanged. The new `Test-patchQuadratureValues`
+  utility checks the behaviour of every registered patch field type.
+
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same
   scheme in all OpenFOAM variants. The case conversion script no longer
