@@ -432,8 +432,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
 
         // Add stabilisation to the traction
-        // We add this before enforcing the traction condition as the stabilisation
-        // is set to zero on traction boundaries
+        // We add this before enforcing the traction condition as the
+        // stabilisation is set to zero on traction boundaries
         momentumStabilisation().updateVector(D(), &gradD());
         traction += impKf_*momentumStabilisation().faceVector();
 
@@ -446,7 +446,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Momentum equation total displacement total Lagrangian form
 #ifndef OPENFOAM_COM
         // Assemble the RHS in stages.
-        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
+        // The equivalent chained tmp fvMatrix expression is stable on
+        // OpenFOAM.com.
         tmp<fvVectorMatrix> tRhsEqn
         (
             fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
@@ -1564,8 +1565,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
-            // Compute the positive face-interpolated reciprocal of the approximate
-            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            // Compute the positive face-interpolated reciprocal of the
+            // approximate momentum equation diagonal (solid analogue of rAUf),
+            // [Pa]
             {
                 fvVectorMatrix approxMomJ
                 (
@@ -1607,7 +1609,8 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 jac,
                 0,                         // row offset
                 blockSize_ - 1,            // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+                solidModel::twoD() ? 2 : 3 // number of scalar equations to
+                                           // insert
             );
         }
     }

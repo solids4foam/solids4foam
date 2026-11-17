@@ -120,7 +120,9 @@ namespace Foam
             // Destructor
             virtual ~RBFMeshMotionSolver();
 
-            // Set the motion of every boundary patch, where m is equal to number of patches and with non-empty vectorFields for moving patches.
+            // Set the motion of every boundary patch, where m is equal to
+            // number of patches and with non-empty vectorFields for moving
+            // patches.
             // The motion is defined at the face centers of the boundary patch.
             void setMotion( const Field<vectorField> & motion );
 
@@ -133,7 +135,8 @@ namespace Foam
             // Update the mesh corresponding to given map
             virtual void updateMesh( const mapPolyMesh & );
 
-            // std::shared_ptr<sdc::TimeIntegrationScheme> timeIntegrationScheme;
+            // std::shared_ptr<sdc::TimeIntegrationScheme>
+            //     timeIntegrationScheme;
 
             bool corrector;
             int k;

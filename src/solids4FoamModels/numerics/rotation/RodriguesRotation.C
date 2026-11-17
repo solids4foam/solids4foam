@@ -241,7 +241,10 @@ Foam::tensorField Foam::RodriguesRotation
     const tensorField rotationT_F(vi.size(), rotationT);
     const tensorField projectionT_F(vi.size(), projectionT);
 
-    return tensorField(I_F + sinTheta*rotationT_F + (1 - cosTheta)*projectionT_F);
+    return tensorField
+    (
+        I_F + sinTheta*rotationT_F + (1 - cosTheta)*projectionT_F
+    );
 }
 
 

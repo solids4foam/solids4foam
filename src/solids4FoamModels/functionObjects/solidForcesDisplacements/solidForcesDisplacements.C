@@ -166,7 +166,7 @@ Foam::solidForcesDisplacements::solidForcesDisplacements
     historyPatchID_(-1),
     historyFilePtr_()
 {
-    Info << "Creating " << this->name() << " function object." << endl;
+    Info<< "Creating " << this->name() << " function object." << endl;
 
     word historyPatchName("notSpecified");
     if (dict.found("historyPatch"))

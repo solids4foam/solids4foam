@@ -1,7 +1,7 @@
 // Hack block-coupled boundary conditions: due for rewrite
 // const volScalarField nuEff = turbulence->nuEff();
 
-forAll (DD().boundaryField(), patchI)
+forAll(DD().boundaryField(), patchI)
 {
     if (DD().boundaryField()[patchI].blockCoupled())
     {
@@ -24,7 +24,7 @@ forAll (DD().boundaryField(), patchI)
         CoeffField<vector4>::squareTypeField& blockDiag =
             DDDpEqn.diag().asSquare();
 
-        forAll (fc, faceI)
+        forAll(fc, faceI)
         {
             blockDiag[fc[faceI]](0, 0) += patchDiag[faceI].xx();
             blockDiag[fc[faceI]](0, 1) += patchDiag[faceI].xy();
@@ -46,7 +46,7 @@ forAll (DD().boundaryField(), patchI)
         // Get matrix source
         Field<vector4>& blockSource = DDDpEqn.source();
 
-        forAll (fc, faceI)
+        forAll(fc, faceI)
         {
             blockSource[fc[faceI]](0) -= patchSource[faceI](0);
             blockSource[fc[faceI]](1) -= patchSource[faceI](1);

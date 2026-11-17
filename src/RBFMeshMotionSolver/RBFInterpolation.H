@@ -51,7 +51,10 @@ namespace rbf
         public:
             RBFInterpolation();
 
-            explicit RBFInterpolation( std::shared_ptr<RBFFunctionInterface> rbfFunction );
+            explicit RBFInterpolation
+            (
+                std::shared_ptr<RBFFunctionInterface> rbfFunction
+            );
 
             RBFInterpolation(
                 std::shared_ptr<RBFFunctionInterface> rbfFunction,

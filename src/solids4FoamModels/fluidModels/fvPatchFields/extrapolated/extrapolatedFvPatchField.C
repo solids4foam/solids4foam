@@ -194,7 +194,7 @@ void extrapolatedFvPatchField<Type>::updateCoeffs()
 
             label patchID = mesh.boundaryMesh().whichPatch(curFace);
 
-            if(mesh.isInternalFace(curFace))
+            if (mesh.isInternalFace(curFace))
             {
                 vector curFaceIntersection =
                     weights[curFace]
@@ -381,7 +381,7 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
 
             label patchID = mesh.boundaryMesh().whichPatch(curFace);
 
-            if(mesh.isInternalFace(curFace))
+            if (mesh.isInternalFace(curFace))
             {
                 iPhi.append
                 (
@@ -604,9 +604,9 @@ void extrapolatedFvPatchField<Type>::evaluate(const Pstream::commsTypes)
         }
 
         // Calculate inverse
-//         Info << M << endl;
-//         Info << lsM << endl;
-//         Info << det(lsM) << endl;
+//         Info<< M << endl;
+//         Info<< lsM << endl;
+//         Info<< det(lsM) << endl;
         tensor invLsM = inv(lsM);
 
         scalarRectangularMatrix curInvMatrix

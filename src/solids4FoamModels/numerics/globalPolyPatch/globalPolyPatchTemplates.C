@@ -116,7 +116,7 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::globalPointToPatch
     {
         const labelList& addr = pointToGlobalAddr();
 
-        forAll (addr, i)
+        forAll(addr, i)
         {
             pField[i] = gField[addr[i]];
         }
@@ -163,7 +163,7 @@ Foam::tmp<Foam::Field<Type> > Foam::globalPolyPatch::patchFaceToGlobal
     {
         const labelList& addr = faceToGlobalAddr();
 
-        forAll (addr, i)
+        forAll(addr, i)
         {
             gField[addr[i]] = pField[i];
         }

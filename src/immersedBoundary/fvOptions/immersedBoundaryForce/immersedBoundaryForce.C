@@ -2311,7 +2311,10 @@ void Foam::fv::immersedBoundaryForce::addSup
                 const labelList& P = linkFluidCells_[bodyi];
                 const labelList& N = linkPenalisedCells_[bodyi];
                 const scalarField& coeff = linkCoeffs_[bodyi];
-                const vectorField Ub(bodies_[bodyi].velocity(linkPoints_[bodyi]));
+                const vectorField Ub
+                (
+                    bodies_[bodyi].velocity(linkPoints_[bodyi])
+                );
 
                 forAll(P, linki)
                 {

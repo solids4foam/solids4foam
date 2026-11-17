@@ -228,7 +228,8 @@ tmp
 
         forAll(tGrad().boundaryField(), patchI)
         {
-            Field<GradType>& patchGrad = boundaryFieldRef(tmpRef(tGrad))[patchI];
+            Field<GradType>& patchGrad =
+                boundaryFieldRef(tmpRef(tGrad))[patchI];
 
             const vectorField& patchN = n.boundaryField()[patchI];
 
@@ -669,7 +670,7 @@ tmp
             }
         }
 
-//         Info << mesh.boundaryMesh()[patchI].name() << ", "
+//         Info<< mesh.boundaryMesh()[patchI].name() << ", "
 //             << test << endl;
     }
 
@@ -678,8 +679,8 @@ tmp
     iGrad /= V;
 
 //     GradType avgGrad = sum(iGrad*V);
-//     Info << "sumV: " << sum(V) << endl;
-//     Info << "avgGrad: " << avgGrad << endl;
+//     Info<< "sumV: " << sum(V) << endl;
+//     Info<< "avgGrad: " << avgGrad << endl;
 
 
 //     iGrad /= mesh.V();
@@ -755,7 +756,7 @@ tmp
 
     // Add normal gradient
 //     fv::gaussGrad<Type>(mesh).correctBoundaryConditions(vf, tGrad());
-    forAll (vf.boundaryField(), patchi)
+    forAll(vf.boundaryField(), patchi)
     {
         if (!vf.boundaryField()[patchi].coupled())
         {

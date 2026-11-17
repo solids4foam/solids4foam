@@ -16,7 +16,7 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-	linearSpatialDisplacementPointPatchVectorField
+    linearSpatialDisplacementPointPatchVectorField
 
 Description
     Displacement varying linearly in space as:
@@ -27,7 +27,7 @@ Description
     patch face centre positions.
 
 SourceFiles
-	linearSpatialDisplacementPointPatchVectorField.C
+    linearSpatialDisplacementPointPatchVectorField.C
 
 Author
     Federico Mazzanti, UCD.

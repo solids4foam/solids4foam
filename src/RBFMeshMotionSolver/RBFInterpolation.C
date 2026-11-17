@@ -25,7 +25,10 @@ namespace rbf
 {
     RBFInterpolation::RBFInterpolation()
         :
-        rbfFunction( std::shared_ptr<RBFFunctionInterface> ( new TPSFunction() ) ),
+        rbfFunction
+        (
+            std::shared_ptr<RBFFunctionInterface> ( new TPSFunction() )
+        ),
         polynomialTerm( true ),
         cpu( false ),
         computed( false ),
@@ -39,7 +42,10 @@ namespace rbf
         positionsInterpolation()
     {}
 
-    RBFInterpolation::RBFInterpolation( std::shared_ptr<RBFFunctionInterface> rbfFunction )
+    RBFInterpolation::RBFInterpolation
+    (
+        std::shared_ptr<RBFFunctionInterface> rbfFunction
+    )
         :
         rbfFunction( rbfFunction ),
         polynomialTerm( true ),
@@ -104,7 +110,8 @@ namespace rbf
         matrix & Phi
         )
     {
-        // Evaluate Phi which contains the evaluation of the radial basis function
+        // Evaluate Phi which contains the evaluation of the radial basis
+        // function
 
         scalar r = 0;
 
@@ -112,7 +119,10 @@ namespace rbf
         {
             for ( int j = 0; j < n_B; j++ )
             {
-                r = ( positions.row( i ) - positionsInterpolation.row( j ) ).norm();
+                r =
+                    (
+                        positions.row( i ) - positionsInterpolation.row( j )
+                    ).norm();
                 Phi( j, i ) = rbfFunction->evaluate( r );
             }
         }
@@ -153,11 +163,16 @@ namespace rbf
             for ( int i = 0; i < n_A; i++ )
                 H( n_A, i ) = 1;
 
-            H.bottomLeftCorner( dimGrid, n_A ) = positions.block( 0, 0, n_A, dimGrid ).transpose();
+            H.bottomLeftCorner( dimGrid, n_A ) =
+                positions.block( 0, 0, n_A, dimGrid ).transpose();
 
             for ( int i = 0; i < dimGrid + 1; i++ )
                 for ( int j = 0; j < dimGrid + 1; j++ )
-                    H( H.rows() - dimGrid - 1 + i, H.rows() - dimGrid - 1 + j ) = 0;
+                    H
+                    (
+                        H.rows() - dimGrid - 1 + i,
+                        H.rows() - dimGrid - 1 + j
+                    ) = 0;
         }
 
         if ( cpu )
@@ -170,7 +185,8 @@ namespace rbf
 
         if ( not cpu )
         {
-            // Evaluate Phi which contains the evaluation of the radial basis function
+            // Evaluate Phi which contains the evaluation of the radial basis
+            // function
 
             if ( polynomialTerm )
                 Phi.resize( n_B, n_A + dimGrid + 1 );
@@ -183,7 +199,8 @@ namespace rbf
                 for ( int i = 0; i < Phi.rows(); i++ )
                     Phi( i, n_A ) = 1;
 
-                Phi.topRightCorner( n_B, dimGrid ) = positionsInterpolation.block( 0, 0, n_B, dimGrid );
+                Phi.topRightCorner( n_B, dimGrid ) =
+                    positionsInterpolation.block( 0, 0, n_B, dimGrid );
             }
 
             // Compute the LU decomposition of the matrix H
@@ -233,7 +250,8 @@ namespace rbf
                 for ( int i = 0; i < Phi.rows(); i++ )
                     Phi( i, n_A ) = 1;
 
-                Phi.topRightCorner( n_B, dimGrid ) = positionsInterpolation.block( 0, 0, n_B, dimGrid );
+                Phi.topRightCorner( n_B, dimGrid ) =
+                    positionsInterpolation.block( 0, 0, n_B, dimGrid );
             }
 
             valuesInterpolation.noalias() = Phi * B;
@@ -297,11 +315,16 @@ namespace rbf
             for ( int i = 0; i < n_A; i++ )
                 H( n_A, i ) = 1;
 
-            H.bottomLeftCorner( dimGrid, n_A ) = positions.block( 0, 0, n_A, dimGrid ).transpose();
+            H.bottomLeftCorner( dimGrid, n_A ) =
+                positions.block( 0, 0, n_A, dimGrid ).transpose();
 
             for ( int i = 0; i < dimGrid + 1; i++ )
                 for ( int j = 0; j < dimGrid + 1; j++ )
-                    H( H.rows() - dimGrid - 1 + i, H.rows() - dimGrid - 1 + j ) = 0;
+                    H
+                    (
+                        H.rows() - dimGrid - 1 + i,
+                        H.rows() - dimGrid - 1 + j
+                    ) = 0;
         }
 
         // Calculate coefficients gamma and beta
@@ -315,7 +338,8 @@ namespace rbf
         lu.compute( H.selfadjointView<Eigen::Lower>() );
         B = lu.solve( valuesLU );
 
-        // Evaluate Phi_BA which contains the evaluation of the radial basis function
+        // Evaluate Phi_BA which contains the evaluation of the radial basis
+        // function
         // This method is only used by the greedy algorithm, and the matrix Phi
         // is therefore enlarged at every greedy step.
 
@@ -328,7 +352,8 @@ namespace rbf
             for ( int i = 0; i < Phi.rows(); i++ )
                 Phi( i, n_A ) = 1;
 
-            Phi.topRightCorner( n_B, dimGrid ) = positionsInterpolation.block( 0, 0, n_B, dimGrid );
+            Phi.topRightCorner( n_B, dimGrid ) =
+                positionsInterpolation.block( 0, 0, n_B, dimGrid );
         }
 
         valuesInterpolation.noalias() = Phi * B;
@@ -366,7 +391,10 @@ namespace rbf
 
             for ( int j = 0; j < n_B; j++ )
             {
-                r = ( positions.row( index ) - positionsInterpolation.row( j ) ).norm();
+                r =
+                    (
+                        positions.row( index ) - positionsInterpolation.row( j )
+                    ).norm();
                 Phi( j, index ) = rbfFunction->evaluate( r );
             }
         }
@@ -390,7 +418,11 @@ namespace rbf
         // resize valuesLU if polynomial is used
         if ( polynomialTerm )
         {
-            valuesLU.conservativeResize( values.rows() + values.cols() + 1, values.cols() );
+            valuesLU.conservativeResize
+            (
+                values.rows() + values.cols() + 1,
+                values.cols()
+            );
         }
 
         valuesLU.setZero(); // initialize all values zero

@@ -1065,7 +1065,7 @@ void fvMeshQuadrature::calcQuadPointsAndWeights3D() const
 
     // Loop over cells
 
-    forAll (cells, cellI)
+    forAll(cells, cellI)
     {
         const cellShape& shape = mesh.cellShapes()[cellI];
         const labelList& cellPoints = mesh.cellPoints()[cellI];

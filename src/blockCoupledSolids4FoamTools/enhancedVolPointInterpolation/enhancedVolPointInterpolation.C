@@ -172,7 +172,10 @@ void Foam::enhancedVolPointInterpolation::calcBoundaryAddressing()
 }
 
 
-void Foam::enhancedVolPointInterpolation::makeInternalWeights(scalarField& sumWeights)
+void Foam::enhancedVolPointInterpolation::makeInternalWeights
+(
+    scalarField& sumWeights
+)
 {
     if (debug)
     {
@@ -212,7 +215,10 @@ void Foam::enhancedVolPointInterpolation::makeInternalWeights(scalarField& sumWe
 }
 
 
-void Foam::enhancedVolPointInterpolation::makeBoundaryWeights(scalarField& sumWeights)
+void Foam::enhancedVolPointInterpolation::makeBoundaryWeights
+(
+    scalarField& sumWeights
+)
 {
     if (debug)
     {
@@ -477,9 +483,17 @@ void Foam::enhancedVolPointInterpolation::makeWeights()
 
 // * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * * //
 
-Foam::enhancedVolPointInterpolation::enhancedVolPointInterpolation(const fvMesh& vm)
+Foam::enhancedVolPointInterpolation::enhancedVolPointInterpolation
+(
+    const fvMesh& vm
+)
 :
-    MeshObject<fvMesh, Foam::UpdateableMeshObject, enhancedVolPointInterpolation>(vm),
+    MeshObject
+    <
+        fvMesh,
+        Foam::UpdateableMeshObject,
+        enhancedVolPointInterpolation
+    >(vm),
     hasSeparated_(hasSeparated(pointMesh::New(vm)))
 {
     makeWeights();

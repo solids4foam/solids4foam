@@ -237,7 +237,7 @@ void Foam::myBlockCholeskyPrecon<Type>::diagMultiply
     // Create multiplication function object
     typename BlockCoeff<Type>::multiply mult;
 
-    forAll (upper, coeffI)
+    forAll(upper, coeffI)
     {
         dDiag[upperAddr[coeffI]] -=
             mult.tripleProduct
@@ -267,7 +267,7 @@ void Foam::myBlockCholeskyPrecon<Type>::diagMultiplyCoeffT
     // Create multiplication function object
     typename BlockCoeff<Type>::multiply mult;
 
-    forAll (upper, coeffI)
+    forAll(upper, coeffI)
     {
         dDiag[upperAddr[coeffI]] -=
             mult.tripleProduct
@@ -298,7 +298,7 @@ void Foam::myBlockCholeskyPrecon<Type>::diagMultiply
     // Create multiplication function object
     typename BlockCoeff<Type>::multiply mult;
 
-    forAll (upper, coeffI)
+    forAll(upper, coeffI)
     {
         dDiag[upperAddr[coeffI]] -=
             mult.tripleProduct
@@ -332,7 +332,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiply
     const unallocLabelList& upperAddr = this->matrix_.lduAddr().upperAddr();
     const unallocLabelList& lowerAddr = this->matrix_.lduAddr().lowerAddr();
 
-    forAll (upper, coeffI)
+    forAll(upper, coeffI)
     {
         x[upperAddr[coeffI]] -=
             mult
@@ -375,7 +375,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiplyCoeffT
     const unallocLabelList& upperAddr = this->matrix_.lduAddr().upperAddr();
     const unallocLabelList& lowerAddr = this->matrix_.lduAddr().lowerAddr();
 
-    forAll (upper, coeffI)
+    forAll(upper, coeffI)
     {
         x[upperAddr[coeffI]] -=
             mult
@@ -422,7 +422,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiply
 
     register label losortCoeff;
 
-    forAll (lower, coeffI)
+    forAll(lower, coeffI)
     {
         losortCoeff = losortAddr[coeffI];
 
@@ -473,7 +473,7 @@ void Foam::myBlockCholeskyPrecon<Type>::ILUmultiplyTranspose
 
     //HJ Not sure if the coefficient itself needs to be transposed.
     // HJ, 30/Oct/2007
-    forAll (lower, coeffI)
+    forAll(lower, coeffI)
     {
         x[upperAddr[coeffI]] -=
             mult

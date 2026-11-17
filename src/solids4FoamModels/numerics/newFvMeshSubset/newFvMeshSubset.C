@@ -75,7 +75,7 @@ void Foam::newFvMeshSubset::markPoints
     Map<label>& pointMap
 )
 {
-    forAll (curPoints, pointI)
+    forAll(curPoints, pointI)
     {
         // Note: insert will only insert if not yet there.
         pointMap.insert(curPoints[pointI], 0);
@@ -89,7 +89,7 @@ void Foam::newFvMeshSubset::markPoints
     labelList& pointMap
 )
 {
-    forAll (curPoints, pointI)
+    forAll(curPoints, pointI)
     {
         pointMap[curPoints[pointI]] = 0;
     }
@@ -111,7 +111,7 @@ void Foam::newFvMeshSubset::doCoupledPatches
     if (syncPar && Pstream::parRun())
     {
         // Send face usage across processor patches
-        forAll (oldPatches, oldPatchI)
+        forAll(oldPatches, oldPatchI)
         {
             const polyPatch& pp = oldPatches[oldPatchI];
 
@@ -137,7 +137,7 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
 
         // Receive face usage count and check for faces that become uncoupled.
-        forAll (oldPatches, oldPatchI)
+        forAll(oldPatches, oldPatchI)
         {
             const polyPatch& pp = oldPatches[oldPatchI];
 
@@ -160,7 +160,7 @@ void Foam::newFvMeshSubset::doCoupledPatches
 
                 // Combine with this side.
 
-                forAll (pp, i)
+                forAll(pp, i)
                 {
                     if
                     (
@@ -179,7 +179,7 @@ void Foam::newFvMeshSubset::doCoupledPatches
     }
 
     // Do same for cyclics.
-    forAll (oldPatches, oldPatchI)
+    forAll(oldPatches, oldPatchI)
     {
         const polyPatch& pp = oldPatches[oldPatchI];
 
@@ -188,7 +188,7 @@ void Foam::newFvMeshSubset::doCoupledPatches
             const cyclicPolyPatch& cycPatch =
                 refCast<const cyclicPolyPatch>(pp);
 
-            forAll (cycPatch, i)
+            forAll(cycPatch, i)
             {
                 label thisFaceI = cycPatch.start() + i;
                 label otherFaceI = cycPatch.transformGlobalFace(thisFaceI);
@@ -230,14 +230,14 @@ labelList Foam::newFvMeshSubset::subset
 {
     // Mark selected elements.
     boolList selected(nElems, false);
-    forAll (selectedElements, i)
+    forAll(selectedElements, i)
     {
         selected[selectedElements[i]] = true;
     }
 
     // Count subset of selected elements
     label n = 0;
-    forAll (subsetMap, i)
+    forAll(subsetMap, i)
     {
         if (selected[subsetMap[i]])
         {
@@ -518,12 +518,12 @@ void Foam::newFvMeshSubset::setCellSubset
 
     Map<label> facesToSubset(primitiveMesh::facesPerCell_*nCellsInSet);
 
-    forAll (cellMap_, cellI)
+    forAll(cellMap_, cellI)
     {
         // Mark all faces from the cell
         const labelList& curFaces = oldCells[cellMap_[cellI]];
 
-        forAll (curFaces, faceI)
+        forAll(curFaces, faceI)
         {
             if (!facesToSubset.found(curFaces[faceI]))
             {
@@ -553,7 +553,7 @@ void Foam::newFvMeshSubset::setCellSubset
     faceMap_.setSize(facesToc.size());
 
     // 1. Get all faces that will be internal to the submesh.
-    forAll (facesToc, faceI)
+    forAll(facesToc, faceI)
     {
         if (facesToSubset[facesToc[faceI]] == 2)
         {
@@ -644,7 +644,7 @@ void Foam::newFvMeshSubset::setCellSubset
     pointMap_ = globalPointMap.toc();
     sort(pointMap_);
 
-    forAll (pointMap_, pointI)
+    forAll(pointMap_, pointI)
     {
         globalPointMap[pointMap_[pointI]] = pointI;
     }
@@ -662,7 +662,7 @@ void Foam::newFvMeshSubset::setCellSubset
 
     label nNewPoints = 0;
 
-    forAll (pointMap_, pointI)
+    forAll(pointMap_, pointI)
     {
         newPoints[nNewPoints] = oldPoints[pointMap_[pointI]];
         nNewPoints++;
@@ -679,7 +679,7 @@ void Foam::newFvMeshSubset::setCellSubset
 
         face newF(oldF.size());
 
-        forAll (newF, i)
+        forAll(newF, i)
         {
             newF[i] = globalPointMap[oldF[i]];
         }
@@ -746,7 +746,7 @@ void Foam::newFvMeshSubset::setCellSubset
 
         face newF(oldF.size());
 
-        forAll (newF, i)
+        forAll(newF, i)
         {
             newF[i] = globalPointMap[oldF[i]];
         }
@@ -762,13 +762,13 @@ void Foam::newFvMeshSubset::setCellSubset
 
     label nNewCells = 0;
 
-    forAll (cellMap_, cellI)
+    forAll(cellMap_, cellI)
     {
         const labelList& oldC = oldCells[cellMap_[cellI]];
 
         labelList newC(oldC.size());
 
-        forAll (newC, i)
+        forAll(newC, i)
         {
             newC[i] = globalFaceMap[oldC[i]];
         }
@@ -920,7 +920,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
     cellMap_.setSize(oldCells.size());
     label nCellsInSet = 0;
 
-    forAll (region, oldCellI)
+    forAll(region, oldCellI)
     {
         if (region[oldCellI] == currentRegion)
         {
@@ -943,7 +943,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
     labelList nCellsUsingFace(oldFaces.size(), 0);
 
     label nFacesInSet = 0;
-    forAll (oldFaces, oldFaceI)
+    forAll(oldFaces, oldFaceI)
     {
         bool faceUsed = false;
 
@@ -1066,7 +1066,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
 
         label oldFaceI = oldPatch.start();
 
-        forAll (oldPatch, i)
+        forAll(oldPatch, i)
         {
             if (nCellsUsingFace[oldFaceI] == 1)
             {
@@ -1135,7 +1135,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
 
         label oldFaceI = oldPatch.start();
 
-        forAll (oldPatch, i)
+        forAll(oldPatch, i)
         {
             if (nCellsUsingFace[oldFaceI] == 1)
             {
@@ -1198,7 +1198,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
 
     label nNewPoints = 0;
 
-    forAll (pointMap_, pointI)
+    forAll(pointMap_, pointI)
     {
         newPoints[nNewPoints] = oldPoints[pointMap_[pointI]];
         nNewPoints++;
@@ -1215,7 +1215,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
 
         face newF(oldF.size());
 
-        forAll (newF, i)
+        forAll(newF, i)
         {
             newF[i] = globalPointMap[oldF[i]];
         }
@@ -1250,7 +1250,7 @@ void Foam::newFvMeshSubset::setLargeCellSubset
         // Relabel vertices of the (possibly turned) face.
         face newF(oldF.size());
 
-        forAll (newF, i)
+        forAll(newF, i)
         {
             newF[i] = globalPointMap[oldF[i]];
         }
@@ -1266,13 +1266,13 @@ void Foam::newFvMeshSubset::setLargeCellSubset
 
     label nNewCells = 0;
 
-    forAll (cellMap_, cellI)
+    forAll(cellMap_, cellI)
     {
         const labelList& oldC = oldCells[cellMap_[cellI]];
 
         labelList newC(oldC.size());
 
-        forAll (newC, i)
+        forAll(newC, i)
         {
             newC[i] = globalFaceMap[oldC[i]];
         }

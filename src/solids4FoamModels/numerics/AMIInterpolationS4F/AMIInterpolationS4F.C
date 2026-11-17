@@ -550,8 +550,8 @@ Foam::AMIInterpolationS4F::AMIInterpolationS4F
     reverseTarget_(dict.getOrDefault("reverseTarget", reverseTarget)),
     lowWeightCorrection_(dict.getOrDefault<scalar>("lowWeightCorrection", -1)),
     singlePatchProc_(-999),
-//	slavePointAddressingPtr_(NULL),//JN: from extendedggi
-//	slavePointDistancePtr_(NULL),//JN: from extendedggi
+//  slavePointAddressingPtr_(NULL),//JN: from extendedggi
+//  slavePointDistancePtr_(NULL),//JN: from extendedggi
     srcMagSf_(),
     srcAddress_(),
     srcWeights_(),
@@ -582,8 +582,8 @@ Foam::AMIInterpolationS4F::AMIInterpolationS4F
     reverseTarget_(reverseTarget),
     lowWeightCorrection_(lowWeightCorrection),
     singlePatchProc_(-999),
-//	slavePointAddressingPtr_(NULL),//JN: from extendedggi
-//	slavePointDistancePtr_(NULL),//JN: from extendedggi
+//  slavePointAddressingPtr_(NULL),//JN: from extendedggi
+//  slavePointDistancePtr_(NULL),//JN: from extendedggi
     srcMagSf_(),
     srcAddress_(),
     srcWeights_(),
@@ -601,7 +601,7 @@ Foam::AMIInterpolationS4F::AMIInterpolationS4F
     upToDate_(false),
     useGlobalPolyPatch_(useGlobalPolyPatch)
 {
-	calculate(srcPatch, tgtPatch);
+    calculate(srcPatch, tgtPatch);
 }
 
 Foam::AMIInterpolationS4F::AMIInterpolationS4F
@@ -616,8 +616,8 @@ Foam::AMIInterpolationS4F::AMIInterpolationS4F
     reverseTarget_(reverseTarget),
     lowWeightCorrection_(lowWeightCorrection),
     singlePatchProc_(-999),
-//	slavePointAddressingPtr_(NULL),//JN: from extendedggi
-//	slavePointDistancePtr_(NULL),//JN: from extendedggi
+//  slavePointAddressingPtr_(NULL),//JN: from extendedggi
+//  slavePointDistancePtr_(NULL),//JN: from extendedggi
     srcMagSf_(),
     srcAddress_(),
     srcWeights_(),
@@ -649,8 +649,8 @@ Foam::AMIInterpolationS4F::AMIInterpolationS4F
     reverseTarget_(fineAMI.reverseTarget_),
     lowWeightCorrection_(-1.0),
     singlePatchProc_(fineAMI.singlePatchProc_),
-//	slavePointAddressingPtr_(NULL),//JN: from extendedggi
-//	slavePointDistancePtr_(NULL),//JN: from extendedggi
+//  slavePointAddressingPtr_(NULL),//JN: from extendedggi
+//  slavePointDistancePtr_(NULL),//JN: from extendedggi
     srcMagSf_(),
     srcAddress_(),
     srcWeights_(),
@@ -747,7 +747,7 @@ Foam::AMIInterpolationS4F::AMIInterpolationS4F
 
 
 Foam::AMIInterpolationS4F::AMIInterpolationS4F(
-	const AMIInterpolationS4F& ami,
+    const AMIInterpolationS4F& ami,
      const bool useGlobalPolyPatch
 )
 :
@@ -755,8 +755,8 @@ Foam::AMIInterpolationS4F::AMIInterpolationS4F(
     reverseTarget_(ami.reverseTarget_),
     lowWeightCorrection_(ami.lowWeightCorrection_),
     singlePatchProc_(ami.singlePatchProc_),
-//	slavePointAddressingPtr_(NULL),//JN: from extendedggi
-//	slavePointDistancePtr_(NULL),//JN: from extendedggi
+//  slavePointAddressingPtr_(NULL),//JN: from extendedggi
+//  slavePointDistancePtr_(NULL),//JN: from extendedggi
     srcMagSf_(ami.srcMagSf_),
     srcAddress_(ami.srcAddress_),
     srcWeights_(ami.srcWeights_),

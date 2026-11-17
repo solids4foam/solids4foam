@@ -210,10 +210,10 @@ class coupledPressureDisplacementSolid
         //  The operator is 2*G*epsilon - nuCoeff*p*I, with
         //  nuCoeff = 3*nu/(1 + nu) set from G and the bulk modulus, which is
         //  the linearisation of an isochoric stress minus the pressure. The
-        //  framework's scalarDeviatoric tangent is the Laplacian surrogate (4/3)*G for
-        //  div(dev(sigma)), so G is three quarters of it. In nonlinear mode it
-        //  sets how the solution is reached and not what it is; in linear mode
-        //  it is the shear modulus of the answer
+        //  framework's scalarDeviatoric tangent is the Laplacian surrogate
+        //  (4/3)*G for div(dev(sigma)), so G is three quarters of it. In
+        //  nonlinear mode it sets how the solution is reached and not what it
+        //  is; in linear mode it is the shear modulus of the answer
         tmp<volScalarField> momentumImpK() const;
 
         //- Face value of momentumImpK()
@@ -225,10 +225,11 @@ class coupledPressureDisplacementSolid
         //- Update the cell or face Cauchy stress from the current displacement
         //  gradient and the solved pressure.
         //
-        //  This is the law's isochoric stress minus the pressure: the law's own volumetric response is replaced by the
-        //  solved pressure rather than added to it, so the pressure does not
-        //  follow the law's dU/dJ. Compressibility enters only through the
-        //  penalty 1/kappa in the pressure equation
+        //  This is the law's isochoric stress minus the pressure: the law's own
+        //  volumetric response is replaced by the solved pressure rather than
+        //  added to it, so the pressure does not follow the law's dU/dJ.
+        //  Compressibility enters only through the penalty 1/kappa in the
+        //  pressure equation
         void updateStress(volSymmTensorField& sigma);
         void updateStress(surfaceSymmTensorField& sigmaf);
 

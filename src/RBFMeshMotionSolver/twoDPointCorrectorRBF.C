@@ -24,9 +24,9 @@ License
 
 namespace Foam
 {
-    // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
-    // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
+// * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
     // Set marker to -1 if is on the "back" side
     void twoDPointCorrectorRBF::setMarker()
@@ -75,13 +75,14 @@ namespace Foam
             else
             {
                 FatalErrorIn( "void twoDPointCorrectorRBF::setMarker()" )
-                    << "Both points give back a negative value with the inner product. Programming error?"
+                    << "Both points give back a negative value with the inner "
+                       "product. Programming error?"
                     << abort( FatalError );
             }
         }
     }
 
-    // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
     twoDPointCorrectorRBF::twoDPointCorrectorRBF( const polyMesh & mesh )
         :
@@ -94,12 +95,12 @@ namespace Foam
         setMarker();
     }
 
-    // * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * * Destructor  * * * * * * * * * * * * * * * //
 
     twoDPointCorrectorRBF::~twoDPointCorrectorRBF()
     {}
 
-    // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+// * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
     const labelList & twoDPointCorrectorRBF::marker() const
     {
@@ -110,7 +111,8 @@ namespace Foam
     {
         forAll( useablePointIDs_, ipoint )
         {
-            newpoints[shadowPointIDs_[ipoint]] = newpoints[useablePointIDs_[ipoint]];
+            newpoints[shadowPointIDs_[ipoint]] =
+                newpoints[useablePointIDs_[ipoint]];
         }
     }
 } // End namespace Foam
