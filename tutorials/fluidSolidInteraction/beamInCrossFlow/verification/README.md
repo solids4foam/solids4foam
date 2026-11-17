@@ -12,7 +12,7 @@ tutorial regression test (`../regressionTest.sh`) is separate.
 | --- | --- |
 | `scripts/richter_case.py` | Builds one self-documenting case (`campaign_case.json`): mesh level `f`, solid thickness multiplier `m`, time step, coupling test, fluid/solid/mesh-motion solver tolerances, PIMPLE correctors, rigid-beam (fluid-only) mode, initialisation from a converged rigid-beam flow. |
 | `campaign/run_case.sh` | Meshes, checks, decomposes and runs a case; continues from the latest time if the case is already decomposed. |
-| `campaign/pack.slurm` | Runs several cases concurrently on MeluXina nodes (`srun --exact`). |
+| `campaign/pack.slurm` | Runs several cases concurrently on SLURM nodes (`srun --exact`); the account and log directory are passed to `sbatch`, and `S4F_ENV` names an optional environment script. |
 | `scripts/richter_analyse.py` | Quantities of interest, steadiness (changes over the last 1 and 2 s, exponential approach fit), coupling iterations, capped steps and the accepted `r1`/`r2` of every step. |
 | `scripts/solid_discretisation.py` | Static solid-only diagnostic (uniform 100 Pa on the upstream face) with independent through-thickness and in-plane refinement. |
 | `scripts/beam_in_cross_flow_verification.py`, `scripts/rigid_fluid_diagnostic.py` | Earlier drivers, kept for the graded-family definitions they export. |
@@ -24,9 +24,8 @@ directories, as does `./Allclean all` in the case directory; the plain case
 
 All definitive runs use one platform and one build: MeluXina, OpenFOAM v2412
 (foss-2024a, GCC 13.3), PETSc 3.22.0, and a frozen copy of the
-`s4f-verif-v2412` build of solids4foam `aee0c8e350267` (-O2), stored in
-`/project/home/p201287/philip/beam-richter-opus/user` (md5 sums identical to
-the source build). The case files come from this branch; each case records
+`s4f-verif-v2412` build of solids4foam `aee0c8e350267` (-O2), frozen for the
+campaign (md5 sums identical to the source build). The case files come from this branch; each case records
 the commit that built it.
 
 ## Case-definition audit (Richter 2012, CMAME 223-224, section 7.2)
@@ -66,7 +65,10 @@ definition, with a labelled 0.2 m/s diagnostic testing which inflow the
 reference values belong to. The reference values are reproduced only with
 the 0.2 m/s peak (below), so since 2026-11-10 the tutorial, its regression
 references and the verification references use a 0.2 m/s peak, as the paper
-does; this is pending confirmation from the author. Nothing here is tuned to
+does. The author has since confirmed the 0.2 m/s peak from his original code
+(T. Richter, private communication, November 2026). Sections dated before
+then describe the 0.2 m/s runs as diagnostics pending that confirmation.
+Nothing here is tuned to
 the reference values; the comparison is made only after our own sequence is
 resolved.
 
@@ -90,7 +92,7 @@ history-independence checks below are met.
 
 ### 1. The coupling-tolerance "floor" was a fluid-solver artefact
 
-The October 10 production attempt (jobs 5323918-5323921, strict test
+The October 10 production attempt (strict test
 `max(r1, r2) <= 1e-6`, PIMPLE `nOuterCorrectors 1`) aborted at
 `nOuterCorr 200` at every level with `r1` stuck at 1.6e-6 to 2.8e-5 while
 `r2` was ~2e-11 (`reference/campaign/failed_r03_2026-10-10`). Per step,
@@ -231,7 +233,7 @@ path.
 | FSI L2 `u_x(A)` | -2.3e-4 | +3.9e-4 | restarted from steady |
 | FSI L2 `F_x` | -1.4e-4 | +2.4e-4 | restarted from steady |
 
-FSI L3 (job 5337651, continued from the converged L3 state at t = 4.5 s with
+FSI L3 (continued from the converged L3 state at t = 4.5 s with
 dt = 0.003125 to t = 7 s, `runs/b3_L3_dt003125`): `u_x(A)` +8.35e-5 and `F_x`
 +5.20e-5 relative. The switch transient (amplitude halving every ~0.25 s:
 `F_x` 3.1e-4 in 4.50-4.75 s to 4.1e-7 in 6.75-7.00 s) has settled by
@@ -334,8 +336,7 @@ production setup. No setting was tuned to the reference values.
 
 Production setup unchanged (same mesh family `m = 2`, strict coupling 1e-5,
 PIMPLE 3, dt = 0.00625, tight solver tolerances, start from rest with the
-1 s ramp) except `maxVelocity 0.2`; `runs/R02_L{0,1,2}_rest`, jobs 5337652
-(L0, L1) and 5337653 (L2). Values are means over the last 0.5 s (t = 24 s for
+1 s ramp) except `maxVelocity 0.2`; `runs/R02_L{0,1,2}_rest`. Values are means over the last 0.5 s (t = 24 s for
 L0, 20 s for L1 and L2); the drift over the preceding second is below 7e-7
 relative.
 
@@ -367,16 +368,16 @@ Data: `reference/campaign/followup_20261013/` (`r02_diagnostic.csv`,
 Kept as a labelled sequence until the author confirms which inflow produced
 the reference values; the printed 0.3 m/s definition remains primary.
 
-- Rigid-beam flows at 0.2 m/s, L0-L3 (job 5339752, from rest to 24 s, steady
+- Rigid-beam flows at 0.2 m/s, L0-L3 (from rest to 24 s, steady
   to `|dF_x|/F_x` < 7.2e-7 over the last 2 s): `F_x` 1.200004, 1.283251,
   1.314469, 1.324974 N (orders 1.42, 1.57; at 0.3 m/s 1.36, 1.55).
-- L3 FSI (job 5339753, `runs/R02_L3_init`, 3 nodes, 14.8 h) from the
+- L3 FSI (`runs/R02_L3_init`, 3 nodes, 14.8 h) from the
   converged rigid L3 flow, as the primary L3, one segment 0-5 s with no
   restart (so the pre-#562 restart issue does not arise). The damped beam mode
   decays by ~2.2x per 0.25 s (`F_x` half-amplitude 1.1e-4 in 3.00-3.25 s to
   6.4e-7 in 4.75-5.00 s); means over 4.5-5.0 s, drift below 3e-6 relative per
   second for `u_x` and `F_x`.
-- History independence (jobs 5339754, 5339755): rigid-flow start against start
+- History independence: rigid-flow start against start
   from rest at L0-L2 differ by at most 1.3e-6 in `u_x` and `F_x` (2.5e-5 in
   `F_y`, 6e-6 in `u_y`).
 
@@ -404,8 +405,8 @@ published Table 3 gives 5.95e-5 m and 1.33 (accuracy 1 %), the preprint
 within 0.3 % of Tukovic et al.'s 0.1055 N. With the printed 0.3 m/s peak the
 values are about 1.8x larger. The reference values are therefore consistent,
 to within their stated accuracy, with a 0.2 m/s peak at Richter's geometry and
-not with the printed 0.3 m/s; whether this is what Richter computed awaits his
-confirmation.
+not with the printed 0.3 m/s. The author has since confirmed that his
+reference computations used the 0.2 m/s peak (November 2026).
 
 #### L4 assessment (estimate, not run)
 
@@ -465,26 +466,26 @@ for Philip, not run): a coupled L3 dt/2 steady-sensitivity run (estimated
 0.2 m/s sequence (2026-10-14/15): rigid L0-L3 1.4, L3 FSI 44.3, history
 checks 7.5 node-hours; together 53.2 node-hours = 6,810 physical core-h.
 
-Follow-up runs (2026-10-13): L3 dt/2 (5337651, 3 nodes, 7.0 h) 21.1
-node-hours; 0.2 m/s diagnostic (5337652, 1 node, 2.7 h; 5337653, 1 node,
+Follow-up runs (2026-10-13): L3 dt/2 (3 nodes, 7.0 h) 21.1
+node-hours; 0.2 m/s diagnostic (1 node, 2.7 h; 1 node,
 7.7 h) 10.5 node-hours; together 31.6 node-hours = 4,040 physical core-h.
 
 Before that: 73.0 node-hours = 9,350 physical core-h since 2026-10-11, of which
-L3 44.6 node-hours (segment 1, job 5333947: 36.0; segment 2, job 5336554:
-8.6; the failed quota attempt 5333773: 0.1). Segment 2 ran ~1.7x faster per
+L3 44.6 node-hours (segment 1: 36.0; segment 2:
+8.6; a failed quota attempt: 0.1). Segment 2 ran ~1.7x faster per
 simulated second than segment 1 (different nodes). Earlier totals in this
 README and in reports were sacct CPUTimeRAW, which counts 256 logical CPUs
 per node and so doubled the physical figure.
 
-## STATUS (2026-10-15, L0-L3 complete at 0.3 m/s and at 0.2 m/s)
+## STATUS (2026-11-17)
 
-All production and check runs are finished, including the L3 dt/2 check and
-the 0.2 m/s reference diagnostic; no beam jobs are queued. The absolute-floor
-coupling criterion is in solids4foam (PR #567, merged). Open: clarification
-of the inflow behind Richter's reference values with the author. If a 0.2 m/s
-peak is confirmed, the definitive sequence (L0-L3 and the dt and coupling
-checks) is rerun at 0.2 m/s; L0-L2 above already use the production setup. Run directories: `/project/home/p201287/philip/beam-richter-opus/runs`
-(L3 keeps its decomposed t = 4, 4.5 s state); archives in
-`/project/home/p201136/philip-beam-archive/beam-richter-opus/`.
+All production and check runs are finished at 0.3 m/s and at 0.2 m/s
+(L0-L3, the L3 dt/2 check and the history-independence checks); no runs are
+queued. The absolute-floor coupling criterion is in solids4foam (PR #567,
+merged). The author has confirmed the 0.2 m/s inlet peak, which the tutorial,
+its regression references and the verification references now use. Open:
+an L4 level (see the assessment above) and a coupled L3 dt/2 run at 0.2 m/s
+are not run. Run directories and full logs are archived off-repository; the
+compact evidence is in `reference/campaign/`.
 
 <!-- markdownlint-enable MD013 -->

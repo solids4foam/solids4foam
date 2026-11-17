@@ -368,6 +368,18 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
+  Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
+  St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
+  bi-parabolic inlet has a 0.2 m/s peak (was 0.3 m/s), the inflow behind
+  Richter's reference values, as confirmed by the author. The coupling uses
+  `requireAllResidualMeasures yes` with `nOuterCorr 200`. Results are not
+  comparable with earlier versions of the tutorial. The regression test has
+  one set of references for all supported OpenFOAM versions, with relative
+  tolerances, and foam-extend is no longer supported for this case. An
+  opt-in verification campaign (`verification/`, not run by CI) reproduces
+  Richter's published values (`u_x(A)` = 5.95e-5 m, `F_x` = 1.33 N) to within
+  0.2 % on the finest of four meshes.
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same
   scheme in all OpenFOAM variants. The case conversion script no longer
