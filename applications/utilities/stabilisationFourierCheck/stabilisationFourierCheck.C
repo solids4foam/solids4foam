@@ -105,6 +105,36 @@ static bool splitSpectralShape(const word& type)
 }
 
 
+//- True for a model that applies the plain Laplacian: laplacian, or
+//  generalisedEvenOrderLaplacian with laplacianPower 0
+static bool plainLaplacian(const dictionary& modelDict)
+{
+    const word type(modelDict.lookup("type"));
+
+    return
+        type == "laplacian"
+     || (
+            type == "generalisedEvenOrderLaplacian"
+         && readLabel(modelDict.lookup("laplacianPower")) == 0
+        );
+}
+
+
+//- True if two models share their implementation, so that their eigenvalues
+//  must agree bitwise: two plain Laplacians, or two directionally split
+//  models. The models are identified by their entries, not their names, so
+//  the order of a pair does not matter
+static bool sharedImplementation(const dictionary& a, const dictionary& b)
+{
+    return
+        (plainLaplacian(a) && plainLaplacian(b))
+     || (
+            splitSpectralShape(word(a.lookup("type")))
+         && splitSpectralShape(word(b.lookup("type")))
+        );
+}
+
+
 //- Number of repeated Laplacian factors, m + 1 with m = laplacianPower, or
 //  -1 for the directionally split models
 static label nLaplacianFactors(const word& type, const dictionary& modelDict)
@@ -1212,9 +1242,11 @@ int main(int argc, char *argv[])
                         &numerical[b][0],
                         numerical[a].size()*sizeof(scalar)
                     ) == 0;
-                const bool requireBitwise =
-                    (names[a] == "laplacian" && names[b] == "gen0")
-                 || (names[a] == "diffStencil" && names[b] == "RhieChow");
+                const bool requireBitwise = sharedImplementation
+                (
+                    models.subDict(names[a]),
+                    models.subDict(names[b])
+                );
                 const bool pass =
                     std::isfinite(error) && error <= pairTol
                  && (!requireBitwise || equal);
