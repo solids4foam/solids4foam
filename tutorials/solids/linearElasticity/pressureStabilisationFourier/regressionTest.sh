@@ -51,6 +51,15 @@ for campaign in RAW NORMALISED; do
         failures=$((failures + 1))
     fi
 done
+# The 3-D level: three active directions, referenceNyquistDirections 3
+LOG_3D="$CASE_DIR/log.stabilisationFourierCheck.3D"
+if [[ -f "$LOG_3D" ]] && grep -q '^Failures: 0$' "$LOG_3D" \
+&& grep -q '^End' "$LOG_3D" && grep -q '^NORMALISED Fourier check' "$LOG_3D"; then
+    echo "PASS: 3-D level: $(grep -c ' PASS$' "$LOG_3D") eigenvalue and pair checks, 0 failures"
+else
+    echo "FAIL: the 3-D level did not complete with 0 failures"
+    failures=$((failures + 1))
+fi
 nRejected=$(grep -c '^PASS rejection' "$CASE_DIR/log.Allrun" || true)
 if [[ "$nRejected" -eq 10 ]] && ! grep -q '^FAIL rejection' "$CASE_DIR/log.Allrun"; then
     echo "PASS: 10 invalid configurations rejected with their messages"

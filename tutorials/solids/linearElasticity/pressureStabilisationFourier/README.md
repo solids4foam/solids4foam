@@ -41,6 +41,10 @@ gradient is `Gauss linear`, face interpolation `linear` and normal gradients
 `uncorrected`; these choices are part of the `diffStencilLaplacian`/`RhieChow`
 symbol.
 
+A 3-D level repeats the checks on an 8^3 mesh of the unit cube, cyclic in x, y
+and z (`system/blockMeshDict.3D`), with `referenceNyquistDirections 3` and
+modes in all three directions (`system/stabilisationFourierCheckDict.3D`).
+
 The ten `system/reject*` dictionaries are invalid configurations, each of
 which must be refused with its message: `referenceNyquistDirections` zero,
 missing, or larger than the number of geometric mesh directions (2 here);
@@ -54,16 +58,17 @@ without a warning, and `normalise` with a deprecation warning.
 ## Running the Case
 
 ```bash
-./Allrun           # 16 cells per axis
-./Allrun refine    # 16, 32 and 64 cells per axis
+./Allrun           # 16 cells per axis, then the 3-D level
+./Allrun refine    # 16, 32 and 64 cells per axis, then the 3-D level
 ```
 
 `Allrun` stops if any eigenvalue or pair check fails (the utility exits
 nonzero) or if an invalid dictionary is accepted. The results are written to
 `postProcessing/stabilisationFourierCheck`:
 
-- `results_NxNx1.csv`: measured and analytical eigenvalues per model and mode,
-  for the raw (`spectralNormalisation` 0) and normalised (1) campaigns. The
+- `results_NxNx1.csv` (`results_8x8x8.csv` for the 3-D level): measured and
+  analytical eigenvalues per model and mode, for the raw
+  (`spectralNormalisation` 0) and normalised (1) campaigns. The
   `paperOrder` column is the number of repeated Laplacian factors, m + 1, and
   the `spectralRelation` labels (`legacyM1`, `coupledRepeatedLaplacian`,
   `splitM2Shape`) also count the order from one;
@@ -81,7 +86,8 @@ scaled by its value at the Nyquist mode.
 All eigenvalue and pair checks pass to the tolerances in
 `system/stabilisationFourierCheckDict` (relative eigenvalue error 1e-9), and all
 ten invalid configurations are refused, and both spellings of the switch are
-accepted as described above. `regressionTest.sh` checks all three.
+accepted as described above, on the 2-D levels and on the 3-D level.
+`regressionTest.sh` checks all of these.
 
 ## Notes
 
