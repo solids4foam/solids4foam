@@ -1,9 +1,9 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {collect, formatSecond, marker} = require('./secondReview.cjs');
+const {collect, changed, formatSecond, marker} = require('./secondReview.cjs');
 const {buildPrompt} = require('./claudeReview.cjs');
 
-const pr = {number: 7, state: 'open', head: {sha: 'c'.repeat(40)},
+const pr = {number: 7, state: 'open', draft: false, head: {sha: 'c'.repeat(40)},
   base: {ref: 'development', sha: 'd'.repeat(40)}, title: 'T', body: 'B'};
 const files = [{filename: 'src/solids4FoamModels/numerics/x.C', status: 'modified',
   patch: '@@ -1 +1 @@\n-a\n+b'}];
@@ -32,9 +32,24 @@ test('second review builds the CI prompt from the base branch on GitHub, not the
   assert.ok(!c.prompt.includes('Claude advisory review'));
 });
 
-test('second review refuses PRs that are closed or target other branches', () => {
+test('second review refuses PRs that are closed, drafts or not into development', () => {
   assert.throws(() => collect(7, fakeApi({...pr, state: 'closed'})), /not open/);
+  assert.throws(() => collect(7, fakeApi({...pr, draft: true})), /not open/);
+  assert.throws(() => collect(7, fakeApi({...pr, base: {ref: 'master', sha: pr.base.sha}})), /not open/);
   assert.throws(() => collect(7, fakeApi({...pr, base: {ref: 'feature-x'}})), /not open/);
+});
+
+test('second review is not posted if the PR changed in any way CI also checks', () => {
+  assert.equal(changed(pr, structuredClone(pr)), false);
+  for (const now of [{...pr, state: 'closed'}, {...pr, draft: true},
+    {...pr, head: {sha: 'e'.repeat(40)}}, {...pr, base: {...pr.base, ref: 'master'}},
+    {...pr, base: {...pr.base, sha: 'f'.repeat(40)}}]) {
+    assert.equal(changed(pr, now), true);
+  }
+  // During collection too: a retarget between the two reads aborts.
+  let reads = 0;
+  const api = {...fakeApi(), json: () => (reads++ ? {...pr, base: {...pr.base, ref: 'master'}} : pr)};
+  assert.throws(() => collect(7, api), /changed during collection/);
 });
 
 test('second review report is validated, escaped and applies the path floor', () => {

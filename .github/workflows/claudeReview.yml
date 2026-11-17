@@ -2,7 +2,9 @@ name: Claude advisory PR review
 
 on:
   pull_request_target:
-    branches: [development, master]
+    # Contributions target development. PRs into master are release merges of
+    # already-reviewed work, and master does not carry the review scripts.
+    branches: [development]
     types: [opened, reopened, ready_for_review, synchronize, labeled]
 
 # No repository-wide write token. The model job cannot write to GitHub.
@@ -49,7 +51,7 @@ jobs:
       # GitHub always runs this YAML from the default branch (master), but
       # contributions target development. Scripts, instructions and the skill
       # therefore come from the tip of the PR's base branch, which the branch
-      # filter limits to development or master. Never check out the PR head,
+      # filter limits to development. Never check out the PR head,
       # a merge ref, or anything else from the PR.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:

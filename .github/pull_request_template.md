@@ -11,6 +11,20 @@ Link related issues. Keep this summary useful without the technical details. -->
 
 **Verification:** State what you tested and the result. Say what is untested.
 
+Closes #<!-- issue number, or delete this line -->
+
+## Before review
+
+<!-- Reviewers, human and AI, check these. Tick them or say why they do not
+apply. Keep the PR in draft until they are done. -->
+
+- [ ] User-facing changes have an entry under `[Unreleased]` in `CHANGELOG.md`.
+- [ ] New or renamed files in `src/solids4FoamModels` are listed in
+  `Make/files.openfoam` and/or `Make/files.foamextend`, for the variants they
+  support.
+- [ ] Added and changed lines follow the
+  [OpenFOAM coding style](https://openfoam.org/dev/coding-style-guide/).
+
 ## Technical details
 
 <!-- Keep only the details that apply. Use “Not applicable” where needed. -->

@@ -1,15 +1,22 @@
 // Trusted base-branch code only. PR material is data, never executable code.
 const fs = require('node:fs');
 const risks = ['LOW', 'MEDIUM', 'HIGH'];
+// Size limits, in characters, for every model-written field. They are chosen so
+// that ANY report the schema accepts also passes validate() and can be
+// published (see maxReportBytes and fitComment); a schema-valid report is never
+// discarded for its size.
+const limits = {summary: 2000, reason: 1000, verification: 2000, file: 300,
+  claim: 800, evidence: 1200, suggested_check: 600, checklist: 800,
+  findings: 10, checklistItems: 5};
 const findingProperties = {
   kind: {type: 'string', enum: ['defect', 'risk', 'question']},
   severity: {type: 'string', enum: ['blocking', 'important', 'minor']},
   category: {type: 'string', enum: ['numerics', 'architecture', 'compatibility',
     'verification', 'security', 'build', 'style']},
-  file: {type: ['string', 'null'], maxLength: 1000},
+  file: {type: ['string', 'null'], maxLength: limits.file},
   line: {type: ['integer', 'null'], minimum: 1},
   ...Object.fromEntries(['claim', 'evidence', 'suggested_check'].map(key =>
-    [key, {type: 'string', minLength: 1, maxLength: 1000}]))
+    [key, {type: 'string', minLength: 1, maxLength: limits[key]}]))
 };
 const schema = {
   type: 'object', additionalProperties: false,
@@ -17,14 +24,23 @@ const schema = {
   properties: {
     risk: {type: 'string', enum: risks},
     ...Object.fromEntries(['summary', 'reason', 'verification'].map(key =>
-      [key, {type: 'string', minLength: 1, maxLength: 4000}])),
-    findings: {type: 'array', maxItems: 10, items: {type: 'object',
+      [key, {type: 'string', minLength: 1, maxLength: limits[key]}])),
+    findings: {type: 'array', maxItems: limits.findings, items: {type: 'object',
       additionalProperties: false, required: Object.keys(findingProperties),
       properties: findingProperties}},
-    human_review: {type: 'array', minItems: 1, maxItems: 5,
-      items: {type: 'string', minLength: 1, maxLength: 2000}}
+    human_review: {type: 'array', minItems: 1, maxItems: limits.checklistItems,
+      items: {type: 'string', minLength: 1, maxLength: limits.checklist}}
   }
 };
+// Most model-written characters a schema-valid report can hold (38,000).
+const maxReportChars = limits.summary + limits.reason + limits.verification +
+  limits.findings*(limits.file + limits.claim + limits.evidence + limits.suggested_check) +
+  limits.checklistItems*limits.checklist;
+// The report reaches the publisher as an environment variable, and Linux
+// rejects a single variable over 128 KiB. Up to 3 bytes per character (any
+// non-ASCII text such as Greek symbols) plus keys, enums and whitespace keeps
+// every schema-valid report below that limit.
+const maxReportBytes = 3*maxReportChars + 6000;
 function exactKeys(data, keys) {
   return data && typeof data === 'object' && !Array.isArray(data) &&
     Object.keys(data).sort().join() === keys.slice().sort().join();
@@ -33,33 +49,36 @@ function validText(value, max) {
   return typeof value === 'string' && value.trim() && value.length <= max;
 }
 function validate(raw) {
-  if (typeof raw !== 'string' || Buffer.byteLength(raw) > 20000) throw new Error('Invalid report size');
+  if (typeof raw !== 'string' || Buffer.byteLength(raw) > maxReportBytes) throw new Error('Invalid report size');
   const data = JSON.parse(raw);
   if (!exactKeys(data, schema.required) || !risks.includes(data.risk)) throw new Error('Invalid report');
   for (const key of ['summary', 'reason', 'verification']) {
-    if (!validText(data[key], 4000)) throw new Error('Invalid report text');
+    if (!validText(data[key], limits[key])) throw new Error('Invalid report text');
   }
-  if (!Array.isArray(data.findings) || data.findings.length > 10) throw new Error('Invalid findings');
+  if (!Array.isArray(data.findings) || data.findings.length > limits.findings) throw new Error('Invalid findings');
   for (const finding of data.findings) {
     if (!exactKeys(finding, Object.keys(findingProperties))) throw new Error('Invalid finding');
     for (const key of ['kind', 'severity', 'category']) {
       if (!findingProperties[key].enum.includes(finding[key])) throw new Error('Invalid finding type');
     }
     for (const key of ['claim', 'evidence', 'suggested_check']) {
-      if (!validText(finding[key], 1000)) throw new Error('Invalid finding text');
+      if (!validText(finding[key], limits[key])) throw new Error('Invalid finding text');
     }
-    if (finding.file !== null && !validText(finding.file, 1000)) throw new Error('Invalid file');
+    if (finding.file !== null && !validText(finding.file, limits.file)) throw new Error('Invalid file');
     if (finding.line !== null && (!Number.isSafeInteger(finding.line) || finding.line < 1)) {
       throw new Error('Invalid line');
     }
   }
-  if (!Array.isArray(data.human_review) || !data.human_review.length || data.human_review.length > 5 ||
-      data.human_review.some(item => !validText(item, 2000))) throw new Error('Invalid checklist');
+  if (!Array.isArray(data.human_review) || !data.human_review.length ||
+      data.human_review.length > limits.checklistItems ||
+      data.human_review.some(item => !validText(item, limits.checklist))) throw new Error('Invalid checklist');
   return data;
 }
 
 // Render model-controlled text as inert content inside fixed report formatting.
-function plain(value) {
+// `max` shortens the raw text first (never an escape sequence); see fitComment.
+function plain(value, max = Infinity) {
+  if (value.length > max) value = Array.from(value).slice(0, max).join('') + '…';
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/@/g, '@\u200b').replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&')
     .replace(/[\r\n]+/g, ' ');
@@ -84,19 +103,22 @@ function riskFloor(files) {
   return files.reduce((floor, file) => [file.filename, file.previous_filename].filter(Boolean)
     .reduce((risk, path) => classifyRisk(pathRisk(path), risk), floor), 'LOW');
 }
-function formatAssessment(data, risk, floor) {
+function formatAssessment(data, risk, floor, max = Infinity) {
+  const text = value => plain(value, max);
   const findings = data.findings.map(f => {
-    const location = f.file === null ? 'PR-wide' : plain(f.file) + (f.line === null ? '' : `:${f.line}`);
+    const location = f.file === null ? 'PR-wide' : text(f.file) + (f.line === null ? '' : `:${f.line}`);
     return `- **${f.severity} ${f.kind} / ${f.category}** (${location})\n` +
-      `  - Claim: ${plain(f.claim)}\n  - Evidence: ${plain(f.evidence)}\n` +
-      `  - Suggested check: ${plain(f.suggested_check)}`;
+      `  - Claim: ${text(f.claim)}\n  - Evidence: ${text(f.evidence)}\n` +
+      `  - Suggested check: ${text(f.suggested_check)}`;
   }).join('\n');
   return `**Status: analysis completed. Advisory only; no approval.**\n\n` +
+    (max === Infinity ? '' : '_Some report text was shortened to fit the GitHub comment ' +
+      'size limit; no finding was removed._\n\n') +
     `**Risk: ${risk}** (path floor: ${risks.includes(floor) ? floor : 'HIGH, unavailable'})\n\n` +
-    `${plain(data.reason)}\n\n### Summary\n\n${plain(data.summary)}\n\n### Findings\n\n` +
+    `${text(data.reason)}\n\n### Summary\n\n${text(data.summary)}\n\n### Findings\n\n` +
     (findings || 'No actionable issue identified in the supplied evidence.') +
-    `\n\n### Verification evidence and limits\n\n${plain(data.verification)}\n\n` +
-    `### Human review checklist\n\n` + data.human_review.map(item => `- [ ] ${plain(item)}`).join('\n') +
+    `\n\n### Verification evidence and limits\n\n${text(data.verification)}\n\n` +
+    `### Human review checklist\n\n` + data.human_review.map(item => `- [ ] ${text(item)}`).join('\n') +
     '\n\nContributing reviewer: what did you independently check? ' +
     'Use this standard AI report; core maintainers decide approval and merging.';
 }
@@ -114,12 +136,29 @@ function secondReviewNotice(risk, number) {
     'alone does not meet the two-reviewer policy.\n\n' +
     '- [ ] Second independent AI review posted (core maintainer)';
 }
-function formatCoverage(coverage) {
+function formatCoverage(coverage, max = Infinity, listed = Infinity) {
+  const omitted = coverage.omitted.slice(0, listed);
+  const more = coverage.omitted.length - omitted.length;
   return `**Patch coverage: ${coverage.status.toUpperCase()}** ` +
     '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n' +
-    (coverage.omitted.length ? 'Not reviewed:\n' + coverage.omitted.map(item =>
-      `- ${plain(item.path)} (${item.reason === 'no_patch' ? 'no patch available' : 'prompt budget'})`)
-      .join('\n') + '\n\n' : '');
+    (omitted.length ? 'Not reviewed:\n' + omitted.map(item =>
+      `- ${plain(item.path, max)} (${item.reason === 'no_patch' ? 'no patch available' : 'prompt budget'})`)
+      .join('\n') + (more ? `\n- and ${more} more files` : '') + '\n\n' : '');
+}
+
+// GitHub rejects comments over 65,536 characters, and escaping can expand
+// model text up to five times. Rather than discard a valid report, shorten
+// each text field (and the not-reviewed list) step by step until it fits. The
+// last step fits any schema-valid report: 48 fields of 121 characters, escaped,
+// plus 20 listed paths, is under 45,000 characters.
+const commentLimit = 60000;
+const fitSteps = [[Infinity, Infinity], [1000, 100], [500, 50], [250, 30], [120, 20]];
+function fitComment(render) {
+  for (const [max, listed] of fitSteps) {
+    const body = render(max, listed);
+    if (body.length <= commentLimit) return body;
+  }
+  throw new Error('Report too large');
 }
 
 // The agent skill shared by all solids4foam agents, read from the trusted base
@@ -219,9 +258,8 @@ async function publish({github, context, core}, env = process.env) {
     if (!['complete', 'partial'].includes(coverage.status) || !Array.isArray(coverage.omitted) ||
         Buffer.byteLength(env.REVIEW_COVERAGE) > 30000) throw new Error('Invalid coverage');
     const risk = classifyRisk(data.risk, env.RISK_FLOOR);
-    body = heading + formatCoverage(coverage) + formatAssessment(data, risk, env.RISK_FLOOR) +
-      secondReviewNotice(risk, pr.number);
-    if (body.length > 60000) throw new Error('Report too large');
+    body = fitComment((max, listed) => heading + formatCoverage(coverage, max, listed) +
+      formatAssessment(data, risk, env.RISK_FLOOR, max) + secondReviewNotice(risk, pr.number));
   } catch {
     failed = true;
     const known = ['metadata_too_large', 'nothing_reviewable', 'file_list_incomplete',
@@ -244,5 +282,5 @@ async function publish({github, context, core}, env = process.env) {
   if (failed) core.setFailed('AI review incomplete; failure report published.');
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
-module.exports = {schema, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
+module.exports = {schema, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};

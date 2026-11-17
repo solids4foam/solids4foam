@@ -52,17 +52,25 @@ const githubApi = {
 // be a branch of the upstream repository that maintainers control.
 function collect(number, api = githubApi, trustedRef = null) {
   const pr = api.json(`repos/${repo}/pulls/${number}`);
-  if (pr.state !== 'open' || !['development', 'master'].includes(pr.base.ref)) {
-    throw new Error('PR is not open against development or master');
+  if (pr.state !== 'open' || pr.draft || pr.base.ref !== 'development') {
+    throw new Error('PR is not open, ready for review and against development');
   }
   const files = api.list(`repos/${repo}/pulls/${number}/files?per_page=100`);
   if (!files.length || files.length >= 3000) throw new Error('file_list_incomplete');
   const ref = encodeURIComponent(trustedRef || pr.base.ref);
   const read = file => api.raw(`repos/${repo}/contents/${file}?ref=${ref}`);
   const {prompt, coverage} = review.buildPrompt(pr, files, read);
-  const after = api.json(`repos/${repo}/pulls/${number}`);
-  if (after.head.sha !== pr.head.sha) throw new Error('PR changed during collection; rerun');
+  if (changed(pr, api.json(`repos/${repo}/pulls/${number}`))) {
+    throw new Error('PR changed during collection; rerun');
+  }
   return {pr, prompt, coverage, floor: review.riskFloor(files)};
+}
+
+// Like CI, a report only applies to the PR as collected: same head and base
+// commits, same target branch, still open and not a draft.
+function changed(pr, now) {
+  return now.state !== 'open' || now.draft || now.head.sha !== pr.head.sha ||
+    now.base.ref !== pr.base.ref || now.base.sha !== pr.base.sha;
 }
 
 // The PR text is untrusted, so Codex gets no way to read local files or reach
@@ -89,14 +97,15 @@ function runCodex(prompt, dir) {
 function formatSecond({pr, coverage, floor}, raw) {
   const data = review.validate(raw.trim());
   const risk = review.classifyRisk(data.risk, floor);
-  return `${marker}\n## Second independent AI review (manual, interim)\n\n` +
+  return review.fitComment((max, listed) =>
+    `${marker}\n## Second independent AI review (manual, interim)\n\n` +
     `Reviewed commit: \`${pr.head.sha}\`\n\n` +
     '**Applies only if this SHA matches the current PR head.**\n\n' +
     `Model: ${model} (Codex CLI); reasoning effort: ${effort}. Run locally by a core ` +
     'maintainer with the same instructions, repository guide and patches as the Claude ' +
     'report. It did not see that report or any PR comment, so overlapping findings are ' +
     'independent agreement.\n\n' +
-    review.formatCoverage(coverage) + review.formatAssessment(data, risk, floor);
+    review.formatCoverage(coverage, max, listed) + review.formatAssessment(data, risk, floor, max));
 }
 
 // One comment per maintainer: rerunning updates it instead of adding another.
@@ -127,9 +136,9 @@ function main(argv) {
   console.error(`Running ${model} (${effort}); this can take several minutes...`);
   const body = formatSecond(collected, runCodex(collected.prompt, dir));
   fs.writeFileSync(path.join(dir, 'comment.md'), body);
-  const head = githubApi.json(`repos/${repo}/pulls/${number}`).head.sha;
-  if (head !== collected.pr.head.sha) {
-    console.error(`PR head moved during the review; not posting. Report: ${dir}/comment.md`);
+  if (changed(collected.pr, githubApi.json(`repos/${repo}/pulls/${number}`))) {
+    console.error('PR changed during the review (head, base, state or draft); not posting. ' +
+      `Rerun the review. Report: ${dir}/comment.md`);
     process.exit(1);
   }
   if (argv.includes('--post')) console.log(`Posted: ${post(number, body, dir)}`);
@@ -140,4 +149,4 @@ function main(argv) {
 }
 
 if (require.main === module) main(process.argv.slice(2));
-module.exports = {collect, formatSecond, marker, model, effort};
+module.exports = {collect, changed, formatSecond, marker, model, effort};

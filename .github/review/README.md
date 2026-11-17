@@ -100,12 +100,14 @@ access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
    reference](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target).
    So also copy **only** `.github/workflows/claudeReview.yml` to `master`, for
    example in a small maintainer PR. The workflow then checks out the tip of
-   the PR's base branch for the scripts, instructions and skill, so PRs into
-   `development` are reviewed with `development`'s current rules and master
-   does not need updating until the next release. Later changes to the YAML
-   itself (triggers, permissions, model flags) only take effect once copied to
-   `master`. Confirm the checked-out commit in the first live run. This draft
-   PR cannot test its own privileged workflow before deployment.
+   `development` for the scripts, instructions and skill, so PRs are reviewed
+   with `development`'s current rules and `master` needs no other review file.
+   Only PRs into `development` are reviewed: PRs into `master` are release
+   merges of reviewed work, and `master` does not carry the review scripts.
+   Later changes to the YAML itself (triggers, permissions, model flags) only
+   take effect once copied to `master`. Confirm the checked-out commit in the
+   first live run. This PR cannot test its own privileged workflow before
+   deployment.
 2. Create an organisation-owned Anthropic API key for a dedicated workspace. Set
    a spending limit and monitor usage. Store it as the organisation Actions
    secret `ANTHROPIC_API_KEY`, restricted to this repository. A repository
@@ -144,7 +146,7 @@ guidance](https://github.com/anthropics/claude-code-action/blob/4fa93a88de49bbef
 
 ## Operation and security
 
-Eligible PRs target `development` or `master`, are open, non-draft, and have a
+Eligible PRs target `development`, are open, non-draft, and have a
 human author. Opening, reopening, marking ready, or adding commits triggers a
 review for OWNER, MEMBER, COLLABORATOR, or CONTRIBUTOR author associations.
 Other authors, including first-time fork contributors, need the triage-applied
@@ -157,8 +159,8 @@ does not trigger review; re-run the workflow if evidence was added there.
 
 `pull_request_target` gives access to base-repository secrets for fork PRs. Both
 jobs check out only the tip of the PR's base branch, which the branch filter
-limits to `development` or `master`; both are maintainer-controlled, so code
-merged there is trusted to the same degree. Checkout credentials are not
+limits to `development`. It is maintainer-controlled, so code merged there is
+trusted as much as code on `master`. Checkout credentials are not
 persisted. Neither job fetches or checks out PR code. The
 collector reads patches through the GitHub API. It never executes them, loads
 their configuration, installs their dependencies, or runs their tests. Only
@@ -235,9 +237,8 @@ optional numeric usage, retention, and retrieval limits. No fallback is enabled.
 Run the offline tests from the repository root:
 
 ```sh
-node --test .github/scripts/claudeReview*.test.cjs
-markdownlint .github/review/*.md .github/pull_request_template.md
-CONTRIBUTING.md
+node --test .github/scripts/*.test.cjs
+markdownlint .github/review/*.md .github/pull_request_template.md CONTRIBUTING.md
 ```
 
 Tests use mocked GitHub APIs and model responses. They verify data handling,

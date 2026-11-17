@@ -1,7 +1,8 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const {prepare, publish, validate, classifyRisk, formatAssessment, pathRisk, riskFloor, buildPrompt, schema} = require('./claudeReview.cjs');
+const {prepare, publish, validate, classifyRisk, formatAssessment, pathRisk, riskFloor, buildPrompt, schema,
+  limits, maxReportBytes, commentLimit} = require('./claudeReview.cjs');
 
 function fixture(filename = 'README.md', patch = '@@ -1 +1 @@\n-old\n+new') {
   const pr = {number: 42, head: {sha: 'a'.repeat(40)}, base: {sha: 'b'.repeat(40)},
@@ -376,7 +377,7 @@ test('collection failures carry a safe diagnostic without API response text', as
 
 test('trigger rules restrict branches and cost eligibility without exposing write tools', () => {
   const yaml = fs.readFileSync('.github/workflows/claudeReview.yml', 'utf8');
-  assert.match(yaml, /branches: \[development, master\]/);
+  assert.match(yaml, /branches: \[development\]\n/);
   // Trusted code comes from the base branch tip; never the PR head or merge ref.
   assert.match(yaml, /ref: refs\/heads\/\$\{\{ github.event.pull_request.base.ref \}\}/);
   assert.match(yaml, /needs.review.outputs.trusted_sha \|\|/);
@@ -384,4 +385,68 @@ test('trigger rules restrict branches and cost eligibility without exposing writ
   assert.match(yaml, /github.event.pull_request.author_association/);
   assert.match(yaml, /contains\(github.event.pull_request.labels.\*.name, 'ai-review-approved'\)/);
   assert.match(yaml, /github.event.label.name != 'ai-review-approved'\n      && github.run_id/);
+});
+
+// A report with every field at its schema maximum, written with character `c`.
+function maxReport(c) {
+  const fill = n => c.repeat(n);
+  return {risk: 'HIGH', summary: fill(limits.summary), reason: fill(limits.reason),
+    verification: fill(limits.verification),
+    findings: Array.from({length: limits.findings}, () => ({kind: 'defect', severity: 'blocking',
+      category: 'architecture', file: fill(limits.file), line: Number.MAX_SAFE_INTEGER,
+      claim: fill(limits.claim), evidence: fill(limits.evidence),
+      suggested_check: fill(limits.suggested_check)})),
+    human_review: Array.from({length: limits.checklistItems}, () => fill(limits.checklist))};
+}
+
+test('schema and validator limits agree: any schema-valid report validates', () => {
+  // The schema is what the model is held to; the validator must not be stricter.
+  const props = schema.properties, finding = props.findings.items.properties;
+  assert.equal(props.summary.maxLength, limits.summary);
+  assert.equal(finding.evidence.maxLength, limits.evidence);
+  assert.equal(props.findings.maxItems, limits.findings);
+  assert.equal(props.human_review.items.maxLength, limits.checklist);
+  // Worst realistic encoding: 3-byte characters, pretty-printed JSON.
+  const raw = JSON.stringify(maxReport('\u2207'), null, 2);
+  assert.ok(Buffer.byteLength(raw) <= maxReportBytes);
+  assert.doesNotThrow(() => validate(raw));
+  // Must stay under Linux's 128 KiB limit for one environment variable.
+  assert.ok(maxReportBytes < 131072);
+  // One character over a schema limit is rejected.
+  const over = maxReport('a');
+  over.findings[0].claim += 'a';
+  assert.throws(() => validate(JSON.stringify(over)), /Invalid finding text/);
+});
+
+test('a long eight-finding report is published in full', async () => {
+  // Reviewer reproduction: about 22.8 KB of valid JSON was rejected at 20,000 bytes.
+  const data = JSON.parse(response('HIGH'));
+  data.summary = 's'.repeat(2000);
+  data.findings = Array.from({length: 8}, (_, i) => ({...finding(`Claim ${i} ` + 'c'.repeat(780)),
+    evidence: 'e'.repeat(1150), suggested_check: 'k'.repeat(580)}));
+  const raw = JSON.stringify(data);
+  assert.ok(Buffer.byteLength(raw) > 22000);
+  const f = fixture('src/solidModels/solver.C');
+  await publish(f, env({REVIEW_JSON: raw, RISK_FLOOR: 'HIGH'}));
+  const body = f.comments[0].body;
+  assert.equal(f.failures.length, 0);
+  assert.ok(!/INCOMPLETE|shortened/.test(body));
+  for (let i = 0; i < 8; i++) assert.ok(body.includes(`Claim ${i} `));
+});
+
+test('a schema-maximum report that escapes badly is shortened, not discarded', async () => {
+  // '&' escapes to five characters, the worst case; add a long not-reviewed list.
+  const f = fixture('src/solidModels/solver.C');
+  const omitted = Array.from({length: 500}, (_, i) => ({path: `tutorials/case${i}/` + '&'.repeat(150),
+    reason: 'budget'}));
+  await publish(f, env({REVIEW_JSON: JSON.stringify(maxReport('&')), RISK_FLOOR: 'HIGH',
+    REVIEW_COVERAGE: JSON.stringify({status: 'partial', omitted: omitted.slice(0, 150)})}));
+  const body = f.comments[0].body;
+  assert.equal(f.failures.length, 0);
+  assert.ok(body.length <= commentLimit + 100);
+  assert.match(body, /shortened to fit/);
+  assert.match(body, /more files/);
+  assert.equal(body.match(/  - Claim: /g).length, limits.findings);
+  // Shortening cuts raw text before escaping, so no entity is split.
+  assert.ok(!/&(a|am)?…/.test(body) && !/&amp(?!;)/.test(body));
 });
