@@ -490,13 +490,25 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
                 // Vector from the face-cell centre to the mirrored face-cell
                 // centred
                 //const vector& d = pd[patchFacei];
+                // The old code below reflects the position vector C about a
+                // plane through the origin, giving d = -2*(n & C)*n. This is
+                // only correct if the symmetry plane passes through the
+                // origin; otherwise d has the wrong length and, in general,
+                // the wrong sign (issue #712)
+                //const vector d =
+                //    transform
+                //    (
+                //        I - 2.0*sqr(nHat[patchFacei]),
+                //        C[faceCells[patchFacei]]
+                //    )
+                //  - C[faceCells[patchFacei]];
                 const vector d =
-                    transform
-                    (
-                        I - 2.0*sqr(nHat[patchFacei]),
-                        C[faceCells[patchFacei]]
+                    2.0
+                   *(
+                        nHat[patchFacei]
+                      & (Cf[patchFacei] - C[faceCells[patchFacei]])
                     )
-                  - C[faceCells[patchFacei]];
+                   *nHat[patchFacei];
 
                 // Multiply by 0.5 to be consistent with the internal field
                 // where we multiply by the interpolation weight
@@ -626,13 +638,25 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
             {
                 // Vector from the face-cell centre to the mirrored face-cell
                 // centred
+                // The old code below reflects the position vector C about a
+                // plane through the origin, giving d = -2*(n & C)*n. This is
+                // only correct if the symmetry plane passes through the
+                // origin; otherwise d has the wrong length and, in general,
+                // the wrong sign (issue #712)
+                //const vector d =
+                //    transform
+                //    (
+                //        I - 2.0*sqr(nHat[patchFacei]),
+                //        C[faceCells[patchFacei]]
+                //    )
+                //  - C[faceCells[patchFacei]];
                 const vector d =
-                    transform
-                    (
-                        I - 2.0*sqr(nHat[patchFacei]),
-                        C[faceCells[patchFacei]]
+                    2.0
+                   *(
+                        nHat[patchFacei]
+                      & (Cf[patchFacei] - C[faceCells[patchFacei]])
                     )
-                  - C[faceCells[patchFacei]];
+                   *nHat[patchFacei];
 
                 // Multiply by 0.5 to be consistent with the internal field
                 // where we multiply by the interpolation weight
@@ -862,9 +886,20 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
                 if (wcI != -1)
                 {
+                    // Vector from the face-cell centre to the mirrored
+                    // face-cell centre
+                    // The old code below reflects the position vector C
+                    // about a plane through the origin, giving
+                    // d = -2*(n & C)*n. This is only correct if the symmetry
+                    // plane passes through the origin; otherwise d has the
+                    // wrong length and, in general, the wrong sign
+                    // (issue #712)
+                    //const vector d =
+                    //    transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
+                    //  - C[cellI];
                     const vector d =
-                        transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
-                      - C[cellI];
+                        2.0*(nHat[patchFacei] & (Cf[patchFacei] - C[cellI]))
+                       *nHat[patchFacei];
 
                     wideDd[wcI] += (1.0/magSqr(d))*sqr(d);
                 }
@@ -1108,9 +1143,20 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
                 if (wcI != -1)
                 {
+                    // Vector from the face-cell centre to the mirrored
+                    // face-cell centre
+                    // The old code below reflects the position vector C
+                    // about a plane through the origin, giving
+                    // d = -2*(n & C)*n. This is only correct if the symmetry
+                    // plane passes through the origin; otherwise d has the
+                    // wrong length and, in general, the wrong sign
+                    // (issue #712)
+                    //const vector d =
+                    //    transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
+                    //  - C[cellI];
                     const vector d =
-                        transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
-                      - C[cellI];
+                        2.0*(nHat[patchFacei] & (Cf[patchFacei] - C[cellI]))
+                       *nHat[patchFacei];
 
                     patchLsP[patchFacei] =
                         (1.0/magSqr(d))*(wideInvDd[wcI] & d);
