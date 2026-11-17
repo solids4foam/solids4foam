@@ -1001,7 +1001,6 @@ int main(int argc, char *argv[])
 
                 if (normalise)
                 {
-                    modelDict.remove("normalise");
                     modelDict.set("spectralNormalisation", Switch(true));
                     modelDict.set("referenceNyquistDirections", rStar);
                 }

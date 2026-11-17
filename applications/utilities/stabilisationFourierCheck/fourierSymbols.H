@@ -52,13 +52,9 @@ inline scalar expectedEigenvalue
         q[d] = sqr(Foam::sin(theta[d]/2));
     }
 
-    // spectralNormalisation, or its deprecated alias normalise; the model
-    // constructor refuses both together
     const Switch normalise
     (
-        modelDict.found("spectralNormalisation")
-      ? Switch(modelDict.lookup("spectralNormalisation"))
-      : modelDict.lookupOrDefault<Switch>("normalise", false)
+        modelDict.lookupOrDefault<Switch>("spectralNormalisation", false)
     );
     if (normalise)
     {

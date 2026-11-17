@@ -45,15 +45,13 @@ A 3-D level repeats the checks on an 8^3 mesh of the unit cube, cyclic in x, y
 and z (`system/blockMeshDict.3D`), with `referenceNyquistDirections 3` and
 modes in all three directions (`system/stabilisationFourierCheckDict.3D`).
 
-The ten `system/reject*` dictionaries are invalid configurations, each of
+The nine `system/reject*` dictionaries are invalid configurations, each of
 which must be refused with its message: `referenceNyquistDirections` zero,
 missing, or larger than the number of geometric mesh directions (2 here);
 normalisation of models that do not support it (`alpha`, `gradDiv`,
-`volStrainRate`, `multiple`); a negative `laplacianPower`; and both
-`spectralNormalisation` and its deprecated alias `normalise` in one model.
-The output of each refused run is kept in `expectedError.<dictionary>`.
-The two `system/accept*` dictionaries must be accepted: `spectralNormalisation`
-without a warning, and `normalise` with a deprecation warning.
+`volStrainRate`, `multiple`); and a negative `laplacianPower`. The output of
+each refused run is kept in `expectedError.<dictionary>`.
+`system/acceptSpectralNormalisation` must be accepted.
 
 ## Running the Case
 
@@ -84,10 +82,10 @@ scaled by its value at the Nyquist mode.
 ## Expected Results
 
 All eigenvalue and pair checks pass to the tolerances in
-`system/stabilisationFourierCheckDict` (relative eigenvalue error 1e-9), and all
-ten invalid configurations are refused, and both spellings of the switch are
-accepted as described above, on the 2-D levels and on the 3-D level.
-`regressionTest.sh` checks all of these.
+`system/stabilisationFourierCheckDict` (relative eigenvalue error 1e-9), on
+the 2-D levels and on the 3-D level. The nine invalid configurations are
+refused and the valid one is accepted. `regressionTest.sh` checks all of
+these.
 
 ## Notes
 

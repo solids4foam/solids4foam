@@ -10,9 +10,7 @@ release. For complete commit-level details and contributor information, see the
 
 - Optional spectral normalisation of the Laplacian-family pressure
   stabilisation models (`spectralNormalisation`, `referenceNyquistDirections`),
-  by Aaron Mullen-Hales (#627). Off by default. The spelling `normalise` is
-  read as a deprecated alias, with a warning, and a dictionary giving both is
-  refused. The order is
+  by Aaron Mullen-Hales (#627). Off by default. The order is
   m = `laplacianPower`, counted from zero; with normalisation the m = 0
   branch uses the ideal `scaleFactor/(4*rStar)*snGrad(p)` form.
   `referenceNyquistDirections` is limited by the geometric mesh directions,

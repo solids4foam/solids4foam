@@ -61,18 +61,17 @@ else
     failures=$((failures + 1))
 fi
 nRejected=$(grep -c '^PASS rejection' "$CASE_DIR/log.Allrun" || true)
-if [[ "$nRejected" -eq 10 ]] && ! grep -q '^FAIL rejection' "$CASE_DIR/log.Allrun"; then
-    echo "PASS: 10 invalid configurations rejected with their messages"
+if [[ "$nRejected" -eq 9 ]] && ! grep -q '^FAIL rejection' "$CASE_DIR/log.Allrun"; then
+    echo "PASS: 9 invalid configurations rejected with their messages"
 else
-    echo "FAIL: parameter validation ($nRejected of 10 rejected as expected)"
+    echo "FAIL: parameter validation ($nRejected of 9 rejected as expected)"
     failures=$((failures + 1))
 fi
-# spectralNormalisation accepted silently, its alias normalise with a warning
-nAccepted=$(grep -c '^PASS accepted' "$CASE_DIR/log.Allrun" || true)
-if [[ "$nAccepted" -eq 2 ]] && ! grep -q '^FAIL accepted' "$CASE_DIR/log.Allrun"; then
-    echo "PASS: spectralNormalisation and its alias normalise accepted as documented"
+# The keyword spectralNormalisation is accepted
+if grep -q '^PASS accepted: acceptSpectralNormalisation' "$CASE_DIR/log.Allrun"; then
+    echo "PASS: spectralNormalisation accepted"
 else
-    echo "FAIL: keyword spelling ($nAccepted of 2 accepted as expected)"
+    echo "FAIL: spectralNormalisation was not accepted"
     failures=$((failures + 1))
 fi
 

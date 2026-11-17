@@ -19,7 +19,7 @@ FoamFile
 
 models
 {
-    // The keyword: accepted, without a deprecation warning
+    // The keyword: accepted
     valid
     {
         type            laplacian;

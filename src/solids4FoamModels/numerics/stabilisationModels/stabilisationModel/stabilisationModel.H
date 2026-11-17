@@ -226,10 +226,6 @@ public:
                 return scaleFactorJacobian_;
             }
 
-            //- Read spectralNormalisation, or its deprecated alias normalise,
-            //  from a model dictionary; both together are refused
-            static bool readSpectralNormalisation(const dictionary& dict);
-
             //- Return whether spectral normalisation is enabled
             //  (spectralNormalisation)
             bool normalise() const

@@ -71,9 +71,7 @@ referenceNyquistDirections   2;
 ```
 
 `spectralNormalisation` defaults to `false`, preserving the legacy formulas
-and dictionary behaviour. Its earlier spelling, `normalise`, is still read,
-with a deprecation warning; a model dictionary that gives both is refused,
-whatever their values. `referenceNyquistDirections`, written `rStar` below,
+and dictionary behaviour. `referenceNyquistDirections`, written `rStar` below,
 is required when normalisation is enabled and must be in the range
 `1 .. min(3, mesh.nGeometricD())`: the number of mesh directions in which the
 isotropic orthogonal reference mode is at the Nyquist frequency. Empty and

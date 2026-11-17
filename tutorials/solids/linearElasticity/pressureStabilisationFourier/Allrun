@@ -78,35 +78,16 @@ checkRejected rejectMultiple \
     "Spectral normalisation is not supported by stabilisation model multiple"
 checkRejected rejectNegativePower \
     "laplacianPower must be non-negative"
-checkRejected rejectBothSpellings \
-    "Both spectralNormalisation and its deprecated alias normalise are given"
 
-# The switch spelling: spectralNormalisation is the keyword, normalise its
-# deprecated alias. Each dictionary must be accepted, with the deprecation
-# warning for the alias only
-checkAccepted()
-{
-    local dictName="$1"
-    local warns="$2"
-    local log="log.stabilisationFourierCheck.$dictName"
-    if ! stabilisationFourierCheck -dict "$dictName" -constructOnly > "$log" 2>&1
-    then
-        echo "FAIL accepted: $dictName was refused"
-        failures=$((failures + 1))
-    elif [ "$warns" = yes ] \
-      && ! grep -Fq "The keyword normalise is deprecated" "$log"
-    then
-        echo "FAIL accepted: $dictName (no deprecation warning)"
-        failures=$((failures + 1))
-    elif [ "$warns" = no ] && grep -Fq "deprecated" "$log"; then
-        echo "FAIL accepted: $dictName (unexpected deprecation warning)"
-        failures=$((failures + 1))
-    else
-        echo "PASS accepted: $dictName"
-    fi
-}
-checkAccepted acceptSpectralNormalisation no
-checkAccepted acceptNormaliseAlias yes
+# The keyword spectralNormalisation must be accepted
+if stabilisationFourierCheck -dict acceptSpectralNormalisation -constructOnly \
+    > log.stabilisationFourierCheck.acceptSpectralNormalisation 2>&1
+then
+    echo "PASS accepted: acceptSpectralNormalisation"
+else
+    echo "FAIL accepted: acceptSpectralNormalisation was refused"
+    failures=$((failures + 1))
+fi
 if [ "$failures" -ne 0 ]; then
     echo "$failures parameter-validation check(s) failed"
     exit 1

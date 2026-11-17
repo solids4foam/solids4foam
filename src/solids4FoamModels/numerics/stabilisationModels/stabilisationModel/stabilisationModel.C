@@ -107,7 +107,7 @@ Foam::stabilisationModel::stabilisationModel
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
     ),
-    normalise_(readSpectralNormalisation(dict)),
+    normalise_(dict.lookupOrDefault<Switch>("spectralNormalisation", false)),
     referenceNyquistDirections_
     (
         readReferenceNyquistDirections(mesh, dict, normalise_)
@@ -131,38 +131,6 @@ Foam::stabilisationModel::stabilisationModel
 
 
 // * * * * * * * * * * * * * * * Member functions * * * * * * * * * * * * * * //
-
-bool Foam::stabilisationModel::readSpectralNormalisation
-(
-    const dictionary& dict
-)
-{
-    // spectralNormalisation is the keyword; normalise, its earlier spelling,
-    // is still read. Both together are refused, whatever their values, so
-    // that a dictionary never carries two settings of which one is ignored
-    const bool canonical = dict.found("spectralNormalisation");
-    const bool alias = dict.found("normalise");
-
-    if (canonical && alias)
-    {
-        FatalIOErrorInFunction(dict)
-            << "Both spectralNormalisation and its deprecated alias "
-            << "normalise are given. Use spectralNormalisation only"
-            << exit(FatalIOError);
-    }
-
-    if (alias)
-    {
-        WarningInFunction
-            << "The keyword normalise is deprecated: use "
-            << "spectralNormalisation" << endl;
-
-        return Switch(dict.lookup("normalise"));
-    }
-
-    return dict.lookupOrDefault<Switch>("spectralNormalisation", false);
-}
-
 
 Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
 (
