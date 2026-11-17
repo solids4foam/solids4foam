@@ -658,7 +658,7 @@ int main(int argc, char *argv[])
     (
         "dict",
         "name",
-        "Dictionary in system (default stabilisationFourierDict)"
+        "Dictionary in system (default stabilisationFourierCheckDict)"
     );
     argList::addBoolOption
     (
@@ -689,7 +689,7 @@ int main(int argc, char *argv[])
 
     // Settings
 
-    word dictName("stabilisationFourierDict");
+    word dictName("stabilisationFourierCheckDict");
     readOption(args, "dict", dictName);
 
     IOdictionary dict

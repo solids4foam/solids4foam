@@ -299,7 +299,7 @@ The mesh is overwritten!
 
 - **Utility description** On a uniform, axis-aligned periodic Cartesian mesh
   (cyclic and empty patches only), each model in
-  `system/stabilisationFourierDict` is applied, through the calls a solid
+  `system/stabilisationFourierCheckDict` is applied, through the calls a solid
   model makes, to discrete Fourier modes of the pressure. The measured
   eigenvalues are compared with the analytical symbols of `fourierSymbols.H`;
   equivalent model pairs, constant-gamma linearity and the rejection of
@@ -310,7 +310,7 @@ The mesh is overwritten!
   `postProcessing/stabilisationFourierCheck`, and the utility exits nonzero if
   a check fails.
 
-- **Options** `-dict <name>` (default `stabilisationFourierDict`),
+- **Options** `-dict <name>` (default `stabilisationFourierCheckDict`),
   `-symbolSweep` (write analytical cuts and 2-D maps), `-writeFields` (write
   the pressure and stabilisation fields of the modes; with a `fieldOutput`
   entry, a generic export only), `-constructOnly` (construct the models and

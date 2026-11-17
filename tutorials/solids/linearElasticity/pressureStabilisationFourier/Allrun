@@ -10,7 +10,7 @@
 #
 # stabilisationFourierCheck exits nonzero if a measured eigenvalue differs from
 # its analytical symbol by more than the tolerance in
-# system/stabilisationFourierDict, so the run stops on a failed check. If
+# system/stabilisationFourierCheckDict, so the run stops on a failed check. If
 # gnuplot is available, plotSymbols.gnuplot plots the analytical cuts and the
 # measured eigenvalues.
 set -e

@@ -20,7 +20,7 @@ Prepared by Aaron Mullen-Hales
 ## Case Overview
 
 `stabilisationFourierCheck` constructs each runtime-selected
-`stabilisationModel` from `system/stabilisationFourierDict` and applies it,
+`stabilisationModel` from `system/stabilisationFourierCheckDict` and applies it,
 through the same calls a solid model makes (`updateScalar(p, &gradP)` and
 `cellScalar(&rAUf, true)`), to discrete Fourier modes of the pressure on a
 uniform periodic mesh: a unit square with cyclic x and y boundaries and one
@@ -79,7 +79,7 @@ scaled by its value at the Nyquist mode.
 ## Expected Results
 
 All eigenvalue and pair checks pass to the tolerances in
-`system/stabilisationFourierDict` (relative eigenvalue error 1e-9), and all
+`system/stabilisationFourierCheckDict` (relative eigenvalue error 1e-9), and all
 ten invalid configurations are refused, and both spellings of the switch are
 accepted as described above. `regressionTest.sh` checks all three.
 
