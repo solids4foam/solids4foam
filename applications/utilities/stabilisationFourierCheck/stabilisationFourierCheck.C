@@ -371,6 +371,113 @@ static void setFourierPressure
 }
 
 
+//- Pressure field for the Fourier modes. Its patches take the mesh patch
+//  types, so the cyclic patches couple the mode across the periodic faces
+static tmp<volScalarField> fourierPressureField(const fvMesh& mesh)
+{
+    wordList patchTypes(mesh.boundary().size());
+    forAll(patchTypes, patchi)
+    {
+        patchTypes[patchi] = mesh.boundary()[patchi].type();
+    }
+
+    return tmp<volScalarField>
+    (
+        new volScalarField
+        (
+            IOobject
+            (
+                "p",
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("zero", dimPressure, 0),
+            patchTypes
+        )
+    );
+}
+
+
+//- Constant face weight with the dimensions of rAUf
+static tmp<surfaceScalarField> uniformFaceWeight
+(
+    const fvMesh& mesh,
+    const word& name,
+    const scalar value
+)
+{
+    return tmp<surfaceScalarField>
+    (
+        new surfaceScalarField
+        (
+            IOobject
+            (
+                name,
+                mesh.time().timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedScalar(name, dimArea/dimPressure, value)
+        )
+    );
+}
+
+
+//- Select a stabilisation model with the dimensions a solid model gives it
+static autoPtr<stabilisationModel> selectStabilisationModel
+(
+    const fvMesh& mesh,
+    const dictionary& modelDict
+)
+{
+    return stabilisationModel::New(mesh, modelDict, dimPressure/dimLength);
+}
+
+
+//- Response S(p) of a model to the pressure p, through the calls a solid
+//  model makes: updateScalar with the cell gradient of p, then cellScalar
+//  with the face weight rAUf. The model keeps no reference to the gradient
+static const volScalarField& stabilisationResponse
+(
+    const stabilisationModel& model,
+    const volScalarField& p,
+    const surfaceScalarField& rAUf
+)
+{
+    volVectorField gradP(fvc::grad(p));
+    gradP.correctBoundaryConditions();
+
+    model.updateScalar(p, &gradP);
+
+    return model.cellScalar(&rAUf, true);
+}
+
+
+//- Write a copy of a field under another name
+static void writeFieldAs(const volScalarField& field, const word& name)
+{
+    volScalarField output
+    (
+        IOobject
+        (
+            name,
+            field.time().timeName(),
+            field.mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        field
+    );
+    output.write();
+}
+
+
 //- Construct each configured model and return; used by the rejection tests
 static void constructModels
 (
@@ -381,24 +488,17 @@ static void constructModels
 {
     forAll(names, modeli)
     {
-        autoPtr<stabilisationModel> model
-        (
-            stabilisationModel::New
-            (
-                mesh,
-                models.subDict(names[modeli]),
-                dimPressure/dimLength
-            )
-        );
+        selectStabilisationModel(mesh, models.subDict(names[modeli]));
 
         Info<< "Constructed stabilisation model " << names[modeli] << nl;
     }
 }
 
 
-//- Generic field export (-writeFields with a fieldOutput entry): write the
-//  pressure and stabilisation fields of each named mode and model. Returns
-//  the number of modes that are not eigenmodes to within the tolerance
+//- Field output (-writeFields with a fieldOutput entry): write each named
+//  pressure mode and the response S(p) of each model to it. Returns the
+//  number of mode and model pairs for which the mode is not an eigenmode to
+//  within the tolerance
 static label writeFieldOutput
 (
     const fvMesh& mesh,
@@ -438,40 +538,10 @@ static label writeFieldOutput
         outputDict.lookupOrDefault<word>("stabilisationPrefix", "fourierS")
     );
 
-    wordList patchTypes(mesh.boundary().size());
-    forAll(patchTypes, patchi)
-    {
-        patchTypes[patchi] = mesh.boundary()[patchi].type();
-    }
-
-    volScalarField p
-    (
-        IOobject
-        (
-            "p",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0),
-        patchTypes
-    );
-
-    surfaceScalarField rAUf
-    (
-        IOobject
-        (
-            "rAUf",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("one", dimArea/dimPressure, 1)
-    );
+    tmp<volScalarField> tp(fourierPressureField(mesh));
+    volScalarField& p = tmpRef(tp);
+    const tmp<surfaceScalarField> trAUf(uniformFaceWeight(mesh, "rAUf", 1));
+    const surfaceScalarField& rAUf = trAUf();
 
     Info<< "Fourier field output: "
         << grid.N[0] << 'x' << grid.N[1] << 'x' << grid.N[2]
@@ -497,24 +567,7 @@ static label writeFieldOutput
         );
 
         setFourierPressure(p, grid, theta);
-
-        volScalarField pMode
-        (
-            IOobject
-            (
-                pressurePrefix + "_" + modeName,
-                runTime.timeName(),
-                mesh,
-                IOobject::NO_READ,
-                IOobject::NO_WRITE,
-                false
-            ),
-            p
-        );
-        pMode.write();
-
-        volVectorField gradP(fvc::grad(p));
-        gradP.correctBoundaryConditions();
+        writeFieldAs(p, pressurePrefix + "_" + modeName);
 
         const scalarField pressure(primitiveField(p));
         const scalar p2 = gSum(mesh.V()*sqr(pressure));
@@ -528,19 +581,13 @@ static label writeFieldOutput
 
         forAll(names, modeli)
         {
-            autoPtr<stabilisationModel> model
+            const autoPtr<stabilisationModel> model
             (
-                stabilisationModel::New
-                (
-                    mesh,
-                    models.subDict(names[modeli]),
-                    dimPressure/dimLength
-                )
+                selectStabilisationModel(mesh, models.subDict(names[modeli]))
             );
 
-            model->updateScalar(p, &gradP);
-
-            const volScalarField& stab = model->cellScalar(&rAUf, true);
+            const volScalarField& stab =
+                stabilisationResponse(model(), p, rAUf);
             const scalarField& S = primitiveField(stab);
 
             // Rayleigh quotient and the residual of the eigenmode relation
@@ -552,20 +599,11 @@ static label writeFieldOutput
 
             failures += !std::isfinite(num) || modeErr > tol;
 
-            volScalarField outputS
+            writeFieldAs
             (
-                IOobject
-                (
-                    stabilisationPrefix + "_" + names[modeli] + "_" + modeName,
-                    runTime.timeName(),
-                    mesh,
-                    IOobject::NO_READ,
-                    IOobject::NO_WRITE,
-                    false
-                ),
-                stab
+                stab,
+                stabilisationPrefix + "_" + names[modeli] + "_" + modeName
             );
-            outputS.write();
 
             Info<< modeName << ' ' << names[modeli]
                 << " lambda_num=" << num
@@ -693,7 +731,7 @@ int main(int argc, char *argv[])
     argList::addBoolOption
     (
         "writeFields",
-        "Write Fourier pressure and production stabilisation fields"
+        "Write the pressure modes and stabilisation responses"
     );
     argList::addBoolOption
     (
@@ -869,54 +907,15 @@ int main(int argc, char *argv[])
     // Fields: the pressure mode, and face weights gamma = rAUf = 1 and a
     // second constant for the linearity check
 
-    wordList patchTypes(mesh.boundary().size());
-    forAll(patchTypes, patchi)
-    {
-        patchTypes[patchi] = mesh.boundary()[patchi].type();
-    }
-
-    volScalarField p
+    tmp<volScalarField> tp(fourierPressureField(mesh));
+    volScalarField& p = tmpRef(tp);
+    const tmp<surfaceScalarField> trAUf(uniformFaceWeight(mesh, "rAUf", 1));
+    const surfaceScalarField& rAUf = trAUf();
+    const tmp<surfaceScalarField> tgammaC
     (
-        IOobject
-        (
-            "p",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("zero", dimPressure, 0),
-        patchTypes
+        uniformFaceWeight(mesh, "gammaC", gammaCheck)
     );
-
-    surfaceScalarField rAUf
-    (
-        IOobject
-        (
-            "rAUf",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("one", dimArea/dimPressure, 1)
-    );
-
-    surfaceScalarField gammaC
-    (
-        IOobject
-        (
-            "gammaC",
-            runTime.timeName(),
-            mesh,
-            IOobject::NO_READ,
-            IOobject::NO_WRITE
-        ),
-        mesh,
-        dimensionedScalar("c", dimArea/dimPressure, gammaCheck)
-    );
+    const surfaceScalarField& gammaC = tgammaC();
 
     const scalarField& V = mesh.V();
     label failures = 0;
@@ -978,9 +977,6 @@ int main(int argc, char *argv[])
 
             setFourierPressure(p, grid, theta);
 
-            volVectorField gradP(fvc::grad(p));
-            gradP.correctBoundaryConditions();
-
             const scalarField pressure(primitiveField(p));
             const scalar p2 = gSum(V*sqr(pressure));
 
@@ -1036,20 +1032,13 @@ int main(int argc, char *argv[])
                 }
                 refs[modeli] = ref;
 
-                // Measured response: the runtime-selected model, through the
-                // updateScalar and cellScalar calls a solid model makes
-                autoPtr<stabilisationModel> model
+                // Measured response of the runtime-selected model
+                const autoPtr<stabilisationModel> model
                 (
-                    stabilisationModel::New
-                    (
-                        mesh,
-                        modelDict,
-                        dimPressure/dimLength
-                    )
+                    selectStabilisationModel(mesh, modelDict)
                 );
-                model->updateScalar(p, &gradP);
-
-                const volScalarField& stab = model->cellScalar(&rAUf, true);
+                const volScalarField& stab =
+                    stabilisationResponse(model(), p, rAUf);
                 numerical[modeli] = primitiveField(stab);
                 const scalarField& S = numerical[modeli];
 
@@ -1139,34 +1128,8 @@ int main(int argc, char *argv[])
                       + names[modeli] + "_mode" + Foam::name(modei)
                     );
 
-                    volScalarField outputP
-                    (
-                        IOobject
-                        (
-                            "fourierP_" + suffix,
-                            runTime.timeName(),
-                            mesh,
-                            IOobject::NO_READ,
-                            IOobject::NO_WRITE,
-                            false
-                        ),
-                        p
-                    );
-                    volScalarField outputS
-                    (
-                        IOobject
-                        (
-                            "fourierS_" + suffix,
-                            runTime.timeName(),
-                            mesh,
-                            IOobject::NO_READ,
-                            IOobject::NO_WRITE,
-                            false
-                        ),
-                        stab
-                    );
-                    outputP.write();
-                    outputS.write();
+                    writeFieldAs(p, "fourierP_" + suffix);
+                    writeFieldAs(stab, "fourierS_" + suffix);
                 }
 
                 // Secondary check: the response is linear in a constant face

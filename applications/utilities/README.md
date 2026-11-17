@@ -311,14 +311,32 @@ The mesh is overwritten!
   a check fails.
 
 - **Options** `-dict <name>` (default `stabilisationFourierCheckDict`),
-  `-symbolSweep` (write analytical cuts and 2-D maps), `-writeFields` (write
-  the pressure and stabilisation fields of the modes; with a `fieldOutput`
-  entry, a generic export only), `-constructOnly` (construct the models and
-  exit, for rejection tests) and `-gammaLinearityCheck <scalar>`.
+  `-symbolSweep` (write analytical cuts and 2-D maps), `-writeFields` (also
+  write the pressure mode and the stabilisation response of every checked
+  mode and model), `-constructOnly` (construct the models and exit, for
+  rejection tests) and `-gammaLinearityCheck <scalar>`.
+
+- **Field output** With `-writeFields` and a `fieldOutput` entry, the utility
+  writes only the named modes instead of running the checks: each pressure
+  mode, `fourierP_<mode>`, and the response S(p) of each model to it,
+  `fourierS_<model>_<mode>`, to inspect the spatial action of a model. It
+  exits nonzero if a mode is not an eigenmode of a model to `tolerance`:
+
+  ```text
+  fieldOutput
+  {
+      modes
+      {
+          nyquist         (1 1 0);    // theta/pi
+      }
+      pressurePrefix      fourierP;   // optional
+      stabilisationPrefix fourierS;   // optional
+  }
+  ```
 
 - **Tutorial** `tutorials/solids/linearElasticity/pressureStabilisationFourier`
-  runs the checks and the parameter validation, and is part of
-  `Alltest-regression`.
+  runs the checks, an example of the field output and the parameter
+  validation, and is part of `Alltest-regression`.
 
 ---
 
