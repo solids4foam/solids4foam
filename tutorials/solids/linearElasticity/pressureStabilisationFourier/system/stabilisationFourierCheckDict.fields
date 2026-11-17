@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      stabilisationFourierCheckDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Field output (stabilisationFourierCheck -writeFields with this dictionary):
+// writes each pressure mode, fourierP_<mode>, and the response S(p) of each
+// model to it, fourierS_<model>_<mode>, to inspect the spatial action of the
+// models. The run fails if a mode is not an eigenmode of a model to the
+// tolerance. rAUf is exactly 1 with dimensions area/pressure.
+tolerance       1e-9;
+
+models
+{
+    laplacian
+    {
+        type            laplacian;
+        scaleFactor     0.37;
+    }
+    gen1Normalised
+    {
+        type            generalisedEvenOrderLaplacian;
+        scaleFactor     0.37;
+        laplacianPower  1;
+        spectralNormalisation true;
+        referenceNyquistDirections 2;
+    }
+}
+
+// theta/pi of each mode, as for the modes of stabilisationFourierCheckDict
+fieldOutput
+{
+    modes
+    {
+        lowX            (0.125 0 0);
+        nyquist         (1 1 0);
+    }
+}
+
+// ************************************************************************* //

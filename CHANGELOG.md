@@ -18,7 +18,7 @@ release. For complete commit-level details and contributor information, see the
 - `stabilisationFourierCheck`, which verifies the stabilisation operators
   against their analytical Fourier symbols, by Aaron Mullen-Hales (#627), and
   the `pressureStabilisationFourier` tutorial and regression test that run it
-  with the parameter-validation checks.
+  with the parameter-validation checks and an example of its field output.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the

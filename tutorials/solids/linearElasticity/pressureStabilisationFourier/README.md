@@ -44,6 +44,16 @@ symbol.
 A 3-D level repeats the checks on an 8^3 mesh of the unit cube, cyclic in x, y
 and z (`system/blockMeshDict.3D`), with `referenceNyquistDirections 3` and
 modes in all three directions (`system/stabilisationFourierCheckDict.3D`).
+Its pairs are given in the reverse order: the pairs that share an
+implementation (two plain Laplacians, or `diffStencilLaplacian` and
+`RhieChow`) must agree bitwise whatever their names and order.
+
+`system/stabilisationFourierCheckDict.fields` is an example of the field
+output (`-writeFields` with a `fieldOutput` entry): it writes the pressure
+modes `fourierP_lowX` and `fourierP_nyquist`, and the response S(p) of
+`laplacian` and of the normalised bi-Laplacian `gen1Normalised` to each,
+`fourierS_<model>_<mode>`, to `0/`. These fields show the spatial action of
+the operators on a single mode; each mode must be an eigenmode of each model.
 
 The nine `system/reject*` dictionaries are invalid configurations, each of
 which must be refused with its message: `referenceNyquistDirections` zero,
@@ -51,7 +61,10 @@ missing, or larger than the number of geometric mesh directions (2 here);
 normalisation of models that do not support it (`alpha`, `gradDiv`,
 `volStrainRate`, `multiple`); and a negative `laplacianPower`. The output of
 each refused run is kept in `expectedError.<dictionary>`.
-`system/acceptSpectralNormalisation` must be accepted.
+`system/stabilisationFourierCheckDict.bitwisePair` must fail: a renamed,
+reversed `laplacian` and m = 0 pair whose `scaleFactor` differs by one ulp,
+within `pairTolerance` but not bitwise. `system/acceptSpectralNormalisation`
+must be accepted.
 
 ## Running the Case
 
@@ -83,9 +96,10 @@ scaled by its value at the Nyquist mode.
 
 All eigenvalue and pair checks pass to the tolerances in
 `system/stabilisationFourierCheckDict` (relative eigenvalue error 1e-9), on
-the 2-D levels and on the 3-D level. The nine invalid configurations are
-refused and the valid one is accepted. `regressionTest.sh` checks all of
-these.
+the 2-D levels and on the 3-D level. The field output writes all six fields,
+and every mode is an eigenmode of both models. The nine invalid
+configurations are refused, the bitwise pair check fails as it must, and the
+valid configuration is accepted. `regressionTest.sh` checks all of these.
 
 ## Notes
 

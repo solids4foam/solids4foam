@@ -51,6 +51,24 @@ for campaign in RAW NORMALISED; do
         failures=$((failures + 1))
     fi
 done
+# Field output: every pressure mode and model response is written, and every
+# mode is an eigenmode of every model
+LOG_FIELDS="$CASE_DIR/log.stabilisationFourierCheck.fields"
+missing=""
+for field in fourierP_lowX fourierP_nyquist \
+    fourierS_laplacian_lowX fourierS_laplacian_nyquist \
+    fourierS_gen1Normalised_lowX fourierS_gen1Normalised_nyquist; do
+    if ! grep -q '^internalField' "$CASE_DIR/0/$field" 2>/dev/null; then
+        missing="$missing $field"
+    fi
+done
+if [[ -f "$LOG_FIELDS" ]] && grep -q '^Failures: 0$' "$LOG_FIELDS" \
+&& grep -q '^End' "$LOG_FIELDS" && [[ -z "$missing" ]]; then
+    echo "PASS: field output: 2 modes and 2 models written, all eigenmodes"
+else
+    echo "FAIL: field output (missing fields:${missing:- none})"
+    failures=$((failures + 1))
+fi
 # The 3-D level: three active directions, referenceNyquistDirections 3
 LOG_3D="$CASE_DIR/log.stabilisationFourierCheck.3D"
 if [[ -f "$LOG_3D" ]] && grep -q '^Failures: 0$' "$LOG_3D" \
@@ -65,6 +83,13 @@ if [[ "$nRejected" -eq 9 ]] && ! grep -q '^FAIL rejection' "$CASE_DIR/log.Allrun
     echo "PASS: 9 invalid configurations rejected with their messages"
 else
     echo "FAIL: parameter validation ($nRejected of 9 rejected as expected)"
+    failures=$((failures + 1))
+fi
+# A renamed, reversed pair differing in the last bit fails as it must
+if grep -q '^PASS bitwise pair' "$CASE_DIR/log.Allrun"; then
+    echo "PASS: a renamed, reversed pair must agree bitwise"
+else
+    echo "FAIL: the bitwise requirement of a renamed, reversed pair"
     failures=$((failures + 1))
 fi
 # The keyword spectralNormalisation is accepted

@@ -84,11 +84,13 @@ modes
     (0.25 0.5 1)
 );
 
+// In the reverse order of stabilisationFourierCheckDict: the pairs that share
+// an implementation must still agree bitwise
 crossChecks
 (
-    (laplacian gen0)
-    (JST gen1)
-    (diffStencil RhieChow)
+    (gen0 laplacian)
+    (gen1 JST)
+    (RhieChow diffStencil)
 );
 
 // ************************************************************************* //

@@ -1,0 +1,54 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      stabilisationFourierCheckDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Must fail: laplacian and m = 0 share their implementation, so they must agree
+// bitwise however the pair is named or ordered. Here the scaleFactor of m0 is
+// one ulp larger, so the two differ by about 1e-16, within pairTolerance, but
+// not bitwise.
+tolerance       1e-9;
+pairTolerance   1e-12;
+gammaLinearityCheck 0;
+
+models
+{
+    laplacian
+    {
+        type            laplacian;
+        scaleFactor     0.37;
+    }
+    m0
+    {
+        type            generalisedEvenOrderLaplacian;
+        scaleFactor     0.37000000000000006;
+        laplacianPower  0;
+    }
+}
+
+modes
+(
+    (0.5 0 0)
+    (1 1 0)
+);
+
+crossChecks
+(
+    (m0 laplacian)
+);
+
+// ************************************************************************* //

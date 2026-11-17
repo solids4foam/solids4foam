@@ -8,7 +8,8 @@
 #                     checks
 #   ./Allrun refine   the same for 16, 32 and 64 cells per active axis
 #
-# Both then check a 3-D level, 8^3 cells cyclic in x, y and z, with
+# Both then write the fields of system/stabilisationFourierCheckDict.fields
+# and check a 3-D level, 8^3 cells cyclic in x, y and z, with
 # referenceNyquistDirections 3 (system/stabilisationFourierCheckDict.3D).
 #
 # stabilisationFourierCheck exits nonzero if a measured eigenvalue differs from
@@ -22,7 +23,7 @@ cd "${0%/*}" || exit 1
 case "${1:-}" in
     "") levels="16" ;;
     refine) levels="16 32 64" ;;
-    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Usage: ./Allrun [refine]" >&2; exit 2 ;;
 esac
 
@@ -39,6 +40,13 @@ for N in $levels; do
     solids4Foam::runApplication -s "N$N" stabilisationFourierCheck -symbolSweep
     tail -n 2 "log.stabilisationFourierCheck.N$N"
 done
+
+# Field output: the pressure modes and the model responses S(p) of
+# system/stabilisationFourierCheckDict.fields, written to 0/. The utility
+# exits nonzero if a mode is not an eigenmode of a model
+solids4Foam::runApplication -s fields stabilisationFourierCheck \
+    -dict stabilisationFourierCheckDict.fields -writeFields
+tail -n 2 log.stabilisationFourierCheck.fields
 
 # Parameter validation: each dictionary must be refused, with its message.
 # The output of these expected failures is written to expectedError.<dict>,
@@ -78,6 +86,25 @@ checkRejected rejectMultiple \
     "Spectral normalisation is not supported by stabilisation model multiple"
 checkRejected rejectNegativePower \
     "laplacianPower must be non-negative"
+
+# A renamed, reversed pair that shares an implementation but differs in the
+# last bit must fail the bitwise requirement. It runs as a separate case,
+# bitwisePair/, so that its results do not replace those of the checks above
+rm -rf bitwisePair
+mkdir bitwisePair
+cp -r constant system bitwisePair/
+if stabilisationFourierCheck -case bitwisePair \
+    -dict stabilisationFourierCheckDict.bitwisePair \
+    > expectedError.bitwisePair 2>&1
+then
+    echo "FAIL bitwise pair: accepted although not bitwise equal"
+    failures=$((failures + 1))
+elif grep -q '^pair m0/laplacian .* FAIL$' expectedError.bitwisePair; then
+    echo "PASS bitwise pair: m0/laplacian must agree bitwise"
+else
+    echo "FAIL bitwise pair: no failed pair check in expectedError.bitwisePair"
+    failures=$((failures + 1))
+fi
 
 # The keyword spectralNormalisation must be accepted
 if stabilisationFourierCheck -dict acceptSpectralNormalisation -constructOnly \
