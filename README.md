@@ -25,3 +25,5 @@ OpenCFD® trade marks.
 OPENFOAM® is a registered trademark of OpenCFD Limited, producer and
 distributor of the OpenFOAM software via
 [www.openfoam.com](https://www.openfoam.com).
+
+<!-- Live test of the advisory AI review workflow (#692). Do not merge. -->
