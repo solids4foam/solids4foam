@@ -205,8 +205,9 @@ before merging them, and repeat live validation after updates.
 
 Each run has an 8.5-minute analysis deadline (inside a ten-minute step timeout)
 and at most two Messages API requests: the second only to fix an invalid report
-or after a transient API error. SDK retries are off, so every request is
-counted. Each request allows up to 40,000 output tokens, about USD 1 at most at
+or after one transient API error (408, 409, 429, 5xx or overloaded), after
+waiting as the server's Retry-After asks. SDK retries are off, so every request
+is counted. Each request allows up to 40,000 output tokens, about USD 1 at most at
 Opus 5.5 prices; a small PR costs a few cents. A safety fallback can re-run a
 request on the fallback model inside the same request, which adds its tokens.
 Opus 5.5 and explicit high effort are selected in the workflow.

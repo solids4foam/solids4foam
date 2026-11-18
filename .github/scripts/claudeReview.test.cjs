@@ -464,7 +464,7 @@ test('a schema-maximum report that escapes badly is shortened, not discarded', a
 });
 
 // ---- analyse(): Messages API call with a mock client (no network) ----
-const {analyse, apiSchema, replayContent, addUsage, clientOptions} = require('./claudeReview.cjs');
+const {analyse, apiSchema, replayContent, addUsage, clientOptions, retryDelay} = require('./claudeReview.cjs');
 const sdk = require('@anthropic-ai/sdk');
 
 function mockClient(...responses) {
@@ -651,4 +651,32 @@ test('usage counts every sampling iteration, including a declined fallback hop',
     cache_creation_input_tokens: 0});
   addUsage(total, {input_tokens: 1, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 0});
   assert.equal(total.input_tokens, 91);
+});
+
+test('the transient retry waits as the server asks, within the deadline', async () => {
+  const now = 1e12;
+  const err = h => ({headers: new Headers(h)});
+  assert.equal(retryDelay(err({'retry-after-ms': '1500'}), now, now), 1500);
+  assert.equal(retryDelay(err({'retry-after': '7'}), now, now), 7000);
+  assert.equal(retryDelay(err({'retry-after': new Date(now + 4000).toUTCString()}), now, now), 4000);
+  assert.equal(retryDelay(err({}), now, now), 2000);
+  assert.equal(retryDelay({}, now, now), 2000);
+  assert.equal(retryDelay(err({'retry-after': '3600'}), now, now), null);  // past the deadline: no retry
+  // A 429 with retry-after-ms is retried only after that wait; 408 and 409 are transient too.
+  for (const status of [429, 408, 409]) {
+    const core = analyseCore();
+    const error = new sdk.APIError(status, {type: 'error'}, 'SECRET', new Headers({'retry-after-ms': '120'}));
+    const client = mockClient(error, reply(response('LOW')));
+    const t0 = Date.now();
+    await analyse({core}, analyseEnv, client);
+    assert.ok(Date.now() - t0 >= 110, `waited for ${status}`);
+    assert.equal(core.outputs.conclusion, 'success', String(status));
+    assert.equal(client.calls.length, 2);
+  }
+  // A long Retry-After means no retry; the failure keeps its reason and status.
+  const core = analyseCore();
+  await analyse({core}, analyseEnv,
+    mockClient(new sdk.RateLimitError(429, {type: 'error'}, 'SECRET', new Headers({'retry-after': '3600'}))));
+  assert.equal(JSON.parse(core.outputs.telemetry).failure_reason, 'rate_limited');
+  assert.equal(JSON.parse(core.outputs.telemetry).attempts, 1);
 });

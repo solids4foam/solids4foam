@@ -142,6 +142,22 @@ const usageKeys = ['input_tokens', 'output_tokens', 'cache_read_input_tokens',
   'cache_creation_input_tokens'];
 const inputFile = env => nodePath.join(env.RUNNER_TEMP || os.tmpdir(), 'review-input.json');
 
+// Wait before the one transient-error retry: the server's retry-after-ms or
+// Retry-After (seconds or HTTP date) when given, else 2 s. Returns null (no
+// retry) when the wait would leave under 3 minutes before the deadline.
+function retryDelay(error, started, now = Date.now()) {
+  const headers = error?.headers;
+  let wait = 2000;
+  const msHeader = headers?.get?.('retry-after-ms');
+  const ms = msHeader ? Number(msHeader) : NaN;
+  const after = headers?.get?.('retry-after');
+  if (Number.isFinite(ms) && ms >= 0) wait = ms;
+  else if (after && Number.isFinite(Number(after))) wait = Number(after)*1000;
+  else if (after && Number.isFinite(Date.parse(after))) wait = Math.max(0, Date.parse(after) - now);
+  wait = Math.max(0, wait);
+  return now + wait < started + analysisDeadlineMs - 3*60*1000 ? wait : null;
+}
+
 // A fallback re-runs the request on another model inside the same response.
 // When continuing the conversation, thinking from before the last fallback
 // boundary must be dropped (refusals-and-fallback: continuing the conversation).
@@ -182,7 +198,8 @@ async function analyse({core}, env = process.env, client = null) {
       const reason = status ?
         {401: 'authentication_error', 403: 'permission_error', 429: 'rate_limited'}[status] || 'api_error' :
         errorTypes[error.type] || 'api_error';
-      const transient = status ? status === 429 || status >= 500 : transientTypes.includes(error.type);
+      const transient = status ? [408, 409, 429].includes(status) || status >= 500 :
+        transientTypes.includes(error.type);
       return {reason, transient};
     }
     return {reason: 'failed', transient: false};
@@ -217,11 +234,12 @@ async function analyse({core}, env = process.env, client = null) {
           system: input.system, messages
         }, {signal: controller.signal}).finalMessage();
       } catch (error) {
-        if (classify(error).transient && canRetry()) {
-          outcome.api_error_status = null;
-          continue;
-        }
-        throw error;
+        const wait = classify(error).transient && canRetry() ? retryDelay(error, started) : null;
+        if (wait === null) throw error;
+        await new Promise(resolve => setTimeout(resolve, wait));
+        if (controller.signal.aborted) throw error;
+        outcome.api_error_status = null;
+        continue;
       }
       addUsage(usage, response.usage);
       if (/^[a-z0-9.-]{1,64}$/.test(response.model || '')) outcome.served_model = response.model;
@@ -483,5 +501,5 @@ async function publish({github, context, core}, env = process.env) {
   if (failed) core.setFailed('AI review incomplete; failure report published.');
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
-module.exports = {schema, apiSchema, analyse, inputFile, replayContent, addUsage, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
+module.exports = {schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};
