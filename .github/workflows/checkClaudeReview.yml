@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/scripts/claudeReview*'
       - '.github/scripts/secondReview*'
+      - '.github/scripts/package*.json'
       - '.github/review/**'
       - '.github/workflows/*ClaudeReview.yml'
       - '.github/workflows/claudeReview.yml'
@@ -14,6 +15,7 @@ on:
     paths:
       - '.github/scripts/claudeReview*'
       - '.github/scripts/secondReview*'
+      - '.github/scripts/package*.json'
       - '.github/review/**'
       - '.github/workflows/*ClaudeReview.yml'
       - '.github/workflows/claudeReview.yml'
@@ -30,4 +32,5 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - run: npm ci --prefix .github/scripts --ignore-scripts --no-audit --no-fund
       - run: node --test .github/scripts/*.test.cjs

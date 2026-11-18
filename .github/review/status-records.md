@@ -7,7 +7,7 @@ accounts is implemented.
 
 | Field | Meaning |
 | --- | --- |
-| `schema_version` | Integer format version; currently `1` |
+| `schema_version` | Integer format version; currently `2` |
 | `repository`, `pr` | Repository name and numeric PR number |
 | `head_sha` | Exact PR head from the triggering event, never the workflow SHA |
 | `review_type` | `primary` in this pilot |
@@ -16,7 +16,10 @@ accounts is implemented.
 | `failure_reason` | Null only for completed; otherwise a machine-readable code |
 | `run_id`, `run_attempt` | GitHub run ID string and numeric attempt number |
 | `coverage` | Patch coverage: `complete`, `partial`, `incomplete`, or null |
-| `usage` | Available numeric SDK token/cost totals, or null if unavailable |
+| `api_error_status` | HTTP status of a failed API request (100-599), or null |
+| `served_model` | Model that served the report (a fallback, if used), or null |
+| `model_requests` | Number of Messages API requests made (at most 2), or null |
+| `usage` | Summed token counts from the API responses, or null |
 
 `completed` requires successful model execution, a valid report, and a successful
 GitHub comment create/update. A successful model invocation or INCOMPLETE comment
@@ -26,28 +29,30 @@ that changed or became ineligible before publication (`pr_changed_or_ineligible`
 A completed record may have partial patch coverage. It is historical evidence
 for its stated SHA, never an approval.
 
-Failure reasons use evidence, not guesses:
+Failure reasons use evidence, not guesses. The analysis step maps typed SDK
+errors and response stop reasons to fixed codes; it never copies error text:
 
-- `rate_limited`: the SDK's last assistant envelope has `error: rate_limit`.
-- `authentication_error`: that envelope has `error: authentication_failed`.
-- `timeout`: GitHub explicitly reports `timed_out` for the review job or a step.
-  An ambiguous cancellation or generic step failure does not establish timeout.
-- `review_failed`: a known failed review/publication without a more specific
-  reliable signal. This also covers invalid reports and generic billing errors.
+- `authentication_error` (HTTP 401), `permission_error` (403), `rate_limited`
+  (429), and `api_error` (any other HTTP error; see `api_error_status`). A
+  billing problem such as no remaining credit is `api_error` with status 400.
+- `connection_error` and `timeout`: the SDK could not reach the API, or the
+  request timed out.
+- `refusal`: the model, and any fallback model, declined the request.
+- `max_tokens`: the report was cut off at the output limit.
+- `invalid_report`: the report failed validation twice.
+- `no_api_key`: the secret was not available to the analysis step.
+- `timeout` is also used when GitHub explicitly reports `timed_out` for the
+  review job or a step. An ambiguous cancellation does not establish timeout.
+- `review_failed`: a known failed review or publication without a more specific
+  reliable signal.
 - `unknown`: no reliable cause is available, including ambiguous cancellation.
-- `api_quota_exceeded`: reserved for an explicit quota-exhaustion signal. The
-  pinned Action does not guarantee one, so this version does not emit this code.
-  Neither a 429/rate-limit code nor a generic billing error proves spent credits.
 
-Only recognised structured SDK codes and non-negative finite token/cost numbers
-are extracted from the local execution file. Message text, error descriptions,
-authentication responses, prompts, and credentials are never copied into status
-outputs or artifacts. Extraction failure yields unknown telemetry. Full/debug
-logging must remain disabled. See the official
-[SDK error definitions](https://code.claude.com/docs/en/agent-sdk/typescript#sdkassistantmessage).
-Usage is best-effort SDK accounting, not a billing ledger or API request count.
-It can be absent on early failure. Re-running only failed jobs can reuse earlier
-model outputs; do not sum repeated usage as if every record were a new API call.
+Only those codes, HTTP status numbers, validated model identifiers and
+non-negative integer token counts are copied. Message text, error descriptions,
+prompts, and credentials are never copied into status outputs or artifacts.
+Usage is the sum over the run's API requests, not a billing ledger, and can be
+absent on early failure. Re-running only failed jobs repeats the analysis; do
+not sum records across attempts as if they were one review.
 
 ## Finalisation and retention limits
 
@@ -81,5 +86,6 @@ conservative error mapping, timeout evidence, missing telemetry, safe usage
 extraction, and writing the file when metadata lookup fails:
 
 ```sh
+npm ci --prefix .github/scripts --ignore-scripts
 node --test .github/scripts/claudeReview*.test.cjs
 ```

@@ -20,8 +20,9 @@ Classification, execution, presentation, and merge decisions are separate:
 
 1. The collector obtains one bounded PR snapshot and deterministic numerical
    and security path floors. No PR code is executed.
-2. The official Claude Action performs one assessment and proposes a risk.
-   There is no separate classifier API call and no risk-based execution branch.
+2. One Messages API request (plus at most one retry to fix an invalid report)
+   performs the assessment and proposes a risk. There is no separate
+   classifier call and no risk-based execution branch.
 3. `classifyRisk` applies the conservative floor. Missing or invalid risk/floor
    data means HIGH. An invalid report or failed execution remains INCOMPLETE;
    HIGH fallback is a routing precaution, not a successful classification.
@@ -84,15 +85,17 @@ public docs does not confirm access for the solids4foam organisation. Before
 activation, test the exact model and effort with its organisation API credential.
 Do not silently substitute an unavailable model.
 
-- Anthropic documents `claude-opus-5-5` on the Claude API. This pilot passes
-  `--effort high` through the official Action to Claude Code. The Messages API
-  equivalent is `output_config.effort: "high"`. See the
-  [model page](https://platform.claude.com/docs/en/models/opus-5-5/overview),
-  [effort reference](https://platform.claude.com/docs/en/build-with-claude/effort),
-  and [CLI flags](https://code.claude.com/docs/en/cli-reference).
+- Anthropic documents `claude-opus-5-5` on the Claude API. This pilot calls the
+  Messages API with `output_config.effort: "high"` and a JSON-schema output
+  format. See the
+  [model page](https://platform.claude.com/docs/en/models/opus-5-5/overview)
+  and [effort reference](https://platform.claude.com/docs/en/build-with-claude/effort).
+- The pilot first used the Claude Code GitHub Action. Its requests are billed
+  separately from organisation API credit, so live runs failed with "Credit
+  balance is too low" while the same key worked for direct API calls. Direct
+  Messages API calls are also simpler: the review needs no agent or tools.
 - OpenAI documents `gpt-6.1-sol` with `reasoning.effort` values including `high`
-  through the Responses API. It needs an OpenAI integration; the Anthropic
-  Action does not run OpenAI models. See the
+  through the Responses API. It needs a separate OpenAI integration. See the
   [model page](https://developers.openai.com/api/docs/models/gpt-6.1-sol).
 - Anthropic documents `claude-fable-5-2`, with high effort and adaptive thinking.
   It is a future HIGH-risk candidate, not enabled here. Its documented 30-day

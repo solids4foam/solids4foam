@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const {telemetry, capture, statusRecord, finalise} = require('./claudeReviewStatus.cjs');
+const {telemetry, statusRecord, finalise} = require('./claudeReviewStatus.cjs');
 const {publish} = require('./claudeReview.cjs');
 
 const context = {repo: {owner: 'example', repo: 'test'}, runId: 123,
@@ -13,7 +13,7 @@ const env = extra => ({GITHUB_RUN_ATTEMPT: '2', REVIEW_RESULT: 'success',
   PUBLICATION_STATUS: '{"status":"completed","coverage":"complete"}', ...extra});
 
 function check(record) {
-  assert.equal(record.schema_version, 1);
+  assert.equal(record.schema_version, 2);
   assert.equal(record.pr, 42);
   assert.equal(record.head_sha, 'a'.repeat(40));
   assert.equal(record.reviewer, 'claude-api');
@@ -48,21 +48,20 @@ test('disabled and stale PRs are skipped, not completed', () => {
   }
 });
 
-test('only structured rate-limit and authentication codes get specific reasons', () => {
-  for (const [error, reason] of [['rate_limit', 'rate_limited'],
-    ['authentication_failed', 'authentication_error'], ['billing_error', 'unknown'],
-    ['credit_balance_exhausted', 'unknown'], ['__proto__', 'unknown']]) {
-    const summary = telemetry([{type: 'assistant', error}]);
-    assert.equal(summary.failure_reason, reason);
+test('only fixed analysis reason codes and HTTP status numbers reach the record', () => {
+  for (const [reason, expected] of [['rate_limited', 'rate_limited'],
+    ['authentication_error', 'authentication_error'], ['api_error', 'api_error'],
+    ['refusal', 'refusal'], ['Credit balance is too low', 'review_failed'], ['__proto__', 'review_failed']]) {
     const record = statusRecord(context, env({REVIEW_RESULT: 'failure',
-      REVIEW_TELEMETRY: JSON.stringify(summary)}));
+      REVIEW_TELEMETRY: JSON.stringify({failure_reason: reason, api_error_status: 400})}));
     check(record);
-    assert.equal(record.failure_reason, reason === 'unknown' ? 'review_failed' : reason);
+    assert.equal(record.failure_reason, expected);
+    assert.equal(record.api_error_status, 400);
   }
-  assert.equal(telemetry([{type: 'assistant', message: {content: 'rate_limit'}}])
-    .failure_reason, 'unknown');
-  assert.equal(telemetry([{type: 'assistant', error: 'rate_limit'},
-    {type: 'assistant', message: {content: 'Recovered'}}]).failure_reason, 'unknown');
+  for (const bad of ['400', 4.5, -1, 99, 600, null]) {
+    assert.equal(telemetry(JSON.stringify({api_error_status: bad})).api_error_status, null);
+  }
+  // A failed publication is not blamed on the analysis.
   assert.equal(statusRecord(context, env({PUBLICATION_OUTCOME: 'failure',
     REVIEW_TELEMETRY: '{"failure_reason":"rate_limited"}'})).failure_reason, 'review_failed');
 });
@@ -77,29 +76,28 @@ test('timeout needs explicit evidence; missing telemetry remains unknown or gene
     REVIEW_TELEMETRY: 'not json'})).failure_reason, 'review_failed');
 });
 
-test('usage is numeric-only; raw responses, prompts and auth material are excluded', () => {
-  const raw = [{type: 'assistant', message: {content: 'SECRET'}},
-    {type: 'result', total_cost_usd: 0.2, errors: ['SECRET'], usage: {
-      input_tokens: 123, output_tokens: 45, cache_read_input_tokens: 0,
-      cache_creation_input_tokens: -1, authentication: 'SECRET'}}];
+test('usage is numeric-only; model ids are validated; nothing else is copied', () => {
+  const raw = JSON.stringify({failure_reason: null, served_model: 'claude-opus-5-5', attempts: 2,
+    secret: 'SECRET', usage: {input_tokens: 123, output_tokens: 45, cache_read_input_tokens: 0,
+      cache_creation_input_tokens: -1, authentication: 'SECRET'}});
   const summary = telemetry(raw);
-  assert.deepEqual(summary.usage, {input_tokens: 123, output_tokens: 45,
-    cache_read_input_tokens: 0, cost_usd: 0.2});
-  const record = statusRecord(context, env({REVIEW_TELEMETRY: JSON.stringify(summary)}));
+  assert.deepEqual(summary.usage, {input_tokens: 123, output_tokens: 45, cache_read_input_tokens: 0});
+  const record = statusRecord(context, env({REVIEW_TELEMETRY: raw}));
   check(record);
   assert.deepEqual(record.usage, summary.usage);
+  assert.equal(record.served_model, 'claude-opus-5-5');
+  assert.equal(record.model_requests, 2);
   assert.ok(!JSON.stringify(record).includes('SECRET'));
-  assert.equal(telemetry([{type: 'result', usage: {input_tokens: 'SECRET'},
-    total_cost_usd: Infinity}]).usage, null);
+  assert.equal(telemetry(JSON.stringify({served_model: '<b>x</b>', usage: {input_tokens: 'SECRET'}}))
+    .served_model, null);
+  assert.equal(telemetry('{"usage":{"input_tokens":"SECRET"}}').usage, null);
 });
 
-test('missing execution file is safe and finalisation writes after lookup failure', async () => {
+test('finalisation writes a record after a job lookup failure', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-review-status-'));
   try {
     const outputs = {};
     const core = {setOutput: (k, v) => {outputs[k] = v;}, notice: () => {}};
-    capture(core, path.join(tmp, 'missing'));
-    assert.deepEqual(JSON.parse(outputs.telemetry), {failure_reason: 'unknown', usage: null});
     const github = {rest: {actions: {listJobsForWorkflowRunAttempt: {}}},
       paginate: async () => {throw new Error('Sensitive API response');}};
     await finalise({github, context, core}, env({RUNNER_TEMP: tmp, REVIEW_RESULT: 'failure'}));
