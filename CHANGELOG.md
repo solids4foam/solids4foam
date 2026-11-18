@@ -965,6 +965,14 @@ release. For complete commit-level details and contributor information, see the
   ranks, because the lower rank posted buffered sends and the higher rank
   blocked in its receive until the lower rank finished its own build. The
   quadrature data are now exchanged collectively (#662).
+- `leastSquaresS4f`: the gradient of a vector or tensor field, such as
+  `grad(D)`, was wrong in the cells next to a symmetry plane that does not
+  pass through the origin (#712). The vector from a cell centre to its mirror
+  image was built by reflecting the cell centre about a plane through the
+  origin, so it had the wrong length and, in general, the wrong sign. Results
+  change for such cases; symmetry planes through the origin and scalar
+  gradients are unaffected. A cell whose centre lies in the plane of its
+  symmetry face is now a fatal error instead of a division by zero.
 
 ## [v2.4] - 2026-08-24
 

@@ -40,6 +40,41 @@ namespace Foam
 {
 namespace
 {
+    // The vector from a cell centre C to its mirror image in a symmetry patch
+    // face, with unit normal nHat and centre Cf.
+    //
+    // The cell centre is reflected about the plane of the face. Reflecting
+    // the position vector C itself is only correct if that plane passes
+    // through the origin (#712).
+    //
+    // A cell centre lying in the plane of the face has no mirror image and
+    // would give a division by zero, which is a fatal error. The test is
+    // relative to the cell's own size rather than to a fixed length
+    vector symmetryMirrorDelta
+    (
+        const vector& nHat,
+        const vector& Cf,
+        const vector& C,
+        const fvPatch& p,
+        const label patchFacei
+    )
+    {
+        const vector CfC = Cf - C;
+        const scalar dn = nHat & CfC;
+
+        if (mag(dn) <= 1e-6*mag(CfC))
+        {
+            FatalErrorInFunction
+                << "Cell " << p.faceCells()[patchFacei]
+                << " centre lies on symmetry patch " << p.name()
+                << " (face " << patchFacei << ")"
+                << abort(FatalError);
+        }
+
+        return 2.0*dn*nHat;
+    }
+
+
     // The smallest and largest eigenvalues of a symmetric tensor.
     //
     // OpenFOAM.org and foam-extend find eigenvalues as the roots of the
@@ -488,27 +523,16 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
             forAll(nHat, patchFacei)
             {
                 // Vector from the face-cell centre to the mirrored face-cell
-                // centred
-                //const vector& d = pd[patchFacei];
-                // The old code below reflects the position vector C about a
-                // plane through the origin, giving d = -2*(n & C)*n. This is
-                // only correct if the symmetry plane passes through the
-                // origin; otherwise d has the wrong length and, in general,
-                // the wrong sign (issue #712)
-                //const vector d =
-                //    transform
-                //    (
-                //        I - 2.0*sqr(nHat[patchFacei]),
-                //        C[faceCells[patchFacei]]
-                //    )
-                //  - C[faceCells[patchFacei]];
+                // centre
                 const vector d =
-                    2.0
-                   *(
-                        nHat[patchFacei]
-                      & (Cf[patchFacei] - C[faceCells[patchFacei]])
-                    )
-                   *nHat[patchFacei];
+                    symmetryMirrorDelta
+                    (
+                        nHat[patchFacei],
+                        Cf[patchFacei],
+                        C[faceCells[patchFacei]],
+                        p,
+                        patchFacei
+                    );
 
                 // Multiply by 0.5 to be consistent with the internal field
                 // where we multiply by the interpolation weight
@@ -637,26 +661,16 @@ void Foam::leastSquaresS4fVectors::calcLeastSquaresVectors() const
             forAll(nHat, patchFacei)
             {
                 // Vector from the face-cell centre to the mirrored face-cell
-                // centred
-                // The old code below reflects the position vector C about a
-                // plane through the origin, giving d = -2*(n & C)*n. This is
-                // only correct if the symmetry plane passes through the
-                // origin; otherwise d has the wrong length and, in general,
-                // the wrong sign (issue #712)
-                //const vector d =
-                //    transform
-                //    (
-                //        I - 2.0*sqr(nHat[patchFacei]),
-                //        C[faceCells[patchFacei]]
-                //    )
-                //  - C[faceCells[patchFacei]];
+                // centre
                 const vector d =
-                    2.0
-                   *(
-                        nHat[patchFacei]
-                      & (Cf[patchFacei] - C[faceCells[patchFacei]])
-                    )
-                   *nHat[patchFacei];
+                    symmetryMirrorDelta
+                    (
+                        nHat[patchFacei],
+                        Cf[patchFacei],
+                        C[faceCells[patchFacei]],
+                        p,
+                        patchFacei
+                    );
 
                 // Multiply by 0.5 to be consistent with the internal field
                 // where we multiply by the interpolation weight
@@ -886,20 +900,15 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
                 if (wcI != -1)
                 {
-                    // Vector from the face-cell centre to the mirrored
-                    // face-cell centre
-                    // The old code below reflects the position vector C
-                    // about a plane through the origin, giving
-                    // d = -2*(n & C)*n. This is only correct if the symmetry
-                    // plane passes through the origin; otherwise d has the
-                    // wrong length and, in general, the wrong sign
-                    // (issue #712)
-                    //const vector d =
-                    //    transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
-                    //  - C[cellI];
                     const vector d =
-                        2.0*(nHat[patchFacei] & (Cf[patchFacei] - C[cellI]))
-                       *nHat[patchFacei];
+                        symmetryMirrorDelta
+                        (
+                            nHat[patchFacei],
+                            Cf[patchFacei],
+                            C[cellI],
+                            p,
+                            patchFacei
+                        );
 
                     wideDd[wcI] += (1.0/magSqr(d))*sqr(d);
                 }
@@ -1143,20 +1152,15 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
 
                 if (wcI != -1)
                 {
-                    // Vector from the face-cell centre to the mirrored
-                    // face-cell centre
-                    // The old code below reflects the position vector C
-                    // about a plane through the origin, giving
-                    // d = -2*(n & C)*n. This is only correct if the symmetry
-                    // plane passes through the origin; otherwise d has the
-                    // wrong length and, in general, the wrong sign
-                    // (issue #712)
-                    //const vector d =
-                    //    transform(I - 2.0*sqr(nHat[patchFacei]), C[cellI])
-                    //  - C[cellI];
                     const vector d =
-                        2.0*(nHat[patchFacei] & (Cf[patchFacei] - C[cellI]))
-                       *nHat[patchFacei];
+                        symmetryMirrorDelta
+                        (
+                            nHat[patchFacei],
+                            Cf[patchFacei],
+                            C[cellI],
+                            p,
+                            patchFacei
+                        );
 
                     patchLsP[patchFacei] =
                         (1.0/magSqr(d))*(wideInvDd[wcI] & d);
