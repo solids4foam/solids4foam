@@ -207,15 +207,15 @@ Each run has an 8.5-minute analysis deadline (inside a ten-minute step timeout)
 and at most two Messages API requests: the second only to fix an invalid report
 or after one transient API error (408, 409, 429, 5xx or overloaded), after
 waiting as the server's Retry-After asks. SDK retries are off, so every request
-is counted. Each request allows up to 40,000 output tokens, about USD 1 at most at
-Opus 5.5 prices; a small PR costs a few cents. A safety fallback can re-run a
+is counted. Each request allows up to 40,000 output tokens, about USD 1 at most
+at Opus 5.5 prices; a small PR costs a few cents. A safety fallback can re-run a
 request on the fallback model inside the same request, which adds its tokens.
-Opus 5.5 and explicit high effort are selected in the workflow.
-Organisation spending limits are still needed: a public contributor can trigger
-repeated runs. Concurrency cancels older runs for the same PR. Reports include
-the requested model/effort, exact head SHA, attempt, and run link. One sticky
-bot comment is updated across commits, including on failure. Its SHA must match
-the current PR head; an older SHA is historical evidence only. A final API check
+Opus 5.5 and explicit high effort are selected in the workflow. Organisation
+spending limits are still needed: a public contributor can trigger repeated
+runs. Concurrency cancels older runs for the same PR. Reports include the
+requested model/effort, exact head SHA, attempt, and run link. One sticky bot
+comment is updated across commits, including on failure. Its SHA must match the
+current PR head; an older SHA is historical evidence only. A final API check
 suppresses stale publication, though a commit can still arrive between that
 check and posting; the explicit SHA remains authoritative.
 
