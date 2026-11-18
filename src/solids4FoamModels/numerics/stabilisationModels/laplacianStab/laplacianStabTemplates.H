@@ -39,7 +39,7 @@ void Foam::laplacianStab::computeDiffStencil
     using Type = typename GeoField::value_type;
     fv::orthogonalSnGrad<Type> op(mesh);
 
-    if (normalise())
+    if (spectralNormalisation())
     {
         faceFlux = scaleFactor*op.snGrad(field);
         return;

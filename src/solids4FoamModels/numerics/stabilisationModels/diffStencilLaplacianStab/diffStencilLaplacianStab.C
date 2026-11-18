@@ -38,7 +38,7 @@ namespace Foam
 
 Foam::scalar Foam::diffStencilLaplacianStab::diffStencilNormalisation() const
 {
-    return normalise()
+    return spectralNormalisation()
          ? 1.0/(4.0*referenceNyquistDirections())
          : 1.0;
 }

@@ -107,10 +107,13 @@ Foam::stabilisationModel::stabilisationModel
     (
         dict.lookupOrDefault<scalar>("scaleFactorJacobian", 1.0)
     ),
-    normalise_(dict.lookupOrDefault<Switch>("spectralNormalisation", false)),
+    spectralNormalisation_
+    (
+        dict.lookupOrDefault<Switch>("spectralNormalisation", false)
+    ),
     referenceNyquistDirections_
     (
-        readReferenceNyquistDirections(mesh, dict, normalise_)
+        readReferenceNyquistDirections(mesh, dict, spectralNormalisation_)
     ),
     faceScalarPtr_(),
     faceVectorPtr_(),
@@ -120,7 +123,7 @@ Foam::stabilisationModel::stabilisationModel
     cellVectorPtr_(),
     h2Ptr_()
 {
-    if (!normalise_ && dict.found("referenceNyquistDirections"))
+    if (!spectralNormalisation_ && dict.found("referenceNyquistDirections"))
     {
         WarningInFunction
             << "Ignoring referenceNyquistDirections because "
@@ -175,7 +178,11 @@ Foam::autoPtr<Foam::stabilisationModel> Foam::stabilisationModel::New
 
     autoPtr<stabilisationModel> modelPtr(ctorPtr(mesh, dict, dims));
 
-    if (modelPtr->normalise() && !modelPtr->supportsSpectralNormalisation())
+    if
+    (
+        modelPtr->spectralNormalisation()
+     && !modelPtr->supportsSpectralNormalisation()
+    )
     {
         FatalIOErrorInFunction(dict)
             << "Spectral normalisation is not supported by stabilisation "
@@ -191,7 +198,7 @@ Foam::scalar Foam::stabilisationModel::nyquistNormalisation
     const label nLaplacianFactors
 ) const
 {
-    if (!normalise_)
+    if (!spectralNormalisation_)
     {
         return 1.0;
     }
@@ -214,7 +221,7 @@ void Foam::stabilisationModel::writeSpectralNormalisationInfo
     const scalar factor
 ) const
 {
-    if (normalise_)
+    if (spectralNormalisation_)
     {
         Info<< "Spectral normalisation: model " << word(dict_.lookup("type"))
             << ", referenceNyquistDirections "

@@ -73,7 +73,7 @@ class stabilisationModel
         const scalar scaleFactorJacobian_;
 
         //- Enable reference-mode spectral normalisation
-        const Switch normalise_;
+        const Switch spectralNormalisation_;
 
         //- Number of Nyquist directions in the reference mode
         const label referenceNyquistDirections_;
@@ -228,9 +228,9 @@ public:
 
             //- Return whether spectral normalisation is enabled
             //  (spectralNormalisation)
-            bool normalise() const
+            bool spectralNormalisation() const
             {
-                return normalise_;
+                return spectralNormalisation_;
             }
 
             //- Return the number of Nyquist directions in the reference mode

@@ -45,7 +45,7 @@ void Foam::generalisedEvenOrderLaplacianStab::computeDiffStencil
     // -----------------------------------------------------
     if (laplacianPower == 0)
     {
-        if (normalise())
+        if (spectralNormalisation())
         {
             faceFlux = scaleFactor*op.snGrad(field);
             return;
