@@ -135,6 +135,18 @@ protected:
             const scalar Kdev
         );
 
+        //- As above, for a law that also declares its shear stiffness: a
+        //  scalarShear request is answered with twoMu. The three-argument
+        //  form refuses a scalarShear request. A law using this form must
+        //  also override providesScalarShearTangent
+        static void fillScalarTangent
+        (
+            mechanicalConstitutiveLawResponse& response,
+            const scalar Kfull,
+            const scalar Kdev,
+            const scalar twoMu
+        );
+
         //- The fourth-order tangent of a law with no analytical one: by
         //  finite differences when that is asked for, and refused, naming
         //  the law, when an analytical one is. The finite-difference tangent
@@ -358,6 +370,16 @@ public:
         //  running a mixed formulation refuses to start with a law that
         //  answers false, naming it, rather than taking a trace and hoping
         virtual bool providesVolumetricSplit() const
+        {
+            return false;
+        }
+
+        //- True if this law answers a scalarShear tangent request with its
+        //  declared shear stiffness 2*mu. False by default. An overriding law
+        //  returns true only for its own type (type() == typeName), so that a
+        //  law derived from it, which may scale or replace the tangent, does
+        //  not inherit the declaration; a wrapper defers to its child law
+        virtual bool providesScalarShearTangent() const
         {
             return false;
         }

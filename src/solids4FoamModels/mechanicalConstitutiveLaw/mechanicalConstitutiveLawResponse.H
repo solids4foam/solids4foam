@@ -177,6 +177,7 @@ public:
             (
                 tangentReq != tangentRequest::scalar
              && tangentReq != tangentRequest::scalarDeviatoric
+             && tangentReq != tangentRequest::scalarShear
             )
             {
                 FatalErrorInFunction

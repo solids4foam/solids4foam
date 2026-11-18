@@ -145,6 +145,14 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Construct impK from the framework
         tmp<volScalarField> makeImpK() const;
 
+        //- A scalar tangent field of the laws, evaluated at the current
+        //  deformation gradient (the identity on a cold start), as impK is
+        virtual tmp<volScalarField> scalarTangentQuery
+        (
+            const tangentRequest req,
+            const word& fieldName
+        ) const;
+
         //- Calculate the current face-area vectors
         tmp<surfaceVectorField> currentSf() const;
 

@@ -209,6 +209,13 @@ public:
             return true;
         }
 
+        //- Declares 2*mu for a scalarShear request. True for this type only:
+        //  a law derived from it does not inherit the declaration
+        virtual bool providesScalarShearTangent() const override
+        {
+            return type() == typeName;
+        }
+
         //- Small-strain constitutive evaluation
         virtual void evaluate
         (

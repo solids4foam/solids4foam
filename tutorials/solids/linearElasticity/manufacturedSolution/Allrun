@@ -9,6 +9,7 @@ Usage: ./Allrun [approach] [mesh]
 
 approach: segregated (default),
           petscSnes,
+          petscSnesPressure (mixed displacement-pressure),
           highOrder-movingLeastSquares,
           highOrder-kExactLeastSquares
 mesh:     hex (default), tet, poly, distHex
@@ -24,7 +25,7 @@ APPROACH="${1:-segregated}"
 MESH="${2:-hex}"
 
 case "$APPROACH" in
-    segregated|petscSnes|highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
+    segregated|petscSnes|petscSnesPressure|highOrder-movingLeastSquares|highOrder-kExactLeastSquares) ;;
     *)
         echo "Error: unknown approach '$APPROACH'"
         usage

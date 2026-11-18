@@ -789,6 +789,11 @@ public:
         //- Const-access to the bulk modulus field
         const volScalarField& kappa() const;
 
+        //- True if every law declares a shear stiffness 2*mu, i.e. answers a
+        //  scalarShear tangent request (providesScalarShearTangent). The
+        //  names of the laws that do not are appended to undeclared
+        bool providesScalarShearTangent(wordList& undeclared) const;
+
         //- True if the laws see Fpre
         bool prestressed() const
         {

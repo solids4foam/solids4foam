@@ -1,0 +1,71 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Input of a negative test only (regressionTest.sh): the mixed formulation
+// with the high-order Jacobian, which the solid model must refuse. The
+// high-order Jacobian reconstructs the shear modulus from the implicit
+// stiffness assuming impK = (4/3)*mu + K, which is negative here
+
+solidModel     linearGeometryTotalDisplacement;
+
+linearGeometryTotalDisplacementCoeffs
+{
+    solutionAlgorithm PETScSNES;
+
+    solvePressure     yes;
+
+    highOrderCoeffs
+    {
+        highOrderJacobian true;
+        highOrderResidual false;
+
+        displacement
+        {
+            type                  kExactLeastSquares;
+            polynomialOrder       1;
+            faceStencilExtraCells 4;
+
+            weightFunctionCoeffs
+            {
+                type radiallySymmetricExponential;
+                k    6;
+            }
+            calcConditionNumber false;
+        }
+    }
+
+    stabilisation
+    {
+        momentum
+        {
+            type        alpha;
+            scaleFactor 0.1;
+        }
+
+        pressure
+        {
+            type                generalisedEvenOrderLaplacian;
+            laplacianPower      1;
+            scaleFactor         0.125;
+            scaleFactorJacobian 1.0;
+        }
+    }
+}
+
+// ************************************************************************* //

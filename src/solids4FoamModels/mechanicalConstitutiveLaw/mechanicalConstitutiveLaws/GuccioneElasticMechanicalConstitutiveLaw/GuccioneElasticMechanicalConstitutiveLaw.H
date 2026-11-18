@@ -176,6 +176,13 @@ public:
             return true;
         }
 
+        //- Declares 2*mu for a scalarShear request. True for this type only:
+        //  a law derived from it does not inherit the declaration
+        virtual bool providesScalarShearTangent() const override
+        {
+            return type() == typeName;
+        }
+
         //- The stress is a function of the total deformation gradient,
         //  with no history, so a prestress Fpre composed onto it is seen. The
         //  fibre directions are taken in the stress-free configuration

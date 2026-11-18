@@ -24,6 +24,9 @@ FoamFile
 //
 // The plasticity laws read constant/plasticStrainVsYieldStress, which has
 // more than two rows, so that the nonlinear hardening branch is the one run.
+// scalarShear (check 7): shearModulus, declared (with declaredMu) or refused,
+// the default. electroMechanicalLawPassiveHGO wraps a passive law that does not
+// declare 2 mu, so the wrapper must refuse too.
 // electroMechanicalLaw appears twice: with its tension ramped over a long time
 // from zero, so that at time 0 the reference state is stress free and the
 // reference checks apply, and with the tension on from the start, so that the
@@ -33,6 +36,7 @@ FoamFile
 
 linearElastic
 {
+    scalarShear     shearModulus;
     finiteStrain    no;
     isotropic       yes;
     linear          yes;
@@ -47,6 +51,8 @@ linearElastic
 
 diffusionElastic
 {
+    // Derived from linearElastic, which declares 2 mu: not inherited
+    scalarShear     refused;
     finiteStrain    no;
     isotropic       yes;
     linear          yes;
@@ -201,6 +207,7 @@ StVenantKirchhoffElastic
 
 neoHookeanElastic
 {
+    scalarShear     shearModulus;
     finiteStrain    yes;
     isotropic       yes;
     linear          no;
@@ -215,6 +222,8 @@ neoHookeanElastic
 
 diffusionHyperElastic
 {
+    // Derived from neoHookeanElastic, which declares 2 mu: not inherited
+    scalarShear     refused;
     finiteStrain    yes;
     isotropic       yes;
     linear          no;
@@ -286,6 +295,9 @@ OgdenElastic
 
 GuccioneElastic
 {
+    // mu = k*(cf + ct + cfs)/6, a declared scalar stiffness measure
+    scalarShear     declared;
+    declaredMu      4666.666666666667;
     finiteStrain    yes;
     isotropic       no;
     linear          no;
@@ -340,6 +352,9 @@ HolzapfelGasserOgdenElastic
 
 electroMechanicalLaw
 {
+    // 2 mu of the passive GuccioneElastic
+    scalarShear     declared;
+    declaredMu      4666.666666666667;
     finiteStrain    yes;
     isotropic       no;
     linear          no;
@@ -367,6 +382,8 @@ electroMechanicalLaw
 
 electroMechanicalLawActive
 {
+    scalarShear     declared;
+    declaredMu      4666.666666666667;
     finiteStrain    yes;
     isotropic       no;
     linear          no;
@@ -389,6 +406,36 @@ electroMechanicalLawActive
             uniformFibreField yes;
             f0              (0 0 1);
             bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 16e6;
+        }
+    }
+}
+
+electroMechanicalLawPassiveHGO
+{
+    // A wrapper whose passive law does not declare 2 mu: scalarShear refused
+    finiteStrain    yes;
+    isotropic       no;
+    linear          no;
+    scalarShear     refused;
+    law
+    {
+        type            electroMechanicalLaw;
+        rho             rho [1 -3 0 0 0 0 0] 1200;
+        activeTension   activeTension [1 -1 -2 0 0 0 0] 60e3;
+        rampTime        1e6;
+        uniformFibreField yes;
+        f0              (0 0 1);
+        passiveMechanicalLaw
+        {
+            type            HolzapfelGasserOgdenElastic;
+            mu              mu [1 -1 -2 0 0 0 0] 44.23e3;
+            fibreAngle      fibreAngle [0 0 0 0 0 0 0] 39.76;
+            k1              k1 [1 -1 -2 0 0 0 0] 0.206e3;
+            k2              k2 [0 0 0 0 0 0 0] 1.465;
+            uniformLocalBasis yes;
+            Ec              (1 0 0);
+            Ea              (0 1 0);
+            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 44.23e6;
         }
     }
 }

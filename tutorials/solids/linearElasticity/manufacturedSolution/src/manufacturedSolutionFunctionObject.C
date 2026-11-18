@@ -102,6 +102,106 @@ calculateAnalyticalCellDisplacement
 }
 
 
+void Foam::manufacturedSolutionFunctionObject::writePressureError
+(
+    const fvMesh& mesh
+)
+{
+    // Read solvePressure as the solid model itself does (solidModel.C);
+    // solidModel::solvePressure() is not public
+    const bool solvePressure =
+        lookupSolidModel(mesh).solidModelDict().lookupOrDefault<Switch>
+        (
+            "solvePressure", false
+        );
+
+    const bool reportPressure =
+        cellPressureSpecified_ ? bool(cellPressure_) : solvePressure;
+
+    if (!reportPressure)
+    {
+        return;
+    }
+
+    if (!solvePressure || !mesh.foundObject<volScalarField>("p"))
+    {
+        FatalErrorInFunction
+            << "cellPressure is enabled but the solid model does not solve "
+            << "for a pressure field p: enable solvePressure or set "
+            << "cellPressure no" << exit(FatalError);
+    }
+
+    // The mixed formulation uses the compression-positive pressure,
+    //     sigma = sigmaTilde - p*I,  with  -p/K - tr(grad(D)) = 0,
+    // so for this linear elastic solution the analytical pressure is
+    //     p = -tr(sigma)/3 = -(lambda + 2*mu/3)*div(u) = -K*div(u),
+    // evaluated from the analytical stress at the cell centres
+    volScalarField analyticalP
+    (
+        IOobject
+        (
+            "analyticalP",
+            time_.timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        mesh,
+        dimensionedScalar("zero", dimPressure, 0.0),
+        "calculated"
+    );
+
+    const vectorField& CI = mesh.C();
+    scalarField& aPI = analyticalP;
+    forAll(aPI, cellI)
+    {
+        aPI[cellI] = -tr(mmsPtr_->calculateStress(CI[cellI]))/3.0;
+    }
+
+    forAll(analyticalP.boundaryField(), patchI)
+    {
+        if (mesh.boundary()[patchI].type() != "empty")
+        {
+#ifdef OPENFOAM_NOT_EXTEND
+            scalarField& pP = analyticalP.boundaryFieldRef()[patchI];
+#else
+            scalarField& pP = analyticalP.boundaryField()[patchI];
+#endif
+            const vectorField& CP = mesh.C().boundaryField()[patchI];
+
+            forAll(pP, faceI)
+            {
+                pP[faceI] = -tr(mmsPtr_->calculateStress(CP[faceI]))/3.0;
+            }
+        }
+    }
+
+    Info<< "Writing analyticalP" << nl << endl;
+    analyticalP.write();
+
+    const volScalarField& p = mesh.lookupObject<volScalarField>("p");
+
+    const volScalarField diff("pDifference", analyticalP - p);
+    Info<< "Writing pDifference field" << endl;
+    diff.write();
+
+    // Cell-wise norms, as for the displacement and stress above: the mean of
+    // |e| and the root mean square over cells (unweighted), and the maximum.
+    // The volume-weighted RMS, sqrt(sum(V*e^2)/sum(V)), is the continuous L2
+    // norm of the cell-wise constant error divided by sqrt(domain volume); it
+    // equals the cell RMS on a uniform mesh only
+    const scalarField& diffI = diff;
+    const scalarField& V = mesh.V();
+    Info<< "    Pressure error norms: mean L1, cell RMS, LInf, "
+        << "volume-weighted RMS: " << nl
+        << "    Magnitude: " << gAverage(mag(diffI))
+        << " " << Foam::sqrt(gAverage(sqr(diffI)))
+        << " " << gMax(mag(diffI))
+        << " " << Foam::sqrt(gSum(V*sqr(diffI))/gSum(V))
+        << endl;
+}
+
+
 bool Foam::manufacturedSolutionFunctionObject::writeData()
 {
     // Lookup the solid mesh
@@ -396,6 +496,10 @@ bool Foam::manufacturedSolutionFunctionObject::writeData()
         }
     }
 
+
+    // Pressure error of the mixed formulation (optional)
+    writePressureError(mesh);
+
     return true;
 }
 
@@ -428,6 +532,11 @@ Foam::manufacturedSolutionFunctionObject::manufacturedSolutionFunctionObject
     pointStress_
     (
         dict.lookupOrDefault<Switch>("pointStress", true)
+    ),
+    cellPressureSpecified_(dict.found("cellPressure")),
+    cellPressure_
+    (
+        dict.lookupOrDefault<Switch>("cellPressure", false)
     )
 {
     Info<< "Creating " << this->name() << " function object" << endl;

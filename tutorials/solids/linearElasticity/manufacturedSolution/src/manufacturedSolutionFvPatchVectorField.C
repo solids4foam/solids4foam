@@ -183,11 +183,21 @@ manufacturedSolutionFvPatchVectorField::evaluateQuadrature
 
 void manufacturedSolutionFvPatchVectorField::write(Ostream& os) const
 {
-    // os.writeKeyword("rate")
-    //     << rate_ << token::END_STATEMENT << nl;
-    // initialC_.writeEntry("initialC", os);
-
     fixedDisplacementFvPatchVectorField::write(os);
+
+    // The parameters of the manufactured solution, so that a rewritten field
+    // (e.g. by decomposePar) can be read again
+    const char* names[] = {"E", "nu", "ax", "ay", "az"};
+    for (label i = 0; i < 5; ++i)
+    {
+        const word name(names[i]);
+        if (dict_.found(name))
+        {
+            os.writeKeyword(name)
+                << readScalar(dict_.lookup(name))
+                << token::END_STATEMENT << nl;
+        }
+    }
 }
 
 
