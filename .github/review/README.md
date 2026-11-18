@@ -111,8 +111,10 @@ access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
 2. Create an organisation-owned Anthropic API key for a dedicated workspace. Set
    a spending limit and monitor usage. Store it as the organisation Actions
    secret `ANTHROPIC_API_KEY`, restricted to this repository. A repository
-   secret can be used for a pilot. Do not use a personal Claude subscription
-   token.
+   secret can be used for a pilot. Prefer a service-account key over one linked
+   to a person. Do not use a personal Claude subscription token. The workflow
+   calls the Messages API directly, so it is billed as API usage; organisation
+   API credit that covers "API" applies to it.
 3. An organisation owner must review the Actions event policy before enabling
    this privileged workflow. GitHub's default policy blocks
    `pull_request_target` in affected public repositories, with enforcement from
@@ -124,10 +126,10 @@ access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
    path. A maintainer or triager applies it after checking the PR's relevance
    and cost. It authorises reviews on subsequent commits to that PR, not merge
    approval.
-5. Allow the pinned checkout, github-script, upload-artifact, and Anthropic
-   Action in organisation Actions policy. The workflow supplies `GITHUB_TOKEN`
+5. Allow the pinned checkout, github-script, and upload-artifact actions in
+   organisation Actions policy. The workflow supplies `GITHUB_TOKEN`
    explicitly; no GitHub App installation, personal access token, or custom App
-   is required. The model job needs Contents read and Pull requests read. Only
+   is required. The analysis job needs Contents read and Pull requests read. Only
    the separate publisher job needs Pull requests write to create a conversation
    comment. It never calls the approval or merge APIs. The publisher also needs
    Actions read to detect explicit timeouts. No Issues write or OIDC is needed.
@@ -138,11 +140,12 @@ access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
 7. Run the live-validation scenarios below before relying on report delivery. Do
    not make this advisory workflow a required branch-protection check.
 
-The official integration supports a supplied workflow token. This avoids the
-broader permissions of the default Claude GitHub App. See the pinned [Action
-inputs](https://github.com/anthropics/claude-code-action/blob/4fa93a88de49bbef68b10eb15aabedf28ca0e1ed/action.yml)
-and [security
-guidance](https://github.com/anthropics/claude-code-action/blob/4fa93a88de49bbef68b10eb15aabedf28ca0e1ed/docs/security.md).
+The analysis calls the Claude Messages API directly through the official
+Anthropic TypeScript SDK, pinned to an exact version in
+`.github/scripts/package-lock.json` and installed with `npm ci --ignore-scripts`.
+No Claude GitHub App, agent action, personal access token, or custom App is
+used. The API key is a service-account key restricted to one workspace; only the
+analysis step receives it.
 
 ## Operation and security
 
@@ -167,51 +170,64 @@ their configuration, installs their dependencies, or runs their tests. Only
 trusted base scripts run. Never change checkout to the PR head or merge ref,
 even to inspect a proposed instruction file.
 
-Claude receives the review instructions, the repository guide, and a bounded
-JSON payload with the PR description and patches. The guide is the solids4foam
-agent skill (`.agents/skills/solids4foam/SKILL.md`, the same file every coding
-agent uses) plus the latest released version from `CHANGELOG.md`. Both are read
-from the trusted base checkout on every run, never copied, so a PR that edits
-the skill cannot change its own review. The versioned instructions explicitly
-treat the PR payload as untrusted. Only the
-schema-return tool `StructuredOutput` is enabled. Shell, filesystem, network,
-and GitHub tools are unavailable. MCP is empty, strict, and denied. Bare mode,
-user-only settings, and disabled commands prevent project skills and hooks from
-loading. The runner is GitHub-hosted and ephemeral. The model has a read-only
-GitHub token and no publishing token. The publisher uses a fresh runner, has no
-Anthropic secret, validates structured output, and escapes model text before
-creating a comment. Path floors cover all changed and renamed paths, including
-omitted files: core numerical/model/solver directories and CI, tests, build
-scripts, and agent configuration force HIGH. Other `src/` changes are at least
-MEDIUM. Non-document changes default to at least MEDIUM. These floors are
+The analysis sends one Messages API request. The system prompt holds the review
+instructions and the repository guide: the solids4foam agent skill
+(`.agents/skills/solids4foam/SKILL.md`, the same file every coding agent uses)
+plus the latest released version from `CHANGELOG.md`. Both are read from the
+trusted base checkout on every run, never copied, so a PR that edits the skill
+cannot change its own review. The user message holds only a bounded JSON payload
+with the PR description and patches, which the instructions treat as untrusted.
+The request defines no tools, so the model has no shell, filesystem, network, or
+GitHub access; it can only return JSON in the report schema (structured output).
+The API cannot enforce length and count limits, so the schema states them and
+the workflow validates them; a report that fails validation gets one retry that
+names the failed check. The analysis step outputs only a validated report, token
+counts and fixed reason codes, never prompt, model, or API error text, and SDK
+logging is off. The runner is GitHub-hosted and ephemeral. The analysis job has
+a read-only GitHub token and no publishing token. The publisher uses a fresh
+runner, has no Anthropic secret, validates the report again, and escapes model
+text before creating a comment. Path floors cover all changed and renamed paths,
+including omitted files: core numerical/model/solver directories and CI, tests,
+build scripts, and agent configuration force HIGH. Other `src/` changes are at
+least MEDIUM. Non-document changes default to at least MEDIUM. These floors are
 conservative heuristics, not an exhaustive semantic classifier.
+
+If the model declines a request for safety reasons, the API's server-side
+fallback re-runs it on a fallback model in the same call. The report then says
+which model served it.
 
 Prompt injection can still distort analysis. It cannot be solved by prompts
 alone. Human reviewers must check findings and risk. This boundary prevents
 external tool use and source writes; it does not guarantee a correct assessment.
 Untrusted content is sent to Anthropic for analysis. Do not put credentials in
-PRs. Keep debug/full-output logging disabled, including Actions step debug.
-Review action updates before changing the full commit pins. The upstream Action
-installs its Claude runtime; the action pin does not freeze every transitive
-runtime dependency. Repeat live validation after updates.
+PRs. Review SDK updates (`package.json` and the lockfile) and action pin updates
+before merging them, and repeat live validation after updates.
 
-Each run has a ten-minute model timeout, a small turn limit, and a USD 2 model
-budget. Opus 5.5 and explicit high effort are selected in the workflow.
-Organisation spending limits are still needed: a public contributor can trigger
-repeated runs. Concurrency cancels older runs for the same PR. Reports include
-the requested model/effort, exact head SHA, attempt, and run link. One sticky
-bot comment is updated across commits, including on failure. Its SHA must match
-the current PR head; an older SHA is historical evidence only. A final API check
+Each run has an 8.5-minute analysis deadline (inside a ten-minute step timeout)
+and at most two Messages API requests: the second only to fix an invalid report
+or after one transient API error (408, 409, 429, 5xx or overloaded), after
+waiting as the server's Retry-After asks. SDK retries are off, so every request
+is counted. Each request allows up to 40,000 output tokens, about USD 1 at most
+at Opus 5.5 prices; a small PR costs a few cents. A safety fallback can re-run a
+request on the fallback model inside the same request, which adds its tokens.
+Opus 5.5 and explicit high effort are selected in the workflow. Organisation
+spending limits are still needed: a public contributor can trigger repeated
+runs. Concurrency cancels older runs for the same PR. Reports include the
+requested model/effort, exact head SHA, attempt, and run link. One sticky bot
+comment is updated across commits, including on failure. Its SHA must match the
+current PR head; an older SHA is historical evidence only. A final API check
 suppresses stale publication, though a commit can still arrive between that
 check and posting; the explicit SHA remains authoritative.
 
 The collector includes whole patches within a 90 KB JSON-escaped prompt budget,
-including instructions, the repository guide (about 18 KB with the
-instructions) and metadata. This leaves margin for the Action's
-serialized environment inputs. Source files precede application code, other
-text, and tutorial mesh/field/CSV data. Missing patches (binary, empty files,
-renames) and budget-excluded files are listed as not reviewed in the prompt and
-report. Their paths still contribute to the risk floor.
+including instructions, the repository guide (about 18 KB with the instructions)
+and metadata. The collector writes the prompt to a file in the runner's
+temporary directory for the analysis step; it is never passed through
+environment variables, which Actions prints in the step log. Source files
+precede application code, other text, and tutorial mesh/field/CSV data. Missing
+patches (binary, empty files, renames) and budget-excluded files are listed as
+not reviewed in the prompt and report. Their paths still contribute to the risk
+floor.
 
 A successful assessment can have COMPLETE or PARTIAL **patch** coverage. Neither
 means the surrounding source, linked plots, CI logs, or numerical cases were
@@ -237,6 +253,7 @@ optional numeric usage, retention, and retrieval limits. No fallback is enabled.
 Run the offline tests from the repository root:
 
 ```sh
+npm ci --prefix .github/scripts --ignore-scripts
 node --test .github/scripts/*.test.cjs
 markdownlint .github/review/*.md .github/pull_request_template.md CONTRIBUTING.md
 ```
@@ -258,8 +275,8 @@ Use disposable PRs in a test repository with the same settings for live checks:
 | Numerical change without results | Missing verification stated; practical human checklist |
 | Add a second commit | Same sticky report; current SHA; stale results suppressed |
 | First-time external fork | Requires approval label; no head checkout or PR code execution |
-| Hidden instructions in title/body/patch | Only StructuredOutput; no disclosure, writes, or approval |
-| Invalid API key or model timeout | INCOMPLETE report; failed run; no completed report |
+| Hidden instructions in title/body/patch | No tools; JSON report only; no disclosure, writes, or approval |
+| Invalid API key, API error or timeout | INCOMPLETE report naming the reason code and HTTP status; failed run |
 | Workflow permission change | HIGH; proposed permissions never take effect in this run |
 
 <!-- markdownlint-enable MD013 -->
@@ -274,8 +291,8 @@ require human assessment.
 ## Independent review before wider team discussion
 
 Ask an independent reviewer to inspect the trusted-ref checkout, token scopes,
-tool allowlist, injection handling, and whether the pinned Action correctly
-passes model/effort and structured-output options. Verify failure reports, HIGH
+absence of tools, injection handling, and whether the analysis step passes
+model, effort and the report schema correctly. Verify failure reports, HIGH
 fallback, comment update ownership checks, and fork/cancellation behaviour in a
 test repo. Evaluate sample numerical PRs for risk and finding quality. Confirm
 Opus API access, costs, and data handling with the organisation account owner.

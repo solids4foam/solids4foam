@@ -1,37 +1,33 @@
-// Read only structured SDK envelopes. Never copy messages, errors, or credentials.
+// Only fixed reason codes and numbers cross into the record; never messages,
+// errors, model text or credentials.
 const fs = require('node:fs');
+const {analysisReasons, httpStatus} = require('./claudeReview.cjs');
 
-function telemetry(messages) {
-  if (!Array.isArray(messages)) return {failure_reason: 'unknown', usage: null};
-  const result = messages.filter(item => item?.type === 'result').at(-1);
-  const error = messages.filter(item => item?.type === 'assistant').at(-1)?.error;
-  const reasons = {rate_limit: 'rate_limited', authentication_failed: 'authentication_error'};
-  // billing_error covers more than quota exhaustion; do not guess from its text.
-  const failure_reason = Object.hasOwn(reasons, error) ? reasons[error] : 'unknown';
-  const usage = {};
-  for (const key of ['input_tokens', 'output_tokens', 'cache_read_input_tokens',
-    'cache_creation_input_tokens']) {
-    const value = result?.usage?.[key];
-    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) usage[key] = value;
+const usageKeys = ['input_tokens', 'output_tokens', 'cache_read_input_tokens',
+  'cache_creation_input_tokens'];
+function sanitiseUsage(usage) {
+  const out = {};
+  for (const key of usageKeys) {
+    const value = usage?.[key];
+    if (Number.isSafeInteger(value) && value >= 0) out[key] = value;
   }
-  const cost = result?.total_cost_usd;
-  if (typeof cost === 'number' && Number.isFinite(cost) && cost >= 0) usage.cost_usd = cost;
-  return {failure_reason, usage: Object.keys(usage).length ? usage : null};
+  return Object.keys(out).length ? out : null;
 }
-
-function capture(core, executionFile) {
-  let summary = telemetry(null);
-  try {
-    summary = telemetry(JSON.parse(fs.readFileSync(executionFile, 'utf8')));
-  } catch {
-    // Missing or malformed telemetry must not prevent workflow finalisation.
-  }
-  core.setOutput('telemetry', JSON.stringify(summary));
+// Parse the analysis step's telemetry output (see analyse() in claudeReview.cjs).
+function telemetry(raw) {
+  let summary = {};
+  try { summary = JSON.parse(raw) || {}; } catch { /* No reliable signal. */ }
+  return {
+    failure_reason: analysisReasons.includes(summary.failure_reason) ? summary.failure_reason : null,
+    api_error_status: httpStatus(summary.api_error_status),
+    served_model: /^[a-z0-9.-]{1,64}$/.test(summary.served_model || '') ? summary.served_model : null,
+    model_requests: Number.isSafeInteger(summary.attempts) && summary.attempts >= 0 ? summary.attempts : null,
+    usage: sanitiseUsage(summary.usage)
+  };
 }
 
 function statusRecord(context, env, timedOut = false) {
-  let summary = {};
-  try { summary = JSON.parse(env.REVIEW_TELEMETRY); } catch { /* No reliable signal. */ }
+  const summary = telemetry(env.REVIEW_TELEMETRY);
   let publication = {};
   try { publication = JSON.parse(env.PUBLICATION_STATUS); } catch { /* Not published. */ }
   let status = 'failed';
@@ -49,15 +45,14 @@ function statusRecord(context, env, timedOut = false) {
     reason = null;
   } else if (timedOut) {
     reason = 'timeout';
-  } else if (env.REVIEW_RESULT !== 'success' &&
-      ['rate_limited', 'authentication_error'].includes(summary?.failure_reason)) {
+  } else if (env.REVIEW_RESULT !== 'success' && summary.failure_reason) {
     reason = summary.failure_reason;
   } else if (env.REVIEW_RESULT === 'failure' || env.PUBLICATION_OUTCOME === 'failure' ||
       publication?.status === 'failed') {
     reason = 'review_failed';
   }
   return {
-    schema_version: 1,
+    schema_version: 2,
     repository: `${context.repo.owner}/${context.repo.repo}`,
     pr: context.payload.pull_request.number,
     head_sha: context.payload.pull_request.head.sha,
@@ -65,9 +60,9 @@ function statusRecord(context, env, timedOut = false) {
     run_id: String(context.runId), run_attempt: Number(env.GITHUB_RUN_ATTEMPT),
     coverage: status === 'completed' && ['complete', 'partial'].includes(publication?.coverage)
       ? publication.coverage : status === 'skipped' ? null : 'incomplete',
-    // Re-sanitise across the job boundary, rather than copying arbitrary JSON.
-    usage: telemetry([{type: 'result', usage: summary?.usage,
-      total_cost_usd: summary?.usage?.cost_usd}]).usage
+    // Re-sanitised across the job boundary, rather than copying arbitrary JSON.
+    api_error_status: summary.api_error_status, served_model: summary.served_model,
+    model_requests: summary.model_requests, usage: summary.usage
   };
 }
 
@@ -86,4 +81,4 @@ async function finalise({github, context, core}, env = process.env) {
   fs.writeFileSync(`${env.RUNNER_TEMP}/review-status.json`, JSON.stringify(record, null, 2) + '\n');
 }
 
-module.exports = {telemetry, capture, statusRecord, finalise};
+module.exports = {telemetry, statusRecord, finalise};
