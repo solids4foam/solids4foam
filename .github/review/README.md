@@ -170,28 +170,27 @@ their configuration, installs their dependencies, or runs their tests. Only
 trusted base scripts run. Never change checkout to the PR head or merge ref,
 even to inspect a proposed instruction file.
 
-The analysis sends one Messages API request. The system prompt holds the
-review instructions and the repository guide: the solids4foam agent skill
+The analysis sends one Messages API request. The system prompt holds the review
+instructions and the repository guide: the solids4foam agent skill
 (`.agents/skills/solids4foam/SKILL.md`, the same file every coding agent uses)
 plus the latest released version from `CHANGELOG.md`. Both are read from the
 trusted base checkout on every run, never copied, so a PR that edits the skill
-cannot change its own review. The user message holds only a bounded JSON
-payload with the PR description and patches, which the instructions treat as
-untrusted. The request defines no tools, so the model has no shell,
-filesystem, network, or GitHub access; it can only return JSON in the report
-schema (structured output). The API cannot enforce length and count limits, so
-the schema states them and the workflow validates them; a report that fails
-validation gets one retry that names the failed check. The analysis step
-outputs only a validated report, token counts and fixed reason codes, never
-prompt, model, or API error text. The runner is GitHub-hosted and ephemeral.
-The analysis job has a read-only GitHub token and no publishing token. The
-publisher uses a fresh runner, has no Anthropic secret, validates the report
-again, and escapes model text before creating a comment. Path floors cover all
-changed and renamed paths, including omitted files: core numerical/model/solver
-directories and CI, tests, build scripts, and agent configuration force HIGH.
-Other `src/` changes are at least MEDIUM. Non-document changes default to at
-least MEDIUM. These floors are conservative heuristics, not an exhaustive
-semantic classifier.
+cannot change its own review. The user message holds only a bounded JSON payload
+with the PR description and patches, which the instructions treat as untrusted.
+The request defines no tools, so the model has no shell, filesystem, network, or
+GitHub access; it can only return JSON in the report schema (structured output).
+The API cannot enforce length and count limits, so the schema states them and
+the workflow validates them; a report that fails validation gets one retry that
+names the failed check. The analysis step outputs only a validated report, token
+counts and fixed reason codes, never prompt, model, or API error text, and SDK
+logging is off. The runner is GitHub-hosted and ephemeral. The analysis job has
+a read-only GitHub token and no publishing token. The publisher uses a fresh
+runner, has no Anthropic secret, validates the report again, and escapes model
+text before creating a comment. Path floors cover all changed and renamed paths,
+including omitted files: core numerical/model/solver directories and CI, tests,
+build scripts, and agent configuration force HIGH. Other `src/` changes are at
+least MEDIUM. Non-document changes default to at least MEDIUM. These floors are
+conservative heuristics, not an exhaustive semantic classifier.
 
 If the model declines a request for safety reasons, the API's server-side
 fallback re-runs it on a fallback model in the same call. The report then says
@@ -204,9 +203,13 @@ Untrusted content is sent to Anthropic for analysis. Do not put credentials in
 PRs. Review SDK updates (`package.json` and the lockfile) and action pin updates
 before merging them, and repeat live validation after updates.
 
-Each run has a ten-minute analysis timeout and at most two model requests of up
-to 40,000 output tokens each, about USD 2 at most at Opus 5.5 prices. Opus 5.5
-and explicit high effort are selected in the workflow.
+Each run has an 8.5-minute analysis deadline (inside a ten-minute step timeout)
+and at most two Messages API requests: the second only to fix an invalid report
+or after a transient API error. SDK retries are off, so every request is
+counted. Each request allows up to 40,000 output tokens, about USD 1 at most at
+Opus 5.5 prices; a small PR costs a few cents. A safety fallback can re-run a
+request on the fallback model inside the same request, which adds its tokens.
+Opus 5.5 and explicit high effort are selected in the workflow.
 Organisation spending limits are still needed: a public contributor can trigger
 repeated runs. Concurrency cancels older runs for the same PR. Reports include
 the requested model/effort, exact head SHA, attempt, and run link. One sticky
@@ -216,13 +219,14 @@ suppresses stale publication, though a commit can still arrive between that
 check and posting; the explicit SHA remains authoritative.
 
 The collector includes whole patches within a 90 KB JSON-escaped prompt budget,
-including instructions, the repository guide (about 18 KB with the
-instructions) and metadata. The trusted part and the PR data travel to the
-analysis step as separate step outputs, each well under the environment size
-limit. Source files precede application code, other
-text, and tutorial mesh/field/CSV data. Missing patches (binary, empty files,
-renames) and budget-excluded files are listed as not reviewed in the prompt and
-report. Their paths still contribute to the risk floor.
+including instructions, the repository guide (about 18 KB with the instructions)
+and metadata. The collector writes the prompt to a file in the runner's
+temporary directory for the analysis step; it is never passed through
+environment variables, which Actions prints in the step log. Source files
+precede application code, other text, and tutorial mesh/field/CSV data. Missing
+patches (binary, empty files, renames) and budget-excluded files are listed as
+not reviewed in the prompt and report. Their paths still contribute to the risk
+floor.
 
 A successful assessment can have COMPLETE or PARTIAL **patch** coverage. Neither
 means the surrounding source, linked plots, CI logs, or numerical cases were

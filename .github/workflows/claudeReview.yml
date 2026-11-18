@@ -70,17 +70,16 @@ jobs:
       # checked), with install scripts disabled. Nothing from the PR is installed.
       - name: Install the pinned Anthropic SDK
         run: npm ci --prefix .github/scripts --ignore-scripts --no-audit --no-fund
-      # One Messages API request with structured JSON output and no tools. Only
-      # this step sees the API key; it outputs a validated report, safe numbers
-      # and fixed reason codes, never prompt, model or error text.
+      # At most two Messages API requests, structured JSON output, no tools. The
+      # prompt comes from the collector's file in RUNNER_TEMP. Only this step
+      # sees the API key; it outputs a validated report, safe numbers and fixed
+      # reason codes, never prompt, model or error text.
       - name: Analyse with the Messages API
         id: claude
         timeout-minutes: 10
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          REVIEW_SYSTEM: ${{ steps.prepare.outputs.system }}
-          REVIEW_DATA: ${{ steps.prepare.outputs.data }}
         with:
           script: |
             await require('./.github/scripts/claudeReview.cjs').analyse({core});

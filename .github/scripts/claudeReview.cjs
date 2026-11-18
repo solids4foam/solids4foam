@@ -1,5 +1,7 @@
 // Trusted base-branch code only. PR material is data, never executable code.
 const fs = require('node:fs');
+const os = require('node:os');
+const nodePath = require('node:path');
 const risks = ['LOW', 'MEDIUM', 'HIGH'];
 // Size limits, in characters, for every model-written field. They are chosen so
 // that ANY report the schema accepts also passes validate() and can be
@@ -115,40 +117,113 @@ function apiSchema(node = schema) {
   return out;
 }
 
-// One Messages API request (plus at most one retry to fix a report that fails
-// validation), structured JSON output only: no tools, no files, no network
-// beyond the API. Never logs or outputs prompt text, model text or API error
-// text; only a validated report, safe numbers and fixed reason codes.
+// The analysis makes at most two Messages API requests: the second only to
+// fix a report that failed validation, or after a transient API error. SDK
+// retries and logging are off, so every request is counted and nothing is
+// logged; an overall deadline (below the 10-minute step timeout) aborts a
+// stalled stream. Structured JSON output only: no tools, no files, no network
+// beyond the API. Outputs only a validated report, token counts and fixed
+// reason codes; never prompt, model or API error text.
 const httpStatus = value => Number.isSafeInteger(value) && value >= 100 && value <= 599 ? value : null;
 const analysisReasons = ['authentication_error', 'permission_error', 'rate_limited', 'api_error',
-  'connection_error', 'timeout', 'refusal', 'max_tokens', 'invalid_report', 'no_api_key', 'failed'];
+  'connection_error', 'timeout', 'refusal', 'max_tokens', 'invalid_report', 'no_api_key',
+  'no_input', 'failed'];
 const maxOutputTokens = 40000;
+const maxRequests = 2;
+const analysisDeadlineMs = 8.5*60*1000;
+const silentLogger = {error() {}, warn() {}, info() {}, debug() {}};
+const clientOptions = apiKey => ({apiKey, maxRetries: 0, timeout: analysisDeadlineMs,
+  logLevel: 'off', logger: silentLogger});
+// Streamed errors carry a structured type but no HTTP status.
+const errorTypes = {authentication_error: 'authentication_error', permission_error: 'permission_error',
+  rate_limit_error: 'rate_limited'};
+const transientTypes = ['rate_limit_error', 'overloaded_error', 'api_error'];
+const usageKeys = ['input_tokens', 'output_tokens', 'cache_read_input_tokens',
+  'cache_creation_input_tokens'];
+const inputFile = env => nodePath.join(env.RUNNER_TEMP || os.tmpdir(), 'review-input.json');
+
+// A fallback re-runs the request on another model inside the same response.
+// When continuing the conversation, thinking from before the last fallback
+// boundary must be dropped (refusals-and-fallback: continuing the conversation).
+function replayContent(content) {
+  const last = content.map(block => block.type).lastIndexOf('fallback');
+  return content.filter((block, i) => i > last ||
+    !['thinking', 'redacted_thinking'].includes(block.type));
+}
+// Every sampling attempt, including a declined fallback hop, is in
+// usage.iterations when present; otherwise the top-level usage is complete.
+function addUsage(total, usage) {
+  const parts = Array.isArray(usage?.iterations) && usage.iterations.length ? usage.iterations : [usage];
+  for (const part of parts) {
+    for (const key of usageKeys) {
+      const value = part?.[key];
+      if (Number.isSafeInteger(value) && value >= 0) total[key] += value;
+    }
+  }
+}
+
 async function analyse({core}, env = process.env, client = null) {
-  const usage = {input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0,
-    cache_creation_input_tokens: 0};
+  const usage = Object.fromEntries(usageKeys.map(key => [key, 0]));
   const outcome = {conclusion: 'failure', reason: 'failed', api_error_status: null,
     served_model: null, attempts: 0};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), analysisDeadlineMs);
+  const started = Date.now();
+  let sdk = null;
+  // Classify an error by typed SDK class, HTTP status or structured type only.
+  const classify = error => {
+    if (error?.reason) return {reason: error.reason, transient: false};
+    if (sdk && error instanceof sdk.APIUserAbortError) return {reason: 'timeout', transient: false};
+    if (sdk && error instanceof sdk.APIConnectionTimeoutError) return {reason: 'timeout', transient: true};
+    if (sdk && error instanceof sdk.APIConnectionError) return {reason: 'connection_error', transient: true};
+    if (sdk && error instanceof sdk.APIError) {
+      const status = httpStatus(error.status);
+      outcome.api_error_status = status;
+      const reason = status ?
+        {401: 'authentication_error', 403: 'permission_error', 429: 'rate_limited'}[status] || 'api_error' :
+        errorTypes[error.type] || 'api_error';
+      const transient = status ? status === 429 || status >= 500 : transientTypes.includes(error.type);
+      return {reason, transient};
+    }
+    return {reason: 'failed', transient: false};
+  };
   try {
     if (!env.ANTHROPIC_API_KEY) throw Object.assign(new Error('no key'), {reason: 'no_api_key'});
-    const Anthropic = require('@anthropic-ai/sdk');
-    client ||= new Anthropic({apiKey: env.ANTHROPIC_API_KEY, maxRetries: 1, timeout: 6*60*1000});
-    const deadline = Date.now() + 9*60*1000;
-    const messages = [{role: 'user', content: env.REVIEW_DATA}];
+    let input;
+    try {
+      input = JSON.parse(fs.readFileSync(inputFile(env), 'utf8'));
+    } catch {
+      throw Object.assign(new Error('no input'), {reason: 'no_input'});
+    }
+    if (typeof input?.system !== 'string' || typeof input?.data !== 'string') {
+      throw Object.assign(new Error('no input'), {reason: 'no_input'});
+    }
+    sdk = require('@anthropic-ai/sdk');
+    client ||= new sdk.Anthropic(clientOptions(env.ANTHROPIC_API_KEY));
+    const messages = [{role: 'user', content: input.data}];
     for (;;) {
       outcome.attempts++;
-      // Server-side fallback: if the model declines for safety reasons, the
-      // API re-runs the request on a fallback model in the same call.
-      const response = await client.beta.messages.stream({
-        model: env.CLAUDE_REVIEW_MODEL, max_tokens: maxOutputTokens,
-        betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
-        output_config: {effort: env.CLAUDE_REVIEW_EFFORT,
-          format: {type: 'json_schema', schema: apiSchema()}},
-        system: env.REVIEW_SYSTEM, messages
-      }).finalMessage();
-      for (const key of Object.keys(usage)) {
-        const value = response.usage?.[key];
-        if (Number.isSafeInteger(value) && value >= 0) usage[key] += value;
+      const canRetry = () => outcome.attempts < maxRequests &&
+        Date.now() - started < analysisDeadlineMs - 3*60*1000;
+      let response;
+      try {
+        // Server-side fallback: if the model declines for safety reasons, the
+        // API re-runs the request on a fallback model in the same call.
+        response = await client.beta.messages.stream({
+          model: env.CLAUDE_REVIEW_MODEL, max_tokens: maxOutputTokens,
+          betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
+          output_config: {effort: env.CLAUDE_REVIEW_EFFORT,
+            format: {type: 'json_schema', schema: apiSchema()}},
+          system: input.system, messages
+        }, {signal: controller.signal}).finalMessage();
+      } catch (error) {
+        if (classify(error).transient && canRetry()) {
+          outcome.api_error_status = null;
+          continue;
+        }
+        throw error;
       }
+      addUsage(usage, response.usage);
       if (/^[a-z0-9.-]{1,64}$/.test(response.model || '')) outcome.served_model = response.model;
       if (response.stop_reason === 'refusal') throw Object.assign(new Error('refusal'), {reason: 'refusal'});
       if (response.stop_reason === 'max_tokens') throw Object.assign(new Error('max_tokens'), {reason: 'max_tokens'});
@@ -160,33 +235,22 @@ async function analyse({core}, env = process.env, client = null) {
         outcome.reason = null;
         return;
       } catch (error) {
-        if (outcome.attempts > 1 || Date.now() > deadline - 3*60*1000) {
-          throw Object.assign(new Error('invalid report'), {reason: 'invalid_report'});
-        }
-        // Keep the assistant turn unchanged (thinking blocks included), then
-        // name the failed check. The message never contains model text.
+        if (!canRetry()) throw Object.assign(new Error('invalid report'), {reason: 'invalid_report'});
+        // Name the failed check; the message never contains model text.
         const check = error instanceof SyntaxError ? 'the output was not valid JSON' : error.message;
-        messages.push({role: 'assistant', content: response.content},
+        messages.push({role: 'assistant', content: replayContent(response.content)},
           {role: 'user', content: `The report failed validation: ${check}. Return the complete ` +
             'report again as JSON matching the schema, keeping every field within the limits ' +
             'stated in the schema descriptions.'});
       }
     }
   } catch (error) {
-    // Typed SDK errors only; never the error message, which may echo request text.
-    let sdk = null;
-    try { sdk = require('@anthropic-ai/sdk'); } catch { /* Not installed: reason stays generic. */ }
-    if (error?.reason) outcome.reason = error.reason;
-    else if (sdk && error instanceof sdk.APIConnectionTimeoutError) outcome.reason = 'timeout';
-    else if (sdk && error instanceof sdk.APIConnectionError) outcome.reason = 'connection_error';
-    else if (sdk && error instanceof sdk.APIError && httpStatus(error.status)) {
-      outcome.api_error_status = error.status;
-      outcome.reason = {401: 'authentication_error', 403: 'permission_error', 429: 'rate_limited'}[error.status] ||
-        'api_error';
-    }
+    if (!sdk) { try { sdk = require('@anthropic-ai/sdk'); } catch { /* Not installed. */ } }
+    outcome.reason = controller.signal.aborted ? 'timeout' : classify(error).reason;
     core.setFailed(`AI analysis failed: ${outcome.reason}` +
       (outcome.api_error_status ? ` (HTTP ${outcome.api_error_status})` : ''));
   } finally {
+    clearTimeout(timer);
     core.setOutput('conclusion', outcome.conclusion);
     core.setOutput('telemetry', JSON.stringify({failure_reason: outcome.reason,
       api_error_status: outcome.api_error_status, served_model: outcome.served_model,
@@ -331,7 +395,8 @@ function buildPrompt(pr, files, read = readCheckout) {
   return {prompt: prompt(), system, data: data(),
     coverage: {status: omitted.length ? 'partial' : 'complete', omitted}};
 }
-async function prepare({github, context, core}) {
+async function prepare({github, context, core}, env = process.env) {
+  fs.rmSync(inputFile(env), {force: true});
   try {
     const pr = context.payload.pull_request;
     const args = {...context.repo, pull_number: pr.number};
@@ -346,8 +411,10 @@ async function prepare({github, context, core}) {
     if (after.head.sha !== pr.head.sha || after.base.sha !== current.base.sha) {
       throw new Error('pr_changed_during_collection');
     }
-    core.setOutput('system', result.system);
-    core.setOutput('data', result.data);
+    // Passed to the analysis step as a file, never as environment variables
+    // (which Actions prints in the step log).
+    fs.writeFileSync(inputFile(env), JSON.stringify({system: result.system, data: result.data}),
+      {mode: 0o600});
     core.setOutput('coverage', JSON.stringify(result.coverage));
     core.setOutput('base_sha', current.base.sha);
     core.setOutput('schema', JSON.stringify(schema));
@@ -416,5 +483,5 @@ async function publish({github, context, core}, env = process.env) {
   if (failed) core.setFailed('AI review incomplete; failure report published.');
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
-module.exports = {schema, apiSchema, analyse, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
+module.exports = {schema, apiSchema, analyse, inputFile, replayContent, addUsage, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};

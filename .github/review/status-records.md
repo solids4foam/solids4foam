@@ -36,11 +36,13 @@ errors and response stop reasons to fixed codes; it never copies error text:
   (429), and `api_error` (any other HTTP error; see `api_error_status`). A
   billing problem such as no remaining credit is `api_error` with status 400.
 - `connection_error` and `timeout`: the SDK could not reach the API, or the
-  request timed out.
+  8.5-minute analysis deadline passed. A streamed error has no HTTP status; its
+  structured error type is mapped instead and `api_error_status` stays null.
 - `refusal`: the model, and any fallback model, declined the request.
 - `max_tokens`: the report was cut off at the output limit.
 - `invalid_report`: the report failed validation twice.
 - `no_api_key`: the secret was not available to the analysis step.
+- `no_input`: the collector's prompt file was missing or malformed.
 - `timeout` is also used when GitHub explicitly reports `timed_out` for the
   review job or a step. An ambiguous cancellation does not establish timeout.
 - `review_failed`: a known failed review or publication without a more specific
@@ -50,7 +52,8 @@ errors and response stop reasons to fixed codes; it never copies error text:
 Only those codes, HTTP status numbers, validated model identifiers and
 non-negative integer token counts are copied. Message text, error descriptions,
 prompts, and credentials are never copied into status outputs or artifacts.
-Usage is the sum over the run's API requests, not a billing ledger, and can be
+Usage is the sum over every sampling iteration of the run's API requests
+(including a declined fallback attempt), not a billing ledger, and can be
 absent on early failure. Re-running only failed jobs repeats the analysis; do
 not sum records across attempts as if they were one review.
 
