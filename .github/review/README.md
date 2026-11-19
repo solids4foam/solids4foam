@@ -2,7 +2,9 @@
 
 The Claude review helps people assess a PR. It does not approve a PR, count
 approvals, enforce a merge gate, or merge changes. Existing CI still supplies
-build and regression evidence.
+build and regression evidence. The human review and merge process, by risk
+level, is in [CONTRIBUTING.md](../../CONTRIBUTING.md#reviewing-pull-requests);
+this guide covers the workflow itself.
 
 ## Human roles
 
@@ -48,19 +50,30 @@ report only new evidence or unresolved findings. No new comment-command system
 is introduced. The only planned additional AI review is the second
 independent review for MEDIUM/HIGH risk, described below.
 
-## Risk and future approval policy
+## Risk and approval policy
 
 Classify by consequences, not diff size. Use the highest relevant risk.
 
-| Risk | Examples | Intended future policy (not enforced) |
-| --- | --- | --- |
-| LOW | Documentation; no expected behaviour change | Lightweight process |
-| MEDIUM | Isolated functionality | One core-maintainer approval |
-| HIGH | Core numerics, architecture, security | Both core-maintainer approvals |
+<!-- markdownlint-disable MD013 -->
 
-The intended one/both policy refers to the two current core maintainers. Role
-membership must be verified before any future enforcement is introduced. This
-version changes no branch protection, approval rules, or permissions.
+| Risk | Examples | Agreed policy (not enforced by GitHub) |
+| --- | --- | --- |
+| LOW | Documentation; no expected behaviour change | One core maintainer |
+| MEDIUM | Isolated functionality | Second AI review; one core maintainer |
+| HIGH | Core numerics, architecture, security | Second AI review; both core maintainers |
+
+<!-- markdownlint-enable MD013 -->
+
+The one/both policy refers to the two current core maintainers. It is agreed
+practice, not branch protection: no approval rules or permissions change.
+Each report states the rule for its risk and links the process.
+
+The publisher labels each PR with its risk: `ai-risk: low`, `ai-risk: medium`
+or `ai-risk: high`, plus `ai-review: incomplete` when no successful review
+exists (which is also labelled HIGH). It replaces only these four labels and
+updates them on every published report; a suppressed (stale) run leaves them
+unchanged. A label failure is a warning, not a failed run: the comment is
+authoritative. Labels added with the workflow token do not trigger new runs.
 
 The workflow runs one strong reviewer at every risk level. See the [model
 policy](model-policy.md) for the planned risk-dependent reviewers, verified API
@@ -68,13 +81,14 @@ options, independence rules, and consolidation safeguards.
 
 ## Second independent AI review (interim, manual)
 
-MEDIUM and HIGH PRs need a second AI review from a different model family.
-Until that is automated, the Claude report for such a PR (and any failed run)
-asks for it and adds a checklist item. A core maintainer then runs, from an
-up-to-date `development` checkout:
+MEDIUM and HIGH PRs need a second AI review, preferably from a different
+model family. Until that is automated, the Claude report for such a PR (and
+any failed run) asks for it, gives both commands below, and adds a checklist
+item. A core maintainer then runs, from an up-to-date `development` checkout:
 
 ```bash
-node .github/scripts/secondReview.cjs <PR number> --post
+node .github/scripts/secondReview.cjs <PR number> --post                # Codex
+node .github/scripts/secondReview.cjs <PR number> --model fable --post  # Fable
 ```
 
 The script builds exactly the prompt CI would build: the instructions, skill
@@ -91,6 +105,17 @@ inside a read-only sandbox in an empty temporary directory, with no user
 config, MCP servers or rules. Recheck the disabled feature list in the script
 when Codex is upgraded. It needs `gh` (authenticated) and a Codex login with
 access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
+
+`--model fable` is the substitute when Codex is unavailable: Claude Fable 5.2
+at high effort, through the same `analyse` function as CI (no tools,
+structured output, validation, one retry, server-side fallback). It needs
+`ANTHROPIC_API_KEY` set to a key with Fable access, billed to that key's
+workspace, and the pinned SDK (`npm ci --prefix .github/scripts
+--ignore-scripts`). Its comment says it shares the Claude report's model
+family, so agreement is weaker evidence. It suits MEDIUM risk; for HIGH, use it
+only when a core maintainer judges the classification borderline. Fable 5.2
+requires 30-day data retention on the API account; confirm that is acceptable
+before first use.
 
 ## Setup
 
@@ -122,17 +147,20 @@ access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
    this event at the narrowest available scope. See [GitHub's policy
    guidance](https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target).
    This PR does not change the policy or repository settings.
-4. Create the `ai-review-approved` label before using the first-time-author
-   path. A maintainer or triager applies it after checking the PR's relevance
-   and cost. It authorises reviews on subsequent commits to that PR, not merge
-   approval.
+4. Create the `ai-risk: low`, `ai-risk: medium`, `ai-risk: high` and
+   `ai-review: incomplete` labels (the publisher would otherwise create them
+   uncoloured). Create the `ai-review-approved` label before using the
+   first-time-author path. A maintainer or triager applies it after checking
+   the PR's relevance and cost. It authorises reviews on subsequent commits to
+   that PR, not merge approval.
 5. Allow the pinned checkout, github-script, and upload-artifact actions in
    organisation Actions policy. The workflow supplies `GITHUB_TOKEN`
    explicitly; no GitHub App installation, personal access token, or custom App
    is required. The analysis job needs Contents read and Pull requests read. Only
    the separate publisher job needs Pull requests write to create a conversation
-   comment. It never calls the approval or merge APIs. The publisher also needs
-   Actions read to detect explicit timeouts. No Issues write or OIDC is needed.
+   comment and set the risk labels. It never calls the approval or merge APIs.
+   The publisher also needs Actions read to detect explicit timeouts. No Issues
+   write or OIDC is needed.
 6. After reviewing security and costs, set repository Actions variable
    `CLAUDE_REVIEW_ENABLED` to `true`. Until then AI execution is skipped;
    finalisation still uploads a skipped status record. Set it to `false` to stop
@@ -207,9 +235,13 @@ Each run has an 8.5-minute analysis deadline (inside a ten-minute step timeout)
 and at most two Messages API requests: the second only to fix an invalid report
 or after one transient API error (408, 409, 429, 5xx or overloaded), after
 waiting as the server's Retry-After asks. SDK retries are off, so every request
-is counted. Each request allows up to 40,000 output tokens, about USD 1 at most
-at Opus 5.5 prices; a small PR costs a few cents. A safety fallback can re-run a
-request on the fallback model inside the same request, which adds its tokens.
+is counted. Each request allows up to 40,000 output tokens (USD 0.80 at most
+at Opus 5.5 prices of USD 4/20 per million input/output tokens) and a full
+prompt budget of about 250,000 input tokens (about USD 1). A small PR costs a
+few cents; a 335 KB patch such as #719 costs about USD 1. A safety fallback
+can re-run a request on the fallback model inside the same request, which adds
+its tokens. Set a monthly spending limit on the API workspace below the
+available credit.
 Opus 5.5 and explicit high effort are selected in the workflow. Organisation
 spending limits are still needed: a public contributor can trigger repeated
 runs. Concurrency cancels older runs for the same PR. Reports include the
@@ -219,7 +251,7 @@ current PR head; an older SHA is historical evidence only. A final API check
 suppresses stale publication, though a commit can still arrive between that
 check and posting; the explicit SHA remains authoritative.
 
-The collector includes whole patches within a 90 KB JSON-escaped prompt budget,
+The collector includes whole patches within a 600 KB JSON-escaped prompt budget,
 including instructions, the repository guide (about 18 KB with the instructions)
 and metadata. The collector writes the prompt to a file in the runner's
 temporary directory for the analysis step; it is never passed through

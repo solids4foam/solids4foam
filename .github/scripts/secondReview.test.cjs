@@ -1,7 +1,10 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {collect, changed, formatSecond, marker} = require('./secondReview.cjs');
-const {buildPrompt} = require('./claudeReview.cjs');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const {collect, changed, formatSecond, runFable, marker, fable} = require('./secondReview.cjs');
+const {buildPrompt, inputFile} = require('./claudeReview.cjs');
 
 const pr = {number: 7, state: 'open', draft: false, head: {sha: 'c'.repeat(40)},
   base: {ref: 'development', sha: 'd'.repeat(40)}, title: 'T', body: 'B'};
@@ -63,4 +66,50 @@ test('second review report is validated, escaped and applies the path floor', ()
   assert.ok(!body.includes('Required for HIGH risk'));
   assert.throws(() => formatSecond({pr, coverage: {status: 'complete', omitted: []}, floor: 'LOW'},
     '{"risk":"LOW"}'));
+});
+
+const report = JSON.stringify({risk: 'LOW', summary: 'S', reason: 'R', findings: [],
+  verification: 'V', human_review: ['Check']});
+
+test('Fable second review runs the CI analysis with separate system and untrusted data', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-fable-'));
+  let seen;
+  const analyse = async ({core}, env) => {
+    seen = {env, input: JSON.parse(fs.readFileSync(inputFile(env), 'utf8'))};
+    core.setOutput('report', report);
+    core.setOutput('conclusion', 'success');
+    core.setOutput('telemetry', JSON.stringify({served_model: 'claude-fable-5-2'}));
+  };
+  const c = collect(7, fakeApi());
+  const result = await runFable(c, dir, {ANTHROPIC_API_KEY: 'k', OTHER: 'x'}, analyse);
+  assert.deepEqual(result, {raw: report, served: null});
+  assert.equal(seen.env.CLAUDE_REVIEW_MODEL, 'claude-fable-5-2');
+  assert.equal(seen.env.CLAUDE_REVIEW_EFFORT, 'high');
+  assert.equal(seen.env.OTHER, undefined);
+  assert.equal(seen.input.system + '\n\n' + seen.input.data, c.prompt);
+});
+
+test('Fable second review needs a key and reports analysis failure and fallback', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-fable-'));
+  const c = collect(7, fakeApi());
+  await assert.rejects(runFable(c, dir, {}, async () => {}), /ANTHROPIC_API_KEY/);
+  await assert.rejects(runFable(c, dir, {ANTHROPIC_API_KEY: 'k'}, async ({core}) => {
+    core.setOutput('conclusion', 'failure');
+    core.setFailed('AI analysis failed: timeout');
+  }), /timeout/);
+  const served = await runFable(c, dir, {ANTHROPIC_API_KEY: 'k'}, async ({core}) => {
+    core.setOutput('report', report);
+    core.setOutput('conclusion', 'success');
+    core.setOutput('telemetry', JSON.stringify({served_model: 'claude-opus-5-5'}));
+  });
+  assert.equal(served.served, 'claude-opus-5-5');
+});
+
+test('Fable second review comment names the model and the weaker independence', () => {
+  const body = formatSecond({pr, coverage: {status: 'complete', omitted: []}, floor: 'HIGH'},
+    report, {...fable, served: 'claude-opus-5-5'});
+  assert.match(body, /Model: claude-fable-5-2 \(Anthropic Messages API\); effort: high/);
+  assert.match(body, /Served by fallback model claude\\-opus\\-5\\-5/);
+  assert.match(body, /shares its model family/);
+  assert.ok(!body.includes('gpt-6-astra'));
 });

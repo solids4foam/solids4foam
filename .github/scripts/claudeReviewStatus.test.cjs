@@ -124,7 +124,7 @@ test('publisher confirms completed only after successful API write', async () =>
   const github = {rest: {pulls: {get: async () => ({data: {...context.payload.pull_request,
     state: 'open', draft: false}})}, issues: {listComments: {},
     createComment: async () => {throw new Error('Denied');}}}, paginate: async () => []};
-  const core = {setFailed: () => {}, notice: () => {}};
+  const core = {setFailed: () => {}, notice: () => {}, warning: () => {}};
   const params = {...env(), REVIEW_JSON: JSON.stringify(data), RISK_FLOOR: 'LOW',
     REVIEW_COVERAGE: JSON.stringify({status: 'complete', omitted: []})};
   await assert.rejects(publish({github, context, core}, params), /Denied/);
