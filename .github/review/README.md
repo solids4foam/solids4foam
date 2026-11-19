@@ -104,7 +104,10 @@ execution, apps, plugins, browser, image, agent and web tools are disabled,
 inside a read-only sandbox in an empty temporary directory, with no user
 config, MCP servers or rules. Recheck the disabled feature list in the script
 when Codex is upgraded. It needs `gh` (authenticated) and a Codex login with
-access to `gpt-6-astra`; it uses that maintainer's Codex allowance.
+access to `gpt-6-astra`; it uses that maintainer's Codex allowance. Codex
+may warn that "Code Mode is unavailable because code-mode host is disabled"
+and "will fail closed". This is expected: the script disables that feature on
+purpose, and failing closed means no code can run. Do not enable it.
 
 `--model fable` is the substitute when Codex is unavailable: Claude Fable 5.2
 at high effort, through the same `analyse` function as CI (no tools,

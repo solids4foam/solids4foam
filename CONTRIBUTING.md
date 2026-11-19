@@ -111,6 +111,14 @@ as one comment and updated in place. It labels the PR `ai-risk: low`,
 Check that the report's commit SHA matches the PR head before relying on it.
 Iterate in draft to avoid a review on every push.
 
+**First-time contributors:** the review runs automatically only for authors
+who are owners, members, collaborators or previous contributors. For anyone
+else nothing runs, and no comment appears, until a core maintainer adds the
+`ai-review-approved` label. First check that the PR is relevant and contains
+nothing suspicious, because the review sends its content to the API at our
+cost. The label starts the review, and later pushes to that PR are reviewed
+automatically. It authorises the review only, not a merge.
+
 Risk follows the consequences of a change, not its size. Changes to core
 numerics, solvers, FSI coupling, CI or agent configuration are at least HIGH
 by path. If you think the risk is too low, say so on the PR; the higher risk
