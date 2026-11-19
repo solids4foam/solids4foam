@@ -1,5 +1,11 @@
 /*--------------------------------*- C++ -*----------------------------------*\
 | solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -8,14 +14,22 @@ FoamFile
     class       dictionary;
     object      blockMeshDict;
 }
-// A box along x, 20 cells; the test app moves its points along x
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-scale 1;
+// A box along x, 20 cells; the test application moves its points along x
+
+convertToMeters 1;
 
 vertices
 (
-    (0 0 0) (1 0 0) (1 0.1 0) (0 0.1 0)
-    (0 0 0.1) (1 0 0.1) (1 0.1 0.1) (0 0.1 0.1)
+    (0 0   0)
+    (1 0   0)
+    (1 0.1 0)
+    (0 0.1 0)
+    (0 0   0.1)
+    (1 0   0.1)
+    (1 0.1 0.1)
+    (0 0.1 0.1)
 );
 
 blocks
@@ -27,13 +41,23 @@ boundary
 (
     ends
     {
-        type patch;
-        faces ((0 4 7 3) (1 2 6 5));
+        type            patch;
+        faces
+        (
+            (0 4 7 3)
+            (1 2 6 5)
+        );
     }
     sides
     {
-        type empty;
-        faces ((0 1 5 4) (3 7 6 2) (0 3 2 1) (4 5 6 7));
+        type            empty;
+        faces
+        (
+            (0 1 5 4)
+            (3 7 6 2)
+            (0 3 2 1)
+            (4 5 6 7)
+        );
     }
 );
 

@@ -205,13 +205,39 @@ const volScalarField& bdfDdtScheme<Type>::cellVolumes() const
         regIOobject::store(ptr);
     }
 
-    // Shift the old levels if this is a new step (they then hold the volumes
-    // the previous steps ended with), and record the current volumes: the
-    // mesh may have moved again since the last call within this step
+    // Shift the old levels if this is a new step, and record the current
+    // volumes: the mesh may have moved again since the last call within
+    // this step
     touch(*ptr);
     ptr->primitiveFieldRef() = mesh().V();
 
+    // After the shift, level 1 holds the volumes of the last call of the
+    // previous step, which are not those that step ended with if the mesh
+    // moved after that call (e.g. a final mesh correction after the FSI
+    // loop). Once the mesh has moved on this step, fvMesh's V0 holds them.
+    if (meshMoved())
+    {
+        ptr->oldTime().primitiveFieldRef() = mesh().V0();
+    }
+
     return *ptr;
+}
+
+
+template<class Type>
+bool bdfDdtScheme<Type>::meshMoved() const
+{
+    // fvMesh::phi() would zero the mesh flux and shift its old levels if it
+    // has not been set on this step, so its time index is read through
+    // setPhi(), which has no side effect
+    const refPtr<surfaceScalarField> tmeshPhi
+    (
+        const_cast<fvMesh&>(mesh()).setPhi()
+    );
+
+    return
+        tmeshPhi.get()
+     && tmeshPhi.get()->timeIndex() == mesh().time().timeIndex();
 }
 
 
@@ -375,24 +401,35 @@ tmp<GeoField> bdfDdtScheme<Type>::history
     touch(vf);
 
     tmp<GeoField> tsum(-a[1]*level(vf, 1));
+    GeoField& sum = tsum.ref();
+
+    if (!weighted)
+    {
+        for (label k = 2; k < a.size(); ++k)
+        {
+            sum -= a[k]*level(vf, k);
+        }
+
+        return tsum;
+    }
+
+    // The internal field is weighted level by level, the boundary values
+    // are summed unweighted
+    const volScalarField& V = cellVolumes();
+    const scalarField& Vn = mesh().V();
+    auto& bsum = sum.boundaryFieldRef();
+
+    sum.primitiveFieldRef() *= level(V, 1).primitiveField()/Vn;
 
     for (label k = 2; k < a.size(); ++k)
     {
-        tsum.ref() -= a[k]*level(vf, k);
-    }
+        sum.primitiveFieldRef() -=
+            a[k]*(level(V, k).primitiveField()/Vn)
+           *level(vf, k).primitiveField();
 
-    if (weighted)
-    {
-        const volScalarField& V = cellVolumes();
-        const scalarField& Vn = mesh().V();
-
-        auto& s = tsum.ref().primitiveFieldRef();
-        s = -a[1]*(level(V, 1).primitiveField()/Vn)*level(vf, 1).primitiveField();
-
-        for (label k = 2; k < a.size(); ++k)
+        forAll(bsum, patchi)
         {
-            s -= a[k]*(level(V, k).primitiveField()/Vn)
-               *level(vf, k).primitiveField();
+            bsum[patchi] -= a[k]*level(vf, k).boundaryField()[patchi];
         }
     }
 
@@ -416,25 +453,35 @@ tmp<GeometricField<Type, fvPatchField, volMesh>> bdfDdtScheme<Type>::history
     (
         -a[1]*level(rho, 1)*level(vf, 1)
     );
+    GeometricField<Type, fvPatchField, volMesh>& sum = tsum.ref();
+
+    if (!weighted)
+    {
+        for (label k = 2; k < a.size(); ++k)
+        {
+            sum -= a[k]*level(rho, k)*level(vf, k);
+        }
+
+        return tsum;
+    }
+
+    const volScalarField& V = cellVolumes();
+    const scalarField& Vn = mesh().V();
+    auto& bsum = sum.boundaryFieldRef();
+
+    sum.primitiveFieldRef() *= level(V, 1).primitiveField()/Vn;
 
     for (label k = 2; k < a.size(); ++k)
     {
-        tsum.ref() -= a[k]*level(rho, k)*level(vf, k);
-    }
+        sum.primitiveFieldRef() -=
+            a[k]*(level(V, k).primitiveField()/Vn)
+           *level(rho, k).primitiveField()*level(vf, k).primitiveField();
 
-    if (weighted)
-    {
-        const volScalarField& V = cellVolumes();
-        const scalarField& Vn = mesh().V();
-
-        Field<Type>& s = tsum.ref().primitiveFieldRef();
-        s = -a[1]*(level(V, 1).primitiveField()/Vn)
-           *level(rho, 1).primitiveField()*level(vf, 1).primitiveField();
-
-        for (label k = 2; k < a.size(); ++k)
+        forAll(bsum, patchi)
         {
-            s -= a[k]*(level(V, k).primitiveField()/Vn)
-               *level(rho, k).primitiveField()*level(vf, k).primitiveField();
+            bsum[patchi] -=
+                a[k]*level(rho, k).boundaryField()[patchi]
+               *level(vf, k).boundaryField()[patchi];
         }
     }
 
@@ -460,27 +507,37 @@ tmp<GeometricField<Type, fvPatchField, volMesh>> bdfDdtScheme<Type>::history
     (
         -a[1]*level(alpha, 1)*level(rho, 1)*level(vf, 1)
     );
+    GeometricField<Type, fvPatchField, volMesh>& sum = tsum.ref();
+
+    if (!weighted)
+    {
+        for (label k = 2; k < a.size(); ++k)
+        {
+            sum -= a[k]*level(alpha, k)*level(rho, k)*level(vf, k);
+        }
+
+        return tsum;
+    }
+
+    const volScalarField& V = cellVolumes();
+    const scalarField& Vn = mesh().V();
+    auto& bsum = sum.boundaryFieldRef();
+
+    sum.primitiveFieldRef() *= level(V, 1).primitiveField()/Vn;
 
     for (label k = 2; k < a.size(); ++k)
     {
-        tsum.ref() -= a[k]*level(alpha, k)*level(rho, k)*level(vf, k);
-    }
+        sum.primitiveFieldRef() -=
+            a[k]*(level(V, k).primitiveField()/Vn)
+           *level(alpha, k).primitiveField()*level(rho, k).primitiveField()
+           *level(vf, k).primitiveField();
 
-    if (weighted)
-    {
-        const volScalarField& V = cellVolumes();
-        const scalarField& Vn = mesh().V();
-
-        Field<Type>& s = tsum.ref().primitiveFieldRef();
-        s = -a[1]*(level(V, 1).primitiveField()/Vn)
-           *level(alpha, 1).primitiveField()*level(rho, 1).primitiveField()
-           *level(vf, 1).primitiveField();
-
-        for (label k = 2; k < a.size(); ++k)
+        forAll(bsum, patchi)
         {
-            s -= a[k]*(level(V, k).primitiveField()/Vn)
-               *level(alpha, k).primitiveField()*level(rho, k).primitiveField()
-               *level(vf, k).primitiveField();
+            bsum[patchi] -=
+                a[k]*level(alpha, k).boundaryField()[patchi]
+               *level(rho, k).boundaryField()[patchi]
+               *level(vf, k).boundaryField()[patchi];
         }
     }
 
@@ -685,7 +742,8 @@ bdfDdtScheme<Type>::fvmDdt
 
     fvm.diag() = (a[0]*rDeltaT)*mesh().V();
 
-    // On a moving mesh the weighted history gives sum_k (-a_k) V^(n+1-k) vf^(n+1-k)
+    // On a moving mesh the weighted history gives
+    // sum_k (-a_k) V^(n+1-k) vf^(n+1-k)
     fvm.source() =
         rDeltaT*mesh().V()*history(vf, a, mesh().moving())().primitiveField();
 
@@ -1097,7 +1155,8 @@ tmp<surfaceScalarField> bdfDdtScheme<Type>::meshPhi
     }
 
     // The mesh flux whose divergence is the formula applied to the volumes:
-    // sum_k a_k V^(n+1-k) = sum_j b_j (V^(n+1-j) - V^(n-j)), b_j = a_0 + .. + a_j,
+    // sum_k a_k V^(n+1-k) = sum_j b_j (V^(n+1-j) - V^(n-j)),
+    // b_j = a_0 + .. + a_j,
     // and the mesh flux of step n+1-j integrates to that step's change of
     // volume over its own dt, so meshPhi = sum_j b_j (dt_j/dt) meshPhi^(n+1-j)
     // over the q steps used. Only BDF 2 may have dt_1 != dt.

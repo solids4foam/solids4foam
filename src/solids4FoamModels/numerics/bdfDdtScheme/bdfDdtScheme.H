@@ -76,8 +76,9 @@ Description
     convergence study either supply the history - write the old-time fields
     (U_0, U_0_0, ...) into the start time, which OpenFOAM reads back with
     distinct time indices - or start from a solution whose low derivatives
-    vanish at t = 0. A restart finds the old-time fields the previous run
-    wrote and resumes at full order.
+    vanish at t = 0. On a static mesh a restart finds the old-time fields
+    the previous run wrote and resumes at full order; on a moving mesh it
+    does not (see Moving meshes).
 
     Fields without stored history. A field may have fewer stored old levels
     than U, e.g. a rho derived rather than read on restart. Its copied levels
@@ -103,7 +104,10 @@ Description
     corrections, therefore keep q old levels in memory from the first step,
     q + 1 copies of the field in all. At each write time q - 1 of them are
     written as well, which is all a restart needs: BDF 3 writes U_0 and
-    U_0_0, and BDF 6 writes U_0 to U_0_0_0_0_0.
+    U_0_0, and BDF 6 writes U_0 to U_0_0_0_0_0. On a moving mesh the cell
+    volumes and the mesh flux meshPhi keep q old levels as well; the volumes
+    are not written, and the old mesh fluxes (meshPhi_0, meshPhi_0_0, ...)
+    are written at each write time where OpenFOAM registers the mesh flux.
 
     Time step. BDF 1 and BDF 2 support a variable time step, including
     adjustTimeStep yes. BDF 2 then uses the variable-step coefficients
@@ -141,27 +145,46 @@ Description
     fvMesh keeps only two old volumes, so the scheme keeps its own: a
     registered field of cell volumes ("bdfDdt:V") that is set to the current
     volumes at every call and whose old-time levels are shifted with the
-    fields' (so it holds the volumes the previous steps ended with, however
-    many times the mesh moved within a step). The order on a moving mesh is
-    also limited by the number of volume levels available. The mesh flux of
+    fields'. Once the mesh has moved on a step, level 1 is set from fvMesh's
+    V0, so the levels hold the volumes the previous steps ended with,
+    however many times the mesh moves within a step and whether or not it
+    moves again after the last ddt call of a step (as the FSI interfaces'
+    additionalMeshCorrection does). The order on a moving mesh is also
+    limited by the number of volume levels available. The mesh flux of
     order q, returned by meshPhi, is the combination of the stored mesh
     fluxes whose divergence is the same formula applied to the volumes
     themselves,
 
     \verbatim
-        meshPhi^(n+1) = sum_{j=0..q-1} b_j (dt^(n+1-j)/dt^(n+1)) meshPhi^(n+1-j),
-        b_j = sum_{i=0..j} a_i
+        meshPhi^(n+1) = sum_j b_j (dt^(n+1-j)/dt^(n+1)) meshPhi^(n+1-j),
+        b_j = sum_{i=0..j} a_i,  j = 0..q-1
     \endverbatim
 
     which satisfies the geometric conservation law exactly, as the mesh flux
     of each step integrates to that step's change of volume, and is
     backward's 3/2 meshPhi - 1/2 meshPhi^0 at order 2 (its variable-step
     form too). The test application Test-bdfDdtMovingMesh checks the orders,
-    the conservation law and the implicit form on a prescribed mesh motion.
+    the conservation law and the implicit form on a prescribed mesh motion,
+    also with the mesh moved again after the last ddt call of each step.
 
     The flux corrections used by the pressure-velocity coupling (ddtCorr) are
     the same q-th order combination applied to the old fluxes and the old
     interpolated velocities, the direct generalisation of backward's.
+
+    Restart on a moving mesh. The volume history is not written, and fvMesh
+    writes the mesh flux but, in OpenFOAM-v2412 for example, not its old
+    levels, so after a restart the order on a moving mesh ramps up from
+    Euler again over the first steps, as on a fresh start, although the
+    fields' old levels are read back.
+
+    FSI. Parts of the fluid models and FSI boundary conditions choose their
+    form by the name of the ddt scheme, "Euler" or "backward": the Robin
+    interface updates of pimpleFluid and fluidModel, elasticWallVelocity,
+    elasticSlipWallVelocity, newMovingWallVelocity and the Robin coefficient
+    of elasticWallPressure. With BDF they take their Euler form or skip the
+    update, so the Robin-Neumann coupling is not yet consistent with a fluid
+    ddt of order 2 or above, and BDF 2 does not reproduce backward exactly in
+    FSI.
 
 Author
     David Kelly, UCD.
@@ -237,8 +260,14 @@ class bdfDdtScheme
         label order(const GeoField& vf) const;
 
         //- The registered field of cell volumes, set to the current volumes,
-        //  with its old levels: V^(n+1-k) is level(cellVolumes(), k)
+        //  with its old levels: V^(n+1-k) is level(cellVolumes(), k). Level
+        //  1 is set from fvMesh's V0 once the mesh has moved on this step.
         const volScalarField& cellVolumes() const;
+
+        //- Whether the mesh has moved on this time step, i.e. the mesh flux
+        //  has been set on it. Checked without the side effects of
+        //  fvMesh::phi().
+        bool meshMoved() const;
 
         //- Order usable on this step for a formula involving two fields:
         //  the lower of their orders

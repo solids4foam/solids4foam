@@ -46,8 +46,18 @@ Description
     ramps 1, 2, ..., q over the first steps and reaches q by the final step
     (the case has many more steps than 6).
 
+    With -moveAfterDdt the mesh is moved twice on each step: 2% past its
+    position (g scaled by 1.02) before the ddt terms are evaluated, and to
+    its position after them, as the FSI interfaces' final mesh correction
+    (additionalMeshCorrection) moves it after the last ddt call of a step.
+    The volumes a step ends with are then not those of its last ddt call.
+    The ddt error is not measured, as the evaluation position is not the
+    exact one, but the implicit form and the geometric conservation law
+    must still hold to round-off.
+
     Usage: Test-bdfDdtMovingMesh [-deltaT dt] [-endTime T] [-poly]
-    prints one line per order; see Allrun for the convergence study.
+    [-moveAfterDdt] prints one line per order; see case/regressionTest.sh
+    for the convergence study.
 
 \*---------------------------------------------------------------------------*/
 
@@ -75,6 +85,12 @@ int main(int argc, char *argv[])
         "poly",
         "polynomial motion and fields: BDFq must be exact for order q"
     );
+    argList::addBoolOption
+    (
+        "moveAfterDdt",
+        "evaluate the ddt terms 2% past the mesh position, then move the mesh"
+        " to it: checks the implicit form and the conservation law only"
+    );
 
     #include "setRootCase.H"
     #include "createTime.H"
@@ -89,6 +105,7 @@ int main(int argc, char *argv[])
         runTime.setEndTime(args.get<scalar>("endTime"));
     }
     const bool poly = args.found("poly");
+    const bool moveAfterDdt = args.found("moveAfterDdt");
 
     const scalar deltaT = runTime.deltaTValue();
     const label nSteps = round(runTime.endTime().value()/deltaT);
@@ -100,7 +117,10 @@ int main(int argc, char *argv[])
     const scalar omega = 2*constant::mathematical::pi;
 
     auto g = [&](const scalar t) { return poly ? t : Foam::sin(omega*t); };
-    auto dg = [&](const scalar t) { return poly ? 1.0 : omega*Foam::cos(omega*t); };
+    auto dg = [&](const scalar t)
+    {
+        return poly ? 1.0 : omega*Foam::cos(omega*t);
+    };
     auto shape = [&](const auto& x)
     {
         return eps*L*Foam::sin(constant::mathematical::pi*x/L);
@@ -188,24 +208,32 @@ int main(int argc, char *argv[])
 
     // Absolute maxima over the run, normalised at the end by the maxima of
     // the quantities themselves (the instantaneous ones pass through zero)
-    scalarList ddtErr(maxOrder, 0.0), fvmErr(maxOrder, 0.0), gclErr(maxOrder, 0.0);
-    scalarList ddtScale(maxOrder, 0.0), gclScale(maxOrder, 0.0);
+    scalarList ddtErr(maxOrder, 0.0);
+    scalarList fvmErr(maxOrder, 0.0);
+    scalarList gclErr(maxOrder, 0.0);
+    scalarList ddtScale(maxOrder, 0.0);
+    scalarList gclScale(maxOrder, 0.0);
     scalar geomErr = 0;
+
+    // Move the mesh to the displacement factor gt
+    auto moveMesh = [&](const scalar gt)
+    {
+        pointField newPoints(X);
+        forAll(newPoints, pointi)
+        {
+            newPoints[pointi].x() = X[pointi].x() + shape(X[pointi].x())*gt;
+        }
+        mesh.movePoints(newPoints);
+    };
 
     for (label step = 1; step <= nSteps; ++step)
     {
         runTime++;
         const scalar t = runTime.value();
 
-        pointField newPoints(X);
-        forAll(newPoints, pointi)
-        {
-            newPoints[pointi].x() = X[pointi].x() + shape(X[pointi].x())*g(t);
-        }
-        mesh.movePoints(newPoints);
+        moveMesh(moveAfterDdt ? 1.02*g(t) : g(t));
 
         const scalarField V(Vexact(t));
-        geomErr = max(geomErr, gMax(mag(V - mesh.V()))/gMax(V));
 
         for (label q = maxOrder; q >= 1; --q)
         {
@@ -231,7 +259,7 @@ int main(int argc, char *argv[])
 
             const volScalarField ddt(scheme.fvcDdt(psi));
             ddtScale[q - 1] = max(ddtScale[q - 1], gMax(mag(exact)));
-            if (measure)
+            if (measure && !moveAfterDdt)
             {
                 ddtErr[q - 1] = max
                 (
@@ -264,6 +292,14 @@ int main(int argc, char *argv[])
                 gMax(mag(ddtOne.primitiveField() - divMeshPhi.primitiveField()))
             );
         }
+
+        // The position of the step, after its last ddt call
+        if (moveAfterDdt)
+        {
+            moveMesh(g(t));
+        }
+
+        geomErr = max(geomErr, gMax(mag(V - mesh.V()))/gMax(V));
     }
 
     for (label q = 1; q <= maxOrder; ++q)
@@ -275,12 +311,19 @@ int main(int argc, char *argv[])
 
     Info<< "deltaT " << deltaT << " steps " << nSteps
         << " motion " << (poly ? "polynomial" : "smooth")
+        << (moveAfterDdt ? ", moved after the ddt terms" : "")
         << " geometry error " << geomErr << nl;
 
     for (label q = 1; q <= maxOrder; ++q)
     {
-        Info<< "BDF " << q << ": ddt error " << ddtErr[q - 1]
-            << " fvm-fvc " << fvmErr[q - 1]
+        Info<< "BDF " << q << ":";
+
+        if (!moveAfterDdt)
+        {
+            Info<< " ddt error " << ddtErr[q - 1];
+        }
+
+        Info<< " fvm-fvc " << fvmErr[q - 1]
             << " GCL " << gclErr[q - 1] << nl;
     }
 

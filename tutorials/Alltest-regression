@@ -195,6 +195,7 @@ REGRESSION_TESTS=(
     "../applications/test/mechanicalConstitutiveLawChecks/case"
     "../applications/test/immersedSurfaceTraction/case"
     "../applications/test/circulationNetworkChecks/case"
+    "../applications/test/bdfDdtMovingMesh/case"
 )
 
 failures=0

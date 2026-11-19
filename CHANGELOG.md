@@ -121,11 +121,18 @@ release. For complete commit-level details and contributor information, see the
   cell integrals with the volumes of the previous steps, which the scheme
   keeps itself (fvMesh stores only two), and its mesh flux is the combination
   of the stored mesh fluxes that satisfies the geometric conservation law
-  exactly, reducing to `backward`'s at order 2. `Test-bdfDdtMovingMesh`
-  (`applications/test/bdfDdtMovingMesh`, with its own `Allrun`) checks the
-  observed orders 1 to 6, the conservation law, the agreement of the implicit
-  and explicit forms and exactness for time polynomials on a prescribed mesh
-  motion, against the exact rate of change of the cell integrals.
+  exactly, reducing to `backward`'s at order 2. The volume history holds the
+  volumes each step ended with, also when the mesh moves again after the last
+  ddt call of a step (`additionalMeshCorrection`). On a moving mesh a restart
+  ramps the order up from Euler again, and the Robin-Neumann FSI coupling,
+  which selects its form by the names `Euler` and `backward`, is not yet
+  consistent with `BDF`. The `bdfDdtMovingMesh` regression test
+  (`applications/test/bdfDdtMovingMesh/case`) runs `Test-bdfDdtMovingMesh`,
+  which checks the observed orders 1 to 6, the conservation law, the
+  agreement of the implicit and explicit forms and exactness for time
+  polynomials on a prescribed mesh motion, against the exact rate of change
+  of the cell integrals, and the conservation law with the mesh moved after
+  the last ddt call of each step.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A
