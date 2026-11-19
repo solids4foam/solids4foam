@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const {collect, changed, formatSecond, runFable, marker, fable} = require('./secondReview.cjs');
+const {collect, changed, formatSecond, runFable, labelRaise, parseArgs, marker, fable} =
+  require('./secondReview.cjs');
 const {buildPrompt, inputFile} = require('./claudeReview.cjs');
 
 const pr = {number: 7, state: 'open', draft: false, head: {sha: 'c'.repeat(40)},
@@ -82,14 +83,14 @@ test('Fable second review runs the CI analysis with separate system and untruste
   };
   const c = collect(7, fakeApi());
   const result = await runFable(c, dir, {ANTHROPIC_API_KEY: 'k', OTHER: 'x'}, analyse);
-  assert.deepEqual(result, {raw: report, served: null});
+  assert.equal(result, report);
   assert.equal(seen.env.CLAUDE_REVIEW_MODEL, 'claude-fable-5-2');
   assert.equal(seen.env.CLAUDE_REVIEW_EFFORT, 'high');
   assert.equal(seen.env.OTHER, undefined);
   assert.equal(seen.input.system + '\n\n' + seen.input.data, c.prompt);
 });
 
-test('Fable second review needs a key and reports analysis failure and fallback', async () => {
+test('Fable second review needs a key; analysis failure and any fallback model fail', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-fable-'));
   const c = collect(7, fakeApi());
   await assert.rejects(runFable(c, dir, {}, async () => {}), /ANTHROPIC_API_KEY/);
@@ -97,19 +98,38 @@ test('Fable second review needs a key and reports analysis failure and fallback'
     core.setOutput('conclusion', 'failure');
     core.setFailed('AI analysis failed: timeout');
   }), /timeout/);
-  const served = await runFable(c, dir, {ANTHROPIC_API_KEY: 'k'}, async ({core}) => {
+  await assert.rejects(runFable(c, dir, {ANTHROPIC_API_KEY: 'k'}, async ({core}) => {
     core.setOutput('report', report);
     core.setOutput('conclusion', 'success');
     core.setOutput('telemetry', JSON.stringify({served_model: 'claude-opus-5-5'}));
-  });
-  assert.equal(served.served, 'claude-opus-5-5');
+  }), /fallback model claude-opus-5-5 answered.*not an independent second review/);
 });
 
 test('Fable second review comment names the model and the weaker independence', () => {
   const body = formatSecond({pr, coverage: {status: 'complete', omitted: []}, floor: 'HIGH'},
-    report, {...fable, served: 'claude-opus-5-5'});
+    report, fable);
   assert.match(body, /Model: claude-fable-5-2 \(Anthropic Messages API\); effort: high/);
-  assert.match(body, /Served by fallback model claude\\-opus\\-5\\-5/);
   assert.match(body, /shares its model family/);
   assert.ok(!body.includes('gpt-6-astra'));
+});
+
+test('options are parsed strictly; a mistyped option never changes the reviewer silently', () => {
+  assert.deepEqual(parseArgs(['726']), {model: 'astra', post: false, trustedRef: null, number: 726});
+  assert.equal(parseArgs(['726', '--model', 'fable', '--post']).model, 'fable');
+  assert.equal(parseArgs(['--model=fable', '726']).model, 'fable');
+  assert.equal(parseArgs(['726', '--trusted-ref=test-branch']).trustedRef, 'test-branch');
+  for (const bad of [[], ['726', '--modle', 'fable'], ['726', '--model'], ['726', '--model=opus'],
+    ['726', '727'], ['726', '--Post'], ['abc']]) {
+    assert.equal(parseArgs(bad), null, bad.join(' '));
+  }
+});
+
+test('a second review only ever raises the ai-risk label', () => {
+  assert.deepEqual(labelRaise(['bug'], 'MEDIUM'), {remove: [], add: 'ai-risk: medium'});
+  assert.deepEqual(labelRaise(['ai-risk: medium', 'bug'], 'HIGH'),
+    {remove: ['ai-risk: medium'], add: 'ai-risk: high'});
+  assert.equal(labelRaise(['ai-risk: high'], 'MEDIUM'), null);
+  assert.equal(labelRaise(['ai-risk: medium'], 'MEDIUM'), null);
+  assert.deepEqual(labelRaise(['ai-risk: low', 'ai-review: incomplete'], 'HIGH'),
+    {remove: ['ai-risk: low'], add: 'ai-risk: high'});
 });

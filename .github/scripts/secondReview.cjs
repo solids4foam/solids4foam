@@ -5,11 +5,16 @@
 //
 //   node .github/scripts/secondReview.cjs <PR number> [--model fable] [--post]
 //
+// With --post it also raises the PR's ai-risk label if this review rates the
+// risk higher than the label shows; it never lowers it.
+//
 // The default reviewer is Codex (gpt-6-astra, xhigh), a different model family
 // from the CI report. --model fable uses Claude Fable 5.2 (high) through the
 // Messages API instead: the same no-tool request, validation and fallback as
 // CI, with the maintainer's ANTHROPIC_API_KEY. It shares the CI report's model
-// family, so it is a substitute, not the preferred second reviewer.
+// family, so it is a substitute, not the preferred second reviewer. If Fable
+// declines and the API's fallback serves another model (possibly the CI
+// reviewer itself), the run fails rather than posting a non-independent review.
 //
 // --trusted-ref=<branch> reads the instructions and skill from another
 // upstream branch instead of the PR's base; use it only for testing.
@@ -31,7 +36,7 @@ const repo = 'solids4foam/solids4foam';
 const model = 'gpt-6-astra';
 const effort = 'xhigh';
 const fable = {model: 'claude-fable-5-2', effort: 'high'};
-const marker = '<!-- solids4foam-ai-review-second -->';
+const marker = review.secondMarker;
 
 function run(cmd, args, input) {
   return execFileSync(cmd, args, {encoding: 'utf8', maxBuffer: 64 << 20, input,
@@ -114,7 +119,11 @@ async function runFable({system, data}, dir, env = process.env, analyse = review
     setFailed: message => { failure = message; }}}, runEnv);
   if (outputs.conclusion !== 'success') throw new Error(failure);
   const served = JSON.parse(outputs.telemetry || '{}').served_model;
-  return {raw: outputs.report, served: served && served !== fable.model ? served : null};
+  if (served && served !== fable.model) {
+    throw new Error(`${fable.model} declined and the fallback model ${served} answered. That is ` +
+      'not an independent second review, so nothing was posted. Use Codex instead.');
+  }
+  return outputs.report;
 }
 
 // Validated and escaped exactly like the CI report.
@@ -127,7 +136,6 @@ function formatSecond({pr, coverage, floor}, raw, reviewer = null) {
     '**Applies only if this SHA matches the current PR head.**\n\n' +
     (reviewer ?
       `Model: ${reviewer.model} (Anthropic Messages API); effort: ${reviewer.effort}.` +
-      (reviewer.served ? ` **Served by fallback model ${review.plain(reviewer.served)}** after a safety decline.` : '') +
       ' Run locally by a core maintainer with the same instructions, repository guide and ' +
       'patches as the Claude report. It did not see that report or any PR comment, but it ' +
       'shares its model family, so overlapping findings are weaker evidence than agreement ' +
@@ -153,28 +161,67 @@ function post(number, body, dir) {
   return JSON.parse(run('gh', ['api', '-X', method, endpoint, '--input', file])).html_url;
 }
 
+// The label change that raises the PR's ai-risk label to `risk`, or null if
+// the label already shows that risk or higher. Other labels are untouched.
+function labelRaise(names, risk) {
+  const present = review.risks.filter(r => names.includes(review.riskLabels[r]));
+  const shown = present.length ? present[present.length - 1] : null;
+  if (shown && review.classifyRisk(shown, risk) === shown) return null;
+  return {remove: present.map(r => review.riskLabels[r]), add: review.riskLabels[risk]};
+}
+function raiseLabel(number, risk, dir) {
+  const names = githubApi.list(`repos/${repo}/issues/${number}/labels?per_page=100`).map(l => l.name);
+  const change = labelRaise(names, risk);
+  if (!change) return null;
+  for (const name of change.remove) {
+    run('gh', ['api', '-X', 'DELETE', `repos/${repo}/issues/${number}/labels/${encodeURIComponent(name)}`]);
+  }
+  const file = path.join(dir, 'labels.json');
+  fs.writeFileSync(file, JSON.stringify({labels: [change.add]}));
+  run('gh', ['api', '-X', 'POST', `repos/${repo}/issues/${number}/labels`, '--input', file]);
+  return change.add;
+}
+
+// Options: --post, --model <astra|fable> or --model=<...>, --trusted-ref=<branch>.
+// Anything else is an error, so a mistyped option never silently changes the run.
+function parseArgs(argv) {
+  const options = {model: 'astra', post: false, trustedRef: null, number: null};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--post') options.post = true;
+    else if (arg === '--model') options.model = argv[++i];
+    else if (arg.startsWith('--model=')) options.model = arg.slice(8);
+    else if (arg.startsWith('--trusted-ref=')) options.trustedRef = arg.slice(14) || null;
+    else if (/^\d+$/.test(arg) && options.number === null) options.number = Number(arg);
+    else return null;
+  }
+  if (!Number.isSafeInteger(options.number) || options.number < 1 ||
+      !['astra', 'fable'].includes(options.model)) return null;
+  return options;
+}
+
 async function main(argv) {
-  const modelIndex = argv.indexOf('--model');
-  const choice = modelIndex >= 0 ? argv[modelIndex + 1] : 'astra';
-  const number = Number(argv.find((arg, i) => !arg.startsWith('--') &&
-    (modelIndex < 0 || i !== modelIndex + 1)));
-  if (!Number.isSafeInteger(number) || number < 1 || !['astra', 'fable'].includes(choice)) {
-    console.error('Usage: node .github/scripts/secondReview.cjs <PR number> [--model astra|fable] [--post]');
+  const options = parseArgs(argv);
+  if (!options) {
+    console.error('Usage: node .github/scripts/secondReview.cjs <PR number> ' +
+      '[--model astra|fable] [--post] [--trusted-ref=<branch>]');
     process.exit(2);
   }
+  const {number, trustedRef} = options;
+  const choice = options.model;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-second-review-'));
   console.error(`Collecting PR #${number} from ${repo} (trusted files from its base branch)...`);
-  const trustedRef = argv.find(arg => arg.startsWith('--trusted-ref='))?.slice(14) || null;
   if (trustedRef) console.error(`Testing: trusted files from ${trustedRef}, not the PR's base branch.`);
   const collected = collect(number, githubApi, trustedRef);
-  let body;
+  let body, raw;
   if (choice === 'fable') {
     console.error(`Running ${fable.model} (${fable.effort}); this can take several minutes...`);
-    const {raw, served} = await runFable(collected, dir);
-    body = formatSecond(collected, raw, {...fable, served});
+    raw = await runFable(collected, dir);
+    body = formatSecond(collected, raw, fable);
   } else {
     console.error(`Running ${model} (${effort}); this can take several minutes...`);
-    body = formatSecond(collected, runCodex(collected.prompt, dir));
+    raw = runCodex(collected.prompt, dir);
+    body = formatSecond(collected, raw);
   }
   fs.writeFileSync(path.join(dir, 'comment.md'), body);
   if (changed(collected.pr, githubApi.json(`repos/${repo}/pulls/${number}`))) {
@@ -182,8 +229,12 @@ async function main(argv) {
       `Rerun the review. Report: ${dir}/comment.md`);
     process.exit(1);
   }
-  if (argv.includes('--post')) console.log(`Posted: ${post(number, body, dir)}`);
-  else {
+  if (options.post) {
+    console.log(`Posted: ${post(number, body, dir)}`);
+    const risk = review.classifyRisk(review.validate(raw.trim()).risk, collected.floor);
+    const raised = raiseLabel(number, risk, dir);
+    if (raised) console.log(`Raised the PR label to "${raised}".`);
+  } else {
     console.log(`Report: ${dir}/comment.md\nTo publish it: gh pr comment ${number} ` +
       `-R ${repo} --body-file ${dir}/comment.md`);
   }
@@ -192,4 +243,5 @@ async function main(argv) {
 if (require.main === module) {
   main(process.argv.slice(2)).catch(error => { console.error(error.message); process.exit(1); });
 }
-module.exports = {collect, changed, formatSecond, runFable, marker, model, effort, fable};
+module.exports = {collect, changed, formatSecond, runFable, labelRaise, parseArgs, marker, model,
+  effort, fable};

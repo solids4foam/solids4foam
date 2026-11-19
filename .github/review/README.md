@@ -70,10 +70,16 @@ Each report states the rule for its risk and links the process.
 
 The publisher labels each PR with its risk: `ai-risk: low`, `ai-risk: medium`
 or `ai-risk: high`, plus `ai-review: incomplete` when no successful review
-exists (which is also labelled HIGH). It replaces only these four labels and
-updates them on every published report; a suppressed (stale) run leaves them
-unchanged. A label failure is a warning, not a failed run: the comment is
-authoritative. Labels added with the workflow token do not trigger new runs.
+exists (which is also labelled HIGH). The label shows the highest AI
+assessment: this report's risk, raised by any second-review comment whose
+author is an owner, member or collaborator (others could copy the marker; a
+counted comment can only raise the risk). Reports then state the higher rule.
+The publisher reads the labels just before updating them, replaces only these
+four, and updates them on every published report; a suppressed (stale) run
+leaves them unchanged. `secondReview.cjs --post` also raises the label when its
+own risk is higher, and never lowers it. A label failure is a warning, not a
+failed run: the comment is authoritative. Labels added with the workflow token
+do not trigger new runs.
 
 The workflow runs one strong reviewer at every risk level. See the [model
 policy](model-policy.md) for the planned risk-dependent reviewers, verified API
@@ -111,12 +117,16 @@ purpose, and failing closed means no code can run. Do not enable it.
 
 `--model fable` is the substitute when Codex is unavailable: Claude Fable 5.2
 at high effort, through the same `analyse` function as CI (no tools,
-structured output, validation, one retry, server-side fallback). It needs
+structured output, validation, one retry). If Fable declines and the
+server-side fallback answers with another model, which could be the CI
+reviewer itself, the script fails without posting, because that would not be
+an independent review. It needs
 `ANTHROPIC_API_KEY` set to a key with Fable access, billed to that key's
 workspace, and the pinned SDK (`npm ci --prefix .github/scripts
 --ignore-scripts`). Its comment says it shares the Claude report's model
 family, so agreement is weaker evidence. It suits MEDIUM risk; for HIGH, use it
-only when a core maintainer judges the classification borderline. Fable 5.2
+only when the core maintainer running it judges the classification
+borderline, and say so on the PR. Fable 5.2
 requires 30-day data retention on the API account; confirm that is acceptable
 before first use.
 
@@ -241,10 +251,13 @@ waiting as the server's Retry-After asks. SDK retries are off, so every request
 is counted. Each request allows up to 40,000 output tokens (USD 0.80 at most
 at Opus 5.5 prices of USD 4/20 per million input/output tokens) and a full
 prompt budget of about 250,000 input tokens (about USD 1). A small PR costs a
-few cents; a 335 KB patch such as #719 costs about USD 1. A safety fallback
-can re-run a request on the fallback model inside the same request, which adds
-its tokens. Set a monthly spending limit on the API workspace below the
-available credit.
+few cents. #719 (335 KB of raw patches, 403 KB as the escaped prompt) costs
+about USD 1. At the old 90 KB budget its partial review used 37,000 input
+tokens and took 63 seconds; both models have 1M-token context, and reading
+input is fast, so the deadline should hold. Check the first large live run.
+A safety fallback can re-run a request on the fallback model inside the same
+request, which adds its tokens. Set a monthly spending limit on the API
+workspace below the available credit.
 Opus 5.5 and explicit high effort are selected in the workflow. Organisation
 spending limits are still needed: a public contributor can trigger repeated
 runs. Concurrency cancels older runs for the same PR. Reports include the

@@ -2,7 +2,8 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {prepare, publish, validate, classifyRisk, formatAssessment, pathRisk, riskFloor, buildPrompt, schema,
-  limits, maxReportBytes, commentLimit, promptBudget, setRiskLabels} = require('./claudeReview.cjs');
+  limits, maxReportBytes, commentLimit, promptBudget, setRiskLabels, secondReviewRisk,
+  secondMarker} = require('./claudeReview.cjs');
 
 // prepare() hands the prompt to analyse() in a file under RUNNER_TEMP.
 process.env.RUNNER_TEMP = fs.mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 's4f-review-'));
@@ -17,11 +18,12 @@ function fixture(filename = 'README.md', patch = '@@ -1 +1 @@\n-old\n+new') {
   const files = [{filename, patch, status: 'modified'}];
   const github = {
     rest: {pulls: {get: async () => ({data: current}), listFiles: {}},
-      issues: {listComments: {}, createComment: async args => comments.push(args),
+      issues: {listComments: {}, listLabelsOnIssue: {}, createComment: async args => comments.push(args),
         updateComment: async args => comments.push(args),
         addLabels: async args => labels.push(['add', ...args.labels]),
         removeLabel: async args => labels.push(['remove', args.name])}},
-    paginate: async endpoint => endpoint === github.rest.issues.listComments ? existingComments : files
+    paginate: async endpoint => endpoint === github.rest.issues.listComments ? existingComments :
+      endpoint === github.rest.issues.listLabelsOnIssue ? current.labels || [] : files
   };
   const context = {repo: {owner: 'example', repo: 'test'},
     payload: {pull_request: pr}, serverUrl: 'https://github.com', runId: 123};
@@ -256,7 +258,7 @@ test('MEDIUM/HIGH and failed reports ask a maintainer for the second review', as
     if (risk === 'HIGH') {
       assert.match(body, /both core maintainers must approve/);
       assert.match(body, /- \[ \] Both core maintainers approve/);
-      assert.match(body, /use it only if a core maintainer judges the classification borderline/);
+      assert.match(body, /use it only if the core maintainer running it judges the\s+classification borderline/);
     } else {
       assert.match(body, /one core maintainer may merge/);
       assert.ok(!body.includes('Both core maintainers approve'));
@@ -314,7 +316,7 @@ test('suppressed publication leaves labels unchanged', async () => {
 
 test('setRiskLabels falls back to HIGH for an unknown risk', async () => {
   const f = fixture();
-  await setRiskLabels(f.github, f.context, 42, {labels: []}, 'UNKNOWN', false);
+  await setRiskLabels(f.github, f.context, 42, 'UNKNOWN', false);
   assert.deepEqual(f.labels, [['add', 'ai-risk: high']]);
 });
 
@@ -743,4 +745,54 @@ test('the transient retry waits as the server asks, within the deadline', async 
     mockClient(new sdk.RateLimitError(429, {type: 'error'}, 'SECRET', new Headers({'retry-after': '3600'}))));
   assert.equal(JSON.parse(core.outputs.telemetry).failure_reason, 'rate_limited');
   assert.equal(JSON.parse(core.outputs.telemetry).attempts, 1);
+});
+
+const secondComment = (risk, author_association = 'OWNER') => ({id: 9, user: {login: 'maintainer'},
+  author_association, body: `${secondMarker}\n## Second independent AI review\n\n` +
+    `**Status: analysis completed.**\n\n**Risk: ${risk}** (path floor: LOW)\n`});
+
+test('second-review risk counts only maintainer comments and takes the highest', () => {
+  assert.equal(secondReviewRisk([]), null);
+  assert.equal(secondReviewRisk([secondComment('MEDIUM'), secondComment('HIGH', 'MEMBER')]), 'HIGH');
+  assert.equal(secondReviewRisk([secondComment('HIGH', 'CONTRIBUTOR'),
+    secondComment('HIGH', 'NONE'), secondComment('LOW', 'COLLABORATOR')]), 'LOW');
+  assert.equal(secondReviewRisk([{author_association: 'OWNER', body: '**Risk: HIGH**'}]), null);
+});
+
+test('a higher maintainer second review raises the label and the merge rule', async () => {
+  const f = fixture();
+  f.existingComments.push(secondComment('HIGH'));
+  await publish(f, env({REVIEW_JSON: response('MEDIUM'), RISK_FLOOR: 'MEDIUM'}));
+  const body = f.comments[0].body;
+  assert.match(body, /\*\*Risk: MEDIUM\*\*/);  // this report's own assessment is unchanged
+  assert.match(body, /rated this PR HIGH, above this report's MEDIUM, so the HIGH rule applies/);
+  assert.match(body, /both core maintainers must approve/);
+  assert.deepEqual(f.labels, [['add', 'ai-risk: high']]);
+});
+
+test('a lower or non-maintainer second review never lowers the risk', async () => {
+  for (const comment of [secondComment('LOW'), secondComment('HIGH', 'CONTRIBUTOR')]) {
+    const f = fixture();
+    f.existingComments.push(comment);
+    await publish(f, env({REVIEW_JSON: response('MEDIUM'), RISK_FLOOR: 'MEDIUM'}));
+    assert.deepEqual(f.labels, [['add', 'ai-risk: medium']]);
+    assert.ok(!f.comments[0].body.includes('so the HIGH rule applies'));
+  }
+});
+
+test('labels are read fresh at update time, not from the earlier PR snapshot', async () => {
+  const f = fixture();
+  f.current.labels = [];
+  let reads = 0;
+  const paginate = f.github.paginate;
+  f.github.paginate = async (endpoint, args) => {
+    if (endpoint === f.github.rest.issues.listLabelsOnIssue) {
+      reads++;
+      return [{name: 'ai-risk: low'}];
+    }
+    return paginate(endpoint, args);
+  };
+  await publish(f, env());
+  assert.equal(reads, 1);
+  assert.deepEqual(f.labels, []);
 });

@@ -13,7 +13,8 @@ step, MEDIUM/HIGH and failed reports ask a core maintainer to run
 (`gpt-6-astra`, `xhigh`) without the first report and posts a separate,
 validated comment. When Codex is unavailable, `--model fable` uses Claude
 Fable 5.2 (`high`) instead; it shares the first report's family, so it suits
-MEDIUM risk and borderline HIGH only. Two separate comments are not yet one
+MEDIUM risk and borderline HIGH only, and a fallback to another model fails
+the run. Two separate comments are not yet one
 consolidated report;
 the [README](README.md#second-independent-ai-review-interim-manual) gives
 details. These manual pairs will show how often the reviewers agree and differ,

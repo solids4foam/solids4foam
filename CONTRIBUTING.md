@@ -121,8 +121,16 @@ automatically. It authorises the review only, not a merge.
 
 Risk follows the consequences of a change, not its size. Changes to core
 numerics, solvers, FSI coupling, CI or agent configuration are at least HIGH
-by path. If you think the risk is too low, say so on the PR; the higher risk
-applies.
+by path. The highest assessment applies: if a second review or a maintainer
+rates the risk higher, follow the higher risk's rule and say so on the PR. A
+second review posted with `--post` raises the label automatically, and later
+Claude reports keep that higher risk. Labels are never lowered by a second
+review.
+
+The reviews see the changed lines with three lines of context each, as in the
+GitHub diff, not whole files. Unchanged code next to a change, such as the
+other half of an edited function, is not reviewed. Human reviewers and private
+agents with a full checkout cover that.
 
 ### 2. Merge rules
 
@@ -156,8 +164,10 @@ node .github/scripts/secondReview.cjs <PR number> --model fable --post
 ```
 
 Fable shares the first report's model family, so agreement is weaker
-evidence. It is fine for MEDIUM. For HIGH, use it only if a core maintainer
-judges the classification borderline and says so on the PR. Findings from
+evidence. It is fine for MEDIUM. For HIGH, use it only if the core maintainer
+running it judges the classification borderline and says so on the PR. If
+Fable declines and the API answers with another model, the script stops
+without posting; use Codex. Findings from
 either review are addressed by the author, with reviewers' help, before merge.
 A report whose SHA no longer matches the PR head is historical only.
 
