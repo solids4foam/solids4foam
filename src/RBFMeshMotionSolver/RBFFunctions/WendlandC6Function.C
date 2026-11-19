@@ -39,6 +39,13 @@ namespace rbf
         if ( 1 - value < 0 )
             return 0;
 
-        return std::pow( 1 - value, 8 ) * (32 * std::pow( value, 3 ) + 25 * std::pow( value, 2 ) + 8 * value + 1);
+        return
+            std::pow( 1 - value, 8 )
+          * (
+                32 * std::pow( value, 3 )
+              + 25 * std::pow( value, 2 )
+              + 8 * value
+              + 1
+            );
     }
 }

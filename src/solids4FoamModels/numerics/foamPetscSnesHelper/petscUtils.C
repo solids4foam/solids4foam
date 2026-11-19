@@ -75,7 +75,8 @@ void Foam::PetscUtils::setFlags
         }
         else
         {
-            // Has a value (assume single-token PETSc option values, e.g. "newtonls")
+            // Has a value (assume single-token PETSc option values, e.g.
+            // "newtonls")
             const word val = e.get<word>();  // safe because nTok>0
             if (verbose)
             {

@@ -85,8 +85,8 @@ private:
         const label faceOrder_;
 
         //- Minimum area ratio of triangle subelement area and face area
-        //  below which decomposition method is changed from fan triangulation to
-        //  triangulation using geometric centre
+        //  below which decomposition method is changed from fan triangulation
+        //  to triangulation using geometric centre
         static const scalar minTriAreaRatio_;
 
         //-  Minimum ratio of triangle and circum-circle area,

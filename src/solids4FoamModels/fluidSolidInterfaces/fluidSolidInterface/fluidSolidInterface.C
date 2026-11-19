@@ -259,7 +259,10 @@ void Foam::fluidSolidInterface::checkFluidInterfaceVelocity()
          || Up.type() == "noSlip"
         )
         {
-            FatalErrorIn("void fluidSolidInterface::checkFluidInterfaceVelocity()")
+            FatalErrorIn
+            (
+                "void fluidSolidInterface::checkFluidInterfaceVelocity()"
+            )
                 << "The fluid velocity " << U.name() << " on the coupled "
                 << "interface patch " << Up.patch().name() << " is of type "
                 << Up.type() << ", which ignores the motion of the interface: "
@@ -1438,7 +1441,8 @@ void Foam::fluidSolidInterface::initializeFields()
         const label nFluidFaces = fluidZone(interfaceI).size();
         const label nSolidFaces = solidZone(interfaceI).size();
 
-        fluidZonesPointsDispls_[interfaceI] = vectorField(nPoints, vector::zero);
+        fluidZonesPointsDispls_[interfaceI] =
+            vectorField(nPoints, vector::zero);
 
         fluidZonesPointsDisplsRef_[interfaceI] =
             vectorField(nPoints, vector::zero);
@@ -2169,7 +2173,8 @@ Foam::scalar Foam::fluidSolidInterface::updateResidual()
         }
 
         // We will use two definitions of residual
-        scalar residualNorm1 = Foam::sqrt(gSum(magSqr(residuals()[interfaceI])));
+        scalar residualNorm1 =
+            Foam::sqrt(gSum(magSqr(residuals()[interfaceI])));
         scalar residualNorm2 = residualNorm1;
 
         if (residualNorm1 > maxResidualsNorm_[interfaceI])
@@ -2745,7 +2750,8 @@ void Foam::fluidSolidInterface::updateElasticWallPressureAcceleration()
             )
         )
         {
-            Info<< "Setting acceleration and previous pressure at fluid side of "
+            Info<< "Setting acceleration and previous pressure at fluid "
+                   "side of "
                 << "the interface: "
                 << fluidMesh().boundary()
                    [

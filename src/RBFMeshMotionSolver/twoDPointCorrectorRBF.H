@@ -57,7 +57,7 @@ class twoDPointCorrectorRBF
     // Private data
 
         // - Reference to moving mesh
-        const polyMesh & mesh_;
+        const polyMesh& mesh_;
 
         // - Holder for marker value: -1 if on "back" side and 0 otherwise
         labelList pointMarker_;
@@ -72,10 +72,10 @@ class twoDPointCorrectorRBF
     // Private Member Functions
 
         // - Disallow default bitwise copy construct
-        twoDPointCorrectorRBF( const twoDPointCorrectorRBF & );
+        twoDPointCorrectorRBF(const twoDPointCorrectorRBF &);
 
         // - Disallow default bitwise assignment
-        void operator=( const twoDPointCorrectorRBF & );
+        void operator=(const twoDPointCorrectorRBF &);
 
         void setMarker();
 
@@ -84,7 +84,7 @@ class twoDPointCorrectorRBF
     // Constructors
 
         // - Construct from components
-        twoDPointCorrectorRBF( const polyMesh & mesh );
+        twoDPointCorrectorRBF(const polyMesh& mesh);
 
 
     // Destructor
@@ -94,9 +94,9 @@ class twoDPointCorrectorRBF
 
     // Member Functions
 
-        const labelList & marker() const;
+        const labelList& marker() const;
 
-        void setShadowSide(vectorField & newpoints) const;
+        void setShadowSide(vectorField& newpoints) const;
 };
 
 } // End namespace Foam

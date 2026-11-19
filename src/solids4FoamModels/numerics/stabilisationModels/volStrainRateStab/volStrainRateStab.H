@@ -34,13 +34,13 @@ Description
     current (future-time extrapolated) and previous time levels, and C(mode)
     is a scaling coefficient that depends on the selected mode:
 
-    Mode                  C(mode)              Vanishes as
-    ──────────────────    ─────────────────    ─────────────────────────────────────
-    physicalDamping       tau/deltaT           never (permanent physical viscosity)
-    firstOrderTemporal    1                    O(deltaT)   as deltaT -> 0
-    secondOrderTemporal   deltaT               O(deltaT^2) as deltaT -> 0
-    spatioTemporal        h^2/m^2              O(h^2*deltaT) as h,deltaT -> 0
-    h2PhysicalDamping     h^2/(m^2*deltaT)     O(h^2) as h->0; O(1) as deltaT->0
+    Mode                C(mode)            Vanishes as
+    ──────────────────  ─────────────────  ─────────────────────────────────────
+    physicalDamping     tau/deltaT         never (permanent physical viscosity)
+    firstOrderTemporal  1                  O(deltaT)   as deltaT -> 0
+    secondOrderTemporal deltaT             O(deltaT^2) as deltaT -> 0
+    spatioTemporal      h^2/m^2            O(h^2*deltaT) as h,deltaT -> 0
+    h2PhysicalDamping   h^2/(m^2*deltaT)   O(h^2) as h->0; O(1) as deltaT->0
 
     Notes on scaleFactor and dimensional consistency
     ─────────────────────────────────────────────────

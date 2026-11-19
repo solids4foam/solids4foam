@@ -30,7 +30,12 @@ namespace Foam
 {
     defineTypeNameAndDebug(faceAreaWeightAMIS4F, 0);
     addToRunTimeSelectionTable(AMIInterpolationS4F, faceAreaWeightAMIS4F, dict);
-    addToRunTimeSelectionTable(AMIInterpolationS4F, faceAreaWeightAMIS4F, component);
+    addToRunTimeSelectionTable
+    (
+        AMIInterpolationS4F,
+        faceAreaWeightAMIS4F,
+        component
+    );
 }
 
 // * * * * * * * * * * * * * Protected Member Functions  * * * * * * * * * * //
@@ -609,7 +614,10 @@ Foam::faceAreaWeightAMIS4F::faceAreaWeightAMIS4F
 {}
 
 
-Foam::faceAreaWeightAMIS4F::faceAreaWeightAMIS4F(const faceAreaWeightAMIS4F& ami)
+Foam::faceAreaWeightAMIS4F::faceAreaWeightAMIS4F
+(
+    const faceAreaWeightAMIS4F& ami
+)
 :
     advancingFrontAMIS4F(ami),
     restartUncoveredSourceFace_(ami.restartUncoveredSourceFace_)

@@ -21,7 +21,7 @@
     // Add consistency term
     if (consistentRhieChow_ && !steadyState)
     {
-        Info << "Applying Rhie-Chow consistency correction" << endl;
+        Info<< "Applying Rhie-Chow consistency correction" << endl;
 
         // Euler (and trapezoidal)
         // if (runTime().timeIndex()>0)
@@ -124,7 +124,7 @@
                 )
             )
             {
-                // Info << mesh().boundary()[patchI].name() << endl;
+                // Info<< mesh().boundary()[patchI].name() << endl;
 
                 phi_.boundaryField()[patchI] = 0;
                 // phi0_.boundaryField()[patchI] = 0;

@@ -80,7 +80,7 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 
         fvPatchField<vector>::operator==
         (
-	    patch().nf()*dispSeries_(this->db().time().timeOutputValue())
+            patch().nf()*dispSeries_(this->db().time().timeOutputValue())
         );
     }
     else
@@ -89,7 +89,7 @@ normalDisplacementFvPatchVectorField::normalDisplacementFvPatchVectorField
 
         fvPatchField<vector>::operator==
         (
-	    patch().nf()*normalDisp_
+            patch().nf()*normalDisp_
         );
     }
 }

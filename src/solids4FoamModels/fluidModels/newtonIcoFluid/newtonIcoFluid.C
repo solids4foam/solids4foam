@@ -847,7 +847,11 @@ newtonIcoFluid::newtonIcoFluid
 
         if (stabDict.found("type"))
         {
-            legacyPressureStabSubDict.add("type", word(stabDict.lookup("type")));
+            legacyPressureStabSubDict.add
+            (
+                "type",
+                word(stabDict.lookup("type"))
+            );
         }
         else
         {
@@ -1184,7 +1188,11 @@ void newtonIcoFluid::setDeltaT(Time& runTime)
             runTime.controlDict().lookupOrDefault<int>("maxTargetNIter", 6);
 
         const Switch enableTimeStepLog =
-            runTime.controlDict().lookupOrDefault("logTimeStepAdjustments", true);
+            runTime.controlDict().lookupOrDefault
+            (
+                "logTimeStepAdjustments",
+                true
+            );
 
         PetscInt numIter;
         SNESGetIterationNumber(foamPetscSnesHelper::snes(), &numIter);

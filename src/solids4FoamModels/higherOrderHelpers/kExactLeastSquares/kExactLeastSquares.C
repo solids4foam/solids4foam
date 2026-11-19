@@ -20,8 +20,7 @@ License
 #include "kExactLeastSquares.H"
 #include "addToRunTimeSelectionTable.H"
 #include "HashSet.H"
-#include "fixedDisplacementFvPatchVectorField.H"
-#include "fixedRotationFvPatchVectorField.H"
+#include "patchQuadratureValues.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -574,7 +573,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -1614,7 +1613,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -1725,7 +1724,7 @@ kExactLeastSquares::QRSolution kExactLeastSquares::QRSolve
 
      result.A = Rbar.colPivHouseholderQr().solve(QbarBhat);
 
-     if(calcConditionNumber_)
+     if (calcConditionNumber_)
      {
          Eigen::JacobiSVD<Eigen::MatrixXd> svd
          (
@@ -1748,7 +1747,7 @@ void kExactLeastSquares::calcCellCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -2207,7 +2206,7 @@ void kExactLeastSquares::calcCellCoeffs() const
     }
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -2373,12 +2372,11 @@ void kExactLeastSquares::fGrad
 
 autoPtr<CompactListList<scalar>> kExactLeastSquares::patchFaceQuadValues
 (
-    const volScalarField&,
-    const label
+    const volScalarField& vf,
+    const label patchI
 ) const
 {
-    NotImplemented;
-    return autoPtr<CompactListList<scalar>>();
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 
@@ -2388,31 +2386,7 @@ autoPtr<CompactListList<vector>> kExactLeastSquares::patchFaceQuadValues
     const label patchI
 ) const
 {
-    const fvPatchField<vector>& pf = vf.boundaryField()[patchI];
-
-    if (isA<fixedDisplacementFvPatchVectorField>(pf))
-    {
-        const fixedDisplacementFvPatchVectorField& patchField =
-            refCast<const fixedDisplacementFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-    else if (isA<fixedRotationFvPatchVectorField>(pf))
-    {
-        const fixedRotationFvPatchVectorField& patchField =
-            refCast<const fixedRotationFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-
-    FatalErrorInFunction
-        << "Patch " << patchI << " fixes displacement, but quadrature-point "
-        << "evaluation is only implemented for "
-        << fixedDisplacementFvPatchVectorField::typeName << " and "
-        << fixedRotationFvPatchVectorField::typeName
-        << abort(FatalError);
-
-    return autoPtr<CompactListList<vector>>();
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 

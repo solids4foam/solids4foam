@@ -125,7 +125,8 @@ public:
 //         virtual void evaluate
 //         (
 // #ifdef OPENFOAM_NOT_EXTEND
-//             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+//             const Pstream::commsTypes commsType =
+//                 Pstream::commsTypes::blocking
 // #else
 //             const Pstream::commsTypes commsType = Pstream::blocking
 // #endif

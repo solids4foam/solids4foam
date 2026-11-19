@@ -50,7 +50,7 @@ void rbfInterfaceToInterfaceMapping::transferFacesZoneToZone
     // Transfer fromField into matrix format
     matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
     matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
-    for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+    for (int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
     {
         const scalarField fromFieldCmptI(fromField.component(cmptI));
 
@@ -88,7 +88,7 @@ void rbfInterfaceToInterfaceMapping::transferFacesZoneToZone
     }
 
     // Transfer toField from matrix format into field
-    for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+    for (int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
     {
         scalarField toFieldCmptI(toField.size(), 0.0);
 
@@ -125,7 +125,7 @@ void rbfInterfaceToInterfaceMapping::transferPointsZoneToZone
     // Transfer fromField into matrix format
     matrix fromRbfField(fromField.size(), int(pTraits<Type>::nComponents));
     matrix toRbfField(toField.size(), int(pTraits<Type>::nComponents));
-    for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+    for (int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
     {
         const scalarField fromFieldCmptI(fromField.component(cmptI));
 
@@ -163,7 +163,7 @@ void rbfInterfaceToInterfaceMapping::transferPointsZoneToZone
     }
 
     // Transfer toField from matrix format into field
-    for(int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
+    for (int cmptI = 0; cmptI < pTraits<Type>::nComponents; cmptI++)
     {
         scalarField toFieldCmptI(toField.size(), 0.0);
 

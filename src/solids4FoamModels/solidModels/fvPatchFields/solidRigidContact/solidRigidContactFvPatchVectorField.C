@@ -136,7 +136,7 @@ void Foam::solidRigidContactFvPatchVectorField::makeFrictionModels
 {
     frictionModels_.setSize(shadowTriSurfNames().size());
 
-    forAll (frictionModels_, triSurfI)
+    forAll(frictionModels_, triSurfI)
     {
         // Check if only one shadow patch is defined
         const dictionary* contactDictPtr = NULL;

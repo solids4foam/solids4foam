@@ -137,7 +137,8 @@ void amiInterfaceToInterfaceMapping::transferPointsZoneToZone
                 FatalErrorIn
                 (
                     "void\n"
-                    "Foam::amiInterfaceToInterfaceMapping::transferPointsZoneToZone\n"
+                    "Foam::amiInterfaceToInterfaceMapping::"
+                    "transferPointsZoneToZone\n"
                     "(\n"
                     "    ...\n"
                     ") const"
@@ -185,7 +186,8 @@ void amiInterfaceToInterfaceMapping::transferPointsZoneToZone
                 FatalErrorIn
                 (
                     "void\n"
-                    "Foam::amiInterfaceToInterfaceMapping::transferPointsZoneToZone\n"
+                    "Foam::amiInterfaceToInterfaceMapping::"
+                    "transferPointsZoneToZone\n"
                     "(\n"
                     "    ...\n"
                     ") const"

@@ -212,7 +212,10 @@ pointStandardPenalty::pointStandardPenalty
     penaltyFactor_(-1),
     penaltyScale_
     (
-        pointNormalContactModelDict_.lookupOrDefault<scalar>("penaltyScale", 1.0)
+        pointNormalContactModelDict_.lookupOrDefault<scalar>
+        (
+            "penaltyScale", 1.0
+        )
     ),
     relaxFac_
     (
@@ -293,7 +296,8 @@ void pointStandardPenalty::correct
 
     //         FatalErrorIn(type())
     //             << "areaInContact is less than zero!" << nl
-    //             << "areaInContact[" << faceI << "] = " << areaInContact[faceI]
+    //             << "areaInContact[" << faceI << "] = "
+    //             << areaInContact[faceI]
     //             << nl
     //             << "vertexValue = " << vertexValue << nl
     //             << endl;
@@ -361,7 +365,8 @@ void pointStandardPenalty::correct
     // Under-relax pressure
     // Note: slavePressure_ is really a traction vector
     slavePressure_ =
-        -relaxFac_*totalSlavePointPressure*slavePatchPointNormals + (1.0 - relaxFac_)*slavePressure();
+        -relaxFac_*totalSlavePointPressure*slavePatchPointNormals
+      + (1.0 - relaxFac_)*slavePressure();
 }
 
 
@@ -376,7 +381,10 @@ scalar pointStandardPenalty::penaltyFactor() const
 }
 
 
-scalar pointStandardPenalty::updatePenaltyScale(const scalar previousPenaltyScale)
+scalar pointStandardPenalty::updatePenaltyScale
+(
+    const scalar previousPenaltyScale
+)
 {
     if (previousPenaltyScale > 0.0)
     {

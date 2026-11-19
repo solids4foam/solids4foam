@@ -136,7 +136,8 @@ int main(int argc, char *argv[])
                 // compare each point with all the refFace points
                 forAll(faces[refFace], refFacePointi)
                 {
-                    label refFaceGlobalPointLabel = faces[refFace][refFacePointi];
+                    label refFaceGlobalPointLabel =
+                        faces[refFace][refFacePointi];
                     if (globalPointLabel == refFaceGlobalPointLabel)
                     {
                         faceHasNoCommonPoints = false;
@@ -204,7 +205,8 @@ int main(int argc, char *argv[])
            if (!ppFound)
            {
                 FatalError
-                    << "\n\nCannot find point point opposite reference face points,"
+                    << "\n\nCannot find point point opposite reference face "
+                       "points,"
                     << " some thing strange is happening..."
                     << endl
                     << exit(FatalError);
@@ -242,17 +244,20 @@ int main(int argc, char *argv[])
     Info<< "Writing node sets for each boundary patch" << endl;
     forAll(mesh.boundaryMesh(), patchi)
     {
-        Info<< "\tWriting points on patch " << mesh.boundaryMesh()[patchi].name()
+        Info<< "\tWriting points on patch "
+            << mesh.boundaryMesh()[patchi].name()
             << " to nodeSet" << mesh.boundaryMesh()[patchi].name() << endl;
 
         // Node set name
         abaqusInp
-            << "*Nset, nset=nodeSet" << mesh.boundaryMesh()[patchi].name() << endl;
+            << "*Nset, nset=nodeSet" << mesh.boundaryMesh()[patchi].name()
+            << endl;
 
         // Node labels
         forAll(mesh.boundaryMesh()[patchi].meshPoints(), pointi)
         {
-            label globalPointi = mesh.boundaryMesh()[patchi].meshPoints()[pointi];
+            label globalPointi =
+                mesh.boundaryMesh()[patchi].meshPoints()[pointi];
             abaqusInp
                 << globalPointi + 1;
             // a comma after every label except the last
@@ -268,7 +273,12 @@ int main(int argc, char *argv[])
             }
 
             // put 10 labels on each line for tidiness
-            if (pointi % 10 == 0 && pointi != 0 && pointi != (mesh.boundaryMesh()[patchi].meshPoints().size()-1))
+            if
+            (
+                pointi % 10 == 0
+             && pointi != 0
+             && pointi != (mesh.boundaryMesh()[patchi].meshPoints().size()-1)
+            )
             {
                abaqusInp
                    << endl;
@@ -289,7 +299,8 @@ int main(int argc, char *argv[])
 
         // Element set name
         abaqusInp
-            << "*Elset, elset=elementSet" << mesh.boundaryMesh()[patchi].name() << endl;
+            << "*Elset, elset=elementSet"
+            << mesh.boundaryMesh()[patchi].name() << endl;
 
         // Element labels
         forAll(mesh.boundaryMesh()[patchi].faceCells(), celli)
@@ -310,7 +321,12 @@ int main(int argc, char *argv[])
              }
 
              // put 10 labels on each line for tidiness
-             if (celli % 10 == 0 && celli != 0 && celli != (mesh.boundaryMesh()[patchi].size()-1))
+             if
+             (
+                 celli % 10 == 0
+              && celli != 0
+              && celli != (mesh.boundaryMesh()[patchi].size()-1)
+             )
              {
                  abaqusInp
                      << endl;
@@ -338,7 +354,8 @@ int main(int argc, char *argv[])
     if (materialsHeader.headerOk())
 #endif
     {
-        Info<< "Reading materials field and writing each material to an element set"
+        Info<< "Reading materials field and writing each material to an "
+               "element set"
             << endl;
 
         volScalarField materials(materialsHeader, mesh);
@@ -366,7 +383,11 @@ int main(int argc, char *argv[])
         );
         forAll(materialsOrdered, matOrderi)
         {
-             materialsOrdered[matOrderi].setSize(cellsOfEachMaterial[matOrderi], 0);
+             materialsOrdered[matOrderi].setSize
+             (
+                 cellsOfEachMaterial[matOrderi],
+                 0
+             );
              label mc = 0;
              forAll(materialsI, celli)
              {
@@ -378,7 +399,8 @@ int main(int argc, char *argv[])
                 }
              }
 
-             Info<< "\tWriting " << cellsOfEachMaterial[matOrderi] << " cells of material "
+             Info<< "\tWriting " << cellsOfEachMaterial[matOrderi]
+                 << " cells of material "
                  << matOrderi << " to elementSetMaterial" << matOrderi << endl;
              abaqusInp
                  << "*Elset, elset=elementSetMaterial" << matOrderi << endl;
@@ -401,7 +423,8 @@ int main(int argc, char *argv[])
     }
     else
     {
-        Info<< "No materials file present so no material element sets will be written"
+        Info<< "No materials file present so no material element sets will be "
+               "written"
             << endl << endl;
     }
     Info<< endl;
@@ -418,7 +441,8 @@ int main(int argc, char *argv[])
 
         // Surface name
         abaqusInp
-            << "*Surface, type=ELEMENT, name=surface" << mesh.boundaryMesh()[patchi].name() << endl;
+            << "*Surface, type=ELEMENT, name=surface"
+            << mesh.boundaryMesh()[patchi].name() << endl;
 
         // the face is denoted by either s1, s2, s3, s4, s5 or s6
         // so I have to find the exterior face of the element and
@@ -464,11 +488,12 @@ int main(int argc, char *argv[])
             abaqusInp
                 << (globalCelli + 1) << ", ";
 
-            // compare this face's points with the abaqusCellPoints and see which points
-            // are used, then compared the points used to the faces above to see which
-            // face it is
+            // compare this face's points with the abaqusCellPoints and see
+            // which points are used, then compared the points used to the
+            // faces above to see which face it is
             const labelList& facePoints = mesh.boundaryMesh()[patchi][facei];
-            const labelList& thisCellAbaqusPoints = abaqusCellPoints[globalCelli];
+            const labelList& thisCellAbaqusPoints =
+                abaqusCellPoints[globalCelli];
             labelList thisFaceAbaqusPoints(4, label(-1));
             label pointsFound = 0;
             forAll(thisCellAbaqusPoints, pointi)
@@ -498,7 +523,8 @@ int main(int argc, char *argv[])
             if (pointsFound != 4)
             {
                 FatalError
-                    << "Something is wrong while determing the surfaces from the patches"
+                    << "Something is wrong while determing the surfaces from "
+                       "the patches"
                     << endl << exit(FatalError);
             }
 
@@ -513,7 +539,11 @@ int main(int argc, char *argv[])
                 {
                     forAll(thisFaceAbaqusPoints, pi)
                     {
-                        if (thisFaceAbaqusPoints[pi] == abaqusFaceConvention[abqfacei][pointi])
+                        if
+                        (
+                            thisFaceAbaqusPoints[pi]
+                         == abaqusFaceConvention[abqfacei][pointi]
+                        )
                         {
                             pointsOnFace++;
                         }

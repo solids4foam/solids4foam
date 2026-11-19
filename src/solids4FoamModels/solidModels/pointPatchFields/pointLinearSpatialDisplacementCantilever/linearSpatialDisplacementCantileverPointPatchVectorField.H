@@ -16,18 +16,18 @@ License
     along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
 
 Class
-	linearSpatialDisplacementCantileverPointPatchVectorField
+    linearSpatialDisplacementCantileverPointPatchVectorField
 
 Description
     Displacement varying linearly in space as:
 
         u(x) = (v0*x/L)*t
 
-    where v0 is the initial velocity, L is the length of the cantilever, x are the
-    patch face centre positions, and t is the time of the simulation
+    where v0 is the initial velocity, L is the length of the cantilever, x are
+    the patch face centre positions, and t is the time of the simulation
 
 SourceFiles
-	linearSpatialDisplacementCantileverPointPatchVectorField.C
+    linearSpatialDisplacementCantileverPointPatchVectorField.C
 
 Author
     Federico Mazzanti, UCD.
@@ -124,7 +124,10 @@ public:
         {
             return autoPtr<pointPatchField<vector> >
             (
-                new linearSpatialDisplacementCantileverPointPatchVectorField(*this)
+                new linearSpatialDisplacementCantileverPointPatchVectorField
+                (
+                    *this
+                )
             );
         }
 #endif
@@ -144,7 +147,11 @@ public:
         {
             return autoPtr<pointPatchField<vector> >
             (
-                new linearSpatialDisplacementCantileverPointPatchVectorField(*this, iF)
+                new linearSpatialDisplacementCantileverPointPatchVectorField
+                (
+                    *this,
+                    iF
+                )
             );
         }
 

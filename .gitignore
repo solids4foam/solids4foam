@@ -110,3 +110,6 @@ compile_flags.txt
 .cache/
 
 # end-of-file
+
+# Pinned dependency of the advisory AI review scripts (npm ci)
+.github/scripts/node_modules/

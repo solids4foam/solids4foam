@@ -140,8 +140,8 @@ public:
         //                          and global syncing activities for points,
         //                          and fvSolution solvers dictionary
         //    location            - Optional: Location of the solution unknowns
-        //                          This is used to determine the local-to-global
-        //                          mapping
+        //                          This is used to determine the
+        //                          local-to-global mapping
         //    stopOnPetscError    - Optional: Give a FatalError when PETSc
         //                          returns an error
         //    initialise          - Optional: Initialise PETSc so that the
@@ -274,7 +274,8 @@ public:
                 Mat& jac,
                 const fvMesh& mesh,
                 const label blockSize,
-                const bool createMat = true  // MatCreate or similar should be called
+                const bool createMat = true  // MatCreate or similar should be
+                                             // called
             ) const;
 
             //- Initialise the solution vector based on the mesh and blockSize
@@ -284,7 +285,8 @@ public:
                 Vec& x,
                 const fvMesh& mesh,
                 const label blockSize,
-                const bool createVec = true  // VecCreate or similar should be called
+                const bool createVec = true  // VecCreate or similar should be
+                                             // called
             ) const;
 
 

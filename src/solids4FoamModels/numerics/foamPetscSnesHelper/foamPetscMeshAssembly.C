@@ -805,7 +805,8 @@ label foamPetscMeshAssembly::InsertFvmGradIntoPETScMatrix
                     //      patchOwnLs[patchFaceI]
                     //     *(patchVsf[patchFaceI] - vsf[faceCells[patchFaceI]]);
 
-                    // Subtract patchOwnLs[patchFaceI] from (faceCellI, faceCellI)
+                    // Subtract patchOwnLs[patchFaceI] from
+                    // (faceCellI, faceCellI)
                     // Nothing else to do as patch value is a known value
 
                     // Local block row ID
