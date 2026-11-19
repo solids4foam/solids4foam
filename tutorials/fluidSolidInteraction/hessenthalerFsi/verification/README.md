@@ -86,7 +86,7 @@ problem.
 Source OpenFOAM, build solids4foam with PETSc, and run from this directory:
 
 The `beta = 0.2` outlet needs the `backflowStabilisedOutletVelocity`
-condition of PR #676; without it, use `outlet=zg` or `outlet=inletOutlet`.
+condition of PR #735; without it, use `outlet=zg` or `outlet=inletOutlet`.
 
 ```bash
 ./Allverify --study solid                      # zero-flow problem, S1-S4

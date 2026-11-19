@@ -1389,7 +1389,7 @@ def set_outlet(case: Path, outlet: str) -> None:
     b02 is the backflow-stabilised traction of the benchmark definition
     (Hessenthaler et al. 2017, Eq. 9), sigma.n = beta*rho*min(u.n, 0)*u with
     beta = 0.2; its condition, backflowStabilisedOutletVelocity, is added by
-    solids4foam PR #676.
+    solids4foam PR #735.
     """
     if outlet == "inletOutlet":
         return
