@@ -9,8 +9,17 @@ source solids4FoamScripts.sh
 cleanCase
 rm -rf processor* force.pdf case.foam constant/polyMesh
 
-# Restore the stored case format
+# Restore the initial fields if ./Allrun shortOutlet stopped while they were
+# moved aside
+if [ -d 0.subsetMesh ] && [ ! -d 0 ]
+then
+    \mv 0.subsetMesh 0
+fi
+rm -rf 0.subsetMesh
+
+# Restore the stored case format and the default case variant
 solids4Foam::restoreCaseFormat .
+solids4Foam::restoreCaseVariant .
 
 # Reset the fluid model selected by ./Allrun <fluidModel>
 solids4Foam::requireGnuSed

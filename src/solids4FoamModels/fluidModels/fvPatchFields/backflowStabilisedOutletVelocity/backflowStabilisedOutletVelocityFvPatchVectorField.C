@@ -27,7 +27,7 @@ License
 Foam::scalar Foam::backflowStabilisedOutletVelocityFvPatchVectorField::nu()
 const
 {
-    if (nuFromDict_)
+    if (nu_ > 0)
     {
         return nu_;
     }
@@ -46,7 +46,46 @@ const
 
     const dimensionedScalar nu(transportProperties.lookup("nu"));
 
+    if (nu.value() <= 0)
+    {
+        FatalErrorIn
+        (
+            "backflowStabilisedOutletVelocityFvPatchVectorField::nu()"
+        )   << "nu in transportProperties must be positive for patch "
+            << patch().name() << abort(FatalError);
+    }
+
     return nu.value();
+}
+
+
+Foam::scalar Foam::backflowStabilisedOutletVelocityFvPatchVectorField::eps
+(
+    const volVectorField& U
+)
+{
+    if (smoothing_ <= 0)
+    {
+        return 0;
+    }
+
+    // eps is computed on the first evaluation of each time step, which every
+    // processor makes, as the time index is the same on all of them, so the
+    // global average below is called on all processors
+    const label timeIndex = db().time().timeIndex();
+
+    if (epsTimeIndex_ != timeIndex)
+    {
+        const vectorField UPold
+        (
+            U.oldTime().boundaryField()[patch().index()].patchInternalField()
+        );
+
+        eps_ = smoothing_*max(gAverage(mag(UPold)), SMALL);
+        epsTimeIndex_ = timeIndex;
+    }
+
+    return eps_;
 }
 
 
@@ -68,11 +107,7 @@ updateValueFraction()
     // between outflow and backflow. The smoothing velocity, eps, is a
     // fraction of the mean speed of the patch-adjacent cells at the
     // previous time step, so it is fixed during the solution of a time step
-    const vectorField UPold
-    (
-        U.oldTime().boundaryField()[patchID].patchInternalField()
-    );
-    const scalar eps = smoothing_*max(gAverage(mag(UPold)), SMALL);
+    const scalar eps = this->eps(U);
 
     // For Un > 0, the algebraically equal form -0.5*eps^2/(Un + sqrt(...))
     // avoids the cancellation of Un - sqrt(...), whose rounding error
@@ -120,7 +155,8 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     beta_(0.2),
     smoothing_(0.01),
     nu_(0),
-    nuFromDict_(false)
+    eps_(0),
+    epsTimeIndex_(-1)
 {
     refValue() = vector::zero;
     refGrad() = vector::zero;
@@ -141,7 +177,8 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     beta_(dict.lookupOrDefault<scalar>("beta", 0.2)),
     smoothing_(dict.lookupOrDefault<scalar>("smoothing", 0.01)),
     nu_(dict.lookupOrDefault<scalar>("nu", 0)),
-    nuFromDict_(dict.found("nu"))
+    eps_(0),
+    epsTimeIndex_(-1)
 {
     if (beta_ < 0)
     {
@@ -165,7 +202,7 @@ backflowStabilisedOutletVelocityFvPatchVectorField
             << exit(FatalIOError);
     }
 
-    if (nuFromDict_ && nu_ <= 0)
+    if (dict.found("nu") && nu_ <= 0)
     {
         FatalIOErrorIn
         (
@@ -208,7 +245,8 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     beta_(ptf.beta_),
     smoothing_(ptf.smoothing_),
     nu_(ptf.nu_),
-    nuFromDict_(ptf.nuFromDict_)
+    eps_(0),
+    epsTimeIndex_(-1)
 {}
 
 
@@ -224,7 +262,8 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     beta_(ptf.beta_),
     smoothing_(ptf.smoothing_),
     nu_(ptf.nu_),
-    nuFromDict_(ptf.nuFromDict_)
+    eps_(ptf.eps_),
+    epsTimeIndex_(ptf.epsTimeIndex_)
 {}
 #endif
 
@@ -241,7 +280,8 @@ backflowStabilisedOutletVelocityFvPatchVectorField
     beta_(ptf.beta_),
     smoothing_(ptf.smoothing_),
     nu_(ptf.nu_),
-    nuFromDict_(ptf.nuFromDict_)
+    eps_(ptf.eps_),
+    epsTimeIndex_(ptf.epsTimeIndex_)
 {}
 
 
@@ -281,7 +321,7 @@ void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::write
     Ostream& os
 ) const
 {
-    mixedFvPatchVectorField::write(os);
+    fvPatchVectorField::write(os);
 
     if (UName_ != "U")
     {
@@ -291,10 +331,16 @@ void Foam::backflowStabilisedOutletVelocityFvPatchVectorField::write
     os.writeKeyword("beta") << beta_ << token::END_STATEMENT << nl;
     os.writeKeyword("smoothing") << smoothing_ << token::END_STATEMENT << nl;
 
-    if (nuFromDict_)
+    if (nu_ > 0)
     {
         os.writeKeyword("nu") << nu_ << token::END_STATEMENT << nl;
     }
+
+#ifdef OPENFOAM_ORG
+    writeEntry(os, "value", *this);
+#else
+    writeEntry("value", os);
+#endif
 }
 
 

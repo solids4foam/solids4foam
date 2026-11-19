@@ -7,8 +7,10 @@
 # ./Allrun
 # ./Allrun newtonIcoFluid
 # ./Allrun pimpleFluid
+# ./Allrun shortOutlet newtonIcoFluid
 
 fluidModel=pimpleFluid
+shortOutlet=false
 
 print_usage()
 {
@@ -17,6 +19,8 @@ Usage:
   ./Allrun                    # default: pimpleFluid
   ./Allrun pimpleFluid        # run with pimpleFluid
   ./Allrun newtonIcoFluid     # run with newtonIcoFluid
+  ./Allrun shortOutlet [...]  # cut the channel 4 D behind the cylinder, with
+                              # a backflow-stabilised outlet
 EOF
 }
 
@@ -25,6 +29,9 @@ do
     case "$arg" in
         pimpleFluid|newtonIcoFluid)
             fluidModel=$arg
+            ;;
+        shortOutlet)
+            shortOutlet=true
             ;;
         help|-h|--help)
             print_usage
@@ -43,6 +50,20 @@ echo "Using ${fluidModel} fluid model"
 # Source solids4Foam scripts
 source solids4FoamScripts.sh
 
+# newtonIcoFluid uses the PETSc SNES solver
+if [[ "${fluidModel}" == "newtonIcoFluid" ]]
+then
+    solids4Foam::requirePetscOrExitSilently
+fi
+
+# Select the short-outlet variant of the initial velocity, or the default
+if [[ "${shortOutlet}" == "true" ]]
+then
+    solids4Foam::selectCaseVariant . shortOutlet
+else
+    solids4Foam::restoreCaseVariant .
+fi
+
 # Check case version is correct
 solids4Foam::convertCaseFormat .
 
@@ -54,11 +75,26 @@ solids4Foam::requireGnuSed
     constant/fluidProperties
 
 # Create the mesh
-solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh
-solids4Foam::runApplication changeDictionary
+solids4Foam::runApplication fluentMeshToFoam cylinderInChannel.msh || exit 1
+solids4Foam::runApplication changeDictionary || exit 1
+
+# Keep the cells up to 4 D behind the cylinder, so that the starting wake
+# crosses the outlet. The initial fields are uniform, so they are moved aside
+# rather than subset
+if [[ "${shortOutlet}" == "true" ]]
+then
+    solids4Foam::runApplication setSet -batch setSet.shortOutlet.batch \
+        || exit 1
+    \mv 0 0.subsetMesh
+    rc=0
+    solids4Foam::runApplication subsetMesh -overwrite keepCells \
+        -patch outlet || rc=$?
+    \mv 0.subsetMesh 0
+    [[ ${rc} -eq 0 ]] || exit 1
+fi
 
 # Run the solver
-solids4Foam::runApplication solids4Foam
+solids4Foam::runApplication solids4Foam || exit 1
 
 # Create plots
 if command -v gnuplot &> /dev/null
