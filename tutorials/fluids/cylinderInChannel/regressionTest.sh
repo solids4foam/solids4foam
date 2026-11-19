@@ -40,9 +40,13 @@ SHORT_DRAG_MAX=0.626
 SHORT_LIFT_MIN=0.020
 SHORT_LIFT_MAX=0.030
 
-# newtonIcoFluid gives a different solution from pimpleFluid for this case
-# whatever the outlet condition (final drag 0.6198 and lift 0.0182 at t = 5
-# in the full channel), so its short-outlet forces have their own bands
+# The newtonIcoFluid on development is not the latest version, which is on
+# feature-petsc-snes-quasi-monolithic. This version gives a different
+# solution from pimpleFluid for this case whatever the outlet condition
+# (final drag 0.6198 and lift 0.0182 at t = 5 in the full channel), so its
+# short-outlet forces have their own bands. With the latest newtonIcoFluid,
+# use the pimpleFluid force bands and a peak backflow band of
+# [0.0080, 0.0089] (0.847%; zero gradient 0.92%)
 NEWTON_DRAG_MIN=0.621
 NEWTON_DRAG_MAX=0.624
 NEWTON_LIFT_MIN=0.048
