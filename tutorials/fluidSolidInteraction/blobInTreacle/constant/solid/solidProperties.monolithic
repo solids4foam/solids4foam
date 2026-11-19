@@ -16,9 +16,12 @@ FoamFile
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-solidModel      linearGeometryVelocity;
+// Finite-strain velocity solid with the neo-Hookean law of
+// mechanicalProperties, the velocity form of the partitioned total Lagrangian
+// solid
+solidModel      nonLinearGeometryTotalLagrangianVelocity;
 
-linearGeometryVelocityCoeffs
+nonLinearGeometryTotalLagrangianVelocityCoeffs
 {
 }
 

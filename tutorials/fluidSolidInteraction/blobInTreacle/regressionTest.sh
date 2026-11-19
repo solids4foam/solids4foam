@@ -27,13 +27,12 @@ REF_DISP_END=0.135583
 REF_FORCE_END=15.7508
 
 # Reference values for the quasi-monolithic Newton coupling, which needs
-# OpenFOAM.com and PETSc: OpenFOAM v2512, serial, Linux. They agree with the
-# partitioned references above to 0.1% at t = 1 s and to 0.4% at the end
-# time; under mesh refinement both converge at second order to steady
-# displacements within 0.08% of each other
-MONO_REF_DISP_T1=0.0566067
-MONO_REF_DISP_END=0.116853
-MONO_REF_FORCE_END=15.7054
+# OpenFOAM.com and PETSc: OpenFOAM v2512, serial, Linux (GCC) and macOS
+# (Clang), which agree to all written digits. They agree with the partitioned
+# references above to 0.08% at t = 1 s and to 0.11% at the end time
+MONO_REF_DISP_T1=0.0596897
+MONO_REF_DISP_END=0.135732
+MONO_REF_FORCE_END=15.6327
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
