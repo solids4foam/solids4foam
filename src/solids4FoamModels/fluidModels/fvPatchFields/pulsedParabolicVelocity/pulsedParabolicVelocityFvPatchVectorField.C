@@ -176,7 +176,11 @@ void pulsedParabolicVelocityFvPatchVectorField::write(Ostream& os) const
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-makePatchTypeField(fvPatchVectorField, pulsedParabolicVelocityFvPatchVectorField);
+makePatchTypeField
+(
+    fvPatchVectorField,
+    pulsedParabolicVelocityFvPatchVectorField
+);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

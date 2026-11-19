@@ -249,7 +249,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                             {
                                 values
                                 [
-                                    (cmptI + rowOffset)*blockSize + cmptJ + colOffset
+                                    (cmptI + rowOffset)*blockSize + cmptJ
+                                  + colOffset
                                 ] = curIntCoeffsPtr[cmptI];
                             }
                         }
@@ -285,7 +286,8 @@ label foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
                                 // Take care: we need to flip the sign
                                 values
                                 [
-                                    (cmptI + rowOffset)*blockSize + cmptJ + colOffset
+                                    (cmptI + rowOffset)*blockSize + cmptJ
+                                  + colOffset
                                 ] = -curNeiCoeffsPtr[cmptI];
                             }
                         }
@@ -360,8 +362,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
 
     if (location_ == solutionLocation::CELLS)
     {
-        // Loop over each block in vf and copy the selected components in x into the
-        // appropriate positions in vf.
+        // Loop over each block in vf and copy the selected components in x into
+        // the appropriate positions in vf.
         // The source index for cell 'cellI' is computed as:
         //   offset + (cellI*blockSize) + local component index.
         forAll(vf, cellI)
@@ -431,8 +433,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
         // 1 for scalar, 3 for vector, etc.)
         const label vfBlockSize = pTraits<Type>::nComponents;
 
-        // Decide which components to extract: if compIndices is empty, default to
-        // all components
+        // Decide which components to extract: if compIndices is empty, default
+        // to all components
         labelList compList;
         if (compIndices.size() == 0)
         {
@@ -447,8 +449,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
             compList = compIndices;
         }
 
-        // The number of components to extract per block is determined by the size of
-        // compList
+        // The number of components to extract per block is determined by the
+        // size of compList
         const label nCompToExtract = compList.size();
         // Extract the local processor values
         // Loop over each point in vf, which is owned by this processor, and
@@ -477,8 +479,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
             }
         }
 
-        // Extract values not owned by this processor; we need to sync these from
-        // other processors
+        // Extract values not owned by this processor; we need to sync these
+        // from other processors
         if (Pstream::parRun())
         {
             // Convert to the number of scalar unknowns on this processor but
@@ -488,8 +490,8 @@ void foamPetscSnesHelper::ExtractFieldComponents
             // Collect the global solution scalar indices of the non-local point
             // values
 
-            // Create a list of global indices on the on-proc points not owned by
-            // this proc
+            // Create a list of global indices on the on-proc points not owned
+            // by this proc
             List<PetscInt> indices(nNotOwnedByThisProc);
             label index = 0;
             const labelList& localToGlobalPointMap =

@@ -1,0 +1,49 @@
+#!/bin/bash
+# Plot columns of a circulationFoam results file by name (needs gnuplot).
+#
+#   circulationPlot [-o out.png] [-t tmin:tmax] results.dat  column [column ...]
+#
+#   circulationPlot -t 19:20 postProcessing/circulation/0/circulation.dat LV.P art.C.P
+#   circulationPlot -o loop.png -t 19:20 circulation.dat LV.V art.C.V ven.C.V
+#
+# The column names are the headings on the second line of the results file
+# ("# t LV.P LV.V AV.Q ..."), also listed by  circulationPlot results.dat
+# Without -o the plot opens in a window; with -o it is written to a PNG.
+# Several columns share one axis; plot quantities of one kind together.
+out=""; trange=""
+while getopts "o:t:" opt; do
+    case $opt in
+        o) out=$OPTARG ;;
+        t) trange=$OPTARG ;;
+        *) sed -n 2,13p "$0"; exit 1 ;;
+    esac
+done
+shift $((OPTIND-1))
+file=$1; shift
+[ -f "$file" ] || { sed -n 2,13p "$0"; exit 1; }
+
+header=$(grep -m1 -E '^# t ' "$file")
+units=$(grep -m2 -E '^# ' "$file" | tail -1)
+if [ $# -eq 0 ]; then
+    echo "Columns in $file:"; echo "$header" | sed 's/^# //' | tr ' ' '\n' | grep -n . | sed 's/^/  /'
+    exit 0
+fi
+command -v gnuplot >/dev/null || { echo "gnuplot not found. The results are plain text (time, then one column per quantity):"; echo "  read them with any tool, or install gnuplot"; exit 1; }
+
+plot=""; ylabel=""
+for name in "$@"; do
+    col=$(echo "$header" | sed 's/^# //' | tr ' ' '\n' | grep -n -x -F -- "$name" | head -1 | cut -d: -f1)
+    [ -n "$col" ] || { echo "No column '$name'. Run  circulationPlot $file  to list them." >&2; exit 1; }
+    u=$(echo "$units" | sed 's/^# //' | tr ' ' '\n' | sed -n "${col}p")
+    [ -n "$ylabel" ] && [ "$u" != "$ylabel" ] && ylabel="$ylabel / $u" || ylabel=${ylabel:-$u}
+    plot="$plot${plot:+, }'$file' using 1:$col with lines lw 2 title '$name'"
+done
+
+cmds="set xlabel 't (s)'; set ylabel '$ylabel'; set grid; set key outside right top;"
+[ -n "$trange" ] && cmds="$cmds set xrange [${trange/:/:}];"
+if [ -n "$out" ]; then
+    cmds="set terminal pngcairo size 1000,500 font 'Helvetica,11'; set output '$out'; $cmds plot $plot"
+    gnuplot -e "$cmds" && echo "wrote $out"
+else
+    gnuplot -persist -e "$cmds plot $plot"
+fi

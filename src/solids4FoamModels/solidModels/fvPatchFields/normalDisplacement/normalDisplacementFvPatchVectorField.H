@@ -19,8 +19,8 @@ Class
     Foam::normalDisplacementFvPatchVectorField
 
 Description
-    Fixed or time-varying normal displacement boundary condition with boundary non-orthogonal
-    correction for solid solvers.
+    Fixed or time-varying normal displacement boundary condition with boundary
+    non-orthogonal correction for solid solvers.
 
 SourceFiles
     normalDisplacementFvPatchVectorField.C

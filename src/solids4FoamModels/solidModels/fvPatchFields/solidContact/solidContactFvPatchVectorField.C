@@ -143,7 +143,7 @@ void Foam::solidContactFvPatchVectorField::makeNormalModels
 {
     normalModels_.setSize(shadowPatchNames().size());
 
-    forAll (normalModels_, shadPatchI)
+    forAll(normalModels_, shadPatchI)
     {
         // Check if only one shadow patch is defined
         const dictionary* contactDictPtr = NULL;
@@ -204,7 +204,7 @@ void Foam::solidContactFvPatchVectorField::makeFrictionModels
 {
     frictionModels_.setSize(shadowPatchNames().size());
 
-    forAll (frictionModels_, shadPatchI)
+    forAll(frictionModels_, shadPatchI)
     {
         // Check if only one shadow patch is defined
         const dictionary* contactDictPtr = NULL;
@@ -462,8 +462,10 @@ Foam::solidContactFvPatchVectorField::solidContactFvPatchVectorField
         if (scaleFaceTractionsNearDownstreamPatch_)
         {
             WarningIn(type() + "::" + type())
-                << "scaleFaceTractionsNearDownstreamPatch can only be applied on"
-                << "the slave patch: this option will be ignored for the master "
+                << "scaleFaceTractionsNearDownstreamPatch can only be "
+                   "applied on"
+                << "the slave patch: this option will be ignored for the "
+                   "master "
                 << "patch!" << endl;
         }
     }
@@ -1174,9 +1176,11 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                     shadowZones()[shadPatchI].globalPointToPatch
                     (
 #ifdef OPENFOAM_NOT_EXTEND
-                        zoneToZones()[shadPatchI].targetPointDistanceToIntersection()
+                        zoneToZones()[shadPatchI]
+                       .targetPointDistanceToIntersection()
 #else
-                        zoneToZones()[shadPatchI].slavePointDistanceToIntersection()
+                        zoneToZones()[shadPatchI]
+                       .slavePointDistanceToIntersection()
 #endif
                     ),
                     // zoneToZones()[shadPatchI],
@@ -1194,9 +1198,9 @@ void Foam::solidContactFvPatchVectorField::updateCoeffs()
                     patchDDInterpToShadowPatch
                 );
                 // shadowPatchDD is the DU on the shadow patch, whereas
-                // patchDDInterpToShadowPatch is the master patch DU interpolated
-                // to the shadow; and the difference between these two is the
-                // (and slip also the normal component of DU)
+                // patchDDInterpToShadowPatch is the master patch DU
+                // interpolated to the shadow; and the difference between these
+                // two is the (and slip also the normal component of DU)
             }
 #ifdef FOAMEXTEND
             else

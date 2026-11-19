@@ -66,7 +66,6 @@ SourceFiles
 #include "leastSquaresStencil.H"
 #include "volFields.H"
 
-#include "fixedDisplacementFvPatchVectorField.H"
 #include "processorPolyPatch.H"
 #include "symmetryPolyPatch.H"
 #ifndef FOAMEXTEND
@@ -422,14 +421,6 @@ private:
         (
             const volVectorField& vf,
             CompactListList<tensor>& result
-        ) const;
-
-        //- Get patch face quadrature values
-        template<class Type>
-        autoPtr<CompactListList<Type>> patchFaceQuadValues
-        (
-            const GeometricField<Type, fvPatchField, volMesh>& vf,
-            const label patchI
         ) const;
 
         //- Get patch face quadrature values for scalar field

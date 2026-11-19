@@ -138,7 +138,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighbours3D
 
     // Since the parallelised search is done on the master, all of
     // slave face data is needed.  HJ, 27/Apr/2016
-    forAll (slavePatch_, faceSi)
+    forAll(slavePatch_, faceSi)
     {
         // Grab points from slave face
         pointField curFacePoints =
@@ -211,7 +211,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighbours3D
         faceMi < this->parMasterEnd();
         faceMi++
     )
-//     forAll (masterPatch_, faceMi)
+//     forAll(masterPatch_, faceMi)
     {
         // For each masterPatch faces, compute the bounding box. With
         // this, we compute the radius of the bounding sphere for this
@@ -234,7 +234,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighbours3D
 
         // This is the inner loop, so the face centres and face radii
         // for the slave faces are already pre-computed
-        forAll (slavePatch_, faceSi)
+        forAll(slavePatch_, faceSi)
         {
             // We test if the squared distance between the two face
             // centers is less than the sum of the 2 squared radii from
@@ -264,7 +264,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighbours3D
     result.setSize(parMasterSize());
 
     // Parallel search split: local size.  HJ, 27/Apr/2016
-    forAll (result, i)
+    forAll(result, i)
     {
         result[i].transfer(candidateMasterNeighbors[i].shrink());
     }
@@ -314,7 +314,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
         faceMi < this->parMasterEnd();
         faceMi++
     )
-//     forAll (masterPatch_, faceMi)
+//     forAll(masterPatch_, faceMi)
     {
         masterPatchBB[faceMi - pmStart] = boundBox
         (
@@ -349,14 +349,14 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
         }
     }
 
-    forAll (slaveFaceBBminThickness, sI)
+    forAll(slaveFaceBBminThickness, sI)
     {
         scalar maxEdgeLength = 0.0;
 
         // Let's use the length of the longest edge from each faces
         edgeList el = slaveLocalFaces[sI].edges();
 
-        forAll (el, elI)
+        forAll(el, elI)
         {
             scalar edgeLength = el[elI].mag(slaveLocalPoints);
             maxEdgeLength = Foam::max(edgeLength, maxEdgeLength);
@@ -370,7 +370,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
 
     // Iterate over slave patch faces, compute its bounding box,
     // using a possible transformation and separation for cyclic patches
-    forAll (slavePatch_, faceSi)
+    forAll(slavePatch_, faceSi)
     {
         pointField curFacePoints =
             slavePatch_[faceSi].points(slavePatch_.points());
@@ -421,7 +421,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
 
     // Check which faces are in the region of interest
     boolList checkMasterFace(masterPatchBB.size(), false);
-    forAll (masterPatchBB, faceMi)
+    forAll(masterPatchBB, faceMi)
     {
         if (regionOfInterest_.contains(masterPatchBB[faceMi].midpoint()))
         {
@@ -430,7 +430,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
     }
 
     boolList checkSlaveFace(slavePatchBB.size(), false);
-    forAll (slavePatchBB, faceSi)
+    forAll(slavePatchBB, faceSi)
     {
         if (regionOfInterest_.contains(slavePatchBB[faceSi].midpoint()))
         {
@@ -448,7 +448,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
         faceMi < this->parMasterEnd();
         faceMi++
     )
-    //forAll (masterPatch_, faceMi)
+    //forAll(masterPatch_, faceMi)
     {
         if (checkMasterFace[faceMi - pmStart])
         {
@@ -494,7 +494,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursAABB
     result.setSize(parMasterSize());
 
     // Parallel search split: local size.  HJ, 27/Apr/2016
-    forAll (result, i)
+    forAll(result, i)
     {
         result[i].transfer(candidateMasterNeighbors[i].shrink());
     }
@@ -524,7 +524,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
         faceMi < this->parMasterEnd();
         faceMi++
     )
-//     forAll (masterPatch_, faceMi)
+//     forAll(masterPatch_, faceMi)
     {
         pointField facePoints
         (
@@ -543,7 +543,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
     // Initialize the list of slave patch faces bounding box
     treeBoundBoxList lslaveFaceBB(slavePatch_.size());
 
-    forAll (slavePatch_, faceSi)
+    forAll(slavePatch_, faceSi)
     {
         pointField facePoints
         (
@@ -627,13 +627,13 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
         faceMi < this->parMasterEnd();
         faceMi++
     )
-//     forAll (masterPatch_, faceMi)
+//     forAll(masterPatch_, faceMi)
     {
         // List of candidate neighbours
         labelList overlappedFaces  =
             slavePatchOctree.findBox(lmasterFaceBB[faceMi - pmStart]);
 
-        forAll (overlappedFaces, ovFi)
+        forAll(overlappedFaces, ovFi)
         {
             label faceSi = overlappedFaces[ovFi];
 
@@ -653,7 +653,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::findNeighboursBBOctree
     result.setSize(parMasterSize());
 
     // Parallel search split: local size.  HJ, 27/Apr/2016
-    forAll (result, i)
+    forAll(result, i)
     {
         result[i].transfer(candidateMasterNeighbors[i].shrink());
     }
@@ -990,7 +990,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::projectPointsOnPlane
         // Construct the plane
         plane projectionPlane(planeOrig, normalVector);
 
-        forAll (lpoints, pointI)
+        forAll(lpoints, pointI)
         {
             projectedPoints[pointI] =
                 projectionPlane.nearestPoint(lpoints[pointI]);
@@ -1039,7 +1039,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::computeOrthonormalBasis
     // Find the projected point from the master face that is the most distant
     scalar longestDistanceFromCenter = 0;
 
-    forAll (pointsOnPlane, pointI)
+    forAll(pointsOnPlane, pointI)
     {
         vector delta = pointsOnPlane[pointI] - normalVectorCentre;
 
@@ -1084,7 +1084,7 @@ List<point2D> newGGIInterpolation<MasterPatch, SlavePatch>::projectPoints3Dto2D
 
     // Project onto the uv plane. The distance from the plane is
     // computed with w
-    forAll (pointsIn3D, pointsI)
+    forAll(pointsIn3D, pointsI)
     {
         // u component
         pointsIn2D[pointsI][0] =
@@ -1115,7 +1115,7 @@ scalarField newGGIInterpolation<MasterPatch, SlavePatch>::projectPoints2Dto1D
 {
     scalarField pointsIn1D(lPoints2D.size()); // Return values.
 
-    forAll (lPoints2D, ptsI)
+    forAll(lPoints2D, ptsI)
     {
         pointsIn1D[ptsI] =
             normalizedProjectionDir & (lPoints2D[ptsI]

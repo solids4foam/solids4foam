@@ -530,7 +530,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::masterFacePenVol() const
         const labelList& maFaceI = ma[faceI];
         const scalarList& mapvFaceI = mapv[faceI];
 
-        if(maFaceI.size() > 0)
+        if (maFaceI.size() > 0)
         {
             forAll(mapvFaceI, I)
             {
@@ -575,7 +575,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::slaveFacePenVol() const
         const labelList& saFaceI = sa[faceI];
         const scalarList& sapvFaceI = sapv[faceI];
 
-        if(saFaceI.size() > 0)
+        if (saFaceI.size() > 0)
         {
             forAll(sapvFaceI, I)
             {
@@ -619,7 +619,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::masterAreaInContact() const
     {
         const scalarList& mnrcaFaceI = mnrca[faceI];
 
-        if(mnrcaFaceI.size() > 0)
+        if (mnrcaFaceI.size() > 0)
         {
             forAll(mnrcaFaceI, I)
             {
@@ -718,7 +718,7 @@ slaveToMasterPointInterpolate
 
     const FieldField<Field, scalar>& weights = masterPointWeights();
 
-    forAll (result, pointI)
+    forAll(result, pointI)
     {
         if (addr[pointI].first() > -1)
         {
@@ -792,7 +792,7 @@ masterToSlavePointInterpolate
 
     const FieldField<Field, scalar>& weights = slavePointWeights();
 
-    forAll (result, pointI)
+    forAll(result, pointI)
     {
         if (addr[pointI].first() > -1)
         {

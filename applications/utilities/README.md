@@ -290,3 +290,61 @@ The mesh is overwritten!
   ```
 
 ---
+
+## `updatePrestress`
+
+- **Utility purpose** Performs one pass of the modified updated Lagrangian
+  formulation for prestressing a solid model: the load is applied to the
+  imaged mesh, `Fpre` is updated and the displacement reset to zero, and this
+  is repeated until the imaged mesh is in equilibrium with the load. `Fpre`
+  for the next pass is the deformation gradient at the latest time composed
+  with the `Fpre` the run used, `FpreNew = F & Fpre`. It is written to the
+  start time at full precision, the previous `Fpre` is kept as
+  `FprePass<N>`, and every time directory after the start time is removed, so
+  the next pass starts from zero displacement. Convergence measures
+  (`mag(D)` and `mag(F - I)`), the range of `det(Fpre)` and, for laws with
+  fibre or other directions, the angle `Fpre` turns them through are printed
+  and appended to `prestressHistory` in the case directory. How the laws use
+  `Fpre` is described in the Prestress section of
+  `src/solids4FoamModels/mechanicalConstitutiveLaw/README.md`.
+
+  Reference: Gee, M. W., Förster, C., & Wall, W. A. (2010). A computational
+  strategy for prestressing patient-specific biomechanical problems under
+  finite deformation. International Journal for Numerical Methods in
+  Biomedical Engineering, 26(1), 52-72.
+
+- **Arguments** None
+
+- **Options/parameters**
+
+  `-parallel` to update a decomposed case (uncollated only). Only the
+  processor directories are updated; run `reconstructPar` before decomposing
+  again.
+
+  `-keepPasses` to keep every earlier `Fpre` as `FprePass<N>`, rather than
+  only the one from before this update.
+
+- **Example of usage**
+
+  Run the first pass with `prestress no;` in `constant/mechanicalProperties`,
+  so `Fpre` is taken to be the identity, and `prestress yes;` for every later
+  pass:
+
+  ```bash
+  solids4Foam
+  updatePrestress
+  ```
+
+  Each pass should be a static solve at the target load: `steadyState` for
+  `ddt(D)` and `d2dt2(D)`, and `predictor no;`.
+
+```note
+Every time directory after the start time is removed. Nothing is removed
+until the previous Fpre is backed up and the new one written and read back;
+if that fails, the previous Fpre is restored. A case that is not steadyState,
+uses a collated fileHandler, uses a law that cannot be prestressed, or whose
+start-time Fpre is not the one the run used, is refused before anything is
+changed.
+```
+
+---

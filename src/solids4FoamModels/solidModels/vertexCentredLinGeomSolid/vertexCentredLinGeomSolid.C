@@ -1217,7 +1217,8 @@ void vertexCentredLinGeomSolid::setDeltaT(Time& runTime)
                 Field<scalar>
 #endif
                 (
-                    dualMesh().surfaceInterpolation::deltaCoeffs().internalField()
+                    dualMesh().surfaceInterpolation::deltaCoeffs()
+                   .internalField()
                    *waveSpeed
                 )
             );
@@ -1261,7 +1262,10 @@ bool vertexCentredLinGeomSolid::evolve()
             << "Use "
             << solutionAlgorithmNames_.names()[solutionAlgorithm::PETSC_SNES]
             << " instead of "
-            << solutionAlgorithmNames_.names()[solutionAlgorithm::IMPLICIT_COUPLED]
+            << solutionAlgorithmNames_.names()
+               [
+                   solutionAlgorithm::IMPLICIT_COUPLED
+               ]
             << exit(FatalError);
 #else
         FatalErrorIn("bool vertexCentredLinGeomSolid::evolve()")

@@ -106,7 +106,8 @@ displacementOrTractionFvPatchVectorField
     }
     else
     {
-        constantDisplacement_ = vectorField("constantDisplacement", dict, p.size());
+        constantDisplacement_ =
+            vectorField("constantDisplacement", dict, p.size());
     }
 
     // Check if traction is time-varying

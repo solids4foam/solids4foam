@@ -84,8 +84,8 @@ public:
             const dictionary&
         );
 
-        //- Construct by mapping given linearSpatialDisplacementFvPatchVectorField
-        //  onto a new patch
+        //- Construct by mapping given
+        //  linearSpatialDisplacementFvPatchVectorField onto a new patch
         linearSpatialDisplacementFvPatchVectorField
         (
             const linearSpatialDisplacementFvPatchVectorField&,

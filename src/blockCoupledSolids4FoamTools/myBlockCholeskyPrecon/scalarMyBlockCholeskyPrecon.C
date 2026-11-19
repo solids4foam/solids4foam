@@ -39,7 +39,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::calcPreconDiag()
         // Get off-diagonal matrix coefficients
         const scalarField& upper = matrix_.upper();
 
-        forAll (upper, coeffI)
+        forAll(upper, coeffI)
         {
             preconDiag_[upperAddr[coeffI]] -=
                 sqr(upper[coeffI])/preconDiag_[lowerAddr[coeffI]];
@@ -54,7 +54,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::calcPreconDiag()
         const scalarField& upper = matrix_.upper();
         const scalarField& lower = matrix_.lower();
 
-        forAll (upper, coeffI)
+        forAll(upper, coeffI)
         {
             preconDiag_[upperAddr[coeffI]] -=
                 upper[coeffI]*lower[coeffI]/preconDiag_[lowerAddr[coeffI]];
@@ -62,7 +62,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::calcPreconDiag()
     }
 
     // Invert the diagonal for future use
-    forAll (preconDiag_, i)
+    forAll(preconDiag_, i)
     {
         preconDiag_[i] = 1.0/preconDiag_[i];
     }
@@ -89,14 +89,14 @@ void Foam::myBlockCholeskyPrecon<scalar>::precondition
         // Get off-diagonal matrix coefficients
         const scalarField& upper = matrix_.upper();
 
-        forAll (upper, coeffI)
+        forAll(upper, coeffI)
         {
             x[upperAddr[coeffI]] -=
                 preconDiag_[upperAddr[coeffI]]*
                 upper[coeffI]*x[lowerAddr[coeffI]];
         }
 
-        forAllReverse (upper, coeffI)
+        forAllReverse(upper, coeffI)
         {
             x[lowerAddr[coeffI]] -=
                 preconDiag_[lowerAddr[coeffI]]*
@@ -115,7 +115,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::precondition
 
         label losortCoeff;
 
-        forAll (lower, coeffI)
+        forAll(lower, coeffI)
         {
             losortCoeff = losortAddr[coeffI];
 
@@ -124,7 +124,7 @@ void Foam::myBlockCholeskyPrecon<scalar>::precondition
                 lower[losortCoeff]*x[lowerAddr[losortCoeff]];
         }
 
-        forAllReverse (upper, coeffI)
+        forAllReverse(upper, coeffI)
         {
             x[lowerAddr[coeffI]] -=
                 preconDiag_[lowerAddr[coeffI]]*
@@ -163,14 +163,14 @@ void Foam::myBlockCholeskyPrecon<scalar>::preconditionT
 
         label losortCoeff;
 
-        forAll (lower, coeffI)
+        forAll(lower, coeffI)
         {
             xT[upperAddr[coeffI]] -=
                 preconDiag_[upperAddr[coeffI]]*
                 upper[coeffI]*xT[lowerAddr[coeffI]];
         }
 
-        forAllReverse (upper, coeffI)
+        forAllReverse(upper, coeffI)
         {
             losortCoeff = losortAddr[coeffI];
 

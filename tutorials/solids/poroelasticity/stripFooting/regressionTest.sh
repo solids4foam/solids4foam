@@ -40,24 +40,28 @@ P_MAX=9.0e4
 # complete face traction, stabilisation included (#578): the stabilisation
 # flux is replaced by the prescribed load on the solidTraction patches, and
 # its shear part is removed on the symmetry and fixedDisplacementZeroShear
-# patches, which moved D by about 1e-4 relative (1.5e-3 on foam-extend).
-# These are recorded numbers, though, and another compiler, CPU or MPI build moves an
+# patches, which moved D by about 1e-4 relative (1.5e-3 on foam-extend), and
+# again when the gradient scheme for D changed from pointCellsLeastSquares to
+# leastSquaresS4f on every fork (#572), which moved the max by 2.9e-3 on
+# OpenFOAM and 4.8e-3 on foam-extend. The forks still differ by 2.8%, so the
+# gradient scheme is not the cause of that difference. These are recorded
+# numbers, though, and another compiler, CPU or MPI build moves an
 # iterative solution by round-off at the solver tolerance: CI measures up to
 # 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
 # largest value, allows for that, and is ten times below the 1e-5 that a
 # 0.001% change in a material constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        REF_D_MAX=0.045903954645363
-        REF_D_MEAN=0.00582333637744533
+        REF_D_MAX=0.045770922675108
+        REF_D_MEAN=0.00580922152343056
         ;;
     org)
-        REF_D_MAX=0.045903954645363
-        REF_D_MEAN=0.00582333637744533
+        REF_D_MAX=0.045770922675108
+        REF_D_MEAN=0.00580922152343057
         ;;
     foamextend)
-        REF_D_MAX=0.047288500636175
-        REF_D_MEAN=0.00606246311049879
+        REF_D_MAX=0.047060044962378
+        REF_D_MEAN=0.00603114551258167
         ;;
 esac
 REF_D_REL_TOL=1e-6

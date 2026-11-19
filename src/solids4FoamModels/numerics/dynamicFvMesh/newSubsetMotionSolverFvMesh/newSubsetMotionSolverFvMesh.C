@@ -40,7 +40,10 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::newSubsetMotionSolverFvMesh::newSubsetMotionSolverFvMesh(const IOobject& io)
+Foam::newSubsetMotionSolverFvMesh::newSubsetMotionSolverFvMesh
+(
+    const IOobject& io
+)
 :
     dynamicFvMesh(io),
     movingMeshCoeffs_
@@ -116,7 +119,8 @@ Foam::newSubsetMotionSolverFvMesh::~newSubsetMotionSolverFvMesh()
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-const Foam::newFvMeshSubset& Foam::newSubsetMotionSolverFvMesh::subsetMesh() const
+const Foam::newFvMeshSubset&
+Foam::newSubsetMotionSolverFvMesh::subsetMesh() const
 {
     return subsetMesh_;
 }
@@ -133,7 +137,7 @@ bool Foam::newSubsetMotionSolverFvMesh::update()
     //- Map the moving part
     const labelList& subsetPointAddr = subsetMesh_.pointMap();
 
-    forAll (subsetPoints, subsetI)
+    forAll(subsetPoints, subsetI)
     {
         p[subsetPointAddr[subsetI]] = subsetPoints[subsetI];
     }

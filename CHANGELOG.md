@@ -63,6 +63,22 @@ release. For complete commit-level details and contributor information, see the
   what does not yet work: thinning the leaflet does not converge to the beam
   model, refined fluid meshes stall in the coupling, and IQN-ILS and
   Robin-Neumann coupling do not complete the case.
+- Added the `pulmonaryArteries` prestressed fluid-solid interaction
+  tutorial: pulsatile, shear-thinning blood flow in a patient-specific main
+  pulmonary artery and its proximal branches, with one inlet, eleven
+  three-element Windkessel outlets and a finite-strain `isotropicFungElastic`
+  wall, coupled by the Robin pressure condition (`elasticWallPressure`). The
+  prestress of the imaged wall is computed first, in a solid-only case, by
+  repeated `solids4Foam` and `updatePrestress` passes (MULF), and applied
+  through `Fpre`. The fluid and wall meshes are generated with
+  `cartesianMesh` and `extrudeMesh`. The case needs PETSc and
+  `cartesianMesh`, and includes a shortened regression test,
+  `regressionTest.sh`, run by hand.
+- `tutorials/Alltest` runs a case's own `Alltest` script, when it has one, in
+  place of its `Allrun`, after the usual one-time-step modifications. This is
+  for cases where one run needs the converged results of an earlier run:
+  `pulmonaryArteries/Alltest` runs one prestress pass to its end time, and
+  then one time step of the fluid-solid interaction case.
 - Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
   a fluid-solid coupling step is also converged if the maximum interface point
   residual (the displacement-increment mismatch by default) is below this
@@ -93,6 +109,30 @@ release. For complete commit-level details and contributor information, see the
   recommended for undamped structures, and a warning is printed when an
   order of 3 or above is selected. The `cantileverVibration` tutorial has a
   non-default `bdf3` option that shows the effect.
+- Added the `circulationModels` module (`src/circulationModels`): a mesh-free
+  lumped-parameter (0D) network of chambers, valves, resistances and
+  compliances for the circulatory system, solved with the OpenFOAM ODE solvers
+  (`libcirculation0D`), with the `circulationFoam` solver and a
+  `circulationPressure` boundary condition and coupler
+  (`libcirculationCoupling`) that couple a network to a CFD domain with
+  explicit or implicit schemes of order 1 to 4. The tutorials are in
+  `tutorials/circulationModels`. It is currently only available for
+  OpenFOAM.com.
+- Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
+  the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
+  `fvc::ddt`, including the `ddtCorr` flux corrections used by the
+  pressure-velocity coupling. It requires a static mesh, and it reduces the
+  order during start-up. `BDF 1` and `BDF 2` support a variable time-step
+  (`adjustTimeStep yes`), with `BDF 2` using the same variable-step
+  coefficients as `backward`; orders 3 and above require a constant
+  time-step, so `adjustTimeStep` cannot be used with them. They are also not
+  A-stable, and a warning is printed when one is selected. It is the
+  first-derivative counterpart of the `BDF` d2dt2 scheme, for fluids, and is
+  currently only available for OpenFOAM.com (#638). `Test-fvcDdt`, run by
+  the `decayingTaylorGreenVortex` regression test, checks the start-up order
+  ramp, exactness for time polynomials and the observed order of accuracy
+  for orders 1 to 6, restart, and a density or flux without stored old-time
+  levels.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A
@@ -344,6 +384,57 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
+  Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
+  St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
+  bi-parabolic inlet has a 0.2 m/s peak (was 0.3 m/s), the inflow behind
+  Richter's reference values, as confirmed by the author. The Aitken and
+  IQN-ILS couplings use `requireAllResidualMeasures yes` with
+  `outerCorrTolerance 1e-5`, `nOuterCorr 30` and `allowUnconvergedCoupling
+  yes`, and the fluid uses three PIMPLE outer correctors with p and U solver
+  tolerances of 1e-10, the production settings of the verification
+  campaign; with one corrector the strict coupling test could stall and stop
+  the run at `nOuterCorr`. Results are not comparable with earlier versions
+  of the tutorial. The regression test has one set of references for all
+  supported OpenFOAM versions, with relative tolerances, and foam-extend is
+  no longer supported for this case. An
+  opt-in verification campaign (`verification/`, not run by CI) reproduces
+  Richter's published values (`u_x(A)` = 5.95e-5 m, `F_x` = 1.33 N) to within
+  0.2 % on the finest of four meshes.
+- The high-order least-squares schemes (`kExactLeastSquares` and
+  `movingLeastSquares`) take the boundary values at the face quadrature
+  points from any patch field that derives from the new
+  `quadratureValuePatchField` interface, not only from `fixedDisplacement`
+  and `fixedRotation`. A scalar or vector `fixedValue` patch field is also
+  accepted when its value is uniform, and stops with an error otherwise;
+  other patch fields that fix the value, e.g. `mixed` and `directionMixed`,
+  still stop with an error. A plain `fixedDisplacement` patch with a
+  non-uniform value now gives a warning, as copying its face-centre values to
+  the quadrature points limits the boundary data to second-order accuracy.
+  The `hofvc` functions take the least-squares scheme as an argument (the
+  solid-model versions are kept), so that models other than solids can use
+  them. Solid results are unchanged. The new `Test-patchQuadratureValues`
+  utility checks the behaviour of every registered patch field type.
+
+- The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
+  `leastSquaresS4f`, which is implemented in solids4foam and so is the same
+  scheme in all OpenFOAM variants. The case conversion script no longer
+  replaces `pointCellsLeastSquares` with `leastSquares` on foam-extend, which
+  made foam-extend solve a different discretisation from OpenFOAM.com and
+  OpenFOAM.org in those tutorials (#549). The regression references of these
+  tutorials were re-recorded, and `blockPunch` now compares the cell
+  displacement field rather than the point-A displacement, which depends on
+  the fork's volume-to-point interpolation. The thermal and poroelastic
+  tutorials use `leastSquaresS4f` for `grad(D)` only, with `leastSquares` for
+  the scalar fields, for which the solid models register no boundary-face
+  list; `hotSphere` and `suctionCaission` keep `leastSquares` for `D` too, as
+  `leastSquaresS4f` moves their peak stress outside the regression bands
+  until the least-squares treatment of the symmetry and zero-shear patches is
+  settled.
+  The tutorials that run only on foam-extend keep `leastSquares`, which they
+  used before. On foam-extend, the case conversion now replaces
+  `pointCellsLeastSquares` with `leastSquaresS4f` in a user case, one way, so
+  that an old case runs with the same scheme as on OpenFOAM.
 - `IQNILS` with `couplingReuse` greater than zero is now robust: the reused
   secant modes are no longer applied to the residual of the solid-only
   predictor (`predictSolid`), which comes from a solid solve with the previous
@@ -368,7 +459,6 @@ release. For complete commit-level details and contributor information, see the
   4.2, and the regression tests pass unchanged. The results in the
   `verification/` READMEs of these tutorials were computed without reuse
   (#587).
-
 - The tutorial `Allclean` scripts keep the `regressionTests/` cases and the
   `verification/work/` and `verification/postProcessing/` outputs of the
   opt-in studies, which can take hours to produce; `./Allclean all` removes
@@ -644,6 +734,25 @@ release. For complete commit-level details and contributor information, see the
   any test. solids4foam's preCICE cases are now maintained upstream in the
   preCICE tutorials and tested by `tests/precice`. The removed cases remain
   available as an archive from the solids4foam website.
+- The `FixedList.C` (OpenFOAM.org and foam-extend) and `meshObjectBase.H`
+  (foam-extend) optional fixes are removed. `FixedList.C` is needed to build
+  OpenFOAM itself with Clang 17 or newer, so it is not a solids4foam fix, and
+  `meshObjectBase.H` only avoids a segmentation fault at the end of a
+  foam-extend run, after the results are written. `Allcheck` no longer
+  reports them, and `Allreplace` no longer copies them.
+- The `EulerDdtScheme.C` and `backwardDdtScheme.C` optional fixes are removed
+  for OpenFOAM.org, OpenFOAM.com and foam-extend, so no optional fixes remain
+  for OpenFOAM.com. The foam-extend ones are replaced by the `ddtCorr` flux
+  correction in `pimpleFluid` (see Fixed). The OpenFOAM.org and OpenFOAM.com
+  backward scheme fixes only changed the start-up of the scheme: on
+  OpenFOAM.org, Euler is used for the first `ddt(U)` of the first time step
+  but backward, with the old-old time level a copy of the old one, for later
+  calls in that step, e.g. with several outer correctors; on OpenFOAM.com, a
+  restart from a time without `U_0_0` uses backward with such a copy for one
+  time step. The foam-extend backward fix also corrected `meshPhi`: the
+  upstream foam-extend `meshPhi` does not conserve the cell volumes when the
+  time-step changes. With foam-extend, the fluid models now stop with an error
+  if the mesh is moving, the ddt scheme is backward and the time-step changes.
 
 ### Fixed
 
@@ -784,6 +893,19 @@ release. For complete commit-level details and contributor information, see the
   `Allcheck` and `Allreplace` no longer select a directory by version (#519).
   Installations patched with the earlier file are reported by `Allcheck`
   (with `S4F_NO_FILE_FIXES=0`), and `Allreplace` updates them.
+- With foam-extend, `pimpleFluid` with `ddtCorr yes` added the whole old-time
+  face flux, from `fvc::ddtConsistentPhiCorr`, on installations without the
+  `EulerDdtScheme.C` and `backwardDdtScheme.C` optional fixes. That flux suits
+  the foam-extend solvers, which keep `ddt(U)` out of the momentum matrix used
+  for `H`, but `pimpleFluid` keeps it in, so the old-time flux was counted
+  twice. `pimpleFluid` now computes the correction itself: the difference
+  between the old face velocity flux and the flux of the interpolated old
+  cell velocity, for the Euler and backward ddt schemes, as the optional fixes
+  did. Other ddt schemes stop with an error when `ddtCorr` is on.
+- The files in `optionalFixes` had their OpenFOAM and foam-extend copyright
+  and licence headers replaced by the solids4foam header. They now keep the
+  upstream headers, with a note on what solids4foam changed, and the file
+  header check skips `optionalFixes`.
 - The high-order least-squares reconstruction now rejects axisymmetric
   (wedge) meshes when the solid model is constructed, with an error that
   names the limitation, instead of stopping later with the misleading
@@ -855,6 +977,19 @@ release. For complete commit-level details and contributor information, see the
   solid models is every time step (#566). It is now issued when the vectors
   are first computed and repeated only if the number of such cells grows on a
   later mesh change, which points to mesh degradation.
+- Fixed the parallel scaling of the high-order solid solvers: synchronising
+  the processor-face quadrature serialised the face coefficient build across
+  ranks, because the lower rank posted buffered sends and the higher rank
+  blocked in its receive until the lower rank finished its own build. The
+  quadrature data are now exchanged collectively (#662).
+- `leastSquaresS4f`: the gradient of a vector or tensor field, such as
+  `grad(D)`, was wrong in the cells next to a symmetry plane that does not
+  pass through the origin (#712). The vector from a cell centre to its mirror
+  image was built by reflecting the cell centre about a plane through the
+  origin, so it had the wrong length and, in general, the wrong sign. Results
+  change for such cases; symmetry planes through the origin and scalar
+  gradients are unaffected. A cell whose centre lies in the plane of its
+  symmetry face is now a fatal error instead of a division by zero.
 
 ## [v2.4] - 2026-08-24
 
