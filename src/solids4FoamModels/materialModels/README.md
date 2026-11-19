@@ -95,8 +95,8 @@ use it:
 | [`GuccioneElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/GuccioneElasticMechanicalConstitutiveLaw/README.md) | finite | Transversely isotropic myocardium (Guccione) |
 | [`isotropicFungElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/isotropicFungElasticMechanicalConstitutiveLaw/README.md) | finite | Isotropic Fung-type exponential soft tissue |
 | [`HolzapfelGasserOgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Fibre-reinforced arterial tissue (HGO) |
-| [`electroMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/electroMechanicalLawMechanicalConstitutiveLaw/README.md) | finite | Active fibre tension over a passive sub-law |
-| [`viscoActiveHolzapfelOgden`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw/README.md) | finite | Orthotropic Holzapfel-Ogden myocardium with viscosity and active stress |
+| [`electroMechanicalLaw`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/electroMechanicalLawMechanicalConstitutiveLaw/README.md) | finite | Active fibre tension, constant, tabulated or a field, over a passive sub-law |
+| [`viscousHolzapfelOgden`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/viscousHolzapfelOgdenMechanicalConstitutiveLaw/README.md) | finite | Orthotropic Holzapfel-Ogden passive myocardium with viscosity |
 
 `rho`, the density, is read by every law. The optional `solvePressureEqn` and
 `pressureSmoothingScaleFactor` (default `100`) entries of a law ask the solid

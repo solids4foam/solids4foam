@@ -20,7 +20,7 @@ Author
 
 \*---------------------------------------------------------------------------*/
 
-#include "viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw.H"
+#include "viscousHolzapfelOgdenMechanicalConstitutiveLaw.H"
 #include "addToRunTimeSelectionTable.H"
 #include "Switch.H"
 
@@ -28,11 +28,11 @@ Author
 
 namespace Foam
 {
-    defineTypeNameAndDebug(viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw, 0);
+    defineTypeNameAndDebug(viscousHolzapfelOgdenMechanicalConstitutiveLaw, 0);
     addToRunTimeSelectionTable
     (
         mechanicalConstitutiveLaw,
-        viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw,
+        viscousHolzapfelOgdenMechanicalConstitutiveLaw,
         mechanicalConstitutiveLaw
     );
 }
@@ -41,7 +41,7 @@ namespace Foam
 // * * * * * * * * * * * * * Private Member Functions  * * * * * * * * * * * //
 
 inline Foam::scalar
-Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::boundedExp
+Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::boundedExp
 (
     const scalar x
 )
@@ -53,7 +53,7 @@ Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::boundedExp
 
 
 inline void
-Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::fibreSwitch
+Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::fibreSwitch
 (
     const scalar I4,
     scalar& H,
@@ -95,7 +95,7 @@ Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::fibreSwitch
 
 
 inline Foam::scalar
-Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::dPsidI4
+Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::dPsidI4
 (
     const scalar I4,
     const scalar a,
@@ -115,8 +115,8 @@ Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::dPsidI4
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::
-viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw
+Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::
+viscousHolzapfelOgdenMechanicalConstitutiveLaw
 (
     const dictionary& dict
 )
@@ -148,7 +148,6 @@ viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw
             a_.value() + (af_.value() + as_.value() + afs_.value())/6.0
         )
     ),
-    activeStressSeries_(),
     f0Default_
     (
         dict.lookupOrDefault<Switch>("uniformFibreField", false)
@@ -212,50 +211,17 @@ viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw
             << "The viscosity eta must not be negative." << exit(FatalIOError);
     }
 
-    if (dict.found("activeStressSeries"))
-    {
-        activeStressSeries_ =
-            interpolationTable<scalar>(dict.subDict("activeStressSeries"));
-    }
-
-    Info<< "    Visco-active Holzapfel-Ogden law: a = " << a_.value()
+    Info<< "    Viscous Holzapfel-Ogden law: a = " << a_.value()
         << ", af = " << af_.value() << ", as = " << as_.value()
         << ", afs = " << afs_.value() << ", kappa = " << bulkModulus_.value()
         << ", eta = " << eta_.value() << ", fibreSwitch = " << switchName
-        << ", tangentShearModulus = " << tangentShearModulus_;
-
-    if (activeStressSeries_.size())
-    {
-        Info<< ", active stress from a table of "
-            << activeStressSeries_.size() << " points";
-    }
-    else
-    {
-        Info<< ", passive";
-    }
-
-    Info<< endl;
+        << ", tangentShearModulus = " << tangentShearModulus_ << endl;
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-Foam::scalar
-Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::activeStress
-(
-    const scalar t
-) const
-{
-    if (activeStressSeries_.size())
-    {
-        return activeStressSeries_(t);
-    }
-
-    return 0.0;
-}
-
-
-void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::declareState
+void Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::declareState
 (
     mechanicalConstitutiveLawStateSpec& spec
 ) const
@@ -278,7 +244,7 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::declareState
 }
 
 
-void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
+void Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
 (
     const finiteStrainMechanicalConstitutiveLawKinematics& kin,
     const mechanicalConstitutiveLawInputs& inputs,
@@ -302,9 +268,6 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
     const scalar afs = afs_.value();
     const scalar kappa = bulkModulus_.value();
     const scalar eta = eta_.value();
-
-    // The active stress is uniform in space: evaluate it once
-    const scalar tau = activeStress(inputs.time());
 
     // The viscous term needs a time step; it is skipped before the first one
     const scalar dt = inputs.dt();
@@ -380,12 +343,6 @@ void Foam::viscoActiveHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
         // J = 1 the two differ by round-off relative to their tiny value,
         // and the solver's volumetric closure check compares them
         const scalar dUdJ = 0.5*kappa*(sqr(Ji) - 1.0)/Ji;
-
-        // Active stress: S = tau f0 (x) f0, pushed forward
-        if (mag(tau) > 0)
-        {
-            sigmaI += rJ*tau*sqr(ff);
-        }
 
         // Viscous stress: S = eta Edot, with Edot over the time step
         if (viscous)

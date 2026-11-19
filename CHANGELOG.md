@@ -14,14 +14,16 @@ release. For complete commit-level details and contributor information, see the
   all-hexahedral O-grid mesh, and `benchmark2`, the idealised biventricle on
   the benchmark's tetrahedral mesh and fibres. Both compare the displacement
   of the benchmark points with the participants' published solutions
-  (gnuplot). `Allrun` downloads the meshes from the solids4foam website and
-  tabulates the time series with a case-local utility,
-  `makeArosticaTimeSeries`.
-- The `viscoActiveHolzapfelOgden` mechanical law: an orthotropic
-  Holzapfel-Ogden myocardium with a smooth fibre-compression switch, a
-  viscous term and a tabulated active stress along the fibres. It returns its
-  volumetric penalty separately, so it can be used with the mixed
-  displacement-pressure formulation.
+  (gnuplot). `Allrun` downloads the meshes from the solids4foam website
+  (`ArosticaEtAl2025-v1.zip`, kept in a cache shared by both cases) and
+  tabulates the time series with the new `makeArosticaTimeSeries` utility.
+- The `viscousHolzapfelOgden` mechanical law: an orthotropic
+  Holzapfel-Ogden passive myocardium with a smooth fibre-compression switch
+  and a viscous term. It returns its volumetric penalty separately, so it can
+  be used with the mixed displacement-pressure formulation.
+- `electroMechanicalLaw` can take its active tension from a time table,
+  `activeTensionSeries`, as the Aróstica et al. (2025) benchmarks do, wrapping
+  `viscousHolzapfelOgden`.
 - An `ellipsoid` method for the `setFibreField` utility, selected in the new
   optional `system/setFibreFieldDict`: the fibre, sheet and sheet-normal
   fields of a truncated ellipsoid (Aróstica et al. 2025). Without the

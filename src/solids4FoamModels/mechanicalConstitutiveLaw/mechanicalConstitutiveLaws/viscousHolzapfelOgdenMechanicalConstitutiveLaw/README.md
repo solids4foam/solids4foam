@@ -2,14 +2,16 @@
 sort: 28
 ---
 
-# viscoActiveHolzapfelOgden
+# viscousHolzapfelOgden
 
-The orthotropic Holzapfel-Ogden law for myocardium, with viscosity and a
-tabulated active stress along the fibres, as defined by the cardiac
-elastodynamics benchmark of Aróstica et al. (2025). The runtime type is:
+The orthotropic Holzapfel-Ogden law for passive myocardium, with viscosity,
+as defined by the cardiac elastodynamics benchmark of Aróstica et al. (2025).
+The benchmark's active stress is added by
+[`electroMechanicalLaw`](../electroMechanicalLawMechanicalConstitutiveLaw/README.md),
+with this law as its passive law. The runtime type is:
 
 ```text
-viscoActiveHolzapfelOgden
+viscousHolzapfelOgden
 ```
 
 The response is anisotropic about a fibre direction `f0` and a sheet
@@ -27,7 +29,7 @@ This is a **finite-strain** law: it is used with a nonlinear geometry solid
 model. The second Piola-Kirchhoff stress is
 
 ```text
-S = dPsi/dE + eta*Edot + tau(t)*f0*f0
+S = dPsi/dE + eta*Edot
 ```
 
 with the passive energy
@@ -56,10 +58,10 @@ reference implementations, which differentiate the energy automatically.
 - **Viscosity**: `S_visco = eta*Edot`, with the Green-Lagrange strain rate
   taken over the time step from the old-time deformation gradient,
   `Edot = (E(F) - E(F0))/dt`. It is skipped before the first time step.
-- **Active stress**: `tau(t)` is uniform in space and read from an
-  interpolation table (`activeStressSeries`), for example the solution of the
-  benchmark's ODE, eq. (5), tabulated once in time. Without a table the law
-  is passive.
+- **Active stress**: not part of this law. The benchmark's
+  `S_active = tau(t)*f0*f0` is the active tension of an
+  `electroMechanicalLaw` wrapped around this one, with `tau(t)` tabulated as
+  its `activeTensionSeries`; see the [example](#example).
 
 The exponentials are evaluated with their argument clamped at 500, so that an
 extreme trial state in a Newton line search gives a large, finite stress
@@ -78,7 +80,6 @@ run.
 | `fibreSwitch` | no | `smooth` | `smooth`, `sharp` or `none` |
 | `k` | no | `100` | Steepness of the smooth switch |
 | `tangentShearModulus` | no | see below | Scalar tangent shear modulus, Pa |
-| `activeStressSeries` | no | - | Interpolation table of `tau(t)`, Pa |
 | `uniformFibreField` | no | `no` | Take `f0` and `s0` from this dictionary |
 | `f0`, `s0` | if uniform | - | Fibre and sheet vectors |
 
@@ -134,31 +135,38 @@ old-time deformation gradient.
 
 ### Example
 
-From the `ArosticaEtAl2025/benchmark1` tutorial (Tables 1-3 of the paper):
+From the `ArosticaEtAl2025/benchmark1` tutorial (Tables 1-3 of the paper),
+with the active stress of eq. (4) added by `electroMechanicalLaw`:
 
 ```text
 mechanical
 (
     heartTissue
     {
-        type            viscoActiveHolzapfelOgden;
+        type            electroMechanicalLaw;
         rho             rho [1 -3 0 0 0 0 0] 1000;
-        a               a [1 -1 -2 0 0 0 0] 59;
-        b               8.023;
-        af              af [1 -1 -2 0 0 0 0] 18472;
-        bf              16.026;
-        as              as [1 -1 -2 0 0 0 0] 2481;
-        bs              11.12;
-        afs             afs [1 -1 -2 0 0 0 0] 216;
-        bfs             11.436;
-        bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
-        eta             eta [1 -1 -1 0 0 0 0] 100;
-        fibreSwitch     smooth;
-        k               100;
-        activeStressSeries
+        activeTensionSeries
         {
             file        "$FOAM_CASE/constant/activeStress";
             outOfBounds clamp;
+        }
+
+        passiveMechanicalLaw
+        {
+            type            viscousHolzapfelOgden;
+            rho             rho [1 -3 0 0 0 0 0] 1000;
+            a               a [1 -1 -2 0 0 0 0] 59;
+            b               8.023;
+            af              af [1 -1 -2 0 0 0 0] 18472;
+            bf              16.026;
+            as              as [1 -1 -2 0 0 0 0] 2481;
+            bs              11.12;
+            afs             afs [1 -1 -2 0 0 0 0] 216;
+            bfs             11.436;
+            bulkModulus     bulkModulus [1 -1 -2 0 0 0 0] 1e6;
+            eta             eta [1 -1 -1 0 0 0 0] 100;
+            fibreSwitch     smooth;
+            k               100;
         }
     }
 );

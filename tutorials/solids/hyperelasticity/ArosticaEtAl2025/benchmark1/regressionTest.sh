@@ -18,24 +18,31 @@ solids4Foam::requireGnuSed
 # Arostica et al. (2025) benchmark 1 regression test
 #
 # Step 1 (active and passive response) on the coarsest mesh (level 1), with
-# the mixed displacement-pressure formulation, for the first 50 time steps
-# (t = 0.05 s, the start of the filling phase). This exercises the
-# viscoActiveHolzapfelOgden law (fibre and sheet families, viscosity, the
-# volumetric split), the spring-dashpot conditions, the follower pressure and
-# setFibreField's ellipsoid method, in about a minute.
+# the mixed displacement-pressure formulation, to t = 0.25 s: through the
+# passive filling phase and past the onset of the active stress, which
+# switches on at t = 0.1645 s. This exercises the viscousHolzapfelOgden law
+# (fibre and sheet families, viscosity, the volumetric split), the tabulated
+# active tension of electroMechanicalLaw, the spring-dashpot conditions, the
+# follower pressure and setFibreField's ellipsoid method.
 #
-# The check is a band, not a reference value: p0 x at t = 0.05 s must lie
-# near the benchmark participants' range, 0.370 to 0.504 mm (about 0.51 mm
-# with the solidSpringDashpot condition of #528 on this mesh). It is still
-# sensitive to the momentum stabilisation scale; a tight reference will be
-# added once that is settled (stabilisation and mesh study, see README.md).
+# p0 x is checked at two times against reference values of this test, which
+# are mesh-1 values and not the benchmark answer:
+#   t = 0.05 s, filling, passive response only (participants: 0.370 to
+#       0.504 mm);
+#   t = 0.25 s, contraction, active stress on (participants: -28.1 to
+#       -30.8 mm).
+# A sign error, a missing 1/J or a missing active term moves the second by
+# far more than its tolerance.
 #
 # Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
 # ============================================================
 
-END_TIME=0.05
-P0X_MIN=3.0e-4
-P0X_MAX=6.0e-4
+END_TIME=0.25
+
+# Reference p0 x [m] at the check times, and the relative tolerance
+CHECK_TIMES=(0.05 0.25)
+P0X_REF=(3.5960e-4 -3.3893e-2)
+REL_TOL=0.02
 
 ALLRUN_LOGFILE="log.Allrun"
 SOLVER_LOGFILE="log.solids4Foam"
@@ -43,8 +50,10 @@ DISP_FILE="postProcessing/0/solidPointDisplacement_p0.dat"
 
 echo "============================================================"
 echo "Arostica et al. (2025) benchmark 1 regression test"
-echo "Step 1, mesh level 1, t = ${END_TIME} s:"
-echo "p0 x in [${P0X_MIN}, ${P0X_MAX}] m"
+echo "Step 1, mesh level 1, to t = ${END_TIME} s:"
+for i in "${!CHECK_TIMES[@]}"; do
+    echo "p0 x at t = ${CHECK_TIMES[$i]} s: ${P0X_REF[$i]} m, within ${REL_TOL}"
+done
 echo "============================================================"
 echo
 
@@ -59,12 +68,14 @@ done
     "${CASE_DIR}/system/controlDict"
 "${SOLIDS4FOAM_SED}" -i 's/^writePrecision.*/writePrecision  14;/' \
     "${CASE_DIR}/system/controlDict"
+"${SOLIDS4FOAM_SED}" -i "s/^writeInterval .*/writeInterval   ${END_TIME};/" \
+    "${CASE_DIR}/system/controlDict"
 
-# The time-series utility and the plot script shared by the benchmarks: next
-# to this case, or, when this case is a copy (as Alltest-regression makes),
-# in the source tree, which is at the same depth below the repository root
+# The plot script and the data cache shared by the benchmarks: next to this
+# case, or, when this case is a copy (as Alltest-regression makes), in the
+# source tree, which is at the same depth below the repository root
 ARO_DIR="${SCRIPT_DIR}/.."
-if [[ ! -d "${ARO_DIR}/makeArosticaTimeSeries" ]]; then
+if [[ ! -f "${ARO_DIR}/plotVsReference.gnuplot" ]]; then
     ARO_DIR="${SCRIPT_DIR}/../../../../../tutorials/solids/hyperelasticity/ArosticaEtAl2025"
 fi
 export ARO_DIR
@@ -122,19 +133,33 @@ else
 fi
 
 t=$(awk 'END {print $1}' "${CASE_DIR}/${DISP_FILE}")
-p0x=$(awk 'END {print $2}' "${CASE_DIR}/${DISP_FILE}")
 
-if [[ -z "${p0x}" ]]; then
-    echo "FAIL: could not read the p0 displacement"
-    failures=$((failures + 1))
-elif ! awk "BEGIN {exit !((${t} - ${END_TIME})^2 <= 1e-12)}"; then
+if ! awk "BEGIN {exit !((${t} - ${END_TIME})^2 <= 1e-12)}"; then
     echo "FAIL: the displacement history stops at t = ${t}"
     failures=$((failures + 1))
-elif awk "BEGIN {exit !(${p0x} >= ${P0X_MIN} && ${p0x} <= ${P0X_MAX})}"; then
-    printf "PASS: p0 x = %.6g m\n" "${p0x}"
 else
-    printf "FAIL: p0 x = %.6g m\n" "${p0x}"
-    failures=$((failures + 1))
+    for i in "${!CHECK_TIMES[@]}"; do
+        tc="${CHECK_TIMES[$i]}"
+        ref="${P0X_REF[$i]}"
+        p0x=$(awk -v tc="${tc}" \
+            '!/^#/ && ($1 - tc)^2 <= 1e-12 {v = $2} END {print v}' \
+            "${CASE_DIR}/${DISP_FILE}")
+
+        if [[ -z "${p0x}" ]]; then
+            echo "FAIL: no p0 displacement at t = ${tc} s"
+            failures=$((failures + 1))
+        elif awk -v v="${p0x}" -v r="${ref}" -v tol="${REL_TOL}" \
+            'BEGIN {d = v - r; if (d < 0) d = -d; a = (r < 0 ? -r : r);
+                    exit !(d <= tol*a)}'
+        then
+            printf "PASS: p0 x = %.6g m at t = %s s (reference %s m)\n" \
+                "${p0x}" "${tc}" "${ref}"
+        else
+            printf "FAIL: p0 x = %.6g m at t = %s s (reference %s m)\n" \
+                "${p0x}" "${tc}" "${ref}"
+            failures=$((failures + 1))
+        fi
+    done
 fi
 
 echo

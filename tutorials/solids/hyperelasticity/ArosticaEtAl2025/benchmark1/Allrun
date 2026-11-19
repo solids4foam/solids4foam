@@ -17,13 +17,13 @@
 #
 # The mesh density is set with MESH_NUMBER, 1 (coarsest) to 4, default 2. The
 # all-hexahedral meshes, with an O-grid at the apex, are downloaded from the
-# solids4foam website (ArosticaEtAl2025.zip). Level 4 is not stored: Allrun
-# extracts the script that generates the meshes, makeOGridMesh.py, and asks
-# for it to be run once (Python 3) before MESH_NUMBER=4.
+# solids4foam website (ArosticaEtAl2025-v1.zip) into ../data, which Allclean
+# keeps. Level 4 is not stored: Allrun extracts the script that generates the
+# meshes, makeOGridMesh.py, and asks for it to be run once (Python 3) before
+# MESH_NUMBER=4.
 #
 # The time series of the active stress and the cavity pressure are tabulated
-# by the makeArosticaTimeSeries utility in the parent directory, which Allrun
-# compiles. e.g.
+# by the makeArosticaTimeSeries utility. e.g.
 #     MESH_NUMBER=3 ./Allrun step1 displacement parallel
 #
 # Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
@@ -43,20 +43,34 @@ solids4Foam::requirePetscOrExitSilently
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-# The time-series utility, makeArosticaTimeSeries, is shared by both
-# benchmarks, in the parent directory, or where ARO_DIR points (the regression
-# test runs a copy of this case elsewhere)
-ARO_DIR="${ARO_DIR:-..}"
-if [[ ! -d "$ARO_DIR/makeArosticaTimeSeries" ]]
+# The time series are tabulated by the makeArosticaTimeSeries utility, built
+# by Allwmake
+if ! command -v makeArosticaTimeSeries > /dev/null 2>&1
 then
-    echo "makeArosticaTimeSeries was not found in $ARO_DIR"
+    echo "makeArosticaTimeSeries was not found: please run Allwmake"
     exit 1
 fi
 
-# The meshes are downloaded once from the solids4foam website, into data/
-ARCHIVE_URL="https://www.solids4foam.com/tutorials/archive/ArosticaEtAl2025.zip"
+# The directory shared by both benchmarks, holding the plot script and the
+# data cache, data/: the parent directory, or where ARO_DIR points (the
+# regression test runs a copy of this case elsewhere)
+ARO_DIR="${ARO_DIR:-..}"
+if [[ ! -f "$ARO_DIR/plotVsReference.gnuplot" ]]
+then
+    echo "plotVsReference.gnuplot was not found in $ARO_DIR"
+    exit 1
+fi
+
+# The meshes are downloaded once from the solids4foam website into
+# $ARO_DIR/data, which Allclean does not remove, and which may hold the
+# archive beforehand for running offline. A published archive is never
+# changed: a new one gets a new version in its name, and a new sum here
+ARCHIVE_NAME="ArosticaEtAl2025-v1"
+ARCHIVE_URL="https://www.solids4foam.com/tutorials/archive/$ARCHIVE_NAME.zip"
 ARCHIVE_SHA256="08a13aad266f0b30a2c311508769cfa37779a33238ff00399d98019c3befc5a3"
-ARCHIVE="data/ArosticaEtAl2025.zip"
+DATA_DIR="$ARO_DIR/data"
+ARCHIVE="$DATA_DIR/$ARCHIVE_NAME.zip"
+EXTRACT_DIR="$DATA_DIR/$ARCHIVE_NAME"
 
 # Mesh level
 MESH_NUMBER="${MESH_NUMBER:-2}"
@@ -105,8 +119,6 @@ else
     PRESSURE_ARGS=(-pressure "$PRESSURE")
 fi
 
-wmake "$ARO_DIR/makeArosticaTimeSeries" > log.wmake 2>&1 \
-    || { echo "Building makeArosticaTimeSeries failed: see log.wmake"; exit 1; }
 {
     makeArosticaTimeSeries -active "${ACTIVE_ARGS[@]}" \
         -out constant/activeStress \
@@ -145,25 +157,28 @@ command -v unzip > /dev/null 2>&1 || {
     echo "unzip: command not found, which is required for this case"
     exit 0
 }
-MESH_DIR="data/ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER"
+MESH_DIR="$EXTRACT_DIR/ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER"
 rm -rf constant/polyMesh
 if [[ "$MESH_NUMBER" == "4" ]]
 then
     # Level 4 (819 200 cells) is not stored: it is written once by
     # makeOGridMesh.py, from the archive, in the same layout as levels 1 to 3
-    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/makeOGridMesh.py" -d data
+    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/makeOGridMesh.py" \
+        -d "$EXTRACT_DIR"
     # The owner header holds the mesh sizes: a missing, partial or other
     # level mesh is not used
     if ! grep -qs "nCells:819200 " "$MESH_DIR/constant/polyMesh/owner"
     then
         echo "Level 4 is not stored in $ARCHIVE. Write it once with"
-        echo "(cd data/ArosticaEtAl2025 && python3 makeOGridMesh.py 4 benchmark1/mesh4)"
+        echo "(cd $EXTRACT_DIR/ArosticaEtAl2025 &&"
+        echo "    python3 makeOGridMesh.py 4 benchmark1/mesh4)"
         echo "and run MESH_NUMBER=4 ./Allrun again."
         exit 1
     fi
 else
     rm -rf "$MESH_DIR"
-    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER/*" -d data
+    unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark1/mesh$MESH_NUMBER/*" \
+        -d "$EXTRACT_DIR"
 fi
 cp -r "$MESH_DIR/constant/polyMesh" constant/polyMesh
 solids4Foam::runApplication checkMesh

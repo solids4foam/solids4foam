@@ -13,8 +13,9 @@ Prepared by Chanikya Valeti and Philip Cardiff (UCD), with Claude Opus 5.5
 ## Tutorial Aims
 
 - Reproduce benchmark 2 (biventricular mechanics) of Aróstica et al. [1].
-- Use the same `viscoActiveHolzapfelOgden` law and `solidSpringDashpot`
-  condition as `benchmark1`, with two cavity pressures.
+- Use the same material (`viscousHolzapfelOgden` wrapped by
+  `electroMechanicalLaw`) and `solidSpringDashpot` condition as
+  `benchmark1`, with two cavity pressures.
 
 ## Case Overview
 
@@ -22,9 +23,10 @@ Prepared by Chanikya Valeti and Philip Cardiff (UCD), with Claude Opus 5.5
 tetrahedral mesh distributed with the benchmark (cardiac-benchmark-toolkit
 [2], `data/biv_mesh_and_fibers_{coarse,fine}_p1`), converted once to OpenFOAM
 format. `Allrun` downloads the converted meshes and fibres from the
-solids4foam website (`ArosticaEtAl2025.zip`, checked against its SHA-256 sum)
-into `data/`, with `curl` or `wget`, and `unzip`. Without internet access,
-place `ArosticaEtAl2025.zip` in `data/` first. The
+solids4foam website (`ArosticaEtAl2025-v1.zip`, checked against its SHA-256
+sum) into `../data/`, shared with `benchmark1` and kept by `Allclean`, with
+`curl` or `wget`, and `unzip`. Without internet access, place
+`ArosticaEtAl2025-v1.zip` in `../data/` first. The
 archive also holds the converter, `convertBiVMesh.py`, and the provenance of
 the toolkit's files. Patches: `base`, `endo_rv`, `endo_lv` and `epi`.
 
@@ -36,7 +38,12 @@ the toolkit's files. Patches: `base`, `endo_rv`, `endo_lv` and `epi`.
 **Fibres** (Section 4.3). The BT-LDRB fibres (∓60°) of the benchmark, computed
 by the participants with life^x and distributed as nodal (P1) vectors. The
 converter averages them to cell and face centres and re-orthonormalises
-(f0, then s0 by Gram–Schmidt, n0 = f0 × s0). The toolkit's `sheet` vector is
+(f0, then s0 by Gram–Schmidt, n0 = f0 × s0), as a P1 interpolation at the
+centroid does. On the coarse mesh a tetrahedron can span much of the wall,
+across which the fibres rotate by 120°, so the cell vectors of neighbouring
+cells occasionally point more than 90° apart (`s0` on 386 of 83 011 internal
+faces); the signed average is kept, since it is what the participants' P1
+interpolation sees. The toolkit's `sheet` vector is
 used as s0, as in the reference implementation.
 
 **Material.** As in benchmark 1 (Tables 1–2), with the active stress of
@@ -45,7 +52,7 @@ Table 8 (σ0 = 1.5·10⁵ Pa, t_sys = 0.163 s, t_dias = 0.5 s; τ_max ≈ 120.1 
 **Pressures** (Table 9): p_lv(t) on `endo_lv` (max 16 490 Pa) and p_rv(t) on
 `endo_rv` (max 4 163 Pa), both follower pressures, tabulated by `Allrun` in
 `constant/pressureLV` and `constant/pressureRV` by the
-`makeArosticaTimeSeries` utility shared with `benchmark1`
+`makeArosticaTimeSeries` utility, as in `benchmark1`
 (`-pressure bivLV|bivRV`).
 
 **Boundary conditions** (Table 7): `base` spring-dashpot α = 10⁶ Pa/m,

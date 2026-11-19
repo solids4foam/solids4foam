@@ -14,9 +14,10 @@ Prepared by Chanikya Valeti and Philip Cardiff (UCD), with Claude Opus 5.5
 
 - Reproduce benchmark 1 (monoventricular mechanics) of Aróstica et al. [1]:
   steps 0A, 0B, 1 and the blinded step 2 cases A–C.
-- Demonstrate the `viscoActiveHolzapfelOgden` law: an orthotropic
-  Holzapfel–Ogden myocardium with a fibre-compression switch, a viscous term
-  and a time-dependent active stress.
+- Demonstrate the `viscousHolzapfelOgden` law, an orthotropic
+  Holzapfel–Ogden myocardium with a fibre-compression switch and a viscous
+  term, wrapped by `electroMechanicalLaw` for the time-dependent active
+  stress (`activeTensionSeries`).
 - Demonstrate the `solidSpringDashpot` boundary condition (pericardium and
   base Robin conditions) and the `ellipsoid` method of the `setFibreField`
   utility.
@@ -44,8 +45,9 @@ cone (x = 26.5 mm on the endocardium, 24.25 mm on the epicardium), exactly as
 in the reference gmsh script of the benchmark toolkit.
 
 **Mesh.** An all-hexahedral mesh with an O-grid at the apex, downloaded by
-`Allrun` from the solids4foam website (`ArosticaEtAl2025.zip`, checked
-against its SHA-256 sum, into `data/`). Endo- and epicardium are exact
+`Allrun` from the solids4foam website (`ArosticaEtAl2025-v1.zip`, checked
+against its SHA-256 sum) into `../data/`, which is shared with `benchmark2`
+and which `Allclean` does not remove. Endo- and epicardium are exact
 ellipsoids; nodes through the wall interpolate linearly between them.
 Patches: `endo`, `epi`, `base`. The archive holds levels 1 to 3 and the
 script that generates them, `makeOGridMesh.py` (Python 3). Level 4 is not
@@ -53,10 +55,11 @@ stored: for `MESH_NUMBER=4`, `Allrun` extracts the script and asks for it to be
 run once, from this directory, with
 
 ```bash
-(cd data/ArosticaEtAl2025 && python3 makeOGridMesh.py 4 benchmark1/mesh4)
+(cd ../data/ArosticaEtAl2025-v1/ArosticaEtAl2025 &&
+    python3 makeOGridMesh.py 4 benchmark1/mesh4)
 ```
 
-(`Allclean` removes `data/`, and with it this mesh.)
+The mesh is kept there, with the archive, for later runs.
 
 | `MESH_NUMBER` | square side × ring × wall | cells |
 | --- | --- | --- |
@@ -95,9 +98,9 @@ the reference codes, which differentiate Ψ automatically), κ = 10⁶ Pa,
 η = 100 Pa s, ρ = 1000 kg/m³. Ė is the change of E over the time step.
 
 **Active stress and pressure** (eq. 5–8, Tables 3–4). Both are ODEs in time
-only, so `Allrun` compiles the `makeArosticaTimeSeries` utility (in the
-parent directory, shared with `benchmark2`), which solves them once (an exact
-exponential integrator, h = 10 µs) and tabulates them in
+only, so `Allrun` calls the `makeArosticaTimeSeries` utility
+(`applications/utilities`, built by `Allwmake`), which solves them once (an
+exact exponential integrator, h = 10 µs) and tabulates them in
 `constant/activeStress` and `constant/timeVsPressure`.
 The peaks are τ_max = 118 106 Pa and p_max = 16 074 Pa. The paper quotes
 118 817 and 16 118 Pa; a tightly toleranced Radau solve gives the values
@@ -145,9 +148,12 @@ and generates `constant/activeStress` and `constant/timeVsPressure` from its
 
 ## New code used by this case
 
-- `viscoActiveHolzapfelOgden`
+- `viscousHolzapfelOgden`
   (`src/solids4FoamModels/mechanicalConstitutiveLaw/mechanicalConstitutiveLaws`):
-  the material law.
+  the passive material law, wrapped by `electroMechanicalLaw` with its
+  `activeTensionSeries` for the active stress τ(t) f0 ⊗ f0 of eq. (4).
+- `makeArosticaTimeSeries` (`applications/utilities`): the tables of τ(t)
+  and p(t).
 - `solidSpringDashpot` (`src/solids4FoamModels/solidModels/fvPatchFields`):
   the spring-dashpot (Robin) condition, nominal traction
   −(K u + C u̇) with separate normal and tangential coefficients. Here
@@ -192,8 +198,11 @@ law, `tangentShearModulus` (default a + (af + as + afs)/6, without the
 viscous η/Δt, which would make the wall far too stiff).
 ```
 
-`regressionTest.sh` runs step 1 on mesh 1 to t = 0.05 s (about a minute) and
-checks that p0 x lies near the participants' range there.
+`regressionTest.sh` runs step 1 on mesh 1 to t = 0.25 s (about 3 minutes),
+past the onset of the active stress at t = 0.1645 s, and checks p0 x at
+t = 0.05 s (filling, 0.360 mm; participants 0.370 to 0.504 mm) and
+t = 0.25 s (contraction, −33.9 mm; participants −28.1 to −30.8 mm) to 2 %.
+These are mesh-1 values of this case, not the benchmark answer.
 
 ```note
 Other differences to expect from the discretisation: a cell-centred

@@ -29,11 +29,13 @@ f0f0  = (f0/|f0|)*(f0/|f0|)
 sigma = sigma_passive + symm(F & (Ta*f0f0) & F^T)/J
 ```
 
-The active tension `Ta` is either a field or a ramped constant:
+The active tension `Ta` is a field, a function of time or a ramped constant:
 
 - with `activeTensionFromField yes`, `Ta` is the coupling input named by
   `activeTensionFieldName` (see [Coupling inputs](#coupling-inputs)), and
   `rampTime` is not applied;
+- otherwise, with `activeTensionSeries`, `Ta(t)` is interpolated from that
+  table, uniform in space;
 - otherwise `Ta` is `activeTension`, ramped linearly from zero:
 
 ```text
@@ -52,6 +54,7 @@ none, so it can be given once, on the outer dictionary.
 | `passiveMechanicalLaw` | yes | - | Sub-dictionary selecting the passive law |
 | `activeTension` | no | - | Constant active tension, pressure units |
 | `rampTime` | no | `0` | Ramp duration for `activeTension`, `>= 0` |
+| `activeTensionSeries` | no | - | Table of `Ta(t)`, pressure units |
 | `activeTensionFromField` | no | see below | Read `Ta` as a coupling input |
 | `activeTensionFieldName` | no | `Ta` | Name of the active tension field |
 | `uniformFibreField` | no | `no` | Take the default `f0` from this dictionary |
@@ -59,11 +62,28 @@ none, so it can be given once, on the outer dictionary.
 | `rho` | see text | - | Density, passed to the passive law if absent there |
 | `inputCaseDirectories` | no | - | Read `Ta` from another case directory |
 
-`activeTensionFromField` defaults to `yes` without an `activeTension` and to
-`no` with one. `activeTension` and `rampTime` are used only when
-`activeTensionFromField` is `no`. With the field on they are not used, and
-giving either prints a warning. Setting `activeTensionFromField no` without an
-`activeTension` is a fatal error, as is a negative `rampTime`.
+`activeTensionFromField` defaults to `yes` without an `activeTension` or an
+`activeTensionSeries`, and to `no` with one. `activeTension`, `rampTime` and
+`activeTensionSeries` are used only when `activeTensionFromField` is `no`.
+With the field on they are not used, and giving any of them prints a warning.
+Setting `activeTensionFromField no` without an `activeTension` or an
+`activeTensionSeries` is a fatal error, as are a negative `rampTime` and
+giving `activeTensionSeries` together with `activeTension` or `rampTime`.
+
+`activeTensionSeries` is a standard interpolation table sub-dictionary, e.g.
+
+```text
+        activeTensionSeries
+        {
+            file        "$FOAM_CASE/constant/activeStress";
+            outOfBounds clamp;
+        }
+```
+
+where `constant/activeStress` lists `(time Ta)` pairs. The
+`ArosticaEtAl2025` tutorials tabulate the benchmark's active stress `tau(t)`
+this way, over a passive
+[`viscousHolzapfelOgden`](../viscousHolzapfelOgdenMechanicalConstitutiveLaw/README.md).
 
 The `passiveMechanicalLaw` sub-dictionary holds the passive law's `type` and
 all of its entries. Any finite-strain law can be used; the tutorials use
@@ -198,3 +218,5 @@ To drive the tension from a field supplied by another model, or from files
 ## Tutorials
 
 - [`solids/hyperelasticity/LandEtAl2015/problem3`](../../../../../tutorials/solids/hyperelasticity/LandEtAl2015/problem3)
+- [`solids/hyperelasticity/ArosticaEtAl2025/benchmark1`](../../../../../tutorials/solids/hyperelasticity/ArosticaEtAl2025/benchmark1/README.md)
+- [`solids/hyperelasticity/ArosticaEtAl2025/benchmark2`](../../../../../tutorials/solids/hyperelasticity/ArosticaEtAl2025/benchmark2/README.md)

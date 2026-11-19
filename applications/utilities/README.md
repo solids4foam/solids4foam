@@ -118,6 +118,38 @@ When using `addTinyPatch` the original mesh is overwritten!
 
 ---
 
+## `makeArosticaTimeSeries`
+
+- **Utility purpose**
+  Tabulate the time series of the Aróstica et al. (2025) cardiac
+  elastodynamics benchmarks as interpolation tables `(time value)`: the
+  active stress `tau(t)`, eq. (5)-(6), and the cavity pressures `p(t)`,
+  eq. (7)-(8), with the parameters of Table 4 (`benchmark1`) or Table 9
+  (`bivLV`, `bivRV`). Each is an ODE in time only, integrated with an exact
+  exponential update. The tables cover `t` in `[0, 1]` s. Created by Claude
+  Opus 5.5, supervised by Chanikya Valeti, UCD.
+
+- **Arguments**
+  None
+
+- **Options/parameters**
+
+  - `-active`: tabulate the active stress, with `-sigma0 <Pa>` and optionally
+    `-tSys <s>` and `-tDias <s>`;
+  - `-pressure <benchmark1|bivLV|bivRV>`: tabulate a cavity pressure;
+  - `-zero`: write an all-zero table;
+  - `-dt <s>`: table spacing, default `1e-4`;
+  - `-out <file>`: the output file.
+
+- **Example of usage**
+
+  ```bash
+  makeArosticaTimeSeries -active -sigma0 1.5e5 -out constant/activeStress
+  makeArosticaTimeSeries -pressure benchmark1 -out constant/timeVsPressure
+  ```
+
+---
+
 ## `perturbMeshPoints`
 
 - **Utility purpose**

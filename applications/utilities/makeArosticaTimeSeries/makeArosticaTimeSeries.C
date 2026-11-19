@@ -42,7 +42,8 @@ Usage
 
 Author
     Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
-    A port of the earlier makeTimeSeries.py of this tutorial.
+    A port of the earlier makeTimeSeries.py of the ArosticaEtAl2025
+    tutorials.
 
 \*---------------------------------------------------------------------------*/
 
