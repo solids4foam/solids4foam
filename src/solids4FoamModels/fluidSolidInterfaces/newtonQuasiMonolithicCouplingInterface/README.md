@@ -135,6 +135,11 @@ solid as in an uninterrupted run. A retried time step restores the fluid mesh
 points and the `cellMotionU`, `pointMotionU`, `cellDisplacement` and
 `pointDisplacement` fields.
 
+The interface point displacement of an OpenFOAM motion solver is taken from
+the fluid mesh when the coupling is constructed. With a `couplingStartTime`,
+the fluid interface must therefore not move before the coupling starts, i.e.
+the interface `pointMotionU` or `pointDisplacement` must be zero.
+
 ## Non-conformal Interfaces
 
 `interfaceTransferMethod` selects how interface data are transferred between
