@@ -1,0 +1,572 @@
+// Trusted base-branch code only. PR material is data, never executable code.
+const fs = require('node:fs');
+const os = require('node:os');
+const nodePath = require('node:path');
+const risks = ['LOW', 'MEDIUM', 'HIGH'];
+// Size limits, in characters, for every model-written field. They are chosen so
+// that ANY report the schema accepts also passes validate() and can be
+// published (see maxReportBytes and fitComment); a schema-valid report is never
+// discarded for its size.
+const limits = {summary: 2000, reason: 1000, verification: 2000, file: 300,
+  claim: 800, evidence: 1200, suggested_check: 600, checklist: 800,
+  findings: 10, checklistItems: 5};
+const findingProperties = {
+  kind: {type: 'string', enum: ['defect', 'risk', 'question']},
+  severity: {type: 'string', enum: ['blocking', 'important', 'minor']},
+  category: {type: 'string', enum: ['numerics', 'architecture', 'compatibility',
+    'verification', 'security', 'build', 'style']},
+  file: {type: ['string', 'null'], maxLength: limits.file},
+  line: {type: ['integer', 'null'], minimum: 1},
+  ...Object.fromEntries(['claim', 'evidence', 'suggested_check'].map(key =>
+    [key, {type: 'string', minLength: 1, maxLength: limits[key]}]))
+};
+const schema = {
+  type: 'object', additionalProperties: false,
+  required: ['risk', 'summary', 'reason', 'findings', 'verification', 'human_review'],
+  properties: {
+    risk: {type: 'string', enum: risks},
+    ...Object.fromEntries(['summary', 'reason', 'verification'].map(key =>
+      [key, {type: 'string', minLength: 1, maxLength: limits[key]}])),
+    findings: {type: 'array', maxItems: limits.findings, items: {type: 'object',
+      additionalProperties: false, required: Object.keys(findingProperties),
+      properties: findingProperties}},
+    human_review: {type: 'array', minItems: 1, maxItems: limits.checklistItems,
+      items: {type: 'string', minLength: 1, maxLength: limits.checklist}}
+  }
+};
+// Most model-written characters a schema-valid report can hold (38,000).
+const maxReportChars = limits.summary + limits.reason + limits.verification +
+  limits.findings*(limits.file + limits.claim + limits.evidence + limits.suggested_check) +
+  limits.checklistItems*limits.checklist;
+// The report reaches the publisher as an environment variable, and Linux
+// rejects a single variable over 128 KiB. Up to 3 bytes per character (any
+// non-ASCII text such as Greek symbols) plus keys, enums and whitespace keeps
+// every schema-valid report below that limit.
+const maxReportBytes = 3*maxReportChars + 6000;
+function exactKeys(data, keys) {
+  return data && typeof data === 'object' && !Array.isArray(data) &&
+    Object.keys(data).sort().join() === keys.slice().sort().join();
+}
+function validText(value, max) {
+  return typeof value === 'string' && value.trim() && value.length <= max;
+}
+// Error messages name the field and limit (never the model's text), so the
+// one retry in analyse() can say what to fix.
+function validate(raw) {
+  if (typeof raw !== 'string' || Buffer.byteLength(raw) > maxReportBytes) throw new Error('Invalid report size');
+  const data = JSON.parse(raw);
+  if (!exactKeys(data, schema.required) || !risks.includes(data.risk)) throw new Error('Invalid report: fields or risk');
+  for (const key of ['summary', 'reason', 'verification']) {
+    if (!validText(data[key], limits[key])) {
+      throw new Error(`Invalid report text: ${key} must be 1 to ${limits[key]} characters`);
+    }
+  }
+  if (!Array.isArray(data.findings) || data.findings.length > limits.findings) {
+    throw new Error(`Invalid findings: at most ${limits.findings}`);
+  }
+  data.findings.forEach((finding, i) => {
+    if (!exactKeys(finding, Object.keys(findingProperties))) throw new Error(`Invalid finding: findings[${i}] fields`);
+    for (const key of ['kind', 'severity', 'category']) {
+      if (!findingProperties[key].enum.includes(finding[key])) {
+        throw new Error(`Invalid finding type: findings[${i}].${key}`);
+      }
+    }
+    for (const key of ['claim', 'evidence', 'suggested_check']) {
+      if (!validText(finding[key], limits[key])) {
+        throw new Error(`Invalid finding text: findings[${i}].${key} must be 1 to ${limits[key]} characters`);
+      }
+    }
+    if (finding.file !== null && !validText(finding.file, limits.file)) {
+      throw new Error(`Invalid file: findings[${i}].file must be null or 1 to ${limits.file} characters`);
+    }
+    if (finding.line !== null && (!Number.isSafeInteger(finding.line) || finding.line < 1)) {
+      throw new Error(`Invalid line: findings[${i}].line must be null or a positive integer`);
+    }
+  });
+  if (!Array.isArray(data.human_review) || !data.human_review.length ||
+      data.human_review.length > limits.checklistItems ||
+      data.human_review.some(item => !validText(item, limits.checklist))) {
+    throw new Error(`Invalid checklist: 1 to ${limits.checklistItems} items of 1 to ${limits.checklist} characters`);
+  }
+  return data;
+}
+
+// The Messages API's JSON outputs reject length, count and numeric constraints,
+// so the schema sent to the API states them in descriptions instead (and uses
+// anyOf for nullable fields). validate() still enforces every limit.
+const dropped = ['minLength', 'maxLength', 'minItems', 'maxItems', 'minimum'];
+function apiSchema(node = schema) {
+  if (Array.isArray(node)) return node.map(apiSchema);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (!dropped.includes(key)) out[key] = apiSchema(value);
+  }
+  const notes = [];
+  if (node.minLength && node.maxLength) notes.push(`${node.minLength} to ${node.maxLength} characters`);
+  else if (node.maxLength) notes.push(`at most ${node.maxLength} characters`);
+  if (node.minItems && node.maxItems) notes.push(`${node.minItems} to ${node.maxItems} items`);
+  else if (node.maxItems) notes.push(`at most ${node.maxItems} items`);
+  if (node.minimum !== undefined) notes.push(`at least ${node.minimum}`);
+  if (Array.isArray(node.type)) {
+    delete out.type;
+    out.anyOf = node.type.map(type => ({type}));
+    notes.push('or null');
+  }
+  if (notes.length) out.description = `Required limit: ${notes.join(', ')}.`;
+  return out;
+}
+
+// The analysis makes at most two Messages API requests: the second only to
+// fix a report that failed validation, or after a transient API error. SDK
+// retries and logging are off, so every request is counted and nothing is
+// logged; an overall deadline (below the 10-minute step timeout) aborts a
+// stalled stream. Structured JSON output only: no tools, no files, no network
+// beyond the API. Outputs only a validated report, token counts and fixed
+// reason codes; never prompt, model or API error text.
+const httpStatus = value => Number.isSafeInteger(value) && value >= 100 && value <= 599 ? value : null;
+const analysisReasons = ['authentication_error', 'permission_error', 'rate_limited', 'api_error',
+  'connection_error', 'timeout', 'refusal', 'max_tokens', 'invalid_report', 'no_api_key',
+  'no_input', 'failed'];
+const maxOutputTokens = 40000;
+const maxRequests = 2;
+const analysisDeadlineMs = 8.5*60*1000;
+const silentLogger = {error() {}, warn() {}, info() {}, debug() {}};
+const clientOptions = apiKey => ({apiKey, maxRetries: 0, timeout: analysisDeadlineMs,
+  logLevel: 'off', logger: silentLogger});
+// Streamed errors carry a structured type but no HTTP status.
+const errorTypes = {authentication_error: 'authentication_error', permission_error: 'permission_error',
+  rate_limit_error: 'rate_limited'};
+const transientTypes = ['rate_limit_error', 'overloaded_error', 'api_error'];
+const usageKeys = ['input_tokens', 'output_tokens', 'cache_read_input_tokens',
+  'cache_creation_input_tokens'];
+const inputFile = env => nodePath.join(env.RUNNER_TEMP || os.tmpdir(), 'review-input.json');
+
+// Wait before the one transient-error retry: the server's retry-after-ms or
+// Retry-After (seconds or HTTP date) when given, else 2 s. Returns null (no
+// retry) when the wait would leave under 3 minutes before the deadline.
+function retryDelay(error, started, now = Date.now()) {
+  const headers = error?.headers;
+  let wait = 2000;
+  const msHeader = headers?.get?.('retry-after-ms');
+  const ms = msHeader ? Number(msHeader) : NaN;
+  const after = headers?.get?.('retry-after');
+  if (Number.isFinite(ms) && ms >= 0) wait = ms;
+  else if (after && Number.isFinite(Number(after))) wait = Number(after)*1000;
+  else if (after && Number.isFinite(Date.parse(after))) wait = Math.max(0, Date.parse(after) - now);
+  wait = Math.max(0, wait);
+  return now + wait < started + analysisDeadlineMs - 3*60*1000 ? wait : null;
+}
+
+// A fallback re-runs the request on another model inside the same response.
+// When continuing the conversation, thinking from before the last fallback
+// boundary must be dropped (refusals-and-fallback: continuing the conversation).
+function replayContent(content) {
+  const last = content.map(block => block.type).lastIndexOf('fallback');
+  return content.filter((block, i) => i > last ||
+    !['thinking', 'redacted_thinking'].includes(block.type));
+}
+// Every sampling attempt, including a declined fallback hop, is in
+// usage.iterations when present; otherwise the top-level usage is complete.
+function addUsage(total, usage) {
+  const parts = Array.isArray(usage?.iterations) && usage.iterations.length ? usage.iterations : [usage];
+  for (const part of parts) {
+    for (const key of usageKeys) {
+      const value = part?.[key];
+      if (Number.isSafeInteger(value) && value >= 0) total[key] += value;
+    }
+  }
+}
+
+async function analyse({core}, env = process.env, client = null) {
+  const usage = Object.fromEntries(usageKeys.map(key => [key, 0]));
+  const outcome = {conclusion: 'failure', reason: 'failed', api_error_status: null,
+    served_model: null, attempts: 0};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), analysisDeadlineMs);
+  const started = Date.now();
+  let sdk = null;
+  // Classify an error by typed SDK class, HTTP status or structured type only.
+  const classify = error => {
+    if (error?.reason) return {reason: error.reason, transient: false};
+    if (sdk && error instanceof sdk.APIUserAbortError) return {reason: 'timeout', transient: false};
+    if (sdk && error instanceof sdk.APIConnectionTimeoutError) return {reason: 'timeout', transient: true};
+    if (sdk && error instanceof sdk.APIConnectionError) return {reason: 'connection_error', transient: true};
+    if (sdk && error instanceof sdk.APIError) {
+      const status = httpStatus(error.status);
+      outcome.api_error_status = status;
+      const reason = status ?
+        {401: 'authentication_error', 403: 'permission_error', 429: 'rate_limited'}[status] || 'api_error' :
+        errorTypes[error.type] || 'api_error';
+      const transient = status ? [408, 409, 429].includes(status) || status >= 500 :
+        transientTypes.includes(error.type);
+      return {reason, transient};
+    }
+    return {reason: 'failed', transient: false};
+  };
+  try {
+    if (!env.ANTHROPIC_API_KEY) throw Object.assign(new Error('no key'), {reason: 'no_api_key'});
+    let input;
+    try {
+      input = JSON.parse(fs.readFileSync(inputFile(env), 'utf8'));
+    } catch {
+      throw Object.assign(new Error('no input'), {reason: 'no_input'});
+    }
+    if (typeof input?.system !== 'string' || typeof input?.data !== 'string') {
+      throw Object.assign(new Error('no input'), {reason: 'no_input'});
+    }
+    sdk = require('@anthropic-ai/sdk');
+    client ||= new sdk.Anthropic(clientOptions(env.ANTHROPIC_API_KEY));
+    const messages = [{role: 'user', content: input.data}];
+    for (;;) {
+      outcome.attempts++;
+      const canRetry = () => outcome.attempts < maxRequests &&
+        Date.now() - started < analysisDeadlineMs - 3*60*1000;
+      let response;
+      try {
+        // Server-side fallback: if the model declines for safety reasons, the
+        // API re-runs the request on a fallback model in the same call.
+        response = await client.beta.messages.stream({
+          model: env.CLAUDE_REVIEW_MODEL, max_tokens: maxOutputTokens,
+          betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
+          output_config: {effort: env.CLAUDE_REVIEW_EFFORT,
+            format: {type: 'json_schema', schema: apiSchema()}},
+          system: input.system, messages
+        }, {signal: controller.signal}).finalMessage();
+      } catch (error) {
+        const wait = classify(error).transient && canRetry() ? retryDelay(error, started) : null;
+        if (wait === null) throw error;
+        await new Promise(resolve => setTimeout(resolve, wait));
+        if (controller.signal.aborted) throw error;
+        outcome.api_error_status = null;
+        continue;
+      }
+      addUsage(usage, response.usage);
+      if (/^[a-z0-9.-]{1,64}$/.test(response.model || '')) outcome.served_model = response.model;
+      if (response.stop_reason === 'refusal') throw Object.assign(new Error('refusal'), {reason: 'refusal'});
+      if (response.stop_reason === 'max_tokens') throw Object.assign(new Error('max_tokens'), {reason: 'max_tokens'});
+      const text = response.content.filter(block => block.type === 'text').map(block => block.text).join('');
+      try {
+        validate(text);
+        core.setOutput('report', text);
+        outcome.conclusion = 'success';
+        outcome.reason = null;
+        return;
+      } catch (error) {
+        if (!canRetry()) throw Object.assign(new Error('invalid report'), {reason: 'invalid_report'});
+        // Name the failed check; the message never contains model text.
+        const check = error instanceof SyntaxError ? 'the output was not valid JSON' : error.message;
+        messages.push({role: 'assistant', content: replayContent(response.content)},
+          {role: 'user', content: `The report failed validation: ${check}. Return the complete ` +
+            'report again as JSON matching the schema, keeping every field within the limits ' +
+            'stated in the schema descriptions.'});
+      }
+    }
+  } catch (error) {
+    if (!sdk) { try { sdk = require('@anthropic-ai/sdk'); } catch { /* Not installed. */ } }
+    outcome.reason = controller.signal.aborted ? 'timeout' : classify(error).reason;
+    core.setFailed(`AI analysis failed: ${outcome.reason}` +
+      (outcome.api_error_status ? ` (HTTP ${outcome.api_error_status})` : ''));
+  } finally {
+    clearTimeout(timer);
+    core.setOutput('conclusion', outcome.conclusion);
+    core.setOutput('telemetry', JSON.stringify({failure_reason: outcome.reason,
+      api_error_status: outcome.api_error_status, served_model: outcome.served_model,
+      attempts: outcome.attempts, usage}));
+  }
+}
+
+// Render model-controlled text as inert content inside fixed report formatting.
+// `max` shortens the raw text first (never an escape sequence); see fitComment.
+function plain(value, max = Infinity) {
+  if (value.length > max) value = Array.from(value).slice(0, max).join('') + '…';
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/@/g, '@\u200b').replace(/[\\`*_{}[\]()#+.!|~-]/g, '\\$&')
+    .replace(/[\r\n]+/g, ' ');
+}
+function classifyRisk(proposed, floor) {
+  if (!risks.includes(proposed) || !risks.includes(floor)) return 'HIGH';
+  return risks[Math.max(risks.indexOf(proposed), risks.indexOf(floor))];
+}
+function pathRisk(path) {
+  if (/^(\.github\/|\.claude\/|\.agents\/|\.docker\/|tests\/|applications\/scripts\/)/.test(path) ||
+      /(^|\/)(CLAUDE(\.local)?\.md|AGENTS\.md|SECURITY\.md|CODEOWNERS|\.gitmodules|\.mcp\.json|\.claude\.json|Allwmake|Allwclean)$/.test(path)) {
+    return 'HIGH';
+  }
+  if (/^src\/(blockCoupledSolids4FoamTools\/|immersedBoundary\/|RBFMeshMotionSolver\/|solids4FoamModels\/(numerics|mechanicalConstitutiveLaw|materialModels|physicsModel|fluidSolidInterfaces|interfaceToInterfaceMapping|Make)[^/]*\/)/.test(path) ||
+      (/^src\/solids4FoamModels\/(solidModels|fluidModels)\//.test(path) &&
+       !/\/(fvPatchFields|pointPatchFields)\//.test(path)) ||
+      /^applications\/solvers\//.test(path)) return 'HIGH';
+  if (path.startsWith('src/')) return 'MEDIUM';
+  return /\.(md|rst|txt|png|jpg|jpeg|svg|pdf)$/i.test(path) ? 'LOW' : 'MEDIUM';
+}
+function riskFloor(files) {
+  return files.reduce((floor, file) => [file.filename, file.previous_filename].filter(Boolean)
+    .reduce((risk, path) => classifyRisk(pathRisk(path), risk), floor), 'LOW');
+}
+function formatAssessment(data, risk, floor, max = Infinity) {
+  const text = value => plain(value, max);
+  const findings = data.findings.map(f => {
+    const location = f.file === null ? 'PR-wide' : text(f.file) + (f.line === null ? '' : `:${f.line}`);
+    return `- **${f.severity} ${f.kind} / ${f.category}** (${location})\n` +
+      `  - Claim: ${text(f.claim)}\n  - Evidence: ${text(f.evidence)}\n` +
+      `  - Suggested check: ${text(f.suggested_check)}`;
+  }).join('\n');
+  return `**Status: analysis completed. Advisory only; no approval.**\n\n` +
+    (max === Infinity ? '' : '_Some report text was shortened to fit the GitHub comment ' +
+      'size limit; no finding was removed._\n\n') +
+    `**Risk: ${risk}** (path floor: ${risks.includes(floor) ? floor : 'HIGH, unavailable'})\n\n` +
+    `${text(data.reason)}\n\n### Summary\n\n${text(data.summary)}\n\n### Findings\n\n` +
+    (findings || 'No actionable issue identified in the supplied evidence.') +
+    `\n\n### Verification evidence and limits\n\n${text(data.verification)}\n\n` +
+    `### Human review checklist\n\n` + data.human_review.map(item => `- [ ] ${text(item)}`).join('\n') +
+    '\n\nContributing reviewer: what did you independently check? ' +
+    'Use this standard AI report; core maintainers decide approval and merging.';
+}
+
+// Merge rule and second-review advice by risk; CONTRIBUTING.md
+// ("Reviewing pull requests") is the human-facing description.
+const secondReviewCommand = (number, fable) =>
+  `\`node .github/scripts/secondReview.cjs ${number}${fable ? ' --model fable' : ''} --post\``;
+function secondReviewNotice(risk, number, guide = 'CONTRIBUTING.md', raisedFrom = null) {
+  const intro = `\n\n### Review process\n\nSee [Reviewing pull requests](${guide}). ` +
+    'If a second review or a maintainer rates the risk higher, the higher risk\'s rule applies. ' +
+    (raisedFrom ? `A second review posted by a maintainer rated this PR ${risk}, above this ` +
+      `report's ${raisedFrom}, so the ${risk} rule applies. ` : '');
+  if (risk === 'LOW') {
+    return intro + 'LOW risk: one core maintainer works through the human review ' +
+      'checklist and may merge. No second AI review is needed.';
+  }
+  const high = risk === 'HIGH';
+  return intro + (high ?
+    'HIGH risk: both core maintainers must approve before merging.' :
+    'MEDIUM risk: one core maintainer may merge after the checks below.') +
+    '\n\n### Second independent AI review\n\n' +
+    `Required for ${risk} risk, but not yet automated. A core maintainer runs it ` +
+    'from an up-to-date `development` checkout once the PR is close to final. It ' +
+    'receives the same instructions, repository guide and patches, without this report ' +
+    'or any PR comment, and posts its result as a separate comment.\n\n' +
+    `- Preferred: Codex (gpt-6-astra, xhigh), a different model family: ${secondReviewCommand(number, false)}\n` +
+    `- Substitute: Claude Fable 5.2 (high) through the Anthropic API: ${secondReviewCommand(number, true)}. ` +
+    'It shares this report\'s model family, so agreement is weaker evidence' +
+    (high ? '. For HIGH risk, use it only if the core maintainer running it judges the ' +
+      'classification borderline and says so on the PR.' : '.') +
+    '\n\nThis report alone does not meet the two-reviewer policy.\n\n' +
+    '- [ ] Second independent AI review posted (core maintainer)' +
+    (high ? '\n- [ ] Both core maintainers approve' : '');
+}
+
+// Labels show the highest AI assessment in PR lists: this report's risk,
+// raised by any second review a maintainer posted (secondReviewRisk). The
+// workflow replaces only the labels it manages. Labels are read just before
+// the update, so a change made during the run is not overwritten blindly.
+const riskLabels = {LOW: 'ai-risk: low', MEDIUM: 'ai-risk: medium', HIGH: 'ai-risk: high'};
+const incompleteLabel = 'ai-review: incomplete';
+async function setRiskLabels(github, context, number, risk, failed) {
+  const managed = [...Object.values(riskLabels), incompleteLabel];
+  const wanted = failed ? [riskLabels.HIGH, incompleteLabel] : [riskLabels[risk] || riskLabels.HIGH];
+  const labels = await github.paginate(github.rest.issues.listLabelsOnIssue,
+    {...context.repo, issue_number: number, per_page: 100});
+  const present = labels.map(label => label.name).filter(name => managed.includes(name));
+  for (const name of present.filter(name => !wanted.includes(name))) {
+    await github.rest.issues.removeLabel({...context.repo, issue_number: number, name});
+  }
+  const missing = wanted.filter(name => !present.includes(name));
+  if (missing.length) {
+    await github.rest.issues.addLabels({...context.repo, issue_number: number, labels: missing});
+  }
+}
+
+// The highest risk in second-review comments posted by maintainers. Others
+// could copy the marker, so only these authors count; a counted comment can
+// only raise the risk, never lower it.
+const secondMarker = '<!-- solids4foam-ai-review-second -->';
+const maintainerAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+function secondReviewRisk(comments) {
+  return comments.filter(c => maintainerAssociations.includes(c.author_association) &&
+    c.body?.startsWith(secondMarker))
+    .map(c => c.body.match(/^\*\*Risk: (LOW|MEDIUM|HIGH)\*\*/m)?.[1])
+    .filter(Boolean)
+    .reduce((highest, risk) => highest ? classifyRisk(risk, highest) : risk, null);
+}
+function formatCoverage(coverage, max = Infinity, listed = Infinity) {
+  const omitted = coverage.omitted.slice(0, listed);
+  const more = coverage.omitted.length - omitted.length;
+  return `**Patch coverage: ${coverage.status.toUpperCase()}** ` +
+    '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n' +
+    (omitted.length ? 'Not reviewed:\n' + omitted.map(item =>
+      `- ${plain(item.path, max)} (${item.reason === 'no_patch' ? 'no patch available' : 'prompt budget'})`)
+      .join('\n') + (more ? `\n- and ${more} more files` : '') + '\n\n' : '');
+}
+
+// GitHub rejects comments over 65,536 characters, and escaping can expand
+// model text up to five times. Rather than discard a valid report, shorten
+// each text field (and the not-reviewed list) step by step until it fits. The
+// last step fits any schema-valid report: 48 fields of 121 characters, escaped,
+// plus 20 listed paths, is under 45,000 characters.
+const commentLimit = 60000;
+const fitSteps = [[Infinity, Infinity], [1000, 100], [500, 50], [250, 30], [120, 20]];
+function fitComment(render) {
+  for (const [max, listed] of fitSteps) {
+    const body = render(max, listed);
+    if (body.length <= commentLimit) return body;
+  }
+  throw new Error('Report too large');
+}
+
+// The agent skill shared by all solids4foam agents, read from the trusted base
+// branch on every run (never copied), so the reviewer knows the same rules.
+// `read` defaults to the trusted checkout; the local second review passes a
+// reader that fetches the same files from the PR's base branch on GitHub.
+const skillPath = '.agents/skills/solids4foam/SKILL.md';
+const readCheckout = path => fs.readFileSync(path, 'utf8');
+function repositoryGuide(read = readCheckout) {
+  const skill = read(skillPath).replace(/^---\n[\s\S]*?\n---\n+/, '');
+  const release = read('CHANGELOG.md').match(/^## \[(v[^\]]+)\]/m);
+  return `## Repository guide (trusted, from \`${skillPath}\` on the base branch)\n\n` +
+    (release ? `Latest released version in CHANGELOG.md: ${release[1]}\n\n` : '') +
+    skill.trim();
+}
+
+// Budget the JSON-escaped *whole prompt*. 600 KB is about 250k tokens (about
+// USD 1 of Opus 5.5 input), enough for whole patches of large refactoring PRs.
+// The prompt reaches the analysis step as a file, never as a step output.
+const promptBudget = 600000;
+function buildPrompt(pr, files, read = readCheckout) {
+  const instructions = read('.github/review/instructions.md');
+  const guide = repositoryGuide(read);
+  const selected = [], omitted = [];
+  const priority = file => file.filename.startsWith('src/') ? 0 :
+    file.filename.startsWith('applications/') ? 1 :
+    /(^|\/)(polyMesh|0)\/|\.csv$/.test(file.filename) ? 3 : 2;
+  // `system` is trusted (base branch); `data` is the untrusted PR. The Messages
+  // API call sends them as the system prompt and the user message; the local
+  // second review sends `prompt`, which is exactly system + blank line + data.
+  const system = `${instructions}\n\n${guide}`;
+  const data = () => `Reviewed head: ${pr.head.sha}\nBase: ${pr.base.sha}\n` +
+    `\nUNTRUSTED PR DATA (JSON):\n${JSON.stringify({title: pr.title, body: pr.body,
+      files: selected, not_reviewed: omitted})}`;
+  const prompt = () => `${system}\n\n${data()}`;
+  // Reserve manifest space before selecting any patches; never silently truncate a patch.
+  // The limit covers instructions and guide (~18 KB escaped) plus the file manifest.
+  for (const file of files) omitted.push({path: file.filename,
+    reason: file.patch ? 'budget' : 'no_patch'});
+  if (Buffer.byteLength(JSON.stringify(prompt())) > 45000) throw new Error('metadata_too_large');
+  for (const file of files.slice().sort((a, b) => priority(a) - priority(b))) {
+    if (!file.patch) continue;
+    const item = {filename: file.filename, previous_filename: file.previous_filename,
+      status: file.status, patch: file.patch};
+    const index = omitted.findIndex(entry => entry.path === file.filename);
+    const [entry] = omitted.splice(index, 1);
+    selected.push(item);
+    if (Buffer.byteLength(JSON.stringify(prompt())) > promptBudget) {
+      selected.pop();
+      omitted.push(entry);
+    }
+  }
+  if (!selected.length) throw new Error('nothing_reviewable');
+  return {prompt: prompt(), system, data: data(),
+    coverage: {status: omitted.length ? 'partial' : 'complete', omitted}};
+}
+async function prepare({github, context, core}, env = process.env) {
+  fs.rmSync(inputFile(env), {force: true});
+  try {
+    const pr = context.payload.pull_request;
+    const args = {...context.repo, pull_number: pr.number};
+    const {data: current} = await github.rest.pulls.get(args);
+    if (current.head.sha !== pr.head.sha || current.state !== 'open' || current.draft) {
+      throw new Error('pr_changed_or_ineligible');
+    }
+    const files = await github.paginate(github.rest.pulls.listFiles, {...args, per_page: 100});
+    if (!files.length || files.length >= 3000) throw new Error('file_list_incomplete');
+    const result = buildPrompt(current, files);
+    const {data: after} = await github.rest.pulls.get(args);
+    if (after.head.sha !== pr.head.sha || after.base.sha !== current.base.sha) {
+      throw new Error('pr_changed_during_collection');
+    }
+    // Passed to the analysis step as a file, never as environment variables
+    // (which Actions prints in the step log).
+    fs.writeFileSync(inputFile(env), JSON.stringify({system: result.system, data: result.data}),
+      {mode: 0o600});
+    core.setOutput('coverage', JSON.stringify(result.coverage));
+    core.setOutput('base_sha', current.base.sha);
+    core.setOutput('schema', JSON.stringify(schema));
+    core.setOutput('risk_floor', riskFloor(files));
+  } catch (error) {
+    const reasons = ['metadata_too_large', 'nothing_reviewable', 'pr_changed_or_ineligible',
+      'file_list_incomplete', 'pr_changed_during_collection'];
+    core.setOutput('collection_reason', reasons.includes(error.message) ? error.message : 'collection_failed');
+    throw new Error('PR evidence collection failed; see the machine-readable collection reason.');
+  }
+}
+async function publish({github, context, core}, env = process.env) {
+  const pr = context.payload.pull_request;
+  const args = {...context.repo, pull_number: pr.number};
+  const {data: current} = await github.rest.pulls.get(args);
+  if (current.head.sha !== pr.head.sha || current.state !== 'open' || current.draft ||
+      (env.REVIEW_BASE_SHA && current.base.sha !== env.REVIEW_BASE_SHA)) {
+    core.notice('No report published: the PR changed or is no longer eligible.');
+    return {status: 'skipped'};
+  }
+  // Only fixed codes and validated identifiers cross from the analysis job.
+  let analysis = {};
+  try { analysis = JSON.parse(env.REVIEW_TELEMETRY || '{}') || {}; } catch { /* No signal. */ }
+  const served = /^[a-z0-9.-]{1,64}$/.test(analysis.served_model || '') ? analysis.served_model : null;
+  const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+  const heading = `## Claude advisory review\n\nReviewed commit: \`${pr.head.sha}\`\n\n` +
+    '**Applies only if this SHA matches the current PR head.**\n\n' +
+    `[Workflow run](${run}) · Attempt ${env.GITHUB_RUN_ATTEMPT || '1'}\n\n` +
+    `Requested API model: ${plain(env.CLAUDE_REVIEW_MODEL || 'unspecified')}; ` +
+    `effort: ${plain(env.CLAUDE_REVIEW_EFFORT || 'unspecified')}.` +
+    (served && served !== env.CLAUDE_REVIEW_MODEL ?
+      ` **Served by fallback model ${plain(served)}** after a safety decline.` : '') + '\n\n';
+  const guide = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+    '/blob/development/CONTRIBUTING.md#reviewing-pull-requests';
+  // One sticky conversation comment, never an approval or merge API call.
+  const marker = '<!-- solids4foam-ai-review -->';
+  const comments = await github.paginate(github.rest.issues.listComments,
+    {...context.repo, issue_number: pr.number, per_page: 100});
+  const second = secondReviewRisk(comments);
+  let body, coverage, risk = 'HIGH';
+  let failed = false;
+  try {
+    if (env.REVIEW_RESULT !== 'success' || env.CLAUDE_CONCLUSION !== 'success') throw new Error('execution_failed');
+    const data = validate(env.REVIEW_JSON);
+    coverage = JSON.parse(env.REVIEW_COVERAGE);
+    if (!['complete', 'partial'].includes(coverage.status) || !Array.isArray(coverage.omitted) ||
+        Buffer.byteLength(env.REVIEW_COVERAGE) > 30000) throw new Error('Invalid coverage');
+    const own = classifyRisk(data.risk, env.RISK_FLOOR);
+    risk = second ? classifyRisk(own, second) : own;
+    body = fitComment((max, listed) => heading + formatCoverage(coverage, max, listed) +
+      formatAssessment(data, own, env.RISK_FLOOR, max) +
+      secondReviewNotice(risk, pr.number, guide, risk !== own ? own : null));
+  } catch {
+    failed = true;
+    const known = ['metadata_too_large', 'nothing_reviewable', 'file_list_incomplete',
+      'pr_changed_or_ineligible', 'pr_changed_during_collection', 'collection_failed'];
+    const status = httpStatus(analysis.api_error_status) ? ` (HTTP ${analysis.api_error_status})` : '';
+    const reason = known.includes(env.COLLECTION_REASON) ? env.COLLECTION_REASON :
+      analysisReasons.includes(analysis.failure_reason) ? `analysis_${analysis.failure_reason}${status}` :
+        'execution_or_report_failed';
+    body = heading + '**Status: INCOMPLETE — no successful AI review.**\n\n' +
+      '**Risk: HIGH (conservative fallback; classification unassessed).**\n\n' +
+      `Reason: ${reason}. Human review is required. See the workflow run for details.` +
+      secondReviewNotice('HIGH', pr.number, guide);
+  }
+  const previous = comments.find(comment => comment.user?.login === 'github-actions[bot]' &&
+    comment.body?.startsWith(marker));
+  body = `${marker}\n${body}`;
+  if (previous) await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
+  else await github.rest.issues.createComment({...context.repo, issue_number: pr.number, body});
+  // The comment is the record; a label failure is reported but does not hide it.
+  try {
+    await setRiskLabels(github, context, pr.number, risk, failed);
+  } catch {
+    core.warning('Could not update the ai-risk labels; the review comment is authoritative.');
+  }
+  if (failed) core.setFailed('AI review incomplete; failure report published.');
+  return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
+}
+module.exports = {promptBudget, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
+  secondReviewRisk, risks, schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
+  formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};

@@ -185,13 +185,17 @@ Foam::pointPointLeastSquaresVectors::vectors() const
 }
 
 
-bool Foam::pointPointLeastSquaresVectors::updateMesh(const mapPolyMesh& mpm) const
+bool Foam::pointPointLeastSquaresVectors::updateMesh
+(
+    const mapPolyMesh& mpm
+) const
 {
     if (debug)
     {
         InfoIn
         (
-            "bool pointPointLeastSquaresVectors::updateMesh(const mapPolyMesh&) const"
+            "bool pointPointLeastSquaresVectors::updateMesh"
+            "(const mapPolyMesh&) const"
         )   << "Clearing least square data" << endl;
     }
 

@@ -45,9 +45,9 @@ namespace Foam
     template<>
     const char* NamedEnum<foamPetscSnesHelper::solutionLocation, 3>::names[] =
     {
-     	"cells",
+        "cells",
         "points",
-	"none"
+        "none"
     };
 #endif
 

@@ -125,7 +125,7 @@ Foam::BlockBiCGStabSolver<Type>::solve
                 beta = 0;
             }
 
-            forAll (p, i)
+            forAll(p, i)
             {
                 p[i] = r[i] + beta*p[i] - beta*omega*v[i];
             }
@@ -134,7 +134,7 @@ Foam::BlockBiCGStabSolver<Type>::solve
             matrix.Amul(v, ph);
             alpha = rho/gSumProd(rw, v);
 
-            forAll (s, i)
+            forAll(s, i)
             {
                 s[i] = r[i] - alpha*v[i];
             }
@@ -144,12 +144,12 @@ Foam::BlockBiCGStabSolver<Type>::solve
             matrix.Amul(t, sh);
             omega = gSumProd(t, s)/gSumProd(t, t);
 
-            forAll (x, i)
+            forAll(x, i)
             {
                 x[i] = x[i] + alpha*ph[i] + omega*sh[i];
             }
 
-            forAll (r, i)
+            forAll(r, i)
             {
                 r[i] = s[i] - omega*t[i];
             }

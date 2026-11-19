@@ -100,7 +100,7 @@ stabLeastSquaresGrad<Type>::calcGrad
 
     label ownFaceI, neiFaceI;
 
-    forAll (own, facei)
+    forAll(own, facei)
     {
         ownFaceI = own[facei];
         neiFaceI = nei[facei];
@@ -112,7 +112,7 @@ stabLeastSquaresGrad<Type>::calcGrad
     }
 
     // Boundary faces
-    forAll (vsf.boundaryField(), patchi)
+    forAll(vsf.boundaryField(), patchi)
     {
         const fvsPatchVectorField& patchOwnLs = ownLs.boundaryField()[patchi];
 
@@ -124,7 +124,7 @@ stabLeastSquaresGrad<Type>::calcGrad
             Field<Type> neiVsf =
                 vsf.boundaryField()[patchi].patchNeighbourField();
 
-            forAll (neiVsf, patchFaceI)
+            forAll(neiVsf, patchFaceI)
             {
                 lsGrad[faceCells[patchFaceI]] +=
                     patchOwnLs[patchFaceI]
@@ -135,7 +135,7 @@ stabLeastSquaresGrad<Type>::calcGrad
         {
             const fvPatchField<Type>& patchVsf = vsf.boundaryField()[patchi];
 
-            forAll (patchVsf, patchFaceI)
+            forAll(patchVsf, patchFaceI)
             {
                 lsGrad[faceCells[patchFaceI]] +=
                      patchOwnLs[patchFaceI]

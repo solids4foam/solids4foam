@@ -107,7 +107,7 @@ void pimpleFluid::updateRobinFsiInterface()
              == fv::backwardDdtScheme<vector>::typeName
             )
             {
-                if(runTime().timeIndex() == 1)
+                if (runTime().timeIndex() == 1)
                 {
                     phi().boundaryField()[patchI] =
                     (
@@ -548,7 +548,7 @@ tmp<scalarField> pimpleFluid::patchPressureForce(const label patchID) const
 
 bool pimpleFluid::evolve()
 {
-    Info << "Evolving fluid model: " << this->type() << endl;
+    Info<< "Evolving fluid model: " << this->type() << endl;
 
     dynamicFvMesh& mesh = this->mesh();
 

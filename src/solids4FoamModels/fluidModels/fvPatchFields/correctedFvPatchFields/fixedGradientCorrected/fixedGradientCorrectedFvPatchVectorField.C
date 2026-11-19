@@ -276,7 +276,11 @@ void fixedGradientCorrectedFvPatchVectorField::write(Ostream& os) const
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-makePatchTypeField(fvPatchVectorField, fixedGradientCorrectedFvPatchVectorField);
+makePatchTypeField
+(
+    fvPatchVectorField,
+    fixedGradientCorrectedFvPatchVectorField
+);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
