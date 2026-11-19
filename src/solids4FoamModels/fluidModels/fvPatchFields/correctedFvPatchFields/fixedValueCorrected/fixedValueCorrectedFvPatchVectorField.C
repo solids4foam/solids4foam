@@ -25,7 +25,8 @@ License
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorField
+Foam::fixedValueCorrectedFvPatchVectorField::
+fixedValueCorrectedFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF
@@ -36,7 +37,8 @@ Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorFie
 {}
 
 
-Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorField
+Foam::fixedValueCorrectedFvPatchVectorField::
+fixedValueCorrectedFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
@@ -51,7 +53,8 @@ Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorFie
 {}
 
 
-Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorField
+Foam::fixedValueCorrectedFvPatchVectorField::
+fixedValueCorrectedFvPatchVectorField
 (
     const fixedValueCorrectedFvPatchVectorField& ptf,
     const fvPatch& p,
@@ -65,7 +68,8 @@ Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorFie
 
 
 #ifndef OPENFOAM_ORG
-Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorField
+Foam::fixedValueCorrectedFvPatchVectorField::
+fixedValueCorrectedFvPatchVectorField
 (
     const fixedValueCorrectedFvPatchVectorField& mwvpvf
 )
@@ -74,7 +78,8 @@ Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorFie
 {}
 #endif
 
-Foam::fixedValueCorrectedFvPatchVectorField::fixedValueCorrectedFvPatchVectorField
+Foam::fixedValueCorrectedFvPatchVectorField::
+fixedValueCorrectedFvPatchVectorField
 (
     const fixedValueCorrectedFvPatchVectorField& mwvpvf,
     const DimensionedField<vector, volMesh>& iF

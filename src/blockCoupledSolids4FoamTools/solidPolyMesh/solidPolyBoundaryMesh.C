@@ -127,7 +127,7 @@ lduInterfacePtrsList solidPolyBoundaryMesh::interfaces() const
 // {
 //     const solidPolyPatchList& patches = *this;
 
-//     forAll (patches, patchI)
+//     forAll(patches, patchI)
 //     {
 //         if (isA<globalTetPolyPatch>(patches[patchI]))
 //         {
@@ -154,7 +154,7 @@ lduInterfacePtrsList solidPolyBoundaryMesh::interfaces() const
 // {
 //     faceListList result(size());
 
-//     forAll (result, patchI)
+//     forAll(result, patchI)
 //     {
 //         result[patchI] = operator[](patchI).triFaces();
 //     }

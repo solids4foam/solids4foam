@@ -38,14 +38,14 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::interpolate
     const scalarListList& weights
 )
 {
-    forAll (result, faceI)
+    forAll(result, faceI)
     {
         const labelList& curAddr = addr[faceI];
         const scalarList& curWeights = weights[faceI];
 
         result[faceI] = pTraits<Type>::zero;
 
-        forAll (curAddr, i)
+        forAll(curAddr, i)
         {
             result[faceI] += ff[curAddr[i]]*curWeights[i];
         }
@@ -64,7 +64,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedInterpolate
     const scalarListList& weights
 )
 {
-    forAll (mask, maskI)
+    forAll(mask, maskI)
     {
         // Pick the masked face
         const label faceI = mask[maskI];
@@ -76,7 +76,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedInterpolate
         // Clear condensed list entry: masked faces only
         result[maskI] = pTraits<Type>::zero;
 
-        forAll (curAddr, i)
+        forAll(curAddr, i)
         {
             // Put the result into condensed list: masked faces only
             result[maskI] += ff[curAddr[i]]*curWeights[i];
@@ -94,7 +94,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::bridge
     const labelList& addr
 )
 {
-    forAll (addr, faceI)
+    forAll(addr, faceI)
     {
         ff[addr[faceI]] = bridgeField[addr[faceI]];
     }
@@ -119,7 +119,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedBridge
 
     label maskAddrI = 0;
 
-    forAll (uncoveredFaces, uncoI)
+    forAll(uncoveredFaces, uncoI)
     {
         // Pick the uncovered face
         const label faceI = uncoveredFaces[uncoI];
@@ -284,7 +284,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedMasterToSlave
         {
             // Constant transform
             // Transform only masked elements.  HJ, 25/May/2016
-            forAll (mask, maskI)
+            forAll(mask, maskI)
             {
                 transformFF[mask[maskI]] =
                     transform(reverseT_[0], ff[mask[maskI]]);
@@ -294,7 +294,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedMasterToSlave
         {
             // Full patch transform
             // Transform only masked elements.  HJ, 25/May/2016
-            forAll (mask, maskI)
+            forAll(mask, maskI)
             {
                 transformFF[mask[maskI]] =
                     transform(reverseT_[mask[maskI]], ff[mask[maskI]]);
@@ -454,7 +454,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedSlaveToMaster
         {
             // Constant transform
             // Transform only masked elements.  HJ, 25/May/2016
-            forAll (mask, maskI)
+            forAll(mask, maskI)
             {
                 transformFF[mask[maskI]] =
                     transform(forwardT_[0], ff[mask[maskI]]);
@@ -464,7 +464,7 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::maskedSlaveToMaster
         {
             // Full patch transform
             // Transform only masked elements.  HJ, 25/May/2016
-            forAll (mask, maskI)
+            forAll(mask, maskI)
             {
                 transformFF[mask[maskI]] =
                     transform(forwardT_[mask[maskI]], ff[mask[maskI]]);

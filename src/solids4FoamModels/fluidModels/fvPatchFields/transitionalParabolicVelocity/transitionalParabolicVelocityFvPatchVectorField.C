@@ -30,7 +30,8 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-transitionalParabolicVelocityFvPatchVectorField::transitionalParabolicVelocityFvPatchVectorField
+transitionalParabolicVelocityFvPatchVectorField::
+transitionalParabolicVelocityFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF
@@ -46,7 +47,8 @@ transitionalParabolicVelocityFvPatchVectorField::transitionalParabolicVelocityFv
 {}
 
 
-transitionalParabolicVelocityFvPatchVectorField::transitionalParabolicVelocityFvPatchVectorField
+transitionalParabolicVelocityFvPatchVectorField::
+transitionalParabolicVelocityFvPatchVectorField
 (
     const transitionalParabolicVelocityFvPatchVectorField& ptf,
     const fvPatch& p,
@@ -64,7 +66,8 @@ transitionalParabolicVelocityFvPatchVectorField::transitionalParabolicVelocityFv
 {}
 
 
-transitionalParabolicVelocityFvPatchVectorField::transitionalParabolicVelocityFvPatchVectorField
+transitionalParabolicVelocityFvPatchVectorField::
+transitionalParabolicVelocityFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
@@ -98,7 +101,8 @@ transitionalParabolicVelocityFvPatchVectorField::transitionalParabolicVelocityFv
 }
 
 
-transitionalParabolicVelocityFvPatchVectorField::transitionalParabolicVelocityFvPatchVectorField
+transitionalParabolicVelocityFvPatchVectorField::
+transitionalParabolicVelocityFvPatchVectorField
 (
     const transitionalParabolicVelocityFvPatchVectorField& fcvpvf,
     const DimensionedField<vector, volMesh>& iF
@@ -176,7 +180,11 @@ void transitionalParabolicVelocityFvPatchVectorField::write(Ostream& os) const
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-makePatchTypeField(fvPatchVectorField, transitionalParabolicVelocityFvPatchVectorField);
+makePatchTypeField
+(
+    fvPatchVectorField,
+    transitionalParabolicVelocityFvPatchVectorField
+);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

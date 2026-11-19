@@ -57,10 +57,10 @@ namespace Foam
     {
         protected:
             // Disallow default bitwise copy construct
-            RBFMeshMotionSolver( const RBFMeshMotionSolver & );
+            RBFMeshMotionSolver(const RBFMeshMotionSolver &);
 
             // Disallow default bitwise assignment
-            void operator=( const RBFMeshMotionSolver & );
+            void operator=(const RBFMeshMotionSolver &);
 
             //- Store motion as a field
             Field<vectorField> motionCenters;
@@ -106,13 +106,13 @@ namespace Foam
             // Construct from polyMesh
             RBFMeshMotionSolver
             (
-                const polyMesh & mesh,
+                const polyMesh& mesh,
 #if defined(OPENFOAM_ORG)
                 const dictionary& msData
 #elif defined(OPENFOAM_COM)
                 const IOdictionary& msData
 #else
-                Istream & msData
+                Istream& msData
 #endif
             );
 
@@ -120,9 +120,11 @@ namespace Foam
             // Destructor
             virtual ~RBFMeshMotionSolver();
 
-            // Set the motion of every boundary patch, where m is equal to number of patches and with non-empty vectorFields for moving patches.
+            // Set the motion of every boundary patch, where m is equal to
+            // number of patches and with non-empty vectorFields for moving
+            // patches.
             // The motion is defined at the face centers of the boundary patch.
-            void setMotion( const Field<vectorField> & motion );
+            void setMotion(const Field<vectorField>& motion);
 
             // Return point location obtained from the current motion field
             virtual tmp<pointField> curPoints() const;
@@ -131,9 +133,10 @@ namespace Foam
             virtual void solve();
 
             // Update the mesh corresponding to given map
-            virtual void updateMesh( const mapPolyMesh & );
+            virtual void updateMesh(const mapPolyMesh &);
 
-            // std::shared_ptr<sdc::TimeIntegrationScheme> timeIntegrationScheme;
+            // std::shared_ptr<sdc::TimeIntegrationScheme>
+            //     timeIntegrationScheme;
 
             bool corrector;
             int k;

@@ -112,7 +112,7 @@ fixedVelocityPressureFvPatchScalarField
 //      && mesh.found("phi")
 //     )
 //     {
-//         Info << "fixedVelocityPressureFvPatchScalarField::evaluate" << endl;
+//         Info<< "fixedVelocityPressureFvPatchScalarField::evaluate" << endl;
 
 //         const fvPatchField<vector>& HU =
 //             patch().lookupPatchField<volVectorField, vector>("HU");

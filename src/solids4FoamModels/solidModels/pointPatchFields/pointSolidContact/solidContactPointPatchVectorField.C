@@ -141,7 +141,7 @@ void Foam::solidContactPointPatchVectorField::makeNormalModels
 {
     normalModels_.setSize(shadowPatchNames().size());
 
-    forAll (normalModels_, shadPatchI)
+    forAll(normalModels_, shadPatchI)
     {
         // Check if only one shadow patch is defined
         const dictionary* contactDictPtr = NULL;
@@ -202,7 +202,7 @@ void Foam::solidContactPointPatchVectorField::makeNormalModels
 // {
 //     frictionModels_.setSize(shadowPatchNames().size());
 
-//     forAll (frictionModels_, shadPatchI)
+//     forAll(frictionModels_, shadPatchI)
 //     {
 //         // Check if only one shadow patch is defined
 //         const dictionary* contactDictPtr = NULL;
@@ -455,15 +455,18 @@ solidContactPointPatchVectorField::solidContactPointPatchVectorField
 
         // if (debug)
         // {
-        //     Info<< "    writePointDistanceFields: " << writePointDistanceFields_
+        //     Info<< "    writePointDistanceFields: "
+        //         << writePointDistanceFields_
         //         << endl;
         // }
 
         // if (scaleFaceTractionsNearDownstreamPatch_)
         // {
         //     WarningIn(type() + "::" + type())
-        //         << "scaleFaceTractionsNearDownstreamPatch can only be applied on"
-        //         << "the slave patch: this option will be ignored for the master "
+        //         << "scaleFaceTractionsNearDownstreamPatch can only be "
+        //            "applied on"
+        //         << "the slave patch: this option will be ignored for the "
+        //            "master "
         //         << "patch!" << endl;
         // }
     }
@@ -647,7 +650,8 @@ void solidContactPointPatchVectorField::autoMap
     // {
     //     // Let the contact models know about the mapping
     //     // Be careful, we must pass slave
-    //     // FIX PC 21-Sep-17: move this check inside if (shadowPatchNames ... )
+    //     // FIX PC 21-Sep-17: move this check inside if (shadowPatchNames
+    //     // ... )
     //     if (!master_)
     //     {
     //         normalModelForThisSlave().autoMap(m);
@@ -1033,8 +1037,8 @@ void solidContactPointPatchVectorField::initEvaluate
 
 //         if (master_)
 //         {
-//             // Let the contact models know that it is a new time-step, in case
-//             // they need to update anything
+//             // Let the contact models know that it is a new time-step, in
+//             // case they need to update anything
 //             forAll(shadowPatchNames(), shadPatchI)
 //             {
 //                 normalModels()[shadPatchI].newTimeStep();
@@ -1042,7 +1046,8 @@ void solidContactPointPatchVectorField::initEvaluate
 
 // #ifdef FOAMEXTEND
 //                 // Force N^2 contact search at least once per time-step
-//                 zoneToZones()[shadPatchI].clearPrevCandidateMasterNeighbors();
+//                 zoneToZones()[shadPatchI]
+//                .clearPrevCandidateMasterNeighbors();
 // #endif
 //             }
 //         }
@@ -1093,7 +1098,10 @@ void solidContactPointPatchVectorField::initEvaluate
             // vectorField patchDD(patch().size(), vector::zero);
             // vectorField shadowPatchDD
             // (
-            //     patch().boundaryMesh()[shadowPatchIndices()[shadPatchI]].size(),
+            //     patch().boundaryMesh()
+            //     [
+            //         shadowPatchIndices()[shadPatchI]
+            //     ].size(),
             //     vector::zero
             // );
 
@@ -1122,10 +1130,12 @@ void solidContactPointPatchVectorField::initEvaluate
 //                 shadowZones()[shadPatchI].globalPointToPatch
 //                 (
 // #ifdef OPENFOAM_NOT_EXTEND
-//                     fixThis() //zoneToZones()[shadPatchI].interpolateToTarget(zoneDD)()
+//                     fixThis()
+//                     //zoneToZones()[shadPatchI].interpolateToTarget(zoneDD)()
 //                     // this is for faces: we need point-to-point interpolate
 // #else
-//                     fixThis() //zoneToZones()[shadPatchI].masterToSlave(zoneDD)()
+//                     fixThis()
+//                     //zoneToZones()[shadPatchI].masterToSlave(zoneDD)()
 // #endif
 //                 )
 //              );
@@ -1141,7 +1151,8 @@ void solidContactPointPatchVectorField::initEvaluate
                 shadowZones()[shadPatchI].globalPointToPatch
                 (
 #ifdef OPENFOAM_NOT_EXTEND
-                    zoneToZones()[shadPatchI].targetPointDistanceToIntersection()
+                    zoneToZones()[shadPatchI]
+                   .targetPointDistanceToIntersection()
 #else
                     zoneToZones()[shadPatchI].slavePointDistanceToIntersection()
 #endif
@@ -1384,15 +1395,16 @@ void solidContactPointPatchVectorField::write(Ostream& os) const
     // os.writeKeyword("writePointDistanceFields")
     //     << writePointDistanceFields_ << token::END_STATEMENT << nl;
     // os.writeKeyword("scaleFaceTractionsNearDownstreamPatch")
-    //     << scaleFaceTractionsNearDownstreamPatch_ << token::END_STATEMENT << nl;
+    //     << scaleFaceTractionsNearDownstreamPatch_
+    //     << token::END_STATEMENT << nl;
     // if (scaleFaceTractionsNearDownstreamPatch_)
     // {
     //     os.writeKeyword("downstreamScaleFactor")
     //         << readScalar(dict_.lookup("downstreamScaleFactor"))
     //         << token::END_STATEMENT << nl;
     //     os.writeKeyword("downstreamPatchName")
-    //         << word(dict_.lookup("downstreamPatchName")) << token::END_STATEMENT
-    //         << nl;
+    //         << word(dict_.lookup("downstreamPatchName"))
+    //         << token::END_STATEMENT << nl;
     // }
 
     if (master_)
