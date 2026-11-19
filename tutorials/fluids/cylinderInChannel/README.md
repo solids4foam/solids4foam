@@ -119,10 +119,10 @@ $$
 
 with $\beta = 0.2$, as in the Hessenthaler et al. (2017) benchmark. On
 backflow faces the traction cancels a fraction $2\beta$ of the incoming
-kinetic energy flux; on outflow faces the condition is zero gradient. With
-`newtonIcoFluid`, an `inletOutlet` outlet fails here when the first faces
-change to inflow, while this condition converges in two Newton iterations
-per time step. `./Allclean` restores the default `0/U`.
+kinetic energy flux; on outflow faces the condition is zero gradient. The
+condition is smooth as faces change between outflow and backflow, so with
+`newtonIcoFluid` it converges in at most three Newton iterations per time
+step here. `./Allclean` restores the default `0/U`.
 
 ---
 

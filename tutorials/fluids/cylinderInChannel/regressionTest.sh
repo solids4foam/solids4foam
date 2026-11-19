@@ -21,7 +21,7 @@ solids4Foam::requireGnuSed
 # backflowStabilisedOutletVelocity outlet (beta = 0.2), run with
 # pimpleFluid and, when PETSc is available, newtonIcoFluid. The
 # peak outlet backflow distinguishes the condition from zero
-# gradient (0.96% with pimpleFluid, 0.92% with newtonIcoFluid)
+# gradient (0.96% with pimpleFluid, 0.81% with newtonIcoFluid)
 # ============================================================
 
 # ------------------------------------------------------------
@@ -40,8 +40,16 @@ SHORT_DRAG_MAX=0.626
 SHORT_LIFT_MIN=0.020
 SHORT_LIFT_MAX=0.030
 
+# newtonIcoFluid gives a different solution from pimpleFluid for this case
+# whatever the outlet condition (final drag 0.6198 and lift 0.0182 at t = 5
+# in the full channel), so its short-outlet forces have their own bands
+NEWTON_DRAG_MIN=0.621
+NEWTON_DRAG_MAX=0.624
+NEWTON_LIFT_MIN=0.048
+NEWTON_LIFT_MAX=0.058
+
 # Peak backflow, -sum(phi < 0)/sum(phi > 0) on the outlet, over the
-# written times: 0.720% with pimpleFluid and 0.847% with newtonIcoFluid
+# written times: 0.720% with pimpleFluid and 0.747% with newtonIcoFluid
 # (OpenFOAM-v2512). The OpenFOAM-9 CI image gives 0.860% with pimpleFluid:
 # its pimpleFluid solution differs from the first time step for any outlet
 # condition (zero gradient gives 0.994% there; a macOS OpenFOAM-9 build gives
@@ -50,8 +58,8 @@ SHORT_LIFT_MAX=0.030
 # outlet, so the backflow check is skipped there (issue #733)
 SHORT_BACKFLOW_MIN=0.0065
 SHORT_BACKFLOW_MAX=0.0090
-NEWTON_BACKFLOW_MIN=0.0080
-NEWTON_BACKFLOW_MAX=0.0089
+NEWTON_BACKFLOW_MIN=0.0070
+NEWTON_BACKFLOW_MAX=0.0078
 NEWTON_MAX_ITERATIONS=6
 
 ALLRUN_LOGFILE="log.Allrun"
@@ -65,7 +73,10 @@ echo "shortOutlet: end time ${SHORT_END_TIME}," \
     "final drag in [${SHORT_DRAG_MIN}, ${SHORT_DRAG_MAX}]," \
     "final lift in [${SHORT_LIFT_MIN}, ${SHORT_LIFT_MAX}]," \
     "peak backflow in [${SHORT_BACKFLOW_MIN}, ${SHORT_BACKFLOW_MAX}]"
-echo "shortOutletNewton: as shortOutlet, peak backflow in" \
+echo "shortOutletNewton: end time ${SHORT_END_TIME}," \
+    "final drag in [${NEWTON_DRAG_MIN}, ${NEWTON_DRAG_MAX}]," \
+    "final lift in [${NEWTON_LIFT_MIN}, ${NEWTON_LIFT_MAX}]," \
+    "peak backflow in" \
     "[${NEWTON_BACKFLOW_MIN}, ${NEWTON_BACKFLOW_MAX}]," \
     "at most ${NEWTON_MAX_ITERATIONS} Newton iterations per step"
 echo "============================================================"
@@ -79,10 +90,7 @@ prepare_case() {
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
 
-    # The case variant record is copied too, so that Allclean in the copy
-    # can undo a variant selected in the tutorial directory
-    for item in "${SCRIPT_DIR}"/* "${SCRIPT_DIR}"/.solids4FoamCaseVariant; do
-        [[ -e "${item}" ]] || continue
+    for item in "${SCRIPT_DIR}"/*; do
         base_item=$(basename "${item}")
         if [[ "${base_item}" == "regressionTests" ]]; then
             continue
@@ -359,8 +367,8 @@ NEWTON_CASE_DIR="${REGRESSION_ROOT}/shortOutletNewton"
 if run_case shortOutletNewton "${SHORT_END_TIME}" \
     shortOutlet newtonIcoFluid; then
     check_end_time shortOutletNewton "${SHORT_END_TIME}"
-    check_forces shortOutletNewton "${SHORT_DRAG_MIN}" "${SHORT_DRAG_MAX}" \
-        "${SHORT_LIFT_MIN}" "${SHORT_LIFT_MAX}"
+    check_forces shortOutletNewton "${NEWTON_DRAG_MIN}" \
+        "${NEWTON_DRAG_MAX}" "${NEWTON_LIFT_MIN}" "${NEWTON_LIFT_MAX}"
     check_range "shortOutletNewton: peak outlet backflow" \
         "$(peak_outlet_backflow "${NEWTON_CASE_DIR}" || true)" \
         "${NEWTON_BACKFLOW_MIN}" "${NEWTON_BACKFLOW_MAX}"

@@ -56,12 +56,18 @@ then
     solids4Foam::requirePetscOrExitSilently
 fi
 
-# Select the short-outlet variant of the initial velocity, or the default
+# Use the short-outlet initial velocity, keeping the default as 0/U.default,
+# or restore the default
 if [[ "${shortOutlet}" == "true" ]]
 then
-    solids4Foam::selectCaseVariant . shortOutlet
-else
-    solids4Foam::restoreCaseVariant .
+    if [[ ! -f 0/U.default ]]
+    then
+        \cp 0/U 0/U.default
+    fi
+    \cp 0/U.shortOutlet 0/U
+elif [[ -f 0/U.default ]]
+then
+    \mv 0/U.default 0/U
 fi
 
 # Check case version is correct

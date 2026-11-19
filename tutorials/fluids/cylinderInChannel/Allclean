@@ -19,9 +19,14 @@ then
     \mv 0.subsetMesh 0
 fi
 
-# Restore the stored case format and the default case variant
+# Restore the stored case format
 solids4Foam::restoreCaseFormat .
-solids4Foam::restoreCaseVariant .
+
+# Restore the default initial velocity after ./Allrun shortOutlet
+if [ -f 0/U.default ]
+then
+    \mv 0/U.default 0/U
+fi
 
 # Reset the fluid model selected by ./Allrun <fluidModel>
 solids4Foam::requireGnuSed
