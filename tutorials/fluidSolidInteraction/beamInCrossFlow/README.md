@@ -142,7 +142,18 @@ are `u_x(A) = 5.95e-5 m` and `F_x = 1.33 N`, each with a stated accuracy of
 `1.327 +/- 0.01 N`. They apply to the `0.2 m/s` peak used here (see above).
 These are independent-code
 verification targets, not regression values to which the discretisation is
-tuned. Figure 2 shows the displacement field in the beam, the fluid velocity
+tuned.
+
+The supplied case does not reproduce these values, and is not expected to. Its
+mesh (14,592 fluid and 256 solid cells) is coarser than the coarsest level of
+the verification study, and the default run to `t = 4 s` has not reached the
+steady state: the wake mode takes about 16-20 s to settle from rest. At
+`t = 4 s` it gives `u_x(A) = 3.91e-5 m` and `F_x = 1.23 N`, with `u_x(A)` still
+increasing. The steady values on four refined meshes (L0-L3), which approach
+Richter's to within 0.2 % on L3, and the settings used to obtain them, are
+given in the [verification README](verification/README.md).
+
+Figure 2 shows the displacement field in the beam, the fluid velocity
 streamlines, and the fluid pressure on the channel ground, wall and outlet.
 
 ![Diagram of the expected results](images/fs_over_2.PNG)
@@ -189,18 +200,30 @@ the supplied settings, the same PETSc-based solid solve and solid predictor, a
 serial run of each coupling gives (solids4foam development, OpenFOAM v2512,
 Apple M1 Ultra):
 
-| Coupling | Convergence test | Outer FSI iterations | Wall-clock |
-| --- | --- | ---: | ---: |
-| Aitken (supplied) | smaller of the two residual measures | 129 | 14 s |
-| Aitken | `requireAllResidualMeasures yes` | 173 | 17 s |
-| IQNILS (supplied) | `requireAllResidualMeasures yes` | 187 | 18 s |
-| IQNILS, `couplingReuse 2` | `requireAllResidualMeasures yes` | 161 | 16 s |
+| Coupling | Outer FSI iterations | Wall-clock |
+| --- | ---: | ---: |
+| Aitken (supplied) | 105 | 27 s |
+| IQNILS (supplied) | 86 | 23 s |
+| IQNILS, `couplingReuse 2` | 64 | 19 s |
 
-All four give the same point-A displacement at `t = 1.0 s` to within
-`1e-10 m`. For this short, mildly coupled start-up window the two methods
-cost about the same once they use the same (strict) convergence test; the
-supplied Aitken setup is cheaper mainly because its default test accepts a
-step when either residual measure is below `outerCorrTolerance`.
+All three use `requireAllResidualMeasures yes` and give the same point-A
+displacement at `t = 1.0 s` to within `1e-10 m`. IQNILS needs about 20 % fewer
+coupling iterations than Aitken over this mildly coupled start-up window, and
+reusing the secant modes of the previous two time steps saves a further 25 %.
+
+Both coupling setups use the production settings of the
+[verification study](verification/README.md): a coupling tolerance
+`outerCorrTolerance 1e-5` with `requireAllResidualMeasures yes`, at most 30
+coupling iterations per time step, and `allowUnconvergedCoupling yes`, so that a
+step that reaches `nOuterCorr` is reported in the log instead of stopping the
+run. The fluid uses three PIMPLE outer correctors per coupling iteration and
+tight linear-solver tolerances (`1e-10` for p and U, `1e-12` for the mesh
+motion). With a single corrector the fluid response to the interface motion
+depends on the history of the coupling iterations, and the strict coupling test
+can then stall. With the supplied settings no time step of the full run to
+`t = 4 s` needs more than 7 coupling iterations. PIMPLE often reports
+`not converged within 3 iterations`, because its `residualControl` tolerances
+are not reached in three correctors; this message is informational.
 
 The IQNILS setup sets `relMinSignificant 1e-2` in `constant/fsiProperties.iqnils`,
 which drops a secant mode when the part of it that is orthogonal to the newer
