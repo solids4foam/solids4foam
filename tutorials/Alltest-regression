@@ -118,6 +118,7 @@ REGRESSION_TESTS=(
     "solids/elastoplasticity/curvedBeams"
     "solids/elastoplasticity/cylinderExpansion"
     "solids/elastoplasticity/neckingBar"
+    "solids/elastoplasticity/notchedBar"
     "solids/fracture/crackingBeams"
     "solids/fracture/crackingPlateHole"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
@@ -196,6 +197,7 @@ REGRESSION_TESTS=(
     "circulationModels/healthyHuman"
     # Not tutorials: test applications' cases, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
+    "../applications/test/logStrainMechanicalConstitutiveLaw/case"
     "../applications/test/immersedSurfaceTraction/case"
     "../applications/test/circulationNetworkChecks/case"
 )

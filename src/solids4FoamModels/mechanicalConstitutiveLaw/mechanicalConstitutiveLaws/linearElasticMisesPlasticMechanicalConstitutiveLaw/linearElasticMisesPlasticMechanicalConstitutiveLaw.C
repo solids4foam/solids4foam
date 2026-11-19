@@ -124,6 +124,142 @@ inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::newtonLoop
 }
 
 
+inline void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::radialReturn
+(
+    const symmTensor& sTrial,
+    const scalar epsilonPEq0,
+    const scalar maxMagDEpsilon,
+    symmTensor& s,
+    symmTensor& DEpsilonP,
+    scalar& epsilonPEq,
+    scalar& sigmaY,
+    scalar& theta
+) const
+{
+    const scalar magSTrial = mag(sTrial);
+
+    // qTrial = sqrt(3/2) |s_trial|
+    const scalar qTrial = sqrt(3.0/2.0)*magSTrial;
+
+    // Yield stress from old eq plastic strain
+    // (we could store this for convenience)
+    const scalar sigmaYTrial = yieldStress(epsilonPEq0);
+
+    // fTrial = qTrial - sigmaY
+    const scalar fTrial = qTrial - sigmaYTrial;
+
+    if (fTrial <= SMALL)
+    {
+        // Elastic
+        s = sTrial;
+        DEpsilonP = symmTensor::zero;
+        epsilonPEq = epsilonPEq0;
+        sigmaY = sigmaYTrial;
+        theta = 1.0;
+
+        return;
+    }
+
+    // Plastic step: compute return direction
+    symmTensor n = symmTensor::zero;
+    if (magSTrial > SMALL)
+    {
+        n = sTrial/magSTrial;
+    }
+    else
+    {
+        // Very unlikely if fTrial>0, but be defensive
+        n = symmTensor::zero;
+    }
+
+    // Solve for DLambda and updated sigmaY
+    scalar dLambda = 0.0;
+    scalar curSigmaY = sigmaYTrial;
+
+    const scalar mu = mu_.value();
+
+    if (nonLinearPlasticity_)
+    {
+        // Newton loop (table-based nonlinear hardening)
+        newtonLoop
+        (
+            dLambda,
+            curSigmaY,
+            epsilonPEq0,
+            qTrial,
+            mu,
+            maxMagDEpsilon
+        );
+    }
+    else
+    {
+        // Linear / perfect plasticity (closed-form radial return)
+        //
+        // Yield function is written in terms of the equivalent (von Mises)
+        // stress:
+        //
+        //     q = sqrt(3/2) * |s|
+        //
+        // For associative J2 plasticity with plastic multiplier increment
+        // Δλ, the radial return mapping gives:
+        //
+        //     q = qTrial - 3 μ Δλ
+        //
+        // The equivalent plastic strain evolves as:
+        //
+        //     εp_eq = εp_eq0 + Δλ
+        //
+        // For linear isotropic hardening:
+        //
+        //     σY = σY0 + Hp Δλ
+        //
+        // Substituting into the consistency condition f = q − σY = 0:
+        //
+        //     qTrial
+        //   − 3 μ Δλ
+        //   − (σY0 + Hp Δλ) = 0
+        //
+        // which gives the closed-form solution:
+        //
+        //     Δλ = (qTrial − σY0) / (3 μ + Hp)
+        //
+        // Perfect plasticity is recovered by setting Hp = 0.
+        const scalar denom = 3.0*mu + Hp_;
+        dLambda = fTrial/max(denom, SMALL);
+        curSigmaY = sigmaYTrial + Hp_*dLambda;
+    }
+
+    // Plastic flow, with dLambda the equivalent plastic strain increment:
+    //
+    //     DEpsilonP  = (3/2) dLambda s/q = sqrt(3/2) dLambda n
+    //     |DEpsilonP| = sqrt(3/2) dLambda
+    //     DEpsilonPEq = sqrt(2/3) |DEpsilonP| = dLambda
+    //
+    // which is self-consistent, unlike the previous form that combined
+    // DEpsilonP = (3/2) dLambda n with DEpsilonPEq = sqrt(2/3) dLambda and
+    // so disagreed with itself by a factor of 3/2
+    DEpsilonP = sqrt(3.0/2.0)*dLambda*n;
+
+    epsilonPEq = epsilonPEq0 + dLambda;
+    sigmaY = curSigmaY;
+
+    // Returned deviatoric stress:
+    //     s = sTrial - 2 mu DEpsilonP = sTrial - 2 mu sqrt(3/2) dLambda n
+    // so that |s| = |sTrial| - 2 mu sqrt(3/2) dLambda and hence
+    //     q = qTrial - 3 mu dLambda
+    s = sTrial - (2.0*mu*sqrt(3.0/2.0)*dLambda)*n;
+
+    // The factor the return scaled the trial stress by, which the
+    // approximate scalar tangent uses
+    theta = 1.0;
+    if (magSTrial > SMALL)
+    {
+        theta = 1.0 - (2.0*mu*sqrt(3.0/2.0)*dLambda)/magSTrial;
+        theta = max(theta, 0.0);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::
@@ -370,147 +506,24 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
         // Elastic predictor (trial deviatoric stress)
         const symmTensor sTrial = 2.0*mu*(eDev - dev(epsilonP0[i]));
 
-        const scalar magSTrial = mag(sTrial);
+        // Return mapping
+        symmTensor s(symmTensor::zero);
+        symmTensor DEpsilonP(symmTensor::zero);
+        scalar theta = 1.0;
 
-        // qTrial = sqrt(3/2) |s_trial|
-        const scalar qTrial = sqrt(3.0/2.0)*magSTrial;
-
-        // Yield stress from old eq plastic strain
-        // (we could store this for convenience)
-        const scalar sigmaYTrial = yieldStress(epsilonPEq0[i]);
-
-        // fTrial = qTrial - sigmaY
-        const scalar fTrial = qTrial - sigmaYTrial;
-
-        if (fTrial <= SMALL)
-        {
-            // Elastic
-            epsilonP[i] = epsilonP0[i];
-            epsilonPEq[i] = epsilonPEq0[i];
-            sigmaY[i] = sigmaYTrial;
-
-            // Full stress = hydro + deviatoric
-            sigma[i] = sTrial + kappa*trEps*I;
-
-            if (wantsSplit)
-            {
-                (*volumetricPtr)[i] = kappa*trEps;
-                sigma[i] = sTrial;
-            }
-
-            if (needScalarTan)
-            {
-                // Small-strain scalar tangent options
-                // - scalar: bulk + deviatoric contribution (usual "2mu+lambda"
-                //   style)
-                // - scalarDeviatoric: deviatoric-only (useful for mixed u-p
-                //   solve)
-                // Here, represent them in (kappa, mu) form:
-                // lambda = kappa - 2/3 mu
-                // 2mu + lambda = 4/3 mu + kappa
-                if (response.tangentReq() == tangentRequest::scalarDeviatoric)
-                {
-                    // Scalar Laplacian surrogate for div(dev(sigma)), which is
-                    // mu*lap(D) + (1/3)*mu*grad(div(D)).
-                    // This is the theta = 1 limit of the plastic branch below
-                    (*scalarTanPtr)[i] = (4.0/3.0)*mu;
-                }
-                else
-                {
-                    (*scalarTanPtr)[i] = (4.0/3.0)*mu + kappa;
-                }
-            }
-
-            continue;
-        }
-
-        // Plastic step: compute return direction
-        symmTensor n = symmTensor::zero;
-        if (magSTrial > SMALL)
-        {
-            n = sTrial/magSTrial;
-        }
-        else
-        {
-            // Very unlikely if fTrial>0, but be defensive
-            n = symmTensor::zero;
-        }
-
-        // Solve for DLambda and updated sigmaY
-        scalar dLambda = 0.0;
-        scalar curSigmaY = sigmaYTrial;
-
-        if (nonLinearPlasticity_)
-        {
-            // Newton loop (table-based nonlinear hardening)
-            newtonLoop
-            (
-                dLambda,
-                curSigmaY,
-                epsilonPEq0[i],
-                qTrial,
-                mu,
-                maxMagDEpsilon
-            );
-        }
-        else
-        {
-            // Linear / perfect plasticity (closed-form radial return)
-            //
-            // Yield function is written in terms of the equivalent (von Mises)
-            // stress:
-            //
-            //     q = sqrt(3/2) * |s|
-            //
-            // For associative J2 plasticity with plastic multiplier increment
-            // Δλ, the radial return mapping gives:
-            //
-            //     q = qTrial - 3 μ Δλ
-            //
-            // The equivalent plastic strain evolves as:
-            //
-            //     εp_eq = εp_eq0 + Δλ
-            //
-            // For linear isotropic hardening:
-            //
-            //     σY = σY0 + Hp Δλ
-            //
-            // Substituting into the consistency condition f = q − σY = 0:
-            //
-            //     qTrial
-            //   − 3 μ Δλ
-            //   − (σY0 + Hp Δλ) = 0
-            //
-            // which gives the closed-form solution:
-            //
-            //     Δλ = (qTrial − σY0) / (3 μ + Hp)
-            //
-            // Perfect plasticity is recovered by setting Hp = 0.
-            const scalar denom = 3.0*mu + Hp_;
-            dLambda = fTrial/max(denom, SMALL);
-            curSigmaY = sigmaYTrial + Hp_*dLambda;
-        }
-
-        // Plastic flow, with dLambda the equivalent plastic strain increment:
-        //
-        //     DEpsilonP  = (3/2) dLambda s/q = sqrt(3/2) dLambda n
-        //     |DEpsilonP| = sqrt(3/2) dLambda
-        //     DEpsilonPEq = sqrt(2/3) |DEpsilonP| = dLambda
-        //
-        // which is self-consistent, unlike the previous form that combined
-        // DEpsilonP = (3/2) dLambda n with DEpsilonPEq = sqrt(2/3) dLambda and
-        // so disagreed with itself by a factor of 3/2
-        const symmTensor DEpsilonP = sqrt(3.0/2.0)*dLambda*n;
+        radialReturn
+        (
+            sTrial,
+            epsilonPEq0[i],
+            maxMagDEpsilon,
+            s,
+            DEpsilonP,
+            epsilonPEq[i],
+            sigmaY[i],
+            theta
+        );
 
         epsilonP[i] = epsilonP0[i] + DEpsilonP;
-        epsilonPEq[i] = epsilonPEq0[i] + dLambda;
-        sigmaY[i] = curSigmaY;
-
-        // Returned deviatoric stress:
-        //     s = sTrial - 2 mu DEpsilonP = sTrial - 2 mu sqrt(3/2) dLambda n
-        // so that |s| = |sTrial| - 2 mu sqrt(3/2) dLambda and hence
-        //     q = qTrial - 3 mu dLambda
-        const symmTensor s = sTrial - (2.0*mu*sqrt(3.0/2.0)*dLambda)*n;
 
         // Total small strain stress
         sigma[i] = s + kappa*trEps*I;
@@ -523,16 +536,20 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
         if (needScalarTan)
         {
-            // Approximate scalar tangent
-            scalar theta = 1.0;
-            if (magSTrial > SMALL)
-            {
-                theta = 1.0 - (2.0*mu*sqrt(3.0/2.0)*dLambda)/magSTrial;
-                theta = max(theta, 0.0);
-            }
-
+            // Small-strain scalar tangent options
+            // - scalar: bulk + deviatoric contribution (usual "2mu+lambda"
+            //   style)
+            // - scalarDeviatoric: deviatoric-only (useful for mixed u-p
+            //   solve)
+            // Here, represent them in (kappa, mu) form:
+            // lambda = kappa - 2/3 mu
+            // 2mu + lambda = 4/3 mu + kappa
+            // When yielding, the elastic stiffness is scaled by theta, the
+            // factor the return scaled the trial stress by
             if (response.tangentReq() == tangentRequest::scalarDeviatoric)
             {
+                // Scalar Laplacian surrogate for div(dev(sigma)), which is
+                // mu*lap(D) + (1/3)*mu*grad(div(D))
                 (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu;
             }
             else
@@ -544,6 +561,94 @@ void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::evaluate
 
     // No analytical fourth-order tangent has been derived for this law
     fourthOrderByFiniteDifferenceOnly(kin, inputs, state, response);
+}
+
+
+void Foam::linearElasticMisesPlasticMechanicalConstitutiveLaw::
+evaluateElasticPredictor
+(
+    const UList<symmTensor>& epsilonETrial,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    UList<symmTensor>& epsilonE,
+    mechanicalConstitutiveLawResponse& response
+) const
+{
+    UIndirectList<symmTensor>& sigma = response.stress();
+
+    const scalar mu = mu_.value();
+    const scalar kappa = kappa_.value();
+
+    Field<scalar>& epsilonPEq = state.scalarField("epsilonPEq");
+    const Field<scalar>& epsilonPEq0 =
+        state.getScalarField0("epsilonPEq");
+
+    Field<scalar>& sigmaY = state.scalarField("sigmaY");
+
+    const bool needScalarTan = response.wantsScalarTangent();
+    UIndirectList<scalar>* scalarTanPtr = nullptr;
+    if (needScalarTan)
+    {
+        scalarTanPtr = &response.scalarTangent();
+    }
+
+    // Normalisation for the Newton residual, as in evaluate(), with the
+    // trial elastic strain standing in for the total strain
+    scalar maxMagDEpsilon = inputs.convergenceScale();
+
+    if (maxMagDEpsilon <= 0)
+    {
+        forAll(epsilonETrial, i)
+        {
+            maxMagDEpsilon = max(maxMagDEpsilon, mag(epsilonETrial[i]));
+        }
+    }
+
+    maxMagDEpsilon = max(maxMagDEpsilon, SMALL);
+
+    forAll(sigma, i)
+    {
+        const symmTensor& epsETrial = epsilonETrial[i];
+        const scalar trEps = tr(epsETrial);
+
+        // Elastic predictor (trial deviatoric stress)
+        const symmTensor sTrial = 2.0*mu*dev(epsETrial);
+
+        // Return mapping
+        symmTensor s(symmTensor::zero);
+        symmTensor DEpsilonP(symmTensor::zero);
+        scalar theta = 1.0;
+
+        radialReturn
+        (
+            sTrial,
+            epsilonPEq0[i],
+            maxMagDEpsilon,
+            s,
+            DEpsilonP,
+            epsilonPEq[i],
+            sigmaY[i],
+            theta
+        );
+
+        // J2 flow is deviatoric, so the volumetric elastic strain is the
+        // trial one
+        epsilonE[i] = epsETrial - DEpsilonP;
+
+        sigma[i] = s + kappa*trEps*I;
+
+        if (needScalarTan)
+        {
+            if (response.tangentReq() == tangentRequest::scalarDeviatoric)
+            {
+                (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu;
+            }
+            else
+            {
+                (*scalarTanPtr)[i] = theta*(4.0/3.0)*mu + kappa;
+            }
+        }
+    }
 }
 
 
