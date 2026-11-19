@@ -384,6 +384,23 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
+  Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
+  St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
+  bi-parabolic inlet has a 0.2 m/s peak (was 0.3 m/s), the inflow behind
+  Richter's reference values, as confirmed by the author. The Aitken and
+  IQN-ILS couplings use `requireAllResidualMeasures yes` with
+  `outerCorrTolerance 1e-5`, `nOuterCorr 30` and `allowUnconvergedCoupling
+  yes`, and the fluid uses three PIMPLE outer correctors with p and U solver
+  tolerances of 1e-10, the production settings of the verification
+  campaign; with one corrector the strict coupling test could stall and stop
+  the run at `nOuterCorr`. Results are not comparable with earlier versions
+  of the tutorial. The regression test has one set of references for all
+  supported OpenFOAM versions, with relative tolerances, and foam-extend is
+  no longer supported for this case. An
+  opt-in verification campaign (`verification/`, not run by CI) reproduces
+  Richter's published values (`u_x(A)` = 5.95e-5 m, `F_x` = 1.33 N) to within
+  0.2 % on the finest of four meshes.
 - The high-order least-squares schemes (`kExactLeastSquares` and
   `movingLeastSquares`) take the boundary values at the face quadrature
   points from any patch field that derives from the new
