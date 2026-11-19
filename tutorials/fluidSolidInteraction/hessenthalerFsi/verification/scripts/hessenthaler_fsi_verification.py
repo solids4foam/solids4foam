@@ -16,14 +16,15 @@ solid
     zero-flow deflection, with observed orders and Richardson estimates.
 
 meshes
-    Build the fluid meshes F1-F5 and the solid meshes S1-S4 and record their
+    Build the fluid meshes rF0-rF3 (or the earlier F-1-F5) and record their
     sizes and quality, without solving.
 
 run
     One coupled Phase I run, given by --spec, for example
-    "F2:S3", "F1:S2:dt=0.001", "F1:S2:tol=1e-6", "F1:S2:T=30",
-    "F1:S2:coupling=robin" or "F1:S2:fluidtol=tight". The run is evaluated
-    and its quantities of interest are written to
+    "rF1", "rF2:S3", "rF0:dt=0.001", "rF0:tol=1e-5", "rF0:outlet=zg" or
+    "rF1:S2:T=30". The defaults are those of the campaign (DEFAULT_SPEC):
+    rF1, S2, beta = 0.2 outlet, strict coupling test, T = 45 s. The run is
+    evaluated and its quantities of interest are written to
     postProcessing/runs/<name>.json.
 
 analyse
@@ -85,7 +86,7 @@ MU_VERIFICATION = 64200.0
 NU = 0.45
 STABILISATION = 0.01
 DELTA_T = 0.002
-END_TIME = 15.0
+END_TIME = 45.0
 # Fraction of the run at its end over which quantities are time-averaged,
 # and the preceding window of the same length used for the drift test
 WINDOW_FRACTION = 0.2
@@ -118,8 +119,37 @@ FLUID_F1_SIZES = {
     "flapSweep": 0.00101,
     "merging": 0.00202,
 }
-FLUID_LEVELS = ("F-1", "F1", "F2", "F3", "F4", "F5")
+FLUID_LEVELS = ("F-1", "F0", "F1", "F2", "F3", "F4", "F5")
 FLUID_RATIO = math.sqrt(2.0)
+
+# The campaign family rF0-rF3 (recipe "R1"). Level rFk has the cell sizes of
+# Fk and adds:
+# - a band of interface-size cells 1.5 mm thick around the flap
+#   (refinementThickness);
+# - a box at the interface size over the path of the flap tip (RF_TIP_BOX);
+# - a shift of the octree, so that no flap face lies on an octree plane: the
+#   octree root box is centred on the surface's bounding box, and one unused
+#   point appended to the feature-edge surface moves that centre by
+#   RF_OCTREE_SHIFT (m);
+# - improveMeshQuality after cartesianMesh.
+# Without the shift, the flap faces of F1 and F3 lie on octree planes and
+# cartesianMesh leaves concave cells and a 0.02 mm bulge on the flap. With it,
+# every level passes checkMesh -allGeometry -allTopology with an exact flap.
+# The shifts are those the meshes of the campaign were built with: rF2 keeps
+# the y-only shift of the mesh that first passed the tip-corner gate; the
+# others maximise the smallest gap between the flap faces and the octree
+# planes at the interface cell size.
+RF_LEVELS = ("rF0", "rF1", "rF2", "rF3")
+RF_OCTREE_SHIFT = {
+    "rF0": (0.0, 3.57088925e-06, 0.000339234478),
+    "rF1": (0.0002525, 0.0002562875, 0.000214625),
+    "rF2": (0.0, 0.0001796897254, 0.0),
+    "rF3": (0.00012625, 0.00012940625, 0.00021525625),
+}
+RF_INTERFACE_THICKNESS = 0.0015
+RF_TIP_BOX = {"centre": (0.0, 0.014, 0.064),
+              "length": (0.016, 0.036, 0.012)}
+ALL_FLUID_LEVELS = FLUID_LEVELS + RF_LEVELS
 
 # Points of the velocity probes (m): the measured jet peaks on the two MRI
 # planes, the shear layer between the jets, and the wake of the flap tip
@@ -140,7 +170,7 @@ VOXEL_SAMPLE_INTERVAL = 0.1
 
 
 def fluid_scale(level: str) -> float:
-    k = int(level[1:])
+    k = int(level[2:] if level.startswith("rF") else level[1:])
     return FLUID_RATIO ** (-(k - 1))
 
 
@@ -186,9 +216,68 @@ def write_mesh_dict(case: Path, level: str, wall: str = "",
                           flags=re.MULTILINE)
     if found != 1:
         fail(f"Could not set the surface file in the meshDict for {level}")
+    if level in RF_LEVELS:
+        text = rf_mesh_dict(text, level, sizes["interface"])
     path = case / "system" / f"meshDict.{level}"
     path.write_text(text)
     return path
+
+
+def rf_mesh_dict(text: str, level: str, interface: float) -> str:
+    """Add the interface band and the tip box of the rF family."""
+    text, found = re.subn(
+        r"(interface\s*\{\s*cellSize\s+[^;]+;)",
+        rf"\g<1>\n        refinementThickness "
+        rf"{RF_INTERFACE_THICKNESS:g};", text, flags=re.DOTALL)
+    if found != 1:
+        fail(f"Could not set the interface band in the meshDict for {level}")
+    (cx, cy, cz), (lx, ly, lz) = RF_TIP_BOX["centre"], RF_TIP_BOX["length"]
+    box = (
+        "    // Path of the flap tip, at the interface size (rF family)\n"
+        "    tipSweep\n    {\n"
+        "        type        box;\n"
+        f"        cellSize    {interface:.8g};\n"
+        f"        centre      ({cx:g} {cy:g} {cz:g});\n"
+        f"        lengthX     {lx:g};\n"
+        f"        lengthY     {ly:g};\n"
+        f"        lengthZ     {lz:g};\n"
+        "    }\n")
+    text, found = re.subn(r"(objectRefinements\s*\{.*?merging\s*\{[^}]*\}\n)",
+                          lambda m: m.group(1) + box, text, flags=re.DOTALL)
+    if found != 1:
+        fail(f"Could not add the tip box to the meshDict for {level}")
+    return text
+
+
+def shift_octree(fms: Path, shift: tuple[float, float, float]) -> dict:
+    """Append one unused point to an .fms surface to shift the octree.
+
+    cartesianMesh centres its octree root box on the bounding box of the
+    surface points, so a point outside the bounding box moves that centre by
+    'shift' without changing the geometry: on each axis with a non-zero
+    shift the point lies 2|shift| beyond the box, otherwise at its centre.
+    """
+    lines = fms.read_text().split("\n")
+    i = next(k for k in range(3, len(lines)) if lines[k].strip().isdigit())
+    n = int(lines[i])
+    points = [[float(v) for v in lines[i + 2 + k].strip()[1:-1].split()]
+              for k in range(n)]
+    lo = [min(p[j] for p in points) for j in range(3)]
+    hi = [max(p[j] for p in points) for j in range(3)]
+    centre = [0.5 * (lo[j] + hi[j]) for j in range(3)]
+    extra = []
+    for j, d in enumerate(shift):
+        if d > 0:
+            extra.append(hi[j] + 2 * d)
+        elif d < 0:
+            extra.append(lo[j] + 2 * d)
+        else:
+            extra.append(centre[j])
+    lines[i] = str(n + 1)
+    lines.insert(i + 2 + n, "(%.12g %.12g %.12g)" % tuple(extra))
+    fms.write_text("\n".join(lines))
+    return {"bbox_centre_m": centre, "octree_shift_m": list(shift),
+            "added_point_m": extra}
 
 
 def centreline_nodes(nz: int) -> list[float]:
@@ -946,15 +1035,27 @@ def fmt_rows(rows: list[dict]) -> list[dict]:
 # Coupled Phase I runs
 # ---------------------------------------------------------------------------
 
+# The defaults are the set-up of the campaign on the rF meshes; a run name
+# lists only the entries that differ from them.
+# - outlet: b02 is the backflow-stabilised traction of the benchmark
+#   definition (beta = 0.2, backflowStabilisedOutletVelocity); zg is a
+#   zero-gradient velocity (sensitivity check); inletOutlet is the tutorial's.
+# - fsitest strict: both coupling residuals below the tolerance (README).
+# - schemes lust: least-squares gradients, full non-orthogonal correction and
+#   Gauss LUST for div(phi,U); lsq keeps linearUpwind; tutorial is limited.
+# - pimple/pimpletol: PIMPLE outer correctors per coupling iteration, ended
+#   when the initial U and p residuals fall below pimpletol.
+# - reuse: IQN-ILS secant modes kept from earlier steps (-1: tutorial, 5).
 DEFAULT_SPEC = {
-    "fluid": "F1", "solid": "S2", "mu": MU_VERIFICATION, "sf": STABILISATION,
+    "fluid": "rF1", "solid": "S2", "mu": MU_VERIFICATION, "sf": STABILISATION,
     "dt": DELTA_T, "T": END_TIME, "tol": 1e-4, "coupling": "iqnils",
-    "fluidtol": "default", "pimple": 1.0, "pc": "auto",
+    "fluidtol": "default", "pimple": 20.0, "pimpletol": 1e-5, "pc": "auto",
     "lag": -2.0, "pcranks": 0.0, "solidranks": 0.0, "rep": 0.0,
-    "solidtol": "default", "coupled": "yes", "fsitest": "default",
-    "reuse": -1.0, "wall": "", "motion": "velocity",
-    "write": 0.0, "schemes": "tutorial", "edges": "yes",
+    "solidtol": "default", "coupled": "yes", "fsitest": "strict",
+    "reuse": 2.0, "wall": "", "motion": "velocity",
+    "write": 0.0, "schemes": "lust", "edges": "yes", "outlet": "b02",
 }
+OUTLET_BETA = 0.2
 
 
 def parse_spec(text: str) -> dict:
@@ -962,7 +1063,7 @@ def parse_spec(text: str) -> dict:
     parts = text.split(":")
     for part in parts:
         if "=" not in part:
-            if part in FLUID_LEVELS or part in ("coarse", "medium"):
+            if part in ALL_FLUID_LEVELS or part in ("coarse", "medium"):
                 spec["fluid"] = part
             elif part in SOLID_LEVELS:
                 spec["solid"] = part
@@ -986,10 +1087,14 @@ def parse_spec(text: str) -> dict:
         fail("fsitest must be default or strict")
     if spec["wall"] and spec["wall"] not in FLUID_LEVELS:
         fail("wall must be a fluid level, e.g. wall=F3")
-    if spec["schemes"] not in ("tutorial", "lsq"):
-        fail("schemes must be tutorial or lsq")
+    if spec["schemes"] not in ("tutorial", "lsq", "lust"):
+        fail("schemes must be tutorial, lsq or lust")
     if spec["edges"] not in ("yes", "no"):
         fail("edges must be yes or no")
+    if spec["edges"] == "no" and spec["fluid"] in RF_LEVELS:
+        fail("the rF meshes need edges=yes")
+    if spec["outlet"] not in ("b02", "zg", "inletOutlet"):
+        fail("outlet must be b02, zg or inletOutlet")
     if spec["motion"] not in ("velocity", "displacement", "hyperelastic"):
         fail("motion must be velocity, displacement or hyperelastic")
     return spec
@@ -1006,8 +1111,10 @@ def spec_name(spec: dict) -> str:
         name += f"_{spec['coupling']}"
     if spec["fluidtol"] != "default":
         name += f"_fluid{spec['fluidtol']}"
-    if spec["pimple"] != 1:
+    if spec["pimple"] != DEFAULT_SPEC["pimple"]:
         name += f"_pimple{spec['pimple']:g}"
+    if spec["pimpletol"] != DEFAULT_SPEC["pimpletol"] and spec["pimple"] != 1:
+        name += f"_pimpletol{spec['pimpletol']:g}"
     if spec["pc"] != "auto":
         name += f"_pc{spec['pc']}"
     if spec["lag"] != -2:
@@ -1020,18 +1127,20 @@ def spec_name(spec: dict) -> str:
         name += f"_solid{spec['solidtol']}"
     if spec["coupled"] != "yes":
         name += "_uncoupled"
-    if spec["fsitest"] != "default":
+    if spec["fsitest"] != DEFAULT_SPEC["fsitest"]:
         name += f"_fsi{spec['fsitest']}"
-    if spec["reuse"] >= 0:
+    if spec["reuse"] != DEFAULT_SPEC["reuse"]:
         name += f"_reuse{spec['reuse']:g}"
     if spec["wall"]:
         name += f"_wall{spec['wall']}"
     if spec["motion"] != "velocity":
         name += f"_motion{spec['motion']}"
-    if spec["schemes"] != "tutorial":
+    if spec["schemes"] != DEFAULT_SPEC["schemes"]:
         name += f"_{spec['schemes']}"
     if spec["edges"] != "yes":
         name += "_noedges"
+    if spec["outlet"] != DEFAULT_SPEC["outlet"]:
+        name += f"_outlet{spec['outlet']}"
     if spec["rep"]:
         # A replicate of the same calculation (run on another rank count)
         name += f"_rep{spec['rep']:g}"
@@ -1085,7 +1194,7 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     info: dict = {}
 
     # Fluid mesh
-    if spec["fluid"] in FLUID_LEVELS:
+    if spec["fluid"] in ALL_FLUID_LEVELS:
         write_mesh_dict(case, spec["fluid"], spec["wall"],
                         spec["edges"] == "yes")
         info["fluid_sizes_m"] = fluid_sizes(spec["fluid"])
@@ -1208,15 +1317,31 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
     if spec["pimple"] != 1:
         solution = case / "system" / "fluid" / "fvSolution"
         replace_entry(solution, "nOuterCorrectors", f"{int(spec['pimple'])}")
+        if spec["pimpletol"] > 0:
+            # End the PIMPLE loop once the initial U and p residuals are
+            # below pimpletol, instead of always running all correctors
+            control = "\n".join(
+                f"        {field}\n        {{\n"
+                f"            relTol    0;\n"
+                f"            tolerance {spec['pimpletol']:g};\n        }}"
+                for field in ("U", "p"))
+            replace_text(solution,
+                         "    nNonOrthogonalCorrectors 1;\n}",
+                         "    nNonOrthogonalCorrectors 1;\n"
+                         "    residualControl\n    {\n"
+                         f"{control}\n    }}\n}}")
+    set_outlet(case, spec["outlet"])
     if spec["motion"] == "displacement":
         set_displacement_mesh_motion(case)
     elif spec["motion"] == "hyperelastic":
         set_hyperelastic_mesh_motion(case)
 
-    if spec["schemes"] == "lsq":
+    if spec["schemes"] in ("lsq", "lust"):
         # Unlimited fluid operators: least-squares gradients without the
         # cellLimited limiter on grad(U), and the full non-orthogonal
-        # correction instead of "limited corrected 0.5"
+        # correction instead of "limited corrected 0.5"; lust also blends
+        # linear and linearUpwind convection (75/25) instead of
+        # linearUpwind alone
         schemes = case / "system" / "fluid" / "fvSchemes"
         text = schemes.read_text()
         for old, new in (
@@ -1231,6 +1356,11 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
             if text.count(old) != 1:
                 fail(f"Could not set the lsq fluid schemes in {schemes}")
             text = text.replace(old, new)
+        if spec["schemes"] == "lust":
+            old = "div(phi,U)         Gauss linearUpwind grad(U);"
+            if text.count(old) != 1:
+                fail(f"Could not set the LUST convection scheme in {schemes}")
+            text = text.replace(old, "div(phi,U)         Gauss LUST grad(U);")
         schemes.write_text(text)
 
     # Decomposition and the solid's parallel linear solver
@@ -1251,6 +1381,44 @@ def prepare_run(spec: dict, cores: int, name: str) -> tuple[Path, dict]:
         replace_entry(solution, "snes_lag_preconditioner",
                       f'"{int(spec["lag"])}"')
     return case, info
+
+
+def set_outlet(case: Path, outlet: str) -> None:
+    """Set the outlet velocity condition (the outlet pressure stays 0).
+
+    b02 is the backflow-stabilised traction of the benchmark definition
+    (Hessenthaler et al. 2017, Eq. 9), sigma.n = beta*rho*min(u.n, 0)*u with
+    beta = 0.2; its condition, backflowStabilisedOutletVelocity, is added by
+    solids4foam PR #676.
+    """
+    if outlet == "inletOutlet":
+        return
+    u = case / "0" / "fluid" / "U"
+    if outlet == "b02":
+        nu = transport_nu(case)
+        entry = ("type            backflowStabilisedOutletVelocity;\n"
+                 f"        beta            {OUTLET_BETA:g};\n"
+                 f"        nu              {nu:.7g};")
+    else:
+        entry = "type            zeroGradient;"
+    text = u.read_text()
+    text, found = re.subn(
+        r"(outlet\s*\{)[^}]*?(value\s+[^;]+;)",
+        lambda m: (m.group(1) + "\n        " + entry + "\n        "
+                   + m.group(2)), text, count=1, flags=re.DOTALL)
+    if found != 1:
+        fail(f"Could not set the outlet condition in {u}")
+    u.write_text(text)
+
+
+def transport_nu(case: Path) -> float:
+    """Kinematic viscosity (m^2/s) from constant/fluid/transportProperties."""
+    path = case / "constant" / "fluid" / "transportProperties"
+    match = re.search(r"^\s*nu\s+(?:nu\s+)?(?:\[[^\]]*\]\s*)?"
+                      r"([-+0-9.eE]+)\s*;", path.read_text(), re.MULTILINE)
+    if not match:
+        fail(f"Could not read nu from {path}")
+    return float(match.group(1))
 
 
 def solid_preconditioner(spec: dict, cores: int) -> str:
@@ -1291,9 +1459,17 @@ def build_meshes(case: Path, spec: dict, cores: int) -> dict:
              "constant/triSurface/fluidDomain.stl.gz",
              "constant/triSurface/fluidDomain.fms"],
             case, "log.surfaceFeatureEdges")
+    rf = spec["fluid"] in RF_LEVELS
+    octree = (shift_octree(case / "constant" / "triSurface"
+                           / "fluidDomain.fms", RF_OCTREE_SHIFT[spec["fluid"]])
+              if rf else None)
     # cartesianMesh is multi-threaded (OpenMP)
     timings["cartesianMesh_s"] = run(["cartesianMesh"], case,
                                      "log.cartesianMesh", threads=cores)
+    if rf:
+        timings["improveMeshQuality_s"] = run(
+            ["improveMeshQuality"], case, "log.improveMeshQuality",
+            threads=cores)
     (case / "constant" / "fluid").mkdir(exist_ok=True)
     shutil.move(str(case / "constant" / "polyMesh"),
                 str(case / "constant" / "fluid" / "polyMesh"))
@@ -1307,6 +1483,16 @@ def build_meshes(case: Path, spec: dict, cores: int) -> dict:
         "solid": checkmesh_metrics(case / "log.checkMesh.solid"),
         "timings": timings,
     }
+    if rf:
+        # The rF recipe is accepted only if the strict checks pass
+        run(["checkMesh", "-region", "fluid", "-allGeometry", "-allTopology"],
+            case, "log.checkMesh.fluid.strict")
+        strict = checkmesh_metrics(case / "log.checkMesh.fluid.strict")
+        metrics["fluid"]["strict_checkmesh_ok"] = strict["checkmesh_ok"]
+        metrics["fluid"]["octree"] = octree
+        if not strict["checkmesh_ok"]:
+            print(f"WARNING: {spec['fluid']} fails the strict checkMesh; see "
+                  f"{case / 'log.checkMesh.fluid.strict'}", flush=True)
     metrics["fluid"]["interface_faces"] = patch_faces(
         case / "constant" / "fluid" / "polyMesh" / "boundary", "interface")
     for patch in ("upperInlet", "lowerInlet", "outlet"):
@@ -1348,7 +1534,10 @@ def write_solid_decomposition(case: Path, spec: dict, cores: int) -> None:
 
 def run_meshes(args: argparse.Namespace) -> bool:
     """Build every requested fluid level with the S2 flap; no solve."""
-    levels = args.levels or list(FLUID_LEVELS)
+    levels = args.levels or list(RF_LEVELS)
+    for level in levels:
+        if level not in ALL_FLUID_LEVELS:
+            fail(f"Unknown fluid level '{level}'")
     rows = []
     for level in levels:
         spec = dict(DEFAULT_SPEC, fluid=level)
@@ -1365,7 +1554,10 @@ def run_meshes(args: argparse.Namespace) -> bool:
         print(json.dumps(row, indent=1), flush=True)
         # Keep only the logs and the boundary file
         for path in (case / "constant" / "fluid" / "polyMesh").iterdir():
-            if path.name != "boundary":
+            if path.is_dir():
+                # sets written by the strict checkMesh
+                shutil.rmtree(path)
+            elif path.name != "boundary":
                 path.unlink()
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     path = OUTPUT_ROOT / "fluid_meshes.json"
@@ -2135,58 +2327,30 @@ def solid_limit_analysis() -> dict:
 
 
 def default_series() -> dict:
-    """The refinement series of the verification campaign (README.md).
+    """The refinement series of the rF campaign (README.md).
 
-    The flap reaches its steady state only after about 20 s, so the spatial
-    series compare runs to T = 30 s (means over 20-30 s). The paired
-    iterative, time-step and stabilisation comparisons use T = 15 s: both
-    members of a pair are at the same stage of the slow development, and
-    the end-time series (15, 30, 40 s) measures the time error itself.
+    Every run goes to T = 45 s from t = 0 with the strict coupling test, and
+    its QoIs are means over the last 20 % (36-45 s). The spatial series use
+    the medium solid S2 and fluid rF1; the sensitivity pairs use the coarse
+    rF0, where they are affordable.
     """
     def n(text: str) -> str:
         return spec_name(parse_spec(text))
 
-    long = ":T=30"
     return {
-        # F5 (11 M cells) was not affordable: the solid's matrix-free
-        # Krylov iterations do not scale to the ~512 ranks it needs
-        "fluid at S2": {"runs": [n(f"F{k}:S2{long}") for k in range(1, 5)],
+        "fluid at S2": {"runs": [n(f"rF{k}") for k in range(4)],
                         "ratio": FLUID_RATIO},
-        "solid at F3": {"runs": [n(f"F3:S{k}{long}") for k in range(1, 4)],
-                        "ratio": 2.0},
-        # Two levels of the r = 2 matched path; its third level, F5:S3,
-        # was not affordable
-        "matched": {"runs": [n(f"F1:S1{long}"), n(f"F3:S2{long}")],
-                    "ratio": 2.0},
-        "solid at F1": {"runs": [n(f"F1:S2{long}"), n(f"F1:S3{long}")],
-                        "ratio": 2.0},
-        "tutorial modulus": {"runs": [n(f"F1:S2:mu=58450{long}"),
-                                      n(f"F1:S2{long}")]},
-        "end time": {"runs": [n("F2:S2"), n(f"F2:S2{long}"),
-                              n("F2:S2:T=40")]},
-        "time": {"runs": [n("F2:S2"), n("F2:S2:dt=0.001"),
-                          n("F2:S2:dt=0.0005")], "ratio": 2.0},
-        "time at T = 30 s": {"runs": [n(f"F2:S2{long}"),
-                                      n(f"F2:S2:dt=0.001{long}")]},
-        # Replicates of the same calculation on other rank counts measure
-        # the run-to-run noise of the slow wake dynamics
-        "replicate, dt": {"runs": [n("F2:S2"), n("F2:S2:rep=1")]},
-        "replicate, dt/2": {"runs": [n("F2:S2:dt=0.001"),
-                                     n("F2:S2:dt=0.001:rep=1")]},
-        # With the default fluid tolerances IQN-ILS stalls at a residual of
-        # about 3e-5 (it fails at 1e-5 and 1e-6); with tight fluid
-        # tolerances it reaches 1e-5 but stalls at 2.5-5e-6 (it fails at
-        # 1e-6). The iterative study is therefore (default fluid, 1e-4),
-        # (tight fluid, 1e-4) and (tight fluid, 1e-5).
-        "fluid linear tolerance": {"runs": [n("F2:S2"),
-                                            n("F2:S2:fluidtol=tight")]},
-        "coupling tolerance": {"runs": [n("F2:S2:fluidtol=tight"),
-                                        n("F2:S2:tol=1e-5:fluidtol=tight")]},
-        "all iterative tolerances": {
-            "runs": [n("F2:S2"), n("F2:S2:tol=1e-5:fluidtol=tight")]},
-        "PIMPLE outer correctors": {"runs": [n("F2:S2"),
-                                             n("F2:S2:pimple=3")]},
-        "stabilisation": {"runs": [n("F2:S2"), n("F2:S2:sf=0.001")]},
+        "solid at rF1": {"runs": [n(f"rF1:S{k}") for k in range(1, 4)],
+                         "ratio": 2.0},
+        "time at rF0": {"runs": [n("rF0:dt=0.004"), n("rF0"),
+                                 n("rF0:dt=0.001")], "ratio": 2.0},
+        "outlet at rF0": {"runs": [n("rF0"), n("rF0:outlet=zg")]},
+        "coupling tolerance at rF0": {"runs": [n("rF0"), n("rF0:tol=1e-5")]},
+        "PIMPLE tolerance at rF0": {"runs": [n("rF0"),
+                                             n("rF0:pimpletol=1e-6")]},
+        "stabilisation at rF0": {"runs": [n("rF0"), n("rF0:sf=0.001")]},
+        # A replicate on another rank count measures the run-to-run noise
+        "replicate at rF0": {"runs": [n("rF0"), n("rF0:rep=1")]},
     }
 
 
@@ -2231,10 +2395,10 @@ def main() -> int:
                         choices=("solid", "meshes", "run", "analyse"))
     parser.add_argument("--levels",
                         help="comma-separated levels: S1-S4 for solid, "
-                             "F1-F5 for meshes")
+                             "rF0-rF3 (default) or F-1-F5 for meshes")
     parser.add_argument("--sf", default="0.01,0.001",
                         help="solid study stabilisation factors")
-    parser.add_argument("--spec", help="run: the coupled run, e.g. F2:S3")
+    parser.add_argument("--spec", help="run: the coupled run, e.g. rF2:S3")
     parser.add_argument("--cores", type=int, default=1,
                         help="MPI ranks of a coupled run")
     parser.add_argument("--cores-solid", type=int, default=0,

@@ -15,17 +15,26 @@ Every run solves the same mathematical problem; only numerical parameters
 change. The problem is the tutorial's Phase I model with ONE fixed shear
 modulus:
 
-| Item | Definition |
-| --- | --- |
-| Geometry | the published fluid-domain surface (`geometry/fluidDomain.vtk.gz`) with the 250 mm outlet extension of `validation/scripts/makeFluidSurface.py` (committed as `constant/triSurface/fluidDomain.stl.gz`); flap 11 x 2 x 65 mm, clamped at z = 0 |
-| Fluid | incompressible Newtonian, ρ = 1163.3 kg/m³, μ_f = 12.50 mPa s, laminar, no gravity |
-| Inlets | parabolic, peak 630 mm/s (upper) and 615 mm/s (lower), radius 10.95 mm, centres y = ±27.15 mm, ramp 3s² − 2s³ over 0.5 s |
-| Outlet | p = 0, `inletOutlet` velocity |
-| Walls, interface | no slip; moving-wall velocity on the flap |
-| Solid | neo-Hookean (`neoHookeanElastic`), μ = μ* (below), ν = 0.45, K = 2μ(1+ν)/(3(1−2ν)), ρ_s = 1058.3 kg/m³ |
-| Buoyancy | net body force on the solid, g_eff = (ρ_s − ρ_f)/ρ_s g = 0.973306 m/s² in +y, ramped with the inflow |
-| Initial state | fluid at rest, straight flap |
-| QoIs | steady state, as time averages over the last 20 % of the run |
+- **Geometry:** the published fluid-domain surface
+  (`geometry/fluidDomain.vtk.gz`) with the 250 mm outlet extension of
+  `validation/scripts/makeFluidSurface.py` (committed as
+  `constant/triSurface/fluidDomain.stl.gz`); flap 11 x 2 x 65 mm, clamped at
+  z = 0.
+- **Fluid:** incompressible Newtonian, ρ = 1163.3 kg/m³, μ_f = 12.50 mPa s,
+  laminar, no gravity.
+- **Inlets:** parabolic, peak 630 mm/s (upper) and 615 mm/s (lower), radius
+  10.95 mm, centres y = ±27.15 mm, ramp 3s² − 2s³ over 0.5 s.
+- **Outlet:** p = 0 and the backflow-stabilised traction
+  σn = βρ min(u·n, 0) u with β = 0.2, as in the benchmark definition
+  (Hessenthaler et al. 2017, Eq. 9; `backflowStabilisedOutletVelocity`). A
+  zero-gradient velocity is a sensitivity check only.
+- **Walls, interface:** no slip; moving-wall velocity on the flap.
+- **Solid:** neo-Hookean (`neoHookeanElastic`), μ = μ* (below), ν = 0.45,
+  K = 2μ(1+ν)/(3(1−2ν)), ρ_s = 1058.3 kg/m³.
+- **Buoyancy:** net body force on the solid,
+  g_eff = (ρ_s − ρ_f)/ρ_s g = 0.973306 m/s² in +y, ramped with the inflow.
+- **Initial state:** fluid at rest, straight flap.
+- **QoIs:** steady state, as time averages over the last 20 % of the run.
 
 μ* is held fixed for every mesh, time step and coupling setting. It is not
 recalibrated per mesh: that would change the mathematical problem under
@@ -76,38 +85,54 @@ problem.
 
 Source OpenFOAM, build solids4foam with PETSc, and run from this directory:
 
+The `beta = 0.2` outlet needs the `backflowStabilisedOutletVelocity`
+condition of PR #676; without it, use `outlet=zg` or `outlet=inletOutlet`.
+
 ```bash
 ./Allverify --study solid                      # zero-flow problem, S1-S4
 ./Allverify --study solid --levels S1,S2 --jobs 4
-./Allverify --study meshes --threads 32        # build F1-F5, record quality
-./Allverify --study run --spec F2:S2:fsitest=strict:reuse=0:T=45 --cores 96
-./Allverify --study run --spec F2:S2:fsitest=strict:reuse=0:T=60 \
-    --extend-from F2:S2:fsitest=strict:reuse=0:T=45 --cores 96
-./Allverify --study run --spec F2:S2:fsitest=strict:reuse=0:T=45 --restart --cores 96
+./Allverify --study meshes --threads 16        # build rF0-rF3, record quality
+./Allverify --study run --spec rF1 --cores 24  # the campaign set-up on rF1
+./Allverify --study run --spec rF0:outlet=zg --cores 24
+./Allverify --study run --spec rF1 --restart --cores 24
 ./Allverify --study analyse                    # tables, orders, uncertainty
 ```
 
-Use `fsitest=strict` (both IQN residual measures; see the finding below) and
-`reuse=0` for every verification run; `tol=1e-3` is sufficient with the
-strict test and avoids its noise-floor stalls near steady state.
+A coupled run is named by its spec: the fluid level (`rF0`-`rF3`; the
+earlier family `F-1`-`F5` is kept for reference), the solid level `S1`-`S4`,
+and the entries that differ from the campaign defaults
+(`DEFAULT_SPEC` in the driver):
 
-A coupled run is named by its spec: the fluid level `F1`-`F5`, the solid
-level `S1`-`S4`, and optional `dt=`, `T=` (end time), `tol=` (coupling
-tolerance), `coupling=robin`, `fluidtol=tight` (fluid linear solvers),
-`pimple=` (PIMPLE outer correctors), `sf=` (stabilisation), `mu=`,
-`fsitest=strict` (require both IQN residual measures), `reuse=` (IQN-ILS
-modes reused from previous steps; tutorial 5), `wall=Fk` (wall cell size of
-level Fk, a diagnostic) and `rep=` (a replicate tag). `--extend-from`
-continues a finished run to a later end time; `--restart` continues an
-interrupted one from its latest written time.
+- fluid, solid (`rF1`, `S2`): the mesh levels.
+- `dt`, `T` (0.002 s, 45 s): time step and end time; every run starts at
+  t = 0.
+- `outlet` (`b02`): `b02` (β = 0.2), `zg` (zero-gradient velocity) or
+  `inletOutlet` (the tutorial's).
+- `fsitest` (`strict`): `strict` requires both IQN residual measures (see the
+  finding below); `default` is the solids4foam test.
+- `tol` (1e-4): the coupling tolerance.
+- `reuse` (2): IQN-ILS modes reused from previous steps (-1: the tutorial's
+  5).
+- `schemes` (`lust`): least-squares gradients, the full non-orthogonal
+  correction and `Gauss LUST` convection; `lsq` keeps `linearUpwind`;
+  `tutorial` is the limited set.
+- `pimple`, `pimpletol` (20, 1e-5): PIMPLE outer correctors per coupling
+  iteration, ended once the initial U and p residuals are below `pimpletol`.
+- `sf`, `mu` (0.01, 64.2 kPa): the solid stabilisation and shear modulus.
+- `fluidtol`, `solidtol` (`default`): `tight` linear-solver tolerances.
+- `wall`: the wall cell size of level Fk (a diagnostic).
+- `rep`: a replicate tag.
+
+`--extend-from` continues a finished run to a later end time; `--restart`
+continues an interrupted one from its latest written time.
 Each run is a copy of the tutorial under `verification/work`; its evaluated
 quantities are written to `verification/postProcessing/runs/<name>.json`.
 Both directories are ignored by Git. `--reuse` re-evaluates a completed run
 only if its settings, tutorial inputs and build match; `--evaluate-only`
 re-evaluates an existing run directory.
 
-The coupled runs are expensive (hours to a day on 24-512 cores each); the
-campaign recorded below ran on MeluXina.
+The coupled runs are expensive: rF1 takes about a day on 24 cores, and rF3
+needs a few hundred cores.
 
 ## Mesh families
 
@@ -123,22 +148,39 @@ campaign recorded below ran on MeluXina.
 S2 → S3 → S4 refine by exactly 2 in every direction. S1 → S2 is 2 in x and
 y but 65/33 = 1.97 in z.
 
-**Fluid** (cfMesh `cartesianMesh`; F1 is the tutorial's coarse mesh). Level
-Fk scales every cell size of `system/meshDict.coarse`, including the octree
-root size `maxCellSize`, by 2^(−(k−1)/2). Every region is refined
-consistently by a nominal √2 per level, and F1 → F3 → F5 by 2. The meshes
-are not nested (the octree is re-fitted on each level).
+**Fluid** (cfMesh `cartesianMesh` from the feature-edge surface written by
+`surfaceFeatureEdges -angle 45`). The campaign family rF0-rF3 takes the cell
+sizes of the tutorial's `coarse` meshDict, scaled by 2^(−(k−1)/2) for level
+rFk, so each level refines every region by a nominal √2, including the
+octree root size `maxCellSize`. Each level adds:
 
-| Level | Cells | Interface faces | Interface / flap-sweep / wall cell size (mm) |
-| --- | --- | --- | --- |
-| F1 | 231 034 | 7 184 | 0.505 / 1.01 / 2.02 |
-| F2 | 605 497 | 14 252 | 0.357 / 0.714 / 1.43 |
-| F3 | 1 531 752 | 28 062 | 0.253 / 0.505 / 1.01 |
-| F4 | 4 177 457 | 56 704 | 0.179 / 0.357 / 0.714 |
+- a 1.5 mm thick band of interface-size cells around the flap;
+- a box at the interface size over the path of the flap tip;
+- a shift of the octree, by one unused point appended to the surface, so
+  that no flap face lies on an octree plane;
+- `improveMeshQuality` after `cartesianMesh`.
 
-The tutorial's `medium` mesh (0.81 M cells) is not part of the family: it
-refines only the wall and merging region and keeps the near-flap and flap
-sizes of `coarse`.
+Without feature edges, cartesianMesh chamfers the flap, and the transferred
+load is then 5-150 % from the fluid force (#665). Without the shift, the flap
+faces of some levels lie on octree planes, which leaves concave cells and a
+0.02 mm bulge on the flap. Every level passes
+`checkMesh -allGeometry -allTopology` with an exact flap; the driver records
+the result as `strict_checkmesh_ok`. The meshes are not nested.
+
+| Level | Cells | Interface faces | Cell sizes (mm) | Non-orth. |
+| --- | --- | --- | --- | --- |
+| rF0 | 122 435 | 3 784 | 0.714 / 1.43 / 2.86 | 39.5° |
+| rF1 | 312 180 | 7 451 | 0.505 / 1.01 / 2.02 | 37.5° |
+| rF2 | 832 552 | 14 654 | 0.357 / 0.714 / 1.43 | 37.3° |
+| rF3 | 2 170 398 | 28 593 | 0.253 / 0.505 / 1.01 | 37.9° |
+
+The cell sizes are those at the interface, in the flap sweep and at the
+walls; Non-orth. is the maximum non-orthogonality. The effective linear
+ratios (N_k/N_k−1)^(1/3) are 1.37, 1.39 and 1.38.
+
+The earlier family F-1-F5 (`meshDict.coarse` scaled, without the band, box,
+shift and quality pass) is kept in the driver for reference only. Its levels
+F1 and F3 fail the strict check, and its results below are superseded.
 
 ## Quantities of interest
 
@@ -161,18 +203,22 @@ sampled at the stations, checks them.
 
 ## Steady state
 
-With the strict FSI test the tip approaches its steady value geometrically
-(τ ≈ 4 s on F1S2) after the start-up oscillation: 35-45 s of simulated time
-are needed (the tutorial's 10 s leaves the F1S2 tip 0.25 mm below its steady
-value). The steady QoIs are means over the last 4 s of runs whose final drift
-is at most about 1e-4 mm/s; an unchanged restart of the settled F1S2 stays
-constant to 5e-7 mm/s. The driver still reports its time averages over the
-final 20 % of a run and an exponential-fit estimate of the residual transient
-(a + b exp(−t/τ) on the smoothed history); with the default convergence test
-these estimates were unreliable, because the "transient" was an accumulating
-iterative error.
+With the strict FSI test the tip approaches its steady value geometrically (τ
+≈ 4 s on F1S2 of the earlier family) after the start-up oscillation: 35-45 s
+of simulated time are needed (the tutorial's 10 s leaves the F1S2 tip 0.25 mm
+below its steady value). The steady QoIs are means over the last 4 s of runs
+whose final drift is at most about 1e-4 mm/s; an unchanged restart of the
+settled F1S2 stays constant to 5e-7 mm/s. The driver still reports its time
+averages over the final 20 % of a run and an exponential-fit estimate of the
+residual transient (a + b exp(−t/τ) on the smoothed history); with the
+default convergence test these estimates were unreliable, because the
+"transient" was an accumulating iterative error.
 
 ## Finding: the default FSI convergence test lets an iterative error accumulate
+
+This finding was made on the earlier mesh family (F2S2, `inletOutlet`
+outlet). It concerns the coupling test, not the mesh, and is why every run
+uses `fsitest=strict`.
 
 With the default IQN-ILS settings (`outerCorrTolerance 1e-4`), every coupled
 run's tip kept rising long after the initial transient: +0.3-0.4 mm from 8 to
@@ -192,9 +238,10 @@ spatial difference. Diagnosis:
    accepted as soon as r2 is small, whether or not the coupling iteration
    converged. The first iterations of every step are also under-relaxed
    (`relaxationFactor 0.05`). Per-step histories of the F2S2 run (0-80 s;
-   iterations and the residuals at the accepting iteration):
+   iterations per step, the median residuals at the accepting iteration,
+   and the share of steps accepted with r1 > 1e-2):
 
-   | Window (s) | Iterations per step | r1 at acceptance (median) | Steps with r1 > 1e-2 | r2 at acceptance (median) |
+   | Window (s) | Iterations | r1 (median) | r1 > 1e-2 | r2 (median) |
    | --- | --- | --- | --- | --- |
    | 0-1 | 4.65 | 9.3e-4 | 4 % | 5.4e-5 |
    | 1-5 | 3.19 | 4.9e-2 | 87 % | 3.9e-5 |
@@ -237,49 +284,21 @@ Richardson estimate and a fine-level GCI (safety factor 1.25) reported.
 Otherwise, a heuristic envelope of three times the largest successive
 difference is given, and no order is claimed.
 
-## Results (strict test from t = 0, μ* = 64.2 kPa, Δt = 0.002 s)
+## Results
 
-Compact results: `results/hessenthaler_phaseI_verification_steady.csv` and
-`results/hessenthaler_phaseI_verification_final.json`. The full evidence
-report is `paper-data/hessenthaler_phaseI_verification.md` in the paper
-repository.
+The campaign on rF0-rF3 with the β = 0.2 outlet is in progress, and its
+results will be added here when it is complete. The default series of
+`--study analyse` are:
 
-Steady tip y (mm):
+- fluid rF0-rF3 at S2;
+- solid S1-S3 at rF1;
+- Δt 0.004/0.002/0.001 s at rF0;
+- the outlet (`zg`), coupling tolerance (1e-5), PIMPLE tolerance (1e-6),
+  stabilisation (0.001) and a replicate, each paired with the rF0 run.
 
-| | S1 | S2 | S3 |
-| --- | --- | --- | --- |
-| F1 | 16.2006 | 16.6550 | 16.7530 |
-| F2 | | 16.6920 | |
-| F3 | | 16.7219 | 16.8133 (tol 1e-3) |
+The earlier campaign (meshes F1-F3, `inletOutlet` outlet) is superseded and
+its results have been removed from this directory. Those meshes chamfered the
+flap (#665), and the outlet was not that of the benchmark definition.
 
-- Solid refinement (F1, ratio 2): differences 0.454 and 0.098 mm, observed
-  order 2.21, Richardson 16.780 mm, GCI on S3 0.034 mm (0.20 %).
-- Fluid refinement (S2, ratio √2): differences 0.037 and 0.030 mm,
-  convergence ratio 0.81, observed order 0.62 (formal 2): asymptotic
-  convergence is not established. Provisional Richardson-based GCI
-  indicator 0.16 mm. The upstream jets and inlet pressures converge at about
-  second order (the lower-inlet pressure at ~0.9); refining only the walls
-  (`wall=F3` on F1) accounts for about 20 % of the F1 → F3 tip change.
-- Additivity: F3S3 = 16.8133 mm against F3S2 + (F1S3 − F1S2) = 16.8198 mm.
-- At the F1S2 steady state: Δt halved/doubled −0.0036/+0.0028 mm; coupling
-  tolerance 1e-3 or 1e-5 < 1e-4 mm (1e-3 vs 1e-4 from t = 0: 0.0004 mm);
-  stabilisation 0.01 → 0.001 +0.050 mm (contained in the solid refinement).
-- PR #546 (barycentric transfer weights) changes S3 levels by +0.006 mm
-  (bit-identical on S1/S2); the build is -O2, unaffected by its aliasing
-  defect.
-- Best-resolved tip (F3S3): 16.813 mm (16.819 mm with the PR #546
-  correction); provisional linear aggregate allowance ≈ 0.20 mm (1.2 %),
-  dominated by the fluid discretisation.
-- Validation (MRI tip 16.41 mm): F3S3 is 0.40 mm above; every refinement
-  moves the tip away from the measurement (S1 −0.21 mm, F3S3 +0.40 mm).
-
-**Open: the fluid convergence of the tip.** A fourth uniform fluid level
-(F4, 4.2 M cells, about 800 node-hours with the strict test) was not run.
-- Proposed route: a locally refined fluid series. Keep the far field and the
-  outlet extension fixed, and refine the flap-sweep, interface and merging
-  regions (and possibly the inlet jets) by √2 per level.
-- The wall-only diagnostic and the second-order convergence of the upstream
-  jets point to those regions.
-
-Related issues: #552 (the default convergence test) and #587
-(`couplingReuse` with the strict test).
+Related issues: #552 (the default convergence test), #665 (the chamfered
+flap) and #675 (the outlet condition).
