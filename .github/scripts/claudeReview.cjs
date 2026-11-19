@@ -324,18 +324,70 @@ function formatAssessment(data, risk, floor, max = Infinity) {
     'Use this standard AI report; core maintainers decide approval and merging.';
 }
 
-// MEDIUM/HIGH need a second, independent AI review (model-policy.md). Until it
-// is automated, the report asks a core maintainer to run it locally.
-function secondReviewNotice(risk, number) {
-  if (risk === 'LOW') return '';
-  return '\n\n### Second independent AI review\n\n' +
-    `Required for ${risk === 'MEDIUM' ? 'MEDIUM' : 'HIGH'} risk, but not yet automated. ` +
-    'A core maintainer runs it locally from an up-to-date `development` checkout with ' +
-    `\`node .github/scripts/secondReview.cjs ${number} --post\`. It gives Codex ` +
-    '(gpt-6-astra) the same instructions, repository guide and patches, without this ' +
-    'report or any PR comment, and posts its result as a separate comment. This report ' +
-    'alone does not meet the two-reviewer policy.\n\n' +
-    '- [ ] Second independent AI review posted (core maintainer)';
+// Merge rule and second-review advice by risk; CONTRIBUTING.md
+// ("Reviewing pull requests") is the human-facing description.
+const secondReviewCommand = (number, fable) =>
+  `\`node .github/scripts/secondReview.cjs ${number}${fable ? ' --model fable' : ''} --post\``;
+function secondReviewNotice(risk, number, guide = 'CONTRIBUTING.md', raisedFrom = null) {
+  const intro = `\n\n### Review process\n\nSee [Reviewing pull requests](${guide}). ` +
+    'If a second review or a maintainer rates the risk higher, the higher risk\'s rule applies. ' +
+    (raisedFrom ? `A second review posted by a maintainer rated this PR ${risk}, above this ` +
+      `report's ${raisedFrom}, so the ${risk} rule applies. ` : '');
+  if (risk === 'LOW') {
+    return intro + 'LOW risk: one core maintainer works through the human review ' +
+      'checklist and may merge. No second AI review is needed.';
+  }
+  const high = risk === 'HIGH';
+  return intro + (high ?
+    'HIGH risk: both core maintainers must approve before merging.' :
+    'MEDIUM risk: one core maintainer may merge after the checks below.') +
+    '\n\n### Second independent AI review\n\n' +
+    `Required for ${risk} risk, but not yet automated. A core maintainer runs it ` +
+    'from an up-to-date `development` checkout once the PR is close to final. It ' +
+    'receives the same instructions, repository guide and patches, without this report ' +
+    'or any PR comment, and posts its result as a separate comment.\n\n' +
+    `- Preferred: Codex (gpt-6-astra, xhigh), a different model family: ${secondReviewCommand(number, false)}\n` +
+    `- Substitute: Claude Fable 5.2 (high) through the Anthropic API: ${secondReviewCommand(number, true)}. ` +
+    'It shares this report\'s model family, so agreement is weaker evidence' +
+    (high ? '. For HIGH risk, use it only if the core maintainer running it judges the ' +
+      'classification borderline and says so on the PR.' : '.') +
+    '\n\nThis report alone does not meet the two-reviewer policy.\n\n' +
+    '- [ ] Second independent AI review posted (core maintainer)' +
+    (high ? '\n- [ ] Both core maintainers approve' : '');
+}
+
+// Labels show the highest AI assessment in PR lists: this report's risk,
+// raised by any second review a maintainer posted (secondReviewRisk). The
+// workflow replaces only the labels it manages. Labels are read just before
+// the update, so a change made during the run is not overwritten blindly.
+const riskLabels = {LOW: 'ai-risk: low', MEDIUM: 'ai-risk: medium', HIGH: 'ai-risk: high'};
+const incompleteLabel = 'ai-review: incomplete';
+async function setRiskLabels(github, context, number, risk, failed) {
+  const managed = [...Object.values(riskLabels), incompleteLabel];
+  const wanted = failed ? [riskLabels.HIGH, incompleteLabel] : [riskLabels[risk] || riskLabels.HIGH];
+  const labels = await github.paginate(github.rest.issues.listLabelsOnIssue,
+    {...context.repo, issue_number: number, per_page: 100});
+  const present = labels.map(label => label.name).filter(name => managed.includes(name));
+  for (const name of present.filter(name => !wanted.includes(name))) {
+    await github.rest.issues.removeLabel({...context.repo, issue_number: number, name});
+  }
+  const missing = wanted.filter(name => !present.includes(name));
+  if (missing.length) {
+    await github.rest.issues.addLabels({...context.repo, issue_number: number, labels: missing});
+  }
+}
+
+// The highest risk in second-review comments posted by maintainers. Others
+// could copy the marker, so only these authors count; a counted comment can
+// only raise the risk, never lower it.
+const secondMarker = '<!-- solids4foam-ai-review-second -->';
+const maintainerAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+function secondReviewRisk(comments) {
+  return comments.filter(c => maintainerAssociations.includes(c.author_association) &&
+    c.body?.startsWith(secondMarker))
+    .map(c => c.body.match(/^\*\*Risk: (LOW|MEDIUM|HIGH)\*\*/m)?.[1])
+    .filter(Boolean)
+    .reduce((highest, risk) => highest ? classifyRisk(risk, highest) : risk, null);
 }
 function formatCoverage(coverage, max = Infinity, listed = Infinity) {
   const omitted = coverage.omitted.slice(0, listed);
@@ -376,7 +428,10 @@ function repositoryGuide(read = readCheckout) {
     skill.trim();
 }
 
-// Budget the JSON-escaped *whole prompt*; each part also travels as a step output.
+// Budget the JSON-escaped *whole prompt*. 600 KB is about 250k tokens (about
+// USD 1 of Opus 5.5 input), enough for whole patches of large refactoring PRs.
+// The prompt reaches the analysis step as a file, never as a step output.
+const promptBudget = 600000;
 function buildPrompt(pr, files, read = readCheckout) {
   const instructions = read('.github/review/instructions.md');
   const guide = repositoryGuide(read);
@@ -404,7 +459,7 @@ function buildPrompt(pr, files, read = readCheckout) {
     const index = omitted.findIndex(entry => entry.path === file.filename);
     const [entry] = omitted.splice(index, 1);
     selected.push(item);
-    if (Buffer.byteLength(JSON.stringify(prompt())) > 90000) {
+    if (Buffer.byteLength(JSON.stringify(prompt())) > promptBudget) {
       selected.pop();
       omitted.push(entry);
     }
@@ -465,7 +520,14 @@ async function publish({github, context, core}, env = process.env) {
     `effort: ${plain(env.CLAUDE_REVIEW_EFFORT || 'unspecified')}.` +
     (served && served !== env.CLAUDE_REVIEW_MODEL ?
       ` **Served by fallback model ${plain(served)}** after a safety decline.` : '') + '\n\n';
-  let body, coverage;
+  const guide = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+    '/blob/development/CONTRIBUTING.md#reviewing-pull-requests';
+  // One sticky conversation comment, never an approval or merge API call.
+  const marker = '<!-- solids4foam-ai-review -->';
+  const comments = await github.paginate(github.rest.issues.listComments,
+    {...context.repo, issue_number: pr.number, per_page: 100});
+  const second = secondReviewRisk(comments);
+  let body, coverage, risk = 'HIGH';
   let failed = false;
   try {
     if (env.REVIEW_RESULT !== 'success' || env.CLAUDE_CONCLUSION !== 'success') throw new Error('execution_failed');
@@ -473,9 +535,11 @@ async function publish({github, context, core}, env = process.env) {
     coverage = JSON.parse(env.REVIEW_COVERAGE);
     if (!['complete', 'partial'].includes(coverage.status) || !Array.isArray(coverage.omitted) ||
         Buffer.byteLength(env.REVIEW_COVERAGE) > 30000) throw new Error('Invalid coverage');
-    const risk = classifyRisk(data.risk, env.RISK_FLOOR);
+    const own = classifyRisk(data.risk, env.RISK_FLOOR);
+    risk = second ? classifyRisk(own, second) : own;
     body = fitComment((max, listed) => heading + formatCoverage(coverage, max, listed) +
-      formatAssessment(data, risk, env.RISK_FLOOR, max) + secondReviewNotice(risk, pr.number));
+      formatAssessment(data, own, env.RISK_FLOOR, max) +
+      secondReviewNotice(risk, pr.number, guide, risk !== own ? own : null));
   } catch {
     failed = true;
     const known = ['metadata_too_large', 'nothing_reviewable', 'file_list_incomplete',
@@ -487,19 +551,22 @@ async function publish({github, context, core}, env = process.env) {
     body = heading + '**Status: INCOMPLETE — no successful AI review.**\n\n' +
       '**Risk: HIGH (conservative fallback; classification unassessed).**\n\n' +
       `Reason: ${reason}. Human review is required. See the workflow run for details.` +
-      secondReviewNotice('HIGH', pr.number);
+      secondReviewNotice('HIGH', pr.number, guide);
   }
-  // One sticky conversation comment, never an approval or merge API call.
-  const marker = '<!-- solids4foam-ai-review -->';
-  const comments = await github.paginate(github.rest.issues.listComments,
-    {...context.repo, issue_number: pr.number, per_page: 100});
   const previous = comments.find(comment => comment.user?.login === 'github-actions[bot]' &&
     comment.body?.startsWith(marker));
   body = `${marker}\n${body}`;
   if (previous) await github.rest.issues.updateComment({...context.repo, comment_id: previous.id, body});
   else await github.rest.issues.createComment({...context.repo, issue_number: pr.number, body});
+  // The comment is the record; a label failure is reported but does not hide it.
+  try {
+    await setRiskLabels(github, context, pr.number, risk, failed);
+  } catch {
+    core.warning('Could not update the ai-risk labels; the review comment is authoritative.');
+  }
   if (failed) core.setFailed('AI review incomplete; failure report published.');
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
-module.exports = {schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
+module.exports = {promptBudget, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
+  secondReviewRisk, risks, schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};
