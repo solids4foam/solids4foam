@@ -89,6 +89,8 @@ then
     rc=0
     solids4Foam::runApplication subsetMesh -overwrite keepCells \
         -patch outlet || rc=$?
+    # foam-extend also writes a 0/setSubset file
+    \rm -rf 0
     \mv 0.subsetMesh 0
     [[ ${rc} -eq 0 ]] || exit 1
 fi
