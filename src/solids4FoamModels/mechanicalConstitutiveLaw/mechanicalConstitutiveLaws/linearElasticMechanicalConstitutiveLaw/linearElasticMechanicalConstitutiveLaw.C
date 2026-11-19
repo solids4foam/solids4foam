@@ -318,4 +318,37 @@ void Foam::linearElasticMechanicalConstitutiveLaw::evaluate
 }
 
 
+void Foam::linearElasticMechanicalConstitutiveLaw::evaluateElasticPredictor
+(
+    const UList<symmTensor>& epsilonETrial,
+    const mechanicalConstitutiveLawInputs& inputs,
+    mechanicalConstitutiveLawState& state,
+    UList<symmTensor>& epsilonE,
+    mechanicalConstitutiveLawResponse& response
+) const
+{
+    UIndirectList<symmTensor>& sigma = response.stress();
+
+    const scalar muVal = mu_.value();
+    const scalar lambdaVal = lambda_.value();
+
+    const Field<symmTensor>& sigma0 = state.getSymmTensorField0("sigma0");
+
+    forAll(sigma, i)
+    {
+        epsilonE[i] = epsilonETrial[i];
+
+        sigma[i] =
+            2.0*muVal*epsilonE[i] + lambdaVal*tr(epsilonE[i])*I + sigma0[i];
+    }
+
+    fillScalarTangent
+    (
+        response,
+        2.0*mu_.value() + lambda_.value(),
+        (4.0/3.0)*mu_.value()
+    );
+}
+
+
 // ************************************************************************* //

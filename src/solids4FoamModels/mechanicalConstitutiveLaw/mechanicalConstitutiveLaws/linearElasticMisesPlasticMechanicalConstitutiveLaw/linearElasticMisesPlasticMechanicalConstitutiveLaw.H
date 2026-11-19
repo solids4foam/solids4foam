@@ -139,6 +139,23 @@ class linearElasticMisesPlasticMechanicalConstitutiveLaw
             const scalar maxMagDEpsilon
         ) const;
 
+        //- Radial return of a trial deviatoric stress, from the equivalent
+        //  plastic strain at the start of the step. Gives the returned
+        //  deviatoric stress, the plastic strain increment, the updated
+        //  equivalent plastic strain and yield stress, and the factor theta
+        //  by which the return scaled the trial stress, one when elastic
+        inline void radialReturn
+        (
+            const symmTensor& sTrial,
+            const scalar epsilonPEq0,
+            const scalar maxMagDEpsilon,
+            symmTensor& s,
+            symmTensor& DEpsilonP,
+            scalar& epsilonPEq,
+            scalar& sigmaY,
+            scalar& theta
+        ) const;
+
         //- No copy construct
         linearElasticMisesPlasticMechanicalConstitutiveLaw
         (
@@ -224,6 +241,26 @@ public:
             const smallStrainMechanicalConstitutiveLawKinematics& kin,
             const mechanicalConstitutiveLawInputs& inputs,
             mechanicalConstitutiveLawState& state,
+            mechanicalConstitutiveLawResponse& response
+        ) const override;
+
+        //- Isotropic, with isotropic hardening, so this law can be driven by
+        //  a trial elastic strain, as logStrain drives it
+        virtual bool providesElasticPredictor() const override
+        {
+            return true;
+        }
+
+        //- Evaluation from a trial elastic strain: the same return mapping,
+        //  from a trial stress with no plastic strain subtracted. The caller
+        //  keeps the plastic deformation, in its elastic history, so
+        //  epsilonP is not used here and stays at its initial value
+        virtual void evaluateElasticPredictor
+        (
+            const UList<symmTensor>& epsilonETrial,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            UList<symmTensor>& epsilonE,
             mechanicalConstitutiveLawResponse& response
         ) const override;
 

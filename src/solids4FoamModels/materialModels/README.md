@@ -89,6 +89,7 @@ use it:
 | [`StVenantKirchhoffElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/StVenantKirchhoffElasticMechanicalConstitutiveLaw/README.md) | finite | St. Venant-Kirchhoff hyperelasticity |
 | [`neoHookeanElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/neoHookeanElasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean hyperelasticity |
 | [`neoHookeanElasticMisesPlastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/neoHookeanElasticMisesPlasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean elasticity with von Mises plasticity |
+| [`logStrain`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/logStrainMechanicalConstitutiveLaw/README.md) | finite | A small-strain sub-law driven by the elastic logarithmic strain |
 | [`diffusionHyperElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/diffusionHyperElasticMechanicalConstitutiveLaw/README.md) | finite | Neo-Hookean hyperelasticity scaled by a mesh motion diffusivity, for mesh motion |
 | [`MooneyRivlinElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/MooneyRivlinElasticMechanicalConstitutiveLaw/README.md) | finite | Mooney-Rivlin hyperelasticity |
 | [`OgdenElastic`](../mechanicalConstitutiveLaw/mechanicalConstitutiveLaws/OgdenElasticMechanicalConstitutiveLaw/README.md) | finite | Three-term Ogden hyperelasticity |

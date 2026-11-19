@@ -217,6 +217,24 @@ public:
             mechanicalConstitutiveLawState& state,
             mechanicalConstitutiveLawResponse& response
         ) const override;
+
+        //- Isotropic and without history, so this law can be driven by an
+        //  elastic strain; under logStrain it is Hencky's law
+        virtual bool providesElasticPredictor() const override
+        {
+            return true;
+        }
+
+        //- Evaluation from a trial elastic strain. With no return mapping,
+        //  the trial strain is the elastic strain
+        virtual void evaluateElasticPredictor
+        (
+            const UList<symmTensor>& epsilonETrial,
+            const mechanicalConstitutiveLawInputs& inputs,
+            mechanicalConstitutiveLawState& state,
+            UList<symmTensor>& epsilonE,
+            mechanicalConstitutiveLawResponse& response
+        ) const override;
 };
 
 

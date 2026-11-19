@@ -8,6 +8,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `logStrain` mechanical constitutive law: a finite-strain composite that
+  drives a small-strain sub-law with the elastic logarithmic strain, by the
+  exponential-map return mapping of Eterovic and Bathe and of Simo, ported
+  from the logarithmic strain laws of Andrew Whelan. `linearElastic` (Hencky
+  elasticity) and `linearElasticMisesPlastic` (finite-strain J2 plasticity)
+  can be used as sub-laws, through a new `evaluateElasticPredictor` interface.
+  `Test-logStrainMechanicalConstitutiveLaw` checks it at a material point,
+  including simple shear against `neoHookeanElasticMisesPlastic`.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the
