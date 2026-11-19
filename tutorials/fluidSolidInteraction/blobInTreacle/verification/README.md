@@ -198,42 +198,23 @@ finite-strain case would be valuable.
 ## Quasi-monolithic coupling
 
 The driver runs the partitioned coupling only. For the quasi-monolithic
-Newton coupling (`./Allrun monolithic`, OpenFOAM.com only), the tutorial was
-run separately on levels x1, x2 and x4 to `t = 3 s`, with the same time steps
-as the mesh study, alongside the partitioned coupling on the same machine
-(OpenFOAM v2512, macOS, serial). Steady `u_x` of the top point (m):
+Newton coupling (`./Allrun monolithic`, OpenFOAM.com only), the finite-strain
+case was run separately on levels x1, x2 and x4 to `t = 3 s`, with the same
+time steps as the mesh study, alongside the partitioned coupling on the same
+node (OpenFOAM v2512, Linux, serial); the partitioned values differ from
+those of the mesh study above, which was run with the driver, by up to 0.04%.
+Steady `u_x` of the top point (m):
 
 | Coupling | x1 | x2 | x4 | Observed order | Extrapolated |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Partitioned | 0.117301 | 0.119696 | 0.120224 | 2.2 | 0.12037 |
-| Monolithic, `devReff` | 0.115467 | 0.118301 | 0.119376 | 1.4 | 0.12003 |
-| Monolithic, `div(U)` | 0.117429 | 0.119524 | 0.120053 | 2.0 | 0.12023 |
-| Monolithic | 0.116851 | 0.119346 | 0.120020 | 1.9 | 0.12027 |
+| Partitioned | 0.135581 | 0.139127 | 0.139991 | 2.04 | 0.140270 |
+| Monolithic | 0.135738 | 0.139035 | 0.139918 | 1.90 | 0.140241 |
 
-The x4 partitioned value differs from the one in the reference results above,
-recorded on Linux, by 0.06%. In this viscous case the interface traction is
-dominated by the wall shear. The monolithic fluid's momentum equation has the
-viscous term `laplacian(nuEff, U)` only, so its discrete wall flux is
-`nuEff*snGrad(U)`; its interface traction was `n & devReff`, which adds the
-transpose and trace parts of the boundary velocity gradient, whose tangential
-components are the adjacent cell values: a first-order force that the fluid's
-momentum balance does not contain. With the traction equal to the wall flux
-of the momentum equation, the monolithic coupling converges at second order,
-to within 0.12% of the partitioned value. Building the continuity residual of
-`newtonIcoFluid` from the convecting face flux `interpolate(U) & Sf`, instead
-of `div(U)` (row `div(U)`), moves the coarse-mesh values by up to
-0.5% and the extrapolated value to within 0.08% of the partitioned one
-(recorded on Linux). A quadratic estimate of the wall
-shear through the first two cells was also tried: it converged quickly here
-but made the partitioned coupling first order, as it treats the cell values
-as pointwise values and is not conservative; the traction passed to the solid
-must be the fluid's own discrete wall flux.
-
-These rows predate the transpose viscous term, which `newtonIcoFluid` now
-always includes in its momentum residual, wall pressure gradient and
-traction, with the wall value taken from the wall velocity (see the
-`newtonIcoFluid` README, Interface Viscous Force and Wall Pressure Gradient);
-the table is pending a rerun.
+The couplings differ by 0.12% on x1 and 0.05% on x4, and their extrapolated
+values by 0.02%. The monolithic coupling needs 2.0, 2.1 and 2.7 Newton
+iterations per step on the three levels. These runs predate the
+mesh-motion interface fix of #699; the current x1 value, 0.135729 m, differs
+from the table by 0.007%.
 
 ## References
 

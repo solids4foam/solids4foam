@@ -89,14 +89,13 @@ is a separate solid model in the fluid region. The files of this variant are
 stored beside the partitioned ones as `*.monolithic` files, which `Allrun`
 links in and `Allclean` removes again.
 
-The solid model is `linearGeometryVelocity`, the velocity form of the
-partitioned `linearGeometryTotalDisplacement`. The x displacement of the top of
-the half cylinder is `0.0566 m` at `t = 1 s` and `0.1169 m` at the end, against
-`0.0566 m` and `0.1173 m` for the partitioned approach, and the final force
-agrees to 0.8%. The monolithic run takes about half the time of the
-partitioned one, and the serial and parallel (four processes) results agree to
-seven significant figures. The regression test runs this variant as a second
-arm on OpenFOAM.com.
+The solid model is `nonLinearGeometryTotalLagrangianVelocity`, the velocity
+form of the partitioned `nonLinearGeometryTotalLagrangianTotalDisplacement`,
+with the same neo-Hookean law. The x displacement of the top of the half
+cylinder is `0.0597 m` at `t = 1 s` and `0.1357 m` at the end, against
+`0.0596 m` and `0.1356 m` for the partitioned approach, and the final force
+agrees to 0.75%. The regression test runs this variant as a second arm on
+OpenFOAM.com.
 
 ---
 
