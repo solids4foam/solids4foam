@@ -81,7 +81,7 @@ inline void limitFace
     const vector& extrapolate
 )
 {
-    for(direction cmpt=0; cmpt<vector::nComponents; cmpt++)
+    for (direction cmpt=0; cmpt<vector::nComponents; cmpt++)
     {
         limitFace
         (

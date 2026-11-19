@@ -1,0 +1,101 @@
+#!/bin/bash
+#------------------------------------------------------------------------------
+# Run the prestressed pulmonary artery FSI tutorial from start to finish:
+#
+#   1. ./Allmesh          fluid and solid meshes; copies the solid mesh to
+#                         prestress/
+#   2. prestress/Allrun   prestress passes on the solid alone; copies Fpre to
+#                         0/solid
+#   3. this case          the fluid-solid interaction run, using Fpre
+#
+# Usage:
+#   ./Allrun           # run in serial
+#   ./Allrun parallel  # run in parallel, using numberOfSubdomains in the
+#                      # decomposeParDict of each case and region
+#------------------------------------------------------------------------------
+
+set -Eeo pipefail
+IFS=$'\n\t'
+
+cd "$(cd "$(dirname "$0")" && pwd)"
+
+: "${WM_PROJECT_DIR:?OpenFOAM environment is not sourced}"
+
+source solids4FoamScripts.sh
+
+mode=""
+
+for arg in "$@"
+do
+    case "$arg" in
+        parallel)
+            mode=parallel
+            ;;
+        help|-h|--help)
+            sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            echo "Usage: ./Allrun [parallel]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Check the requirements here, before any step starts, so that a missing one
+# skips the whole case rather than only the step that needs it
+solids4Foam::requirePetscOrExitSilently
+solids4Foam::caseDoesNotRunWithFoamExtend
+
+if ! command -v cartesianMesh &> /dev/null
+then
+    echo
+    echo "cartesianMesh command not found, which is required for this case"
+    echo
+    exit 0
+fi
+
+echo "Step 1: generating the fluid and solid meshes"
+./Allmesh
+
+echo "Step 2: computing the prestress (Fpre)"
+(cd prestress && ./Allrun $mode)
+
+if [ ! -f 0/solid/Fpre ]
+then
+    echo "0/solid/Fpre missing: prestress/Allrun did not write it." >&2
+    exit 1
+fi
+
+echo "Step 3: running the prestressed fluid-solid interaction case"
+if [ "$mode" = parallel ]
+then
+    solids4Foam::runApplication -o -s fluid decomposePar -region fluid -force
+    solids4Foam::runApplication -o -s solid decomposePar -region solid -force
+    solids4Foam::runParallel -o solids4Foam
+    solids4Foam::runApplication -o -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -o -s solid reconstructPar -region solid
+else
+    solids4Foam::runApplication -o solids4Foam
+fi
+
+# Plot the inlet flow rate against the pressure at the probe in the main
+# pulmonary artery. A failed plot does not fail the run
+if command -v gnuplot &> /dev/null
+then
+    if [ -d postProcessing/pressureProbe/fluid ]
+    then
+        echo "Generating inletFlow_vs_probePressure.png using gnuplot"
+        gnuplot plotInletVsPressure.gplt &> log.gnuplot \
+            || echo "gnuplot failed: see log.gnuplot" >&2
+    else
+        echo "No pressure probe output found: skipping the plot" >&2
+    fi
+else
+    echo "Please install gnuplot if you would like to generate the plot"
+fi
+
+echo "Done"
+
+#------------------------------------------------------------------------------

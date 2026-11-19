@@ -305,10 +305,10 @@ Foam::solidPointDisplacement::solidPointDisplacement
         }
 
         if
-	(
-	    returnReduce(pointID_, maxOp<int>()) == -1
-	 || returnReduce(cellID_, maxOp<int>()) == -1
-	)
+        (
+            returnReduce(pointID_, maxOp<int>()) == -1
+         || returnReduce(cellID_, maxOp<int>()) == -1
+        )
         {
             FatalErrorIn("solidPointDisplacement::solidPointDisplacement")
                 << "Something went wrong: no proc found a closest point/cell!"

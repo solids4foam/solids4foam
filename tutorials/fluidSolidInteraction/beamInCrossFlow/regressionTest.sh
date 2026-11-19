@@ -16,11 +16,13 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # Regression tolerances
 # ------------------------------------------------------------
 
-# The high-order and standard PETSc discretisations share the same reference
-# values. Their small, expected discretisation difference is covered here.
-DISP_MAX_TOL=6e-3
-DISP_FINAL_TOL=6e-3
-FORCE_FINAL_TOL=0.2
+# Relative tolerances. All supported OpenFOAM versions share one set of
+# references (the high-order solid has its own), so these cover the small
+# differences between coupling methods (Aitken, IQN-ILS, Robin: < 3e-4),
+# OpenFOAM versions (< 1e-4), compilers and platforms.
+DISP_MAX_TOL=1e-2
+DISP_FINAL_TOL=1e-2
+FORCE_FINAL_TOL=5e-3
 
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
@@ -38,19 +40,18 @@ SOLID_MESH_MOTION_END_TIME=0.5
 SOLID_MESH_MOTION_DISP_TOL=1e-3
 SOLID_MESH_MOTION_FORCE_TOL=0.1
 
+# foam-extend is not supported for this case: the Allrun declares a skip
 variant="openfoamcom"
-if [[ -n "${FOAMEXTEND:-}" || "${WM_PROJECT_VERSION:-}" == "4.1" ]]; then
-    variant="foamextend"
-elif [[ "${WM_PROJECT_VERSION:-}" == "9" ]]; then
+if [[ "${WM_PROJECT_VERSION:-}" != v* ]]; then
     variant="openfoamorg"
 fi
 
 echo "============================================================"
 echo "Beam-in-cross-flow FSI regression test"
 echo "Regression end time          = ${REGRESSION_END_TIME}"
-echo "Max tip Dx difference       < ${DISP_MAX_TOL}"
-echo "Final tip Dx difference     < ${DISP_FINAL_TOL}"
-echo "Final total force Fx diff   < ${FORCE_FINAL_TOL}"
+echo "Max point-A Dx rel. diff.    < ${DISP_MAX_TOL}"
+echo "Final point-A Dx rel. diff.  < ${DISP_FINAL_TOL}"
+echo "Final total Fx rel. diff.    < ${FORCE_FINAL_TOL}"
 echo "============================================================"
 echo
 
@@ -118,6 +119,11 @@ extract_final_force() {
 
 abs() {
     awk -v x="$1" 'BEGIN {print (x < 0 ? -x : x)}'
+}
+
+# |value - reference| / |reference|
+rel_diff() {
+    awk -v x="$1" -v r="$2" 'BEGIN {d = x - r; if (d < 0) d = -d; if (r < 0) r = -r; print d/r}'
 }
 
 latest_numeric_time() {
@@ -198,9 +204,7 @@ prepare_case() {
         ln -vnsf "U.${interface_condition}" 0/fluid/U
         ln -vnsf "p.${interface_condition}" 0/fluid/p
 
-if [[ "${variant}" == "foamextend" ]]; then
-            ln -vnsf "fvSolution.${solution_setup}.foamextend" system/fluid/fvSolution
-        elif [[ "${variant}" == "openfoamorg" ]]; then
+        if [[ "${variant}" == "openfoamorg" ]]; then
             ln -vnsf "fvSolution.${solution_setup}.openfoamorg" system/fluid/fvSolution
         fi
 
@@ -267,24 +271,13 @@ check_case() {
     local max_disp
     local final_disp
     local final_force
-    local disp_diff
     local disp_diff_abs
-    local final_disp_diff
     local final_disp_diff_abs
-    local final_force_diff
     local final_force_diff_abs
     local failures=0
     local disp_time
     local force_time
     local force_file
-
-    disp_time=$(latest_numeric_time "${case_dir}/${DISP_FILE}" || true)
-    force_file=$(find_force_file "${case_dir}" || true)
-    if [[ -n "${force_file}" ]]; then
-        force_time=$(latest_numeric_time "${force_file}" || true)
-    else
-        force_time=""
-    fi
 
     # A skip is only valid if the tutorial declared one in the Allrun log.
     # Anything else that leaves the expected output missing or incomplete is a
@@ -292,6 +285,14 @@ check_case() {
     if solids4Foam::regressionCaseSkipped "${case_dir}/${ALLRUN_LOGFILE}"; then
         echo "Skipping ${coupling} regression checks because the tutorial skipped in this environment"
         return 0
+    fi
+
+    disp_time=$(latest_numeric_time "${case_dir}/${DISP_FILE}" || true)
+    force_file=$(find_force_file "${case_dir}" || true)
+    if [[ -n "${force_file}" ]]; then
+        force_time=$(latest_numeric_time "${force_file}" || true)
+    else
+        force_time=""
     fi
 
     if [[ -z "${disp_time}" || -z "${force_file}" || -z "${force_time}" ]]; then
@@ -324,38 +325,35 @@ check_case() {
         return 1
     fi
 
-    disp_diff=$(awk "BEGIN {print ${max_disp} - ${ref_max_disp}}")
-    disp_diff_abs=$(abs "${disp_diff}")
+    disp_diff_abs=$(rel_diff "${max_disp}" "${ref_max_disp}")
 
-    final_disp_diff=$(awk "BEGIN {print ${final_disp} - ${ref_final_disp}}")
-    final_disp_diff_abs=$(abs "${final_disp_diff}")
+    final_disp_diff_abs=$(rel_diff "${final_disp}" "${ref_final_disp}")
 
-    final_force_diff=$(awk "BEGIN {print ${final_force} - ${ref_final_force}}")
-    final_force_diff_abs=$(abs "${final_force_diff}")
+    final_force_diff_abs=$(rel_diff "${final_force}" "${ref_final_force}")
 
     if awk "BEGIN {exit !(${disp_diff_abs} < ${DISP_MAX_TOL})}"; then
-        printf "PASS [%s]: max displacement = %.6g (Δ = %.3g)\n" \
+        printf "PASS [%s]: max displacement = %.6g (rel. Δ = %.3g)\n" \
             "${coupling}" "${max_disp}" "${disp_diff_abs}"
     else
-        printf "FAIL [%s]: max displacement = %.6g (Δ = %.3g)\n" \
+        printf "FAIL [%s]: max displacement = %.6g (rel. Δ = %.3g)\n" \
             "${coupling}" "${max_disp}" "${disp_diff_abs}"
         failures=$((failures + 1))
     fi
 
     if awk "BEGIN {exit !(${final_disp_diff_abs} < ${DISP_FINAL_TOL})}"; then
-        printf "PASS [%s]: final tip Dx = %.6g (Δ = %.3g)\n" \
+        printf "PASS [%s]: final tip Dx = %.6g (rel. Δ = %.3g)\n" \
             "${coupling}" "${final_disp}" "${final_disp_diff_abs}"
     else
-        printf "FAIL [%s]: final tip Dx = %.6g (Δ = %.3g)\n" \
+        printf "FAIL [%s]: final tip Dx = %.6g (rel. Δ = %.3g)\n" \
             "${coupling}" "${final_disp}" "${final_disp_diff_abs}"
         failures=$((failures + 1))
     fi
 
     if awk "BEGIN {exit !(${final_force_diff_abs} < ${FORCE_FINAL_TOL})}"; then
-        printf "PASS [%s]: final total Fx = %.6g (Δ = %.3g)\n" \
+        printf "PASS [%s]: final total Fx = %.6g (rel. Δ = %.3g)\n" \
             "${coupling}" "${final_force}" "${final_force_diff_abs}"
     else
-        printf "FAIL [%s]: final total Fx = %.6g (Δ = %.3g)\n" \
+        printf "FAIL [%s]: final total Fx = %.6g (rel. Δ = %.3g)\n" \
             "${coupling}" "${final_force}" "${final_force_diff_abs}"
         failures=$((failures + 1))
     fi
@@ -363,21 +361,25 @@ check_case() {
     return "${failures}"
 }
 
-# St Venant-Kirchhoff reference values, regenerated from the OpenFOAM.com
-# v2512 IQNILS run after aligning the tutorial material law with the
-# Richter/Tukovic benchmark. The existing tolerances cover the known small
-# cross-version differences; the high-order variant uses the same references
-# with its widened displacement tolerance.
-REF_MAX_DISP=0.0263297
-REF_FINAL_DISP=0.0247337
-REF_FINAL_FORCE=4.799864
+# Reference values at t = 1 s for the tutorial's Richter definition (inlet
+# peak 0.2 m/s, St Venant-Kirchhoff E = 1.4 MPa), from the IQN-ILS runs of the
+# GitHub CI OpenFOAM-v2512-PETSc image. One set serves all supported versions:
+# the OpenFOAM-9-PETSc image agrees to within 4e-5. The high-order solid gives
+# a different, less stiff answer on this coarse mesh and therefore has its own
+# references.
+REF_MAX_DISP=8.27140e-5
+REF_FINAL_DISP=4.41995e-5
+REF_FINAL_FORCE=1.40949
+REF_HO_MAX_DISP=9.64144e-5
+REF_HO_FINAL_DISP=5.22025e-5
+REF_HO_FINAL_FORCE=1.41024
 
-# diffusionElastic fluid mesh motion, to t = 0.5, from the OpenFOAM.com v2512
-# run: the tip displacement is still increasing, so its maximum is its final
-# value. All the fluid mesh motions agree to within 3e-6 and 2e-3 at this time
-REF_SOLID_MESH_MOTION_MAX_DISP=0.0122428
-REF_SOLID_MESH_MOTION_FINAL_DISP=0.0122428
-REF_SOLID_MESH_MOTION_FINAL_FORCE=3.485119
+# diffusionElastic fluid mesh motion, to t = 0.5, from the same CI image (it
+# runs only on OpenFOAM.com): the tip displacement is still increasing, so its
+# maximum is its final value
+REF_SOLID_MESH_MOTION_MAX_DISP=7.76066e-5
+REF_SOLID_MESH_MOTION_FINAL_DISP=7.76066e-5
+REF_SOLID_MESH_MOTION_FINAL_FORCE=3.00683
 
 aitken_case=$(prepare_case aitken)
 run_case "${aitken_case}" aitken
@@ -388,10 +390,8 @@ run_case "${iqnils_case}" iqnils
 robin_case=$(prepare_case robin)
 run_case "${robin_case}" robin
 
-if [[ "${variant}" != "foamextend" ]]; then
-    high_order_case=$(prepare_case iqnils highOrder)
-    run_high_order_case "${high_order_case}"
-fi
+high_order_case=$(prepare_case iqnils highOrder)
+run_high_order_case "${high_order_case}"
 
 # The fluid mesh motion variants: displacementLaplacian changes the beam
 # response by much less than the tolerances, so it shares the references;
@@ -422,13 +422,9 @@ check_case robin "${robin_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
     || failures=$((failures + $?))
 
-if [[ "${variant}" != "foamextend" ]]; then
-    check_case highOrder "${high_order_case}" \
-        "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
-        || failures=$((failures + $?))
-else
-    echo "Skipping high-order regression case: unavailable on foam-extend"
-fi
+check_case highOrder "${high_order_case}" \
+    "${REF_HO_MAX_DISP}" "${REF_HO_FINAL_DISP}" "${REF_HO_FINAL_FORCE}" \
+    || failures=$((failures + $?))
 
 check_case displacementLaplacian "${displacement_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \

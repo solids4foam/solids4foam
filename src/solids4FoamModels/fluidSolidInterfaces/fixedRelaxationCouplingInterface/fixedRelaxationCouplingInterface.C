@@ -51,7 +51,10 @@ fixedRelaxationCouplingInterface::fixedRelaxationCouplingInterface
     (
         fsiProperties().lookupOrAddDefault<scalar>("relaxationFactor", 0.01)
     ),
-    predictSolid_(fsiProperties().lookupOrAddDefault<bool>("predictSolid", true))
+    predictSolid_
+    (
+        fsiProperties().lookupOrAddDefault<bool>("predictSolid", true)
+    )
 {}
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //

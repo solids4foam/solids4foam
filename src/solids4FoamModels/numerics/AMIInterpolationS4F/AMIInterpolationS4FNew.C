@@ -30,7 +30,7 @@ Foam::autoPtr<Foam::AMIInterpolationS4F> Foam::AMIInterpolationS4F::New
     const bool reverseTarget
 )
 {
-    DebugInfo << "Selecting model " << modelName << endl;
+    DebugInfo<< "Selecting model " << modelName << endl;
 
     auto cstrIter = dictConstructorTablePtr_->cfind(modelName);
 
@@ -56,7 +56,7 @@ Foam::autoPtr<Foam::AMIInterpolationS4F> Foam::AMIInterpolationS4F::New
     const scalar lowWeightCorrection
 )
 {
-    DebugInfo << "Selecting model " << modelName << endl;
+    DebugInfo<< "Selecting model " << modelName << endl;
 
     auto cstrIter = componentConstructorTablePtr_->cfind(modelName);
 

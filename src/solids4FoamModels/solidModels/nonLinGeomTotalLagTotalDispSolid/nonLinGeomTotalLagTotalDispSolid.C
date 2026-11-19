@@ -163,77 +163,6 @@ void nonLinGeomTotalLagTotalDispSolid::predict()
 }
 
 
-void nonLinGeomTotalLagTotalDispSolid::checkVolumetricClosure() const
-{
-    if (volumetricClosureChecked_)
-    {
-        return;
-    }
-
-
-    // The pressure equation hard-codes its half of the constitutive model:
-    // its residual is -p/K + stabilisation - 0.5*(J^2 - 1)/J, so it assumes
-    // the law's volumetric energy is U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)) and
-    // takes K from the mechanical model. Nothing in providesVolumetricSplit()
-    // promises that. A law with a different U(J) would separate its response
-    // honestly and then be solved against a pressure equation describing a
-    // different material - silently, because both halves are individually
-    // reasonable.
-    //
-    // The response the law returns is exactly dU/dJ, so the assumption can be
-    // checked rather than trusted. Once is enough: it is a property of the
-    // law, not of the state
-    const volScalarField assumed
-    (
-        0.5*(sqr(J_) - 1.0)/(J_*rKappa())
-    );
-
-    const volScalarField& actual = volumetricResponse();
-
-    // Guarded on the size of the comparison rather than on a threshold in
-    // the kinematics. Both responses are zero in an undeformed material, and
-    // for a nearly incompressible case they stay small for ever - plateHole's
-    // mixed arm runs at tr(epsilon) of order 1e-20 - so a fixed cut-off
-    // either fires on nothing or never fires at all. What matters is only
-    // that there is something to compare: once either response is non-zero
-    // the comparison is relative and means something at any magnitude
-    const scalar scale =
-        max
-        (
-            gMax(mag(Foam::primitiveField(assumed))),
-            gMax(mag(Foam::primitiveField(actual)))
-        );
-
-    if (scale <= 0)
-    {
-        return;
-    }
-
-    volumetricClosureChecked_ = true;
-    const scalar err =
-        gMax
-        (
-            mag(Foam::primitiveField(actual) - Foam::primitiveField(assumed))
-        );
-
-    if (err > 1e-8*scale)
-    {
-        FatalErrorInFunction
-            << "The law's volumetric response is not the one the pressure "
-            << "equation was written for." << nl << nl
-            << "    The pressure equation assumes "
-            << "U(J) = 0.25*K*(J^2 - 1 - 2*ln(J)), so dU/dJ = "
-            << "0.5*K*(J^2 - 1)/J, with K taken from the mechanical model. "
-            << "The law returned something else: the largest difference is "
-            << err << " against a response of order " << scale << '.' << nl << nl
-            << "    Separating the volumetric response honestly is not enough "
-            << "on its own - the pressure equation has to be solving for the "
-            << "same thing, or the two halves describe different materials."
-            << exit(FatalError);
-    }
-}
-
-
 void nonLinGeomTotalLagTotalDispSolid::replaceVolumetricStress
 (
     const volScalarField& p
@@ -503,8 +432,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
 
         // Add stabilisation to the traction
-        // We add this before enforcing the traction condition as the stabilisation
-        // is set to zero on traction boundaries
+        // We add this before enforcing the traction condition as the
+        // stabilisation is set to zero on traction boundaries
         momentumStabilisation().updateVector(D(), &gradD());
         traction += impKf_*momentumStabilisation().faceVector();
 
@@ -517,7 +446,8 @@ bool nonLinGeomTotalLagTotalDispSolid::evolveImplicitSegregated()
         // Momentum equation total displacement total Lagrangian form
 #ifndef OPENFOAM_COM
         // Assemble the RHS in stages.
-        // The equivalent chained tmp fvMatrix expression is stable on OpenFOAM.com.
+        // The equivalent chained tmp fvMatrix expression is stable on
+        // OpenFOAM.com.
         tmp<fvVectorMatrix> tRhsEqn
         (
             fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
@@ -809,8 +739,6 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
             volumetricResponse()
         );
 
-        checkVolumetricClosure();
-
         return;
     }
 
@@ -1085,6 +1013,26 @@ nonLinGeomTotalLagTotalDispSolid::nonLinGeomTotalLagTotalDispSolid
 
         // Ensure p is created and the oldTime is stored
         p().oldTime();
+
+        // A p that is zero everywhere, as it is at the start of a run, starts
+        // from the law's volumetric response at the initial kinematics, which
+        // correctStress() above has evaluated: p = -dU/dJ, as the pressure
+        // residual has it. A p that is not, as when a run is continued, is
+        // left as it was read. With no initial deformation, and no prestress,
+        // the response is zero everywhere and there is nothing to do
+        if
+        (
+            gMax(mag(Foam::primitiveField(p()))) == 0
+         && gMax(mag(Foam::primitiveField(volumetricResponse()))) > 0
+        )
+        {
+            Info<< "Initialising p from the law's volumetric response" << endl;
+
+            Foam::primitiveFieldRef(p()) =
+                -Foam::primitiveField(volumetricResponse());
+            p().correctBoundaryConditions();
+            p().oldTime() = p();
+        }
 
         // Initialise dpdt field
         dpdtPtr_.set
@@ -1439,12 +1387,13 @@ label nonLinGeomTotalLagTotalDispSolid::formResidual
             rAUf() = -1.0/(fvc::interpolate(approxMomJ.A())*one);
         }
 
-        // Calculate pressure equation residual
+        // Calculate pressure equation residual. The pressure stands in for
+        // the law's volumetric response, dU/dJ, which correctStress() has just
+        // evaluated at the kinematics the law was given
         scalarField pressureResidual
         (
-          - p*rKappa()
+          - rKappa()*(p + volumetricResponse())
           + pressureStabilisation().cellScalar(&rAUf(), true)*one
-          - 0.5*(pow(J_, 2.0) - 1.0)/J_
         );
 
         // Make residual extensive
@@ -1616,8 +1565,9 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
-            // Compute the positive face-interpolated reciprocal of the approximate
-            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            // Compute the positive face-interpolated reciprocal of the
+            // approximate momentum equation diagonal (solid analogue of rAUf),
+            // [Pa]
             {
                 fvVectorMatrix approxMomJ
                 (
@@ -1659,7 +1609,8 @@ label nonLinGeomTotalLagTotalDispSolid::formJacobian
                 jac,
                 0,                         // row offset
                 blockSize_ - 1,            // column offset
-                solidModel::twoD() ? 2 : 3 // number of scalar equations to insert
+                solidModel::twoD() ? 2 : 3 // number of scalar equations to
+                                           // insert
             );
         }
     }

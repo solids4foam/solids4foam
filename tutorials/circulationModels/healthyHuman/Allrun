@@ -1,0 +1,17 @@
+#!/bin/bash
+# Run this circuit (0D, no mesh): check the set-up, then solve it.
+#   ./Allrun            results: postProcessing/circulation/0/circulation.dat
+cd "$(dirname "$0")" || exit 1
+: "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
+
+# Source solids4Foam scripts (on macOS, this keeps the OpenFOAM libraries findable)
+source solids4FoamScripts.sh
+
+# The circulation models are currently only built for OpenFOAM.com
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+solids4Foam::runApplication -s check circulationFoam -check || exit 1
+grep '^Result' log.circulationFoam.check
+solids4Foam::runApplication circulationFoam || exit 1
+echo "done: postProcessing/circulation/0/circulation.dat"

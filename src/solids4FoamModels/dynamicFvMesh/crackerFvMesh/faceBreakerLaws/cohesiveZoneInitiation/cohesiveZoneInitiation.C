@@ -56,7 +56,7 @@ void Foam::cohesiveZoneInitiation::calcCohesivePatchID() const
     cohesivePatchIDPtr_ = new label(-1);
     label& cohesivePatchID = *cohesivePatchIDPtr_;
 
-    forAll (mesh.boundaryMesh(), patchI)
+    forAll(mesh.boundaryMesh(), patchI)
     {
         if (mesh.boundaryMesh()[patchI].type() == cohesivePolyPatch::typeName)
         {

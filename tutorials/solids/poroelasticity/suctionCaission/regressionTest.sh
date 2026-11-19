@@ -27,9 +27,12 @@ solids4Foam::requireGnuSed
 # not that a particular number came back.
 # ============================================================
 
+# With the leastSquares gradient on every fork: a max sigmaEq of
+# 1.0e6 on OpenFOAM.com v2412, 9.4e5 on OpenFOAM.org 9 and
+# 7.1e5 on foam-extend 4.1
 EPS_MIN=0.85
 EPS_MAX=1.25
-SIGMA_MIN=1.5e6
+SIGMA_MIN=6e5
 SIGMA_MAX=2.2e6
 
 # The comparison with the removed legacy mechanicalModel runs to t = 1 rather
@@ -44,24 +47,31 @@ COMPARISON_END_TIME=1
 # c3a92b3d) exactly, in every one of those figures. The values were then
 # re-recorded when poroLinearGeometry started to impose the boundary traction
 # on the complete face traction, stabilisation included (#578), which moved
-# the mean D by up to 1.6e-3 and the max porePressure by up to 6e-3 relative.
-# These are recorded numbers, though, and another compiler, CPU or MPI build moves an
+# the mean D by up to 1.6e-3 and the max porePressure by up to 6e-3 relative,
+# and again when the gradient scheme changed from pointCellsLeastSquares to
+# leastSquares on OpenFOAM (#572), which moved the max porePressure by 2.5%
+# (94425.610687978 before on OpenFOAM.com v2412); foam-extend ran leastSquares
+# before, so its values are unchanged. The forks still differ, by 28% in the
+# max porePressure, so the gradient scheme is not the cause of that
+# difference; this case reaches the corrector limit on every step, as noted
+# above. These are recorded numbers, though, and another compiler, CPU or MPI
+# build moves an
 # iterative solution by round-off at the solver tolerance: CI measures up to
 # 3e-8 relative against values recorded on macOS. The tolerance, 1e-6 of the
 # largest value, allows for that, and is ten times below the 1e-5 that a
 # 0.001% change in a material constant makes
 case "$(solids4Foam::foamFlavour)" in
     com)
-        REF_D_MAX=0.039971175058915
-        REF_D_MEAN=0.00324562697026321
-        REF_P_MAX=94425.610687978
-        REF_P_MEAN=19620.7620978048
+        REF_D_MAX=0.039971669908629
+        REF_D_MEAN=0.00326212073353083
+        REF_P_MAX=92102.839890555
+        REF_P_MEAN=19210.7346285929
         ;;
     org)
-        REF_D_MAX=0.039971184755511
-        REF_D_MEAN=0.00324553463292661
-        REF_P_MAX=94400.985183683
-        REF_P_MEAN=19614.4960676196
+        REF_D_MAX=0.039971624906797
+        REF_D_MEAN=0.00326283142869508
+        REF_P_MAX=92202.164647563
+        REF_P_MEAN=19231.4888421653
         ;;
     foamextend)
         REF_D_MAX=0.039984255131382

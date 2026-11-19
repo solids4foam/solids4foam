@@ -130,7 +130,12 @@ with `MESH_LEVEL=1`, fixed time steps of 0.002 s and 0.0005 s give
 $$C_d = 5.607$$ and $$C_d = 5.600$$, one pressure corrector gives the same
 $$C_d$$, and with `MESH_LEVEL=2`, 1 and 4 processors give the same $$C_d$$
 to the written precision. Columns 11-13 of the force file hold the force from
-the surface traction, which gives $$C_d$$ = 5.36, 5.46 and 5.48.
+the surface traction, which, with the default `tractionQuadrature clustered`,
+gives $$C_d$$ = 5.35, 5.46 and 5.49 and $$C_l$$ = 0.0026, 0.0078 and 0.0084:
+the reconstructed wall traction varies on the scale of the cells, and the
+lift remains low on these meshes. With `tractionQuadrature greedy;` (the
+default of earlier versions), the lift is -0.060, -0.063 and -0.048, with a
+sign set by the order of the facets of the STL file.
 
 The other forcing methods of `immersedBoundaryForce` (see
 `src/immersedBoundary/README.md`) give:

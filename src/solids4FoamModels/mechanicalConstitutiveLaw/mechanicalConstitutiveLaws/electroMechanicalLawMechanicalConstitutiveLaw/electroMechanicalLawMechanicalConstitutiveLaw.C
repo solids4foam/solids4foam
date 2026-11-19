@@ -51,12 +51,18 @@ electroMechanicalLawMechanicalConstitutiveLaw
         )
     ),
     subStateName_("passiveMechanicalLaw"),
-    Ta_(dict.lookup("activeTension")),
-    rampTime_(readScalar(dict.lookup("rampTime"))),
+    TaGiven_(dict.found("activeTension")),
+    Ta_
+    (
+        TaGiven_
+      ? dimensionedScalar(dict.lookup("activeTension"))
+      : dimensionedScalar("activeTension", dimPressure, 0.0)
+    ),
+    rampTime_(dict.lookupOrDefault<scalar>("rampTime", 0.0)),
     TaName_(dict.lookupOrDefault<word>("activeTensionFieldName", "Ta")),
     TaFromField_
     (
-        dict.lookupOrDefault<Switch>("activeTensionFromField", false)
+        dict.lookupOrDefault<Switch>("activeTensionFromField", !TaGiven_)
     ),
     f0Default_
     (
@@ -71,12 +77,31 @@ electroMechanicalLawMechanicalConstitutiveLaw
             << "rampTime must not be negative." << exit(FatalIOError);
     }
 
-    Info<< "    Active tension law over " << subLawPtr_->type()
-        << ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_;
+    if (!TaFromField_ && !TaGiven_)
+    {
+        FatalIOErrorInFunction(dict)
+            << "activeTensionFromField is off but no constant 'activeTension' "
+            << "is given." << exit(FatalIOError);
+    }
+
+    // The constant and its ramp are not used when the tension comes from a
+    // field, so a case that gives them is probably not running as intended
+    if (TaFromField_ && (TaGiven_ || dict.found("rampTime")))
+    {
+        WarningInFunction
+            << "The active tension is read from the field '" << TaName_
+            << "', so 'activeTension' and 'rampTime' are not used." << endl;
+    }
+
+    Info<< "    Active tension law over " << subLawPtr_->type();
 
     if (TaFromField_)
     {
         Info<< ", from field " << TaName_;
+    }
+    else
+    {
+        Info<< ", Ta = " << Ta_.value() << ", rampTime = " << rampTime_;
     }
 
     Info<< endl;

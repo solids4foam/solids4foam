@@ -53,7 +53,8 @@ pointNormalContactModel::pointNormalContactModel
     slavePatchID_(slavePatchID) //,
     // slaveContactPointGap_
     // (
-    //     patch.boundaryMesh().mesh().boundaryMesh()[slavePatchID].nPoints(), 0.0
+    //     patch.boundaryMesh().mesh().boundaryMesh()[slavePatchID].nPoints(),
+    //     0.0
     // )
 {
     if (slavePatchID == -1)
@@ -64,7 +65,10 @@ pointNormalContactModel::pointNormalContactModel
 }
 
 
-pointNormalContactModel::pointNormalContactModel(const pointNormalContactModel& nm)
+pointNormalContactModel::pointNormalContactModel
+(
+    const pointNormalContactModel& nm
+)
 :
     name_(nm.name_),
     mesh_(nm.mesh_),
