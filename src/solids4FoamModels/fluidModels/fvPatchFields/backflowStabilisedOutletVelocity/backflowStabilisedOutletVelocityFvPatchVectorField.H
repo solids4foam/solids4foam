@@ -27,12 +27,18 @@ Description
 
     to be used with a fixed pressure on the outlet. On outflow faces,
     U & n > 0, the traction is zero and the condition is zero gradient (a
-    do-nothing outlet). On backflow faces, the traction cancels a fraction
-    beta of the influx of kinetic energy, which causes backflow divergence;
-    beta = 1 cancels it completely and beta = 0 gives zero gradient.
+    do-nothing outlet), up to the smoothing described below. On backflow
+    faces, the traction does work rho*beta*(U & n)*|U|^2 per unit area,
+    against the influx of kinetic energy 0.5*rho*|U|^2*|U & n| that causes
+    backflow divergence, so it cancels a fraction 2*beta of that influx:
+    beta = 0.5 cancels it completely in the continuous problem, and
+    beta = 0 gives zero gradient. The discrete condition below is an
+    approximation and does not carry an exact discrete energy guarantee.
 
-    Keeping the dominant viscous term of the traction, the condition is the
-    Robin condition
+    Keeping only the n & grad(U) part of the viscous traction (the
+    transpose part, grad(U) & n, and any deviation of the outlet pressure
+    from the fixed value are not included), the condition is the Robin
+    condition
 
         dU/dn = c*U,  c = beta*min(U & n, 0)/nu  (c <= 0)
 
@@ -56,8 +62,11 @@ Description
     the residual differentiable, |U & n| is nevertheless replaced by
     sqrt((U & n)^2 + eps^2), where the smoothing velocity eps is the
     fraction "smoothing" (default 0.01) of the mean speed of the
-    patch-adjacent cells at the previous time step, so that it is fixed
-    within a time step; smoothing 0 recovers the exact condition.
+    patch-adjacent cells at the previous time step. eps is computed once
+    per time step (a global average over the patch) and then kept fixed
+    within the time step; smoothing 0 recovers the exact condition. With
+    smoothing, outflow faces also get a small damping, of relative size
+    (eps/(U & n))^2.
 
     The value fraction is recomputed at every evaluation, not only in
     updateCoeffs: updateCoeffs is skipped while the patch is flagged as
@@ -66,7 +75,16 @@ Description
     Jacobians of Newton solvers.
 
     The kinematic viscosity, nu, is read from the optional "nu" entry or,
-    if it is not given, from the "nu" entry of transportProperties.
+    if it is not given, from the "nu" entry of transportProperties. It is
+    a single constant laminar viscosity: the condition is not intended for
+    turbulent or non-Newtonian flows, where the effective viscosity at the
+    outlet would be needed.
+
+    The newtonIcoFluid "physics" preconditioner creates its correction
+    field from the boundary condition type names, so its copy of this
+    condition takes the default beta, smoothing and nu (from
+    transportProperties); non-default settings then only reach the
+    residual, not that preconditioner.
 
     References:
         M. Esmaily Moghadam, Y. Bazilevs, T.-Y. Hsia, I. E. Vignon-Clementel,
@@ -84,8 +102,8 @@ Description
     {
         type            backflowStabilisedOutletVelocity;
 
-        // Fraction of the backflow energy influx that is cancelled
-        // (default 0.2); 0 gives zero gradient
+        // Stabilisation coefficient (default 0.2): a fraction 2*beta of
+        // the backflow energy influx is cancelled; 0 gives zero gradient
         beta            0.2;
 
         // Smoothing velocity of min(U & n, 0), as a fraction of the mean
@@ -137,25 +155,33 @@ class backflowStabilisedOutletVelocityFvPatchVectorField
         //  evaluated
         word UName_;
 
-        //- Fraction of the backflow kinetic energy influx that is cancelled
+        //- Stabilisation coefficient: a fraction 2*beta of the backflow
+        //  kinetic energy influx is cancelled
         scalar beta_;
 
         //- Smoothing velocity of min(U & n, 0), as a fraction of the mean
         //  speed of the patch-adjacent cells at the previous time step
         scalar smoothing_;
 
-        //- Kinematic viscosity, if given in the dictionary; otherwise it is
-        //  read from transportProperties
+        //- Kinematic viscosity, if given (positive) in the dictionary;
+        //  otherwise zero, and it is read from transportProperties
         scalar nu_;
 
-        //- Is nu given in the dictionary
-        bool nuFromDict_;
+        //- Smoothing velocity, eps, for the time step epsTimeIndex_
+        scalar eps_;
+
+        //- Time index for which eps_ was computed (-1: not computed)
+        label epsTimeIndex_;
 
 
     // Private Member Functions
 
         //- Return the kinematic viscosity
         scalar nu() const;
+
+        //- Return the smoothing velocity for the current time step,
+        //  computing it on the first call of the time step
+        scalar eps(const volVectorField& U);
 
         //- Set refValue, refGrad and valueFraction from the current velocity
         void updateValueFraction();

@@ -97,6 +97,31 @@ Remember that a tutorial case can be cleaned and reset using the included
  `Allclean` script, i.e. `./Allclean`.
 ```
 
+### Short outlet with backflow
+
+```bash
+./Allrun shortOutlet                 # pimpleFluid
+./Allrun shortOutlet newtonIcoFluid  # requires PETSc
+```
+
+The `shortOutlet` option cuts the channel 4 D behind the cylinder (`setSet`
+and `subsetMesh`), so that the starting vortices cross the outlet. About 1 %
+of the outflow comes back in at t ≈ 6.4 s. The outlet velocity uses the
+`backflowStabilisedOutletVelocity` condition (`0/U.shortOutlet`), with the
+backflow-stabilised traction of Esmaily Moghadam et al. (2011):
+
+$$
+\boldsymbol{\sigma} \cdot \boldsymbol{n}
+= \rho \beta \min(\boldsymbol{v} \cdot \boldsymbol{n}, 0) \boldsymbol{v}
+$$
+
+with $\beta = 0.2$, as in the Hessenthaler et al. (2017) benchmark. On
+backflow faces the traction cancels a fraction $2\beta$ of the incoming
+kinetic energy flux; on outflow faces the condition is zero gradient. With
+`newtonIcoFluid`, an `inletOutlet` outlet fails here when the first faces
+change to inflow, while this condition converges in two Newton iterations
+per time step. `./Allclean` restores the default `0/U`.
+
 ---
 
 ## Analysing the Results
@@ -199,3 +224,15 @@ solids4foam/src/solids4FoamModels/fluidModels/pimpleFluid/pimpleFluid.C
 
 and this code directly ports the `pimpleFoam` solver code; in particular, see
 the `evolve()` function with `pimpleFluid.C`.
+
+---
+
+## References
+
+- M. Esmaily Moghadam, Y. Bazilevs, T.-Y. Hsia, I. E. Vignon-Clementel, A. L.
+  Marsden (2011). A comparison of outlet boundary treatments for prevention of
+  backflow divergence with relevance to blood flow simulations. *Comput.
+  Mech.* 48:277–291.
+- A. Hessenthaler, O. Röhrle, D. Nordsletten (2017). Validation of a
+  non-conforming monolithic fluid-structure interaction method using
+  phase-contrast MRI. *Int. J. Numer. Meth. Biomed. Engng.* 33:e2845.
