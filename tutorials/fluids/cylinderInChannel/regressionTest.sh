@@ -42,9 +42,14 @@ SHORT_LIFT_MAX=0.030
 
 # Peak backflow, -sum(phi < 0)/sum(phi > 0) on the outlet, over the
 # written times: 0.720% with pimpleFluid and 0.847% with newtonIcoFluid
-# (OpenFOAM-v2512)
+# (OpenFOAM-v2512). The OpenFOAM-9 CI image gives 0.860% with pimpleFluid:
+# its pimpleFluid solution differs from the first time step for any outlet
+# condition (zero gradient gives 0.994% there; a macOS OpenFOAM-9 build gives
+# 0.718%), so the band covers both, while still excluding zero gradient.
+# With foam-extend the wake does not reverse the outlet flow, for either
+# outlet, so the backflow check is skipped there (issue #733)
 SHORT_BACKFLOW_MIN=0.0065
-SHORT_BACKFLOW_MAX=0.0080
+SHORT_BACKFLOW_MAX=0.0090
 NEWTON_BACKFLOW_MIN=0.0080
 NEWTON_BACKFLOW_MAX=0.0089
 NEWTON_MAX_ITERATIONS=6
@@ -333,9 +338,15 @@ if run_case shortOutlet "${SHORT_END_TIME}" shortOutlet pimpleFluid; then
     check_end_time shortOutlet "${SHORT_END_TIME}"
     check_forces shortOutlet "${SHORT_DRAG_MIN}" "${SHORT_DRAG_MAX}" \
         "${SHORT_LIFT_MIN}" "${SHORT_LIFT_MAX}"
-    check_range "shortOutlet: peak outlet backflow" \
-        "$(peak_outlet_backflow "${REGRESSION_ROOT}/shortOutlet" || true)" \
-        "${SHORT_BACKFLOW_MIN}" "${SHORT_BACKFLOW_MAX}"
+    if [[ "$(solids4Foam::foamFlavour)" == "foamextend" ]]; then
+        echo "SKIP: shortOutlet: peak outlet backflow: no backflow with" \
+            "foam-extend (issue #733)"
+    else
+        check_range "shortOutlet: peak outlet backflow" \
+            "$(peak_outlet_backflow "${REGRESSION_ROOT}/shortOutlet" \
+            || true)" \
+            "${SHORT_BACKFLOW_MIN}" "${SHORT_BACKFLOW_MAX}"
+    fi
     clean_case shortOutlet
 fi
 

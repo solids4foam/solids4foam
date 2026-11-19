@@ -8,14 +8,16 @@ source solids4FoamScripts.sh
 
 cleanCase
 rm -rf processor* force.pdf case.foam constant/polyMesh
+# foam-extend subsetMesh output
+rm -rf constant/setSubset system/setSubset
 
 # Restore the initial fields if ./Allrun shortOutlet stopped while they were
-# moved aside
-if [ -d 0.subsetMesh ] && [ ! -d 0 ]
+# moved aside; any 0 directory then holds only subsetMesh output
+if [ -d 0.subsetMesh ]
 then
+    \rm -rf 0
     \mv 0.subsetMesh 0
 fi
-rm -rf 0.subsetMesh
 
 # Restore the stored case format and the default case variant
 solids4Foam::restoreCaseFormat .

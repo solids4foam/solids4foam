@@ -106,9 +106,11 @@ Remember that a tutorial case can be cleaned and reset using the included
 
 The `shortOutlet` option cuts the channel 4 D behind the cylinder (`setSet`
 and `subsetMesh`), so that the starting vortices cross the outlet. About 1 %
-of the outflow comes back in at t ≈ 6.4 s. The outlet velocity uses the
-`backflowStabilisedOutletVelocity` condition (`0/U.shortOutlet`), with the
-backflow-stabilised traction of Esmaily Moghadam et al. (2011):
+of the outflow comes back in at t ≈ 6.4 s (with OpenFOAM; with foam-extend
+the wake does not reverse the outlet flow, see issue #733). The outlet
+velocity uses the `backflowStabilisedOutletVelocity` condition
+(`0/U.shortOutlet`), with the backflow-stabilised traction of Esmaily
+Moghadam et al. (2011):
 
 $$
 \boldsymbol{\sigma} \cdot \boldsymbol{n}
