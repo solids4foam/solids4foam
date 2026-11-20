@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# "./Allrun" runs the plate with a mid-layer of thickness h = 0.01W;
+# "./Allrun <h/W>" selects the thickness, where <h/W> is 0.002, 0.005, 0.01 or
+# 0, which is the bi-material plate with no mid-layer
+H_OVER_W="${1:-0.01}"
+case "${H_OVER_W}" in
+    0)
+        MATERIALS="twoMaterials"
+        ;;
+    0.002|0.005|0.01)
+        MATERIALS="threeMaterials"
+        ;;
+    *)
+        echo "Usage: ./Allrun [0|0.002|0.005|0.01]"
+        exit 1
+        ;;
+esac
+
+# Create the dictionaries that depend on the mid-layer thickness
+echo "Creating the case for h/W = ${H_OVER_W}"
+m4 -P -DhOverW="${H_OVER_W}" system/blockMeshDict.m4 > system/blockMeshDict
+m4 -P -DhOverW="${H_OVER_W}" system/sample.m4 > system/sample
+cp system/sample system/sampleDict
+cp "constant/mechanicalProperties.${MATERIALS}" constant/mechanicalProperties
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create mesh, where each block is a material cellZone
+solids4Foam::runApplication blockMesh
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Sample stress along the interfaces
+if [[ $WM_PROJECT = "foam" ]]
+then
+    solids4Foam::runApplication sample -latestTime
+else
+    solids4Foam::runApplication postProcess -func sample -latestTime
+fi
+
+# Create plots
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating sigmaxx.png using gnuplot"
+    gnuplot -e "hOverW=${H_OVER_W}" plot.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

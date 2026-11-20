@@ -187,6 +187,10 @@ Cases with more than one entry in the `mechanical` list:
 - `solids/multiMaterial/layeredPipe`: a bi-material thick-walled cylinder with
   cellZones built by `setSet`/`setsToZones` and an analytical solution to
   compare against.
+- `solids/multiMaterial/multiMaterialPlate`: a plate of two materials bonded
+  through a thin mid-layer of a third, with cellZones named in the
+  `blockMeshDict` blocks and the analytical order of the free-edge stress
+  singularity to compare against.
 - `solids/linearElasticity/punch`: two separately meshed parts merged into one
   mesh, then split into the `punch_top` and `punch_bottom` cellZones.
 - `solids/thermoelasticity/hotCylinder/hotCylinderPredefinedTFieldMultipleMaterials`:
