@@ -26,12 +26,14 @@ Description
         sigma = sigma_passive + (1/J)*F & (Ta*f0 (x) f0) & F^T
 
     The active tension Ta is either a field, supplied by an electrophysiology
-    model or read from the case, or a constant ramped over rampTime. The field
-    is read when activeTensionFromField is set, under the name given by
-    activeTensionFieldName (default Ta), and the constant is used otherwise;
-    the constant and rampTime are then not used. activeTensionFromField is
-    on by default when no constant activeTension is given, and rampTime
-    defaults to 0.
+    model or read from the case, a constant ramped over rampTime, or a
+    function of time tabulated in activeTensionSeries (an interpolationTable
+    sub-dictionary). The field is read when activeTensionFromField is set,
+    under the name given by activeTensionFieldName (default Ta), and the
+    constant or the table is used otherwise; they are then not used.
+    activeTensionFromField is on by default when neither activeTension nor
+    activeTensionSeries is given, and rampTime defaults to 0. A table and a
+    constant cannot both be given.
     Unlike the removed legacy law, a registered field is not picked up
     unasked: a coupled case sets activeTensionFromField, and one that does not
     is warned that it is running on the constant.
@@ -67,6 +69,7 @@ Author
 #include "dimensionedScalar.H"
 #include "autoPtr.H"
 #include "Switch.H"
+#include "interpolationTable.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -101,12 +104,19 @@ class electroMechanicalLawMechanicalConstitutiveLaw
         //- Name of the active tension field, when one is supplied
         const word TaName_;
 
+        //- Whether a time table 'activeTensionSeries' is given
+        const bool TaSeriesGiven_;
+
+        //- Active tension as a function of time, used in place of the
+        //  constant when given
+        interpolationTable<scalar> TaSeries_;
+
         //- Whether the active tension is to come from a field.
         //  Asked for explicitly rather than detected, because a law that
         //  quietly looks for a field it was never given the chance to receive
         //  reports nothing and uses the constant instead - which is a wrong
         //  answer that runs to completion. On by default when no constant
-        //  'activeTension' is given
+        //  'activeTension' or 'activeTensionSeries' is given
         const Switch TaFromField_;
 
         //- The fibre direction to use where a case supplies no f0 field

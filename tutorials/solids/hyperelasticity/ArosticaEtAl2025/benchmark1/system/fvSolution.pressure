@@ -1,0 +1,102 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    t
+    {
+        solver          PCG;
+        preconditioner  FDIC;
+        tolerance       1e-12;
+        relTol          0.0;
+        maxIter         1000;
+    }
+
+    D
+    {
+        solver    petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type bt;   // backtracking: robust through the rapid relaxation after t = 0.5 s
+            snes_rtol "1e-6";
+            // Absolute tolerance: steps that start converged (e.g. step0A, where
+            // nothing loads the wall at first) must not chase round-off
+            snes_atol "1e-10";
+            snes_monitor;
+            snes_converged_reason;
+            snes_max_linear_solve_fail "100000";
+
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "200";
+            ksp_rtol "1e-4";
+            ksp_converged_reason;
+            ksp_max_it "300";
+
+            // Mixed displacement-pressure system (3-D: block size 4):
+            // Schur-complement field split of the displacement (0,1,2)
+            // and pressure (3), each preconditioned with HYPRE BoomerAMG
+            pc_type fieldsplit;
+            pc_fieldsplit_type schur;
+            pc_fieldsplit_schur_fact_type lower;
+            pc_fieldsplit_schur_precondition a11;
+            pc_fieldsplit_block_size "4";
+            pc_fieldsplit_0_fields "0,1,2";
+            pc_fieldsplit_1_fields "3";
+
+            // Displacement block
+            fieldsplit_0_ksp_type preonly;
+            fieldsplit_0_pc_type hypre;
+            fieldsplit_0_pc_hypre_type boomeramg;
+            fieldsplit_0_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_0_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_0_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_0_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_0_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_0_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_0_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_0_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_0_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_0_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_0_pc_hypre_boomeramg_truncfactor "0.3";
+
+            // Pressure Schur complement
+            fieldsplit_1_ksp_type preonly;
+            fieldsplit_1_pc_type hypre;
+            fieldsplit_1_pc_hypre_type boomeramg;
+            fieldsplit_1_pc_hypre_boomeramg_max_iter "1";
+            fieldsplit_1_pc_hypre_boomeramg_strong_threshold "0.6";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_up "1";
+            fieldsplit_1_pc_hypre_boomeramg_grid_sweeps_down "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_nl "1";
+            fieldsplit_1_pc_hypre_boomeramg_agg_num_paths "1";
+            fieldsplit_1_pc_hypre_boomeramg_max_levels "25";
+            fieldsplit_1_pc_hypre_boomeramg_coarsen_type HMIS;
+            fieldsplit_1_pc_hypre_boomeramg_interp_type ext+i;
+            fieldsplit_1_pc_hypre_boomeramg_P_max "1";
+            fieldsplit_1_pc_hypre_boomeramg_truncfactor "0.3";
+        }
+    }
+}
+
+// ************************************************************************* //

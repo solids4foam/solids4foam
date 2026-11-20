@@ -113,3 +113,6 @@ compile_flags.txt
 
 # Pinned dependency of the advisory AI review scripts (npm ci)
 .github/scripts/node_modules/
+
+# Mesh archive and meshes downloaded by the ArosticaEtAl2025 tutorials
+tutorials/solids/hyperelasticity/ArosticaEtAl2025/data/
