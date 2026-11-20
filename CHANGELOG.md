@@ -8,6 +8,18 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Non-local forms of `linearElasticMisesPlasticLemaitreDamage`
+  (`nonLocal classic` or `effective`, with a `characteristicLength`): the
+  stress is degraded by the implicit non-local damage of Peerlings et al.,
+  or by the effective non-local damage of Whelan et al. (2025), which
+  removes the mesh dependence of the local form once the damage localises.
+  The non-local damage is an *implicit-gradient field*: a law names it, its
+  source state variable and its length (`implicitGradientFields()`), the
+  manager hands the solid model the source at the cells, and the updated
+  Lagrangian, total Lagrangian and linear geometry total displacement solid
+  models solve the equation once per outer iteration. The tutorial
+  `fracture/notchedBarLemaitre` compares the reaction force with the Abaqus
+  result of Whelan et al.
 - `linearElasticMisesPlasticLemaitreDamage` mechanical constitutive law:
   J2 plasticity coupled to local Lemaitre ductile damage, ported from the
   damage laws of Andrew Whelan. Classic, Malcher and the triaxiality-dependent

@@ -738,6 +738,8 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
             volumetricResponse()
         );
 
+        solveImplicitGradientFields();
+
         return;
     }
 
@@ -761,6 +763,8 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
 
         addSmoothedHydrostaticStress(sigma(), impK_, &J_);
 
+        solveImplicitGradientFields();
+
         return;
     }
 
@@ -775,6 +779,8 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::correctStress()
         mesh().time().deltaTValue(),
         sigma()
     );
+
+    solveImplicitGradientFields();
 }
 
 

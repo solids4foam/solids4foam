@@ -161,6 +161,31 @@ protected:
 
 public:
 
+    // Public Classes
+
+        //- A field a law reads that is the solution of an implicit-gradient
+        //  (non-local) equation,
+        //
+        //      phi - div(length^2 grad(phi)) = source,
+        //
+        //  whose source is one of the law's own scalar state variables.
+        //  The solid model owns and solves the equation; the law reads phi
+        //  as a scalar input of the same name
+        class implicitGradientField
+        {
+        public:
+
+            //- The name of the field phi, which the law reads as an input
+            word name;
+
+            //- The scalar state variable of the law that is the source
+            word source;
+
+            //- The length scale of the regularisation
+            scalar length;
+        };
+
+
     //- Runtime type information
     TypeName("mechanicalConstitutiveLaw");
 
@@ -283,6 +308,21 @@ public:
         virtual wordList optionalScalarInputs() const
         {
             return wordList();
+        }
+
+        //- The implicit-gradient fields this law reads, each also one of its
+        //  requiredScalarInputs().
+        //
+        //  A law cannot solve a field equation: it sees only its own
+        //  integration points. So it names the field, the state variable
+        //  that is its source and the length scale, and the solid model
+        //  solves the equation over the mesh once per outer iteration, after
+        //  the stress update, from the source the manager hands it. The law
+        //  then reads the solution as an input, lagged by one outer
+        //  iteration, which the converged step balances. None by default
+        virtual List<implicitGradientField> implicitGradientFields() const
+        {
+            return List<implicitGradientField>();
         }
 
         //- A sub-law's dictionary, carrying the entries it needs from the

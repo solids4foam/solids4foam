@@ -158,6 +158,13 @@ class nonLinGeomUpdatedLagSolid
             return true;
         }
 
+        //- This model solves the implicit-gradient fields the laws read, in
+        //  correctStress()
+        virtual bool supportsImplicitGradientFields() const
+        {
+            return true;
+        }
+
         //- Update the stress at the face quadrature points.
         //  The high-order face quadrature does not exist on foam-extend
         void correctStressQuad();
