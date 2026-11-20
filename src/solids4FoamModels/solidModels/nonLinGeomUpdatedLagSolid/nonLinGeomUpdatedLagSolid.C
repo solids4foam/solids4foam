@@ -571,6 +571,7 @@ void Foam::solidModels::nonLinGeomUpdatedLagSolid::correctStressQuad()
 
     mechanicalManager().updateStressFiniteStrain
     (
+        mechanicalConstitutiveLawManager::compactLayout::faces,
         FQuadPtr_(),
         FQuadOldPtr_(),
         FinvQuadPtr_(),
