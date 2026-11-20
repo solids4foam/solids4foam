@@ -1,6 +1,5 @@
 #!/bin/bash
-# Remove everything Allrun (both the CFD case and the 0D reference) and
-# plotter.py made
+# Remove everything Allrun made (both the CFD case and the 0D reference)
 cd "$(dirname "$0")" || exit 1
 : "${WM_PROJECT_DIR:?OpenFOAM environment not sourced}"
 
@@ -12,8 +11,8 @@ cleanCase
 # The 0D reference of ./Allrun 0D
 (cd reference0D && cleanCase)
 
-# Remove the plots of plotter.py
-rm -rf plots
+# Remove the plots
+rm -f interface.png heart.png circuit.png
 
 # Remove the regression test cases too with ./Allclean all
 if [ "${1:-}" = "all" ]

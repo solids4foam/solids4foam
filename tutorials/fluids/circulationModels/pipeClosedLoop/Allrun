@@ -1,7 +1,6 @@
 #!/bin/bash
 # Demo: a CFD pipe in a closed circulation loop (both ends coupled).
 # Runs on numberOfSubdomains ranks of system/decomposeParDict (1: serial, slow).
-# Then:  python3 plotter.py
 #
 #   ./Allrun              the coupled CFD case, the pipe solved by solids4Foam
 #                         (pimpleFluid)
@@ -77,4 +76,13 @@ if [ "$np" -gt 1 ]; then
 else
     solids4Foam::runApplication "${solver}" || exit 1
 fi
-echo "done: postProcessing/circulationCoupling/0/coupling.dat  (python3 plotter.py to plot)"
+echo "done: postProcessing/circulationCoupling/0/coupling.dat"
+
+# Plot the results
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating interface.png, heart.png and circuit.png using gnuplot"
+    gnuplot plot.gnuplot 2> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
+fi

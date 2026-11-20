@@ -1,7 +1,7 @@
 #!/bin/bash
 # A CFD pipe coupled to a Windkessel (explicit coupling, order 2, deltaT 0.05,
 # serial, about a minute), then, if python3 is available, the comparison with
-# the exact solution.
+# the exact solution and, if gnuplot is available, its plot.
 #
 #   ./Allrun                  the pipe solved by solids4Foam (pimpleFluid, default)
 #   ./Allrun pimpleFoam       the pipe solved by stock pimpleFoam
@@ -55,4 +55,13 @@ if command -v python3 > /dev/null; then
     python3 analyse.py
 else
     echo "python3 not found: skipping the comparison with the exact solution (analyse.py)"
+fi
+
+# Plot the results
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating outletPressure.png using gnuplot"
+    gnuplot outletPressure.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plots"
 fi

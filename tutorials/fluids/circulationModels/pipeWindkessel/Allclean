@@ -8,6 +8,9 @@ cd "$(dirname "$0")" || exit 1
 
 cleanCase
 
+# Remove the plot
+rm -f outletPressure.png
+
 # Remove the regression test cases too with ./Allclean all
 if [ "${1:-}" = "all" ]
 then

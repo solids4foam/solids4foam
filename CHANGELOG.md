@@ -661,7 +661,9 @@ release. For complete commit-level details and contributor information, see the
   by `solids4Foam` with the `pimpleFluid` fluid model, with `./Allrun
   pimpleFoam` for stock `pimpleFoam` (`pipeWindkesselSolids4Foam` is folded
   into `pipeWindkessel`), and `pipeClosedLoop0D` is now `./Allrun 0D` in
-  `pipeClosedLoop` (its circuit is in `pipeClosedLoop/reference0D`).
+  `pipeClosedLoop` (its circuit is in `pipeClosedLoop/reference0D`). The
+  tutorials plot their results with gnuplot instead of Python and
+  `matplotlib`.
 
 ### Removed
 

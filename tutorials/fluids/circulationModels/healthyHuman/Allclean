@@ -8,8 +8,8 @@ cd "$(dirname "$0")" || exit 1
 
 cleanCase
 
-# Remove the plots of plotter.py
-rm -rf plots
+# Remove the plots
+rm -f pvLoops.png valvePressures.png wiggers.png
 
 # Remove the regression test cases too with ./Allclean all
 if [ "${1:-}" = "all" ]

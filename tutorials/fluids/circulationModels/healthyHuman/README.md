@@ -72,14 +72,15 @@ set-up, and then solves it, in under a second. The results are written to
 `postProcessing/circulation/0/circulation.dat`: a row every `deltaT`, with the
 pressure, volume and flow of every element.
 
-The results can be plotted with `plotter.py`, which needs `matplotlib`:
+If gnuplot is installed, `Allrun` then plots the last cycle with
+`plot.gnuplot`, and prints its left ventricular volumes. Another cycle is
+plotted with
 
 ```bash
-python3 plotter.py
+gnuplot -e "cycle=12" plot.gnuplot
 ```
 
-The figures are saved in the `plots` directory. The case is cleaned with
-`./Allclean`.
+The case is cleaned with `./Allclean`.
 
 ---
 
@@ -94,10 +95,14 @@ Note that this healthy parameter set is itself hypertensive and has a high
 venous pressure, so the parameters should be checked before relying on the
 physiology.
 
-`plotter.py` draws the last cycle in three figures:
+`plot.gnuplot` draws the cycle in three figures:
 
-- `pv_loops.png`: the pressure-volume loops of the four chambers;
-- `valve_pressures.png`: the pressures on each side of the four valves, with
+- `pvLoops.png`: the pressure-volume loops of the four chambers;
+- `valvePressures.png`: the pressures on each side of the four valves, with
   the valve flows;
-- `wiggers.png`: the left heart: pressures, left ventricular volume and aortic
-  flow.
+- `wiggers.png`: the left heart: pressures, left ventricular volume and the
+  aortic and mitral valve flows.
+
+![Pressure-volume loops of the four chambers in the last cycle](images/pvLoops.png)
+
+![Left heart in the last cycle: pressures, left ventricular volume and valve flows](images/wiggers.png)
