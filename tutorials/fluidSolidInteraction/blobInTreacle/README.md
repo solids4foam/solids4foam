@@ -78,6 +78,31 @@ parallel instead. It takes about three minutes on one core. When `gnuplot` is
 installed, `deflection.pdf` and `force.pdf` show the displacement of the top of
 the half cylinder and the force on the interface.
 
+### Quasi-monolithic variant
+
+`./Allrun monolithic` (optionally with `parallel`) runs the case with the
+quasi-monolithic Newton coupling (`fluidSolidInterface NewtonQuasiMonolithic`),
+which needs OpenFOAM.com and PETSc. The fluid velocity and pressure
+(`newtonIcoFluid`) and the solid velocity are solved together with PETSc SNES
+in every time step, so there are no FSI sub-iterations; the fluid mesh motion
+is a separate solid model in the fluid region. The files of this variant are
+stored beside the partitioned ones as `*.monolithic` files, which `Allrun`
+links in and `Allclean` removes again.
+
+The solid model is `nonLinearGeometryTotalLagrangianVelocity`, the velocity
+form of the partitioned `nonLinearGeometryTotalLagrangianTotalDisplacement`,
+with the same neo-Hookean law. The x displacement of the top of the half
+cylinder is `0.0597 m` at `t = 1 s` and `0.1357 m` at the end, against
+`0.0596 m` and `0.1356 m` for the partitioned approach, and the final force
+agrees to 0.75%. The regression test runs this variant as a second arm on
+OpenFOAM.com.
+
+`./Allrun monolithic velocityLaplacian` moves the fluid mesh with the
+`velocityLaplacian` motion solver of the partitioned case instead of the solid
+model. The x displacement of the top of the half cylinder is then 0.16% lower
+at the end, within 0.05% of the partitioned value, and the final force is
+0.04% lower. The regression test runs it as a third arm.
+
 ---
 
 ## Results

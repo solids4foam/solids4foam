@@ -260,7 +260,21 @@ of the mesh is needed; with `finiteStrain yes`, for the
 configuration (see the
 [solid model page](../solidModels/meshMotionTotalDispSolid/README.md)). The
 stiffness scale factor is recalculated on the current mesh before each
-solution.
+solution. The partitioned couplings require this solid model.
+
+The quasi-monolithic coupling (`NewtonQuasiMonolithic`) also moves the fluid
+mesh with `solids4foamSolidModel`, but needs a PETSc SNES solid model:
+`meshMotionTotalDisplacement` with `solutionAlgorithm PETScSNES` (the
+segregated algorithm, its default, is rejected), whose stiffness scale factor
+is recalculated on the current mesh before each solution, as with the
+partitioned couplings, or a model formulated on the reference configuration,
+e.g. `nonLinearGeometryTotalLagrangianTotalDisplacement`; the `*.monolithic`
+tutorial files set `regionName fluid`. For the reference-configuration solid
+models, the stiffness scale factor is calculated once, from the mesh at
+construction, and written for, and read on, a restart when the solid model
+has `restart yes`. The optional
+`updateStiffnessScaleFactor` entry overrides the default (`yes` for
+`meshMotionTotalDisplacement`, `no` otherwise).
 
 The solid model reads `solidProperties` and `mechanicalProperties` from
 `constant/fluid`, `D` and `pointD` from `0/fluid`, and its schemes and solver

@@ -24,14 +24,19 @@ Group
 Description
     Mesh motion solver for an fvMesh using a solids4foam solidModel.
 
-    The solid model, which must be meshMotionTotalDisplacement, is solved on
-    the moving mesh itself, for the total displacement from the reference
-    points, points0, and the mesh points are the reference points plus the
-    solid model point displacement, pointD. As with displacementLaplacian, the
-    equations are discretised on the current mesh, so no copy of the mesh is
+    The solid model is solved on the moving mesh itself, and the mesh points
+    are the reference points, points0, plus the solid model point
+    displacement, pointD. With the meshMotionTotalDisplacement solid model,
+    which the partitioned fluid-solid couplings require (see
+    solidModelFluidMeshMotionCoupler), the equations are discretised on the
+    current mesh, as with displacementLaplacian, so no copy of the mesh is
     needed and, because the unknown is the total displacement and not an
     increment, the mesh for a given interface position does not drift with
-    the path taken to reach it.
+    the path taken to reach it. The quasi-monolithic coupling
+    (newtonQuasiMonolithicCouplingInterface) needs a PETSc SNES solid model:
+    meshMotionTotalDisplacement with solutionAlgorithm PETScSNES, or, e.g.,
+    nonLinearGeometryTotalLagrangianTotalDisplacement, which is formulated on
+    the reference configuration.
 
     The solid model reads its solidProperties and mechanicalProperties from
     constant/<region>, its D and pointD fields from <time>/<region>, and its
@@ -43,17 +48,27 @@ Description
     stiffnessScaleFactor field, which the diffusionElastic and
     diffusionHyperElastic mechanical laws use to scale their stiffness: the
     face diffusivity, limited to between minFactor and maxFactor times its
-    average, divided by its average, and averaged to the cells. It is
-    recalculated on the current mesh before each solution:
+    average, divided by its average, and averaged to the cells.
+
+    With updateStiffnessScaleFactor yes, the default for the
+    meshMotionTotalDisplacement solid model, which is discretised on the
+    current mesh, the factor is recalculated on the current mesh before each
+    solution. With updateStiffnessScaleFactor no, the default for the other
+    solid models, which are formulated on the reference configuration, it is
+    calculated once, from the mesh at construction; on a restart it is read
+    from the start time, where it is written when the solid model has
+    'restart yes', as the mesh at construction is then the deformed mesh:
 
     \verbatim
     motionSolver    solids4foamSolidModel;
 
     // Optional
+    regionName      fluid;  // must be the region of the moving mesh
     diffusivity     quadratic inverseDistance (interface);
     maxFactor       100;
     minFactor       0.1;
     writeStiffScaleFactor no;
+    updateStiffnessScaleFactor no;
     \endverbatim
 
     If the solveEquations flag is false, the solid model pointD field is
@@ -91,7 +106,12 @@ class meshMotionSolidModelFvMotionSolver
 {
     // Private data
 
-        //- Mesh motion diffusivity, if specified
+        //- Recalculate the stiffness scale factor on the current mesh before
+        //  each solution, rather than once at construction
+        const bool updateStiffnessScaleFactor_;
+
+        //- Mesh motion diffusivity, if specified and the stiffness scale
+        //  factor is updated
         autoPtr<motionDiffusivity> diffusivityPtr_;
 
         //- Stiffness scale factor, if a diffusivity is specified
@@ -112,13 +132,21 @@ class meshMotionSolidModelFvMotionSolver
         //  mesh, and return it
         word regionName() const;
 
+        //- Read the updateStiffnessScaleFactor switch; by default, it is on
+        //  for the meshMotionTotalDisplacement solid model only
+        bool readUpdateStiffnessScaleFactor() const;
+
         //- Create the stiffness scale factor, if a diffusivity is specified
         autoPtr<volScalarField> makeStiffnessScaleFactor();
+
+        //- Calculate the stiffness scale factor once, from the current mesh,
+        //  or read it from the start time on a restart
+        autoPtr<volScalarField> makeFrozenStiffnessScaleFactor() const;
 
         //- Update the stiffness scale factor on the current mesh
         void updateStiffnessScaleFactor();
 
-        //- Create the solid model, which must be meshMotionTotalDisplacement
+        //- Create the solid model
         void makeModel();
 
         //- No copy construct

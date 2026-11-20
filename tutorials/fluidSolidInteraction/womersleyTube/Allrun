@@ -10,6 +10,7 @@ source solids4FoamScripts.sh
 # ./Allrun            # default behaviour is IQNILS coupling
 # ./Allrun robin      # Robin-Neumann coupling
 # ./Allrun robin parallel
+# ./Allrun monolithic # quasi-monolithic Newton coupling
 
 # The exact solution is set with coded boundary conditions and #codeStream,
 # which foam-extend lacks, and the sampling uses OpenFOAM.com set types
@@ -34,12 +35,16 @@ do
             coupling=robin
             interfaceCondition=robin
             ;;
+        monolithic|Monolithic)
+            coupling=monolithic
+            interfaceCondition=dirichletNeumann
+            ;;
         parallel)
             runMode=parallel
             ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [iqnils|robin] [parallel]"
+            echo "Usage: ./Allrun [iqnils|robin|monolithic] [parallel]"
             exit 1
             ;;
     esac
@@ -47,9 +52,19 @@ done
 
 echo "Using ${coupling} coupling"
 
+# Start from the stored case
+solids4Foam::restoreCaseVariant .
+
 ln -vnsf "fsiProperties.${coupling}" constant/fsiProperties
 ln -vnsf "U.${interfaceCondition}" 0/fluid/U
 ln -vnsf "p.${interfaceCondition}" 0/fluid/p
+
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com (checked above); its files are stored as *.monolithic
+    # variants, which replace the links made above
+    solids4Foam::selectCaseVariant . monolithic
+fi
 
 # Check case version is correct
 solids4Foam::convertCaseFormat .

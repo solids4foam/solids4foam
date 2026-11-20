@@ -280,6 +280,20 @@ public:
                 const Field<vector>& fromField,       // from field
                 Field<vector>& toField                // to field
             ) const = 0;
+
+            //- Return the addressing and weights of the face transfer from
+            //  one zone to another: the value on toZone face i is the sum
+            //  over j of weights[i][j] times the value on fromZone face
+            //  addressing[i][j]. This allows the transfer to be linearised,
+            //  e.g. in a monolithic Jacobian. The default is a fatal error
+            //  for methods that do not provide it
+            virtual void zoneToZoneFaceWeights
+            (
+                const standAlonePatch& fromZone,      // from zone
+                const standAlonePatch& toZone,        // to zone
+                labelListList& addressing,            // fromZone faces
+                scalarListList& weights               // weights
+            ) const;
 };
 
 

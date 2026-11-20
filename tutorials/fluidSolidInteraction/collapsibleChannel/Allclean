@@ -17,6 +17,9 @@ elif [[ $WM_PROJECT_VERSION == v* ]]; then
 fi
 
 rm -rf case.foam residuals deflection.pdf postProcessing
+
+# Undo the monolithic variant links before removing the default ones
+solids4Foam::restoreCaseVariant .
 rm -f constant/solid/solidProperties system/solid/fvSolution
 rm -f constant/fsiProperties 0/fluid/U 0/fluid/p
 

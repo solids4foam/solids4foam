@@ -203,6 +203,7 @@ significance test, which then stall.
 ./Allverify --study coupling # IQN-ILS against Robin-Neumann only
 ./Allverify --cores 5        # run up to 5 serial cases at once
 ./Allverify --reuse          # reuse completed runs whose settings match
+./Allverify --monolithic     # the studies with the quasi-monolithic coupling
 ```
 
 The driver works on copies under `verification/work/` and writes
@@ -311,6 +312,54 @@ study.
   quantity. Robin-Neumann takes 9.3 coupling iterations per time-step against
   14.6 for IQN-ILS, and half the run time.
 
+### Quasi-monolithic coupling
+
+> **Note:** the results in this section use the former Laplacian-form
+> traction `nuEff*snGrad(U)`. The transpose viscous term is now always
+> included (see the `newtonIcoFluid` README); it changes the load on the
+> deforming wall and removes the wall phase offset from the partitioned
+> solutions (4.8e-4 rad at every mesh). The table is pending a rerun.
+
+`--monolithic` runs the mesh and time-step studies with the quasi-monolithic
+Newton coupling (`./Allrun monolithic`: `newtonIcoFluid` and
+`linearGeometryVelocity`), and compares it, rather than Robin-Neumann, with
+IQN-ILS on the tutorial mesh at 100 steps per period. The seven runs take
+1.3 to 18 minutes each in serial. Every check of the partitioned study
+passes with the same tolerances
+(`postProcessing/verification_summary_monolithic.md`):
+
+| Case | profile | flow_amp | wallMid_amp | wallMid_phase | speed | attenuation |
+|---|---:|---:|---:|---:|---:|---:|
+| m1, n200 | 1.76e-2 | 6.08e-3 | -1.04e-2 | -2.89e-3 | -2.35e-3 | -2.80e-3 |
+| m2, n200 | 4.69e-3 | 9.01e-4 | -2.52e-3 | -1.96e-3 | -5.19e-4 | -2.58e-3 |
+| m4, n200 | 9.97e-4 | -3.42e-4 | -5.30e-4 | -1.62e-3 | -5.96e-5 | -2.31e-3 |
+| m2, n50 | 6.22e-3 | -1.27e-3 | 4.94e-3 | -6.59e-3 | 1.34e-3 | -1.35e-2 |
+| m2, n100 | 4.70e-3 | 4.73e-4 | -9.96e-4 | -2.82e-3 | -1.36e-4 | -4.64e-3 |
+| m2, n400 | 4.68e-3 | 1.01e-3 | -2.90e-3 | -1.76e-3 | -6.16e-4 | -2.09e-3 |
+
+- The observed mesh orders are 2.23 (profile), 2.06 (flow rate), 1.98 (wall
+  amplitude) and 2.00 (wave speed), and the time-step orders of the signed
+  quantities 1.94-2.07 over the finest three steps, so the coupled solution
+  is second order in space and time. `newtonIcoFluid` has no
+  `fluxConsistentPatches` option, but its coupled pressure-velocity solve has
+  no splitting error at the tube ends.
+- It agrees with IQN-ILS to $$7.2 \times 10^{-4}$$ or better on every
+  quantity (the velocity profile, of the largest velocity), and to
+  $$5.5 \times 10^{-4}$$ in the wall amplitude. Its wall amplitude is lower
+  than that of the partitioned (Robin-Neumann) runs by
+  $$3.2$$-$$3.5 \times 10^{-4}$$ on m2 (all four step sizes) and m4, so the
+  difference does not change with refinement there; on m1 it is
+  $$8.0 \times 10^{-5}$$ at $$L/2$$. It is below the $$5 \times 10^{-4}$$
+  the linear theory neglects. The traction omitted the physical term
+  $$\mu \nabla(\mathbf{u} \cdot \mathbf{n})$$ on the deforming wall, of
+  relative size about $$\mu \omega R / (E h)$$, which is a leading
+  candidate for this offset.
+- It takes 2 Newton iterations per time-step and 149 s, against 14.6 coupling
+  iterations and 524 s for IQN-ILS.
+- The velocity solid starts from the exact displacement with `restart yes`,
+  and the fluid mesh follows the wall displacement relative to its initial
+  value, as in the partitioned set-up.
+
 ### Tolerances
 
 | Check | Tolerance |
@@ -341,6 +390,50 @@ The driver also rejects histories that are truncated, non-finite, not
 increasing or not uniformly spaced in time, and fluid samples with an
 unexpected number of points, and a run whose solver log lacks `End` or
 reports a fatal error, whether freshly run or reused.
+
+### Accuracy limit of the profile near the wall
+
+The linearised exact solution does not say whether it refers to the
+undeformed or to the current position of a point, and the two differ at
+O(η ∂u/∂r). `profile` evaluates the exact solution at the undeformed cell
+centres. The fluid mesh follows the wall displacement relative to its initial
+value, $$D(t) - D(0)$$, so the near-wall cells are offset from the exact
+wall position by the static part $$-\eta(0)$$, which is $$2.26 \times 10^{-4} R$$
+at $$x = L/2$$. Through the steep velocity gradient at the wall this shifts
+the first harmonic of the exact profile at the near-wall cells by
+$$\eta(0)\, \partial \hat{u} / \partial r \approx 8 \times 10^{-4}$$ of the
+largest velocity. Because $$D(0)$$ is taken from the exact solution of the
+reference tube, the offset does not change with the Young's modulus used in the
+simulation (a run with $$E \times 1000$$ gives the same gap). Products of two
+first harmonics feed only the mean and the second harmonic, so the oscillating
+part of the wall motion does not contribute.
+
+Wall-layer profile errors below about $$8 \times 10^{-4}$$ are therefore not
+resolved at the tutorial amplitude, and which evaluation point the discrete
+solution follows depends on the mesh motion: with the Laplacian motion of the
+partitioned runs it follows the undeformed centres, with the pseudo-solid
+motion of the quasi-monolithic runs the current ones. This is why the
+quasi-monolithic profile error appears to stall at $$7.7 \times 10^{-4}$$ on m8
+(solids4foam issue #650); a fluid-only run with the exact wall motion
+prescribed reproduces it without any coupling. The other quantities are
+integral or wall quantities and are not affected. The m8 runs, the fluid-only
+run and the scaled-amplitude runs below are one-off investigation runs outside
+the `Allverify` study, which offers neither m8 nor an amplitude scaling; their
+set-up and data are recorded in solids4foam issue #650.
+
+The ambiguity scales with the amplitude and the discretisation error does
+not. With every amplitude (pressure, velocity and wall displacement) scaled
+by 0.1 and errors taken relative to the scaled exact solution, the
+quasi-monolithic profile error is $$1.80 \times 10^{-2}$$, $$5.01 \times 10^{-3}$$,
+$$1.25 \times 10^{-3}$$ and $$3.67 \times 10^{-4}$$ on m1 to m8 at 200 steps per
+period (orders 1.84, 2.01, 1.77) and $$2.55 \times 10^{-4}$$ on m8 at 400,
+against $$2.69 \times 10^{-4}$$ with Robin-Neumann; the two couplings agree to
+1-5% on every common level. These runs use the current traction with the
+transpose viscous term (build a421f063d), unlike the quasi-monolithic table
+above, which uses the former Laplacian-form traction and is pending a rerun.
+The tutorial keeps its amplitude, for which the tables above were computed; for
+wall-layer errors below $$10^{-3}$$, scale the amplitude down (by 0.1 or more)
+or evaluate the exact solution at the current cell centres.
 
 ## Solid model
 

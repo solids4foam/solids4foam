@@ -1,0 +1,38 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Velocity-based total-Lagrangian solid for the quasi-monolithic coupling,
+// with the same St Venant-Kirchhoff wall as the partitioned set-up. The
+// high-order residual of the partitioned solid is not available here
+solidModel      nonLinearGeometryTotalLagrangianVelocity;
+
+nonLinearGeometryTotalLagrangianVelocityCoeffs
+{
+
+    // Stabilisation
+    stabilisation
+    {
+        momentum
+        {
+            type            diffStencilLaplacian;
+            scaleFactor     0.1;
+        }
+    }
+}
+
+// ************************************************************************* //

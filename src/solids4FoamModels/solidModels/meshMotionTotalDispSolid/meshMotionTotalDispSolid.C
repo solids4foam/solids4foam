@@ -53,6 +53,15 @@ void meshMotionTotalDispSolid::updateKinematics()
     // Gradient of the total displacement on the current mesh
     gradD() = fvc::grad(D());
 
+    if (incremental_)
+    {
+        // Increment of the time step on the current mesh, which is that of
+        // the start of the time step, at the reference points plus
+        // pointD.oldTime()
+        DD() = D() - D().oldTime();
+        gradDD() = fvc::grad(DD());
+    }
+
     if (!finiteStrain_)
     {
         return;
@@ -96,10 +105,13 @@ void meshMotionTotalDispSolid::correctStress()
     }
     else
     {
+        // The incremental form is stress free at the start of the time step
+        const volTensorField& gradDisp = incremental_ ? gradDD() : gradD();
+
         mechanicalManager().updateStressSmallStrain
         (
-            gradD(),
-            gradD().oldTime(),
+            gradDisp,
+            gradDisp.oldTime(),
             mesh().time().deltaTValue(),
             sigma()
         );
@@ -127,10 +139,12 @@ void meshMotionTotalDispSolid::updateImpK()
     }
     else
     {
+        const volTensorField& gradDisp = incremental_ ? gradDD() : gradD();
+
         mechanicalManager().updateScalarTangent
         (
-            gradD(),
-            gradD().oldTime(),
+            gradDisp,
+            gradDisp.oldTime(),
             mesh().time().deltaTValue(),
             impK_,
             tangentRequest::scalar
@@ -176,6 +190,237 @@ void meshMotionTotalDispSolid::enforceTractionBoundaries
 }
 
 
+tmp<surfaceVectorField> meshMotionTotalDispSolid::faceForce()
+{
+    // Unit normal vectors at the faces of the current mesh
+    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
+
+    // Traction vectors at the faces
+    surfaceVectorField traction(n & fvc::interpolate(sigma()));
+
+    // Add stabilisation to the traction
+    // We add this before enforcing the traction condition as the
+    // stabilisation is set to zero on traction boundaries
+    if (incremental_)
+    {
+        momentumStabilisation().updateVector(DD(), &gradDD());
+    }
+    else
+    {
+        momentumStabilisation().updateVector(D(), &gradD());
+    }
+    traction += impKf_*momentumStabilisation().faceVector();
+
+    // Enforce traction boundary conditions
+    enforceTractionBoundaries(traction, n);
+
+    return tmp<surfaceVectorField>
+    (
+        new surfaceVectorField("faceForce", mesh().magSf()*traction)
+    );
+}
+
+
+void meshMotionTotalDispSolid::updateDerivedFields()
+{
+    if (incremental_)
+    {
+        // Interpolate the increment on the mesh of the start of the time
+        // step and accumulate it, rather than interpolate the total
+        // displacement, so the points follow the increments as the mesh
+        // deforms
+        DD() = D() - D().oldTime();
+        gradDD() = fvc::grad(DD());
+        interpolatePointDisplacement(DD(), gradDD(), pointDD());
+
+        pointD() = pointD().oldTime() + pointDD();
+        pointD().correctBoundaryConditions();
+
+        // The increment including the boundary point values
+        pointDD() = pointD() - pointD().oldTime();
+
+        return;
+    }
+
+    // Increments of displacement
+    DD() = D() - D().oldTime();
+    gradDD() = gradD() - gradD().oldTime();
+
+    // Interpolate cell displacements to vertices
+    interpolatePointDisplacement(D(), gradD(), pointD());
+
+    // Increment of point displacement
+    pointDD() = pointD() - pointD().oldTime();
+}
+
+
+bool meshMotionTotalDispSolid::evolveImplicitSegregated()
+{
+    Info<< "Evolving the mesh motion solid model on the current mesh" << endl;
+
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
+    // The mesh has moved since the last solution, so the kinematics, the
+    // stiffness and the stress are recalculated on the current mesh
+    updateKinematics();
+    updateImpK();
+    correctStress();
+
+    SolverPerformance<vector>::debug = 0;
+
+    int iCorr = 0;
+    scalar currentResidualNorm = 0;
+    scalar initialResidualNorm = 0;
+    scalar deltaXNorm = 0;
+    scalar xNorm = 0;
+    const convergenceParameters convParam =
+        readConvergenceParameters(solidModelDict());
+
+    // Momentum equation loop
+    do
+    {
+        // Store fields for under-relaxation and residual calculation
+        D().storePrevIter();
+
+        // Quasi-static momentum equation on the current mesh
+        fvVectorMatrix DEqn
+        (
+            fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
+          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
+          + fvc::div(faceForce())
+        );
+
+        // Under-relax the linear system
+        DEqn.relax();
+
+        // Enforce any cell displacements
+        solidModel::setCellDisps(DEqn);
+
+        // Solve the linear system and store the residual
+        currentResidualNorm = mag(DEqn.solve().initialResidual());
+
+        // Norm of the solution correction
+        deltaXNorm =
+            sqrt
+            (
+                gSum
+                (
+                    magSqr
+                    (
+                        D().primitiveField() - D().prevIter().primitiveField()
+                    )
+                )
+            );
+
+        // Norm of the solution
+        xNorm = sqrt(gSum(magSqr(D().primitiveField())));
+
+        // Store the initial residual
+        if (iCorr == 0)
+        {
+            initialResidualNorm = currentResidualNorm;
+            Info<< "Initial Residual Norm = " << initialResidualNorm << nl
+                << "Initial Solution Norm = " << xNorm << endl;
+        }
+
+        // Fixed or adaptive field under-relaxation
+        relaxField(D(), iCorr);
+
+        // Update the kinematics and the stress
+        updateKinematics();
+        correctStress();
+    }
+    while
+    (
+        !checkConvergence
+        (
+            currentResidualNorm,
+            initialResidualNorm,
+            deltaXNorm,
+            xNorm,
+            ++iCorr,
+            convParam
+        )
+    );
+
+    updateDerivedFields();
+
+    SolverPerformance<vector>::debug = 1;
+
+    return true;
+}
+
+
+bool meshMotionTotalDispSolid::evolveSnes()
+{
+#ifdef USE_PETSC
+    Info<< "Evolving the mesh motion solid model on the current mesh using "
+        << "PETSc SNES" << endl;
+
+    // Update D boundary conditions
+    D().correctBoundaryConditions();
+
+    // The mesh has moved since the last solution, so the kinematics, the
+    // stiffness and the stress are recalculated on the current mesh, as in
+    // the segregated loop. This stops if the boundary motion inverts the
+    // mesh. The implicit stiffness is then fixed during the solution, so the
+    // residual is that of the segregated loop
+    updateKinematics();
+    updateImpK();
+    correctStress();
+
+    // Seed the SNES solution vector from the current D on every solution:
+    // the initial guess is the last solution, with the new boundary values,
+    // as in the segregated loop, and the owner may have set D externally,
+    // e.g. on a time-step retry
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        primitiveFieldRef(D()),
+        foamPetscSnesHelper::solution(),
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    // Solve the nonlinear system and check the convergence
+    foamPetscSnesHelper::solve();
+
+    // Map the PETSc solution to the D field
+    vectorField& DI = D();
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        foamPetscSnesHelper::solution(),
+        DI,
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    D().correctBoundaryConditions();
+
+    // Update the kinematics and the stress from the solution, which also
+    // stops if the solution inverts the mesh
+    updateKinematics();
+    correctStress();
+
+    updateDerivedFields();
+
+#else
+
+    FatalErrorInFunction
+        << "To use PETSc with solids4foam, set the PETSC_DIR to point to your "
+        << "PETSC installation directory and re-build solids4foam"
+        << exit(FatalError);
+
+#endif
+
+    return true;
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
 meshMotionTotalDispSolid::meshMotionTotalDispSolid
@@ -185,9 +430,28 @@ meshMotionTotalDispSolid::meshMotionTotalDispSolid
 )
 :
     solidModel(typeName, runTime, region),
+    foamPetscSnesHelper
+    (
+        "D",
+        fileName
+        (
+            solidModelDict().lookupOrDefault<fileName>
+            (
+                "optionsFile", "petscOptions"
+            )
+        ),
+        mesh(),
+        solutionLocation::CELLS,
+        solidModelDict().lookupOrDefault<Switch>("stopOnPetscError", true),
+        bool(solutionAlg() == solutionAlgorithm::PETSC_SNES)
+    ),
     finiteStrain_
     (
         solidModelDict().lookupOrDefault<Switch>("finiteStrain", false)
+    ),
+    incremental_
+    (
+        solidModelDict().lookupOrDefault<Switch>("incremental", false)
     ),
     F_
     (
@@ -256,7 +520,8 @@ meshMotionTotalDispSolid::meshMotionTotalDispSolid
         mesh(),
         dimensionedScalar("zero", dimArea/dimForce, 0),
         calculatedFvPatchScalarField::typeName
-    )
+    ),
+    blockSize_(solidModel::twoD() ? 2 : 3)
 {
     if (!sharedMesh())
     {
@@ -293,7 +558,43 @@ meshMotionTotalDispSolid::meshMotionTotalDispSolid
         }
     }
 
-    Info<< "finiteStrain = " << finiteStrain_ << endl;
+    if
+    (
+        solutionAlg() != solutionAlgorithm::IMPLICIT_SEGREGATED
+     && solutionAlg() != solutionAlgorithm::PETSC_SNES
+    )
+    {
+        FatalErrorInFunction
+            << "The " << typeName << " solid model supports the "
+            << solutionAlgorithmNames_[solutionAlgorithm::IMPLICIT_SEGREGATED]
+            << " and "
+            << solutionAlgorithmNames_[solutionAlgorithm::PETSC_SNES]
+            << " solution algorithms, not "
+            << solutionAlgorithmNames_[solutionAlg()] << exit(FatalError);
+    }
+
+    if (highOrderResidual() || highOrderJacobian())
+    {
+        FatalErrorInFunction
+            << "highOrderResidual and highOrderJacobian are not supported by "
+            << "the " << typeName << " solid model" << exit(FatalError);
+    }
+
+    if (incremental_ && finiteStrain_)
+    {
+        FatalErrorInFunction
+            << "incremental is only available with finiteStrain no, in "
+            << "the " << typeName << " solid model" << exit(FatalError);
+    }
+
+    // The incremental form measures the increment from the old-time fields
+    D().oldTime();
+    pointD().oldTime();
+
+    Info<< "finiteStrain = " << finiteStrain_ << nl
+        << "incremental = " << incremental_ << nl
+        << "solutionAlgorithm = "
+        << solutionAlgorithmNames_[solutionAlg()] << endl;
 
     D().correctBoundaryConditions();
     updateKinematics();
@@ -306,123 +607,122 @@ meshMotionTotalDispSolid::meshMotionTotalDispSolid
 
 bool meshMotionTotalDispSolid::evolve()
 {
-    Info<< "Evolving the mesh motion solid model on the current mesh" << endl;
-
-    // Update D boundary conditions
-    D().correctBoundaryConditions();
-
-    // The mesh has moved since the last solution, so the kinematics, the
-    // stiffness and the stress are recalculated on the current mesh
-    updateKinematics();
-    updateImpK();
-    correctStress();
-
-    SolverPerformance<vector>::debug = 0;
-
-    int iCorr = 0;
-    scalar currentResidualNorm = 0;
-    scalar initialResidualNorm = 0;
-    scalar deltaXNorm = 0;
-    scalar xNorm = 0;
-    const convergenceParameters convParam =
-        readConvergenceParameters(solidModelDict());
-
-    // Unit normal vectors at the faces of the current mesh
-    const surfaceVectorField n(mesh().Sf()/mesh().magSf());
-
-    // Momentum equation loop
-    do
+    if (solutionAlg() == solutionAlgorithm::PETSC_SNES)
     {
-        // Store fields for under-relaxation and residual calculation
-        D().storePrevIter();
-
-        // Traction vectors at the faces
-        surfaceVectorField traction(n & fvc::interpolate(sigma()));
-
-        // Add stabilisation to the traction
-        // We add this before enforcing the traction condition as the
-        // stabilisation is set to zero on traction boundaries
-        momentumStabilisation().updateVector(D(), &gradD());
-        traction += impKf_*momentumStabilisation().faceVector();
-
-        // Enforce traction boundary conditions
-        enforceTractionBoundaries(traction, n);
-
-        // Quasi-static momentum equation on the current mesh
-        fvVectorMatrix DEqn
-        (
-            fvm::laplacian(impKf_, D(), "laplacian(DD,D)")
-          - fvc::laplacian(impKf_, D(), "laplacian(DD,D)")
-          + fvc::div(mesh().magSf()*traction)
-        );
-
-        // Under-relax the linear system
-        DEqn.relax();
-
-        // Enforce any cell displacements
-        solidModel::setCellDisps(DEqn);
-
-        // Solve the linear system and store the residual
-        currentResidualNorm = mag(DEqn.solve().initialResidual());
-
-        // Norm of the solution correction
-        deltaXNorm =
-            sqrt
-            (
-                gSum
-                (
-                    magSqr
-                    (
-                        D().primitiveField() - D().prevIter().primitiveField()
-                    )
-                )
-            );
-
-        // Norm of the solution
-        xNorm = sqrt(gSum(magSqr(D().primitiveField())));
-
-        // Store the initial residual
-        if (iCorr == 0)
-        {
-            initialResidualNorm = currentResidualNorm;
-            Info<< "Initial Residual Norm = " << initialResidualNorm << nl
-                << "Initial Solution Norm = " << xNorm << endl;
-        }
-
-        // Fixed or adaptive field under-relaxation
-        relaxField(D(), iCorr);
-
-        // Update the kinematics and the stress
-        updateKinematics();
-        correctStress();
+        return evolveSnes();
     }
-    while
+
+    return evolveImplicitSegregated();
+}
+
+
+#ifdef USE_PETSC
+
+label meshMotionTotalDispSolid::initialiseJacobian(Mat& jac)
+{
+    // Initialise based on the compact stencil of the mesh
+    return foamPetscSnesHelper::initialiseJacobian(jac, mesh(), blockSize_);
+}
+
+
+label meshMotionTotalDispSolid::initialiseSolution(Vec& x)
+{
+    // Initialise based on mesh.nCells()
+    return foamPetscSnesHelper::initialiseSolution(x, mesh(), blockSize_);
+}
+
+
+label meshMotionTotalDispSolid::formResidual
+(
+    Vec f,
+    const Vec x
+)
+{
+    // Copy x into the D field
+    vectorField& DI = D();
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
     (
-        !checkConvergence
-        (
-            currentResidualNorm,
-            initialResidualNorm,
-            deltaXNorm,
-            xNorm,
-            ++iCorr,
-            convParam
-        )
+        x,
+        DI,
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
     );
 
-    // Increments of displacement
-    DD() = D() - D().oldTime();
-    gradDD() = gradD() - gradD().oldTime();
+    // Enforce the boundary conditions
+    D().correctBoundaryConditions();
 
-    // Interpolate cell displacements to vertices
-    interpolatePointDisplacement(D(), gradD(), pointD());
+    // Update the kinematics on the current mesh, which stops if D inverts
+    // the mesh, and the stress, as in the segregated loop
+    updateKinematics();
+    correctStress();
 
-    // Increment of point displacement
-    pointDD() = pointD() - pointD().oldTime();
+    // Enforce the boundary conditions again, now that gradD and sigma have
+    // been updated from x, so that the traction conditions use the stress of
+    // this x
+    D().correctBoundaryConditions();
 
-    SolverPerformance<vector>::debug = 1;
+    // The residual is the divergence of the face forces, i.e. the explicit
+    // part of the segregated momentum equation, made extensive
+    vectorField residual(fvc::div(faceForce())().primitiveField());
+    residual *= mesh().V();
 
-    return true;
+    // Copy the residual into the f field
+    foamPetscSnesHelper::InsertFieldComponents<vector>
+    (
+        residual,
+        f,
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    return 0;
 }
+
+
+label meshMotionTotalDispSolid::formJacobian
+(
+    Mat jac,
+    const Vec x
+)
+{
+    // Copy x into the D field
+    vectorField& DI = D();
+    foamPetscSnesHelper::ExtractFieldComponents<vector>
+    (
+        x,
+        DI,
+        0, // Location of first component
+        solidModel::twoD()
+      ? makeList<label>({0,1})
+      : makeList<label>({0,1,2})
+    );
+
+    // Enforce the boundary conditions
+    D().correctBoundaryConditions();
+
+    // The implicit stiffness Laplacian of the segregated loop, on the current
+    // mesh. It is built here rather than taken from the momentum
+    // stabilisation, whose cached matrix would keep the geometry and the
+    // stiffness of the mesh it was first built on
+    fvVectorMatrix approxJ(fvm::laplacian(impKf_, D(), "laplacian(DD,D)"));
+
+    // Optional: under-relaxation of the linear system
+    approxJ.relax();
+
+    // Convert the fvMatrix to a PETSc matrix
+    foamPetscSnesHelper::InsertFvMatrixIntoPETScMatrix
+    (
+        approxJ, jac, 0, 0, blockSize_
+    );
+
+    return 0;
+}
+
+#endif // USE_PETSC
 
 
 tmp<vectorField> meshMotionTotalDispSolid::tractionBoundarySnGrad
@@ -441,14 +741,33 @@ tmp<vectorField> meshMotionTotalDispSolid::tractionBoundarySnGrad
     // Patch reciprocal implicit stiffness
     const scalarField& rImpK = rImpK_.boundaryField()[patchID];
 
-    // Patch gradient
-    const tensorField& pGradD = gradD().boundaryField()[patchID];
-
     // Patch Cauchy stress
     const symmTensorField& pSigma = sigma().boundaryField()[patchID];
 
     // Patch unit normals of the current mesh
     const vectorField n(patch.nf());
+
+    if (incremental_)
+    {
+        // The stress is that of the increment, so the condition sets the
+        // snGrad of the increment, added to that of the old-time D
+        const tensorField& pGradDD = gradDD().boundaryField()[patchID];
+
+        return tmp<vectorField>
+        (
+            new vectorField
+            (
+                D().oldTime().boundaryField()[patchID].snGrad()
+              + (
+                    (traction - n*pressure)
+                  - (n & (pSigma - impK*pGradDD))
+                )*rImpK
+            )
+        );
+    }
+
+    // Patch gradient
+    const tensorField& pGradD = gradD().boundaryField()[patchID];
 
     // Return patch snGrad
     return tmp<vectorField>

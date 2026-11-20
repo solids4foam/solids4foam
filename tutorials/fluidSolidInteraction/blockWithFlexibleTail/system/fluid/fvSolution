@@ -1,0 +1,84 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "p|pFinal"
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0;
+        minIter         1;
+        maxIter         1000;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    cellMotionU
+    {
+        solver          GAMG;
+        tolerance       1e-06;
+        relTol          0;
+        minIter         1;
+        maxIter         100;
+        smoother        GaussSeidel;
+        nPreSweeps      0;
+        nPostSweeps     2;
+        nFinestSweeps   2;
+        scaleCorrection true;
+        directSolveCoarsest false;
+        cacheAgglomeration true;
+        nCellsInCoarsestLevel 20;
+        agglomerator    faceAreaPair;
+        mergeLevels     1;
+    }
+
+    "U|UFinal"
+    {
+        solver          PBiCG;
+        preconditioner  DILU;
+        tolerance       1e-06;
+        relTol          0;
+        minIter         1;
+    }
+}
+
+PIMPLE
+{
+    momentumPredictor   on;
+    // More than one outer corrector is needed for robust IQNILS coupling:
+    // the fluid solve in each FSI outer corrector starts from the previous
+    // one's solution, so with a single PIMPLE outer corrector the fluid
+    // response to a given interface displacement depends on the FSI iteration
+    // history, and IQNILS stalls near outerCorrTolerance. Two are enough once
+    // the coupling is under way, but the first coupled time-step, when the
+    // developed flow first loads the tail, needs three
+    nOuterCorrectors    3;
+    nCorrectors         3;
+    nNonOrthogonalCorrectors 1;
+}
+
+// ************************************************************************* //

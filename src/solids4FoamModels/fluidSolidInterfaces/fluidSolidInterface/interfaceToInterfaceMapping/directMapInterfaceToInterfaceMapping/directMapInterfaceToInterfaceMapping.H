@@ -218,6 +218,15 @@ public:
                 const Field<vector>& fromField,       // from field
                 Field<vector>& toField                // to field
             ) const;
+            //- Return the face transfer addressing and weights: one face
+            //  with a unit weight
+            virtual void zoneToZoneFaceWeights
+            (
+                const standAlonePatch& fromZone,      // from zone
+                const standAlonePatch& toZone,        // to zone
+                labelListList& addressing,            // fromZone faces
+                scalarListList& weights               // weights
+            ) const;
 };
 
 

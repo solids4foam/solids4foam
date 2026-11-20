@@ -1,0 +1,107 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun                      # partitioned IQN-ILS, serial
+# ./Allrun parallel             # partitioned IQN-ILS, parallel
+# ./Allrun highOrder            # partitioned IQN-ILS, cubic solid, serial
+# ./Allrun highOrder parallel   # partitioned IQN-ILS, cubic solid, parallel
+# ./Allrun monolithic           # quasi-monolithic Newton, serial
+# ./Allrun monolithic parallel  # quasi-monolithic Newton, parallel
+
+coupling=iqnils
+runMode=serial
+solidVariant=linear
+
+for arg in "$@"
+do
+    case "$arg" in
+        iqnils|IQNILS)
+            coupling=iqnils
+            ;;
+        monolithic|Monolithic)
+            coupling=monolithic
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        highOrder)
+            solidVariant=highOrder
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [iqnils|monolithic] [highOrder] [parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+echo "Using ${coupling} coupling setup"
+
+if [[ "${coupling}" == "monolithic" ]]; then
+    # The quasi-monolithic Newton approach is only implemented for
+    # OpenFOAM.com with PETSc
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+    solids4Foam::requirePetscOrExitSilently
+    if [[ "${solidVariant}" == "highOrder" ]]; then
+        echo "The highOrder option is not available with monolithic coupling"
+        exit 1
+    fi
+elif [[ "${solidVariant}" == "highOrder" ]]; then
+    # The high-order solid discretisation requires PETSc SNES and is not
+    # available on foam-extend.
+    solids4Foam::caseDoesNotRunWithFoamExtend
+    solids4Foam::requirePetscOrExitSilently
+fi
+
+# Start from the stored partitioned case. The quasi-monolithic dictionaries
+# and fields are stored as *.monolithic variants.
+solids4Foam::restoreCaseVariant .
+ln -vnsf "solidProperties.${solidVariant}" constant/solid/solidProperties
+ln -vnsf "fvSolution.${solidVariant}" system/solid/fvSolution
+ln -vnsf fsiProperties.iqnils constant/fsiProperties
+ln -vnsf U.dirichletNeumann 0/fluid/U
+ln -vnsf p.dirichletNeumann 0/fluid/p
+
+if [[ "${coupling}" == "monolithic" ]]; then
+    solids4Foam::selectCaseVariant . monolithic
+fi
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+if [[ "${runMode}" == "parallel" ]]; then
+    if [[ "${coupling}" == "monolithic" ]]; then
+        # Decompose the regions as one graph, preserving matching ownership at
+        # the conformal fluid-solid interface.
+        solids4Foam::runApplication decomposeParMonolithic -force
+    else
+        solids4Foam::runApplication -s fluid decomposePar -region fluid
+        solids4Foam::runApplication -s solid decomposePar -region solid
+    fi
+    solids4Foam::runParallel solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid
+    solids4Foam::runApplication -s solid reconstructPar -region solid
+else
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Create tip-displacement plot
+if command -v gnuplot &> /dev/null
+then
+    echo "Generating deflection.pdf using gnuplot"
+    gnuplot deflection.gnuplot &> /dev/null
+else
+    echo "Please install gnuplot if you would like to generate the plot"
+fi

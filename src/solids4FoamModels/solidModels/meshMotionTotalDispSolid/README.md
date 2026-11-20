@@ -46,11 +46,36 @@ supported. Traction conditions act on the current face areas;
 The model stops if the displacement inverts the mesh, i.e. if the
 determinant of `Finv` is not positive.
 
-The corrector loop stops when the relative residual falls below `rTol`
-(default `1e-6`), the residual below `aTol` (default `1e-50`) or the
-relative correction below `sTol` (default `1e-10`), and fails after
-`nCorrectors` (default `10000`) iterations. The older `solutionTolerance` and
-`alternativeTolerance` keys are not read.
+### Solution algorithms
+
+`solutionAlgorithm` selects how the equations are solved:
+
+- `implicitSegregated` (the default): a segregated corrector loop. It stops
+  when the relative residual falls below `rTol` (default `1e-6`), the
+  residual below `aTol` (default `1e-50`) or the relative correction below
+  `sTol` (default `1e-10`), and fails after `nCorrectors` (default `10000`)
+  iterations. The older `solutionTolerance` and `alternativeTolerance` keys
+  are not read.
+- `PETScSNES`: the PETSc nonlinear solver (SNES). The residual is that of the
+  segregated loop, the divergence of the stress plus the stabilisation on
+  the current mesh, with the same kinematics and law, so the two algorithms
+  converge to the same displacement. The approximate Jacobian, used as the
+  preconditioner of a matrix-free Newton-Krylov method (`snes_mf_operator`),
+  is the implicit stiffness Laplacian of the segregated loop, assembled on the
+  current mesh. Each solution starts from the last displacement with the new
+  boundary values. The PETSc options are read from the `D` entry of the
+  `solvers` in `system/<region>/fvSolution` of the moving mesh, or else from
+  the `optionsFile` (default `petscOptions`); `stopOnPetscError` (default
+  `yes`) stops the run if the SNES solve fails. The `rTol`, `nCorrectors`
+  and the other corrector loop entries are not used, and the
+  `cellDisplacements` and high-order options are not supported.
+
+The quasi-monolithic coupling (`NewtonQuasiMonolithic`) needs `PETScSNES`, and
+stops with a message if the segregated algorithm is selected. The partitioned
+couplings accept either algorithm. In both cases, the stiffness scale factor
+of the `solids4foamSolidModel` mesh motion solver is recalculated on the
+current mesh before each solution (`updateStiffnessScaleFactor`, default
+`yes` for this model).
 
 ### Example
 
@@ -68,6 +93,55 @@ meshMotionTotalDisplacementCoeffs
     nCorrectors     1000;
     rTol            1e-04;
     infoFrequency   100;
+}
+```
+
+For the quasi-monolithic coupling, select PETSc SNES:
+
+```text
+solidModel     meshMotionTotalDisplacement;
+
+meshMotionTotalDisplacementCoeffs
+{
+    finiteStrain        yes;
+    solutionAlgorithm   PETScSNES;
+}
+```
+
+with the PETSc options in `system/fluid/fvSolution`, e.g. as in the
+`TurekHron2006` tutorial (`system/fluid/fvSolution.monolithic`):
+
+```text
+solvers
+{
+    D // fluid mesh motion
+    {
+        solver    petsc;
+
+        options
+        {
+            snes_type newtonls;
+            snes_linesearch_type basic;
+            snes_rtol "1e-3";
+            snes_stol "1e-3";
+            snes_max_it "100";
+            snes_monitor;
+            snes_converged_reason;
+
+            snes_mf;
+            snes_mf_operator;
+
+            ksp_type lgmres;
+            ksp_gmres_restart "100";
+            ksp_converged_reason;
+
+            pc_type bjacobi;
+            sub_pc_type lu;
+
+            snes_lag_preconditioner_persists true;
+            snes_lag_preconditioner "-2";
+        }
+    }
 }
 ```
 

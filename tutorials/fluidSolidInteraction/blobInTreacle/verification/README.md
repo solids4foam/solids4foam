@@ -195,6 +195,27 @@ Because the published data are limited to self-convergence norms and the
 coarse-mesh figures of the preprint, an independent reference solution of the
 finite-strain case would be valuable.
 
+## Quasi-monolithic coupling
+
+The driver runs the partitioned coupling only. For the quasi-monolithic
+Newton coupling (`./Allrun monolithic`, OpenFOAM.com only), the finite-strain
+case was run separately on levels x1, x2 and x4 to `t = 3 s`, with the same
+time steps as the mesh study, alongside the partitioned coupling on the same
+node (OpenFOAM v2512, Linux, serial); the partitioned values differ from
+those of the mesh study above, which was run with the driver, by up to 0.04%.
+Steady `u_x` of the top point (m):
+
+| Coupling | x1 | x2 | x4 | Observed order | Extrapolated |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Partitioned | 0.135581 | 0.139127 | 0.139991 | 2.04 | 0.140270 |
+| Monolithic | 0.135738 | 0.139035 | 0.139918 | 1.90 | 0.140241 |
+
+The couplings differ by 0.12% on x1 and 0.05% on x4, and their extrapolated
+values by 0.02%. The monolithic coupling needs 2.0, 2.1 and 2.7 Newton
+iterations per step on the three levels. These runs predate the
+mesh-motion interface fix of #699; the current x1 value, 0.135729 m, differs
+from the table by 0.007%.
+
 ## References
 
 J. Liu, R.K. Jaiman, P.S. Gurugubelli, A stable second-order scheme for

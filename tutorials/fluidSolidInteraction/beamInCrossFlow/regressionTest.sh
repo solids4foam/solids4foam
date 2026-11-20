@@ -178,6 +178,9 @@ prepare_case() {
     if [[ "${coupling}" == "robin" ]]; then
         solution_setup="iqnils"
         interface_condition="robin"
+    elif [[ "${coupling}" == "monolithic" ]]; then
+        # The monolithic variant shares the IQNILS controlDict
+        solution_setup="iqnils"
     fi
 
     rm -rf "${case_dir}"
@@ -193,6 +196,12 @@ prepare_case() {
 
         cp -a "${item}" "${case_dir}/"
     done
+
+    # Copy the record of a selected case variant too, so that the Allrun of
+    # the copy can restore the default variant
+    if [[ -f "${SCRIPT_DIR}/.solids4FoamCaseVariant" ]]; then
+        cp -a "${SCRIPT_DIR}/.solids4FoamCaseVariant" "${case_dir}/"
+    fi
 
     (
         cd "${case_dir}"
@@ -374,6 +383,14 @@ REF_HO_MAX_DISP=9.64144e-5
 REF_HO_FINAL_DISP=5.22025e-5
 REF_HO_FINAL_FORCE=1.41024
 
+# Reference values for the quasi-monolithic Newton coupling.
+# TODO: regenerate. These values are from the tutorial definition before #544
+# (inlet peak 0.3 m/s, E = 10 kPa, earlier plate position), so the
+# monolithic arm fails against them until it is rerun with the Richter
+# definition on the GitHub CI OpenFOAM-v2512-PETSc image
+MONO_REF_MAX_DISP=0.0278474
+MONO_REF_FINAL_DISP=0.0267971
+MONO_REF_FINAL_FORCE=5.11391
 # diffusionElastic fluid mesh motion, to t = 0.5, from the same CI image (it
 # runs only on OpenFOAM.com): the tip displacement is still increasing, so its
 # maximum is its final value
@@ -393,6 +410,11 @@ run_case "${robin_case}" robin
 high_order_case=$(prepare_case iqnils highOrder)
 run_high_order_case "${high_order_case}"
 
+# The quasi-monolithic Newton coupling is only implemented for OpenFOAM.com
+if [[ "${variant}" == "openfoamcom" ]]; then
+    monolithic_case=$(prepare_case monolithic)
+    run_case "${monolithic_case}" monolithic
+fi
 # The fluid mesh motion variants: displacementLaplacian changes the beam
 # response by much less than the tolerances, so it shares the references;
 # diffusionElastic is run to the shorter end time, and diffusionHyperElastic
@@ -426,6 +448,14 @@ check_case highOrder "${high_order_case}" \
     "${REF_HO_MAX_DISP}" "${REF_HO_FINAL_DISP}" "${REF_HO_FINAL_FORCE}" \
     || failures=$((failures + $?))
 
+if [[ "${variant}" == "openfoamcom" ]]; then
+    check_case monolithic "${monolithic_case}" \
+        "${MONO_REF_MAX_DISP}" "${MONO_REF_FINAL_DISP}" \
+        "${MONO_REF_FINAL_FORCE}" \
+        || failures=$((failures + $?))
+else
+    echo "Skipping monolithic regression case: only available on OpenFOAM.com"
+fi
 check_case displacementLaplacian "${displacement_case}" \
     "${REF_MAX_DISP}" "${REF_FINAL_DISP}" "${REF_FINAL_FORCE}" \
     || failures=$((failures + $?))

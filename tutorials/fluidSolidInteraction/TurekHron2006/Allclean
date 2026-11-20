@@ -24,6 +24,9 @@ done < <(find 0 constant system -name '*.stored' -print0)
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .
 
+# Undo the monolithic variant links
+solids4Foam::restoreCaseVariant .
+
 # Link the default Dirichlet-Neumann IQN-ILS dictionaries, which a Robin run
 # replaces; foam-extend's case conversion may also have replaced the links
 ln -vnsf fsiProperties.iqnils constant/fsiProperties

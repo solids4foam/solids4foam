@@ -39,9 +39,35 @@ Description
     With finiteStrain no (the default), the small-strain law is evaluated
     from gradD on the current mesh.
 
+    With incremental yes, the small-strain law is instead evaluated from the
+    increment of the time step, DD = D - D.oldTime(), on the mesh of the start
+    of the time step, which the owner moves to the reference points plus
+    pointD.oldTime(). The mesh is then stress free at the start of each time
+    step, and the point displacement accumulates the interpolated increment:
+
+        pointD = pointD.oldTime() + interpolate(DD)
+
+    as velocityLaplacian does, so the mesh for a given boundary motion depends
+    on how the boundary got there. A total-displacement law redistributes the
+    whole accumulated displacement at each solution and inverts cells next to
+    a boundary that moves by many cell sizes, e.g. a bending flap, where the
+    incremental form keeps them valid. The unknown remains the total D, so
+    the boundary conditions are the same. The incremental form assumes one
+    solution per time step, as the solids4foamSolidModel mesh motion solver
+    and the quasi-monolithic coupling do, and it is not available with
+    finiteStrain yes.
+
     The model has no inertia and no gravity, and it never updates the mesh:
     the mesh is moved by its owner, to the reference points plus pointD.
     Only history-independent (elastic) laws are supported.
+
+    The equations are solved with the segregated corrector loop (the
+    default, implicitSegregated) or, with solutionAlgorithm PETScSNES, with
+    the PETSc nonlinear solver (SNES), whose residual is the same
+    div(sigma) on the current mesh and whose preconditioner is the implicit
+    stiffness Laplacian of the segregated loop. The PETSc options are read
+    from the D entry of the fvSolution solvers of the moving mesh. The
+    quasi-monolithic fluid-solid coupling requires PETScSNES.
 
     \verbatim
     solidModel      meshMotionTotalDisplacement;
@@ -52,9 +78,18 @@ Description
         // diffusionHyperElastic (default no)
         finiteStrain        yes;
 
+        // Small-strain law from the increment of the time step, with
+        // finiteStrain no (default no)
+        // incremental         yes;
+
         nCorrectors         1000;
         rTol                1e-4;
         infoFrequency       100;
+
+        // Optional: solve with PETSc SNES (default implicitSegregated)
+        // solutionAlgorithm   PETScSNES;
+        // optionsFile         petscOptions;
+        // stopOnPetscError    yes;
     }
     \endverbatim
 
@@ -73,6 +108,7 @@ SourceFiles
 
 #include "solidModel.H"
 #include "mechanicalConstitutiveLawManager.H"
+#include "foamPetscSnesHelper.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -90,12 +126,19 @@ namespace solidModels
 
 class meshMotionTotalDispSolid
 :
-    public solidModel
+    public solidModel,
+    public foamPetscSnesHelper
 {
     // Private data
 
         //- Use finite-strain kinematics
         const Switch finiteStrain_;
+
+        //- Evaluate the small-strain law from the increment of displacement
+        //  of the time step, D - D.oldTime(), instead of the total
+        //  displacement, so the mesh is stress free at the start of each
+        //  time step
+        const Switch incremental_;
 
         //- Total deformation gradient
         volTensorField F_;
@@ -119,6 +162,9 @@ class meshMotionTotalDispSolid
         //- Reciprocal of impK
         volScalarField rImpK_;
 
+        //- Number of unknowns per cell, used by the PETSc SNES solver
+        const label blockSize_;
+
 
     // Private Member Functions
 
@@ -130,6 +176,23 @@ class meshMotionTotalDispSolid
 
         //- Update impK, impKf and rImpK from the law
         void updateImpK();
+
+        //- Return the force at the faces of the current mesh, from sigma
+        //  plus the stabilisation, with the traction conditions enforced;
+        //  its divergence is the residual of the momentum equation
+        tmp<surfaceVectorField> faceForce();
+
+        //- Update the fields that follow from the solved D
+        void updateDerivedFields();
+
+        //- Evolve with the segregated corrector loop
+        bool evolveImplicitSegregated();
+
+        //- Evolve with the PETSc nonlinear solver (SNES)
+        //  The residual is that of the segregated loop, and the implicit
+        //  stiffness Laplacian is the preconditioner; a matrix-free
+        //  (snes_mf_operator) Newton-Krylov method works well with it
+        bool evolveSnes();
 
         //- Enforce traction boundary conditions on the provided traction
         //  field
@@ -194,6 +257,28 @@ public:
 
             //- Solve the mathematical model on the current mesh
             virtual bool evolve();
+
+#ifdef USE_PETSC
+            //- Initialise the Jacobian matrix
+            virtual label initialiseJacobian(Mat& jac);
+
+            //- Initialise the solution vector
+            virtual label initialiseSolution(Vec& x);
+
+            //- Calculate the residual given the solution
+            virtual label formResidual
+            (
+                Vec f,         // Residual
+                const Vec x    // Solution
+            );
+
+            //- Form the approximate Jacobian, i.e. the preconditioner
+            virtual label formJacobian
+            (
+                Mat jac,       // Jacobian
+                const Vec x    // Solution
+            );
+#endif // USE_PETSC
 
             //- Traction boundary surface normal gradient
             virtual tmp<vectorField> tractionBoundarySnGrad

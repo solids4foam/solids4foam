@@ -96,13 +96,13 @@ Region selection is currently dictionary-driven only:
 
 The current implementation is intentionally narrow:
 
-- it expects conformal interface patches
-- it requires the paired patches to have the same number of faces
-- it matches the two patches by nearest face centre using an O(n^2) search
+- it matches conformal patches one-to-one by nearest face centre using an
+  O(n^2) search
+- for non-conformal patches (different face counts, or faces that do not
+  coincide), it pairs each face of either patch with the nearest face centre
+  on the other patch; these pairs only add graph edges, so they need not be
+  one-to-one
 - it does not read or interpret a separate mapping mode from the dictionary
-
-In practice, this utility is best suited to direct-map style interfaces such as
-the conformal `flag`/`interface` pair in `foilInWind`.
 
 If multiple interface face pairs connect the same two owner cells, the duplicate
 cell-cell graph edges are collapsed before decomposition.

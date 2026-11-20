@@ -36,7 +36,10 @@ void rbfInterfaceToInterfaceMapping::transferFacesZoneToZone
     Field<Type>& toField             // to field
 ) const
 {
-    Info<< "Interpolating face values using RBF" << endl;
+    if (debug)
+    {
+        Info<< "Interpolating face values using RBF" << endl;
+    }
 
     // Check field sizes are correct
     interfaceToInterfaceMapping::checkFieldSizes
@@ -108,7 +111,10 @@ void rbfInterfaceToInterfaceMapping::transferPointsZoneToZone
     Field<Type>& toField             // to field
 ) const
 {
-    Info<< "Interpolating point values using RBF" << endl;
+    if (debug)
+    {
+        Info<< "Interpolating point values using RBF" << endl;
+    }
 
     // Check field sizes are correct
     interfaceToInterfaceMapping::checkFieldSizes

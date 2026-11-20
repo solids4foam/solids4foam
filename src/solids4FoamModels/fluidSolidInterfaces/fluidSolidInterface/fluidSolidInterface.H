@@ -350,9 +350,6 @@ class fluidSolidInterface
         //- Return accumulated interfaces displacements
         PtrList<vectorIOField>& accumulatedFluidInterfacesDisplacements();
 
-        //- Return the fluid mesh motion coupler, creating it on first use
-        fluidMeshMotionCoupler& fluidMeshMotion();
-
         //- Disallow default bitwise copy construct
         fluidSolidInterface(const fluidSolidInterface&);
 
@@ -361,6 +358,9 @@ class fluidSolidInterface
 
 protected:
     // Protected Member Functions
+
+        //- Return the fluid mesh motion coupler, creating it on first use
+        fluidMeshMotionCoupler& fluidMeshMotion();
 
         //- Update the coupled switch based on the couplingStartTime
         bool updateCoupled();
@@ -810,6 +810,15 @@ public:
             virtual bool movesFluidInterface() const
             {
                 return true;
+            }
+
+            //- Does the coupling itself set the fluid velocity on the
+            //  interface to the solid velocity, e.g. as part of a monolithic
+            //  system? If so, the fluid interface velocity condition is
+            //  expected to be fixedValue and is not checked
+            virtual bool imposesFluidInterfaceVelocity() const
+            {
+                return false;
             }
 
             //- Sync the fluidZonePointsDispl field across processors

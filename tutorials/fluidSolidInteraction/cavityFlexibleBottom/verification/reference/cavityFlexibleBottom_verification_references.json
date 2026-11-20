@@ -23,6 +23,10 @@
     },
     "iqnils": {
       "coupling": "IQNILS"
+    },
+    "monolithic": {
+      "coupling": "monolithic",
+      "inlet_ramp_s": 20
     }
   },
   "steady_state": {

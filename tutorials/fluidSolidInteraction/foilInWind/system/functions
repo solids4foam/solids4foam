@@ -1,0 +1,24 @@
+functions
+{
+    forces
+    {
+        type                forces;
+        region              fluid;
+        libs                ( "libforces.so" );
+        writeControl        timeStep;
+        writeInterval       1;
+        patches             (flag);
+        "pName|p"           p;
+        "UName|U"           U;
+        "rhoName|rho"       rhoInf;
+        log                 false;
+        rhoInf              1.18;
+        CofR                (0.06 0.055 0.055);
+    }
+    displacement
+    {
+        // Mid-span point on the trailing edge of the flag
+        type                solidPointDisplacement;
+        point               (0.1 0.055 0.055);
+    }
+}

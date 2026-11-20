@@ -468,7 +468,16 @@ def phase_error(value: complex, exact: complex) -> float:
 def coupling_iterations(case: Path) -> tuple[float, int]:
     path = case / RESIDUALS
     if not path.is_file():
-        return math.nan, 0
+        # The quasi-monolithic coupling: the Newton iterations of the coupled
+        # solve in each step, not those of the fluid mesh motion
+        counts = [int(n) for n in re.findall(
+            r"^Solving the monolithic momentum-continuity system.*?"
+            r"Nonlinear solve \w+ due to \w+ iterations (\d+)",
+            (case / "log.solids4Foam").read_text(errors="replace"),
+            re.MULTILINE | re.DOTALL)]
+        if not counts:
+            return math.nan, 0
+        return sum(counts) / len(counts), max(counts)
     per_step: dict[str, int] = {}
     for line in path.read_text(errors="replace").splitlines()[1:]:
         fields = line.split()
@@ -580,6 +589,16 @@ def analyse(spec: dict, reference: dict) -> dict:
 # Study definition
 # ---------------------------------------------------------------------------
 
+def study_coupling(args: argparse.Namespace, study: dict) -> str:
+    """The coupling of the mesh and time-step studies."""
+    return "monolithic" if args.monolithic else study["studyCoupling"]
+
+
+def compared_coupling(args: argparse.Namespace) -> str:
+    """The coupling compared with IQN-ILS in the coupling study."""
+    return "monolithic" if args.monolithic else "robin"
+
+
 def build_specs(args: argparse.Namespace, reference: dict) -> list[dict]:
     study = reference["study"]
     if args.quick:
@@ -597,15 +616,17 @@ def build_specs(args: argparse.Namespace, reference: dict) -> list[dict]:
 
     if "quick" in studies:
         quick = study["quick"]
-        add(quick["meshFactor"], quick["steps"], study["studyCoupling"],
+        add(quick["meshFactor"], quick["steps"], study_coupling(args, study),
             "quick")
     if "main" in studies:
         for factor in study["meshFactors"]:
-            add(factor, study["meshStudySteps"], study["studyCoupling"], "mesh")
+            add(factor, study["meshStudySteps"], study_coupling(args, study),
+                "mesh")
         for steps in study["timeSteps"]:
-            add(study["timeStudyFactor"], steps, study["studyCoupling"], "time")
+            add(study["timeStudyFactor"], steps, study_coupling(args, study),
+                "time")
     if "coupling" in studies:
-        for coupling in ("iqnils", "robin"):
+        for coupling in ("iqnils", compared_coupling(args)):
             add(study["couplingFactor"], study["couplingSteps"], coupling,
                 "coupling")
     for spec in specs.values():
@@ -702,7 +723,7 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
         found = [f for f in found if f is not None and group in f["groups"]]
         return found if len(found) == len(values) else None
 
-    coupling = study["studyCoupling"]
+    coupling = study_coupling(args, study)
     mesh = series("mesh", "factor", study["meshFactors"], coupling=coupling,
                   steps=study["meshStudySteps"])
     if mesh:
@@ -749,12 +770,13 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
                      f"{fmt(coarser['speed'] - finest['speed'])}")
     iq = find(rows, coupling="iqnils", factor=study["couplingFactor"],
               steps=study["couplingSteps"])
-    rb = find(rows, coupling="robin", factor=study["couplingFactor"],
-              steps=study["couplingSteps"])
+    rb = find(rows, coupling=compared_coupling(args),
+              factor=study["couplingFactor"], steps=study["couplingSteps"])
+    other = "quasi-monolithic" if args.monolithic else "Robin"
     if iq is not None and rb is not None \
             and "coupling" in iq["groups"] and "coupling" in rb["groups"]:
         check_errors(iq, tol["coupling"], f"IQN-ILS ({iq['name']})")
-        check_errors(rb, tol["coupling"], f"Robin ({rb['name']})")
+        check_errors(rb, tol["coupling"], f"{other} ({rb['name']})")
         for key, description in METRICS:
             if key == "profile":
                 # The profiles themselves, not their error norms
@@ -765,11 +787,11 @@ def check_rows(rows: list[dict], reference: dict, args: argparse.Namespace,
             else:
                 difference = abs(rb[key] - iq[key])
             check(difference <= tol["couplingAgreement"],
-                  f"Robin and IQN-ILS agree on the {description} to "
+                  f"{other} and IQN-ILS agree on the {description} to "
                   f"{fmt(difference)} (within {tol['couplingAgreement']:g})")
         lines.append(f"  - mean coupling iterations per step: "
                      f"{fmt(iq['mean_iterations'], '.2f')} (IQN-ILS), "
-                     f"{fmt(rb['mean_iterations'], '.2f')} (Robin); run time "
+                     f"{fmt(rb['mean_iterations'], '.2f')} ({other}); run time "
                      f"{fmt(iq['execution_time'], '.0f')} s and "
                      f"{fmt(rb['execution_time'], '.0f')} s")
     if len(orders) > 7:
@@ -816,6 +838,10 @@ def main() -> int:
                         "settings match")
     parser.add_argument("--quick", action="store_true",
                         help="short smoke run on the coarsest mesh")
+    parser.add_argument("--monolithic", action="store_true",
+                        help="run the mesh and time-step studies with the "
+                        "quasi-monolithic coupling and compare it, rather "
+                        "than Robin-Neumann, with IQN-ILS")
     args = parser.parse_args()
     if args.cores < 1:
         parser.error("--cores must be a positive integer")
@@ -859,9 +885,10 @@ def main() -> int:
         lines.append(f"- FAIL: {error}")
     failures += errors
     lines += ["", "PASSED" if not failures else f"FAILED ({len(failures)} checks)"]
-    summary = OUTPUT_ROOT / "verification_summary.md"
+    suffix = "_monolithic" if args.monolithic else ""
+    summary = OUTPUT_ROOT / f"verification_summary{suffix}.md"
     summary.write_text("\n".join(lines) + "\n")
-    write_csv(OUTPUT_ROOT / "womersleyTube_results.csv", rows)
+    write_csv(OUTPUT_ROOT / f"womersleyTube_results{suffix}.csv", rows)
     print("\n".join(lines))
     print(f"\nWrote {summary}")
     return 0 if not failures else 1

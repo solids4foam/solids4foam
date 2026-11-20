@@ -1,0 +1,34 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      solidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solidModel    nonLinearGeometryTotalLagrangianTotalDisplacement;
+
+nonLinearGeometryTotalLagrangianTotalDisplacementCoeffs
+{
+    solutionAlgorithm    PETScSNES;
+
+    // Start each mesh-motion solve from the extrapolated displacement, so
+    // that the interior moves with the wall: without it, the first iterate
+    // carries the whole wall increment in the cells next to the wall, which
+    // fold once the increment exceeds about half their height (fluid level 2
+    // at deltaT 0.025 s), and the Krylov solve with the lagged
+    // preconditioner stagnates. Needs a ddt(D) scheme in fvSchemes
+    predictor            yes;
+}
+
+// ************************************************************************* //

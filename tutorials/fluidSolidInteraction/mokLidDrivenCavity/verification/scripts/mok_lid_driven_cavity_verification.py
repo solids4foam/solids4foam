@@ -79,6 +79,12 @@ def parse_args() -> argparse.Namespace:
         help="override the end time (s); a full study needs at least 70 s",
     )
     parser.add_argument(
+        "--monolithic",
+        action="store_true",
+        help="run every member with the quasi-monolithic Newton coupling "
+        "(OpenFOAM.com only), in work/monolithic and postProcessing/monolithic",
+    )
+    parser.add_argument(
         "--keep-going",
         action="store_true",
         help="continue after an individual case fails",
@@ -762,8 +768,15 @@ def summary_table(rows: list[dict]) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 def main() -> int:
+    global WORK_DIR, POST_DIR
     args = parse_args()
     config = json.loads(REFERENCE_FILE.read_text())
+    if args.monolithic:
+        WORK_DIR = WORK_DIR / "monolithic"
+        POST_DIR = POST_DIR / "monolithic"
+        for study in config["studies"].values():
+            for member in study["members"]:
+                member["coupling"] = "monolithic"
 
     studies = (
         list(STUDIES) if args.study == "all"
