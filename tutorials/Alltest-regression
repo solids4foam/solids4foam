@@ -198,6 +198,7 @@ REGRESSION_TESTS=(
     # Not tutorials: test applications' cases, run the same way
     "../applications/test/mechanicalConstitutiveLawChecks/case"
     "../applications/test/logStrainMechanicalConstitutiveLaw/case"
+    "../applications/test/LemaitreDamageMechanicalConstitutiveLaw/case"
     "../applications/test/immersedSurfaceTraction/case"
     "../applications/test/circulationNetworkChecks/case"
 )

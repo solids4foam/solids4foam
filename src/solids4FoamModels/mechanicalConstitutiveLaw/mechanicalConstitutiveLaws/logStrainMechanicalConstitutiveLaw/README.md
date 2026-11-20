@@ -51,7 +51,9 @@ only rotates the stress. Under `logStrain`:
   differ.
 
 Only a sub-law that can be driven by a trial elastic strain can be used:
-`linearElastic` and `linearElasticMisesPlastic`. Any other is refused when
+`linearElastic`, `linearElasticMisesPlastic` and
+[`linearElasticMisesPlasticLemaitreDamage`](../linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw/README.md).
+Any other is refused when
 the case starts, naming it. A law with kinematic hardening or a preferred
 material direction does not qualify, since the exponential map is exact only
 when the return mapping keeps the elastic strain coaxial with its trial

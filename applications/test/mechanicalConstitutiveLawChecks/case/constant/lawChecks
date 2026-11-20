@@ -267,6 +267,48 @@ logStrainLinearElastic
     }
 }
 
+linearElasticMisesPlasticLemaitreDamage
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            linearElasticMisesPlasticLemaitreDamage;
+        rho             rho [1 -3 0 0 0 0 0] 3500;
+        E               E [1 -1 -2 0 0 0 0] 70e9;
+        nu              nu [0 0 0 0 0 0 0] 0.3;
+        "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+        outOfBounds     clamp;
+        S0              S0 [1 -1 -2 0 0 0 0] 1.1e6;
+        b               1;
+        crackClosure    0.2;
+    }
+}
+
+logStrainLemaitreDamage
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    law
+    {
+        type            logStrain;
+        rho             rho [1 -3 0 0 0 0 0] 7800;
+        mechanicalLaw
+        {
+            type            linearElasticMisesPlasticLemaitreDamage;
+            E               E [1 -1 -2 0 0 0 0] 2.069e10;
+            nu              nu [0 0 0 0 0 0 0] 0.29;
+            "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+            outOfBounds     clamp;
+            lemaitreType    triaxiality;
+            S0              S0 [1 -1 -2 0 0 0 0] 1.1e6;
+            b               1;
+        }
+    }
+}
+
 logStrainMisesPlastic
 {
     finiteStrain    yes;
