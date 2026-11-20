@@ -11,11 +11,24 @@ const pr = {number: 7, state: 'open', draft: false, head: {sha: 'c'.repeat(40)},
   base: {ref: 'development', sha: 'd'.repeat(40)}, title: 'T', body: 'B'};
 const files = [{filename: 'src/solids4FoamModels/numerics/x.C', status: 'modified',
   patch: '@@ -1 +1 @@\n-a\n+b'}];
-function fakeApi(prData = pr) {
-  const raws = [];
-  return {raws,
+function fakeApi(prData = pr, blobs = {}) {
+  const raws = [], queries = [];
+  return {raws, queries,
     json: () => prData,
     list: () => files,
+    // Answers both GraphQL phases from `blobs` (path -> text); others are null.
+    graphql: async (query, variables) => {
+      queries.push({query, variables});
+      const repository = {};
+      for (const [key, value] of Object.entries(variables)) {
+        const text = blobs[value.slice(value.indexOf(':') + 1)];
+        if (/^e\d+$/.test(key) && text !== undefined) {
+          repository[`f${key.slice(1)}`] = {byteSize: Buffer.byteLength(text), isBinary: false,
+            text, isTruncated: false};
+        }
+      }
+      return {repository};
+    },
     raw: endpoint => {
       raws.push(endpoint);
       if (endpoint.includes('CHANGELOG.md')) return '## [v9.9] - date\n';
@@ -24,9 +37,9 @@ function fakeApi(prData = pr) {
     }};
 }
 
-test('second review builds the CI prompt from the base branch on GitHub, not the local tree', () => {
+test('second review builds the CI prompt from the base branch on GitHub, not the local tree', async () => {
   const api = fakeApi();
-  const c = collect(7, api);
+  const c = await collect(7, api);
   assert.ok(api.raws.length === 3 && api.raws.every(e => e.endsWith('?ref=development')));
   assert.match(c.prompt, /^BASE INSTRUCTIONS\n\n## Repository guide/);
   assert.match(c.prompt, /Latest released version in CHANGELOG.md: v9\.9/);
@@ -36,14 +49,14 @@ test('second review builds the CI prompt from the base branch on GitHub, not the
   assert.ok(!c.prompt.includes('Claude advisory review'));
 });
 
-test('second review refuses PRs that are closed, drafts or not into development', () => {
-  assert.throws(() => collect(7, fakeApi({...pr, state: 'closed'})), /not open/);
-  assert.throws(() => collect(7, fakeApi({...pr, draft: true})), /not open/);
-  assert.throws(() => collect(7, fakeApi({...pr, base: {ref: 'master', sha: pr.base.sha}})), /not open/);
-  assert.throws(() => collect(7, fakeApi({...pr, base: {ref: 'feature-x'}})), /not open/);
+test('second review refuses PRs that are closed, drafts or not into development', async () => {
+  await assert.rejects(collect(7, fakeApi({...pr, state: 'closed'})), /not open/);
+  await assert.rejects(collect(7, fakeApi({...pr, draft: true})), /not open/);
+  await assert.rejects(collect(7, fakeApi({...pr, base: {ref: 'master', sha: pr.base.sha}})), /not open/);
+  await assert.rejects(collect(7, fakeApi({...pr, base: {ref: 'feature-x'}})), /not open/);
 });
 
-test('second review is not posted if the PR changed in any way CI also checks', () => {
+test('second review is not posted if the PR changed in any way CI also checks', async () => {
   assert.equal(changed(pr, structuredClone(pr)), false);
   for (const now of [{...pr, state: 'closed'}, {...pr, draft: true},
     {...pr, head: {sha: 'e'.repeat(40)}}, {...pr, base: {...pr.base, ref: 'master'}},
@@ -53,7 +66,7 @@ test('second review is not posted if the PR changed in any way CI also checks', 
   // During collection too: a retarget between the two reads aborts.
   let reads = 0;
   const api = {...fakeApi(), json: () => (reads++ ? {...pr, base: {...pr.base, ref: 'master'}} : pr)};
-  assert.throws(() => collect(7, api), /changed during collection/);
+  await assert.rejects(collect(7, api), /changed during collection/);
 });
 
 test('second review report is validated, escaped and applies the path floor', () => {
@@ -81,7 +94,7 @@ test('Fable second review runs the CI analysis with separate system and untruste
     core.setOutput('conclusion', 'success');
     core.setOutput('telemetry', JSON.stringify({served_model: 'claude-fable-5-2'}));
   };
-  const c = collect(7, fakeApi());
+  const c = await collect(7, fakeApi());
   const result = await runFable(c, dir, {ANTHROPIC_API_KEY: 'k', OTHER: 'x'}, analyse);
   assert.equal(result, report);
   assert.equal(seen.env.CLAUDE_REVIEW_MODEL, 'claude-fable-5-2');
@@ -92,7 +105,7 @@ test('Fable second review runs the CI analysis with separate system and untruste
 
 test('Fable second review needs a key; analysis failure and any fallback model fail', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-fable-'));
-  const c = collect(7, fakeApi());
+  const c = await collect(7, fakeApi());
   await assert.rejects(runFable(c, dir, {}, async () => {}), /ANTHROPIC_API_KEY/);
   await assert.rejects(runFable(c, dir, {ANTHROPIC_API_KEY: 'k'}, async ({core}) => {
     core.setOutput('conclusion', 'failure');
@@ -132,4 +145,26 @@ test('a second review only ever raises the ai-risk label', () => {
   assert.equal(labelRaise(['ai-risk: medium'], 'MEDIUM'), null);
   assert.deepEqual(labelRaise(['ai-risk: low', 'ai-review: incomplete'], 'HIGH'),
     {remove: ['ai-risk: low'], add: 'ai-risk: high'});
+});
+
+test('second review gets the same full files as CI, read at the PR head through GraphQL', async () => {
+  const text = 'line one\nline two\n';
+  const api = fakeApi(pr, {[files[0].filename]: text});
+  const c = await collect(7, api);
+  assert.equal(api.queries.length, 2);
+  assert.deepEqual(Object.values(api.queries[0].variables).slice(0, 2), ['solids4foam', 'solids4foam']);
+  assert.equal(api.queries[0].variables.e0, `${pr.head.sha}:${files[0].filename}`);
+  assert.deepEqual(c.coverage.full_files, [files[0].filename]);
+  assert.ok(c.data.includes('1|line one\\n2|line two'));
+  const full = [{path: files[0].filename, reason: 'changed', text}];
+  assert.equal(c.prompt, buildPrompt(pr, files, endpoint => api.raw(`x/${endpoint}?ref=development`),
+    {fullFiles: full}).prompt);
+});
+
+test('a failed full-file fetch leaves a hunks-only second review that says so', async () => {
+  const api = {...fakeApi(), graphql: async () => { throw new Error('GraphQL down'); }};
+  const c = await collect(7, api);
+  assert.deepEqual(c.coverage.full_files, []);
+  assert.equal(c.coverage.full_files_failed, true);
+  assert.match(formatSecond(c, report), /Full files could not be fetched/);
 });

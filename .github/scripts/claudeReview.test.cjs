@@ -14,9 +14,12 @@ function fixture(filename = 'README.md', patch = '@@ -1 +1 @@\n-old\n+new') {
   const pr = {number: 42, head: {sha: 'a'.repeat(40)}, base: {sha: 'b'.repeat(40)},
     title: 'Change', body: 'Evidence', state: 'open', draft: false};
   const comments = [], existingComments = [], outputs = {}, failures = [], labels = [], warnings = [];
+  const graphqlCalls = [];
   const current = structuredClone(pr);
   const files = [{filename, patch, status: 'modified'}];
   const github = {
+    // Full-file fetches (#729): no blob found unless a test replaces this.
+    graphql: async (query, variables) => { graphqlCalls.push({query, variables}); return {repository: {}}; },
     rest: {pulls: {get: async () => ({data: current}), listFiles: {}},
       issues: {listComments: {}, listLabelsOnIssue: {}, createComment: async args => comments.push(args),
         updateComment: async args => comments.push(args),
@@ -30,7 +33,7 @@ function fixture(filename = 'README.md', patch = '@@ -1 +1 @@\n-old\n+new') {
   const core = {setOutput: (key, value) => {outputs[key] = String(value);},
     setFailed: value => failures.push(value), notice: () => {}, warning: value => warnings.push(value)};
   return {github, context, core, comments, outputs, failures, current, files, existingComments,
-    labels, warnings};
+    labels, warnings, graphqlCalls};
 }
 
 const finding = claim => ({kind: 'risk', severity: 'important', category: 'numerics',
@@ -795,4 +798,152 @@ test('labels are read fresh at update time, not from the earlier PR snapshot', a
   await publish(f, env());
   assert.equal(reads, 1);
   assert.deepEqual(f.labels, []);
+});
+
+// ---- Full post-change files (#729) ----
+const {fullFileBudget, maxFullFiles, fullFileCandidates, fetchFullFiles, numberLines} =
+  require('./claudeReview.cjs');
+// A GraphQL mock that answers both phases from `blobs` (path -> blob fields).
+function blobApi(sha, blobs, calls = []) {
+  return async (query, variables) => {
+    calls.push({query, variables});
+    const repository = {};
+    for (const [key, value] of Object.entries(variables)) {
+      const blob = /^e\d+$/.test(key) ? blobs[value.slice(sha.length + 1)] : undefined;
+      if (blob) repository[`f${key.slice(1)}`] = blob;
+    }
+    return {repository};
+  };
+}
+
+test('full-file candidates: sources first, then the matching header, then other text', () => {
+  const files = [
+    {filename: 'tutorials/case/system/controlDict', status: 'modified'},
+    {filename: 'README.md', status: 'modified'},
+    {filename: 'src/a/model.C', status: 'modified'},
+    {filename: 'src/a/other.C', status: 'modified'},
+    {filename: 'src/a/other.H', status: 'modified'},
+    {filename: 'src/a/gone.C', status: 'removed'},
+    {filename: 'applications/solvers/s/s.C', status: 'added'},
+    {filename: 'tutorials/case/0/U', status: 'modified'},
+    {filename: 'tutorials/case/constant/polyMesh/points', status: 'modified'},
+    {filename: 'tutorials/case/plot.png', status: 'added'},
+    {filename: 'tests/data.csv', status: 'modified'}];
+  assert.deepEqual(fullFileCandidates(files), [
+    {path: 'src/a/model.C', reason: 'changed'},
+    {path: 'src/a/other.C', reason: 'changed'},
+    {path: 'src/a/other.H', reason: 'changed'},
+    {path: 'applications/solvers/s/s.C', reason: 'changed'},
+    {path: 'src/a/model.H', reason: 'matching_header'},
+    {path: 'applications/solvers/s/s.H', reason: 'matching_header'},
+    {path: 'tutorials/case/system/controlDict', reason: 'changed'}]);
+  const many = Array.from({length: 80}, (_, i) => ({filename: `src/m${i}.H`, status: 'modified'}));
+  assert.equal(fullFileCandidates(many).length, maxFullFiles);
+});
+
+test('full files take two GraphQL requests and skip missing, binary, oversized and truncated blobs', async () => {
+  const sha = 'c'.repeat(40), calls = [];
+  const graphql = blobApi(sha, {
+    'src/a.C': {byteSize: 10, isBinary: false, text: 'a', isTruncated: false},
+    'src/bin.C': {byteSize: 10, isBinary: true, text: null, isTruncated: false},
+    'src/huge.C': {byteSize: fullFileBudget + 1, isBinary: false, text: 'h', isTruncated: false},
+    'src/cut.C': {byteSize: 10, isBinary: false, text: 'partial', isTruncated: true},
+    'src/b.H': {byteSize: fullFileBudget - 20, isBinary: false, text: 'b', isTruncated: false},
+    'src/late.H': {byteSize: 5, isBinary: false, text: 'late', isTruncated: false}}, calls);
+  const paths = ['src/a.C', 'src/missing.C', 'src/bin.C', 'src/huge.C', 'src/cut.C', 'src/b.H', 'src/late.H'];
+  const got = await fetchFullFiles(graphql, {owner: 'o', repo: 'r'}, sha,
+    paths.map(path => ({path, reason: 'changed'})));
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].query, /byteSize isBinary/);
+  assert.equal(calls[0].variables.e1, `${sha}:src/missing.C`);
+  // a.C, cut.C and b.H fill the budget exactly, so late.H is not requested.
+  assert.match(calls[1].query, /text isTruncated/);
+  assert.deepEqual(Object.values(calls[1].variables).slice(2),
+    [`${sha}:src/a.C`, `${sha}:src/cut.C`, `${sha}:src/b.H`]);
+  assert.deepEqual(got.map(file => [file.path, file.text]), [['src/a.C', 'a'], ['src/b.H', 'b']]);
+  assert.deepEqual(await fetchFullFiles(graphql, {owner: 'o', repo: 'r'}, sha, []), []);
+  assert.equal(calls.length, 2);
+});
+
+test('full-file lines are numbered so findings can cite them', () => {
+  assert.equal(numberLines('a\nb\n'), '1|a\n2|b');
+  assert.equal(numberLines('a\nb'), '1|a\n2|b');
+});
+
+test('patches come first; full files use only what is left, within their own budget', () => {
+  const f = fixture();
+  const full = n => Array.from({length: n}, (_, i) =>
+    ({path: `src/f${i}.C`, reason: 'changed', text: 'x'.repeat(30000)}));
+  const files = [{filename: 'src/a.C', patch: '@@ -1 +1 @@\n-a\n+b', status: 'modified'}];
+  const result = buildPrompt(f.current, files, undefined, {fullFiles: full(10)});
+  // About 30 KB each: six fit in the 200 KB full-file budget.
+  assert.equal(result.coverage.full_files.length, 6);
+  const data = JSON.parse(result.data.slice(result.data.indexOf('{')));
+  assert.deepEqual(Object.keys(data), ['title', 'body', 'files', 'not_reviewed', 'full_files']);
+  assert.equal(data.full_files[0].content.slice(0, 4), '1|xx');
+  // Patches that nearly fill the prompt leave no room, and are never dropped for full files.
+  const big = [{filename: 'src/big.C', patch: 'p'.repeat(promptBudget - 40000), status: 'modified'}];
+  const tight = buildPrompt(f.current, big, undefined, {fullFiles: full(3)});
+  assert.equal(tight.coverage.status, 'complete');
+  assert.deepEqual(tight.coverage.full_files, []);
+  assert.ok(Buffer.byteLength(JSON.stringify(tight.prompt)) <= promptBudget);
+});
+
+test('prepare reads full files at the collected head SHA and the report lists them', async () => {
+  const f = fixture('src/solids4FoamModels/numerics/op.C');
+  const sha = 'a'.repeat(40), blob = {byteSize: 4, isBinary: false, text: 'int\n', isTruncated: false};
+  f.github.graphql = blobApi(sha, {'src/solids4FoamModels/numerics/op.C': blob,
+    'src/solids4FoamModels/numerics/op.H': blob}, f.graphqlCalls);
+  await prepare(f);
+  assert.deepEqual(Object.values(f.graphqlCalls[0].variables),
+    ['example', 'test', `${sha}:src/solids4FoamModels/numerics/op.C`,
+      `${sha}:src/solids4FoamModels/numerics/op.H`]);
+  const coverage = JSON.parse(f.outputs.coverage);
+  assert.deepEqual(coverage.full_files,
+    ['src/solids4FoamModels/numerics/op.C', 'src/solids4FoamModels/numerics/op.H']);
+  assert.ok(input().data.includes('"reason":"matching_header","content":"1|int"'));
+  await publish(f, env({REVIEW_COVERAGE: f.outputs.coverage, RISK_FLOOR: f.outputs.risk_floor}));
+  assert.match(f.comments[0].body, /plus the full post-change text of the files listed below/);
+  assert.match(f.comments[0].body, /Seen in full:\n- src\/solids4FoamModels\/numerics\/op\\\.C\n/);
+});
+
+test('a failed full-file fetch keeps the review and says it saw hunks only', async () => {
+  const f = fixture('src/solids4FoamModels/numerics/op.C');
+  f.github.graphql = async () => { throw new Error('GraphQL down'); };
+  await prepare(f);
+  const coverage = JSON.parse(f.outputs.coverage);
+  assert.equal(coverage.full_files_failed, true);
+  assert.deepEqual(coverage.full_files, []);
+  await publish(f, env({REVIEW_COVERAGE: f.outputs.coverage, RISK_FLOOR: f.outputs.risk_floor}));
+  assert.match(f.comments[0].body, /supplied hunks only/);
+  assert.match(f.comments[0].body, /Full files could not be fetched/);
+  assert.equal(f.failures.length, 0);
+});
+
+test('a documentation-only PR makes no full-file request', async () => {
+  const f = fixture('README.md');
+  await prepare(f);
+  assert.equal(f.graphqlCalls.length, 0);
+  assert.deepEqual(JSON.parse(f.outputs.coverage), {status: 'complete', omitted: [], full_files: []});
+});
+
+test('a malformed full-file list fails closed', async () => {
+  const f = fixture('src/solidModels/solver.C');
+  await publish(f, env({REVIEW_COVERAGE: JSON.stringify({status: 'complete', omitted: [],
+    full_files: 'src/x.C'})}));
+  assert.match(f.comments[0].body, /INCOMPLETE/);
+});
+
+test('a schema-maximum report with long not-reviewed and full-file lists still fits', async () => {
+  const f = fixture('src/solidModels/solver.C');
+  const path = i => `src/case${i}/` + '&'.repeat(150);
+  await publish(f, env({REVIEW_JSON: JSON.stringify(maxReport('&')), RISK_FLOOR: 'HIGH',
+    REVIEW_COVERAGE: JSON.stringify({status: 'partial',
+      omitted: Array.from({length: 80}, (_, i) => ({path: path(i), reason: 'budget'})),
+      full_files: Array.from({length: maxFullFiles}, (_, i) => path(i + 100))})}));
+  const body = f.comments[0].body;
+  assert.equal(f.failures.length, 0);
+  assert.ok(body.length <= commentLimit + 100);
+  assert.equal(body.match(/  - Claim: /g).length, limits.findings);
+  assert.match(body, /Seen in full:/);
 });

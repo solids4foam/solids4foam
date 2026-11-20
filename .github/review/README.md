@@ -277,8 +277,21 @@ patches (binary, empty files, renames) and budget-excluded files are listed as
 not reviewed in the prompt and report. Their paths still contribute to the risk
 floor.
 
+After the patches, the collector adds the full post-change text of changed
+files (#729), so the model can judge a change against the rest of its function,
+its header and nearby code. The files are read at the PR head SHA through two
+GraphQL requests (sizes, then text), as data; the PR is still never checked out
+or run. Order: C/C++ sources and headers under `src/` and `applications/`, then
+the unchanged `.H` matching a changed `.C`, then other changed text files.
+Documentation, tutorial mesh/field/CSV data, binaries and removed files are
+skipped. Full files have their own 200 KB budget (about 80k tokens, USD 0.35)
+inside the 600 KB prompt budget, and patches always come first, so a large PR
+keeps patch-only coverage. Each line is numbered so findings can cite it. The
+report lists the files seen in full. If the fetch fails, the review continues
+on hunks only and the report says so.
+
 A successful assessment can have COMPLETE or PARTIAL **patch** coverage. Neither
-means the surrounding source, linked plots, CI logs, or numerical cases were
+means other source files, linked plots, CI logs, or numerical cases were
 independently inspected. Partial coverage alone does not fail the job. No
 reviewable patches, an incomplete file listing (3000 or more files), oversized
 metadata, collection/API errors, timeouts, or invalid model output produce an

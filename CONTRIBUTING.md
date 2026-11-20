@@ -128,9 +128,10 @@ Claude reports keep that higher risk. Labels are never lowered by a second
 review.
 
 The reviews see the changed lines with three lines of context each, as in the
-GitHub diff, not whole files. Unchanged code next to a change, such as the
-other half of an edited function, is not reviewed. Human reviewers and private
-agents with a full checkout cover that.
+GitHub diff. When there is room, they also see the full post-change text of
+changed source files and the header of each changed `.C` file; the report lists
+these files. Other files, such as callers elsewhere in the code, are not
+reviewed. Human reviewers and private agents with a full checkout cover that.
 
 ### 2. Merge rules
 
