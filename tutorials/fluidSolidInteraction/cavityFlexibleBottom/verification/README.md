@@ -125,6 +125,50 @@ tutorial README between the solids4foam prediction and the published
 displacement at the coarsest spacing, and it is why the displacement tolerance
 is looser than the force tolerance.
 
+The table above was recorded before the change below, and with the default
+coupling test.
+
+## Continuity-flux interpolation
+
+The fluid `fvSchemes` sets `flux(HbyA) skewCorrected linear`. This is the
+interpolation of the continuity flux in the pressure equation. Without the
+entry it falls back to `default linear`, with no skew correction. The existing
+`interpolate(U)` entry does not cover this flux.
+
+The plate deforms the fluid mesh strongly at its ends. There, the uncorrected
+interpolation error converges slowly. A four-level study then extrapolates to
+an interface force 0.054% from two other solutions that agree with each other.
+That gap lies outside the study's own grid convergence index (GCI, safety
+factor 1.25) of 0.019%. The two solutions are:
+
+- SU2 with CalculiX: -0.240559 m and -5.257784 N;
+- FEniCSx: -0.240544 m and -5.257801 N.
+
+Both are available in the `paper-data/cavity_su2_calculix` and
+`paper-data/fenicsx_cavityflexiblebottom` directories of
+https://github.com/philipcardiff/paper-fsi-verification.
+
+With skew correction, the limits agree with them:
+
+| Level | ΔX (m) | ΔT (s) | uy (m), linear | uy (m), skew-corrected | Fy (N), linear | Fy (N), skew-corrected |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 | 0.05 | 0.25 | -0.231482 | -0.231268 | -5.239862 | -5.233332 |
+| 3 | 0.025 | 0.125 | -0.238403 | -0.238225 | -5.256547 | -5.251155 |
+| 4 | 0.0125 | 0.0625 | -0.240111 | -0.239986 | -5.2598 | -5.256073 |
+| Richardson limit, levels 2–4 | | | -0.240671 | -0.240583 | -5.260619 | -5.257947 |
+| Observed order | | | 2.02 | 1.98 | 2.33 | 1.86 |
+
+How the study was run:
+
+- Aitken coupling with `requireAllResidualMeasures yes`, end time 200 s.
+- Level 4 used `nOuterCorr 40` and fluid linear-solver tolerances of 1e-8.
+  With the defaults, the strict coupling test fails at t ≈ 56 s.
+- The linear level-4 values are from the same set-up; the linear level-4 Fy
+  is available only to four decimals.
+
+The change moves the level-1 tutorial result by 0.13% in uy and by 0.15% in Fy,
+well inside the regression-test tolerances.
+
 ## References
 
 Ž. Tuković, A. Karač, P. Cardiff, H. Jasak, A. Ivanković, OpenFOAM finite

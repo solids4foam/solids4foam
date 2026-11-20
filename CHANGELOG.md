@@ -788,6 +788,12 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `cavityFlexibleBottom`: the fluid continuity flux, `flux(HbyA)`, is now
+  skew-corrected. It fell back to `default linear`, and on the strongly
+  deformed mesh at the plate ends its slowly converging error put the
+  extrapolated interface force 0.054% from independent solutions (SU2 with
+  CalculiX, FEniCSx); with skew correction they agree to 0.003%. Other
+  partitioned FSI cases on strongly deformed meshes may need the same entry.
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual
