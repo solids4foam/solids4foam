@@ -2,7 +2,7 @@
 sort: 7
 ---
 
-# Heart Tissue Beam: `heartTissueBeam`
+# Heart Tissue Beam: `LandEtAl2015/problem1`
 
 ---
 
@@ -91,8 +91,8 @@ for sufficiently small time-step sizes.
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/solids/hyperelasticity/heartTissueBeam`. The case can
-be run using the included `Allrun` script:
+`solids4foam/tutorials/solids/hyperelasticity/LandEtAl2015/problem1`. The
+case can be run using the included `Allrun` script:
 
 ```bash
 ./Allrun
