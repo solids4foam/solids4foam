@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import difflib
 import json
 import math
 import os
@@ -1476,6 +1477,13 @@ def build_meshes(case: Path, spec: dict, cores: int) -> dict:
     run(["blockMesh", "-region", "solid"], case, "log.blockMesh")
     if spec.get("solidranks"):
         write_solid_decomposition(case, spec, cores)
+    return mesh_metrics(case, spec, timings, octree)
+
+
+def mesh_metrics(case: Path, spec: dict, timings: dict,
+                 octree: dict | None) -> dict:
+    """checkMesh metrics and patch sizes of the case's undeformed meshes."""
+    rf = spec["fluid"] in RF_LEVELS
     run(["checkMesh", "-region", "fluid"], case, "log.checkMesh.fluid")
     run(["checkMesh", "-region", "solid"], case, "log.checkMesh.solid")
     metrics = {
@@ -1952,9 +1960,132 @@ def count_max_iterations(case: Path, spec: dict) -> int:
     return sum(1 for value in counts.values() if value >= limit)
 
 
+# ---------------------------------------------------------------------------
+# Import of a finished case run outside the driver
+# ---------------------------------------------------------------------------
+
+def normalised_dictionary(path: Path) -> str:
+    """Dictionary text without comments and with collapsed white space."""
+    text = path.read_text(errors="replace")
+    text = re.sub(r"/\*.*?\*/", " ", text, flags=re.DOTALL)
+    text = re.sub(r"//[^\n]*", " ", text)
+    return " ".join(text.split())
+
+
+def input_files(case: Path) -> dict[str, Path]:
+    """The input dictionaries of a case (0, constant, system), not meshes."""
+    files = {}
+    for directory in ("0", "constant", "system"):
+        for path in (case / directory).rglob("*"):
+            relative = path.relative_to(case)
+            if {"polyMesh", "triSurface"} & set(relative.parts) \
+                    or path.name.endswith(".withDefaultValues"):
+                # Meshes and the solver's own record of its defaults
+                continue
+            if path.is_file():
+                files[str(relative)] = path
+    return files
+
+
+def compare_inputs(driver_case: Path, source: Path, report: Path,
+                   level: str) -> dict:
+    """Differences between the driver's inputs and those of an import."""
+    ours, theirs = input_files(driver_case), input_files(source)
+    # The driver links system/meshDict to the level's dictionary when it
+    # builds the mesh
+    mesh_dict = ours.get(f"system/meshDict.{level}")
+    if mesh_dict and "system/meshDict" in theirs:
+        ours["system/meshDict"] = mesh_dict
+    differing = []
+    lines = []
+    for name in sorted(set(ours) & set(theirs)):
+        if normalised_dictionary(ours[name]) == normalised_dictionary(
+                theirs[name]):
+            continue
+        differing.append(name)
+        lines.extend(difflib.unified_diff(
+            ours[name].read_text(errors="replace").splitlines(),
+            theirs[name].read_text(errors="replace").splitlines(),
+            f"driver/{name}", f"imported/{name}", lineterm=""))
+    report.write_text("\n".join(lines) + "\n")
+    return {"differing": differing,
+            "only_driver": sorted(set(ours) - set(theirs)),
+            "only_imported": sorted(set(theirs) - set(ours))}
+
+
+def import_run(args: argparse.Namespace) -> bool:
+    """Evaluate a finished case that was run outside the driver.
+
+    The case must have run the spec to its end time from t = 0 with the
+    driver's monitors. The driver writes its own case of the spec and
+    records every input dictionary that differs from the imported one
+    (import_differences.diff); the imported case is copied, with only the
+    final time of the processor directories, and evaluated as a run of
+    the driver. The original case is not modified.
+    """
+    if not args.spec:
+        fail("--import-case needs --spec")
+    spec = parse_spec(args.spec)
+    name = spec_name(spec)
+    source = Path(args.import_case).resolve()
+    vmod.check_solver_log(source, str(source))
+    processors = sorted(source.glob("processor[0-9]*"))
+    cores = len(processors) or 1
+    time_name = vmod.latest_time(source, cores)
+    if not math.isclose(float(time_name), spec["T"], rel_tol=1e-9):
+        fail(f"{source} ends at t = {time_name}, not at T = {spec['T']:g}")
+
+    # The driver's own case of the spec, for the comparison of the inputs
+    driver_case, info = prepare_run(spec, cores, name)
+    reference = WORK_ROOT / f"{name}.driver"
+    if reference.exists():
+        shutil.rmtree(reference)
+    shutil.move(str(driver_case), str(reference))
+    case = WORK_ROOT / name
+    print(f"Copying {source} to {case}", flush=True)
+    shutil.copytree(source, case, symlinks=True,
+                    ignore=shutil.ignore_patterns("processor*"))
+    for processor in processors:
+        for entry in ("constant", time_name):
+            shutil.copytree(processor / entry,
+                            case / processor.name / entry, symlinks=True)
+    differences = compare_inputs(reference, case,
+                                 case / "import_differences.diff",
+                                 spec["fluid"])
+    shutil.rmtree(reference)
+    for key, label in (("differing", "differ from the driver's"),
+                       ("only_driver", "are missing"),
+                       ("only_imported", "are not written by the driver")):
+        if differences[key]:
+            print(f"{name}: these inputs {label}: "
+                  f"{', '.join(differences[key])}", flush=True)
+
+    meshes = mesh_metrics(case, spec, {}, None)
+    build = re.search(r"^Build\s*:\s*(.*)$",
+                      (case / "log.solids4Foam").read_text(errors="replace"),
+                      re.MULTILINE)
+    settings = {"study": "import", "spec": spec, "cores": cores,
+                "driver": vmod.hashlib.sha256(SCRIPT.read_bytes()).hexdigest(),
+                "tutorial_inputs": vmod.tutorial_fingerprint(),
+                "source": str(source),
+                "source_build": build.group(1).strip() if build else "",
+                "note": args.import_note or "",
+                "input_differences": differences}
+    (case / SETTINGS_FILE).write_text(json.dumps(settings, indent=2) + "\n")
+    result = evaluate_run(case, spec, cores, info, meshes)
+    result["settings"] = settings
+    RUNS_ROOT.mkdir(parents=True, exist_ok=True)
+    (RUNS_ROOT / f"{name}.json").write_text(json.dumps(result, indent=1)
+                                            + "\n")
+    print(json.dumps(result["qoi"], indent=1))
+    return True
+
+
 def run_coupled(args: argparse.Namespace) -> bool:
     if not args.spec:
         fail("--study run needs --spec")
+    if args.import_case:
+        return import_run(args)
     spec = parse_spec(args.spec)
     if args.quick:
         spec["T"] = 0.02
@@ -2417,6 +2548,12 @@ def main() -> int:
                              "shorter T) to the end time of --spec")
     parser.add_argument("--restart", action="store_true",
                         help="run: continue an interrupted run")
+    parser.add_argument("--import-case",
+                        help="run: evaluate this finished case, run outside "
+                             "the driver, as the run of --spec")
+    parser.add_argument("--import-note",
+                        help="run: a note on the imported case's build, "
+                             "stored with its result")
     parser.add_argument("--work", help="work directory holding the runs "
                         "(default verification/work)")
     args = parser.parse_args()
