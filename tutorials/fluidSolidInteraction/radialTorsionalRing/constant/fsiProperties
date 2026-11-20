@@ -1,3 +1,12 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
@@ -5,6 +14,8 @@ FoamFile
     class       dictionary;
     object      fsiProperties;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 fluidSolidInterface    IQNILS;
 IQNILSCoeffs
 {
@@ -14,10 +25,10 @@ IQNILSCoeffs
     predictSolid         yes;
     relaxationFactor     0.05;
     outerCorrTolerance   1e-06;
-    // absolute interface point-mismatch tolerance [m]: the C-inf ramp starts with signals at
-    // round-off level, where the relative residual (normalised by the largest residual seen so
-    // far) cannot reach 1e-6 (pilot R1 attempt 1 stalled at t = 0.035 s); 1e-12 m is 1e-11 of the
-    // expected interface displacement
+    // Absolute interface point-mismatch tolerance (m). The C-inf ramp starts
+    // with signals at round-off level, where the relative residual cannot
+    // reach outerCorrTolerance; 1e-12 m is 1e-11 of the expected interface
+    // displacement
     outerCorrAbsoluteTolerance 1e-12;
     nOuterCorr           100;
     couplingReuse        5;
@@ -25,3 +36,5 @@ IQNILSCoeffs
     interfaceTransferMethod directMap;
     writeResidualsToFile yes;
 }
+
+// ************************************************************************* //

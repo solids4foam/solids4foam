@@ -10,24 +10,22 @@ REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 # radialTorsionalRing FSI regression test
 # ============================================================
 
-# Shortened regression horizon: 120 time-steps of the M1 mesh, combined
-# drive (radial and torsional), serial. Only the start of the drive is run, so
-# this is a check that the tutorial launches and reproduces the same discrete
-# solution, not a verification of the benchmark (see verification/README.md).
+# Shortened regression horizon: the first 120 time steps of the stored case
+# (M1 mesh, combined drive, serial). This checks that the tutorial runs and
+# reproduces the same discrete solution; it is not a verification of the
+# benchmark (see verification/README.md).
 REG_END_TIME=0.3
 
-# Regression tolerances. The interface radial displacement u_B at t = 0.3 s is
-# 1.0928e-3 m in the solver and 1.1008e-3 m in the semi-analytical reference
-# (an M1-mesh difference of 0.7%, 8.0e-6 m). The value reproduces the
-# accepted M1 combined run of the study to round-off.
+# Regression tolerances. At t = 0.3 s the interface radial displacement u_B is
+# 1.0935e-3 m in the solver and 1.1008e-3 m in the semi-analytical reference,
+# an M1 difference of 7.3e-6 m (0.7%).
 EXACT_TOL=3e-5          # |u_B - u_B(semi-analytical reference)| (m)
 DISP_TOL=1e-7           # |u_B - u_B(regression reference)| (m)
 ALPHA_TOL=2e-8          # |alpha_B - alpha_B(regression reference)| (rad)
 
-# Reference values at REG_END_TIME (OpenFOAM-v2512, M1, combined,
-# nNonOrthogonalCorrectors 2, 1 rank)
-REF_U_B=0.001092801156254323
-REF_ALPHA_B=-1.218218794956131e-05
+# Reference values at REG_END_TIME (OpenFOAM-v2512, 1 rank)
+REF_U_B=0.001093495396680078
+REF_ALPHA_B=-1.218234725512528e-05
 
 ALLRUN_LOGFILE="log.Allrun"
 DIAG_FILE="rtDiagSolid.dat"
@@ -52,14 +50,13 @@ prepare_case() {
         if [[ "${base_item}" == "regressionTests" ]]; then
             continue
         fi
-        if [[ "${base_item}" == "verification" ]]; then
-            # only the generator and analysis scripts, not any study cases
-            mkdir -p "${case_dir}/verification"
-            cp -a "${item}/scripts" "${case_dir}/verification/"
-            continue
-        fi
         cp -a "${item}" "${case_dir}/"
     done
+    rm -rf "${case_dir}/verification/work"
+
+    sed -i.orig "s/^endTime .*/endTime         ${REG_END_TIME};/" \
+        "${case_dir}/system/controlDict"
+    rm -f "${case_dir}/system/controlDict.orig"
 }
 
 abs() {
@@ -73,7 +70,7 @@ prepare_case "${case_dir}"
 (
     cd "${case_dir}"
     ./Allclean > /dev/null 2>&1 || true
-    ./Allrun M1 combined serial "endTime=${REG_END_TIME}" > "${ALLRUN_LOGFILE}" 2>&1
+    ./Allrun > "${ALLRUN_LOGFILE}" 2>&1
 )
 
 # A skip is only valid if the tutorial declared one in the Allrun log
@@ -97,22 +94,13 @@ if [[ ! -f "${diag_file}" ]]; then
     exit 1
 fi
 
-# Last row of rtDiagSolid.dat: time, u_B (column 3), alpha_B (column 4); the
-# semi-analytical reference at the same time and face radius
-IFS=" " read -r end_time ur alpha < <(awk 'NF >= 4 { t=$1; u=$3; a=$4 } END { print t, u, a }' "${diag_file}")
+# Last row of rtDiagSolid.dat: time, u_B (column 3), alpha_B (column 4)
+IFS=" " read -r end_time ur alpha \
+    < <(awk 'NF >= 4 { t=$1; u=$3; a=$4 } END { print t, u, a }' "${diag_file}")
 if ! awk "BEGIN {exit !(${end_time} + 1e-9 >= ${REG_END_TIME})}"; then
     echo "FAIL: the diagnostics stop at t = ${end_time}, short of ${REG_END_TIME}"
     exit 1
 fi
-ref_ur=$(python3 -B -I -c "
-import json, sys
-r = json.load(open('${case_dir}/reference.json'))
-i = min(range(len(r['t'])), key=lambda k: abs(r['t'][k] - ${end_time}))
-print('%.12g' % r['u_Rf'][i])")
-
-exact_diff=$(abs "$(awk "BEGIN {print ${ur} - ${ref_ur}}")")
-ref_diff=$(abs "$(awk "BEGIN {print ${ur} - ${REF_U_B}}")")
-alpha_diff=$(abs "$(awk "BEGIN {print ${alpha} - (${REF_ALPHA_B})}")")
 
 check() {
     # name, difference, tolerance
@@ -125,19 +113,31 @@ check() {
 }
 
 printf "t = %s, u_B = %.10g m, alpha_B = %.6g rad\n" "${end_time}" "${ur}" "${alpha}"
-check "u_B against the semi-analytical reference" "${exact_diff}" "${EXACT_TOL}"
+
+# The semi-analytical reference is written by Allrun only where python3 with
+# numpy and scipy is available
+reference="${case_dir}/reference.json"
+if [[ -f "${reference}" ]]; then
+    ref_ur=$(python3 -B -I -c "
+import json
+r = json.load(open('${reference}'))
+i = min(range(len(r['t'])), key=lambda k: abs(r['t'][k] - ${end_time}))
+print('%.12g' % r['u_Rf'][i])")
+    exact_diff=$(abs "$(awk "BEGIN {print ${ur} - ${ref_ur}}")")
+    check "u_B against the semi-analytical reference" "${exact_diff}" "${EXACT_TOL}"
+else
+    echo "SKIPPED: u_B against the semi-analytical reference (no reference.json:"
+    echo "         python3 with numpy and scipy is not available)"
+fi
+
+ref_diff=$(abs "$(awk "BEGIN {print ${ur} - ${REF_U_B}}")")
+alpha_diff=$(abs "$(awk "BEGIN {print ${alpha} - (${REF_ALPHA_B})}")")
 check "u_B against the regression reference" "${ref_diff}" "${DISP_TOL}"
 check "alpha_B against the regression reference" "${alpha_diff}" "${ALPHA_TOL}"
 echo
 
-if (( failures == 0 )); then
-    echo "============================================================"
-    echo "Regression test PASSED"
-    echo "============================================================"
-    exit 0
-else
-    echo "============================================================"
-    echo "Regression test FAILED (${failures} checks)"
-    echo "============================================================"
+if [[ ${failures} -ne 0 ]]; then
+    echo "FAIL: ${failures} check(s) failed"
     exit 1
 fi
+echo "PASS: all radialTorsionalRing regression checks passed"

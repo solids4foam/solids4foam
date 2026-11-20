@@ -16,12 +16,8 @@ elif [[ $WM_PROJECT_VERSION == v* ]]; then
 fi
 
 rm -rf case.foam residuals postProcessing dynamicCode processor* \
-    rtDiagFluid.dat rtDiagSolid.dat analysis.json series.csv caseSetup.json \
-    reference.json verification/scripts/__pycache__
-
-# Restore the stored M1, combined, 4-rank dictionaries
-python3 -B -I verification/scripts/makeCase.py . --mesh M1 --config combined \
-    --no-reference > /dev/null 2>&1 && rm -f caseSetup.json
+    rtDiagFluid.dat rtDiagSolid.dat analysis.json series.csv \
+    reference.json caseSetup.json verification/scripts/__pycache__
 
 # Restore the stored case format
 solids4Foam::restoreCaseFormat .

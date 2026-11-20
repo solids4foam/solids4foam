@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""QoI extraction, reference errors, conservation diagnostics and coupling statistics
+"""QoI extraction, reference errors and conservation diagnostics
 for one radialTorsionalRing case (portable: uses only the case directory).
 
 Usage: analyse_case.py CASE_DIR        (writes CASE_DIR/analysis.json and CASE_DIR/series.csv)
 
-Inputs (case dir): rtDiagFluid.dat, rtDiagSolid.dat, reference.json, log.solids4Foam.
+Inputs (case dir): rtDiagFluid.dat, rtDiagSolid.dat, reference.json.
 All extensive quantities are converted to per radian, per unit depth (divide by 2 pi dz).
 Errors: E = max_t |num - ref| / max_t |ref| over t > 2 dt (max-norm, same convention as the
 study). Conservation-balance residuals are also reported per time window.
@@ -20,7 +20,6 @@ _sys.dont_write_bytecode = True
 import json
 import math
 import os
-import re
 import sys
 
 import numpy as np
@@ -64,34 +63,6 @@ def load(C, dz=0.1):
     return t, num, refq, ref
 
 
-def coupling_stats(C):
-    """Outer coupling iterations and the criterion that accepted each step (raw log, same definition as
-    acceptance.py / verify.py: the criterion of the LAST iteration of the step).
-
-    The solver accepts a step when min(residual1, residual2) <= outerCorrTolerance (legacy minimum test,
-    requireAllResidualMeasures unset) or when the absolute point mismatch is below outerCorrAbsoluteTolerance. With
-    allowUnconvergedCoupling unset an unconverged step aborts the run (FOAM FATAL ERROR). The audits' printed-line
-    counts of absolute acceptances (76 and 83 for M1 and M2 torsion) include the solid-predictor evaluation before
-    iteration 1 and therefore differ from the counts here (68 and 70)."""
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import acceptance as ACC
-    thr = dict(layerA={"p_final_residual_max": {"value": 1e-12}, "U_final_residual_max": {"value": 1e-13},
-                       "final_residual_slack": {"value": 1e-6}, "outerCorrTolerance_default": {"value": 1e-6},
-                       "nOuterCorr_default": {"value": 100}})
-    cfg = ACC.case_settings(C, thr)
-    rec = ACC.parse_log(os.path.join(C, "log.solids4Foam"), thr, cfg)
-    cnt = {"both": 0, "r1-only": 0, "r2-only": 0, "absolute": 0, "none": 0}
-    its = []
-    for st in rec["steps"]:
-        c, _ = ACC.classify_step(st, cfg["tol"], cfg["absTol"])
-        cnt[c] += 1
-        its.append(len(st["trip"]) - 1 if st["trip"] else 0)
-    its = np.array(its)
-    return dict(steps=int(its.size), outer_iters_mean=float(its.mean()), outer_iters_max=int(its.max()),
-                criterion_counts=cnt, steps_accepted_by_absolute_tol=cnt["absolute"],
-                steps_passed_by_single_measure_only=cnt["r1-only"] + cnt["r2-only"])
-
-
 def main():
     C = sys.argv[1]
     t, num, refq, ref = load(C)
@@ -116,11 +87,7 @@ def main():
         out["wall_torque_vs_AM_balance_rel"] = float(np.max(np.abs(num["T_B"][sel] - num["T_bal"][sel])) / Tsc)
     E = np.max(np.abs(refq["KE_f"])) + np.max(np.abs(refq["KE_s"])) + np.max(np.abs(refq["W_s"]))
     out["fluid_energy_residual_max_rel_to_power"] = float(np.max(np.abs(num["res_Ef"][sel])) / max(np.max(np.abs(refq["P_wall"])), 1e-300))
-    out["notes"] = {"sig_nv": "sig_nv (viscous normal wall stress) differs from the reference by O(1) (about 0.7 of the reference): the CFD transmits about 0.29-0.32 of the reference value "
-                              "(ratio 0.286, 0.307, 0.317 on M1, M2, M3 combined), without mesh convergence. It is a documented discrepancy, not an error of this script; "
-                              "it is excluded from every order claim (see README).",
-                    "torque_units": "T_B, T_A, T_c, H_f, H_s are per radian and per metre of depth (rtDiag value / (2 pi dz)); multiply by 2 pi for the whole annulus per metre of depth"}
-    out["coupling"] = coupling_stats(C)
+    out["notes"] = {"torque_units": "T_B, T_A, T_c, H_f, H_s are per radian and per metre of depth (rtDiag value / (2 pi dz)); multiply by 2 pi for the whole annulus per metre of depth"}
     # momentum / energy balance windows (relative to the reference torque / interface power in the window)
     dt0 = float(t[1] - t[0])
     win = {}

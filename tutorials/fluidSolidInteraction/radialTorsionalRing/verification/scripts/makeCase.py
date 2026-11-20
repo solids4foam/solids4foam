@@ -40,20 +40,35 @@ CONFIGS = {"torsion": (0.1, 0.0), "radial": (0.0, -3000.0), "combined": (0.1, -3
 ABSTOL = {"M1": 1e-12, "M2": 1e-12, "M3": 1e-10}
 
 
-HEADER = """FoamFile
+HEADER = r"""/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
 {{
     version     2.0;
     format      ascii;
     class       {cls};
     object      {obj};
 }}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+"""
+
+FOOTER = """
+// ************************************************************************* //
 """
 
 
 def w(path, cls, obj, body):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as fh:
-        fh.write(HEADER.format(cls=cls, obj=obj) + body)
+        fh.write(HEADER.format(cls=cls, obj=obj) + body + FOOTER)
 
 
 def block_mesh(p, nth, nr, dz=0.1):
@@ -149,12 +164,16 @@ FLUID_DIAG = r'''
             const fvMesh& m = refCast<const fvMesh>(obr_);
             const volVectorField& U = m.lookupObject<volVectorField>("U");
             const volScalarField& p = m.lookupObject<volScalarField>("p");
-            const surfaceScalarField& phi = m.lookupObject<surfaceScalarField>("phi");
+            const surfaceScalarField& phi =
+                m.lookupObject<surfaceScalarField>("phi");
             const volTensorField gradU(fvc::grad(U));
             const label iI = m.boundaryMesh().findPatchID("interface");
             const label iO = m.boundaryMesh().findPatchID("outer");
-            // in-plane unit vectors from the x,y components of the face centre
-            scalar A = 0, Rm = 0, pm = 0, srr = 0, snv = 0, srt = 0, Tq = 0, Pw = 0, wB = 0, ubn = 0;
+
+            // Interface traction, torque, power and wall velocity; in-plane
+            // unit vectors from the x and y components of the face centre
+            scalar A = 0, Rm = 0, pm = 0, srr = 0, snv = 0;
+            scalar srt = 0, Tq = 0, Pw = 0, wB = 0, ubn = 0;
             {
                 const vectorField& Sf = m.Sf().boundaryField()[iI];
                 const scalarField& mS = m.magSf().boundaryField()[iI];
@@ -167,7 +186,8 @@ FLUID_DIAG = r'''
                     const symmTensor dRR(-rho*nu*dev(twoSymm(gb[i])));
                     const vector fP(rho*Sf[i]*pb[i]);
                     const vector fV(Sf[i] & dRR);
-                    const scalar rxy = Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y()));
+                    const scalar rxy =
+                        Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y()));
                     const vector er(Cf[i].x()/rxy, Cf[i].y()/rxy, 0);
                     const vector et(-er.y(), er.x(), 0);
                     A += mS[i];
@@ -182,6 +202,8 @@ FLUID_DIAG = r'''
                     ubn += (er & Ub[i])*mS[i];
                 }
             }
+
+            // Fluid angular momentum, kinetic energy and dissipation
             scalar Hf = 0, KEf = 0, Df = 0;
             forAll(U, c)
             {
@@ -191,6 +213,9 @@ FLUID_DIAG = r'''
                 const symmTensor Dc(symm(gradU[c]));
                 Df += 2.0*rho*nu*(Dc && Dc)*m.V()[c];
             }
+
+            // Outer boundary: angular-momentum flux, viscous torque, flow
+            // rate, and power in minus the kinetic energy convected out
             scalar Fc = 0, Tc = 0, Qo = 0, Pc = 0;
             {
                 const vectorField& Sf = m.Sf().boundaryField()[iO];
@@ -202,27 +227,52 @@ FLUID_DIAG = r'''
                 forAll(Cf, i)
                 {
                     const symmTensor dRR(-rho*nu*dev(twoSymm(gb[i])));
-                    const vector fOn(-rho*pb[i]*Sf[i] - (Sf[i] & dRR));   // force by exterior on fluid
+
+                    // Force of the exterior on the fluid
+                    const vector fOn(-rho*pb[i]*Sf[i] - (Sf[i] & dRR));
+
                     Fc += rho*((Cf[i] ^ Ub[i]).z())*ph[i];
                     Tc += (Cf[i] ^ (-(Sf[i] & dRR))).z();
                     Qo += ph[i];
-                    Pc += (fOn & Ub[i]) - 0.5*rho*magSqr(Ub[i])*ph[i];   // power in, minus KE convected out
+                    Pc += (fOn & Ub[i]) - 0.5*rho*magSqr(Ub[i])*ph[i];
                 }
             }
-            // parallel: global sums (serial: no-op)
-            reduce(A, sumOp<scalar>()); reduce(Rm, sumOp<scalar>()); reduce(pm, sumOp<scalar>());
-            reduce(srr, sumOp<scalar>()); reduce(snv, sumOp<scalar>()); reduce(srt, sumOp<scalar>());
-            reduce(Tq, sumOp<scalar>()); reduce(Pw, sumOp<scalar>()); reduce(wB, sumOp<scalar>());
-            reduce(ubn, sumOp<scalar>()); reduce(Hf, sumOp<scalar>()); reduce(KEf, sumOp<scalar>());
-            reduce(Df, sumOp<scalar>()); reduce(Fc, sumOp<scalar>()); reduce(Tc, sumOp<scalar>());
-            reduce(Qo, sumOp<scalar>()); reduce(Pc, sumOp<scalar>());
-            if (!Pstream::master()) return true;
-            std::ofstream os((m.time().globalPath()/"rtDiagFluid.dat").c_str(), std::ios::app);
+
+            // Global sums (no-op in serial)
+            reduce(A, sumOp<scalar>());
+            reduce(Rm, sumOp<scalar>());
+            reduce(pm, sumOp<scalar>());
+            reduce(srr, sumOp<scalar>());
+            reduce(snv, sumOp<scalar>());
+            reduce(srt, sumOp<scalar>());
+            reduce(Tq, sumOp<scalar>());
+            reduce(Pw, sumOp<scalar>());
+            reduce(wB, sumOp<scalar>());
+            reduce(ubn, sumOp<scalar>());
+            reduce(Hf, sumOp<scalar>());
+            reduce(KEf, sumOp<scalar>());
+            reduce(Df, sumOp<scalar>());
+            reduce(Fc, sumOp<scalar>());
+            reduce(Tc, sumOp<scalar>());
+            reduce(Qo, sumOp<scalar>());
+            reduce(Pc, sumOp<scalar>());
+
+            if (!Pstream::master())
+            {
+                return true;
+            }
+
+            std::ofstream os
+            (
+                (m.time().globalPath()/"rtDiagFluid.dat").c_str(),
+                std::ios::app
+            );
             os.precision(16);
-            os << m.time().value() << ' ' << A << ' ' << Rm/A << ' ' << pm/A << ' ' << srr/A << ' '
-               << snv/A << ' ' << srt/A << ' ' << Tq << ' ' << Pw << ' ' << Hf << ' ' << KEf << ' '
-               << Df << ' ' << Fc << ' ' << Tc << ' ' << Qo << ' ' << Pc << ' ' << wB/A << ' ' << ubn/A
-               << std::endl;
+            os  << m.time().value() << ' ' << A << ' ' << Rm/A << ' ' << pm/A
+                << ' ' << srr/A << ' ' << snv/A << ' ' << srt/A << ' ' << Tq
+                << ' ' << Pw << ' ' << Hf << ' ' << KEf << ' ' << Df
+                << ' ' << Fc << ' ' << Tc << ' ' << Qo << ' ' << Pc
+                << ' ' << wB/A << ' ' << ubn/A << std::endl;
         #};
     }
 '''
@@ -252,9 +302,12 @@ SOLID_DIAG = r'''
             const volVectorField& D0 = D.oldTime();
             const volVectorField& D00 = D.oldTime().oldTime();
             const volTensorField gD(fvc::grad(D));
-            // interface (R = B) and inner (R = A) patches: radius, rotation, n = 2 Fourier modes
-            scalar out[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
-            scalar hi[4] = {0,0,0,0};
+
+            // Interface (R = B) and inner (R = A) patches: mean radius,
+            // radial displacement, rotation and n = 2 Fourier modes, plus
+            // the n = 3 and n = 4 modes of the interface
+            scalar out[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+            scalar hi[4] = {0, 0, 0, 0};
             const char* pn[2] = {"interface", "inner"};
             for (label k = 0; k < 2; ++k)
             {
@@ -262,30 +315,66 @@ SOLID_DIAG = r'''
                 const vectorField& Cf = m.Cf().boundaryField()[pI];
                 const scalarField& mS = m.magSf().boundaryField()[pI];
                 const vectorField& Db = D.boundaryField()[pI];
-                scalar A = 0, ur = 0, al = 0, c2 = 0, s2 = 0, R0 = 0, c3 = 0, s3 = 0, c4 = 0, s4 = 0;
+                scalar A = 0, ur = 0, al = 0, R0 = 0;
+                scalar c2 = 0, s2 = 0, c3 = 0, s3 = 0, c4 = 0, s4 = 0;
                 forAll(Cf, i)
                 {
-                    const scalar X = Cf[i].x(), Y = Cf[i].y();
+                    const scalar X = Cf[i].x();
+                    const scalar Y = Cf[i].y();
                     const scalar R = Foam::sqrt(X*X + Y*Y);
                     const scalar th = Foam::atan2(Y, X);
-                    const scalar x = X + Db[i].x(), y = Y + Db[i].y();
+                    const scalar x = X + Db[i].x();
+                    const scalar y = Y + Db[i].y();
                     const scalar r = Foam::sqrt(x*x + y*y);
                     scalar da = Foam::atan2(y, x) - th;
-                    if (da > constant::mathematical::pi) da -= constant::mathematical::twoPi;
-                    if (da < -constant::mathematical::pi) da += constant::mathematical::twoPi;
-                    A += mS[i]; ur += (r - R)*mS[i]; al += da*mS[i]; R0 += R*mS[i];
-                    c2 += (r - R)*Foam::cos(2*th)*mS[i]; s2 += (r - R)*Foam::sin(2*th)*mS[i];
-                    c3 += (r - R)*Foam::cos(3*th)*mS[i]; s3 += (r - R)*Foam::sin(3*th)*mS[i];
-                    c4 += (r - R)*Foam::cos(4*th)*mS[i]; s4 += (r - R)*Foam::sin(4*th)*mS[i];
+                    if (da > constant::mathematical::pi)
+                    {
+                        da -= constant::mathematical::twoPi;
+                    }
+                    if (da < -constant::mathematical::pi)
+                    {
+                        da += constant::mathematical::twoPi;
+                    }
+                    A += mS[i];
+                    ur += (r - R)*mS[i];
+                    al += da*mS[i];
+                    R0 += R*mS[i];
+                    c2 += (r - R)*Foam::cos(2*th)*mS[i];
+                    s2 += (r - R)*Foam::sin(2*th)*mS[i];
+                    c3 += (r - R)*Foam::cos(3*th)*mS[i];
+                    s3 += (r - R)*Foam::sin(3*th)*mS[i];
+                    c4 += (r - R)*Foam::cos(4*th)*mS[i];
+                    s4 += (r - R)*Foam::sin(4*th)*mS[i];
                 }
-                reduce(A, sumOp<scalar>()); reduce(ur, sumOp<scalar>()); reduce(al, sumOp<scalar>());
-                reduce(c2, sumOp<scalar>()); reduce(s2, sumOp<scalar>()); reduce(R0, sumOp<scalar>());
-                reduce(c3, sumOp<scalar>()); reduce(s3, sumOp<scalar>()); reduce(c4, sumOp<scalar>()); reduce(s4, sumOp<scalar>());
-                if (k == 0) { hi[0] = 2*c3/A; hi[1] = 2*s3/A; hi[2] = 2*c4/A; hi[3] = 2*s4/A; }
-                out[6*k + 0] = R0/A; out[6*k + 1] = ur/A; out[6*k + 2] = al/A;
-                out[6*k + 3] = 2*c2/A; out[6*k + 4] = 2*s2/A; out[6*k + 5] = A;
+                reduce(A, sumOp<scalar>());
+                reduce(ur, sumOp<scalar>());
+                reduce(al, sumOp<scalar>());
+                reduce(c2, sumOp<scalar>());
+                reduce(s2, sumOp<scalar>());
+                reduce(R0, sumOp<scalar>());
+                reduce(c3, sumOp<scalar>());
+                reduce(s3, sumOp<scalar>());
+                reduce(c4, sumOp<scalar>());
+                reduce(s4, sumOp<scalar>());
+                if (k == 0)
+                {
+                    hi[0] = 2*c3/A;
+                    hi[1] = 2*s3/A;
+                    hi[2] = 2*c4/A;
+                    hi[3] = 2*s4/A;
+                }
+                out[6*k + 0] = R0/A;
+                out[6*k + 1] = ur/A;
+                out[6*k + 2] = al/A;
+                out[6*k + 3] = 2*c2/A;
+                out[6*k + 4] = 2*s2/A;
+                out[6*k + 5] = A;
             }
-            scalar Hs = 0, KEs = 0, Ws = 0, lmin = GREAT, Jmin = GREAT, Jmax = 0;
+
+            // Solid angular momentum, kinetic and strain energy, smallest
+            // in-plane principal stretch and Jacobian range
+            scalar Hs = 0, KEs = 0, Ws = 0;
+            scalar lmin = GREAT, Jmin = GREAT, Jmax = 0;
             forAll(D, c)
             {
                 const vector V((1.5*D[c] - 2.0*D0[c] + 0.5*D00[c])/dt);
@@ -293,27 +382,56 @@ SOLID_DIAG = r'''
                 Hs += rho*((x ^ V).z())*m.V()[c];
                 KEs += 0.5*rho*magSqr(V)*m.V()[c];
                 tensor F(I + gD[c].T());
-                F.zz() = 1.0; F.xz() = 0; F.yz() = 0; F.zx() = 0; F.zy() = 0;
+                F.zz() = 1.0;
+                F.xz() = 0;
+                F.yz() = 0;
+                F.zx() = 0;
+                F.zy() = 0;
                 const scalar J = det(F);
                 const symmTensor C(symm(F.T() & F));
                 const scalar trC = tr(C);
-                Ws += (0.5*mu*(Foam::pow(J, -2.0/3.0)*trC - 3.0)
-                     + 0.25*kappa*(J*J - 1.0 - 2.0*Foam::log(J)))*m.V()[c];
-                // in-plane principal stretches of C
-                const scalar a = C.xx(), b = C.yy(), d = C.xy();
-                const scalar lmn = 0.5*(a + b) - Foam::sqrt(0.25*sqr(a - b) + d*d);
+                Ws +=
+                    (
+                        0.5*mu*(Foam::pow(J, -2.0/3.0)*trC - 3.0)
+                      + 0.25*kappa*(J*J - 1.0 - 2.0*Foam::log(J))
+                    )*m.V()[c];
+
+                // In-plane principal stretches of C
+                const scalar a = C.xx();
+                const scalar b = C.yy();
+                const scalar d = C.xy();
+                const scalar lmn =
+                    0.5*(a + b) - Foam::sqrt(0.25*sqr(a - b) + d*d);
                 lmin = min(lmin, Foam::sqrt(max(lmn, 0.0)));
-                Jmin = min(Jmin, J); Jmax = max(Jmax, J);
+                Jmin = min(Jmin, J);
+                Jmax = max(Jmax, J);
             }
-            reduce(Hs, sumOp<scalar>()); reduce(KEs, sumOp<scalar>()); reduce(Ws, sumOp<scalar>());
-            reduce(lmin, minOp<scalar>()); reduce(Jmin, minOp<scalar>()); reduce(Jmax, maxOp<scalar>());
-            if (!Pstream::master()) return true;
-            std::ofstream os((m.time().globalPath()/"rtDiagSolid.dat").c_str(), std::ios::app);
+            reduce(Hs, sumOp<scalar>());
+            reduce(KEs, sumOp<scalar>());
+            reduce(Ws, sumOp<scalar>());
+            reduce(lmin, minOp<scalar>());
+            reduce(Jmin, minOp<scalar>());
+            reduce(Jmax, maxOp<scalar>());
+
+            if (!Pstream::master())
+            {
+                return true;
+            }
+
+            std::ofstream os
+            (
+                (m.time().globalPath()/"rtDiagSolid.dat").c_str(),
+                std::ios::app
+            );
             os.precision(16);
-            os << m.time().value();
-            for (label k = 0; k < 12; ++k) os << ' ' << out[k];
-            os << ' ' << Hs << ' ' << KEs << ' ' << Ws << ' ' << lmin << ' ' << Jmin << ' ' << Jmax
-               << ' ' << hi[0] << ' ' << hi[1] << ' ' << hi[2] << ' ' << hi[3] << std::endl;
+            os  << m.time().value();
+            for (label k = 0; k < 12; ++k)
+            {
+                os  << ' ' << out[k];
+            }
+            os  << ' ' << Hs << ' ' << KEs << ' ' << Ws << ' ' << lmin
+                << ' ' << Jmin << ' ' << Jmax << ' ' << hi[0] << ' ' << hi[1]
+                << ' ' << hi[2] << ' ' << hi[3] << std::endl;
         #};
     }
 '''
@@ -393,10 +511,10 @@ IQNILSCoeffs
     predictSolid         yes;
     relaxationFactor     {a.relax};
     outerCorrTolerance   {a.outerTol};
-    // absolute interface point-mismatch tolerance [m]: the C-inf ramp starts with signals at
-    // round-off level, where the relative residual (normalised by the largest residual seen so
-    // far) cannot reach 1e-6 (pilot R1 attempt 1 stalled at t = 0.035 s); 1e-12 m is 1e-11 of the
-    // expected interface displacement
+    // Absolute interface point-mismatch tolerance (m). The C-inf ramp starts
+    // with signals at round-off level, where the relative residual cannot
+    // reach outerCorrTolerance; 1e-12 m is 1e-11 of the expected interface
+    // displacement
     outerCorrAbsoluteTolerance {a.absTol};
     nOuterCorr           100;
     couplingReuse        {a.reuse};
@@ -457,13 +575,41 @@ mechanical
     }}
 );
 """)
-    w(f"{C}/system/solid/fvSchemes", "dictionary", "fvSchemes", """d2dt2Schemes { default backward; }
-ddtSchemes { default backward; }
-gradSchemes { default leastSquaresS4f; }
-divSchemes { default Gauss linear; }
-laplacianSchemes { default Gauss linear corrected; }
-snGradSchemes { default corrected; }
-interpolationSchemes { default linear; }
+    w(f"{C}/system/solid/fvSchemes", "dictionary", "fvSchemes", """d2dt2Schemes
+{
+    default backward;
+}
+
+ddtSchemes
+{
+    default backward;
+}
+
+gradSchemes
+{
+    default leastSquaresS4f;
+}
+
+divSchemes
+{
+    default Gauss linear;
+}
+
+laplacianSchemes
+{
+    default Gauss linear corrected;
+}
+
+snGradSchemes
+{
+    default corrected;
+}
+
+interpolationSchemes
+{
+    default linear;
+}
+
 """)
     w(f"{C}/system/solid/fvSolution", "dictionary", "fvSolution", """solvers
 {
@@ -490,7 +636,9 @@ interpolationSchemes { default linear; }
         }
     }
 }
-relaxationFactors {}
+relaxationFactors
+{
+}
 """)
     w(f"{C}/0/solid/D", "volVectorField", "D", """dimensions      [0 1 0 0 0 0 0];
 internalField   uniform (0 0 0);
@@ -522,7 +670,7 @@ boundaryField
 }
 """)
     # ------------------------------------------------------------- fluid
-    w(f"{C}/constant/fluid/fluidProperties", "dictionary", "fluidProperties", "fluidModel pimpleFluid;\npimpleFluidCoeffs {}\n")
+    w(f"{C}/constant/fluid/fluidProperties", "dictionary", "fluidProperties", "fluidModel pimpleFluid;\n\npimpleFluidCoeffs\n{\n}\n")
     w(f"{C}/constant/fluid/transportProperties", "dictionary", "transportProperties",
       f"transportModel Newtonian;\nnu nu [0 2 -1 0 0 0 0] {p.nu_f};\nrho rho [1 -3 0 0 0 0 0] {p.rho_f};\n")
     for nm in ("turbulenceProperties", "momentumTransport"):
@@ -537,8 +685,16 @@ displacementLaplacianCoeffs
 }
 diffusivity     quadratic inverseDistance (interface);
 """)
-    w(f"{C}/system/fluid/fvSchemes", "dictionary", "fvSchemes", """ddtSchemes { default backward; }
-gradSchemes { default leastSquares; }
+    w(f"{C}/system/fluid/fvSchemes", "dictionary", "fvSchemes", """ddtSchemes
+{
+    default backward;
+}
+
+gradSchemes
+{
+    default leastSquares;
+}
+
 divSchemes
 {
     default         none;
@@ -546,10 +702,27 @@ divSchemes
     div((nuEff*dev2(T(grad(U))))) Gauss linear;
     div((nuEff*dev(T(grad(U))))) Gauss linear;
 }
-laplacianSchemes { default Gauss linear corrected; }
-interpolationSchemes { default linear; }
-snGradSchemes { default corrected; }
-fluxRequired { default no; p; }
+laplacianSchemes
+{
+    default Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default linear;
+}
+
+snGradSchemes
+{
+    default corrected;
+}
+
+fluxRequired
+{
+    default no;
+    p;
+}
+
 """)
     w(f"{C}/system/fluid/fvSolution", "dictionary", "fvSolution", """solvers
 {
@@ -611,7 +784,10 @@ boundaryField
             const vectorField nf(this->patch().nf());
             const vectorField Cf(this->patch().Cf());
             scalarField rf(Cf.size());
-            forAll(Cf, i) { rf[i] = Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y())); }
+            forAll(Cf, i)
+            {
+                rf[i] = Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y()));
+            }
             const vectorField Up(*this);
             this->refGrad() = (Up - 2.0*nf*(nf & Up))/rf;
             this->refValue() = Up;
@@ -644,10 +820,14 @@ boundaryField
         #}};
         code
         #{{
-            // p_c(t)/rho from the reference table; optional n = 2 pulse (stability screen):
-            // seed*cos(2 theta)*B(t), B = C-inf bump on [0.1, 0.5] s, peak 1 at 0.3 s
+            // p_c(t)/rho from the drive table, plus an optional pulse
+            // seed*sum_n cos(n theta)*B(t) (stability screen), with B a C-inf
+            // bump on [0.1, 0.5] s peaking at 1 at 0.3 s
             const scalar t = this->db().time().value();
-            interpolationTable<scalar> pTab(fileName("$FOAM_CASE/constant/pcTable").expand());
+            interpolationTable<scalar> pTab
+            (
+                fileName("$FOAM_CASE/constant/pcTable").expand()
+            );
             const scalar pc = pTab(t);
             const scalar seed = {seedP!r};
             const labelList modes({{{",".join(str(int(x)) for x in a.seedModes.split(","))}}});
@@ -663,7 +843,10 @@ boundaryField
             {{
                 const scalar th = Foam::atan2(Cf[i].y(), Cf[i].x());
                 scalar pert = 0;
-                forAll(modes, j) {{ pert += Foam::cos(modes[j]*th); }}
+                forAll(modes, j)
+                {{
+                    pert += Foam::cos(modes[j]*th);
+                }}
                 pv[i] = pc + seed*bump*pert;
             }}
             this->operator==(pv);

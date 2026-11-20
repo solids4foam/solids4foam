@@ -1,3 +1,12 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
 FoamFile
 {
     version     2.0;
@@ -5,6 +14,8 @@ FoamFile
     class       volVectorField;
     object      U;
 }
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
 dimensions      [0 1 -1 0 0 0 0];
 internalField   uniform (0 0 0);
 boundaryField
@@ -27,7 +38,10 @@ boundaryField
             const vectorField nf(this->patch().nf());
             const vectorField Cf(this->patch().Cf());
             scalarField rf(Cf.size());
-            forAll(Cf, i) { rf[i] = Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y())); }
+            forAll(Cf, i)
+            {
+                rf[i] = Foam::sqrt(sqr(Cf[i].x()) + sqr(Cf[i].y()));
+            }
             const vectorField Up(*this);
             this->refGrad() = (Up - 2.0*nf*(nf & Up))/rf;
             this->refValue() = Up;
@@ -39,3 +53,5 @@ boundaryField
         type            empty;
     }
 }
+
+// ************************************************************************* //

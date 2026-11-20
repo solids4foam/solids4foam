@@ -44,7 +44,7 @@ WINDOWS = {"0-2": (0.0, 2.0), "0-1.8": (0.0, 1.8)}
 MESHES = ("M1", "M2", "M3")
 
 
-OVERRIDE = {}   # (config, mesh) -> already loaded case (used by verify.py)
+OVERRIDE = {}   # (config, mesh) -> already loaded case
 
 
 def load_case(work, config, mesh):
@@ -69,7 +69,7 @@ def common_grid(cases, a, b):
     return [np.array([round(x, 9) in common for x in S["t"]]) & select(S, a, b) for S in cases]
 
 
-NOISE = {"torsion": {"default": 2.4e-4}, "combined": {"default": 1.3e-3}}   # max-norm noise of E in units of max|ref| per QoI (thresholds.json, numerical_noise)
+NOISE = {"torsion": {"default": 2.4e-4}, "combined": {"default": 1.3e-3}}   # max-norm noise of E in units of max|ref| per QoI (study estimate)
 
 
 def delta_for(config, q):
