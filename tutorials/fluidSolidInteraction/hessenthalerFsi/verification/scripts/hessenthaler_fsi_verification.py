@@ -1964,12 +1964,55 @@ def count_max_iterations(case: Path, spec: dict) -> int:
 # Import of a finished case run outside the driver
 # ---------------------------------------------------------------------------
 
-def normalised_dictionary(path: Path) -> str:
-    """Dictionary text without comments and with collapsed white space."""
-    text = path.read_text(errors="replace")
+def dictionary_tokens(text: str) -> list:
+    """Tokens of dictionary text, without comments; numbers as floats."""
     text = re.sub(r"/\*.*?\*/", " ", text, flags=re.DOTALL)
     text = re.sub(r"//[^\n]*", " ", text)
-    return " ".join(text.split())
+    text = re.sub(r"([{}();\[\]])", r" \1 ", text)
+    tokens = []
+    for token in text.split():
+        try:
+            tokens.append(float(token))
+        except ValueError:
+            tokens.append(token)
+    return tokens
+
+
+def same_tokens(ta: list, tb: list) -> bool:
+    """Equal token lists; numbers to 1e-7, the precision the driver writes."""
+    if len(ta) != len(tb):
+        return False
+    for x, y in zip(ta, tb):
+        if isinstance(x, float) and isinstance(y, float):
+            if not math.isclose(x, y, rel_tol=1e-7, abs_tol=1e-15):
+                return False
+        elif x != y:
+            return False
+    return True
+
+
+def expanded_dictionary(path: Path) -> str | None:
+    """The dictionary with its #include and $ entries expanded, if possible.
+
+    foamDictionary -set expands a dictionary it rewrites, so the same inputs
+    can be stored expanded in one case and with #include in another.
+    """
+    if not shutil.which("foamDictionary"):
+        return None
+    result = subprocess.run(["foamDictionary", "-expand", path.name],
+                            cwd=path.parent, capture_output=True, text=True,
+                            env=environment())
+    return result.stdout if result.returncode == 0 else None
+
+
+def same_dictionary(a: Path, b: Path) -> bool:
+    """Equal up to formatting, comments, round-off and #include expansion."""
+    if same_tokens(dictionary_tokens(a.read_text(errors="replace")),
+                   dictionary_tokens(b.read_text(errors="replace"))):
+        return True
+    ea, eb = expanded_dictionary(a), expanded_dictionary(b)
+    return ea is not None and eb is not None and same_tokens(
+        dictionary_tokens(ea), dictionary_tokens(eb))
 
 
 def input_files(case: Path) -> dict[str, Path]:
@@ -1996,11 +2039,12 @@ def compare_inputs(driver_case: Path, source: Path, report: Path,
     mesh_dict = ours.get(f"system/meshDict.{level}")
     if mesh_dict and "system/meshDict" in theirs:
         ours["system/meshDict"] = mesh_dict
+        if f"system/meshDict.{level}" not in theirs:
+            del ours[f"system/meshDict.{level}"]
     differing = []
     lines = []
     for name in sorted(set(ours) & set(theirs)):
-        if normalised_dictionary(ours[name]) == normalised_dictionary(
-                theirs[name]):
+        if same_dictionary(ours[name], theirs[name]):
             continue
         differing.append(name)
         lines.extend(difflib.unified_diff(

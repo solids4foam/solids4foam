@@ -125,6 +125,10 @@ and the entries that differ from the campaign defaults
 
 `--extend-from` continues a finished run to a later end time; `--restart`
 continues an interrupted one from its latest written time.
+`--import-case DIR` evaluates a finished case run outside the driver as the
+run of `--spec`: the driver writes its own case of the spec, records every
+input dictionary that differs (`import_differences.diff` and the run's
+JSON), and evaluates a copy of the case; the original is not modified.
 Each run is a copy of the tutorial under `verification/work`; its evaluated
 quantities are written to `verification/postProcessing/runs/<name>.json`.
 Both directories are ignored by Git. `--reuse` re-evaluates a completed run
@@ -286,9 +290,53 @@ difference is given, and no order is claimed.
 
 ## Results
 
-The campaign on rF0-rF3 with the β = 0.2 outlet is in progress, and its
-results will be added here when it is complete. The default series of
-`--study analyse` are:
+The fluid series rF0-rF2 at S2 with the campaign defaults is complete
+(`results/`); rF3, the solid and time-step series, and the rF0 sensitivity
+pairs are still to be run. The three runs were made on UCD Sonic (v2512,
+solids4foam `206437983` with the outlet condition of PR #735, 24, 24 and 48
+ranks) and evaluated by the driver with `--import-case`. Their inputs equal
+the driver's except for the write settings and `restart yes` in the solid
+properties, which only adds restart fields to the output. The values are
+means over t = 36-45 s, except the tip, which is the mean of the last third
+with its residual-transient uncertainty:
+
+| Level | Cells | Tip y (mm) | Tip z (mm) | Iter. |
+| --- | --- | --- | --- | --- |
+| rF0 | 122 435 | 16.24 ± 0.10 | 62.70 | 4.4 |
+| rF1 | 312 180 | 16.66 ± 0.02 | 62.58 | 4.2 |
+| rF2 | 832 552 | 16.722 ± 0.003 | 62.56 | 6.7 |
+
+Changes between successive levels:
+
+| Change | Tip y (mm) | Centreline RMS (mm) | Velocity (mean) |
+| --- | --- | --- | --- |
+| rF0 to rF1 | +0.415 | 0.234 | 0.70 % |
+| rF1 to rF2 | +0.065 | 0.040 | 0.37 % |
+
+- The tip and centreline changes fall by a factor of about 6 from one
+  level to the next, and the voxel velocity changes by a factor of 2. The
+  rF1-rF2 tip change (0.065 mm) is below the residual-transient uncertainty
+  of rF0 (0.10 mm), which still oscillates, so no observed order is claimed
+  for the tip; the heuristic envelope is 1.2 mm. rF3 is needed for an order
+  on rF1-rF3.
+- The peak jet velocity of the lower jet converges monotonically, with
+  observed orders of 2.2 (z = 10 mm) and 1.9 (z = 30 mm). The upper jet's
+  peaks change by less than 2.2 mm/s, and their apparent orders (6 and 9)
+  fall outside the screening range.
+- The inlet pressures change by 2.1 and 0.65 Pa (upper inlet), against a
+  residual-transient uncertainty of 1.1 Pa on rF0.
+- rF2 needs about four coupling iterations per step until t ≈ 35 s, as rF0
+  and rF1 do. From 35 to 45 s, 441 steps reach `nOuterCorr` (60), and 436
+  are accepted unconverged, with final residuals between 1.0e-4 and 1.8e-3
+  (median 1.8e-4) against the tolerance of 1e-4. The tip is then constant to
+  5e-4 mm. The other runs have no unconverged steps.
+
+The comparison with the measurements (validation, not verification) is in
+the same files: the tip is 16.41 mm measured, the RMS centreline differences
+are 0.19, 0.27 and 0.31 mm, and the mean voxel velocity differences are
+5.0 %, 4.9 % and 5.0 % of 630 mm/s on rF0, rF1 and rF2.
+
+The default series of `--study analyse` are:
 
 - fluid rF0-rF3 at S2;
 - solid S1-S3 at rF1;
