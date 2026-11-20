@@ -15,7 +15,7 @@ Attenuation/wave-QoI budget at (m4, 200 steps/period):
   spatial part    -(E(m4) - E(m2))/(2^p - 1) at n200 (p = 2 and observed p);
   amplitude part  slope of the linear fit over a = 0.5, 1, 2, 4 at m2/n200,
                   times a = 1 (assumed independent of h and dt; the m1 slope,
-                  from a = 1 and 4, differs from the m2 slope by 2.0 %);
+                  from a = 1 and 4, differs from the m2 slope by 0.5 %);
   residual        the remainder.
 Uncertainty of the residual: spatial part bounded by |E(m4) - E(m2)| when the
 m1/m2/m4 series is non-monotone (Richardson not applicable), otherwise by the
@@ -86,8 +86,6 @@ for q in ("attenuation", "speed", "wallMid_amp", "wallMid_phase"):
         "mesh_series_monotone": bool(monotone),
         "residual_uncertainty_space": u_space, "residual_uncertainty_amplitude": u_amp,
         "residual_uncertainty_estimate": u_space + u_amp,
-        "prediction_f1/3_infiniteTube": lim["prediction_modified_normal_viscous"]["f=0.333"][q],
-        "prediction_f1/3_finiteTube": lim["prediction_modified_normal_viscous"]["f=0.333"]["finiteTube"][q],
     }
 
 # --- traction components: space-time limits and amplitude correction -------
@@ -110,16 +108,6 @@ for q in ("Vn_ratio", "VnEst_ratio", "Vn_err/|p|", "P_err/|p|", "Sn_err/|p|", "V
                           "limit_a1_pobs": [limp.real, limp.imag],
                           "amplitude_slope": [ampl.real, ampl.imag],
                           "limit_a0": [zero.real, zero.imag]}
-Vn, P = c(ex["Vn"]), c(ex["P"])
-deficit = (1 / 3 - 1) * Vn / abs(P)
-out["traction"]["uncompensated_deficit_f1/3_rel_p"] = [deficit.real, deficit.imag]
-# total normal traction residual (a -> 0) resolved along / across the deficit:
-# along = 1 means no compensation, 0 full compensation; across is the part of
-# the residual that the viscous split cannot explain
-res = c(out["traction"]["Sn_err/|p|"]["limit_a0"])
-proj = res * deficit.conjugate() / abs(deficit) ** 2
-out["traction"]["Sn_residual_along_deficit_fraction"] = proj.real
-out["traction"]["Sn_residual_across_deficit_rel_p"] = abs(proj.imag) * abs(deficit)
 out["exact"] = {k: v for k, v in ex.items()}
 
 # --- coupling tolerance --------------------------------------------------
@@ -150,15 +138,11 @@ parts = [("temporal (n200)", b["temporal_error_at_n200"]), ("spatial (m4)", b["s
          ("amplitude-dependent", b["finite_amplitude_part"]), ("residual (linear continuum)", b["residual_linear_continuum"])]
 fig, ax = plt.subplots(figsize=(6.5, 3.6))
 ax.barh([p[0] for p in parts], [p[1] * 1e3 for p in parts], color=["#4c72b0", "#55a868", "#c44e52", "#8172b2"])
-ax.axvline(b["prediction_f1/3_infiniteTube"] * 1e3, color="k", ls="--", lw=0.8, label="f=1/3, infinite tube")
-ax.axvline(b["prediction_f1/3_finiteTube"] * 1e3, color="k", ls=":", lw=0.8, label="f=1/3, finite tube")
 ax.set_xlabel("contribution to the Im(k) error at m4, 200 steps/period  [x 1e-3]")
 ax.set_title(f"attenuation error {b['E_m4_n200']*1e3:.2f}e-3: budget")
-ax.legend(fontsize=7)
 fig.tight_layout()
 fig.savefig(R / "attenuation_budget.png", dpi=130)
 plt.close(fig)
-print(json.dumps({"Sn_residual_along_deficit_fraction": out["traction"]["Sn_residual_along_deficit_fraction"],
-                  "Sn_residual_across_deficit_rel_p": out["traction"]["Sn_residual_across_deficit_rel_p"],
-                  "waveQoIs": out["waveQoIs"], "traction_limits_a0": {k: v["limit_a0"] for k, v in out["traction"].items() if isinstance(v, dict)},
-                  "deficit": out["traction"]["uncompensated_deficit_f1/3_rel_p"], "coupling": out["coupling"]}, indent=1, default=float))
+print(json.dumps({"waveQoIs": out["waveQoIs"],
+                  "traction_limits_a0": {k: v["limit_a0"] for k, v in out["traction"].items()},
+                  "coupling": out["coupling"]}, indent=1, default=float))

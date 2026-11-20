@@ -396,6 +396,13 @@ release. For complete commit-level details and contributor information, see the
   couplings. The tube ends use `fluxConsistentPatches` (below), and the
   old-time solid displacements carry exact boundary values; the time-step
   study runs 50/100/200/400 steps per period.
+- The `womersleyTube` tutorial has an optional interface-traction
+  diagnostic, `verification/traction/AllverifyTraction`. It records the
+  pressure, the transferred viscous traction, the momentum equation's wall
+  flux and the traction applied to the solid, and compares their
+  wave-projected first harmonics with the exact solution under mesh,
+  time-step, amplitude and coupling-tolerance refinement. It needs python3
+  with numpy and does not change the tutorial or its standard verification.
 - `pimpleFluid` (OpenFOAM.com) has an opt-in PIMPLE entry,
   `fluxConsistentPatches (<patches>);`, for patches that fix the pressure and
   whose velocity condition fixes the boundary value, such as a mixed
@@ -779,6 +786,9 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `womersleyTube`: `Allrun` now exits with the failing step's status when
+  meshing, decomposition, the solver or reconstruction fails. It returned 0
+  before, because the final optional plotting step set the status.
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual

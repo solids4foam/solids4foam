@@ -91,9 +91,7 @@ def make_inputs(work: Path, mesh_levels, slope_stored=2.5e-3, slope_values=None)
     lim = {"limits": {q: {"E_m4_n200": -2e-3, "E_m4_n400": -1.5e-3,
                           "space_increment_m4_p2": 1e-4, "space_increment_m4_pobs": 1.2e-4}
                       for q in QS},
-           "cases": {n: {q: -2.1e-3 for q in QS} for n in ("robin_m1_n200", "robin_m2_n200")},
-           "prediction_modified_normal_viscous": {"f=0.333": dict(
-               {q: 0.0 for q in QS}, finiteTube={q: 0.0 for q in QS})}}
+           "cases": {n: {q: -2.1e-3 for q in QS} for n in ("robin_m1_n200", "robin_m2_n200")}}
     write(work / "attenuation_limit_mu5.json", lim)
     amp = {str(a): {q: slope_values * a for q in QS} for a in (0.5, 1.0, 2.0, 4.0)}
     write(work / "amplitude_series.json", {
