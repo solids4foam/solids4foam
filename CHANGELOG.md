@@ -8,6 +8,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `linearElasticGTNPlastic` mechanical constitutive law:
+  Gurson-Tvergaard-Needleman porous plasticity, ported from the GTN laws of
+  Andrew Whelan, with strain-controlled void nucleation, optional
+  coalescence and the shear term of Nahshon and Hutchinson. The return
+  mapping and the void fraction update are solved together, implicitly, at
+  each point. With `nonLocal classic` the yield function is written with the
+  implicit non-local void fraction `voidFractionNonLocal`. Used at finite
+  strain under `logStrain`. `Test-GTNPlasticMechanicalConstitutiveLaw` checks
+  it at a material point, and the tutorial `fracture/notchedBarGTN` compares
+  the reaction force with the Abaqus result of Whelan et al. (2025).
 - Non-local forms of `linearElasticMisesPlasticLemaitreDamage`
   (`nonLocal classic` or `effective`, with a `characteristicLength`): the
   stress is degraded by the implicit non-local damage of Peerlings et al.,

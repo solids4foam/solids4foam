@@ -1,0 +1,3 @@
+Test-GTNPlasticMechanicalConstitutiveLaw.C
+
+EXE = $(FOAM_MODULE_APPBIN)/Test-GTNPlasticMechanicalConstitutiveLaw
