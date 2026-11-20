@@ -175,7 +175,10 @@ public:
         //- Construct and return a clone
         virtual autoPtr<AMIInterpolationS4F> clone() const
         {
-            return autoPtr<AMIInterpolationS4F>(new faceAreaWeightAMIS4F(*this));
+            return autoPtr<AMIInterpolationS4F>
+            (
+                new faceAreaWeightAMIS4F(*this)
+            );
         }
 
 

@@ -255,20 +255,21 @@ void newGGIInterpolation<MasterPatch, SlavePatch>::calcAddressing() const
         // normalized.
         //
         //
-        // u  =  vector from face center to most distant projected master face point.
-        //                                    /       .
-        //           ^y                     / |       .      .w = normal to master face
-        //           |                    /   |       .    .
-        //           |                  /     |       .  .
-        //           |                 |      |       .
-        //           |                 |      /        .
-        //           |                 |    /           .
-        //           |                 |  /              .
-        //           ---------> x      |/                 .
-        //          /                                                 v = w^u
-        //         /
-        //        /
-        //       z
+        // u  =  vector from face center to most distant projected master face
+        //       point.
+        //                             /       .
+        //       ^y                  / |       .      .w = normal to master face
+        //       |                 /   |       .    .
+        //       |               /     |       .  .
+        //       |              |      |       .
+        //       |              |      /        .
+        //       |              |    /           .
+        //       |              |  /              .
+        //       ---------> x   |/                 .
+        //      /                                              v = w^u
+        //     /
+        //    /
+        //   z
         //
         //
 

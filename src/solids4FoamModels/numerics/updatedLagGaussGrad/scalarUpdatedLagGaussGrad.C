@@ -74,7 +74,7 @@ tmp<BlockLduSystem<vector, vector> > updatedLagGaussGrad<scalar>::fvmGrad
     bs.negSumDiag();
 
     // Boundary contributions
-    forAll (vf.boundaryField(), patchI)
+    forAll(vf.boundaryField(), patchI)
     {
         const fvPatchScalarField& pf = vf.boundaryField()[patchI];
         const fvPatch& patch = pf.patch();
@@ -90,7 +90,7 @@ tmp<BlockLduSystem<vector, vector> > updatedLagGaussGrad<scalar>::fvmGrad
         const scalarField internalCoeffs(pf.valueInternalCoeffs(pw));
 
         // Diag contribution
-        forAll (pf, faceI)
+        forAll(pf, faceI)
         {
             d[fc[faceI]] += internalCoeffs[faceI]*pSf[faceI];
         }
@@ -114,7 +114,7 @@ tmp<BlockLduSystem<vector, vector> > updatedLagGaussGrad<scalar>::fvmGrad
             const scalarField boundaryCoeffs(pf.valueBoundaryCoeffs(pw));
 
             // Boundary contribution
-            forAll (pf, faceI)
+            forAll(pf, faceI)
             {
                 source[fc[faceI]] -= boundaryCoeffs[faceI]*pSf[faceI];
             }

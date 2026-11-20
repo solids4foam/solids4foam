@@ -44,7 +44,8 @@ solidDirectionMixedFvPatchVectorField::solidDirectionMixedFvPatchVectorField
 {
     // solidModel may not exist here, so we cannot look it up
     // Lookup the solidModel object
-    // const solidModel& solMod = lookupSolidModel(patch().boundaryMesh().mesh());
+    // const solidModel& solMod =
+    //     lookupSolidModel(patch().boundaryMesh().mesh());
 
     // if (solMod.solidModelDict().found("snGradLimitCoeff"))
     // {

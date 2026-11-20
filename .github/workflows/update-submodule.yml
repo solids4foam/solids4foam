@@ -31,7 +31,12 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      # Step 4: Update the submodule to the latest commit on the "development" branch
+      # Step 4: Update the submodule to the latest commit on the "development"
+      # branch, and regenerate the website's documentation symlinks and link
+      # data with bin/sync-docs.sh. The generated files (_config.yml,
+      # _data/docs_links.yml, image symlinks) depend on the READMEs' contents,
+      # so committing the submodule pointer alone leaves them stale and fails
+      # the website's "Documentation Symlinks" check.
       - name: Update submodule to latest commit
         run: |
           cd solids4foam.github.io
@@ -40,7 +45,8 @@ jobs:
               git fetch origin development
               git checkout origin/development
           )
-          git add imported/solids4foam
+          ./bin/sync-docs.sh
+          git add -A
           git commit -m "Automated update of submodule to the latest development commit" \
               || echo "No submodule changes to commit"
 

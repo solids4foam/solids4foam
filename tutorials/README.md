@@ -88,6 +88,12 @@ This script is:
 - Used routinely in **GitHub Actions CI**
 - Intended to catch build, linking, and obvious runtime failures
 
+`Alltest` modifies each case to run one time step and then runs its `Allrun`
+script. A case that cannot be tested this way, for example because one run
+needs the converged results of an earlier run, can provide its own `Alltest`
+script, which `Alltest` runs in place of `Allrun` on the modified case. See
+`fluidSolidInteraction/pulmonaryArteries/Alltest` for an example.
+
 ---
 
 ### `Alltest-regression` (Regression Tests)

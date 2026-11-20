@@ -1,0 +1,8 @@
+{
+  "name": "solids4foam-review-scripts",
+  "private": true,
+  "description": "Pinned dependency for the advisory AI review workflow (installed with npm ci --ignore-scripts).",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.5.0"
+  }
+}

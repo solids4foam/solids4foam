@@ -31,7 +31,10 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors * * * * * * * * * * * * * * //
 
-Foam::cellPointLeastSquaresVectors::cellPointLeastSquaresVectors(const fvMesh& mesh)
+Foam::cellPointLeastSquaresVectors::cellPointLeastSquaresVectors
+(
+    const fvMesh& mesh
+)
 :
 #ifdef OPENFOAM_NOT_EXTEND
     MeshObject<fvMesh, MoveableMeshObject, cellPointLeastSquaresVectors>(mesh),
@@ -209,13 +212,17 @@ Foam::cellPointLeastSquaresVectors::vectors() const
 }
 
 
-bool Foam::cellPointLeastSquaresVectors::updateMesh(const mapPolyMesh& mpm) const
+bool Foam::cellPointLeastSquaresVectors::updateMesh
+(
+    const mapPolyMesh& mpm
+) const
 {
     if (debug)
     {
         InfoIn
         (
-            "bool cellPointLeastSquaresVectors::updateMesh(const mapPolyMesh&) const"
+            "bool cellPointLeastSquaresVectors::updateMesh"
+            "(const mapPolyMesh&) const"
         )   << "Clearing least square data" << endl;
     }
 

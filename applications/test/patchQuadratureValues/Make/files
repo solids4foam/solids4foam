@@ -1,0 +1,3 @@
+Test-patchQuadratureValues.C
+
+EXE = $(FOAM_MODULE_APPBIN)/Test-patchQuadratureValues

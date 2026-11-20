@@ -91,7 +91,11 @@ class meshDualiser
 
         static void checkPolyTopoChange(const directTopoChange&);
 
-        static void dumpPolyTopoChange(const directTopoChange&, const fileName&);
+        static void dumpPolyTopoChange
+        (
+            const directTopoChange&,
+            const fileName&
+        );
 
         //- Find dual cell given point and cell
         label findDualCell(const label cellI, const label pointI) const;
