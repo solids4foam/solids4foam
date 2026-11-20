@@ -8,6 +8,15 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `linearElasticMisesPlasticLemaitreDamage` mechanical constitutive law:
+  J2 plasticity coupled to local Lemaitre ductile damage, ported from the
+  damage laws of Andrew Whelan. Classic, Malcher and the triaxiality-dependent
+  damage denominator of Whelan et al. (2025), crack closure, a triaxiality
+  cut-off, a damage threshold and a critical damage, with the return mapping
+  and damage solved together, implicitly, at each point. Used at finite
+  strain under `logStrain`. `Test-LemaitreDamageMechanicalConstitutiveLaw`
+  checks it at a material point, including against the analytical uniaxial
+  solution of Doghri.
 - `logStrain` mechanical constitutive law: a finite-strain composite that
   drives a small-strain sub-law with the elastic logarithmic strain, by the
   exponential-map return mapping of Eterovic and Bathe and of Simo, ported
