@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Opt-in verification study for radialTorsionalRing.
+#
+# For each selected drive and mesh, copies the tutorial to
+# work/<config>_<mesh>, writes its dictionaries and the reference with
+# scripts/makeCase.py, runs it, and then runs the convergence and mixed-term
+# analysis over all cases in work/ (work/convergence.{txt,json,csv}).
+#
+#   ./Allverify                         # M1 torsion, radial, combined
+#   ./Allverify torsion M1 M2 M3        # given drives and meshes
+#   ./Allverify combined M3 np=8        # M3 runs in parallel (default 4 ranks)
+#   ./Allverify combined M1 endTime=0.5 # shortened run
+#   ./Allverify analyse                 # only analyse the cases in work/
+#
+# M1 and M2 run in serial, M3 in parallel. Indicative serial wall times on a
+# desktop: M1 about 100 s, M2 about 400 s; M3 on 4 ranks about 1200 s.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TUTORIAL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORK="${SCRIPT_DIR}/work"
+np=4
+endTime=2
+configs=()
+meshes=()
+analyseOnly=no
+failed=0
+
+for arg in "$@"
+do
+    case "$arg" in
+        torsion|radial|combined)
+            configs+=("$arg")
+            ;;
+        M1|M2|M3)
+            meshes+=("$arg")
+            ;;
+        np=*)
+            np="${arg#np=}"
+            ;;
+        endTime=*)
+            endTime="${arg#endTime=}"
+            ;;
+        analyse)
+            analyseOnly=yes
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            exit 1
+            ;;
+    esac
+done
+[[ ${#configs[@]} -gt 0 ]] || configs=(torsion radial combined)
+[[ ${#meshes[@]} -gt 0 ]] || meshes=(M1)
+
+if ! command -v python3 > /dev/null 2>&1 \
+    || ! python3 -c "import numpy, scipy" > /dev/null 2>&1
+then
+    echo "ERROR: python3 with numpy and scipy is required" >&2
+    exit 2
+fi
+
+if [[ "$analyseOnly" == "no" ]]
+then
+    for config in "${configs[@]}"
+    do
+        for mesh in "${meshes[@]}"
+        do
+            case_dir="${WORK}/${config}_${mesh}"
+            echo "=== ${config} ${mesh}"
+            rm -rf "${case_dir}"
+            mkdir -p "${case_dir}/verification"
+            for dir in 0 constant system
+            do
+                cp -a "${TUTORIAL_DIR}/${dir}" "${case_dir}/"
+            done
+            cp -a "${TUTORIAL_DIR}/Allrun" "${TUTORIAL_DIR}/Allclean" \
+                "${case_dir}/"
+            cp -a "${SCRIPT_DIR}/scripts" "${case_dir}/verification/"
+
+            mode=serial
+            [[ "$mesh" == "M3" ]] && mode=parallel
+            python3 -B -I "${SCRIPT_DIR}/scripts/makeCase.py" "${case_dir}" \
+                --mesh "${mesh}" --config "${config}" --np "${np}" \
+                --tend "${endTime}" > "${case_dir}/log.makeCase" 2>&1 \
+                || { echo "  makeCase.py failed"; failed=1; continue; }
+
+            (cd "${case_dir}" && ./Allrun "${mode}" > log.Allrun 2>&1) \
+                || { echo "  run failed (see ${case_dir}/log.Allrun)"; \
+                     failed=1; }
+        done
+    done
+fi
+
+python3 -B -I "${SCRIPT_DIR}/scripts/convergence.py" "${WORK}" \
+    | tee "${WORK}/convergence.txt"
+
+exit ${failed}

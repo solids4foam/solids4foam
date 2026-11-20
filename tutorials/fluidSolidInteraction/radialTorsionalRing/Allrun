@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun            # stored case: M1 mesh, combined drive, serial
+# ./Allrun parallel   # the same on the ranks set in decomposeParDict
+#
+# Other meshes and drives are generated and run by verification/Allverify
+
+# The outer boundary conditions and the diagnostics are coded (dynamicCode)
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+# PETSc is required for the solid solver (SNES)
+solids4Foam::requirePetscOrExitSilently
+
+runMode=serial
+
+for arg in "$@"
+do
+    case "$arg" in
+        serial)
+            runMode=serial
+            ;;
+        parallel)
+            runMode=parallel
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: ./Allrun [serial|parallel]"
+            exit 1
+            ;;
+    esac
+done
+
+# Check case version is correct
+solids4Foam::convertCaseFormat .
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+if [[ "$runMode" == "parallel" ]]; then
+    # Run parallel
+    solids4Foam::runApplication -s fluid decomposePar -region fluid
+    solids4Foam::runApplication -s solid decomposePar -region solid
+    nProcs=$(solids4Foam::getNumberOfProcessors system/fluid/decomposeParDict)
+    solids4Foam::runParallel -np "$nProcs" solids4Foam
+    solids4Foam::runApplication -s fluid reconstructPar -region fluid \
+        -latestTime
+    solids4Foam::runApplication -s solid reconstructPar -region solid \
+        -latestTime
+else
+    # Run serial
+    solids4Foam::runApplication solids4Foam
+fi
+
+# Optional: the semi-analytical reference (reference.json) and the errors,
+# balances and quantities of interest (analysis.json, series.csv)
+if ! command -v python3 > /dev/null 2>&1 \
+    || ! python3 -c "import numpy, scipy" > /dev/null 2>&1
+then
+    echo "Install python3 with numpy and scipy to compute the reference"
+    echo "solution and the errors"
+    exit 0
+fi
+
+if [[ ! -f reference.json ]]; then
+    python3 -B -I verification/scripts/make_reference.py . \
+        --config combined --mesh M1 > log.make_reference 2>&1 \
+        || echo "No reference written (see log.make_reference)"
+fi
+
+if [[ -f reference.json && -f rtDiagSolid.dat \
+    && $(wc -l < rtDiagSolid.dat) -ge 10 ]]; then
+    python3 -B -I verification/scripts/analyse_case.py . \
+        > log.analyse_case 2>&1 \
+        && echo "Errors against the reference written to analysis.json" \
+        || echo "No analysis written (see log.analyse_case)"
+fi

@@ -8,6 +8,12 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- The `radialTorsionalRing` fluid-solid interaction tutorial: a neo-Hookean
+  ring in a viscous annulus, driven in torsion at its inner surface and by a
+  pressure ramp at the outer fluid boundary, with a semi-analytical
+  finite-amplitude reference solution, a regression test and an opt-in
+  `verification/` mesh and drive study.
+
 - Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
   `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
   idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an

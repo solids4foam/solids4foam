@@ -192,6 +192,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
     "fluidSolidInteraction/womersleyTube"
+    "fluidSolidInteraction/radialTorsionalRing"
     "circulationModels/pipeWindkessel"
     "circulationModels/pipeWindkesselSolids4Foam"
     "circulationModels/healthyHuman"
