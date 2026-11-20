@@ -1249,6 +1249,26 @@ public:
         //  points are the cells, so nothing is interpolated. The fields carry
         //  no dimensions, since a law does not declare them
         void writeStateFields() const;
+
+        //- The names of the implicit-gradient fields the laws, or the laws
+        //  they wrap, read, sorted, each once
+        wordList implicitGradientFieldNames() const;
+
+        //- The source and the squared length scale of one implicit-gradient
+        //  field at the cells: in the cells of each law that reads it, the
+        //  current value of the state variable it names as the source and
+        //  the square of its length; zero in the cells of every other law.
+        //
+        //  The source is the law's current state, so this is called after
+        //  the stress update it is to follow. Read from the cell-centred
+        //  integration points, whose points are the cells, so it refuses
+        //  if the stress has not been evaluated there
+        void implicitGradientSource
+        (
+            const word& name,
+            scalarField& source,
+            scalarField& lengthSqr
+        ) const;
 };
 
 
