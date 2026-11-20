@@ -230,7 +230,10 @@ void coupledPressureDisplacementSolid::updateStress
 }
 
 
-scalar coupledPressureDisplacementSolid::residual(const volVectorField& DD) const
+scalar coupledPressureDisplacementSolid::residual
+(
+    const volVectorField& DD
+) const
 {
     scalar refRes =
         gMax
@@ -763,7 +766,7 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
 
     if (runTime.timeIndex() == 0)
     {
-        Info << "Initialize curSf, deltas and weights" << endl;
+        Info<< "Initialize curSf, deltas and weights" << endl;
 
         curSf_ = mesh().Sf();
         weights_ = mesh().weights();
@@ -802,9 +805,9 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
 
         nuCoeff_ = 3*nu/(1+nu);
 
-        Info << "nuCoeff, max: " << gMax(nuCoeff_.internalField())
-             << ", avg: " << gAverage(nuCoeff_.internalField())
-             << ", min: " << gMin(nuCoeff_.internalField()) << endl;
+        Info<< "nuCoeff, max: " << gMax(nuCoeff_.internalField())
+            << ", avg: " << gAverage(nuCoeff_.internalField())
+            << ", min: " << gMin(nuCoeff_.internalField()) << endl;
     }
 
     if
@@ -842,8 +845,22 @@ coupledPressureDisplacementSolid::coupledPressureDisplacementSolid
             );
     }
 
+    // The pressure equation here is an incremental relation on the mesh,
+    // with the pressure starting from zero, while a prestressed law's
+    // volumetric response is that of J*det(Fpre), already non-zero at zero
+    // displacement. The two would describe different materials
+    if (mechanicalManager().prestressed())
+    {
+        FatalErrorInFunction
+            << type() << " does not support prestress: its pressure "
+            << "equation does not see Fpre." << nl
+            << "Use nonLinearGeometryTotalLagrangianTotalDisplacement, with or "
+            << "without solvePressure, for a prestressed case"
+            << exit(FatalError);
+    }
+
     // Prepare for consisten Rhie-Chow correction
-    if(consistentRhieChow_)
+    if (consistentRhieChow_)
     {
         interpDDfPtr_ =
             new surfaceVectorField
@@ -1130,7 +1147,7 @@ bool coupledPressureDisplacementSolid::evolve()
 
             #include "calcTraction.H"
 
-            Info << "Assembling momentum equaton" << endl;
+            Info<< "Assembling momentum equaton" << endl;
             momentumStabilisation().updateVector(DD(), &gradDD());
 
             // Construct momentum equation in total Lagrangian
@@ -1214,7 +1231,7 @@ bool coupledPressureDisplacementSolid::evolve()
 
         #include "calcPhi.H"
 
-        Info << "Assembling presure equation" << endl;
+        Info<< "Assembling presure equation" << endl;
         fvScalarMatrix DpEqn
         (
             fvm::Sp(rKappa_, Dp_)
@@ -1318,8 +1335,8 @@ bool coupledPressureDisplacementSolid::evolve()
          || maxIterReached() == nCorr()
         )
         {
-            Info << "Corr " << iCorr << ", relative residual = "
-                 << res << endl;
+            Info<< "Corr " << iCorr << ", relative residual = "
+                << res << endl;
         }
 
         if (maxIterReached() == nCorr())
@@ -1680,7 +1697,7 @@ void coupledPressureDisplacementSolid::moveToCurConfig(const bool prevConfig)
 {
     if (refConfig_)
     {
-        Info << "Move mesh to current confguration" << endl;
+        Info<< "Move mesh to current confguration" << endl;
 
         pointVectorField newPointD = pointD().oldTime();
 
@@ -1711,7 +1728,7 @@ void coupledPressureDisplacementSolid::moveToRefConfig()
 {
     if (!refConfig_)
     {
-        Info << "Move mesh back to the initial confguration" << endl;
+        Info<< "Move mesh back to the initial confguration" << endl;
         mesh().movePoints(refPoints_);
         mesh().V00();
         mesh().moving(false);
@@ -1863,7 +1880,7 @@ void coupledPressureDisplacementSolid::updateTotalFields()
                 dimensionedScalar("K", dimless/dimTime, 0)
             );
 
-        Info << "K: " << K_ << endl;
+        Info<< "K: " << K_ << endl;
     }
 
     if (nonLinear_)
@@ -1898,9 +1915,9 @@ void coupledPressureDisplacementSolid::updateTotalFields()
             scalar initVolume = gSum(mesh().V().field());
             scalar volumeRelError = (curVolume - initVolume)/initVolume;
 
-            Info << "Initial total volume: " << initVolume << endl;
-            Info << "Current total volume: " << curVolume << endl;
-            Info << "Rel. volume error: " << volumeRelError << endl;
+            Info<< "Initial total volume: " << initVolume << endl;
+            Info<< "Current total volume: " << curVolume << endl;
+            Info<< "Rel. volume error: " << volumeRelError << endl;
         }
     }
 }

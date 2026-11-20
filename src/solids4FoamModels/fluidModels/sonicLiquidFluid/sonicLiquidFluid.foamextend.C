@@ -382,6 +382,12 @@ bool sonicLiquidFluid::evolve()
         CorrectFlux();
     }
 
+    // Stop if the backward meshPhi would be inconsistent
+    fluidModel::checkBackwardMeshPhi
+    (
+        word("ddt(" + rho_.name() + ',' + U().name() + ')')
+    );
+
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), rho_, U());
 

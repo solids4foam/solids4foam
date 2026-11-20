@@ -1105,15 +1105,16 @@ This equation explains the three nested loops in `averageMonomial()`:
 - index $b$ expands the power in the $y$ direction;
 - index $c$ expands the power in the $z$ direction.
 
-For each stencil cell and each polynomial term, `calcCellCoeffs()`
-calls `averageMonomial()` twice:
+For the owner cell, $\boldsymbol{d}_{PP}=\boldsymbol{0}$, so every term of
+the sum except the last one vanishes and the owner-cell average is the
+central moment $M_P^{(i,j,k)}$ itself. `calcCellCoeffs()` therefore stores
+the owner-cell averages once per cell, before the stencil loop, directly from
+`centralMoment()`. For each stencil cell and each polynomial term it then
+calls `averageMonomial()` once, with cell $N$ and $\boldsymbol{d}_{PN}$, to
+calculate the neighbour-cell average.
 
-1. with cell $N$ and $\boldsymbol{d}_{PN}$ to calculate the neighbour-cell
-   average;
-2. with cell $P$ and $\boldsymbol{d}_{PP}=\boldsymbol{0}$ to calculate the
-   owner-cell average.
-
-Their difference becomes one entry of the matrix $\boldsymbol{Q}_P$ after
+The difference between the neighbour-cell average and the stored owner-cell
+average becomes one entry of the matrix $\boldsymbol{Q}_P$ after
 division by the distance scaling and factorial.
 
 #### Complete 2D quadratic example
@@ -1194,8 +1195,9 @@ another column of $\boldsymbol{Q}_P$, or equivalently another equation in the
 least-squares system. For $p=3$, the procedure is identical, but the cubic
 terms additionally use the third-order moments.
 
-For the owner cell, $\boldsymbol{d}_{PP}=\boldsymbol{0}$, so the same function
-returns $M_P^{(i,j,k)}$. First-order central moments are set to zero because
+For the owner cell, $\boldsymbol{d}_{PP}=\boldsymbol{0}$, so the owner-cell
+average is $M_P^{(i,j,k)}$ and is read from `centralMoment()` directly, as
+described above. First-order central moments are set to zero because
 cell centres are volume centroids. Second- and third-order moments are read
 from `fvMeshQuadrature` and exchanged when a stencil contains remote cells.
 

@@ -110,7 +110,11 @@ void Foam::advancingFrontAMIS4F::createExtendedTgtPatch()
 }
 
 
-bool Foam::advancingFrontAMIS4F::initialiseWalk(label& srcFacei, label& tgtFacei)
+bool Foam::advancingFrontAMIS4F::initialiseWalk
+(
+    label& srcFacei,
+    label& tgtFacei
+)
 {
     const auto& src = this->srcPatch();
     const auto& tgt = this->tgtPatch();
@@ -390,7 +394,10 @@ Foam::advancingFrontAMIS4F::advancingFrontAMIS4F
 {}
 
 
-Foam::advancingFrontAMIS4F::advancingFrontAMIS4F(const advancingFrontAMIS4F& ami)
+Foam::advancingFrontAMIS4F::advancingFrontAMIS4F
+(
+    const advancingFrontAMIS4F& ami
+)
 :
     AMIInterpolationS4F(ami),
     srcTris_(),
@@ -416,7 +423,8 @@ bool Foam::advancingFrontAMIS4F::calculate
 {
     if (AMIInterpolationS4F::calculate(srcPatch, tgtPatch, surfPtr))
     {
-        // Create a representation of the target patch that covers the source patch
+        // Create a representation of the target patch that covers the source
+        // patch
         if (distributed())
         {
             createExtendedTgtPatch();

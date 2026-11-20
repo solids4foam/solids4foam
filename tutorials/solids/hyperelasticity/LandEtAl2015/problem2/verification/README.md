@@ -1,4 +1,4 @@
-# idealisedVentricle verification study
+# LandEtAl2015/problem2 verification study
 
 This opt-in study is a mesh-convergence study. It refines the tutorial
 `blockMesh` and its rotational `extrudeMesh` together, samples the deformed
@@ -15,7 +15,7 @@ mesh convergence. Nothing here is run by `tutorials/Alltest` or
 Source an OpenFOAM.com environment, build solids4foam with PETSc, and run:
 
 ```bash
-cd tutorials/solids/hyperelasticity/idealisedVentricle/verification
+cd tutorials/solids/hyperelasticity/LandEtAl2015/problem2/verification
 ./Allverify
 ```
 

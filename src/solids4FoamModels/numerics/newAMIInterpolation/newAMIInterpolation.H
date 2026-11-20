@@ -79,10 +79,12 @@ public:
 
     // Public typedefs
 
-        // Typedef to SourcePatch type this newAMIInterplation is instantiated on
+        // Typedef to SourcePatch type this newAMIInterplation is
+        // instantiated on
         typedef SourcePatch sourcePatchType;
 
-        // Typedef to TargetPatch type this newAMIInterplation is instantiated on
+        // Typedef to TargetPatch type this newAMIInterplation is
+        // instantiated on
         typedef TargetPatch targetPatchType;
 
 

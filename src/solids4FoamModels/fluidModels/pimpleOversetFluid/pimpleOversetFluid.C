@@ -87,7 +87,10 @@ pimpleOversetFluid::pimpleOversetFluid
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
-tmp<vectorField> pimpleOversetFluid::patchViscousForce(const label patchID) const
+tmp<vectorField> pimpleOversetFluid::patchViscousForce
+(
+    const label patchID
+) const
 {
     tmp<vectorField> tvF
     (
@@ -110,7 +113,10 @@ tmp<vectorField> pimpleOversetFluid::patchViscousForce(const label patchID) cons
 }
 
 
-tmp<scalarField> pimpleOversetFluid::patchPressureForce(const label patchID) const
+tmp<scalarField> pimpleOversetFluid::patchPressureForce
+(
+    const label patchID
+) const
 {
     tmp<scalarField> tpF
     (
@@ -177,6 +183,9 @@ bool pimpleOversetFluid::evolve()
         const Time& runTime = fluidModel::runTime();
 #       include "volContinuity.H"
     }
+
+    // Stop if the backward meshPhi would be inconsistent
+    fluidModel::checkBackwardMeshPhi();
 
     // Make the fluxes relative to the mesh motion
     fvc::makeRelative(phi(), U());

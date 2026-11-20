@@ -176,7 +176,8 @@ void Foam::meshDual::makeDualMesh()
         dualMesh.movePoints(map().preMotionPoints());
     }
 
-    // Find a way to add this default value to 'solidProperties' dict in the future
+    // Find a way to add this default value to 'solidProperties' dict in the
+    // future
     if (dict_.lookupOrDefault<Switch>("writeDualMesh", false))
     {
         dualMesh.setInstance(runTime().constant());

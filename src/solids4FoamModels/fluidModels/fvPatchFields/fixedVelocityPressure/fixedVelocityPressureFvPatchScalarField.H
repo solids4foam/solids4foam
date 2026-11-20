@@ -19,8 +19,8 @@ Class
     Foam::fixedVelocityPressureFvPatchScalarField
 
 Description
-    Set the pressure gradient boundary condition appropriately for boundary where
-    velocity is fixed.
+    Set the pressure gradient boundary condition appropriately for boundary
+    where velocity is fixed.
 
 SourceFiles
     fixedVelocityPressureFvPatchScalarField.C
@@ -129,7 +129,8 @@ public:
 //         virtual void evaluate
 //         (
 // #ifdef OPENFOAM_NOT_EXTEND
-//             const Pstream::commsTypes commsType = Pstream::commsTypes::blocking
+//             const Pstream::commsTypes commsType =
+//                 Pstream::commsTypes::blocking
 // #else
 //             const Pstream::commsTypes commsType = Pstream::blocking
 // #endif

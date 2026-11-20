@@ -96,6 +96,99 @@ Go to the original solids4foam repository on GitHub and open a pull request
 - Any **related issue numbers** (e.g., `Closes #123`).
 - **Instructions or example cases** to test your contribution, if applicable.
 
+## Reviewing Pull Requests
+
+Every ready PR into `development` goes through the steps below. Core
+maintainers (currently Philip Cardiff and Ivan Batistić) approve and merge.
+Contributing reviewers are welcome at every risk level.
+
+### 1. Automated review and risk label
+
+When a PR is marked ready, and on every later push, a Claude review is posted
+as one comment and updated in place. It labels the PR `ai-risk: low`,
+`ai-risk: medium` or `ai-risk: high`. A failed review is labelled
+`ai-risk: high` and `ai-review: incomplete`; re-run it or review by hand.
+Check that the report's commit SHA matches the PR head before relying on it.
+Iterate in draft to avoid a review on every push.
+
+**First-time contributors:** the review runs automatically only for authors
+who are owners, members, collaborators or previous contributors. For anyone
+else nothing runs, and no comment appears, until a core maintainer adds the
+`ai-review-approved` label. First check that the PR is relevant and contains
+nothing suspicious, because the review sends its content to the API at our
+cost. The label starts the review, and later pushes to that PR are reviewed
+automatically. It authorises the review only, not a merge.
+
+Risk follows the consequences of a change, not its size. Changes to core
+numerics, solvers, FSI coupling, CI or agent configuration are at least HIGH
+by path. The highest assessment applies: if a second review or a maintainer
+rates the risk higher, follow the higher risk's rule and say so on the PR. A
+second review posted with `--post` raises the label automatically, and later
+Claude reports keep that higher risk. Labels are never lowered by a second
+review.
+
+The reviews see the changed lines with three lines of context each, as in the
+GitHub diff, not whole files. Unchanged code next to a change, such as the
+other half of an edited function, is not reviewed. Human reviewers and private
+agents with a full checkout cover that.
+
+### 2. Merge rules
+
+<!-- markdownlint-disable MD013 -->
+
+| Risk | Second AI review | Human check | Who merges |
+| --- | --- | --- | --- |
+| LOW | Not needed | A maintainer works through the report's human review checklist | One core maintainer |
+| MEDIUM | Required, posted on the PR | Author addresses findings; maintainer checks the checklist | One core maintainer |
+| HIGH | Required, posted on the PR | As MEDIUM, plus numerical evidence | Both core maintainers approve |
+
+<!-- markdownlint-enable MD013 -->
+
+At every level you may check things privately with your own AI assistant. Do
+not post another full AI review unless it adds something specific.
+
+### 3. Second independent AI review (MEDIUM and HIGH)
+
+A core maintainer runs it once the PR is close to final, and again only after
+substantive changes. The reviewer gets the same instructions and patches as
+the Claude report, but not the report or any PR comment, so the two are
+independent. From an up-to-date `development` checkout:
+
+```bash
+# Preferred: Codex (gpt-6-astra, xhigh), a different model family
+node .github/scripts/secondReview.cjs <PR number> --post
+
+# Substitute: Claude Fable 5.2 (high); needs ANTHROPIC_API_KEY and
+# npm ci --prefix .github/scripts --ignore-scripts
+node .github/scripts/secondReview.cjs <PR number> --model fable --post
+```
+
+Fable shares the first report's model family, so agreement is weaker
+evidence. It is fine for MEDIUM. For HIGH, use it only if the core maintainer
+running it judges the classification borderline and says so on the PR. If
+Fable declines and the API answers with another model, the script stops
+without posting; use Codex. Findings from
+either review are addressed by the author, with reviewers' help, before merge.
+A report whose SHA no longer matches the PR head is historical only.
+
+### Contributing reviewers
+
+You can check a numerical method, reproduce results, or explain a
+compatibility concern. State what you inspected and what remains uncertain. On
+LOW and MEDIUM PRs you may do the human-check pass; a core maintainer still
+merges. HIGH PRs still need both core maintainers.
+
+Contributors develop into contributing reviewers through sustained work and
+paired reviews. Progression to core maintainer depends on review quality,
+architectural understanding, and sound technical judgement. Core maintainers
+discuss that responsibility with the contributor; review counts do not grant
+it.
+
+The AI reviews are advisory. They can be wrong or miss bugs, and they never
+replace human judgement or numerical verification. See the
+[review guide](.github/review/README.md) for the workflow's security, costs
+and setup.
+
 ## Questions?
 
 If you have any questions or need assistance, we encourage you to use the

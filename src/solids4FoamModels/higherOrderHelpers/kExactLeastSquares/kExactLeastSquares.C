@@ -20,8 +20,7 @@ License
 #include "kExactLeastSquares.H"
 #include "addToRunTimeSelectionTable.H"
 #include "HashSet.H"
-#include "fixedDisplacementFvPatchVectorField.H"
-#include "fixedRotationFvPatchVectorField.H"
+#include "patchQuadratureValues.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -574,7 +573,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -740,6 +739,15 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
         factorials[n] = factorials[n - 1]*n;
     }
 
+    // Integer powers, up to the polynomial order, of the scaling factor h and
+    // of the cell-centre offsets
+    scalarList hPow(polynomialOrder_ + 1);
+    FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
+    FixedList<scalarList, 3> rPow(scalarList(polynomialOrder_ + 1));
+
+    // Owner-cell monomial averages, refilled for each face
+    scalarList ownerAverages(Np);
+
     const List<symmTensor>* secondMomentsPtr = nullptr;
     const List<symmTensor3rdOrder>* thirdMomentsPtr = nullptr;
     Map<symmTensor> remoteSecondMoments;
@@ -850,7 +858,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
     [&]
     (
         const label globalCellID,
-        const vector& d,
+        const FixedList<scalarList, 3>& dPow,
         const label i,
         const label j,
         const label k
@@ -875,15 +883,36 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 
                     average +=
                         binomialI*binomialJ*binomialK
-                       *pow(d.x(), i - a)
-                       *pow(d.y(), j - b)
-                       *pow(d.z(), k - c)
+                       *dPow[0][i - a]
+                       *dPow[1][j - b]
+                       *dPow[2][k - c]
                        *centralMoment(globalCellID, a, b, c);
                 }
             }
         }
 
         return average;
+    };
+
+    // Fill ownerAverages with the central moments of the owner cell: with a
+    // zero offset the monomial average reduces to the central moment
+    const auto fillOwnerAverages =
+    [&]
+    (
+        const label ownerGlobalCellID
+    )
+    {
+        forAll(exponents, p)
+        {
+            const FixedList<label, 3>& exponent = exponents[p];
+            ownerAverages[p] = centralMoment
+            (
+                ownerGlobalCellID,
+                exponent[0],
+                exponent[1],
+                twoD ? 0 : exponent[2]
+            );
+        }
     };
 
     // Return a central moment of a cell after reflection with tensor R.
@@ -979,7 +1008,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
     (
         const label globalCellID,
         const tensor& R,
-        const vector& d,
+        const FixedList<scalarList, 3>& dPow,
         const label i,
         const label j,
         const label k
@@ -1004,9 +1033,9 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 
                     average +=
                         binomialI*binomialJ*binomialK
-                       *pow(d.x(), i - a)
-                       *pow(d.y(), j - b)
-                       *pow(d.z(), k - c)
+                       *dPow[0][i - a]
+                       *dPow[1][j - b]
+                       *dPow[2][k - c]
                        *reflectedCentralMoment
                         (
                             globalCellID,
@@ -1094,17 +1123,32 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             }
 
             const scalar h = 2.0*maxDist;
+            integerPowers(h, hPow);
             Eigen::MatrixXd Q(Np, numberOfObservations);
             Eigen::DiagonalMatrix<double, Eigen::Dynamic> W
             (
                 numberOfObservations
             );
 
+            // The owner-cell averages do not depend on the stencil cell
+            fillOwnerAverages(ownerGlobalCellID);
+
             forAll(cellStencil, stencilI)
             {
                 const label neighbourGlobalCellID = cellStencil[stencilI];
                 const vector dx =
                     cellCentre(neighbourGlobalCellID) - cellC;
+                componentPowers(dx, dxPow);
+
+                const vector mirroredCentre =
+                    faceCentres[faceI]
+                  + transform
+                    (
+                        R,
+                        cellCentre(neighbourGlobalCellID)
+                      - faceCentres[faceI]
+                    );
+                componentPowers(mirroredCentre - cellC, rPow);
 
                 forAll(exponents, p)
                 {
@@ -1115,37 +1159,21 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                     const label order = i + j + k;
                     const scalar factorialDenominator =
                         factorials[i]*factorials[j]*factorials[k];
-                    const scalar ownerAverage = averageMonomial
-                    (
-                        ownerGlobalCellID,
-                        vector::zero,
-                        i,
-                        j,
-                        k
-                    );
+                    const scalar ownerAverage = ownerAverages[p];
 
                     Q(p, stencilI) =
                         (
                             averageMonomial
                             (
                                 neighbourGlobalCellID,
-                                dx,
+                                dxPow,
                                 i,
                                 j,
                                 k
                             )
                           - ownerAverage
                         )
-                       /(pow(h, order)*factorialDenominator);
-
-                    const vector mirroredCentre =
-                        faceCentres[faceI]
-                      + transform
-                        (
-                            R,
-                            cellCentre(neighbourGlobalCellID)
-                          - faceCentres[faceI]
-                        );
+                       /(hPow[order]*factorialDenominator);
 
                     Q(p, Nn + 1 + stencilI) =
                         (
@@ -1153,14 +1181,14 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                             (
                                 neighbourGlobalCellID,
                                 R,
-                                mirroredCentre - cellC,
+                                rPow,
                                 i,
                                 j,
                                 k
                             )
                           - ownerAverage
                         )
-                       /(pow(h, order)*factorialDenominator);
+                       /(hPow[order]*factorialDenominator);
                 }
 
                 const scalar distance = mag
@@ -1176,6 +1204,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             const vector mirroredOwnerCentre =
                 faceCentres[faceI]
               + transform(R, cellC - faceCentres[faceI]);
+            componentPowers(mirroredOwnerCentre - cellC, rPow);
 
             forAll(exponents, p)
             {
@@ -1193,21 +1222,14 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                         (
                             ownerGlobalCellID,
                             R,
-                            mirroredOwnerCentre - cellC,
+                            rPow,
                             i,
                             j,
                             k
                         )
-                      - averageMonomial
-                        (
-                            ownerGlobalCellID,
-                            vector::zero,
-                            i,
-                            j,
-                            k
-                        )
+                      - ownerAverages[p]
                     )
-                   /(pow(h, order)*factorialDenominator);
+                   /(hPow[order]*factorialDenominator);
             }
 
             W.diagonal()[Nn] = weightFunc().weight
@@ -1229,6 +1251,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             forAll(faceQuadPoints[faceI], qpI)
             {
                 const vector r = faceQuadPoints[faceI][qpI] - cellC;
+                componentPowers(r, rPow);
                 Eigen::MatrixXd L = Eigen::MatrixXd::Zero(3, Np);
 
                 forAll(exponents, p)
@@ -1239,26 +1262,26 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                     const label k = twoD ? 0 : exponent[2];
                     const label order = i + j + k;
                     const scalar denominator =
-                        pow(h, order)
+                        hPow[order]
                        *factorials[i]*factorials[j]*factorials[k];
 
                     if (i > 0)
                     {
                         L(0, p) =
-                            i*pow(r.x(), i - 1)
-                             *pow(r.y(), j)*pow(r.z(), k)/denominator;
+                            i*rPow[0][i - 1]*rPow[1][j]*rPow[2][k]
+                           /denominator;
                     }
                     if (j > 0)
                     {
                         L(1, p) =
-                            j*pow(r.x(), i)
-                             *pow(r.y(), j - 1)*pow(r.z(), k)/denominator;
+                            j*rPow[0][i]*rPow[1][j - 1]*rPow[2][k]
+                           /denominator;
                     }
                     if (k > 0)
                     {
                         L(2, p) =
-                            k*pow(r.x(), i)
-                             *pow(r.y(), j)*pow(r.z(), k - 1)/denominator;
+                            k*rPow[0][i]*rPow[1][j]*rPow[2][k - 1]
+                           /denominator;
                     }
                 }
 
@@ -1316,10 +1339,14 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             }
 
             const scalar h = 2.0*maxDist;
+            integerPowers(h, hPow);
             const label ownerGlobalCellID =
                 globalCells.toGlobal(ownCellI);
             Eigen::MatrixXd Q(Np, Nn + Nc);
             Eigen::DiagonalMatrix<double, Eigen::Dynamic> W(Nn + Nc);
+
+            // The owner-cell averages do not depend on the stencil cell
+            fillOwnerAverages(ownerGlobalCellID);
 
             forAll(cellStencil, stencilI)
             {
@@ -1327,6 +1354,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                     cellStencil[stencilI];
                 const vector dx =
                     cellCentre(neighbourGlobalCellID) - cellC;
+                componentPowers(dx, dxPow);
 
                 forAll(exponents, p)
                 {
@@ -1340,23 +1368,16 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                     const scalar neighbourAverage = averageMonomial
                     (
                         neighbourGlobalCellID,
-                        dx,
+                        dxPow,
                         i,
                         j,
                         k
                     );
-                    const scalar ownerAverage = averageMonomial
-                    (
-                        ownerGlobalCellID,
-                        vector::zero,
-                        i,
-                        j,
-                        k
-                    );
+                    const scalar ownerAverage = ownerAverages[p];
 
                     Q(p, stencilI) =
                         (neighbourAverage - ownerAverage)
-                       /(pow(h, order)*factorialDenominator);
+                       /(hPow[order]*factorialDenominator);
                 }
 
                 const scalar d =
@@ -1371,6 +1392,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                     boundaryData[boundaryI];
                 const point& x = faceQuadPoints[address[0]][address[1]];
                 const vector r = x - cellC;
+                componentPowers(r, rPow);
 
                 W.diagonal()[Nn + boundaryI] =
                     weightFunc().weight(mag(r), maxDist);
@@ -1385,14 +1407,14 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                     const scalar factorialDenominator =
                         factorials[i]*factorials[j]*factorials[k];
                     const scalar pointMonomial =
-                        pow(r.x(), i)*pow(r.y(), j)*pow(r.z(), k);
+                        rPow[0][i]*rPow[1][j]*rPow[2][k];
 
                     Q(p, Nn + boundaryI) =
                         (
                             pointMonomial
                           - centralMoment(ownerGlobalCellID, i, j, k)
                         )
-                       /(pow(h, order)*factorialDenominator);
+                       /(hPow[order]*factorialDenominator);
                 }
             }
 
@@ -1429,6 +1451,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
             forAll(faceQuadPoints[faceI], qpI)
             {
                 const vector r = faceQuadPoints[faceI][qpI] - cellC;
+                componentPowers(r, rPow);
                 Eigen::MatrixXd L = Eigen::MatrixXd::Zero(3, Np);
 
                 forAll(exponents, p)
@@ -1439,26 +1462,26 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
                     const label k = twoD ? 0 : exponent[2];
                     const label order = i + j + k;
                     const scalar denominator =
-                        pow(h, order)
+                        hPow[order]
                        *factorials[i]*factorials[j]*factorials[k];
 
                     if (i > 0)
                     {
                         L(0, p) =
-                            i*pow(r.x(), i - 1)
-                             *pow(r.y(), j)*pow(r.z(), k)/denominator;
+                            i*rPow[0][i - 1]*rPow[1][j]*rPow[2][k]
+                           /denominator;
                     }
                     if (j > 0)
                     {
                         L(1, p) =
-                            j*pow(r.x(), i)
-                             *pow(r.y(), j - 1)*pow(r.z(), k)/denominator;
+                            j*rPow[0][i]*rPow[1][j - 1]*rPow[2][k]
+                           /denominator;
                     }
                     if (k > 0)
                     {
                         L(2, p) =
-                            k*pow(r.x(), i)
-                             *pow(r.y(), j)*pow(r.z(), k - 1)/denominator;
+                            k*rPow[0][i]*rPow[1][j]*rPow[2][k - 1]
+                           /denominator;
                     }
                 }
 
@@ -1590,7 +1613,7 @@ void kExactLeastSquares::calcFaceGradCoeffs() const
 
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -1701,7 +1724,7 @@ kExactLeastSquares::QRSolution kExactLeastSquares::QRSolve
 
      result.A = Rbar.colPivHouseholderQr().solve(QbarBhat);
 
-     if(calcConditionNumber_)
+     if (calcConditionNumber_)
      {
          Eigen::JacobiSVD<Eigen::MatrixXd> svd
          (
@@ -1724,7 +1747,7 @@ void kExactLeastSquares::calcCellCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -1790,6 +1813,14 @@ void kExactLeastSquares::calcCellCoeffs() const
     {
         factorials[n] = factorials[n - 1]*n;
     }
+
+    // Integer powers, up to the polynomial order, of the scaling factor h and
+    // of the cell-centre offsets
+    scalarList hPow(polynomialOrder_ + 1);
+    FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
+
+    // Owner-cell monomial averages, refilled for each cell
+    scalarList ownerAverages(Np);
 
     // Reference to remote centres
     const Map<vector>& remoteCI = stencil().remoteCentresMap();
@@ -1909,7 +1940,7 @@ void kExactLeastSquares::calcCellCoeffs() const
     [&]
     (
         const label globalCellID,
-        const vector& d,
+        const FixedList<scalarList, 3>& dPow,
         const label i,
         const label j,
         const label k
@@ -1934,15 +1965,36 @@ void kExactLeastSquares::calcCellCoeffs() const
 
                     average +=
                         binomialI*binomialJ*binomialK
-                       *pow(d.x(), i - a)
-                       *pow(d.y(), j - b)
-                       *pow(d.z(), k - c)
+                       *dPow[0][i - a]
+                       *dPow[1][j - b]
+                       *dPow[2][k - c]
                        *centralMoment(globalCellID, a, b, c);
                 }
             }
         }
 
         return average;
+    };
+
+    // Fill ownerAverages with the central moments of the owner cell: with a
+    // zero offset the monomial average reduces to the central moment
+    const auto fillOwnerAverages =
+    [&]
+    (
+        const label ownerGlobalCellID
+    )
+    {
+        forAll(exponents, p)
+        {
+            const FixedList<label, 3>& exponent = exponents[p];
+            ownerAverages[p] = centralMoment
+            (
+                ownerGlobalCellID,
+                exponent[0],
+                exponent[1],
+                twoD ? 0 : exponent[2]
+            );
+        }
     };
 
     forAll(stencils, cellI)
@@ -1963,6 +2015,7 @@ void kExactLeastSquares::calcCellCoeffs() const
 
         // Scaling factor for Taylor series
         const scalar h = 2.0*maxDist;
+        integerPowers(h, hPow);
 
         // Number of neighbours in stencil
         const label Nn = stencil.size();
@@ -1980,11 +2033,15 @@ void kExactLeastSquares::calcCellCoeffs() const
                 << abort(FatalError);
         }
 
+        // The owner-cell averages do not depend on the stencil cell
+        fillOwnerAverages(ownerGlobalCellID);
+
         // Loop over stencil cells and compute their cell-average equations
         for (label cI = 0; cI < stencil.size(); ++cI)
         {
             const label neiGlobalCellID = stencil[cI];
             const vector dx = cellCentre(neiGlobalCellID) - cellC;
+            componentPowers(dx, dxPow);
 
             forAll(exponents, p)
             {
@@ -2001,23 +2058,16 @@ void kExactLeastSquares::calcCellCoeffs() const
                 const scalar neighbourAverage = averageMonomial
                 (
                     neiGlobalCellID,
-                    dx,
+                    dxPow,
                     i,
                     j,
                     k
                 );
-                const scalar ownerAverage = averageMonomial
-                (
-                    ownerGlobalCellID,
-                    vector::zero,
-                    i,
-                    j,
-                    k
-                );
+                const scalar ownerAverage = ownerAverages[p];
 
                 Q(p, cI) =
                     (neighbourAverage - ownerAverage)
-                   /(pow(h, order)*factorialDenominator);
+                   /(hPow[order]*factorialDenominator);
             }
         }
 
@@ -2156,7 +2206,7 @@ void kExactLeastSquares::calcCellCoeffs() const
     }
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -2322,12 +2372,11 @@ void kExactLeastSquares::fGrad
 
 autoPtr<CompactListList<scalar>> kExactLeastSquares::patchFaceQuadValues
 (
-    const volScalarField&,
-    const label
+    const volScalarField& vf,
+    const label patchI
 ) const
 {
-    NotImplemented;
-    return autoPtr<CompactListList<scalar>>();
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 
@@ -2337,31 +2386,7 @@ autoPtr<CompactListList<vector>> kExactLeastSquares::patchFaceQuadValues
     const label patchI
 ) const
 {
-    const fvPatchField<vector>& pf = vf.boundaryField()[patchI];
-
-    if (isA<fixedDisplacementFvPatchVectorField>(pf))
-    {
-        const fixedDisplacementFvPatchVectorField& patchField =
-            refCast<const fixedDisplacementFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-    else if (isA<fixedRotationFvPatchVectorField>(pf))
-    {
-        const fixedRotationFvPatchVectorField& patchField =
-            refCast<const fixedRotationFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-
-    FatalErrorInFunction
-        << "Patch " << patchI << " fixes displacement, but quadrature-point "
-        << "evaluation is only implemented for "
-        << fixedDisplacementFvPatchVectorField::typeName << " and "
-        << fixedRotationFvPatchVectorField::typeName
-        << abort(FatalError);
-
-    return autoPtr<CompactListList<vector>>();
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 

@@ -24,22 +24,16 @@ EXPECTED_TIME_STEPS=4
 DISP_Z_MIN=-0.159
 DISP_Z_MAX=-0.163
 
-# The segregated approach's final point-A disp_z on the removed legacy
-# mechanicalModel, from the last commit that had it (mcl-stage8-coverage,
-# c3a92b3d), per fork. This is the end-to-end comparison of the framework's
-# neoHookeanElastic against the legacy law: the framework matched it to the
-# eight digits printed, and is held to the 1e-6 relative that comparison used
-case "$(solids4Foam::foamFlavour)" in
-    com)
-        REF_SEGREGATED_DISP_Z=-0.162328
-        ;;
-    org)
-        REF_SEGREGATED_DISP_Z=-0.162328
-        ;;
-    foamextend)
-        REF_SEGREGATED_DISP_Z=-0.160351
-        ;;
-esac
+# The segregated approach's final D, as the max and mean component magnitude
+# of the cell field written to fourteen figures. The cell field is compared
+# rather than the point-A displacement because the volume-to-point
+# interpolation differs between the forks, whereas the cell field is the same
+# discretisation on every fork with the leastSquaresS4f gradient. Recorded on
+# OpenFOAM.com v2412; OpenFOAM.org 9 gives the same
+# figures and foam-extend 4.1 agrees to 2e-7, whereas the point-A disp_z still
+# differs by 4e-3 between foam-extend and the OpenFOAM forks
+REF_SEGREGATED_D_MAX=0.15203902341504
+REF_SEGREGATED_D_MEAN=0.0302371699378385
 REF_REL_TOL=1e-6
 
 ALLRUN_LOGFILE="log.Allrun"
@@ -81,6 +75,12 @@ prepare_case() {
         "s/^endTime[[:space:]][[:space:]]*[^;][^;]*;/endTime         ${REGRESSION_END_TIME};/" \
         "${case_dir}/system/controlDict"
     rm -f "${case_dir}/system/controlDict.bak"
+
+    # The D field is compared with the reference to the last figure written
+    "${SOLIDS4FOAM_SED}" -i 's|^writeFormat.*|writeFormat     ascii;|' \
+        "${case_dir}/system/controlDict"
+    "${SOLIDS4FOAM_SED}" -i 's|^writePrecision.*|writePrecision  14;|' \
+        "${case_dir}/system/controlDict"
 }
 
 extract_final_disp_z() {
@@ -209,7 +209,6 @@ if [ "$CHECK_ONLY" = false ]; then
 fi
 
 failures=0
-declare -A RESULT_DISP
 
 # The framework checks depend only on the mesh and the material, so they are
 # run once rather than once per approach
@@ -250,8 +249,6 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    RESULT_DISP["${approach}"]=$(extract_final_disp_z "${CASE_DIR}")
-
     if ! grep -q "Selecting mechanical constitutive law" \
         "${CASE_DIR}/${SOLVER_LOGFILE}"
     then
@@ -259,7 +256,7 @@ for approach in "${APPROACHES[@]}"; do
         failures=$((failures + 1))
     fi
 
-    # Before the Allclean below, which removes the mesh
+    # Before the Allclean below, which removes the mesh and the fields
     if [ "${constitutive_tested}" = false ]; then
         constitutive_tested=true
 
@@ -268,29 +265,24 @@ for approach in "${APPROACHES[@]}"; do
         fi
     fi
 
+    if [[ "${approach}" == "segregated" ]]; then
+        if [ "$CHECK_ONLY" = true ] \
+            && [[ ! -f "${CASE_DIR}/${REGRESSION_END_TIME}/D" ]]
+        then
+            echo "SKIP: segregated D reference check (case has no fields)"
+        elif ! solids4Foam::checkFieldNorms "segregated D" \
+            "${CASE_DIR}/${REGRESSION_END_TIME}/D" \
+            "${REF_SEGREGATED_D_MAX}" "${REF_SEGREGATED_D_MEAN}" \
+            "${REF_REL_TOL}"
+        then
+            failures=$((failures + 1))
+        fi
+    fi
+
     if [ "$CHECK_ONLY" = false ]; then
         ( cd "${CASE_DIR}" && ./Allclean > /dev/null 2>&1 ) || true
     fi
 done
-
-# The segregated approach against the legacy law
-if [[ -n "${RESULT_DISP[segregated]:-}" ]]
-then
-    a="${REF_SEGREGATED_DISP_Z}"
-    b="${RESULT_DISP[segregated]}"
-
-    if awk "BEGIN {exit !(($a - $b)^2 <= (${REF_REL_TOL}*$a)^2)}"; then
-        printf "PASS: segregated disp_z matches the reference (%.8g vs %.8g)\n" \
-            "$b" "$a"
-    else
-        printf "FAIL: segregated disp_z differs from the reference (%.8g vs %.8g)\n" \
-            "$b" "$a"
-        failures=$((failures + 1))
-    fi
-elif [ "$CHECK_ONLY" = false ]; then
-    echo "FAIL: the segregated approach produced no disp_z to compare"
-    failures=$((failures + 1))
-fi
 
 echo
 if (( failures == 0 )); then

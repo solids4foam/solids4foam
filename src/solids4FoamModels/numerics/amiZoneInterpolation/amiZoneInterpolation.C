@@ -370,7 +370,7 @@ void Foam::amiZoneInterpolation::calcTargetPointAddressing() const
             }
         }
 
-//         Info << "MinEta " << MinEta << endl;
+//         Info<< "MinEta " << MinEta << endl;
 
         targetPointAddr[pointI] = faceTriangle;
         targetPointDist[pointI] = distance;

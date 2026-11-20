@@ -450,6 +450,33 @@ void leastSquaresScheme::checkMeshSupported(const fvMesh& mesh)
 }
 
 
+void leastSquaresScheme::integerPowers(const scalar x, UList<scalar>& xPow)
+{
+    if (xPow.size())
+    {
+        xPow[0] = 1.0;
+    }
+
+    for (label n = 1; n < xPow.size(); ++n)
+    {
+        xPow[n] = xPow[n - 1]*x;
+    }
+}
+
+
+void leastSquaresScheme::componentPowers
+(
+    const vector& d,
+    FixedList<scalarList, 3>& dPow
+)
+{
+    for (direction cmpt = 0; cmpt < 3; ++cmpt)
+    {
+        integerPowers(d[cmpt], dPow[cmpt]);
+    }
+}
+
+
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * //
 
 leastSquaresScheme::leastSquaresScheme(const fvMesh& mesh)

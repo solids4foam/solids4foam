@@ -100,7 +100,7 @@ tmp<scalarField> oneWayFsiFluid::patchPressureForce(const label patchID) const
 
 bool oneWayFsiFluid::evolve()
 {
-    Info << "Evolving fluid model" << endl;
+    Info<< "Evolving fluid model" << endl;
 
     // Read the latest fluid mesh
     const_cast<dynamicFvMesh&>(mesh()).readUpdate();
