@@ -24,10 +24,13 @@ source "${SCRIPT_DIR}/../../../applications/scripts/solids4FoamScripts.sh"
 # Five time steps of 2e-3 s
 REG_END_TIME=0.01
 
-# Flap tip displacement components (m)
-REF_TIP_DY=-1.86627e-07
-REF_TIP_DZ=-2.54964e-08
-TIP_TOL=2e-08
+# Flap tip displacement components (m), with the fluid mesh built from the
+# feature-edge surface (Allrun). The earlier references (Dy -1.87e-7,
+# Dz -2.55e-8) came from a mesh that chamfered the flap, on which the
+# transferred load was dominated by a spurious net force (#665)
+REF_TIP_DY=4.65246e-09
+REF_TIP_DZ=3.17309e-08
+TIP_TOL=3e-09
 
 ALLRUN_LOGFILE="log.Allrun"
 TIP_FILE="postProcessing/0/solidPointDisplacement_flapTip.dat"
