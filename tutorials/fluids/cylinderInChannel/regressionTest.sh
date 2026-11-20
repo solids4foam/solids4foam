@@ -46,10 +46,12 @@ SHORT_LIFT_MAX=0.030
 # (final drag 0.6198 and lift 0.0182 at t = 5 in the full channel), so its
 # short-outlet forces have their own bands. With the latest newtonIcoFluid,
 # use the pimpleFluid force bands and a peak backflow band of
-# [0.0080, 0.0089] (0.847%; zero gradient 0.92%)
+# [0.0080, 0.0089] (0.847%; zero gradient 0.92%). The lower lift limit
+# covers foam-extend (0.0476; 0.0529 with OpenFOAM), where the wake does not
+# reverse the outlet flow (issue #733)
 NEWTON_DRAG_MIN=0.621
 NEWTON_DRAG_MAX=0.624
-NEWTON_LIFT_MIN=0.048
+NEWTON_LIFT_MIN=0.045
 NEWTON_LIFT_MAX=0.058
 
 # Peak backflow, -sum(phi < 0)/sum(phi > 0) on the outlet, over the
@@ -59,7 +61,8 @@ NEWTON_LIFT_MAX=0.058
 # condition (zero gradient gives 0.994% there; a macOS OpenFOAM-9 build gives
 # 0.718%), so the band covers both, while still excluding zero gradient.
 # With foam-extend the wake does not reverse the outlet flow, for either
-# outlet, so the backflow check is skipped there (issue #733)
+# outlet or fluid model, so the backflow checks are skipped there (issue
+# #733)
 SHORT_BACKFLOW_MIN=0.0065
 SHORT_BACKFLOW_MAX=0.0090
 NEWTON_BACKFLOW_MIN=0.0070
@@ -67,6 +70,7 @@ NEWTON_BACKFLOW_MAX=0.0078
 NEWTON_MAX_ITERATIONS=6
 
 ALLRUN_LOGFILE="log.Allrun"
+FOAM_FLAVOUR=$(solids4Foam::foamFlavour)
 
 echo "============================================================"
 echo "cylinderInChannel regression test"
@@ -350,7 +354,7 @@ if run_case shortOutlet "${SHORT_END_TIME}" shortOutlet pimpleFluid; then
     check_end_time shortOutlet "${SHORT_END_TIME}"
     check_forces shortOutlet "${SHORT_DRAG_MIN}" "${SHORT_DRAG_MAX}" \
         "${SHORT_LIFT_MIN}" "${SHORT_LIFT_MAX}"
-    if [[ "$(solids4Foam::foamFlavour)" == "foamextend" ]]; then
+    if [[ "${FOAM_FLAVOUR}" == "foamextend" ]]; then
         echo "SKIP: shortOutlet: peak outlet backflow: no backflow with" \
             "foam-extend (issue #733)"
     else
@@ -373,9 +377,14 @@ if run_case shortOutletNewton "${SHORT_END_TIME}" \
     check_end_time shortOutletNewton "${SHORT_END_TIME}"
     check_forces shortOutletNewton "${NEWTON_DRAG_MIN}" \
         "${NEWTON_DRAG_MAX}" "${NEWTON_LIFT_MIN}" "${NEWTON_LIFT_MAX}"
-    check_range "shortOutletNewton: peak outlet backflow" \
-        "$(peak_outlet_backflow "${NEWTON_CASE_DIR}" || true)" \
-        "${NEWTON_BACKFLOW_MIN}" "${NEWTON_BACKFLOW_MAX}"
+    if [[ "${FOAM_FLAVOUR}" == "foamextend" ]]; then
+        echo "SKIP: shortOutletNewton: peak outlet backflow: no backflow" \
+            "with foam-extend (issue #733)"
+    else
+        check_range "shortOutletNewton: peak outlet backflow" \
+            "$(peak_outlet_backflow "${NEWTON_CASE_DIR}" || true)" \
+            "${NEWTON_BACKFLOW_MIN}" "${NEWTON_BACKFLOW_MAX}"
+    fi
     check_range "shortOutletNewton: max Newton iterations per step" \
         "$(max_newton_iterations "${NEWTON_CASE_DIR}/log.solids4Foam")" \
         1 "${NEWTON_MAX_ITERATIONS}"
