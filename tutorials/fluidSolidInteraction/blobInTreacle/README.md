@@ -97,6 +97,12 @@ cylinder is `0.0597 m` at `t = 1 s` and `0.1357 m` at the end, against
 agrees to 0.75%. The regression test runs this variant as a second arm on
 OpenFOAM.com.
 
+`./Allrun monolithic velocityLaplacian` moves the fluid mesh with the
+`velocityLaplacian` motion solver of the partitioned case instead of the solid
+model. The x displacement of the top of the half cylinder is then 0.16% lower
+at the end, within 0.05% of the partitioned value, and the final force is
+0.04% lower. The regression test runs it as a third arm.
+
 ---
 
 ## Results

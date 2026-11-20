@@ -11,9 +11,14 @@ source solids4FoamScripts.sh
 # ./Allrun parallel             # partitioned (IQNILS), parallel
 # ./Allrun monolithic           # quasi-monolithic Newton (PETSc), serial
 # ./Allrun monolithic parallel  # quasi-monolithic Newton (PETSc), parallel
+# ./Allrun monolithic velocityLaplacian
+#                               # quasi-monolithic Newton with the
+#                               # velocityLaplacian fluid mesh motion of the
+#                               # partitioned case instead of a solid model
 
 coupling=partitioned
 runMode=serial
+meshMotion=solidModel
 
 for arg in "$@"
 do
@@ -24,9 +29,12 @@ do
         parallel)
             runMode=parallel
             ;;
+        velocityLaplacian)
+            meshMotion=velocityLaplacian
+            ;;
         *)
             echo "Unknown option: $arg"
-            echo "Usage: ./Allrun [monolithic] [parallel]"
+            echo "Usage: ./Allrun [monolithic] [parallel] [velocityLaplacian]"
             exit 1
             ;;
     esac
@@ -40,6 +48,13 @@ if [[ "${coupling}" == "monolithic" ]]; then
     solids4Foam::caseDoesNotRunWithFoamExtend
     solids4Foam::caseDoesNotRunWithOpenFOAMOrg
     solids4Foam::selectCaseVariant . monolithic
+
+    if [[ "${meshMotion}" == "velocityLaplacian" ]]; then
+        # Use the partitioned dynamicMeshDict; restoreCaseVariant still
+        # restores it, as the link is recorded
+        echo "Using dynamicMeshDict.default for constant/fluid/dynamicMeshDict"
+        ln -nsf dynamicMeshDict.default constant/fluid/dynamicMeshDict
+    fi
 else
     solids4Foam::restoreCaseVariant .
 fi

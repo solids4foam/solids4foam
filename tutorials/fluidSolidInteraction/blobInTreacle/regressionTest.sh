@@ -34,6 +34,14 @@ MONO_REF_DISP_T1=0.0596897
 MONO_REF_DISP_END=0.135732
 MONO_REF_FORCE_END=15.6327
 
+# Reference values for the quasi-monolithic Newton coupling with the
+# velocityLaplacian fluid mesh motion of the partitioned case: OpenFOAM v2512,
+# serial, Linux (GCC) and macOS (Clang), which agree to all written digits.
+# They differ from the solid model mesh motion by up to 0.16%
+MONO_VL_REF_DISP_T1=0.0596639
+MONO_VL_REF_DISP_END=0.135511
+MONO_VL_REF_FORCE_END=15.6260
+
 # Log files
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -144,8 +152,10 @@ check() {
 
 # ------------------------------------------------------------
 # Run and check one arm
-# Arguments: arm name, Allrun arguments, and the references for the
-# displacement at t = 1 s, the final displacement and the final force
+# Arguments: arm name, Allrun arguments (separated by tabs, as IFS has no
+# space), the references for the displacement at t = 1 s, the final
+# displacement and the final force, and optionally a line that the solver log
+# must contain
 # ------------------------------------------------------------
 
 run_and_check() {
@@ -154,6 +164,7 @@ run_and_check() {
     local ref_disp_t1="$3"
     local ref_disp_end="$4"
     local ref_force_end="$5"
+    local MESH_MOTION_LOG_LINE="${6:-}"
     local CASE_DIR="${REGRESSION_ROOT}/${ARM}"
 
     echo "Running the ${ARM} arm"
@@ -209,6 +220,15 @@ run_and_check() {
         return
     fi
 
+    # The mesh motion of an arm, if given, must be the one that was used
+    if [[ -n "${MESH_MOTION_LOG_LINE}" ]] \
+        && ! grep -qF "${MESH_MOTION_LOG_LINE}" "${SOLVER_LOG}"; then
+        echo "FAIL [${ARM}]: '${MESH_MOTION_LOG_LINE}' not found in" \
+            "${SOLVER_LOG}"
+        failures=$((failures + 1))
+        return
+    fi
+
     # ------------------------------------------------------------
     # Extract values
     # ------------------------------------------------------------
@@ -258,8 +278,13 @@ run_and_check partitioned "" \
 if [[ "${WM_PROJECT_VERSION:-}" == v* && -n "${PETSC_DIR:-}" ]]; then
     run_and_check monolithic monolithic \
         "${MONO_REF_DISP_T1}" "${MONO_REF_DISP_END}" "${MONO_REF_FORCE_END}"
+    run_and_check monolithicVelocityLaplacian \
+        $'monolithic\tvelocityLaplacian' \
+        "${MONO_VL_REF_DISP_T1}" "${MONO_VL_REF_DISP_END}" \
+        "${MONO_VL_REF_FORCE_END}" \
+        "The fluid mesh is moved by the velocityLaplacian motion solver"
 else
-    echo "Skipping the monolithic arm: it needs OpenFOAM.com and PETSc"
+    echo "Skipping the monolithic arms: they need OpenFOAM.com and PETSc"
 fi
 
 echo
