@@ -392,8 +392,16 @@ function secondReviewRisk(comments) {
 function formatCoverage(coverage, max = Infinity, listed = Infinity) {
   const omitted = coverage.omitted.slice(0, listed);
   const more = coverage.omitted.length - omitted.length;
+  const full = Array.isArray(coverage.full_files) ? coverage.full_files : [];
+  const fullShown = full.slice(0, listed);
   return `**Patch coverage: ${coverage.status.toUpperCase()}** ` +
-    '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n' +
+    (full.length ? '(supplied hunks, plus the full post-change text of the files listed below; ' +
+      'other source and linked evidence are not inspected).\n\n' :
+      '(supplied hunks only; surrounding source and linked evidence are not inspected).\n\n') +
+    (coverage.full_files_failed ? 'Full files could not be fetched, so the review saw hunks only.\n\n' : '') +
+    (full.length ? 'Seen in full:\n' + fullShown.map(path => `- ${plain(path, max)}`).join('\n') +
+      (full.length > fullShown.length ? `\n- and ${full.length - fullShown.length} more files` : '') +
+      '\n\n' : '') +
     (omitted.length ? 'Not reviewed:\n' + omitted.map(item =>
       `- ${plain(item.path, max)} (${item.reason === 'no_patch' ? 'no patch available' : 'prompt budget'})`)
       .join('\n') + (more ? `\n- and ${more} more files` : '') + '\n\n' : '');
@@ -401,9 +409,9 @@ function formatCoverage(coverage, max = Infinity, listed = Infinity) {
 
 // GitHub rejects comments over 65,536 characters, and escaping can expand
 // model text up to five times. Rather than discard a valid report, shorten
-// each text field (and the not-reviewed list) step by step until it fits. The
-// last step fits any schema-valid report: 48 fields of 121 characters, escaped,
-// plus 20 listed paths, is under 45,000 characters.
+// each text field (and the path lists) step by step until it fits. The last
+// step fits any schema-valid report: 48 fields of 121 characters, escaped,
+// plus 20 not-reviewed and 20 full-file paths, is under 55,000 characters.
 const commentLimit = 60000;
 const fitSteps = [[Infinity, Infinity], [1000, 100], [500, 50], [250, 30], [120, 20]];
 function fitComment(render) {
@@ -428,14 +436,90 @@ function repositoryGuide(read = readCheckout) {
     skill.trim();
 }
 
+// Full post-change files (#729). Hunks alone hide the rest of a changed
+// function, the matching header and nearby code. After the patches, the prompt
+// also carries the full text of changed source files at the PR head, read
+// through the GitHub API as data: nothing from the PR is checked out or run.
+// Full files have their own budget (about 80k tokens, USD 0.35 of Opus 5.5
+// input), so an ordinary PR does not fill the whole prompt budget, and patches
+// always come first. Order: C/C++ sources and headers under src/ and
+// applications/, then the unchanged header matching a changed .C file, then
+// other changed text files. Documentation, tutorial mesh/field/CSV data,
+// binaries and removed files are skipped.
+const fullFileBudget = 200000;
+const maxFullFiles = 60;
+const sourceFile = /^(src|applications)\/.+\.(C|H|c|h|cc|cpp|cxx|hh|hpp|hxx)$/;
+const notFullFile = /(^|\/)(polyMesh|0)\/|\.(csv|md|rst|txt|png|jpe?g|gif|svg|pdf|gz|zip)$/i;
+function fullFileCandidates(files) {
+  const listed = new Set(files.map(file => file.filename));
+  const present = files.filter(file => file.status !== 'removed').map(file => file.filename);
+  const sources = present.filter(path => sourceFile.test(path));
+  const headers = sources.filter(path => path.endsWith('.C'))
+    .map(path => `${path.slice(0, -2)}.H`).filter(path => !listed.has(path));
+  const others = present.filter(path => !sourceFile.test(path) && !notFullFile.test(path));
+  return [...sources.map(path => ({path, reason: 'changed'})),
+    ...headers.map(path => ({path, reason: 'matching_header'})),
+    ...others.map(path => ({path, reason: 'changed'}))].slice(0, maxFullFiles);
+}
+// One GraphQL request asks for the sizes of all candidates, and a second one
+// for the text of those that fit, so the number of API calls does not grow
+// with the PR. `graphql(query, variables)` returns the response data. A
+// missing path (null), a binary or truncated blob, or a file that does not
+// fit is skipped.
+function blobQuery(count, fields) {
+  const variables = Array.from({length: count}, (_, i) => `$e${i}: String!`).join(', ');
+  const objects = Array.from({length: count}, (_, i) =>
+    `f${i}: object(expression: $e${i}) { ... on Blob { ${fields} } }`).join(' ');
+  return `query($owner: String!, $name: String!, ${variables}) ` +
+    `{ repository(owner: $owner, name: $name) { ${objects} } }`;
+}
+async function fetchFullFiles(graphql, repo, sha, candidates) {
+  const blobs = async (list, fields) => {
+    if (!list.length) return [];
+    const variables = {owner: repo.owner, name: repo.repo,
+      ...Object.fromEntries(list.map((file, i) => [`e${i}`, `${sha}:${file.path}`]))};
+    const data = await graphql(blobQuery(list.length, fields), variables);
+    return list.map((file, i) => data?.repository?.[`f${i}`] || null);
+  };
+  let room = fullFileBudget;
+  const fitting = [];
+  (await blobs(candidates, 'byteSize isBinary')).forEach((blob, i) => {
+    if (blob?.isBinary === false && Number.isSafeInteger(blob.byteSize) &&
+        blob.byteSize > 0 && blob.byteSize <= room) {
+      fitting.push(candidates[i]);
+      room -= blob.byteSize;
+    }
+  });
+  const texts = await blobs(fitting, 'text isTruncated');
+  return fitting.map((file, i) => ({...file, text: texts[i]?.text}))
+    .filter((file, i) => typeof file.text === 'string' && texts[i].isTruncated === false);
+}
+// CI and the local second review share this, so both reviewers get the same
+// files. A failed fetch leaves a hunks-only review, stated in the coverage.
+async function collectFullFiles(graphql, repo, sha, files) {
+  const candidates = fullFileCandidates(files);
+  if (!candidates.length) return {fullFiles: [], fullFilesFailed: false};
+  try {
+    return {fullFiles: await fetchFullFiles(graphql, repo, sha, candidates), fullFilesFailed: false};
+  } catch {
+    return {fullFiles: [], fullFilesFailed: true};
+  }
+}
+// Each line starts with its number and `|`, so findings can cite exact lines.
+function numberLines(text) {
+  const lines = text.split('\n');
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+  return lines.map((line, i) => `${i + 1}|${line}`).join('\n');
+}
+
 // Budget the JSON-escaped *whole prompt*. 600 KB is about 250k tokens (about
 // USD 1 of Opus 5.5 input), enough for whole patches of large refactoring PRs.
 // The prompt reaches the analysis step as a file, never as a step output.
 const promptBudget = 600000;
-function buildPrompt(pr, files, read = readCheckout) {
+function buildPrompt(pr, files, read = readCheckout, {fullFiles = [], fullFilesFailed = false} = {}) {
   const instructions = read('.github/review/instructions.md');
   const guide = repositoryGuide(read);
-  const selected = [], omitted = [];
+  const selected = [], omitted = [], full = [];
   const priority = file => file.filename.startsWith('src/') ? 0 :
     file.filename.startsWith('applications/') ? 1 :
     /(^|\/)(polyMesh|0)\/|\.csv$/.test(file.filename) ? 3 : 2;
@@ -445,7 +529,7 @@ function buildPrompt(pr, files, read = readCheckout) {
   const system = `${instructions}\n\n${guide}`;
   const data = () => `Reviewed head: ${pr.head.sha}\nBase: ${pr.base.sha}\n` +
     `\nUNTRUSTED PR DATA (JSON):\n${JSON.stringify({title: pr.title, body: pr.body,
-      files: selected, not_reviewed: omitted})}`;
+      files: selected, not_reviewed: omitted, full_files: full})}`;
   const prompt = () => `${system}\n\n${data()}`;
   // Reserve manifest space before selecting any patches; never silently truncate a patch.
   // The limit covers instructions and guide (~18 KB escaped) plus the file manifest.
@@ -465,8 +549,21 @@ function buildPrompt(pr, files, read = readCheckout) {
     }
   }
   if (!selected.length) throw new Error('nothing_reviewable');
+  // Full files only use what the patches left, and at most fullFileBudget.
+  let size = Buffer.byteLength(JSON.stringify(prompt())), used = 0;
+  for (const file of fullFiles) {
+    full.push({path: file.path, reason: file.reason, content: numberLines(file.text)});
+    const next = Buffer.byteLength(JSON.stringify(prompt()));
+    if (next > promptBudget || used + next - size > fullFileBudget) {
+      full.pop();
+      continue;
+    }
+    used += next - size;
+    size = next;
+  }
   return {prompt: prompt(), system, data: data(),
-    coverage: {status: omitted.length ? 'partial' : 'complete', omitted}};
+    coverage: {status: omitted.length ? 'partial' : 'complete', omitted,
+      full_files: full.map(file => file.path), ...(fullFilesFailed ? {full_files_failed: true} : {})}};
 }
 async function prepare({github, context, core}, env = process.env) {
   fs.rmSync(inputFile(env), {force: true});
@@ -479,7 +576,10 @@ async function prepare({github, context, core}, env = process.env) {
     }
     const files = await github.paginate(github.rest.pulls.listFiles, {...args, per_page: 100});
     if (!files.length || files.length >= 3000) throw new Error('file_list_incomplete');
-    const result = buildPrompt(current, files);
+    // Read at the collected head SHA, before the check that the head did not move.
+    const full = await collectFullFiles((query, variables) => github.graphql(query, variables),
+      context.repo, current.head.sha, files);
+    const result = buildPrompt(current, files, readCheckout, full);
     const {data: after} = await github.rest.pulls.get(args);
     if (after.head.sha !== pr.head.sha || after.base.sha !== current.base.sha) {
       throw new Error('pr_changed_during_collection');
@@ -534,6 +634,8 @@ async function publish({github, context, core}, env = process.env) {
     const data = validate(env.REVIEW_JSON);
     coverage = JSON.parse(env.REVIEW_COVERAGE);
     if (!['complete', 'partial'].includes(coverage.status) || !Array.isArray(coverage.omitted) ||
+        (coverage.full_files !== undefined && (!Array.isArray(coverage.full_files) ||
+          coverage.full_files.some(path => typeof path !== 'string'))) ||
         Buffer.byteLength(env.REVIEW_COVERAGE) > 30000) throw new Error('Invalid coverage');
     const own = classifyRisk(data.risk, env.RISK_FLOOR);
     risk = second ? classifyRisk(own, second) : own;
@@ -567,6 +669,7 @@ async function publish({github, context, core}, env = process.env) {
   if (failed) core.setFailed('AI review incomplete; failure report published.');
   return {status: failed ? 'failed' : 'completed', coverage: failed ? 'incomplete' : coverage.status};
 }
-module.exports = {promptBudget, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
+module.exports = {promptBudget, fullFileBudget, maxFullFiles, fullFileCandidates, blobQuery,
+  fetchFullFiles, collectFullFiles, numberLines, riskLabels, incompleteLabel, setRiskLabels, secondMarker,
   secondReviewRisk, risks, schema, apiSchema, analyse, inputFile, replayContent, addUsage, retryDelay, clientOptions, maxRequests, analysisReasons, httpStatus, limits, maxReportChars, maxReportBytes, commentLimit, fitComment, validate, classifyRisk, pathRisk, riskFloor, buildPrompt,
   formatAssessment, formatCoverage, secondReviewNotice, plain, prepare, publish};
