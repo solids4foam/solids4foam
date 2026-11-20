@@ -244,6 +244,13 @@ else
     failures=$((failures + 1))
 fi
 
+# Restart consistency of the quasi-monolithic coupling (skipped without
+# OpenFOAM.com and PETSc)
+echo
+if ! "${SCRIPT_DIR}/restartTest.sh"; then
+    failures=$((failures + 1))
+fi
+
 echo
 if (( failures == 0 )); then
     echo "============================================================"

@@ -853,6 +853,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `solids4Foam` stops with an error when a run continues from a written time
+  that holds the old-time fields of a restart but not its time state
+  (`<time>/uniform/time`), as after decomposing a time region by region
+  (`decomposePar -region`), which does not copy `<time>/uniform`. The time
+  index then restarted from zero and the models continued as a new run
+  (first-step time schemes, restart fields not read, the mesh motion
+  stiffness recomputed on the deformed mesh), which on the quasi-monolithic
+  Hessenthaler case doubled the Newton iterations per step after the restart
+  (#740). On OpenFOAM.com, decompose all regions in one call with
+  `-copyUniform`, e.g.
+  `decomposePar -regions '(fluid solid)' -copyUniform -time <time>`.
+  `TurekHron2006/restartTest.sh`, run by its regression test, checks that a
+  quasi-monolithic run restarted on the same or a new decomposition continues
+  as the uninterrupted run.
 - In parallel, a point displacement boundary condition (`fixedValue`) or
   symmetry plane is now applied to every processor's copy of a point, also on
   a processor that holds none of the patch's faces at that point, as happens
