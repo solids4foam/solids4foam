@@ -1,0 +1,45 @@
+#!/bin/bash
+# Convergence of the BDF ddt scheme on a moving mesh: the test app at four
+# time steps (observed orders from successive pairs), then the polynomial
+# exactness run. Needs Test-bdfDdtMovingMesh built (wmake in this directory).
+cd "$(dirname "$0")/case" || exit 1
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+blockMesh > log.blockMesh 2>&1 || { echo "blockMesh failed"; exit 1; }
+
+for dt in 0.1 0.05 0.025 0.0125
+do
+    Test-bdfDdtMovingMesh -deltaT $dt > "log.dt$dt" 2>&1 || { echo "run failed: log.dt$dt"; exit 1; }
+done
+Test-bdfDdtMovingMesh -deltaT 0.05 -poly > log.poly 2>&1 || { echo "run failed: log.poly"; exit 1; }
+
+python3 - <<'PY'
+import math, re
+dts = [0.1, 0.05, 0.025, 0.0125]
+err = {}
+for dt in dts:
+    for line in open(f"log.dt{dt}"):
+        m = re.match(r"BDF (\d): ddt error (\S+) fvm-fvc (\S+) GCL (\S+)", line)
+        if m:
+            err.setdefault(int(m[1]), []).append(tuple(float(x) for x in m.groups()[1:]))
+print("order | ddt error at dt = " + ", ".join(f"{d:g}" for d in dts) + " | observed orders | max fvm-fvc | max GCL")
+ok = True
+for q in sorted(err):
+    e = [r[0] for r in err[q]]
+    orders = [math.log2(e[i]/e[i+1]) if e[i+1] > 0 else float('nan') for i in range(len(e)-1)]
+    fvm = max(r[1] for r in err[q]); gcl = max(r[2] for r in err[q])
+    floor = e[-1] < 1e-9
+    good = floor or orders[-1] > q - 0.5
+    ok &= good and fvm < 1e-9 and gcl < 1e-9
+    print(f"  {q}   | " + " ".join(f"{x:.2e}" for x in e) + " | " + " ".join(f"{o:.2f}" for o in orders)
+          + f" | {fvm:.1e} | {gcl:.1e}" + ("" if good else "  <-- order not reached"))
+poly_ok = True
+for line in open("log.poly"):
+    m = re.match(r"BDF (\d): ddt error (\S+)", line)
+    if m:
+        poly_ok &= float(m[2]) < 1e-9
+print("polynomial exactness (BDFq on degree-q V psi):", "PASS" if poly_ok else "FAIL")
+print("RESULT:", "PASS" if ok and poly_ok else "FAIL")
+PY

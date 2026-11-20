@@ -1,0 +1,25 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+
+application     Test-bdfDdtMovingMesh;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         1;
+deltaT          0.05;
+writeControl    timeStep;
+writeInterval   1000;
+writeFormat     ascii;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable no;
+
+// ************************************************************************* //
