@@ -2,7 +2,7 @@
 sort: 5
 ---
 
-# Idealised Ventricle Inflation: `idealisedVentricle`
+# Idealised Ventricle Inflation: `LandEtAl2015/problem2`
 
 ---
 
@@ -43,8 +43,8 @@ Two options are provided:
 ## Running the Case
 
 The tutorial case is located at
-`solids4foam/tutorials/solids/hyperelasticity/idealisedVentricle`. The case
-can be run using the included `Allrun` script:
+`solids4foam/tutorials/solids/hyperelasticity/LandEtAl2015/problem2`. The
+case can be run using the included `Allrun` script:
 
 ```bash
 ./Allrun

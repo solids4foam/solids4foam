@@ -302,8 +302,8 @@ void mechanicalEnergies::checkEnergies
             //<< laplacianSmoothingEnergy_ << " J" << nl
             << "Bulk viscosity energy = " << linearBulkViscosityEnergy_ << " J"
             << nl
-            << "Energy imbalance (% of max) = " << energyImbalancePercent << " %"
-            << endl;
+            << "Energy imbalance (% of max) = " << energyImbalancePercent
+            << " %" << endl;
 
         if (energyImbalancePercent > 10.0)
         {

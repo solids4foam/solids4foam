@@ -138,7 +138,7 @@ Foam::amiZoneInterpolation::interpolateToSourcePoints
 
     const List< List<scalar> >& weights = sourcePointWeights();
 
-    forAll (result, pointI)
+    forAll(result, pointI)
     {
         if (addr[pointI].first() > -1)
         {
@@ -203,7 +203,7 @@ Foam::amiZoneInterpolation::interpolateToTargetPoints
 
     const List< List<scalar> >& weights = targetPointWeights();
 
-    forAll (result, pointI)
+    forAll(result, pointI)
     {
         if (addr[pointI].first() > -1)
         {

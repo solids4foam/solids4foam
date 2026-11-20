@@ -118,6 +118,38 @@ When using `addTinyPatch` the original mesh is overwritten!
 
 ---
 
+## `makeArosticaTimeSeries`
+
+- **Utility purpose**
+  Tabulate the time series of the Aróstica et al. (2025) cardiac
+  elastodynamics benchmarks as interpolation tables `(time value)`: the
+  active stress `tau(t)`, eq. (5)-(6), and the cavity pressures `p(t)`,
+  eq. (7)-(8), with the parameters of Table 4 (`benchmark1`) or Table 9
+  (`bivLV`, `bivRV`). Each is an ODE in time only, integrated with an exact
+  exponential update. The tables cover `t` in `[0, 1]` s. Created by Claude
+  Opus 5.5, supervised by Chanikya Valeti, UCD.
+
+- **Arguments**
+  None
+
+- **Options/parameters**
+
+  - `-active`: tabulate the active stress, with `-sigma0 <Pa>` and optionally
+    `-tSys <s>` and `-tDias <s>`;
+  - `-pressure <benchmark1|bivLV|bivRV>`: tabulate a cavity pressure;
+  - `-zero`: write an all-zero table;
+  - `-dt <s>`: table spacing, default `1e-4`;
+  - `-out <file>`: the output file.
+
+- **Example of usage**
+
+  ```bash
+  makeArosticaTimeSeries -active -sigma0 1.5e5 -out constant/activeStress
+  makeArosticaTimeSeries -pressure benchmark1 -out constant/timeVsPressure
+  ```
+
+---
+
 ## `perturbMeshPoints`
 
 - **Utility purpose**
@@ -240,6 +272,61 @@ The mesh is overwritten!
 
 ---
 
+## `setFibreField`
+
+- **Utility purpose**
+  Set the fibre field of a cardiac case. Both methods first solve
+  `laplacian(t) = 0` for the transmural coordinate `t`, which needs
+  `fixedValue 0` (endocardium) and `fixedValue 1` (epicardium) conditions in
+  `0/t`, and `zeroGradient` elsewhere.
+
+  - `rossiLassila` (default): the fibre field `f0` (cell and face values) of
+    the Land et al. (2015) ellipsoidal ventricle benchmarks; the longitudinal
+    direction is rotated about the transmural direction by an angle varying
+    linearly from 90° (endocardium) to -90° (epicardium). The base normal is
+    z.
+  - `ellipsoid`: the fibre `f0`, sheet `s0` and sheet-normal `n0` fields of a
+    truncated ellipsoid with its long axis along x, following the rule-based
+    definition of Aróstica et al. (2025), eq. (12)-(16), a port of the
+    benchmark's reference implementation. The ellipsoid method was created by
+    Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
+
+- **Arguments**
+  None
+
+- **Options/parameters**
+  `-region <name>`
+
+- **Dictionary**
+  The optional dictionary `system/setFibreFieldDict` selects the method;
+  without it, `rossiLassila` is used:
+
+  ```c++
+  method      ellipsoid;      // rossiLassila (default) or ellipsoid
+
+  // Non-orthogonal correctors for the Laplace solve of t, default 0
+  nCorrectors 3;
+
+  // ellipsoid only: radii in m and fibre angles in degrees
+  rShortEndo  0.025;
+  rLongEndo   0.09;
+  rShortEpi   0.035;
+  rLongEpi    0.097;
+  alphaEndo   -60;
+  alphaEpi    60;
+  ```
+
+- **Example of usage**
+
+  ```bash
+  setFibreField
+  ```
+
+  See the `LandEtAl2015/problem3` (`rossiLassila`) and
+  `ArosticaEtAl2025/benchmark1` (`ellipsoid`) tutorials.
+
+---
+
 ## `splitPatch`
 
 - **Utility purpose** Splits a patch into two patches by putting faces in the
@@ -288,5 +375,63 @@ The mesh is overwritten!
   Alternatively, the `-overwrite` option can be used to overwrite the original
   mesh.
   ```
+
+---
+
+## `updatePrestress`
+
+- **Utility purpose** Performs one pass of the modified updated Lagrangian
+  formulation for prestressing a solid model: the load is applied to the
+  imaged mesh, `Fpre` is updated and the displacement reset to zero, and this
+  is repeated until the imaged mesh is in equilibrium with the load. `Fpre`
+  for the next pass is the deformation gradient at the latest time composed
+  with the `Fpre` the run used, `FpreNew = F & Fpre`. It is written to the
+  start time at full precision, the previous `Fpre` is kept as
+  `FprePass<N>`, and every time directory after the start time is removed, so
+  the next pass starts from zero displacement. Convergence measures
+  (`mag(D)` and `mag(F - I)`), the range of `det(Fpre)` and, for laws with
+  fibre or other directions, the angle `Fpre` turns them through are printed
+  and appended to `prestressHistory` in the case directory. How the laws use
+  `Fpre` is described in the Prestress section of
+  `src/solids4FoamModels/mechanicalConstitutiveLaw/README.md`.
+
+  Reference: Gee, M. W., Förster, C., & Wall, W. A. (2010). A computational
+  strategy for prestressing patient-specific biomechanical problems under
+  finite deformation. International Journal for Numerical Methods in
+  Biomedical Engineering, 26(1), 52-72.
+
+- **Arguments** None
+
+- **Options/parameters**
+
+  `-parallel` to update a decomposed case (uncollated only). Only the
+  processor directories are updated; run `reconstructPar` before decomposing
+  again.
+
+  `-keepPasses` to keep every earlier `Fpre` as `FprePass<N>`, rather than
+  only the one from before this update.
+
+- **Example of usage**
+
+  Run the first pass with `prestress no;` in `constant/mechanicalProperties`,
+  so `Fpre` is taken to be the identity, and `prestress yes;` for every later
+  pass:
+
+  ```bash
+  solids4Foam
+  updatePrestress
+  ```
+
+  Each pass should be a static solve at the target load: `steadyState` for
+  `ddt(D)` and `d2dt2(D)`, and `predictor no;`.
+
+```note
+Every time directory after the start time is removed. Nothing is removed
+until the previous Fpre is backed up and the new one written and read back;
+if that fails, the previous Fpre is restored. A case that is not steadyState,
+uses a collated fileHandler, uses a law that cannot be prestressed, or whose
+start-time Fpre is not the one the run used, is refused before anything is
+changed.
+```
 
 ---

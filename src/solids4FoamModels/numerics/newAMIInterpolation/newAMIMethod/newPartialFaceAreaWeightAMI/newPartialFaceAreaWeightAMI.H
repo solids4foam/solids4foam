@@ -85,7 +85,10 @@ public:
         );
 
         //- Disallow default bitwise copy construction
-        newPartialFaceAreaWeightAMI(const newPartialFaceAreaWeightAMI&) = delete;
+        newPartialFaceAreaWeightAMI
+        (
+            const newPartialFaceAreaWeightAMI&
+        ) = delete;
 
 
     //- Destructor

@@ -33,7 +33,7 @@ Skipping this case as PETSc is not installed" \
 fi
 
 # ============================================================
-# idealisedVentricle regression test
+# LandEtAl2015/problem2 regression test
 # Runs the petsc and pressureDisplacement approaches, and the
 # petsc case with the isotropicFungElastic material, with a
 # shortened end-time and loosened tolerances, and checks that
@@ -98,7 +98,7 @@ APPROACHES=(
 )
 
 echo "============================================================"
-echo "idealisedVentricle regression tests"
+echo "LandEtAl2015/problem2 regression tests"
 echo "Max sigmaEq in [${SIGMA_MIN}, ${SIGMA_MAX}]"
 echo "Approaches: ${APPROACHES[*]}"
 echo "============================================================"

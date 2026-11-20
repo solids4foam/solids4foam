@@ -1,0 +1,13 @@
+SOLIDS4FOAM_ROOT := ../../..
+
+sinclude $(SOLIDS4FOAM_ROOT)/etc/wmake-options
+sinclude $(SOLIDS4FOAM_ROOT)/../etc/wmake-options
+
+EXE_INC = \
+    -I$(SOLIDS4FOAM_ROOT)/src/circulationModels/circulation0D/lnInclude \
+    $(VERSION_SPECIFIC_INC) \
+    -I$(LIB_SRC)/ODE/lnInclude
+
+EXE_LIBS = \
+    -L$(FOAM_MODULE_LIBBIN) -lcirculation0D \
+    -lODE

@@ -54,7 +54,10 @@ bool Foam::fsiConvergenceData::writeData()
         time_.lookupObject<fvMesh>(regionName_);
 
     const fluidSolidInterface& fsi =
-        mesh.thisDb().parent().lookupObject<fluidSolidInterface>("fsiProperties");
+        mesh.thisDb().parent().lookupObject<fluidSolidInterface>
+        (
+            "fsiProperties"
+        );
         // mesh.parent().lookupObject<fluidSolidInterface>("fsiProperties");
 
     if (Pstream::master())

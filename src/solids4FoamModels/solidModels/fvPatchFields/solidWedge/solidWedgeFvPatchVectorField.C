@@ -197,8 +197,8 @@ tmp<Field<vector> > solidWedgeFvPatchVectorField::snGrad() const
             this->patchInternalField() + (k & gradU.patchInternalField())
         );
 
-        // Calculate delta coeffs from proj position on centre plane to transformed
-        // projected position
+        // Calculate delta coeffs from proj position on centre plane to
+        // transformed projected position
         const scalarField projDeltaCoeff
         (
             1.0/mag(transform(wedgePatch.cellT(), projC) - projC)

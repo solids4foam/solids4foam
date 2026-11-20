@@ -95,7 +95,10 @@ movingWallPressureFvPatchScalarField
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
 
-// void movingWallPressureFvPatchScalarField::evaluate(const Pstream::commsTypes)
+// void movingWallPressureFvPatchScalarField::evaluate
+// (
+//     const Pstream::commsTypes
+// )
 // {
 //     if (!this->updated())
 //     {

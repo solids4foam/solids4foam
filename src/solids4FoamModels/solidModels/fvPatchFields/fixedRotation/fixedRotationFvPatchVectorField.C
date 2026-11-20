@@ -27,6 +27,7 @@ License
 #include "patchCorrectionVectors.H"
 #include "lookupSolidModel.H"
 #include "compatibilityFunctions.H"
+#include "patchQuadratureValues.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -502,6 +503,26 @@ fixedRotationFvPatchVectorField::evaluateQuadrature() const
     }
 
     return tQuadPointsValue;
+}
+
+
+autoPtr<CompactListList<vector>>
+fixedRotationFvPatchVectorField::quadratureValues
+(
+    const fvMeshQuadrature& quad
+) const
+{
+    // evaluateQuadrature() uses the quadrature of the displacement
+    // least-squares scheme of the solid model
+    const solidModel& solMod =
+        lookupSolidModel(patch().boundaryMesh().mesh());
+
+    checkSameQuadraturePoints
+    (
+        *this, quad, solMod.displacementLeastSquares().quadrature()
+    );
+
+    return evaluateQuadrature();
 }
 
 

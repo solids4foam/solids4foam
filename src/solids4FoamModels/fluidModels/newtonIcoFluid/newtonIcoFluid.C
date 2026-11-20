@@ -169,7 +169,11 @@ newtonIcoFluid::newtonIcoFluid
 
         if (stabDict.found("type"))
         {
-            legacyPressureStabSubDict.add("type", word(stabDict.lookup("type")));
+            legacyPressureStabSubDict.add
+            (
+                "type",
+                word(stabDict.lookup("type"))
+            );
         }
         else
         {
@@ -386,7 +390,11 @@ void newtonIcoFluid::setDeltaT(Time& runTime)
             runTime.controlDict().lookupOrDefault<int>("maxTargetNIter", 6);
 
         const Switch enableTimeStepLog =
-            runTime.controlDict().lookupOrDefault("logTimeStepAdjustments", true);
+            runTime.controlDict().lookupOrDefault
+            (
+                "logTimeStepAdjustments",
+                true
+            );
 
         PetscInt numIter;
         SNESGetIterationNumber(foamPetscSnesHelper::snes(), &numIter);
@@ -551,6 +559,9 @@ bool newtonIcoFluid::evolve()
     // motion
     if (mesh.changing())
     {
+        // Stop if the backward meshPhi would be inconsistent
+        fluidModel::checkBackwardMeshPhi();
+
         // Make the flux relative to the mesh motion
         fvc::makeRelative(phi, U);
     }
@@ -916,8 +927,8 @@ label newtonIcoFluid::formResidual
     //fvc::makeRelative(phi, U);
 
     // Correct the transport and turbulence models
-    // NOTE: these assume the fluid mesh is in the deformed configuration and may
-    // not be correct in the reference configuration
+    // NOTE: these assume the fluid mesh is in the deformed configuration and
+    // may not be correct in the reference configuration
     // DISABLED for now
     // laminarTransport_.correct();
     // turbulence_->correct();

@@ -170,7 +170,8 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
     }
     const fvMesh& mesh = *meshPtr;
 
-    // Set capacity of point lists to be a fraction of the total number of points
+    // Set capacity of point lists to be a fraction of the total number of
+    // points
     pointID_.setCapacity(0.001*mesh.nPoints());
     pointCoord_.setCapacity(0.001*mesh.nPoints());
 
@@ -287,7 +288,8 @@ Foam::solidPointDisplacementAlongLine::solidPointDisplacementAlongLine
             (
                 new OFstream
                 (
-                    historyDir/"solidPointDisplacementAlongLine_" + name + ".dat"
+                    historyDir/"solidPointDisplacementAlongLine_" + name
+                  + ".dat"
                 )
             );
 

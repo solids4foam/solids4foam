@@ -562,11 +562,13 @@ int main(int argc, char *argv[])
                     //     //     pointPoints[curPointID];
                     //     // forAll(secondPointPoints, sppI)
                     //     // {
-                    //     //     const label secondPointID = secondPointPoints[sppI];
+                    //     //     const label secondPointID =
+                    //     //         secondPointPoints[sppI];
                     //     //     if (!minEdgeLengthUpdated[secondPointID])
                     //     //     {
                     //     //         minEdgeLength[secondPointID] *= beta;
-                    //     //         minEdgeLengthUpdated[secondPointID] = true;
+                    //     //         minEdgeLengthUpdated[secondPointID] =
+                    //     //             true;
                     //     //     }
                     //     // }
                     // }
@@ -586,7 +588,8 @@ int main(int argc, char *argv[])
                 {
 #ifdef OPENFOAM_COM
                     Warning
-                        << "Maximum mesh correction steps reached, but the mesh "
+                        << "Maximum mesh correction steps reached, but the "
+                           "mesh "
                         << "is still invalid" << endl;
 
                     Info<< "Resetting the random number generator seed" << endl;
@@ -601,7 +604,8 @@ int main(int argc, char *argv[])
                     iter = 0;
 #else
                     FatalError
-                        << "Maximum mesh correction steps reached, but the mesh "
+                        << "Maximum mesh correction steps reached, but the "
+                           "mesh "
                         << "is still invalid" << abort(FatalError);
 #endif
                 }

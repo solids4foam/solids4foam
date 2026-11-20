@@ -138,10 +138,10 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 
 //     if (ddtScheme == fv::backwardDdtScheme<vector>::typeName)
 //     {
-//         Info << "void normalInletVelocityFvPatchVectorField::updateCoeffs()"
+//         Info<< "void normalInletVelocityFvPatchVectorField::updateCoeffs()"
 //             << endl;
 
-//         if(myTimeIndex_ < mesh.time().timeIndex())
+//         if (myTimeIndex_ < mesh.time().timeIndex())
 //         {
 //             oldoldFc_ = oldFc_;
 //             oldFc_ = Fc_;
@@ -178,14 +178,14 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 //         Up = coefft*(Fc_ - oldFc_)/deltaT
 //           + coefft00*(oldFc_ - oldoldFc_)/deltaT;
 
-// //         Info << max(mag(Up)) << endl;
+// //         Info<< max(mag(Up)) << endl;
 //     }
 //     else // Euler
 //     {
-//         Info << "void normalInletVelocityFvPatchVectorField::updateCoeffs()"
+//         Info<< "void normalInletVelocityFvPatchVectorField::updateCoeffs()"
 //             << endl;
 
-//         if(myTimeIndex_ < mesh.time().timeIndex())
+//         if (myTimeIndex_ < mesh.time().timeIndex())
 //         {
 //             oldFc_ = Fc_;
 
@@ -208,11 +208,11 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 //     const scalarField& magSf = p.magSf();
 //     scalarField Un = phip/(magSf + VSMALL);
 
-// //     Info << max(mag(Un)) << endl;
+// //     Info<< max(mag(Un)) << endl;
 
 //     Up += n*(Un - (n & Up));
 
-// //     Info << max(mag(Up)) << endl;
+// //     Info<< max(mag(Up)) << endl;
 
 //     vectorField::operator=(Up);
 
@@ -223,7 +223,7 @@ normalInletVelocityFvPatchVectorField::normalInletVelocityFvPatchVectorField
 Foam::tmp<Foam::Field<vector> > normalInletVelocityFvPatchVectorField::
 snGrad() const
 {
-//     Info << "snGrad - in" << endl;
+//     Info<< "snGrad - in" << endl;
 
     bool secondOrder_ = false;
 
@@ -278,7 +278,7 @@ snGrad() const
 //           - nGradUP;
     }
 
-//     Info << "snGrad - out" << endl;
+//     Info<< "snGrad - out" << endl;
 
 //     return fixedValueFvPatchVectorField::snGrad();
 
@@ -319,7 +319,7 @@ snGrad() const
 tmp<Field<vector> > normalInletVelocityFvPatchVectorField::
 gradientBoundaryCoeffs() const
 {
-//     Info << "gradientBoundaryCoeffs - in" << endl;
+//     Info<< "gradientBoundaryCoeffs - in" << endl;
 
     bool secondOrder_ = false;
 
@@ -380,7 +380,7 @@ gradientBoundaryCoeffs() const
 //     tResult() = this->patch().deltaCoeffs()
 //        *(*this - (k&gradU.patchInternalField()));
 
-//     Info << "gradientBoundaryCoeffs - out" << endl;
+//     Info<< "gradientBoundaryCoeffs - out" << endl;
 
 //     return tResult;
 

@@ -90,7 +90,7 @@ tmp<BlockLduSystem<vector, vector> > stabLeastSquaresGrad<scalar>::fvmGrad
 
     label owner, neighbour;
 
-    forAll (nei, faceI)
+    forAll(nei, faceI)
     {
         owner = own[faceI];
         neighbour = nei[faceI];
@@ -104,7 +104,7 @@ tmp<BlockLduSystem<vector, vector> > stabLeastSquaresGrad<scalar>::fvmGrad
     }
 
     // Boundary contributions
-    forAll (vf.boundaryField(), patchI)
+    forAll(vf.boundaryField(), patchI)
     {
         const fvPatchScalarField& pf = vf.boundaryField()[patchI];
         const fvPatch& patch = pf.patch();
@@ -113,7 +113,7 @@ tmp<BlockLduSystem<vector, vector> > stabLeastSquaresGrad<scalar>::fvmGrad
         const labelList& fc = patch.faceCells();
 
         // Part of diagonal contribution irrespective of the patch type
-        forAll (pf, faceI)
+        forAll(pf, faceI)
         {
             const label cellI = fc[faceI];
             d[cellI] -= cellVIn[cellI]*pownLs[faceI];
@@ -131,7 +131,7 @@ tmp<BlockLduSystem<vector, vector> > stabLeastSquaresGrad<scalar>::fvmGrad
                 bs.coupleLower()[patchI].asLinear();
 
             // Coupling  and diagonal contributions
-            forAll (pf, faceI)
+            forAll(pf, faceI)
             {
                 pcoupleUpper[faceI] -= cellVIn[fc[faceI]]*pownLs[faceI];
                 pcoupleLower[faceI] -= cellVInNei[faceI]*pneiLs[faceI];
@@ -143,7 +143,7 @@ tmp<BlockLduSystem<vector, vector> > stabLeastSquaresGrad<scalar>::fvmGrad
             const scalarField boundaryCoeffs(pf.valueBoundaryCoeffs(pw));
 
             // Diagonal and source contributions depending on the patch type
-            forAll (pf, faceI)
+            forAll(pf, faceI)
             {
                 const label cellI = fc[faceI];
 
