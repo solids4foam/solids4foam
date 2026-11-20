@@ -61,6 +61,7 @@ SourceFiles
 #include "tensorList.H"
 #include "symmTensor3rdOrder.H"
 #include "weightFunction.H"
+#include "adaptiveStencil.H"
 #include "fvMeshQuadrature.H"
 #include "compatibilityFunctions.H"
 #include "leastSquaresStencil.H"
@@ -118,6 +119,9 @@ private:
         //- Calculate the condition number field for cells and faces
         //  Very expensive but useful, use only for debugging purposes
         const Switch calcConditionNumber_;
+
+        //- Adaptive enlargement of poorly conditioned stencils
+        const adaptiveStencil adaptiveStencil_;
 
         //- Cell centre interpolation coefficients
         mutable autoPtr<CompactListList<scalar>>  cellInterpCoeffsPtr_;
@@ -221,17 +225,31 @@ private:
         //- Make the cell and face stencil pointer
         void makeStencils() const;
 
+        //- Enlarge the face and cell stencils with a poor condition number
+        void adaptStencils() const;
+
         //- Make the fvMeshQuadrature pointer
         void makeQuadrature() const;
 
         //- Make the weight function
         void makeWeightFunction() const;
 
-        //- Calculate interpolation coefficients for the cell centres
-        void calcCellCoeffs() const;
+        //- Calculate interpolation coefficients for the cell centres.
+        //  If conditioning is requested, only the condition number estimates
+        //  of the least-squares systems are calculated
+        void calcCellCoeffs
+        (
+            adaptiveStencil::conditioning* conditioningPtr = nullptr
+        ) const;
 
-        //- Calculate interpolation coefficients for the faces quadrature points
-        void calcFaceCoeffs() const;
+        //- Calculate interpolation coefficients for the faces quadrature
+        //  points. If conditioning is requested, only the condition number
+        //  estimates of the least-squares systems are calculated; the
+        //  estimate for a face is the largest one of its quadrature points
+        void calcFaceCoeffs
+        (
+            adaptiveStencil::conditioning* conditioningPtr = nullptr
+        ) const;
 
         //- Calculate value coefficients for one cell at a specified point
         //  Stencil-cell coefficients are followed by the owner coefficient
@@ -271,6 +289,15 @@ private:
             const Map<FixedList<label, 2>>& remoteLocation,
             const UList<Type>& localField,
             const List<Field<Type>>& remoteField
+        ) const;
+
+        //- Exchange a field across a processor patch
+        template<class Type>
+        void exchangeProcessorPatchField
+        (
+            const processorFvPatch& procPatch,
+            const Field<Type>& sendField,
+            Field<Type>& receiveField
         ) const;
 
         //- Evaluate a field using the reconstruction associated with one cell
