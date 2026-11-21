@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Source tutorial run functions
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# Source solids4Foam scripts
+source solids4FoamScripts.sh
+
+# Example usage
+# ./Allrun              # fluid body force: hydrostatic fluid, unloaded solid
+# ./Allrun gravity      # solid gravity from constant/solid/g
+# ./Allrun bodyForce    # the same solid load as an fvOptions body force
+
+# The quasi-monolithic coupling requires PETSc and OpenFOAM.com
+solids4Foam::requirePetscOrExitSilently
+solids4Foam::caseDoesNotRunWithFoamExtend
+solids4Foam::caseDoesNotRunWithOpenFOAMOrg
+
+variant=${1:-hydrostatic}
+
+rm -f constant/fluid/fvOptions constant/solid/fvOptions constant/solid/g
+case "${variant}" in
+    hydrostatic)
+        cp constant/fluid/fvOptions.hydrostatic constant/fluid/fvOptions
+        cp constant/solid/g.none constant/solid/g
+        ;;
+    gravity)
+        cp constant/solid/g.gravity constant/solid/g
+        ;;
+    bodyForce)
+        cp constant/solid/fvOptions.bodyForce constant/solid/fvOptions
+        cp constant/solid/g.none constant/solid/g
+        ;;
+    *)
+        echo "Unknown option: ${variant}"
+        echo "Usage: ./Allrun [hydrostatic|gravity|bodyForce]"
+        exit 1
+        ;;
+esac
+
+# Create meshes
+solids4Foam::runApplication -s solid blockMesh -region solid
+solids4Foam::runApplication -s fluid blockMesh -region fluid
+
+# Run solver
+solids4Foam::runApplication solids4Foam
+
+# Cell centres for the hydrostatic check
+solids4Foam::runApplication -s fluid \
+    postProcess -func writeCellCentres -region fluid -latestTime

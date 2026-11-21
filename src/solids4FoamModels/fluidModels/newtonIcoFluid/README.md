@@ -271,6 +271,12 @@ The following entries are read from `newtonIcoFluidCoeffs`:
 - `optionsFile`: optional PETSc options file name, defaulting to
   `petscOptions`.
 
+On OpenFOAM.com, finite-volume options (`constant/fvOptions`, or
+`constant/fluid/fvOptions` in FSI cases) acting on `U` are applied as a
+momentum source per unit mass, e.g. a `vectorSemiImplicitSource` body force.
+They enter the momentum residual and the wall pressure gradient (see Wall
+Pressure Gradient). The source is explicit in the Jacobian.
+
 `newtonIcoFluid` honours `relaxationFactors.equations.U` from
 `system/fvSolution` by adding an implicit diagonal source to the
 velocity `fvMatrix` before PETSc insertion:
@@ -366,7 +372,8 @@ given PETSc solution vector:
 - corrects boundary conditions and updates `gradU`, `gradp`, and `phi`;
 - computes the momentum residual from diffusion (`laplacian(nuEff, U)` plus
   the explicit transpose term `div(nuEff*dev2(T(grad(U))))`), pressure
-  gradient, transient, advection, and optional momentum stabilisation terms;
+  gradient, transient, advection, optional momentum stabilisation terms and
+  the fvOptions source `fvOptions(U) & U` (OpenFOAM.com);
 - computes the pressure residual from the divergence of the face flux
   `interpolate(U) & Sf`, the same flux that convects momentum, plus the
   pressure stabilisation;
@@ -479,7 +486,8 @@ another type, e.g. `uniformFixedGradient`, which keeps its gradient.
 A plain `fixedGradient` pressure on a wall with fixed velocity, such as the FSI
 interface of the monolithic tutorials, has its gradient set from the normal
 momentum equation in the adjacent cells, `n & (laplacian(nuEff, U) +
-div(nuEff*dev2(T(grad(U)))) - ddt(U)_wall)` (`updatePressureGradientBoundary`),
+div(nuEff*dev2(T(grad(U)))) - ddt(U)_wall + f)`
+(`updatePressureGradientBoundary`), where `f` is the fvOptions body force,
 with the same viscous terms as the momentum residual, taken from the cached
 fields described above (no whole-mesh evaluation per patch). Leaving the
 transpose term out of this gradient, while it is in the residual and the
