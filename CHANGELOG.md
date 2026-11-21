@@ -445,6 +445,16 @@ release. For complete commit-level details and contributor information, see the
   velocity flux by a term proportional to the time-step, which limits a
   fixed-mesh time-step study to first order; with the entry the flux is
   consistent to O(Δt h). It is empty by default, so no other case changes.
+- `newtonIcoFluid` and the quasi-monolithic coupling accept
+  `fixedGradientCorrected` as a momentum-balance wall or interface pressure,
+  like `fixedGradient`: its gradient comes from the wall-normal momentum
+  equation, and `grad(p)` is set from the current pressure before its
+  face-centre value is evaluated. Together with `leastSquaresS4f` for
+  `grad(U)` and `grad(p)` and `fixedValueCorrected` velocities, the boundary
+  treatment of the solid models, this keeps the interface traction second
+  order on non-orthogonal interface cells (#747, #716); see the
+  `newtonIcoFluid` README. Cases with a plain `fixedGradient` pressure do not
+  change.
 
 ### Changed
 
@@ -853,6 +863,9 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `fixedValueCorrected` keeps its `nonOrthogonalCorrections` setting when it
+  is copied or mapped; the copies used to fall back to no correction, and a
+  mapped patch to the correction.
 - The quasi-monolithic coupling applies `fvOptions` sources on OpenFOAM.com
   (#746). Before, they were read but ignored. `newtonIcoFluid` adds them, per
   unit mass, to the momentum residual and to the wall-normal momentum balance

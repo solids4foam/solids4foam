@@ -27,6 +27,7 @@ License
 #include "wallFvPatch.H"
 #include "compatibilityFunctions.H"
 #include "wedgePolyPatch.H"
+#include "gaussGrad.H"
 
 
 namespace
@@ -93,6 +94,21 @@ bool sameValues(const Foam::UList<Type>& a, const Foam::UList<Type>& b)
     }
 
     return true;
+}
+
+
+// The gradient scheme selected for the field fieldName
+Foam::word gradSchemeType(const Foam::fvMesh& mesh, const Foam::word& fieldName)
+{
+    const Foam::word gradName("grad(" + fieldName + ')');
+    return Foam::word
+    (
+#ifdef OPENFOAM_NOT_EXTEND
+        mesh.gradScheme(gradName)
+#else
+        mesh.schemesDict().gradScheme(gradName)
+#endif
+    );
 }
 
 
@@ -641,6 +657,14 @@ void newtonIcoFluid::updateViscousCache() const
         {
             gradU = tgradU();
         }
+
+        // On non-coupled boundaries the normal derivative is the boundary
+        // snGrad, as the OpenFOAM gradient schemes set it; leastSquaresS4f
+        // leaves the value of the adjacent cell there
+        if (gradSchemeType(mesh, U.name()) == "leastSquaresS4f")
+        {
+            fv::gaussGrad<vector>::correctBoundaryConditions(U, gradU);
+        }
     }
 
     // Evaluated as in the momentum residual: the same schemes and the same
@@ -938,6 +962,39 @@ newtonIcoFluid::newtonIcoFluid
     // would be a copy of the failed iterate
     p().oldTime();
 
+    // fixedGradientCorrected walls add k & grad(p) of the wall cell to the
+    // boundary value, the pressure at the face centre, and grad(p) is set
+    // from the current pressure before that value is evaluated
+    // (updatePressureGradientBoundary). This needs a gradient scheme that
+    // does not read this boundary value: leastSquaresS4f, which uses the
+    // values of fixed-value patches only. Another scheme (e.g. leastSquares,
+    // which reads it at the projected point C + (n & d) n on OpenFOAM.com)
+    // makes the wall-cell momentum inconsistent and the residual depend on
+    // the previous iterate
+    forAll(mesh().boundary(), patchI)
+    {
+        if
+        (
+            p().boundaryField()[patchI].type() == "fixedGradientCorrected"
+         && isA<fixedValueFvPatchVectorField>(U().boundaryField()[patchI])
+        )
+        {
+            const word gradpName("grad(" + p().name() + ')');
+            const word gradpScheme(gradSchemeType(mesh(), p().name()));
+
+            if (gradpScheme != "leastSquaresS4f")
+            {
+                FatalErrorInFunction
+                    << "Patch " << mesh().boundary()[patchI].name()
+                    << ": a fixedGradientCorrected pressure on a wall with "
+                    << "fixed velocity needs leastSquaresS4f for "
+                    << gradpName << ", not " << gradpScheme << nl
+                    << "Set it per field in gradSchemes: " << gradpName
+                    << " leastSquaresS4f;" << abort(FatalError);
+            }
+        }
+    }
+
     // A plain fixedGradient pressure on a wall with a fixedValue velocity is
     // not a prescribed gradient: it is set from the wall-normal momentum
     // equation (updatePressureGradientBoundary)
@@ -946,8 +1003,12 @@ newtonIcoFluid::newtonIcoFluid
         if
         (
             isA<wallFvPatch>(mesh().boundary()[patchI])
-         && p().boundaryField()[patchI].type()
-         == fixedGradientFvPatchScalarField::typeName
+         && (
+                p().boundaryField()[patchI].type()
+             == fixedGradientFvPatchScalarField::typeName
+             || p().boundaryField()[patchI].type()
+             == "fixedGradientCorrected"
+            )
          && isA<fixedValueFvPatchVectorField>(U().boundaryField()[patchI])
         )
         {
@@ -1666,17 +1727,25 @@ tmp<volVectorField> newtonIcoFluid::fvOptionsMomentumSource()
 #endif
 
 
-void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
+void newtonIcoFluid::updatePressureGradientBoundary
+(
+    const label patchI,
+    const bool updateGradp
+)
 {
     volScalarField& p = this->p();
     const volVectorField& U = this->U();
 
-    // Only a plain fixedGradient pressure: conditions derived from it, such
-    // as fixedGradientCorrected, keep the gradient they are given
+    // A plain fixedGradient pressure or fixedGradientCorrected, whose value
+    // adds the non-orthogonal correction k & grad(p) of the wall cell; other
+    // conditions derived from fixedGradient keep the gradient they are given
+    const word& pType = p.boundaryField()[patchI].type();
     if
     (
-        p.boundaryField()[patchI].type()
-     != fixedGradientFvPatchScalarField::typeName
+        (
+            pType != fixedGradientFvPatchScalarField::typeName
+         && pType != "fixedGradientCorrected"
+        )
      || !isA<fixedValueFvPatchVectorField>(U.boundaryField()[patchI])
     )
     {
@@ -1726,17 +1795,63 @@ void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
     refCast<fixedGradientFvPatchScalarField>(pPatch).gradient() =
         n & (viscousTerm - acceleration + bodyForce);
 
+    // The value of fixedGradientCorrected reads the registered grad(p): set
+    // it from the current pressure first, so that the boundary value, and the
+    // traction it gives, depend on the current iterate only. With a gradient
+    // scheme that does not read this patch's value (leastSquaresS4f, which
+    // uses the values of fixed-value patches only), this is not circular
+    if (pType == "fixedGradientCorrected" && updateGradp)
+    {
+        updatePressureGradient();
+    }
+
     pPatch.evaluate();
+}
+
+
+void newtonIcoFluid::updatePressureGradient()
+{
+    gradp() = fvc::grad(p());
+
+    // On non-coupled boundaries the normal derivative of the pressure must be
+    // the boundary snGrad, as the OpenFOAM gradient schemes set it, so that
+    // the Rhie-Chow flux, snGrad(p) - (n & grad(p)_b), vanishes on walls;
+    // leastSquaresS4f leaves the value of the adjacent cell there
+    if (gradSchemeType(mesh(), p().name()) == "leastSquaresS4f")
+    {
+        fv::gaussGrad<scalar>::correctBoundaryConditions(p(), gradp());
+    }
 }
 
 
 void newtonIcoFluid::updatePressureGradientBoundaries()
 {
+    // The grad(p) read by fixedGradientCorrected walls, once for all of them
+    // (leastSquaresS4f does not read their values, so it does not change
+    // as they are evaluated)
+    bool correctedWalls = false;
+    forAll(mesh().boundary(), patchI)
+    {
+        if
+        (
+            isA<wallFvPatch>(mesh().boundary()[patchI])
+         && p().boundaryField()[patchI].type() == "fixedGradientCorrected"
+        )
+        {
+            correctedWalls = true;
+        }
+    }
+
+    if (correctedWalls)
+    {
+        updatePressureGradient();
+    }
+
     forAll(mesh().boundary(), patchI)
     {
         if (isA<wallFvPatch>(mesh().boundary()[patchI]))
         {
-            updatePressureGradientBoundary(patchI);
+            updatePressureGradientBoundary(patchI, false);
         }
     }
 }
@@ -1830,7 +1945,7 @@ label newtonIcoFluid::formResidual
 
     // Pressure has already been unpacked from x (and BCs corrected)
     // by unpackSolution() above
-    gradp() = fvc::grad(p);
+    updatePressureGradient();
 
     // Interpolated effective viscosity for momentum stabilisation
     const surfaceScalarField nuEfff(fvc::interpolate(turbulence_->nuEff()));

@@ -439,12 +439,27 @@ public:
             //  with the mesh, is neglected. A zeroGradient pressure at such a
             //  boundary gives first-order errors in the boundary pressure and
             //  in the pressure gradient of the cells next to it
-            void updatePressureGradientBoundary(const label patchI);
+            //  For fixedGradientCorrected, grad(p) is first set from the
+            //  current pressure, unless updateGradp is false (the caller
+            //  has set it)
+            void updatePressureGradientBoundary
+            (
+                const label patchI,
+                const bool updateGradp = true
+            );
 
             //- Call updatePressureGradientBoundary on every wall patch with
             //  fixedGradient pressure (not a condition derived from it) and
             //  fully prescribed velocity
             void updatePressureGradientBoundaries();
+
+            //- Set gradp() from the current pressure, with the normal
+            //  derivative on non-coupled boundaries equal to the boundary
+            //  snGrad (as the OpenFOAM gradient schemes set it; added for
+            //  leastSquaresS4f). Every evaluation of the pressure gradient
+            //  used by the momentum residual and the pressure stabilisation
+            //  should call this
+            void updatePressureGradient();
 
 #ifdef USE_PETSC
             //- Initialise the Jacobian matrix

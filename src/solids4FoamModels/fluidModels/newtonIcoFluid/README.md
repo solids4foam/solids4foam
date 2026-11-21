@@ -480,10 +480,15 @@ fixed-velocity patch and reused until the mesh points change.
 
 ### Wall Pressure Gradient
 
-This applies to every wall patch where `p` is exactly `fixedGradient` and `U`
-is `fixedValue`, in standalone runs too, and each such patch is listed in the
-log at start-up. A prescribed wall pressure gradient needs a condition of
-another type, e.g. `uniformFixedGradient`, which keeps its gradient.
+This applies to every wall patch where `p` is exactly `fixedGradient` or
+`fixedGradientCorrected` and `U` is `fixedValue` (or derived from it), in
+standalone runs too, and each such patch is listed in the log at start-up. A
+prescribed wall pressure gradient needs a condition of another type, e.g.
+`uniformFixedGradient`, which keeps its gradient. For `fixedGradientCorrected`
+the registered `grad(p)` is first set from the current pressure, so that its
+value `p_P + (k & grad(p)_P) + g/deltaCoeffs`, the pressure at the face centre,
+and the interface traction depend on the current iterate only (see
+Non-Orthogonal Walls and Interfaces).
 
 A plain `fixedGradient` pressure on a wall with fixed velocity, such as the FSI
 interface of the monolithic tutorials, has its gradient set from the normal
@@ -511,6 +516,63 @@ case as well, the differences are +0.31%, +0.11% and +0.06%; with
 `interpolate(U) linear` alone, -0.20%, -0.23% and -0.14%. (The tutorial
 schemes are unchanged here; on TurekHron2006 the interpolation of U has a
 large effect on the coarse meshes.)
+
+### Non-Orthogonal Walls and Interfaces
+
+When the cells next to a wall or the FSI interface are non-orthogonal (e.g. an
+interface that tilts against the ALE mesh columns), use the same boundary
+treatment as the solid models:
+
+```text
+// system/fluid/fvSchemes
+gradSchemes
+{
+    default            leastSquares;
+    grad(U)            leastSquaresS4f;
+    grad(p)            leastSquaresS4f;
+}
+laplacianSchemes { default Gauss linear corrected; }
+snGradSchemes { default corrected; }
+
+// 0/fluid/U: walls and interface
+type            fixedValueCorrected;
+
+// 0/fluid/p: walls and interface (momentum-balance pressure)
+type            fixedGradientCorrected;
+```
+
+Set `leastSquaresS4f` per field, not as `default`: other gradients of the case,
+such as `grad(cellDisplacement)` of the mesh motion solver, have no
+`useBoundaryFaceValues_<field>` list and stop the run.
+
+Why: on OpenFOAM.com `fvPatch::delta()` is the normal projection `(n & d) n`
+of the face-cell vector `d` for non-coupled patches, so `leastSquares`,
+`snGrad` and the Laplacian read a boundary value at the projected point
+`C + (n & d) n`. With `k = d - (n & d) n` non-zero this gives, on a plain
+`fixedValue`/`fixedGradient` setup, first-order interface tractions
+(solids4foam #747, #716):
+
+- `leastSquaresS4f` places fixed values at the face centre and does not read
+  the momentum-balance pressure patch, so the wall-cell gradients of `U` and
+  `p` are consistent (as for the solid's `D`);
+- `fixedValueCorrected` corrects the wall `snGrad` with `k & grad(U)`, which
+  goes into the momentum residual, the wall pressure gradient and
+  `patchViscousForce` alike;
+- `fixedGradientCorrected` gives the pressure at the face centre, which
+  `patchPressureForce` passes to the solid.
+
+`fixedGradientCorrected` on a momentum-balance wall needs `leastSquaresS4f`
+for `grad(p)`, which does not read its value; with another scheme the solver
+stops at start-up (`leastSquares` reads the value at the projected point, which
+is inconsistent and makes the residual depend on the previous iterate). The
+recipe has been verified on OpenFOAM.com; on the other forks
+`leastSquaresS4f` shares one set of least-squares vectors between fields
+(their boundary masks differ for `U` and `p`), which needs fixing first.
+
+On a manufactured FSI solution whose interface tilts by up to 13°, the recipe
+makes the fluid's interface traction second order (fluid alone with
+the exact interface motion, n16 to n128: orders 1.94, 2.01, 1.63 against 1.53,
+1.25, 1.09) and halves the coupled traction error.
 
 ### Model-Side Physics Preconditioner
 
