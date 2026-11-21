@@ -1254,9 +1254,22 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // Make residual extensive as fvc operators are intensive (per unit volume)
     residual *= mesh.V();
 
-    // Add optional fvOptions, e.g. MMS body force
-    // Note that "source()" is already multiplied by the volumes
-    //residual -= fvOptions()(ds_, const_cast<volVectorField&>(U))().source();
+#ifdef OPENFOAM_COM
+    // Add optional fvOptions, e.g. a manufactured-solution body force per
+    // unit reference volume. They enter with the same sign as rho*g. The
+    // fvOptions matrix M represents Su + Sp*U and "M & U" evaluates it per
+    // unit volume (as in linGeomTotalDispSolid). The assembled Jacobian
+    // omits it; with -snes_mf_operator the matrix-free Jacobian action
+    // includes it
+    if (fvOptions().optionList::size())
+    {
+        const tmp<fvVectorMatrix> tfvOptionsEqn
+        (
+            fvOptions()(rho(), const_cast<volVectorField&>(U))
+        );
+        residual += mesh.V().field()*(tfvOptionsEqn() & U)().primitiveField();
+    }
+#endif
 
     // Copy the residual into the f field
     foamPetscSnesHelper::InsertFieldComponents<vector>

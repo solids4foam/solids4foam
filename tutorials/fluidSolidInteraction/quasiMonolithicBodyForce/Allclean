@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Source tutorial clean functions
+. $WM_PROJECT_DIR/bin/tools/CleanFunctions
+
+cleanCase
+foamCleanPolyMesh -region fluid
+foamCleanPolyMesh -region solid
+rm -rf postProcessing dynamicCode regressionTests
+rm -f constant/fluid/fvOptions constant/solid/fvOptions constant/solid/g

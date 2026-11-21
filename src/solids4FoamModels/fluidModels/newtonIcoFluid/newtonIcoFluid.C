@@ -1651,6 +1651,21 @@ label newtonIcoFluid::initialiseSolution(Vec& x)
 }
 
 
+#ifdef OPENFOAM_COM
+tmp<volVectorField> newtonIcoFluid::fvOptionsMomentumSource()
+{
+    // "M & U" evaluates the fvOptions matrix (Su + Sp*U) per unit volume
+    volVectorField& U = const_cast<volVectorField&>(this->U());
+    const tmp<fvVectorMatrix> tM(options()(U));
+
+    return tmp<volVectorField>
+    (
+        new volVectorField("fvOptionsMomentumSource", tM() & U)
+    );
+}
+#endif
+
+
 void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
 {
     volScalarField& p = this->p();
@@ -1696,8 +1711,20 @@ void newtonIcoFluid::updatePressureGradientBoundary(const label patchI)
 
     fvPatchScalarField& pPatch = boundaryFieldRef(p)[patchI];
 
+    // Body force (fvOptions) in the cells next to the boundary: it is part
+    // of the normal momentum balance at the wall
+    vectorField bodyForce(n.size(), Zero);
+#ifdef OPENFOAM_COM
+    if (options().optionList::size())
+    {
+        bodyForce =
+            fvOptionsMomentumSource()().boundaryField()[patchI]
+           .patchInternalField();
+    }
+#endif
+
     refCast<fixedGradientFvPatchScalarField>(pPatch).gradient() =
-        n & (viscousTerm - acceleration);
+        n & (viscousTerm - acceleration + bodyForce);
 
     pPatch.evaluate();
 }
@@ -1832,6 +1859,18 @@ label newtonIcoFluid::formResidual
     // its wall flux is part of the traction on a deforming wall
     // (patchViscousForce). The Jacobian omits it
     residual += Foam::primitiveField(cachedDivViscousStressTranspose());
+
+#ifdef OPENFOAM_COM
+    // Optional fvOptions momentum source, e.g. a body force or a
+    // manufactured-solution source, per unit mass (the pressure is
+    // kinematic). It enters with the same sign as in pimpleFluid
+    // (UEqn == fvOptions(U)). The assembled Jacobian omits it; with
+    // -snes_mf_operator the matrix-free Jacobian action includes it
+    if (options().optionList::size())
+    {
+        residual += Foam::primitiveField(fvOptionsMomentumSource()());
+    }
+#endif
 
     residual *= mesh.V();
 

@@ -190,6 +190,7 @@ REGRESSION_TESTS=(
     "fluidSolidInteraction/hessenthalerFsi"
     "fluidSolidInteraction/membraneRoof"
     "fluidSolidInteraction/ringAddedMass"
+    "fluidSolidInteraction/quasiMonolithicBodyForce"
     "fluidSolidInteraction/womersleyTube"
     "circulationModels/pipeWindkessel"
     "circulationModels/pipeWindkesselSolids4Foam"

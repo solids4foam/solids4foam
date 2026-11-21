@@ -1,0 +1,40 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fluidProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluidModel    newtonIcoFluid;
+
+newtonIcoFluidCoeffs
+{
+    forceImplicitFlux yes;
+    fluidFluxExtrapolationAlgorithm1 yes;
+    addDivPhiUDamping no;
+    pressureScaleFactor 1.0;
+    stabilisation
+    {
+        type RhieChow;
+        scaleFactor 1.0;
+    }
+
+    // The fluid is enclosed: fix the pressure in the cell below the
+    // interface at its hydrostatic value, p = g (1 - y) with y = 0.9375,
+    // so that the interface pressure is zero
+    pRefPoint (0.53 0.94 0.05);
+    pRefValue 0.625;
+}
+
+// ************************************************************************* //

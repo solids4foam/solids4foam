@@ -853,6 +853,14 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The quasi-monolithic coupling applies `fvOptions` sources on OpenFOAM.com
+  (#746). Before, they were read but ignored. `newtonIcoFluid` adds them, per
+  unit mass, to the momentum residual and to the wall-normal momentum balance
+  that sets the `fixedGradient` wall and interface pressure gradient, and
+  `nonLinearGeometryTotalLagrangianVelocity` adds them, per unit reference
+  volume, to the solid momentum residual. The new `quasiMonolithicBodyForce`
+  tutorial checks the exact hydrostatic pressure under a fluid body force and
+  solid gravity given as an `fvOptions` body force.
 - `solids4Foam` stops with an error when a run continues from a written time
   that holds the old-time fields of a restart but not its time state
   (`<time>/uniform/time`), as after decomposing a time region by region

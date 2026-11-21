@@ -419,14 +419,22 @@ public:
             //  a new effective viscosity
             void invalidateViscousCache() const;
 
+#ifdef OPENFOAM_COM
+            //- fvOptions momentum source per unit mass (e.g. a body force or
+            //  a manufactured-solution source), evaluated as
+            //  "fvOptions(U) & U"
+            tmp<volVectorField> fvOptionsMomentumSource();
+#endif
+
             //- Set the normal gradient of the (kinematic) pressure on a
             //  patch with fixedGradient pressure and fully prescribed
             //  velocity, at which the fluid moves with the boundary (a
             //  no-slip wall or a fluid-solid interface), from the normal
             //  momentum equation:
             //      dp/dn = n & (laplacian(nuEff, U)
-            //                 + div(nuEff*dev2(T(grad(U)))) - dU/dt)
-            //  where dU/dt is the acceleration of the boundary faces. The
+            //                 + div(nuEff*dev2(T(grad(U)))) - dU/dt + f)
+            //  where dU/dt is the acceleration of the boundary faces and f
+            //  the fvOptions body force per unit mass, if any. The
             //  convective term, which vanishes at a no-slip wall that moves
             //  with the mesh, is neglected. A zeroGradient pressure at such a
             //  boundary gives first-order errors in the boundary pressure and
