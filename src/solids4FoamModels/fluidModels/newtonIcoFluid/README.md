@@ -275,7 +275,9 @@ On OpenFOAM.com, finite-volume options (`constant/fvOptions`, or
 `constant/fluid/fvOptions` in FSI cases) acting on `U` are applied as a
 momentum source per unit mass, e.g. a `vectorSemiImplicitSource` body force.
 They enter the momentum residual and the wall pressure gradient (see Wall
-Pressure Gradient). The source is explicit in the Jacobian.
+Pressure Gradient). The assembled Jacobian (the preconditioner with
+`-snes_mf_operator`) does not contain them; the matrix-free Jacobian action
+does, through the residual.
 
 `newtonIcoFluid` honours `relaxationFactors.equations.U` from
 `system/fvSolution` by adding an implicit diagonal source to the

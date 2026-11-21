@@ -1258,8 +1258,9 @@ label nonLinGeomTotalLagVelocitySolid::formResidual
     // Add optional fvOptions, e.g. a manufactured-solution body force per
     // unit reference volume. They enter with the same sign as rho*g. The
     // fvOptions matrix M represents Su + Sp*U and "M & U" evaluates it per
-    // unit volume (as in linGeomTotalDispSolid). The Jacobian omits it, which
-    // is exact for an explicit source (Sp = 0)
+    // unit volume (as in linGeomTotalDispSolid). The assembled Jacobian
+    // omits it; with -snes_mf_operator the matrix-free Jacobian action
+    // includes it
     if (fvOptions().optionList::size())
     {
         const tmp<fvVectorMatrix> tfvOptionsEqn

@@ -1864,8 +1864,8 @@ label newtonIcoFluid::formResidual
     // Optional fvOptions momentum source, e.g. a body force or a
     // manufactured-solution source, per unit mass (the pressure is
     // kinematic). It enters with the same sign as in pimpleFluid
-    // (UEqn == fvOptions(U)). The Jacobian omits it, which is exact for an
-    // explicit source
+    // (UEqn == fvOptions(U)). The assembled Jacobian omits it; with
+    // -snes_mf_operator the matrix-free Jacobian action includes it
     if (options().optionList::size())
     {
         residual += Foam::primitiveField(fvOptionsMomentumSource()());

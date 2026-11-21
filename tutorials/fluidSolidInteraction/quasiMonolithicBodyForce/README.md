@@ -1,9 +1,17 @@
-# quasiMonolithicBodyForce
+---
+sort: 16
+---
 
-A small check that the quasi-monolithic (QM) coupling applies body forces
-given as finite-volume options (`fvOptions`) in the fluid and in the solid.
+# Body forces in the quasi-monolithic coupling: `quasiMonolithicBodyForce`
 
-## Case
+---
+
+## Tutorial Aims
+
+- Checks that the quasi-monolithic (QM) coupling applies body forces given
+  as finite-volume options (`fvOptions`) in the fluid and in the solid.
+
+## Case Overview
 
 - **Fluid:** an enclosed unit box of fluid (`newtonIcoFluid`, 8 x 8 cells),
   with no-slip walls on three sides.
@@ -32,7 +40,7 @@ the body force enters both:
 
 The case needs PETSc and OpenFOAM.com.
 
-## Regression test
+## Regression Test
 
 `./regressionTest.sh` runs the three variants for three time steps and checks:
 

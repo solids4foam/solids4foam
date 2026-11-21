@@ -27,6 +27,8 @@ U_TOL=1e-9
 P_TOL=1e-8
 D_TOL=1e-12
 D_REL_TOL=1e-8
+# The gravity run must deform the solid (about 1e-3 here)
+D_GRAVITY_MIN=1e-5
 
 ALLRUN_LOGFILE="log.Allrun"
 
@@ -41,14 +43,18 @@ run_variant() {
 
     rm -rf "${case_dir}"
     mkdir -p "${case_dir}"
-    for item in "${SCRIPT_DIR}"/*; do
-        if [[ "$(basename "${item}")" == "regressionTests" ]]; then
-            continue
-        fi
-        cp -a "${item}" "${case_dir}/"
+
+    # Only the case inputs, and cleaned: runApplication skips an application
+    # whose log already exists
+    for item in 0 constant system Allrun Allclean; do
+        cp -a "${SCRIPT_DIR}/${item}" "${case_dir}/"
     done
 
-    (cd "${case_dir}" && ./Allrun "${variant}" > "${ALLRUN_LOGFILE}" 2>&1)
+    (
+        cd "${case_dir}"
+        ./Allclean > /dev/null 2>&1
+        ./Allrun "${variant}" > "${ALLRUN_LOGFILE}" 2>&1
+    )
 }
 
 max_abs() {
@@ -125,12 +131,13 @@ if [[ ${failed} -eq 0 ]]; then
             <(solids4Foam::internalFieldValues "${db}") \
           | awk '{print $1 - $2}' | max_abs)
 
-    if awk "BEGIN {exit !(${dMax} > 0)}"; then
+    if awk "BEGIN {exit !(${dMax} > ${D_GRAVITY_MIN})}"; then
         check "solid: max |D(gravity) - D(bodyForce)| / max |D|" \
             "$(awk "BEGIN {printf \"%.6e\", ${dDiff}/${dMax}}")" \
             "${D_REL_TOL}"
     else
-        echo "FAIL: solid: the gravity run did not deform the solid"
+        echo "FAIL: solid: the gravity run did not deform the solid" \
+            "(max |D| = ${dMax})"
         failed=1
     fi
 fi
