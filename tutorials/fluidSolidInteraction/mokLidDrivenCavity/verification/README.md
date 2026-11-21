@@ -52,12 +52,19 @@ the published curves fall into two groups (see the figure below).
   mesh, and the group is not self-consistent: Wall's 64 x 64 solution has a
   peak of 0.177 m, Mok's 32 x 32 solution 0.215 m. Mok's thesis does not give a
   better-defined alternative to group B.
-- **Group B**: Valdés (2007, Fig. 5.12), the Kratos Multiphysics example and
-  Tiba et al. (2026, Table 3). They prescribe a linear inflow
+- **Group B**: Valdés (2007, Fig. 5.12), Tiba et al. (2026, Table 3) and an
+  independent Kratos Multiphysics solution with the openings fixed (Taran
+  2026, below). They prescribe a linear inflow
   $$v_x = \bar{v}(8y - 7)$$ over a fixed 0.125 m opening on the left and
   $$p = 0$$ on the right opening, which fully specifies the problem. Valdés
   notes that his solution differs from Mok's because not all of Mok's boundary
   conditions are available. This study uses the group B definition.
+- The Kratos Multiphysics example (Zorrilla) was previously counted in group B.
+  It fixes only the horizontal mesh displacement of the side walls, so its
+  inlet and outlet nodes slide up the walls with the mesh, and at the peak
+  both openings are about 15% smaller than 0.125 m. It therefore does not solve
+  the group B problem, and its peak lies 9-11% below the group B solutions at
+  every level. It is kept for context only.
 - Kassiotis et al. (2011, Fig. 7a) use OpenFOAM with two unconstrained faces on
   each side wall and $$p = 0$$ at the outlet; their curve lies between the
   groups. They also note that imposing the pressure at both the inlet and the
@@ -80,26 +87,46 @@ The curves are stored in `reference/`, each with a header recording its
 source, figure and extraction method. The Valdés, Mok, Wall, Gerbeau and
 Vidrascu, and Kassiotis curves are extracted exactly from the vector paths of
 the PDF figures and calibrated against each figure's axis ticks or labels. The
-Kratos curve is digitised from the example's 2400 x 1800 PNG, to about 0.5% of
-the peak. The Valdés and Mok extractions agree with the independent
+Kratos example curve is digitised from the example's 2400 x 1800 PNG, to
+about 0.5% of the peak. The Valdés and Mok extractions agree with the independent
 digitisations shipped with the CoCoNuT example to 1 mm and 2.3 mm (RMS). Over
 the periodic window $$t = 20$$-$$70$$ s the references give:
 
 | Reference | Group | Peak (m) | Trough (m) | Mean (m) |
 |---|---|---|---|---|
 | Valdés (2007) | B | 0.2695 | 0.1967 | 0.2321 |
-| Kratos (Zorrilla) | B | 0.2619 | 0.2033 | 0.2316 |
+| Kratos, openings fixed (Taran 2026), 128 x 128 | B | 0.2835 | 0.2057 | 0.2439 |
 | Tiba et al. (2026), Table 3 only | B | 0.2769 | - | 0.2466 |
+| Kratos example (Zorrilla), moving openings | - | 0.2619 | 0.2033 | 0.2316 |
 | Kassiotis et al. (2011) | - | 0.2433 | 0.2066 | 0.2255 |
 | Mok (2001) | A | 0.2149 | 0.1426 | 0.1773 |
 | Gerbeau and Vidrascu (2003) | A | 0.2132 | 0.1545 | 0.1828 |
 | Wall (1999), to 50 s | A | 0.1770 | 0.1474 | 0.1610 |
 
-Within group B the peak spreads by 5.7% (Kratos to Tiba), the mean by 6.5%
-and the peak-to-peak amplitude by 20% (Kratos 0.059 m, Valdés 0.073 m); the
-largest history difference between Valdés and Kratos after $$t = 20$$ s is 6%
-of the peak. None of the sources reports a mesh or time-step study. The
-periods agree (5 s), and in every curve the membrane rises into the cavity.
+Within group B the peak spreads by 5.2% (Valdés to Kratos), the trough by
+4.6% and the mean by 6.2%. None of the published sources reports a mesh or
+time-step study. The periods agree (5 s), and in every curve the membrane
+rises into the cavity.
+
+The fixed-opening Kratos solution is the only group B reference with its own
+convergence evidence. It was computed with Kratos Multiphysics 10.3.0, which
+shares no code with solids4foam: a P1/P1 VMS-stabilised fluid with Bossak time
+integration, a Q1 total Lagrangian St Venant-Kirchhoff solid, and
+Dirichlet-Neumann coupling with MVQN at a tolerance of $$10^{-6}$$ m, met in
+every step. The side-wall mesh nodes with $$y \ge 0.875$$ are fixed in both
+directions, so the openings keep their size. On fluid meshes from 16 x 16 to
+128 x 128 at $$\Delta t = 0.0125$$ s the trough converges at order 1.9 and the
+mean at 1.35, but the peak, monotone only from 32 x 32, at order 0.4: the
+peak extrapolates to about 0.280 m, below the 128 x 128 value of 0.2835 m.
+The time step, the coupling tolerance and the solid resolution through the
+thickness each change the response by less than $$10^{-5}$$ m or 0.03%. The
+one model-form difference from solids4foam is the outlet: Kratos leaves the
+outlet velocity to its natural condition, whereas solids4foam imposes a zero
+gradient, and imposing $$u_y = 0$$ at the Kratos outlet changes the peak,
+trough and mean by 0.5%, 1.7% and 1.0%. The stored curve is the 128 x 128
+solution, written every fourth time step; the runs, inputs and scripts are in
+the `paper-fsi-verification` repository,
+`paper-data/kratos_mok_lid_driven_cavity/`.
 
 ## Studies
 
@@ -109,9 +136,8 @@ a uniform mesh-motion diffusivity, as the tutorial does. The comparison window
 is $$t = 20$$-$$70$$ s, after the start-up transient. For each member the driver
 records the mean peak and trough per lid period, the time-mean, their distance
 outside the group B envelope, and the largest distance of the history from the
-band between the Valdés and Kratos curves. In the tables below, "FSI its" is the
-mean/maximum number of coupling iterations per time step, and "Time" the
-wall-clock time in seconds.
+band between the Valdés and fixed-opening Kratos curves. In the tables below,
+"FSI its" is the mean/maximum number of coupling iterations per time step.
 
 - `mesh`: the fluid and solid meshes are refined together (16, 32, 64 and 96
   cells across the cavity and along the membrane, eight cells through the
@@ -123,16 +149,20 @@ wall-clock time in seconds.
   against the high-order solid with eight, on the 64 mesh at
   $$\Delta t = 0.1$$ s.
 
-### Mesh study (high-order solid, eight cells through the membrane, 2 ranks)
+### Mesh study (high-order solid, eight cells through the membrane, 8 ranks)
 
-| Mesh | $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its | Time |
-|---|---|---|---|---|---|---|
-| 16 x 16 | 0.2 | 0.2934 | 0.1942 | 0.2426 | 5.6/15 | 83 |
-| 32 x 32 | 0.1 | 0.2890 | 0.1986 | 0.2427 | 4.3/11 | 239 |
-| 64 x 64 | 0.05 | 0.2870 | 0.2022 | 0.2437 | 3.1/7 | 827 |
-| 96 x 96 | 0.025 | 0.2861 | 0.2044 | 0.2445 | 2.5/6 | 3729 |
+| Mesh | $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its |
+|---|---|---|---|---|---|
+| 16 x 16 | 0.2 | 0.2934 | 0.1943 | 0.2425 | 5.3/26 |
+| 32 x 32 | 0.1 | 0.2889 | 0.1986 | 0.2426 | 2.7/14 |
+| 64 x 64 | 0.05 | 0.2870 | 0.2022 | 0.2437 | 2.3/6 |
+| 96 x 96 | 0.025 | 0.2861 | 0.2044 | 0.2445 | 2.0/6 |
 
-The response changes by 1.56%, 1.26% and 0.78% of the peak between successive
+The 16 x 16 and 32 x 32 levels were run serially: on eight ranks these small
+meshes leave each rank so few cells that the high-order solid gives wrong
+results (solids4foam issue #696).
+
+The response changes by 1.58%, 1.25% and 0.77% of the peak between successive
 levels. The mean is mesh-independent to 0.8%, and the peak converges at an
 observed order of about 1.2 (from the 16, 32 and 64 levels) towards about
 0.285 m. The trough converges more slowly, at an observed order below 0.5, and
@@ -140,41 +170,50 @@ is still rising by 0.8% of the peak at the finest level; it is uncertain by
 about 1-2% of the peak. The time step matters much less than the mesh (see
 below), so halving it with each mesh level only removes a small contribution.
 
-A 128 x 128 level was attempted and could not be completed. With both the
+A 128 x 128 level does not run with the tutorial settings. With both the
 standard and the high-order solid, with $$\Delta t = 0.1$$ and 0.025 s, with an
 initial relaxation factor of 0.02 and with eight PIMPLE outer correctors, the
 coupled iteration diverges within a single time step and the solid PETSc SNES
 solve then fails: at $$t = 4.3$$ s with $$\Delta t = 0.1$$ s, and at
-$$t = 13.925$$ s in all three runs with $$\Delta t = 0.025$$ s. The 96 x 96
-level therefore stands in for it. The cause was not isolated, and the
-divergence is recorded as a known limitation.
+$$t = 13.925$$ s in all three runs with $$\Delta t = 0.025$$ s. The cause is the
+fluid's unrelaxed PIMPLE outer loop: during the fast rise to the third peak the
+pressure residual grows across the outer correctors within one coupling
+iteration ($$\nu \Delta t / h^2$$ is about 4 at 128 x 128 against 2.3 at
+96 x 96). Relaxing the non-final outer correctors (p 0.3, U 0.7, the final
+corrector unrelaxed) with residual control (p 1e-4, U 1e-6, at most 30 outer
+correctors) removes it. With these settings, the high-order solid and
+$$\Delta t = 0.025$$ s, the 128 x 128 mesh runs to $$t = 70$$ s and gives a peak,
+trough and mean of 0.2848, 0.2058 and 0.2446 m, within 0.5% of the
+fixed-opening Kratos solution on the same mesh. The settings are not the
+tutorial default because they have not been tested on the coarser levels, so
+this run is not part of the study tables.
 
-### Time-step study (64 mesh, high-order solid, 2 ranks)
+### Time-step study (64 mesh, high-order solid, 4 ranks)
 
-| $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its | Time |
-|---|---|---|---|---|---|
-| 0.1 | 0.2871 | 0.2027 | 0.2440 | 4.8/23 | 654 |
-| 0.05 | 0.2870 | 0.2022 | 0.2437 | 3.1/7 | 829 |
-| 0.025 | 0.2870 | 0.2021 | 0.2437 | 2.4/6 | 1225 |
+| $$\Delta t$$ (s) | Peak (m) | Trough (m) | Mean (m) | FSI its |
+|---|---|---|---|---|
+| 0.1 | 0.2870 | 0.2026 | 0.2440 | 3.1/25 |
+| 0.05 | 0.2870 | 0.2022 | 0.2437 | 2.3/7 |
+| 0.025 | 0.2870 | 0.2020 | 0.2436 | 1.9/6 |
 
-The response changes by 0.17% and then 0.04% of the peak: the benchmark time
+The response changes by 0.16% and then 0.06% of the peak: the benchmark time
 step of 0.1 s is already converged to well within the reference spread.
 
-### Solid discretisation study (64 mesh, $$\Delta t = 0.1$$ s, serial)
+### Solid discretisation study (64 mesh, $$\Delta t = 0.1$$ s, 2 ranks)
 
-| Solid | Cells in $$h$$ | Peak (m) | Trough (m) | Mean (m) | FSI its | Time |
-|---|---|---|---|---|---|---|
-| standard | 2 | 0.2870 | 0.2028 | 0.2441 | 4.8/32 | 828 |
-| standard | 8 | 0.2870 | 0.2028 | 0.2441 | 4.8/18 | 845 |
-| high-order | 8 | 0.2871 | 0.2027 | 0.2440 | 4.8/19 | 1268 |
+| Solid | Cells in $$h$$ | Peak (m) | Trough (m) | Mean (m) | FSI its |
+|---|---|---|---|---|---|
+| standard | 2 | 0.2869 | 0.2027 | 0.2440 | 3.2/26 |
+| standard | 8 | 0.2870 | 0.2027 | 0.2441 | 3.5/32 |
+| high-order | 8 | 0.2870 | 0.2026 | 0.2440 | 3.4/34 |
 
-The standard and the high-order solids give the same response to 0.04% of the
+The standard and the high-order solids give the same response to 0.03% of the
 peak, and the standard solid needs only two cells through the thickness. The
 membrane carries the pressure almost entirely through tension (its bending
 stiffness is $$h^2 / (12 L^2) \approx 3 \times 10^{-7}$$ of $$EA L^2$$), so the
 second-order finite volume solid does not suffer the slow convergence seen for
 bending-dominated slender structures. The high-order solid gives no accuracy
-benefit here and costs 1.5 times as much. It is also more demanding of the
+benefit here and costs about 1.6 times as much. It is also more demanding of the
 mesh: on the 32 mesh, with two or four cells through the thickness its PETSc
 SNES solve stalls within the first second, whereas eight cells work, so the
 tutorial and the studies use eight. The high-order solid is the tutorial default
@@ -183,13 +222,13 @@ with the same result.
 
 ### FSI iterations
 
-With IQN-ILS and the predictor, a time step needs 4.3 coupling iterations on
-average on the 32 mesh at $$\Delta t = 0.1$$ s (at most 11), and 4.8 on the 64
-mesh at $$\Delta t = 0.1$$ s; halving the time step reduces this to 3.1 and
-2.4. Aitken relaxation
-(`./Allrun aitken`) gives the same response with 9.9 iterations per step on the
-32 mesh. For comparison, at $$\Delta t = 0.1$$ s Mok (2001) reports 15
-iterations in the first step without relaxation and 8 with the best fixed
+With IQN-ILS and the predictor, a time step needs 2.7 coupling iterations on
+average on the 32 mesh at $$\Delta t = 0.1$$ s (at most 14), and 3.1 on the 64
+mesh at $$\Delta t = 0.1$$ s; halving the time step reduces this to 2.3 and
+1.9. Aitken relaxation (`./Allrun aitken`) gave the same response with 9.9
+iterations per step on the 32 mesh in an earlier run with OpenFOAM v2412. For
+comparison, at $$\Delta t = 0.1$$ s Mok (2001) reports 15 iterations in the
+first step without relaxation and 8 with the best fixed
 relaxation factor 0.825, with Aitken and steepest-descent relaxation 1-2
 iterations cheaper than that over the run; Küttler and Wall (2008, Fig. 4,
 tolerance $$10^{-7}$$, constant predictor) report about 5-7 iterations for
@@ -213,19 +252,19 @@ relaxation methods, whereas the solids4foam Aitken implementation needs more.
   result is compared with the group B references rather than with any single
   one of them:
   - the peak, trough and mean must lie within 5% of the envelope spanned by
-    Valdés, Kratos and Tiba et al. (Tiba gives only the peak and the mean):
-    at most 5% above its maximum and at most 5% below its minimum. The
-    envelopes are 0.2619-0.2769 m for the peak, 0.1967-0.2033 m for the trough
-    and 0.2316-0.2466 m for the mean;
+    Valdés, the fixed-opening Kratos solution and Tiba et al. (Tiba gives
+    only the peak and the mean): at most 5% above its maximum and at most 5%
+    below its minimum. The envelopes are 0.2695-0.2835 m for the peak,
+    0.1967-0.2057 m for the trough and 0.2321-0.2466 m for the mean;
   - after $$t = 20$$ s, the history must stay within 10% of the peak of the
-    band between the Valdés and Kratos curves, which at each time runs from
-    the lower to the higher of the two. The peak used is the smaller of the
-    two curve peaks.
+    band between the Valdés and fixed-opening Kratos curves, which at each
+    time runs from the lower to the higher of the two. The peak used is the
+    smaller of the two curve peaks.
 
-Neither the published references nor this study can say which group B
-solution is the most accurate, so the checks accept any result within the
-spread of the independent group B codes plus a 5% allowance, and reject
-results that leave it.
+The published group B values are single-mesh results, so the checks accept any
+result within the spread of the independent group B codes plus a 5% allowance,
+and reject results that leave it. The fixed-opening Kratos solution, with its
+own convergence study, is the closest of them to the converged answer.
 
 A `--quick` run exercises the two coarsest members of each study to
 $$t = 10$$ s, before the periodic state, and checks only that they complete.
@@ -234,68 +273,84 @@ $$t = 10$$ s, before the periodic state, and checks only that they complete.
 
 - None of the published references demonstrates mesh or time-step
   insensitivity: each gives one solution on one mesh (32 x 32 fluid elements
-  in Mok, Valdés, Kratos and Kassiotis et al., 64 x 64 in Wall) at one time
-  step.
+  in Mok, Valdés, the Kratos example and Kassiotis et al., 64 x 64 in Wall) at
+  one time step. The fixed-opening Kratos solution is the exception.
 - The solids4foam solution is mesh- and time-step-converged: the peak changes
   by 0.3% of itself between the 64 and 96 meshes (the whole response by
-  0.8% of the peak), and by 0.04% of the peak between
+  0.8% of the peak), and by 0.06% of the peak between
   $$\Delta t = 0.05$$ and 0.025 s. The standard and the high-order solids
-  agree to 0.04%.
-- The peak therefore lies 6-9% above the Valdés and Kratos peaks for reasons
-  that cannot be attributed to the solids4foam discretisation. The trough and
-  the mean lie inside the group B envelope, and the peak lies 3.3% above its
-  upper end (the Tiba et al. value). The solids4foam result may be the more
-  accurate one, since the published solutions use numerically dissipative
-  time integrators (generalised-alpha and Bossak schemes, backward Euler in
-  Mok) on single, coarse meshes, but this cannot be decided from the
-  published data.
-- An independent solution from a commercial finite element code (COMSOL,
-  LS-DYNA or ANSYS) has been requested. It will be added to `reference/` and
-  to the group B envelope when it is available.
+  agree to 0.03%.
+- The fixed-opening Kratos solution agrees with solids4foam. On the same
+  combined sequence (16 x 16 at 0.2 s to 96 x 96 at 0.025 s) the peak differs
+  by -2.0%, -0.25%, -0.70% and -0.77%, the trough by +5.7%, +4.6%, +2.0% and
+  +0.71%, and the mean by +1.3%, +1.9%, +0.48% and -0.13% (Kratos relative to
+  solids4foam). The trough and mean differences shrink with refinement, the
+  peak difference stays below 1% from 32 x 32 on, and the largest difference
+  between the 96 x 96 histories is 2.4 mm, 0.8% of the peak. This is within
+  the resolution of about 1% set by the different outlet conditions.
+- Both codes therefore place the converged peak and trough above the
+  published group B values of Valdés and Tiba et al., and the mean inside
+  their range. The published solutions use numerically dissipative time
+  integrators (generalised-alpha and Bossak schemes) on single, coarse meshes,
+  and appear to be under-resolved.
+- The peak converges slowly in both codes (observed order about 1.2 in
+  solids4foam and 0.4 in Kratos at fixed time step), so the remaining
+  difference of the 96 x 96 solids4foam peak from the extrapolated Kratos peak
+  (0.9-2.2%) is mostly the solids4foam spatial error, not a disagreement
+  between the codes.
 
 ## Recorded results
 
-Recorded with OpenFOAM v2412 on an Apple Silicon Mac Studio shared with other
-jobs. The three studies were run concurrently with
-`./Allverify --study mesh --cores 2`, `./Allverify --study timestep --cores 2`
-and `./Allverify --study solid`, and the combined summary was then written by
-`./Allverify --reuse`, which passes every check. (These runs predate the
-`verification_member.json` records, which were written for them afterwards
-from the same settings.) The margins of the finest members to the acceptance
-limits are:
+Recorded with OpenFOAM v2512 on Linux, on the UCD Sonic cluster (Intel Xeon Gold
+6542Y nodes), with solids4foam `development` at `206437983` (a clean checkout;
+the source tree also held the outlet condition of PR #676, which is not built
+into the solver library and not used by this case) and this branch's
+verification scripts. The studies ran concurrently in two Slurm jobs: `mesh` on
+eight ranks, with the 16 x 16 and 32 x 32 members rerun serially (`--cores 1`)
+because of solids4foam issue #696; `timestep` on four ranks; and `solid` on two.
+The combined summary was then written by `./Allverify --reuse`, which passes
+every check. The eight-rank `mesh` pass on its own reports FAIL only because its
+two coarsest members cannot complete there; the serial pass completes them.
+
+The margins of the finest members to the acceptance limits are:
 
 | Member | Check | Value | Outside envelope | Margin to limit |
 |---|---|---|---|---|
-| mesh96 | peak | 0.2861 m | +3.32% | 1.68% |
-| mesh96 | trough | 0.2044 m | +0.56% | 4.44% |
-| mesh96 | mean | 0.2445 m | inside | 5.85% |
-| mesh96 | history band | 8.42% of peak | - | 1.58% |
-| dt0.025 | peak | 0.2870 m | +3.64% | 1.36% |
-| dt0.025 | trough | 0.2021 m | inside | 5.60% |
-| dt0.025 | mean | 0.2437 m | inside | 6.18% |
-| dt0.025 | history band | 8.70% of peak | - | 1.30% |
-| highOrder_ny8 | peak | 0.2871 m | +3.68% | 1.32% |
-| highOrder_ny8 | trough | 0.2027 m | inside | 5.30% |
+| mesh96 | peak | 0.2861 m | +0.92% | 4.08% |
+| mesh96 | trough | 0.2044 m | inside | 5.67% |
+| mesh96 | mean | 0.2445 m | inside | 5.86% |
+| mesh96 | history band | 1.11% of peak | - | 8.89% |
+| dt0.025 | peak | 0.2870 m | +1.23% | 3.77% |
+| dt0.025 | trough | 0.2020 m | inside | 6.82% |
+| dt0.025 | mean | 0.2436 m | inside | 6.20% |
+| dt0.025 | history band | 1.42% of peak | - | 8.58% |
+| highOrder_ny8 | peak | 0.2870 m | +1.25% | 3.75% |
+| highOrder_ny8 | trough | 0.2026 m | inside | 6.52% |
 | highOrder_ny8 | mean | 0.2440 m | inside | 6.06% |
-| highOrder_ny8 | history band | 8.95% of peak | - | 1.05% |
+| highOrder_ny8 | history band | 1.37% of peak | - | 8.63% |
 
-The peak and the history are the binding checks; the trough and the mean lie
-inside, or within 0.6% of, the group B envelope.
+Every result lies inside, or within 1.3% of, the group B envelope; the peak
+is the binding check. Clock times are not given: the parallel
+members shared nodes on Sonic and were slowed by MPI overhead, so they do not
+represent the cost. As an indication only, in an earlier run on an Apple
+Silicon Mac Studio with two ranks (OpenFOAM v2412), the 64 x 64 and 96 x 96
+members took 827 s and 3729 s.
 
 With `--quick` the driver runs the two coarsest members of each study to
 $$t = 10$$ s, which took about 7 minutes on two ranks.
 
 ## Known limitations
 
-- A 128 x 128 mesh level could not be completed (see the mesh study), so the
-  finest mesh level is 96 x 96.
+- A 128 x 128 mesh level needs relaxed PIMPLE outer correctors (see the mesh
+  study), so the finest level of the study is 96 x 96.
 - The study was run on OpenFOAM.com only. The tutorial also runs on
   OpenFOAM.org and foam-extend, but their results differ (see the tutorial
   README): on foam-extend the midpoint displacement at t = 5 s is 3% smaller
   and the vertical force on the membrane about a tenth.
-- Only one group B reference (Valdés) gives the full history from vector data;
-  the Kratos curve is digitised from a raster image and Tiba et al. give scalar
-  values only.
+- Two group B references give the full history: Valdés, extracted from
+  vector data, and the fixed-opening Kratos solution, as computed. Tiba et al.
+  give scalar values only. The Kratos and solids4foam outlet conditions
+  differ, which limits their comparison to about 1%.
 
 `verification/Allclean` removes the generated `work/` and `postProcessing/`
 directories, as does `./Allclean all` in the case directory; the plain case
@@ -323,6 +378,9 @@ directories, as does `./Allclean all` in the case directory; the plain case
   algorithm, nonlinear stability proof and validation examples. Comput. Mech.
   47:305-323.
 - Kratos Multiphysics Examples, FSI lid driven cavity (R. Zorrilla).
+- Taran, A. (2026). Kratos Multiphysics 10.3.0 solution of the group B lid
+  driven cavity with fixed openings. paper-fsi-verification,
+  `paper-data/kratos_mok_lid_driven_cavity/`.
 - Tiba, A. et al. (2026). Online adaptive non-intrusive model reduction via
   manifold interpolation and subspace updates: application to FSI convergence
   acceleration. arXiv:2609.16876.

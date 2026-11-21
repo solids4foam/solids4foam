@@ -19,8 +19,10 @@ set yrange [-0.02:0.32]
 plot \
     refdir."/Valdes2007_fig5.12.csv" using 1:2 \
         with lines lw 3 lc rgb "#d62728" title "Valdes (2007)", \
+    refdir."/KratosFixedOpenings_n128.csv" using 1:2 \
+        with lines lw 3 lc rgb "#2ca02c" title "Kratos, openings fixed (Taran)", \
     refdir."/KratosZorrilla.csv" using 1:2 \
-        with lines lw 3 lc rgb "#17becf" title "Kratos (Zorrilla)", \
+        with lines lw 1 dt 3 lc rgb "#17becf" title "Kratos example, moving openings", \
     refdir."/Mok2001_bild6.6.csv" using 1:2 \
         with lines lw 1 dt 2 lc rgb "#7f7f7f" title "Mok (2001), context", \
     for [i=2:ncurves+1] histories using 1:i \

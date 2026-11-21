@@ -12,11 +12,13 @@ are available:
 
 The midpoint displacement history of each run is compared with the group B
 references, whose boundary conditions are fully specified: Valdes (2007),
-Kratos (Zorrilla) and the scalar values of Tiba et al. (2026). The late-time
-peak, trough and mean of the periodic response must lie within a tolerance of
-the envelope spanned by these references, and the history must stay close to
-the band between the Valdes and Kratos curves. The curves of Mok (2001), Wall
-(1999), Gerbeau and Vidrascu (2003) and Kassiotis et al. (2011) are reported
+an independent Kratos solution with the openings fixed (Taran 2026, 128x128)
+and the scalar values of Tiba et al. (2026). The late-time peak, trough and
+mean of the periodic response must lie within a tolerance of the envelope
+spanned by these references, and the history must stay close to the band
+between the Valdes and fixed-opening Kratos curves. The curves of Mok (2001),
+Wall (1999), Gerbeau and Vidrascu (2003), Kassiotis et al. (2011) and the
+Kratos example (Zorrilla), whose openings move with the mesh, are reported
 for context only: their openings are defined differently.
 """
 
