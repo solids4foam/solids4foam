@@ -82,7 +82,10 @@ solids4foam force slightly lower, as for the `notchedBar` and
 $$0.37$$ mm, as it failed to converge [1]; solids4foam continues through
 the sharp loss of strength that follows, as the void fraction at the centre
 of the notch passes $$0.3$$. Since the void fraction is local, this last
-part of the curve depends on the mesh.
+part of the curve depends on the mesh, and on the step: with $$500$$ steps,
+the step of [1], the force agrees with that of $$100$$ steps to within
+$$0.2\%$$ up to $$0.35$$ mm, but falls faster after $$0.37$$ mm, to
+$$15.6$$ kN at $$0.45$$ mm against $$18.8$$ kN.
 
 ![Figure 1: Reaction force at the loading boundary against displacement](./images/notchedBarGTN-forceDisplacement.png)
 
