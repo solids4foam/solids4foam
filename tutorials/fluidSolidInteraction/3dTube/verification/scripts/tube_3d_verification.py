@@ -427,12 +427,22 @@ def require_complete(path: Path, rows: list[list[float]], end_time: float,
         reached = times[-1] if times else 0.0
         fail(f"{path} ends at t={reached:g}, not at the end time "
              f"t={end_time:g}")
-    if len(times) != expected or any(
-        not math.isclose(later - earlier, delta_t, rel_tol=1e-3)
-        for earlier, later in zip(times, times[1:])
+    # The function objects write the time with the case's timePrecision
+    # (6 significant digits), which does not resolve dt = 6.25e-6 s beyond
+    # t = 10 ms; each time must therefore round to the next multiple of dt,
+    # and is then replaced by that exact multiple, so that the histories
+    # are equally spaced for the peak and arrival interpolation.
+    steps = [round(time / delta_t) for time in times]
+    if len(times) != expected or steps != list(
+        range(steps[0], steps[0] + expected)
+    ) or any(
+        abs(time - step * delta_t) > 1e-5 * abs(time) + 1e-3 * delta_t
+        for time, step in zip(times, steps)
     ):
         fail(f"{path} has {len(times)} time levels, expected {expected} "
              f"at dt = {delta_t:g}")
+    for row, step in zip(rows, steps):
+        row[0] = step * delta_t
     if any(not math.isfinite(value) for row in rows for value in row):
         fail(f"{path} contains non-finite values")
 
@@ -713,13 +723,14 @@ def coupling_summary(case: Path, coupling: str, end_time: float
     # The residual evaluated for each step must be that of its last
     # FSI iteration, as recorded independently in fsiConvergenceData.dat.
     _, residuals = residual_rows(case, end_time)
+    delta_t = dictionary_scalar(case / "system/controlDict", "deltaT")
     iterations = {
-        row[0]: row[1] for row in last_per_time(numeric_rows(next(
-            case.glob("postProcessing/**/fsiConvergenceData.dat")
-        )))
+        round(row[0] / delta_t): row[1] for row in last_per_time(numeric_rows(
+            next(case.glob("postProcessing/**/fsiConvergenceData.dat"))
+        ))
     }
     mismatched = [row[0] for row in residuals
-                  if iterations.get(row[0]) != row[1]]
+                  if iterations.get(round(row[0] / delta_t)) != row[1]]
     if mismatched:
         fail(f"{len(mismatched)} step(s) in {case} have a final residual row "
              "that is not their last FSI iteration, starting at "
