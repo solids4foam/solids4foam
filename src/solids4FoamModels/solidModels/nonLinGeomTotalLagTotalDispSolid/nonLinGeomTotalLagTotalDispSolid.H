@@ -109,6 +109,13 @@ class nonLinGeomTotalLagTotalDispSolid
         //- Predict new time-step fields using the velocity field
         const Switch predictor_;
 
+        //- Take the tangential rows of the displacement gradient on traction
+        //  patches from the surface gradient over the face, so that the
+        //  deformed area and normal with which the traction is applied are
+        //  second-order accurate (see
+        //  solidModel::correctTractionPatchGradient)
+        const Switch tractionPatchSurfaceGradient_;
+
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 

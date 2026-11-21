@@ -616,6 +616,24 @@ protected:
             autoPtr<CompactListList<scalar>>& JPtr
         );
 
+        //- Set the tangential rows of the displacement gradient on the
+        //  solidTraction patches (the patch types are those of D()) to the
+        //  surface gradient of the displacement over each face, keeping the
+        //  normal row of the adjacent cell. The boundary gradient is
+        //  otherwise the adjacent cell value, half a cell from the face, so
+        //  the deformed face area and normal with which the traction is
+        //  applied are only first-order accurate; they depend on the
+        //  tangential rows alone. The displacement at the patch points is
+        //  extrapolated with the cell gradients from the adjacent fixed-value
+        //  faces where there are any, else from the cells next to the
+        //  adjacent traction faces. On wedge meshes the hoop row keeps the
+        //  cell value
+        void correctTractionPatchGradient
+        (
+            const volVectorField& D,
+            volTensorField& gradD
+        ) const;
+
 
     // Protected member functions
 
