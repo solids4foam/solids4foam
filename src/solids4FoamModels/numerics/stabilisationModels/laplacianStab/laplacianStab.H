@@ -25,6 +25,11 @@ Description
     This is the simplest Laplacian-based stabilisation in the directory and
     provides the common cached face-field and approximate Jacobian interface.
 
+    For backwards compatibility, the unnormalised form retains its legacy
+    face-based |d|^2 scaling. Spectral normalisation uses the ideal m = 0
+    (Laplacian) form, scaleFactor/(4*rStar)*snGrad(field), without the legacy
+    |d|^2 scaling.
+
 SourceFiles
     laplacianStab.C
     laplacianStabTemplates.H
@@ -96,6 +101,12 @@ public:
     // Member Functions
 
         // Access
+
+            //- Return true: spectral normalisation is supported
+            virtual bool supportsSpectralNormalisation() const
+            {
+                return true;
+            }
 
             //- Re-calculate the scalar stabilisation
             //  Provide the primary variable field and optionally its gradient
