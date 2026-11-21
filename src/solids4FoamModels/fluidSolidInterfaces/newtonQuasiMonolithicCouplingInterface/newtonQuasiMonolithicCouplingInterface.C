@@ -3077,6 +3077,17 @@ bool newtonQuasiMonolithicCouplingInterface::evolve()
     setInterfacePressureGradient();
     reportInterfaceFluxDiagnostics();
 
+    // Store the converged Rhie-Chow correction of this time-step, for its
+    // time history (opt-in RhieChowTimeHistory)
+    {
+        fluidModels::newtonIcoFluid& newtonFluid =
+            refCast<fluidModels::newtonIcoFluid>(fluid());
+        if (newtonFluid.rhieChowTimeHistory())
+        {
+            newtonFluid.storeRhieChowHistory(true);
+        }
+    }
+
     // Set the solid displacement from the converged velocity: during the
     // solve, D held the predicted displacement that moved the fluid mesh
     refCast<solidModels::nonLinGeomTotalLagVelocitySolid>
