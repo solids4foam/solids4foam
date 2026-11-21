@@ -51,13 +51,14 @@ only rotates the stress. Under `logStrain`:
   differ.
 
 Only a sub-law that can be driven by a trial elastic strain can be used:
-`linearElastic`, `linearElasticMisesPlastic` and
-[`linearElasticMisesPlasticLemaitreDamage`](../linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw/README.md).
-Any other is refused when
-the case starts, naming it. A law with kinematic hardening or a preferred
-material direction does not qualify, since the exponential map is exact only
-when the return mapping keeps the elastic strain coaxial with its trial
-value.
+`linearElastic`, `linearElasticMisesPlastic`,
+[`linearElasticMisesPlasticLemaitreDamage`](../linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw/README.md)
+and
+[`linearElasticGTNPlastic`](../linearElasticGTNPlasticMechanicalConstitutiveLaw/README.md).
+Any other is refused when the case starts, naming it. A law with kinematic
+hardening or a preferred material direction does not qualify, since the
+exponential map is exact only when the return mapping keeps the elastic
+strain coaxial with its trial value.
 
 The density and the bulk modulus are those of the sub-law. `rho` given on
 this law is passed down to the sub-law when its own dictionary has none.

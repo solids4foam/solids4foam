@@ -1,0 +1,5 @@
+// Yield stress against equivalent plastic strain: perfect plasticity
+(
+    ( 0     400e6 )
+    ( 1     400e6 )
+)
