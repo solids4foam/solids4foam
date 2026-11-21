@@ -1,4 +1,5 @@
-/*---------------------------------------------------------------------------*\ =========                 |
+/*---------------------------------------------------------------------------*\
+ =========                 |
     This file is part of solids4foam.
 
     solids4foam is free software: you can redistribute it and/or modify it
@@ -418,7 +419,8 @@ bool sonicLiquidFluid::evolve()
                 psi_
                *(
                     fvc::flux(U())
-                  + rhorAUf*fvc::ddtCorr(rho_, U(), phi())/fvc::interpolate(rho_)
+                  + rhorAUf*fvc::ddtCorr(rho_, U(), phi())
+                   /fvc::interpolate(rho_)
                 )
             );
 

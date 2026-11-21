@@ -1410,7 +1410,7 @@ void Foam::meshDualiser::setRefinement
                     meshMod
                 );
             }
-            while(fp != 0);
+            while (fp != 0);
         }
     }
 

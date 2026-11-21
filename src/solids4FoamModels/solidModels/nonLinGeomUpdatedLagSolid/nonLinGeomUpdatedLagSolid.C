@@ -345,8 +345,8 @@ bool nonLinGeomUpdatedLagSolid::evolveImplicitSegregated()
         surfaceVectorField traction(nCurrent & fvc::interpolate(sigma()));
 
         // Add stabilisation to the traction
-        // We add this before enforcing the traction condition as the stabilisation
-        // is set to zero on traction boundaries
+        // We add this before enforcing the traction condition as the
+        // stabilisation is set to zero on traction boundaries
         momentumStabilisation().updateVector(DD(), &gradDD());
         traction += impKf_*momentumStabilisation().faceVector();
 
@@ -853,7 +853,8 @@ nonLinGeomUpdatedLagSolid::nonLinGeomUpdatedLagSolid
 
     // Refused here, at construction, rather than at the first residual
     // evaluation, so that a case asking for it stops before it runs.
-    // The mixed formulation has not been ported to this model. nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
+    // The mixed formulation has not been ported to this model.
+    // nonLinGeomTotalLagTotalDispSolid asks each law for its isochoric
     // stress and its volumetric response apart, and replaces the second with
     // the solved pressure; this one asks for a total stress and takes dev()
     // of it, which is the same thing only where what remains is trace free.
@@ -1377,8 +1378,9 @@ label nonLinGeomUpdatedLagSolid::formJacobian
                 "one", dimensionSet(-2, 4, 4, 0, 0, 0, 0), 1.0
             );
 
-            // Compute the positive face-interpolated reciprocal of the approximate
-            // momentum equation diagonal (solid analogue of rAUf), [Pa]
+            // Compute the positive face-interpolated reciprocal of the
+            // approximate momentum equation diagonal (solid analogue of
+            // rAUf), [Pa]
             {
                 fvVectorMatrix approxMomJ
                 (

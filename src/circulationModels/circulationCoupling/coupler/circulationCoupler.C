@@ -1015,7 +1015,8 @@ Foam::scalar Foam::circulationCoupler::patchPressure(const word& port) const
         }
     }
 
-    FatalErrorInFunction << "No port '" << port << "'" << exit(FatalError);
+    FatalErrorInFunction
+        << "No port '" << port << "'" << exit(FatalError);
     return 0;
 }
 

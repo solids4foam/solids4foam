@@ -72,6 +72,13 @@ class solidSpringDashpotFvPatchVectorField
         //- Additional pressure [Pa]
         scalarField pressure_;
 
+        //- Old-time displacement extrapolated to the faces, for the dashpot
+        //  velocity in springDashpotTraction; computed once per time step
+        mutable vectorField DoldExtrap_;
+
+        //- Time index at which DoldExtrap_ was computed
+        mutable label DoldExtrapTimeIndex_;
+
 public:
 
     //- Runtime type information

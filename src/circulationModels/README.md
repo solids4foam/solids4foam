@@ -36,7 +36,7 @@ separately.
 The application is `applications/solvers/circulationFoam`, which solves a
 circulation network with no mesh.
 
-The tutorials are in `tutorials/circulationModels`.
+The tutorials are in `tutorials/fluids/circulationModels`.
 
 ## Building
 
@@ -59,7 +59,7 @@ libs ("libcirculationCoupling.so");
 ## Quick start
 
 ```bash
-cd tutorials/circulationModels/healthyHuman
+cd tutorials/fluids/circulationModels/healthyHuman
 ./Allrun    # 20 cardiac cycles of a 4-chamber closed loop, about 20 s
 # results: postProcessing/circulation/0/circulation.dat
 ```
@@ -86,10 +86,11 @@ LV { type coupledDomain;  provider external;               // 3D
 connections ( (LV SAS SAT SAR SCP SVN RA TV RV PV PAS PAT PAR PCP PVN LA LV) );
 ```
 
-The CFD coupling tutorials in `tutorials/circulationModels` (`pipeWindkessel`,
-`pipeWindkesselSolids4Foam`, solved by `solids4Foam`, and `pipeClosedLoop`) use
-the simplest case of this, an `externalPort` attached to a circuit, bound to a
-patch by name.
+The CFD coupling tutorials in `tutorials/fluids/circulationModels`
+(`pipeWindkessel` and `pipeClosedLoop`, solved by `solids4Foam` with the
+`pimpleFluid` fluid model or, with `./Allrun pimpleFoam`, by stock `pimpleFoam`)
+use the simplest case of this, an `externalPort` attached to a circuit, bound
+to a patch by name.
 
 ### What crosses the interface
 
@@ -187,4 +188,4 @@ implicit.
 
 The step-by-step tutorial and the verification scripts and reference data for
 these models are not included yet. The tutorials in
-`tutorials/circulationModels` are self-contained.
+`tutorials/fluids/circulationModels` are self-contained.

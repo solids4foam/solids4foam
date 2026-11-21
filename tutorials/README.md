@@ -15,8 +15,9 @@ The tutorials are organised into the following subdirectories:
 - `fluids/` – fluid mechanics cases
 - `fluidSolidInteraction/` – monolithic FSI cases
 - `thermoFluidSolidInteraction/` – thermo-mechanical and coupled problems
-- `circulationModels/` – lumped-parameter (0D) circulation networks, solved
-  on their own or coupled to a CFD domain (OpenFOAM.com only)
+
+Lumped-parameter (0D) circulation networks, solved on their own or coupled to
+a CFD domain, are in `fluids/circulationModels/` (OpenFOAM.com only).
 
 Partitioned FSI cases coupled through [preCICE](https://precice.org) are
 maintained in the [preCICE tutorials](https://precice.org/tutorials.html)
@@ -86,6 +87,12 @@ This script is:
 - **Fast**
 - Used routinely in **GitHub Actions CI**
 - Intended to catch build, linking, and obvious runtime failures
+
+`Alltest` modifies each case to run one time step and then runs its `Allrun`
+script. A case that cannot be tested this way, for example because one run
+needs the converged results of an earlier run, can provide its own `Alltest`
+script, which `Alltest` runs in place of `Allrun` on the modified case. See
+`fluidSolidInteraction/pulmonaryArteries/Alltest` for an example.
 
 ---
 

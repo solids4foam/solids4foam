@@ -301,8 +301,8 @@ public:
             //  function
             pointNormalContactModel& normalModelForThisSlave();
 
-            // //- Return friction contact model for the slave patch calling this
-            // //  function
+            // //- Return friction contact model for the slave patch calling
+            // //  this function
             // frictionContactModel& frictionModelForThisSlave();
 
             //- Return const reference to deformed zone

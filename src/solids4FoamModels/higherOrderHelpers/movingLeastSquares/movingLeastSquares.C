@@ -30,8 +30,7 @@ License
 #endif
 
 #include "solidTractionFvPatchVectorField.H"
-#include "fixedDisplacementFvPatchVectorField.H"
-#include "fixedRotationFvPatchVectorField.H"
+#include "patchQuadratureValues.H"
 #include "fixedGradientFvPatchFields.H"
 
 
@@ -517,7 +516,7 @@ movingLeastSquares::QRSolution movingLeastSquares::QRSolve
 
      result.A = Rbar.colPivHouseholderQr().solve(QbarBhat);
 
-     if(calcConditionNumber_)
+     if (calcConditionNumber_)
      {
          Eigen::JacobiSVD<Eigen::MatrixXd> svd
          (
@@ -540,7 +539,7 @@ void movingLeastSquares::calcCellCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -838,7 +837,7 @@ void movingLeastSquares::calcCellCoeffs() const
     }
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -847,7 +846,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if (faceGradCoeffsPtr_.valid())
@@ -1146,7 +1145,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -1300,7 +1299,7 @@ movingLeastSquares::patchFaceQuadValues
     const label patchI
 ) const
 {
-    return this->patchFaceQuadValues<scalar>(vf, patchI);
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 
@@ -1311,33 +1310,7 @@ movingLeastSquares::patchFaceQuadValues
     const label patchI
 ) const
 {
-    const fvPatchField<vector>& pf = vf.boundaryField()[patchI];
-
-    // The problem is that evaluateQuadrature is not pure virtual function,
-    // so we need to handle in this way
-    if (isA<fixedDisplacementFvPatchVectorField>(pf))
-    {
-        const fixedDisplacementFvPatchVectorField& patchField =
-            refCast<const fixedDisplacementFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-    else if (isA<fixedRotationFvPatchVectorField>(pf))
-    {
-        const fixedRotationFvPatchVectorField& patchField =
-            refCast<const fixedRotationFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-
-    FatalErrorInFunction
-        << "Patch " << patchI << " fixes value, but quadrature-point "
-        << "evaluation is only implemented for "
-        << fixedDisplacementFvPatchVectorField::typeName << " and "
-        << fixedRotationFvPatchVectorField::typeName
-        << abort(FatalError);
-
-    return autoPtr<CompactListList<vector>>();
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 
