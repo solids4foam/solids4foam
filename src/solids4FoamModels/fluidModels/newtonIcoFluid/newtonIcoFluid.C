@@ -1728,6 +1728,46 @@ void newtonIcoFluid::rhieChowTimeCoeffs
 
     const word scheme(t.wordToken());
 
+    // BDF 1 has Euler's weights in every step, so it is accepted as Euler.
+    // Higher BDF orders are not supported: the history would need q levels
+    // of w (also written and read on restart), the order-q weights and the
+    // scheme's own start-up ramp, which are private to bdfDdtScheme. BDF 2
+    // has backward's weights, but its start-up and restart time-step
+    // handling are the scheme's own, so backward is required instead.
+    if (scheme == "BDF")
+    {
+        token schemeToken(is);
+        token orderToken(is);
+        is.rewind();
+
+        if (!orderToken.isLabel() || orderToken.labelToken() != 1)
+        {
+            FatalErrorInFunction
+                << "RhieChowTimeHistory does not support the BDF ";
+
+            if (orderToken.isLabel())
+            {
+                FatalError<< orderToken.labelToken();
+            }
+            else
+            {
+                FatalError<< orderToken.info();
+            }
+
+            FatalError
+                << " ddt scheme of " << U().name() << "." << nl
+                << "    The time-history correction uses the weights of"
+                << " backward (BDF 2) or Euler (BDF 1) with two levels of"
+                << " history; BDF 2 to 6 would need the BDF scheme's own"
+                << " order-q weights, start-up ramp and q history levels,"
+                << " which are not implemented. Use backward or Euler for "
+                << U().name() << ", or switch RhieChowTimeHistory off."
+                << exit(FatalError);
+        }
+
+        return;
+    }
+
     if (scheme == "backward")
     {
         // As backwardDdtScheme::deltaT0_(vf): Euler for the first time-step
@@ -1743,8 +1783,8 @@ void newtonIcoFluid::rhieChowTimeCoeffs
     else if (scheme != "Euler")
     {
         FatalErrorInFunction
-            << "RhieChowTimeHistory supports the backward and Euler ddt "
-            << "schemes of " << U().name() << ", not " << scheme
+            << "RhieChowTimeHistory supports the backward, Euler and BDF 1 "
+            << "ddt schemes of " << U().name() << ", not " << scheme
             << exit(FatalError);
     }
 }

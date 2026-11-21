@@ -434,7 +434,9 @@ public:
             void makeRhieChowHistory() const;
 
             //- Coefficients of the time scheme of ddt(U), as the installed
-            //  backwardDdtScheme uses them (Euler for the first time-step)
+            //  backwardDdtScheme uses them (Euler for the first time-step).
+            //  Euler and BDF 1 give Euler's; other schemes, including BDF 2
+            //  to 6, are fatal
             void rhieChowTimeCoeffs
             (
                 scalar& coefft,
