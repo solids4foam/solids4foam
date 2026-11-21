@@ -52,9 +52,10 @@ only rotates the stress. Under `logStrain`:
 
 Only a sub-law that can be driven by a trial elastic strain can be used:
 `linearElastic`, `linearElasticMisesPlastic`,
-[`linearElasticMisesPlasticLemaitreDamage`](../linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw/README.md)
+[`linearElasticMisesPlasticLemaitreDamage`](../linearElasticMisesPlasticLemaitreDamageMechanicalConstitutiveLaw/README.md),
+[`linearElasticGTNPlastic`](../linearElasticGTNPlasticMechanicalConstitutiveLaw/README.md)
 and
-[`linearElasticGTNPlastic`](../linearElasticGTNPlasticMechanicalConstitutiveLaw/README.md).
+[`linearElasticMisesPlasticPhaseFieldFracture`](../linearElasticMisesPlasticPhaseFieldFractureMechanicalConstitutiveLaw/README.md).
 Any other is refused when the case starts, naming it. A law with kinematic
 hardening or a preferred material direction does not qualify, since the
 exponential map is exact only when the return mapping keeps the elastic

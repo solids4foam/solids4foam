@@ -306,24 +306,28 @@ input's name and written. In parallel the directory is looked for inside each
 
 A law that is regularised by a non-local variable, such as the non-local
 damage of `linearElasticMisesPlasticLemaitreDamage` or the non-local void
-fraction of `linearElasticGTNPlastic`, needs the solution of
+fraction of `linearElasticGTNPlastic`, or that is driven by a phase field,
+such as `linearElasticMisesPlasticPhaseFieldFracture`, needs the solution of
 
 ```text
-phi - div(l^2 grad(phi)) = source
+c phi - div(l^2 grad(phi)) = source
 ```
 
-over the mesh, with zero flux on the boundary, where the source is one of the
-law's own state variables. A law sees only its integration points and cannot
+over the mesh, with zero flux on the boundary, where the source, and the
+coefficient `c` unless it is 1, are the law's own state variables. A law
+sees only its integration points and cannot
 solve a field equation, and the manager must not drive a solver, so the
 equation belongs to the solid model:
 
-1. the law names the field, the state variable that is its source and the
-   length `l` through `implicitGradientFields()`, and lists the field among
-   its `requiredScalarInputs()`;
+1. the law names the field, the state variable that is its source, the
+   length `l` and, optionally, the positive state variable that is `c`
+   through `implicitGradientFields()`, and lists the field among its
+   `requiredScalarInputs()`;
 2. the manager collects the names over every law and the laws they wrap
-   (`implicitGradientFieldNames()`), and gives the source and `l^2` at the
-   cells from the current state of each law that reads the field, zero in
-   the cells of the others (`implicitGradientSource()`);
+   (`implicitGradientFieldNames()`), and gives the source, `l^2` and `c` at
+   the cells from the current state of each law that reads the field; in
+   the cells of the others the source and `l^2` are zero and `c` is 1, so
+   the field is zero there (`implicitGradientSource()`);
 3. the solid model makes the field when it builds the manager, so that the
    first evaluation finds it registered, and solves the equation after every
    cell-centred stress update (`solidModel::solveImplicitGradientFields()`);

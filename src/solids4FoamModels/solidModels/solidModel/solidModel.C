@@ -2745,11 +2745,28 @@ void Foam::solidModel::solveImplicitGradientFields()
             zeroGradientFvPatchScalarField::typeName
         );
 
+        volScalarField coefficient
+        (
+            IOobject
+            (
+                phi.name() + "Coefficient",
+                mesh().time().timeName(),
+                mesh(),
+                IOobject::NO_READ,
+                IOobject::NO_WRITE,
+                false
+            ),
+            mesh(),
+            dimensionedScalar("one", dimless, 1.0),
+            zeroGradientFvPatchScalarField::typeName
+        );
+
         mechanicalManager().implicitGradientSource
         (
             phi.name(),
             primitiveFieldRef(source),
-            primitiveFieldRef(lengthSqr)
+            primitiveFieldRef(lengthSqr),
+            primitiveFieldRef(coefficient)
         );
 
         // The processor and other coupled patches take the neighbours' values
@@ -2810,7 +2827,7 @@ void Foam::solidModel::solveImplicitGradientFields()
 
         fvScalarMatrix phiEqn
         (
-            fvm::Sp(dimensionedScalar("one", dimless, 1.0), phi)
+            fvm::Sp(coefficient, phi)
           - fvm::laplacian(lengthSqrf, phi, "laplacian(" + phi.name() + ")")
          == source
         );

@@ -166,11 +166,11 @@ public:
         //- A field a law reads that is the solution of an implicit-gradient
         //  (non-local) equation,
         //
-        //      phi - div(length^2 grad(phi)) = source,
+        //      c phi - div(length^2 grad(phi)) = source,
         //
-        //  whose source is one of the law's own scalar state variables.
-        //  The solid model owns and solves the equation; the law reads phi
-        //  as a scalar input of the same name
+        //  whose source, and coefficient c if not 1, are the law's own
+        //  scalar state variables. The solid model owns and solves the
+        //  equation; the law reads phi as a scalar input of the same name
         class implicitGradientField
         {
         public:
@@ -183,6 +183,10 @@ public:
 
             //- The length scale of the regularisation
             scalar length;
+
+            //- The scalar state variable of the law that is the
+            //  coefficient c, which must be positive; empty for c = 1
+            word coefficient;
         };
 
 
