@@ -123,6 +123,7 @@ REGRESSION_TESTS=(
     "solids/fracture/crackingPlateHole"
     "solids/fracture/notchedBarLemaitre"
     "solids/fracture/notchedBarGTN"
+    "solids/fracture/flatNotchedBarPhaseField"
     "solids/hyperelasticity/rigidRotation/rotatingSphere"
     "solids/hyperelasticity/rigidRotation/rotatingBlock"
     "solids/hyperelasticity/rigidRotation/rotatingCylinder"
@@ -202,6 +203,7 @@ REGRESSION_TESTS=(
     "../applications/test/logStrainMechanicalConstitutiveLaw/case"
     "../applications/test/LemaitreDamageMechanicalConstitutiveLaw/case"
     "../applications/test/GTNPlasticMechanicalConstitutiveLaw/case"
+    "../applications/test/phaseFieldFractureMechanicalConstitutiveLaw/case"
     "../applications/test/immersedSurfaceTraction/case"
     "../applications/test/circulationNetworkChecks/case"
 )

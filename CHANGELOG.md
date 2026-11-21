@@ -8,6 +8,20 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- `linearElasticMisesPlasticPhaseFieldFracture` mechanical constitutive
+  law: J2 plasticity coupled to the ductile phase field fracture model of
+  Borden et al., ported from the phase field laws of Andrew Whelan. The
+  crack is driven by the history of the tensile elastic energy and by the
+  plastic work past a threshold, and the stress is degraded except for its
+  volumetric part in compression; with a yield stress out of reach it is the
+  brittle model of Miehe et al. The phase field `phaseField` is an
+  implicit-gradient field, which may now carry a coefficient: a law names a
+  state variable `c` and the solid model solves
+  `c phi - div(l^2 grad(phi)) = source`. Used at finite strain under
+  `logStrain`. `Test-phaseFieldFractureMechanicalConstitutiveLaw` checks it at
+  a material point, including the analytical homogeneous brittle response,
+  and the tutorial `fracture/flatNotchedBarPhaseField` compares it with
+  Borden et al. and Eldahshan et al.
 - `linearElasticGTNPlastic` mechanical constitutive law:
   Gurson-Tvergaard-Needleman porous plasticity, ported from the GTN laws of
   Andrew Whelan, with strain-controlled void nucleation, optional

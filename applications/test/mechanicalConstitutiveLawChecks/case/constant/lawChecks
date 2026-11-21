@@ -357,6 +357,60 @@ logStrainGTNPlastic
     }
 }
 
+linearElasticMisesPlasticPhaseFieldFracture
+{
+    finiteStrain    no;
+    isotropic       yes;
+    linear          no;
+    // Intact: with a crack, the volumetric stiffness differs in tension and
+    // compression, so the stress-free reference state is a kink
+    fields
+    {
+        phaseField phaseField [0 0 0 0 0 0 0] 0;
+    }
+    law
+    {
+        type            linearElasticMisesPlasticPhaseFieldFracture;
+        rho             rho [1 -3 0 0 0 0 0] 2700;
+        E               E [1 -1 -2 0 0 0 0] 68.8e9;
+        nu              nu [0 0 0 0 0 0 0] 0.33;
+        "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+        outOfBounds     clamp;
+        Gc              Gc [1 0 -2 0 0 0 0] 60e3;
+        characteristicLength characteristicLength [0 1 0 0 0 0 0] 3.226e-4;
+        w0              w0 [1 -1 -2 0 0 0 0] 1e7;
+    }
+}
+
+logStrainPhaseFieldFracture
+{
+    finiteStrain    yes;
+    isotropic       yes;
+    linear          no;
+    // Intact: with a crack, the volumetric stiffness differs in tension and
+    // compression, so the stress-free reference state is a kink
+    fields
+    {
+        phaseField phaseField [0 0 0 0 0 0 0] 0;
+    }
+    law
+    {
+        type            logStrain;
+        rho             rho [1 -3 0 0 0 0 0] 2700;
+        mechanicalLaw
+        {
+            type            linearElasticMisesPlasticPhaseFieldFracture;
+            E               E [1 -1 -2 0 0 0 0] 68.8e9;
+            nu              nu [0 0 0 0 0 0 0] 0.33;
+            "file|fileName" "$FOAM_CASE/constant/plasticStrainVsYieldStress";
+            outOfBounds     clamp;
+            Gc              Gc [1 0 -2 0 0 0 0] 60e3;
+            characteristicLength characteristicLength [0 1 0 0 0 0 0] 3.226e-4;
+            residualStiffness 1e-6;
+        }
+    }
+}
+
 logStrainMisesPlastic
 {
     finiteStrain    yes;

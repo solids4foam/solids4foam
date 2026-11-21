@@ -299,14 +299,15 @@ void collectImplicitGradientNames
 
 
 //- The current source of an implicit-gradient field, from the state of the
-//  law that reads it, which is this law or one below it, and its length.
-//  Null if none of them reads it
+//  law that reads it, which is this law or one below it, its length, and
+//  its coefficient, or null for 1. Null if none of them reads it
 const scalarField* implicitGradientSourceOf
 (
     const mechanicalConstitutiveLaw& law,
     const mechanicalConstitutiveLawState& state,
     const word& name,
-    scalar& length
+    scalar& length,
+    const scalarField*& coefficientPtr
 )
 {
     const List<mechanicalConstitutiveLaw::implicitGradientField> fields
@@ -319,6 +320,14 @@ const scalarField* implicitGradientSourceOf
         if (fields[i].name == name)
         {
             length = fields[i].length;
+
+            coefficientPtr = nullptr;
+
+            if (!fields[i].coefficient.empty())
+            {
+                coefficientPtr =
+                    &state.getScalarField(fields[i].coefficient);
+            }
 
             return &state.getScalarField(fields[i].source);
         }
@@ -334,7 +343,8 @@ const scalarField* implicitGradientSourceOf
                 law.childLaw(childNames[i]),
                 state.child(childNames[i]),
                 name,
-                length
+                length,
+                coefficientPtr
             );
 
         if (sourcePtr)
@@ -3921,13 +3931,16 @@ void Foam::mechanicalConstitutiveLawManager::implicitGradientSource
 (
     const word& name,
     scalarField& source,
-    scalarField& lengthSqr
+    scalarField& lengthSqr,
+    scalarField& coefficient
 ) const
 {
     source.setSize(mesh_.nCells());
     lengthSqr.setSize(mesh_.nCells());
+    coefficient.setSize(mesh_.nCells());
     source = 0;
     lengthSqr = 0;
+    coefficient = 1;
 
     const topologyEntry* entryPtr = nullptr;
 
@@ -3963,11 +3976,13 @@ void Foam::mechanicalConstitutiveLawManager::implicitGradientSource
         }
 
         scalar length = 0;
+        const scalarField* coefficientPtr = nullptr;
 
         const scalarField* sourcePtr =
             implicitGradientSourceOf
             (
-                laws_[lawI], entry.states_[lawI], name, length
+                laws_[lawI], entry.states_[lawI], name, length,
+                coefficientPtr
             );
 
         if (!sourcePtr)
@@ -3982,6 +3997,25 @@ void Foam::mechanicalConstitutiveLawManager::implicitGradientSource
         {
             source[cells[i]] = lawSource[i];
             lengthSqr[cells[i]] = sqr(length);
+        }
+
+        if (coefficientPtr)
+        {
+            const scalarField& lawCoefficient = *coefficientPtr;
+
+            forAll(cells, i)
+            {
+                if (lawCoefficient[i] <= 0)
+                {
+                    FatalErrorInFunction
+                        << "The coefficient of the implicit-gradient field "
+                        << name << " is " << lawCoefficient[i] << " in cell "
+                        << cells[i] << ": it must be positive"
+                        << exit(FatalError);
+                }
+
+                coefficient[cells[i]] = lawCoefficient[i];
+            }
         }
     }
 }

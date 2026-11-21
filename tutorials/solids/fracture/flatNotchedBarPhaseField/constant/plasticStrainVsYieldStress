@@ -1,0 +1,6 @@
+// Yield stress (Pa) against equivalent plastic strain: linear hardening,
+// 320e6 + 688e6*epsilonPEq, as in Whelan et al. (2025)
+(
+    ( 0 320e6 )
+    ( 1 1008e6 )
+)
