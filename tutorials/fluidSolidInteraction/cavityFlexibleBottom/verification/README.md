@@ -133,10 +133,15 @@ coupling test.
 The fluid `fvSchemes` sets `flux(HbyA) skewCorrected linear`. This is the
 interpolation of the continuity flux in the pressure equation. Without the
 entry it falls back to `default linear`, with no skew correction. The existing
-`interpolate(U)` entry does not cover this flux.
+`interpolate(U)` entry does not cover this flux on OpenFOAM.com and
+OpenFOAM.org. On foam-extend, `pimpleFluid` builds the flux with
+`fvc::interpolate(U)`, so the `interpolate(U)` entry already applied there.
 
-The plate deforms the fluid mesh strongly at its ends. There, the uncorrected
-interpolation error converges slowly. A four-level study then extrapolates to
+The plate deforms the fluid mesh strongly at its ends. There, the error of
+the uncorrected interpolation shrinks only about 1.5 times per halving of the
+mesh: that is the rate at which the linear and skew-corrected results approach
+each other. The total error still looks second order over levels 2-4, so the
+study extrapolates to
 an interface force 0.054% from two other solutions that agree with each other.
 That gap lies outside the study's own grid convergence index (GCI, safety
 factor 1.25) of 0.019%. The two solutions are:
@@ -160,6 +165,8 @@ With skew correction, the limits agree with them. The time step ΔT is
 | Order | 2.02 | 1.98 | 2.33 | 1.86 |
 
 Units: uy in m, Fy in N. "Limit" is the Richardson limit from levels 2–4.
+The linear Fy limit and order use the four-decimal values -5.2399, -5.2565 and
+-5.2598, so they are approximate.
 
 How the study was run:
 
