@@ -146,17 +146,20 @@ factor 1.25) of 0.019%. The two solutions are:
 
 Both are available in the `paper-data/cavity_su2_calculix` and
 `paper-data/fenicsx_cavityflexiblebottom` directories of
-https://github.com/philipcardiff/paper-fsi-verification.
+<https://github.com/philipcardiff/paper-fsi-verification>.
 
-With skew correction, the limits agree with them:
+With skew correction, the limits agree with them. The time step ΔT is
+0.25, 0.125 and 0.0625 s on levels 2, 3 and 4.
 
-| Level | ΔX (m) | ΔT (s) | uy (m), linear | uy (m), skew-corrected | Fy (N), linear | Fy (N), skew-corrected |
-|---:|---:|---:|---:|---:|---:|---:|
-| 2 | 0.05 | 0.25 | -0.231482 | -0.231268 | -5.239862 | -5.233332 |
-| 3 | 0.025 | 0.125 | -0.238403 | -0.238225 | -5.256547 | -5.251155 |
-| 4 | 0.0125 | 0.0625 | -0.240111 | -0.239986 | -5.2598 | -5.256073 |
-| Richardson limit, levels 2–4 | | | -0.240671 | -0.240583 | -5.260619 | -5.257947 |
-| Observed order | | | 2.02 | 1.98 | 2.33 | 1.86 |
+| Level | uy linear | uy skew | Fy linear | Fy skew |
+|---:|---:|---:|---:|---:|
+| 2 | -0.231482 | -0.231268 | -5.239862 | -5.233332 |
+| 3 | -0.238403 | -0.238225 | -5.256547 | -5.251155 |
+| 4 | -0.240111 | -0.239986 | -5.2598 | -5.256073 |
+| Limit, 2–4 | -0.240671 | -0.240583 | -5.260619 | -5.257947 |
+| Order | 2.02 | 1.98 | 2.33 | 1.86 |
+
+Units: uy in m, Fy in N. "Limit" is the Richardson limit from levels 2–4.
 
 How the study was run:
 
