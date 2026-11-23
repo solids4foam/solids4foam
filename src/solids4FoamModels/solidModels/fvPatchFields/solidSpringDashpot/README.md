@@ -100,6 +100,16 @@ stiffness, including `2μ` when `solvePressure` is used.
   evaluation; in a PETSc SNES residual that lag acts as a hidden fixed-point
   iteration, and Newton diverged on the `cerebralAneurysm` tutorial, even for
   a very soft spring.
+- **High-order residual:** with `highOrderResidual` (PETSc SNES,
+  displacement formulation), the imposed traction uses the displacement
+  reconstructed at the face centres by the high-order least-squares scheme
+  of the adjacent cell, for the current and the old-time field, instead of
+  the linear extrapolation. `fixesValue()` returns `false`, so the
+  reconstruction does not treat the patch value as a Dirichlet datum, and
+  `evaluate()` sets the patch value to the same reconstruction, because the
+  Robin closure is built from the low-order cell stress, which the high-order
+  residual does not update. The traction is integrated with one point per
+  face (the face centre). The high-order Jacobian is not supported.
 - **PETSc SNES residual:** the residual updates the boundary conditions
   again after the stress has been computed from the current unknowns, so
   the Robin closure uses the current stress rather than that of the previous
@@ -211,9 +221,14 @@ v2512:
   condition): inner radial displacement errors 1.7e-3, 4.0e-4 and 9.8e-5 on
   10×20, 20×40 and 40×80 cells, with 51–64 outer iterations on all meshes
   and k = 1e5 … 1e8 Pa/m.
+- **High-order residual** (total Lagrangian `springSupportedBar` with a
+  traction load, polynomial order 2 and 3, alpha stabilisation): the cell
+  displacements agree with the standard PETSc SNES solution to 4e-10 m, and
+  the spring-face displacement, 1.778699e-4 m, equals the force balance
+  `t a/(k_N A_0)` in both.
 - **Refusals:** `secondOrder yes`, an unsupported solid model and the
-  high-order SNES residual or Jacobian stop with a fatal error; a dashpot in
-  a `steadyState` run prints the warning.
+  high-order SNES Jacobian stop with a fatal error; a dashpot in a
+  `steadyState` run prints the warning.
 
 Outer iterations to a step-norm tolerance of 1e-10, against the same
 condition with the base-class diagonal and without the imposed traction:

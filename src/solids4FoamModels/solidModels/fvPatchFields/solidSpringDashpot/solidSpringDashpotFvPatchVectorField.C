@@ -28,6 +28,8 @@ License
 #include "IStringStream.H"
 #include "patchCorrectionVectors.H"
 #include "fvcGrad.H"
+#include "surfaceFields.H"
+#include "leastSquaresScheme.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -271,6 +273,88 @@ solidSpringDashpotFvPatchVectorField::solidSpringDashpotFvPatchVectorField
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
 
+void solidSpringDashpotFvPatchVectorField::evaluate
+(
+    const Pstream::commsTypes commsType
+)
+{
+    solidDirectionMixedFvPatchVectorField::evaluate(commsType);
+
+    // Not during construction and start-up, when the solid model and its
+    // least-squares scheme may not exist yet
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+    const word solModName("solidModel_" + mesh.name());
+
+    if
+    (
+        db().time().timeIndex() > db().time().startTimeIndex()
+     && db().foundObject<volVectorField>(internalFieldName(*this))
+     && (
+            mesh.thisDb().foundObject<solidModel>(solModName)
+         || mesh.thisDb().parent().foundObject<solidModel>(solModName)
+        )
+    )
+    {
+        const solidModel& solMod = lookupSolidModel(mesh);
+
+        if (solMod.highOrderResidual())
+        {
+            Field<vector>::operator=
+            (
+                highOrderFaceCentreValue
+                (
+                    db().lookupObject<volVectorField>
+                    (
+                        internalFieldName(*this)
+                    ),
+                    solMod
+                )
+            );
+        }
+    }
+}
+
+
+tmp<vectorField>
+solidSpringDashpotFvPatchVectorField::highOrderFaceCentreValue
+(
+    const volVectorField& vf,
+    const solidModel& solMod
+) const
+{
+    const fvMesh& mesh = patch().boundaryMesh().mesh();
+
+    surfaceVectorField ownerValues
+    (
+        IOobject
+        (
+            "ownerFaceCentreValues(" + vf.name() + ")",
+            mesh.time().timeName(),
+            mesh,
+            IOobject::NO_READ,
+            IOobject::NO_WRITE,
+            false
+        ),
+        mesh,
+        dimensionedVector("zero", vf.dimensions(), vector::zero)
+    );
+    surfaceVectorField neighbourValues
+    (
+        "neighbourFaceCentreValues", ownerValues
+    );
+
+    solMod.displacementLeastSquares().faceCentreValues
+    (
+        vf, ownerValues, neighbourValues
+    );
+
+    return tmp<vectorField>
+    (
+        new vectorField(ownerValues.boundaryField()[patch().index()])
+    );
+}
+
+
 tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
 (
     const vectorField& nPressure,
@@ -297,10 +381,25 @@ tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
     (
         solMod.gradD().boundaryField()[patchID].patchInternalField()
     );
-    const vectorField DP
+    vectorField DP
     (
         patchInternalField() + (k & gradDP) + (n & gradDP)/deltaCoeffs
     );
+
+    // High-order residual: reconstruct the displacement at the face centres
+    // from the adjacent cell's least-squares polynomial instead of the linear
+    // extrapolation above. Like the extrapolation, it depends on the cell
+    // unknowns only
+    const bool highOrder = solMod.highOrderResidual();
+
+    if (highOrder)
+    {
+        DP = highOrderFaceCentreValue
+        (
+            db().lookupObject<volVectorField>(internalFieldName(*this)),
+            solMod
+        );
+    }
 
     // The old-time gradient is reconstructed here, once per time step, rather
     // than taken from gradD().oldTime(), which holds zero on the first step
@@ -329,15 +428,24 @@ tmp<vectorField> solidSpringDashpotFvPatchVectorField::springDashpotTraction
             Dold
         );
 
-        const volTensorField gradDold(fvc::grad(DoldCopy));
-        const tensorField gradDoldP
-        (
-            gradDold.boundaryField()[patchID].patchInternalField()
-        );
+        if (highOrder)
+        {
+            // The same reconstruction as for the current displacement, so
+            // the dashpot velocity compares like with like
+            DoldExtrap_ = highOrderFaceCentreValue(DoldCopy, solMod);
+        }
+        else
+        {
+            const volTensorField gradDold(fvc::grad(DoldCopy));
+            const tensorField gradDoldP
+            (
+                gradDold.boundaryField()[patchID].patchInternalField()
+            );
 
-        DoldExtrap_ =
-            Dold.boundaryField()[patchID].patchInternalField()
-          + (k & gradDoldP) + (n & gradDoldP)/deltaCoeffs;
+            DoldExtrap_ =
+                Dold.boundaryField()[patchID].patchInternalField()
+              + (k & gradDoldP) + (n & gradDoldP)/deltaCoeffs;
+        }
 
         DoldExtrapTimeIndex_ = db().time().timeIndex();
     }
@@ -434,14 +542,15 @@ void solidSpringDashpotFvPatchVectorField::updateCoeffs()
             << patch().name() << ")" << exit(FatalError);
     }
 
-    // The high-order residual has no quadrature treatment of this condition,
-    // and the high-order Jacobian assembles it as a fixed-value patch
-    // (directionMixed::fixesValue() is true)
-    if (solMod.highOrderResidual() || solMod.highOrderJacobian())
+    // The high-order residual imposes the spring-dashpot traction with the
+    // boundary displacement reconstructed at the face centre by the
+    // high-order least-squares scheme (see springDashpotTraction). The
+    // high-order Jacobian has no treatment of this condition
+    if (solMod.highOrderJacobian())
     {
         FatalErrorIn("solidSpringDashpotFvPatchVectorField::updateCoeffs()")
-            << "solidSpringDashpot does not support the high-order residual "
-            << "or Jacobian of the PETSc SNES algorithm (patch "
+            << "solidSpringDashpot does not support the high-order Jacobian "
+            << "of the PETSc SNES algorithm (patch "
             << patch().name() << ")" << exit(FatalError);
     }
 

@@ -38,6 +38,7 @@ SourceFiles
 
 #include "fvPatchFields.H"
 #include "solidDirectionMixedFvPatchVectorField.H"
+#include "solidModel.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -192,6 +193,39 @@ public:
             //- Diagonal of the valueFraction, used for the implicit matrix
             //  coefficient (the base class returns its square root)
             virtual tmp<Field<vector> > snGradTransformDiag() const;
+
+            //- A Robin condition does not fix the value. The base class
+            //  (directionMixed) returns true, which would make the high-order
+            //  least-squares reconstruction use the patch value as a
+            //  Dirichlet datum
+            virtual bool fixesValue() const
+            {
+                return false;
+            }
+
+            //- Evaluate the patch. With the high-order residual, the patch
+            //  value is set to the high-order reconstruction at the face
+            //  centres, which is the displacement the imposed spring-dashpot
+            //  traction uses; the Robin closure of the base class is built
+            //  from the low-order cell stress, which the high-order residual
+            //  does not update
+            virtual void evaluate
+            (
+#ifdef OPENFOAM_NOT_EXTEND
+                const Pstream::commsTypes commsType =
+                    Pstream::commsTypes::blocking
+#else
+                const Pstream::commsTypes commsType = Pstream::blocking
+#endif
+            );
+
+            //- Displacement at the patch face centres reconstructed from the
+            //  adjacent cells by the high-order least-squares scheme
+            tmp<vectorField> highOrderFaceCentreValue
+            (
+                const volVectorField& vf,
+                const solidModel& solMod
+            ) const;
 
 
         //- Write
