@@ -1,0 +1,29 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       uniformDimensionedVectorField;
+    location    "constant";
+    object      g;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Net buoyancy acceleration of the flap in the surrounding fluid:
+//     g_eff = (rho_s - rho_f)/rho_s*g, with g = (0 -9.81 0) m/s^2
+// so that rho_s*g_eff = (rho_s - rho_f)*g while the solid inertia still uses
+// rho_s. The flap is lighter than the fluid, so g_eff points in +y.
+// The system/gravityRamp function object ramps this value in from zero; the
+// value here is the final value.
+dimensions      [0 1 -2 0 0 0 0];
+value           (0 0.973306 0);
+
+// ************************************************************************* //

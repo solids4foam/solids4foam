@@ -34,7 +34,7 @@ gradSchemes
     // falls by about 50% and the max porePressure by 7% on foam-extend 4.1,
     // outside the bands below, until the least-squares treatment of the
     // zero-shear patches is settled (#578)
-    default            leastSquares;
+    default            pointCellsLeastSquares;
 }
 
 divSchemes

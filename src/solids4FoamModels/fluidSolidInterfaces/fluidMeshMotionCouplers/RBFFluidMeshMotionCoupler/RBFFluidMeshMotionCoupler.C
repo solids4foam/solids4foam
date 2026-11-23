@@ -75,14 +75,15 @@ void Foam::RBFFluidMeshMotionCoupler::setPatchMotion
         {
             motion_[patchI] = vectorField
             (
-                mesh().boundaryMesh()[patchI].size(), vector::zero
+                mesh().boundaryMesh()[patchI].nPoints(), vector::zero
+                // mesh().boundaryMesh()[patchI].size(), vector::zero
             );
         }
     }
 
-    primitivePatchInterpolation interp(mesh().boundaryMesh()[patchID]);
-
-    motion_[patchID] = interp.pointToFaceInterpolate(iterDisplacement);
+    // primitivePatchInterpolation interp(mesh().boundaryMesh()[patchID]);
+    // motion_[patchID] = interp.pointToFaceInterpolate(iterDisplacement);
+    motion_[patchID] = iterDisplacement;
 }
 
 

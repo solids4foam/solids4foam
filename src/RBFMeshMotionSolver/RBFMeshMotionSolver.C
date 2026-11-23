@@ -24,6 +24,8 @@ License
 #include <vector>
 #include "FieldSumOp.H"
 
+#include "primitivePatchInterpolation.H"
+
 using namespace Foam;
 
 defineTypeNameAndDebug(RBFMeshMotionSolver, 0);
@@ -53,6 +55,7 @@ RBFMeshMotionSolver::RBFMeshMotionSolver
     motionSolver(mesh),
 #endif
     motionCenters(mesh.boundaryMesh().size(), vectorField(0)),
+    pointMotion_(mesh.boundaryMesh().size(), vectorField(0)), // ZT, FSB Zagreb
     accumulatedMotionCentersField_
     (
         IOobject
@@ -344,11 +347,66 @@ tmp<pointField> RBFMeshMotionSolver::curPoints() const
 }
 
 // As a first step, the motion is defined in the
-void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
+void RBFMeshMotionSolver::setMotion(const Field<vectorField> & pointMotion)
 {
     // Input checking
 
-    assert(motion.size() == mesh().boundaryMesh().size());
+    // ZT, FSB Zagreb
+    assert(pointMotion.size() == mesh().boundaryMesh().size());
+    // assert(motion.size() == mesh().boundaryMesh().size());
+
+    // Check if pointMotion is point field
+    forAll(pointMotion, ipatch)
+    {
+        const vectorField & pmpatch = pointMotion[ipatch];
+
+        // Check whether the size of patch pointMotion is equal
+	// to number of points in patch
+	assert(pmpatch.size() == mesh().boundaryMesh()[ipatch].meshPoints().size());
+    }
+
+    // Store point motion (ZT, FSB Zagreb)
+    this->pointMotion_ = pointMotion;
+
+    Field<vectorField> motion(mesh().boundaryMesh().size());
+    if (faceCellCenters)
+    {
+	// ZT, FSB Zagreb: Calculate face-center displacements
+	// by interpolating face-points
+	forAll(mesh().boundaryMesh(), patchI)
+	{
+	    motion[patchI] = vectorField
+	    (
+		mesh().boundaryMesh()[patchI].size(),
+		vector::zero
+	    );
+
+	    bool isMovingPatch = false;
+	    forAll(movingPatchIDs, j)
+	    {
+		if (patchI == movingPatchIDs[j])
+		    isMovingPatch = true;
+	    }
+
+	    if (isMovingPatch)
+	    {
+		// Create interpolator
+		primitivePatchInterpolation interp
+		(
+		    mesh().boundaryMesh()[patchI]
+		);
+
+		// Set motion of FSI interface
+		motion[patchI] =
+		    interp.pointToFaceInterpolate(pointMotion[patchI]);
+	    }
+	}
+    }
+    else
+    {
+	// Use sepecified point motion field
+	motion = this->pointMotion_;
+    }
 
     forAll(motion, ipatch)
     {
@@ -361,7 +419,8 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
         if (not faceCellCenters && mpatch.size() > 0)
             assert(mpatch.size() == mesh().boundaryMesh()[ipatch].meshPoints().size());
 
-        // Check whether the size of a moving patch is equal to the number of face centers in the patch
+        // Check whether the size of a moving patch is equal
+	// to the number of face centers in the patch
         // First check if patchid is a moving patch
         bool movingPatch = false;
         forAll(movingPatchIDs, movingPatchI)
@@ -376,7 +435,8 @@ void RBFMeshMotionSolver::setMotion(const Field<vectorField> & motion)
         if (not faceCellCenters && movingPatch)
             assert(mpatch.size() == mesh().boundaryMesh()[ipatch].meshPoints().size());
 
-        // Set values on motionCentersField boundary
+        // ZT, FSB Zagreb: This boundary assignment is incorrect because
+        // motion can be either a point field or a face field.
 #ifdef OPENFOAM_NOT_EXTEND
         accumulatedMotionCentersField_.boundaryFieldRef()[ipatch] = motion[ipatch];
 #else
@@ -399,7 +459,9 @@ void RBFMeshMotionSolver::solve()
 
     if (!motionCentersSet_)
     {
-        // Copy motionCentersField to motionCenters
+        // ZT, FSB Zagreb: This is also incorrect because accumulatedMotionCentersField_
+        // is a volVectorField, while motionCenters can be either a point field or a
+        // face field, depending on faceCellCenters.
         forAll(accumulatedMotionCentersField_.boundaryField(), patchI)
         {
             motionCenters[patchI] =
@@ -985,6 +1047,32 @@ void RBFMeshMotionSolver::solve()
                 valuesInterpolationField[meshPoints[j]] = Foam::vector::zero;
         }
     }
+
+
+    // ZT, FSB Zagreb
+    // Apply the prescribed displacement to the moving patches and
+    // exclude them from RBF interpolation. Necessary only if faceCellCentres is true.
+    if (faceCellCenters)
+    {
+	forAll(mesh().boundaryMesh(), i)
+	{
+	    const labelList & meshPoints = mesh().boundaryMesh()[i].meshPoints();
+
+	    bool isMovingPatch = false;
+	    forAll(movingPatchIDs, j)
+	    {
+		if (i == movingPatchIDs[j])
+		    isMovingPatch = true;
+	    }
+
+	    if (isMovingPatch)
+	    {
+		for (int j = 0; j < meshPoints.size(); j++)
+		    valuesInterpolationField[meshPoints[j]] = this->pointMotion_[i][j];
+	    }
+	}
+    }
+
 
     /*
      * Step 6: Set the motion of the mesh vertices

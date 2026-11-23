@@ -64,6 +64,8 @@ namespace Foam
 
             //- Store motion as a field
             Field<vectorField> motionCenters;
+            //- Store point motion (ZT, FSB Zagreb)
+            Field<vectorField> pointMotion_;
 
             //- Store accumulated center motions as a volVectorField.
             //  This allows this mesh motion solver to be used
@@ -120,9 +122,14 @@ namespace Foam
             // Destructor
             virtual ~RBFMeshMotionSolver();
 
-            // Set the motion of every boundary patch, where m is equal to number of patches and with non-empty vectorFields for moving patches.
+            // Set the motion of every boundary patch, where m is equal to number
+	    // of patches and with non-empty vectorFields for moving patches.
             // The motion is defined at the face centers of the boundary patch.
-            void setMotion( const Field<vectorField> & motion );
+
+	    // ZT (FSB Zagreb): Always use point motion regardless of
+	    // the value of faceCellCenters.
+            // void setMotion( const Field<vectorField> & motion );
+            void setMotion( const Field<vectorField> & pointMotion );
 
             // Return point location obtained from the current motion field
             virtual tmp<pointField> curPoints() const;

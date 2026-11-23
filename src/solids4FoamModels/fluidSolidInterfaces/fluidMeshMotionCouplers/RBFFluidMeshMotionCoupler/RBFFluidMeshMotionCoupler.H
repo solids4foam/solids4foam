@@ -63,7 +63,6 @@ class RBFFluidMeshMotionCoupler
         //- Face motion of every patch of the fluid mesh, for the next update
         Field<vectorField> motion_;
 
-
     // Private Member Functions
 
         //- Disallow default bitwise copy construct

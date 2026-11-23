@@ -29,7 +29,7 @@ ddtSchemes
 gradSchemes
 {
     // This case runs only on foam-extend
-    default            leastSquares;
+    default            pointCellsLeastSquares;
 }
 
 divSchemes
