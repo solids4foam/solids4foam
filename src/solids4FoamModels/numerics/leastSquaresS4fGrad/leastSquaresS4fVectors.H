@@ -33,6 +33,11 @@ SourceFiles
 #include "fvMesh.H"
 #include "surfaceFields.H"
 #include "vectorList.H"
+#include "volFields.H"
+#ifdef OPENFOAM_NOT_EXTEND
+    #include "centredCPCCellToCellStencilObject.H"
+    #include "mapDistribute.H"
+#endif
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -64,8 +69,18 @@ class leastSquaresS4fVectors
         //  the wider point-cell (vertex-neighbour) stencil
         mutable labelList wideCells_;
 
-        //- For each cell in wideCells_, the cells sharing at least one point
+        //- For each cell in wideCells_, the cells sharing at least one point.
+        //  When wideCompact_ is true these are indices into the compact
+        //  (local + remote) addressing of the parallel cell-point-cell
+        //  stencil, so that a stencil cut by a processor boundary still holds
+        //  the cells on the other side; otherwise they are local cell labels
         mutable labelListList wideStencil_;
+
+        //- Whether wideStencil_ uses the compact parallel addressing
+        mutable bool wideCompact_ = false;
+
+        //- Cell centres in the addressing of wideStencil_
+        mutable vectorField wideC_;
 
         //- For each cell in wideCells_, the least-squares vector of each
         //  cell in wideStencil_
@@ -155,6 +170,40 @@ public:
         const List<vectorList>& wideVectors() const
         {
             return wideVectors_;
+        }
+
+        //- Return the cell values of vf in the addressing of wideStencil():
+        //  the local cells followed, in parallel, by the remote cells of the
+        //  stencil. Collective: to be called on every processor
+        template<class Type>
+        tmp<Field<Type>> wideStencilField
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf
+        ) const
+        {
+#ifdef OPENFOAM_NOT_EXTEND
+            if (wideCompact_)
+            {
+                const mapDistribute& map =
+                    centredCPCCellToCellStencilObject::New(vf.mesh()).map();
+
+                tmp<Field<Type>> tflat
+                (
+                    new Field<Type>(map.constructSize(), Zero)
+                );
+                Field<Type>& flat = tflat.ref();
+
+                forAll(vf, cellI)
+                {
+                    flat[cellI] = vf[cellI];
+                }
+
+                map.distribute(flat);
+
+                return tflat;
+            }
+#endif
+            return tmp<Field<Type>>(new Field<Type>(vf.primitiveField()));
         }
 
         //- Delete the least square vectors when the mesh moves

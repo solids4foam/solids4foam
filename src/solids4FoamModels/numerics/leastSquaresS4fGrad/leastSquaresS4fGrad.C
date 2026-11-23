@@ -167,6 +167,10 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
     const labelListList& wideStencil = lsv.wideStencil();
     const List<vectorList>& wideVectors = lsv.wideVectors();
 
+    // The stencil may reach cells on other processors
+    const tmp<Field<Type>> tWideVsf(lsv.wideStencilField(vsf));
+    const Field<Type>& wideVsf = tWideVsf();
+
     forAll(wideCells, wcI)
     {
         const label cellI = wideCells[wcI];
@@ -175,7 +179,7 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
         forAll(stencil, i)
         {
-            lsGrad[cellI] += lsVecs[i]*(vsf[stencil[i]] - vsf[cellI]);
+            lsGrad[cellI] += lsVecs[i]*(wideVsf[stencil[i]] - vsf[cellI]);
         }
     }
 
