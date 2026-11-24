@@ -83,8 +83,8 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
 
     // // Lookup the useBoundaryFaceValues list
     // // This list needs to be created before calling the gradient operation
-    // // The list defines which patch values should be used in the least squares
-    // // calculation.
+    // // The list defines which patch values should be used in the least
+    // // squares calculation.
     // // There must be a nice way to define this on the fly, but for now this
     // // solution is OK, as it avoids misuse
     const word useBndFcValName("useBoundaryFaceValues_" + vsf.name());
@@ -107,7 +107,10 @@ Foam::fv::leastSquaresS4fGrad<Type>::calcGrad
     // boolList useBoundaryFaceValues(mesh.boundary().size(), true);
     // forAll(mesh.boundary(), patchI)
     // {
-    //     if (isA<solidTractionFvPatchVectorField>(vsf.boundaryField()[patchI]))
+    //     if
+    //     (
+    //         isA<solidTractionFvPatchVectorField>(vsf.boundaryField()[patchI])
+    //     )
     //     {
     //         //useBoundaryFaceValues = false; // bug: [patchI] was missing!
     //         useBoundaryFaceValues[patchI] = false;

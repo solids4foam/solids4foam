@@ -60,9 +60,10 @@ Description
     walls wetted on one side, where a single impedance applies. This
     estimate is reported at the start of the run, with a warning when it
     exceeds 0.95 (about 45 iterations per order of magnitude of the
-    residual; the beamInCrossFlow Robin variant has about 0.91). A smaller time-step reduces l and helps; for such walls,
-    IQN-ILS with a Dirichlet-Neumann interface is usually much cheaper. With writeDiagnostics, the
-    measured impedances and the predicted and observed contraction factors
+    residual; the beamInCrossFlow Robin variant has about 0.91). A smaller
+    time-step reduces l and helps; for such walls, IQN-ILS with a
+    Dirichlet-Neumann interface is usually much cheaper. With writeDiagnostics,
+    the measured impedances and the predicted and observed contraction factors
     are written to postProcessing/robinCoefficient_<patch>.dat.
 
     Coupling: the Robin-Neumann coupling is designed for unrelaxed fixed-point

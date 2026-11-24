@@ -85,7 +85,7 @@ solidSymmetryFvPatchScalarField::solidSymmetryFvPatchScalarField
 :
     symmetryFvPatchField<scalar>(p, iF, dict)
 {
-    Info << "Symmetry boundary condition with non-orthogonal correction"
+    Info<< "Symmetry boundary condition with non-orthogonal correction"
         << endl;
 
     if (!isType<symmetryFvPatch>(p))

@@ -8,6 +8,29 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
+  `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
+  idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an
+  all-hexahedral O-grid mesh, and `benchmark2`, the idealised biventricle on
+  the benchmark's tetrahedral mesh and fibres. Both compare the displacement
+  of the benchmark points with the participants' published solutions
+  (gnuplot). `Allrun` downloads the meshes from the solids4foam website
+  (`ArosticaEtAl2025-v1.zip`, kept in a cache shared by both cases) and
+  tabulates the time series with the new `makeArosticaTimeSeries` utility.
+- The `viscousHolzapfelOgden` mechanical law: an orthotropic
+  Holzapfel-Ogden passive myocardium with a smooth fibre-compression switch
+  and a viscous term. It returns its volumetric penalty separately, so it can
+  be used with the mixed displacement-pressure formulation.
+- `electroMechanicalLaw` can take its active tension from a time table,
+  `activeTensionSeries`, as the Aróstica et al. (2025) benchmarks do, wrapping
+  `viscousHolzapfelOgden`.
+- An `ellipsoid` method for the `setFibreField` utility, selected in the new
+  optional `system/setFibreFieldDict`: the fibre, sheet and sheet-normal
+  fields of a truncated ellipsoid (Aróstica et al. 2025). Without the
+  dictionary the utility behaves as before.
+- `solids4Foam::downloadFile` in `solids4FoamScripts.sh`: download a
+  tutorial's input data once, e.g. from the solids4foam website, and check its
+  SHA-256 sum.
 - Cook's membrane verification studies now store the per-mesh tip
   displacements of the published references migrated from solid-benchmarks
   (Simo and Armero, César de Sá et al., Areias and Abaqus for the
@@ -63,6 +86,22 @@ release. For complete commit-level details and contributor information, see the
   what does not yet work: thinning the leaflet does not converge to the beam
   model, refined fluid meshes stall in the coupling, and IQN-ILS and
   Robin-Neumann coupling do not complete the case.
+- Added the `pulmonaryArteries` prestressed fluid-solid interaction
+  tutorial: pulsatile, shear-thinning blood flow in a patient-specific main
+  pulmonary artery and its proximal branches, with one inlet, eleven
+  three-element Windkessel outlets and a finite-strain `isotropicFungElastic`
+  wall, coupled by the Robin pressure condition (`elasticWallPressure`). The
+  prestress of the imaged wall is computed first, in a solid-only case, by
+  repeated `solids4Foam` and `updatePrestress` passes (MULF), and applied
+  through `Fpre`. The fluid and wall meshes are generated with
+  `cartesianMesh` and `extrudeMesh`. The case needs PETSc and
+  `cartesianMesh`, and includes a shortened regression test,
+  `regressionTest.sh`, run by hand.
+- `tutorials/Alltest` runs a case's own `Alltest` script, when it has one, in
+  place of its `Allrun`, after the usual one-time-step modifications. This is
+  for cases where one run needs the converged results of an earlier run:
+  `pulmonaryArteries/Alltest` runs one prestress pass to its end time, and
+  then one time step of the fluid-solid interaction case.
 - Added the optional `outerCorrAbsoluteTolerance` keyword in `fsiProperties`:
   a fluid-solid coupling step is also converged if the maximum interface point
   residual (the displacement-increment mismatch by default) is below this
@@ -100,7 +139,7 @@ release. For complete commit-level details and contributor information, see the
   `circulationPressure` boundary condition and coupler
   (`libcirculationCoupling`) that couple a network to a CFD domain with
   explicit or implicit schemes of order 1 to 4. The tutorials are in
-  `tutorials/circulationModels`. It is currently only available for
+  `tutorials/fluids/circulationModels`. It is currently only available for
   OpenFOAM.com.
 - Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
   the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
@@ -368,6 +407,23 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
+  Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
+  St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the
+  bi-parabolic inlet has a 0.2 m/s peak (was 0.3 m/s), the inflow behind
+  Richter's reference values, as confirmed by the author. The Aitken and
+  IQN-ILS couplings use `requireAllResidualMeasures yes` with
+  `outerCorrTolerance 1e-5`, `nOuterCorr 30` and `allowUnconvergedCoupling
+  yes`, and the fluid uses three PIMPLE outer correctors with p and U solver
+  tolerances of 1e-10, the production settings of the verification
+  campaign; with one corrector the strict coupling test could stall and stop
+  the run at `nOuterCorr`. Results are not comparable with earlier versions
+  of the tutorial. The regression test has one set of references for all
+  supported OpenFOAM versions, with relative tolerances, and foam-extend is
+  no longer supported for this case. An
+  opt-in verification campaign (`verification/`, not run by CI) reproduces
+  Richter's published values (`u_x(A)` = 5.95e-5 m, `F_x` = 1.33 N) to within
+  0.2 % on the finest of four meshes.
 - The high-order least-squares schemes (`kExactLeastSquares` and
   `movingLeastSquares`) take the boundary values at the face quadrature
   points from any patch field that derives from the new
@@ -608,6 +664,15 @@ release. For complete commit-level details and contributor information, see the
   iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
   The estimate is printed at the start of the run, with a warning when it
   exceeds 0.95.
+- The `circulationModels` tutorials moved from `tutorials/circulationModels`
+  to `tutorials/fluids/circulationModels`, beside the other fluid cases.
+  The two CFD cases, `pipeWindkessel` and `pipeClosedLoop`, are now solved
+  by `solids4Foam` with the `pimpleFluid` fluid model, with `./Allrun
+  pimpleFoam` for stock `pimpleFoam` (`pipeWindkesselSolids4Foam` is folded
+  into `pipeWindkessel`), and `pipeClosedLoop0D` is now `./Allrun 0D` in
+  `pipeClosedLoop` (its circuit is in `pipeClosedLoop/reference0D`). The
+  tutorials plot their results with gnuplot instead of Python and
+  `matplotlib`.
 
 ### Removed
 
@@ -958,6 +1023,14 @@ release. For complete commit-level details and contributor information, see the
   ranks, because the lower rank posted buffered sends and the higher rank
   blocked in its receive until the lower rank finished its own build. The
   quadrature data are now exchanged collectively (#662).
+- `leastSquaresS4f`: the gradient of a vector or tensor field, such as
+  `grad(D)`, was wrong in the cells next to a symmetry plane that does not
+  pass through the origin (#712). The vector from a cell centre to its mirror
+  image was built by reflecting the cell centre about a plane through the
+  origin, so it had the wrong length and, in general, the wrong sign. Results
+  change for such cases; symmetry planes through the origin and scalar
+  gradients are unaffected. A cell whose centre lies in the plane of its
+  symmetry face is now a fatal error instead of a division by zero.
 
 ## [v2.4] - 2026-08-24
 

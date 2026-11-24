@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run opt-in HronTurek verification studies in isolated case copies.
+"""Run opt-in TurekHron2006 verification studies in isolated case copies.
 
 The studies compare the periodic response of the Turek-Hron FSI3 benchmark
 (mean, amplitude and frequency of the point-A displacement and of the drag and
@@ -1392,7 +1392,7 @@ def main() -> int:
     # followed by an FSI2 run keeps both; delete the file to start afresh
     summary = OUTPUT_ROOT / "verification_summary.md"
     if not summary.exists():
-        summary.write_text("# HronTurek verification summary\n\n")
+        summary.write_text("# TurekHron2006 verification summary\n\n")
     if args.benchmark == "fsi1":
         study = fsi1_coupling_study if args.study == "coupling" else fsi1_mesh_study
         return 0 if study(args, spec) else 1

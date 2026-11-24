@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the idealisedVentricle mesh-convergence verification study.
+"""Run the LandEtAl2015/problem2 mesh-convergence verification study.
 
 The study refines the tutorial blockMesh and rotational extrusion together,
 samples the deformed mid-wall line of Land et al. (2015) Problem 2, and checks
@@ -38,7 +38,7 @@ SAMPLE_DICT_NAME = "sampleVerificationMidLine"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the idealisedVentricle verification variants"
+        description="Run the LandEtAl2015/problem2 verification variants"
     )
     parser.add_argument(
         "--variants",
@@ -437,7 +437,7 @@ def write_results(
             )
 
     lines = [
-        "# idealisedVentricle verification summary",
+        "# LandEtAl2015/problem2 verification summary",
         "",
         f"- Mode: {'quick smoke test' if quick else 'full verification'}",
         f"- Variants: {', '.join(variant_names)}",

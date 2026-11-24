@@ -222,7 +222,10 @@ public:
         //- Construct and return a clone
         virtual autoPtr<AMIInterpolationS4F> clone() const
         {
-            return autoPtr<AMIInterpolationS4F>(new advancingFrontAMIS4F(*this));
+            return autoPtr<AMIInterpolationS4F>
+            (
+                new advancingFrontAMIS4F(*this)
+            );
         }
 
 

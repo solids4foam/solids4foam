@@ -256,7 +256,10 @@ label countNodes(IFstream& inputStream, bool& threeD)
 // It is assumed the the header has already been read from the input stream
 void readNodes
 (
-    IFstream& inputStream, const label nNodes, pointField& points, const bool threeD
+    IFstream& inputStream,
+    const label nNodes,
+    pointField& points,
+    const bool threeD
 )
 {
     forAll(points, pointI)
@@ -407,7 +410,10 @@ label countElements(IFstream& inputStream, bool& threeD)
 // Read the elements and populate the faces and cells lists
 void readElements
 (
-    IFstream& inputStream, const label nElements, faceList& faces, cellList& cells
+    IFstream& inputStream,
+    const label nElements,
+    faceList& faces,
+    cellList& cells
 )
 {
     // Read element list header

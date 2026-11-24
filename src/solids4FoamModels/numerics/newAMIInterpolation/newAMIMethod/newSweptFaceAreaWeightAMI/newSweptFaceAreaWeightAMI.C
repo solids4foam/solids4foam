@@ -563,7 +563,7 @@ Foam::newSweptFaceAreaWeightAMI<SourcePatch, TargetPatch>::interArea
             {
                 writeCutTrisVTK(cutTris, "tris" + name(srcN));
 
-                Info << "view triangles then press ENTER to continue ...";
+                Info<< "view triangles then press ENTER to continue ...";
                 getchar();
             }
         }

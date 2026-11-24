@@ -1205,7 +1205,8 @@ public:
             //- This function will check that the DD field was read from disk
             virtual void DDisRequired();
 
-            //- This function will check that the pointD field was read from disk
+            //- This function will check that the pointD field was read from
+            //  disk
             virtual void pointDisRequired();
 
             //- Make the global poly patches

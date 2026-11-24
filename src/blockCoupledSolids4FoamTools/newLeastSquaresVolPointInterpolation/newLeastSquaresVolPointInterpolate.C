@@ -1261,7 +1261,7 @@ tmp<Field<Type> > newLeastSquaresVolPointInterpolation::interpolate
 //             << endl;
 //     }
 
-//     Info << "patch cell to point interpolation" << endl;
+//     Info<< "patch cell to point interpolation" << endl;
 
 // #if (defined(OPENFOAM) || defined(OPENFOAM_NOT_EXTEND))
 //     const Field<Type>& vfI = vf.primitiveField();
@@ -2061,7 +2061,8 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //                     // non-global points
 //                     if (gpIndex == -1)
 //                     {
-//                         label curNgbPoint = procPatch.neighbPoints()[curPoint];
+//                         label curNgbPoint =
+//                             procPatch.neighbPoints()[curPoint];
 
 //                         label curNgbBndPoint =
 //                             findIndex(ngbBndPoints, curNgbPoint);
@@ -2100,7 +2101,7 @@ Type newLeastSquaresVolPointInterpolation::interpolate
 //                     procBndFaceData[Pstream::myProcNo()] =
 //                         List<Type>(curBndFaces.size());
 
-//                     forAll (curBndFaces, faceI)
+//                     forAll(curBndFaces, faceI)
 //                     {
 //                         label faceID = curBndFaces[faceI];
 //                         label patchID =
@@ -2220,7 +2221,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcBndFaceFieldData
                     procBndFaceData[Pstream::myProcNo()] =
                         List<Type>(curBndFaces.size());
 
-                    forAll (curBndFaces, faceI)
+                    forAll(curBndFaces, faceI)
                     {
                         label faceID = curBndFaces[faceI];
                         label patchID =
@@ -2346,7 +2347,7 @@ void newLeastSquaresVolPointInterpolation::globalPointNgbProcCellFieldData
                     procCellData[Pstream::myProcNo()] =
                         List<Type>(curCells.size());
 
-                    forAll (curCells, cellI)
+                    forAll(curCells, cellI)
                     {
                         procCellData[Pstream::myProcNo()][cellI] =
                             vfI[curCells[cellI]];
@@ -2418,7 +2419,7 @@ newLeastSquaresVolPointInterpolation::procCellsFieldData
     FieldField<Field, Type>& procPsi = tprocPsi();
 #endif
 
-    forAll (procPsi, procI)
+    forAll(procPsi, procI)
     {
         procPsi.set
         (
@@ -2528,7 +2529,7 @@ newLeastSquaresVolPointInterpolation::procBndFacesFieldData
     FieldField<Field, Type>& procPsi = tprocPsi();
 #endif
 
-    forAll (procPsi, procI)
+    forAll(procPsi, procI)
     {
         procPsi.set
         (

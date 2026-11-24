@@ -276,7 +276,7 @@ Foam::tmp<Foam::surfaceScalarField> poroLinGeomSolid::makeImpKf() const
 
 bool poroLinGeomSolid::evolve()
 {
-    Info << "Evolving poro solid solver" << endl;
+    Info<< "Evolving poro solid solver" << endl;
 
     // Refresh time-varying loads before assembling the explicit face traction
     D().correctBoundaryConditions();

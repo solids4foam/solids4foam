@@ -178,7 +178,8 @@ void Foam::solidContactPointPatchVectorField::calcShadowZones() const
     {
         InfoIn
         (
-            "void Foam::solidContactPointPatchVectorField::calcShadowZones() const"
+            "void Foam::solidContactPointPatchVectorField::"
+            "calcShadowZones() const"
         )   << patch().name() << " : making the shadow zones" << endl;
     }
 
@@ -227,7 +228,8 @@ void Foam::solidContactPointPatchVectorField::calcZoneToZones() const
     {
         InfoIn
         (
-            "void Foam::solidContactPointPatchVectorField::calcZoneToZones() const"
+            "void Foam::solidContactPointPatchVectorField::"
+            "calcZoneToZones() const"
         )   << patch().name() << " : making the zoneToZone" << endl;
     }
 
@@ -254,7 +256,7 @@ void Foam::solidContactPointPatchVectorField::calcZoneToZones() const
 
     zoneToZones_.setSize(shadowPatchNames().size());
 
-    forAll (zoneToZones_, shadPatchI)
+    forAll(zoneToZones_, shadPatchI)
     {
         const solidContactPointPatchVectorField& shadowPatchField =
             refCast<const solidContactPointPatchVectorField>

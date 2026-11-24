@@ -281,7 +281,8 @@ void Foam::alphaStab::computeDiffStencil
                 const vector dL = patchCf[facei] - C[ownCellID];
 
                 // Extrapolate from the owner to the face
-                const Type uL = fieldI[ownCellID] + (dL & gradFieldI[ownCellID]);
+                const Type uL =
+                    fieldI[ownCellID] + (dL & gradFieldI[ownCellID]);
 
                 // Use the actual boundary value on uncoupled patches
                 const Type& uR = pvf[facei];

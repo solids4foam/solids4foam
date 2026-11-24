@@ -151,7 +151,7 @@ coupledUnsLinGeomLinearElasticSolid::coupledUnsLinGeomLinearElasticSolid
 bool coupledUnsLinGeomLinearElasticSolid::evolve()
 {
 #ifdef FOAMEXTEND
-    Info << "Evolving solid solver" << endl;
+    Info<< "Evolving solid solver" << endl;
 
     BlockSolverPerformance<vector> solverPerfD("undefined", "blockD");
     BlockLduMatrix<vector>::debug = 5;

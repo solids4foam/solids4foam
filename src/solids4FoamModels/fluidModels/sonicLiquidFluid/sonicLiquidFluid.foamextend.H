@@ -21,7 +21,7 @@ Class
 Description
     Transient solver for trans-sonic/supersonic, laminar flow of a
     compressible liquid. Assumes a linear equation of state between
-	density and pressure related by the bulk modulus.
+    density and pressure related by the bulk modulus.
 
 Author
     Iago Lessa de Oliveira, FEIS/UNESP/UCD.
@@ -63,19 +63,19 @@ class sonicLiquidFluid
         //- Dynamic viscosity
         dimensionedScalar mu_;
 
-		//- Thermodynamic properties
-		IOdictionary thermodynamicProperties_;
+        //- Thermodynamic properties
+        IOdictionary thermodynamicProperties_;
 
-		//- Ref. fluid density
-		const dimensionedScalar rho0_;
+        //- Ref. fluid density
+        const dimensionedScalar rho0_;
 
-		//- Ref. pressure
-		const dimensionedScalar p0_;
+        //- Ref. pressure
+        const dimensionedScalar p0_;
 
         //- const Ref. of psi field
         const dimensionedScalar psi_;
 
-		//- Density offset
+        //- Density offset
         const volScalarField rhoO_;
 
         //- Fluid density
@@ -99,13 +99,13 @@ class sonicLiquidFluid
         void CorrectFlux();
 
         //- Print compressible Courant number
-		void compressibleCourantNo();
+        void compressibleCourantNo();
 
         //- Solve pressure equation
-		void solvePEqn
-		(
-			const fvVectorMatrix& UEqn
-		);
+        void solvePEqn
+        (
+            const fvVectorMatrix& UEqn
+        );
 
         //- Disallow default bitwise copy construct
         sonicLiquidFluid(const sonicLiquidFluid&);

@@ -482,8 +482,8 @@ Foam::solidRigidContactFvPatchVectorField::zoneToZones()
 //             << abort(FatalError);
 //     }
 
-//     // The master may have multiple slaves so we need to find which zoneToZone
-//     // corresponds to the current slave patch
+//     // The master may have multiple slaves so we need to find which
+//     // zoneToZone corresponds to the current slave patch
 //     const wordList& shadPatchNames = shadowPatchField().shadowPatchNames();
 //     label masterShadowID = -1;
 //     forAll(shadPatchNames, shadPatchI)
@@ -519,13 +519,14 @@ Foam::solidRigidContactFvPatchVectorField::zoneToZones()
 //         FatalErrorIn
 //         (
 //             "const Foam::globalPolyPatch&"
-//             " Foam::solidRigidContactFvPatchVectorField::zoneForThisSlave() const"
+//             " Foam::solidRigidContactFvPatchVectorField::"
+//             "zoneForThisSlave() const"
 //         )   << "The master patch is not allowed to call this function"
 //             << abort(FatalError);
 //     }
 
-//     // The master may have multiple slaves so we need to find which shadowZone
-//     // corresponds to the current slave patch
+//     // The master may have multiple slaves so we need to find which
+//     // shadowZone corresponds to the current slave patch
 //     const wordList& shadPatchNames = shadowPatchField().shadowPatchNames();
 //     label masterShadowID = -1;
 //     forAll(shadPatchNames, shadPatchI)
@@ -542,7 +543,8 @@ Foam::solidRigidContactFvPatchVectorField::zoneToZones()
 //         FatalErrorIn
 //         (
 //             "const Foam::globalPolyPatch&"
-//             " Foam::solidRigidContactFvPatchVectorField::zoneForThisSlave() const"
+//             " Foam::solidRigidContactFvPatchVectorField::"
+//             "zoneForThisSlave() const"
 //         )   << "Something went wrong when looking for the shadowPatch"
 //             << abort(FatalError);
 //     }
