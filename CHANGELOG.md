@@ -797,6 +797,9 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- The neo-Hookean law now preserves zero stress at the undeformed state
+  when the compiler contracts floating-point operations.
+
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual

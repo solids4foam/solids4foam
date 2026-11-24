@@ -210,7 +210,11 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
                 << exit(FatalError);
         }
 
-        const symmTensor bEbar = pow(Ji, -2.0/3.0)*symm(F[i] & F[i].T());
+        const symmTensor b = symm(F[i] & F[i].T());
+        // Subtract the reference strain before dev() to preserve zero stress
+        // at rest when the diagonal subtraction is fused.
+        const symmTensor sigmaDev =
+            (muVal/Ji)*pow(Ji, -2.0/3.0)*dev(b - I);
 
         // Hydrostatic stress, 0.5*K*(J^2 - 1), as in the other hyperelastic
         // laws here. The two common volumetric energies, 0.5*K*(J^2 - 1) and
@@ -219,7 +223,7 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
         // changing to log(J) changes the neckingBar results by about 1e-3
         const scalar sigmaHyd = 0.5*kappaVal*(sqr(Ji) - 1.0);
 
-        sigma[i] = (muVal/Ji)*dev(bEbar) + (sigmaHyd/Ji)*I;
+        sigma[i] = sigmaDev + (sigmaHyd/Ji)*I;
 
         // The energy is written on the isochoric measure bEbar, so the first
         // term is the isochoric stress and the second is dU/dJ for
@@ -227,7 +231,7 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
         if (wantsSplit)
         {
             (*volumetricPtr)[i] = sigmaHyd/Ji;
-            sigma[i] = (muVal/Ji)*dev(bEbar);
+            sigma[i] = sigmaDev;
         }
     }
 
