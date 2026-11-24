@@ -210,11 +210,17 @@ void Foam::neoHookeanElasticMechanicalConstitutiveLaw::evaluate
                 << exit(FatalError);
         }
 
-        const symmTensor b = symm(F[i] & F[i].T());
-        // Subtract the reference strain before dev() to preserve zero stress
-        // at rest when the diagonal subtraction is fused.
-        const symmTensor sigmaDev =
-            (muVal/Ji)*pow(Ji, -2.0/3.0)*dev(b - I);
+        const symmTensor b(symm(F[i] & F[i].T()));
+
+        // Isochoric stress, (mu/J)*dev(bEbar) with bEbar = J^(-2/3)*b.
+        // I is subtracted before dev(), which changes nothing since
+        // dev(I) = 0, so that the stress is exactly zero at rest: dev(I)
+        // itself is not, by round-off, when the compiler fuses the
+        // multiply-add in its diagonal
+        const symmTensor sigmaDev
+        (
+            (muVal/Ji)*pow(Ji, -2.0/3.0)*dev(b - I)
+        );
 
         // Hydrostatic stress, 0.5*K*(J^2 - 1), as in the other hyperelastic
         // laws here. The two common volumetric energies, 0.5*K*(J^2 - 1) and

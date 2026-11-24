@@ -314,7 +314,10 @@ void Foam::viscousHolzapfelOgdenMechanicalConstitutiveLaw::evaluate
         const scalar I1bar = tr(bBar);
         const scalar psi1 = 0.5*a*boundedExp(b_*(I1bar - 3.0));
 
-        symmTensor sigmaI(2.0*rJ*psi1*dev(bBar));
+        // I is subtracted before dev(), which changes nothing since
+        // dev(I) = 0, so that this term is exactly zero at rest, as in
+        // neoHookeanElastic
+        symmTensor sigmaI(2.0*rJ*psi1*dev(bBar - I));
 
         // Pushed-forward fibre and sheet directions
         const vector ff(Fi & (f0[i]/magF0));

@@ -797,8 +797,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
-- The neo-Hookean law now preserves zero stress at the undeformed state
-  when the compiler contracts floating-point operations.
+- The `neoHookeanElastic`, `neoHookeanElasticMisesPlastic`,
+  `MooneyRivlinElastic`, `HolzapfelGasserOgdenElastic` and
+  `viscousHolzapfelOgden` laws now give exactly zero stress at the undeformed
+  state. Where the compiler fused the multiply-add in `dev()`, `dev(I)` left a
+  round-off residual of about `5.6e-17*mu`, which was enough to derail an
+  initially unloaded PETSc solve. The identity is now subtracted before
+  `dev()`, which leaves the stress algebraically unchanged.
 
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface

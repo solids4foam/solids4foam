@@ -207,8 +207,11 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
 
         // Fbar*Sbar*Fbar^T for each term of the energy: the ground substance
         // contributes mu*bbar, and each fibre family contributes its stress
-        // along the deformed fibre direction
-        symmTensor T(muVal*bbar);
+        // along the deformed fibre direction. The ground substance is taken
+        // as mu*(bbar - I): dev() removes the I anyway, and without it dev()
+        // of mu*I is not exactly zero at rest, by round-off, when the
+        // compiler fuses the multiply-add in its diagonal
+        symmTensor T(muVal*(bbar - I));
 
         T += (2.0*k1Val*(I4 - 1.0)*exp(k2_*sqr(I4 - 1.0)))*symm(n4*n4);
         T += (2.0*k1Val*(I6 - 1.0)*exp(k2_*sqr(I6 - 1.0)))*symm(n6*n6);
