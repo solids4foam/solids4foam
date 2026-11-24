@@ -22,6 +22,46 @@ Description
     Incompressible Newtonian laminar fluid model solved used a Jacobian-free
     Newton-Krylov approach via a PETSc SNES interface.
 
+    Optional entries in newtonIcoFluidCoeffs:
+
+        // Include the convection term (default yes). Without it, the model
+        // solves the unsteady Stokes equations
+        convection      no;
+
+        // High-order (k-exact least-squares) residual, in the format of the
+        // solid models' highOrderCoeffs with velocity in place of
+        // displacement. The stress and the volume flux are integrated over
+        // the face quadrature points of the reconstructions of U and p, and
+        // the second-order Jacobian is kept as the preconditioner. It needs
+        // convection off, a static mesh, a serial run and a pressure
+        // stabilisation that supports it, e.g. alpha
+        highOrderCoeffs
+        {
+            highOrderResidual yes;
+
+            velocity
+            {
+                type                    kExactLeastSquares;
+                polynomialOrder         3;
+                faceStencilExtraCells   20;
+                weightFunctionCoeffs
+                {
+                    type    radiallySymmetricExponential;
+                    k       6;
+                }
+            }
+
+            pressure
+            {
+                // As for velocity
+            }
+        }
+
+    An optional momentumSource field (m/s^2) in the start time directory is
+    added to the momentum equation, e.g. for a manufactured solution. Its cell
+    values are the cell averages of the body force per unit mass, and they do
+    not change in time.
+
 Author
     Philip Cardiff, UCD.
 
@@ -47,6 +87,7 @@ SourceFiles
 #include "foamPetscSnesHelper.H"
 #include "solidModel.H"
 #include "stabilisationModel.H"
+#include "leastSquaresReconstruction.H"
 
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -103,6 +144,18 @@ class newtonIcoFluid
         //- Number of unknowns per cell, used by PETSc SNES solver
         const label blockSize_;
 
+        //- Include the convection term; without it, the model solves the
+        //  unsteady Stokes equations
+        const Switch convection_;
+
+        //- Use the high-order (k-exact least-squares) residual
+        Switch highOrderResidual_;
+
+        //- Optional momentum source per unit mass, read from the start time
+        //  directory; its cell values are cell averages and do not change in
+        //  time
+        autoPtr<volVectorField> momentumSourcePtr_;
+
         //- Optional file for recording the time step sizes and number of
         //  nonlinear iterations
         autoPtr<OFstream> tsLogPtr_;
@@ -118,6 +171,21 @@ class newtonIcoFluid
 
         // Return a const reference to the rAU field
         surfaceScalarField& rAUf();
+
+        //- Return the highOrderCoeffs sub-dictionary for the given field
+        //  role (velocity or pressure)
+        const dictionary& highOrderCoeffs(const word& fieldRole) const;
+
+        //- Calculate the face traction (the stress integrated over each face
+        //  with the face quadrature, divided by the face area) and the face
+        //  volume flux from the high-order reconstructions of U and p
+        void highOrderFaceFluxes
+        (
+            const volVectorField& U,
+            const volScalarField& p,
+            surfaceVectorField& traction,
+            surfaceScalarField& flux
+        ) const;
 
         //- Correct phi function
         void correctPhi();
@@ -213,6 +281,18 @@ public:
             {
                 return pressureStabilisationPtr_();
             }
+
+            //- Return true if the high-order residual is active
+            bool highOrderResidual() const
+            {
+                return highOrderResidual_;
+            }
+
+            //- Return the least-squares reconstruction scheme of U
+            const leastSquaresScheme& velocityLeastSquares() const;
+
+            //- Return the least-squares reconstruction scheme of p
+            const leastSquaresScheme& pressureLeastSquares() const;
 
 
         // Edit

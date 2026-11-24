@@ -39,6 +39,16 @@ Description
     centre value is of second order in the cell size. The boundary values are
     the exact solution at the face centres in both cases.
 
+    With the -steadyStokesSource option, the utility also writes the
+    momentumSource field read by newtonIcoFluid: the cell averages of
+
+        f(x, y) = 2 pi^2 nu A(t) [u, v](x, y, 0) + grad p(x, y, 0),
+
+    where A(t) = e^{-2pi^2 nu t} and t is the given time. With convection
+    off and a steady time scheme, the exact solution of the forced Stokes
+    problem solved at time t is then the Taylor-Green velocity at time t,
+    which the walls impose, and the initial pressure above.
+
  Author
     Philip Cardiff, UCD.
 
@@ -74,6 +84,16 @@ scalar exactP(const point& c)
     return 0.25*(Foam::cos(2*pi*c.x()) + Foam::cos(2*pi*c.y())) + pOffset;
 }
 
+vector exactGradP(const point& c)
+{
+    return -0.5*pi*vector
+    (
+        Foam::sin(2*pi*c.x()),
+        Foam::sin(2*pi*c.y()),
+        0
+    );
+}
+
 } // End anonymous namespace
 
 
@@ -87,14 +107,24 @@ int main(int argc, char *argv[])
         "set the cell values to the exact cell averages"
     );
 
+    argList::addOption
+    (
+        "steadyStokesSource",
+        "time",
+        "also write the momentumSource field of the steady forced Stokes "
+        "problem solved at the given time"
+    );
+
     #include "setRootCase.H"
     #include "createTime.H"
     #include "createMesh.H"
 
 #ifdef OPENFOAM_COM
     const bool cellAverage = args.found("cellAverage");
+    const bool steadyStokesSource = args.found("steadyStokesSource");
 #else
     const bool cellAverage = args.optionFound("cellAverage");
+    const bool steadyStokesSource = args.optionFound("steadyStokesSource");
 #endif
 
     // Initialise the velocity field
@@ -192,6 +222,72 @@ int main(int argc, char *argv[])
     Info<< nl << "Writing U and p to " << runTime.timeName() << endl;
     U.write();
     p.write();
+
+    if (steadyStokesSource)
+    {
+#ifdef OPENFOAM_COM
+        const scalar t = args.get<scalar>("steadyStokesSource");
+#else
+        const scalar t = args.optionRead<scalar>("steadyStokesSource");
+#endif
+
+        IOdictionary transportProperties
+        (
+            IOobject
+            (
+                "transportProperties",
+                runTime.constant(),
+                mesh,
+                IOobject::MUST_READ,
+                IOobject::NO_WRITE
+            )
+        );
+
+        const scalar nu =
+            dimensionedScalar("nu", dimViscosity, transportProperties).value();
+
+        const scalar A = Foam::exp(-2.0*sqr(pi)*nu*t);
+
+        volVectorField momentumSource
+        (
+            IOobject
+            (
+                "momentumSource",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::NO_WRITE
+            ),
+            mesh,
+            dimensionedVector(dimVelocity/dimTime, Zero)
+        );
+
+        // Cell averages of the source, with the same cell quadrature
+        const fvMeshQuadrature quad(mesh, 6, 6);
+        auto& cellQuadPoints = compactListListCRef(quad.cellQuadPoints());
+        auto& cellQuadWeights = compactListListCRef(quad.cellQuadWeights());
+        const scalarField& V = mesh.V();
+
+        forAll(momentumSource, cellI)
+        {
+            vector integral = Zero;
+
+            forAll(cellQuadPoints[cellI], qI)
+            {
+                const point& x = cellQuadPoints[cellI][qI];
+
+                integral +=
+                    cellQuadWeights[cellI][qI]
+                   *(2*sqr(pi)*nu*A*exactU(x) + exactGradP(x));
+            }
+
+            momentumSource[cellI] = integral/V[cellI];
+        }
+
+        Info<< "Writing momentumSource for the steady Stokes problem at time "
+            << t << " to " << runTime.timeName() << endl;
+        momentumSource.write();
+    }
 
     Info<< nl << "End" << nl << endl;
 

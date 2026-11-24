@@ -545,8 +545,21 @@ The opt-in `verification/Allverify` study runs the
  `checkTaylorGreenVortexReconstruction` utility on the uniform and graded
  meshes. The utility reconstructs U and p from their exact cell averages with
  `kExactLeastSquares` for polynomial orders 1 to 3, and the study checks that
- the values converge at order k + 1 and the gradients at order k. See
- `verification/README.md` for the method and results.
+ the values converge at order k + 1 and the gradients at order k.
+
+`verification/Allverify stokes` runs `newtonIcoFluid` without convection
+ (`convection no`) and with its high-order residual (`highOrderCoeffs`) on two
+ Stokes problems: a steady forced problem, whose body force
+ (`initialiseTaylorGreenVortex -steadyStokesSource`) gives a non-constant
+ exact pressure, and the unsteady decaying vortex with the time step refined
+ as $$h^2$$. With `polynomialOrder 3`, the velocity and the pressure converge
+ at fourth order (Figure 3). See `verification/README.md` for the method and
+ results.
+
+![High-order Stokes convergence](images/highOrderStokesConvergence.png)
+
+**Figure 3: L2 errors of the cell averages for the second-order and
+ high-order residuals of `newtonIcoFluid` on the Stokes problems.**
 
 ## References
 

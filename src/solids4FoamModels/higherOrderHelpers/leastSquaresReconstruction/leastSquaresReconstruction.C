@@ -46,7 +46,8 @@ leastSquaresReconstruction::leastSquaresReconstruction(const fvMesh& mesh)
     >(mesh),
 #endif
     displacementSchemePtr_(),
-    pressureSchemePtr_()
+    pressureSchemePtr_(),
+    velocitySchemePtr_()
 {}
 
 
@@ -75,12 +76,16 @@ const leastSquaresScheme& leastSquaresReconstruction::scheme
     {
         schemePtr = &pressureSchemePtr_;
     }
+    else if (fieldRole == "velocity")
+    {
+        schemePtr = &velocitySchemePtr_;
+    }
     else
     {
         FatalErrorInFunction
             << "Unknown least-squares reconstruction field role '"
             << fieldRole << "'" << nl << nl
-            << "Valid field roles are displacement and pressure"
+            << "Valid field roles are displacement, pressure and velocity"
             << exit(FatalError);
     }
 
@@ -112,6 +117,11 @@ void leastSquaresReconstruction::clear() const
     {
         pressureSchemePtr_->clear();
     }
+
+    if (velocitySchemePtr_.valid())
+    {
+        velocitySchemePtr_->clear();
+    }
 }
 
 
@@ -135,6 +145,7 @@ void leastSquaresReconstruction::updateMesh(const mapPolyMesh&)
 {
     displacementSchemePtr_.clear();
     pressureSchemePtr_.clear();
+    velocitySchemePtr_.clear();
 
 #ifdef FOAMEXTEND
     return true;

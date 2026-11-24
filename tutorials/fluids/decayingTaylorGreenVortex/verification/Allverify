@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Opt-in reconstruction order check for decayingTaylorGreenVortex.
+# Opt-in verification of decayingTaylorGreenVortex:
+#   ./Allverify [options]         reconstruction order check
+#   ./Allverify stokes [options]  steady and unsteady Stokes order studies of
+#                                 the high-order newtonIcoFluid residual
 set -euo pipefail
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -8,4 +11,11 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ "${1:-}" = "stokes" ]
+then
+    shift
+    exec python3 -u "${SCRIPT_DIR}/scripts/stokes_order_check.py" "$@"
+fi
+
 exec python3 -u "${SCRIPT_DIR}/scripts/reconstruction_order_check.py" "$@"

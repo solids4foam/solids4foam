@@ -42,7 +42,10 @@ summarise their characteristic features.
     in solids4foam FSI analyses.
   - `newtonIcoFluid`: incompressible laminar solver using a Jacobian-free
     Newton-Krylov approach via the PETSc SNES interface; suitable for cases
-    where a fully implicit nonlinear solve is preferred.
+    where a fully implicit nonlinear solve is preferred. It can also solve the
+    Stokes equations (`convection no`) with a high-order k-exact residual
+    (`highOrderCoeffs`), see `newtonIcoFluid.H` and the
+    `decayingTaylorGreenVortex` verification.
 
 - **Incompressible multi-phase models**
 
