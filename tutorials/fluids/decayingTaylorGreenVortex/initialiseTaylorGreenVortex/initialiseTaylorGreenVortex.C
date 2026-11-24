@@ -24,13 +24,20 @@ Description
 
         u(x, y, t) = e^{-2pi^2 t/Re} sin(pi x) cos(pi y)
         v(x, y, t) = -e^{-2pi^2 t/Re} cos(pi x) sin(pi y)
-        p(x, y, t) = e^{-4pi^2 t/Re} (1/4) [cos(2pi x) + sin(2pi y)]
+        p(x, y, t) = e^{-4pi^2 t/Re} (1/4) [cos(2pi x) + cos(2pi y)]
 
     Assuming time (t) is 0.0, the intial fields are
 
         u(x, y, 0) = sin(pi x) cos(pi y)
         v(x, y, 0) = -cos(pi x) sin(pi y)
-        p(x, y, 0) = (1/4) [cos(2pi x) + sin(2pi y)] + pOffset
+        p(x, y, 0) = (1/4) [cos(2pi x) + cos(2pi y)] + pOffset
+
+    By default, the cell values are the exact solution at the cell centres.
+    With the -cellAverage option, they are the exact cell averages, computed
+    with a high-order cell quadrature. A high-order (k-exact) finite volume
+    scheme needs cell averages, because the gap between the average and the
+    centre value is of second order in the cell size. The boundary values are
+    the exact solution at the face centres in both cases.
 
  Author
     Philip Cardiff, UCD.
@@ -39,19 +46,56 @@ Description
 
 #include "fvCFD.H"
 #include "mathematicalConstants.H"
+#include "fvMeshQuadrature.H"
+#include "compatibilityFunctions.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace
+{
+
+const scalar pi = constant::mathematical::pi;
+
+const scalar pOffset = 0.5;
+//const scalar pOffset = 0;
+
+vector exactU(const point& c)
+{
+    return vector
+    (
+        Foam::sin(pi*c.x())*Foam::cos(pi*c.y()),
+      - Foam::cos(pi*c.x())*Foam::sin(pi*c.y()),
+        0
+    );
+}
+
+scalar exactP(const point& c)
+{
+    return 0.25*(Foam::cos(2*pi*c.x()) + Foam::cos(2*pi*c.y())) + pOffset;
+}
+
+} // End anonymous namespace
+
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 int main(int argc, char *argv[])
 {
+    argList::addBoolOption
+    (
+        "cellAverage",
+        "set the cell values to the exact cell averages"
+    );
+
     #include "setRootCase.H"
     #include "createTime.H"
     #include "createMesh.H"
 
-    const scalar pi = constant::mathematical::pi;
-
-    const scalar pOffset = 0.5;
-    //const scalar pOffset = 0;
+#ifdef OPENFOAM_COM
+    const bool cellAverage = args.found("cellAverage");
+#else
+    const bool cellAverage = args.optionFound("cellAverage");
+#endif
 
     // Initialise the velocity field
     Info<< "Creating U" << endl;
@@ -86,49 +130,62 @@ int main(int argc, char *argv[])
     );
 
     // Set the internal field
+    if (cellAverage)
     {
-        const scalarField x(mesh.C().component(vector::X));
-        const scalarField y(mesh.C().component(vector::Y));
+        Info<< "Setting the cell values to the exact cell averages" << endl;
 
-        U.primitiveFieldRef().replace
-        (
-            vector::X,
-            Foam::sin(pi*x)*Foam::cos(pi*y)
-        );
+        // The cell quadrature is exact for polynomials of degree 6, so its
+        // error is far below the discretisation errors of interest
+        const fvMeshQuadrature quad(mesh, 6, 6);
+        auto& cellQuadPoints = compactListListCRef(quad.cellQuadPoints());
+        auto& cellQuadWeights = compactListListCRef(quad.cellQuadWeights());
+        const scalarField& V = mesh.V();
 
-        U.primitiveFieldRef().replace
-        (
-            vector::Y,
-          - Foam::cos(pi*x)*Foam::sin(pi*y)
-        );
+        forAll(U, cellI)
+        {
+            vector UIntegral = Zero;
+            scalar pIntegral = 0;
 
-        p.primitiveFieldRef() =
-            0.25*(Foam::cos(2*pi*x) + Foam::cos(2*pi*y)) + pOffset;
+            forAll(cellQuadPoints[cellI], qI)
+            {
+                const scalar w = cellQuadWeights[cellI][qI];
+                UIntegral += w*exactU(cellQuadPoints[cellI][qI]);
+                pIntegral += w*exactP(cellQuadPoints[cellI][qI]);
+            }
+
+            U[cellI] = UIntegral/V[cellI];
+            p[cellI] = pIntegral/V[cellI];
+        }
+    }
+    else
+    {
+        const vectorField& C = mesh.C();
+
+        forAll(U, cellI)
+        {
+            U[cellI] = exactU(C[cellI]);
+            p[cellI] = exactP(C[cellI]);
+        }
     }
 
     // Set the boundary fields
 
     forAll(mesh.boundary(), patchI)
     {
-        const scalarField x
-        (
-            mesh.C().boundaryField()[patchI].component(vector::X)
-        );
-        const scalarField y
-        (
-            mesh.C().boundaryField()[patchI].component(vector::Y)
-        );
+        const vectorField& Cf = mesh.C().boundaryField()[patchI];
 
-        vectorField patchU
-        (
-            Foam::sin(pi*x)*Foam::cos(pi*y)*vector(1, 0, 0)
-          - Foam::cos(pi*x)*Foam::sin(pi*y)*vector(0, 1, 0)
-        );
+        vectorField patchU(Cf.size());
+        scalarField patchP(Cf.size());
+
+        forAll(Cf, faceI)
+        {
+            patchU[faceI] = exactU(Cf[faceI]);
+            patchP[faceI] = exactP(Cf[faceI]);
+        }
 
         U.boundaryFieldRef()[patchI] == patchU;
 
-        p.boundaryFieldRef()[patchI] ==
-            0.25*(Foam::cos(2*pi*x) + Foam::cos(2*pi*y)) + pOffset;
+        p.boundaryFieldRef()[patchI] == patchP;
     }
 
     // Write U and p

@@ -8,6 +8,16 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
+- A high-order test bench for the `decayingTaylorGreenVortex` tutorial, to
+  verify the boundary data and initial fields that a k-exact fluid scheme
+  needs. `initialiseTaylorGreenVortex -cellAverage` writes the exact cell
+  averages of U and p (the default output is unchanged), the
+  `decayingTaylorGreenVortexVelocity` condition gives the exact velocity at
+  the face quadrature points (`quadratureValuePatchField`), and the new
+  `checkTaylorGreenVortexReconstruction` utility measures the errors of the
+  `kExactLeastSquares` reconstruction of U and p from the exact averages.
+  The opt-in `verification/Allverify` study checks the observed orders on the
+  uniform and graded meshes. The solver results are unchanged.
 - Cardiac elastodynamics benchmark tutorials of Aróstica et al. (2025),
   `tutorials/solids/hyperelasticity/ArosticaEtAl2025`: `benchmark1`, an
   idealised left ventricle (steps 0A, 0B, 1 and the blinded 2A to 2C) on an

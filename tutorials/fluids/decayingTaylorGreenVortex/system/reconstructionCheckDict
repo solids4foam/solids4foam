@@ -1,0 +1,36 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      reconstructionCheckDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Least-squares reconstruction scheme tested by
+// checkTaylorGreenVortexReconstruction for U and p. The utility sets
+// polynomialOrder to 1, 2 and 3 in turn.
+
+type                    kExactLeastSquares;
+
+// Extra cells in the minimum-size stencil. With 15, some stencils near the
+// walls of the graded meshes are rank-deficient for polynomialOrder 3
+faceStencilExtraCells   20;
+
+// Weight function for the least-squares systems
+weightFunctionCoeffs
+{
+    type    radiallySymmetricExponential;
+    k       6;
+}
+
+// ************************************************************************* //
