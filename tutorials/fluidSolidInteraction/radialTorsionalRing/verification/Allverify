@@ -87,7 +87,12 @@ then
 
             (cd "${case_dir}" && ./Allrun "${mode}" > log.Allrun 2>&1) \
                 || { echo "  run failed (see ${case_dir}/log.Allrun)"; \
-                     failed=1; }
+                     failed=1; continue; }
+
+            python3 -B -I "${SCRIPT_DIR}/scripts/analyse_case.py" \
+                "${case_dir}" > "${case_dir}/log.analyse_case" 2>&1 \
+                || { echo "  analysis failed" \
+                       "(see ${case_dir}/log.analyse_case)"; failed=1; }
         done
     done
 fi

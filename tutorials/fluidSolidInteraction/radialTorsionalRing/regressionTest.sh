@@ -25,6 +25,9 @@ ALPHA_TOL=2e-8          # |alpha_B - alpha_B(regression reference)| (rad)
 
 # Reference values at REG_END_TIME (OpenFOAM-v2512, 1 rank)
 REF_U_B=0.001093495396680078
+# Semi-analytical u_B at REG_END_TIME, from
+# verification/scripts/make_reference.py --config combined --mesh M1
+EXACT_U_B=0.00110075659695
 REF_ALPHA_B=-1.218234725512528e-05
 
 ALLRUN_LOGFILE="log.Allrun"
@@ -114,22 +117,8 @@ check() {
 
 printf "t = %s, u_B = %.10g m, alpha_B = %.6g rad\n" "${end_time}" "${ur}" "${alpha}"
 
-# The semi-analytical reference is written by Allrun only where python3 with
-# numpy and scipy is available
-reference="${case_dir}/reference.json"
-if [[ -f "${reference}" ]]; then
-    ref_ur=$(python3 -B -I -c "
-import json
-r = json.load(open('${reference}'))
-i = min(range(len(r['t'])), key=lambda k: abs(r['t'][k] - ${end_time}))
-print('%.12g' % r['u_Rf'][i])")
-    exact_diff=$(abs "$(awk "BEGIN {print ${ur} - ${ref_ur}}")")
-    check "u_B against the semi-analytical reference" "${exact_diff}" "${EXACT_TOL}"
-else
-    echo "SKIPPED: u_B against the semi-analytical reference (no reference.json:"
-    echo "         python3 with numpy and scipy is not available)"
-fi
-
+exact_diff=$(abs "$(awk "BEGIN {print ${ur} - ${EXACT_U_B}}")")
+check "u_B against the semi-analytical reference" "${exact_diff}" "${EXACT_TOL}"
 ref_diff=$(abs "$(awk "BEGIN {print ${ur} - ${REF_U_B}}")")
 alpha_diff=$(abs "$(awk "BEGIN {print ${alpha} - (${REF_ALPHA_B})}")")
 check "u_B against the regression reference" "${ref_diff}" "${DISP_TOL}"

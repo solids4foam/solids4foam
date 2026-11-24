@@ -14,8 +14,9 @@ semi-analytical reference. Nothing here is run by `tutorials/Alltest` or
 ```
 
 Each case is a copy of the tutorial in `work/<drive>_<mesh>`. Its dictionaries
-and reference are written by `scripts/makeCase.py`, and it is run with the
-tutorial `Allrun`, which also writes `analysis.json` and `series.csv`.
+and reference are written by `scripts/makeCase.py`, it is run with the
+tutorial `Allrun`, and `scripts/analyse_case.py` then writes `analysis.json`
+and `series.csv`.
 `scripts/convergence.py` then writes the errors, observed and self-convergence
 orders and the mixed terms (combined minus torsion) for all cases in `work/`
 to `work/convergence.{txt,json,csv}`.

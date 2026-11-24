@@ -29,10 +29,10 @@ A neo-Hookean ring, $$A \le R \le B$$ with $$A = 0.5$$ m and $$B = 1$$ m, is
 surrounded by a viscous fluid in the annulus $$B \le r \le c$$, $$c = 2$$ m
 (Figure 1). The full 2-D annulus is modelled in plane strain, one cell deep,
 with a conformal interface at $$r = B$$. The inner surface of the ring is
-rotated by $$\alpha_A(t)$$ (`fixedRotation`) and is free radially; the outer
-fluid boundary carries a pressure $$p_c(t)$$ and an exact open condition for
-the velocity. Both drives start with a $$C^\infty$$ ramp, so the solution is
-smooth in time.
+rotated by $$\alpha_A(t)$$ (`fixedRotation`) and held at its radius; the
+outer fluid boundary carries a pressure $$p_c(t)$$ and an exact open condition
+for the velocity. Both drives start with a $$C^\infty$$ ramp, so the solution
+is smooth in time.
 
 ![Figure 1: geometry and loading (schematic, interface deformation
 exaggerated)](images/geometry.png)
@@ -115,10 +115,15 @@ on mesh M1; `verification/Allverify` generates the others.
 ```
 
 The case needs solids4foam built with PETSc on OpenFOAM.com; the coded
-conditions are not available on foam-extend or OpenFOAM.org. Where `python3`
-with numpy and scipy is available, `Allrun` also writes the semi-analytical
-reference (`reference.json`) and the errors, balances and quantities of
-interest (`analysis.json`, `series.csv`); without them only the solver runs.
+conditions are not available on foam-extend or OpenFOAM.org. `Allrun` runs
+only the solver. With `python3`, numpy and scipy, the semi-analytical reference
+(`reference.json`) and the errors, balances and quantities of interest
+(`analysis.json`, `series.csv`) are then written by
+
+```bash
+python3 verification/scripts/make_reference.py .
+python3 verification/scripts/analyse_case.py .
+```
 
 The mesh and drive study runs separately:
 
@@ -150,9 +155,9 @@ at close to second order:
 
 <!-- markdownlint-enable MD013 -->
 
-These values were obtained before #671. The torsion drive does not stretch the
-interface, so it is not expected to depend on the change, but the table has not
-been regenerated.
+These values were obtained before #671 and have not been regenerated with it.
+The torsion drive also moves the interface radially (second-order
+stretch-rotation coupling), so the table may change slightly.
 
 In the **combined** drive the rotational errors stopped decreasing between M2
 and M3 before #671, at about 3-7e-3 of max|reference|. Halving or quartering

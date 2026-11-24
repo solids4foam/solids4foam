@@ -6,8 +6,10 @@ Legendre-Gauss-Lobatto nodes, Chebyshev-collocated fluid, Radau time integration
 rtol 1e-11, 20 solid and 32 fluid nodes) and stores, at every solver time step, the
 quantities of interest compared by analyse_case.py in CASE_DIR/reference.json.
 
-The reference is only numerically resolved (spectral refinement and tolerance
-sensitivity); it is not validated by a second, independent nonlinear implementation.
+Besides spectral refinement and tolerance sensitivity, the reference has been
+checked against an independently coded coupled solver, symbolic derivations and
+limiting cases; that evidence is kept with the verification paper (see
+verification/README.md).
 
 Tested with Python 3.12.3, numpy 1.26.4, scipy 1.11.4 (the versions of the accepted
 study; other versions change the reference only at the integrator tolerance level).

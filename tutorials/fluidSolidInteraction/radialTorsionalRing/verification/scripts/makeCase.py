@@ -268,7 +268,7 @@ FLUID_DIAG = r'''
                 std::ios::app
             );
             os.precision(16);
-            os  << m.time().value() << ' ' << A << ' ' << Rm/A << ' ' << pm/A
+            os<< m.time().value() << ' ' << A << ' ' << Rm/A << ' ' << pm/A
                 << ' ' << srr/A << ' ' << snv/A << ' ' << srt/A << ' ' << Tq
                 << ' ' << Pw << ' ' << Hf << ' ' << KEf << ' ' << Df
                 << ' ' << Fc << ' ' << Tc << ' ' << Qo << ' ' << Pc
@@ -424,12 +424,12 @@ SOLID_DIAG = r'''
                 std::ios::app
             );
             os.precision(16);
-            os  << m.time().value();
+            os<< m.time().value();
             for (label k = 0; k < 12; ++k)
             {
-                os  << ' ' << out[k];
+                os<< ' ' << out[k];
             }
-            os  << ' ' << Hs << ' ' << KEs << ' ' << Ws << ' ' << lmin
+            os<< ' ' << Hs << ' ' << KEs << ' ' << Ws << ' ' << lmin
                 << ' ' << Jmin << ' ' << Jmax << ' ' << hi[0] << ' ' << hi[1]
                 << ' ' << hi[2] << ' ' << hi[3] << std::endl;
         #};

@@ -62,6 +62,16 @@ def select(S, a, b):
     return (t > max(a, 2 * S["dt"]) + 1e-9) & (t <= b + 1e-9)
 
 
+def covers(S, b):
+    """True if the case reached the window end b (within half a time step)."""
+    return S["t"][-1] + 0.5 * S["dt"] >= b
+
+
+def short_of(named, b):
+    """Names and end times of the cases that stop before the window end b."""
+    return [f"{n} ends at t = {S['t'][-1]:g}" for n, S in named if not covers(S, b)]
+
+
 def common_grid(cases, a, b):
     """Boolean masks selecting the same time levels in every case (rounded to 1e-9 s)."""
     keys = [set(np.round(S["t"][select(S, a, b)], 9)) for S in cases]
@@ -114,6 +124,10 @@ def convergence(work, config, noise=None):
         return {"status": "incomplete: missing " + ",".join(m for m, s in zip(MESHES, S) if s is None)}
     out = {}
     for wn, (a, b) in WINDOWS.items():
+        short = short_of(zip(MESHES, S), b)
+        if short:
+            out[wn] = {"status": "incomplete: " + ", ".join(short)}
+            continue
         masks = common_grid(S, a, b)
         res = {}
         for q in QOI[config]:
@@ -143,19 +157,25 @@ def mixed_terms(work, mesh):
         return {"status": "needs combined and torsion"}
     out = {}
     for wn, (a, b) in WINDOWS.items():
-        cases = [x for x in (C, T, R) if x is not None]
-        masks = common_grid(cases, a, b)
-        mc, mt = masks[0], masks[1]
+        short = short_of((("combined", C), ("torsion", T)), b)
+        if short:
+            out[wn] = {"status": "incomplete: " + ", ".join(short)}
+            continue
+        # The two-drive terms use only C and T, so an incomplete or missing
+        # radial run cannot change their time levels
+        mc, mt = common_grid([C, T], a, b)
         g = lambda S, m, q, w: S[w][q][m]  # noqa: E731
         defs = {"d_alpha": ("alpha_B", [(C, mc, 1), (T, mt, -1)]),
                 "d_Hf": ("H_f", [(C, mc, 1), (T, mt, -1)]),
                 "d_T": ("T_B", [(C, mc, 1), (T, mt, -1)]),
                 "d_sig_rt": ("sig_rt", [(C, mc, 1), (T, mt, -1)])}
-        if R is not None:
-            mr = masks[2]
-            defs["d_u3"] = ("u_B", [(C, mc, 1), (R, mr, -1), (T, mt, -1)])
-            defs["d_sig_rr3"] = ("sig_rr", [(C, mc, 1), (R, mr, -1), (T, mt, -1)])
         res = {}
+        if R is not None and covers(R, b):
+            mc3, mr3, mt3 = common_grid([C, R, T], a, b)
+            defs["d_u3"] = ("u_B", [(C, mc3, 1), (R, mr3, -1), (T, mt3, -1)])
+            defs["d_sig_rr3"] = ("sig_rr", [(C, mc3, 1), (R, mr3, -1), (T, mt3, -1)])
+        elif R is not None:
+            res["three_drive_terms"] = "omitted: " + ", ".join(short_of((("radial", R),), b))
         for k, (q, terms) in defs.items():
             ref = sum(sg * g(S, m, q, "ref") for S, m, sg in terms)
             num = sum(sg * g(S, m, q, "num") for S, m, sg in terms)
@@ -182,6 +202,8 @@ def main():
             if "status" in byw:
                 continue
             for w, res in byw.items():
+                if "status" in res:
+                    continue
                 for q, r in res.items():
                     o = r["observed_order"]
                     wr.writerow([c, w, q] + [f"{x:.4e}" for x in r["E"]] + ([f"{x:.3f}" for x in o] if isinstance(o, list) else ["n/m", "n/m"])
@@ -191,6 +213,9 @@ def main():
         if "status" in byw:
             continue
         for w, res in byw.items():
+            if "status" in res:
+                print(f"  {w:6s} {res['status']}")
+                continue
             for q, r in res.items():
                 o = r["observed_order"]
                 ps = "n/a" if r["self_order"] is None else f"{r['self_order']:.2f}"
@@ -201,7 +226,13 @@ def main():
         if "status" in byw:
             continue
         for w, res in byw.items():
-            print(f"== mixed terms {m} {w}: " + " ".join(f"{k}: {v['error_over_signal']:.3f}" for k, v in res.items()))
+            if "status" in res:
+                print(f"== mixed terms {m} {w}: {res['status']}")
+                continue
+            print(f"== mixed terms {m} {w}: " + " ".join(
+                f"{k}: {v}" if isinstance(v, str) else
+                f"{k}: " + ("n/a" if v["error_over_signal"] is None else f"{v['error_over_signal']:.3f}")
+                for k, v in res.items()))
 
 
 if __name__ == "__main__":
