@@ -223,7 +223,11 @@ void checkField
     {
         cellValue.add
         (
-            mag(scheme.valueAtPoint(vf, cellI, C[cellI]) - exactValue(C[cellI])),
+            mag
+            (
+                scheme.valueAtPoint(vf, cellI, C[cellI])
+              - exactValue(C[cellI])
+            ),
             V[cellI]
         );
 
