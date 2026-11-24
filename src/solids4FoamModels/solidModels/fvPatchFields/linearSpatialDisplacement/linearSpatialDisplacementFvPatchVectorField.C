@@ -27,7 +27,8 @@ namespace Foam
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
-linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVectorField
+linearSpatialDisplacementFvPatchVectorField::
+linearSpatialDisplacementFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF
@@ -39,7 +40,8 @@ linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVec
 {}
 
 
-linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVectorField
+linearSpatialDisplacementFvPatchVectorField::
+linearSpatialDisplacementFvPatchVectorField
 (
     const linearSpatialDisplacementFvPatchVectorField& ptf,
     const fvPatch& p,
@@ -53,7 +55,8 @@ linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVec
 {}
 
 
-linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVectorField
+linearSpatialDisplacementFvPatchVectorField::
+linearSpatialDisplacementFvPatchVectorField
 (
     const fvPatch& p,
     const DimensionedField<vector, volMesh>& iF,
@@ -68,7 +71,8 @@ linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVec
 }
 
 #ifndef OPENFOAM_ORG
-linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVectorField
+linearSpatialDisplacementFvPatchVectorField::
+linearSpatialDisplacementFvPatchVectorField
 (
     const linearSpatialDisplacementFvPatchVectorField& ptf
 )
@@ -79,7 +83,8 @@ linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVec
 {}
 #endif
 
-linearSpatialDisplacementFvPatchVectorField::linearSpatialDisplacementFvPatchVectorField
+linearSpatialDisplacementFvPatchVectorField::
+linearSpatialDisplacementFvPatchVectorField
 (
     const linearSpatialDisplacementFvPatchVectorField& ptf,
     const DimensionedField<vector, volMesh>& iF

@@ -198,7 +198,8 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 //             forAllConstIter(labelHashSet, procFaceSet, iter)
 //             {
 //                 const label faceID = iter.key();
-//                 const label patchID = mesh().boundaryMesh().whichPatch(faceID);
+//                 const label patchID =
+//                     mesh().boundaryMesh().whichPatch(faceID);
 //                 const polyPatch& pp = mesh().boundaryMesh()[patchID];
 
 //                 // we only care about processor patches
@@ -214,9 +215,11 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
 //                 // XXX: is this expensive?
 //                 boundBox bb(vectorField(points, pointPoints[pointI]), false);
 // #ifdef OPENFOAM_NOT_EXTEND
-//                 const scalar tol = mesh().globalData().matchTol_*mag(bb.max() - bb.min());
+//                 const scalar tol =
+//                     mesh().globalData().matchTol_*mag(bb.max() - bb.min());
 // #else
-//                 const scalar tol = polyPatch::matchTol_()*mag(bb.max() - bb.min());
+//                 const scalar tol =
+//                     polyPatch::matchTol_()*mag(bb.max() - bb.min());
 // #endif
 
 //                 for
@@ -504,10 +507,20 @@ void newLeastSquaresVolPointInterpolation::makePointFaces() const
                             << mesh().boundaryMesh()[patchID].name() << " "
                             << cycGgiPatch.master() << " "
                             << cycGgiPatch.faceCentres()[localFaceID] << " "
-                            << cycGgiPatch.shadow().faceCentres()[ngbLocalFaceID] << " "
+                            << cycGgiPatch.shadow()
+                              .faceCentres()[ngbLocalFaceID] << " "
                             << points[pointI] << " " << points[minPointI] << " "
-                            << transform(cycGgiPatch.reverseT()[0], points[pointI]) << " "
-                            << transform(cycGgiPatch.reverseT()[0], cycGgiPatch.faceCentres()[localFaceID])
+                            << transform
+                               (
+                                   cycGgiPatch.reverseT()[0],
+                                   points[pointI]
+                               )
+                            << " "
+                            << transform
+                               (
+                                   cycGgiPatch.reverseT()[0],
+                                   cycGgiPatch.faceCentres()[localFaceID]
+                               )
                             << abort(FatalError);
                 }
 
@@ -655,7 +668,8 @@ void newLeastSquaresVolPointInterpolation::makePointAxisEdges() const
     }
 }
 
-//void newLeastSquaresVolPointInterpolation::makePointNgbProcBndFaceCentres() const
+//void
+//newLeastSquaresVolPointInterpolation::makePointNgbProcBndFaceCentres() const
 // {
 //     if (debug)
 //     {
@@ -1010,7 +1024,8 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
 {
     if (debug)
     {
-        Info<< "newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() : "
+        Info<< "newLeastSquaresVolPointInterpolation::"
+               "makeProcBndFaceCentres() : "
             << "constructing centres of boundary faces from ngb processors"
             << endl;
     }
@@ -1021,7 +1036,8 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
     {
         FatalErrorIn
         (
-            "newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const"
+            "newLeastSquaresVolPointInterpolation::"
+            "makeProcBndFaceCentres() const"
         )
             << "Centres of faces from ngb processors already exist"
                 << abort(FatalError);
@@ -1096,7 +1112,7 @@ void newLeastSquaresVolPointInterpolation::makeProcBndFaceCentres() const
     }
     else
     {
-        forAll (procBndFaceCentres, procI)
+        forAll(procBndFaceCentres, procI)
         {
             procBndFaceCentres.set(procI, new vectorField(0));
         }
@@ -1209,8 +1225,8 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                     }
 
                     // ZT: This bug-fix is not required any more since problem
-                    // problem is solved by checking only local processor patch cells
-                    // (see above)
+                    // problem is solved by checking only local processor patch
+                    // cells (see above)
                     // FIX: Ph 5-5-2021
                     // Temporary fix for the cell-skipping:
                     // if a cell is connected to the current (processor patch)
@@ -1241,8 +1257,8 @@ void newLeastSquaresVolPointInterpolation::makeProcCells() const
                     //         }
                     //     }
 
-                    //     // grab all processor-patch (local) faces connected to
-                    //     // the current point
+                    //     // grab all processor-patch (local) faces connected
+                    //     // to the current point
                     //     const labelList& pointFaces =
                     //         procPatch.pointFaces()[pointI];
 
@@ -1519,7 +1535,7 @@ void newLeastSquaresVolPointInterpolation::makeProcCellCentres() const
     }
     else
     {
-        forAll (procCellCentres, procI)
+        forAll(procCellCentres, procI)
         {
             procCellCentres.set(procI, new vectorField(0));
         }
@@ -2424,7 +2440,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
-//                     Info << "own: " <<
+//                     Info<< "own: " <<
 //                         mesh().Cf().boundaryField()[patchID]
 //                         [
 //                             localFaceID
@@ -2466,7 +2482,7 @@ void newLeastSquaresVolPointInterpolation::makeOrigins() const
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
-//                     Info << "ngb: " <<
+//                     Info<< "ngb: " <<
 //                         mesh().Cf().boundaryField()[patchID]
 //                         [
 //                             localFaceID
@@ -3117,7 +3133,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
-//                     Info << "own: " <<
+//                     Info<< "own: " <<
 //                         mesh().Cf().boundaryField()[patchID]
 //                         [
 //                             localFaceID
@@ -3158,7 +3174,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 
                     allPoints[pointID++] = C[faceCells[localFaceID]] + delta;
 
-//                     Info << "ngb: " <<
+//                     Info<< "ngb: " <<
 //                         mesh().Cf().boundaryField()[patchID]
 //                         [
 //                             localFaceID
@@ -3652,7 +3668,7 @@ void newLeastSquaresVolPointInterpolation::makeInvLsMatrices() const
 //                 curRowSum += lsM[i][j];
                 curRowSum += lsM(i,j);
             }
-            if(curRowSum > maxRowSum)
+            if (curRowSum > maxRowSum)
             {
                 maxRowSum = curRowSum;
             }
@@ -3872,7 +3888,12 @@ newLeastSquaresVolPointInterpolation::newLeastSquaresVolPointInterpolation
 )
 :
 #ifdef OPENFOAM_NOT_EXTEND
-    MeshObject<fvMesh, Foam::UpdateableMeshObject, newLeastSquaresVolPointInterpolation>(vm),
+    MeshObject
+    <
+        fvMesh,
+        Foam::UpdateableMeshObject,
+        newLeastSquaresVolPointInterpolation
+    >(vm),
 #else
     MeshObject<fvMesh, newLeastSquaresVolPointInterpolation>(vm),
 #endif
@@ -4091,7 +4112,8 @@ newLeastSquaresVolPointInterpolation::globalPointNgbProcCellCentres() const
     return globalPointNgbProcCellCentresPtr_();
 }
 
-const labelListList& newLeastSquaresVolPointInterpolation::pointProcFaces() const
+const labelListList&
+newLeastSquaresVolPointInterpolation::pointProcFaces() const
 {
     if (pointProcFacesPtr_.empty())
     {

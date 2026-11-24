@@ -1,0 +1,19 @@
+platform,family,discretisation,factor,cells_through_thickness,cells_y,cells_z,solid_cells,ux_A,uy_A,uz_A
+MeluXina v2412,m1,standard,1,4,8,8,256,0.000105218,1.91482e-06,-1.97474e-06
+MeluXina v2412,m1,standard,2,8,16,16,2048,0.000125083,1.90395e-06,-1.99298e-06
+MeluXina v2412,m1,standard,4,16,32,32,16384,0.000135662,1.89796e-06,-2.00027e-06
+MeluXina v2412,m1,standard,8,32,64,64,131072,0.000139553,1.89726e-06,-2.00302e-06
+MeluXina v2412,m1,standard,16,64,128,128,1048576,0.000140807,1.89823e-06,-2.00412e-06
+MeluXina v2412,m2,standard,1,8,8,8,512,0.000123944,1.94858e-06,-1.98438e-06
+MeluXina v2412,m2,standard,2,16,16,16,4096,0.0001351,1.92007e-06,-1.99614e-06
+MeluXina v2412,m2,standard,4,32,32,32,32768,0.00013952,1.90688e-06,-2.00145e-06
+MeluXina v2412,m2,standard,8,64,64,64,262144,0.000140874,1.9022e-06,-2.00353e-06
+workstation v2512,thickness x4 at fixed in-plane factor,standard,1,16,8,8,1024,0.000134035,1.96656e-06,-1.98858e-06
+workstation v2512,thickness x4 at fixed in-plane factor,standard,2,32,16,16,8192,0.000139091,1.92985e-06,-1.99759e-06
+workstation v2512,thickness x4 at fixed in-plane factor,standard,4,64,32,32,65536,0.000140903,1.91227e-06,-2.00203e-06
+workstation v2512,in-plane x2,standard,1,4,16,16,1024,0.000106009,1.87826e-06,-1.98551e-06
+workstation v2512,in-plane x2,standard,2,8,32,32,8192,0.000125796,1.88524e-06,-1.99773e-06
+workstation v2512,in-plane x2,standard,4,16,64,64,65536,0.00013583,1.88971e-06,-2.00202e-06
+workstation v2512,m1,high-order,1,4,8,8,256,0.000122169,1.90621e-06,-1.99242e-06
+workstation v2512,m1,high-order,2,8,16,16,2048,0.000136993,1.89584e-06,-2.00061e-06
+workstation v2512,m1,high-order,4,16,32,32,16384,0.000140325,1.89547e-06,-2.00317e-06

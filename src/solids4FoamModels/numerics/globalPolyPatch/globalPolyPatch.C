@@ -98,7 +98,7 @@ void Foam::globalPolyPatch::calcGlobalPatch() const
     label nZonePoints = 0;
 
     // Sum up points and faces to add
-    forAll (procPatchFaces, procI)
+    forAll(procPatchFaces, procI)
     {
         nZonePoints += procPatchPoints[procI].size();
         nZoneFaces += procPatchFaces[procI].size();
@@ -132,7 +132,7 @@ void Foam::globalPolyPatch::calcGlobalPatch() const
     label nCurFaces = 0;
 
     // Collect all points and faces
-    forAll (procPatchPoints, procI)
+    forAll(procPatchPoints, procI)
     {
         // Add points from all processors except self
         const pointList& curProcPoints = procPatchPoints[procI];
@@ -141,7 +141,7 @@ void Foam::globalPolyPatch::calcGlobalPatch() const
         labelList pointMap(curProcPoints.size());
 
         // Add points from all processors
-        forAll (curProcPoints, pointI)
+        forAll(curProcPoints, pointI)
         {
             // Note: possible removal of duplicate points here
             // HJ, 28/Dec/2016
@@ -188,12 +188,12 @@ void Foam::globalPolyPatch::calcGlobalPatch() const
         // Label face map for the current processor
         labelList faceMap(curProcFaces.size());
 
-        forAll (curProcFaces, faceI)
+        forAll(curProcFaces, faceI)
         {
             // Renumber face into new points
             face curFace = curProcFaces[faceI];
 
-            forAll (curFace, fI)
+            forAll(curFace, fI)
             {
                 curFace[fI] = pointMap[curFace[fI]];
             }
@@ -547,7 +547,10 @@ void Foam::globalPolyPatch::updateMesh()
 }
 
 
-void Foam::globalPolyPatch::setGlobalPoints(const pointField& globalPoints) const
+void Foam::globalPolyPatch::setGlobalPoints
+(
+    const pointField& globalPoints
+) const
 {
     if (!globalPatchPtr_)
     {

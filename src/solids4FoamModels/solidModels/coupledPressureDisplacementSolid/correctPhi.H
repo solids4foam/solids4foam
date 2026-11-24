@@ -6,8 +6,8 @@
             D().boundaryField()[patchI].fixesValue()
         )
         {
-            // Info << "Setting flux (phi) for patch: "
-            //      << mesh().boundary()[patchI].name() << endl;
+            // Info<< "Setting flux (phi) for patch: "
+            //     << mesh().boundary()[patchI].name() << endl;
 
             phi_.boundaryField()[patchI] =
             (
@@ -46,8 +46,8 @@
             )
         )
         {
-            // Info << "Setting zero flux (phi) for patch: "
-            //      << mesh().boundary()[patchI].name() << endl;
+            // Info<< "Setting zero flux (phi) for patch: "
+            //     << mesh().boundary()[patchI].name() << endl;
 
             phi_.boundaryField()[patchI] = 0;
         }
@@ -59,8 +59,8 @@
             )
         )
         {
-            // Info << "Setting zero flux (phi) for patch: "
-            //      << mesh().boundary()[patchI].name() << endl;
+            // Info<< "Setting zero flux (phi) for patch: "
+            //     << mesh().boundary()[patchI].name() << endl;
 
             phi_.boundaryField()[patchI] = 0;
         }

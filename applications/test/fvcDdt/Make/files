@@ -1,0 +1,3 @@
+Test-fvcDdt.C
+
+EXE = $(FOAM_MODULE_APPBIN)/Test-fvcDdt

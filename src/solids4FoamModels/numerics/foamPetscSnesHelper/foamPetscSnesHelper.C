@@ -219,11 +219,23 @@ static PetscErrorCode PCSetUpPhysics(PC pc)
     // char variant[64] = "schur";
     // PetscOptionsGetString
     // (
-    //     nullptr, nullptr, "-pc_physics_variant", variant, sizeof(variant), nullptr
+    //     nullptr,
+    //     nullptr,
+    //     "-pc_physics_variant",
+    //     variant,
+    //     sizeof(variant),
+    //     nullptr
     // );
     // PetscInt steps = 3;
     // PetscReal tol = 1e-1;
-    // PetscOptionsGetInt(nullptr, nullptr, "-pc_physics_steps", &steps, nullptr);
+    // PetscOptionsGetInt
+    // (
+    //     nullptr,
+    //     nullptr,
+    //     "-pc_physics_steps",
+    //     &steps,
+    //     nullptr
+    // );
     // PetscOptionsGetReal(nullptr, nullptr, "-pc_physics_tol", &tol, nullptr);
 
     PetscFunctionReturn(0);
@@ -1210,7 +1222,8 @@ label foamPetscSnesHelper::InsertFvmGradIntoPETScMatrix
                     //      patchOwnLs[patchFaceI]
                     //     *(patchVsf[patchFaceI] - vsf[faceCells[patchFaceI]]);
 
-                    // Subtract patchOwnLs[patchFaceI] from (faceCellI, faceCellI)
+                    // Subtract patchOwnLs[patchFaceI] from
+                    // (faceCellI, faceCellI)
                     // Nothing else to do as patch value is a known value
 
                     // Local block row ID

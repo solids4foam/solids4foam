@@ -387,8 +387,9 @@ Foam::globalPointIndices::globalPointIndices(const polyMesh& mesh)
     // - on-core: count all points which share a cell with the point, and
     //   add 1 for the point itself
     // - off-core: receive on-core counts across processor boundaries and via
-    //   global points. Note: the stencilSizeNotOwned will not be exact, instead,
-    //   it will be a conservative estimate (some points counted twice or more)
+    //   global points. Note: the stencilSizeNotOwned will not be exact,
+    //   instead, it will be a conservative estimate (some points counted twice
+    //   or more)
 
     // Check local points
     const labelListList& pointCells = mesh_.pointCells();

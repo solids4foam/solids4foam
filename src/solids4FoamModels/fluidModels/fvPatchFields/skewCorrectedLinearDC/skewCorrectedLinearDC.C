@@ -204,7 +204,7 @@ Foam::skewCorrectedLinearDC<Type>::interpolate
         sfI[faceI] = wI[faceI]*(vfOwn - vfNei) + vfNei;
     }
 
-    forAll (vf.boundaryField(), patchI)
+    forAll(vf.boundaryField(), patchI)
     {
         const scalarField& pw =
             w.boundaryField()[patchI];

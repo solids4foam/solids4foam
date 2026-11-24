@@ -211,8 +211,8 @@ public:
         //                          and global syncing activities for points,
         //                          and fvSolution solvers dictionary
         //    location            - Optional: Location of the solution unknowns
-        //                          This is used to determine the local-to-global
-        //                          mapping
+        //                          This is used to determine the
+        //                          local-to-global mapping
         //    stopOnPetscError    - Optional: Give a FatalError when PETSc
         //                          returns an error
         //    initialise          - Optional: Initialise PETSc
@@ -336,14 +336,15 @@ public:
             //  assigned
             virtual label initialiseJacobian(Mat& jac) = 0;
 
-            //- Initialise Joacobian based on compact stencil of the given mesh with the
-            //  given blockSize (number of scalar equations per cell)
+            //- Initialise Joacobian based on compact stencil of the given mesh
+            //  with the given blockSize (number of scalar equations per cell)
             label initialiseJacobian
             (
                 Mat& jac,
                 const fvMesh& mesh,
                 const label blockSize,
-                const bool createMat = true  // MatCreate or similar should be called
+                const bool createMat = true  // MatCreate or similar should be
+                                             // called
             );
 
             //- Initialise the solution vector
@@ -357,7 +358,8 @@ public:
                 Vec& x,
                 const fvMesh& mesh,
                 const label blockSize,
-                const bool createVec = true  // VecCreate or similar should be called
+                const bool createVec = true  // VecCreate or similar should be
+                                             // called
             );
 
             //- Calculate the residual of the governing equations
@@ -406,9 +408,9 @@ public:
             //  Converts the finite volume matrix into block coefficients using
             //  the specified row and column offsets (rowOffset, colOffset)
             //  within each block.
-            //  nScalarEqns indicates the number of scalar equations to add, e.g.
-            //  3 for a 3-D vector equation, 2 for 2-D vector equation, 1 for a
-            //  scalar equation
+            //  nScalarEqns indicates the number of scalar equations to add,
+            //  e.g. 3 for a 3-D vector equation, 2 for 2-D vector equation, 1
+            //  for a scalar equation
             //  A non-zero return value indicates an error.
             //  Note: fvM should be const but OF9 does not have required const
             //  access functions
@@ -493,7 +495,8 @@ public:
             //                  block in 'x' (i.e., the stride).
             //    compIndices - (Optional) List of component indices specifying
             //                  which scalars from each element of 'vf' should
-            //                  be inserted. If empty, all components are copied.
+            //                  be inserted. If empty, all components are
+            //                  copied.
             template <class Type>
             void ExtractFieldComponents
             (

@@ -24,10 +24,26 @@ fi
 # ------------------------------------------------------------
 
 REG_END_TIME=2
-CD_MEAN_MIN=17.7
-CD_MEAN_MAX=18.7
+CD_MEAN_MIN=16.7
+CD_MEAN_MAX=17.7
 CD_RMS_MIN=53.8
 CD_RMS_MAX=56.0
+
+# The tolerances above are those of the default (clustered) surface-traction
+# quadrature: on this mesh it gives a mean Cd of 17.17 and an RMS Cd of
+# 54.70, within 0.05% of the integral of every candidate point (17.165 and
+# 54.68). Check of the legacy greedy quadrature:
+#     TRACTION_QUADRATURE=greedy ./regressionTest.sh
+# whose mean Cd is 6% higher (18.20, RMS 54.91): the mean range is centred
+# on it, with the same width
+TRACTION_QUADRATURE="${TRACTION_QUADRATURE:-clustered}"
+if [[ "${TRACTION_QUADRATURE}" == "greedy" ]]; then
+    CD_MEAN_MIN=17.7
+    CD_MEAN_MAX=18.7
+elif [[ "${TRACTION_QUADRATURE}" != "clustered" ]]; then
+    echo "FAIL: TRACTION_QUADRATURE must be clustered (default) or greedy"
+    exit 1
+fi
 
 ALLRUN_LOGFILE="log.Allrun"
 FORCE_FILE="postProcessing/immersedBoundary/0/beam.dat"
@@ -35,6 +51,7 @@ FORCE_FILE="postProcessing/immersedBoundary/0/beam.dat"
 echo "============================================================"
 echo "bendingBeamInChannel regression test"
 echo "Regression end time = ${REG_END_TIME}"
+echo "Traction quadrature = ${TRACTION_QUADRATURE}"
 echo "Mean Cd in [${CD_MEAN_MIN}, ${CD_MEAN_MAX}]"
 echo "RMS Cd in [${CD_RMS_MIN}, ${CD_RMS_MAX}]"
 echo "============================================================"
@@ -56,6 +73,18 @@ prepare_case() {
         "s/^endTime[[:space:]]\+[0-9.]*;/endTime         ${REG_END_TIME};/" \
         "${CASE_DIR}/system/controlDict"
     rm -f "${CASE_DIR}/system/controlDict.bak"
+
+    if [[ "${TRACTION_QUADRATURE}" == "greedy" ]]; then
+        local fvOptions="${CASE_DIR}/constant/fvOptions"
+        sed -i.bak \
+            "/type *immersedBoundaryForce;/a\\    tractionQuadrature greedy;" \
+            "${fvOptions}"
+        rm -f "${fvOptions}.bak"
+        if ! grep -q "tractionQuadrature greedy;" "${fvOptions}"; then
+            echo "FAIL: could not select tractionQuadrature greedy"
+            exit 1
+        fi
+    fi
 }
 
 # ------------------------------------------------------------

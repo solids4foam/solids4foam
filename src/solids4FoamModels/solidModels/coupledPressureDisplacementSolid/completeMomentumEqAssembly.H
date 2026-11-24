@@ -226,8 +226,9 @@
                //  );
             internalCoeffs = tensor::zero;
 
-            // Info << mesh().boundary()[patchI].name()
-            //      << ", " << average(nGradDDn_.boundaryField()[patchI]) << endl;
+            // Info<< mesh().boundary()[patchI].name()
+            //     << ", " << average(nGradDDn_.boundaryField()[patchI])
+            //     << endl;
         }
         else if
         (
@@ -299,7 +300,7 @@
         }
         else
         {
-            Info << "****** BC not implemented ******" << endl;
+            Info<< "****** BC not implemented ******" << endl;
         }
 
         forAll(faceCells, faceI)

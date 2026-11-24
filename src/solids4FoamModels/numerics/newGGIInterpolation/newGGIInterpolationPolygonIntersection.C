@@ -121,7 +121,7 @@ newGGIInterpolation<MasterPatch, SlavePatch>::polygonIntersection
 
     }
 
-    switch(statusInOut)
+    switch (statusInOut)
     {
         case ALL_INSIDE:
         {

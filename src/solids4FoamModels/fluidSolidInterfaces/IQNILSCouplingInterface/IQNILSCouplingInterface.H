@@ -274,7 +274,8 @@ class IQNILSCouplingInterface
         void applyResidualPreconditioningCombined(vectorField& v) const;
 
         //- Orthogonalize and normalize a new QR column using a preCICE-like
-        //  repeated MGS procedure. Returns -1 if the column should be discarded.
+        //  repeated MGS procedure. Returns -1 if the column should be
+        //  discarded.
         label orthogonalizeCouplingColumn
         (
             vectorField& v,

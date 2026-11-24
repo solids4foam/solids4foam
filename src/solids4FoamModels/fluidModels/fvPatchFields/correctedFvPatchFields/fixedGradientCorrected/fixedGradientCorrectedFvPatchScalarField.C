@@ -280,7 +280,11 @@ void fixedGradientCorrectedFvPatchScalarField::write(Ostream& os) const
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-makePatchTypeField(fvPatchScalarField, fixedGradientCorrectedFvPatchScalarField);
+makePatchTypeField
+(
+    fvPatchScalarField,
+    fixedGradientCorrectedFvPatchScalarField
+);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 

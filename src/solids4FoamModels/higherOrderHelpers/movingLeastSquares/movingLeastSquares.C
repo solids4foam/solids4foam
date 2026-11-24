@@ -30,8 +30,7 @@ License
 #endif
 
 #include "solidTractionFvPatchVectorField.H"
-#include "fixedDisplacementFvPatchVectorField.H"
-#include "fixedRotationFvPatchVectorField.H"
+#include "patchQuadratureValues.H"
 #include "fixedGradientFvPatchFields.H"
 
 
@@ -517,7 +516,7 @@ movingLeastSquares::QRSolution movingLeastSquares::QRSolve
 
      result.A = Rbar.colPivHouseholderQr().solve(QbarBhat);
 
-     if(calcConditionNumber_)
+     if (calcConditionNumber_)
      {
          Eigen::JacobiSVD<Eigen::MatrixXd> svd
          (
@@ -540,7 +539,7 @@ void movingLeastSquares::calcCellCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if
@@ -610,6 +609,9 @@ void movingLeastSquares::calcCellCoeffs() const
         factorials[n] = factorials[n - 1]*n;
     }
 
+    // Integer powers of the normalised offset, up to the polynomial order
+    FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
+
     // Reference to remote centres
     const Map<vector>& remoteCI = stencil().remoteCentresMap();
 
@@ -667,6 +669,7 @@ void movingLeastSquares::calcCellCoeffs() const
 
             // Normalise dx to improve conditioning
             dx /= h;
+            componentPowers(dx, dxPow);
 
             // Compute monomial values for each exponent
             for (label p = 0; p < Np; ++p)
@@ -683,14 +686,13 @@ void movingLeastSquares::calcCellCoeffs() const
                 // Compute monomial values for each exponent
                 if (twoD)
                 {
-                    Q(p, cI) =
-                        pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
+                    Q(p, cI) = dxPow[0][i]*dxPow[1][j]/factorialDenominator;
                 }
                 else
                 {
                     Q(p, cI) =
-                        pow(dx.x(), i)*pow(dx.y(), j)*pow(dx.z(), k)
-                        /factorialDenominator;
+                        dxPow[0][i]*dxPow[1][j]*dxPow[2][k]
+                       /factorialDenominator;
                 }
             }
         }
@@ -835,7 +837,7 @@ void movingLeastSquares::calcCellCoeffs() const
     }
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -844,7 +846,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 {
     if (debug)
     {
-        InfoInFunction << "start" << endl;
+        InfoInFunction<< "start" << endl;
     }
 
     if (faceGradCoeffsPtr_.valid())
@@ -879,6 +881,9 @@ void movingLeastSquares::calcFaceCoeffs() const
     {
         factorials[n] = factorials[n - 1]*n;
     }
+
+    // Integer powers of the normalised offset, up to the polynomial order
+    FixedList<scalarList, 3> dxPow(scalarList(polynomialOrder_ + 1));
 
     // Reference to face stencils, quadrature points and remote centres
     auto& stencils = compactListListCRef(faceGradStencil());
@@ -1037,6 +1042,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 
                 // Normalise dx to improve conditioning
                 dx /= h;
+                componentPowers(dx, dxPow);
 
                 // Compute monomial values for each exponent
                 for (label p = 0; p < Np; ++p)
@@ -1052,15 +1058,13 @@ void movingLeastSquares::calcFaceCoeffs() const
                     if (twoD)
                     {
                         Q(p, cI) =
-                            pow(dx.x(), i)*pow(dx.y(), j)/factorialDenominator;
+                            dxPow[0][i]*dxPow[1][j]/factorialDenominator;
                     }
                     else
                     {
                         Q(p, cI) =
-                            pow(dx.x(), i)
-                          * pow(dx.y(), j)
-                          * pow(dx.z(), k)
-                          / factorialDenominator;
+                            dxPow[0][i]*dxPow[1][j]*dxPow[2][k]
+                           /factorialDenominator;
                     }
                 }
             }
@@ -1141,7 +1145,7 @@ void movingLeastSquares::calcFaceCoeffs() const
 
     if (debug)
     {
-        InfoInFunction << "end" << endl;
+        InfoInFunction<< "end" << endl;
     }
 }
 
@@ -1295,7 +1299,7 @@ movingLeastSquares::patchFaceQuadValues
     const label patchI
 ) const
 {
-    return this->patchFaceQuadValues<scalar>(vf, patchI);
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 
@@ -1306,33 +1310,7 @@ movingLeastSquares::patchFaceQuadValues
     const label patchI
 ) const
 {
-    const fvPatchField<vector>& pf = vf.boundaryField()[patchI];
-
-    // The problem is that evaluateQuadrature is not pure virtual function,
-    // so we need to handle in this way
-    if (isA<fixedDisplacementFvPatchVectorField>(pf))
-    {
-        const fixedDisplacementFvPatchVectorField& patchField =
-            refCast<const fixedDisplacementFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-    else if (isA<fixedRotationFvPatchVectorField>(pf))
-    {
-        const fixedRotationFvPatchVectorField& patchField =
-            refCast<const fixedRotationFvPatchVectorField>(pf);
-
-        return patchField.evaluateQuadrature();
-    }
-
-    FatalErrorInFunction
-        << "Patch " << patchI << " fixes value, but quadrature-point "
-        << "evaluation is only implemented for "
-        << fixedDisplacementFvPatchVectorField::typeName << " and "
-        << fixedRotationFvPatchVectorField::typeName
-        << abort(FatalError);
-
-    return autoPtr<CompactListList<vector>>();
+    return patchQuadratureValues(vf.boundaryField()[patchI], quadrature());
 }
 
 

@@ -271,8 +271,8 @@ pointGaussLeastSquaresGrad<Type>::calcGrad
          && !vf.boundaryField()[patchI].coupled()
         )
         {
-            // Info << mesh.boundary()[patchI].name() << ", "
-            //      << mesh.boundary()[patchI].type() << endl;
+            // Info<< mesh.boundary()[patchI].name() << ", "
+            //     << mesh.boundary()[patchI].type() << endl;
 
             Field<Type> ppf = pf.boundaryField()[patchI].patchInternalField();
 

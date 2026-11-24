@@ -1,0 +1,166 @@
+/*---------------------------------------------------------------------------*\
+License
+    This file is part of solids4foam.
+
+    solids4foam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the
+    Free Software Foundation, either version 3 of the License, or (at your
+    option) any later version.
+
+    solids4foam is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with solids4foam.  If not, see <http://www.gnu.org/licenses/>.
+
+Class
+    Foam::circulationPressureFvPatchScalarField
+
+Description
+    Pressure on a patch coupled to a lumped circulation
+    network. The one boundary condition for every coupling algorithm: whether
+    the exchange is explicit or implicit, and of what order, is chosen in the
+    "coupling" block of constant/circulationProperties, not by the BC type.
+
+        outlet
+        {
+            type    circulationPressure;
+            value   uniform 0;
+            // network circulationProperties;   // optional: which description
+            // phi     phi;                     // optional: the volumetric flux
+        }
+
+    The patch is bound to its port by the port's "patch" entry in the network
+    description. Each time the boundary is evaluated the coupler is asked to
+    sample the flux and, on a new exchange, advance the network; the pressure
+    returned is the one the network wants imposed there. The network works in
+    Pa: the pressure is divided by the coupling rho for a kinematic p
+    [m2/s2], used directly for p in Pa, and any other dimensions are an error.
+
+Author
+    David Kelly, UCD.
+
+\*---------------------------------------------------------------------------*/
+
+#ifndef circulationPressureFvPatchScalarField_H
+#define circulationPressureFvPatchScalarField_H
+
+#include "fixedValueFvPatchFields.H"
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+namespace Foam
+{
+
+/*---------------------------------------------------------------------------*\
+            Class circulationPressureFvPatchScalarField Declaration
+\*---------------------------------------------------------------------------*/
+
+class circulationPressureFvPatchScalarField
+:
+    public fixedValueFvPatchScalarField
+{
+    // Private Data
+
+        //- Name of the network description dictionary in constant/
+        //  (default: circulationProperties)
+        word propertiesName_;
+
+        //- Name of the volumetric flux the coupler samples
+        word phiName_;
+
+
+public:
+
+    //- Runtime type information
+    TypeName("circulationPressure");
+
+
+    // Constructors
+
+        //- Construct from patch and internal field
+        circulationPressureFvPatchScalarField
+        (
+            const fvPatch&,
+            const DimensionedField<scalar, volMesh>&
+        );
+
+        //- Construct from patch, internal field and dictionary
+        circulationPressureFvPatchScalarField
+        (
+            const fvPatch&,
+            const DimensionedField<scalar, volMesh>&,
+            const dictionary&
+        );
+
+        //- Construct by mapping given circulationPressureFvPatchScalarField
+        //  onto a new patch
+        circulationPressureFvPatchScalarField
+        (
+            const circulationPressureFvPatchScalarField&,
+            const fvPatch&,
+            const DimensionedField<scalar, volMesh>&,
+            const fvPatchFieldMapper&
+        );
+
+        //- Construct as copy
+        circulationPressureFvPatchScalarField
+        (
+            const circulationPressureFvPatchScalarField&
+        );
+
+        //- Construct as copy setting internal field reference
+        circulationPressureFvPatchScalarField
+        (
+            const circulationPressureFvPatchScalarField&,
+            const DimensionedField<scalar, volMesh>&
+        );
+
+        //- Construct and return a clone
+        virtual tmp<fvPatchScalarField> clone() const
+        {
+            return tmp<fvPatchScalarField>
+            (
+                new circulationPressureFvPatchScalarField(*this)
+            );
+        }
+
+        //- Construct and return a clone setting internal field reference
+        virtual tmp<fvPatchScalarField> clone
+        (
+            const DimensionedField<scalar, volMesh>& iF
+        ) const
+        {
+            return tmp<fvPatchScalarField>
+            (
+                new circulationPressureFvPatchScalarField(*this, iF)
+            );
+        }
+
+
+    // Member Functions
+
+        // Evaluation functions
+
+            //- Update the coefficients associated with the patch field:
+            //  sample the flux through the coupler, advancing the network
+            //  on a new exchange, and impose the port pressure (divided by
+            //  the coupling rho for a kinematic pressure)
+            virtual void updateCoeffs();
+
+        //- Write
+        virtual void write(Ostream&) const;
+};
+
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+} // End namespace Foam
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#endif
+
+// ************************************************************************* //

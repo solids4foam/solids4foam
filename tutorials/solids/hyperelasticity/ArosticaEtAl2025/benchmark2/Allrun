@@ -10,10 +10,10 @@
 # coarse (default): 45 304 tetrahedra, fine: 121 133 tetrahedra (Table 6).
 # The meshes and fibres are those distributed with the benchmark, converted
 # to OpenFOAM format once and downloaded from the solids4foam website
-# (ArosticaEtAl2025.zip, with the converter). Without internet access, put
-# ArosticaEtAl2025.zip in data/ first. The time series are tabulated by the
-# makeArosticaTimeSeries utility in the parent directory, which Allrun
-# compiles.
+# (ArosticaEtAl2025-v1.zip, with the converter) into ../data, which Allclean
+# keeps. Without internet access, put ArosticaEtAl2025-v1.zip in ../data
+# first. The time series are tabulated by the makeArosticaTimeSeries
+# utility.
 #
 # Created by Claude Opus 5.5, supervised by Chanikya Valeti, UCD.
 #------------------------------------------------------------------------------
@@ -32,20 +32,34 @@ solids4Foam::requirePetscOrExitSilently
 solids4Foam::caseDoesNotRunWithFoamExtend
 solids4Foam::caseDoesNotRunWithOpenFOAMOrg
 
-# The time-series utility, makeArosticaTimeSeries, is shared by both
-# benchmarks, in the parent directory, or where ARO_DIR points (the regression
-# test runs a copy of this case elsewhere)
-ARO_DIR="${ARO_DIR:-..}"
-if [[ ! -d "$ARO_DIR/makeArosticaTimeSeries" ]]
+# The time series are tabulated by the makeArosticaTimeSeries utility, built
+# by Allwmake
+if ! command -v makeArosticaTimeSeries > /dev/null 2>&1
 then
-    echo "makeArosticaTimeSeries was not found in $ARO_DIR"
+    echo "makeArosticaTimeSeries was not found: please run Allwmake"
     exit 1
 fi
 
-# The meshes are downloaded once from the solids4foam website, into data/
-ARCHIVE_URL="https://www.solids4foam.com/tutorials/archive/ArosticaEtAl2025.zip"
-ARCHIVE_SHA256="c998559b9af72b78ea86f12c28cada94e656818f63068d8fb95ee80ba57742a5"
-ARCHIVE="data/ArosticaEtAl2025.zip"
+# The directory shared by both benchmarks, holding the plot script and the
+# data cache, data/: the parent directory, or where ARO_DIR points (the
+# regression test runs a copy of this case elsewhere)
+ARO_DIR="${ARO_DIR:-..}"
+if [[ ! -f "$ARO_DIR/plotVsReference.gnuplot" ]]
+then
+    echo "plotVsReference.gnuplot was not found in $ARO_DIR"
+    exit 1
+fi
+
+# The meshes are downloaded once from the solids4foam website into
+# $ARO_DIR/data, which Allclean does not remove, and which may hold the
+# archive beforehand for running offline. A published archive is never
+# changed: a new one gets a new version in its name, and a new sum here
+ARCHIVE_NAME="ArosticaEtAl2025-v1"
+ARCHIVE_URL="https://www.solids4foam.com/tutorials/archive/$ARCHIVE_NAME.zip"
+ARCHIVE_SHA256="08a13aad266f0b30a2c311508769cfa37779a33238ff00399d98019c3befc5a3"
+DATA_DIR="$ARO_DIR/data"
+ARCHIVE="$DATA_DIR/$ARCHIVE_NAME.zip"
+EXTRACT_DIR="$DATA_DIR/$ARCHIVE_NAME"
 
 MESH="coarse"
 FORMULATION="pressure"
@@ -63,8 +77,6 @@ echo "Biventricular mesh: $MESH"
 
 # Active stress tau(t) (Table 8) and the LV and RV pressures (Table 9): ODEs
 # in time only, tabulated once here
-wmake "$ARO_DIR/makeArosticaTimeSeries" > log.wmake 2>&1 \
-    || { echo "Building makeArosticaTimeSeries failed: see log.wmake"; exit 1; }
 {
     makeArosticaTimeSeries -active -sigma0 1.5e5 -tSys 0.163 -tDias 0.5 \
         -out constant/activeStress \
@@ -104,10 +116,11 @@ command -v unzip > /dev/null 2>&1 || {
     echo "unzip: command not found, which is required for this case"
     exit 0
 }
-rm -rf constant/polyMesh data/ArosticaEtAl2025/benchmark2
-unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark2/$MESH/*" -d data
-cp -r "data/ArosticaEtAl2025/benchmark2/$MESH/constant/polyMesh" constant/
-cp "data/ArosticaEtAl2025/benchmark2/$MESH/0/"* 0/
+MESH_DIR="$EXTRACT_DIR/ArosticaEtAl2025/benchmark2/$MESH"
+rm -rf constant/polyMesh "$MESH_DIR"
+unzip -q -o "$ARCHIVE" "ArosticaEtAl2025/benchmark2/$MESH/*" -d "$EXTRACT_DIR"
+cp -r "$MESH_DIR/constant/polyMesh" constant/
+cp "$MESH_DIR/0/"* 0/
 solids4Foam::runApplication checkMesh
 
 # Run the solver
