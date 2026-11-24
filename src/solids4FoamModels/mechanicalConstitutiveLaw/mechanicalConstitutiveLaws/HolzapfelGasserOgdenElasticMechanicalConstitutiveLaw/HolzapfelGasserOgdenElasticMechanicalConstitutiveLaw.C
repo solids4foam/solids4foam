@@ -187,9 +187,13 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
         const vector ea(Ea[i]/magEa);
 
         // The two fibre families, wound symmetrically about the
-        // circumferential direction
-        const vector N4(cosA*ec + sinA*ea);
-        const vector N6(-cosA*ec + sinA*ea);
+        // circumferential direction. Normalised, since the fibre strains
+        // below take them to be unit vectors, and a basis that is not
+        // exactly orthogonal would otherwise give them a length other than 1
+        vector N4(cosA*ec + sinA*ea);
+        vector N6(-cosA*ec + sinA*ea);
+        N4 /= mag(N4);
+        N6 /= mag(N6);
 
         // The isochoric deformation. Every invariant below is taken on this,
         // which is what makes the stress a function of shape alone and lets
@@ -199,8 +203,12 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
         const symmTensor bbar(symm(Fbar & Fbar.T()));
         const symmTensor Cbar(symm(Fbar.T() & Fbar));
 
-        const scalar I4 = Cbar && symm(N4*N4);
-        const scalar I6 = Cbar && symm(N6*N6);
+        // Fibre strains, I4 - 1 and I6 - 1, formed from Cbar - I rather than
+        // as Cbar && N*N - 1: the two agree for a unit N, but N & N is not
+        // exactly 1 in floating point, and this way the fibre stress is
+        // exactly zero at rest
+        const scalar I4m1 = (Cbar - I) && symm(N4*N4);
+        const scalar I6m1 = (Cbar - I) && symm(N6*N6);
 
         const vector n4(Fbar & N4);
         const vector n6(Fbar & N6);
@@ -213,8 +221,8 @@ void Foam::HolzapfelGasserOgdenElasticMechanicalConstitutiveLaw::evaluate
         // compiler fuses the multiply-add in its diagonal
         symmTensor T(muVal*(bbar - I));
 
-        T += (2.0*k1Val*(I4 - 1.0)*exp(k2_*sqr(I4 - 1.0)))*symm(n4*n4);
-        T += (2.0*k1Val*(I6 - 1.0)*exp(k2_*sqr(I6 - 1.0)))*symm(n6*n6);
+        T += (2.0*k1Val*I4m1*exp(k2_*sqr(I4m1)))*symm(n4*n4);
+        T += (2.0*k1Val*I6m1*exp(k2_*sqr(I6m1)))*symm(n6*n6);
 
         // The isochoric Cauchy stress
         const symmTensor s(dev(T)/Ji);

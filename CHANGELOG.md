@@ -803,7 +803,10 @@ release. For complete commit-level details and contributor information, see the
   state. Where the compiler fused the multiply-add in `dev()`, `dev(I)` left a
   round-off residual of about `5.6e-17*mu`, which was enough to derail an
   initially unloaded PETSc solve. The identity is now subtracted before
-  `dev()`, which leaves the stress algebraically unchanged.
+  `dev()`, which leaves the stress algebraically unchanged. The two
+  Holzapfel-Ogden laws likewise form their fibre strains from `C - I`, since
+  `|N|^2` of a unit fibre direction is not exactly 1 in floating point, and
+  `HolzapfelGasserOgdenElastic` now normalises its fibre directions.
 
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
