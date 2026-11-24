@@ -8,7 +8,7 @@ release. For complete commit-level details and contributor information, see the
 
 ### Added
 
-- `viscoActiveHolzapfelOgden`: `localTangentShearModulus`, a scalar tangent
+- `viscousHolzapfelOgden`: `localTangentShearModulus`, a scalar tangent
   evaluated from the local material state (matrix stiffness at the current
   stretch plus the fibre, sheet and coupling shares, switched off where a
   family is slack), bounded by `tangentShearModulusMin` and
@@ -161,7 +161,7 @@ release. For complete commit-level details and contributor information, see the
   `circulationPressure` boundary condition and coupler
   (`libcirculationCoupling`) that couple a network to a CFD domain with
   explicit or implicit schemes of order 1 to 4. The tutorials are in
-  `tutorials/circulationModels`. It is currently only available for
+  `tutorials/fluids/circulationModels`. It is currently only available for
   OpenFOAM.com.
 - Added the `BDF` ddt scheme, `default BDF 3;` in `ddtSchemes`, which applies
   the backward differentiation formula of order 1 to 6 to `fvm::ddt` and
@@ -461,6 +461,15 @@ release. For complete commit-level details and contributor information, see the
   them. Solid results are unchanged. The new `Test-patchQuadratureValues`
   utility checks the behaviour of every registered patch field type.
 
+- The stabilisation models no longer look up the solid model. The
+  second-order `alpha` stabilisation can now be used in any model, e.g. as
+  the `newtonIcoFluid` pressure stabilisation, where it used to stop with
+  "Could not find solidModel_region0", and it has a scalar Jacobian, which
+  the `newtonIcoFluid` pressure needs. The high-order form is a separate
+  call, `updateScalarHighOrder` or `updateVectorHighOrder`, which takes the
+  least-squares scheme from the caller; the solid models make this call when
+  `highOrderResidual` is on. Solid results are unchanged.
+
 - The tutorials that used the `pointCellsLeastSquares` gradient scheme now use
   `leastSquaresS4f`, which is implemented in solids4foam and so is the same
   scheme in all OpenFOAM variants. The case conversion script no longer
@@ -677,6 +686,15 @@ release. For complete commit-level details and contributor information, see the
   iteration: 0.96, about 160 iterations per time step, on `HronTurekFsi3`.
   The estimate is printed at the start of the run, with a warning when it
   exceeds 0.95.
+- The `circulationModels` tutorials moved from `tutorials/circulationModels`
+  to `tutorials/fluids/circulationModels`, beside the other fluid cases.
+  The two CFD cases, `pipeWindkessel` and `pipeClosedLoop`, are now solved
+  by `solids4Foam` with the `pimpleFluid` fluid model, with `./Allrun
+  pimpleFoam` for stock `pimpleFoam` (`pipeWindkesselSolids4Foam` is folded
+  into `pipeWindkessel`), and `pipeClosedLoop0D` is now `./Allrun 0D` in
+  `pipeClosedLoop` (its circuit is in `pipeClosedLoop/reference0D`). The
+  tutorials plot their results with gnuplot instead of Python and
+  `matplotlib`.
 
 ### Removed
 

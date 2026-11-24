@@ -95,6 +95,14 @@ class multipleStabilisationModels
 
     // Private Member Functions
 
+        //- Set the scalar face stabilisation to the sum of the sub-model
+        //  contributions, times the outer scale factor
+        void sumFaceScalars(const word& fieldName) const;
+
+        //- Set the vector face stabilisation to the sum of the sub-model
+        //  contributions, times the outer scale factor
+        void sumFaceVectors(const word& fieldName) const;
+
         //- Disallow default bitwise copy construct
         multipleStabilisationModels(const multipleStabilisationModels&);
 
@@ -140,6 +148,24 @@ public:
         (
             const volVectorField& field,
             const volTensorField* gradPtr = nullptr
+        ) const;
+
+        //- Re-calculate the scalar stabilisation with the given high-order
+        //  least-squares reconstruction by accumulating all sub-model
+        //  contributions
+        virtual void updateScalarHighOrder
+        (
+            const volScalarField& field,
+            const leastSquaresScheme& reconstruction
+        ) const;
+
+        //- Re-calculate the vector stabilisation with the given high-order
+        //  least-squares reconstruction by accumulating all sub-model
+        //  contributions
+        virtual void updateVectorHighOrder
+        (
+            const volVectorField& field,
+            const leastSquaresScheme& reconstruction
         ) const;
 
         //- Delegate the scalar Jacobian to the nominated sub-model
