@@ -1,37 +1,47 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-  interfaceTractionDiagnostic (optional, womersleyTube verification)
-
-  A coded function object that records, on the FSI interface, every part of
-  the interface traction, without changing the solver:
-
-  fluid patch 'interface' (region fluid), per face:
-    p_b         boundary pressure (kinematic) used by the momentum equation
-                and by patchPressureForce
-    tTr         transferred viscous traction  n & (-devReff_b)  (kinematic),
-                i.e. exactly what pimpleFluid::patchViscousForce passes
-                (before the factor rho), from the registered turbulence model
-    tLap        laplacian wall flux of the momentum matrix,
-                gradientInternalCoeffs*U_P + gradientBoundaryCoeffs
-    tExp        explicit wall flux of the momentum equation,
-                n & dev2(T(grad(U)_b))   (times nuEff)
-                (tLap + tExp)*nuEff is the viscous momentum the fluid loses
-    snGrad      the wall condition's snGrad()
-    trGradU     tr(grad(U)_b)
-  solid patch 'interface' (region solid), per face:
-    tApplied    the traction applied by the solidTraction condition,
-                traction - n*pressure, read from the patch's own written
-                entries (no solids4foam headers needed)
-    tSigma      n & sigma_b. NOTE: with the PETSc SNES solid the boundary
-                value of sigma is NOT the enforced traction (the traction
-                enters the residual as a face force); recorded for reference
-
-  Serial runs only: it stops with a fatal error if Pstream::parRun().
-
-  All values are written for t >= timeStart every executeInterval steps to
-  postProcessing/interfaceTraction/{fluid,solid}.dat with 12 significant
-  digits. The Womersley analysis script converts them to wave-projected
-  first-harmonic amplitudes.
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
 \*---------------------------------------------------------------------------*/
+
+// Optional womersleyTube verification diagnostic: prepare_study.py installs it
+// as system/interfaceTractionDiagnostic in the study copies and includes it in
+// their controlDict functions.
+//
+// A coded function object that records, on the FSI interface, every part of
+// the interface traction, without changing the solver:
+//
+// fluid patch 'interface' (region fluid), per face:
+//   p_b         boundary pressure (kinematic) used by the momentum equation
+//               and by patchPressureForce
+//   tTr         transferred viscous traction  n & (-devReff_b)  (kinematic),
+//               i.e. exactly what pimpleFluid::patchViscousForce passes
+//               (before the factor rho), from the registered turbulence model
+//   tLap        laplacian wall flux of the momentum matrix,
+//               gradientInternalCoeffs*U_P + gradientBoundaryCoeffs
+//   tExp        explicit wall flux of the momentum equation,
+//               n & dev2(T(grad(U)_b))   (times nuEff)
+//               (tLap + tExp)*nuEff is the viscous momentum the fluid loses
+//   snGrad      the wall condition's snGrad()
+//   trGradU     tr(grad(U)_b)
+// solid patch 'interface' (region solid), per face:
+//   tApplied    the traction applied by the solidTraction condition,
+//               traction - n*pressure, read from the patch's own written
+//               entries (no solids4foam headers needed)
+//   tSigma      n & sigma_b. NOTE: with the PETSc SNES solid the boundary
+//               value of sigma is NOT the enforced traction (the traction
+//               enters the residual as a face force); recorded for reference
+//
+// Serial runs only: it stops with a fatal error if Pstream::parRun().
+//
+// All values are written for t >= timeStart every executeInterval steps to
+// postProcessing/interfaceTraction/{fluid,solid}.dat with 12 significant
+// digits. The Womersley analysis script converts them to wave-projected
+// first-harmonic amplitudes.
 
 interfaceTractionDiagnostic
 {
@@ -97,7 +107,8 @@ interfaceTractionDiagnostic
         const label sp = sm.boundaryMesh().findPatchID("interface");
         if (fp < 0 || sp < 0)
         {
-            FatalErrorInFunction << "patch 'interface' not found"
+            FatalErrorInFunction
+                << "patch 'interface' not found"
                 << exit(FatalError);
         }
 
@@ -108,10 +119,10 @@ interfaceTractionDiagnostic
             mkDir(dir);
             fluidFile_.reset(new OFstream(dir/"fluid.dat"));
             solidFile_.reset(new OFstream(dir/"solid.dat"));
-            fluidFile_() << "# t face x y z magSf nx ny nz p_b"
+            fluidFile_()<< "# t face x y z magSf nx ny nz p_b"
                 " tTr_x tTr_y tTr_z tLap_x tLap_y tLap_z tExp_x tExp_y tExp_z"
                 " snGrad_x snGrad_y snGrad_z trGradU nuEff" << nl;
-            solidFile_() << "# t face x y z magSf nx ny nz"
+            solidFile_()<< "# t face x y z magSf nx ny nz"
                 " tApplied_x tApplied_y tApplied_z tSigma_x tSigma_y tSigma_z"
                 << nl;
             fluidFile_().precision(12);
@@ -151,8 +162,7 @@ interfaceTractionDiagnostic
             const vector tLap(cmptMultiply(gic[i], UP[i]) + gbc[i]);
             const tensor gT(gUb[i].T());
             const vector tExp(nf[i] & (gT - (2.0/3.0)*tr(gUb[i])*tensor::I));
-            fluidFile_()
-                << runTime.value() << ' ' << i << ' '
+            fluidFile_()<< runTime.value() << ' ' << i << ' '
                 << Cf[i].x() << ' ' << Cf[i].y() << ' ' << Cf[i].z() << ' '
                 << magSf[i] << ' '
                 << nf[i].x() << ' ' << nf[i].y() << ' ' << nf[i].z() << ' '
@@ -168,7 +178,10 @@ interfaceTractionDiagnostic
         // written entries, and n & sigma_b for reference
         const volVectorField& D = sm.lookupObject<volVectorField>("D");
         const fvPatch& spatch = sm.boundary()[sp];
+        // Full precision: the round trip must not limit the comparison with
+        // the fluid traction
         OStringStream os;
+        os.precision(17);
         D.boundaryField()[sp].write(os);
         IStringStream is(os.str());
         const dictionary pd(is);
@@ -184,8 +197,7 @@ interfaceTractionDiagnostic
         {
             const vector ta(trac[i] - snf[i]*pres[i]);
             const vector ts(snf[i] & sigb[i]);
-            solidFile_()
-                << runTime.value() << ' ' << i << ' '
+            solidFile_()<< runTime.value() << ' ' << i << ' '
                 << sCf[i].x() << ' ' << sCf[i].y() << ' ' << sCf[i].z() << ' '
                 << smagSf[i] << ' '
                 << snf[i].x() << ' ' << snf[i].y() << ' ' << snf[i].z() << ' '

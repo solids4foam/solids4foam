@@ -19,9 +19,8 @@ axial tangent e_x; fields = Re[a exp(i w t)], axial dependence exp(-i k x)):
            sigma_rr and sigma_rx on the solid side
   SigN   = n_s.sigma_b.n_s: boundary value of the solid stress (with the
            PETSc SNES solid this is NOT the enforced traction; reference only)
-  VnEst  = -2 rho nuEff tr(grad U)_b, the continuum normal viscous stress
-           2 mu du_n/dn estimated from the fields (incompressibility)
-First Fourier coefficient over the last `window` periods (all samples),
+First Fourier coefficient over the last `window` periods (all samples); the
+samples must cover the whole window and end at the run's endTime.
 then the wave projection over the central half of the tube,
   a_hat = sum_f a(x_f) exp(+i k x_f) w_f / sum_f w_f,
 which for the exact field returns its amplitude at x = 0. The weights w_f are
@@ -51,10 +50,13 @@ import cmath
 import csv
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
 import numpy as np
+
+ENDTIME_RE = re.compile(r"^\s*endTime\s+([^;\s]+)\s*;", re.M)
 
 
 def load_exact(study: Path):
@@ -111,6 +113,34 @@ def per_time(data, ncol_face):
         raise RuntimeError("incomplete diagnostic output")
     order = np.lexsort((data[:, 1], data[:, 0]))
     return times, data[order].reshape(times.size, nface, ncol_face)
+
+
+def check_window(t, t0, t1, length, end_time=None):
+    """The samples in (t0, t1] must cover the whole window of the given
+    length uniformly (no truncated or partial series), and t1 must be the
+    run's end time when it is known."""
+    tt = t[(t > t0 + 1e-9) & (t <= t1 + 1e-9)]
+    if tt.size < 2:
+        raise RuntimeError("too few samples in the analysis window")
+    dt = float(np.median(np.diff(tt)))
+    if abs(tt.size * dt - length) > 0.5 * dt or tt[0] - t0 > 1.5 * dt:
+        raise RuntimeError(f"the samples do not cover the analysis window: {tt.size} samples "
+                           f"of {dt:.6g} s from t = {tt[0]:.6g} to {tt[-1]:.6g} s for a "
+                           f"window of {length:.6g} s ending at {t1:.6g} s")
+    if end_time is not None and abs(t1 - end_time) > 0.5 * dt:
+        raise RuntimeError(f"the diagnostic output ends at t = {t1:.6g} s, not at the run's "
+                           f"endTime {end_time:.6g} s (incomplete run)")
+
+
+def run_end_time(case: Path):
+    """endTime from the run's system/controlDict (None if there is none)."""
+    control = case / "system/controlDict"
+    if not control.is_file():
+        return None
+    m = ENDTIME_RE.search(control.read_text())
+    if not m:
+        raise RuntimeError(f"{control}: no numeric endTime")
+    return float(m.group(1))
 
 
 def mean_positions(F, t, t0, t1):
@@ -183,6 +213,7 @@ def analyse_case(case: Path, ex: dict, window: int, fluid_mean_positions: bool =
     rho = ex["rho"]
     t_end = tf[-1]
     t0 = t_end - window * ex["period"]
+    check_window(tf, t0, t_end, window * ex["period"], run_end_time(case))
     # fluid face centres (window mean) only to match the faces; the projection
     # uses the undeformed solid positions and areas
     Xfm = mean_positions(F, tf, t0, t_end)
@@ -206,7 +237,6 @@ def analyse_case(case: Path, ex: dict, window: int, fluid_mean_positions: bool =
     Vx = rho * np.einsum("tfi,tfi->tf", tTr, tang)
     VnMom = rho * nu * np.einsum("tfi,tfi->tf", tMom, n)
     VxMom = rho * nu * np.einsum("tfi,tfi->tf", tMom, tang)
-    VnEst = -2 * rho * nu * F[:, :, 22]
     # solid side, matched to fluid faces on the full face-centre coordinates
     ns = S[:, match, 6:9]
     tsol = S[:, match, 9:12]          # applied traction (solidTraction)
@@ -215,7 +245,7 @@ def analyse_case(case: Path, ex: dict, window: int, fluid_mean_positions: bool =
     SsX = -np.einsum("tfi,tfi->tf", tsol, tang)
     SigN = np.einsum("tfi,tfi->tf", tsig, ns)
     series = {"P": P, "Vn": Vn, "Vx": Vx, "Sn": -P + Vn, "VnMom": VnMom,
-              "VxMom": VxMom, "VnEst": VnEst, "SolidSn": SsN, "SolidSx": SsX,
+              "VxMom": VxMom, "SolidSn": SsN, "SolidSx": SsX,
               "SolidSigmaN": SigN}
     # central half of the tube, weighted by the face areas
     sel = (xf >= 0.25 * ex["L"]) & (xf <= 0.75 * ex["L"])
@@ -240,7 +270,6 @@ def errors(res: dict, ex: dict) -> dict:
         "Vn_err/|p|": (res["Vn"] - ex["Vn"]) / Pabs,
         "Sn_err/|p|": (res["Sn"] - ex["Sn"]) / Pabs,
         "Vx_err/|Vx|": (res["Vx"] - ex["Vx"]) / abs(ex["Vx"]),
-        "VnEst_ratio": res["VnEst"] / ex["Vn"],
         "mom_vs_transfer_n/|Vn|": (res["VnMom"] - res["Vn"]) / abs(ex["Vn"]),
         "mom_vs_transfer_x/|Vx|": (res["VxMom"] - res["Vx"]) / abs(ex["Vx"]),
         "solid_vs_fluid_n/|p|": (res["SolidSn"] - res["Sn"]) / Pabs,

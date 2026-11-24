@@ -402,7 +402,7 @@ release. For complete commit-level details and contributor information, see the
   flux and the traction applied to the solid, and compares their
   wave-projected first harmonics with the exact solution under mesh,
   time-step, amplitude and coupling-tolerance refinement. It needs python3
-  with numpy and does not change the tutorial or its standard verification.
+  with numpy and does not change the tutorial defaults.
 - `pimpleFluid` (OpenFOAM.com) has an opt-in PIMPLE entry,
   `fluxConsistentPatches (<patches>);`, for patches that fix the pressure and
   whose velocity condition fixes the boundary value, such as a mixed
@@ -414,6 +414,13 @@ release. For complete commit-level details and contributor information, see the
 
 ### Changed
 
+- `womersleyTube` verification (`verification/Allverify --reuse`): a stored
+  run is now reused only if, in addition to the case and tutorial files, the
+  time schedule, the case inputs as the driver writes them and the content of
+  the `solids4Foam` executable and `libsolids4Foam*` libraries match.
+  Before, the build was compared by file size and time stamp, so a rebuild
+  or copy of the same binaries forced a rerun while a changed driver
+  substitution did not. Runs stored by an earlier version are rerun once.
 - The `beamInCrossFlow` tutorial now follows the stationary 3-D benchmark of
   Richter (2012), section 7.2: the plate moves to x = 0.4-0.5 m, the solid is
   St Venant-Kirchhoff with E = 1.4 MPa (was 10 kPa) and nu = 0.4, and the

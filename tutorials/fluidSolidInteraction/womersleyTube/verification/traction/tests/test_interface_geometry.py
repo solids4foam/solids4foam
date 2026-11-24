@@ -89,90 +89,36 @@ class Projection(unittest.TestCase):
         self.assertGreater(abs(fluid_mean["P"] - (0.4 + 0.3j)), 2e-5)
 
 
-def old_projection_P(case: Path, ex: dict, window: int) -> complex:
-    """Faithful copy of what the analysis did at 7c9f1e2cf (the PR head) for
-    the pressure series: positions xf = the deformed fluid face centre at the
-    LAST sample, solid faces matched by nearest axial position with a 1e-6 L
-    tolerance, weights from midpoints between the sorted axial positions. Only
-    the lines that decide the projection are kept."""
-    tf, F = W.per_time(W.read(case / "postProcessing/interfaceTraction/fluid.dat", 24), 24)
-    ts, S = W.per_time(W.read(case / "postProcessing/interfaceTraction/solid.dat", 15), 15)
-    t_end = tf[-1]
-    t0 = t_end - window * ex["period"]
-    xf = F[-1, :, 2]
-    xs = S[-1, :, 2]
-    match = np.array([np.argmin(np.abs(xs - x)) for x in xf])
-    if np.max(np.abs(xs[match] - xf)) > 1e-6 * ex["L"]:
-        raise RuntimeError("solid and fluid interface faces do not coincide")
-    sel = (xf >= 0.25 * ex["L"]) & (xf <= 0.75 * ex["L"])
-    order = np.argsort(xf)
-    xs_sorted = xf[order]
-    edges = np.concatenate([[xs_sorted[0] - 0.5 * (xs_sorted[1] - xs_sorted[0])],
-                            0.5 * (xs_sorted[1:] + xs_sorted[:-1]),
-                            [xs_sorted[-1] + 0.5 * (xs_sorted[-1] - xs_sorted[-2])]])
-    dx = np.empty_like(xf)
-    dx[order] = np.diff(edges)
-    w = np.where(sel, dx, 0.0)
-    proj = np.exp(1j * ex["k"] * xf)
-    a, _ = W.harmonic(tf, ex["rho"] * F[:, :, 9], ex["omega"], t0, t_end)
-    return complex(np.sum(a * proj * w) / np.sum(w))
+class WindowCoverage(unittest.TestCase):
+    """The analysis window must be fully covered and end at the run's endTime
+    (a truncated series must not be analysed as a complete window)."""
 
-
-class HistoricalBehaviour(unittest.TestCase):
-    """What is and is not claimed about the code at 7c9f1e2cf.
-
-    NOT claimed: that the old projection silently produced a ~1e-4 phase error
-    in the PR's runs. The old code took the deformed fluid face centres at the
-    LAST sample, a whole number of periods after the start. If the run starts
-    from the periodic state (D(0) equal to the periodic value at that phase,
-    d0 = UX here) the mesh offset D(t_end) - D(0) is ~0 there, and the old and
-    the corrected code agree (test_old_code_is_fine_when_the_last_sample_is_
-    undisplaced). That D(0) matches the periodic state in the real runs has not
-    been checked (no stored output on this machine).
-
-    Claimed: the old result depended on the fluid mesh position at one
-    sample. The old safety net was a 1e-6 L match tolerance, which allows a
-    phase error of only k x 1.5e-5 m ~ 2e-6; a larger offset (D(0) not equal
-    to the periodic value: here up to UX = 7.3e-4 m, the size Philip quotes)
-    makes the old code RAISE rather than silently be wrong, so it could not
-    carry the 1e-4 error either; the corrected code needs no such coincidence.
-    Also, the old nearest-axial-position matching and sorted-x midpoint weights
-    break down with several faces per axial station.
-    """
-
-    def test_old_code_is_fine_when_the_last_sample_is_undisplaced(self):
+    def test_fragment_shorter_than_the_window_raises(self):
         xs = np.linspace(0.1, L - 0.1, 41)
         with tempfile.TemporaryDirectory() as tmp:
             case = Path(tmp)
-            make_case(case, xs, 0.4 + 0.3j, d0=UX)
-            old = old_projection_P(case, EX, 2)
-            new = W.analyse_case(case, EX, 2)["P"]
-        self.assertLess(abs(old - (0.4 + 0.3j)), 5e-6)
-        self.assertLess(abs(new - (0.4 + 0.3j)), 5e-6)
+            make_case(case, xs, 0.4 + 0.3j)          # 4 periods of samples
+            with self.assertRaisesRegex(RuntimeError, "do not cover"):
+                W.analyse_case(case, EX, 5)
 
-    def test_old_code_stops_when_the_fluid_mesh_is_displaced_at_the_last_sample(self):
-        # D(0) = 0: the mesh oscillates about +UX; last sample displaced by
-        # UX = 7.3e-4 m >> 1e-6 L = 1.5e-5 m. Old: raises. New: correct.
+    def test_output_ending_before_endTime_raises(self):
         xs = np.linspace(0.1, L - 0.1, 41)
         with tempfile.TemporaryDirectory() as tmp:
             case = Path(tmp)
-            make_case(case, xs, 0.4 + 0.3j, d0=0.0)
-            with self.assertRaises(RuntimeError):
-                old_projection_P(case, EX, 2)
-            new = W.analyse_case(case, EX, 2)["P"]
-        self.assertLess(abs(new - (0.4 + 0.3j)), 5e-6)
+            make_case(case, xs, 0.4 + 0.3j)
+            (case / "system").mkdir()
+            (case / "system/controlDict").write_text(f"endTime         {6 * PERIOD!r};\n")
+            with self.assertRaisesRegex(RuntimeError, "endTime"):
+                W.analyse_case(case, EX, 2)
 
-    def test_old_code_phase_error_is_bounded_by_its_tolerance(self):
-        # largest offset the old tolerance accepts: error <~ k * 1.5e-5 ~ 2e-6,
-        # i.e. the old code could not produce a 1e-4 error without raising
+    def test_output_ending_at_endTime_is_accepted(self):
         xs = np.linspace(0.1, L - 0.1, 41)
         with tempfile.TemporaryDirectory() as tmp:
             case = Path(tmp)
-            make_case(case, xs, 0.4 + 0.3j, d0=UX - 1.4e-5)
-            old = old_projection_P(case, EX, 2)
-        err = abs(old - (0.4 + 0.3j))
-        self.assertLess(err, 1e-5)
-        self.assertGreater(err, 1e-7)     # the offset is visible, but small
+            make_case(case, xs, 0.4 + 0.3j)
+            (case / "system").mkdir()
+            (case / "system/controlDict").write_text(f"endTime         {4 * PERIOD!r};\n")
+            self.assertLess(abs(W.analyse_case(case, EX, 2)["P"] - (0.4 + 0.3j)), 5e-6)
 
 
 class ProjectionGeometry(unittest.TestCase):

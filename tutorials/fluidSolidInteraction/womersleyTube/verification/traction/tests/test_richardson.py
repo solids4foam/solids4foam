@@ -75,7 +75,7 @@ def write(path, obj):
 
 
 QS = ("attenuation", "speed", "wallMid_amp", "wallMid_phase")
-TQS = ("Vn_ratio", "VnEst_ratio", "Vn_err/|p|", "P_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|")
+TQS = ("Vn_ratio", "Vn_err/|p|", "P_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|")
 SIGQ = ("P_err/|p|", "Vn_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|", "solid_vs_fluid_n/|p|")
 
 
@@ -83,11 +83,20 @@ def pair(z):
     return [z.real, z.imag]
 
 
-def make_inputs(work: Path, mesh_levels, slope_stored=2.5e-3, slope_values=None):
+def make_inputs(work: Path, mesh_levels, slope_stored=2.5e-3, slope_values=None,
+                slope_m1=None):
     """Synthetic inputs for decomposition_summary.py; mesh_levels = (e1, e2, e4)
     of every traction quantity; the amplitude values are linear with
-    slope_values but the stored fit says slope_stored (to prove it is read)."""
+    slope_values but the stored fit says slope_stored (to prove it is read).
+    The m1 fit (slope_m1, default slope_stored) goes in work/../out, the
+    script's OUT_DIR."""
     slope_values = slope_stored if slope_values is None else slope_values
+    slope_m1 = slope_stored if slope_m1 is None else slope_m1
+    (work.parent / "out").mkdir(exist_ok=True)
+    write(work.parent / "out" / "amplitude_series_m1.json", {
+        "case": "robin_m1_n200",
+        "linearFit": {q: {"E0": 0.0, "slope_per_Pa": slope_m1, "misfit": 0.0,
+                          "m_observed": []} for q in QS}})
     lim = {"limits": {q: {"E_m4_n200": -2e-3, "E_m4_n400": -1.5e-3,
                           "space_increment_m4_p2": 1e-4, "space_increment_m4_pobs": 1.2e-4}
                       for q in QS},
@@ -130,6 +139,15 @@ class DecompositionSummary(unittest.TestCase):
             self.assertEqual(res["waveQoIs"][q]["amplitude_slope_per_Pa_m2"], 2.5e-3)
             self.assertEqual(res["waveQoIs"][q]["amplitude_fit_misfit"], 7e-9)
 
+    def test_amplitude_uncertainty_is_the_m1_m2_slope_difference(self):
+        r, res = self.run_script((0.4 + 0j, 0.2 + 0j, 0.1 + 0j), slope_stored=2.0e-3,
+                                 slope_m1=2.1e-3)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        for q in QS:
+            w = res["waveQoIs"][q]
+            self.assertAlmostEqual(w["residual_uncertainty_amplitude"], 1e-4, places=12)
+            self.assertAlmostEqual(w["amplitude_slope_m1_vs_m2"], 0.05, places=9)
+
     def test_missing_stored_fit_is_a_clear_error(self):
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp) / "w"
@@ -140,7 +158,7 @@ class DecompositionSummary(unittest.TestCase):
             del d["linearFit"]
             f.write_text(json.dumps(d))
             r = subprocess.run([sys.executable, "-I", str(SCRIPTS / "decomposition_summary.py"),
-                                str(work), str(Path(tmp) / "o")], capture_output=True, text=True)
+                                str(work), str(Path(tmp) / "out")], capture_output=True, text=True)
             self.assertNotEqual(r.returncode, 0)
             self.assertIn("linearFit", r.stderr)
 
@@ -189,6 +207,42 @@ class TractionChecks(unittest.TestCase):
         r = self.run_checks([4e-4 * ph + 1e-4, 1e-4 + 0j, 0j + 0.0])   # d1/d2 = 4*ph*(...)
         self.assertEqual(r.returncode, 1)
         self.assertIn("FAIL: shear traction mesh order", r.stdout)
+
+
+
+class TractionConvergenceUncertainty(unittest.TestCase):
+    """A rejected observed order must not be reported as a zero uncertainty."""
+
+    def run_convergence(self, levels):
+        measures = ("P_err/|p|", "Vn_ratio", "Vn_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|",
+                    "mom_vs_transfer_n/|Vn|", "mom_vs_transfer_x/|Vx|",
+                    "solid_vs_fluid_n/|p|", "solid_vs_fluid_x/|Vx|")
+        with tempfile.TemporaryDirectory() as tmp:
+            study = Path(tmp) / "s" / "womersleyTube"
+            d = study / "verification/postProcessing"
+            d.mkdir(parents=True)
+            cases = {f"robin_m{m}_n200": {"errors": {q: pair(e) for q in measures}}
+                     for m, e in zip((1, 2, 4), levels)}
+            write(d / "interfaceTraction_summary.json", {"exact": {}, "cases": cases})
+            out = Path(tmp) / "out"
+            r = subprocess.run([sys.executable, "-I", str(SCRIPTS / "traction_convergence.py"),
+                                str(out), str(study)], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            rep = json.loads((out / "traction_convergence.json").read_text())
+            return rep["s_robin"]["mesh"]["P_err/|p|"]
+
+    def test_rejected_order_gives_unavailable_uncertainty(self):
+        for levels in ((0.1 + 0j, 0.1 + 0j, 0.05 + 0j),      # zero difference
+                       (0.1 + 0j, 0.2 + 0j, 0.4 + 0j),       # negative order
+                       (0.4 + 0j, 0.2 + 0j, 0.2 + 0.1j)):    # inconsistent phase
+            r = self.run_convergence(levels)
+            self.assertFalse(r["asymptotic"], levels)
+            self.assertTrue(math.isnan(r["limit_uncertainty"]), levels)
+
+    def test_accepted_order_gives_finite_uncertainty(self):
+        r = self.run_convergence((0.4 + 0j, 0.2 + 0j, 0.1 + 0j))       # order 1
+        self.assertTrue(r["asymptotic"])
+        self.assertGreater(r["limit_uncertainty"], 0.0)
 
 
 if __name__ == "__main__":

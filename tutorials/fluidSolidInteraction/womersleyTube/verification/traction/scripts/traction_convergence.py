@@ -15,7 +15,8 @@ steps per period and the time series 100/200/400 on m2:
   - Richardson limit E_inf = E4 + (E4 - E2)/(2^p_used - 1) with p_used = 2
     (the formal order) and with the observed p, as the estimate of the
     resolution-independent part of the error; their difference is quoted as
-    the uncertainty of that estimate.
+    the uncertainty of that estimate, and as unavailable (nan) when the
+    observed order is rejected.
 Writes OUT_DIR/traction_convergence.json, .csv, a Markdown table and plots.
 """
 import csv
@@ -37,7 +38,7 @@ except ImportError:      # plots are optional
     plt = None
 
 MEASURES = ["P_err/|p|", "Vn_ratio", "Vn_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|",
-            "VnEst_ratio", "mom_vs_transfer_n/|Vn|", "mom_vs_transfer_x/|Vx|",
+            "mom_vs_transfer_n/|Vn|", "mom_vs_transfer_x/|Vx|",
             "solid_vs_fluid_n/|p|", "solid_vs_fluid_x/|Vx|"]
 
 
@@ -96,7 +97,8 @@ def main():
                                 "asymptotic": info["valid"], "order_note": info["reason"],
                                 "limit_p2": [lim2.real, lim2.imag],
                                 "limit_pobs": [limp.real, limp.imag],
-                                "limit_uncertainty": abs(lim2 - limp)}
+                                "limit_uncertainty": abs(lim2 - limp) if info["valid"]
+                                else float("nan")}
         report[label] = rep
         md += [f"## {label}", "", "| measure | series | finest value | observed order | arg(ratio) [deg] | Richardson limit (p=2) | |limit p=2 - p_obs| | note |",
                "|---|---|---|---|---|---|---|---|"]
@@ -122,11 +124,9 @@ def main():
             ax[0].set_ylabel("|relative error| of wave-projected first harmonic")
             ax[0].set_title(f"{label}: mesh series (200 steps/period)")
             ax[0].legend(fontsize=7)
-            for m, mk in (("Vn_ratio", "o-"), ("VnEst_ratio", "s--")):
-                vals = [complex(*v) for v in rep["mesh"][m]["values"]]
-                ax[1].plot(h, [v.real for v in vals], mk, label=m + " (Re)")
-                ax[1].plot(h, [v.imag for v in vals], mk, alpha=0.5, label=m + " (Im)")
-            ax[1].axhline(1 / 3, color="gray", lw=0.8, ls=":")
+            vals = [complex(*v) for v in rep["mesh"]["Vn_ratio"]["values"]]
+            ax[1].plot(h, [v.real for v in vals], "o-", label="Vn_ratio (Re)")
+            ax[1].plot(h, [v.imag for v in vals], "o-", alpha=0.5, label="Vn_ratio (Im)")
             ax[1].axhline(1.0, color="gray", lw=0.8)
             ax[1].set_xscale("log")
             ax[1].set_xlabel("relative cell size h/h(m1)")

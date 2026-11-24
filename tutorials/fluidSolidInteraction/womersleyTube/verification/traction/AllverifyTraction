@@ -20,6 +20,13 @@ if ! command -v python3 >/dev/null 2>&1; then
     echo "ERROR: python3 (with numpy; matplotlib for plots) is required" >&2
     exit 2
 fi
+# The scripts run with python3 -I, which ignores user site-packages: check
+# numpy the same way now rather than after hours of solver runs
+if ! python3 -I -c 'import numpy' >/dev/null 2>&1; then
+    echo "ERROR: numpy is not importable by 'python3 -I' (a numpy installed" \
+         "with 'pip install --user' is not seen); install it for python3" >&2
+    exit 2
+fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TUTORIAL="$(cd "$HERE/../.." && pwd)"
@@ -41,6 +48,24 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option $1" >&2; exit 2 ;;
     esac
 done
+
+# Solver runs need what the tutorial needs (see its Allrun): OpenFOAM.com
+# (the coded diagnostic also uses OpenFOAM.com-only API) and PETSc. The
+# diagnostic was requested explicitly, so fail instead of skipping silently.
+if [[ $ANALYSIS_ONLY == 0 ]]; then
+    if [[ ${WM_PROJECT:-} != "OpenFOAM" || ${WM_PROJECT_VERSION:-} != v* ]]
+    then
+        echo "ERROR: solver runs need OpenFOAM.com (vYYMM); found" \
+             "'${WM_PROJECT:-none} ${WM_PROJECT_VERSION:-}'." \
+             "Use --analysis-only to analyse stored runs." >&2
+        exit 2
+    fi
+    if [[ -z ${PETSC_DIR:-} ]]; then
+        echo "ERROR: solver runs need solids4foam built with PETSc" \
+             "(PETSC_DIR is not set)" >&2
+        exit 2
+    fi
+fi
 mkdir -p "$WORK" "$OUT"
 
 prepare() {   # name [prepare_study options]

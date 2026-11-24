@@ -5,8 +5,10 @@ in the womersleyTube FSI tutorial and compares it with the exact linear
 solution. It also splits the tutorial's attenuation error into temporal,
 spatial, amplitude-dependent and residual parts.
 
-- It is separate from the standard verification (`../Allverify`), which it does
-  not change, and it does not change the solver or the tutorial defaults.
+- It is separate from the standard verification (`../Allverify`) and does not
+  change the solver or the tutorial defaults. It reuses the standard driver,
+  which now decides more strictly when a stored run may be reused (see
+  [Usage](#usage)); the standard driver's results are unchanged.
 - Its function object (`scripts/interfaceTractionDiagnostic`) is not part of
   the tutorial's `system/`; it is included only in the study copies it
   creates.
@@ -16,6 +18,9 @@ spatial, amplitude-dependent and residual parts.
 - OpenFOAM.com with solids4foam built with PETSc (MUMPS and HYPRE), as for
   the tutorial.
 - python3 with numpy; matplotlib is optional (plots are skipped without it).
+  The scripts run with `python3 -I`, so numpy must be importable without the
+  user site-packages; `AllverifyTraction` checks this, and the OpenFOAM
+  variant and PETSc, before any run.
 - The `coded` function object is compiled at run time (the usual OpenFOAM
   `dynamicCode` requirements). It is serial only and stops with a fatal error
   in a decomposed run.
@@ -138,7 +143,8 @@ The normal viscous stress converges to the exact value at first order. Before
 [#671][pr671] the wall velocity conditions set ∂u_n/∂n = 0, so the transferred normal
 viscous stress converged to about one third of the exact value (0.20, 0.27,
 0.30 on m1/m2/m4); see [#670][i670]. With the continuity-based gradient,
-`tr(grad(U)_b)` is zero to round-off by construction.
+`tr(grad(U)_b)` is zero to round-off by construction, so it no longer gives
+an independent estimate of ∂u_n/∂n and the analysis no longer reports one.
 
 `tSigma` differs from the applied traction by 31 %, 16 % and 8 % of |p| on
 m1/m2/m4 (first order). It is reconstructed from the cell gradient, whereas
@@ -153,13 +159,15 @@ The attenuation (Im k) error at m4, 200 steps/period is −2.05e-3:
 | Part | Value | Basis |
 |---|---|---|
 | temporal | −0.67e-3 | m4/200 vs m4/400 with q = 2 |
-| spatial | unresolved, \|·\| ≤ 0.18e-3 | m1/m2/m4 series non-monotone (−2.10, −2.23, −2.05e-3) |
+| spatial | unresolved; sensitivity \|E(m4) − E(m2)\| = 0.18e-3, not a bound | m1/m2/m4 series non-monotone (−2.10, −2.23, −2.05e-3) |
 | amplitude-dependent | −1.10e-3 | linear fit over a = 0.5–4 at m2/200 (exponent 1.00–1.01); the m1 slope differs by 0.5 % |
-| residual | −0.22e-3 ± 0.20e-3 | remainder |
+| residual | −0.22e-3 ± about 0.2e-3 | remainder; uncertainty = spatial sensitivity + m1/m2 amplitude-slope difference |
 <!-- markdownlint-enable MD013 -->
 
 The amplitude-dependent part is linear and odd in the amplitude, and does not
-decay with time:
+decay with time. These two results come from the optional copies `ampm1`,
+`p10` and `p10a4`, which `AllverifyTraction` does not run; see
+[Study](#study) for how to reproduce them.
 
 - a = −1 (m2/200): the odd part (E(1) − E(−1))/2 is 1.00 times the fitted
   slope (0.99–1.04 over the six quantities) and the even part equals the

@@ -7,6 +7,7 @@ Inputs in WORK_DIR (produced by the other diagnostic scripts):
   attenuation_limit_mu5.json, amplitude_series.json,
   {mu5,amp2,tol}/womersleyTube/verification/postProcessing/
   interfaceTraction_summary.json
+and in OUT_DIR: amplitude_series_m1.json (the m1 slope, from a = 1 and 4).
 Outputs in OUT_DIR: findings_summary.json, and (if matplotlib is
 available) amplitude_linearity.png, attenuation_budget.png.
 
@@ -14,12 +15,14 @@ Attenuation/wave-QoI budget at (m4, 200 steps/period):
   temporal part   E(m4,n200) - E(m4, dt->0), from m4 at 200/400 with q = 2;
   spatial part    -(E(m4) - E(m2))/(2^p - 1) at n200 (p = 2 and observed p);
   amplitude part  slope of the linear fit over a = 0.5, 1, 2, 4 at m2/n200,
-                  times a = 1 (assumed independent of h and dt; the m1 slope,
-                  from a = 1 and 4, differs from the m2 slope by 0.5 %);
+                  times a = 1 (assumed independent of h and dt; checked
+                  against the m1 slope, from a = 1 and 4);
   residual        the remainder.
-Uncertainty of the residual: spatial part bounded by |E(m4) - E(m2)| when the
-m1/m2/m4 series is non-monotone (Richardson not applicable), otherwise by the
-spread between p = 2 and the observed p; plus 2 % of the amplitude part.
+Uncertainty of the residual: for the spatial part, a heuristic sensitivity
+estimate |E(m4) - E(m2)| when the m1/m2/m4 series is non-monotone (Richardson
+not applicable; this is not a bound on the spatial error), otherwise the
+spread between p = 2 and the observed p; plus the difference between the m1
+and m2 amplitude slopes (times a = 1).
 """
 import json
 import math
@@ -47,6 +50,7 @@ c = lambda v: complex(*v)  # noqa: E731
 
 lim = json.loads((D / "attenuation_limit_mu5.json").read_text())
 _amp = json.loads((D / "amplitude_series.json").read_text())
+_amp1 = json.loads((R / "amplitude_series_m1.json").read_text())
 amp = {float(k): v for k, v in _amp.get("values", _amp).items()}
 summ = lambda s: json.loads((D / s / "womersleyTube/verification/postProcessing/"  # noqa: E731
                              "interfaceTraction_summary.json").read_text())
@@ -76,11 +80,18 @@ for q in ("attenuation", "speed", "wallMid_amp", "wallMid_phase"):
     e1m, e2m = lim["cases"]["robin_m1_n200"][q], lim["cases"]["robin_m2_n200"][q]
     monotone = (e1m - e2m) * (e2m - e4) > 0
     u_space = abs(s_err - s_err_pobs) if monotone else abs(e4 - e2m)
-    u_amp = 0.02 * abs(amp_part)
+    try:
+        slope_m1 = float(_amp1["linearFit"][q]["slope_per_Pa"])
+    except KeyError:
+        sys.exit(f"decomposition_summary.py: amplitude_series_m1.json has no linearFit "
+                 f"for '{q}'; run amplitude_series.py again")
+    u_amp = abs(slope_m1 - slope) * 1.0                # mesh dependence of the slope
     out["waveQoIs"][q] = {
         "E_m4_n200": e4, "temporal_error_at_n200": t_err_n200,
         "spatial_error_m4_p2": s_err, "spatial_error_m4_pobs": s_err_pobs,
         "finite_amplitude_part": amp_part, "amplitude_slope_per_Pa_m2": slope,
+        "amplitude_slope_per_Pa_m1": slope_m1,
+        "amplitude_slope_m1_vs_m2": slope_m1 / slope - 1 if slope else math.nan,
         "amplitude_fit_misfit": misfit,
         "residual_linear_continuum": resid,
         "mesh_series_monotone": bool(monotone),
@@ -90,7 +101,7 @@ for q in ("attenuation", "speed", "wallMid_amp", "wallMid_phase"):
 
 # --- traction components: space-time limits and amplitude correction -------
 cs = S5["cases"]
-for q in ("Vn_ratio", "VnEst_ratio", "Vn_err/|p|", "P_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|"):
+for q in ("Vn_ratio", "Vn_err/|p|", "P_err/|p|", "Sn_err/|p|", "Vx_err/|Vx|"):
     e1, e2, e4, e4b = (c(cs[n]["errors"][q]) for n in
                        ("robin_m1_n200", "robin_m2_n200", "robin_m4_n200", "robin_m4_n400"))
     info, lim2_sp, limp_sp = richardson.richardson_limits(e1, e2, e4)
