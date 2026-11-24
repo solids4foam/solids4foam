@@ -119,9 +119,6 @@ dispCorr(const bool refConfig) const
     );
     vectorField& DispCorr = tDispCorr();
 
-    // Normal vector
-    const vectorField n = patch().nf();
-
     // Non-orthogonal correction vectors
     const vectorField k(patchCorrectionVectors(patch()));
 

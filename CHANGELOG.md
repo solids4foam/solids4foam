@@ -788,6 +788,26 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- On OpenFOAM.com and OpenFOAM.org, the non-orthogonal correction of
+  `newMovingWallVelocity`, `elasticWallVelocity`, `normalInletVelocity`,
+  `paraboloidInletVelocity`, `fixedTemperature`, `normalDisplacement`,
+  `solidSymmetry` and, on OpenFOAM.com, the finite-area `clampedMoment` was
+  always zero. Each built its correction vector from `fvPatch::delta()` (or
+  `faPatch::delta()`), which on these forks is only the normal part of the
+  face-cell vector, so removing the normal part left nothing. The correction
+  vector is now taken from the face centre minus the cell centre (for
+  `clampedMoment`, the edge centre minus the adjacent face centre), which is
+  what `delta()` returns on foam-extend, so foam-extend results are
+  unchanged. The foam-extend-only conditions that used the same pattern
+  (`tractionPressureDisplacement`, `solidCohesive` and the block-coupled
+  conditions) were changed in the same way for consistency. Cases with
+  non-orthogonal faces on these patches change slightly: the `hotSphere` and
+  `perforatedPlate` references were re-recorded. `interFluid` now also
+  updates the registered velocity gradient after the pressure correction on
+  OpenFOAM.com and OpenFOAM.org, as it already did on foam-extend and as
+  `pimpleFluid` does, because the corrected velocity conditions read it
+  (#748).
+
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual
