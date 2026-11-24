@@ -195,9 +195,9 @@ void newtonIcoFluid::highOrderFaceFluxes
         }
     }
 
-    // Boundary faces: the velocity is the boundary condition value on
-    // patches that fix it and the owner reconstruction elsewhere; the
-    // pressure is the owner reconstruction
+    // Boundary faces: the velocity and the pressure are the boundary
+    // condition values on patches that fix them, and the owner reconstruction
+    // elsewhere
     forAll(mesh.boundary(), patchI)
     {
         const fvPatch& patch = mesh.boundary()[patchI];
@@ -210,10 +210,16 @@ void newtonIcoFluid::highOrderFaceFluxes
         }
 
         autoPtr<CompactListList<vector>> patchUQuad;
+        autoPtr<CompactListList<scalar>> patchPQuad;
 
         if (U.boundaryField()[patchI].fixesValue())
         {
             patchUQuad = ULs.patchFaceQuadValues(U, patchI);
+        }
+
+        if (p.boundaryField()[patchI].fixesValue())
+        {
+            patchPQuad = pLs.patchFaceQuadValues(p, patchI);
         }
 
         const labelUList& faceCells = patch.faceCells();
@@ -228,7 +234,10 @@ void newtonIcoFluid::highOrderFaceFluxes
             {
                 const point& x = faceQuadPoints[faceI][qI];
 
-                const scalar pq = pLs.valueAtPoint(p, faceCells[i], x);
+                const scalar pq =
+                    patchPQuad.valid()
+                  ? patchPQuad()[i][qI]
+                  : pLs.valueAtPoint(p, faceCells[i], x);
 
                 const vector Uq =
                     patchUQuad.valid()
@@ -467,13 +476,15 @@ newtonIcoFluid::newtonIcoFluid
     // solution. newtonIcoFluid does not use fvOptions, so the source is read
     // as a field (m/s^2) whose cell values are the cell averages of the source
     {
+        // The field is written with the other fields, so that a restart from
+        // a later time reads it back
         IOobject sourceIO
         (
             "momentumSource",
             runTime.timeName(),
             mesh(),
             IOobject::MUST_READ,
-            IOobject::NO_WRITE
+            IOobject::AUTO_WRITE
         );
 
 #ifdef OPENFOAM_NOT_EXTEND
@@ -484,6 +495,15 @@ newtonIcoFluid::newtonIcoFluid
         {
             Info<< "    Reading momentumSource" << endl;
             momentumSourcePtr_.reset(new volVectorField(sourceIO, mesh()));
+
+            if (momentumSourcePtr_().dimensions() != dimVelocity/dimTime)
+            {
+                FatalErrorInFunction
+                    << "momentumSource is a body force per unit mass and must "
+                    << "have the dimensions " << dimVelocity/dimTime
+                    << ", not " << momentumSourcePtr_().dimensions()
+                    << exit(FatalError);
+            }
         }
     }
 
@@ -1344,10 +1364,11 @@ label newtonIcoFluid::formResidual
 
     residual += momentumStabilisation().cellVector(&nuEfff, true);
 
-    // Add the optional momentum source
+    // Add the optional momentum source, scaled by the volume ratio of the
+    // reference configuration like the inertia term
     if (momentumSourcePtr_.valid())
     {
-        residual += primitiveField(momentumSourcePtr_());
+        residual += primitiveField(Jm)*primitiveField(momentumSourcePtr_());
     }
 
     // Make residual extensive as fvc operators are intensive (per unit volume)

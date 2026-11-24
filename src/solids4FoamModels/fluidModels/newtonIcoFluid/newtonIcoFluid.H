@@ -60,7 +60,8 @@ Description
     An optional momentumSource field (m/s^2) in the start time directory is
     added to the momentum equation, e.g. for a manufactured solution. Its cell
     values are the cell averages of the body force per unit mass, and they do
-    not change in time.
+    not change in time. It is written with the other fields, so a restart
+    reads it back.
 
 Author
     Philip Cardiff, UCD.
@@ -152,8 +153,8 @@ class newtonIcoFluid
         Switch highOrderResidual_;
 
         //- Optional momentum source per unit mass, read from the start time
-        //  directory; its cell values are cell averages and do not change in
-        //  time
+        //  directory and written with the other fields; its cell values are
+        //  cell averages and do not change in time
         autoPtr<volVectorField> momentumSourcePtr_;
 
         //- Optional file for recording the time step sizes and number of
