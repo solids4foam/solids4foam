@@ -1147,8 +1147,8 @@ bool coupledPressureDisplacementSolid::evolve()
 
             #include "calcTraction.H"
 
-            Info<< "Assembling momentum equaton" << endl;
-            momentumStabilisation().updateVector(DD(), &gradDD());
+            Info << "Assembling momentum equaton" << endl;
+            updateMomentumStabilisation(DD(), gradDD());
 
             // Construct momentum equation in total Lagrangian
             // form where gradients are calculated directly at the faces

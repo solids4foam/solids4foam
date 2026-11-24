@@ -343,7 +343,7 @@ bool thermalLinGeomSolid::evolve()
         // Store fields for under-relaxation and residual calculation
         D().storePrevIter();
 
-        momentumStabilisation().updateVector(D(), &gradD());
+        updateMomentumStabilisation(D(), gradD());
 
         const surfaceVectorField n(mesh().Sf()/mesh().magSf());
         // linearInterpolate is deliberate: it reproduces the Gauss linear
