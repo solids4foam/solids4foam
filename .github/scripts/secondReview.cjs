@@ -57,13 +57,16 @@ const githubApi = {
   json: endpoint => JSON.parse(gh(['api', endpoint])),
   list: endpoint => gh(['api', '--paginate', endpoint, '--jq', '.[] | tojson'])
     .split('\n').filter(Boolean).map(line => JSON.parse(line)),
-  raw: endpoint => gh(['api', '-H', 'Accept: application/vnd.github.raw', endpoint])
+  raw: endpoint => gh(['api', '-H', 'Accept: application/vnd.github.raw', endpoint]),
+  // One attempt only: a missing or unreadable file is simply left out.
+  file: endpoint => JSON.parse(run('gh', ['api', endpoint]))
 };
 
-// Same evidence and budget as prepare(); trusted files from the base branch.
+// Same evidence and budget as prepare(); trusted files from the base branch,
+// full changed files (untrusted data) from the PR head SHA.
 // `trustedRef` overrides that branch only for testing before a merge, and must
 // be a branch of the upstream repository that maintainers control.
-function collect(number, api = githubApi, trustedRef = null) {
+async function collect(number, api = githubApi, trustedRef = null) {
   const pr = api.json(`repos/${repo}/pulls/${number}`);
   if (pr.state !== 'open' || pr.draft || pr.base.ref !== 'development') {
     throw new Error('PR is not open, ready for review and against development');
@@ -72,7 +75,11 @@ function collect(number, api = githubApi, trustedRef = null) {
   if (!files.length || files.length >= 3000) throw new Error('file_list_incomplete');
   const ref = encodeURIComponent(trustedRef || pr.base.ref);
   const read = file => api.raw(`repos/${repo}/contents/${file}?ref=${ref}`);
-  const {prompt, system, data, coverage} = review.buildPrompt(pr, files, read);
+  // PR paths are untrusted: encode each segment so none can alter the endpoint.
+  const encodePath = file => file.split('/').map(encodeURIComponent).join('/');
+  const getFile = file =>
+    api.file(`repos/${repo}/contents/${encodePath(file)}?ref=${encodeURIComponent(pr.head.sha)}`);
+  const {prompt, system, data, coverage} = await review.buildReviewPrompt(pr, files, getFile, read);
   if (changed(pr, api.json(`repos/${repo}/pulls/${number}`))) {
     throw new Error('PR changed during collection; rerun');
   }
@@ -136,13 +143,13 @@ function formatSecond({pr, coverage, floor}, raw, reviewer = null) {
     '**Applies only if this SHA matches the current PR head.**\n\n' +
     (reviewer ?
       `Model: ${reviewer.model} (Anthropic Messages API); effort: ${reviewer.effort}.` +
-      ' Run locally by a core maintainer with the same instructions, repository guide and ' +
-      'patches as the Claude report. It did not see that report or any PR comment, but it ' +
+      ' Run locally by a core maintainer with the same instructions, repository guide, ' +
+      'patches and full files as the Claude report. It did not see that report or any PR comment, but it ' +
       'shares its model family, so overlapping findings are weaker evidence than agreement ' +
       'across families.\n\n' :
       `Model: ${model} (Codex CLI); reasoning effort: ${effort}. Run locally by a core ` +
-      'maintainer with the same instructions, repository guide and patches as the Claude ' +
-      'report. It did not see that report or any PR comment, so overlapping findings are ' +
+      'maintainer with the same instructions, repository guide, patches and full files as ' +
+      'the Claude report. It did not see that report or any PR comment, so overlapping findings are ' +
       'independent agreement.\n\n') +
     review.formatCoverage(coverage, max, listed) + review.formatAssessment(data, risk, floor, max));
 }
@@ -212,7 +219,7 @@ async function main(argv) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 's4f-second-review-'));
   console.error(`Collecting PR #${number} from ${repo} (trusted files from its base branch)...`);
   if (trustedRef) console.error(`Testing: trusted files from ${trustedRef}, not the PR's base branch.`);
-  const collected = collect(number, githubApi, trustedRef);
+  const collected = await collect(number, githubApi, trustedRef);
   let body, raw;
   if (choice === 'fable') {
     console.error(`Running ${fable.model} (${fable.effort}); this can take several minutes...`);
