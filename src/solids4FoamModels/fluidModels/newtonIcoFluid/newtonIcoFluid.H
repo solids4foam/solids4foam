@@ -176,6 +176,14 @@ class newtonIcoFluid
         //  role (velocity or pressure)
         const dictionary& highOrderCoeffs(const word& fieldRole) const;
 
+        //- Return true for the patches on which the field fixes the value,
+        //  which are included in the least-squares reconstruction stencils
+        template<class Type>
+        static boolList fixedValuePatchMask
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& field
+        );
+
         //- Calculate the face traction (the stress integrated over each face
         //  with the face quadrature, divided by the face area) and the face
         //  volume flux from the high-order reconstructions of U and p

@@ -28,34 +28,6 @@ License
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-namespace
-{
-    // Include the patches that fix the field value in the least-squares
-    // reconstruction stencils, as solidModel does
-    template<class Type>
-    Foam::boolList fixedValuePatchMask
-    (
-        const Foam::GeometricField<Type, Foam::fvPatchField, Foam::volMesh>&
-            field
-    )
-    {
-        Foam::boolList includePatchInStencils
-        (
-            field.boundaryField().size(),
-            false
-        );
-
-        forAll(includePatchInStencils, patchI)
-        {
-            includePatchInStencils[patchI] =
-                field.boundaryField()[patchI].fixesValue();
-        }
-
-        return includePatchInStencils;
-    }
-}
-
-
 namespace Foam
 {
 
@@ -116,6 +88,25 @@ surfaceScalarField& newtonIcoFluid::rAUf()
     }
 
     return autoPtrRef(rAUfPtr_);
+}
+
+
+template<class Type>
+boolList newtonIcoFluid::fixedValuePatchMask
+(
+    const GeometricField<Type, fvPatchField, volMesh>& field
+)
+{
+    // As in solidModel, the patches that fix the value are in the stencils
+    boolList includePatchInStencils(field.boundaryField().size(), false);
+
+    forAll(includePatchInStencils, patchI)
+    {
+        includePatchInStencils[patchI] =
+            field.boundaryField()[patchI].fixesValue();
+    }
+
+    return includePatchInStencils;
 }
 
 
@@ -230,7 +221,7 @@ void newtonIcoFluid::highOrderFaceFluxes
 
         forAll(faceCells, i)
         {
-            const label faceI = patch.start() + i;
+            const label faceI = patch.patch().start() + i;
             const vector n(faceAreas[faceI]/mag(faceAreas[faceI]));
 
             forAll(faceQuadPoints[faceI], qI)
@@ -1037,7 +1028,7 @@ label newtonIcoFluid::formResidual
     //
     // Check: do we want to include div(gradU.T).. it makes the stencil
     // larger and should be zero anyway, although it may increase accuracy
-    vectorField residual(mesh.nCells(), Zero);
+    vectorField residual(mesh.nCells(), vector::zero);
 
     // Face volume flux of the continuity equation
     surfaceScalarField continuityFlux
