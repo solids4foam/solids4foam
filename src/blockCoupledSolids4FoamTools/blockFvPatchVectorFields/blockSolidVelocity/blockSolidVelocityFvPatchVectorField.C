@@ -303,7 +303,9 @@ blockSolidVelocityFvPatchVectorField::snGrad() const
     const vectorField delta = patch().delta();
 
     // Correction vectors
-    const vectorField k = delta - n*(n&delta);
+    // Non-orthogonal correction vectors from the real face-cell vector
+    // (on OpenFOAM.com, fvPatch::delta() is its normal part only)
+    const vectorField k((I - sqr(n)) & (patch().Cf() - patch().Cn()));
 
     return
     (
