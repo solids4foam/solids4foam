@@ -29,6 +29,7 @@ SourceFiles
 #ifndef leastSquaresS4fVectors_H
 #define leastSquaresS4fVectors_H
 
+#include "compatibilityFunctions.H"
 #include "MeshObject.H"
 #include "fvMesh.H"
 #include "surfaceFields.H"
@@ -203,7 +204,7 @@ public:
                 return tflat;
             }
 #endif
-            return tmp<Field<Type>>(new Field<Type>(vf.primitiveField()));
+            return tmp<Field<Type>>(new Field<Type>(Foam::primitiveField(vf)));
         }
 
         //- Delete the least square vectors when the mesh moves

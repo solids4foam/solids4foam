@@ -906,7 +906,7 @@ void Foam::leastSquaresS4fVectors::calcWideStencilVectors
         const labelListList& cellPoints = mesh.cellPoints();
         const labelListList& pointCells = mesh.pointCells();
 
-        wideC_ = C.primitiveField();
+        wideC_ = Foam::primitiveField(C);
 
         forAll(wideCells_, wcI)
         {
