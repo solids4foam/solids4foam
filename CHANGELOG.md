@@ -797,6 +797,12 @@ release. For complete commit-level details and contributor information, see the
 
 ### Fixed
 
+- `womersleyTube`: the initial solid displacement on the `interface` and
+  `outer` patches read the face centres through a dangling reference to a
+  temporary, which intermittently gave NaN or wrong values and stopped the
+  run at start-up with a floating-point exception (seen with Clang on
+  macOS) (#765).
+
 - `IQNILS`: the `preciceStyleCouplingQR` least-squares solve, per interface
   and with `combinedCouplingSystem`, had the wrong sign and moved the interface
   away from the fixed point. With `residualSumPreconditioning`, the residual
