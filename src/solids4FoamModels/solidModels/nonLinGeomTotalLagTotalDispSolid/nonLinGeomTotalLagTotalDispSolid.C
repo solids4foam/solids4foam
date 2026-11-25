@@ -987,8 +987,8 @@ void Foam::solidModels::nonLinGeomTotalLagTotalDispSolid::updateImpK()
     impKf_ = fvc::interpolate(impK_);
     rImpK_ = 1.0/impK_;
 
-    Info<< "    impK: min " << gMin(impK_.primitiveField())
-        << ", max " << gMax(impK_.primitiveField()) << endl;
+    Info<< "    impK: min " << gMin(Foam::primitiveField(impK_))
+        << ", max " << gMax(Foam::primitiveField(impK_)) << endl;
 }
 
 
@@ -1019,7 +1019,7 @@ pressureStabilisationStiffnessField() const
 
     if (pressureStabilisationStiffnessFactor_ != 1.0)
     {
-        tK.ref() *= pressureStabilisationStiffnessFactor_;
+        tmpRef(tK) *= pressureStabilisationStiffnessFactor_;
     }
 
     return tK;

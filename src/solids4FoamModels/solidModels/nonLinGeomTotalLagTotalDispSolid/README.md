@@ -62,6 +62,8 @@ The runtime type name for this class is
 
 The following `solidModel` options are particularly relevant here:
 
+<!-- markdownlint-disable MD013 -->
+
 | Entry | Default | Relevance |
 | --- | --- | --- |
 | `solutionAlgorithm` | `implicitSegregated` | Selects the solver path |
@@ -81,6 +83,8 @@ The following `solidModel` options are particularly relevant here:
 | `stabilisation` | auto-created if absent | Has `momentum` and `pressure` |
 | `cellDisplacements` | optional | Internal-cell displacement constraints |
 | `solvePressure` | `false` | Pressure unknown, only with `PETScSNES` |
+
+<!-- markdownlint-enable MD013 -->
 
 For `stabilisation`, the code creates a default dictionary if none is
 provided. The default sub-model is `diffStencilLaplacian` with

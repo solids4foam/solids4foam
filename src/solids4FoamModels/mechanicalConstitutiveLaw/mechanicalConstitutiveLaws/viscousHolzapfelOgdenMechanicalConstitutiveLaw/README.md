@@ -78,6 +78,8 @@ run.
 
 ### Model options
 
+<!-- markdownlint-disable MD013 -->
+
 | Entry | Required | Default | Description |
 | --- | --- | --- | --- |
 | `rho` | yes | - | Density, `[1 -3 0 0 0 0 0]` |
@@ -93,6 +95,8 @@ run.
 | `tangentShearModulusMax` | no | unbounded | Upper bound of the local tangent, Pa |
 | `uniformFibreField` | no | `no` | Take `f0` and `s0` from this dictionary |
 | `f0`, `s0` | if uniform | - | Fibre and sheet vectors |
+
+<!-- markdownlint-enable MD013 -->
 
 The default `tangentShearModulus` is `a + (af + as + afs)/6`. `f0` and `s0`
 need not be of unit length: they are normalised before use.
