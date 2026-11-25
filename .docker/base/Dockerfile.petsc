@@ -18,6 +18,11 @@ SHELL ["/bin/bash", "-c"]
 
 ARG PETSC_VERSION=3.24.0
 
+# Number of parallel make jobs; empty uses every CPU the build can see. Set it
+# when building on a shared machine, where docker build is not confined to a
+# scheduler's CPU allocation
+ARG BUILD_JOBS=
+
 # ---------------------------------------------------------------------
 # System dependencies for PETSc
 # ---------------------------------------------------------------------
@@ -59,10 +64,11 @@ RUN git clone --depth 1 -b v${PETSC_VERSION} \
       --download-scalapack \
       --download-hwloc \
       --download-cmake \
+      --with-make-np="${BUILD_JOBS:-$(nproc)}" \
       COPTFLAGS='-O3' \
       CXXOPTFLAGS='-O3' \
       FOPTFLAGS='-O3' && \
-    make -j"$(nproc)" && \
+    make -j"${BUILD_JOBS:-$(nproc)}" && \
     make install && \
     cd / && \
     rm -rf /opt/petsc-src
