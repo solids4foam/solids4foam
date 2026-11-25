@@ -71,7 +71,8 @@ jobs:
           docker images
           docker run --rm "${GMSH_IMAGE}" bash -c \
               'source /usr/lib/openfoam/openfoam*/etc/bashrc; \
-               set -e; foamVersion; cat /etc/os-release | head -2; \
+               set -e; echo "OpenFOAM-${WM_PROJECT_VERSION}"; \
+               command -v simpleFoam; grep PRETTY /etc/os-release; \
                test -f "${PETSC_DIR}/lib/libpetsc.so"; gmsh --version'
 
       - name: Log in to Docker Hub
