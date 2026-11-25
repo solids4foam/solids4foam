@@ -14,7 +14,7 @@ jobs:
       matrix:
         container-image:
           - name: "OpenFOAM-v2512-PETSc"
-            image: "philippic/openfoam-v2512:ubuntu-22.04-petsc-no-openmp-system-blas-gmsh"
+            image: "philippic/openfoam-v2512:ubuntu-24.04-petsc-no-openmp-system-blas-gmsh"
             source: "/usr/lib/openfoam/openfoam2512/etc/bashrc"
             buildflags: "-j"
 
