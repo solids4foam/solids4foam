@@ -28,7 +28,10 @@ for each order:
    step and to its position after them (`-moveAfterDdt`), as the FSI
    interfaces' final mesh correction (`additionalMeshCorrection`) moves it
    after the last ddt call of a step: the implicit form and the conservation
-   law, to `1e-9`.
+   law, to `1e-9`;
+5. in every run, that `fvc::ddt(psi)` rebuilt from the weights returned by
+   `fieldWeights(psi)` and the scheme's volume levels agrees with
+   `fvc::ddt(psi)` to `1e-9`, and that the order of the final step is `q`.
 
 The errors are relative to the largest value of the quantity compared, and
 the derivative errors are measured over the second half of the run, after

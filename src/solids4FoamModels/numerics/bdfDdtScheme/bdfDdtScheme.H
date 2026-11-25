@@ -77,8 +77,11 @@ Description
     (U_0, U_0_0, ...) into the start time, which OpenFOAM reads back with
     distinct time indices - or start from a solution whose low derivatives
     vanish at t = 0. On a static mesh a restart finds the old-time fields
-    the previous run wrote and resumes at full order; on a moving mesh it
-    does not (see Moving meshes).
+    the previous run wrote and resumes at full order, also when that run was
+    itself restarted; on a moving mesh it does not (see Moving meshes).
+    OpenFOAM (v2412, for example) does not register again the old levels
+    below the first that it reads back, which would then not be written
+    again, so the scheme registers them.
 
     Fields without stored history. A field may have fewer stored old levels
     than U, e.g. a rho derived rather than read on restart. Its copied levels
@@ -169,13 +172,18 @@ Description
 
     The flux corrections used by the pressure-velocity coupling (ddtCorr) are
     the same q-th order combination applied to the old fluxes and the old
-    interpolated velocities, the direct generalisation of backward's.
+    interpolated velocities, the direct generalisation of backward's. On a
+    moving mesh the Uf form projects the old face velocities on the current
+    face areas and uses the default ddtCouplingCoeff, as backward does.
+    Whether this term limits the order of the pressure on a moving mesh has
+    not been checked in a flow.
 
     Restart on a moving mesh. The volume history is not written, and fvMesh
     writes the mesh flux but, in OpenFOAM-v2412 for example, not its old
     levels, so after a restart the order on a moving mesh ramps up from
-    Euler again over the first steps, as on a fresh start, although the
-    fields' old levels are read back.
+    Euler again over the first steps, as on a fresh start, although the old
+    levels of the fields and of the fluxes (U_0, Uf_0, ...) are read back
+    and used as the order ramps up.
 
     FSI. Parts of the fluid models and FSI boundary conditions choose their
     form by the name of the ddt scheme, "Euler" or "backward": the Robin
@@ -184,7 +192,8 @@ Description
     of elasticWallPressure. With BDF they take their Euler form or skip the
     update, so the Robin-Neumann coupling is not yet consistent with a fluid
     ddt of order 2 or above, and BDF 2 does not reproduce backward exactly in
-    FSI.
+    FSI. Code that must use the weights of the scheme can take them from
+    fieldWeights.
 
 Author
     David Kelly, UCD.
@@ -372,6 +381,20 @@ public:
         {
             return fv::ddtScheme<Type>::mesh();
         }
+
+        //- The difference weights a_0..a_q that fvm::ddt(vf) and
+        //  fvc::ddt(vf) apply on this step, for code that must use the same
+        //  weights as the scheme, e.g. a time history of a flux correction.
+        //  The order q is that of the step: it ramps up during start-up and
+        //  is limited by the old levels of vf and, on a moving mesh, by the
+        //  volume levels. On a moving mesh level k of the internal field is
+        //  also weighted by V^(n+1-k)/V^(n+1), which is not included. Like
+        //  the ddt terms, it creates the old levels of vf up to the order
+        //  of the scheme.
+        scalarList fieldWeights
+        (
+            const GeometricField<Type, fvPatchField, volMesh>& vf
+        ) const;
 
         tmp<GeometricField<Type, fvPatchField, volMesh>> fvcDdt
         (

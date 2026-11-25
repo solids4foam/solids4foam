@@ -39,7 +39,11 @@ Description
         fvc::ddt(psi): the implicit and explicit forms must agree to
         round-off;
       - fvc::ddt(1) against div(meshPhi): the geometric conservation law,
-        which the scheme's mesh flux must satisfy to round-off.
+        which the scheme's mesh flux must satisfy to round-off;
+      - fvc::ddt(psi) against the formula applied with the weights of
+        fieldWeights(psi) and the scheme's volume levels: the accessor must
+        return the weights the scheme used, and its order (printed for the
+        final step) must have reached q.
 
     The old-time chains of psi and of the scheme's volumes are created before
     the first step, as a solver's first call to fvm::ddt does, so the order
@@ -211,6 +215,8 @@ int main(int argc, char *argv[])
     scalarList ddtErr(maxOrder, 0.0);
     scalarList fvmErr(maxOrder, 0.0);
     scalarList gclErr(maxOrder, 0.0);
+    scalarList weightsErr(maxOrder, 0.0);
+    labelList finalOrder(maxOrder, 0);
     scalarList ddtScale(maxOrder, 0.0);
     scalarList gclScale(maxOrder, 0.0);
     scalar geomErr = 0;
@@ -268,6 +274,27 @@ int main(int argc, char *argv[])
                 );
             }
 
+            // fvc::ddt(psi) rebuilt from the weights of fieldWeights and the
+            // volume levels the scheme keeps
+            const scalarList a(scheme.fieldWeights(psi));
+            finalOrder[q - 1] = a.size() - 1;
+            const volScalarField& Vs =
+                mesh.lookupObject<volScalarField>("bdfDdt:V");
+            scalarField VPsi(a[0]*mesh.V()*psi.primitiveField());
+            const volScalarField* psik = &psi;
+            const volScalarField* Vk = &Vs;
+            for (label k = 1; k < a.size(); ++k)
+            {
+                psik = &psik->oldTime();
+                Vk = &Vk->oldTime();
+                VPsi += a[k]*Vk->primitiveField()*psik->primitiveField();
+            }
+            weightsErr[q - 1] = max
+            (
+                weightsErr[q - 1],
+                gMax(mag(VPsi/(deltaT*mesh.V()) - ddt.primitiveField()))
+            );
+
             const fvScalarMatrix M(scheme.fvmDdt(psi));
             const scalarField fvmDdt
             (
@@ -306,6 +333,7 @@ int main(int argc, char *argv[])
     {
         ddtErr[q - 1] /= max(ddtScale[q - 1], SMALL);
         fvmErr[q - 1] /= max(ddtScale[q - 1], SMALL);
+        weightsErr[q - 1] /= max(ddtScale[q - 1], SMALL);
         gclErr[q - 1] /= max(gclScale[q - 1], SMALL);
     }
 
@@ -324,7 +352,9 @@ int main(int argc, char *argv[])
         }
 
         Info<< " fvm-fvc " << fvmErr[q - 1]
-            << " GCL " << gclErr[q - 1] << nl;
+            << " GCL " << gclErr[q - 1]
+            << " weights " << weightsErr[q - 1]
+            << " order " << finalOrder[q - 1] << nl;
     }
 
     Info<< nl << "End" << nl << endl;

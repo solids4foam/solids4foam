@@ -126,6 +126,21 @@ template<class GeoField>
 void bdfDdtScheme<Type>::touch(const GeoField& vf) const
 {
     level(vf, order_);
+
+    // On a restart OpenFOAM (v2412, for example) reads the old levels
+    // recursively and constructs each level below the first more than once.
+    // The copy it keeps cannot register under the name an earlier copy still
+    // holds, so it would not be written again, and a restart from a later
+    // write time would lose that level. Register such levels again.
+    for (label k = 1; k <= order_; ++k)
+    {
+        const GeoField& f = level(vf, k);
+
+        if (f.registerObject() && !f.registered())
+        {
+            const_cast<GeoField&>(f).checkIn();
+        }
+    }
 }
 
 
@@ -589,6 +604,16 @@ IOobject bdfDdtScheme<Type>::ddtIOobject(const word& name) const
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+template<class Type>
+scalarList bdfDdtScheme<Type>::fieldWeights
+(
+    const GeometricField<Type, fvPatchField, volMesh>& vf
+) const
+{
+    return weights(order(vf));
+}
+
 
 template<class Type>
 tmp<GeometricField<Type, fvPatchField, volMesh>>

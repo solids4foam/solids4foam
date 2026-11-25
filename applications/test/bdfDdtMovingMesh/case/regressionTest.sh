@@ -8,7 +8,8 @@ IFS=$'\n\t'
 # that the cell volumes are known in closed form: the observed order of BDF 1
 # to 6 from four time steps, exactness for a polynomial motion and field,
 # and, with the mesh moved again after the last ddt call of each step, the
-# implicit form and the geometric conservation law. See README.md
+# implicit form, the geometric conservation law and the weights returned by
+# fieldWeights. See README.md
 # ============================================================
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -79,14 +80,17 @@ do
     LOGS+=("log.${APP}.moveAfterDdt.dt${dt}")
 done
 
-# Each log has one line per order, "BDF q: [ddt error e] fvm-fvc f GCL g".
+# Each log has one line per order,
+# "BDF q: [ddt error e] fvm-fvc f GCL g weights w order o".
 # Checks, for each order q:
 #   - the observed order from the two smallest time steps is at least
 #     q - 0.5, unless the error has reached the round-off floor (1e-9);
 #   - fvm-fvc and GCL are below 1e-9 in the convergence runs;
 #   - the polynomial run has a ddt error, fvm-fvc and GCL below 1e-9;
 #   - the runs with the mesh moved after the ddt terms have fvm-fvc and GCL
-#     below 1e-9
+#     below 1e-9;
+#   - in every run, fvc::ddt rebuilt from the weights of fieldWeights agrees
+#     with fvc::ddt to 1e-9 and the order of the final step is q
 # The checks fail if a log does not have all six orders.
 # The time steps as one string, for the table heading
 DT_LIST=$(printf '%s ' "${DELTA_TS[@]}")
@@ -143,6 +147,8 @@ FNR == 1 { file++ }
     ddt[file, q] = value("error")
     fvm[file, q] = value("fvm-fvc")
     gcl[file, q] = value("GCL")
+    wts[file, q] = value("weights")
+    ord[file, q] = value("order")
 }
 
 END {
@@ -204,11 +210,24 @@ END {
         check(mf < tol && mg < tol, \
             sprintf("BDF %d: moved after ddt, fvm-fvc %.1e, GCL %.1e < %g", \
                 q, mf, mg, tol))
+
+        mw = maxOver(wts, 1, poly + nMove, q)
+        orderReached = 1
+        for (f = 1; f <= poly + nMove; f++)
+        {
+            if (ord[f, q] != q)
+            {
+                orderReached = 0
+            }
+        }
+        check(mw < tol && orderReached, \
+            sprintf("BDF %d: fieldWeights, ddt from weights %.1e < %g, " \
+                "final order %d", q, mw, tol, ord[poly, q]))
     }
 
     print "BDF moving-mesh checks: " (nPass + 0) " passed, " \
         (nFail + 0) " failed"
-    exit (nFail > 0 || nPass != 24)
+    exit (nFail > 0 || nPass != 30)
 }
 ' "${LOGS[@]}" > log.checks || status=$?
 

@@ -110,13 +110,14 @@ release. For complete commit-level details and contributor information, see the
   `BDF 2` using the same variable-step coefficients as `backward`; orders 3
   and above require a constant time-step, so `adjustTimeStep` cannot be used
   with them. They are also not A-stable, and a warning is printed when one is
-  selected. It is the
-  first-derivative counterpart of the `BDF` d2dt2 scheme, for fluids, and is
-  currently only available for OpenFOAM.com (#638). `Test-fvcDdt`, run by
-  the `decayingTaylorGreenVortex` regression test, checks the start-up order
+  selected. A restart on a static mesh resumes at full order, also from a
+  time written after an earlier restart. It is the first-derivative
+  counterpart of the `BDF` d2dt2 scheme, for fluids, and is currently only
+  available for OpenFOAM.com (#638). `Test-fvcDdt`, run by the
+  `decayingTaylorGreenVortex` regression test, checks the start-up order
   ramp, exactness for time polynomials and the observed order of accuracy
-  for orders 1 to 6, restart, and a density or flux without stored old-time
-  levels.
+  for orders 1 to 6, restart, also twice, and a density or flux without
+  stored old-time levels.
 - The `BDF` ddt scheme works on moving meshes: the formula is applied to the
   cell integrals with the volumes of the previous steps, which the scheme
   keeps itself (fvMesh stores only two), and its mesh flux is the combination
@@ -126,13 +127,15 @@ release. For complete commit-level details and contributor information, see the
   ddt call of a step (`additionalMeshCorrection`). On a moving mesh a restart
   ramps the order up from Euler again, and the Robin-Neumann FSI coupling,
   which selects its form by the names `Euler` and `backward`, is not yet
-  consistent with `BDF`. The `bdfDdtMovingMesh` regression test
+  consistent with `BDF`. `fieldWeights(vf)` returns the weights the scheme
+  applies to `vf` on the current step, for code that must use the same
+  ones. The `bdfDdtMovingMesh` regression test
   (`applications/test/bdfDdtMovingMesh/case`) runs `Test-bdfDdtMovingMesh`,
   which checks the observed orders 1 to 6, the conservation law, the
   agreement of the implicit and explicit forms and exactness for time
   polynomials on a prescribed mesh motion, against the exact rate of change
-  of the cell integrals, and the conservation law with the mesh moved after
-  the last ddt call of each step.
+  of the cell integrals, the conservation law with the mesh moved after the
+  last ddt call of each step, and the weights returned by `fieldWeights`.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A
