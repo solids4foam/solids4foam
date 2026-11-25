@@ -118,15 +118,20 @@ and the series is flagged.
 
 ## Results
 
-OpenFOAM v2512, GCC, PETSc 3.24, this branch merged with development
-`e123ecf75` (which includes [#671][pr671]), Robin–Neumann, μ = 5 Pa s.
-`./AllverifyTraction --cores 20` ran end-to-end with exit status 0 in
-1 h 57 min, and every check passed.
+OpenFOAM v2512, Robin–Neumann, μ = 5 Pa s, on two platforms, which give the
+same values to the digits shown:
+
+- Linux, GCC, PETSc 3.24: this branch merged with development `e123ecf75`
+  (which includes [#671][pr671]); `./AllverifyTraction --cores 20`, 1 h 57 min;
+- macOS arm64, Clang 21, PETSc 3.22: this branch at `9923ce77c` with
+  [#766][pr766] applied; `--cores 14`, 1 h 14 min.
+
+Both ran end-to-end with exit status 0, and every check passed.
 
 <!-- markdownlint-disable MD013 -->
 | Quantity | Value | Basis |
 |---|---|---|
-| Transferred viscous traction vs momentum wall flux | ≤ 3.3e-14 (all runs) | measured |
+| Transferred viscous traction vs momentum wall flux | ≤ 5e-14 (all runs) | measured |
 | Applied solid vs transferred fluid traction | shear ≤ 7e-12 of \|σ_rx\|; normal 1.5e-6 of \|p\| in every run, unchanged (4e-11) with tolerances × 0.01 | measured |
 | Normal viscous stress / exact 2μ∂u_r/∂r | 0.55 − 0.35i, 0.78 − 0.19i, 0.89 − 0.10i on m1/m2/m4 | measured |
 | | → 1.01 + 0.00i (observed order 0.96) | extrapolated |
@@ -161,7 +166,7 @@ The attenuation (Im k) error at m4, 200 steps/period is −2.05e-3:
 | temporal | −0.67e-3 | m4/200 vs m4/400 with q = 2 |
 | spatial | unresolved; sensitivity \|E(m4) − E(m2)\| = 0.18e-3, not a bound | m1/m2/m4 series non-monotone (−2.10, −2.23, −2.05e-3) |
 | amplitude-dependent | −1.10e-3 | linear fit over a = 0.5–4 at m2/200 (exponent 1.00–1.01); the m1 slope differs by 0.5 % |
-| residual | −0.22e-3 ± about 0.2e-3 | remainder; uncertainty = spatial sensitivity + m1/m2 amplitude-slope difference |
+| residual | −0.22e-3 ± 0.19e-3 | remainder; uncertainty = spatial sensitivity + m1/m2 amplitude-slope difference |
 <!-- markdownlint-enable MD013 -->
 
 The amplitude-dependent part is linear and odd in the amplitude, and does not
@@ -195,3 +200,4 @@ and 400 steps/period (observed order 2.05).
 [i650]: https://github.com/solids4foam/solids4foam/issues/650
 [i670]: https://github.com/solids4foam/solids4foam/issues/670
 [pr671]: https://github.com/solids4foam/solids4foam/pull/671
+[pr766]: https://github.com/solids4foam/solids4foam/pull/766
