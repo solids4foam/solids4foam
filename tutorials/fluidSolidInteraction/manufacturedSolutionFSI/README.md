@@ -151,8 +151,11 @@ cd derivation
 ./run_checks.sh     # about six minutes; Python 3 with sympy and symengine
 ```
 
-The default call, the full variant, writes `derivation/generated/` and
-reproduces `src/mmsFsiExact.H` and `derivation/reference_values.txt`. Its
+The default call, the full variant, writes `derivation/generated/` with the
+same solution as `src/mmsFsiExact.H` and `derivation/reference_values.txt`.
+The files need not be byte-identical, as the order of the common
+subexpressions and the last of the 40 digits can change from run to run;
+`check_generated.C` compares the header with the 40-digit values. Its
 arguments select other variants, which the case does not use: for example
 `./run_checks.sh generated_flat 1 1 flat` gives the `flat` variant, in which
 the interface stays flat and moves only vertically, and the density and

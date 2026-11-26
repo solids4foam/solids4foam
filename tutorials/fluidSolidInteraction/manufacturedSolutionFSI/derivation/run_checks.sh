@@ -11,9 +11,10 @@
 # symbolic and 40-digit checks and writes <outDir>/mmsFsiExact.H and
 # <outDir>/reference_values.txt; check_generated.C then checks the generated
 # header independently. The logs are <outDir>/log.derive and
-# <outDir>/log.check. The
-# full variant with the default parameters reproduces ../src/mmsFsiExact.H
-# and reference_values.txt; copy them there to update the case.
+# <outDir>/log.check. The full variant with the default parameters gives the
+# solution of ../src/mmsFsiExact.H and reference_values.txt (the order of the
+# common subexpressions can differ between runs); copy them there to update
+# the case.
 #
 # Requires Python 3 with sympy and symengine (PYTHON, default python3) and a
 # C++17 compiler (CXX, default c++). Each variant takes about six minutes.
