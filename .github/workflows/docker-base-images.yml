@@ -21,6 +21,10 @@ on:
       - ".docker/base/**"
       - ".github/workflows/docker-base-images.yml"
 
+# Only the checkout needs the GITHUB_TOKEN; Docker Hub uses its own secrets
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build ${{ matrix.image.repository }}:${{ matrix.image.tag }}
