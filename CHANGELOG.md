@@ -827,6 +827,13 @@ release. For complete commit-level details and contributor information, see the
     velocity. The density comes from the `rho` field or the fluid's
     `transportProperties`, which are no longer read from disk at every
     update.
+- `elasticWallPressure` (Robin-Neumann coupling) includes the same viscous
+  term by default: the Robin condition uses the solid normal acceleration
+  minus the normal viscous term, and `pimpleFluid` and `interFluid` add the
+  corresponding flux, so that the converged interface flux still equals the
+  mesh flux. **This changes the results of existing Robin-Neumann cases.**
+  `viscousTerm no` restores the earlier condition exactly. The viscous term
+  of both conditions is evaluated by the new `wallNormalViscousTerm`.
 - A high-order (face-quadrature) parallel run no longer stops at the end of the
   first time step when a processor holds no cells. The constitutive law manager
   decided from the row count whether a compact integration-point layout was
