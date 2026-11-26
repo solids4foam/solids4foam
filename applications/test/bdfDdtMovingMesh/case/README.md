@@ -29,7 +29,11 @@ for each order:
    interfaces' final mesh correction (`additionalMeshCorrection`) moves it
    after the last ddt call of a step: the implicit form and the conservation
    law, to `1e-9`;
-5. in every run, that `fvc::ddt(psi)` rebuilt from the weights returned by
+5. with `meshPhi` first called in the second half of the run
+   (`-lateMeshPhi`), after the order of the ddt terms has ramped up: the
+   conservation law from then on, to `1e-9`, which holds only if `meshPhi`
+   finds a genuine history of mesh fluxes as deep as the volumes';
+6. in every run, that `fvc::ddt(psi)` rebuilt from the weights returned by
    `fieldWeights(psi)` and the scheme's volume levels agrees with
    `fvc::ddt(psi)` to `1e-9`, and that the order of the final step is `q`.
 

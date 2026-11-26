@@ -30,7 +30,7 @@ Description
     order q under test. The finite-volume time derivative on a moving mesh
     is that of the cell integral, (1/V) d(V psi)/dt = psi' + psi V'/V, and
     BDFq must reproduce it to order q, exactly when V psi is a polynomial of
-    degree q or less. Three things are compared, as maxima over the run
+    degree q or less. Four things are compared, as maxima over the run
     (the derivative over its second half, after the order has ramped up),
     normalised by the maxima of the quantities themselves, for every order:
 
@@ -59,9 +59,16 @@ Description
     exact one, but the implicit form and the geometric conservation law
     must still hold to round-off.
 
+    With -lateMeshPhi, meshPhi is first called in the second half of the
+    run, after the order of the ddt terms has ramped up, and the
+    conservation law is measured from then on. The mesh flux must then have
+    a genuine history as deep as the volumes', or meshPhi would weight
+    copied levels as older fluxes, or fall to a lower order than fvc::ddt(1)
+    on its first steps.
+
     Usage: Test-bdfDdtMovingMesh [-deltaT dt] [-endTime T] [-poly]
-    [-moveAfterDdt] prints one line per order; see case/regressionTest.sh
-    for the convergence study.
+    [-moveAfterDdt] [-lateMeshPhi] prints one line per order; see
+    case/regressionTest.sh for the convergence study.
 
 \*---------------------------------------------------------------------------*/
 
@@ -95,6 +102,12 @@ int main(int argc, char *argv[])
         "evaluate the ddt terms 2% past the mesh position, then move the mesh"
         " to it: checks the implicit form and the conservation law only"
     );
+    argList::addBoolOption
+    (
+        "lateMeshPhi",
+        "call meshPhi only from the second half of the run, and measure the"
+        " conservation law from then on"
+    );
 
     #include "setRootCase.H"
     #include "createTime.H"
@@ -110,6 +123,7 @@ int main(int argc, char *argv[])
     }
     const bool poly = args.found("poly");
     const bool moveAfterDdt = args.found("moveAfterDdt");
+    const bool lateMeshPhi = args.found("lateMeshPhi");
 
     const scalar deltaT = runTime.deltaTValue();
     const label nSteps = round(runTime.endTime().value()/deltaT);
@@ -120,7 +134,10 @@ int main(int argc, char *argv[])
     const scalar eps = 0.2;
     const scalar omega = 2*constant::mathematical::pi;
 
-    auto g = [&](const scalar t) { return poly ? t : Foam::sin(omega*t); };
+    auto g = [&](const scalar t)
+    {
+        return poly ? t : Foam::sin(omega*t);
+    };
     auto dg = [&](const scalar t)
     {
         return poly ? 1.0 : omega*Foam::cos(omega*t);
@@ -306,6 +323,11 @@ int main(int argc, char *argv[])
                 gMax(mag(fvmDdt - ddt.primitiveField()))
             );
 
+            if (lateMeshPhi && !measure)
+            {
+                continue;
+            }
+
             const volScalarField ddtOne
             (
                 scheme.fvcDdt(dimensionedScalar(dimless, 1))
@@ -340,6 +362,7 @@ int main(int argc, char *argv[])
     Info<< "deltaT " << deltaT << " steps " << nSteps
         << " motion " << (poly ? "polynomial" : "smooth")
         << (moveAfterDdt ? ", moved after the ddt terms" : "")
+        << (lateMeshPhi ? ", meshPhi first called late" : "")
         << " geometry error " << geomErr << nl;
 
     for (label q = 1; q <= maxOrder; ++q)

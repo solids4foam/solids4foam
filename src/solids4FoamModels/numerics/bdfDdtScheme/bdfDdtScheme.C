@@ -233,6 +233,13 @@ const volScalarField& bdfDdtScheme<Type>::cellVolumes() const
     if (meshMoved())
     {
         ptr->oldTime().primitiveFieldRef() = mesh().V0();
+
+        // Start the history of the mesh flux with that of the volumes, so
+        // that meshPhi finds the old mesh fluxes it needs even if it is
+        // first called on a later step. fvMesh shifts the levels once they
+        // exist. The flux has been set on this step, so fvMesh::phi() has
+        // no side effect here.
+        touch(mesh().phi());
     }
 
     return *ptr;
@@ -253,6 +260,17 @@ bool bdfDdtScheme<Type>::meshMoved() const
     return
         tmeshPhi.get()
      && tmeshPhi.get()->timeIndex() == mesh().time().timeIndex();
+}
+
+
+template<class Type>
+label bdfDdtScheme<Type>::meshFluxLevels() const
+{
+    const surfaceScalarField& phi = mesh().phi();
+
+    const label n = levels(phi);
+
+    return level(phi, 1).timeIndex() == phi.timeIndex() ? 0 : n;
 }
 
 
@@ -1185,10 +1203,16 @@ tmp<surfaceScalarField> bdfDdtScheme<Type>::meshPhi
     // and the mesh flux of step n+1-j integrates to that step's change of
     // volume over its own dt, so meshPhi = sum_j b_j (dt_j/dt) meshPhi^(n+1-j)
     // over the q steps used. Only BDF 2 may have dt_1 != dt.
-    const scalarList a(weights(order(vf)));
+    //
+    // Order q uses the mesh fluxes of q - 1 old steps, so the order is also
+    // limited by the genuine old levels of the mesh flux: a copied level
+    // must not be weighted as an older flux. The history of the mesh flux
+    // starts with that of the volumes (see cellVolumes), so this limit only
+    // acts if the mesh flux has fewer levels, e.g. if no ddt term saw the
+    // moved mesh before meshPhi was first called.
+    const label q = order(vf);
     const surfaceScalarField& phi = mesh().phi();
-
-    touch(phi);
+    const scalarList a(weights(min(q, meshFluxLevels() + 1)));
 
     scalar b = a[0];
 

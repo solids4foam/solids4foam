@@ -124,12 +124,14 @@ release. For complete commit-level details and contributor information, see the
   of the stored mesh fluxes that satisfies the geometric conservation law
   exactly, reducing to `backward`'s at order 2. The volume history holds the
   volumes each step ended with, also when the mesh moves again after the last
-  ddt call of a step (`additionalMeshCorrection`). On a moving mesh a restart
-  ramps the order up from Euler again. The Robin-Neumann FSI coupling and the
-  FSI wall conditions select their form by the names `Euler` and `backward`,
-  so they now stop with a fatal error if the fluid ddt is `BDF`, rather than
-  quietly taking their Euler form. `fieldWeights(vf)` returns the weights the
-  scheme
+  ddt call of a step (`additionalMeshCorrection`). The mesh-flux history
+  starts with the volume history, and the order of the mesh flux is limited
+  by its genuine old levels, so the conservation law also holds when
+  `meshPhi` is first called late. On a moving mesh a restart ramps the order
+  up from Euler again. The Robin-Neumann FSI coupling and the FSI wall
+  conditions select their form by the names `Euler` and `backward`, so they
+  now stop with a fatal error if the fluid ddt is `BDF`, rather than quietly
+  taking their Euler form. `fieldWeights(vf)` returns the weights the scheme
   applies to `vf` on the current step, for code that must use the same
   ones. The `bdfDdtMovingMesh` regression test
   (`applications/test/bdfDdtMovingMesh/case`) runs `Test-bdfDdtMovingMesh`,
@@ -137,7 +139,8 @@ release. For complete commit-level details and contributor information, see the
   agreement of the implicit and explicit forms and exactness for time
   polynomials on a prescribed mesh motion, against the exact rate of change
   of the cell integrals, the conservation law with the mesh moved after the
-  last ddt call of each step, and the weights returned by `fieldWeights`.
+  last ddt call of each step and with `meshPhi` first called late, and the
+  weights returned by `fieldWeights`.
 - A method of manufactured solutions tutorial for finite strains,
   `tutorials/solids/hyperelasticity/manufacturedSolution`, with a
   compressible neo-Hookean solid and the total Lagrangian solid model. A

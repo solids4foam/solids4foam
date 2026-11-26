@@ -9,7 +9,8 @@ IFS=$'\n\t'
 # to 6 from four time steps, exactness for a polynomial motion and field,
 # and, with the mesh moved again after the last ddt call of each step, the
 # implicit form, the geometric conservation law and the weights returned by
-# fieldWeights. See README.md
+# fieldWeights; the conservation law also with meshPhi first called late in
+# the run. See README.md
 # ============================================================
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -69,6 +70,15 @@ do
         || failed "${APP} -deltaT ${dt} -moveAfterDdt"
 done
 
+# meshPhi first called in the second half of the run
+LATE_DTS=(0.05)
+for dt in "${LATE_DTS[@]}"
+do
+    solids4Foam::runApplication -s "lateMeshPhi.dt${dt}" "${APP}" \
+        -deltaT "${dt}" -lateMeshPhi \
+        || failed "${APP} -deltaT ${dt} -lateMeshPhi"
+done
+
 LOGS=()
 for dt in "${DELTA_TS[@]}"
 do
@@ -78,6 +88,10 @@ LOGS+=("log.${APP}.poly")
 for dt in "${MOVE_DTS[@]}"
 do
     LOGS+=("log.${APP}.moveAfterDdt.dt${dt}")
+done
+for dt in "${LATE_DTS[@]}"
+do
+    LOGS+=("log.${APP}.lateMeshPhi.dt${dt}")
 done
 
 # Each log has one line per order,
@@ -89,6 +103,8 @@ done
 #   - the polynomial run has a ddt error, fvm-fvc and GCL below 1e-9;
 #   - the runs with the mesh moved after the ddt terms have fvm-fvc and GCL
 #     below 1e-9;
+#   - the runs with meshPhi first called late have fvm-fvc and GCL below
+#     1e-9;
 #   - in every run, fvc::ddt rebuilt from the weights of fieldWeights agrees
 #     with fvc::ddt to 1e-9 and the order of the final step is q
 # The checks fail if a log does not have all six orders.
@@ -98,6 +114,7 @@ DT_LIST=$(printf '%s ' "${DELTA_TS[@]}")
 awk \
     -v nConv="${#DELTA_TS[@]}" \
     -v nMove="${#MOVE_DTS[@]}" \
+    -v nLate="${#LATE_DTS[@]}" \
     -v dtList="${DT_LIST% }" \
 '
 function value(name,    i)
@@ -155,6 +172,7 @@ END {
     tol = 1e-9
     roundOff = 1e-9
     poly = nConv + 1
+    nRuns = nConv + 1 + nMove + nLate
     gsub(" ", ", ", dtList)
 
     printf "order | ddt error at dt = %s | observed orders\n", dtList
@@ -162,7 +180,7 @@ END {
     for (q = 1; q <= 6; q++)
     {
         complete = 1
-        for (f = 1; f <= nConv + 1 + nMove; f++)
+        for (f = 1; f <= nRuns; f++)
         {
             if (!seen[f, q])
             {
@@ -211,9 +229,15 @@ END {
             sprintf("BDF %d: moved after ddt, fvm-fvc %.1e, GCL %.1e < %g", \
                 q, mf, mg, tol))
 
-        mw = maxOver(wts, 1, poly + nMove, q)
+        mf = maxOver(fvm, poly + nMove + 1, nRuns, q)
+        mg = maxOver(gcl, poly + nMove + 1, nRuns, q)
+        check(mf < tol && mg < tol, \
+            sprintf("BDF %d: meshPhi first called late, fvm-fvc %.1e, " \
+                "GCL %.1e < %g", q, mf, mg, tol))
+
+        mw = maxOver(wts, 1, nRuns, q)
         orderReached = 1
-        for (f = 1; f <= poly + nMove; f++)
+        for (f = 1; f <= nRuns; f++)
         {
             if (ord[f, q] != q)
             {
@@ -227,7 +251,7 @@ END {
 
     print "BDF moving-mesh checks: " (nPass + 0) " passed, " \
         (nFail + 0) " failed"
-    exit (nFail > 0 || nPass != 30)
+    exit (nFail > 0 || nPass != 36)
 }
 ' "${LOGS[@]}" > log.checks || status=$?
 

@@ -166,9 +166,32 @@ Description
     which satisfies the geometric conservation law exactly, as the mesh flux
     of each step integrates to that step's change of volume, and is
     backward's 3/2 meshPhi - 1/2 meshPhi^0 at order 2 (its variable-step
-    form too). The test application Test-bdfDdtMovingMesh checks the orders,
-    the conservation law and the implicit form on a prescribed mesh motion,
-    also with the mesh moved again after the last ddt call of each step.
+    form too). The old levels of the mesh flux are created with the volume
+    history, on the first ddt call after the mesh has moved, so meshPhi has
+    them even if it is first called on a later step. Its order is also
+    limited by the genuine old mesh fluxes, so a copied level is never
+    weighted as an older flux. The test application Test-bdfDdtMovingMesh
+    checks the orders, the conservation law and the implicit form on a
+    prescribed mesh motion, also with the mesh moved again after the last
+    ddt call of each step and with meshPhi first called late in the run.
+
+    fvc::ddt of a constant has no history of its own, so it takes its order
+    from the volume levels alone. While a field's own history is shorter
+    than the volumes' (its first steps, if it is created after the mesh
+    starts moving), that order can be above the field's. The conservation
+    law a solver relies on holds between fvm::ddt(vf) and meshPhi(vf),
+    which share the field's order.
+
+    Topology changes. On a static mesh that changes topology (e.g.
+    dynamicRefineFvMesh, which does not move the points) the scheme uses no
+    volume history and, like backward, works on the old levels of the
+    fields as OpenFOAM maps them. On a moving mesh that also changes
+    topology, bdfDdt:V and its old levels are mapped like any registered
+    field, so the volumes of split or merged cells are not their true old
+    volumes, and the order and the conservation law are not guaranteed on
+    the steps after a change (backward has the same issue with fvMesh's
+    V0 and V00, which are mapped by cell label). This combination has not
+    been tested.
 
     The flux corrections used by the pressure-velocity coupling (ddtCorr) are
     the same q-th order combination applied to the old fluxes and the old
@@ -273,13 +296,19 @@ class bdfDdtScheme
 
         //- The registered field of cell volumes, set to the current volumes,
         //  with its old levels: V^(n+1-k) is level(cellVolumes(), k). Level
-        //  1 is set from fvMesh's V0 once the mesh has moved on this step.
+        //  1 is set from fvMesh's V0 once the mesh has moved on this step,
+        //  and the old levels of the mesh flux are created then as well.
         const volScalarField& cellVolumes() const;
 
         //- Whether the mesh has moved on this time step, i.e. the mesh flux
         //  has been set on it. Checked without the side effects of
         //  fvMesh::phi().
         bool meshMoved() const;
+
+        //- Number of genuine old levels of the mesh flux, up to order_. On
+        //  the step the mesh flux is created on, its level 1 is a copy of
+        //  the current flux, not the previous step's, so there are none.
+        label meshFluxLevels() const;
 
         //- Order usable on this step for a formula involving two fields:
         //  the lower of their orders
