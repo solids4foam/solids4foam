@@ -47,9 +47,24 @@ solvers
 PIMPLE
 {
     momentumPredictor   on;
-    nOuterCorrectors    1;
+
+    // Two outer correctors update the convecting flux within the time step;
+    // with one, the fluid alone is first order in time. In this coupled case
+    // the FSI correctors already do this, and one outer corrector gives the
+    // same errors to four digits
+    nOuterCorrectors    2;
     nCorrectors         4;
     nNonOrthogonalCorrectors 1;
+
+    // The ddtCorr flux correction adds an error that grows as the time step
+    // falls on a fixed mesh
+    ddtCorr             no;
+
+    // Make the outlet flux consistent with the boundary velocity, which
+    // removes a first-order pressure error layer in the outlet cells. Uncomment
+    // with solids4foam PR #776: without it, pimpleFluid stops with a fatal
+    // error, as the outlet velocity condition does not fix the value
+    // fluxConsistentPatches (outlet);
 }
 
 // ************************************************************************* //

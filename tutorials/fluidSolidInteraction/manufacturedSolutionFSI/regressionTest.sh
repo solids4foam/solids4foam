@@ -12,8 +12,11 @@ REGRESSION_ROOT="${SCRIPT_DIR}/regressionTests"
 
 # The coarse case (16 cells along the interface, deltaT = 0.02) is run with the
 # Aitken and Robin-Neumann couplings, and the L2 errors against the
-# manufactured solution at t = 0.4 are compared with the reference errors of
-# verification/reference/manufacturedSolutionFSI_verification_references.json
+# manufactured solution at t = 0.4 are compared with the development
+# reference errors of
+# verification/reference/manufacturedSolutionFSI_verification_references.json.
+# The solid uses tractionPatchSurfaceGradient, which is ignored until
+# solids4foam PR #756 is merged; these references are then to be updated
 REL_TOL=0.02
 
 COUPLINGS=(aitken robin)
@@ -21,8 +24,8 @@ COUPLINGS=(aitken robin)
 # L2 errors at t = 0.4: U p D intTrac
 ref_errors() {
     case "$1" in
-        aitken) echo "0.068473 0.064079 0.0037244 0.070628" ;;
-        robin) echo "0.073195 0.085667 0.0038314 0.10459" ;;
+        aitken) echo "0.038365 0.06739 0.0037206 0.088893" ;;
+        robin) echo "0.043958 0.086565 0.0038143 0.11443" ;;
     esac
 }
 

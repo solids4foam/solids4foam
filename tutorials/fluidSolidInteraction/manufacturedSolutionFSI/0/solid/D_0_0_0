@@ -1,0 +1,92 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    location    "0/solid";
+    object      D_0_0_0;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+#include "$FOAM_CASE/system/mmsFsiOldTimeCode"
+
+// The exact displacement three time steps before the start, read by the
+// second-order (backward) time scheme
+mmsFsiOldTimeLevel 3;
+
+dimensions      [0 1 0 0 0 0 0];
+
+internalField   #codeStream
+{
+    codeInclude     $mmsFsiOldTimeCodeInclude;
+    codeOptions     $mmsFsiOldTimeCodeOptions;
+    codeLibs        $mmsFsiOldTimeCodeLibs;
+    code            $mmsFsiOldTimeDisplacement;
+};
+
+boundaryField
+{
+    interface
+    {
+        type            calculated;
+        value #codeStream
+        {
+            codeInclude     $mmsFsiOldTimeCodeInclude;
+            codeOptions     $mmsFsiOldTimeCodeOptions;
+            codeLibs        $mmsFsiOldTimeCodeLibs;
+            code            $mmsFsiOldTimeDisplacement;
+        };
+    }
+
+    top
+    {
+        type            calculated;
+        value #codeStream
+        {
+            codeInclude     $mmsFsiOldTimeCodeInclude;
+            codeOptions     $mmsFsiOldTimeCodeOptions;
+            codeLibs        $mmsFsiOldTimeCodeLibs;
+            code            $mmsFsiOldTimeDisplacement;
+        };
+    }
+
+    left
+    {
+        type            calculated;
+        value #codeStream
+        {
+            codeInclude     $mmsFsiOldTimeCodeInclude;
+            codeOptions     $mmsFsiOldTimeCodeOptions;
+            codeLibs        $mmsFsiOldTimeCodeLibs;
+            code            $mmsFsiOldTimeDisplacement;
+        };
+    }
+
+    right
+    {
+        type            calculated;
+        value #codeStream
+        {
+            codeInclude     $mmsFsiOldTimeCodeInclude;
+            codeOptions     $mmsFsiOldTimeCodeOptions;
+            codeLibs        $mmsFsiOldTimeCodeLibs;
+            code            $mmsFsiOldTimeDisplacement;
+        };
+    }
+
+    frontAndBack
+    {
+        type            empty;
+    }
+}
+
+// ************************************************************************* //

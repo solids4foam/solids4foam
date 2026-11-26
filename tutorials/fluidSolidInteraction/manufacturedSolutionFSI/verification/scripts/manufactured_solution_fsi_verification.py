@@ -6,7 +6,9 @@ system/caseParameters (nCells cells along the interface, square cells and
 deltaT = 0.32/nCells, i.e. combined space-time refinement) and runs Allrun.
 The errors written by the mmsFsiErrors function object at t = 0.2 and 0.4 are
 compared with the reference errors, and the observed orders between
-successive levels are reported.
+successive levels are reported. The default reference errors are those of
+the case on the development branch; --references withFixes selects those
+with solids4foam PRs #756 and #776 (see the README).
 """
 
 from __future__ import annotations
@@ -64,6 +66,10 @@ def parse_args() -> argparse.Namespace:
         "--quick",
         action="store_true",
         help="run the first two levels as a smoke test",
+    )
+    parser.add_argument(
+        "--references",
+        help="reference error set: development (default) or withFixes",
     )
     parser.add_argument(
         "--reuse",
@@ -197,6 +203,7 @@ def write_results(
     levels: list[int],
     errors: dict[int, dict[str, dict[str, float]]],
     reference: dict,
+    reference_set: str,
     quick: bool,
 ) -> bool:
     POST_DIR.mkdir(parents=True, exist_ok=True)
@@ -204,7 +211,9 @@ def write_results(
     metrics = reference["metrics"]
     minimum_order = reference["acceptance"]["minimum_net_order"]
     tolerance = reference["acceptance"]["relative_tolerance"]
-    reference_errors = reference["couplings"][coupling]["reference_errors"]
+    reference_errors = (
+        reference["couplings"][coupling]["reference_errors"][reference_set]
+    )
 
     with (POST_DIR / f"{coupling}_errors.csv").open("w", newline="") as stream:
         writer = csv.writer(stream)
@@ -217,7 +226,7 @@ def write_results(
                 )
 
     passed = True
-    lines = [f"## {coupling}", ""]
+    lines = [f"## {coupling} ({reference_set} references)", ""]
     for time in times:
         lines.extend(
             [
@@ -300,12 +309,26 @@ def main() -> int:
     if any(right <= left for left, right in zip(levels, levels[1:])):
         raise SystemExit("levels must be strictly increasing")
 
+    reference_set = args.references or reference["default_reference_set"]
+    available_sets = set.intersection(
+        *(
+            set(all_couplings[name]["reference_errors"])
+            for name in couplings
+        )
+    )
+    if reference_set not in available_sets:
+        raise SystemExit(
+            "references must be one of: "
+            + ", ".join(sorted(available_sets))
+        )
+
     times = [f"{time:g}" for time in reference["times"]]
 
     POST_DIR.mkdir(parents=True, exist_ok=True)
     (POST_DIR / "verification_summary.md").write_text(
         "# Manufactured-solution FSI verification summary\n\n"
         f"- Mode: {'quick smoke test' if args.quick else 'full verification'}\n"
+        f"- Reference errors: {reference_set}\n"
         f"- Levels: {', '.join(str(n) for n in levels)} cells along the "
         f"interface, deltaT = {DT_TIMES_NCELLS:g}/nCells\n\n"
     )
@@ -327,7 +350,9 @@ def main() -> int:
             passed = False
             continue
         passed = (
-            write_results(coupling, levels, errors, reference, args.quick)
+            write_results(
+                coupling, levels, errors, reference, reference_set, args.quick
+            )
             and passed
         )
 

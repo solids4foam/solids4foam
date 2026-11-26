@@ -1,0 +1,85 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| solids4foam: solid mechanics and fluid-solid interaction simulations        |
+| Version:     v2.4                                                           |
+| Web:         https://solids4foam.github.io                                  |
+| Disclaimer:  This offering is not approved or endorsed by OpenCFD Limited,  |
+|              producer and distributor of the OpenFOAM software via          |
+|              www.openfoam.com, and owner of the OPENFOAM® and OpenCFD®      |
+|              trade marks.                                                   |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      mmsFsiOldTimeCode;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// The exact solid displacement before the start, used for the old-time
+// displacements 0/solid/D_0, D_0_0 and D_0_0_0 that the second-order time
+// scheme reads. The time level, mmsFsiOldTimeLevel, is read from the field
+// file. The same code gives the cell values (internalField) and the patch
+// values, so that it is compiled only once
+
+mmsFsiOldTimeCodeInclude
+#{
+    #include "volFields.H"
+    #include "baseIOdictionary.H"
+    #include "mmsFsiFields.H"
+#};
+
+// The generated exact solution is large: -O1 keeps the build short
+mmsFsiOldTimeCodeOptions
+#{
+    -O1 \
+    -I$(FOAM_CASE)/src \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude
+#};
+
+mmsFsiOldTimeCodeLibs
+#{
+    -lfiniteVolume \
+    -lmeshTools
+#};
+
+mmsFsiOldTimeDisplacement
+#{
+    const dictionary& top = dict.topDict();
+    const fvMesh& mesh =
+        refCast<const fvMesh>
+        (
+            static_cast<const baseIOdictionary&>(top).db()
+        );
+    const scalar t =
+        mesh.time().value()
+      - readScalar(top.lookup("mmsFsiOldTimeLevel"))
+       *mesh.time().deltaTValue();
+
+    // The cell centres for the internal field, otherwise the face centres
+    // of the patch named by the enclosing dictionary
+    const vectorField* pointsPtr = &mesh.C().primitiveField();
+    if (&dict != &top)
+    {
+        const label patchI =
+            mesh.boundaryMesh().findPatchID(dict.dictName());
+        if (patchI < 0)
+        {
+            FatalErrorInFunction
+                << "No patch " << dict.dictName() << exit(FatalError);
+        }
+        pointsPtr = &mesh.C().boundaryField()[patchI];
+    }
+    const vectorField& points = *pointsPtr;
+
+    vectorField value(points.size());
+    forAll(points, i)
+    {
+        value[i] = mmsFsiFields::solid(points[i], t).D;
+    }
+    os  << word("nonuniform") << token::SPACE << value;
+#};
+
+// ************************************************************************* //
